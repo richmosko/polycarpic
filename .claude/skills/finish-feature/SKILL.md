@@ -58,6 +58,14 @@ git status --porcelain
 
 If tests are red, **do not proceed**. Surface the failure and let the user (or QA agent) fix it.
 
+### Push the metrics branch (POLY-4)
+
+`process/cairn/metrics/` is a nested worktree of the orphan `metrics` branch (never merged — see `process/WORKFLOW.md` → Metrics branch); `test_run_record.py` commits its own append there after every test run, including the gate run above, but never pushes. Push it now, once per finish, from inside the nested worktree — skip silently if it isn't one yet (nothing to push):
+
+```bash
+[ -f process/cairn/metrics/.git ] && git -C process/cairn/metrics push origin metrics
+```
+
 ## Steps
 
 ### 1. Stage and commit
