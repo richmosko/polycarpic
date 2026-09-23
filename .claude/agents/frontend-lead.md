@@ -51,7 +51,7 @@ Pick up tasks where `[frontend-lead]` is the owner or where `blockedBy` points a
 - **Accessible by default.** Semantic HTML, ARIA only when semantics fail. Keyboard-navigable.
 - **Test the user journey, not the implementation.** Prefer `@testing-library` queries that mirror user actions.
 - **No dead code.** Delete branches that don't ship; remove `console.log` and `// TODO` before PR.
-- **Small commits.** One logical change per commit; squash on merge.
+- **Small commits.** One logical change per commit; merge commits keep each agent's commits, and their authorship, on `main`.
 
 ## Read live, never from here
 

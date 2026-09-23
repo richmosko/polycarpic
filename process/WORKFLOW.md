@@ -626,8 +626,8 @@ Sections that already have comments show a `💬 N` count badge next to the head
 - **Git is non-negotiable.** Commit at every meaningful step. Push at every completed I→V loop.
 - **Branches:** `feature/<issue-id>-<kebab-slug>` for feature work (use `/start-feature`); `phase/<phase>-<slug>` for non-feature doc updates during Research/Plan or meta edits anytime (use `/start-doc-update`).
 - **No direct pushes to `main`.** All changes — including doc-only updates on `phase/...` branches — merge via PR. **Two merge paths:**
-  - **Human review** via GitHub's UI: review the diff, approve, click "Squash and merge."
-  - **Team-lead merge** via `/merge-pr`: the user asks the lead to merge on their behalf after QA sign-off (for features) or lead's read of the diff (for doc updates). The skill verifies merge-readiness, flips the issue to done, updates state, and squash-merges.
+  - **Human review** via GitHub's UI: review the diff, approve, click "Create a merge commit" (the only method the repo settings allow — squash would erase per-agent commit authorship from `main`).
+  - **Team-lead merge** via `/merge-pr`: the user asks the lead to merge on their behalf after QA sign-off (for features) or lead's read of the diff (for doc updates). The skill verifies merge-readiness, flips the issue to done, updates state, and merges with a merge commit.
   Both paths land on `main` **only** through a PR.
 - **Enforce at GitHub-level.** Skills and docs are advisory — the **hard enforcement layer** is GitHub branch protection on `main` (Settings → Branches → Add rule → require pull request before merging). Enable this at first-run; without it, the workflow's "no direct pushes" rule is bypassable.
 - **SSH-key setup once per repo.** Run `/setup-claude-deploy-key` on first bootstrap — it generates a passphrase-less Ed25519 key (`~/.ssh/id_ed25519_claude_<repo>`), helps you register it as a GitHub deploy key with write access, and pins the repo's git to use it via `core.sshCommand`. This eliminates `Permission denied (publickey)` failures that occur when Claude Code can't unlock your main passphrase-protected SSH key from its non-TTY bash.
