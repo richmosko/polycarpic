@@ -51,3 +51,13 @@ Red gate @ 5d9cb16: added ParseSummaryColorizedTests (scripts/cairn/tests/test_r
 Narrowed run (`-p "test_run_tests.py"`): both new tests fail red with `ParseError`, not an assertion mismatch — confirmed failing for the right reason.
 
 Full `--gate red`: 1673 tests, 98 files, FAILED (failures=23, errors=7, files=6) — my 1 new file plus the 5 pre-existing stale files from this issue's finding #2. Implementation-lead: parser fix + the 6 stale files are yours; do not touch test_run_tests.py's new class except to make it pass.
+
+### @implementation-lead — 2026-09-23
+
+Green gate @ 12063c6: python3 scripts/cairn/run_tests.py --gate green -- 1672 tests, 98 files, OK (skipped=3).
+
+parse_summary now strips ANSI SGR escapes before matching unittest's own summary lines (ee2a962) -- fixes qa's red gate (5d9cb16). The 5 pre-existing stale files, all one class (config.yml's issue prefix changed PT->POLY at bootstrap, breaking every branch-derived bucket key): test_backfill_tokens.py + fixtures (3a2630f), test_otel_receiver.py + basic.json (8cc803c, 12063c6), test_agent_setting_role.py + fixtures (7a3c6c0). Two exceptions to the mechanical rename: test_test_run_hooks.py's one PT-97-fixture test deleted per AC, not recreated (696069b); test_state_releases_bound.py's guard taught a real pre-first-release sentinel row exception, since STATE.md's own row is genuinely correct as-is (95d265c).
+
+AC #4 (test-runs.jsonl commit-vs-gitignore) recommendation sent to team-lead, pending user confirmation before the WORKFLOW.md entry lands.
+
+Requesting architect peer review.
