@@ -366,7 +366,7 @@ Comments append to the end of the file, under a single `## Comments` heading, ol
 
 This shape lets an agent append a comment with a **plain `Edit`** — the anchor is the last line of the file — while a regex still splits the log reliably.
 
-**Union merge on rebase (POLY-4).** `process/cairn/issues/*.md merge=union` in the repo-root `.gitattributes` lets two teammates' concurrent, uncommitted comment appends merge cleanly on rebase instead of conflicting — safe because comments are strictly append-only; anything structural in the frontmatter above the `## Comments` line is still single-writer and can still conflict normally.
+**Union merge on rebase (POLY-4).** `process/cairn/issues/*.md merge=union` in the repo-root `.gitattributes` lets two teammates' concurrent, uncommitted comment appends merge cleanly on rebase instead of conflicting — safe because comments are strictly append-only. Union merge never conflicts at the git level, though — it keeps both sides' lines unconditionally — so two concurrent frontmatter edits above `## Comments` (including `updated:`, which `cairn comment` bumps on every comment) merge into a duplicate key instead of a clean 3-way resolution. That surfaces loudly, not silently: cairn's YAML parser (and `cairn check`) rejects the merged file, and the fix is by hand — drop the stale `updated:` line (or whichever key duplicated).
 
 ### Sub-issues
 
