@@ -37,10 +37,14 @@ add` refuses outright on any non-empty target directory, and
 directory (pidfile, `.sessions/`, its log) even after the tracked
 `*.jsonl` files move off this branch. So a pre-existing directory there
 is renamed aside to `metrics.pre-worktree` (never deleted), the worktree
-is added at the now-clear path, and then every entry from the backup
-that ISN'T already provided by the fresh checkout (the runtime scratch,
-never a stale copy of a tracked file the checkout just supplied) is
-moved back in before the backup directory is removed. A renamed-aside
+is added at the now-clear path, and then every entry from the backup is
+restored: an entry the fresh checkout doesn't already have (the runtime
+scratch) is moved straight in; a `*.jsonl` entry the checkout DOES
+already have (test-runs.jsonl, token-usage.jsonl) is merged line-by-line
+rather than dropped -- a bare "checkout already has it, skip" rule (this
+script's own first version) silently lost every hook-recorded append
+made locally since the last `metrics` push, on every existing clone's
+first mount (team-lead, live repro). A renamed-aside
 directory keeps any process's already-open file descriptors on files
 inside it valid (POSIX rename semantics) -- the otel receiver's own log
 fd survives this swap without needing to be told to reopen anything.
@@ -102,22 +106,58 @@ def _swap_aside(path: Path, backup: Path) -> bool:
     return True
 
 
+def _merge_jsonl_lines(backup_file: Path, target_file: Path) -> None:
+    """Data-loss fix (team-lead, live repro against the lead's own
+    checkout): appends every line from `backup_file` NOT already present
+    (exact line match) in `target_file`, in `backup_file`'s own order, to
+    the end of `target_file`. A plain "checkout already has this name,
+    keep the checkout's copy" rule -- this function's predecessor --
+    silently dropped every hook-recorded append made locally since the
+    last time anyone pushed `metrics`, on EVERY existing clone's first
+    mount: the fresh checkout only ever has the branch's last-pushed
+    content, never the local backup's newer lines. Never reorders or
+    dedupes `target_file`'s own existing lines; never raises."""
+    try:
+        target_lines = target_file.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    existing = set(target_lines)
+    try:
+        backup_lines = backup_file.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    to_append = [line for line in backup_lines if line.strip() and line not in existing]
+    if not to_append:
+        return
+    try:
+        with open(target_file, "a", encoding="utf-8") as f:
+            for line in to_append:
+                f.write(line + "\n")
+    except OSError as exc:
+        sys.stderr.write(f"ensure_metrics_worktree: could not merge {backup_file} into {target_file}: {exc}\n")
+
+
 def _restore_backup_into(backup: Path, path: Path) -> None:
     """Moves every backup entry NOT already provided by the fresh
     checkout back into `path` -- the runtime scratch (pidfile,
-    .sessions/, the receiver's log), never a stale copy of a tracked
-    file the checkout just supplied (test-runs.jsonl, token-usage.jsonl,
-    .gitattributes, .gitignore all already exist post-checkout, so those
-    specific backup entries are simply dropped with the rest of the
-    backup dir at the end)."""
+    .sessions/, the receiver's log). A `*.jsonl` entry that DOES already
+    exist in the checkout (test-runs.jsonl, token-usage.jsonl) is merged
+    line-by-line instead of dropped (see `_merge_jsonl_lines`) -- these
+    are append-only ledgers, and the checkout's freshly-pushed copy is
+    never a superset of a local backup that has been accumulating hook
+    appends since the last push. Any other overlapping name
+    (.gitattributes, .gitignore) is left as-is -- the checkout's own copy
+    is authoritative for those, the backup's copy simply superseded."""
     for entry in backup.iterdir():
         target = path / entry.name
-        if target.exists():
-            continue  # the checkout already provides this name -- keep it
-        try:
-            shutil.move(str(entry), str(target))
-        except OSError as exc:
-            sys.stderr.write(f"ensure_metrics_worktree: could not restore {entry} into {path}: {exc}\n")
+        if not target.exists():
+            try:
+                shutil.move(str(entry), str(target))
+            except OSError as exc:
+                sys.stderr.write(f"ensure_metrics_worktree: could not restore {entry} into {path}: {exc}\n")
+            continue
+        if entry.is_file() and target.is_file() and entry.suffix == ".jsonl":
+            _merge_jsonl_lines(entry, target)
     shutil.rmtree(backup, ignore_errors=True)
 
 
