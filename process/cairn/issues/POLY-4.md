@@ -1,11 +1,11 @@
 ---
 id: POLY-4
 title: Test-suite health after template scrub: color-safe run_tests.py, fix 5 stale failures
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: []
-assignee: null
+assignee: team-lead
 labels: [workflow, cairn, tests]
 priority: P2
 pr: null
@@ -37,3 +37,9 @@ matrix keyed on scrubbed `PT-301`–`PT-306` fixtures; resolves everything to
 - [ ] The six listed files are fixed or deleted with a one-line rationale each (a fixture pointing at scrubbed template history is deleted, not recreated)
 - [ ] `python3 scripts/cairn/run_tests.py --gate green` is fully green on `main`
 - [ ] `process/cairn/metrics/test-runs.jsonl` handling reviewed: decide whether hook-recorded runs are committed with feature work or gitignored, and record the call in `process/WORKFLOW.md`
+
+## Comments
+
+### @team-lead — 2026-09-23
+
+Feature started. Branch: `feature/poly-4-test-suite-health`. Team: implementation-lead + qa-engineer; architect reviews. The uncommitted `test-runs.jsonl` diff from prior sessions rides on this branch pending AC #4.

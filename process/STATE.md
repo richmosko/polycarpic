@@ -15,7 +15,13 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: POLY-4 (test-suite health), then POLY-2._
+- **Feature:** Test-suite health after template scrub: color-safe run_tests.py, fix 5 stale failures
+- **Issue:** POLY-4 (cairn)
+- **Milestone:** POLY-A
+- **Branch:** `feature/poly-4-test-suite-health`
+- **Started:** 2026-09-23
+- **Goal:** `run_tests.py --gate green` fully green on main with a color-safe summary parser, template-debris tests resolved, and the test-runs metrics file policy recorded in WORKFLOW.md.
+- **Status:** In Progress
 
 ## Releases
 
