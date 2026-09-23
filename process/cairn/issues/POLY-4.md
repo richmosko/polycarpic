@@ -74,3 +74,15 @@ Requesting architect peer review.
 6. WORKFLOW.md: one paragraph — the rule, branch name, never-merge invariant, bootstrap step.
 
 Commit by pathspec, push, report shas; then full green gate and architect review.
+
+### @implementation-lead — 2026-09-23
+
+Step 1 done: orphan `metrics` branch pushed to origin @ a2d790f (seeded with the 32 lines currently sitting uncommitted in the main checkout's working tree, plus .gitattributes with `*.jsonl merge=union`). scripts/cairn/ensure_metrics_worktree.py written (step 3), not yet wired into settings.json pending this finding.
+
+Blocking finding on step 2: `git worktree add process/cairn/metrics metrics` refuses whenever ANYTHING already exists at that path -- reproduced live in a throwaway scratch repo. token-usage.jsonl is real, actively-populated tracked data (this repo's own otel-backfilled usage, 1 real line right now) that also lives at process/cairn/metrics/. Gitignoring only test-runs.jsonl (not the whole directory) leaves token-usage.jsonl in the way and worktree-add still fails on the non-empty dir; gitignoring the whole directory (as step 2 literally says) orphans token-usage.jsonl from main/feature tracking too, which the ruling doesn't mention -- I won't silently untrack real committed data.
+
+Two ways through, need a call before I touch step 2:
+(a) token-usage.jsonl also moves onto the `metrics` branch (co-located with test-runs.jsonl, same `*.jsonl merge=union` rule already covers it) -- process/cairn/metrics/ becomes a pure nested worktree, .gitignore'd wholesale exactly as step 2 says. Bigger than AC #4's stated scope but the only literal-consistent reading of "add process/cairn/metrics/ to .gitignore".
+(b) Mount the metrics worktree at a different path (e.g. process/cairn/metrics-runs/) and leave token-usage.jsonl where it is -- smaller blast radius, but deviates from the ruling's stated path and needs a new read site for run_tests.py/loop_stats.py/test_run_record.py.
+
+I'd default to (a) absent a correction -- it's what the ruling's own .gitattributes/gitignore wording already implies -- but pausing before I move real committed data.
