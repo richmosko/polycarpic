@@ -275,6 +275,18 @@ class ExtractorSelfTests(unittest.TestCase):
         self.assertIsNone(VERSION_CELL_RE.match("| 0.10.0 | 2026-09-03 |"))
         self.assertIsNotNone(VERSION_CELL_RE.match("| v0.10.0 | 2026-09-03 |"))
 
+    def test_no_release_yet_sentinel_requires_both_the_cell_and_the_text(self):
+        """Architect's nit (POLY-4.md review): the sentinel exception must
+        not fire on an em-dash cell alone -- some OTHER reason a row's
+        first cell is "—" (a genuine malformed/blank version) must still
+        trip the version-literal guard, not be waved through by
+        coincidence."""
+        self.assertIsNotNone(NO_RELEASE_YET_ROW_RE.match("| — | — | POLY-V1 | none yet | main | No release cut |"))
+        self.assertIsNone(
+            NO_RELEASE_YET_ROW_RE.match("| — | 2026-09-03 | POLY-V1 | v1 shipped | main | link |"),
+            "an em-dash cell without the exact 'No release cut' text must not be waved through",
+        )
+
     def test_github_owner_repo_extraction_finds_a_releases_link(self):
         lead_in = "Full history lives at https://github.com/acme-corp/widget-api/releases -- see it."
         owner, repo = extract_github_owner_repo(lead_in)
