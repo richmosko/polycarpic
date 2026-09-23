@@ -39,7 +39,6 @@ import helpers  # noqa: F401
 REPO_ROOT = helpers.CAIRN_DIR.parent.parent  # scripts/cairn -> scripts -> repo root
 HOOKS_DIR = REPO_ROOT / ".claude" / "hooks"
 SETTINGS_PATH = REPO_ROOT / ".claude" / "settings.json"
-HOOK_PAYLOADS_PATH = REPO_ROOT / "process" / "reviews" / "PT-97" / "hook-payloads.json"
 REAL_METRICS_DIR = REPO_ROOT / "process" / "cairn" / "metrics"
 REAL_TEST_RUNS_PATH = REAL_METRICS_DIR / "test-runs.jsonl"
 REAL_RECEIVER_PIDFILE = REAL_METRICS_DIR / ".receiver.pid"
@@ -64,13 +63,6 @@ def _pre_payload(command: str, agent_type="qa-engineer", **overrides) -> dict:
         payload["agent_type"] = agent_type
     payload.update(overrides)
     return payload
-
-
-def _load_post_sample() -> dict:
-    # The ruling's own real capture -- a hand-written payload proves only
-    # self-consistency (ruling, "Writers").
-    data = json.loads(HOOK_PAYLOADS_PATH.read_text(encoding="utf-8"))
-    return data["post_sample"]
 
 
 def _run_hook(script: str, stdin_text: str, env: dict | None = None) -> subprocess.CompletedProcess:
@@ -145,36 +137,26 @@ class GuardFailsOpenTests(unittest.TestCase):
 
 
 class RecorderTests(unittest.TestCase):
-    """Guard thresholds 7 and 8: the recorder writes one record matching
-    the ruling's real captured payload, and writes nothing for a
-    non-test Bash call. $CLAUDE_PROJECT_DIR always points at a throwaway
-    tmp dir here -- the real repo's metrics file is never touched."""
+    """Guard threshold 8: the recorder writes nothing for a non-test Bash
+    call. $CLAUDE_PROJECT_DIR always points at a throwaway tmp dir here --
+    the real repo's metrics file is never touched.
+
+    POLY-4: guard threshold 7's own test (matching the ruling's real
+    captured payload) is deleted, not recreated -- it read its fixture
+    from `process/reviews/PT-97/hook-payloads.json`, and `process/reviews/`
+    was removed wholesale by the template scrub (kickoff § 2.2). That
+    payload was a hand-capture of one real PreToolUse/PostToolUse pair;
+    there is nothing left in this repo to re-diff a replacement against
+    without inventing history that never happened here. `ScrapedRecordCarriesFailureDetailTests`
+    below still exercises the recorder's parsing/writing path end to end
+    with synthetic payloads, so guard threshold 8 is not the only recorder
+    coverage lost with this deletion."""
 
     def _env(self, tmp: Path) -> dict:
         return {"CLAUDE_PROJECT_DIR": str(tmp)}
 
     def _records_path(self, tmp: Path) -> Path:
         return tmp / "process" / "cairn" / "metrics" / "test-runs.jsonl"
-
-    def test_recorder_writes_one_record_matching_the_captured_payload(self):
-        tmp = helpers.make_empty_tmp_dir(self)
-        (tmp / "process" / "cairn" / "metrics").mkdir(parents=True)
-        result = _run_hook("test_run_record.py", json.dumps(_load_post_sample()), env=self._env(tmp))
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        records_path = self._records_path(tmp)
-        self.assertTrue(records_path.exists(), "must write process/cairn/metrics/test-runs.jsonl under $CLAUDE_PROJECT_DIR")
-        lines = [json.loads(l) for l in records_path.read_text(encoding="utf-8").splitlines() if l.strip()]
-        self.assertEqual(len(lines), 1, f"expected exactly one record, got {len(lines)}: {lines!r}")
-        record = lines[0]
-        self.assertEqual(record.get("tests"), 29)
-        self.assertEqual(record.get("files"), 1)
-        # Mutation guard: seconds must come from the PARSED "Ran 29 tests
-        # in 0.079s" summary, never duration_ms/1000 (157/1000 = 0.157,
-        # the gap IS shell overhead, per the ruling -- substituting one
-        # for the other is exactly the mutation this pins).
-        self.assertAlmostEqual(record.get("seconds"), 0.079, places=3)
-        self.assertEqual(record.get("runner"), "run_tests")
-        self.assertEqual(record.get("who"), "architect")
 
     def test_recorder_leaves_the_file_unchanged_for_a_non_test_bash_call(self):
         tmp = helpers.make_empty_tmp_dir(self)
