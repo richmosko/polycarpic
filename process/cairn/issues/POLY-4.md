@@ -125,3 +125,22 @@ Architect review items addressed @ 6cf6e11: 3a (ls-remote-gated orphan bootstrap
 New tests: OfflineFetchNeverCreatesADivergentOrphanTests (3a) and LinkedWorktreeSessionIsANoOpTests (3c), alongside the existing 3b regression tests -- all real subprocess/git against throwaway repos. Full green gate: 1678 tests, 99 files, OK.
 
 3g (test_run_record.py commit) and 3h's other approvals were already correct, untouched. Requesting re-review of ensure_metrics_worktree.py, finish-feature SKILL.md, and WORKFLOW.md only, per the review's own routing.
+
+### @architect — 2026-09-23
+
+**Re-review @ a680aef: approve, conditional on one doc fix (TRACKER.md, below).** Measured: `python3 -m unittest test_ensure_metrics_worktree test_state_releases_bound` gives 27 tests OK. Full gate not rerun; 1678/99 OK is implementation-lead's figure.
+
+| Item | Verdict | Note |
+|---|---|---|
+| 3a. fetch failure | approve | Mounts from `refs/remotes/origin/metrics` whatever the fetch returned. Creates an orphan only when `ls-remote` exits 2. Tested with a broken origin URL. Nit: no test for "no tracking ref + unreachable origin → skip". |
+| 3b. restore merge (2b90e0c) | approve | Missing `*.jsonl` lines are appended, never dropped, and a second run doesn't merge them again. Tested. The merged lines are left uncommitted; the next hook commit, or `/finish-feature` for `token-usage.jsonl`, picks them up. |
+| 3c. linked worktree | approve | Checks `--git-dir` vs `--git-common-dir` before any fetch. Tested. |
+| 3d. swap race | approve | A failed add or bootstrap puts the backup back into whatever is at the path, so it is never stranded. Untested; a follow-up is fine. |
+| 3e. finish-feature commit/pull/push, `.lock` ignore | approve | The pull uses `--no-rebase`, so the branch's union driver merges concurrent appends. `.lock` ignore confirmed on origin/metrics (f909047). |
+| 3f. tests | approve | They exercise real git against throwaway repos. |
+| 3h. WORKFLOW paragraph | approve | Matches the code. |
+| Sentinel negative control (6cf6e11) | approve | |
+| d309ecd: union merge for issue files | **approve after rewording** | The attribute itself is fine. The TRACKER sentence "structural frontmatter … can still conflict normally" is false: `merge=union` never produces a conflict. `cairn comment` bumps `updated:` (cairn.py:770), so comments from different days, or any two-sided frontmatter edit, merge into a file with the same key twice. cairn's parser rejects that (cairn.py:456), so it fails loud, not silent. Replace with: "Frontmatter edits on both sides (including the `updated:` bump `cairn comment` makes) merge into a file with the same key twice, which `cairn check` rejects. Keep one line by hand." |
+| 4. SessionStart hook line | approve to land | 3c and 3d are fixed, so running the ensure script before the otel receiver is safe. |
+
+On the TRACKER wording landing (team-lead checks it against the text above), POLY-4 is approved for `/finish-feature`. No further architect pass is needed.
