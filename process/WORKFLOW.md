@@ -38,7 +38,7 @@ Specialist roles (PM, UX, Architect, SecEng, QA, DevOps) apply universally. The 
 | CLI, library, plugin, ML/data pipeline, single-binary service | `implementation-lead` (generalist) |
 | Hybrid (e.g. CLI + web admin) | mix as appropriate |
 
-**This project uses:** _e.g. `frontend-lead`, `backend-lead`_ — _set during Plan phase, log change as a `DECISIONS.md` entry if it shifts later._
+**This project uses:** `frontend-lead`, `backend-lead` — full-stack SvelteKit app over layer packages (`docs/project_kickoff.md` § 2.10); log a `DECISIONS.md` entry if it shifts.
 
 All implementation-lead agent files ship with the template; the project just picks which are active. Inactive ones can be left in place — they cost nothing until spawned.
 
@@ -46,7 +46,7 @@ All implementation-lead agent files ship with the template; the project just pic
 
 How far a `/drive`-aimed [goal-driven loop](#goal-driven-loop-drive) runs before handing control back to you. Set once at `/setup-tracker`; change by editing the line below and logging a `DECISIONS.md` entry.
 
-**Delivery autonomy:** _`stop-at-merge` (default) | `self-merge-within-milestone`_ — _set at bootstrap; see [Goal-driven loop](#goal-driven-loop-drive)._
+**Delivery autonomy:** `stop-at-merge` — set 2026-09-23. The Principal may grant `self-merge-within-milestone` for a named milestone (`/drive self-merge`); see [Goal-driven loop](#goal-driven-loop-drive) and `docs/project_kickoff.md` § 2.1.
 
 ## Phase-by-phase
 
@@ -832,7 +832,7 @@ Every non-trivial decision (stack pick, architecture pivot, scope cut, deferred 
 - Who approved
 - Supersedes (if it overturns a prior decision)
 
-The log is **append-only**. Mistakes get a new entry that supersedes the old one — don't edit history.
+The log is **consolidated, not append-only** (Principal's rule, 2026-09-22): a decision that supersedes an earlier one replaces that entry with the condensed new guideline and names what it replaced in `Supersedes:`. Version history is the audit trail; stacked reversals are the failure mode this avoids.
 
 `DECISIONS.md` is **not auto-loaded** into session context (unlike `STATE.md`). Pull it in explicitly when you need to recall historical context — e.g. "why did we pick Postgres?" This split keeps the live-state ledger lean and lets the decision log scale as the project ages without bloating every session.
 
