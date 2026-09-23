@@ -62,6 +62,10 @@
           {
             "type": "command",
             "command": "[ -d .githooks ] && git config core.hooksPath .githooks 2>/dev/null; exit 0"
+          },
+          {
+            "type": "command",
+            "command": "git config extensions.worktreeConfig true 2>/dev/null; exit 0"
           }
         ]
       }
