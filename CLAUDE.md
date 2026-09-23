@@ -4,10 +4,9 @@
 
 ## What this project is
 
-<!-- REPLACE on first run: one or two sentences on what the product is and who it's for. -->
-_TBD — fill in during the Research phase. See [`docs/PRD/index.html`](docs/PRD/index.html)._
+**polycarpic** — personal budgeting and wealth management that grows into a virtual Single Family Office: a genuine double-entry general ledger in PostgreSQL under row-level security, multi-entity (Person / Trust / Business / Household) with shared-access memberships, provider-agnostic transaction import, lot-based securities tracking, and a Monarch/Origin-grade SvelteKit dashboard. Self-hostable on one VPS; native iOS/macOS later. **The operative kickoff record is [`docs/project_kickoff.md`](docs/project_kickoff.md)** (vision, scope, and every architecture/workflow decision); the original brief is [`docs/project_manifesto.md`](docs/project_manifesto.md). The PRD at [`docs/PRD/index.html`](docs/PRD/index.html) absorbs both as it is written.
 
-This repo was instantiated from the [project_template](https://github.com/richmosko/project_template) starter. The template's workflow, agent roster, and artifact conventions are defined in [`process/WORKFLOW.md`](process/WORKFLOW.md). The current state of the work — phase, feature, decisions — lives in [`process/STATE.md`](process/STATE.md). **Read process/STATE.md before doing anything else.**
+This repo was bootstrapped from [project_template](https://github.com/richmosko/project_template) v0.12.2 (see `process/DECISIONS.md`); the project itself lives at [github.com/richmosko/polycarpic](https://github.com/richmosko/polycarpic). The workflow, agent roster, and artifact conventions are defined in [`process/WORKFLOW.md`](process/WORKFLOW.md). The current state of the work — phase, feature, decisions — lives in [`process/STATE.md`](process/STATE.md). **Read process/STATE.md before doing anything else.**
 
 ## Current state at a glance
 
@@ -28,7 +27,7 @@ This repo was instantiated from the [project_template](https://github.com/richmo
 | Tracker spec (cairn) | [`process/TRACKER.md`](process/TRACKER.md) | architect |
 | Tracker data — majors, milestones, issues | [`process/cairn/`](process/cairn/) | all agents (issues); team-lead + architect (majors/milestones) |
 | Live state ledger | [`process/STATE.md`](process/STATE.md) | team-lead |
-| Decision log | [`process/DECISIONS.md`](process/DECISIONS.md) | team-lead (append-only) |
+| Decision log | [`process/DECISIONS.md`](process/DECISIONS.md) | team-lead (consolidated; see WORKFLOW → Decision logging) |
 
 Open any HTML doc with `/open-doc docs/PRD/index.html` (or just double-click it).
 
@@ -74,31 +73,9 @@ The auto-injected STATE head gives you the dashboard; this runbook is the rest o
 
 **Mid-feature gotcha:** the previous session's tactical micro-state (which approach was ruled out, which test was being debugged) is not in any artifact. If you walked away mid-feature without `/compact`, expect to re-derive — or ask the user explicitly: "Mid-feature pickup — anything from last session I should know before I dive in?"
 
-## First run / bootstrap
+## Bootstrap status
 
-When this template is freshly cloned for a new project, the team-lead should walk the user through this checklist on the first session:
-
-1. **Confirm the repo is a git repo.** `git rev-parse --git-dir` should succeed. If not, run `git init`.
-2. **Confirm `gh` is authenticated** to the GitHub account that will host this project. `gh auth status` — if not, prompt the user to run `gh auth login`.
-3. **Set up Claude's SSH deploy key** — run `/setup-claude-deploy-key`. Generates a passphrase-less Ed25519 key scoped to this repo (`~/.ssh/id_ed25519_claude_<repo>`), walks you through adding it to GitHub as a deploy key with **write access**, and pins the repo's git to use it via `core.sshCommand`. Without this step, Claude's `git push` will fail whenever your main SSH key is passphrase-protected (Claude Code's bash has no TTY to unlock it).
-4. **Enable GitHub branch protection on `main`** — go to **Settings → Branches → Add rule**. Suggested config for the solo + team-agents workflow:
-   - **Branch name pattern:** `main`
-   - ✅ **Require a pull request before merging** — this is the key gate; blocks direct `git push origin main`
-   - ☐ Require approvals — skip for solo dev; the `/merge-pr` workflow handles QA + lead approval. Re-enable if you have human collaborators.
-   - ✅ **Do not allow bypassing the above settings** — even admins go through PRs
-   - ✅ Require status checks (only if you have CI configured)
-   Without this, the workflow's "no direct pushes" rule is advisory only — branch protection is the hard enforcement layer.
-5. **Replace the placeholders** in this file:
-   - L7–8: the "TBD" project description block
-   - L10: the GitHub URL (points at the template repo by default — change to this project's repo once created)
-6. **Run `/setup-tracker`** to bootstrap cairn (the file-based issue tracker) — confirms the issue-ID prefix, scaffolds `process/cairn/` with the founding major (V1) and the A/B definition milestones so the board is populated from Day 0, optionally seeds PRD stories as backlog issues, and sets the **delivery-autonomy methodology** for `/drive` (`stop-at-merge` recommended). View the board anytime with `/cairn`.
-7. **Verify team-agents is enabled.** `.claude/settings.json` must have `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"` (shipped with the template — do not turn off; the workflow depends on it). Then pick `teammateMode`: `"tmux"` (default) for split-pane teammates that survive `/resume`, or `"in-process"` if you don't have tmux/iTerm2 with `it2`. Change it before spawning the first team.
-8. **Spawn the Research team:** say _"Create an agent team for the Research phase"_ — the lead will spawn `product-manager` (and bring `ux-designer` + `seceng` in later).
-9. **Run `/generate-prd`** to start the discovery interview. The PM teammate drives.
-10. **Log the bootstrap** as the first entry in [`process/DECISIONS.md`](process/DECISIONS.md) (the template already includes a stub — update the date and approver name). **Record the template version** on the `**Bootstrapped from:**` line — run `git -C <path-to-template-clone> describe --tags --abbrev=0`, or check the [project_template Releases page](https://github.com/richmosko/project_template/releases) for the latest published version.
-11. **Delete `process/TEMPLATE_DECISIONS.md`** — that file documents decisions about the template itself; it's not relevant to your project. Your project's decision log is `process/DECISIONS.md` (already in place).
-
-After step 11, the project is in the Research phase and process/STATE.md becomes the source of truth for "where we are".
+Bootstrapped 2026-09-23 from `project_template` v0.12.2 (`process/DECISIONS.md`). Tracker (`/setup-tracker`) done: prefix `POLY`, major `POLY-V1`, milestones `POLY-A`/`POLY-B`, delivery autonomy `stop-at-merge`, telemetry on (port 4318). Team-agents enabled (`teammateMode: "tmux"`). **Still to confirm on the GitHub side:** Claude's SSH deploy key (`/setup-claude-deploy-key`) and branch protection on `main` (require a PR before merging; no bypass) — the workflow's "no direct pushes" rule is advisory until branch protection is on.
 
 ## Working principles
 

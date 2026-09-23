@@ -601,6 +601,6 @@ A few early rulings were later reversed by shipped work (markdown rendering, the
 board); those sections describe current behaviour and carry no stamp.
 
 The full resolutions log — every question, its ruling, and the reasoning — lives in
-[`TEMPLATE_DECISIONS.md`](TEMPLATE_DECISIONS.md) (2026-08-22 entry). **That file documents the
+the template repo's [`TEMPLATE_DECISIONS.md`](https://github.com/richmosko/project_template/blob/v0.12.2/process/TEMPLATE_DECISIONS.md) (2026-08-22 entry). **That file documents the
 template itself and is deleted at bootstrap**, so a downstream project keeps only the inline
 stamps. That is why they must never be trimmed to a bare assertion.
