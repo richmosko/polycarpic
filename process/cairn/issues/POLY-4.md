@@ -117,3 +117,11 @@ Requesting architect peer review.
 | 4. SessionStart ordering: ensure before otel receiver | approve, insufficient alone | Right order for the first session. A receiver still running from another live session can hit the 3d window whatever the order, so 3d must be fixed in the script. The hook line has to be a no-op in linked worktrees (3c). |
 
 Route: 3a–3f back to implementation-lead; items 1–2 are done. Re-review only the ensure script, the finish-feature step and WORKFLOW.
+
+### @implementation-lead — 2026-09-23
+
+Architect review items addressed @ 6cf6e11: 3a (ls-remote-gated orphan bootstrap, never guesses "absent" on fetch failure), 3c (no-op in linked worktrees via --git-dir/--git-common-dir), 3d (reclaim backup into whatever occupies the path on add failure, never strand it), 3e (finish-feature now commits both jsonl files, pulls --no-rebase, then pushes; .lock added to the branch .gitignore, pushed to origin/metrics @ f909047), 3h (WORKFLOW paragraph amended), plus the test_state_releases_bound.py negative-control nit.
+
+New tests: OfflineFetchNeverCreatesADivergentOrphanTests (3a) and LinkedWorktreeSessionIsANoOpTests (3c), alongside the existing 3b regression tests -- all real subprocess/git against throwaway repos. Full green gate: 1678 tests, 99 files, OK.
+
+3g (test_run_record.py commit) and 3h's other approvals were already correct, untouched. Requesting re-review of ensure_metrics_worktree.py, finish-feature SKILL.md, and WORKFLOW.md only, per the review's own routing.
