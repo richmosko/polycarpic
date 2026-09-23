@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Design — TBD</title>
+  <link rel="stylesheet" href="../_assets/doc.css">
+  <link rel="stylesheet" href="../_assets/comments.css">
+  <link rel="stylesheet" href="tokens.css">
+  <script defer src="../_assets/mermaid-init.js"></script>
+  <script defer src="../_assets/comments.js"></script>
+  <script defer src="../_assets/toc.js"></script>
+</head>
+<body>
+
+<header class="doc-header">
+  <h1>Design System &amp; UX</h1>
+  <p class="doc-subtitle"><span class="tbd">Project name — TBD</span></p>
+  <div class="doc-meta">
+    <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
+    <span><strong>Status:</strong> <span class="tbd">Draft</span></span>
+    <span><strong>Version:</strong> <span class="tbd">0.1</span></span>
+    <span><strong>Last updated:</strong> <span class="tbd">—</span></span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#overview">Overview &amp; Design Principles</a></li>
+    <li><a href="#design-system">Design System</a></li>
+    <li><a href="#tokens">Design Tokens</a></li>
+    <li><a href="#components">Components &amp; Screen Styles</a></li>
+    <li><a href="#flows">User Flows</a></li>
+    <li><a href="#wireframes">Wireframes</a></li>
+    <li><a href="#styled-screens">Styled Screens</a></li>
+    <li><a href="#accessibility">Accessibility</a></li>
+    <li><a href="#open-questions">Open Questions</a></li>
+    <li><a href="#appendix">Appendix</a>
+      <ol>
+        <li><a href="#faqs">FAQs</a></li>
+      </ol>
+    </li>
+  </ol>
+</nav>
+
+<section id="overview" data-section="overview">
+  <h2>1. Overview &amp; Design Principles</h2>
+  <p class="section-hint">What this product should feel like to use, and the principles that resolve design disputes. Owned by <code>ux-designer</code>; spans late-Research (flows, wireframes) through Plan/Implement (the design system matures as screens get built).</p>
+  <div class="stub">Replace during the Research/Plan phases. Use <code>/generate-designdoc</code> to be interviewed.</div>
+  <ul>
+    <li class="tbd">Principle — e.g. "mobile-first; design up, not down"</li>
+    <li class="tbd">Principle — e.g. "accessible by default (WCAG AA)"</li>
+    <li class="tbd">Principle — e.g. "no decorative loading states"</li>
+  </ul>
+</section>
+
+<section id="design-system" data-section="design-system">
+  <h2>2. Design System</h2>
+  <p class="section-hint">The single source of truth for the visual language. The written spec lives alongside this doc; the machine-readable system lives in the two CSS files that <code>frontend-lead</code> consumes directly.</p>
+  <ul>
+    <li><a href="design-system-spec.md">design-system-spec.md</a> — the written spec (token rationale, component inventory, usage rules)</li>
+    <li><a href="tokens.css">tokens.css</a> — design tokens as CSS custom properties</li>
+    <li><a href="screen.css">screen.css</a> — component &amp; screen styles built on the tokens</li>
+  </ul>
+  <p class="section-hint">Figma stays the high-fidelity design tool (via the <code>ux-designer</code>'s Figma skills); <code>docs/DESIGN/</code> is the in-repo, code-level home that ships with the project and is the contract for implementation.</p>
+</section>
+
+<section id="tokens" data-section="tokens">
+  <h2>3. Design Tokens</h2>
+  <p class="section-hint">Color, typography, spacing, radius, shadow, and motion primitives. Edit values in <a href="tokens.css">tokens.css</a>; the swatches below preview the live variables.</p>
+  <blockquote>
+    <p>This palette is based on the shadcn/ui theme preset <strong>Stone · Lime · Amber</strong> —
+    <a href="https://ui.shadcn.com/create?preset=b1FR0Us0w&amp;item=preview">ui.shadcn.com/create?preset=b1FR0Us0w</a>.
+    Tokens use shadcn's own names (so shadcn components drop in unchanged); the
+    <code>--color-*</code> aliases in §3.6 are the project-facing names. Both light and
+    dark themes ship — re-theme by swapping values in <a href="tokens.css">tokens.css</a>.</p>
+  </blockquote>
+
+  <h3 id="tokens-surfaces">3.1 Surfaces &amp; Text</h3>
+  <div class="tokens-grid">
+    <div class="swatch"><span class="chip" style="background:var(--background)"></span><span class="name">--background</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--foreground)"></span><span class="name">--foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--card)"></span><span class="name">--card</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--card-foreground)"></span><span class="name">--card-foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--popover)"></span><span class="name">--popover</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--popover-foreground)"></span><span class="name">--popover-foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--muted)"></span><span class="name">--muted</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--muted-foreground)"></span><span class="name">--muted-foreground</span></div>
+  </div>
+
+  <h3 id="tokens-actions">3.2 Actions &amp; States</h3>
+  <div class="tokens-grid">
+    <div class="swatch"><span class="chip" style="background:var(--primary)"></span><span class="name">--primary</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--primary-foreground)"></span><span class="name">--primary-foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--secondary)"></span><span class="name">--secondary</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--secondary-foreground)"></span><span class="name">--secondary-foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--accent)"></span><span class="name">--accent</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--accent-foreground)"></span><span class="name">--accent-foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--destructive)"></span><span class="name">--destructive</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--destructive-foreground)"></span><span class="name">--destructive-foreground</span></div>
+  </div>
+
+  <h3 id="tokens-lines">3.3 Borders &amp; Focus</h3>
+  <div class="tokens-grid">
+    <div class="swatch"><span class="chip" style="background:var(--border)"></span><span class="name">--border</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--input)"></span><span class="name">--input</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--ring)"></span><span class="name">--ring</span></div>
+  </div>
+
+  <h3 id="tokens-charts">3.4 Charts</h3>
+  <div class="tokens-grid">
+    <div class="swatch"><span class="chip" style="background:var(--chart-1)"></span><span class="name">--chart-1</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--chart-2)"></span><span class="name">--chart-2</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--chart-3)"></span><span class="name">--chart-3</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--chart-4)"></span><span class="name">--chart-4</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--chart-5)"></span><span class="name">--chart-5</span></div>
+  </div>
+
+  <h3 id="tokens-sidebar">3.5 Sidebar</h3>
+  <div class="tokens-grid">
+    <div class="swatch"><span class="chip" style="background:var(--sidebar)"></span><span class="name">--sidebar</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--sidebar-foreground)"></span><span class="name">--sidebar-foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--sidebar-primary)"></span><span class="name">--sidebar-primary</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--sidebar-primary-foreground)"></span><span class="name">--sidebar-primary-foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--sidebar-accent)"></span><span class="name">--sidebar-accent</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--sidebar-accent-foreground)"></span><span class="name">--sidebar-accent-foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--sidebar-border)"></span><span class="name">--sidebar-border</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--sidebar-ring)"></span><span class="name">--sidebar-ring</span></div>
+  </div>
+
+  <h3 id="tokens-aliases">3.6 Project aliases &amp; scales</h3>
+  <p class="section-hint">The rest of the repo uses these semantic names, mapped onto the shadcn base above.</p>
+  <table>
+    <thead><tr><th>Project alias</th><th>shadcn base</th><th>Role</th></tr></thead>
+    <tbody>
+      <tr><td><code>--color-primary</code> / <code>--color-on-primary</code></td><td><code>--primary</code> / <code>--primary-foreground</code></td><td>Primary actions (buttons, active nav) + text on them</td></tr>
+      <tr><td><code>--color-secondary</code> / <code>--color-on-secondary</code></td><td><code>--secondary</code> / <code>--secondary-foreground</code></td><td>Secondary buttons / chips</td></tr>
+      <tr><td><code>--color-surface</code></td><td><code>--background</code></td><td>Page background / canvas base</td></tr>
+      <tr><td><code>--color-surface-raised</code></td><td><code>--card</code></td><td>Cards, sheets, the doc content card</td></tr>
+      <tr><td><code>--color-surface-muted</code></td><td><code>--muted</code></td><td>Subtle fills — code, table hover</td></tr>
+      <tr><td><code>--color-text</code> / <code>--color-text-muted</code></td><td><code>--foreground</code> / <code>--muted-foreground</code></td><td>Body text / secondary text</td></tr>
+      <tr><td><code>--color-border</code> / <code>--color-input</code> / <code>--color-ring</code></td><td><code>--border</code> / <code>--input</code> / <code>--ring</code></td><td>Hairlines, field borders, focus rings</td></tr>
+      <tr><td><code>--color-danger</code> / <code>--color-on-danger</code></td><td><code>--destructive</code> / <code>--destructive-foreground</code></td><td>Errors, destructive actions</td></tr>
+      <tr><td><code>--color-success</code> / <code>--color-warning</code> <span class="tbd">(+ on-)</span></td><td><em>not in shadcn base</em></td><td>Status states — kept as project roles</td></tr>
+    </tbody>
+  </table>
+  <p class="section-hint"><strong>Radius:</strong> <code>--radius</code> 0.625rem → <code>--radius-sm|md|lg|xl|full</code>. &nbsp;<strong>Type:</strong> <code>--font-sans</code> Inter, <code>--font-mono</code> Geist Mono (self-hosted). &nbsp;Plus <code>--text-*</code>, <code>--space-*</code>, <code>--shadow-*</code>, <code>--duration-*</code> scales.</p>
+</section>
+
+<section id="components" data-section="components">
+  <h2>4. Components &amp; Screen Styles</h2>
+  <p class="section-hint">The component inventory and the styles that realize it, built on the tokens. Styles live in <a href="screen.css">screen.css</a>; document each component's states (default, hover, focus, disabled, loading, error) and link to its styled-screen example.</p>
+  <table>
+    <thead><tr><th>Component</th><th>States documented</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td class="tbd">Button</td><td class="tbd">—</td><td class="tbd">—</td></tr>
+      <tr><td class="tbd">Input</td><td class="tbd">—</td><td class="tbd">—</td></tr>
+      <tr><td class="tbd">Card</td><td class="tbd">—</td><td class="tbd">—</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="flows" data-section="flows">
+  <h2>5. User Flows</h2>
+  <p class="section-hint">How users move through the product to accomplish the highest-traffic stories. Mermaid <code>flowchart</code> is fine for first-pass; source diagrams live in <a href="flows/">flows/</a>.</p>
+  <div class="stub">Sketch the top 3–8 stories from the PRD. One flow per major task.</div>
+  <pre class="mermaid">
+flowchart LR
+  start([User opens app]) --> action[Primary action — TBD]
+  action --> outcome([Outcome — TBD])
+  </pre>
+</section>
+
+<section id="wireframes" data-section="wireframes">
+  <h2>6. Wireframes</h2>
+  <p class="section-hint">Low-fidelity layout of each key screen — structure before style. Assets live in <a href="wireframes/">wireframes/</a> (images or HTML); promote to Figma for anything that will ship.</p>
+  <div class="stub">Reference wireframe assets with relative paths, e.g. <code>&lt;img src="wireframes/onboarding-01.png"&gt;</code>.</div>
+  <ul>
+    <li class="tbd">Screen — wireframe link</li>
+  </ul>
+</section>
+
+<section id="styled-screens" data-section="styled-screens">
+  <h2>7. Styled Screens</h2>
+  <p class="section-hint">High-fidelity screens that apply the design system to the wireframes. HTML mockups in <a href="styled-screens/">styled-screens/</a> consume <code>tokens.css</code> + <code>screen.css</code>, so they double as a visual regression reference and a head-start for <code>frontend-lead</code>.</p>
+  <ul>
+    <li class="tbd">Screen — styled-screen link</li>
+  </ul>
+</section>
+
+<section id="accessibility" data-section="accessibility">
+  <h2>8. Accessibility</h2>
+  <p class="section-hint">Accessibility is a design responsibility, not a QA afterthought. Document the target and any deliberate exceptions.</p>
+  <table>
+    <thead><tr><th>Concern</th><th>Standard / approach</th></tr></thead>
+    <tbody>
+      <tr><td>Color contrast</td><td class="tbd">WCAG AA (4.5:1 text, 3:1 large/UI)</td></tr>
+      <tr><td>Keyboard</td><td class="tbd">All interactive elements reachable &amp; operable</td></tr>
+      <tr><td>Screen readers</td><td class="tbd">Semantic markup; labelled controls</td></tr>
+      <tr><td>Motion</td><td class="tbd">Respect <code>prefers-reduced-motion</code></td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="open-questions" data-section="open-questions">
+  <h2>9. Open Questions</h2>
+  <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Drives the next design conversation.</p>
+  <ul>
+    <li class="tbd">—</li>
+  </ul>
+</section>
+
+<section id="appendix" data-section="appendix">
+  <h2>10. Appendix</h2>
+  <p class="section-hint">Inspiration, references, prior art, links to Figma files.</p>
+  <ul>
+    <li class="tbd">—</li>
+  </ul>
+
+  <h3 id="faqs">10.1 FAQs</h3>
+  <dl class="faqs">
+    <dt>Q: How do I add review comments to this design doc?</dt>
+    <dd>A: Same as the other docs. Hand-edit <code>docs/DESIGN/comments.md</code> with <code>## §&lt;section-id&gt;</code> blocks pointing at a section's <code>id</code> (e.g. <code>tokens</code>, <code>flows</code>), or run <code>/serve-docs DESIGN</code> and use the inline <code>+ Comment</code> widget. Then run <code>/refine-doc DESIGN</code> to have the changes applied and the addressed comments removed. The sidecar is gitignored; resolutions land via PR. See <a href="../../process/WORKFLOW.md">process/WORKFLOW.md</a> → Doc review loop.</dd>
+    <dt>Q: Why is the design system in <code>docs/DESIGN/</code> and not in the app's source?</dt>
+    <dd>A: It's the design <em>deliverable</em> — the contract. During Implement, <code>frontend-lead</code> imports or derives the app's real stylesheets from <code>tokens.css</code> / <code>screen.css</code>. Keeping the canonical system here keeps it reviewable as a doc and decoupled from any one app's build layout.</dd>
+    <dt class="tbd">Q: —</dt>
+    <dd class="tbd">A: —</dd>
+  </dl>
+</section>
+
+<footer class="doc-footer">
+  Generated by the <code>ux-designer</code> agent via <code>/generate-designdoc</code>. Edit by re-running the skill or editing in place.
+</footer>
+
+</body>
+</html>

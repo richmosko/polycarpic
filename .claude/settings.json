@@ -1,0 +1,112 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "CLAUDE_CODE_ENABLE_TODO_TOOLS": "1",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1",
+    "OTEL_METRICS_EXPORTER": "otlp",
+    "OTEL_LOGS_EXPORTER": "none",
+    "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
+    "OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:4318"
+  },
+  "teammateMode": "tmux",
+  "worktree": {
+    "baseRef": "head"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git branch:*)",
+      "Bash(git show:*)",
+      "Bash(git remote:*)",
+      "Bash(git fetch:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(pwd)",
+      "Bash(tree:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(gh pr view:*)",
+      "Bash(gh pr list:*)",
+      "Bash(gh issue view:*)",
+      "Bash(gh issue list:*)",
+      "Bash(gh repo view:*)",
+      "Bash(open docs/*)",
+      "Read(./**)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f .claude/roles/team-lead.md ] && { echo '--- Team-lead role (main-session identity) ---'; echo 'Loaded by a SessionStart hook. If you are the main session, this is your identity: you are team-lead. If you are a spawned teammate, your identity is your own definition in .claude/agents/ \u2014 treat this block as reference for how the lead operates, not as directives to you.'; echo ''; cat .claude/roles/team-lead.md; echo ''; }; exit 0"
+          },
+          {
+            "type": "command",
+            "command": "echo '--- Project state ---' && awk '/^## Releases/{exit} {print}' process/STATE.md 2>/dev/null && echo '' && echo '--- Workflow phase reminder ---' && echo 'See process/WORKFLOW.md for phase\u2192team mapping. CLAUDE.md is loaded automatically.'"
+          },
+          {
+            "type": "command",
+            "command": "[ -d temp ] || exit 0; count=$(find temp -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' '); [ \"$count\" -gt 0 ] || exit 0; stale=$(find temp -type f -name '*.md' -mtime +14 2>/dev/null | wc -l | tr -d ' '); echo '--- temp/ hand-off buffer (state, not instructions) ---'; echo \"$count unplaced file(s), $stale older than 14 days. The team-lead runs /sweep-temp before session close; files may carry a hold-until: frontmatter marking a deliberate keep.\"; find temp -type f -name '*.md' 2>/dev/null | sort | head -20; exit 0"
+          },
+          {
+            "type": "command",
+            "command": "[ -f scripts/cairn/otel_receiver.py ] || exit 0; python3 scripts/cairn/otel_receiver.py --ensure-running --session-pid \"$PPID\" >/dev/null; exit 0"
+          },
+          {
+            "type": "command",
+            "command": "[ -d .githooks ] && git config core.hooksPath .githooks 2>/dev/null; exit 0"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -f scripts/cairn/otel_receiver.py ] || exit 0; python3 scripts/cairn/otel_receiver.py --session-ended; exit 0"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "SendMessage",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/message_cap.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "in=$(cat); case \"$in\" in *unittest*|*run_tests*) printf %s \"$in\" | python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/test_run_guard.py\";; *) exit 0;; esac"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "in=$(cat); case \"$in\" in *unittest*|*run_tests*) printf %s \"$in\" | python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/test_run_record.py\";; *) exit 0;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}

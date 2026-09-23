@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cairn</title>
+<!-- PT-69 (architect's ruling §3): inline, not external -- must run and
+     apply BEFORE the stylesheet links below so the correct theme
+     variant/mode is already in effect at first paint (no FOUC). Reads
+     the origin-global `cairn.theme` localStorage key and sets
+     data-cairn-base/theme/chart + the .dark class synchronously.
+     Generated from scripts/cairn/design/variants.json by
+     scripts/cairn/design/gen_variants.py (see
+     scripts/cairn/design/bootstrap.snippet.html) -- byte-identical to
+     the copy in dashboard/index.html's <head>
+     (test_theme_bootstrap_and_dropdown.py asserts this). -->
+<script id="cairn-theme-bootstrap">
+(function () {
+  try {
+    var KEY = "cairn.theme";
+    var DEFAULTS = { mode: "system", base: "stone", theme: "sky", chart: "yellow" };
+    var VALID_MODE = ["system", "light", "dark"];
+    var VALID_BASE = ["stone", "mauve", "mist", "neutral", "olive", "taupe", "zinc"];
+    var VALID_THEME = ["sky", "amber", "blue", "cyan", "emerald", "fuchsia", "green", "indigo", "mauve", "mist", "neutral", "olive", "orange", "pink", "purple", "red", "rose", "stone", "taupe", "teal", "violet", "yellow", "zinc"];
+    var VALID_CHART = ["yellow", "amber", "blue", "cyan", "emerald", "fuchsia", "green", "indigo", "lime", "mauve", "mist", "neutral", "olive", "orange", "pink", "purple", "red", "rose", "sky", "stone", "taupe", "teal", "violet", "zinc"];
+    var raw = null;
+    try {
+      raw = localStorage.getItem(KEY);
+    } catch (e) {}
+    var parsed = null;
+    if (raw) {
+      try {
+        parsed = JSON.parse(raw);
+      } catch (e) {}
+    }
+    if (!parsed || parsed.v !== 1) parsed = {};
+    // Per-dimension fallback (architect's ruling §3): an unrecognized or
+    // absent value on ANY one field falls back to that field's own
+    // default, independently -- never a whole-blob rejection.
+    var mode = VALID_MODE.indexOf(parsed.mode) !== -1 ? parsed.mode : DEFAULTS.mode;
+    var base = VALID_BASE.indexOf(parsed.base) !== -1 ? parsed.base : DEFAULTS.base;
+    var theme = VALID_THEME.indexOf(parsed.theme) !== -1 ? parsed.theme : DEFAULTS.theme;
+    var chart = VALID_CHART.indexOf(parsed.chart) !== -1 ? parsed.chart : DEFAULTS.chart;
+    var root = document.documentElement;
+    var systemDark = false;
+    try {
+      systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    } catch (e) {}
+    var dark = mode === "dark" || (mode === "system" && systemDark);
+    root.classList.toggle("dark", dark);
+    if (base !== DEFAULTS.base) root.setAttribute("data-cairn-base", base);
+    if (theme !== DEFAULTS.theme) root.setAttribute("data-cairn-theme", theme);
+    if (chart !== DEFAULTS.chart) root.setAttribute("data-cairn-chart", chart);
+    // PT-70 (architect's finding): head-time embed detection, before
+    // board.js (loaded at body-end) ever runs -- static markup like the
+    // theme-settings trigger button can otherwise paint for one frame
+    // before script removes it. Same iframe check board.js's own
+    // isEmbedMode uses; :root, not body -- the class must exist before
+    // body itself has painted. Harmless on the dashboard's own head (it
+    // is never itself framed).
+    if (window.self !== window.top) root.classList.add("embed");
+  } catch (e) {}
+})();
+</script>
+<!-- PT-57: preset design tokens, linked BEFORE board.css so its
+     :root/.dark custom properties are already in scope when board.css's
+     own rules reference them (--primary, --border, --radius-sm/md/lg,
+     etc.). Served by the existing /board/<rel> static route -- no
+     server change. -->
+<link rel="stylesheet" href="/board/tokens.css">
+<!-- PT-69 (architect's ruling §2): variant deltas, linked AFTER
+     tokens.css (so its defaults are already declared) and BEFORE
+     board.css (so board.css's own rules see whichever variant is
+     selected). Generated -- see scripts/cairn/design/gen_variants.py. -->
+<link rel="stylesheet" href="/board/variants.css">
+<link rel="stylesheet" href="/board/board.css">
+</head>
+<body>
+
+<!-- PT-32: pull-down-to-refresh indicator -- board.js's updatePullIndicator
+     drives the hidden attribute/text/transform/dragging class. Sits ABOVE
+     the sticky header (z-index 11 > 10), off-canvas at rest via
+     translateY(-100%); pulling reveals it OVER the header by the pull
+     offset -- see board.css's .pull-indicator comment for why (architect's
+     fix during diff review @ 295785c, replacing the original under-header
+     design, which measured out as never visible at any real viewport). -->
+<div class="pull-indicator" id="pull-indicator" hidden></div>
+
+<!-- PT-49 §6: a PERSISTENT banner, not a toast -- the condition (the
+     server process is running older code than the checked-out cairn.py)
+     does not self-resolve on its own, and a toast auto-dismisses in
+     3.5s. board.js's renderEngineBanner drives the hidden attribute/text;
+     shown when board.engine.stale, removed the moment a later payload
+     reports false. Never disables anything below it -- a stale server
+     still serves true data, only its behaviour is old. -->
+<div class="engine-stale-banner" id="engine-stale-banner" hidden></div>
+
+<header class="app-header">
+  <div class="app-header-row">
+    <span class="app-title">cairn</span>
+    <!-- PT-1: minimal live/polling indicator -- board.js's connectLive()
+         drives the text/class; starts "polling" until SSE confirms open. -->
+    <span class="connection-state polling" id="connection-state">○ polling</span>
+    <div class="majors-tabs" id="majors-tabs"></div>
+    <div class="view-tabs">
+      <!-- PT-73 (architect ruling §5): points at the new never-
+           redirecting /board alias, not bare `/` -- once dist is
+           present, `/` server-side-redirects into the dashboard, which
+           would otherwise bounce a standalone-Kanban click straight out
+           of the board. board.js needs no change: it selects its view
+           by `pathname === "/list"`, so any other path already renders
+           kanban. -->
+      <a href="/board" id="tab-kanban">Kanban</a>
+      <a href="/list" id="tab-list">List</a>
+      <!-- PT-54 nit (architect): an unreachable surface is a broken one --
+           the real shadcn-svelte dashboard is a separate app at /dashboard,
+           not a third tab of this vanilla board. -->
+      <a href="/dashboard" id="tab-dashboard">Dashboard</a>
+    </div>
+    <!-- PT-69 (ux-designer's placement proposal): board has no Svelte
+         sidebar, so the trigger pins to the top-right header -- the
+         reference pattern's own placement. Content built by board.js's
+         wireThemeSettings()/renderThemeMenu() (four rows: Mode / Base
+         Color / Theme / Chart Color, each a submenu radiogroup). -->
+    <div class="theme-settings">
+      <!-- PT-71 (ux's icon-fidelity ruling): vendored inline, the real
+           Lucide "settings-2" glyph -- path/circle data extracted
+           verbatim from the installed @lucide/svelte v1.37.0 package
+           (dashboard/node_modules/@lucide/svelte/dist/icons/
+           settings-2.svelte's iconNode + Icon.svelte's default <svg>
+           attributes), not a unicode stand-in and not a lookalike.
+           24x24 viewBox, stroke-width 2 (ux: "do not thin the stroke"),
+           same shape the dashboard's real Settings2 component renders.
+           Icon-only per ux's PT-69 placement ruling ("icon-only with
+           aria-label/tooltip 'Appearance' rather than a visible text
+           label") -- matches the dashboard trigger exactly. -->
+      <button id="theme-settings-trigger" class="theme-settings-trigger" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Appearance" title="Appearance">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-settings-2" aria-hidden="true">
+          <path d="M14 17H5" />
+          <path d="M19 7h-9" />
+          <circle cx="17" cy="17" r="3" />
+          <circle cx="7" cy="7" r="3" />
+        </svg>
+      </button>
+      <div id="theme-settings-menu" class="theme-settings-menu" hidden></div>
+    </div>
+    <button id="new-issue-btn" class="new-issue-btn" type="button">+ New</button>
+  </div>
+  <!-- PT-44 §7: the milestone-progress strip is retired -- its content
+       (id · name · GA · target_tag · n/m done) is now on the milestone's
+       own lane header (PT-40) and card, with zero information loss (a
+       lane now renders for every milestone in the payload, PT-44 §2). -->
+  <div class="filters">
+    <input type="text" id="filter-text" placeholder="Filter…">
+    <select id="filter-milestone"><option value="">All milestones</option></select>
+    <select id="filter-assignee"><option value="">All assignees</option></select>
+    <select id="filter-label"><option value="">All labels</option></select>
+    <!-- PT-3: hidden by default, shown only when the board payload carries
+         more than one root (renderHeader toggles the hidden attribute). -->
+    <select id="filter-repo" hidden><option value="">All repos</option></select>
+    <label><input type="checkbox" id="filter-cancelled"> Show cancelled</label>
+    <!-- PT-42: default off, adjacent to Show cancelled -- see board.js's
+         #filter-archived listener for the etag-clear + refetch it triggers
+         (unlike Show cancelled, this changes what the SERVER sends). -->
+    <label><input type="checkbox" id="filter-archived"> Show archived</label>
+    <label><input type="checkbox" id="toggle-swimlanes" checked> Swimlanes</label>
+    <!-- PT-30: hidden (not disabled) whenever Swimlanes is off -- renderHeader
+         toggles the hidden attribute, same precedent as #filter-repo above. -->
+    <button id="expand-all-btn" class="view-state-btn" type="button">Expand all</button>
+    <button id="collapse-all-btn" class="view-state-btn" type="button">Collapse all</button>
+  </div>
+  <!-- Minimal create affordance: title + milestone only, per the spec's
+       "issue creation from the board beyond title + milestone" being the
+       out-of-phase-1-scope line (implying title+milestone IS in scope).
+       See process/TRACKER.md and architect conformance review finding 5. -->
+  <div class="new-issue-form" id="new-issue-form" hidden>
+    <input type="text" id="new-issue-title" placeholder="New issue title…">
+    <select id="new-issue-milestone"><option value="">No milestone</option></select>
+    <button id="new-issue-submit" type="button">Create</button>
+    <button id="new-issue-cancel" type="button">Cancel</button>
+  </div>
+</header>
+
+<main id="main"></main>
+
+<div class="drawer-overlay" id="drawer-overlay">
+  <div class="drawer" id="drawer" role="dialog" aria-modal="true"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- PT-4: vendored (checked-in, no CDN) -- see vendor/NOTICE.md for
+     version/license/provenance. Loaded before board.js so renderMarkdown's
+     window.marked / window.DOMPurify feature-check sees them. -->
+<script src="/board/vendor/marked.js"></script>
+<script src="/board/vendor/purify.min.js"></script>
+<!-- PT-22: pure-logic functions, unit-tested independently of the DOM
+     (scripts/cairn/tests/js/). Must load before board.js -- board.js
+     destructures the CairnLogic global at the top of its own IIFE, so a
+     load-order mistake here throws at parse time instead of silently
+     producing `undefined` deep inside a render. -->
+<script src="/board/board-logic.js"></script>
+<script src="/board/board.js"></script>
+</body>
+</html>

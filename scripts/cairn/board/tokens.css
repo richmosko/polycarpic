@@ -1,0 +1,213 @@
+/*
+ * tokens.css — Design tokens for the vanilla cairn board.
+ *
+ * PT-57 (architect's token-delivery ruling): board.css's legacy
+ * Atlassian-derived palette migrates to these preset tokens. Linked from
+ * board.html BEFORE board.css (`<link rel="stylesheet" href="/board/
+ * tokens.css">`), served by the existing `/board/<rel>` static route --
+ * zero server changes.
+ *
+ * PT-63 (the font follow-up PT-57's ruling pre-decided): the three
+ * preset faces are self-hosted below via @font-face, sourced from
+ * scripts/cairn/board/vendor/fonts/ (checked in, zero CDN, zero build --
+ * see vendor/NOTICE.md for provenance/license/checksums). Latin +
+ * latin-ext subsets only, six .woff2 files, ~250KB. Explicitly rejected,
+ * permanently: pointing these @font-face rules at the dashboard's
+ * `/dashboard/assets/*.woff2` -- that would make the board's own
+ * rendering depend on the dashboard's build artifact, the dependency
+ * direction the spin-off constraint forbids.
+ *
+ * This is a THIRD copy of the same preset values (alongside
+ * docs/DESIGN/tokens.css and scripts/cairn/dashboard/src/app.css) --
+ * accepted per the ruling ("where a copy is unavoidable, make drift
+ * loud"): scripts/cairn/tests/test_board_tokens_parity.py asserts every
+ * variable this file shares with the other two agrees on value. Copies
+ * are survivable; silent copies aren't.
+ *
+ * PALETTE = shadcn-svelte "create" preset b6XadDxmQS -- same source as
+ * the other two copies; see docs/DESIGN/design-system-spec.md for full
+ * detail and usage rules.
+ *
+ * Owned by the ux-designer agent for its color/radius values; the
+ * board-specific font-delivery mechanism (self-hosted @font-face here,
+ * not app.css's Vite-bundled import) is PT-57/PT-63's own ruling.
+ */
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.147 0.004 49.25);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.147 0.004 49.25);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.147 0.004 49.25);
+  --primary: oklch(0.5 0.134 242.749);
+  --primary-foreground: oklch(0.977 0.013 236.62);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.97 0.001 106.424);
+  /* PT-69 (Mosko's ruling, 2026-08-29, "darken the ink"; re-derived under
+     the "two-model rule"): darkened from the preset's own oklch(0.553
+     0.013 58.071), which fails WCAG AA against --muted above (4.39:1 <
+     4.5:1 floor) -- clears the floor under BOTH the quantized-hex and
+     float contrast models (4.58:1 / 4.56:1). See app.css's own copy of
+     this comment and scripts/cairn/design/gen_variants.py's
+     derive_muted_foreground() for the full rationale/method. */
+  --muted-foreground: oklch(0.5450 0.013 58.071);
+  --accent: oklch(0.97 0.001 106.424);
+  --accent-foreground: oklch(0.216 0.006 56.043);
+  --destructive: oklch(0.577 0.245 27.325);
+  /* PT-69 (ux-designer's ruling, 2026-08-29, on architect's f26dbad): see
+     app.css's own copy of this comment for the full rationale --
+     lightened (the direction-correct fix here) to pure white, the only
+     value with real headroom (4.35:1 -> 4.76:1); costs the preset's
+     slight warm-pink tint. See .dark's own copy for the opposite-
+     direction dark-mode fix. */
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.923 0.003 48.717);
+  --input: oklch(0.923 0.003 48.717);
+  --ring: oklch(0.709 0.01 56.259);
+  --chart-1: oklch(0.905 0.182 98.111);
+  --chart-2: oklch(0.795 0.184 86.047);
+  --chart-3: oklch(0.681 0.162 75.834);
+  --chart-4: oklch(0.554 0.135 66.442);
+  --chart-5: oklch(0.476 0.114 61.907);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0.001 106.423);
+  --sidebar-foreground: oklch(0.147 0.004 49.25);
+  --sidebar-primary: oklch(0.588 0.158 241.966);
+  --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
+  --sidebar-accent: oklch(0.97 0.001 106.424);
+  --sidebar-accent-foreground: oklch(0.216 0.006 56.043);
+  --sidebar-border: oklch(0.923 0.003 48.717);
+  --sidebar-ring: oklch(0.709 0.01 56.259);
+
+  /* Radius scale -- same multiplicative formula as the live shadcn-svelte
+     scaffold's generated @theme inline block (verified against real CLI
+     output, not derived on paper -- see docs/DESIGN/tokens.css's own
+     comment for the correction history). PT-57's ruling: pick per
+     component (badge/chip -> sm, button/input -> md, card/drawer -> lg),
+     never a blanket swap of the old flat 6px --radius. */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+
+  /* PT-63: face is by ROLE, not size (design-system-spec.md Typography) --
+     --font-sans carries the base/default UI (body, buttons, inputs,
+     table cells, badges/chips) despite the "sans" name; --font-heading
+     is headings/section-titles only; --font-mono is ids. Same strings as
+     docs/DESIGN/tokens.css and app.css -- parity-tested. */
+  --font-sans: 'Merriweather Variable', Georgia, 'Times New Roman', serif;
+  --font-heading: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.dark {
+  --background: oklch(0.147 0.004 49.25);
+  --foreground: oklch(0.985 0.001 106.423);
+  --card: oklch(0.216 0.006 56.043);
+  --card-foreground: oklch(0.985 0.001 106.423);
+  --popover: oklch(0.216 0.006 56.043);
+  --popover-foreground: oklch(0.985 0.001 106.423);
+  --primary: oklch(0.443 0.11 240.79);
+  --primary-foreground: oklch(0.977 0.013 236.62);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.268 0.007 34.298);
+  --muted-foreground: oklch(0.709 0.01 56.259);
+  --accent: oklch(0.268 0.007 34.298);
+  --accent-foreground: oklch(0.985 0.001 106.423);
+  --destructive: oklch(0.704 0.191 22.216);
+  /* PT-69 (architect's ruling, 2026-08-29, f26dbad): SPLIT from :root's
+     value above -- see app.css's own copy of this comment for the full
+     rationale (one shared ink can't clear both modes; dark's fill is
+     unusually lighter than light's own). Re-derived under the "two-model
+     rule" -- a bare-minimum single-model search first landed on
+     L=0.3145 (4.53:1 quantized, but only 4.4955:1 float, below floor);
+     L=0.31 clears both (4.60:1 quantized / 4.57:1 float). Also fixes
+     .engine-stale-banner below, which pairs the same two tokens. */
+  --destructive-foreground: oklch(0.31 0.01 17.0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.553 0.013 58.071);
+  --chart-1: oklch(0.905 0.182 98.111);
+  --chart-2: oklch(0.795 0.184 86.047);
+  --chart-3: oklch(0.681 0.162 75.834);
+  --chart-4: oklch(0.554 0.135 66.442);
+  --chart-5: oklch(0.476 0.114 61.907);
+  --sidebar: oklch(0.216 0.006 56.043);
+  --sidebar-foreground: oklch(0.985 0.001 106.423);
+  --sidebar-primary: oklch(0.685 0.169 237.323);
+  --sidebar-primary-foreground: oklch(0.293 0.066 243.157);
+  --sidebar-accent: oklch(0.268 0.007 34.298);
+  --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.553 0.013 58.071);
+}
+
+/* PT-63: self-hosted faces, vendored under scripts/cairn/board/vendor/
+   fonts/ (see vendor/NOTICE.md for provenance, license, checksums).
+   Latin + latin-ext subsets only. Declarations copied verbatim from each
+   @fontsource-variable package's own generated CSS (unicode-range/
+   font-weight-range included), with only the src url() repointed at the
+   local vendored path -- never at the dashboard's build output. */
+
+/* merriweather-latin-wght-normal */
+@font-face {
+  font-family: 'Merriweather Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url(/board/vendor/fonts/merriweather-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+/* merriweather-latin-ext-wght-normal */
+@font-face {
+  font-family: 'Merriweather Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 900;
+  src: url(/board/vendor/fonts/merriweather-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+/* space-grotesk-latin-wght-normal */
+@font-face {
+  font-family: 'Space Grotesk Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url(/board/vendor/fonts/space-grotesk-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+/* space-grotesk-latin-ext-wght-normal */
+@font-face {
+  font-family: 'Space Grotesk Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url(/board/vendor/fonts/space-grotesk-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}
+
+/* geist-mono-latin-wght-normal */
+@font-face {
+  font-family: 'Geist Mono Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(/board/vendor/fonts/geist-mono-latin-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+}
+
+/* geist-mono-latin-ext-wght-normal */
+@font-face {
+  font-family: 'Geist Mono Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url(/board/vendor/fonts/geist-mono-latin-ext-wght-normal.woff2) format('woff2-variations');
+  unicode-range: U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF;
+}

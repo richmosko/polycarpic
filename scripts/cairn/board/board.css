@@ -1,0 +1,1208 @@
+/* board.css — cairn board. Vanilla CSS, no framework, no CDN.
+ *
+ * PT-57 (architect's token-delivery ruling): colors and radius now come
+ * from tokens.css (linked before this file in board.html), NOT this
+ * :root -- --background/--foreground/--card/--muted/--primary/
+ * --secondary/--destructive/--border/--ring/--chart-1..5/
+ * --radius(-sm/md/lg) etc. are all defined there. This :root keeps only
+ * what ISN'T a preset token: layout spacing (--col-gap, --card-gap) and
+ * the shadow (not part of the preset; mapped by eye to the spec's
+ * shadow-sm/md guidance).
+ *
+ * ⚠ --accent changes MEANING, not just value, in this migration: the old
+ * --accent here was the legacy palette's primary blue (see design-system-
+ * spec.md's Legacy/migration table for that retired value) -- active tabs,
+ * +New, submit/drawer-action buttons, the in-progress dot, the assignee
+ * chip text. The preset's --accent is a near-white HOVER SURFACE, a
+ * different role entirely. Every one of those old --accent call sites
+ * below is now var(--primary) -- the one deliberate exception is
+ * table.issue-list tr:hover, where "hover surface" is genuinely what the
+ * preset's --accent means.
+ */
+:root {
+  --col-gap: 12px;
+  --card-gap: 8px;
+  /* PT-29: the containing-card shadow (majors/milestones as bordered
+     surface cards, architect's ruling § 1) -- named here rather than
+     inlined at each use site so the value exists once. Not a preset
+     token (the spec's shadow guidance is qualitative -- shadow-sm on
+     cards/popovers -- not a literal value); kept local and mapped by eye.
+     PT-57 (architect's addendum § 1): the navy tint (rgb(9, 30, 66) --
+     Atlassian's N800) is a carried-forward hue the preset-pure direction
+     forbids as much as any hex, even hidden inside an rgba() where a
+     bare grep for "#" would miss it. Dropped to plain black -- same
+     perceived depth, no inherited hue. */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+* { box-sizing: border-box; }
+
+/* PT-76 (architect's ruling, correcting the cascade model recorded at
+   PT-69): `hidden` only works via the UA stylesheet's own
+   `[hidden] { display: none }` rule, which is UA-ORIGIN. Cascade origin is
+   compared before specificity or source order (CSS Cascade §6.1), so any
+   author-origin `display` declaration beats it unconditionally -- not "wins
+   the tie because it loads later" (PT-69's original explanation), not "wins
+   because of matching specificity." That's why `.theme-settings-menu`,
+   `.theme-settings-row-flyout` and `.new-issue-form` (all author
+   `display: flex`) stayed visible under `hidden` 100% of the time rather
+   than intermittently, and why raising a selector's specificity -- PT-69's
+   original, `!important`-free fix -- only holds until some future
+   higher-specificity rule (an id selector, say) displaces it again; the
+   pairing has to be re-remembered for every element that ever grows its own
+   `display` declaration, and it was already forgotten once, silently, for
+   `.new-issue-form` across four releases. Only an author-origin
+   `!important` is both origin- and specificity-independent, so a single
+   generic reset here makes the whole bug class unrepresentable instead of
+   patching instances one at a time. This deliberately OVERRIDES PT-69's
+   stated `!important`-free preference -- correct for that ruling's
+   one-element scope, but it doesn't generalize. Verified
+   behaviour-preserving everywhere else: every element in board.html that
+   carries `hidden` with no author `display` rule (#pull-indicator,
+   #engine-stale-banner, #filter-repo, #expand-all-btn, #collapse-all-btn)
+   already resolved to `display: none` before this rule existed, so nothing
+   changes for them -- only for the elements that were actually broken. */
+[hidden] {
+  display: none !important;
+}
+
+body {
+  margin: 0;
+  /* PT-63: base/default UI face (design-system-spec.md Typography --
+     face is by ROLE, not size). Headings/titles override this with
+     --font-heading at their own selectors below; everything else
+     (buttons, inputs, table cells, badges/chips) inherits this. */
+  font-family: var(--font-sans);
+  background: var(--muted);
+  color: var(--foreground);
+  font-size: 14px;
+  /* PT-32 (architect's ruling § 3): LOAD-BEARING, not polish. Chrome on
+     Android ships its own native pull-to-refresh that reloads the WHOLE
+     PAGE -- exactly what PT-32's AC1 forbids. Without this, a pull on
+     Android Chrome can trigger both the browser's gesture and ours;
+     `contain` stops the vertical overscroll from chaining past this
+     element to that native handler. */
+  overscroll-behavior-y: contain;
+}
+
+/* PT-32: the pull-down-to-refresh indicator. Fixed at the very top,
+   ABOVE the header (z-index 11 > header.app-header's 10) -- architect's
+   fix during diff review @ 295785c (BLOCKING): the original design sat
+   BEHIND the header and relied on the header's own height to decide how
+   much of the indicator peeked out below it, which measured out as never
+   visible at any real viewport (verified empirically: at max pull, the
+   element under the indicator's own center point was still a header
+   label). The fix decouples reveal from header height entirely --
+   `translateY(-100%)` at rest puts the indicator fully off-canvas, above
+   its own height; board.js's updatePullIndicator adds the (capped) pull
+   offset back via `translateY(calc(-100% + <offset>px))`, so pulling
+   overlays exactly `offset` pixels of indicator ON TOP of the header --
+   the conventional iOS/Android look, and PULL_MAX_OFFSET (board-logic.js)
+   stays a pure gesture-feel constant, never re-coupled to a header-height
+   value. `.dragging` (added/removed by updatePullIndicator) suppresses the
+   transition WHILE pulling/armed, so the indicator tracks the finger 1:1
+   during the drag itself -- the transition is for snap-back-to-hidden and
+   the release settle, never the live drag. */
+.pull-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 11;
+  text-align: center;
+  padding: 10px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  transform: translateY(-100%);
+  transition: transform 0.15s ease;
+}
+
+.pull-indicator.dragging {
+  transition: none;
+}
+
+/* PT-31 (architect's triage ruling, item 6c): only the leading glyph
+   spins, not the whole "↻ Refreshing…" label -- board.js splits it into
+   its own span for exactly this. `PULL_MIN_SPINNER_MS` is a MINIMUM
+   hold, not a duration; a slow/stalled network can make it arbitrarily
+   long, and a motionless glyph in that window reads as a frozen page
+   rather than a working one. */
+.pull-indicator-glyph {
+  display: inline-block;
+}
+
+.pull-indicator-glyph.spinning {
+  animation: pull-indicator-spin 0.8s linear infinite;
+}
+
+@keyframes pull-indicator-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* PT-49 §6: persistent, in-flow (NOT fixed/overlay like .pull-indicator
+   above) -- it never covers or blocks anything, it just sits at the top
+   of the document and pushes the header down while shown. Warning color
+   (--danger), not the toast's transient styling -- this state doesn't
+   self-resolve. */
+.engine-stale-banner {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+  text-align: center;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+header.app-header {
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  padding: 10px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.app-header-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.app-title {
+  /* PT-63: page/app title role -- --font-heading, matching
+     design-system-spec.md's "Page/dashboard title" row. */
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 16px;
+  margin-right: 8px;
+}
+
+/* PT-55 (architect ruling § 3): `body.embed` (toggled by board.js's
+   init() when board-logic.js's isEmbedMode reads `?embed=1`) hides
+   EXACTLY two things -- the wordmark and the Dashboard tab. The latter
+   would otherwise let a viewer inside the dashboard's own board panel
+   load the whole dashboard SPA into that same panel. Everything else
+   (filters, majors tabs, expand/collapse, + New) stays -- the dashboard
+   has no replacement for any of it. */
+body.embed .app-title,
+body.embed #tab-dashboard {
+  display: none;
+}
+
+/* PT-72 (architect's unified-shell ruling § 3, ux-designer's strip-list
+   enumeration): `body.readonly` (toggled by board.js's module-scope
+   isReadOnly, `?readonly=1`) hides every WRITE affordance -- filter row,
+   Kanban/List view tabs (the dashboard-home preview is fixed to Kanban),
+   the create-issue button, the per-lane expand/collapse toggles, and the
+   global expand/collapse-all buttons. Drag is disabled in board.js itself
+   (card.draggable + the dragstart/drop listeners never attach), not via
+   CSS -- a display:none on the cards would remove the content this mode
+   exists to show. Kept: column headers, cards (click-through), the
+   connection-state indicator (informational). PT-76: `#new-issue-form`
+   (the button's own toggle target) is listed explicitly alongside
+   `#new-issue-btn` -- this is the POLICY statement that read-only carries
+   no create affordance, and it must hold even if the form is reached some
+   other way, independent of whatever fixes the `[hidden]` mechanism
+   itself (see the generic reset near the top of this file). */
+body.readonly .filters,
+body.readonly .view-tabs,
+body.readonly #new-issue-btn,
+body.readonly #new-issue-form,
+body.readonly #expand-all-btn,
+body.readonly #collapse-all-btn,
+body.readonly .swimlane-toggle,
+body.readonly .repo-group-toggle {
+  display: none;
+}
+
+/* PT-1: minimal live/polling connection indicator, driven by board.js's
+   connectLive() toggling the "live"/"polling" class + text. */
+/* PT-64 (Mosko's ruling, 2026-08-28, full face floor): every sub-13px
+   selector in this file gets an explicit --font-heading override, not
+   just the .filters/.drawer-field labels the ruling started with. */
+.connection-state {
+  font-size: 12px;
+  font-family: var(--font-heading);
+  color: var(--muted-foreground);
+}
+
+.connection-state.live {
+  /* PT-57 (architect ruling § 3): no green exists in this preset -- a
+     liveness indicator maps onto --primary, same as every other
+     primary-action-weight signal in this file. */
+  color: var(--primary);
+}
+
+.majors-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.majors-tabs button {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.majors-tabs button.active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+/* PT-48: same muted language as .card.is-archived/.chip.archived --
+   opacity + italic, not a second dot vocabulary crammed into a tab that
+   already has no room for status text (PT-40's own constraint). */
+.majors-tabs button.is-archived {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+/* PT-40 (ruling § 6): status dot inside a major tab button -- color via
+   data-status, same RECORD_STATUS_LABELS vocabulary the card uses. */
+.major-status-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-right: 4px;
+  /* PT-57 (architect ruling § 3, "Status dots"): unknown/no-record is
+     absence, not a status -- the lowest-weight neutral, --muted-foreground,
+     not the same token as "planned" below (--ring), even though both were
+     the same grey hex pre-migration. */
+  background: var(--muted-foreground); /* default: unknown/no-record */
+}
+.major-status-dot[data-status="planned"] { background: var(--ring); }
+.major-status-dot[data-status="in-progress"] { background: var(--primary); }
+.major-status-dot[data-status="paused"] { background: var(--chart-2); }
+.major-status-dot[data-status="done"] { background: var(--foreground); }
+.major-status-dot[data-status="cancelled"] { background: var(--destructive); }
+
+/* PT-40: the sibling "open card" button after each major tab -- smaller
+   and icon-only, distinct from the filter-tab styling it shares
+   `.majors-tabs button`'s base rule with. */
+/* PT-64 (full face floor): buttons don't inherit the page font-family by
+   default (UA-default Arial), so an explicit face declaration is needed
+   here even though the rest of the file's non-serif fix is about
+   overriding the body's inherited serif. */
+.major-tab-open {
+  padding: 4px 6px;
+  font-size: 11px;
+  font-family: var(--font-heading);
+  color: var(--muted-foreground);
+}
+
+.view-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.view-tabs a {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  font-size: 13px;
+  text-decoration: none;
+  color: var(--foreground);
+}
+
+.view-tabs a.active {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border-color: var(--primary);
+}
+
+.filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.filters input, .filters select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+/* PT-64 (Mosko's ruling, 2026-08-28, option (a)): sub-13px form labels are
+   the a11y face-floor exception -- --font-heading (Space Grotesk, sans),
+   not the inherited body var(--font-sans) (Merriweather, serif). Design
+   spec's Accessibility section carries the rationale. */
+.filters label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-family: var(--font-heading);
+  color: var(--muted-foreground);
+}
+
+/* PT-30: Expand all / Collapse all -- secondary buttons, same visual
+   weight as #new-issue-cancel, living in the filter bar per the
+   architect's ruling § 4. Hidden (not disabled) via board.js's
+   renderHeader when Swimlanes is off. */
+/* PT-64 (full face floor): same UA-default-button reasoning as
+   .major-tab-open above. */
+.view-state-btn {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--foreground);
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: var(--font-heading);
+  cursor: pointer;
+}
+
+.new-issue-btn {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 4px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.new-issue-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.new-issue-form input, .new-issue-form select {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+.new-issue-form input[type="text"] {
+  min-width: 240px;
+}
+
+.new-issue-form button {
+  border-radius: var(--radius-md);
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+#new-issue-submit {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+}
+
+#new-issue-cancel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+}
+
+main {
+  padding: 16px;
+}
+
+/* Kanban */
+
+.board {
+  display: flex;
+  gap: var(--col-gap);
+  align-items: flex-start;
+  overflow-x: auto;
+}
+
+.column {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  flex: 1 1 0;
+  min-width: 220px;
+  padding: 8px;
+}
+
+.column-header {
+  /* PT-63: eyebrow-label role (12px, uppercase, --muted-foreground) --
+     design-system-spec.md's Dashboard-scale eyebrow row is --font-heading. */
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  padding: 4px 4px 8px;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* PT-29 (architect's ruling § 1): .swimlane and .repo-group ARE the
+   containment cards -- no new wrapper elements. The header is always in
+   the DOM; only .board (the card body) is conditionally appended, so
+   is-collapsed only ever tightens padding here, it never drives layout
+   structure. Three nested surfaces need three distinguishable
+   backgrounds -- alternated BY DEPTH via the main>/.repo-group> combinators
+   below, never by editing the base .column/.swimlane rule globally (the
+   standalone .board view, Swimlanes checkbox off, has no containing card
+   at all and must keep its pre-PT-29 look untouched). */
+.swimlane {
+  margin-bottom: 16px;
+  border-radius: var(--radius-lg);
+  padding: 4px 12px 12px;
+}
+
+.swimlane.is-collapsed {
+  padding-bottom: 4px;
+}
+
+/* Single-root: the swimlane is the ONLY containing card -- white panel,
+   border, shadow. */
+main > .swimlane {
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+/* Single-root: columns sit inside that white card, so they read as a
+   grey WELL rather than a second white surface stacked on the first. */
+main > .swimlane .column {
+  background: var(--muted);
+  border-color: transparent;
+}
+
+.swimlane-header {
+  /* PT-63: this is the milestone lane's own title -- section-heading
+     role, --font-heading. */
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  padding: 4px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  /* PT-31 (architect's triage ruling, item 2): flex-wrap ALONE is a
+     non-fix -- .swimlane-label below is `flex: 1` (i.e. `flex: 1 1 0%`,
+     a zero basis with shrink enabled), so the label always shrinks to
+     nothing before anything has a reason to wrap. Pairs with
+     .swimlane-label's min-width below; neither alone fixes a fully-
+     populated collapsed lane crushing the milestone name at narrow
+     viewports. */
+  flex-wrap: wrap;
+}
+
+/* PT-29 (architect's ruling § 3): shared with .repo-group-toggle -- one
+   filled-triangle control, not two visually different ones. Fixed 18x18
+   box is the point, not the font-size bump: ▼ and ▶ have different
+   glyph advance widths, so without a fixed box the label shifts
+   horizontally on every toggle. `font: inherit` is deliberately NOT used
+   here -- it resets family/size/weight together, making a bare
+   font-size override alongside it order-dependent; all three are set
+   explicitly instead. */
+/* PT-64 (full face floor): `font-family: inherit` swapped for an explicit
+   var(--font-heading) -- both toggles happen to sit inside a
+   --font-heading-scoped header today (confirmed via live computed-style
+   read), but `inherit` makes that a placement fact, not a source fact;
+   this is exactly the sampling-trap shape the ruling's chip finding
+   already exposed once, so it's ruled out here on purpose. */
+.swimlane-toggle,
+.repo-group-toggle {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+
+.swimlane-label {
+  /* PT-31 (architect's triage ruling, item 2): the LOAD-BEARING half --
+     `flex: 1 1 auto` plus a `min-width` floor gives the label something
+     to refuse to shrink past, which is what forces the status chips onto
+     a second line instead of crushing the milestone name. `flex: 1`
+     alone (a zero basis) has no floor at all. */
+  flex: 1 1 auto;
+  min-width: 8em;
+}
+
+.swimlane-count {
+  font-weight: 400;
+}
+
+/* PT-40 (ruling § 2's own wording: "Clicking the label opens the
+   milestone card") -- minimal affordance on the existing label, not a
+   new element. */
+.swimlane-label-clickable {
+  cursor: pointer;
+}
+.swimlane-label-clickable:hover {
+  text-decoration: underline;
+}
+
+/* PT-29 (architect's ruling § 1, judgment call): the collapsed-lane
+   status breakdown -- one chip per non-empty status, board-column order
+   (laneSummary, board-logic.js). Reuses .chip's visual language (see
+   .card-meta below) rather than inventing a second chip style. */
+.swimlane-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* PT-3: top-level repo section under multi-root repo grouping, promoted
+   to a containment card by PT-29 -- a heavier header than
+   .swimlane-header (this is the outer grouping, milestone lanes nest
+   inside it) plus the left accent (now --accent, was --border pre-PT-29)
+   to read as the repo marker on top of the card boundary itself. */
+.repo-group {
+  margin-bottom: 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 4px 12px 12px;
+}
+
+.repo-group.is-collapsed {
+  padding-bottom: 4px;
+}
+
+/* Multi-root: milestone lanes nest ONE level inside the white
+   .repo-group card, so they take the grey inset-card treatment instead
+   of a second white surface -- .repo-group .column underneath stays
+   --panel, unchanged, since the default .column rule already alternates
+   correctly against this grey lane. */
+.repo-group > .swimlane {
+  background: var(--muted);
+  border: 1px solid var(--border);
+}
+
+/* PT-29 architect review gap (diff review @ 0ce5647, R-gap): with
+   Swimlanes OFF, repoSectionEl appends .board directly under .repo-group
+   -- no intervening .swimlane -- so .column had no grey-well treatment
+   and sat white-on-white against the repo card. Mirrors the
+   single-root `main > .swimlane .column` rule above, one level deeper. */
+.repo-group > .board .column {
+  background: var(--muted);
+  border-color: transparent;
+}
+
+.repo-group-header {
+  /* PT-63: the repo group's own title -- section-heading role,
+     --font-heading, same reasoning as .swimlane-header. */
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 4px 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.repo-group-label {
+  flex: 1;
+}
+
+.repo-group-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+
+.repo-group-count {
+  font-weight: 400;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 8px;
+  margin-bottom: var(--card-gap);
+  cursor: grab;
+  font-size: 13px;
+}
+
+.card:active { cursor: grabbing; }
+
+.card.dragging { opacity: 0.4; }
+
+/* PT-42: muted treatment for an archived card -- read-only on the board
+   (not draggable: cursor stays the default, not grab), rendered in its
+   original lane/column, distinguished by opacity + a desaturated chip
+   rather than a separate lane/column (ruling § 3). */
+.card.is-archived { opacity: 0.6; cursor: default; }
+.card.is-archived:active { cursor: default; }
+
+.card-id {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+.card-title {
+  /* PT-63: card-title role, matching design-system-spec.md's "Card
+     title, dialog title" --font-heading row -- role, not size (this
+     card's title runs smaller than the spec's 18px reference). */
+  font-family: var(--font-heading);
+  font-weight: 500;
+  margin: 2px 0 6px;
+}
+
+.card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* PT-57 (architect ruling § 3, "Chips" table): re-expressed as the
+   spec's badge variants by WEIGHT, not a per-category hue -- the old
+   taxonomy (person=blue, milestone=green, subissues=yellow, repo=purple,
+   blocked=red) is retired per design-system-spec.md's Legacy/migration
+   table, not migrated hex-for-hex. `outline` = transparent fill, --border
+   outline, --muted-foreground text; `secondary` = --secondary/
+   --secondary-foreground; `destructive` = --destructive/
+   --destructive-foreground; `default` = --primary/--primary-foreground. */
+/* PT-64 (Mosko's re-ruling, 2026-08-28, "full face floor"): .chip had NO
+   font-family override at all, so its actual face was placement-dependent
+   -- sans inside .swimlane-header, serif inside .card-meta (the bulk of
+   board chips). An explicit var(--font-heading) here closes that gap for
+   every non-.repo variant (.assignee/.release/.blocked/.ga/.archived/
+   .status[...]) without touching each one -- .chip.repo's own mono
+   override below still wins by specificity. */
+.chip {
+  display: inline-block;
+  border-radius: var(--radius-sm);
+  padding: 1px 8px;
+  font-size: 11px;
+  font-family: var(--font-heading);
+  /* outline (default/base): .milestone, .subissues, .progress inherit
+     this unchanged -- they're plain category labels, no elevated weight. */
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+/* secondary: a person chip and a release chip look the same weight,
+   distinguished by label/icon, not color (spec's Badge/chip vocabulary). */
+.chip.assignee, .chip.release { background: var(--secondary); border-color: transparent; color: var(--secondary-foreground); }
+/* outline + keep the monospace family -- the family IS the label
+   distinction here, not a hue. */
+.chip.repo { font-family: var(--font-mono); }
+.chip.blocked { background: var(--destructive); border-color: transparent; color: var(--destructive-foreground); }
+.chip.archived { font-style: italic; opacity: 0.6; }
+
+/* PT-44: the retired strip's content, now on the milestone lane header
+   and card -- status pill (color keyed off data-status, same
+   RECORD_STATUS_LABELS vocabulary as .major-status-dot), progress
+   (n/m or the isComplete checkmark), release state, and the GA chip
+   moved off its old "· GA" text suffix.
+   PT-57: straight from the spec's record-status table -- planned stays
+   the base outline chip (no override needed); the other four states
+   override background/border/color explicitly. */
+.chip.status[data-status="in-progress"] { background: var(--primary); border-color: transparent; color: var(--primary-foreground); }
+/* PT-69 (architect's ruling 1db6053 + ux-designer's replacement token):
+   moved OFF --chart-2 -- a status chip's legibility must not depend on
+   the user's (now user-selectable) Chart Color choice. --accent/
+   --accent-foreground is Base-Color-owned (inverts correctly per mode)
+   and passes 13.79-16.42:1 across every Base variant, both modes.
+   Deliberately KEEPS the 1px var(--border) outline (doesn't follow the
+   other filled variants' border-color: transparent) -- cheap insurance
+   against --accent's other role as this system's hover/active surface;
+   if a status chip ever lands in a hoverable row, the border keeps it
+   visible instead of disappearing into an identical hover fill. */
+.chip.status[data-status="paused"] { background: var(--accent); color: var(--accent-foreground); }
+.chip.status[data-status="done"] { background: var(--foreground); border-color: transparent; color: var(--background); }
+.chip.status[data-status="cancelled"] { background: var(--destructive); border-color: transparent; color: var(--destructive-foreground); }
+/* GA is the one milestone marker that should dominate -- `default`
+   weight (--primary/--primary-foreground), ruled here (not in the
+   spec's own table). */
+.chip.ga { background: var(--primary); border-color: transparent; color: var(--primary-foreground); font-weight: 600; }
+
+.column.drop-target {
+  outline: 2px dashed var(--primary);
+  outline-offset: -4px;
+}
+
+/* List view */
+
+table.issue-list {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+table.issue-list th, table.issue-list td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+/* PT-64 (full face floor): the 12px header row is the sub-13px override
+   here -- table.issue-list td stays at the 13px shared rule above and is
+   unaffected. */
+table.issue-list th {
+  cursor: pointer;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+}
+
+table.issue-list tr:hover { background: var(--accent); cursor: pointer; }
+
+/* Drawer */
+
+.drawer-overlay {
+  position: fixed;
+  inset: 0;
+  /* PT-57 (architect's addendum § 1): drop the Atlassian-navy tint, keep
+     the alpha -- same as --shadow above. */
+  background: rgba(0, 0, 0, 0.35);
+  display: none;
+  z-index: 100;
+}
+
+.drawer-overlay.open { display: block; }
+
+.drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(480px, 100vw);
+  background: var(--card);
+  /* PT-57 (architect's addendum § 1): drop the Atlassian-navy tint,
+     keep the alpha -- same as --shadow/.drawer-overlay above. */
+  box-shadow: -4px 0 16px rgba(0, 0, 0, 0.15);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.drawer h2 {
+  /* PT-63: dialog-title role -- matches design-system-spec.md's
+     text-lg / "Card title, dialog title" row exactly (18px). */
+  font-family: var(--font-heading);
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.drawer .drawer-id {
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.drawer .close-btn {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  border: none;
+  background: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--muted-foreground);
+}
+
+.drawer-field {
+  margin: 12px 0;
+}
+
+/* PT-64 (Mosko's ruling, 2026-08-28, option (a)): same face-floor
+   exception as .filters label above -- --font-heading, not the inherited
+   serif var(--font-sans). */
+.drawer-field label {
+  display: block;
+  font-size: 11px;
+  text-transform: uppercase;
+  font-family: var(--font-heading);
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+
+.drawer-field select, .drawer-field input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
+.drawer pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  margin: 0;
+}
+
+/* PT-4: rendered markdown (description + comment bodies). Sanitized HTML
+   from DOMPurify -- see renderMarkdown() in board.js. */
+.markdown-body {
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.markdown-body > *:first-child { margin-top: 0; }
+.markdown-body > *:last-child { margin-bottom: 0; }
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3,
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 12px 0 4px;
+}
+
+.markdown-body ul, .markdown-body ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.markdown-body p { margin: 8px 0; }
+
+.markdown-body code {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--card);
+  border-radius: 3px;
+  padding: 1px 4px;
+}
+
+.markdown-body pre {
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  padding: 8px;
+  overflow-x: auto;
+  margin: 8px 0;
+}
+
+.markdown-body pre code {
+  background: none;
+  padding: 0;
+}
+
+.markdown-body a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+.markdown-body blockquote {
+  margin: 8px 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  color: var(--muted-foreground);
+}
+
+.ac-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.ac-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+
+.ac-list input[type="checkbox"] {
+  margin-top: 3px;
+}
+
+.comment-log {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 8px 0;
+}
+
+.comment {
+  border-left: 3px solid var(--border);
+  padding-left: 10px;
+}
+
+/* PT-64 (full face floor). */
+.comment-meta {
+  font-size: 12px;
+  font-family: var(--font-heading);
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+
+.add-comment textarea {
+  width: 100%;
+  min-height: 70px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+.add-comment button, .drawer-actions button {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.section-heading {
+  /* PT-63: eyebrow-label role, same as .column-header. */
+  font-family: var(--font-heading);
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  margin: 18px 0 6px;
+  font-weight: 600;
+}
+
+/* PT-64 (full face floor). */
+.pr-link, .file-link, .parent-link {
+  font-size: 12px;
+  font-family: var(--font-heading);
+}
+
+/* PT-40: the record drawer's (milestone/major card) progress line and
+   read-only note -- same font sizing as the issue drawer's file/PR/parent
+   lines above, distinct classes since they're record-card-only. */
+/* PT-64 (full face floor). */
+.drawer-progress {
+  font-size: 12px;
+  font-family: var(--font-heading);
+  color: var(--muted-foreground);
+  margin: 4px 0;
+}
+.record-readonly-note {
+  font-size: 12px;
+  font-family: var(--font-heading);
+  color: var(--muted-foreground);
+  font-style: italic;
+  margin-top: 8px;
+}
+
+.children-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.children-list li {
+  font-size: 13px;
+  padding: 3px 0;
+}
+
+.children-list li.resolved {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+
+/* Toast */
+
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  /* PT-57: dark-fill-on-light-text is the same "inverted" pairing the
+     spec's Done record-status uses (--foreground fill, --background
+     text) -- not a blanket --background substitution, the deliberate
+     correct pairing for THIS fill. */
+  background: var(--foreground);
+  color: var(--background);
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 200;
+}
+
+.toast.visible { opacity: 1; }
+.toast.error {
+  background: var(--destructive);
+  color: var(--destructive-foreground);
+}
+
+.empty-state {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  padding: 8px 4px;
+}
+
+/* PT-69 (ux-designer's placement proposal): styled from the Legacy/
+   migration token map (popover surface, radius-lg, shadow-sm) even
+   though the board can't mount the real Svelte DropdownMenu primitive --
+   content built by board.js's wireThemeSettings()/renderThemeMenu().
+   PT-64 (full face floor): every sub-13px/13px text below gets an
+   explicit font-family -- buttons don't inherit it by default. */
+.theme-settings {
+  position: relative;
+}
+
+/* PT-71 (ux's icon-fidelity ruling): icon-only trigger now, matching the
+   dashboard's own icon-only Settings2 button -- a fixed square rather
+   than text-driven padding. The vendored <svg> (board.html) renders at
+   its native 24x24; scaled down slightly here so it sits comfortably
+   inside the header row alongside the board's other controls. */
+.theme-settings-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--foreground);
+  padding: 0;
+  cursor: pointer;
+}
+
+.theme-settings-trigger svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* PT-70 (architect's finding): head-time embed flash prevention. The
+   trigger is static markup and board.js (which removes it at runtime
+   for the embedded case) loads at body-end -- without this, the button
+   can paint for one frame before script ever runs. The inline bootstrap
+   script (board.html's <head>, generated -- see
+   scripts/cairn/design/gen_variants.py) adds `embed` to <html>'s
+   classList synchronously, before body paints, so this rule applies
+   before the flash window opens. :root, not body -- the class exists on
+   <html> at head-time; body doesn't exist yet when the bootstrap runs. */
+:root.embed #theme-settings-trigger {
+  display: none;
+}
+
+.theme-settings-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  z-index: 210;
+  min-width: 220px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  /* shadow-sm value, literal -- the board has no --shadow-* custom
+     property (Shadows section of design-system-spec.md: shadcn's stock
+     scale isn't re-tuned per preset, so there's nothing to vendor here). */
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.theme-settings-row {
+  position: relative;
+}
+
+/* PT-69 (ux-designer's ruling, 2026-08-29): the row is now a Popover
+   TRIGGER, not an always-expanded group heading -- clicking it opens a
+   nested flyout (.theme-settings-row-flyout below), cascading to the
+   row's LEFT (side="left" in the reference Popover's own vocabulary). */
+.theme-settings-row-trigger {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--popover-foreground);
+  padding: 4px 6px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+
+.theme-settings-row-trigger:hover { background: var(--accent); color: var(--accent-foreground); }
+.theme-settings-row-trigger[aria-expanded="true"] { background: var(--accent); color: var(--accent-foreground); }
+
+.theme-settings-row-flyout {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 4px);
+  z-index: 220;
+  min-width: 160px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.theme-settings-option {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--popover-foreground);
+  padding: 3px 8px;
+  font-size: 13px;
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+
+.theme-settings-option.selected {
+  background: var(--accent);
+  color: var(--accent-foreground);
+  border-color: var(--ring);
+}
+
+.theme-settings-option:hover {
+  background: var(--accent);
+  color: var(--accent-foreground);
+}

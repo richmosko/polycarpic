@@ -1,0 +1,158 @@
+/*
+ * tokens.css — Design tokens for the project dashboard.
+ *
+ * The machine-readable reference copy of the design system's primitives.
+ * The color/border/ring/chart/sidebar tokens below are shipped verbatim
+ * (byte-identical) into the real consumer — scripts/cairn/dashboard/
+ * src/app.css's `:root`/`.dark` blocks. The radius scale and font stacks
+ * are value-identical to app.css but not block-identical: this file keeps
+ * them flat inside `:root` for a single-file reference copy, while app.css
+ * wires the same values through a separate `@theme inline` block per
+ * shadcn-svelte's standard Tailwind v4 convention (verified against the
+ * live scaffold's generated output 2026-08-26, after an earlier revision
+ * of this file carried a subtractive radius formula that had only ever
+ * been derived on paper, never checked against what the CLI actually
+ * generates — see design-system-spec.md's Radius scale section for the
+ * same correction). This file is the doc-side reference copy (PT-54 AC),
+ * not itself built — `index.html` links it to live-preview the swatches.
+ *
+ * PALETTE = shadcn-svelte "create" preset b6XadDxmQS — Style "Mira", Base
+ * "Stone" (warm neutrals), Theme "Sky" (blue primary), Chart "Yellow",
+ * Heading face Space Grotesk, Body face Merriweather, Icon library Lucide,
+ * radius 0.625rem. Values pulled verbatim from the live preset
+ * (https://www.shadcn-svelte.com/create/preview?preset=b6XadDxmQS),
+ * extracted 2026-08-26 — full detail and usage rules in
+ * docs/DESIGN/design-system-spec.md, which this file's values must match
+ * exactly (re-extract and diff both if the preset ever changes upstream).
+ *
+ * Direction pivot (2026-08-26): supersedes the retired Atlassian-modeled
+ * palette (preset b1FR0Us0w) this file previously carried. That legacy
+ * palette lived on in scripts/cairn/board/board.css only until PT-57
+ * (2026-08-27) migrated it too — board.css now consumes its own third
+ * copy of these values (scripts/cairn/board/tokens.css, colors+radius
+ * only; no font vars — see that file's own header for why a third copy
+ * is unavoidable there and how drift across all three is caught). No
+ * project-specific semantic aliases are added here: the pivot is
+ * preset-pure by design (no invented hues) — see design-system-spec.md
+ * § Project extensions for how the record-status/badge vocabulary is
+ * expressed entirely as shadcn badge variants against these tokens.
+ *
+ * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
+ */
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.147 0.004 49.25);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.147 0.004 49.25);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.147 0.004 49.25);
+  --primary: oklch(0.5 0.134 242.749);
+  --primary-foreground: oklch(0.977 0.013 236.62);
+  --secondary: oklch(0.967 0.001 286.375);
+  --secondary-foreground: oklch(0.21 0.006 285.885);
+  --muted: oklch(0.97 0.001 106.424);
+  /* PT-69 (Mosko's ruling, 2026-08-29, "darken the ink"; re-derived under
+     the "two-model rule"): darkened from the preset's own oklch(0.553
+     0.013 58.071), which fails WCAG AA against --muted above (4.39:1 <
+     4.5:1 floor) -- clears the floor under BOTH the quantized-hex and
+     float contrast models (4.58:1 / 4.56:1). See app.css's own copy of
+     this comment and scripts/cairn/design/gen_variants.py's
+     derive_muted_foreground() for the full rationale/method. */
+  --muted-foreground: oklch(0.5450 0.013 58.071);
+  --accent: oklch(0.97 0.001 106.424);
+  --accent-foreground: oklch(0.216 0.006 56.043);
+  --destructive: oklch(0.577 0.245 27.325);
+  /* PT-69 (ux-designer's ruling, 2026-08-29, on architect's f26dbad): see
+     app.css's own copy of this comment for the full rationale --
+     lightened (the direction-correct fix here) to pure white, the only
+     value with real headroom (4.35:1 -> 4.76:1); costs the preset's
+     slight warm-pink tint. See .dark's own copy for the opposite-
+     direction dark-mode fix. */
+  --destructive-foreground: oklch(1 0 0);
+  --border: oklch(0.923 0.003 48.717);
+  --input: oklch(0.923 0.003 48.717);
+  --ring: oklch(0.709 0.01 56.259);
+  --chart-1: oklch(0.905 0.182 98.111);
+  --chart-2: oklch(0.795 0.184 86.047);
+  --chart-3: oklch(0.681 0.162 75.834);
+  --chart-4: oklch(0.554 0.135 66.442);
+  --chart-5: oklch(0.476 0.114 61.907);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0.001 106.423);
+  --sidebar-foreground: oklch(0.147 0.004 49.25);
+  --sidebar-primary: oklch(0.588 0.158 241.966);
+  --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
+  --sidebar-accent: oklch(0.97 0.001 106.424);
+  --sidebar-accent-foreground: oklch(0.216 0.006 56.043);
+  --sidebar-border: oklch(0.923 0.003 48.717);
+  --sidebar-ring: oklch(0.709 0.01 56.259);
+
+  /* Radius scale — matches the live shadcn-svelte scaffold's generated
+     @theme inline block exactly (scripts/cairn/dashboard/src/app.css),
+     verified 2026-08-26 against the actual `shadcn-svelte init --preset
+     b6XadDxmQS` output -- multiplicative, not the subtractive formula an
+     earlier revision of this file (and of design-system-spec.md)
+     documented from derivation alone, never re-verified live. Same
+     computed px values at --radius: 0.625rem (6/8/10/14), but the two
+     formulas diverge the moment --radius is customized -- the scaffold
+     is ground truth. */
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Typography — face is by ROLE, not size (see design-system-spec.md
+     § Typography). --font-sans carries the base/default UI despite the
+     name; --font-heading is headings/titles only. */
+  --font-sans: 'Merriweather Variable', Georgia, 'Times New Roman', serif;
+  --font-heading: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.dark {
+  --background: oklch(0.147 0.004 49.25);
+  --foreground: oklch(0.985 0.001 106.423);
+  --card: oklch(0.216 0.006 56.043);
+  --card-foreground: oklch(0.985 0.001 106.423);
+  --popover: oklch(0.216 0.006 56.043);
+  --popover-foreground: oklch(0.985 0.001 106.423);
+  --primary: oklch(0.443 0.11 240.79);
+  --primary-foreground: oklch(0.977 0.013 236.62);
+  --secondary: oklch(0.274 0.006 286.033);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.268 0.007 34.298);
+  --muted-foreground: oklch(0.709 0.01 56.259);
+  --accent: oklch(0.268 0.007 34.298);
+  --accent-foreground: oklch(0.985 0.001 106.423);
+  --destructive: oklch(0.704 0.191 22.216);
+  /* PT-69 (architect's ruling, 2026-08-29, f26dbad): SPLIT from :root's
+     value above -- see app.css's own copy of this comment for the full
+     rationale (one shared ink can't clear both modes; dark's fill is
+     unusually lighter than light's own). Minimum darkening that clears
+     unusually lighter than light's own). Re-derived under the "two-model
+     rule" -- a bare-minimum single-model search first landed on
+     L=0.3145 (4.53:1 quantized, but only 4.4955:1 float, below floor);
+     L=0.31 clears both (4.60:1 quantized / 4.57:1 float). Also fixes
+     .engine-stale-banner (board.css), which pairs the same two tokens. */
+  --destructive-foreground: oklch(0.31 0.01 17.0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.553 0.013 58.071);
+  --chart-1: oklch(0.905 0.182 98.111);
+  --chart-2: oklch(0.795 0.184 86.047);
+  --chart-3: oklch(0.681 0.162 75.834);
+  --chart-4: oklch(0.554 0.135 66.442);
+  --chart-5: oklch(0.476 0.114 61.907);
+  --sidebar: oklch(0.216 0.006 56.043);
+  --sidebar-foreground: oklch(0.985 0.001 106.423);
+  --sidebar-primary: oklch(0.685 0.169 237.323);
+  --sidebar-primary-foreground: oklch(0.293 0.066 243.157);
+  --sidebar-accent: oklch(0.268 0.007 34.298);
+  --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.553 0.013 58.071);
+}

@@ -1,0 +1,307 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn-svelte/tailwind.css';
+/* PT-69 (architect's ruling §2): variant deltas, immediately after the
+   three imports above -- still ahead of any rule, so Tailwind v4's
+   "@import must lead the file" rule holds. Generated -- see
+   scripts/cairn/design/gen_variants.py. */
+@import './variants.css';
+
+/* PT-106 (architect's ruling, PT-106.md @ f26390c): root .gitignore
+   negates dist/ so this app's build output can be committed, and
+   Tailwind v4's automatic source detection respects .gitignore -- so
+   the PREVIOUS build's own emitted JS/CSS became a content source,
+   feeding its class-name strings into the NEXT build's utility
+   emission. The build must not depend on its own prior output. */
+@source not "../dist";
+
+/* PT-54 (architect ruling §2): fonts are self-hosted via the three
+   @fontsource-variable packages, imported as JS side-effect imports in
+   src/main.ts -- NOT a CSS @import here, which would push
+   `@import "tailwindcss";` (required to stay first) below a font import
+   and violate Tailwind v4's "@import must lead the file" rule. */
+
+@custom-variant dark (&:is(.dark *));
+
+/* Design tokens -- shadcn-svelte preset b6XadDxmQS (Style "Mira", Base
+   "Stone", Theme "Sky", Chart "Yellow"), extracted 2026-08-26. Verbatim
+   per docs/DESIGN/design-system-spec.md -- these :root/.dark blocks ARE
+   docs/DESIGN/tokens.css (PT-54 AC: same blocks ship in both places). */
+:root {
+	--background: oklch(1 0 0);
+	--foreground: oklch(0.147 0.004 49.25);
+	--card: oklch(1 0 0);
+	--card-foreground: oklch(0.147 0.004 49.25);
+	--popover: oklch(1 0 0);
+	--popover-foreground: oklch(0.147 0.004 49.25);
+	--primary: oklch(0.5 0.134 242.749);
+	--primary-foreground: oklch(0.977 0.013 236.62);
+	--secondary: oklch(0.967 0.001 286.375);
+	--secondary-foreground: oklch(0.21 0.006 285.885);
+	--muted: oklch(0.97 0.001 106.424);
+	/* PT-69 (Mosko's ruling, 2026-08-29, "darken the ink"; re-derived under
+	   architect's "two-model rule," see design-system-spec.md's
+	   Accessibility section): the preset's own published value,
+	   oklch(0.553 0.013 58.071), fails WCAG AA against --muted above
+	   (4.39:1, floor 4.5:1) -- a live a11y miss since this preset's
+	   2026-08-26 extraction. Darkened by the minimum amount that clears
+	   the floor UNDER BOTH the quantized-hex and float contrast models
+	   (4.58:1 quantized / 4.56:1 float, both well past the floor+0.05
+	   requirement) -- same derivation scripts/cairn/design/
+	   gen_variants.py's derive_muted_foreground() applies to every other
+	   Base Color variant. .dark's own --muted-foreground below already
+	   clears the floor and is untouched. */
+	--muted-foreground: oklch(0.5450 0.013 58.071);
+	--accent: oklch(0.97 0.001 106.424);
+	--accent-foreground: oklch(0.216 0.006 56.043);
+	--destructive: oklch(0.577 0.245 27.325);
+	/* PT-69 (ux-designer's ruling, 2026-08-29, on architect's f26dbad):
+	   the preset's own oklch(0.97 0.01 17) fails AA here (4.35:1, floor
+	   4.5:1). Direction-correct fix is LIGHTER ink (light-mode
+	   --destructive is a dark red); pure white is the only value with
+	   real headroom (4.76:1) -- checked a faint-tint middle ground
+	   (oklch(0.99 0.01 17), 4.58:1) and rejected it as too fragile.
+	   Costs the preset's slight warm-pink tint on destructive text;
+	   ux-designer preferred that over darkening the --destructive fill
+	   itself (a bigger, more visible brand-hue change). See .dark's own
+	   copy of this comment for the opposite-direction dark-mode fix. */
+	--destructive-foreground: oklch(1 0 0);
+	--border: oklch(0.923 0.003 48.717);
+	--input: oklch(0.923 0.003 48.717);
+	--ring: oklch(0.709 0.01 56.259);
+	--chart-1: oklch(0.905 0.182 98.111);
+	--chart-2: oklch(0.795 0.184 86.047);
+	--chart-3: oklch(0.681 0.162 75.834);
+	--chart-4: oklch(0.554 0.135 66.442);
+	--chart-5: oklch(0.476 0.114 61.907);
+	/* PT-120 (architect's gate-1 ruling, PT-120.md @fe2a929; ux-designer's
+	   mapping, same issue): the throughput chart's 3 series are now
+	   var(--chart-N) ALIASES of the selected Chart Color variant's own
+	   vendored shadcn ramp -- declared ONCE here, no per-variant CSS
+	   block, no derivation math (gen_variants.py's rotate+gamut-map
+	   machinery from PT-118 is deleted). Mapping: opened/closed/wip ->
+	   chart-1/3/5 -- the widest achievable lightness spread within a
+	   5-step ramp (measured: the only triple of five clearing categorical
+	   ΔE >= 0.06 with margin in all 24 variants, min 0.1195). PT-92's
+	   pairwise-hue (>=60 deg) and role-collision guards are RETIRED for
+	   this family: a single-hue ordinal ramp's pairwise hue spread tops
+	   out under 25 deg by construction (measured: min hue gap 0.2 deg,
+	   all 48 variant x mode combinations fail) -- replaced by categorical
+	   ΔE and the hue-independent dash/marker coincidence mechanism
+	   (IssueFlowChart.svelte), unaffected by this change. PT-83's 2:1
+	   contrast floor and the sRGB gamut check are also retired to a
+	   RECORDED OBSERVATION, never a nudge or a gate -- Mosko's steer is
+	   that these values must be EXACT (see design-system-spec.md's
+	   "Chart-local ramp" section for the observation tables: contrast
+	   misses, gamut overshoots, counter-adjacency risks). No two flow
+	   series can ever collide -- chart-1..5 is monotonic in lightness by
+	   construction. The retired PT-85/PT-92/PT-118 literal values and
+	   their own placement rationale are prior history now superseded --
+	   see those issue files for the archaeology, not this comment. */
+	--chart-flow-opened: var(--chart-1);
+	--chart-flow-closed: var(--chart-3);
+	--chart-flow-wip: var(--chart-5);
+	/* PT-79: the token/cost dashboard block's ROLE stack -- categorical
+	   (unordered), not ordinal, so this is a DIFFERENT validator shape
+	   from the flow ramp above (minimum pairwise OKLab dE, not monotone
+	   lightness). ux-designer's proposal (design-system-spec.md §
+	   Categorical role palette, commit fd6df5c), mechanism ruled by
+	   architect (PT-79 issue, amendments ad940d3 §2 + 962f3e9) --
+	   8 role hues (Okabe-Ito-derived, CVD-checked) via the explicit
+	   append-only ROLE_TOKEN_ORDER in token-chart-logic.ts, plus 3
+	   separate neutral fold/guard tokens (never one shared grey -- a
+	   grouped bucket must announce itself, same posture as cost_usd:
+	   null for an unpriced model). Guarded by
+	   scripts/cairn/tests/palette_check.py (in-repo, stdlib-only,
+	   never skips) -- both modes validated against each mode's own
+	   real --card, values parsed from THIS file, never hardcoded in
+	   the guard. Identical values in :root/.dark (no per-mode split
+	   needed -- verified against both real --card surfaces). */
+	--chart-role-1: oklch(0.570 0.1587 252.00);   /* team-lead */
+	--chart-role-2: oklch(0.6375 0.1242 76.77);   /* product-manager */
+	--chart-role-3: oklch(0.600 0.2403 300.00);   /* architect */
+	--chart-role-4: oklch(0.6018 0.2368 346.32);  /* ux-designer */
+	--chart-role-5: oklch(0.6286 0.1262 236.18);  /* seceng */
+	--chart-role-6: oklch(0.710 0.1402 105.04);   /* devops-engineer */
+	--chart-role-7: oklch(0.5735 0.1465 47.51);   /* implementation-lead */
+	--chart-role-8: oklch(0.5728 0.1114 165.46);  /* qa-engineer */
+	--chart-role-guard-aux: oklch(0.700 0.015 56.0);          /* auxiliary series */
+	--chart-role-guard-unattributed: oklch(0.440 0.020 56.0); /* subagent-unattributed series */
+	--chart-role-other: oklch(0.600 0.010 56.0);              /* grouped roles outside ROLE_TOKEN_ORDER */
+	/* PT-120: the token chart's counter-type series are also var(--chart-N)
+	   aliases now, superseding PT-79's dedicated muted cyan/teal palette
+	   entirely -- see the flow comment above for the mapping rationale.
+	   output/cache-read/cache-write/input -> chart-2/3/4/5 (chart-1
+	   deliberately UNUSED here -- it fails the 2:1 contrast floor against
+	   white in every variant, on record since 2026-08-28, and counter has
+	   no pattern-based fallback the way flow's dash/marker treatment
+	   does), preserving today's light=output/dark=input direction.
+	   Correction (architect, measured): contiguous chart-5/4/3/2 leaves
+	   4 variants (violet/indigo/blue/rose) with adjacent steps below the
+	   categorical ΔE 0.06 floor -- recorded as an observation
+	   (design-system-spec.md), not fixed, per the same "exact outranks
+	   the floor" steer. */
+	--chart-counter-input: var(--chart-5);
+	--chart-counter-cache-write: var(--chart-4);
+	--chart-counter-cache-read: var(--chart-3);
+	--chart-counter-output: var(--chart-2);
+	--radius: 0.625rem;
+	--sidebar: oklch(0.985 0.001 106.423);
+	--sidebar-foreground: oklch(0.147 0.004 49.25);
+	--sidebar-primary: oklch(0.588 0.158 241.966);
+	--sidebar-primary-foreground: oklch(0.977 0.013 236.62);
+	--sidebar-accent: oklch(0.97 0.001 106.424);
+	--sidebar-accent-foreground: oklch(0.216 0.006 56.043);
+	--sidebar-border: oklch(0.923 0.003 48.717);
+	--sidebar-ring: oklch(0.709 0.01 56.259);
+}
+
+.dark {
+	--background: oklch(0.147 0.004 49.25);
+	--foreground: oklch(0.985 0.001 106.423);
+	--card: oklch(0.216 0.006 56.043);
+	--card-foreground: oklch(0.985 0.001 106.423);
+	--popover: oklch(0.216 0.006 56.043);
+	--popover-foreground: oklch(0.985 0.001 106.423);
+	--primary: oklch(0.443 0.11 240.79);
+	--primary-foreground: oklch(0.977 0.013 236.62);
+	--secondary: oklch(0.274 0.006 286.033);
+	--secondary-foreground: oklch(0.985 0 0);
+	--muted: oklch(0.268 0.007 34.298);
+	--muted-foreground: oklch(0.709 0.01 56.259);
+	--accent: oklch(0.268 0.007 34.298);
+	--accent-foreground: oklch(0.985 0.001 106.423);
+	--destructive: oklch(0.704 0.191 22.216);
+	/* PT-69 (architect's ruling, 2026-08-29, f26dbad): SPLIT from :root's
+	   value above -- nothing requires the two modes to share one ink, and
+	   here they can't: light-mode --destructive is a dark red (favors
+	   lighter ink), dark-mode --destructive is unusually a LIGHTER red
+	   than its own light-mode counterpart (favors darker ink) -- opposite
+	   directions, so one shared value could never clear both (max
+	   achievable here with white ink is 2.89:1, still below the 4.5:1
+	   floor). Darkened via gen_variants.py's derive_destructive_foreground
+	   ("darken" direction, dark mode only), re-derived under the
+	   "two-model rule" (design-system-spec.md's Accessibility section):
+	   a bare-minimum single-model search first landed on L=0.3145, which
+	   cleared 4.5:1 under the quantized-hex model (4.53:1) but NOT the
+	   float model (4.4955:1, ux-designer's independent re-check) -- the
+	   floor sat inside the ~0.03 gap between the two bridges. L=0.31
+	   clears both with real margin (4.60:1 quantized / 4.57:1 float).
+	   Also fixes .engine-stale-banner (board.css), which pairs the same
+	   two tokens. */
+	--destructive-foreground: oklch(0.31 0.01 17.0);
+	--border: oklch(1 0 0 / 10%);
+	--input: oklch(1 0 0 / 15%);
+	--ring: oklch(0.553 0.013 58.071);
+	--chart-1: oklch(0.905 0.182 98.111);
+	--chart-2: oklch(0.795 0.184 86.047);
+	--chart-3: oklch(0.681 0.162 75.834);
+	--chart-4: oklch(0.554 0.135 66.442);
+	--chart-5: oklch(0.476 0.114 61.907);
+	/* PT-120: see :root's comment -- same var(--chart-N) alias mapping,
+	   mode-invariant (aliases resolve through the cascade regardless of
+	   mode). Prior PT-85/PT-92 literal dark-mode values retired; see
+	   :root's comment and those issue files for the archaeology. */
+	--chart-flow-opened: var(--chart-1);
+	--chart-flow-closed: var(--chart-3);
+	--chart-flow-wip: var(--chart-5);
+	/* PT-79: see :root's comment -- identical values, both real --card
+	   surfaces validated independently (no per-mode split needed). */
+	--chart-role-1: oklch(0.570 0.1587 252.00);
+	--chart-role-2: oklch(0.6375 0.1242 76.77);
+	--chart-role-3: oklch(0.600 0.2403 300.00);
+	--chart-role-4: oklch(0.6018 0.2368 346.32);
+	--chart-role-5: oklch(0.6286 0.1262 236.18);
+	--chart-role-6: oklch(0.710 0.1402 105.04);
+	--chart-role-7: oklch(0.5735 0.1465 47.51);
+	--chart-role-8: oklch(0.5728 0.1114 165.46);
+	--chart-role-guard-aux: oklch(0.700 0.015 56.0);
+	--chart-role-guard-unattributed: oklch(0.440 0.020 56.0);
+	--chart-role-other: oklch(0.600 0.010 56.0);
+	/* PT-120: see :root's comment -- same mapping (chart-1 unused). */
+	--chart-counter-input: var(--chart-5);
+	--chart-counter-cache-write: var(--chart-4);
+	--chart-counter-cache-read: var(--chart-3);
+	--chart-counter-output: var(--chart-2);
+	--sidebar: oklch(0.216 0.006 56.043);
+	--sidebar-foreground: oklch(0.985 0.001 106.423);
+	--sidebar-primary: oklch(0.685 0.169 237.323);
+	--sidebar-primary-foreground: oklch(0.293 0.066 243.157);
+	--sidebar-accent: oklch(0.268 0.007 34.298);
+	--sidebar-accent-foreground: oklch(0.985 0.001 106.423);
+	--sidebar-border: oklch(1 0 0 / 10%);
+	--sidebar-ring: oklch(0.553 0.013 58.071);
+}
+
+@theme inline {
+	/* Typography (design-system-spec.md → Typography). Face is by ROLE,
+	   not size -- --font-sans (Merriweather) is the base/default face
+	   despite the "sans" name (shadcn slot naming, not a description);
+	   --font-heading (Space Grotesk) covers headings/titles only. */
+	--font-sans: 'Merriweather Variable', Georgia, 'Times New Roman', serif;
+	--font-heading: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+	--font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+	--color-sidebar-ring: var(--sidebar-ring);
+	--color-sidebar-border: var(--sidebar-border);
+	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+	--color-sidebar-accent: var(--sidebar-accent);
+	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+	--color-sidebar-primary: var(--sidebar-primary);
+	--color-sidebar-foreground: var(--sidebar-foreground);
+	--color-sidebar: var(--sidebar);
+	--color-chart-5: var(--chart-5);
+	--color-chart-4: var(--chart-4);
+	--color-chart-3: var(--chart-3);
+	--color-chart-2: var(--chart-2);
+	--color-chart-1: var(--chart-1);
+	--color-ring: var(--ring);
+	--color-input: var(--input);
+	--color-border: var(--border);
+	--color-destructive-foreground: var(--destructive-foreground);
+	--color-destructive: var(--destructive);
+	--color-accent-foreground: var(--accent-foreground);
+	--color-accent: var(--accent);
+	--color-muted-foreground: var(--muted-foreground);
+	--color-muted: var(--muted);
+	--color-secondary-foreground: var(--secondary-foreground);
+	--color-secondary: var(--secondary);
+	--color-primary-foreground: var(--primary-foreground);
+	--color-primary: var(--primary);
+	--color-popover-foreground: var(--popover-foreground);
+	--color-popover: var(--popover);
+	--color-card-foreground: var(--card-foreground);
+	--color-card: var(--card);
+	--color-foreground: var(--foreground);
+	--color-background: var(--background);
+	--radius-sm: calc(var(--radius) * 0.6);
+	--radius-md: calc(var(--radius) * 0.8);
+	--radius-lg: var(--radius);
+	--radius-xl: calc(var(--radius) * 1.4);
+	--radius-2xl: calc(var(--radius) * 1.8);
+	--radius-3xl: calc(var(--radius) * 2.2);
+	--radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Dashboard canvas convention (design-system-spec.md → Foundations →
+   Color): page/canvas root sits on --muted, content cards/panels sit on
+   --card, so the two planes actually separate visually. */
+@layer base {
+	* {
+		@apply border-border outline-ring/50;
+	}
+	html {
+		@apply font-sans;
+	}
+	body {
+		@apply bg-muted text-foreground;
+	}
+}
+
+/* PT-110 verdict delta 2: bits-ui 2.19 copies the content's computed
+   z-index onto this wrapper inside a requestAnimationFrame
+   (use-floating-layer.svelte.js:211-227); measured on the live board,
+   it does not land, leaving every floating overlay at layer 0.
+   shadcn's own `z-50` is on the content INSIDE the wrapper, which the
+   wrapper's stacking position makes inert. */
+[data-bits-floating-content-wrapper] { z-index: 50; }

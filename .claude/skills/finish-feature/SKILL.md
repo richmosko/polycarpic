@@ -1,0 +1,129 @@
+---
+name: finish-feature
+description: Closes a feature — commits, pushes, opens a PR linked to the active cairn issue, updates the issue (status → in-review, pr → URL), and prepares the Validate handoff. Use when the implementation is complete, tests are green, and the feature is ready to merge. No arguments needed; reads feature state from process/STATE.md and the issue file.
+---
+
+# finish-feature
+
+Wraps one Implement→Validate loop (one feature) and queues it for merge. The tracker is **cairn** (`process/cairn/`, via the `scripts/cairn/cairn` CLI).
+
+## Pre-flight checks
+
+Run these in parallel; abort with a clear message if any fails:
+
+```bash
+# 1. We're on a feature branch
+git rev-parse --abbrev-ref HEAD | grep -q '^feature/' || echo "ERROR: not on a feature branch"
+
+# 2. Tests are green — HARD GATE (PT-24: the old npm/yarn/pytest||echo chain never
+#    ran the suite and never blocked). The cairn Python suite runs through the
+#    PT-93 parallel runner (file-level, default 8 workers, same pass/skip counts
+#    as `--serial` — process/reviews/PT-93/timings.md); the
+#    board.js JS suite (PT-22) chains when Node is present. Do NOT reintroduce an
+#    `npm test`-first chain — a stray package.json would silently become THE gate
+#    and skip Python. This is the finish-feature gate, so it is a FULL run
+#    (PT-94 C9: gate owner only, once) — never narrow it with `-p`.
+( cd scripts/cairn && python3 run_tests.py --gate finish ) \
+  || { echo "GATE FAIL: cairn Python suite is red — do not proceed"; exit 1; }
+if command -v node >/dev/null 2>&1 && ls scripts/cairn/tests/js/*.test.js >/dev/null 2>&1; then
+  node --test "scripts/cairn/tests/js/**/*.test.js" \
+    || { echo "GATE FAIL: board.js JS suite is red — do not proceed"; exit 1; }
+else
+  echo "NOTE: board.js JS suite skipped (Node absent or no *.test.js files) — Python suite is the hard gate."
+fi
+
+# 2b. Dashboard type-checks — HARD GATE (PT-104: the dashboard-api.ts /
+#     token-chart-logic.ts wire-type duplicate survived three loops
+#     (PT-88, PT-101, PT-102) undetected because nothing ran svelte-check
+#     until now; a gate that cannot pass is not a gate, so every error it
+#     finds is in scope, not just the one this loop introduced).
+if [ -d scripts/cairn/dashboard/node_modules ]; then
+  ( cd scripts/cairn/dashboard && node ./node_modules/svelte-check/bin/svelte-check --tsconfig ./tsconfig.app.json ) \
+    || { echo "GATE FAIL: dashboard svelte-check is red — do not proceed"; exit 1; }
+else
+  echo "NOTE: dashboard svelte-check skipped (scripts/cairn/dashboard/node_modules absent) — a local install must run this before merge."
+fi
+
+# 3. Dashboard dist/ is not stale relative to its committed source — HARD GATE
+#    (PT-58: committed dist/ used to rely on PR discipline alone; this makes it
+#    checked. Git-aware, not mtime — mtimes lie after a clone/checkout. Only
+#    fires when the feature branch actually touched the dashboard; a doc-only
+#    or non-dashboard PR reports fresh untouched.)
+python3 scripts/cairn/check_dist_freshness.py \
+  || { echo "GATE FAIL: scripts/cairn/dashboard/dist/ is stale or has uncommitted source changes — rebuild/commit dist/ before proceeding"; exit 1; }
+
+# 4. No uncommitted changes beyond the tracker's own status edits
+git status --porcelain
+```
+
+If tests are red, **do not proceed**. Surface the failure and let the user (or QA agent) fix it.
+
+## Steps
+
+### 1. Stage and commit
+
+- `git status` / `git diff` to see what's changing.
+- Group into logical commits — one per logical change. The cairn issue-file edits from this loop (status flips, comments) ride with the feature's commits.
+- Commit message format: `<type>(<issue-id>): <subject>` — e.g. `feat(PT-14): add login form`.
+- Trailer per global git instructions.
+
+### 2. Push and open PR
+
+```bash
+git push -u origin HEAD
+```
+
+Then `gh pr create` with:
+- Title: matches the issue title, prefixed with the ID (`feat(PT-14): …`)
+- Body:
+  - `Tracker: PT-14 — process/cairn/issues/PT-14.md` (there is no auto-close integration; `/merge-pr` flips the status)
+  - `## Summary` (2–4 bullets)
+  - `## Test plan` (checklist of what QA validated)
+  - `## Loop scorecard` — paste the output of `scripts/cairn/cairn loop-stats <ID>` verbatim (PT-94 E16). A row marked `OVER` gets a one-line justification under the table; the caps are soft, the justification is not optional.
+  - The standard footer
+
+**Invariant check — HARD GATE (PT-82).** Now that the PR exists, confirm origin holds exactly what this feature is supposed to produce:
+
+```bash
+python3 scripts/cairn/check_feature_branch_invariant.py \
+  || { echo "GATE FAIL: origin does not hold exactly one feature/<id>-* branch, zero worktree-* branches, and one open PR — a teammate's worktree-* branch may have reached origin"; exit 1; }
+```
+
+A pushed `worktree-*` branch is the failure that matters — it is what would produce a second PR for this issue. Do not proceed past a failure; find and delete the stray branch on origin, then re-run.
+
+### 3. Update the issue
+
+```bash
+scripts/cairn/cairn set <ID> status=in-review pr=<PR-URL>
+scripts/cairn/cairn comment <ID> --author team-lead --body - <<'EOF'
+PR opened: <PR-URL>. Awaiting Validate.
+EOF
+```
+
+Commit this tracker edit as a final chore commit on the branch (`chore(PT-14): tracker → in-review`) and push — the PR then carries its own status change.
+
+### 4. Update process/STATE.md
+
+Update the `## Active Feature` block: Status → "In Review", add the PR URL. (The board's in-review column shows the same fact — STATE.md keeps only the active-feature pointer, per the table dissolution ruled in `process/TRACKER.md`.)
+
+### 5. Head-match, then the validation handshake
+
+Before the handshake, confirm the verified code is what the PR carries: `scripts/cairn/cairn gate --head <sha qa measured green>` — `PASS` means everything since that sha is docs or tracker (PT-94 C8). qa's build-green run is not repeated; no "re-verify" message is sent.
+
+
+`SendMessage` to qa-engineer: "Feature <ID> opened as PR <url>. Drive Validate." (If teammate messaging is unavailable, the qa-engineer picks up via the anchor task or a `temp/` note — see the hand-off protocol in `process/WORKFLOW.md`.)
+
+The Validate phase begins. QA + DevOps + Architect review, deploy to staging, and either approve merge (then `/merge-pr`) or send back a fix request.
+
+### 6. Promote durable state before teardown
+
+The shared task list is **session-scoped** — it disappears with the team. Before teardown:
+
+- Anything on the anchor task that captures a **decision** or **lesson** gets promoted:
+  - Decisions → `process/DECISIONS.md`
+  - Implementation notes future-you wants → `cairn comment <ID> --author <role> --body -` (the issue file is the durable record)
+- Ephemeral status pings and WIP markers stay transient — that's the point.
+
+## After-merge follow-up
+
+This skill does **not** auto-merge. Merge is a separate step (`/merge-pr`) gated on QA approval and a human review.

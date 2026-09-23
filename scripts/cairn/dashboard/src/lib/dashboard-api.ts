@@ -1,0 +1,366 @@
+// PT-54: typed client for GET /api/dashboard (scripts/cairn/cairn.py) and
+// the freshness contract the architect ruled on -- SSE refetch (the
+// existing /api/events channel, coarse: any frame -> refetch) PLUS a 15s
+// poll, because the data-dir watcher backing /api/events only scans
+// process/cairn/, so a branch switch / new tag / dirty working tree is
+// invisible to it. This module owns both triggers; callers just get an
+// `onUpdate` callback.
+
+export type GitState = {
+	branch: string | null;
+	dirty: boolean | null;
+	head: string | null;
+	latest_tag: string | null;
+	warning: string | null;
+	// PT-68: the ONE field in this group that's never null, even when
+	// every other git-dependent field degrades -- a directory basename
+	// needs no git subprocess to exist, so the sidebar header stays
+	// honest instead of blank on a repo with no git history.
+	repo_name: string;
+};
+
+export type TrackerCounts = Record<string, number>;
+
+export type CheckResult = {
+	ok: boolean;
+	errors: string[];
+};
+
+// Matches build_dashboard_payload's `_find_release_milestone` join exactly
+// (scripts/cairn/cairn.py) -- `id`/`name`/`status`/`ga` are the matched
+// milestone's own fields, not a `tag` (the tag lives on `git.latest_tag`,
+// which is what produced this join in the first place). `null` whole-object
+// when nothing matches (including "no tags at all").
+export type ReleaseRow = {
+	id: string | null;
+	name: string | null;
+	status: string | null;
+	ga: boolean | null;
+} | null;
+
+export type DashboardPayload = {
+	git: GitState;
+	tracker: { counts_by_status: TrackerCounts };
+	check: CheckResult;
+	release: ReleaseRow;
+	generated_at: string;
+};
+
+const POLL_INTERVAL_MS = 15_000;
+
+export async function fetchDashboard(
+	etag?: string,
+): Promise<{ payload: DashboardPayload | null; etag: string | null; notModified: boolean }> {
+	const headers: Record<string, string> = {};
+	if (etag) headers['If-None-Match'] = etag;
+	const res = await fetch('/api/dashboard', { headers });
+	if (res.status === 304) {
+		return { payload: null, etag: etag ?? null, notModified: true };
+	}
+	if (!res.ok) {
+		throw new Error(`GET /api/dashboard -> ${res.status}`);
+	}
+	const payload = (await res.json()) as DashboardPayload;
+	return { payload, etag: res.headers.get('ETag'), notModified: false };
+}
+
+/**
+ * Subscribes to both freshness triggers and calls `onUpdate` with every
+ * successfully fetched payload (never with a 304 -- the caller only cares
+ * about actual data, the ETag dance is this module's own concern).
+ * Returns a teardown function.
+ */
+export function subscribeDashboard(
+	onUpdate: (payload: DashboardPayload) => void,
+	onError: (err: unknown) => void = () => {},
+): () => void {
+	let etag: string | undefined;
+	let stopped = false;
+
+	const refresh = async () => {
+		try {
+			const result = await fetchDashboard(etag);
+			if (stopped) return;
+			if (result.etag) etag = result.etag;
+			if (result.payload) onUpdate(result.payload);
+		} catch (err) {
+			if (!stopped) onError(err);
+		}
+	};
+
+	// Initial load.
+	void refresh();
+
+	// Slow poll -- the only trigger for git-state changes (branch/tag/dirty),
+	// which the SSE watcher never sees (it scans process/cairn/ only).
+	const pollId = window.setInterval(() => void refresh(), POLL_INTERVAL_MS);
+
+	// SSE -- coarse contract shared with the board: any frame means
+	// refetch, never a targeted diff.
+	const source = new EventSource('/api/events');
+	source.onmessage = () => void refresh();
+	source.onerror = (err) => {
+		// EventSource auto-reconnects on its own; this is informational,
+		// not fatal -- the poll above keeps the dashboard fresh regardless.
+		onError(err);
+	};
+
+	return () => {
+		stopped = true;
+		window.clearInterval(pollId);
+		source.close();
+	};
+}
+
+// PT-56: the agent-roster panel's data source. Architect's ruling puts
+// this behind a SEPARATE endpoint (GET /api/roster, never a key on
+// /api/dashboard) -- kept as a separate type/fetch/subscribe trio here
+// too, mirroring that boundary on the client rather than folding it into
+// DashboardPayload's shape.
+// PT-65 (split out of PT-56/PT-60): `work` used to be a server-composed
+// English sentence ("last shipped PT-1: ...") the component re-parsed
+// with `.split(':')` -- now a structured object, `id`/`title`/`status`
+// straight off the underlying issue, `kind` classifying how to frame it
+// (current: a live not-yet-shipped assignment; stale: working-shaped but
+// its `updated` predates today, pairs with the `stale_since` field below;
+// history: a kept-for-provenance `done` issue, reads as past work). `null`
+// only when the agent has no live assignment at all (presence: 'unknown').
+export type RosterAgent = {
+	id: string;
+	name: string;
+	role: string;
+	presence: 'working' | 'idle' | 'unknown';
+	work: {
+		id: string;
+		title: string;
+		status: string;
+		kind: 'current' | 'stale' | 'history';
+	} | null;
+	stale_since: string | null;
+};
+
+export type RosterPayload = {
+	agents: RosterAgent[];
+};
+
+export async function fetchRoster(): Promise<RosterPayload> {
+	const res = await fetch('/api/roster');
+	if (!res.ok) {
+		throw new Error(`GET /api/roster -> ${res.status}`);
+	}
+	return (await res.json()) as RosterPayload;
+}
+
+/**
+ * Poll-only refresh, same 15s cadence as the dashboard's own poll --
+ * deliberately NOT wired to /api/events: the watcher backing that stream
+ * scans process/cairn/ only, so a change under .claude/agents/ (this
+ * panel's identity source) would never emit a frame. SSE would be pure
+ * decoration here, not a real freshness trigger.
+ */
+export function subscribeRoster(
+	onUpdate: (payload: RosterPayload) => void,
+	onError: (err: unknown) => void = () => {},
+): () => void {
+	let stopped = false;
+
+	const refresh = async () => {
+		try {
+			const payload = await fetchRoster();
+			if (!stopped) onUpdate(payload);
+		} catch (err) {
+			if (!stopped) onError(err);
+		}
+	};
+
+	void refresh();
+	const pollId = window.setInterval(() => void refresh(), POLL_INTERVAL_MS);
+
+	return () => {
+		stopped = true;
+		window.clearInterval(pollId);
+	};
+}
+
+// PT-61: the issue-flow chart's data source. Architect's ruling puts this
+// behind a SEPARATE endpoint too (GET /api/flow, never a key on
+// /api/dashboard) -- different cost profile (bounded git subprocesses on
+// a cache miss), different cache key (HEAD sha), different freshness
+// cadence. `counts` keys are always the live STATUS_ORDER set server-side;
+// PT-85: PT-61's cumulative status-stack shape (`counts: Record<string,
+// number>`) is retired -- replaced by a throughput view (architect's
+// ruling 409d310, payload pinned at 2f8eba0). `opened`/`closed`/
+// `cancelled` are per-period DELTAS (a missing key would mean zero);
+// `wip` is POINT-IN-TIME (a missing key would mean "unchanged") -- see
+// `by_milestone`'s own comment for why the server never actually omits
+// either kind once a milestone has appeared.
+export type FlowMilestoneBreakdown = {
+	opened: number;
+	closed: number;
+	cancelled: number;
+	wip: number;
+};
+
+export type FlowPoint = {
+	date: string; // UTC calendar day, half-open [start, next)
+	opened: number;
+	closed: number;
+	cancelled: number;
+	wip: number;
+	// DENSE from a milestone's first appearance in the walk onward (never
+	// sparse) -- the server, not the client, resolves the "missing means
+	// zero vs missing means unchanged" ambiguity a sparse dict would leave
+	// for every consumer to get right independently.
+	by_milestone: Record<string, FlowMilestoneBreakdown>;
+};
+
+export type FlowMilestone = {
+	id: string;
+	// `null` when the walk saw this id (so it's real, selectable history)
+	// but no CURRENT milestone file carries it any more.
+	name: string | null;
+	status: string | null;
+};
+
+export type FlowPayload = {
+	period: 'day'; // server emits day granularity only; week is a client aggregation
+	series: FlowPoint[];
+	milestones: FlowMilestone[];
+	default_milestone: string | null;
+	as_of: string | null;
+	scope: string;
+	warning: string | null;
+};
+
+export async function fetchFlow(): Promise<FlowPayload> {
+	const res = await fetch('/api/flow');
+	if (!res.ok) {
+		throw new Error(`GET /api/flow -> ${res.status}`);
+	}
+	return (await res.json()) as FlowPayload;
+}
+
+/**
+ * Poll-only, same reasoning as subscribeRoster above -- history is a pure
+ * function of committed git state, which the SSE watcher (process/cairn/
+ * working-tree changes) never touches. Ruling: "the client polls this on
+ * its own cadence (roster's pattern)."
+ */
+export function subscribeFlow(
+	onUpdate: (payload: FlowPayload) => void,
+	onError: (err: unknown) => void = () => {},
+): () => void {
+	let stopped = false;
+
+	const refresh = async () => {
+		try {
+			const payload = await fetchFlow();
+			if (!stopped) onUpdate(payload);
+		} catch (err) {
+			if (!stopped) onError(err);
+		}
+	};
+
+	void refresh();
+	const pollId = window.setInterval(() => void refresh(), POLL_INTERVAL_MS);
+
+	return () => {
+		stopped = true;
+		window.clearInterval(pollId);
+	};
+}
+
+// PT-79: the token/cost dashboard block's data source. Architect's ruling
+// puts this behind its own endpoint too (GET /api/tokens, never a key on
+// /api/dashboard) -- different cost profile (a metrics-file parse plus a
+// price lookup on a cache miss), different cache key (the metrics file's
+// own mtime/size), different freshness cadence (a backfill re-run or an
+// otel flush, neither of which the /api/events watcher -- process/cairn/
+// working-tree changes only -- would ever see). Aggregated server-side to
+// issue x role; per-model detail never crosses the wire (the price table
+// stays server-side too).
+export type TokenCounters = {
+	input: number;
+	cache_write: number;
+	cache_read: number;
+	output: number;
+	cost_usd: number | null;
+};
+
+export type TokenRoleTotal = TokenCounters & { role: string };
+
+// PT-84 §7: server-computed, never string-sniffed here -- the chart must
+// not infer a bar's kind by parsing the `milestone:` prefix off `issue`
+// itself (exactly the coupling §7 rejects; see build_tokens_payload's
+// _token_bucket_kind).
+export type TokenKind = 'issue' | 'milestone' | 'main';
+
+export type TokenIssueTotal = {
+	issue: string;
+	kind: TokenKind;
+	total: TokenCounters;
+	roles: TokenRoleTotal[];
+	// PT-102 (amended ruling, PT-102.md @ ccd4f48, item (a)): the
+	// status->done transition date, server-computed by reusing the
+	// throughput chart's own git-history derivation -- never re-derived
+	// here. The emitter writes the key unconditionally -- `null`, never
+	// absent, for an issue not yet done ("open").
+	closed_at: string | null;
+};
+
+export type TokensPayload = {
+	issues: TokenIssueTotal[];
+	window_start: string | null;
+	window_end: string | null;
+	generated: string | null;
+	sources: string[];
+	prices: {
+		retrieved: string | null;
+		source: string | null;
+		unpriced_models: string[];
+	};
+	warning: string | null;
+	// PT-84 §7: one-clause explanation of what milestone bars are, null
+	// when the payload carries no milestone bucket -- server-composed
+	// (cairn.py's build_tokens_payload), appended VERBATIM by
+	// token-chart-logic.ts's formatCaption, never recomposed client-side.
+	milestone_caption: string | null;
+};
+
+export async function fetchTokens(): Promise<TokensPayload> {
+	const res = await fetch('/api/tokens');
+	if (!res.ok) {
+		throw new Error(`GET /api/tokens -> ${res.status}`);
+	}
+	return (await res.json()) as TokensPayload;
+}
+
+/**
+ * Poll-only, same reasoning as subscribeFlow/subscribeRoster above -- the
+ * metrics file is written by two out-of-band processes (a one-time
+ * backfill, an OTel receiver flushing at most every 30 minutes), neither
+ * of which the SSE watcher can see.
+ */
+export function subscribeTokens(
+	onUpdate: (payload: TokensPayload) => void,
+	onError: (err: unknown) => void = () => {},
+): () => void {
+	let stopped = false;
+
+	const refresh = async () => {
+		try {
+			const payload = await fetchTokens();
+			if (!stopped) onUpdate(payload);
+		} catch (err) {
+			if (!stopped) onError(err);
+		}
+	};
+
+	void refresh();
+	const pollId = window.setInterval(() => void refresh(), POLL_INTERVAL_MS);
+
+	return () => {
+		stopped = true;
+		window.clearInterval(pollId);
+	};
+}
