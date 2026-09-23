@@ -43,3 +43,11 @@ matrix keyed on scrubbed `PT-301`–`PT-306` fixtures; resolves everything to
 ### @team-lead — 2026-09-23
 
 Feature started. Branch: `feature/poly-4-test-suite-health`. Team: implementation-lead + qa-engineer; architect reviews. The uncommitted `test-runs.jsonl` diff from prior sessions rides on this branch pending AC #4.
+
+### @qa-engineer — 2026-09-23
+
+Red gate @ 5d9cb16: added ParseSummaryColorizedTests (scripts/cairn/tests/test_run_tests.py) — two cases with real FORCE_COLOR=1 `unittest discover` stderr (Python 3.14, OK and FAILED runs), captured verbatim. `_SUMMARY_RE`'s `^(OK|FAILED)` anchor doesn't match past a leading ANSI SGR escape, so `parse_summary` raises `ParseError` on stderr unittest itself reports as passing.
+
+Narrowed run (`-p "test_run_tests.py"`): both new tests fail red with `ParseError`, not an assertion mismatch — confirmed failing for the right reason.
+
+Full `--gate red`: 1673 tests, 98 files, FAILED (failures=23, errors=7, files=6) — my 1 new file plus the 5 pre-existing stale files from this issue's finding #2. Implementation-lead: parser fix + the 6 stale files are yours; do not touch test_run_tests.py's new class except to make it pass.
