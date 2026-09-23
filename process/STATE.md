@@ -21,7 +21,7 @@ _None — Research phase._
 
 **Template base:** bootstrapped 2026-09-23 from [`project_template`](https://github.com/richmosko/project_template) **v0.12.2** — diff template updates against that tag when porting them here.
 
-Full history, every tagged release with its notes, lives at [the GitHub Releases page](https://github.com/richmosko/polycopic/releases) — this row is a pointer, not a log. Cut via `/merge-pr`; `/merge-pr` **replaces** this row (never appends) on every tag.
+Full history, every tagged release with its notes, lives at [the GitHub Releases page](https://github.com/richmosko/polycarpic/releases) — this row is a pointer, not a log. Cut via `/merge-pr`; `/merge-pr` **replaces** this row (never appends) on every tag.
 
 | Version | Date | Major line | Milestone shipped | Branch | Notes |
 |---|---|---|---|---|---|

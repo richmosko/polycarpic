@@ -1,4 +1,4 @@
-# Polycopic — Project Kickoff
+# Polycarpic — Project Kickoff
 
 _Consolidated from [`project_manifesto.md`](project_manifesto.md) (the Principal's original brief, frozen as written) and the clarification pass of 2026-09-22/23. This file is the operative kickoff record: where it and the manifesto disagree, this file wins. It is a living document until the PRD absorbs the roadmap and the ARCH doc absorbs the architecture decisions; after that it is frozen as history._
 

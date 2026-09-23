@@ -1,4 +1,4 @@
-# polycopic
+# polycarpic
 
 > Personal budgeting and wealth management, growing into a virtual Single Family Office: a real double-entry general ledger under the hood, a Monarch/Origin-grade dashboard on top, multi-entity (Person / Trust / Business / Household) with row-level security, self-hostable on one VPS.
 
