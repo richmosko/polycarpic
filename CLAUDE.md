@@ -75,7 +75,7 @@ The auto-injected STATE head gives you the dashboard; this runbook is the rest o
 
 ## Bootstrap status
 
-Bootstrapped 2026-09-23 from `project_template` v0.12.2 (`process/DECISIONS.md`). Tracker (`/setup-tracker`) done: prefix `POLY`, major `POLY-V1`, milestones `POLY-A`/`POLY-B`, delivery autonomy `stop-at-merge`, telemetry on (port 4318). Team-agents enabled (`teammateMode: "tmux"`). **Still to confirm on the GitHub side:** Claude's SSH deploy key (`/setup-claude-deploy-key`) and branch protection on `main` (require a PR before merging; no bypass) — the workflow's "no direct pushes" rule is advisory until branch protection is on.
+Bootstrapped 2026-09-23 from `project_template` v0.12.2 (`process/DECISIONS.md`). Tracker (`/setup-tracker`) done: prefix `POLY`, major `POLY-V1`, milestones `POLY-A`/`POLY-B`, delivery autonomy `stop-at-merge`, telemetry on (port 4318). Team-agents enabled (`teammateMode: "tmux"`). GitHub side confirmed 2026-09-23: Claude's SSH deploy key is registered and `main` is protected (PR required, admins included, no force-push), so the workflow's "no direct pushes" rule is enforced.
 
 ## Working principles
 

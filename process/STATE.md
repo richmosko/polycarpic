@@ -15,7 +15,13 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — Research phase._
+- **Feature:** Per-agent git author identity in worktrees
+- **Issue:** `POLY-1` (cairn) — [`process/cairn/issues/POLY-1.md`](cairn/issues/POLY-1.md)
+- **Milestone:** `POLY-A` (Bootstrap & Research) — first of three workflow items (POLY-1 → POLY-2 → POLY-3) from kickoff § 2.1 / § 2.12
+- **Branch:** `feature/poly-1-agent-git-identity`
+- **Started:** 2026-09-23
+- **Goal:** every teammate's commits carry its own git author identity, set per worktree, so the path-ownership check and the estimation loop can attribute work by agent.
+- **Status:** In Progress
 
 ## Releases
 
