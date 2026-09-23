@@ -5,29 +5,38 @@ token-usage.jsonl moves too): idempotent bootstrap for
 `process/cairn/metrics/` as a nested worktree of the orphan `metrics`
 branch. That branch holds `test-runs.jsonl`, `token-usage.jsonl`, a
 `.gitattributes` (`*.jsonl merge=union`), and its own `.gitignore` for
-the otel receiver's runtime scratch (`.receiver.pid`, `.sessions/`,
-`otel_receiver.log`, `*.swp`) -- never merged into `main` or any feature
-branch. See WORKFLOW.md -> Metrics branch for the full rule.
+the otel receiver's runtime scratch (`.receiver.pid`, `.lock`,
+`.sessions/`, `otel_receiver.log`, `*.swp`) -- never merged into `main`
+or any feature branch. See WORKFLOW.md -> Metrics branch for the full rule.
 
 Wired as a SessionStart hook step (.claude/settings.json) so every fresh
-session -- the main checkout or any teammate's `.claude/worktrees/*`
-checkout -- gets a working `process/cairn/metrics/` without a manual
-bootstrap step.
+session in the MAIN checkout gets a working `process/cairn/metrics/`
+without a manual bootstrap step. A no-op in any linked worktree
+(architect's block, POLY-4.md review item 3c) -- the main checkout may
+already have `metrics` checked out there, which would fail every such
+session and cost a network fetch each time for nothing; every session's
+writes/commits reach the main checkout's nested worktree anyway, the
+same way `run_tests.py`'s own worktree -> main-checkout redirect works.
 
 Idempotent: exits 0 immediately once `process/cairn/metrics/` is
 registered as a git worktree (checked via `git worktree list
 --porcelain`'s own path list, never just "a `.git` file exists there" --
 a stale or foreign `.git` file must not be trusted as proof).
 
-Bootstrap path (first run in a checkout, or after `metrics` was deleted
-locally):
-1. `git fetch origin metrics`. If origin has it -- the normal case once
-   any checkout has run this script after POLY-4's one-time seed push --
-   create a local branch tracking it.
-2. If origin has no `metrics` ref at all (a fresh fork before anyone has
-   pushed one), create it as a fresh orphan worktree instead of failing:
-   `git worktree add --orphan -b metrics <path>`, then commit a real
-   first commit so the branch isn't left with an unborn HEAD.
+Bootstrap path (first run in the main checkout, or after `metrics` was
+deleted locally):
+1. `git fetch origin metrics` (best-effort). Then check
+   `refs/remotes/origin/metrics` directly, regardless of whether the
+   fetch itself succeeded -- a fresh clone already carries that ref
+   locally from its own clone, and an offline/auth-failed fetch here
+   must never be read as "no ref exists" (architect's block, item 3a).
+   If present, create a local branch tracking it.
+2. Only when NEITHER a local nor a remote-tracking ref exists, AND
+   `git ls-remote --exit-code origin refs/heads/metrics` exits exactly
+   `2` (ls-remote's own "ref not found" code, never conflated with a
+   network/auth failure): create a fresh orphan worktree instead of
+   failing -- `git worktree add --orphan -b metrics <path>`, then commit
+   a real first commit so the branch isn't left with an unborn HEAD.
 3. `git worktree add <path> metrics` once the ref exists locally by
    either path above.
 
@@ -48,6 +57,12 @@ first mount (team-lead, live repro). A renamed-aside
 directory keeps any process's already-open file descriptors on files
 inside it valid (POSIX rename semantics) -- the otel receiver's own log
 fd survives this swap without needing to be told to reopen anything.
+
+If the add/bootstrap step itself fails -- including the otel receiver
+flushing during the swap window and recreating `process/cairn/metrics/`
+out from under it (architect's fix, item 3d) -- the backup is never
+stranded: it's merged into whatever now occupies the path if something
+does, or renamed straight back if nothing does.
 
 Never raises: a broken repo state here must not fail the session start
 it's wired into. Prints one diagnostic line to stderr on any skip/error;
@@ -161,6 +176,57 @@ def _restore_backup_into(backup: Path, path: Path) -> None:
     shutil.rmtree(backup, ignore_errors=True)
 
 
+def _is_linked_worktree(repo_root: Path) -> bool:
+    """True iff `repo_root` is a LINKED worktree, discriminated the same
+    way `run_tests.py`'s `_resolve_worktree_main_checkout` is (PT-82
+    ruling): `--git-dir` != `--git-common-dir`. A session started inside
+    `.claude/worktrees/*` must never try to `git worktree add` the
+    `metrics` branch itself here -- the main checkout may already have
+    it checked out, which fails every such session and costs a network
+    fetch each time for nothing (architect's block, POLY-4.md review).
+    The main checkout's own nested worktree is what every session's
+    writes/commits ultimately reach anyway, the same way `run_tests.py`'s
+    own worktree -> main-checkout redirect already works."""
+    git_dir = _git("rev-parse", "--git-dir", cwd=repo_root)
+    common_dir = _git("rev-parse", "--git-common-dir", cwd=repo_root)
+    if git_dir.returncode != 0 or common_dir.returncode != 0:
+        return False
+    git_dir_path = (repo_root / git_dir.stdout.strip()).resolve()
+    common_dir_path = (repo_root / common_dir.stdout.strip()).resolve()
+    return git_dir_path != common_dir_path
+
+
+def _remote_metrics_branch_definitively_absent() -> bool:
+    """True iff `git ls-remote --exit-code origin refs/heads/<BRANCH>`
+    exits exactly 2 -- ls-remote's OWN code for "ref not found", distinct
+    from every other non-zero exit (network unreachable, auth failure, a
+    malformed remote) which must never be read as "safe to create new,
+    unrelated orphan history" (architect's block, POLY-4.md review: an
+    offline/auth-failed `git fetch` used to be silently treated as
+    "origin has no metrics", creating a divergent orphan whose first
+    `/finish-feature` push then gets rejected)."""
+    result = _git("ls-remote", "--exit-code", "origin", f"refs/heads/{BRANCH}")
+    return result.returncode == 2
+
+
+def _reclaim_backup_after_failed_bootstrap() -> None:
+    """Never strand `BACKUP_PATH` on a failed add/bootstrap (architect's
+    fix item 3d): if something now occupies `METRICS_PATH` (e.g. the
+    otel receiver flushed during the swap window and recreated the
+    directory), merge the backup's content into it via the same restore
+    logic a successful mount uses; otherwise just put the backup back
+    exactly where it was."""
+    if not BACKUP_PATH.exists():
+        return
+    if METRICS_PATH.exists():
+        _restore_backup_into(BACKUP_PATH, METRICS_PATH)
+        return
+    try:
+        BACKUP_PATH.rename(METRICS_PATH)
+    except OSError as exc:
+        sys.stderr.write(f"ensure_metrics_worktree: could not restore backup after failed bootstrap: {exc}\n")
+
+
 def _bootstrap_fresh_orphan() -> None:
     add = _git("worktree", "add", "--orphan", "-b", BRANCH, str(METRICS_PATH))
     if add.returncode != 0:
@@ -171,25 +237,32 @@ def _bootstrap_fresh_orphan() -> None:
     # have something to build on.
     (METRICS_PATH / ".gitattributes").write_text("*.jsonl merge=union\n", encoding="utf-8")
     (METRICS_PATH / ".gitignore").write_text(
-        ".receiver.pid\n.sessions/\notel_receiver.log\n*.swp\n", encoding="utf-8",
+        ".receiver.pid\n.lock\n.sessions/\notel_receiver.log\n*.swp\n", encoding="utf-8",
     )
     _git("add", "--", ".gitattributes", ".gitignore", cwd=METRICS_PATH)
     _git("commit", "-q", "-m", "metrics: initialize orphan branch", cwd=METRICS_PATH)
 
 
 def main() -> int:
+    if _is_linked_worktree(REPO_ROOT):
+        return 0
+
     if _is_registered_worktree(METRICS_PATH):
         return 0
 
-    swapped = METRICS_PATH.exists()
     if not _swap_aside(METRICS_PATH, BACKUP_PATH):
         return 0
 
-    fetch = _git("fetch", "origin", BRANCH)
-    have_remote_branch = fetch.returncode == 0
+    # Best-effort -- refreshes refs/remotes/origin/<BRANCH> when origin is
+    # reachable. Its return code is NOT the signal for "does origin have
+    # metrics": a fresh clone already has refs/remotes/origin/<BRANCH>
+    # locally without this script ever running, and an offline/auth
+    # failure here must not be conflated with "no ref exists at all".
+    _git("fetch", "origin", BRANCH)
+    have_remote_tracking_ref = _git("rev-parse", "--verify", f"refs/remotes/origin/{BRANCH}").returncode == 0
     have_local_branch = _git("rev-parse", "--verify", f"refs/heads/{BRANCH}").returncode == 0
 
-    if have_remote_branch and not have_local_branch:
+    if have_remote_tracking_ref and not have_local_branch:
         _git("branch", BRANCH, f"refs/remotes/origin/{BRANCH}")
         have_local_branch = True
 
@@ -197,21 +270,28 @@ def main() -> int:
         add = _git("worktree", "add", str(METRICS_PATH), BRANCH)
         if add.returncode != 0:
             sys.stderr.write(f"ensure_metrics_worktree: git worktree add failed: {add.stderr}\n")
-            if swapped and not METRICS_PATH.exists():
-                # Don't strand the backup on a failed add -- put it back
-                # exactly where it was.
-                BACKUP_PATH.rename(METRICS_PATH)
+            _reclaim_backup_after_failed_bootstrap()
             return 0
-    else:
-        # Neither local nor remote has `metrics` yet -- this is a fresh
-        # fork nobody has bootstrapped. Create it, rather than fail.
+    elif _remote_metrics_branch_definitively_absent():
+        # Neither local nor remote-tracking has `metrics`, AND origin
+        # itself confirms no such ref exists -- a fresh fork nobody has
+        # bootstrapped yet. Create it, rather than fail.
         _bootstrap_fresh_orphan()
         if not METRICS_PATH.exists():
-            if swapped:
-                BACKUP_PATH.rename(METRICS_PATH)
+            _reclaim_backup_after_failed_bootstrap()
             return 0
+    else:
+        # Can't confirm either way (network/auth issue) -- never guess;
+        # guessing "absent" here is exactly the defect that created
+        # divergent orphan histories.
+        sys.stderr.write(
+            "ensure_metrics_worktree: could not confirm origin's metrics branch "
+            "state (network or auth issue?) -- skipping bootstrap this run\n"
+        )
+        _reclaim_backup_after_failed_bootstrap()
+        return 0
 
-    if swapped:
+    if BACKUP_PATH.exists():
         _restore_backup_into(BACKUP_PATH, METRICS_PATH)
     return 0
 

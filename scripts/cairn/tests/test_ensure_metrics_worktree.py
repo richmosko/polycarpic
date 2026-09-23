@@ -179,5 +179,71 @@ class FirstMountMergesLocalAppendsTests(unittest.TestCase):
         )
 
 
+class OfflineFetchNeverCreatesADivergentOrphanTests(unittest.TestCase):
+    """Architect's block (POLY-4.md review, item 3a): an offline/auth-
+    failed `git fetch` used to be read as "origin has no metrics",
+    creating a fresh orphan with unrelated history -- even though a
+    fresh clone already carries `refs/remotes/origin/metrics` locally
+    (git's own post-push tracking-ref update, confirmed live: pushing
+    `<sha>:refs/heads/metrics` populates it without ever running `git
+    fetch`) and `git ls-remote` would have confirmed the ref is real if
+    origin were reachable."""
+
+    def test_a_broken_origin_url_still_mounts_the_real_branch_not_a_fresh_orphan(self):
+        seed_lines = ['{"n": 1}', '{"n": 2}']
+        checkout_root, _bare_remote = _build_fake_repo_with_pushed_metrics_branch(self, seed_lines)
+        # refs/remotes/origin/metrics is already populated locally (the
+        # push above updated it) -- now make origin itself unreachable,
+        # simulating the offline/auth-failed case the block is about.
+        result = _git(checkout_root, "remote", "set-url", "origin", "/no/such/path/does-not-exist.git")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        metrics_dir = checkout_root / "process" / "cairn" / "metrics"
+        metrics_dir.mkdir(parents=True)
+        (metrics_dir / "test-runs.jsonl").write_text(
+            "".join(line + "\n" for line in seed_lines), encoding="utf-8",
+        )
+
+        result = _run_script(checkout_root)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        final_lines = (metrics_dir / "test-runs.jsonl").read_text(encoding="utf-8").splitlines()
+        self.assertEqual(
+            final_lines, seed_lines,
+            f"an unreachable origin must still mount the REAL branch from the local "
+            f"refs/remotes/origin/metrics tracking ref, never fabricate a fresh orphan "
+            f"with unrelated history -- got {final_lines!r}",
+        )
+        self.assertTrue((metrics_dir / ".git").is_file())
+
+
+class LinkedWorktreeSessionIsANoOpTests(unittest.TestCase):
+    """Architect's block (POLY-4.md review, item 3c): a session started
+    inside a linked worktree must never try to `git worktree add` the
+    `metrics` branch itself -- the main checkout may already have it
+    checked out, which would fail every such session and cost a network
+    fetch each time for nothing."""
+
+    def test_running_from_a_linked_worktree_does_nothing(self):
+        seed_lines = ['{"n": 1}']
+        checkout_root, _bare_remote = _build_fake_repo_with_pushed_metrics_branch(self, seed_lines)
+
+        linked_root = helpers.make_empty_tmp_dir(self) / "linked"
+        result = _git(checkout_root, "worktree", "add", "-b", "feature-x", str(linked_root))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        script_dir = linked_root / "scripts" / "cairn"
+        script_dir.mkdir(parents=True)
+        (script_dir / "ensure_metrics_worktree.py").write_text(
+            SCRIPT_SRC.read_text(encoding="utf-8"), encoding="utf-8",
+        )
+
+        result = _run_script(linked_root)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(
+            (linked_root / "process" / "cairn" / "metrics").exists(),
+            "a linked worktree session must do nothing -- no mount, no directory created",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
