@@ -263,11 +263,11 @@ class BackfillRoleMatrixTests(unittest.TestCase):
 
     def test_roster_agent_setting_wins_over_a_non_roster_agent_name(self):
         by_issue, _ = self._run()
-        self.assertEqual(by_issue.get("PT-301"), "qa-engineer", by_issue)
+        self.assertEqual(by_issue.get("POLY-301"), "qa-engineer", by_issue)
 
     def test_non_roster_agent_setting_is_kept_verbatim_and_stays_on_the_unmapped_trail(self):
         by_issue, stderr = self._run()
-        self.assertEqual(by_issue.get("PT-302"), "claude-code-guide", by_issue)
+        self.assertEqual(by_issue.get("POLY-302"), "claude-code-guide", by_issue)
         self.assertIn(
             "claude-code-guide", stderr,
             f"a non-roster agentSetting must still be reported on the unmapped-names paper trail -- got stderr: {stderr!r}",
@@ -276,24 +276,24 @@ class BackfillRoleMatrixTests(unittest.TestCase):
     def test_agent_setting_present_agent_name_absent_is_not_team_lead(self):
         # The exact live mis-attribution the whole ticket exists to fix.
         by_issue, _ = self._run()
-        self.assertEqual(by_issue.get("PT-303"), "implementation-lead", by_issue)
-        self.assertNotEqual(by_issue.get("PT-303"), "team-lead", "must not collapse to team-lead just because agentName is absent")
+        self.assertEqual(by_issue.get("POLY-303"), "implementation-lead", by_issue)
+        self.assertNotEqual(by_issue.get("POLY-303"), "team-lead", "must not collapse to team-lead just because agentName is absent")
 
     def test_agent_setting_absent_roster_suffixed_agent_name_still_normalises(self):
         by_issue, _ = self._run()
-        self.assertEqual(by_issue.get("PT-304"), "qa-engineer", by_issue)
+        self.assertEqual(by_issue.get("POLY-304"), "qa-engineer", by_issue)
 
     def test_agent_setting_absent_adhoc_agent_name_stays_verbatim_and_unmapped(self):
         by_issue, stderr = self._run()
-        self.assertEqual(by_issue.get("PT-305"), "impl2", by_issue)
+        self.assertEqual(by_issue.get("POLY-305"), "impl2", by_issue)
         self.assertIn("impl2", stderr, f"impl2 must still appear on the unmapped-names trail -- got stderr: {stderr!r}")
 
     def test_neither_field_resolves_to_team_lead(self):
         by_issue, _ = self._run()
-        self.assertEqual(by_issue.get("PT-306"), "team-lead", by_issue)
+        self.assertEqual(by_issue.get("POLY-306"), "team-lead", by_issue)
 
     def test_superseded_spawn_names_never_appear_as_roles(self):
-        # qa-telemetry-probe and guide-pt18 are the agentName values PT-303/2
+        # qa-telemetry-probe and guide-pt18 are the agentName values POLY-303/2
         # would have wrongly resolved to before this ticket -- must never
         # surface anywhere once agentSetting is consulted.
         by_issue, stderr = self._run()
