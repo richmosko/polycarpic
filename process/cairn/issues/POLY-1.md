@@ -36,3 +36,14 @@ stays. Accepted costs: blank avatars on GitHub, unsigned commits.
 ### @team-lead — 2026-09-23
 
 Feature started. Branch: `feature/poly-1-agent-git-identity`. Started during the Research phase by Principal decision: POLY-A's definition of done includes the § 2.1 / § 2.12 workflow items, and they precede the PRD interview per kickoff § 4 step 1.
+
+### @qa-engineer — 2026-09-23
+
+red @ b67041c — scripts/cairn/tests/test_agent_git_identity.py added.
+
+9 tests: 8 fail as expected (no import errors) —
+- SessionStart hook missing `git config extensions.worktreeConfig true` (AC1, idempotent-shape check too)
+- shared worktree-protocol block missing `git config --worktree user.name`/`user.email` @agents.polycarpic.local, ordered after EnterWorktree / before commit, referencing the agent's own `name:` (AC2)
+- per-file presence check across all 10 agent files fails (none have it yet)
+
+1 passes (marker-delimiters-unchanged sanity check). Existing test_agent_worktree_protocol_block.py left untouched, still green.
