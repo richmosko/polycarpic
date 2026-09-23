@@ -1,14 +1,14 @@
 ---
 id: POLY-1
 title: Per-agent git author identity in worktrees
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: team-lead
 labels: [workflow, git]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/3
 created: 2026-09-23
 updated: 2026-09-23
 ---
@@ -108,3 +108,7 @@ All 6 ACs verified from the tree:
 6. `process/WORKFLOW.md` line 230 documents the convention in one paragraph, points to kickoff § 2.1.
 
 Broken: none blocking. POLY-4 (pre-existing suite health) and POLY-5 (fail-closed isolation) are filed and out of scope here.
+
+### @team-lead — 2026-09-23
+
+PR opened: https://github.com/richmosko/polycarpic/pull/3. Awaiting Validate. Finish gate exception granted by the Principal for the five pre-existing template-scrub failures (POLY-4); see the PR body.

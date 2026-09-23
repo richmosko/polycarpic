@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-1-agent-git-identity`
 - **Started:** 2026-09-23
 - **Goal:** every teammate's commits carry its own git author identity, set per worktree, so the path-ownership check and the estimation loop can attribute work by agent.
-- **Status:** In Progress
+- **Status:** In Review — [PR #3](https://github.com/richmosko/polycarpic/pull/3)
 
 ## Releases
 
