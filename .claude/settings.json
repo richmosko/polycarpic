@@ -35,7 +35,9 @@
       "Bash(gh issue list:*)",
       "Bash(gh repo view:*)",
       "Bash(open docs/*)",
-      "Read(./**)"
+      "Read(./**)",
+      "EnterWorktree",
+      "ExitWorktree"
     ]
   },
   "hooks": {

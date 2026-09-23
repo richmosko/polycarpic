@@ -61,3 +61,16 @@ parse_summary now strips ANSI SGR escapes before matching unittest's own summary
 AC #4 (test-runs.jsonl commit-vs-gitignore) recommendation sent to team-lead, pending user confirmation before the WORKFLOW.md entry lands.
 
 Requesting architect peer review.
+
+### @team-lead — 2026-09-23
+
+**AC #4 ruling (user-confirmed): metrics live on an orphan `metrics` branch, never merged, checked out as a nested worktree at `process/cairn/metrics/`.** Not committed with feature work, not gitignored-and-lost. Hold the green gate until this lands.
+
+1. Orphan branch `metrics` (create from a temp worktree with `git checkout --orphan metrics`) containing only `test-runs.jsonl` — seeded with the 19 pending lines currently uncommitted in the main checkout's working tree — and a `.gitattributes` with `*.jsonl merge=union`. Push to origin.
+2. On the feature branch: `git rm --cached process/cairn/metrics/test-runs.jsonl`; add `process/cairn/metrics/` to `.gitignore`.
+3. `scripts/cairn/ensure_metrics_worktree.py`, idempotent: if `process/cairn/metrics/` is not a worktree of `metrics`, `git fetch origin metrics` and `git worktree add process/cairn/metrics metrics` (create the orphan locally if origin has none). Wire it as a SessionStart hook step. **Put the `.claude/settings.json` change in its own pathspec commit** — the lead cannot commit that file (auto-mode classifier); the user lands it if it bounces on push.
+4. `test_run_record.py`: after appending, `git -C process/cairn/metrics commit -q -m "metrics: test run" -- test-runs.jsonl`; skip silently if not a worktree. The push of `metrics` belongs to `/finish-feature` (add the step to `.claude/skills/finish-feature/SKILL.md`), not the hook.
+5. `run_tests.py`'s worktree→main-checkout redirect must still resolve to the nested worktree path; verify from your own worktree. Fix fixtures that assumed the file is tracked on main.
+6. WORKFLOW.md: one paragraph — the rule, branch name, never-merge invariant, bootstrap step.
+
+Commit by pathspec, push, report shas; then full green gate and architect review.
