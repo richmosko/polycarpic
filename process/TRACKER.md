@@ -366,6 +366,8 @@ Comments append to the end of the file, under a single `## Comments` heading, ol
 
 This shape lets an agent append a comment with a **plain `Edit`** — the anchor is the last line of the file — while a regex still splits the log reliably.
 
+**Union merge on rebase (POLY-4).** `process/cairn/issues/*.md merge=union` in the repo-root `.gitattributes` lets two teammates' concurrent, uncommitted comment appends merge cleanly on rebase instead of conflicting — safe because comments are strictly append-only; anything structural in the frontmatter above the `## Comments` line is still single-writer and can still conflict normally.
+
 ### Sub-issues
 
 A sub-issue is an ordinary issue file with `parent: PT-14`. It has its own status and can be assigned independently. The board renders a `2/3` badge on the parent and nests children in the detail drawer. There is no separate file type and no ordering field — children sort by ID.
