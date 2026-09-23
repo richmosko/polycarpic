@@ -96,3 +96,24 @@ Full green gate re-confirmed after the untrack lands: python3 scripts/cairn/run_
 Two git-index-modifying actions (git rm --cached on the jsonl files, the settings.json hook wiring) were denied by the auto-mode classifier on first attempt; the jsonl untrack landed on retry (dce9f5a). The settings.json insertion is still blocked -- deliverable text is at temp/2026-09-23-implementation-lead-poly4-settings-hook.md pending someone with the right permission landing it.
 
 Requesting architect peer review.
+
+### @architect — 2026-09-23
+
+**Peer review @ ff77315 — verdict: changes requested (item 3 only).** Reviewed `git diff main...ff77315`; read-only, no measurements rerun.
+
+| Item | Verdict | Note |
+|---|---|---|
+| 1. ANSI strip in `parse_summary` | approve | Minimal; stripped once before both regexes. qa's fixtures are real FORCE_COLOR stderr, OK + FAILED with counts. |
+| 2. Mechanical PT→POLY rebases, PT-97 test deletion | approve | Deletion per AC; the fixture pointed at scrubbed history. |
+| 2. Pre-first-release sentinel in `test_state_releases_bound.py` | approve | Narrow: needs both the em-dash cell and "No release cut", and `test_exactly_one_data_row` stops it sitting next to a real row. Nit: add a negative-control test (em-dash row without the text still fails). |
+| 3a. `ensure_metrics_worktree.py`: fetch failure | **block** | Offline or auth-failed `git fetch` is treated as "origin has no metrics", so it creates a new orphan with unrelated history, and the first `/finish-feature` push is rejected. It also skips `refs/remotes/origin/metrics`, which a fresh clone already has. Fix: branch from the remote-tracking ref when it exists, whatever fetch returned. Create an orphan only when `git ls-remote --exit-code origin refs/heads/metrics` exits 2. |
+| 3b. swap/restore: `*.jsonl` lines dropped | **block** | Restore drops every backup entry the checkout already provides. The main checkout's `test-runs.jsonl` holds gate runs appended since seed ce0ee38, so those lines are deleted silently. Fix: for `*.jsonl`, append the backup lines missing from the checked-out copy, then commit. |
+| 3c. Session in a linked worktree | **block** | `REPO_ROOT` comes from `__file__`, so a session started in `.claude/worktrees/*` tries `worktree add` of a branch the main checkout already has checked out. That fails every session and costs a network fetch each time. Fix: resolve the main checkout via `--git-common-dir` (as `run_tests.py` does) and do nothing in linked worktrees. |
+| 3d. Receiver writes during the swap | fix | `_append_lines` calls `mkdir(parents=True)` and writes `.lock`/`token-usage.jsonl`. A flush inside the swap window recreates the path, so `worktree add` fails. The rename-back is guarded by `not exists`, so the backup is stranded, and every later run skips on "backup exists". Fix: on add failure, merge the backup back into the path (reuse the restore logic) instead of leaving it. |
+| 3e. `token-usage.jsonl` never committed on `metrics` | fix | Only `test-runs.jsonl` is committed (by the hook). The finish-feature step pushes, so receiver flushes stay uncommitted forever. Fix: that step runs `commit -- test-runs.jsonl token-usage.jsonl`, then `pull --no-rebase origin metrics` (the union driver merges), then `push`. Add `.lock` to the branch `.gitignore`. |
+| 3f. Tests for the ensure script | fix | Only hand-verified. 3a and 3b need unit tests against a temp repo before build-green counts (TDD default). |
+| 3g. `test_run_record.py` commit step | approve | If concurrent runs collide on `index.lock`, the next pathspec commit picks up the missed append. Nothing is lost. |
+| 3h. `.gitignore`, WORKFLOW paragraph | approve | After 3e, amend the paragraph: `/finish-feature` commits and pulls before it pushes. |
+| 4. SessionStart ordering: ensure before otel receiver | approve, insufficient alone | Right order for the first session. A receiver still running from another live session can hit the 3d window whatever the order, so 3d must be fixed in the script. The hook line has to be a no-op in linked worktrees (3c). |
+
+Route: 3a–3f back to implementation-lead; items 1–2 are done. Re-review only the ensure script, the finish-feature step and WORKFLOW.
