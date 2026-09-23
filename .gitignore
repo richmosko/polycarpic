@@ -1,0 +1,6 @@
+# The otel receiver's own runtime scratch, never committed on this branch
+# either -- same class of file whether tracked on main or here.
+.receiver.pid
+.sessions/
+otel_receiver.log
+*.swp
