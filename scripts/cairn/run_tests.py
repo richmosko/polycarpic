@@ -142,6 +142,22 @@ _RAN_RE = re.compile(r"^Ran (\d+) tests? in", re.MULTILINE)
 _SUMMARY_RE = re.compile(r"^(OK|FAILED)\b\s*(?:\(([^)]*)\))?", re.MULTILINE)
 _NO_TESTS_RE = re.compile(r"^NO TESTS RAN", re.MULTILINE)
 
+# POLY-4 gate-red (qa-engineer, test_run_tests.py::ParseSummaryColorizedTests):
+# Python 3.13+'s unittest wraps its own dots/summary tokens in ANSI SGR
+# escapes whenever FORCE_COLOR leaks into the child (a tmux teammate pane's
+# environment, not this repo's own setting) -- `^(OK|FAILED)` no longer
+# matches at true line start with an escape sequence prefixing the token,
+# so a run that actually passed raised ParseError. Stripped before either
+# regex above ever sees the text, once, so both anchors keep working
+# unmodified. `[0-9;]*` covers plain and combined SGR codes (`0`, `32`,
+# `1;31`) -- unittest's colorizer never emits cursor-movement or other CSI
+# final bytes, so this narrower-than-general-ANSI pattern is deliberate.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
 
 class ParseError(Exception):
     """Raised when a child's stderr doesn't contain unittest's own summary
@@ -183,6 +199,7 @@ def parse_summary(stderr: str, file_name: Optional[str] = None) -> Tuple[int, in
     # first-match parse silently dropped that one failure. `failed_files`
     # was never wrong (it comes from the child's returncode) -- only the
     # failure *count*, which is why PT-93's own counts-only guards missed it.
+    stderr = _strip_ansi(stderr)
     ran_match = _last_match(_RAN_RE, stderr)
     summary_match = _last_match(_SUMMARY_RE, stderr)
     if not ran_match or not summary_match:
