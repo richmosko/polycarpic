@@ -73,6 +73,31 @@ _ERRORS_RE = re.compile(r"errors=(\d+)")
 _RECORDS_REL = Path("process") / "cairn" / "metrics" / "test-runs.jsonl"
 
 
+def _commit_metrics_worktree(metrics_dir: Path) -> None:
+    """POLY-4 (team-lead ruling, process/cairn/issues/POLY-4.md @
+    5495132, step 4): commits this hook's own append inside the nested
+    `metrics` worktree so the ledger's git history stays a real,
+    per-append audit trail across sessions, not just a locally-mutating
+    file. Skips silently (never raises) when `metrics_dir` isn't actually
+    a linked worktree yet -- a linked worktree's `.git` is a FILE (a
+    gitdir pointer), never a directory, which is exactly what
+    `ensure_metrics_worktree.py`'s own bootstrap produces and a plain
+    not-yet-migrated checkout never does. Pushing `metrics` to origin is
+    `/finish-feature`'s job (WORKFLOW.md -> Metrics branch), never this
+    hook's -- a hook that pushed on every test run would hammer origin
+    once per run, across every concurrent teammate."""
+    if not (metrics_dir / ".git").is_file():
+        return
+    try:
+        import subprocess
+        subprocess.run(
+            ["git", "-C", str(metrics_dir), "commit", "-q", "-m", "metrics: test run", "--", "test-runs.jsonl"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (FileNotFoundError, OSError):
+        pass
+
+
 def _runner_of(command: str) -> str:
     return "run_tests" if "run_tests.py" in command else "unittest"
 
@@ -244,6 +269,7 @@ def main() -> int:
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record) + "\n")
+        _commit_metrics_worktree(path.parent)
     except Exception:
         pass
     return 0
