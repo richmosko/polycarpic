@@ -196,7 +196,7 @@ class BackfillGoldenPathTests(unittest.TestCase):
     and the architect's own QA fixture-case list (duplicate requestId
     across two files, a lead record with no agentName, a nested
     subagents/agent-*.jsonl record, a main record, agentName:
-    qa-engineer-76, model: "<synthetic>", an uppercase feature/PT-47
+    qa-engineer-76, model: "<synthetic>", an uppercase feature/POLY-47
     branch, a chore/pt-0.11-* milestone branch).
 
     RESTRUCTURED (PT-87, architect's per-test ruling at 4bd40f9, on top
@@ -259,14 +259,14 @@ class BackfillGoldenPathTests(unittest.TestCase):
         buckets = bucket_map(lines)
 
         expected = {
-            ("PT-7", "impl2", "claude-sonnet-5"): (3, 4, 5, 1),
-            ("PT-19", "custom-worker-7", "claude-sonnet-5"): (9, 9, 9, 9),
-            ("PT-28", "team-lead", "claude-sonnet-5"): (100, 200, 300, 50),
-            ("PT-28", "backend-lead", "claude-fable-5-1"): (10, 20, 30, 5),
-            ("PT-28", "qa-engineer", "claude-sonnet-5"): (50, 60, 70, 20),
-            ("PT-28", "implementation-lead", "claude-sonnet-5"): (6, 7, 8, 2),
-            ("PT-47", "qa-engineer", "claude-sonnet-5"): (11, 22, 33, 4),
-            ("PT-90", "team-lead", "claude-sonnet-5"): (15, 16, 17, 3),
+            ("POLY-7", "impl2", "claude-sonnet-5"): (3, 4, 5, 1),
+            ("POLY-19", "custom-worker-7", "claude-sonnet-5"): (9, 9, 9, 9),
+            ("POLY-28", "team-lead", "claude-sonnet-5"): (100, 200, 300, 50),
+            ("POLY-28", "backend-lead", "claude-fable-5-1"): (10, 20, 30, 5),
+            ("POLY-28", "qa-engineer", "claude-sonnet-5"): (50, 60, 70, 20),
+            ("POLY-28", "implementation-lead", "claude-sonnet-5"): (6, 7, 8, 2),
+            ("POLY-47", "qa-engineer", "claude-sonnet-5"): (11, 22, 33, 4),
+            ("POLY-90", "team-lead", "claude-sonnet-5"): (15, 16, 17, 3),
             ("main", "team-lead", "claude-sonnet-5"): (7, 8, 9, 2),
             ("main", "impl", "claude-sonnet-5"): (5, 6, 7, 1),
         }
@@ -294,7 +294,7 @@ class BackfillGoldenPathTests(unittest.TestCase):
         result = self._run_golden()
         lines = read_jsonl(self.out_path)
         buckets = bucket_map(lines)
-        line = buckets[("PT-28", "team-lead", "claude-sonnet-5")]
+        line = buckets[("POLY-28", "team-lead", "claude-sonnet-5")]
         self.assertEqual(line["input"], 100, "duplicate requestId across two files must be deduped, not double-counted")
         if "records" in line:
             self.assertEqual(line["records"], 1, "exactly one unique requestId contributed to this bucket")
@@ -310,7 +310,7 @@ class BackfillGoldenPathTests(unittest.TestCase):
         result = self._run_golden()
         lines = read_jsonl(self.out_path)
         buckets = bucket_map(lines)
-        line = buckets[("PT-90", "team-lead", "claude-sonnet-5")]
+        line = buckets[("POLY-90", "team-lead", "claude-sonnet-5")]
         self.assertEqual(line["input"], 15, "uuid-fallback dedupe must fold the pair sharing uuid-fallback-1 to one contribution")
         if "records" in line:
             self.assertEqual(line["records"], 1)
@@ -319,7 +319,7 @@ class BackfillGoldenPathTests(unittest.TestCase):
         result = self._run_golden()
         lines = read_jsonl(self.out_path)
         buckets = bucket_map(lines)
-        self.assertIn(("PT-28", "team-lead", "claude-sonnet-5"), buckets)
+        self.assertIn(("POLY-28", "team-lead", "claude-sonnet-5"), buckets)
         self.assertIn(("main", "team-lead", "claude-sonnet-5"), buckets)
 
     def test_roster_suffixed_role_name_is_normalised(self):
@@ -331,15 +331,15 @@ class BackfillGoldenPathTests(unittest.TestCase):
         # stripping rule were never exercised, since golden/subagents/
         # agent-1.jsonl ALSO produces role "qa-engineer" via a plain,
         # unrelated, no-stripping-needed pass-through. Scoped to the
-        # PT-47 bucket specifically -- the ONE bucket only
+        # POLY-47 bucket specifically -- the ONE bucket only
         # qa_engineer_suffix_stripped_pt47.jsonl's stripped record can
         # produce -- so this test can only pass for the right reason.
         result = self._run_golden()
         lines = read_jsonl(self.out_path)
         buckets = bucket_map(lines)
         self.assertIn(
-            ("PT-47", "qa-engineer", "claude-sonnet-5"), buckets,
-            "qa-engineer-76's stem (qa-engineer) IS a roster name -- must normalise, and PT-47 is the only "
+            ("POLY-47", "qa-engineer", "claude-sonnet-5"), buckets,
+            "qa-engineer-76's stem (qa-engineer) IS a roster name -- must normalise, and POLY-47 is the only "
             "bucket this specific record can produce",
         )
         roles = {line["role"] for line in lines}
@@ -376,7 +376,7 @@ class BackfillGoldenPathTests(unittest.TestCase):
         self.assertIn("impl", roles)
         buckets = bucket_map(lines)
         self.assertIn(
-            ("PT-19", "custom-worker-7", "claude-sonnet-5"), buckets,
+            ("POLY-19", "custom-worker-7", "claude-sonnet-5"), buckets,
             "custom-worker-7's pattern DOES match (stem custom-worker, not a roster name) -- the roster "
             "gate, not a regex non-match, is what keeps it verbatim here",
         )
@@ -395,32 +395,32 @@ class BackfillGoldenPathTests(unittest.TestCase):
         lines = read_jsonl(self.out_path)
         issues = {line["issue"] for line in lines}
         self.assertIn("main", issues)
-        # A phase/* branch (team_lead_main.jsonl) and a chore/pt-0.11-*
+        # A phase/* branch (team_lead_main.jsonl) and a chore/poly-0.11-*
         # MILESTONE branch (impl_adhoc_milestone_branch_main.jsonl) both
-        # land in main, not PT-0 or PT-0.11 -- only a genuine numeric
+        # land in main, not POLY-0 or POLY-0.11 -- only a genuine numeric
         # issue id or "main" may appear.
         for issue in issues:
             self.assertTrue(
-                issue == "main" or (issue.startswith("PT-") and issue[3:].isdigit()),
-                f"unexpected issue bucket {issue!r} -- a milestone branch (chore/pt-0.11-*) must land in main, not a fabricated PT-0/PT-0.11",
+                issue == "main" or (issue.startswith("POLY-") and issue[5:].isdigit()),
+                f"unexpected issue bucket {issue!r} -- a milestone branch (chore/poly-0.11-*) must land in main, not a fabricated POLY-0/POLY-0.11",
             )
 
     def test_case_insensitive_uppercase_branch_still_buckets(self):
         # qa_engineer_suffix_stripped_pt47.jsonl's record is on
-        # "feature/PT-47" (uppercase, no trailing slug) -- must still
-        # bucket to PT-47.
+        # "feature/POLY-47" (uppercase, no trailing slug) -- must still
+        # bucket to POLY-47.
         result = self._run_golden()
         lines = read_jsonl(self.out_path)
         issues = {line["issue"] for line in lines}
-        self.assertIn("PT-47", issues)
+        self.assertIn("POLY-47", issues)
 
     def test_multi_issue_branch_attributes_wholly_to_the_first_id(self):
-        # feature/pt-7-8-9-13-cli-hardening -- must land entirely on PT-7,
+        # feature/poly-7-8-9-13-cli-hardening -- must land entirely on POLY-7,
         # never split or attributed to PT-8/PT-9/PT-13.
         result = self._run_golden()
         lines = read_jsonl(self.out_path)
         issues = {line["issue"] for line in lines}
-        self.assertIn("PT-7", issues)
+        self.assertIn("POLY-7", issues)
         self.assertNotIn("PT-8", issues)
         self.assertNotIn("PT-9", issues)
         self.assertNotIn("PT-13", issues)
@@ -435,16 +435,16 @@ class BackfillGoldenPathTests(unittest.TestCase):
         result = self._run_golden()
         lines = read_jsonl(self.out_path)
         buckets = bucket_map(lines)
-        self.assertIn(("PT-28", "qa-engineer", "claude-sonnet-5"), buckets)
+        self.assertIn(("POLY-28", "qa-engineer", "claude-sonnet-5"), buckets)
 
     def test_two_roles_two_models_on_one_issue_are_kept_distinct(self):
         result = self._run_golden()
         lines = read_jsonl(self.out_path)
-        pt28_lines = [line for line in lines if line["issue"] == "PT-28"]
+        pt28_lines = [line for line in lines if line["issue"] == "POLY-28"]
         role_model_pairs = {(line["role"], line["model"]) for line in pt28_lines}
         self.assertIn(("team-lead", "claude-sonnet-5"), role_model_pairs)
         self.assertIn(("backend-lead", "claude-fable-5-1"), role_model_pairs)
-        self.assertGreaterEqual(len(role_model_pairs), 2, "PT-28 must carry at least two distinct role/model pairs, not one merged bucket")
+        self.assertGreaterEqual(len(role_model_pairs), 2, "POLY-28 must carry at least two distinct role/model pairs, not one merged bucket")
 
     def test_non_assistant_record_with_no_usage_is_skipped_without_error(self):
         # non_assistant_no_usage.jsonl's type:"user" record carries no
@@ -476,7 +476,7 @@ class BackfillGoldenPathTests(unittest.TestCase):
         # synthetic_model_filtered.jsonl's model:"<synthetic>" record has
         # no requestId, all-zero usage -- must be filtered before
         # dedupe/bucketing, not counted anywhere (including not silently
-        # folded into PT-28 via uuid fallback).
+        # folded into POLY-28 via uuid fallback).
         result = self._run_golden()
         lines = read_jsonl(self.out_path)
         total_records = sum(line.get("records", 1) for line in lines)
@@ -528,7 +528,7 @@ class BackfillGoldenPathTests(unittest.TestCase):
 
     def test_window_end_is_the_latest_record_date_of_its_own_bucket_not_generated(self):
         # PT-103 addendum 1: max(window_end) across every line is
-        # 2026-08-24 (the subagent file -> PT-28/qa-engineer), still !=
+        # 2026-08-24 (the subagent file -> POLY-28/qa-engineer), still !=
         # today, and explicitly not shared by every line. Architect's
         # amendment (9e94514) struck the original ruling's §2 sentence
         # ("the backfill sets window_end to its generated date") --
@@ -541,7 +541,7 @@ class BackfillGoldenPathTests(unittest.TestCase):
         window_ends = {line["window_end"] for line in lines}
         self.assertEqual(max(window_ends), "2026-08-24", f"got {window_ends}")
         self.assertGreater(len(window_ends), 1, f"per-bucket window_end must not collapse to one value -- got {window_ends}")
-        self.assertEqual(buckets[("PT-28", "qa-engineer", "claude-sonnet-5")]["window_end"], "2026-08-24")
+        self.assertEqual(buckets[("POLY-28", "qa-engineer", "claude-sonnet-5")]["window_end"], "2026-08-24")
         self.assertNotIn(today, window_ends, "window_end must not silently equal today -- that would be the struck reading")
 
     def test_window_end_tracks_the_record_not_the_clock_on_a_dedicated_fixture(self):
@@ -573,8 +573,8 @@ class BackfillGoldenPathTests(unittest.TestCase):
         # Each line's (window_start, window_end) equals the min/max date
         # of its own bucket's contributing records; at least two distinct
         # pairs on the golden fixture, with LITERAL (hard-coded, never
-        # code-derived) expectations for two named buckets: PT-90/
-        # team-lead (2026-08-23/2026-08-23) and PT-47/qa-engineer
+        # code-derived) expectations for two named buckets: POLY-90/
+        # team-lead (2026-08-23/2026-08-23) and POLY-47/qa-engineer
         # (2026-08-22/2026-08-22). Mutation: revert to a run-level window
         # computed once and repeated on every line -> both named buckets
         # collapse to the run span (2026-08-18/2026-08-24) and this goes
@@ -589,9 +589,9 @@ class BackfillGoldenPathTests(unittest.TestCase):
             f"different (issue, role, model) buckets active on different days must carry DIFFERENT "
             f"window pairs -- got a single uniform pair {pairs}, the exact defect PT-103 fixes",
         )
-        pt90 = buckets[("PT-90", "team-lead", "claude-sonnet-5")]
+        pt90 = buckets[("POLY-90", "team-lead", "claude-sonnet-5")]
         self.assertEqual((pt90["window_start"], pt90["window_end"]), ("2026-08-23", "2026-08-23"))
-        pt47 = buckets[("PT-47", "qa-engineer", "claude-sonnet-5")]
+        pt47 = buckets[("POLY-47", "qa-engineer", "claude-sonnet-5")]
         self.assertEqual((pt47["window_start"], pt47["window_end"]), ("2026-08-22", "2026-08-22"))
 
     def test_two_issues_active_on_different_days_get_different_windows(self):
@@ -607,9 +607,9 @@ class BackfillGoldenPathTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         lines = read_jsonl(out_path)
         buckets = bucket_map(lines)
-        self.assertEqual(set(buckets.keys()), {("PT-30", "team-lead", "claude-sonnet-5"), ("PT-31", "team-lead", "claude-sonnet-5")})
-        pt30 = buckets[("PT-30", "team-lead", "claude-sonnet-5")]
-        pt31 = buckets[("PT-31", "team-lead", "claude-sonnet-5")]
+        self.assertEqual(set(buckets.keys()), {("POLY-30", "team-lead", "claude-sonnet-5"), ("POLY-31", "team-lead", "claude-sonnet-5")})
+        pt30 = buckets[("POLY-30", "team-lead", "claude-sonnet-5")]
+        pt31 = buckets[("POLY-31", "team-lead", "claude-sonnet-5")]
         self.assertEqual((pt30["window_start"], pt30["window_end"]), ("2026-07-05", "2026-07-05"))
         self.assertEqual((pt31["window_start"], pt31["window_end"]), ("2026-07-10", "2026-07-10"))
         self.assertNotEqual(
@@ -719,9 +719,9 @@ class BackfillOrderingTests(unittest.TestCase):
     same issue"): per-file role resolution means the original single
     4-record file (agentName zzz-role/aaa-role/aaa-role/aaa-role across
     its records) can no longer produce two roles from one file. Split
-    into 4 single-role files -- the PT-5 pair (zzz_role_pt5.jsonl,
+    into 4 single-role files -- the POLY-5 pair (zzz_role_pt5.jsonl,
     aaa_role_pt5.jsonl) is the one that must stay two SEPARATE files to
-    prove "role lexicographic within one issue" at all; PT-2 and main
+    prove "role lexicographic within one issue" at all; POLY-2 and main
     each only ever needed one role and one record. Every value/timestamp
     preserved from the original ordering/session.jsonl."""
 
@@ -739,7 +739,7 @@ class BackfillOrderingTests(unittest.TestCase):
         sequence = [(line["issue"], line["role"]) for line in lines]
         self.assertEqual(
             sequence,
-            [("PT-2", "aaa-role"), ("PT-5", "aaa-role"), ("PT-5", "zzz-role"), ("main", "aaa-role")],
+            [("POLY-2", "aaa-role"), ("POLY-5", "aaa-role"), ("POLY-5", "zzz-role"), ("main", "aaa-role")],
             "expected order: issue numeric ascending, main last, role lexicographic within an issue",
         )
 
@@ -868,7 +868,7 @@ class BackfillWorkingDirectoryAndConfigResolutionTests(unittest.TestCase):
             f"This is the architect's blocking finding on 99725d0: the prefix must resolve from the "
             f"script's own repo root, not from cwd via cairn.find_data_dir().",
         )
-        self.assertIn("PT-28", issues, "the golden fixture's PT-28 records must still bucket correctly regardless of cwd")
+        self.assertIn("POLY-28", issues, "the golden fixture's POLY-28 records must still bucket correctly regardless of cwd")
 
     def test_cairn_data_dir_pointing_at_a_dir_with_no_config_yml_is_a_loud_error(self):
         # CAIRN_DATA_DIR is a real seam (cairn.py itself honors it) -- but
@@ -946,8 +946,8 @@ class BackfillTruncatedFinalLineTests(unittest.TestCase):
         self.assertTrue(out_path.is_file())
         lines = read_jsonl(out_path)
         buckets = bucket_map(lines)
-        self.assertIn(("PT-15", "team-lead", "claude-sonnet-5"), buckets)
-        line = buckets[("PT-15", "team-lead", "claude-sonnet-5")]
+        self.assertIn(("POLY-15", "team-lead", "claude-sonnet-5"), buckets)
+        line = buckets[("POLY-15", "team-lead", "claude-sonnet-5")]
         self.assertEqual(line["input"], 9)
         self.assertEqual(line["cache_write"], 8)
         self.assertEqual(line["cache_read"], 7)
