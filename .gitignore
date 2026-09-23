@@ -52,16 +52,16 @@ coverage/
 *.log
 logs/
 
-# PT-78: the otel receiver's own runtime state -- never the committed
-# process/cairn/metrics/token-usage.jsonl data file itself, which stays
-# tracked.
+# PT-78/PT-86/POLY-4 (team-lead ruling, process/cairn/issues/POLY-4.md
+# @ 5495132, extended per the follow-up ruling to cover token-usage.jsonl
+# too): process/cairn/metrics/ is a nested git worktree of the orphan
+# `metrics` branch (see WORKFLOW.md -> Metrics branch) -- never merged
+# into this branch, bootstrapped idempotently by
+# scripts/cairn/ensure_metrics_worktree.py. Every file under it --
+# test-runs.jsonl, token-usage.jsonl, the receiver's pidfile/.lock, its
+# .sessions/ bookkeeping -- lives there now, never tracked here.
 *.pid
-process/cairn/metrics/.lock
-
-# PT-86: the receiver's live-session bookkeeping (one small file per
-# session id, alongside the pidfile) -- runtime state, same class as the
-# pidfile itself, never committed.
-process/cairn/metrics/.sessions/
+process/cairn/metrics/
 
 # Vendored third-party assets (e.g. Mermaid bundle from scripts/vendor-mermaid.sh).
 # Downstream projects that want this committed can un-ignore in their own .gitignore.
