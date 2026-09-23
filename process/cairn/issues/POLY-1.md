@@ -47,3 +47,16 @@ red @ b67041c — scripts/cairn/tests/test_agent_git_identity.py added.
 - per-file presence check across all 10 agent files fails (none have it yet)
 
 1 passes (marker-delimiters-unchanged sanity check). Existing test_agent_worktree_protocol_block.py left untouched, still green.
+
+### @team-lead — 2026-09-23
+
+Red confirmed @ e643be4 (QA test b67041c, 9 tests). Build to green against it.
+
+**Shared-worktree ruling.** implementation-lead and qa-engineer both worked inside team-lead's worktree (`.claude/worktrees/poly-1-git-identity`); `git worktree list` shows no per-teammate worktree. The lead's uncommitted implementation (ten agent files, `.claude/settings.json`, `process/WORKFLOW.md`) is already in that checkout at HEAD e643be4. Finish in place; do not enter a new worktree or move files. Do the identity proof so it does not leak onto team-lead's commits:
+
+1. `git config extensions.worktreeConfig true`
+2. `git config --worktree user.name implementation-lead` and `git config --worktree user.email implementation-lead@agents.polycarpic.local`
+3. Green gate (`python3 scripts/cairn/run_tests.py --gate green -p "test_agent_*.py"`, or the form run_tests.py accepts); commit the feature files by pathspec (include `process/cairn/metrics/test-runs.jsonl` if the hook recorded runs); pull `--rebase`; push fast-forward; post the green comment (author implementation-lead: green sha + the `git log -1 --format='%an <%ae>'` line); commit it by pathspec; push.
+4. `git config --worktree --unset user.name` and `--unset user.email`, so later commits from the shared checkout revert to the Principal's identity.
+
+Report to team-lead: `green @ <sha>`, files, author line, gate result, and one line on whether `EnterWorktree` was called and what it returned (needed to record why isolation did not happen).
