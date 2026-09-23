@@ -24,12 +24,12 @@ stays. Accepted costs: blank avatars on GitHub, unsigned commits.
 
 ## Acceptance criteria
 
-- [ ] `extensions.worktreeConfig=true` is set in the repo config by the SessionStart hook, idempotently (same pattern as `core.hooksPath`), so a fresh clone gets it without a manual step
-- [ ] The shared worktree-protocol block in every `.claude/agents/*.md` sets `user.name=<agent-name>` and `user.email=<agent-name>@agents.polycarpic.local` with `git config --worktree` immediately after `EnterWorktree`, before any commit
-- [ ] The block stays byte-identical across all agent files (a test in `scripts/cairn/tests/` or a check script fails on drift)
-- [ ] The team-lead's main checkout is untouched: commits there keep the Principal's identity
-- [ ] Verified end to end: one spawned teammate commits in its worktree and `git log --format='%an <%ae>'` on the feature branch shows the agent's identity with the `Co-Authored-By` trailer intact
-- [ ] `process/WORKFLOW.md` → worktree section documents the identity convention in one paragraph; `docs/project_kickoff.md` § 2.1 is left as the decision record
+- [x] `extensions.worktreeConfig=true` is set in the repo config by the SessionStart hook, idempotently (same pattern as `core.hooksPath`), so a fresh clone gets it without a manual step
+- [x] The shared worktree-protocol block in every `.claude/agents/*.md` sets `user.name=<agent-name>` and `user.email=<agent-name>@agents.polycarpic.local` with `git config --worktree` immediately after `EnterWorktree`, before any commit
+- [x] The block stays byte-identical across all agent files (a test in `scripts/cairn/tests/` or a check script fails on drift)
+- [x] The team-lead's main checkout is untouched: commits there keep the Principal's identity
+- [x] Verified end to end: one spawned teammate commits in its worktree and `git log --format='%an <%ae>'` on the feature branch shows the agent's identity with the `Co-Authored-By` trailer intact
+- [x] `process/WORKFLOW.md` → worktree section documents the identity convention in one paragraph; `docs/project_kickoff.md` § 2.1 is left as the decision record
 
 ## Comments
 
@@ -93,3 +93,18 @@ reviewed @ 8cb9d89 (diff origin/main...8cb9d89) — **APPROVE**, with one follow
 2. Nothing else would surprise a senior engineer. Block label `(PT-82)` is a template-era id (pre-existing, out of scope).
 
 **Process finding / follow-up (file as POLY-A issue).** The teammates did not isolate because the lead was itself inside a worktree, contrary to WORKFLOW "The lead never enters a worktree". Teammates spawned there inherit its cwd. `EnterWorktree` refuses to create a new worktree from inside a worktree session, and nobody recorded what it returned. The protocol block has no branch for that case. A teammate that follows it cold sets its identity on the lead's worktree, which is how finding 1 happened. Proposed issue: "Fail closed when a teammate cannot isolate". (a) Block text: if `EnterWorktree` fails, or `git rev-parse --show-toplevel` is not a worktree you created this session, do not set identity or commit; report to team-lead with the tool's verbatim result. (b) Add a lead-side session-start check that refuses teammate spawn while the lead's cwd is under `.claude/worktrees/`. (c) Add a test asserting the block carries the fail-closed clause. Keep it separate from POLY-2. Path-ownership would not catch a misattributed author.
+
+### @qa-engineer — 2026-09-23
+
+verdict @ 400c100 — PASS.
+
+Full-suite gate (`FORCE_COLOR=0 NO_COLOR=1 python3 scripts/cairn/run_tests.py --gate verdict`, 98 files, 1671 tests): 23 failures / 5 errors, all confined to the 5 pre-existing files POLY-4 already tracks (test_test_run_hooks.py, test_backfill_tokens.py, test_otel_receiver.py, test_state_releases_bound.py, test_agent_setting_role.py) — none touch git identity, the worktree-protocol block, or settings.json. `--gate` and `-p` are mutually exclusive by run_tests.py's own argparse (PT-94 C9), so I ran the full suite for the gate and separately confirmed POLY-1's own two files narrowed: test_agent_git_identity.py (9/9) and test_agent_worktree_protocol_block.py (5/5), both OK.
+
+All 6 ACs verified from the tree:
+1. `git config --get extensions.worktreeConfig` = true; hook line `git config extensions.worktreeConfig true 2>/dev/null; exit 0` matches the hooksPath idempotent shape.
+2/3. Covered by the two green test files above (identity step present, ordered, byte-identical across all 10 agent files).
+4. Common `.git/config` (`git rev-parse --git-common-dir`) carries no `user.*`; this worktree's own `--worktree` scope is unset (confirms cleanup step ran) — subsequent commits (752c1b4, 400c100, 7e4410d) are back to `richmosko <richmosko@gmail.com>`.
+5. `8cb9d89` is `implementation-lead <implementation-lead@agents.polycarpic.local>` with `Co-Authored-By: Claude Sonnet 5` intact. Caveat already recorded by architect and tracked as POLY-5: committed from the shared lead worktree, not an isolated teammate worktree — doesn't block this verdict.
+6. `process/WORKFLOW.md` line 230 documents the convention in one paragraph, points to kickoff § 2.1.
+
+Broken: none blocking. POLY-4 (pre-existing suite health) and POLY-5 (fail-closed isolation) are filed and out of scope here.
