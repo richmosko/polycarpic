@@ -58,12 +58,17 @@ git status --porcelain
 
 If tests are red, **do not proceed**. Surface the failure and let the user (or QA agent) fix it.
 
-### Push the metrics branch (POLY-4)
+### Commit, pull, and push the metrics branch (POLY-4)
 
-`process/cairn/metrics/` is a nested worktree of the orphan `metrics` branch (never merged — see `process/WORKFLOW.md` → Metrics branch); `test_run_record.py` commits its own append there after every test run, including the gate run above, but never pushes. Push it now, once per finish, from inside the nested worktree — skip silently if it isn't one yet (nothing to push):
+`process/cairn/metrics/` is a nested worktree of the orphan `metrics` branch (never merged — see `process/WORKFLOW.md` → Metrics branch). `test_run_record.py` commits its own `test-runs.jsonl` append after every test run, including the gate run above, but `token-usage.jsonl` (the otel receiver's own flushes) is never committed by any hook — catch it here. Skip silently if the path isn't a worktree yet (nothing to push):
 
 ```bash
-[ -f process/cairn/metrics/.git ] && git -C process/cairn/metrics push origin metrics
+if [ -f process/cairn/metrics/.git ]; then
+  git -C process/cairn/metrics commit -q -m "metrics: finish-feature sync" -- test-runs.jsonl token-usage.jsonl || true
+  # --no-rebase: *.jsonl merge=union resolves any concurrent-append conflict automatically.
+  git -C process/cairn/metrics pull -q --no-rebase origin metrics
+  git -C process/cairn/metrics push origin metrics
+fi
 ```
 
 ## Steps
