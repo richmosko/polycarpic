@@ -19,6 +19,12 @@
 
 ---
 
+### 2026-09-23 — Finish-gate exception only for failures already red on `main`
+**Decision:** `/finish-feature`'s full-suite gate may be bypassed for a PR only when every failure is already red on `main`, touches none of the PR's changed files, and is tracked in an open issue named in the PR body; the next loop takes that issue before any other feature.
+**Why:** POLY-1's gate was red solely from template-scrub debris (five files, POLY-4). A gate that cannot pass for any PR is not a gate; the exception keeps the loop honest without blocking approved, verdicted work.
+**Alternatives considered:** Fold the suite cleanup into the approved PR (scope creep after review); hold the PR until POLY-4 lands (blocks a verdicted feature on unrelated debris).
+**Approved by:** richmosko
+
 ### 2026-09-23 — Kickoff decisions consolidated in `docs/project_kickoff.md`
 **Decision:** The thirteen decision areas settled in the kickoff clarification pass (tracker = cairn with prefix `POLY`; delivery autonomy = `stop-at-merge` with per-milestone self-merge grants; per-agent git author identity; path ownership declared per task; initiatives as a PRD roadmap section; entity-owns-books tenant model; ledger in our Postgres under RLS; schema-ready multi-currency; draft→immutable imports with two-way immutability, opt-in auto-post rules, transfer matching, reconciliation; declarative reports with read-only templates; BetterAuth; Hetzner VPS primary with Vercel+Neon secondary; shadcn-svelte; pnpm monorepo with SvelteKit-hosted API; native Swift; deterministic fake provider; token + gate-cycle estimation in cairn) are recorded there, one section each, and are not duplicated here.
 **Why:** One consolidated record beats thirteen ledger entries; the kickoff file is the operative source until the PRD/ARCH docs absorb it.
