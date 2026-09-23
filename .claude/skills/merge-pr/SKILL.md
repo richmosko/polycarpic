@@ -38,7 +38,7 @@ A `worktree-*` branch reaching origin between `/finish-feature` and now is the f
 
 ### 2. Close the issue on the branch, then merge
 
-The status flip rides the PR itself — it's the branch's **final commit**, so the squash merge lands the feature and its `done` status atomically. (If the merge aborts, the flip dies with the branch — nothing to unwind.)
+The status flip rides the PR itself — it's the branch's **final commit**, so the merge lands the feature and its `done` status atomically. (If the merge aborts, the flip dies with the branch — nothing to unwind.)
 
 ```bash
 git checkout feature/<id>-<slug>       # or gh pr checkout <pr-num>
@@ -53,10 +53,10 @@ git push
 
 **If this merge closes the milestone** (this issue was its last open one — check `cairn ls --milestone <m>`), fold the milestone flip into the same commit: `scripts/cairn/cairn set <milestone-id> status=done` and `git add` the milestone file alongside the issue file. This is the only branch the flip can legally ride — after the merge there is no branch, and a direct push to `main` is forbidden.
 
-Then squash-merge (one PR = one logical commit on main; override only if the user has set a different convention):
+Then merge with a **merge commit** — never squash (project convention, `process/DECISIONS.md` 2026-09-23: per-agent commit authorship must survive on `main`; a squash collapses every teammate's commits into one commit authored by the Principal). GitHub's repo settings allow only this method:
 
 ```bash
-gh pr merge <pr-num> --squash --delete-branch
+gh pr merge <pr-num> --merge --delete-branch
 ```
 
 ### 3. Sync local
