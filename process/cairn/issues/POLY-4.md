@@ -1,7 +1,7 @@
 ---
 id: POLY-4
 title: Test-suite health after template scrub: color-safe run_tests.py, fix 5 stale failures
-status: backlog
+status: todo
 milestone: POLY-A
 parent: null
 blocked_by: []

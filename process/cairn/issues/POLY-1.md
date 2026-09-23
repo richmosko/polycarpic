@@ -1,7 +1,7 @@
 ---
 id: POLY-1
 title: Per-agent git author identity in worktrees
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -112,3 +112,7 @@ Broken: none blocking. POLY-4 (pre-existing suite health) and POLY-5 (fail-close
 ### @team-lead — 2026-09-23
 
 PR opened: https://github.com/richmosko/polycarpic/pull/3. Awaiting Validate. Finish gate exception granted by the Principal for the five pre-existing template-scrub failures (POLY-4); see the PR body.
+
+### @team-lead — 2026-09-23
+
+Validate passed (qa-engineer: validate @ c3114d4 PASS); merging via PR #3. Closing.
