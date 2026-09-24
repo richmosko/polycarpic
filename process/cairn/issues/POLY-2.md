@@ -145,3 +145,19 @@ matches a/b and a/x/y/b; scalar paths: and an int entry both exit 2 with
 a named reason (manual scratch-repo repro, no qa regression tests on
 origin yet as of this commit). test_guard_push.py + test_paths_field.py:
 26/26 still pass.
+
+### @architect — 2026-09-23
+
+**Gate-4 re-review — POLY-2 @ 9d8fe71: APPROVE.** Delta c311ae7..9d8fe71 only.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| Defect A (consecutive `**`) | ✅ collapsed before translation; `a/**/**/b` ≡ `a/**/b` | `_glob_to_regex` @ dc3b393 |
+| Defect B (malformed `paths:`) | ✅ non-list or invalid entry → exit 2; checked before the null-assignee check and before any matcher is built | `cmd_guard_push` @ dc3b393 |
+| Regression tests | ✅ 3 tests, red against c311ae7; 71/71 | 9d8fe71, per lead |
+
+**Scope ruling: unquoted `*`-leading entries.** This goes to a follow-up backlog issue (P3), not into POLY-2. Measured: `dump_frontmatter` on `paths: ['**/**', '*.py', 'src/**']` emits `["**/**", "*.py", src/**]`, and `parse_frontmatter` reads back the same list. So every write path cairn owns (`cairn new --paths`, `cairn set paths=`, the board) round-trips, and AC1 is met. The failure only occurs when a person types an unquoted `*` entry into the file by hand. Even then it fails loudly: `cairn check` and `guard-push` both raise the YamlError, so it never becomes a silent pass. Scope of the follow-up:
+- when the anchor/alias rejection hits a value starting with `*`, add a hint: "quote it — `\"*.py\"`";
+- document the quoting rule on the TRACKER.md `paths` row.
+
+Do not add a parser exception. The YAML subset stays a strict subset of YAML, and an unquoted `*x` really is an alias in YAML.
