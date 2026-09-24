@@ -15,13 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** cairn close: stage-aware windows for same-assignee siblings
-- **Issue:** POLY-16 (cairn)
-- **Milestone:** POLY-A
-- **Branch:** `feature/poly-16-stage-aware-close-windows`
-- **Started:** 2026-09-24
-- **Goal:** A plan and a review sub-issue held by the same agent each get their own gate cycles when closed, and WORKFLOW says when each stage's close runs; POLY-3's reference class is re-closed correctly.
-- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/10
+_None — between loops. Next: POLY-10 (receiver attribution → sub-issue tokens), POLY-6 (test-suite isolation + first CI job), POLY-15 (unpriced-model cost)._
 
 ## Releases
 

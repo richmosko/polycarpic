@@ -1,7 +1,7 @@
 ---
 id: POLY-16
 title: cairn close: same-assignee siblings closed back-to-back collapse into the first window (close at stage end or stage-aware windows)
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -95,3 +95,9 @@ Verdict: PASS. Anchor #8 marked completed.
 ### @team-lead — 2026-09-24
 
 PR opened: https://github.com/richmosko/polycarpic/pull/10. Awaiting Validate.
+
+### @team-lead — 2026-09-24
+
+Validate passed (qa PASS @ 68cd94d at ef18f50; architect APPROVE @ 243884b on 630da5c); merging via PR #10. Closing.
+Estimate calibration: estimated 14 commits / 2 gate cycles / ~45 min at spawn (17:06Z). Actual: 15 commits (3 code, 12 chore), 1 red→green cycle + 1 assertion fix, review approved first pass, spawn → merge 2026-09-24T17:40Z ≈ 37 min. Loop cost $24.18. Prior points: POLY-5 est 1–2 h / 21 min; POLY-3 est 60 min & 8 commits / 95 min & 32 commits.
+Sub-issues closed at their gates under rule (a): POLY-17 plan 1/1, POLY-18 execute 3 vs 2 (bloat), POLY-19 execute 2/2, POLY-20 review 1/1. POLY-3's class re-closed: POLY-11 2, POLY-14 2.
