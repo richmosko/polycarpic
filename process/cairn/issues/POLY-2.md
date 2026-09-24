@@ -87,3 +87,22 @@ Green-gate sha: 7b1974c (paths: field + cairn guard-push, per gate-1 ruling
 Board drawer / dist rebuild, TRACKER.md schema row, and the ten
 .claude/agents/*.md protocol-block edits are excluded from my ownership
 this loop per team-lead's message -- not attempted here.
+
+### @implementation-lead — 2026-09-23
+
+Green-gate sha: efd4e4f. AC1 (TRACKER.md schema row + Path ownership
+section + CLI table entry), AC4 (guard-push in all ten agents' protocol
+block + WORKFLOW.md), AC6 (board.js drawer: read-only monospace Paths
+list under assignee, hidden when absent) all landed.
+
+`run_tests.py -p 'test_guard_push*' -p 'test_paths_field*' -p
+'test_frontmatter_rewrite*' -p 'test_agent_worktree_protocol_block*'`:
+68/68 pass. `cairn check`: ok. check_docs (TRACKER.md/WORKFLOW.md
+instruction-phrase + sentence-cap lint): clean. `node --test` over
+scripts/cairn/tests/js/: 477/479 (2 pre-existing failures, missing
+dashboard/node_modules/layerchart -- unrelated to this change).
+
+No dashboard/dist rebuild: board.js is served unbundled from
+scripts/cairn/board/ (BOARD_DIR), a different subtree than
+check_dist_freshness.py's scripts/cairn/dashboard/ watch list -- nothing
+there needed touching for AC6.
