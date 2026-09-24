@@ -208,6 +208,71 @@ class GlobSemanticsTests(GuardPushTestBase):
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
         self.assertIn("src/authz/a.py", r.stdout + r.stderr)
 
+    def test_consecutive_double_star_segments_collapse_to_one(self):
+        """Architect's gate-4 verdict, defect A (POLY-2.md @ c311ae7):
+        `**/**` must match exactly what bare `**` matches -- a root-level
+        file and a nested one -- not nothing. `_glob_to_regex("**/**")`
+        must collapse consecutive `**` segments before translating.
+
+        The entry is written double-quoted (`paths: ["**/**"]`) rather than
+        through `seed_issue_and_branch`'s bare-flow-list helper -- an
+        UNQUOTED entry starting with `*` collides with this repo's YAML
+        subset parser's anchor/alias rejection (`raw[0] in "&*"`) before
+        `_glob_to_regex` is ever reached (confirmed: `*.py` unquoted fails
+        the same way). That is a separate, broader latent defect than
+        anything this ticket's ruling scopes -- flagged to the lead/
+        architect, not fixed here -- so this test isolates defect A alone
+        by sidestepping it with an explicit quote, same convention already
+        used for numeric-looking milestone values."""
+        (self.data_dir / "issues" / "PT-1.md").write_text(
+            ISSUE_TEMPLATE.format(id="PT-1", title="Sub-issue", assignee="backend-lead", paths_line='paths: ["**/**"]\n'),
+            encoding="utf-8",
+        )
+        commit_as(self.root, "seed", "seed: tracker + fixture main files")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "x")
+        write_file(self.root, "a/b")
+        commit_as(self.root, "backend-lead", "root-level and nested, both under **/**")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+
+class MalformedPathsIsAUsageErrorTests(GuardPushTestBase):
+    """Architect's gate-4 verdict, defect B (POLY-2.md @ c311ae7): a
+    malformed `paths:` must be a usage/config error (exit 2), never
+    indistinguishable from a real stray-file failure (exit 1) or an
+    uncaught traceback."""
+
+    def _write_issue_raw_paths(self, issue_id: str, assignee: str, paths_literal: str) -> None:
+        (self.data_dir / "issues" / f"{issue_id}.md").write_text(
+            "---\n"
+            f"id: {issue_id}\ntitle: Malformed paths\nstatus: in-progress\nmilestone: null\nparent: null\n"
+            f"blocked_by: []\nassignee: {assignee}\nlabels: []\npriority: null\npr: null\n"
+            "created: 2026-09-23\nupdated: 2026-09-23\n"
+            f"paths: {paths_literal}\n"
+            "---\n\nBody.\n",
+            encoding="utf-8",
+        )
+
+    def test_a_scalar_paths_value_is_a_usage_error_not_every_file_stray(self):
+        self._write_issue_raw_paths("PT-1", "backend-lead", "src/auth/**")  # scalar, not a list
+        commit_as(self.root, "seed", "seed: tracker + fixture main files")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "src/auth/a.py")
+        commit_as(self.root, "backend-lead", "in-bounds by any reasonable reading")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+
+    def test_a_non_string_paths_entry_is_a_usage_error_not_a_traceback(self):
+        self._write_issue_raw_paths("PT-1", "backend-lead", "[src/auth/**, 42]")
+        commit_as(self.root, "seed", "seed: tracker + fixture main files")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "src/auth/a.py")
+        commit_as(self.root, "backend-lead", "in-bounds by any reasonable reading")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertNotIn("Traceback", r.stderr)
+
 
 class AttributionEdgeCaseTests(GuardPushTestBase):
     def test_paths_set_and_assignee_null_is_a_usage_error(self):
