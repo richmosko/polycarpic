@@ -914,5 +914,335 @@ class TokenActualsSourceFilterTests(unittest.TestCase):
         self.assertEqual(result["lines"], 1)
 
 
+# --------------------------------------------------------------------------
+# 9. POLY-16 ruling: stage-aware windows + `--at` ceiling (design note
+# "Stage windows" section, ruling @ d9dd5f8) -- RED against 599e844, which
+# predates the fix. `--at` isn't a recognized `cairn close` flag yet
+# (argparse rejects it), and `_sibling_floor` filters neither by stage
+# order nor excludes the issue's own id, so both the ceiling mechanism and
+# the floor exclusions below are unimplemented. Tests 2 and 3 pin EXISTING
+# (unchanged) behavior -- the default ceiling and the same-stage-sibling
+# rule -- and are expected to already pass; they guard against a fix that
+# accidentally changes either.
+# --------------------------------------------------------------------------
+
+class StageWindowTestBase(unittest.TestCase):
+    """A real git repo: `main` seeded with the fixture data dir, `feature`
+    diverging at a fixed, early author date (the parent flip) -- every
+    test's own commits land after it. Mirrors `CloseCommandTestBase`, but
+    `seed_subissues` takes an explicit `stage` per issue: POLY-16's tests
+    need a plan and a review sibling under one parent+assignee, not just
+    one execute sub-issue."""
+
+    FEATURE_STARTED = "2020-01-01T12:00:00+00:00"  # -> normalized "2020-01-01T12:00:00Z"
+
+    def setUp(self):
+        self.root = helpers.make_empty_tmp_dir(self)
+        git(self.root, "init", "-q", "-b", "main")
+        git(self.root, "config", "user.email", "seed@example.com")
+        git(self.root, "config", "user.name", "seed")
+        (self.root / "process").mkdir()
+        self.data_dir = helpers.copy_fixture_data_dir(self.root / "process")
+        commit_as(self.root, "seed", "seed: tracker + fixtures", when="2020-01-01T00:00:00+00:00")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "FEATURE_STARTED", "x\n")
+        commit_as(self.root, "seed", "feature: started", when=self.FEATURE_STARTED)
+        self.parent_flip_sha = self.head_sha()
+
+    def seed_subissues(self, specs: list, when: str) -> None:
+        """One commit authored by `seed`, adding every issue in `specs` --
+        the lead's own issue-file commit (design note §2: "the lead's
+        issue-file commits ... break runs"), matching `/start-feature`'s
+        real "sub-issues with estimates" commit."""
+        for spec in specs:
+            write_issue(self.data_dir, spec["issue_id"], parent="PT-1", status="in-progress",
+                        stage=spec["stage"], assignee=spec["assignee"],
+                        estimate_tokens=spec.get("estimate_tokens", 100000),
+                        estimate_gate_cycles=spec.get("estimate_gate_cycles", 1))
+        commit_as(self.root, "seed", "seed: sub-issues", when=when)
+
+    def head_sha(self) -> str:
+        return git(self.root, "rev-parse", "HEAD").stdout.strip()
+
+    def calibration_lines(self, id_=None) -> list:
+        p = self.data_dir / "metrics" / "calibration.jsonl"
+        if not p.exists():
+            return []
+        rows = [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
+        return [r for r in rows if id_ is None or r["id"] == id_]
+
+    def issue_fm(self, issue_id: str) -> dict:
+        fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / f"{issue_id}.md").read_text(encoding="utf-8"))
+        return fm
+
+    def close(self, issue_id: str, *extra: str) -> subprocess.CompletedProcess:
+        return cairn_cmd(self.root, self.data_dir, "close", issue_id, "--no-flush", *extra)
+
+
+class BackToBackPairWithAtTests(StageWindowTestBase):
+    """Spec 1: a plan and a review sub-issue held by the same assignee,
+    each closed with `--at` at its own gate commit, get their own gate
+    cycles -- neither absorbs the other's."""
+
+    def test_plan_and_review_each_get_their_own_gate_cycle(self):
+        self.seed_subissues([
+            {"issue_id": "PT-11", "stage": "plan", "assignee": "architect"},
+            {"issue_id": "PT-14", "stage": "review", "assignee": "architect"},
+        ], when="2020-01-02T00:00:00+00:00")
+
+        write_file(self.root, "design.md", "ruling\n")
+        commit_as(self.root, "architect", "ruling", when="2020-01-02T01:00:00+00:00")
+        plan_gate_sha = self.head_sha()
+
+        r1 = self.close("PT-11", "--at", plan_gate_sha)
+        self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
+        self.assertEqual(self.issue_fm("PT-11").get("actual.gate_cycles"), 1)
+
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "execute", when="2020-01-02T02:00:00+00:00")
+        write_file(self.root, "verdict.md", "approve\n")
+        commit_as(self.root, "architect", "verdict", when="2020-01-02T03:00:00+00:00")
+        review_gate_sha = self.head_sha()
+
+        r2 = self.close("PT-14", "--at", review_gate_sha)
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+        self.assertEqual(self.issue_fm("PT-14").get("actual.gate_cycles"), 1)
+        # PT-14's close must not have rewritten PT-11's own record.
+        self.assertEqual(self.issue_fm("PT-11").get("actual.gate_cycles"), 1)
+
+
+class NoAtReproducesCollapseTests(StageWindowTestBase):
+    """Spec 2: the same pair, both closed with no `--at` (finish-feature
+    style, back-to-back at real `now`) -- pins that the default ceiling is
+    still `close_ts = now()`, and reproduces POLY-3's own collapse: the
+    plan close absorbs every architect commit (including the review's own
+    verdict), and the review close gets 0."""
+
+    def test_plan_close_absorbs_review_work_when_neither_uses_at(self):
+        self.seed_subissues([
+            {"issue_id": "PT-11", "stage": "plan", "assignee": "architect"},
+            {"issue_id": "PT-14", "stage": "review", "assignee": "architect"},
+        ], when="2020-01-02T00:00:00+00:00")
+        write_file(self.root, "design.md", "ruling\n")
+        commit_as(self.root, "architect", "ruling", when="2020-01-02T01:00:00+00:00")
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "execute", when="2020-01-02T02:00:00+00:00")
+        write_file(self.root, "verdict.md", "approve\n")
+        commit_as(self.root, "architect", "verdict", when="2020-01-02T03:00:00+00:00")
+        # All work committed BEFORE either close runs -- the finish-feature shape.
+
+        r1 = self.close("PT-11")
+        self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
+        self.assertEqual(self.issue_fm("PT-11").get("actual.gate_cycles"), 2)
+
+        r2 = self.close("PT-14")
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+        self.assertIn("zero commit", (r2.stderr or "").lower())
+        self.assertEqual(self.issue_fm("PT-14").get("actual.gate_cycles"), 0)
+
+
+class SameStageSiblingsUnaffectedTests(StageWindowTestBase):
+    """Spec 3: qa and builder, both execute-stage sub-issues under one
+    parent, with interleaved commits -- each gets its own single cycle,
+    and neither's close floors the other (different assignees, so the
+    (parent, assignee) sibling-floor match never fires between them)."""
+
+    def test_interleaved_execute_commits_each_get_one_cycle(self):
+        self.seed_subissues([
+            {"issue_id": "PT-20", "stage": "execute", "assignee": "backend-lead"},
+            {"issue_id": "PT-21", "stage": "execute", "assignee": "qa-engineer"},
+        ], when="2020-01-02T00:00:00+00:00")
+        write_file(self.root, "red.py", "1\n")
+        commit_as(self.root, "qa-engineer", "red", when="2020-01-02T01:00:00+00:00")
+        write_file(self.root, "green.py", "2\n")
+        commit_as(self.root, "backend-lead", "green", when="2020-01-02T02:00:00+00:00")
+        write_file(self.root, "more_red.py", "3\n")
+        commit_as(self.root, "qa-engineer", "more red", when="2020-01-02T03:00:00+00:00")
+        write_file(self.root, "more_green.py", "4\n")
+        commit_as(self.root, "backend-lead", "more green", when="2020-01-02T04:00:00+00:00")
+
+        r1 = self.close("PT-20")
+        self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
+        self.assertEqual(self.issue_fm("PT-20").get("actual.gate_cycles"), 1)
+
+        r2 = self.close("PT-21")
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+        self.assertEqual(self.issue_fm("PT-21").get("actual.gate_cycles"), 1)
+
+
+class TwoReviewRoundsTests(StageWindowTestBase):
+    """Spec 4: one review sub-issue, closed after each verdict -- the
+    second close's floor is unchanged from the first (self excluded from
+    the sibling-floor query), so W grows to cover both rounds: close-
+    after-verdict-1 gives 1, close-after-verdict-2 gives 2, and the last
+    calibration line for the id holds 2."""
+
+    def test_second_close_after_verdict_two_grows_the_window_to_two_cycles(self):
+        self.seed_subissues([
+            {"issue_id": "PT-14", "stage": "review", "assignee": "architect"},
+        ], when="2020-01-02T00:00:00+00:00")
+        write_file(self.root, "build.py", "1\n")
+        commit_as(self.root, "backend-lead", "build", when="2020-01-02T01:00:00+00:00")
+        write_file(self.root, "verdict1.md", "changes-requested\n")
+        commit_as(self.root, "architect", "verdict 1", when="2020-01-02T02:00:00+00:00")
+        verdict1_sha = self.head_sha()
+
+        r1 = self.close("PT-14", "--at", verdict1_sha)
+        self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
+        self.assertEqual(self.issue_fm("PT-14").get("actual.gate_cycles"), 1)
+
+        write_file(self.root, "fix.py", "2\n")
+        commit_as(self.root, "backend-lead", "fix", when="2020-01-02T03:00:00+00:00")
+        write_file(self.root, "verdict2.md", "approve\n")
+        commit_as(self.root, "architect", "verdict 2", when="2020-01-02T04:00:00+00:00")
+        verdict2_sha = self.head_sha()
+
+        r2 = self.close("PT-14", "--at", verdict2_sha)
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+        self.assertEqual(self.issue_fm("PT-14").get("actual.gate_cycles"), 2)
+
+        lines = self.calibration_lines("PT-14")
+        self.assertEqual(len(lines), 2, lines)
+        self.assertEqual(lines[-1]["actual"]["gate_cycles"], 2)
+
+
+class ReCloseIdempotenceTests(StageWindowTestBase):
+    """Spec 5: re-closing at the SAME `--at` twice gives identical
+    `actual.*` and `window`, appends a second calibration line, and
+    leaves `status: done`. A re-close whose new evaluation no longer
+    overruns its (possibly revised) estimate REMOVES the `bloat` label
+    rather than leaving it stuck from the first close."""
+
+    def test_same_at_twice_is_idempotent(self):
+        self.seed_subissues([
+            {"issue_id": "PT-14", "stage": "review", "assignee": "architect"},
+        ], when="2020-01-02T00:00:00+00:00")
+        write_file(self.root, "verdict.md", "approve\n")
+        commit_as(self.root, "architect", "verdict", when="2020-01-02T01:00:00+00:00")
+        gate_sha = self.head_sha()
+
+        r1 = self.close("PT-14", "--at", gate_sha)
+        self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
+        fm1 = self.issue_fm("PT-14")
+        self.assertEqual(fm1.get("status"), "done")
+
+        r2 = self.close("PT-14", "--at", gate_sha)
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+        fm2 = self.issue_fm("PT-14")
+
+        self.assertEqual(fm2.get("status"), "done")
+        self.assertEqual(fm1.get("actual.gate_cycles"), fm2.get("actual.gate_cycles"))
+
+        lines = self.calibration_lines("PT-14")
+        self.assertEqual(len(lines), 2, lines)
+        self.assertEqual(lines[0]["window"], lines[1]["window"])
+        self.assertEqual(lines[0]["actual"], lines[1]["actual"])
+
+    def test_re_close_that_no_longer_overruns_removes_bloat(self):
+        self.seed_subissues([
+            {"issue_id": "PT-14", "stage": "review", "assignee": "architect", "estimate_gate_cycles": 1},
+        ], when="2020-01-02T00:00:00+00:00")
+        write_file(self.root, "build.py", "1\n")
+        commit_as(self.root, "backend-lead", "build", when="2020-01-02T01:00:00+00:00")
+        write_file(self.root, "verdict1.md", "changes-requested\n")
+        commit_as(self.root, "architect", "verdict 1", when="2020-01-02T02:00:00+00:00")
+        write_file(self.root, "fix.py", "2\n")
+        commit_as(self.root, "backend-lead", "fix", when="2020-01-02T03:00:00+00:00")
+        write_file(self.root, "verdict2.md", "approve\n")
+        commit_as(self.root, "architect", "verdict 2", when="2020-01-02T04:00:00+00:00")
+        gate_sha = self.head_sha()
+
+        r1 = self.close("PT-14", "--at", gate_sha)
+        self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
+        fm1 = self.issue_fm("PT-14")
+        self.assertEqual(fm1.get("actual.gate_cycles"), 2)  # verdict1, fix breaks, verdict2
+        self.assertIn("bloat", fm1.get("labels") or [])
+
+        set_r = subprocess.run(
+            [str(helpers.CAIRN_BIN), "set", "PT-14", "estimate.gate_cycles=5", "--data-dir", str(self.data_dir)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(set_r.returncode, 0, set_r.stdout + set_r.stderr)
+
+        r2 = self.close("PT-14", "--at", gate_sha)  # same ceiling -- only the estimate changed
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+        fm2 = self.issue_fm("PT-14")
+        self.assertEqual(fm2.get("actual.gate_cycles"), 2)
+        self.assertNotIn("bloat", fm2.get("labels") or [])
+
+        lines = self.calibration_lines("PT-14")
+        self.assertEqual(lines[-1]["bloat"], False)
+        self.assertEqual(lines[-1]["bloat_reasons"], [])
+
+
+class PlanRecloseIgnoresLaterStageSiblingTests(StageWindowTestBase):
+    """Spec 6: PT-11 (plan) is re-closed AFTER PT-14 (review) has already
+    closed, both same parent+assignee. The floor must come from an
+    earlier-or-equal-stage sibling only (plan has none) -- never from
+    PT-14 (review, a LATER stage) -- so the re-close's `window.from` stays
+    the parent flip, not PT-14's `window.to`."""
+
+    def test_plan_recloses_floor_ignores_the_review_siblings_window(self):
+        self.seed_subissues([
+            {"issue_id": "PT-11", "stage": "plan", "assignee": "architect"},
+            {"issue_id": "PT-14", "stage": "review", "assignee": "architect"},
+        ], when="2020-01-02T00:00:00+00:00")
+
+        write_file(self.root, "design.md", "ruling\n")
+        commit_as(self.root, "architect", "ruling", when="2020-01-02T01:00:00+00:00")
+        plan_gate_sha = self.head_sha()
+        r1 = self.close("PT-11", "--at", plan_gate_sha)
+        self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
+
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "execute", when="2020-01-02T02:00:00+00:00")
+        write_file(self.root, "verdict.md", "approve\n")
+        commit_as(self.root, "architect", "verdict", when="2020-01-02T03:00:00+00:00")
+        review_gate_sha = self.head_sha()
+        r2 = self.close("PT-14", "--at", review_gate_sha)
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+
+        # PT-14 (review) is now the MOST RECENTLY closed sibling under
+        # (parent=PT-1, assignee=architect) -- a stage-blind floor would
+        # wrongly pick it. Re-close PT-11 (plan) after a later addendum.
+        write_file(self.root, "design.md", "addendum\n")
+        commit_as(self.root, "architect", "addendum", when="2020-01-02T04:00:00+00:00")
+        addendum_sha = self.head_sha()
+        r3 = self.close("PT-11", "--at", addendum_sha)
+        self.assertEqual(r3.returncode, 0, r3.stdout + r3.stderr)
+
+        lines = self.calibration_lines("PT-11")
+        self.assertEqual(lines[-1]["window"]["from"], "2020-01-01T12:00:00Z")
+
+
+class AtCeilingValidationTests(StageWindowTestBase):
+    """Spec 7: `--at <sha>` must be on `ref`'s first-parent history, after
+    the parent flip -- otherwise `close` refuses (exit 1) rather than
+    silently accepting an arbitrary commit as the ceiling."""
+
+    def setUp(self):
+        super().setUp()
+        self.seed_subissues([
+            {"issue_id": "PT-11", "stage": "plan", "assignee": "architect"},
+        ], when="2020-01-02T00:00:00+00:00")
+        write_file(self.root, "design.md", "ruling\n")
+        commit_as(self.root, "architect", "ruling", when="2020-01-02T01:00:00+00:00")
+
+    def test_at_off_first_parent_history_exits_one(self):
+        git(self.root, "checkout", "-q", "main")
+        write_file(self.root, "main_only.py", "1\n")
+        commit_as(self.root, "seed", "main-only work", when="2020-01-02T05:00:00+00:00")
+        off_history_sha = self.head_sha()
+        git(self.root, "checkout", "-q", "feature")
+
+        r = self.close("PT-11", "--at", off_history_sha)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+
+    def test_at_at_the_parent_flip_exits_one(self):
+        # The parent-flip commit itself -- AT the floor, not after it.
+        r = self.close("PT-11", "--at", self.parent_flip_sha)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()
