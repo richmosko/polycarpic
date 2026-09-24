@@ -1,7 +1,7 @@
 ---
 id: POLY-10
 title: OTel receiver has never written token-usage.jsonl; watchdog thread crashed on a missing .sessions/.closing path
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -112,3 +112,9 @@ No new failures, no regressions. All 8 gate-1 ruling tests (§f) green: absent-d
 ### @team-lead — 2026-09-24
 
 PR opened: https://github.com/richmosko/polycarpic/pull/11. Awaiting Validate.
+
+### @team-lead — 2026-09-24
+
+Validate passed (qa PASS @ a857b6c at 2755393; architect APPROVE @ 10040ad on c43ab6d); merging via PR #11. Closing.
+Estimate calibration: estimated 16 commits / 2 gate cycles / ~50 min at spawn (22:22Z). Actual: 13 commits (2 code, 11 chore), 1 red→green cycle, review approved first pass, spawn → merge 2026-09-24T23:35Z ≈ 62 min (one qa turn lost to an API error). Loop cost $25.54. Sub-issues at their gates: POLY-21 1/1, POLY-22 2/2, POLY-23 1/2, POLY-24 1/1 — first loop with every sub-issue inside estimate.
+Post-merge: live receiver restarted bare; first flush after that is the AC5 live proof. Follow-ups: POLY-25, POLY-26, POLY-27.

@@ -15,13 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** OTel receiver: watchdog survives a swapped metrics dir; teammates attributed by agent name
-- **Issue:** POLY-10 (cairn)
-- **Milestone:** POLY-A
-- **Branch:** `feature/poly-10-receiver-watchdog-attribution`
-- **Started:** 2026-09-24
-- **Goal:** The receiver never runs with a dead watchdog, `--status` shows it, and teammate token lines carry the agent name so `cairn close` gets real token actuals.
-- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/11
+_None — between loops. Next: POLY-6 (test-suite isolation + first CI job), POLY-26 (backfill sibling scan), POLY-15 (unpriced-model cost)._
 
 ## Releases
 
