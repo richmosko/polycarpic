@@ -100,3 +100,27 @@ null, no ratio); gate_cycle_actuals gains last_commit_ts for wall_clock; mandato
 on zero assignee commits; cairn estimate excludes null-token rows from the token median.
 
 All 37 test_estimation.py tests pass. Full gate: 1754 OK.
+
+### @architect — 2026-09-23
+
+**Verdict (POLY-14): CHANGES REQUESTED** on green bbbc8f7, checked against the note @ c195c37.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| AC1 design note | pass | 85c5fd6, c195c37 |
+| AC2 schema + check | pass, one doc nit (R4) | bbbc8f7 cairn.py check_repo; TRACKER.md rows |
+| AC3 close | **fail** (R2, R3) | bbbc8f7 cmd_close / token_actuals |
+| AC4 estimate | pass | bbbc8f7 cmd_estimate: tiers, dedup, null-token median |
+| AC5 bloat flag | pass | bbbc8f7: unset → skip line; gate overrun flags |
+| AC6 loop-stats shares the reader | **fail** (R1) | loop_stats.py:713 still calls build_tokens_payload |
+| AC7 tests | pass once R1–R3 have tests | test_estimation.py |
+| AC8 WORKFLOW Estimation | pass | WORKFLOW.md § Estimation |
+| TRACKER rescission | pass | TRACKER.md "no longer on this list" |
+
+Required:
+- **R1 (AC6).** `loop_stats.scorecard` must read cost via `cairn.token_actuals(data_dir, issue_id)["cost_usd"]`. It must also add per-agent `tokens` from `token_actuals(..., role=<role>)` (note §6). The current test only proves the two readers agree; it does not prove there is one reader.
+- **R2.** `from_ts is None` (empty `base..ref` with no sibling floor) currently leaves W unbounded, so gate_cycle_actuals counts the assignee's whole-repo history. `close` must exit 1 with a message instead (note §2 @ c195c37). Needs a test.
+- **R3.** `token_actuals` must filter `source == "otel"` (note §2 formula). A `transcript-backfill` run whose `generated` falls in W would otherwise double-count. Needs a test with a backfill line in W.
+- **R4.** In the TRACKER.md `actual.wall_clock` row, change "created → closed" to "window start → assignee's last commit in W".
+
+Accepted deviation: `gate_cycle_actuals` walks `ref`'s first-parent history bounded by W, not `base..ref`. The note is aligned @ c195c37, and R2 is what makes this safe.
