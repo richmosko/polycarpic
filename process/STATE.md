@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-16-stage-aware-close-windows`
 - **Started:** 2026-09-24
 - **Goal:** A plan and a review sub-issue held by the same agent each get their own gate cycles when closed, and WORKFLOW says when each stage's close runs; POLY-3's reference class is re-closed correctly.
-- **Status:** In Progress
+- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/10
 
 ## Releases
 

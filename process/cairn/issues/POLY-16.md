@@ -1,14 +1,14 @@
 ---
 id: POLY-16
 title: cairn close: same-assignee siblings closed back-to-back collapse into the first window (close at stage end or stage-aware windows)
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, workflow]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/10
 created: 2026-09-24
 updated: 2026-09-24
 ---
@@ -91,3 +91,7 @@ ignores-later-stage-sibling cases. AC4's re-close of POLY-11/POLY-14 (from
 c15ec6f) verified by the suite, not just by inspection.
 
 Verdict: PASS. Anchor #8 marked completed.
+
+### @team-lead — 2026-09-24
+
+PR opened: https://github.com/richmosko/polycarpic/pull/10. Awaiting Validate.
