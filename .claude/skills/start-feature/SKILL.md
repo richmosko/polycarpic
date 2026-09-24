@@ -18,6 +18,10 @@ The tracker is **cairn** — files under `process/cairn/`, worked via the `scrip
 
 ## Steps
 
+### 0. Pre-flight
+
+Run `python3 scripts/cairn/check_lead_not_in_worktree.py` before anything else. A non-zero exit means the lead's own cwd is a linked worktree, not the main checkout (POLY-5) — stop this skill, print the script's message verbatim, and do not spawn any teammate until the fix it names has been applied.
+
 ### 1. Resolve the feature
 
 If `$ARGUMENTS` is an issue ID:
@@ -103,6 +107,7 @@ Set the `## Active Feature` block:
 
 ## Failure modes
 
+- **Lead's cwd is a linked worktree (step 0 exits non-zero)** — do not proceed; surface the script's message (it names the fix) and wait for the user to restart from the main checkout or `ExitWorktree` before retrying.
 - **Branch exists already** — ask the user: switch to it (interrupted feature) or pick a different feature.
 - **cairn not set up** (`cairn` errors about a missing `config.yml`) — run `/setup-tracker` first.
 - **Uncommitted changes on main** — stop and ask the user to commit or stash. Never auto-stash.
