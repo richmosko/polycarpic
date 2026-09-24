@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-10-receiver-watchdog-attribution`
 - **Started:** 2026-09-24
 - **Goal:** The receiver never runs with a dead watchdog, `--status` shows it, and teammate token lines carry the agent name so `cairn close` gets real token actuals.
-- **Status:** In Progress
+- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/11
 
 ## Releases
 

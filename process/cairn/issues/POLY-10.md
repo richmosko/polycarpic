@@ -1,14 +1,14 @@
 ---
 id: POLY-10
 title: OTel receiver has never written token-usage.jsonl; watchdog thread crashed on a missing .sessions/.closing path
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/11
 created: 2026-09-23
 updated: 2026-09-24
 ---
@@ -108,3 +108,7 @@ VERDICT: PASS @ 2755393 (build 10040ad, architect-approved gate-1 deviation: exi
 | JS suite | `node --test "scripts/cairn/tests/js/**/*.test.js"` | 479 tests, 477 pass, 2 fail — both the known layerchart ENOENT (POLY-8, unrelated to this feature) |
 
 No new failures, no regressions. All 8 gate-1 ruling tests (§f) green: absent-dir hold, recreate-after-bound, .closing ENOENT non-fatal, fatal-exception exit 3, --status watchdog/last-flush + exit 2, HTTP smoke, worktree-sibling role resolution, worktree-sibling staleness.
+
+### @team-lead — 2026-09-24
+
+PR opened: https://github.com/richmosko/polycarpic/pull/11. Awaiting Validate.
