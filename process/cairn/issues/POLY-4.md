@@ -1,7 +1,7 @@
 ---
 id: POLY-4
 title: Test-suite health after template scrub: color-safe run_tests.py, fix 5 stale failures
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -162,3 +162,7 @@ PR opened: https://github.com/richmosko/polycarpic/pull/5. Finish gate @ 10daa4a
 ### @team-lead — 2026-09-23
 
 Head-match exception (PT-94 C8): `cairn gate --head e4438c0` reports one non-docs path since qa's verdict sha — `.claude/settings.json` @ 10daa4a, the SessionStart hook line wiring `ensure_metrics_worktree.py` (architect: "approve to land", e4438c0). Not covered by the suite; covered by the team-lead finish gate run at 10daa4a (1678/99 OK) and by the live mount in the lead checkout. Proceeding to merge per the user's "merge on green".
+
+### @team-lead — 2026-09-23
+
+Validate passed; merging via PR #5. Closing.
