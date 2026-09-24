@@ -1,7 +1,7 @@
 ---
 id: POLY-22
 title: POLY-10 execute: red tests, verdict
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-10
 blocked_by: []
@@ -10,6 +10,8 @@ paths: [scripts/cairn/tests/**, process/cairn/issues/POLY-10.md]
 stage: execute
 estimate.tokens: 700000
 estimate.gate_cycles: 2
+actual.gate_cycles: 2
+actual.wall_clock: 55
 labels: [cairn, telemetry]
 priority: P1
 pr: null
