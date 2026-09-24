@@ -106,3 +106,30 @@ No dashboard/dist rebuild: board.js is served unbundled from
 scripts/cairn/board/ (BOARD_DIR), a different subtree than
 check_dist_freshness.py's scripts/cairn/dashboard/ watch list -- nothing
 there needed touching for AC6.
+
+### @architect — 2026-09-23
+
+**Gate-4 verdict — POLY-2 @ 6f98f8f: CHANGES-REQUESTED** (two small defects; everything else conforms to the ruling @ 226865e).
+
+| Axis | Result | Evidence |
+|---|---|---|
+| Base (§1) | ✅ origin/main → main → exit 2; merge-base; `--no-merges` | cairn.py `_resolve_push_base_ref`, `cmd_guard_push` @ 7b1974c |
+| Attribution (§3) | ✅ exact `%an` == assignee; `--no-renames`; null-assignee exit 2; `@handle` exit 0. The `%x01` delimiter is a sound deviation (it is documented) | `_files_touched_by_author` @ 7b1974c |
+| Exit codes (§3) | ⚠ 1 is overloaded. See defect B | — |
+| Glob matcher (§2) | ⚠ 14/15 probe cases correct. `**/**` fails. See defect A | probe: `python3 -c` over `_glob_to_regex`, 15 (pattern, path) pairs |
+| `paths:` field + lint (§4) | ✅ row after `assignee`; shape-only; absent ≠ `[]`; `LIST_FIELDS` shared | TRACKER.md, `validate_path_glob` @ 0251300 / 7b1974c |
+| Protocol block (§5) | ✅ wording is as ruled; byte-identity plus the sixth-element test pass | agents/*.md @ fa0b554, 68/68 per lead |
+| TRACKER "Path ownership" / WORKFLOW | ✅ faithful to the ruling | @ 0251300 |
+| Drawer | ✅ read-only list under assignee; hidden when absent; `[]` renders "(may touch nothing)" | board.js @ efd4e4f |
+
+**Defect A — consecutive `**` segments.** `_glob_to_regex("**/**")` compiles to `^(?:.*/)?(?:/.*)?$`. That regex matches neither `x` nor `a/b`, yet `validate_path_glob("**/**")` passes. So a lint-clean pattern silently denies every file. Fix: collapse runs of consecutive `**` segments to one before translating (`a/**/**/b` ≡ `a/**/b`, `**/**` ≡ `**`). qa: add a regression case (`**/**` matches `x` and `a/b`).
+
+**Defect B — malformed `paths:` exits 1.** `cmd_guard_push` never validates `paths_val`:
+- A scalar (`paths: src/**`) is iterated character by character. Every file then reports as stray, exit 1.
+- A non-string entry raises a traceback. Python also exits 1.
+
+Both are indistinguishable from "stray files". Fix: if `paths_val` is not a list, or any entry fails `validate_path_glob`, print the reason and exit 2 (config error, per §3). The matchers are built only after that check. qa: add a regression test covering scalar `paths:` and an int entry → exit 2.
+
+Non-blocking, no change needed: `src/auth/**` also matches `src/auth` itself (zero segments). This is harmless, and the ruling allows it.
+
+Re-review delta after the fix: `cairn.py` (`_glob_to_regex`, `cmd_guard_push`) plus the two new tests only.
