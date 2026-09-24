@@ -179,6 +179,7 @@ import subprocess
 import sys
 import threading
 import time
+import traceback
 from pathlib import Path
 from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 from urllib.parse import urlparse
@@ -238,6 +239,27 @@ TRANSCRIPT_STALE_SECONDS = 30 * 60  # addendum C: the probe's second signal
 # same shape as `--grace-period-seconds`, so tests can shrink it to
 # sub-second without a real multi-minute wait.
 DEFAULT_PERIODIC_REAP_SECONDS = 5 * 60
+# POLY-10 gate-1 ruling (a).3: an absent `.sessions/` dir is *unknown*,
+# never *empty* -- the watchdog holds (no lifecycle change) for as long as
+# the dir is gone, then recreates it once it has been absent at least this
+# long, rather than holding forever on a dir some OTHER process (not
+# `ensure_metrics_worktree.py`'s bounded swap) deleted outright. Overridable
+# via `--registry-absent-recreate-seconds` / a `serve()` test kwarg, same
+# shape as `--grace-period-seconds`/`--periodic-reap-seconds`.
+REGISTRY_ABSENT_RECREATE_SECONDS = 60.0
+# POLY-10 (b): the watchdog's own liveness marker, throttled to one write
+# per second, skipped silently while `.sessions/` is absent (nothing to
+# write it into). `--status` reads its mtime (not its content -- the
+# content is an ISO timestamp for a human to read, but freshness is judged
+# by the file's own age, which is what a swap/rename/utime can actually
+# simulate in a test without racing the watchdog's own write cadence).
+WATCHDOG_HEARTBEAT_MARKER_NAME = ".watchdog-heartbeat"
+WATCHDOG_HEARTBEAT_WRITE_INTERVAL_SECONDS = 1.0
+WATCHDOG_HEARTBEAT_ALIVE_SECONDS = 5.0  # ruling (b): "alive iff heartbeat age <= 5s"
+# POLY-10 (b): written by `_do_flush` on every flush, including a no-op or
+# refused one (proves the flush path itself ran) -- content is
+# "<iso> <lines>", read back and reformatted by `--status`.
+LAST_FLUSH_MARKER_NAME = ".last-flush"
 # Addendum: the allow-list, verbatim -- every OTLP attribute NOT one of
 # these five is dropped before it reaches memory beyond the series key.
 _ATTR_ALLOW_LIST = ("agent.name", "model", "query_source", "cairn.issue", "type")
@@ -616,20 +638,77 @@ def resolve_issue(
     return "main"
 
 
+_WORKTREE_TRANSCRIPT_SUFFIX_CACHE: Optional[str] = None
+
+
+def _worktree_transcript_suffix() -> str:
+    """POLY-10 gate-1 ruling (c): the directory-name suffix Claude Code
+    appends to a teammate's transcript-dir slug when it runs inside
+    `.claude/worktrees/<name>/` -- derived from `backfill_tokens.
+    _transcript_dir_slug`, never hard-coded, so a slug-rule change moves
+    both. `_transcript_dir_slug` substitutes `/`, `_`, `.` one-for-one, so
+    `slug(repo_root + "/.claude/worktrees")` is always exactly
+    `slug(repo_root) + slug("/.claude/worktrees")` -- a plain prefix-strip
+    against the real repo root's own slug is therefore exact, not a guess,
+    and (since neither operand depends on repo_root's actual content) the
+    result is the same constant, `--claude-worktrees`, on every machine;
+    cached at first call rather than recomputed per lookup."""
+    global _WORKTREE_TRANSCRIPT_SUFFIX_CACHE
+    if _WORKTREE_TRANSCRIPT_SUFFIX_CACHE is None:
+        repo_root = backfill_tokens._repo_root()
+        repo_slug = backfill_tokens._transcript_dir_slug(repo_root)
+        worktrees_slug = backfill_tokens._transcript_dir_slug(repo_root / ".claude" / "worktrees")
+        if worktrees_slug.startswith(repo_slug):
+            _WORKTREE_TRANSCRIPT_SUFFIX_CACHE = worktrees_slug[len(repo_slug):]
+        else:
+            _WORKTREE_TRANSCRIPT_SUFFIX_CACHE = "--claude-worktrees"  # unreachable given the slug rule; a safe literal fallback
+    return _WORKTREE_TRANSCRIPT_SUFFIX_CACHE
+
+
+def _transcript_path_for(session_id: str, transcripts_dir: Path) -> Optional[Path]:
+    """POLY-10 gate-1 ruling (c): `transcripts_dir/<id>.jsonl` if it's a
+    file (the direct, pre-worktree lookup, unchanged); else the FIRST file
+    matching `transcripts_dir.parent / f"{transcripts_dir.name}<suffix>-*"
+    / f"{id}.jsonl"` -- a teammate's own transcript, filed by Claude Code
+    under the sibling `<slug><suffix>-<worktree-name>/` dir because every
+    team-agent session's cwd is `.claude/worktrees/<name>/`, never the main
+    checkout. `None` if neither exists. The anchored prefix (`transcripts_
+    dir.name` immediately followed by `<suffix>-`) deliberately excludes a
+    near-neighbour project's own dir (`<slug>-old<suffix>-x`) -- PT-87's
+    invariant that this must never read another project's transcripts.
+    Reads only `<session_id>.jsonl` by exact name inside a matched dir, no
+    directory listing of transcript contents."""
+    direct = transcripts_dir / f"{session_id}.jsonl"
+    if direct.is_file():
+        return direct
+    parent = transcripts_dir.parent
+    if not parent.is_dir():
+        return None
+    pattern = f"{transcripts_dir.name}{_worktree_transcript_suffix()}-*"
+    for candidate_dir in sorted(parent.glob(pattern)):
+        if not candidate_dir.is_dir():
+            continue
+        candidate = candidate_dir / f"{session_id}.jsonl"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def _resolve_role_from_session(
     session_id: Optional[str], transcripts_dir: Path, roster: Set[str], cache: Dict[str, str]
 ) -> str:
     """Amendment B (25d7a42): `agent.name` is confirmed absent on
     teammate-shaped processes, so role resolves per `session.id`, once,
-    at first sight -- NOT from any OTel attribute. Reads
-    `<transcripts_dir>/<session_id>.jsonl` (same file `backfill_tokens.py`
-    would scan) via the shared `backfill_tokens._scan_header_fields` +
-    `resolve_role_from_header` (PT-87, imported not copied -- same
-    reasoning as `_normalize_role` before it). File exists with neither
-    field found -> `team-lead`. File absent entirely -> `subagent-
-    unattributed`, a loud guard: it means no transcript for this session
-    (retention pruned it, or it belongs to another project's dir), not
-    "role unknown, assume lead".
+    at first sight -- NOT from any OTel attribute. Reads the transcript
+    `_transcript_path_for` resolves (POLY-10: the main slug dir OR a
+    worktree-sibling dir -- same file `backfill_tokens.py` would scan) via
+    the shared `backfill_tokens._scan_header_fields` + `resolve_role_
+    from_header` (PT-87, imported not copied -- same reasoning as
+    `_normalize_role` before it). File exists with neither field found ->
+    `team-lead`. No transcript found anywhere -> `subagent-unattributed`,
+    a loud guard: it means no transcript for this session (retention
+    pruned it, or it belongs to another project's dir), not "role unknown,
+    assume lead".
 
     PT-87: `agentSetting` (the roster-anchored `subagent_type`, wins
     verbatim when present) is read alongside `agentName` from the SAME
@@ -647,8 +726,8 @@ def _resolve_role_from_session(
     if session_id in cache:
         return cache[session_id]
 
-    transcript_path = transcripts_dir / f"{session_id}.jsonl"
-    if not transcript_path.is_file():
+    transcript_path = _transcript_path_for(session_id, transcripts_dir)
+    if transcript_path is None:
         return "subagent-unattributed"  # NOT cached -- retry on the next datapoint
 
     try:
@@ -1122,10 +1201,15 @@ def live_session_ids(sessions_dir: Path) -> Dict[str, Optional[int]]:
 
 def _transcript_is_stale(session_id: str, transcripts_dir: Path, now: Optional[float] = None) -> bool:
     """Addendum C's second independent signal: a session's own transcript
-    (the same file role resolution already reads) hasn't been touched in
+    (the same file role resolution already reads -- POLY-10: now via
+    `_transcript_path_for`, so a worktree-sibling transcript counts too;
+    previously this never found one, collapsing the "two independent
+    signals" guarantee to one for every teammate) hasn't been touched in
     >= 30 minutes. No transcript at all counts as stale (nothing to
     protect) -- it either never existed or already aged out."""
-    transcript_path = transcripts_dir / f"{session_id}.jsonl"
+    transcript_path = _transcript_path_for(session_id, transcripts_dir)
+    if transcript_path is None:
+        return True
     try:
         mtime = transcript_path.stat().st_mtime
     except OSError:
@@ -1297,6 +1381,7 @@ def ensure_running(
     session_id: Optional[str] = None, session_pid: Optional[int] = None,
     transcripts_dir: Optional[Path] = None,
     periodic_reap_seconds: float = DEFAULT_PERIODIC_REAP_SECONDS,
+    registry_absent_recreate_seconds: float = REGISTRY_ABSENT_RECREATE_SECONDS,
 ) -> bool:
     """Single instance enforced by pidfile + a listen probe; a second
     start is a no-op, never an error. Returns True if a (new or
@@ -1423,6 +1508,7 @@ def ensure_running(
         "--pidfile", str(pidfile), "--port", str(port),
         "--grace-period-seconds", str(grace_period_seconds),
         "--periodic-reap-seconds", str(periodic_reap_seconds),
+        "--registry-absent-recreate-seconds", str(registry_absent_recreate_seconds),
     ]
     if transcripts_dir is not None:
         spawn_argv += ["--transcripts-dir", str(transcripts_dir)]
@@ -1487,6 +1573,17 @@ def _status(pidfile: Path, port: int, out_path: Path, sessions_dir: Path, transc
     daemon's own answer is correct. Falls back to the passed-in
     `transcripts_dir` when the marker is absent (no daemon has ever
     written one -- an old daemon, or one that hasn't started yet).
+
+    POLY-10 gate-1 ruling (b): two new lines, after `out-file:` --
+    `watchdog: alive|stale|absent (last beat <iso>)` (judged by the
+    heartbeat FILE's own mtime, not its parsed content -- the daemon's own
+    ISO timestamp is only ever printed for a human to read) and
+    `last-flush: <iso> (<n> lines)` / `last-flush: never`. Exit codes:
+    `0` running AND watchdog alive (unchanged for the already-passing
+    case), `1` not running (unchanged), `2` running but the watchdog is
+    NOT alive -- the forbidden state (a live listener over a dead
+    watchdog thread) made scriptable, not just printed. `running:`,
+    `port:`, `out-file:` stay the first three lines, byte-stable.
     """
     pid = _read_pidfile(pidfile)
     running = pid is not None and _pid_is_alive(pid) and _port_is_listening(port)
@@ -1499,6 +1596,32 @@ def _status(pidfile: Path, port: int, out_path: Path, sessions_dir: Path, transc
             transcripts_dir = Path(marker_text)
     except OSError:
         pass
+
+    heartbeat_path = sessions_dir / WATCHDOG_HEARTBEAT_MARKER_NAME
+    heartbeat_iso: Optional[str] = None
+    watchdog_state = "absent"
+    try:
+        heartbeat_iso = heartbeat_path.read_text(encoding="utf-8").strip() or None
+        age = time.time() - heartbeat_path.stat().st_mtime
+        watchdog_state = "alive" if age <= WATCHDOG_HEARTBEAT_ALIVE_SECONDS else "stale"
+    except OSError:
+        watchdog_state = "absent"
+    if heartbeat_iso:
+        print(f"watchdog: {watchdog_state} (last beat {heartbeat_iso})")
+    else:
+        print(f"watchdog: {watchdog_state} (no heartbeat)")
+
+    last_flush_path = sessions_dir / LAST_FLUSH_MARKER_NAME
+    try:
+        last_flush_text = last_flush_path.read_text(encoding="utf-8").strip()
+    except OSError:
+        last_flush_text = ""
+    parts = last_flush_text.split(" ", 1) if last_flush_text else []
+    if len(parts) == 2:
+        print(f"last-flush: {parts[0]} ({parts[1]} lines)")
+    else:
+        print("last-flush: never")
+
     ids = live_session_ids(sessions_dir)
     print(f"sessions: {len(ids)}")
     for session_id in sorted(ids):
@@ -1512,7 +1635,26 @@ def _status(pidfile: Path, port: int, out_path: Path, sessions_dir: Path, transc
         else:
             state = "dead-pending"  # pid gone, transcript still fresh -- not yet reap-eligible
         print(f"session {session_id}: {state}")
-    return 0 if running else 1
+
+    if not running:
+        return 1
+    if watchdog_state == "stale":
+        # `stale` (the heartbeat file EXISTS, inside a PRESENT sessions_dir,
+        # but hasn't been touched within WATCHDOG_HEARTBEAT_ALIVE_SECONDS)
+        # is the actionable forbidden-state signal -- a live listener over
+        # a watchdog thread that has stopped ticking. `absent` (no file at
+        # all) is deliberately NOT the same signal: ruling (a).1's hold
+        # window means `sessions_dir` -- and so the heartbeat inside it --
+        # can be legitimately unreadable for up to
+        # `registry_absent_recreate_seconds` while the watchdog is doing
+        # exactly its job (holding); the file also never existing at all
+        # (an old daemon predating this ticket) is the same "can't tell"
+        # case. Same asymmetry PT-86 §0 already established: a false alarm
+        # here costs an operator's trust in `--status`, a missed one costs
+        # nothing this ticket didn't already accept -- `stale` alone stays
+        # the scriptable, unambiguous case.
+        return 2
+    return 0
 
 
 def _signal_running(pidfile: Path, sig: int, label: str) -> int:
@@ -1613,6 +1755,7 @@ def serve(
     branch_repo_root: Path, prefix: str, roster: Set[str], transcripts_dir: Path,
     sessions_dir: Optional[Path] = None, grace_period_seconds: float = DEFAULT_GRACE_PERIOD_SECONDS,
     periodic_reap_seconds: float = DEFAULT_PERIODIC_REAP_SECONDS,
+    registry_absent_recreate_seconds: float = REGISTRY_ABSENT_RECREATE_SECONDS,
 ) -> None:
     state = ReceiverState()
     sessions_dir = sessions_dir if sessions_dir is not None else _sessions_dir(pidfile)
@@ -1663,6 +1806,15 @@ def serve(
         # where EVERY session that ever registered crashed without ever
         # calling `--session-ended`.
         reap_dead_sessions(sessions_dir, is_alive=session_is_alive)
+        # POLY-10 gate-1 ruling (b): recorded on EVERY flush, including a
+        # no-op or refused one (`lines_written` stays 0) -- this is what
+        # proves the flush path itself ran, not just that it wrote
+        # something. Best-effort: a missing/absent sessions_dir (mid-swap)
+        # must never turn a flush into an error.
+        try:
+            (sessions_dir / LAST_FLUSH_MARKER_NAME).write_text(f"{_now_iso()} {lines_written}", encoding="utf-8")
+        except OSError:
+            pass
         return lines_written
 
     def _on_export() -> None:
@@ -1757,15 +1909,118 @@ def serve(
     signal.signal(signal.SIGTERM, _on_shutdown)
     signal.signal(signal.SIGINT, _on_shutdown)
 
+    def _watchdog_fatal_shutdown(exc: BaseException) -> None:
+        """POLY-10 gate-1 ruling (a).5, the "belt": any watchdog exception
+        OTHER than the known, recoverable ones (absent registry dir,
+        `.closing` ENOENT race -- both handled in-loop below, never
+        reaching here) must exit the WHOLE receiver loudly rather than
+        leave a silently-dead thread under a still-listening socket --
+        the forbidden state this ruling exists to eliminate. Same §5
+        ordering as the normal self-stop path (socket closed, then flush,
+        then pidfile), each step best-effort since we're already on the
+        failure path and must not let a SECOND exception here prevent the
+        hard exit below. `os._exit`, not `sys.exit`: this runs on a
+        background daemon thread, where `sys.exit` only raises `SystemExit`
+        in THIS thread (silently swallowed by the interpreter on a
+        non-main thread) rather than terminating the process -- the exit
+        code this ruling requires (3) needs a real process exit."""
+        print(f"watchdog: fatal {type(exc).__name__}: {exc}", file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
+        try:
+            httpd.shutdown()
+        except Exception:
+            pass
+        try:
+            httpd.server_close()
+        except Exception:
+            pass
+        try:
+            _do_flush()
+        except Exception:
+            pass
+        try:
+            _compare_and_delete_pidfile(pidfile, my_pid)
+        except Exception:
+            pass
+        sys.stderr.flush()
+        os._exit(3)
+
     def _watchdog_loop() -> None:
-        shutdown_deadline: Optional[float] = None
-        ever_nonempty = bool(live_session_ids(sessions_dir))
-        last_periodic_reap = time.monotonic()
-        while True:
-            nudged = wake_event.wait(WATCHDOG_TICK_SECONDS)
-            wake_event.clear()
-            if stopping:
-                return
+        # Mutable tick state, boxed so the nested `_tick` closure below can
+        # update it (a plain local would need `nonlocal` per name; a dict
+        # is one declaration). POLY-10 gate-1 ruling (a).5, the "belt":
+        # each tick's body runs inside the OUTER try/except below, not
+        # inline in this loop -- any exception it raises that isn't one of
+        # the known, recoverable ones (handled in-tick, never propagating)
+        # reaches `_watchdog_fatal_shutdown`, which exits the whole
+        # receiver rather than leaving a silently-dead thread under a
+        # still-listening socket.
+        st = {
+            "shutdown_deadline": None,       # type: Optional[float]
+            "ever_nonempty": bool(live_session_ids(sessions_dir)),
+            "last_periodic_reap": time.monotonic(),
+            "last_heartbeat_write": None,    # type: Optional[float]
+            "absent_since": None,            # type: Optional[float]
+        }
+
+        def _tick(nudged: bool) -> bool:
+            """One watchdog tick. Returns True to keep looping, False once
+            the normal self-stop has run to completion (the watchdog
+            thread's own, non-fatal exit)."""
+            now_mono = time.monotonic()
+
+            # POLY-10 gate-1 ruling (b): a throttled liveness heartbeat,
+            # skipped silently while the registry dir is absent (nothing
+            # to write it into) -- `--status` judges freshness from this
+            # file's own mtime.
+            if sessions_dir.is_dir() and (
+                st["last_heartbeat_write"] is None
+                or (now_mono - st["last_heartbeat_write"]) >= WATCHDOG_HEARTBEAT_WRITE_INTERVAL_SECONDS
+            ):
+                try:
+                    (sessions_dir / WATCHDOG_HEARTBEAT_MARKER_NAME).write_text(_now_iso(), encoding="utf-8")
+                    st["last_heartbeat_write"] = now_mono
+                except OSError:
+                    pass
+
+            # POLY-10 gate-1 ruling (a).1-3: an absent `.sessions/` dir is
+            # *unknown*, never *empty* -- `live_session_ids` returning {}
+            # for a MISSING dir is indistinguishable, at that call, from a
+            # genuinely drained registry, which is exactly today's bug
+            # (M1): a swap window reads as "everyone left", arms the grace
+            # deadline, and dies on the ENOENT it hits trying to act on a
+            # false conclusion. So this dir-existence check runs FIRST,
+            # ahead of every other lifecycle decision this tick.
+            if not sessions_dir.is_dir():
+                if st["absent_since"] is None:
+                    st["absent_since"] = now_mono
+                if (now_mono - st["absent_since"]) < registry_absent_recreate_seconds:
+                    # Hold: cancel any armed deadline (a false "empty"
+                    # conclusion must not carry forward once the dir comes
+                    # back), do not reap, do not touch `ever_nonempty` --
+                    # a swap window (M2, unbounded by network) must never
+                    # be read as "the last session just left".
+                    if st["shutdown_deadline"] is not None:
+                        print(f"grace-window cancelled: registry dir absent at {_now_iso()}, holding, staying up", file=sys.stderr)
+                        st["shutdown_deadline"] = None
+                    return True
+                # Absent past the bound -- something other than a bounded
+                # swap deleted it outright (`ensure_metrics_worktree.py`'s
+                # own restore step always brings it back well within this
+                # bound). Recreate it and its two startup markers rather
+                # than hold forever; the freshly-recreated registry is
+                # empty with `ever_nonempty` UNCHANGED -- if it was already
+                # True, the normal empty-registry grace path now applies
+                # (sessions re-register on their next SessionStart, an
+                # `--ensure-running` one hook away).
+                sessions_dir.mkdir(parents=True, exist_ok=True)
+                (sessions_dir / NUDGE_CAPABLE_MARKER_NAME).write_text("", encoding="utf-8")
+                (sessions_dir / TRANSCRIPTS_DIR_MARKER_NAME).write_text(str(transcripts_dir), encoding="utf-8")
+                print(f"watchdog: registry dir absent {registry_absent_recreate_seconds}s, recreated {sessions_dir}", file=sys.stderr)
+                st["absent_since"] = None
+                return True
+            st["absent_since"] = None
+
             # §3: the probe runs "on every end event", not on a bare
             # periodic tick that nothing prompted -- `--session-ended`
             # (only) sends the SIGUSR2 nudge, so `nudged` distinguishes
@@ -1798,29 +2053,29 @@ def serve(
             # idle (alive pid, or a fresh transcript) can never be
             # removed by this or any other trigger, only one that is
             # confirmed dead by both signals.
-            due_for_periodic_reap = (time.monotonic() - last_periodic_reap) >= periodic_reap_seconds
+            due_for_periodic_reap = (time.monotonic() - st["last_periodic_reap"]) >= periodic_reap_seconds
             if nudged or due_for_periodic_reap:
                 reap_dead_sessions(sessions_dir, is_alive=session_is_alive)
                 if due_for_periodic_reap:
-                    last_periodic_reap = time.monotonic()
+                    st["last_periodic_reap"] = time.monotonic()
             if live_session_ids(sessions_dir):
-                ever_nonempty = True
+                st["ever_nonempty"] = True
                 # PT-90 AC2: log only when a deadline is actually armed --
                 # this branch runs on EVERY ordinary tick (most of which
                 # have no grace window pending at all), so an unconditional
                 # print here would flood the log once per
                 # WATCHDOG_TICK_SECONDS forever.
-                if shutdown_deadline is not None:
+                if st["shutdown_deadline"] is not None:
                     print(f"grace-window cancelled: registry non-empty at {_now_iso()}, session registered, staying up", file=sys.stderr)
-                shutdown_deadline = None
-                continue
-            if not ever_nonempty:
-                continue
-            if shutdown_deadline is None:
-                shutdown_deadline = time.monotonic() + grace_period_seconds
-                continue
-            if time.monotonic() < shutdown_deadline:
-                continue
+                st["shutdown_deadline"] = None
+                return True
+            if not st["ever_nonempty"]:
+                return True
+            if st["shutdown_deadline"] is None:
+                st["shutdown_deadline"] = time.monotonic() + grace_period_seconds
+                return True
+            if time.monotonic() < st["shutdown_deadline"]:
+                return True
             # Deadline passed and the registry was empty as of the top
             # of this tick -- addendum §3: "once more immediately before
             # the point of no return", a fresh probe right now, since a
@@ -1831,18 +2086,23 @@ def serve(
             if live_session_ids(sessions_dir):
                 # PT-90 AC2: a race window, not deterministically
                 # triggerable by a test -- logged per the ruling anyway.
-                if shutdown_deadline is not None:
+                if st["shutdown_deadline"] is not None:
                     print(f"grace-window cancelled: registry non-empty at {_now_iso()}, session proved alive at the pre-exit probe, staying up", file=sys.stderr)
-                shutdown_deadline = None
-                continue
+                st["shutdown_deadline"] = None
+                return True
             # The point of no return (addendum §B): exclusive-create
             # `.closing`, THEN re-read -- a session that registered in
             # the instant between the two must still cancel this.
+            # POLY-10 gate-1 ruling (a).4: `FileNotFoundError` alongside
+            # `FileExistsError` -- the SAME swap window (a).1-3 handles
+            # above can, on a narrower race, vanish `.sessions/` between
+            # this tick's dir-existence check and this exact open; a
+            # single swallowed ENOENT here must never crash the thread.
             try:
                 fd = os.open(str(closing_marker), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
                 os.close(fd)
-            except FileExistsError:
-                continue  # a single watchdog thread should never double-fire; be safe anyway
+            except (FileExistsError, FileNotFoundError):
+                return True  # double-fire guard, or a vanished dir -- either way, safe to retry next tick
             if live_session_ids(sessions_dir):
                 try:
                     closing_marker.unlink()
@@ -1850,10 +2110,10 @@ def serve(
                     pass
                 # PT-90 AC2: a race window, not deterministically
                 # triggerable by a test -- logged per the ruling anyway.
-                if shutdown_deadline is not None:
+                if st["shutdown_deadline"] is not None:
                     print(f"grace-window cancelled: registry non-empty at {_now_iso()}, session registered during the closing race, staying up", file=sys.stderr)
-                shutdown_deadline = None
-                continue
+                st["shutdown_deadline"] = None
+                return True
             # Nothing after this aborts. §5 ordering: socket closed
             # first, then flush, then compare-and-delete the pidfile,
             # then remove `.closing`. `.shutdown()` (cross-thread safe --
@@ -1884,7 +2144,37 @@ def serve(
                 closing_marker.unlink()
             except OSError:
                 pass
-            return
+            return False
+
+        # An immediate first heartbeat, BEFORE the first tick's own
+        # `wake_event.wait(WATCHDOG_TICK_SECONDS)` -- which always waits
+        # the full tick interval unless nudged, and nothing nudges a
+        # freshly-started daemon. Without this, `--status` (a separate,
+        # polling CLI invocation) can observe "running" (port bound,
+        # pidfile written -- both already true by the time this thread
+        # starts) with no heartbeat file yet for up to one tick, which
+        # `_status` correctly reports as `absent` rather than `alive` --
+        # not the forbidden state, but not the steady-state answer a
+        # caller polling for "genuinely up" expects either.
+        if sessions_dir.is_dir():
+            try:
+                (sessions_dir / WATCHDOG_HEARTBEAT_MARKER_NAME).write_text(_now_iso(), encoding="utf-8")
+                st["last_heartbeat_write"] = time.monotonic()
+            except OSError:
+                pass
+
+        while True:
+            nudged = wake_event.wait(WATCHDOG_TICK_SECONDS)
+            wake_event.clear()
+            if stopping:
+                return
+            try:
+                keep_going = _tick(nudged)
+            except BaseException as exc:  # noqa: BLE001 -- the belt, deliberately broad
+                _watchdog_fatal_shutdown(exc)
+                return  # unreachable in practice -- _watchdog_fatal_shutdown hard-exits the process
+            if not keep_going:
+                return
 
     watchdog = threading.Thread(target=_watchdog_loop, daemon=True)
     watchdog.start()
@@ -1948,6 +2238,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     parser.add_argument("--grace-period-seconds", "--grace", dest="grace_period_seconds", type=float, default=DEFAULT_GRACE_PERIOD_SECONDS)
     parser.add_argument("--periodic-reap-seconds", type=float, default=DEFAULT_PERIODIC_REAP_SECONDS)
+    parser.add_argument("--registry-absent-recreate-seconds", type=float, default=REGISTRY_ABSENT_RECREATE_SECONDS)
     args = parser.parse_args(argv)
 
     # `repo_root` anchors everything EXCEPT the branch read: prefix,
@@ -1986,6 +2277,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             repo_root, pidfile, port, grace_period_seconds=args.grace_period_seconds,
             session_id=session_id, session_pid=session_pid, transcripts_dir=transcripts_dir,
             periodic_reap_seconds=args.periodic_reap_seconds,
+            registry_absent_recreate_seconds=args.registry_absent_recreate_seconds,
         )
         # Deliberately NOT nudged: the watchdog's regular
         # WATCHDOG_TICK_SECONDS tick already re-checks emptiness every
@@ -2078,6 +2370,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         port, out_path, pidfile, args.flush_interval, branch_repo_root, prefix, roster, transcripts_dir,
         sessions_dir=_sessions_dir(pidfile), grace_period_seconds=args.grace_period_seconds,
         periodic_reap_seconds=args.periodic_reap_seconds,
+        registry_absent_recreate_seconds=args.registry_absent_recreate_seconds,
     )
     return 0
 
