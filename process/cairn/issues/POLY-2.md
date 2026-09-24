@@ -1,14 +1,14 @@
 ---
 id: POLY-2
 title: Path-ownership push check for concurrent writers
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: [POLY-1]
 assignee: null
 labels: [workflow, cairn]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/6
 created: 2026-09-23
 updated: 2026-09-23
 ---
@@ -170,3 +170,7 @@ Python: `run_tests.py --gate verdict` (full suite, no -p) -- 1707 tests, 0 failu
 JS: `node --test "tests/js/**/*.test.js"` -- 479 tests, 477 pass, 2 fail. Both failures are pre-existing and unrelated (dashboard/node_modules/layerchart missing -- ENOENT on package.json and BarChart.base.svelte), matching implementation-lead's own green-gate comment on this same baseline. No POLY-2 code touches the JS suite.
 
 Sign-off: acceptance criteria all covered by scripts/cairn/tests/test_guard_push.py, test_paths_field.py, test_agent_worktree_protocol_block.py, test_frontmatter_rewrite.py -- green against 6863a4e. Ready for /finish-feature.
+
+### @team-lead — 2026-09-23
+
+PR opened: https://github.com/richmosko/polycarpic/pull/6. Finish gate at 632e573: 1707 py / 0 failures / 4 skipped; JS 477/479 (POLY-8 gap, identical on main); `cairn gate --head 6863a4e` PASS. Awaiting merge call (delivery autonomy: stop-at-merge).
