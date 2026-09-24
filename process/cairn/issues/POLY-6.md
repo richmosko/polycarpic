@@ -32,7 +32,12 @@ Filed from a POLY-4 side conversation (2026-09-23). Not scheduled; no milestone.
 - [ ] CI (when introduced) runs path-filtered jobs: one for `scripts/cairn/` + workflow tests, one per product package; a change in one does not run the other's suite
 - [ ] `process/WORKFLOW.md` (Shared / reusable components) notes that cairn's test boundary is spin-off-clean
 - [ ] One-shot migration commands that have already run on this repo (`migrate-prefix-ids`, `migrate-lifecycle-status`, `migrate-archive-issues`, token backfill) are retired together with their tests (~130 of the ~1700 suite); a migration a fresh template instance still needs stays in the template, not here
+- [ ] A first GitHub Actions workflow (`.github/workflows/`) runs cairn's Python suite via `run_tests.py` plus the JS suite as ONE path-filtered job (`scripts/cairn/**`, `.claude/**`, `process/**`), and is registered as a required status check on `main` so the branch-protection rule enforces green; no matrix and no sharding until a product package exists (a matrix then splits by package, e.g. a Postgres service container for ledger tests, not by shard — ruled 2026-09-24, suite is ~24 s on 8 local workers)
 
 ### @team-lead — 2026-09-23
 
 Scope added 2026-09-24 (user, after the POLY-2 finish gate ran 1707 tests): retire the one-shot migrations and their ~130 tests as part of the same isolation effort. The whole suite costs ~24 s on 8 workers; the point is boundary, not wall-clock.
+
+### @team-lead — 2026-09-23
+
+Scope added 2026-09-24 (user): the first CI workflow lands here too — one path-filtered Actions job, required check on main. Matrix/sharding deferred until there is more than one package; devops-engineer owns the workflow, decided in Plan.
