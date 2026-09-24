@@ -96,3 +96,15 @@ Gate-4 verdict (POLY-24): **approve** at c43ab6d (code d8cf722), reviewed agains
 Deviation accepted: `--status` exits 2 only on `stale`. When the heartbeat is `absent` it still prints the state and exits 0. The ruling's "absent → 2" would false-alarm during the swap-window hold, and in the gap between bind and the first heartbeat. The only real case it misses is a daemon started before POLY-10, and one restart clears that.
 Accepted: the AC5 fixture is a synthetic header-only record. It matches the measured M3 shape (`type: agent-setting` record at index ≤ 3) and carries no captured transcript content.
 Non-blocking follow-up (my ruling's gap, not the build's): the recreate step uses `mkdir(parents=True)`, which can recreate `process/cairn/metrics/` itself if a swap runs longer than 60 s. The fix: keep holding while `sessions_dir.parent` is absent. Candidate to fold into POLY-25/26 or a new issue.
+
+### @qa-engineer — 2026-09-24
+
+VERDICT: PASS @ 2755393 (build 10040ad, architect-approved gate-1 deviation: exit 2 on stale-only).
+
+| Suite | Command | Result |
+|---|---|---|
+| POLY-10 RED file | `run_tests.py -p 'test_otel_receiver_watchdog_attribution*'` | 11/11 green |
+| Full Python gate | `python3 run_tests.py --gate verdict` | 1777 tests, OK, 4 skipped (expected) |
+| JS suite | `node --test "scripts/cairn/tests/js/**/*.test.js"` | 479 tests, 477 pass, 2 fail — both the known layerchart ENOENT (POLY-8, unrelated to this feature) |
+
+No new failures, no regressions. All 8 gate-1 ruling tests (§f) green: absent-dir hold, recreate-after-bound, .closing ENOENT non-fatal, fatal-exception exit 3, --status watchdog/last-flush + exit 2, HTTP smoke, worktree-sibling role resolution, worktree-sibling staleness.
