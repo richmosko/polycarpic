@@ -43,3 +43,21 @@ AC4 expected: POLY-11 --at b6caa8a → 2; POLY-14 --at de60cde → 2. Close POLY
 ### @team-lead — 2026-09-24
 
 Gate-1 ruling accepted @ d9dd5f8 (both: close-at-stage-end rule + `--at <sha>` ceiling; sibling floor excludes self and later stages; re-close allowed with bloat re-evaluated). First application of rule (a): POLY-17 (architect/plan) closed now, at design-gate clear, from the main checkout.
+
+### @qa-engineer — 2026-09-24
+
+RED @ 3c811b3 (test_estimation.py, 9 new tests per ruling d9dd5f8's Tests list 1-7).
+
+7/9 fail right-reason: `close --at <sha>` is not a recognized flag yet
+(argparse "unrecognized arguments"), covering items 1 (back-to-back pair),
+4 (two review rounds), 5 (re-close idempotence + bloat removal), 6 (plan
+re-close ignores later-stage sibling), 7 (--at off-history / at-flip exits 1).
+
+2/9 pass unchanged (pinned regressions, not new behavior): item 2 (no --at
+still defaults to `now`, reproduces POLY-3's collapse) and item 3 (same-stage
+siblings unaffected).
+
+Full `test_estimation*` run: 49 tests, 7 failures (all the above), rest green.
+`_sibling_floor` still needs the self-exclusion + stage-order fix once --at
+lands (idempotence/plan-reclose cases will stay red on --at's own logic
+otherwise). Over to backend-lead for POLY-19.
