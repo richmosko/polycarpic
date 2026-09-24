@@ -1,19 +1,26 @@
 ---
 id: POLY-10
 title: OTel receiver has never written token-usage.jsonl; watchdog thread crashed on a missing .sessions/.closing path
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
-priority: P2
+priority: P1
 pr: null
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 ---
+The OTel receiver (`scripts/cairn/otel_receiver.py`) ran for a day without writing `process/cairn/metrics/token-usage.jsonl`: its watchdog thread died on a missing `.sessions/.closing` path (the metrics dir was swapped aside under it by `ensure_metrics_worktree.py`). After a bare restart it flushes, but every teammate session lands as `role: subagent-unattributed` (16 lines) instead of its agent name, so no sub-issue can ever match its assignee's tokens and every `cairn close` writes `actual.tokens: null`. See the two team-lead comments for the evidence.
 
+## Acceptance criteria
 
+- [ ] Watchdog survives a swapped or absent `.sessions` dir: it recreates the dir or exits the whole receiver loudly — never a dead thread under a live listener; a test pins it
+- [ ] `--status` reports the watchdog thread state and the last flush time
+- [ ] A smoke test proves one metrics export lands as an `otel` line in the token log (end-to-end through the HTTP endpoint)
+- [ ] The absent `OTEL_*` exporter vars in tool subshells are root-caused (settings.json `env` scope vs the lead's Bash env) and the finding is recorded in `process/TRACKER.md` → telemetry, as a verification not a bug unless proven otherwise
+- [ ] Teammate sessions resolve to their agent name (`architect`, `qa-engineer`, `implementation-lead`, …), not `subagent-unattributed`: the resolver reads the team agent's identity from wherever Claude Code actually records it for `--agent-name` teammates (transcript header, session registry, process args), with a test on a captured teammate transcript fixture; the lead still resolves to `team-lead`
 ## Comments
 
 ### @team-lead — 2026-09-23
@@ -24,3 +31,8 @@ Acceptance: (1) watchdog survives a swapped/absent `.sessions` dir (recreate or 
 ### @team-lead — 2026-09-23
 
 Update after the bare restart (2026-09-24 06:21Z flush): token-usage.jsonl now exists, so exports do reach the receiver — the dead watchdog was the blocker, and the OTEL_* env suspicion is weaker (keep AC4 as a verification, not a bug). New AC5: teammate sessions land as `role: subagent-unattributed` (both opus and sonnet lines on POLY-3) rather than `architect` / `qa-engineer` / `implementation-lead`; only the lead resolves to `team-lead`. The role resolver's transcript-header lookup evidently does not see team agents spawned with `--agent-name`. Until fixed, every POLY-3 sub-issue closes with `actual.tokens` matching nothing (0 or null), so calibration tokens are empty even with the receiver healthy. Fix candidates: read `--agent-name` from the registered session's process args, or from the `agent.name` resource attribute if Claude Code sets it for team agents.
+
+### @team-lead — 2026-09-24
+
+Feature started. Branch: `feature/poly-10-receiver-watchdog-attribution`.
+Lead estimate at start (calibration input; prior: POLY-5 21 min, POLY-3 95 min/32 commits, POLY-16 37 min/15 commits): 16 commits, 2 gate cycles, ~50 min spawn→merge. Receiver code is threaded and transcript-scanning, so the diagnosis (AC5) is the risk.
