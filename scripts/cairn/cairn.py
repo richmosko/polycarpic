@@ -4017,6 +4017,13 @@ def token_actuals(
     raw_cost = 0.0
     any_unpriced = False
     for row in rows:
+        # Architect's review of bbbc8f7 (R3, design note §2 formula): only
+        # `source == "otel"` lines count -- a `transcript-backfill` line
+        # whose `generated` falls inside the same window would otherwise
+        # double-count alongside the live otel stream it was backfilled
+        # to cover.
+        if row.get("source") != "otel":
+            continue
         if row.get("issue") != issue_id:
             continue
         if role is not None and row.get("role") != role:
@@ -7245,7 +7252,18 @@ def cmd_close(args: argparse.Namespace) -> int:
     if floor_candidates:
         from_ts = _normalize_iso_z(max(floor_candidates, key=lambda pair: pair[1])[0])
     else:
-        from_ts = None
+        # Architect's review of bbbc8f7 (R2, note @ c195c37): a bounded
+        # window is mandatory once `gate_cycle_actuals` walks `ref`'s full
+        # history rather than a `base..ref` range -- an undefined floor
+        # must refuse, not silently read the assignee's whole-repo/
+        # whole-file history as if it were all this sub-issue's own work.
+        print(
+            f"close: {args.id}'s window has no floor -- {args.base}..{args.ref} is empty (no feature-branch "
+            f"divergence) and no closed sibling exists for (parent={parent}, assignee={assignee}); "
+            "refusing an unbounded window",
+            file=sys.stderr,
+        )
+        return 1
 
     usage_path = data_dir / TOKEN_USAGE_REL
     if not args.no_flush and not args.dry_run:

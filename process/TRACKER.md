@@ -221,7 +221,7 @@ Reuse `lib/session/store.py` rather than introducing a second session abstractio
 | `estimate.gate_cycles` | int ≥ 0 \| absent | — | Sub-issue effort estimate, gate cycles (one red→green pass or one review round). |
 | `actual.tokens` | int ≥ 0 \| absent | — | Written by `cairn close`, never by hand. `cairn check` errors if set while `status` isn't `done`. |
 | `actual.gate_cycles` | int ≥ 0 \| absent | — | Written by `cairn close`. Same non-`done` restriction as `actual.tokens`. |
-| `actual.wall_clock` | int ≥ 0 \| absent | — | Minutes, created → closed. Written by `cairn close`; recorded, never compared against a bound. |
+| `actual.wall_clock` | int ≥ 0 \| absent | — | Minutes, window start → assignee's last commit in the window. Written by `cairn close`; absent (not `0`) with zero commits by the assignee in the window; recorded, never compared against a bound. |
 | `ratio` | decimal string \| absent | — | `actual.tokens / estimate.tokens`, 2dp, quoted (the YAML subset has no float type). Present iff both `actual.tokens` and `estimate.tokens` are set; `cairn check` errors on a `ratio` without both operands. |
 | `labels` | list[string] | ✅ | Free-form, lowercase-kebab. May be `[]`. |
 | `priority` | `P0`–`P3` \| null | — | Backlog ordering only. Not a due date. |
