@@ -95,7 +95,11 @@ class InvalidPathsShapesAreLintErrors(unittest.TestCase):
 
     def test_an_empty_string_entry_is_an_error(self):
         data_dir = helpers.make_tmp_data_dir(self)
-        _write_issue_with_paths_line(data_dir, "PT-1", "[src/auth/**, ]")
+        # A bare trailing comma (`[src/auth/**, ]`) is elided by the YAML
+        # subset parser's flow-list splitter -- no empty entry ever reaches
+        # the validator that way. An explicit quoted "" is what exercises
+        # the case this test names.
+        _write_issue_with_paths_line(data_dir, "PT-1", '[src/auth/**, ""]')
         self.assertNotEqual(_errors_mentioning(data_dir, "PT-1"), [])
 
 

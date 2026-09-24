@@ -35,6 +35,12 @@ def tail_bytes_after_second_fence(raw: bytes) -> bytes:
 
 class DumpFrontmatterTests(unittest.TestCase):
     def test_canonical_key_order_regardless_of_input_order(self):
+        # POLY-2: `paths` is now a member of ISSUE_FIELD_ORDER, so it must
+        # be present in `fields` for this test's own claim (full canonical
+        # order regardless of input order) to mean what it says -- an
+        # absent `paths` would legitimately not appear in the output at
+        # all (see the field's own "absent means undeclared" rule, POLY-2
+        # gate-1 ruling item 4), which is a different, narrower assertion.
         fields = {
             "updated": "2026-08-19",
             "id": "PT-1",
@@ -45,6 +51,7 @@ class DumpFrontmatterTests(unittest.TestCase):
             "parent": None,
             "blocked_by": [],
             "assignee": None,
+            "paths": [],
             "labels": [],
             "priority": None,
             "pr": None,
@@ -229,13 +236,19 @@ class UnknownFrontmatterKeyPreservationTests(unittest.TestCase):
         )
         cairn.apply_patch(self.path, {"status": "in-review"})
 
+        # POLY-2: `_canonical_frontmatter_text()` never declares `paths:`,
+        # and that absence must survive a patch (the field's own "absent
+        # means undeclared" rule) -- so the canonical-keys-lead prefix here
+        # is ISSUE_FIELD_ORDER minus the one field this fixture never had,
+        # not the full order.
+        expected_leading_keys = [f for f in cairn.ISSUE_FIELD_ORDER if f != "paths"]
         keys = self._frontmatter_keys_in_file()
         self.assertEqual(
-            keys[: len(cairn.ISSUE_FIELD_ORDER)], cairn.ISSUE_FIELD_ORDER,
+            keys[: len(expected_leading_keys)], expected_leading_keys,
             "canonical keys must still lead, in their documented order",
         )
         self.assertEqual(
-            keys[len(cairn.ISSUE_FIELD_ORDER):], ["epic", "team"],
+            keys[len(expected_leading_keys):], ["epic", "team"],
             "unknown keys must survive in their original insertion order",
         )
 
@@ -516,7 +529,10 @@ class PT13MilestoneFieldOrderAndNoUpdatedInjectionTests(unittest.TestCase):
         raw = issue_path.read_text(encoding="utf-8")
         inner = raw.split("---\n", 2)[1]
         keys = [line.split(":", 1)[0] for line in inner.splitlines() if ":" in line]
-        self.assertEqual(keys, cairn.ISSUE_FIELD_ORDER)
+        # POLY-2: this fixture never declares `paths:`, and that absence
+        # must survive a patch -- expected order is ISSUE_FIELD_ORDER
+        # minus the one field this fixture never had.
+        self.assertEqual(keys, [f for f in cairn.ISSUE_FIELD_ORDER if f != "paths"])
         frontmatter, _ = cairn.parse_frontmatter(raw)
         self.assertEqual(frontmatter["updated"], datetime.date.today().isoformat())
 
