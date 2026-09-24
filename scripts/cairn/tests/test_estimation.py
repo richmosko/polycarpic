@@ -29,11 +29,25 @@ lint/CLI behavior that plain doesn't happen yet.
   stamp to fixed PAST dates (2020-01-0x) well before any real test-run
   time, so the window always contains them regardless of when the suite
   runs — no dependency on close_ts's actual value.
+
+## Architect addendum 1 (scripts/cairn/design/estimation.md @ 85c5fd6)
+
+Three more RED tests below (`AddendumOneTestBase` and its subclasses),
+landed against `a3738ed` (POLY-13's green, which predates the addendum):
+W's floor is `from_ts = max(parent flip, sibling floor)` rather than the
+sub-issue file's own creation commit; a token file present with zero
+matching (parent, role, W) lines gives `actual.tokens: null` (not `0`) the
+same as a missing file, and the calibration record's own `"ratio"` is
+`null`; `cairn estimate` must not crash on a null-token reference row and
+must exclude it from the token median while still folding its gate_cycles
+into the gate-cycle median; zero assignee commits in W is a mandatory
+stderr warning, and leaves `actual.wall_clock` null (not 0).
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import unittest
 from pathlib import Path
@@ -614,6 +628,154 @@ class LoopStatsParityTests(unittest.TestCase):
         # field's presence/shape rather than the dollar figure, which
         # depends on the real price table this fixture doesn't control.
         self.assertIn("cost_usd", expected)
+
+
+# --------------------------------------------------------------------------
+# 7. Architect addendum 1 (scripts/cairn/design/estimation.md @ 85c5fd6) --
+# RED against a3738ed, which predates the addendum.
+# --------------------------------------------------------------------------
+
+class AddendumOneTestBase(unittest.TestCase):
+    """A real feature-branch divergence from `main` -- addendum 1's
+    "parent flip" is the oldest commit in `<base>..<ref>`, which only
+    means something once `ref` has actually diverged from `base` (the
+    real `/start-feature` shape). `CloseCommandTestBase` above (base ==
+    ref, no divergence) predates this addendum; these three tests are new
+    and self-contained rather than retrofitted onto it."""
+
+    def setUp(self):
+        self.root = helpers.make_empty_tmp_dir(self)
+        git(self.root, "init", "-q", "-b", "main")
+        git(self.root, "config", "user.email", "seed@example.com")
+        git(self.root, "config", "user.name", "seed")
+        (self.root / "process").mkdir()
+        self.data_dir = helpers.copy_fixture_data_dir(self.root / "process")
+        commit_as(self.root, "seed", "seed: tracker + fixtures", when="2020-01-01T00:00:00+00:00")
+        git(self.root, "checkout", "-q", "-b", "feature")
+
+    def feature_started(self, when: str) -> None:
+        """The oldest commit in `base..ref` -- the "parent flip" candidate."""
+        write_file(self.root, "FEATURE_STARTED", "x\n")
+        commit_as(self.root, "seed", "feature: started", when=when)
+
+    def calibration_lines(self) -> list:
+        p = self.data_dir / "metrics" / "calibration.jsonl"
+        if not p.exists():
+            return []
+        return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()]
+
+    def append_calibration_row(self, row: dict) -> None:
+        p = Path(self.data_dir) / "metrics" / "calibration.jsonl"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row) + "\n")
+
+
+class ZeroCommitWarningTests(AddendumOneTestBase):
+    def test_zero_assignee_commits_warns_and_leaves_wall_clock_null(self):
+        self.feature_started(when="2020-01-02T00:00:00+00:00")
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="in-progress", stage="execute",
+                    assignee="backend-lead", estimate_tokens=100000, estimate_gate_cycles=1)
+        # Committed by someone OTHER than the assignee -- backend-lead has
+        # zero commits anywhere in this repo's history.
+        commit_as(self.root, "seed", "add PT-9", when="2020-01-02T01:00:00+00:00")
+
+        r = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--no-flush")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertTrue(
+            re.search(r"(?i)(zero|no|0)\s*commit", r.stderr),
+            f"expected a mandatory zero-commits warning on stderr, got: {r.stderr!r}",
+        )
+        fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        self.assertEqual(fm.get("actual.gate_cycles"), 0)
+        self.assertIsNone(fm.get("actual.wall_clock"))  # null, never 0 -- no evidence to compute it from
+
+
+class NoMatchingTokenLineTests(AddendumOneTestBase):
+    def test_no_matching_line_gives_null_tokens_null_calibration_ratio_and_estimate_excludes_it(self):
+        self.feature_started(when="2020-01-02T00:00:00+00:00")
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="in-progress", stage="execute",
+                    assignee="backend-lead", estimate_tokens=100000, estimate_gate_cycles=1)
+        commit_as(self.root, "backend-lead", "add PT-9", when="2020-01-02T00:30:00+00:00")
+        # The file exists, but no line matches (parent, role, W) -- wrong role.
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-02T01:00:00Z", issue="PT-1", role="someone-else", input=999),
+        ])
+
+        r = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--no-flush")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("actual.tokens", r.stderr)
+        self.assertTrue(
+            any(s in r.stderr.lower() for s in ("null", "no match", "no line")),
+            f"expected a warning naming the no-matching-line case, got: {r.stderr!r}",
+        )
+        fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        self.assertIsNone(fm.get("actual.tokens"))  # null, never 0 -- "no evidence" is not "measured zero"
+        self.assertNotIn("ratio", fm)
+
+        lines = self.calibration_lines()
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn("ratio", lines[0])
+        self.assertIsNone(lines[0]["ratio"])  # a zero ratio would poison every reference-class median
+
+        # A second, real reference class + a fresh target sub-issue: `cairn
+        # estimate` must not crash on PT-9's null-token row, must exclude
+        # it from the TOKEN median, but still fold its gate_cycles (1 --
+        # backend-lead's one commit above) into the gate-cycle median.
+        self.append_calibration_row(calibration_row(
+            "PT-50", parent="PT-1", stage="execute", assignee="backend-lead",
+            act_tokens=200000, act_gc=3, wall=90, closed="2026-09-05T00:00:00Z",
+        ))
+        write_issue(self.data_dir, "PT-51", parent="PT-1", status="todo", stage="execute",
+                    assignee="backend-lead", labels=[])
+        r2 = subprocess.run(
+            [str(helpers.CAIRN_BIN), "estimate", "PT-51", "--data-dir", str(self.data_dir)],
+            capture_output=True, text=True,
+        )
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+        self.assertIn("tokens 200000", r2.stdout)  # median of the ONE non-null value
+        self.assertIn("gate_cycles 2", r2.stdout)  # median of [1, 3] -- the null-token row still counts here
+
+
+class WindowFloorAndWallClockTests(AddendumOneTestBase):
+    def test_from_ts_is_the_max_of_parent_flip_and_sibling_floor(self):
+        self.feature_started(when="2020-01-02T00:00:00+00:00")  # parent flip, T1
+        # A closed sibling under the same parent + assignee (stage need
+        # not match -- the addendum's rule is parent + assignee only)
+        # whose calibration window.to (T2) is LATER than the parent flip.
+        # The sibling floor must win: from_ts = max(T1, T2) = T2.
+        self.append_calibration_row(calibration_row(
+            "PT-40", parent="PT-1", stage="plan", assignee="backend-lead",
+            act_tokens=1, act_gc=1, wall=1, closed="2020-01-05T00:00:00Z",  # T2
+        ))
+        # Generated between T1 and T2 -- must be EXCLUDED. A parent-flip-
+        # only implementation (the pre-addendum behavior) would wrongly
+        # include it.
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-03T00:00:00Z", issue="PT-1", role="backend-lead", input=500),
+            token_row(generated="2020-01-05T01:00:00Z", issue="PT-1", role="backend-lead", input=500),
+        ])
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="in-progress", stage="execute",
+                    assignee="backend-lead", estimate_tokens=100000, estimate_gate_cycles=1)
+        commit_as(self.root, "backend-lead", "add PT-9", when="2020-01-05T01:30:00+00:00")
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "work", when="2020-01-05T02:00:00+00:00")  # last commit, T4
+
+        r = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--no-flush")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        # Only the after-T2 row counts -- proves the sibling floor, not
+        # the earlier parent flip, gates the window.
+        self.assertEqual(fm.get("actual.tokens"), 500)
+        # wall_clock = last assignee commit (T4, 02:00) - from_ts (T2,
+        # 00:00 on the 5th) = 120m -- NOT close_ts (real now) - from_ts,
+        # and NOT close_ts - the sub-issue file's own commit.
+        self.assertEqual(fm.get("actual.wall_clock"), 120)
+
+        # No --since override exists -- a hand-set window would let a
+        # calibration record be fudged (design note addendum).
+        r2 = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--since", "2020-01-01T00:00:00Z")
+        self.assertEqual(r2.returncode, 2, r2.stdout + r2.stderr)
 
 
 if __name__ == "__main__":
