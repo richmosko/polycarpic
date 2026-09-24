@@ -1,14 +1,14 @@
 ---
 id: POLY-5
 title: Fail closed when a teammate cannot isolate in its own worktree
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: [POLY-1]
 assignee: null
 labels: [workflow, git]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/8
 created: 2026-09-23
 updated: 2026-09-23
 ---
@@ -119,3 +119,7 @@ VERDICT: PASS @ 88a4d5b.
 `python3 run_tests.py --gate verdict` (scripts/cairn, worktree): 1717 tests, OK (skipped=4).
 `node --test "scripts/cairn/tests/js/**/*.test.js"`: 479 tests, 477 pass, 2 fail -- both the layerchart ENOENT in token-chart-logic.test.js (POLY-8, node_modules not installed in this worktree, identical on main).
 Acceptance criteria (POLY-5): fail-closed block, lead guard script, extended identity/drift tests, WORKFLOW.md sentence -- all present and green. Sign-off for merge.
+
+### @team-lead — 2026-09-23
+
+PR opened: https://github.com/richmosko/polycarpic/pull/8. Awaiting Validate.
