@@ -10,7 +10,7 @@ labels: [workflow, cairn]
 priority: P2
 pr: null
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 ---
 
 
@@ -158,3 +158,13 @@ Cost ruling. `cost_usd: null` when any matching line's model is missing from pri
 Non-blocking notes, for the lead to file or drop:
 - Because of R3, loop-stats cost is now otel-only. An issue with only backfill lines shows "—" where it used to show a cost.
 - A role with two transcripts (`role-<stem>` keys) shows the full role token total on each key.
+
+### @qa-engineer — 2026-09-24
+
+**QA verdict: PASS** on `bf56e5a` (architect re-approved `67a54d9` at `de60cde`; `bf56e5a` is team-lead's POLY-15 filing, tracker-only, no code).
+
+Python: `python3 run_tests.py --gate verdict` from `scripts/cairn` -- 1757 tests, OK (skipped=4). One transient failure on the first run (`test_otel_receiver_self_stop.GraceWindowFlushContentTests.test_a_datapoint_posted_during_the_grace_window_lands_in_the_final_flush`) -- passed standalone and on a full-suite rerun; `otel_receiver.py` has zero diff across this entire feature loop, so this is a pre-existing timing flake under parallel contention, not a POLY-3 regression. Not filed as a new issue -- flagging for team-lead to decide whether it needs one.
+
+JS: `node --test "scripts/cairn/tests/js/**/*.test.js"` -- 479 tests, 477 pass, 2 fail (layerchart ENOENT x2, POLY-8, known).
+
+`test_estimation.py`: 40/40. All 8 ACs covered per the architect's final verdict table (AC1-AC8, TRACKER rescission). guard-push POLY-12 passed.
