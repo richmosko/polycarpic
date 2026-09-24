@@ -221,6 +221,77 @@ class SharedBlockSetsWorktreeGitIdentityTests(unittest.TestCase):
         )
 
 
+FAIL_CLOSED_PHRASE_RE = re.compile(r"fail closed", re.IGNORECASE)
+SET_NO_IDENTITY_RE = re.compile(r"set no identity", re.IGNORECASE)
+MAKE_NO_COMMIT_RE = re.compile(r"make no commit", re.IGNORECASE)
+
+
+class FailClosedClauseTests(unittest.TestCase):
+    """POLY-5 gate-1 ruling (architect, process/cairn/issues/POLY-5.md @
+    be1d195, item (d)): the block's new fail-closed clause contains `set
+    no identity` and `make no commit`, and comes BEFORE the `git config
+    --worktree user.name` identity step and before the `commit by
+    pathspec` instruction -- identity only happens on success, so the
+    fail-closed instruction must be read first."""
+
+    def _get_the_one_block(self) -> str:
+        self.assertTrue(AGENT_FILES, "expected agent definitions")
+        source = AGENT_FILES[0].read_text(encoding="utf-8")
+        return extract_worktree_protocol_block(source, label=str(AGENT_FILES[0]))
+
+    def test_fail_closed_clause_contains_set_no_identity_and_make_no_commit(self):
+        block = self._get_the_one_block()
+        self.assertRegex(
+            block, SET_NO_IDENTITY_RE,
+            f"expected 'set no identity' in the fail-closed clause -- got: {block!r}",
+        )
+        self.assertRegex(
+            block, MAKE_NO_COMMIT_RE,
+            f"expected 'make no commit' in the fail-closed clause -- got: {block!r}",
+        )
+
+    def test_fail_closed_clause_starts_before_the_identity_step_and_the_commit_instruction(self):
+        block = self._get_the_one_block()
+        fail_closed_match = FAIL_CLOSED_PHRASE_RE.search(block)
+        self.assertIsNotNone(
+            fail_closed_match, f"expected a 'fail closed' clause in the block -- got: {block!r}",
+        )
+        name_match = USER_NAME_CONFIG_RE.search(block)
+        self.assertIsNotNone(
+            name_match, f"expected `git config --worktree user.name` in block -- got: {block!r}",
+        )
+        commit_match = re.search(r"commit\s+by\s+pathspec", block, re.IGNORECASE)
+        self.assertIsNotNone(
+            commit_match, f"expected a 'commit by pathspec' instruction in block -- got: {block!r}",
+        )
+        self.assertLess(
+            fail_closed_match.start(), name_match.start(),
+            "expected the fail-closed clause to start before `git config --worktree user.name` "
+            "(identity only happens on success)",
+        )
+        self.assertLess(
+            fail_closed_match.start(), commit_match.start(),
+            "expected the fail-closed clause to start before the 'commit by pathspec' instruction",
+        )
+
+    def test_fail_closed_clause_is_present_in_every_agent_file(self):
+        missing = []
+        for path in AGENT_FILES:
+            source = path.read_text(encoding="utf-8")
+            block = extract_worktree_protocol_block(source, label=str(path))
+            if not (
+                FAIL_CLOSED_PHRASE_RE.search(block)
+                and SET_NO_IDENTITY_RE.search(block)
+                and MAKE_NO_COMMIT_RE.search(block)
+            ):
+                missing.append(str(path))
+        self.assertEqual(
+            missing, [],
+            f"expected every agent file's block to carry the fail-closed clause ('fail closed', "
+            f"'set no identity', 'make no commit') -- missing from: {missing}",
+        )
+
+
 class ExistingByteIdenticalDriftGuardStillAppliesTests(unittest.TestCase):
     """Guard against accidentally weakening the pre-existing byte-identical
     drift test while adding the identity step -- the marker delimiters
