@@ -45,6 +45,16 @@ BLOCK_RE = re.compile(re.escape(BLOCK_START) + r"(.*?)" + re.escape(BLOCK_END), 
 # <ID>` runs before `git push`, and a non-zero exit skips the push. The
 # existing push/fast-forward pattern above still matches; this is an
 # ADDITIONAL ordering requirement, not a replacement.
+#
+# POLY-5 gate-1 ruling (architect, process/cairn/issues/POLY-5.md @
+# be1d195, item (a)/(d)): the block's first sentence gains a fail-closed
+# clause -- `EnterWorktree` is called UNCONDITIONALLY (even from inside
+# someone else's worktree under `.claude/worktrees/`), and on error,
+# refusal, or a denied permission prompt the teammate sets no identity,
+# writes nothing, commits nothing, and reports the failure to team-lead
+# instead of working in place. Each sub-phrase the ruling names gets its
+# own key here (never one lookahead regex hiding which sub-phrase is
+# missing) so a partial implementation fails loudly at the right key.
 REQUIRED_ELEMENT_PATTERNS = {
     "EnterWorktree first": re.compile(r"EnterWorktree", re.IGNORECASE),
     "pull-rebase before a step": re.compile(r"pull\s+--rebase|pull-rebase", re.IGNORECASE),
@@ -52,6 +62,19 @@ REQUIRED_ELEMENT_PATTERNS = {
     "commit by pathspec": re.compile(r"commit\s+by\s+pathspec", re.IGNORECASE),
     "report a sha": re.compile(r"report\s+(?:the|a)\s+sha", re.IGNORECASE),
     "guard-push precedes git push": re.compile(r"guard-push[\s\S]*?git push", re.IGNORECASE),
+    "EnterWorktree called unconditionally": re.compile(r"EnterWorktree[\s\S]*?unconditionally", re.IGNORECASE),
+    "unconditional even already under .claude/worktrees": re.compile(
+        r"already under `?\.claude/worktrees/", re.IGNORECASE
+    ),
+    "fail closed phrase": re.compile(r"fail closed", re.IGNORECASE),
+    "fail closed on errors": re.compile(r"\berrors\b", re.IGNORECASE),
+    "fail closed on refusal": re.compile(r"\brefused\b", re.IGNORECASE),
+    "fail closed on denied permission prompt": re.compile(
+        r"permission prompt[\s\S]*?denied", re.IGNORECASE
+    ),
+    "report failure to team-lead": re.compile(
+        r"report[\s\S]{0,60}failure[\s\S]{0,40}team-lead", re.IGNORECASE
+    ),
 }
 
 

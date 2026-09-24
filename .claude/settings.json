@@ -51,6 +51,10 @@
           },
           {
             "type": "command",
+            "command": "[ -f scripts/cairn/check_lead_not_in_worktree.py ] || exit 0; python3 scripts/cairn/check_lead_not_in_worktree.py; exit 0"
+          },
+          {
+            "type": "command",
             "command": "echo '--- Project state ---' && awk '/^## Releases/{exit} {print}' process/STATE.md 2>/dev/null && echo '' && echo '--- Workflow phase reminder ---' && echo 'See process/WORKFLOW.md for phase\u2192team mapping. CLAUDE.md is loaded automatically.'"
           },
           {
