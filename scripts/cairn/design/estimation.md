@@ -42,7 +42,7 @@ estimate.tokens: 400000
 estimate.gate_cycles: 1
 actual.tokens: 512340          # written by `cairn close`, never by hand
 actual.gate_cycles: 2
-actual.wall_clock: 47          # integer minutes, created -> closed
+actual.wall_clock: 47          # integer minutes, from_ts -> last assignee commit
 ratio: "1.28"                  # actual.tokens / estimate.tokens, 2 dp
 ```
 
@@ -88,13 +88,25 @@ so every existing issue round-trips byte-identical.
 
 ## 2. Actuals sources
 
-All three sources are computed over one **window** W = (created_ts, close_ts]:
+All three sources are computed over one **window** W = (from_ts, close_ts]:
 
-- `created_ts` is the author time of the commit that added the sub-issue file:
-  `git log --diff-filter=A --format=%aI -- <path>`, with the oldest taken.
+- `from_ts` = max(**parent flip**, **sibling floor**).
+  - The parent flip is the author time of the oldest commit in `<base>..<ref>`,
+    i.e. `/start-feature`'s "feature started" commit, which is the same default
+    `loop-stats` uses for `since`.
+  - The sibling floor is the latest calibration `window.to` of a closed
+    sub-issue with the same `parent` and the same `assignee`. It is absent when
+    there is none.
+  - The sub-issue file's own creation time is **not** used. Sub-issues are
+    often written after the work has started (as POLY-11 was), and the
+    assignee/role filters already keep other agents' commits and tokens out of
+    W.
+  - There is no `--since` override: a hand-set window would let a calibration
+    record be fudged.
 - `close_ts` is the wall time at which `cairn close` runs.
-- If the file was never committed, `created_ts` falls back to `created` at
-  00:00 UTC, and the command prints a warning.
+- Known limit: two same-(parent, assignee) sub-issues that are open at the
+  same time split their work at the first close. The protocol opens a review
+  sub-issue only after the plan closes.
 
 ### Tokens — OTel receiver, `process/cairn/metrics/token-usage.jsonl`
 
@@ -118,7 +130,7 @@ with its role. Sub-issue tokens are therefore:
 ```
 actual.tokens(S) = Σ (input + cache_write + cache_read + output)
     over lines with source == "otel", issue == S.parent, role == S.assignee,
-                    created_ts < generated <= close_ts
+                    from_ts < generated <= close_ts
 ```
 
 `cairn close` first signals the receiver (`otel_receiver.py --flush-now`) and
@@ -134,9 +146,15 @@ review. Known limits, stated rather than papered over:
   destroys the windows. Compaction must never cover an issue with an open
   sub-issue. It is not run automatically today; the implementer adds a guard
   or a docstring warning.
-- `token-usage.jsonl` is currently absent in this clone, so the reader must
-  treat a missing file as `actual.tokens: null`, plus a warning. It must not
-  treat a missing file as 0.
+- **No evidence is null, never 0.** In both of these cases `close` warns
+  (naming the case), writes `actual.tokens: null`, and writes no `ratio`:
+  - the token file is missing;
+  - the file exists but **no line** matches (parent, role, W).
+
+  The calibration record also carries `"ratio": null`. A zero ratio would
+  poison every reference-class median. `cairn estimate` excludes null
+  token actuals from the token median, and gate-cycle medians still use
+  those rows. A real 0 is only ever the sum of ≥1 matching line.
 
 `tokens` sums all four counters, the same total the dashboard shows.
 `cache_read` dominates the sum, and that is intended: context re-reads are the
@@ -164,8 +182,11 @@ commits) and one ruling revision for `plan`. The lead's issue-file commits
 (questions, gate records) also break runs, which is correct: they are round
 boundaries.
 
-Zero commits by the assignee in W gives `actual.gate_cycles: 0`, and the
-command warns.
+Zero commits by the assignee in W gives `actual.gate_cycles: 0` **and a
+warning line on stderr**, which is mandatory and pinned by a test. Zero cycles
+means one of two things: the work happened outside W, or it was committed under
+another identity. It is still recorded, because the gate-cycle bloat rule
+cannot fire on it.
 
 Known limit: a review round carried only by `SendMessage` is invisible. The
 protocol already requires rulings in the file ("messages carry pointers, not
@@ -173,7 +194,11 @@ rulings"), so the definition and the protocol agree.
 
 ### Wall clock
 
-`actual.wall_clock = round((close_ts − created_ts) / 60)`, in integer minutes.
+`actual.wall_clock = round((last_ts − from_ts) / 60)`, in integer minutes.
+`last_ts` is the author time of the assignee's last commit in W, not
+`close_ts`. That way a sub-issue closed long after its work finished (POLY-11
+closes only once `cairn close` exists) does not count the idle gap. It is
+`null` when the assignee has no commits in W.
 It is secondary: it is recorded and printed by `estimate`, and never compared
 against a bound.
 
