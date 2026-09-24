@@ -133,3 +133,15 @@ Both are indistinguishable from "stray files". Fix: if `paths_val` is not a list
 Non-blocking, no change needed: `src/auth/**` also matches `src/auth` itself (zero segments). This is harmless, and the ruling allows it.
 
 Re-review delta after the fix: `cairn.py` (`_glob_to_regex`, `cmd_guard_push`) plus the two new tests only.
+
+### @implementation-lead — 2026-09-23
+
+Fix sha: dc3b393, addressing architect's gate-4 verdict @ c311ae7.
+Defect A: consecutive ** segments collapse to one before translation
+(_glob_to_regex). Defect B: cmd_guard_push validates paths_val via
+validate_path_glob before building matchers; scalar/non-string entries
+now exit 2, never 1. Verified: **/** matches x and a/b; a/**/**/b
+matches a/b and a/x/y/b; scalar paths: and an int entry both exit 2 with
+a named reason (manual scratch-repo repro, no qa regression tests on
+origin yet as of this commit). test_guard_push.py + test_paths_field.py:
+26/26 still pass.
