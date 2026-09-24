@@ -1,19 +1,26 @@
 ---
 id: POLY-6
 title: Separate repo-convention tests from cairn's suite; path-filtered CI per component
-status: backlog
-milestone: null
+status: in-progress
+milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [workflow, cairn, tests, ci]
-priority: P3
+priority: P2
 pr: null
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 ---
+cairn is isolated in practice, not by declaration: all tracker code and its tests live under `scripts/cairn/`, `run_tests.py` discovers only `scripts/cairn/tests/`, and there is no CI. Several files there guard repo conventions (STATE.md releases row, agent-definition drift, worktree protocol block, git identity) rather than the tracker, which couples a future `/spin-off-component` of cairn to project-specific checks. Full history in the comments below.
 
+## Acceptance criteria
 
+- [ ] Repo-convention tests move out of `scripts/cairn/tests/` into a workflow-tests location with their own discovery entry point (or a second `-s` root in `run_tests.py`); cairn's suite contains only tracker/tooling tests
+- [ ] CI (when introduced) runs path-filtered jobs: one for `scripts/cairn/` + workflow tests, one per product package; a change in one does not run the other's suite
+- [ ] `process/WORKFLOW.md` (Shared / reusable components) notes that cairn's test boundary is spin-off-clean
+- [ ] One-shot migration commands that have already run on this repo (`migrate-prefix-ids`, `migrate-lifecycle-status`, `migrate-archive-issues`, token backfill) are retired together with their tests (~130 of the ~1700 suite); a migration a fresh template instance still needs stays in the template, not here. Note: `otel_receiver.py` imports header-scan helpers from `backfill_tokens.py` and POLY-26 builds on that module — the architect rules what "retire the token backfill" means for the shared module
+- [ ] A first GitHub Actions workflow (`.github/workflows/`) runs cairn's Python suite via `run_tests.py` plus the JS suite as ONE path-filtered job (`scripts/cairn/**`, `.claude/**`, `process/**`), and is registered as a required status check on `main` so the branch-protection rule enforces green; no matrix and no sharding until a product package exists
 ## Comments
 
 ### @team-lead — 2026-09-23
@@ -41,3 +48,8 @@ Scope added 2026-09-24 (user, after the POLY-2 finish gate ran 1707 tests): reti
 ### @team-lead — 2026-09-23
 
 Scope added 2026-09-24 (user): the first CI workflow lands here too — one path-filtered Actions job, required check on main. Matrix/sharding deferred until there is more than one package; devops-engineer owns the workflow, decided in Plan.
+
+### @team-lead — 2026-09-24
+
+Feature started. Branch: `feature/poly-6-test-boundary-ci`. Attached to milestone POLY-A (was unscheduled) as a workflow item, P3 → P2, at the user's request 2026-09-24.
+Lead estimate at start (calibration input; prior: POLY-5 21 min, POLY-3 95 min/32 commits, POLY-16 37 min/15, POLY-10 62 min/13): 18 commits, 2 gate cycles, ~70 min spawn→merge. Five ACs across four owners (architect, qa, implementation-lead, devops-engineer); the branch-protection registration is a user action after the workflow's first run.
