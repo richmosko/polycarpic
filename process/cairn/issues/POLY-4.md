@@ -158,3 +158,7 @@ All 4 acceptance criteria satisfied. Recommend merge.
 ### @team-lead — 2026-09-23
 
 PR opened: https://github.com/richmosko/polycarpic/pull/5. Finish gate @ 10daa4a: 1678 tests, 99 files, OK. Architect approved @ e4438c0, qa verdict PASS @ 967b4c2. JS suite 47/48 — the one error is the uninstalled-dashboard gap, identical on main, filed as POLY-8. Awaiting Validate.
+
+### @team-lead — 2026-09-23
+
+Head-match exception (PT-94 C8): `cairn gate --head e4438c0` reports one non-docs path since qa's verdict sha — `.claude/settings.json` @ 10daa4a, the SessionStart hook line wiring `ensure_metrics_worktree.py` (architect: "approve to land", e4438c0). Not covered by the suite; covered by the team-lead finish gate run at 10daa4a (1678/99 OK) and by the live mount in the lead checkout. Proceeding to merge per the user's "merge on green".
