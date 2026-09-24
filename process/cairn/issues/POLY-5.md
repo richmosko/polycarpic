@@ -123,3 +123,11 @@ Acceptance criteria (POLY-5): fail-closed block, lead guard script, extended ide
 ### @team-lead — 2026-09-23
 
 PR opened: https://github.com/richmosko/polycarpic/pull/8. Awaiting Validate.
+
+### @qa-engineer — 2026-09-23
+
+VERDICT (re-verified): PASS @ 71f9220.
+`.claude/settings.json` gained the optional SessionStart hook entry (4 lines, user-committed) since the prior verdict at 88a4d5b -- re-ran the full gate against the new tip.
+`python3 run_tests.py --gate verdict` (scripts/cairn, worktree): 1717 tests, OK (skipped=4).
+`python3 -c "import json;json.load(open('.claude/settings.json'))"`: parses OK.
+JS suite unaffected by this commit (already verified 479 tests, 2 known POLY-8 layerchart ENOENT failures at 88a4d5b). Sign-off for merge stands at 71f9220.
