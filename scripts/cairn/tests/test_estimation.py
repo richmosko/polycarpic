@@ -393,9 +393,18 @@ class GateCycleActualsTests(unittest.TestCase):
 # --------------------------------------------------------------------------
 
 class CloseCommandTestBase(unittest.TestCase):
-    """A real git repo, `main` seeded with the fixture data dir, `PT-9`
-    (the sub-issue under close) added on its own commit at a fixed
-    author date -- that commit is `created_ts`."""
+    """A real git repo, `main` seeded with the fixture data dir, then a
+    `feature` branch diverging before any test's own commits/token
+    timestamps -- `PT-9` (the sub-issue under close) is added on its own
+    commit at a fixed author date on that branch.
+
+    R2 (architect verdict, POLY-3.md @ c9ae61a): `close` refuses an
+    unbounded window -- `base == ref` (no divergence) with no closed
+    sibling is refused outright. Every test here needs a real floor
+    (the "parent flip"), so `main` and `feature` diverge in setUp, well
+    before 2020-01-02 (every test's own commit/token timestamps) --
+    same pattern as `AddendumOneTestBase`'s `feature_started`.
+    """
 
     def setUp(self):
         self.root = helpers.make_empty_tmp_dir(self)
@@ -405,6 +414,9 @@ class CloseCommandTestBase(unittest.TestCase):
         (self.root / "process").mkdir()
         self.data_dir = helpers.copy_fixture_data_dir(self.root / "process")
         commit_as(self.root, "seed", "seed: tracker + fixtures", when="2020-01-01T00:00:00+00:00")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "FEATURE_STARTED", "x\n")
+        commit_as(self.root, "seed", "feature: started", when="2020-01-01T12:00:00+00:00")
 
     def seed_subissue(self, issue_id="PT-9", assignee="backend-lead", estimate_tokens=100000,
                        estimate_gate_cycles=1, created_when="2020-01-02T00:00:00+00:00"):
