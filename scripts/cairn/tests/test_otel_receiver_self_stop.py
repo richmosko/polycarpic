@@ -55,7 +55,7 @@ scaffolding across files that must stay independently readable).
 
 basic.json (already used by test_otel_receiver.py for the one other
 socket-touching test in this suite) carries a single measured,
-distinctive fingerprint: `cairn.issue: PT-95`, and its `type: "input"`
+distinctive fingerprint: `cairn.issue: POLY-95`, and its `type: "input"`
 datapoint's value is exactly 100. A real HTTP POST of those exact bytes,
 sent to the daemon's bound port strictly AFTER the last SessionEnd fires
 (i.e. inside the grace window, before the timer's deadline), followed by
@@ -1050,7 +1050,7 @@ class TranscriptsDirMarkerPrecedenceTests(unittest.TestCase):
 # --------------------------------------------------------------------------
 
 class GraceWindowFlushContentTests(unittest.TestCase):
-    """basic.json's fingerprint (cairn.issue: PT-95, an `input`-type
+    """basic.json's fingerprint (cairn.issue: POLY-95, an `input`-type
     datapoint of value 100) sent DURING the grace window must survive
     into the flush that happens at self-stop -- proving the daemon keeps
     accepting real exports for the whole grace window, not just idling
@@ -1110,8 +1110,8 @@ class GraceWindowFlushContentTests(unittest.TestCase):
         out_path = _out_path(fake_root)
         self.assertTrue(out_path.is_file(), "the self-stop flush must have written --out-file")
         lines = read_jsonl(out_path)
-        pt95 = [l for l in lines if l.get("issue") == "PT-95"]
-        self.assertTrue(pt95, f"the datapoint posted during grace (cairn.issue PT-95) must be in the final flush -- got {lines}")
+        pt95 = [l for l in lines if l.get("issue") == "POLY-95"]
+        self.assertTrue(pt95, f"the datapoint posted during grace (cairn.issue POLY-95) must be in the final flush -- got {lines}")
         self.assertEqual(
             sum(l.get("input", 0) for l in pt95), 100,
             f"basic.json's input-type value (100) must be exactly what was flushed, proving THIS datapoint landed -- got {pt95}",

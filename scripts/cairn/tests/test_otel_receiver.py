@@ -301,37 +301,37 @@ class BranchAttributionTests(unittest.TestCase):
     on the cwd-as-stub mechanism."""
 
     def test_feature_branch_wins_even_without_a_cairn_issue_attribute(self):
-        repo = make_repo_on_branch(self, "feature/pt-95-otel-thing")
+        repo = make_repo_on_branch(self, "feature/poly-95-otel-thing")
         out_dir = helpers.make_empty_tmp_dir(self)
         out_path = out_dir / "token-usage.jsonl"
         result = ingest("no_cairn_issue.json", out_path, repo_root=repo)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         issues = {l["issue"] for l in read_jsonl(out_path)}
-        self.assertEqual(issues, {"PT-95"}, issues)
+        self.assertEqual(issues, {"POLY-95"}, issues)
 
     def test_cairn_issue_wins_only_when_branch_resolves_to_main(self):
         repo = make_repo_on_branch(self, "main")
         out_dir = helpers.make_empty_tmp_dir(self)
         out_path = out_dir / "token-usage.jsonl"
-        # basic.json carries cairn.issue: PT-95
+        # basic.json carries cairn.issue: POLY-95
         result = ingest("basic.json", out_path, repo_root=repo)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         issues = {l["issue"] for l in read_jsonl(out_path)}
-        self.assertEqual(issues, {"PT-95"}, issues)
+        self.assertEqual(issues, {"POLY-95"}, issues)
 
     def test_feature_branch_overrides_a_stale_cairn_issue_attribute(self):
         # §4's load-bearing ordering: a real branch signal must win over
         # a stale cairn.issue, never the reverse.
-        repo = make_repo_on_branch(self, "feature/pt-95-otel-thing")
+        repo = make_repo_on_branch(self, "feature/poly-95-otel-thing")
         out_dir = helpers.make_empty_tmp_dir(self)
         out_path = out_dir / "token-usage.jsonl"
-        # basic.json's cairn.issue is PT-95 too by coincidence -- use a
+        # basic.json's cairn.issue is POLY-95 too by coincidence -- use a
         # fixture with a DIFFERENT cairn.issue to make this test a real
         # discriminator: old_timestamp.json carries cairn.issue: PT-1.
         result = ingest("old_timestamp.json", out_path, repo_root=repo)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         issues = {l["issue"] for l in read_jsonl(out_path)}
-        self.assertEqual(issues, {"PT-95"}, f"branch (PT-95) must win over the stale cairn.issue (PT-1) attribute -- got {issues}")
+        self.assertEqual(issues, {"POLY-95"}, f"branch (POLY-95) must win over the stale cairn.issue (PT-1) attribute -- got {issues}")
 
     def test_neither_branch_nor_cairn_issue_lands_in_main(self):
         repo = make_repo_on_branch(self, "main")
@@ -589,7 +589,7 @@ class OutFileResolvesFromRepoRootTests(unittest.TestCase):
     asserting the OTHER repo-root-anchored resolution (branch regex
     prefix, via the real config.yml) still works correctly -- if cwd leaked
     into that resolution the way it did for PT-77/PT-80, this would
-    misattribute or error instead of landing on PT-95."""
+    misattribute or error instead of landing on POLY-95."""
 
     def test_prefix_and_branch_resolution_do_not_depend_on_cwd(self):
         # Architect's observation (review of 3aa09e8, 4f7fafc): the
@@ -604,7 +604,7 @@ class OutFileResolvesFromRepoRootTests(unittest.TestCase):
         # throwaway repo on a KNOWN branch, same technique
         # BranchAttributionTests already uses -- independent of wherever
         # this suite happens to run.
-        repo = make_repo_on_branch(self, "feature/pt-95-otel-thing")
+        repo = make_repo_on_branch(self, "feature/poly-95-otel-thing")
         outside_cwd = helpers.make_empty_tmp_dir(self)
         out_dir = helpers.make_empty_tmp_dir(self)
         out_path = out_dir / "token-usage.jsonl"
@@ -615,7 +615,7 @@ class OutFileResolvesFromRepoRootTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(out_path.is_file(), "a run from outside the repo must still write real output")
         issues = {l["issue"] for l in read_jsonl(out_path)}
-        self.assertEqual(issues, {"PT-95"}, f"cwd outside the repo (with an explicit --repo-root on a known feature branch) must resolve PT-95, not collapse to main -- got {issues}")
+        self.assertEqual(issues, {"POLY-95"}, f"cwd outside the repo (with an explicit --repo-root on a known feature branch) must resolve POLY-95, not collapse to main -- got {issues}")
 
 
 class OnceIntegrationTests(unittest.TestCase):
@@ -641,7 +641,7 @@ class OnceIntegrationTests(unittest.TestCase):
         # --repo-root pinned to a throwaway repo on main, same reason as
         # CountingTests: without it, branch-first attribution reads this
         # real shared checkout's actual current branch instead of
-        # basic.json's cairn.issue: PT-95.
+        # basic.json's cairn.issue: POLY-95.
         repo = make_repo_on_branch(self, "main")
         out_dir = helpers.make_empty_tmp_dir(self)
         out_path = out_dir / "token-usage.jsonl"
@@ -671,7 +671,7 @@ class OnceIntegrationTests(unittest.TestCase):
 
         self.assertTrue(out_path.is_file(), "--once must flush to --out-file after handling its one request")
         issues = {l["issue"] for l in read_jsonl(out_path)}
-        self.assertIn("PT-95", issues, f"expected basic.json's PT-95 line, got {issues}")
+        self.assertIn("POLY-95", issues, f"expected basic.json's POLY-95 line, got {issues}")
 
     def _wait_until_listening(self, port: int, timeout: float = 5.0):
         import socket

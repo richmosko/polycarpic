@@ -230,6 +230,54 @@ class ParseSummaryTakesTheLastMatchTests(unittest.TestCase):
         self.assertEqual(run_tests.parse_summary(stderr), (28, 1, 0, 0))
 
 
+class ParseSummaryColorizedTests(unittest.TestCase):
+    """POLY-4 gate-red (qa-engineer): a tmux teammate pane can leak
+    FORCE_COLOR into the child `unittest discover` process, wrapping its
+    own "OK"/"FAILED" summary tokens in ANSI SGR escapes. `_SUMMARY_RE`
+    is anchored `^(OK|FAILED)` -- with an escape sequence prefixing the
+    token on its own line, that anchor no longer matches at line start,
+    so parse_summary raises ParseError on a run that actually passed (or
+    undercounts a run that actually failed). Both stderr blobs below are
+    captured verbatim from a real `FORCE_COLOR=1 python3 -m unittest
+    discover` child on this interpreter (Python 3.14) -- not synthesized
+    -- so a fix that merely tolerates a guessed escape shape cannot pass
+    by accident."""
+
+    OK_STDERR = (
+        "\x1b[32m.\x1b[0m\n"
+        "----------------------------------------------------------------------\n"
+        "Ran 1 test in 0.000s\n\n"
+        "\x1b[32mOK\x1b[0m\n"
+    )
+
+    FAILED_STDERR = (
+        "\x1b[31mE\x1b[0m\x1b[31mF\x1b[0m\x1b[32m.\x1b[0m\n"
+        "======================================================================\n"
+        "\x1b[31mERROR\x1b[0m\x1b[1;31m: test_error (test_x.T.test_error)\x1b[0m\n"
+        "----------------------------------------------------------------------\n"
+        "Traceback (most recent call last):\n"
+        "  File \x1b[35m\"/tmp/x/test_x.py\"\x1b[0m, line \x1b[35m9\x1b[0m, in \x1b[35mtest_error\x1b[0m\n"
+        "    raise ValueError()\n"
+        "\x1b[1;35mValueError\x1b[0m\n\n"
+        "======================================================================\n"
+        "\x1b[31mFAIL\x1b[0m\x1b[1;31m: test_fail (test_x.T.test_fail)\x1b[0m\n"
+        "----------------------------------------------------------------------\n"
+        "Traceback (most recent call last):\n"
+        "  File \x1b[35m\"/tmp/x/test_x.py\"\x1b[0m, line \x1b[35m7\x1b[0m, in \x1b[35mtest_fail\x1b[0m\n"
+        "    \x1b[31mself.assertTrue\x1b[0m\x1b[1;31m(False)\x1b[0m\n"
+        "\x1b[1;35mAssertionError\x1b[0m: \x1b[35mFalse is not true\x1b[0m\n\n"
+        "----------------------------------------------------------------------\n"
+        "Ran 3 tests in 0.000s\n\n"
+        "\x1b[1;31mFAILED\x1b[0m (\x1b[1;31mfailures=1\x1b[0m, \x1b[1;31merrors=1\x1b[0m)\n"
+    )
+
+    def test_a_colorized_ok_summary_still_parses_as_ok_not_a_parse_error(self):
+        self.assertEqual(run_tests.parse_summary(self.OK_STDERR), (1, 0, 0, 0))
+
+    def test_a_colorized_failed_summary_still_reports_the_real_counts(self):
+        self.assertEqual(run_tests.parse_summary(self.FAILED_STDERR), (3, 1, 1, 0))
+
+
 class DefaultJobsTests(unittest.TestCase):
     """Guard threshold 5: default jobs == min(8, os.cpu_count() or 4);
     --serial => jobs 1."""

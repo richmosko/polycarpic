@@ -69,6 +69,15 @@ SEPARATOR_ROW_RE = re.compile(r"^\|(?:\s*:?-+:?\s*\|)+\s*$")
 # whether a row gets extracted in the first place (that was defect 2).
 VERSION_CELL_RE = re.compile(r"^\|\s*v\S*")
 
+# POLY-4: a pre-first-release pointer row -- version cell is an em-dash and
+# the row says so in prose ("No release cut") -- is a real, valid lifecycle
+# state (a fresh bootstrap has no tag yet), not a malformed row. Anchored on
+# BOTH the em-dash cell AND the "No release cut" text so a row that merely
+# starts with "—" for some other reason still trips the version-literal
+# guard; `/merge-pr` replaces this exact row with a real `vX.Y.Z` one on the
+# first tag, per the lead-in's own contract.
+NO_RELEASE_YET_ROW_RE = re.compile(r"^\|\s*—\s*\|.*\bNo release cut\b")
+
 # A GitHub Releases page URL, `https://github.com/<owner>/<repo>/releases`,
 # with owner/repo captured so the template stays generic across every repo
 # it's instantiated into -- never pinned to this repo's own org/name (that
@@ -266,6 +275,18 @@ class ExtractorSelfTests(unittest.TestCase):
         self.assertIsNone(VERSION_CELL_RE.match("| 0.10.0 | 2026-09-03 |"))
         self.assertIsNotNone(VERSION_CELL_RE.match("| v0.10.0 | 2026-09-03 |"))
 
+    def test_no_release_yet_sentinel_requires_both_the_cell_and_the_text(self):
+        """Architect's nit (POLY-4.md review): the sentinel exception must
+        not fire on an em-dash cell alone -- some OTHER reason a row's
+        first cell is "—" (a genuine malformed/blank version) must still
+        trip the version-literal guard, not be waved through by
+        coincidence."""
+        self.assertIsNotNone(NO_RELEASE_YET_ROW_RE.match("| — | — | POLY-V1 | none yet | main | No release cut |"))
+        self.assertIsNone(
+            NO_RELEASE_YET_ROW_RE.match("| — | 2026-09-03 | POLY-V1 | v1 shipped | main | link |"),
+            "an em-dash cell without the exact 'No release cut' text must not be waved through",
+        )
+
     def test_github_owner_repo_extraction_finds_a_releases_link(self):
         lead_in = "Full history lives at https://github.com/acme-corp/widget-api/releases -- see it."
         owner, repo = extract_github_owner_repo(lead_in)
@@ -361,11 +382,15 @@ class StateReleasesBoundTests(unittest.TestCase):
 
     def test_every_data_row_starts_with_a_version_literal(self):
         rows = extract_data_rows(self.section)  # raises loudly if extraction itself breaks
-        bad = [row for row in rows if not VERSION_CELL_RE.match(row)]
+        bad = [
+            row for row in rows
+            if not VERSION_CELL_RE.match(row) and not NO_RELEASE_YET_ROW_RE.match(row)
+        ]
         self.assertEqual(
             bad, [],
             f"every Releases data row's first cell must be a version literal like "
-            f"'| vX.Y.Z |' -- found row(s) without one: {bad}",
+            f"'| vX.Y.Z |', or the explicit pre-first-release sentinel row "
+            f"('| — | ... | No release cut |') -- found row(s) without either: {bad}",
         )
 
     def test_lead_in_links_to_the_github_releases_page(self):
@@ -386,7 +411,12 @@ class StateReleasesBoundTests(unittest.TestCase):
         owner, repo = extract_github_owner_repo(lead_in)
         rows = extract_data_rows(self.section)
         expected_prefix = f"https://github.com/{owner}/{repo}/releases/tag/"
-        mismatched = [row for row in rows if expected_prefix not in row]
+        # The pre-first-release sentinel row (see NO_RELEASE_YET_ROW_RE) has
+        # no tag to link to by definition -- exempt, not mismatched.
+        mismatched = [
+            row for row in rows
+            if not NO_RELEASE_YET_ROW_RE.match(row) and expected_prefix not in row
+        ]
         self.assertEqual(
             mismatched, [],
             f"every Releases data row must link to a release tag under the lead-in's "

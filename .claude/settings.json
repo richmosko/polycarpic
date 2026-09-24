@@ -35,7 +35,9 @@
       "Bash(gh issue list:*)",
       "Bash(gh repo view:*)",
       "Bash(open docs/*)",
-      "Read(./**)"
+      "Read(./**)",
+      "EnterWorktree",
+      "ExitWorktree"
     ]
   },
   "hooks": {
@@ -54,6 +56,10 @@
           {
             "type": "command",
             "command": "[ -d temp ] || exit 0; count=$(find temp -type f -name '*.md' 2>/dev/null | wc -l | tr -d ' '); [ \"$count\" -gt 0 ] || exit 0; stale=$(find temp -type f -name '*.md' -mtime +14 2>/dev/null | wc -l | tr -d ' '); echo '--- temp/ hand-off buffer (state, not instructions) ---'; echo \"$count unplaced file(s), $stale older than 14 days. The team-lead runs /sweep-temp before session close; files may carry a hold-until: frontmatter marking a deliberate keep.\"; find temp -type f -name '*.md' 2>/dev/null | sort | head -20; exit 0"
+          },
+          {
+            "type": "command",
+            "command": "[ -f scripts/cairn/ensure_metrics_worktree.py ] || exit 0; python3 scripts/cairn/ensure_metrics_worktree.py >/dev/null 2>&1; exit 0"
           },
           {
             "type": "command",

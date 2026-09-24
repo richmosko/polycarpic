@@ -15,7 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: POLY-4 (test-suite health), then POLY-2._
+_None — between loops. Next: POLY-2 (path-ownership push check), POLY-5 (fail-closed worktree isolation), POLY-3._
 
 ## Releases
 
