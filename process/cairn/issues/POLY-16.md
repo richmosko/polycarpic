@@ -65,3 +65,13 @@ otherwise). Over to backend-lead for POLY-19.
 ### @implementation-lead — 2026-09-24
 
 GREEN @ d95e7e3 (POLY-19): `close --at <sha>` implemented (ceiling on ref's first-parent history after the parent flip, `window.at` calibration key); `_sibling_floor` excludes self-id and later-stage siblings; re-close now removes `bloat` on a no-longer-overrunning re-evaluation, not just adds it. WORKFLOW.md → Estimation states per-stage close timing (rule a). Full `--gate green`: 1765/1766 pass. The one failure (`ReCloseIdempotenceTests.test_re_close_that_no_longer_overruns_removes_bloat`) asserts `bloat: False` where design note §3's unmodified contract (threshold unset + gate cycles within estimate = "not evaluated") gives `null` — flagged to team-lead; qa owns the assertion fix. POLY-11–14 re-closes left to the lead from the main checkout per this issue's plan.
+
+### @architect — 2026-09-24
+
+Verdict on 630da5c: **approve**.
+- AC1: ruling d9dd5f8 is implemented as written (floor excludes self and later stages, last line per id; `--at` ceiling validated after the flip; `window.at` recorded; re-close adds or removes `bloat`).
+- AC2: all seven ruled tests are present. `test_estimation` 49/49 OK, run via unittest discover in the architect worktree @ 630da5c.
+- AC3: WORKFLOW → Estimation states who closes (the lead) and when each stage closes, matching the note.
+- AC4: POLY-11 → 2 cycles, wall 46; POLY-14 → 2 cycles, wall 33. Both match the (from, at] windows (22:38:53→23:24:34, 23:24:34→23:57:33 local). `bloat` on both is correct (2 > est 1).
+- Call 1 — the default stays explicit; do not auto-detect a merged parent. Picking the merge whose ^2 holds `<sha>` would infer the window from the log, which is what the ruling rejected. Under rule (a), a post-merge re-close is the exception, and the documented `--base <merge-base> --ref <merge>^2` form keeps base/ref visible in the record.
+- Call 2 — `bloat: null` confirmed (note §3: threshold unset and no gate overrun means not evaluated). The lead's ruling and b321ccf stand.
