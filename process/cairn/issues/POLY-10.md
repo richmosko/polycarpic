@@ -36,3 +36,7 @@ Update after the bare restart (2026-09-24 06:21Z flush): token-usage.jsonl now e
 
 Feature started. Branch: `feature/poly-10-receiver-watchdog-attribution`.
 Lead estimate at start (calibration input; prior: POLY-5 21 min, POLY-3 95 min/32 commits, POLY-16 37 min/15 commits): 16 commits, 2 gate cycles, ~50 min spawn→merge. Receiver code is threaded and transcript-scanning, so the diagnosis (AC5) is the risk.
+
+### @team-lead — 2026-09-24
+
+AC5 root cause, measured 2026-09-24 before spawn: `_resolve_role_from_session` returns `subagent-unattributed` when `<transcripts_dir>/<session_id>.jsonl` is absent. `.sessions/.transcripts-dir` is `~/.claude/projects/-Users-mosko-Projects-polycarpic`, but every teammate runs with cwd `.claude/worktrees/<name>/`, so Claude Code files its transcript under the sibling slug `-Users-mosko-Projects-polycarpic--claude-worktrees-<name>/` (17 such dirs exist, one transcript each). The header fields (`agentSetting`/`agentName`) are presumably there; nothing reads that dir. Fix shape is the architect's call: scan `<slug>--claude-worktrees-*` siblings (cheap, PT-87 scan window unchanged), or have SessionStart registration record each session's own transcript path so the receiver never guesses.
