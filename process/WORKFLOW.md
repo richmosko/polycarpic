@@ -670,7 +670,10 @@ Schema: [`TRACKER.md` → Effort estimation](TRACKER.md#effort-estimation-poly-3
   the new evaluation, and appends a fresh calibration line. Either way,
   `close` pulls actuals from the OTel receiver and the commit log, writes
   `actual.*`/`ratio`/`status: done`, flags `bloat` on an overrun, and
-  appends a calibration record.
+  appends a calibration record. Re-closing a merged feature's sub-issues
+  (`--at`'s default `--base main --ref HEAD` doesn't reach commits sitting
+  on the merge's second parent) needs the explicit merge shape instead:
+  `--base <merge-base> --ref <merge-sha>^2`.
 
 ### Metrics branch
 

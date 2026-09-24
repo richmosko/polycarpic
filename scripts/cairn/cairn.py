@@ -6611,7 +6611,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_close.add_argument("id")
     p_close.add_argument("--base", default="main")
     p_close.add_argument("--ref", default="HEAD")
-    p_close.add_argument("--at", dest="at_sha", default=None, help="ceiling (POLY-16): close_ts becomes <sha>'s author time and ref becomes <sha> -- must be on ref's first-parent history after the parent flip")
+    p_close.add_argument("--at", dest="at_sha", default=None, help="ceiling (POLY-16): close_ts becomes <sha>'s author time and ref becomes <sha> -- must be on ref's first-parent history after the parent flip; re-closing a merged feature's sub-issues needs --base <merge-base> --ref <merge-sha>^2, since the default --ref HEAD doesn't reach commits on the merge's second parent")
     p_close.add_argument("--no-flush", dest="no_flush", action="store_true", help="skip signaling the otel receiver to flush before reading actuals")
     p_close.add_argument("--dry-run", action="store_true", help="print the computed actuals without writing either file")
     p_close.set_defaults(func=cmd_close)
