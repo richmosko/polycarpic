@@ -42,7 +42,7 @@ estimate.tokens: 400000
 estimate.gate_cycles: 1
 actual.tokens: 512340          # written by `cairn close`, never by hand
 actual.gate_cycles: 2
-actual.wall_clock: 47          # integer minutes, from_ts -> last assignee commit
+actual.wall_clock: 47          # integer minutes, window start -> last assignee commit
 ratio: "1.28"                  # actual.tokens / estimate.tokens, 2 dp
 ```
 
@@ -165,9 +165,15 @@ without a rerun.
 ### Gate cycles — per-agent commit log (POLY-1 identities)
 
 Commits carry `author.name == <agent-name> == assignee`. The input is the
-linear first-parent history `git log --first-parent --reverse <base>..<ref>`
-filtered to W. The defaults are `base = main` and `ref = HEAD`, the same
-defaults `loop-stats` uses.
+first-parent history of `<ref>`, filtered to W. The defaults are `base = main`
+and `ref = HEAD`, the same defaults `loop-stats` uses.
+
+`base` bounds W through the parent flip, not through a `<base>..<ref>` range
+exclusion. The review of the green build (bbbc8f7) accepted this as a
+deviation: it gives the same result once W is bounded. That makes a bounded W
+mandatory. If `from_ts` resolves to none (`base..ref` is empty and there is no
+sibling floor), `close` exits 1; it does not count the assignee's whole-repo
+history.
 
 **Definition.** One gate cycle is one maximal run of the assignee's commits in
 that history, where a run is broken **only** by a commit whose author is
