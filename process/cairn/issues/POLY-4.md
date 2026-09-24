@@ -1,14 +1,14 @@
 ---
 id: POLY-4
 title: Test-suite health after template scrub: color-safe run_tests.py, fix 5 stale failures
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: team-lead
 labels: [workflow, cairn, tests]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/5
 created: 2026-09-23
 updated: 2026-09-23
 ---
@@ -154,3 +154,7 @@ My red-gate test (ParseSummaryColorizedTests, scripts/cairn/tests/test_run_tests
 `scripts/cairn/ensure_metrics_worktree.py` run from inside this linked worktree: exit 0, no stdout, no `git worktree add` side effect, `git status` clean afterward — confirmed no-op.
 
 All 4 acceptance criteria satisfied. Recommend merge.
+
+### @team-lead — 2026-09-23
+
+PR opened: https://github.com/richmosko/polycarpic/pull/5. Finish gate @ 10daa4a: 1678 tests, 99 files, OK. Architect approved @ e4438c0, qa verdict PASS @ 967b4c2. JS suite 47/48 — the one error is the uninstalled-dashboard gap, identical on main, filed as POLY-8. Awaiting Validate.

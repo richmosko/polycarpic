@@ -21,7 +21,8 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-4-test-suite-health`
 - **Started:** 2026-09-23
 - **Goal:** `run_tests.py --gate green` fully green on main with a color-safe summary parser, template-debris tests resolved, and the test-runs metrics file policy recorded in WORKFLOW.md.
-- **Status:** In Progress
+- **PR:** https://github.com/richmosko/polycarpic/pull/5
+- **Status:** In Review
 
 ## Releases
 
