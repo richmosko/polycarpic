@@ -56,3 +56,13 @@ Key calls: flat dotted keys (`estimate.tokens` …) not nested maps (dumper/set/
 Design note reviewed @ 6979191: APPROVED, no revision round. Accepted calls: flat dotted keys (writer has no dict support), `ratio` as a quoted decimal string (int-only parser), gate cycle = maximal run of the assignee's commits broken only by a different-stage or lead commit, `close` flushes the receiver first, bloat sweep by grep. Length over target is fine.
 Receiver finding, out of POLY-3 scope → POLY-10: the receiver never wrote token-usage.jsonl and its watchdog thread is dead. Restarted bare at review time. POLY-3's null-tokens path is therefore the live path for this loop's own sub-issues.
 Decomposition (first hand-estimated reference class; tokens incl. cache reads, gate cycles): POLY-11 architect/plan 800k/1 · POLY-12 qa-engineer/execute 700k/1 · POLY-13 implementation-lead/execute 1.2M/2 · POLY-14 architect/review 400k/1. Closed via `cairn close` at finish-feature once it exists.
+
+### @qa-engineer — 2026-09-23
+
+RED @ da3af80: `scripts/cairn/tests/test_estimation.py` (POLY-12), plus an INTERFACE.md pointer. Confirmed failing for the right reason: `python3 -m unittest discover -s tests -p "test_estimation.py"` -> 22 failures + 6 errors (AttributeError on `cairn.token_actuals`/`gate_cycle_actuals`, argparse "invalid choice" for `close`/`estimate`, `unknown field 'estimate.tokens'`, `ISSUE_FIELD_ORDER` missing the seven keys) out of 34 tests. The 6 passing are pre-existing generic behavior (dump_frontmatter quoting/round-trip) that must stay green, not new coverage.
+
+Covers design note Section 9's minimum set: check validation (stage enum/parent, non-int estimate, `estimate.tokens: 0`, actual-on-non-done, ratio-without-operand, unknown `estimation.*` key, bloat_ratio >1.0), round-trip + `ISSUE_FIELD_ORDER` position, `token_actuals`/`gate_cycle_actuals` unit tests, `cairn close` (actuals, gate-cycle splitting, calibration line, missing-token-log warning, unset/set bloat threshold), `cairn estimate` (tier A/B, dedup, self-exclusion, empty message, median suggestion), loop-stats parity.
+
+Two assumptions flagged in the file's own docstring (not literally pinned by the design note): `since`/`until` are ISO-8601 `Z` strings compared lexically (matches `build_tokens_payload`'s existing convention); `close`/`estimate` resolve repo root from `cwd` like `guard-push` does. Neither should require a test rewrite if wrong -- just a signature tweak.
+
+`scripts/cairn/cairn guard-push POLY-12` passed before push.
