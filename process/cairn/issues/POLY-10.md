@@ -67,3 +67,15 @@ Confirmed right-reason failures against current `otel_receiver.py` (7/11 methods
 Bubble-up: the AC3 smoke test (real CLI, ephemeral port, HTTP POST, SIGUSR1 flush, role via a fixture transcript) is GREEN already today — AC3's wiring pre-dates this ticket. Kept as a locked-in regression test, not forced red.
 
 No regressions: full `test_otel_receiver*` suite (4 files, 87 tests) — only this new file fails; the other 80 pass.
+
+### @implementation-lead — 2026-09-24
+
+GREEN @ (pending push sha): all 8 ruling tests (3d83a20 §f) pass; full suite 1777 tests/104 files green (`--gate green`).
+
+otel_receiver.py changes per (a)-(e): watchdog holds on absent `.sessions/` (unknown, not empty), recreates after `--registry-absent-recreate-seconds` (default 60s), catches ENOENT at the `.closing` open, and any other exception hard-exits the whole receiver (code 3, `watchdog: fatal` stderr, `os._exit` from the watchdog thread since `sys.exit` in a non-main thread wouldn't set the process exit code). `--status` gained `watchdog:`/`last-flush:` lines and exit 2 -- narrowed to a *stale* heartbeat specifically, not merely *absent*: test 1's mid-swap probe needs `.sessions` (and the heartbeat file inside it) to be legitimately unreadable without tripping the forbidden-state alarm, matching PT-86 section 0's "false stop costs more than false calm" asymmetry. `_transcript_path_for` (new) resolves both the main slug dir and worktree-sibling dirs, used by role resolution, staleness probe, and `--status` alike; suffix derived via `backfill_tokens._transcript_dir_slug`, not hard-coded.
+
+TRACKER.md: H1/H3 corrected per (e) (OTEL_* never reaches hook-spawned processes; H3 never fires against a real mismatch in the hook path). New POLY-10 paragraphs for watchdog health + sibling-scan attribution.
+
+Judgment call beyond the ruling's literal text: (b)'s "2 = running AND watchdog not alive" reads as absent-or-stale, but that breaks test 1 (mid-swap heartbeat legitimately unreadable) unless narrowed to stale-only, which test 5 also satisfies (its absent/alive/stale cases are all explicit). Flagging for the verdict gate rather than re-opening the ruling myself.
+
+Files: scripts/cairn/otel_receiver.py, process/TRACKER.md.
