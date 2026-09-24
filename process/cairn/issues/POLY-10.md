@@ -53,3 +53,17 @@ Gate-1 ruling (POLY-21): read `scripts/cairn/design/telemetry-attribution.md` @ 
 ### @team-lead — 2026-09-24
 
 Gate-1 ruling accepted @ 3d83a20 (hold-during-swap / recreate after 60 s / fail closed exit 3; heartbeat + last-flush files for --status with exit 2 on the forbidden state; one shared transcript-path resolver over the worktree sibling dirs used by role, staleness and status; smoke test via the real CLI). POLY-21 closed at design-gate clear. Follow-ups filed from the bubble-ups: POLY-25 (H3 check never runs), POLY-26 (backfill sibling scan). PT-86 latent reap defect is in scope via the shared resolver.
+
+### @qa-engineer — 2026-09-24
+
+RED @ bb000bc: `scripts/cairn/tests/test_otel_receiver_watchdog_attribution.py`, 8 tests per gate-1 ruling (3d83a20) §f.
+
+Confirmed right-reason failures against current `otel_receiver.py` (7/11 methods fail):
+- AC1: absent `.sessions` swap crashes the watchdog thread on an uncaught `FileNotFoundError` at `.closing` (line 1842) — self-stop never fires after restore. Recreate-after-bound fails on missing `--registry-absent-recreate-seconds` (my own inferred flag name, flagged in the file's docstring).
+- AC1 belt: an injected non-ENOENT exception (`RuntimeError` via a monkeypatched `live_session_ids`) kills the thread silently; process hangs forever instead of exiting 3.
+- AC2: `--status` has no `watchdog:`/`last-flush:` lines and no exit-2 forbidden state yet.
+- AC5: `resolve_role`/`_transcript_is_stale` have no worktree-sibling-dir fallback yet (direct-match and near-neighbour-exclusion cases already pass, as expected regression companions).
+
+Bubble-up: the AC3 smoke test (real CLI, ephemeral port, HTTP POST, SIGUSR1 flush, role via a fixture transcript) is GREEN already today — AC3's wiring pre-dates this ticket. Kept as a locked-in regression test, not forced red.
+
+No regressions: full `test_otel_receiver*` suite (4 files, 87 tests) — only this new file fails; the other 80 pass.
