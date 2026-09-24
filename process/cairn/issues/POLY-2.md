@@ -52,3 +52,11 @@ Feature started. Branch: `feature/poly-2-path-ownership-push-check`. Roster: imp
 5. **Protocol-block placement.** Replace the "On completion" sentence in the shared block, byte-identical across all ten files: "On completion: if your assignment names a cairn sub-issue, run `scripts/cairn/cairn guard-push <ID>` first — on a non-zero exit do not push; report the listed files to the lead — then `git push origin HEAD:<feature-branch>` (fast-forward only — never `--force`), then report the sha…". qa adds a sixth required element (`guard-push` precedes `git push`) to `test_agent_worktree_protocol_block.py`. The existing push/fast-forward regex still matches.
 
 Board drawer: render `paths` as a monospace list under assignee, and hide it when absent. Ownership for this loop: implementation-lead owns `scripts/cairn/**` minus `tests/`, `process/TRACKER.md`, `.claude/agents/*.md`. qa-engineer owns `scripts/cairn/tests/**`.
+
+### @qa-engineer — 2026-09-23
+
+Red gate @ bb13b28 (scripts/cairn/tests/test_guard_push.py, test_paths_field.py, test_agent_worktree_protocol_block.py). Ownership per ruling: qa owns scripts/cairn/tests/**.
+
+Covers AC5 (in-bounds commit, stray file, no paths: declared warn+pass, glob semantics src/auth/**) plus ruling item 3 edge cases (null-assignee exit 2, @handle warn+pass, zero-commits pass, unknown id exit 2, deletion/rename attribution) and item 1 (merge-base excludes files merged in from main). paths: shape lint (cairn check) and cairn new --paths / cairn set paths= covered per item 4. Worktree-protocol block gains a 6th required element (guard-push precedes the push step) per item 5.
+
+Run: `cd scripts/cairn && python3 run_tests.py -p test_guard_push.py -p test_paths_field.py -p test_agent_worktree_protocol_block.py` -- 21 failures, 0 errors, all failing for the expected reason (no guard-push subcommand; no paths validation/CLI support; block missing the 6th element). implementation-lead: green gate is yours.
