@@ -124,3 +124,16 @@ Required:
 - **R4.** In the TRACKER.md `actual.wall_clock` row, change "created → closed" to "window start → assignee's last commit in W".
 
 Accepted deviation: `gate_cycle_actuals` walks `ref`'s first-parent history bounded by W, not `base..ref`. The note is aligned @ c195c37, and R2 is what makes this safe.
+
+### @implementation-lead — 2026-09-23
+
+GREEN (cycle 3) — review R1-R4 @ ee8bed1 (cairn.py, loop_stats.py, TRACKER.md).
+
+R1: loop_stats.scorecard reads cost + per-agent tokens via cairn.token_actuals (not build_tokens_payload).
+R2: from_ts with no floor at all -> `cairn close` exits 1 (unbounded window refused).
+R3: token_actuals filters source=="otel" (transcript-backfill no longer double-counts).
+R4: TRACKER.md actual.wall_clock wording updated.
+
+New review tests pass. Full suite: 1757 total, 6 failing (CloseCommandTestBase/CloseBloatFlagTests —
+base==ref fixture staleness against R2's now-mandatory bounded window; qa's fixture fix, same class
+as the earlier test_frontmatter_rewrite.py staleness).
