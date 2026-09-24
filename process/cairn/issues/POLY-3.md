@@ -1,7 +1,7 @@
 ---
 id: POLY-3
 title: Effort estimation loop in cairn (tokens + gate cycles)
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: [POLY-2]
@@ -193,3 +193,9 @@ JS: `node --test "scripts/cairn/tests/js/**/*.test.js"` -- 477/479, 2 known laye
 ### @team-lead — 2026-09-24
 
 PR opened: https://github.com/richmosko/polycarpic/pull/9. Awaiting Validate.
+
+### @team-lead — 2026-09-24
+
+Validate passed (qa PASS @ 716adb2, re-verified @ e4d48da at b6455f8; architect APPROVE @ de60cde on 67a54d9); merging via PR #9. Closing.
+Estimate calibration: estimated 8 commits / 3 gate cycles / ~60 min at spawn (05:38Z). Actual: 32 commits (6 code, 24 chore, 2 tracker riders), 3 red→green cycles + 1 review round, spawn → merge 2026-09-24T15:33Z ≈ 1 h 35 min. Loop cost $31.20 (otel, after the opus-5-5 price row). Prior point: POLY-5 estimated 1–2 h, actual 21 min.
+Follow-ups: POLY-10 (receiver attribution → sub-issue tokens), POLY-15 AC2 (unpriced model → partial cost), POLY-16 (sibling window collapse; re-close this reference class under the fix).
