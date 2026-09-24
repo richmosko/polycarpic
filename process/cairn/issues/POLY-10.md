@@ -49,3 +49,7 @@ Gate-1 ruling (POLY-21): read `scripts/cairn/design/telemetry-attribution.md` @ 
 - AC5: one `_transcript_path_for` resolver scanning `<slug>--claude-worktrees-*/<id>.jsonl` (0.09 ms/miss), used by role resolution, staleness probe and `--status` (fixes a latent PT-86 one-signal reap for teammates). No registration-time paths.
 - AC4: `OTEL_*` reach neither tool subshells nor hook-spawned processes (measured); TRACKER H1/H3 wording is false as written — H3 never runs in the real hook path. Doc fix in POLY-10; code fix is a follow-up.
 - Tests: 8, listed in note §(f).
+
+### @team-lead — 2026-09-24
+
+Gate-1 ruling accepted @ 3d83a20 (hold-during-swap / recreate after 60 s / fail closed exit 3; heartbeat + last-flush files for --status with exit 2 on the forbidden state; one shared transcript-path resolver over the worktree sibling dirs used by role, staleness and status; smoke test via the real CLI). POLY-21 closed at design-gate clear. Follow-ups filed from the bubble-ups: POLY-25 (H3 check never runs), POLY-26 (backfill sibling scan). PT-86 latent reap defect is in scope via the shared resolver.

@@ -1,7 +1,7 @@
 ---
 id: POLY-21
 title: POLY-10 plan: receiver watchdog + teammate attribution ruling
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-10
 blocked_by: []
@@ -10,6 +10,8 @@ paths: [scripts/cairn/design/telemetry-attribution.md, process/cairn/issues/POLY
 stage: plan
 estimate.tokens: 700000
 estimate.gate_cycles: 1
+actual.gate_cycles: 1
+actual.wall_clock: 6
 labels: [cairn, telemetry]
 priority: P1
 pr: null
