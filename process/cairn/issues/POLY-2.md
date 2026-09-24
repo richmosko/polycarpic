@@ -60,3 +60,30 @@ Red gate @ bb13b28 (scripts/cairn/tests/test_guard_push.py, test_paths_field.py,
 Covers AC5 (in-bounds commit, stray file, no paths: declared warn+pass, glob semantics src/auth/**) plus ruling item 3 edge cases (null-assignee exit 2, @handle warn+pass, zero-commits pass, unknown id exit 2, deletion/rename attribution) and item 1 (merge-base excludes files merged in from main). paths: shape lint (cairn check) and cairn new --paths / cairn set paths= covered per item 4. Worktree-protocol block gains a 6th required element (guard-push precedes the push step) per item 5.
 
 Run: `cd scripts/cairn && python3 run_tests.py -p test_guard_push.py -p test_paths_field.py -p test_agent_worktree_protocol_block.py` -- 21 failures, 0 errors, all failing for the expected reason (no guard-push subcommand; no paths validation/CLI support; block missing the 6th element). implementation-lead: green gate is yours.
+
+### @implementation-lead — 2026-09-23
+
+Green-gate sha: 7b1974c (paths: field + cairn guard-push, per gate-1 ruling
+226865e). Tiered runs (no untiered full suite):
+
+- test_guard_push.py: 14/14 pass (in-bounds, stray, no-paths warn, glob
+  semantics, null/human/zero-commit/unknown-id, rename+deletion attribution).
+- test_paths_field.py: 11/12 pass. 1 fail:
+  test_an_empty_string_entry_is_an_error uses `[src/auth/**, ]` expecting an
+  empty-string list entry; this repo's YAML flow-list parser elides a
+  trailing comma (standard YAML trailing-comma tolerance, same as
+  labels/blocked_by already get) rather than emitting `""`, so no empty
+  entry ever reaches validate_path_glob. Looks like a test-construction
+  issue, not a validator gap -- flagging for qa rather than editing tests/.
+- test_check_lint.py (67), test_set_records.py/test_migrate_lifecycle_status.py/test_cli.py
+  (86 combined): all pass -- no regressions from ISSUE_FIELD_ORDER/LIST_FIELDS gaining `paths`.
+- test_frontmatter_rewrite.py: 3 pre-existing failures (DumpFrontmatterTests,
+  PT13 milestone-field-order test, UnknownFrontmatterKeyPreservation)
+  compare dump_frontmatter's output against cairn.ISSUE_FIELD_ORDER using
+  fixture dicts that predate `paths` -- they omit the key, so the emitted
+  order is one field short of the (correctly updated) constant. Needs a
+  one-line fixture addition per test; out of my ownership (tests/).
+
+Board drawer / dist rebuild, TRACKER.md schema row, and the ten
+.claude/agents/*.md protocol-block edits are excluded from my ownership
+this loop per team-lead's message -- not attempted here.
