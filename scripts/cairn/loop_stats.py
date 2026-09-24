@@ -692,6 +692,7 @@ def scorecard(repo_root: Path, data_dir: Path, issue_id: str, base: str = "main"
 
     full_runs = msgs_to_lead = idle = idle_dup = full_blocked = 0
     per_agent: Dict[str, Dict[str, Any]] = {}
+    agent_roles: Dict[str, str] = {}
     ledger_path = Path(data_dir) / "metrics" / "test-runs.jsonl"
     if transcripts_dir and Path(transcripts_dir).is_dir():
         for p, role in transcript_roles(Path(transcripts_dir)).items():
@@ -701,7 +702,9 @@ def scorecard(repo_root: Path, data_dir: Path, issue_id: str, base: str = "main"
             full_runs += summ["full_suite_runs"]
             full_blocked += summ.get("full_run_blocked", 0)
             msgs_to_lead += summ["msgs_to_lead"]
-            per_agent[role if role not in per_agent else f"{role}-{p.stem[:8]}"] = summ
+            key = role if role not in per_agent else f"{role}-{p.stem[:8]}"
+            per_agent[key] = summ
+            agent_roles[key] = role
             if role == "team-lead":
                 rows, dup = lead_inbound(p, since, until)
                 idle += sum(1 for r in rows if r[2] == "idle")
@@ -710,10 +713,15 @@ def scorecard(repo_root: Path, data_dir: Path, issue_id: str, base: str = "main"
     cost = None
     try:
         import cairn  # local import: cairn imports nothing from here
-        payload = cairn.build_tokens_payload(data_dir)
-        for row in payload.get("issues", []):
-            if row.get("issue") == issue_id:
-                cost = row.get("total", {}).get("cost_usd")
+        # POLY-3 architect review (POLY-3.md @ c9ae61a, R1/AC6): reads
+        # through `token_actuals`, the ONE shared actuals seam `cairn
+        # close` also uses (design note §6) -- `build_tokens_payload` is a
+        # dashboard-shaped, display-rounded (2dp) aggregate with no time
+        # filter; reading it here instead would let this scorecard and
+        # `cairn close` silently disagree about what an issue cost.
+        cost = cairn.token_actuals(data_dir, issue_id)["cost_usd"]
+        for key, role in agent_roles.items():
+            per_agent[key]["tokens"] = cairn.token_actuals(data_dir, issue_id, role=role)["tokens"]
     except Exception:
         cost = None
 

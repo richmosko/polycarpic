@@ -21,6 +21,17 @@ import helpers  # noqa: F401
 
 import cairn
 
+# POLY-3: `stage`/`estimate.*`/`actual.*`/`ratio` joined ISSUE_FIELD_ORDER as
+# optional, absent-means-undeclared fields -- same "canonical keys lead, but
+# only the ones a fixture actually declares" precedent POLY-2 set for
+# `paths`. Every fixture below that asserts a "leading canonical keys"
+# invariant against a dict/file that never declares these must exclude them
+# from the expected order the same way it already excludes `paths`.
+_OPTIONAL_UNDECLARED_FIELDS = (
+    "paths", "stage", "estimate.tokens", "estimate.gate_cycles",
+    "actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio",
+)
+
 
 def write_issue(path: Path, frontmatter_text: str, body: str) -> None:
     path.write_bytes(("---\n" + frontmatter_text + "---\n" + body).encode("utf-8"))
@@ -35,12 +46,13 @@ def tail_bytes_after_second_fence(raw: bytes) -> bytes:
 
 class DumpFrontmatterTests(unittest.TestCase):
     def test_canonical_key_order_regardless_of_input_order(self):
-        # POLY-2: `paths` is now a member of ISSUE_FIELD_ORDER, so it must
-        # be present in `fields` for this test's own claim (full canonical
-        # order regardless of input order) to mean what it says -- an
-        # absent `paths` would legitimately not appear in the output at
-        # all (see the field's own "absent means undeclared" rule, POLY-2
-        # gate-1 ruling item 4), which is a different, narrower assertion.
+        # POLY-2/POLY-3: `paths` and (later) `stage`/`estimate.*`/
+        # `actual.*`/`ratio` are all members of ISSUE_FIELD_ORDER, so every
+        # one of them must be present in `fields` for this test's own claim
+        # (full canonical order regardless of input order) to mean what it
+        # says -- an absent optional field would legitimately not appear in
+        # the output at all (see each field's own "absent means undeclared"
+        # rule), which is a different, narrower assertion.
         fields = {
             "updated": "2026-08-19",
             "id": "PT-1",
@@ -52,6 +64,13 @@ class DumpFrontmatterTests(unittest.TestCase):
             "blocked_by": [],
             "assignee": None,
             "paths": [],
+            "stage": None,
+            "estimate.tokens": None,
+            "estimate.gate_cycles": None,
+            "actual.tokens": None,
+            "actual.gate_cycles": None,
+            "actual.wall_clock": None,
+            "ratio": None,
             "labels": [],
             "priority": None,
             "pr": None,
@@ -236,12 +255,12 @@ class UnknownFrontmatterKeyPreservationTests(unittest.TestCase):
         )
         cairn.apply_patch(self.path, {"status": "in-review"})
 
-        # POLY-2: `_canonical_frontmatter_text()` never declares `paths:`,
-        # and that absence must survive a patch (the field's own "absent
-        # means undeclared" rule) -- so the canonical-keys-lead prefix here
-        # is ISSUE_FIELD_ORDER minus the one field this fixture never had,
-        # not the full order.
-        expected_leading_keys = [f for f in cairn.ISSUE_FIELD_ORDER if f != "paths"]
+        # POLY-2/POLY-3: `_canonical_frontmatter_text()` never declares
+        # `paths:` or any of the POLY-3 estimation fields, and that absence
+        # must survive a patch (each field's own "absent means undeclared"
+        # rule) -- so the canonical-keys-lead prefix here is ISSUE_FIELD_ORDER
+        # minus the fields this fixture never had, not the full order.
+        expected_leading_keys = [f for f in cairn.ISSUE_FIELD_ORDER if f not in _OPTIONAL_UNDECLARED_FIELDS]
         keys = self._frontmatter_keys_in_file()
         self.assertEqual(
             keys[: len(expected_leading_keys)], expected_leading_keys,
@@ -529,10 +548,11 @@ class PT13MilestoneFieldOrderAndNoUpdatedInjectionTests(unittest.TestCase):
         raw = issue_path.read_text(encoding="utf-8")
         inner = raw.split("---\n", 2)[1]
         keys = [line.split(":", 1)[0] for line in inner.splitlines() if ":" in line]
-        # POLY-2: this fixture never declares `paths:`, and that absence
-        # must survive a patch -- expected order is ISSUE_FIELD_ORDER
-        # minus the one field this fixture never had.
-        self.assertEqual(keys, [f for f in cairn.ISSUE_FIELD_ORDER if f != "paths"])
+        # POLY-2/POLY-3: this fixture never declares `paths:` or any POLY-3
+        # estimation field, and that absence must survive a patch --
+        # expected order is ISSUE_FIELD_ORDER minus the fields this fixture
+        # never had.
+        self.assertEqual(keys, [f for f in cairn.ISSUE_FIELD_ORDER if f not in _OPTIONAL_UNDECLARED_FIELDS])
         frontmatter, _ = cairn.parse_frontmatter(raw)
         self.assertEqual(frontmatter["updated"], datetime.date.today().isoformat())
 

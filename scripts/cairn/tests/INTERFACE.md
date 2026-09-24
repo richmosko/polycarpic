@@ -110,6 +110,26 @@ Design + full rationale: `process/cairn/issues/PT-51.md`'s `@architect` ruling c
 - `build_record_payload(data_dir: Path, record_id: str) -> dict | None` — the milestone/major analog of `build_issue_payload` (PT-51 §1/§2) — see the Record mutation section above.
 - `make_server(data_dir: Path, config: dict | None = None, port: int | None = None, roots: list[Root] | None = None, source_path: Path = Path(__file__)) -> http.server.HTTPServer` — binds `127.0.0.1`, does **not** call `serve_forever()` (caller's job, so tests can thread it). `port=0` → ephemeral, read back via `server.server_address[1]`. `port=None` → `load_config(data_dir)["port"]`. `roots=None` (PT-3) synthesises the single primary root via `resolve_roots(data_dir, config)` — every pre-PT-3 caller (including every `test_server.py` test) is therefore exercised by the same code path multi-root uses, unmodified. Routes: `GET /api/board` (ETag/If-None-Match → 304, now roots-aware via `compute_multi_etag`/`build_multi_board_payload`), `GET /api/issue/<id>` (roots-aware via `find_issue_in_roots`, stamps `repo`/`read_only`), `POST /api/issue`, `POST /api/issue/<id>` (409 on stale `seen`; 403 `read_only_root` for a secondary-root id — see Multi-root section), `POST /api/record/<id>` (PT-51 — see Record mutation section above), plus static `GET /`, `/list`, `/board/*`.
 
+## Effort estimation (POLY-3)
+
+Full design: `scripts/cairn/design/estimation.md` (architect's design note, approved
+`de28e82`) — authoritative; this entry is just the pointer + the bits
+`tests/test_estimation.py` imports directly.
+
+- `ISSUE_FIELD_ORDER` gains, after `paths` and before `labels`: `stage`,
+  `estimate.tokens`, `estimate.gate_cycles`, `actual.tokens`, `actual.gate_cycles`,
+  `actual.wall_clock`, `ratio` — flat dotted keys, not nested maps (design note §1).
+- `token_actuals(data_dir, issue_id, role=None, since=None, until=None, prices=None) -> dict`
+  — `{"tokens", "input", "cache_write", "cache_read", "output", "cost_usd", "lines"}`;
+  `tokens` is `None` and `lines` is `0` when `token-usage.jsonl` is absent, never `0`
+  tokens for "no data". `since`/`until` are assumed ISO-8601 `%Y-%m-%dT%H:%M:%SZ`
+  strings, compared lexically (design note §6/§2) — flag and fix this file if the
+  real signature takes `datetime` instead.
+- `gate_cycle_actuals(repo_root, base, ref, assignee, same_stage_authors, since=None, until=None) -> dict`
+  — `{"gate_cycles", "commits"}` (design note §2/§6).
+- `cairn close <ID> [--base main] [--ref HEAD] [--no-flush] [--dry-run]` and
+  `cairn estimate <ID> [--limit N] [--json]` (design note §7).
+
 ## Running the suite
 
 ```
