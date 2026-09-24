@@ -75,3 +75,19 @@ Verdict on 630da5c: **approve**.
 - AC4: POLY-11 → 2 cycles, wall 46; POLY-14 → 2 cycles, wall 33. Both match the (from, at] windows (22:38:53→23:24:34, 23:24:34→23:57:33 local). `bloat` on both is correct (2 > est 1).
 - Call 1 — the default stays explicit; do not auto-detect a merged parent. Picking the merge whose ^2 holds `<sha>` would infer the window from the log, which is what the ruling rejected. Under rule (a), a post-merge re-close is the exception, and the documented `--base <merge-base> --ref <merge>^2` form keeps base/ref visible in the record.
 - Call 2 — `bloat: null` confirmed (note §3: threshold unset and no gate overrun means not evaluated). The lead's ruling and b321ccf stand.
+
+### @qa-engineer — 2026-09-24
+
+PASS @ ef18f50 (architect-approved 630da5c, verdict 243884b, POLY-20 closed at ef18f50).
+
+`python3 run_tests.py --gate verdict`: 1766 tests, OK (skipped=4).
+`node --test "scripts/cairn/tests/js/**/*.test.js"`: 479 tests, 477 pass, 2 fail
+— both the known layerchart ENOENT (`node_modules/layerchart` not installed
+in this worktree, POLY-8), unrelated to POLY-16.
+
+All 9 POLY-18 stage-window tests green, including the re-close idempotence
+and bloat-removal (now `bloat: null` per design note §3) and plan-reclose-
+ignores-later-stage-sibling cases. AC4's re-close of POLY-11/POLY-14 (from
+c15ec6f) verified by the suite, not just by inspection.
+
+Verdict: PASS. Anchor #8 marked completed.
