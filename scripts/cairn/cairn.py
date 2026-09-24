@@ -3993,8 +3993,11 @@ def token_actuals(
     cannot separate two same-(parent, role) sub-issues sharing one parent
     issue's token stream.
 
-    A missing `token-usage.jsonl` gives `tokens: None` (never `0` -- "no
-    data" must not look like "measured zero"), `lines: 0`.
+    A missing `token-usage.jsonl`, OR one present but with zero lines
+    matching (`issue_id`, `role`, window) -- addendum 1, design note @
+    85c5fd6 §2 -- both give `tokens: None` (never `0`: "no evidence" must
+    not look like "measured zero"; a real `0` only ever comes from
+    summing >=1 matching line), `lines: 0`.
     """
     data_dir = Path(data_dir)
     prices = load_prices() if prices is None else prices
@@ -4033,14 +4036,20 @@ def token_actuals(
             raw_cost += _row_cost_usd(row, rate)
 
     result = dict(totals)
-    result["tokens"] = sum(totals.values())
-    # 6dp, not `build_tokens_payload`'s 2dp: that function's rounding is a
-    # UI-display convention (real usage sums to real dollars); this seam
-    # feeds the calibration record, where a small-window sub-issue's own
-    # cost can be a fraction of a cent, and 2dp would silently round it to
-    # 0.0 -- indistinguishable from "no cost", which token_actuals must
-    # never claim for a genuinely priced, non-empty window.
-    result["cost_usd"] = None if any_unpriced else round(raw_cost, 6)
+    if lines == 0:
+        # Addendum 1: a present-but-empty-match file is "no evidence",
+        # the same as a missing file entirely -- never a real 0.
+        result["tokens"] = None
+        result["cost_usd"] = None
+    else:
+        result["tokens"] = sum(totals.values())
+        # 6dp, not `build_tokens_payload`'s 2dp: that function's rounding is a
+        # UI-display convention (real usage sums to real dollars); this seam
+        # feeds the calibration record, where a small-window sub-issue's own
+        # cost can be a fraction of a cent, and 2dp would silently round it to
+        # 0.0 -- indistinguishable from "no cost", which token_actuals must
+        # never claim for a genuinely priced, non-empty window.
+        result["cost_usd"] = None if any_unpriced else round(raw_cost, 6)
     result["lines"] = lines
     return result
 
@@ -4081,6 +4090,12 @@ def gate_cycle_actuals(
     sub-issue's own creation commit never counts as gate-cycle work.
 
     Zero commits by `assignee` in the window gives `gate_cycles: 0`.
+
+    `last_commit_ts` (addendum 1, design note @ 85c5fd6 §2): the author
+    date of `assignee`'s own chronologically LAST commit in the window,
+    `None` with zero commits -- `cairn close`'s `actual.wall_clock` is
+    measured against this, not `close_ts`, so a sub-issue closed long
+    after its work finished doesn't count the idle gap.
     """
     repo_root = Path(repo_root)
     since_dt = _parse_iso_any(since) if since else None
@@ -4093,6 +4108,7 @@ def gate_cycle_actuals(
     gate_cycles = 0
     commits = 0
     in_run = False
+    last_commit_ts: Optional[str] = None
     for line in result.stdout.splitlines():
         if not line:
             continue
@@ -4104,6 +4120,7 @@ def gate_cycle_actuals(
             continue
         if author == assignee:
             commits += 1
+            last_commit_ts = author_date  # oldest-to-newest traversal -- last write wins
             if not in_run:
                 gate_cycles += 1
                 in_run = True
@@ -4111,7 +4128,7 @@ def gate_cycle_actuals(
             continue  # same-stage sibling -- doesn't break the run
         else:
             in_run = False
-    return {"gate_cycles": gate_cycles, "commits": commits}
+    return {"gate_cycles": gate_cycles, "commits": commits, "last_commit_ts": last_commit_ts}
 
 
 def build_roster_payload(data_dir: Path) -> Dict[str, Any]:
@@ -7117,6 +7134,53 @@ def _flush_receiver_and_wait(repo_root: Path, usage_path: Path, timeout: float =
         time.sleep(0.2)
 
 
+def _parent_flip(repo_root: Path, base: str, ref: str) -> Optional[str]:
+    """Addendum 1 (design note @ 85c5fd6 §2): the author date of the
+    OLDEST commit in `<base>..<ref>` -- `/start-feature`'s own "feature
+    started" commit, the same default `loop-stats` uses for `since`.
+    `None` when the range is empty (no divergence between `base` and
+    `ref` -- e.g. `base` itself resolves to `ref`), which lets `from_ts`
+    fall back to the sibling floor alone, or to no floor at all.
+    """
+    result = subprocess.run(
+        ["git", "log", "--first-parent", "--reverse", "--format=%aI", f"{base}..{ref}"],
+        cwd=repo_root, capture_output=True, text=True, check=True,
+    )
+    lines = [l for l in result.stdout.splitlines() if l]
+    return lines[0] if lines else None
+
+
+def _sibling_floor(data_dir: Path, parent: str, assignee: str) -> Optional[str]:
+    """Addendum 1: the latest calibration `window.to` among closed
+    sub-issues sharing this one's `parent` AND `assignee` (stage need not
+    match) -- the floor that keeps a second same-(parent, assignee)
+    sub-issue's actuals from re-counting the first one's already-closed
+    window. `None` when there is no such sibling yet."""
+    cal_path = Path(data_dir) / "metrics" / "calibration.jsonl"
+    if not cal_path.is_file():
+        return None
+    latest_dt: Optional[datetime.datetime] = None
+    latest_str: Optional[str] = None
+    for line in cal_path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if row.get("parent") != parent or row.get("assignee") != assignee:
+            continue
+        window_to = (row.get("window") or {}).get("to")
+        if not window_to:
+            continue
+        dt = _parse_iso_any(window_to)
+        if latest_dt is None or dt > latest_dt:
+            latest_dt = dt
+            latest_str = window_to
+    return latest_str
+
+
 def _append_calibration_record(data_dir: Path, record: Dict[str, Any]) -> None:
     import backfill_tokens  # sibling module; imported here so `cairn` stays import-light
     out_path = Path(data_dir) / "metrics" / "calibration.jsonl"
@@ -7168,20 +7232,20 @@ def cmd_close(args: argparse.Namespace) -> int:
         print("close: not inside a git repository", file=sys.stderr)
         return 2
 
-    # `root` comes back from `git rev-parse --show-toplevel`, which resolves
-    # symlinks (e.g. macOS's /var -> /private/var tmp dirs); `path` does not
-    # -- resolving it too keeps `relpath` from producing a bogus `../..`
-    # climb when the two sides disagree about which form is canonical.
-    rel = os.path.relpath(path.resolve(), root)
-    created_log = subprocess.run(
-        ["git", "log", "--diff-filter=A", "--format=%aI", "--", rel],
-        cwd=root, capture_output=True, text=True,
-    ).stdout.strip().splitlines()
-    if created_log:
-        created_ts = _normalize_iso_z(created_log[-1])  # oldest -- git log is newest-first
+    # Addendum 1 (design note @ 85c5fd6 §2): W's floor is
+    # from_ts = max(parent flip, sibling floor) -- the sub-issue file's
+    # own creation commit is no longer used at all (sub-issues are often
+    # written after work has started; the assignee/role filters already
+    # keep other agents' commits and tokens out of W). Neither candidate
+    # is required: with no divergence from `base` and no closed sibling,
+    # from_ts is `None` -- no floor at all, only `close_ts` bounds W.
+    parent_flip = _parent_flip(root, args.base, args.ref)
+    sibling_floor = _sibling_floor(data_dir, parent, assignee)
+    floor_candidates = [(v, _parse_iso_any(v)) for v in (parent_flip, sibling_floor) if v]
+    if floor_candidates:
+        from_ts = _normalize_iso_z(max(floor_candidates, key=lambda pair: pair[1])[0])
     else:
-        created_ts = f"{fm.get('created')}T00:00:00Z"
-        print(f"close: warning: {args.id}'s file was never committed -- falling back to created: at 00:00 UTC", file=sys.stderr)
+        from_ts = None
 
     usage_path = data_dir / TOKEN_USAGE_REL
     if not args.no_flush and not args.dry_run:
@@ -7189,16 +7253,31 @@ def cmd_close(args: argparse.Namespace) -> int:
 
     close_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    token_result = token_actuals(data_dir, parent, role=assignee, since=created_ts, until=close_ts)
+    token_result = token_actuals(data_dir, parent, role=assignee, since=from_ts, until=close_ts)
     if token_result["tokens"] is None:
-        print(f"close: warning: {usage_path} not found -- actual.tokens left null", file=sys.stderr)
+        if usage_path.is_file():
+            print(
+                f"close: warning: no matching {usage_path} line for (parent={parent}, role={assignee}, window) "
+                "-- actual.tokens: null",
+                file=sys.stderr,
+            )
+        else:
+            print(f"close: warning: {usage_path} not found -- actual.tokens: null", file=sys.stderr)
 
     same_stage_authors = _same_stage_sibling_assignees(data_dir, args.id, parent, stage, assignee)
-    gate_result = gate_cycle_actuals(root, args.base, args.ref, assignee, same_stage_authors, since=created_ts, until=close_ts)
+    gate_result = gate_cycle_actuals(root, args.base, args.ref, assignee, same_stage_authors, since=from_ts, until=close_ts)
+    if gate_result["commits"] == 0:
+        print(f"close: warning: zero commits by {assignee} in window -- actual.gate_cycles: 0", file=sys.stderr)
 
-    created_dt = _parse_iso_any(created_ts)
-    close_dt = _parse_iso_any(close_ts)
-    wall_clock = round((close_dt - created_dt).total_seconds() / 60)
+    # Addendum 1: wall_clock is measured against the assignee's own last
+    # commit in W, not close_ts -- a sub-issue closed long after its work
+    # finished (POLY-11 closes only once `cairn close` exists) must not
+    # count the idle gap. `None` with zero commits, or no floor to
+    # measure from.
+    last_ts = gate_result.get("last_commit_ts")
+    wall_clock: Optional[int] = None
+    if last_ts is not None and from_ts is not None:
+        wall_clock = round((_parse_iso_any(last_ts) - _parse_iso_any(from_ts)).total_seconds() / 60)
 
     estimate_tokens = fm.get("estimate.tokens")
     estimate_gate_cycles = fm.get("estimate.gate_cycles")
@@ -7235,8 +7314,9 @@ def cmd_close(args: argparse.Namespace) -> int:
     patch: Dict[str, Any] = {
         "status": "done",
         "actual.gate_cycles": gate_result["gate_cycles"],
-        "actual.wall_clock": wall_clock,
     }
+    if wall_clock is not None:
+        patch["actual.wall_clock"] = wall_clock
     if token_result["tokens"] is not None:
         patch["actual.tokens"] = token_result["tokens"]
     if ratio_val is not None:
@@ -7262,7 +7342,7 @@ def cmd_close(args: argparse.Namespace) -> int:
             "output": token_result["output"], "cost_usd": token_result["cost_usd"],
         },
         "ratio": ratio_val, "bloat": calibration_bloat, "bloat_reasons": bloat_reasons,
-        "window": {"from": created_ts, "to": close_ts},
+        "window": {"from": from_ts, "to": close_ts},
         "base": args.base, "ref_sha": ref_sha,
     }
 
@@ -7345,23 +7425,41 @@ def cmd_estimate(args: argparse.Namespace) -> int:
         out.append("  id       closed      est.tok  act.tok  ratio  est.gc  act.gc  wall  bloat")
         for r in rows:
             est, act = r.get("estimate") or {}, r.get("actual") or {}
+
+            def _cell(v: Any) -> str:
+                return "null" if v is None else str(v)
+
             out.append(
                 f"  {r.get('id', ''):<8} {str(r.get('closed') or '')[:10]:<11} "
-                f"{est.get('tokens', ''):<8} {act.get('tokens', ''):<8} "
-                f"{r.get('ratio', ''):<6} {est.get('gate_cycles', ''):<7} "
-                f"{act.get('gate_cycles', ''):<7} {act.get('wall_clock', ''):<5} "
+                f"{_cell(est.get('tokens')):<8} {_cell(act.get('tokens')):<8} "
+                f"{_cell(r.get('ratio')):<6} {_cell(est.get('gate_cycles')):<7} "
+                f"{_cell(act.get('gate_cycles')):<7} {_cell(act.get('wall_clock')):<5} "
                 f"{'yes' if r.get('bloat') else 'no'}"
             )
-        tok_median = int(statistics.median(r["actual"]["tokens"] for r in rows))
+        # Addendum 1 (design note @ 85c5fd6 §2): a null `actual.tokens` --
+        # "no evidence", not "measured zero" -- must never enter the token
+        # median (a real median call on a `None` raises `TypeError`, and
+        # folding it in as 0 would poison every reference-class estimate
+        # downstream). Gate-cycle and wall-clock medians are unaffected --
+        # a sub-issue with no token evidence still has real commits.
+        token_values = [r["actual"]["tokens"] for r in rows if r["actual"].get("tokens") is not None]
+        tok_median = int(statistics.median(token_values)) if token_values else None
         gc_median = int(statistics.median(r["actual"]["gate_cycles"] for r in rows))
-        wall_median = int(statistics.median(r["actual"]["wall_clock"] for r in rows))
-        out.append(f"  median actual: tokens {tok_median} · gate_cycles {gc_median} · wall {wall_median}m")
+        wall_values = [r["actual"]["wall_clock"] for r in rows if r["actual"].get("wall_clock") is not None]
+        wall_median = int(statistics.median(wall_values)) if wall_values else None
+        out.append(
+            f"  median actual: tokens {tok_median if tok_median is not None else 'n/a'} · "
+            f"gate_cycles {gc_median} · wall {wall_median if wall_median is not None else 'n/a'}m"
+        )
         if suggestion is None:
             suggestion = (tok_median, gc_median, tier_name)
 
     if suggestion is not None:
         tok, gc, tier_name = suggestion
-        out.append(f"suggested: estimate.tokens={tok} estimate.gate_cycles={gc}   (tier {tier_name} median)")
+        if tok is not None:
+            out.append(f"suggested: estimate.tokens={tok} estimate.gate_cycles={gc}   (tier {tier_name} median)")
+        else:
+            out.append(f"suggested: estimate.gate_cycles={gc}   (tier {tier_name} median; no non-null token actuals)")
     print("\n".join(out))
     return 0
 
