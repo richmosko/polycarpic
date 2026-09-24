@@ -1755,7 +1755,7 @@ def check_repo(data_dir: Path) -> List[str]:
                         errors.append(f"{label}: paths[{idx}] {entry!r} invalid -- {reason}")
         # POLY-3 (design note §1): stage/estimate.*/actual.*/ratio.
         stage = fm.get("stage")
-        if stage is not None and stage not in ("plan", "execute", "review"):
+        if stage is not None and stage not in _STAGE_ORDER:
             errors.append(f"{label}: unknown stage {stage!r} -- expected one of plan, execute, review")
         if stage is not None and parent is None:
             errors.append(f"{label}: stage {stage!r} set but parent is null -- stage belongs to a sub-issue")
@@ -6611,6 +6611,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_close.add_argument("id")
     p_close.add_argument("--base", default="main")
     p_close.add_argument("--ref", default="HEAD")
+    p_close.add_argument("--at", dest="at_sha", default=None, help="ceiling (POLY-16): close_ts becomes <sha>'s author time and ref becomes <sha> -- must be on ref's first-parent history after the parent flip")
     p_close.add_argument("--no-flush", dest="no_flush", action="store_true", help="skip signaling the otel receiver to flush before reading actuals")
     p_close.add_argument("--dry-run", action="store_true", help="print the computed actuals without writing either file")
     p_close.set_defaults(func=cmd_close)
@@ -7081,6 +7082,12 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
 # POLY-3: `cairn close` / `cairn estimate` (design note §7)
 # --------------------------------------------------------------------------
 
+# POLY-16 ruling (design note §2 -- Stage windows): plan < execute < review.
+# Shared by `check_repo`'s stage-enum validation and `_sibling_floor`'s
+# later-stage exclusion, so the ordering is defined exactly once.
+_STAGE_ORDER = {"plan": 0, "execute": 1, "review": 2}
+
+
 def _normalize_iso_z(value: str) -> str:
     """Any ISO-8601 timestamp (git's `+00:00` offset or the receiver's
     `Z`) -> the `%Y-%m-%dT%H:%M:%SZ` form `token-usage.jsonl`'s
@@ -7157,17 +7164,25 @@ def _parent_flip(repo_root: Path, base: str, ref: str) -> Optional[str]:
     return lines[0] if lines else None
 
 
-def _sibling_floor(data_dir: Path, parent: str, assignee: str) -> Optional[str]:
-    """Addendum 1: the latest calibration `window.to` among closed
-    sub-issues sharing this one's `parent` AND `assignee` (stage need not
-    match) -- the floor that keeps a second same-(parent, assignee)
-    sub-issue's actuals from re-counting the first one's already-closed
-    window. `None` when there is no such sibling yet."""
+def _sibling_floor(data_dir: Path, parent: str, assignee: str, self_id: str, stage: Optional[str]) -> Optional[str]:
+    """Addendum 1 + POLY-16 ruling (design note §2 -- Stage windows): the
+    latest calibration `window.to` (last line per id) among closed
+    sub-issues sharing this one's `parent` AND `assignee`, with a
+    **different id** and a stage **no later** than `stage`
+    (plan < execute < review) -- the floor that keeps a second
+    same-(parent, assignee) sub-issue's actuals from re-counting the first
+    one's already-closed window. Excluding `self_id` makes a re-close
+    re-measure from the same floor instead of flooring at its own prior
+    close; excluding later-stage siblings keeps a plan re-close from
+    flooring at its own review's close. `None` when there is no such
+    sibling yet."""
     cal_path = Path(data_dir) / "metrics" / "calibration.jsonl"
     if not cal_path.is_file():
         return None
-    latest_dt: Optional[datetime.datetime] = None
-    latest_str: Optional[str] = None
+    self_rank = _STAGE_ORDER.get(stage) if stage is not None else None
+    # Last line per id wins -- a sibling's own re-close must not let its
+    # earlier calibration line outvote its latest one.
+    rows_by_id: Dict[str, Dict[str, Any]] = {}
     for line in cal_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
@@ -7176,8 +7191,19 @@ def _sibling_floor(data_dir: Path, parent: str, assignee: str) -> Optional[str]:
             row = json.loads(line)
         except json.JSONDecodeError:
             continue
+        row_id = row.get("id")
+        if row_id:
+            rows_by_id[row_id] = row
+    latest_dt: Optional[datetime.datetime] = None
+    latest_str: Optional[str] = None
+    for row_id, row in rows_by_id.items():
+        if row_id == self_id:
+            continue
         if row.get("parent") != parent or row.get("assignee") != assignee:
             continue
+        sib_rank = _STAGE_ORDER.get(row.get("stage"))
+        if self_rank is not None and sib_rank is not None and sib_rank > self_rank:
+            continue  # a later-stage sibling never floors an earlier stage
         window_to = (row.get("window") or {}).get("to")
         if not window_to:
             continue
@@ -7186,6 +7212,37 @@ def _sibling_floor(data_dir: Path, parent: str, assignee: str) -> Optional[str]:
             latest_dt = dt
             latest_str = window_to
     return latest_str
+
+
+def _at_ceiling(repo_root: Path, base: str, ref: str, at_arg: str) -> Optional[Tuple[str, str]]:
+    """POLY-16 ruling (design note §2 -- Stage windows): resolves `--at
+    <at_arg>` to a `(full_sha, author_ts)` pair, but only when the commit
+    sits on `ref`'s first-parent history strictly AFTER the parent flip
+    (the oldest commit in `base..ref`, the same commit `_parent_flip`
+    would report). Returns `None` when `at_arg` doesn't resolve to a
+    commit, isn't on that first-parent range at all, or IS the flip commit
+    itself (at, not after) -- the caller turns `None` into an exit-1
+    refusal rather than silently accepting an arbitrary commit as the
+    ceiling."""
+    resolved = subprocess.run(
+        ["git", "rev-parse", "--verify", f"{at_arg}^{{commit}}"],
+        cwd=repo_root, capture_output=True, text=True,
+    )
+    if resolved.returncode != 0:
+        return None
+    at_sha = resolved.stdout.strip()
+    range_result = subprocess.run(
+        ["git", "log", "--first-parent", "--reverse", "--format=%H%x1f%aI", f"{base}..{ref}"],
+        cwd=repo_root, capture_output=True, text=True, check=True,
+    )
+    rows = [tuple(l.split("\x1f", 1)) for l in range_result.stdout.splitlines() if l]
+    if not rows:
+        return None
+    shas = [sha for sha, _ in rows]
+    if at_sha not in shas or at_sha == shas[0]:
+        return None
+    at_ts = next(date for sha, date in rows if sha == at_sha)
+    return at_sha, _normalize_iso_z(at_ts)
 
 
 def _append_calibration_record(data_dir: Path, record: Dict[str, Any]) -> None:
@@ -7210,6 +7267,14 @@ def cmd_close(args: argparse.Namespace) -> int:
     `apply_patch`, and appends a calibration record. Never commits either
     file -- the caller commits the issue file by pathspec; the metrics
     branch is committed the usual way (WORKFLOW.md → Metrics branch).
+
+    `--at <sha>` (POLY-16 ruling, design note §2 -- Stage windows) sets the
+    ceiling: `close_ts` becomes `<sha>`'s own author time and `ref` becomes
+    `<sha>`, so a close run late measures as if it had run at the gate.
+    `close` on an already-`done` sub-issue is a re-close: it rewrites
+    `actual.*`/`ratio`, adds or removes `bloat` to match the new
+    evaluation, leaves `status: done`, and appends a fresh calibration
+    line -- the last line per id is the record readers trust.
     """
     data_dir = resolve_data_dir(args)
     path = find_record_path(data_dir, args.id)
@@ -7239,6 +7304,25 @@ def cmd_close(args: argparse.Namespace) -> int:
         print("close: not inside a git repository", file=sys.stderr)
         return 2
 
+    # POLY-16 ruling (design note §2 -- Stage windows): `--at <sha>` sets
+    # the ceiling -- close_ts becomes <sha>'s author time and ref becomes
+    # <sha>, so a close run late (as in POLY-3) measures as if it had run
+    # at the gate. Validated against the ORIGINAL ref/base, before ref is
+    # overwritten below.
+    at_sha: Optional[str] = None
+    at_ts: Optional[str] = None
+    if args.at_sha:
+        ceiling = _at_ceiling(root, args.base, args.ref, args.at_sha)
+        if ceiling is None:
+            print(
+                f"close: --at {args.at_sha!r} is not on {args.ref}'s first-parent history after the parent "
+                f"flip ({args.base}..{args.ref}) -- refusing an arbitrary ceiling",
+                file=sys.stderr,
+            )
+            return 1
+        at_sha, at_ts = ceiling
+        args.ref = at_sha
+
     # Addendum 1 (design note @ 85c5fd6 §2): W's floor is
     # from_ts = max(parent flip, sibling floor) -- the sub-issue file's
     # own creation commit is no longer used at all (sub-issues are often
@@ -7247,7 +7331,7 @@ def cmd_close(args: argparse.Namespace) -> int:
     # is required: with no divergence from `base` and no closed sibling,
     # from_ts is `None` -- no floor at all, only `close_ts` bounds W.
     parent_flip = _parent_flip(root, args.base, args.ref)
-    sibling_floor = _sibling_floor(data_dir, parent, assignee)
+    sibling_floor = _sibling_floor(data_dir, parent, assignee, args.id, stage)
     floor_candidates = [(v, _parse_iso_any(v)) for v in (parent_flip, sibling_floor) if v]
     if floor_candidates:
         from_ts = _normalize_iso_z(max(floor_candidates, key=lambda pair: pair[1])[0])
@@ -7269,7 +7353,9 @@ def cmd_close(args: argparse.Namespace) -> int:
     if not args.no_flush and not args.dry_run:
         _flush_receiver_and_wait(root, usage_path)
 
-    close_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # POLY-16 ruling: `--at` pins close_ts to the ceiling commit's own
+    # author time; the default ceiling is real wall-clock now().
+    close_ts = at_ts if at_sha is not None else datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     token_result = token_actuals(data_dir, parent, role=assignee, since=from_ts, until=close_ts)
     if token_result["tokens"] is None:
@@ -7339,9 +7425,15 @@ def cmd_close(args: argparse.Namespace) -> int:
         patch["actual.tokens"] = token_result["tokens"]
     if ratio_val is not None:
         patch["ratio"] = f"{ratio_val:.2f}"
+    # POLY-16 ruling: a re-close adds OR REMOVES the `bloat` label to match
+    # the new evaluation -- a revised estimate (or a corrected window) that
+    # no longer overruns must not leave the label stuck from an earlier close.
     labels = list(fm.get("labels") or [])
     if bloat_reasons and "bloat" not in labels:
         labels.append("bloat")
+        patch["labels"] = labels
+    elif not bloat_reasons and "bloat" in labels:
+        labels = [l for l in labels if l != "bloat"]
         patch["labels"] = labels
 
     ref_sha = subprocess.run(
@@ -7360,7 +7452,7 @@ def cmd_close(args: argparse.Namespace) -> int:
             "output": token_result["output"], "cost_usd": token_result["cost_usd"],
         },
         "ratio": ratio_val, "bloat": calibration_bloat, "bloat_reasons": bloat_reasons,
-        "window": {"from": from_ts, "to": close_ts},
+        "window": {"from": from_ts, "to": close_ts, "at": at_sha},
         "base": args.base, "ref_sha": ref_sha,
     }
 

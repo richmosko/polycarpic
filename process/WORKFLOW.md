@@ -654,11 +654,23 @@ Schema: [`TRACKER.md` → Effort estimation](TRACKER.md#effort-estimation-poly-3
   any estimation-loop change itself (this loop's own POLY-11 is the
   precedent) — sub-issues are hand-estimated reference classes until the
   first calibration records exist.
-- **When close runs:** the assignee (or the lead, on their behalf) runs
-  `cairn close <ID>` at the end of a sub-issue's own loop. It pulls actuals
-  from the OTel receiver and the commit log, writes `actual.*`/`ratio`/
-  `status: done`, flags `bloat` on an overrun, and appends a calibration
-  record — never run by hand-editing the frontmatter.
+- **When close runs (POLY-16 ruling, design note §2 → Stage windows):** the
+  lead runs `cairn close <ID>` immediately after the gate commit that ends a
+  sub-issue's own stage, and commits the issue file by pathspec — never
+  batched at finish-feature (that collapses same-assignee siblings into the
+  first one's window), and never by hand-editing the frontmatter:
+  - **plan**: when the design gate clears, and again after each addendum.
+  - **execute** (qa and builder): at the approving verdict.
+  - **review**: after each verdict — both changes-requested and approve.
+
+  A close run late is corrected with `cairn close <ID> --at <sha>`, which
+  pins `close_ts` (and `ref`) to `<sha>` so the window measures as if the
+  close had run at the gate. `close` on an already-`done` sub-issue is a
+  re-close: it rewrites `actual.*`/`ratio`, adds or removes `bloat` to match
+  the new evaluation, and appends a fresh calibration line. Either way,
+  `close` pulls actuals from the OTel receiver and the commit log, writes
+  `actual.*`/`ratio`/`status: done`, flags `bloat` on an overrun, and
+  appends a calibration record.
 
 ### Metrics branch
 
