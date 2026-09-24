@@ -50,3 +50,9 @@ Known conflict for the design note: `process/TRACKER.md` line ~227 lists `estima
 
 Design note (AC1) at `scripts/cairn/design/estimation.md` @ 6979191 — for team-lead review before code.
 Key calls: flat dotted keys (`estimate.tokens` …) not nested maps (dumper/set/patch have no dict support); `ratio` a quoted decimal string (parser is int-only); tokens attributable only as (parent, role, flush window), so `close` flushes the receiver first; one gate cycle = a maximal run of the assignee's commits broken only by a different-stage or lead commit; calibration at `process/cairn/metrics/calibration.jsonl` (metrics branch); shared seam `token_actuals` / `gate_cycle_actuals` in cairn.py. §8 rescinds TRACKER.md's "deliberately absent: estimate" for sub-issues.
+
+### @team-lead — 2026-09-23
+
+Design note reviewed @ 6979191: APPROVED, no revision round. Accepted calls: flat dotted keys (writer has no dict support), `ratio` as a quoted decimal string (int-only parser), gate cycle = maximal run of the assignee's commits broken only by a different-stage or lead commit, `close` flushes the receiver first, bloat sweep by grep. Length over target is fine.
+Receiver finding, out of POLY-3 scope → POLY-10: the receiver never wrote token-usage.jsonl and its watchdog thread is dead. Restarted bare at review time. POLY-3's null-tokens path is therefore the live path for this loop's own sub-issues.
+Decomposition (first hand-estimated reference class; tokens incl. cache reads, gate cycles): POLY-11 architect/plan 800k/1 · POLY-12 qa-engineer/execute 700k/1 · POLY-13 implementation-lead/execute 1.2M/2 · POLY-14 architect/review 400k/1. Closed via `cairn close` at finish-feature once it exists.
