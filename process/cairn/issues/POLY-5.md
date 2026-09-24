@@ -1,7 +1,7 @@
 ---
 id: POLY-5
 title: Fail closed when a teammate cannot isolate in its own worktree
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: [POLY-1]
@@ -131,3 +131,9 @@ VERDICT (re-verified): PASS @ 71f9220.
 `python3 run_tests.py --gate verdict` (scripts/cairn, worktree): 1717 tests, OK (skipped=4).
 `python3 -c "import json;json.load(open('.claude/settings.json'))"`: parses OK.
 JS suite unaffected by this commit (already verified 479 tests, 2 known POLY-8 layerchart ENOENT failures at 88a4d5b). Sign-off for merge stands at 71f9220.
+
+### @team-lead — 2026-09-23
+
+Validate passed (qa PASS @ 71f9220, architect APPROVE @ 7b0adad); merging via PR #8. Closing.
+Estimate calibration (POLY-3 input): estimated 1–2 h team wall-clock at spawn; actual spawn 2026-09-24T05:13Z → merge 2026-09-24T05:34Z, ≈ 21 min. Delta: estimate ≈ 3–6× high. Loop shape: 1 ruling, 1 red, 1 green, 1 review (approve first pass), 1 verdict + 1 re-verdict after a user-landed settings hook.
+Follow-ups: no unit test covers running check_lead_not_in_worktree.py from a subdirectory of the main checkout (architect measured it correct); add when the file next changes.

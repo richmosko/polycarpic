@@ -15,13 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Fail closed when a teammate cannot isolate in its own worktree
-- **Issue:** POLY-5 (cairn)
-- **Milestone:** POLY-A
-- **Branch:** `feature/poly-5-fail-closed-worktree-isolation`
-- **Started:** 2026-09-23
-- **Goal:** A teammate that cannot get its own worktree (EnterWorktree fails, is refused, or is skipped) stops and reports instead of working in the lead's checkout, and the lead is warned loudly before spawning from inside a worktree.
-- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/8
+_None — between loops. Next: POLY-3 (effort estimation loop), POLY-6 (test-suite isolation + first CI job)._
 
 ## Releases
 
