@@ -7,20 +7,12 @@ parent: POLY-3
 blocked_by: []
 assignee: implementation-lead
 paths: [scripts/cairn/cairn.py, scripts/cairn/otel_receiver.py, process/TRACKER.md, process/WORKFLOW.md, process/cairn/config.yml, process/cairn/issues/POLY-3.md]
+stage: execute
+estimate.tokens: 1200000
+estimate.gate_cycles: 2
 labels: [cairn, workflow]
 priority: P2
 pr: null
 created: 2026-09-23
 updated: 2026-09-23
 ---
-
-
-## Estimate (hand, team-lead, 2026-09-24)
-
-To be lifted into frontmatter once POLY-3 lands the schema (`cairn set` rejects the keys until then).
-
-```yaml
-stage: execute
-estimate.tokens: 1200000
-estimate.gate_cycles: 2
-```
