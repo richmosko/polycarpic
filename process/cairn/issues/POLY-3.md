@@ -137,3 +137,24 @@ R4: TRACKER.md actual.wall_clock wording updated.
 New review tests pass. Full suite: 1757 total, 6 failing (CloseCommandTestBase/CloseBloatFlagTests —
 base==ref fixture staleness against R2's now-mandatory bounded window; qa's fixture fix, same class
 as the earlier test_frontmatter_rewrite.py staleness).
+
+### @architect — 2026-09-23
+
+**Re-verdict (POLY-14): APPROVE** on 67a54d9, checked against the note @ c195c37.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| R1 / AC6 loop-stats on token_actuals | pass | ee8bed1 loop_stats.scorecard; LoopStatsSharedReaderTests |
+| R2 bounded window | pass | ee8bed1 cmd_close exits 1 on no floor; UnboundedWindowForbiddenTests; 67a54d9 fixture floor |
+| R3 otel-only | pass | ee8bed1 token_actuals; TokenActualsSourceFilterTests |
+| R4 TRACKER wall_clock row | pass | ee8bed1 TRACKER.md |
+| AC1–AC5, AC7, AC8 | pass (unchanged since bbbc8f7 verdict) | c9ae61a table |
+
+Cost ruling. `cost_usd: null` when any matching line's model is missing from prices.json is **not a POLY-3 defect**:
+- It is the established posture of `build_tokens_payload`: a total with a gap is null, not understated. The shared reader keeps that posture on purpose.
+- Cost is not an estimation axis. Tokens are, and the calibration record keeps the per-counter breakdown, so cost can be recomputed once the price exists.
+- The missing `claude-opus-5-5` rate is a **prices.json follow-up**, to be filed separately.
+
+Non-blocking notes, for the lead to file or drop:
+- Because of R3, loop-stats cost is now otel-only. An issue with only backfill lines shows "—" where it used to show a cost.
+- A role with two transcripts (`role-<stem>` keys) shows the full role token total on each key.
