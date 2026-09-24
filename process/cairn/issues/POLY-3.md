@@ -1,14 +1,14 @@
 ---
 id: POLY-3
 title: Effort estimation loop in cairn (tokens + gate cycles)
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: [POLY-2]
 assignee: null
 labels: [workflow, cairn]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/9
 created: 2026-09-23
 updated: 2026-09-24
 ---
@@ -189,3 +189,7 @@ Python: `python3 run_tests.py --gate verdict` from `scripts/cairn` -- 1757 tests
 JS: `node --test "scripts/cairn/tests/js/**/*.test.js"` -- 477/479, 2 known layerchart ENOENT (POLY-8), unchanged.
 
 `prices.json`'s new `claude-opus-5-5` row (ba0a246) doesn't affect `test_estimation.py`'s fixtures -- they inject their own `TEST_PRICES` dict rather than reading the real price table, except `LoopStatsSharedReaderTests` and `LoopStatsParityTests`, which pin `claude-haiku-4-5-20251001` -- unaffected by an added row.
+
+### @team-lead — 2026-09-24
+
+PR opened: https://github.com/richmosko/polycarpic/pull/9. Awaiting Validate.

@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-3-effort-estimation-loop`
 - **Started:** 2026-09-23
 - **Goal:** Sub-issues carry a token + gate-cycle estimate; `cairn close` writes actuals from OTel and the commit log plus a calibration record; `cairn estimate` seeds new estimates from closed reference classes.
-- **Status:** In Progress
+- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/9
 
 ## Releases
 
