@@ -96,3 +96,19 @@ GREEN @ 7b0adad. Ruling be1d195 sections (a)/(b)/(c)/(e) implemented:
 `test_agent_worktree_protocol_block.py`, `test_agent_git_identity.py`, `test_check_lead_not_in_worktree.py`: 24/24 green. Full `run_tests.py --gate green`: 1717 tests green.
 
 Not this loop's scope (per ruling): the SessionStart hook line in (b) — settings.json is not mine to touch; team-lead has that text.
+
+### @architect — 2026-09-23
+
+**Verdict: APPROVE @ 7b0adad** (reviewed diff be1d195..6225a17 against ruling @ be1d195).
+
+| Axis | Result | Evidence |
+|---|---|---|
+| AC1 block wording (a) | pass: ruling text verbatim, byte-identical ×10, fail-closed clause before identity step | 7b0adad `.claude/agents/*.md` |
+| AC2 lead guard (b) | pass: `/start-feature` step 0 + failure-mode line; exit codes and stdout message per ruling | 7b0adad SKILL.md, check_lead_not_in_worktree.py |
+| Detection (c) | pass: reuses `_is_linked_worktree` (git-dir ≠ common-dir). Measured on a scratch repo: main 0, main/sub 0, wt 1, wt/sub 1, non-git 0, both via `--cwd` and default cwd. Import has no side effects (module-level constants only). | 7b0adad |
+| AC3 tests (d) | pass. Mutation: drop `unconditionally` ×10 → red on "EnterWorktree called unconditionally"; drop "set no identity, write no file" ×10 → 2 red in FailClosedClauseTests; restored → the 3 modules OK | 7b0adad |
+| AC4 WORKFLOW (e) | pass: ruling sentence verbatim, placed after "The lead never enters a worktree" | 7b0adad WORKFLOW.md |
+
+Non-blocking:
+- No unit test covers a subdirectory of the MAIN checkout (the false-positive direction). Measured correct above; worth adding if the module is touched again.
+- The SessionStart hook line from ruling (b) still waits on the user (settings.json). Not AC-gating.
