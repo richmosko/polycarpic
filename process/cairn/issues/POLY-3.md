@@ -66,3 +66,18 @@ Covers design note Section 9's minimum set: check validation (stage enum/parent,
 Two assumptions flagged in the file's own docstring (not literally pinned by the design note): `since`/`until` are ISO-8601 `Z` strings compared lexically (matches `build_tokens_payload`'s existing convention); `close`/`estimate` resolve repo root from `cwd` like `guard-push` does. Neither should require a test rewrite if wrong -- just a signature tweak.
 
 `scripts/cairn/cairn guard-push POLY-12` passed before push.
+
+### @implementation-lead — 2026-09-23
+
+GREEN — POLY-13 @ a3738ed (scripts/cairn/cairn.py, process/TRACKER.md, process/WORKFLOW.md).
+
+Implements the design note (de28e82): ISSUE_FIELD_ORDER gains stage/estimate.*/actual.*/ratio;
+check_repo validates them plus config.yml's estimation.bloat_ratio; new token_actuals/
+gate_cycle_actuals are the shared actuals seam (AC6); `cairn close`/`cairn estimate` per §7;
+TRACKER.md/WORKFLOW.md updated per §8, "estimate deliberately absent" sentence rescinded.
+
+All 34 scripts/cairn/tests/test_estimation.py tests pass. Full suite (`run_tests.py --gate green`)
+has 3 pre-existing failures in test_frontmatter_rewrite.py, unrelated to test_estimation.py: they
+hardcode the old (pre-POLY-3) ISSUE_FIELD_ORDER literal/fixtures, same precedent as the `paths`
+field exclusion already in that file. Not part of qa's red set for this loop — pending qa's
+fixture update on top of this commit.
