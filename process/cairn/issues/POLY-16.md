@@ -61,3 +61,7 @@ Full `test_estimation*` run: 49 tests, 7 failures (all the above), rest green.
 `_sibling_floor` still needs the self-exclusion + stage-order fix once --at
 lands (idempotence/plan-reclose cases will stay red on --at's own logic
 otherwise). Over to backend-lead for POLY-19.
+
+### @implementation-lead — 2026-09-24
+
+GREEN @ d95e7e3 (POLY-19): `close --at <sha>` implemented (ceiling on ref's first-parent history after the parent flip, `window.at` calibration key); `_sibling_floor` excludes self-id and later-stage siblings; re-close now removes `bloat` on a no-longer-overrunning re-evaluation, not just adds it. WORKFLOW.md → Estimation states per-stage close timing (rule a). Full `--gate green`: 1765/1766 pass. The one failure (`ReCloseIdempotenceTests.test_re_close_that_no_longer_overruns_removes_bloat`) asserts `bloat: False` where design note §3's unmodified contract (threshold unset + gate cycles within estimate = "not evaluated") gives `null` — flagged to team-lead; qa owns the assertion fix. POLY-11–14 re-closes left to the lead from the main checkout per this issue's plan.
