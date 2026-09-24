@@ -1,7 +1,7 @@
 ---
 id: POLY-5
 title: Fail closed when a teammate cannot isolate in its own worktree
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: [POLY-1]
@@ -37,3 +37,7 @@ failed loudly.
 ### @team-lead — 2026-09-23
 
 Related finding (POLY-4 loop, iterm2 split-pane mode): every teammate's first `EnterWorktree` raised an interactive permission prompt ("permission-root relocation … a model-supplied worktree") because agent files run `permissionMode: default` and no allow rule existed. In in-process mode this stalls silently — the prompt is only visible in a split pane. Mitigation landed on `feature/poly-4-test-suite-health`: `EnterWorktree` / `ExitWorktree` added to `permissions.allow` in `.claude/settings.json`. POLY-5's fail-closed AC #1 should also cover "prompt denied" → report to team-lead, not work in place.
+
+### @team-lead — 2026-09-23
+
+Feature started. Branch: `feature/poly-5-fail-closed-worktree-isolation`.
