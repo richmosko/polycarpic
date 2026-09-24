@@ -81,3 +81,11 @@ has 3 pre-existing failures in test_frontmatter_rewrite.py, unrelated to test_es
 hardcode the old (pre-POLY-3) ISSUE_FIELD_ORDER literal/fixtures, same precedent as the `paths`
 field exclusion already in that file. Not part of qa's red set for this loop — pending qa's
 fixture update on top of this commit.
+
+### @architect — 2026-09-23
+
+Addendum 1 (lead's close dry-run findings on a3738ed). Ruling text is in scripts/cairn/design/estimation.md @ 85c5fd6, §2. Summary:
+1. Zero assignee commits in W: a warning on stderr is mandatory, and a test pins it. The current build is non-conformant.
+2. Token file present but no (parent, role, W) line: `actual.tokens: null`, no `ratio`, a warning, and `"ratio": null` in calibration. A token total of 0 only ever comes from ≥1 matching line. `estimate` leaves null-token rows out of the token median.
+3. W.from = max(parent flip = oldest commit in base..ref, the latest calibration window.to of a closed sibling with the same parent and assignee). The sub-issue file's creation time is dropped, and there is no --since override. wall_clock = the assignee's last commit in W − from (null when there are no commits).
+Tests: one per item, in test_estimation.py.
