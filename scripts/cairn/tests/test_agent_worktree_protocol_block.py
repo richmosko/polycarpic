@@ -39,12 +39,19 @@ BLOCK_RE = re.compile(re.escape(BLOCK_START) + r"(.*?)" + re.escape(BLOCK_END), 
 # The five elements the ruling names for the block's content (AC2,
 # verbatim): EnterWorktree first, pull-rebase before a step, push
 # fast-forward on completion, commit by pathspec, report a sha.
+#
+# POLY-2 gate-1 ruling (architect, process/cairn/issues/POLY-2.md @
+# 226865e, item 5): a sixth element joins the block -- `cairn guard-push
+# <ID>` runs before `git push`, and a non-zero exit skips the push. The
+# existing push/fast-forward pattern above still matches; this is an
+# ADDITIONAL ordering requirement, not a replacement.
 REQUIRED_ELEMENT_PATTERNS = {
     "EnterWorktree first": re.compile(r"EnterWorktree", re.IGNORECASE),
     "pull-rebase before a step": re.compile(r"pull\s+--rebase|pull-rebase", re.IGNORECASE),
     "push fast-forward on completion": re.compile(r"push\b.*fast.forward|fast.forward\b.*push", re.IGNORECASE | re.DOTALL),
     "commit by pathspec": re.compile(r"commit\s+by\s+pathspec", re.IGNORECASE),
     "report a sha": re.compile(r"report\s+(?:the|a)\s+sha", re.IGNORECASE),
+    "guard-push precedes git push": re.compile(r"guard-push[\s\S]*?git push", re.IGNORECASE),
 }
 
 
