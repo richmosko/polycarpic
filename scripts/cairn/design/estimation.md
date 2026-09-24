@@ -23,6 +23,15 @@ would emit `str(dict)`, `cmd_set`'s `key=value` has no path syntax, and
 surfaces (dumper, setter path syntax, patch merge), each needing round-trip
 tests. Flat keys need none of them.
 
+*Reconciling the implementation-lead's finding that "the parser supports one
+level of nesting, so these can be real nested maps":* the premise is true, but
+it covers the read side only. Every close writes the file back through
+`dump_frontmatter`, and that function cannot emit a dict. Nested maps are
+therefore not free. If the lead prefers them anyway, the cost is: a block-map
+branch in `dump_frontmatter` (top level only), a `key.sub=value` path in
+`cmd_set`/`apply_patch`, and round-trip tests. The rest of this note works
+unchanged under either shape.
+
 **Decision:** logically `estimate: {tokens, gate_cycles}`; physically flat
 dotted keys. `estimate.tokens` is a plain key to this parser (`_MAPPING_LINE_RE`
 accepts dots) and to any real YAML parser, so no reader disagrees about it.
@@ -265,6 +274,14 @@ def gate_cycle_actuals(repo_root, base, ref, assignee, same_stage_authors,
 
 - `token_actuals` is built on the existing `_read_token_usage_lines` and
   `_row_cost_usd`. It does not add a second parser.
+- `build_tokens_payload` is **not** the seam, contrary to the
+  implementation-lead's suggestion. It sums every line for an issue with no
+  time filter, so it cannot separate two same-(parent, role) sub-issues, such
+  as the architect's plan and review. It also returns a dashboard-shaped
+  payload (sorted issues and role entries with rounding). `loop-stats`
+  currently reads cost from it, and AC6 moves that read onto `token_actuals`.
+  `build_tokens_payload` may itself be refactored onto `token_actuals`
+  (`since`/`until` = None), but that is optional.
 - `cairn close` calls both with W.
 - `loop_stats.scorecard` replaces its `build_tokens_payload(...)` issue-row
   loop with `token_actuals(data_dir, issue_id)["cost_usd"]`, and adds per-agent
