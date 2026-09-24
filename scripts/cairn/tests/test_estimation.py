@@ -45,6 +45,7 @@ stderr warning, and leaves `actual.wall_clock` null (not 0).
 """
 from __future__ import annotations
 
+import datetime
 import json
 import os
 import re
@@ -155,6 +156,10 @@ def cairn_cmd(root: Path, data_dir: Path, *args: str) -> subprocess.CompletedPro
         [str(helpers.CAIRN_BIN), *args, "--data-dir", str(data_dir)],
         capture_output=True, text=True, cwd=root,
     )
+
+
+def write_jsonl(path: Path, records: list) -> None:
+    path.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
 
 
 # --------------------------------------------------------------------------
@@ -776,6 +781,125 @@ class WindowFloorAndWallClockTests(AddendumOneTestBase):
         # calibration record be fudged (design note addendum).
         r2 = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--since", "2020-01-01T00:00:00Z")
         self.assertEqual(r2.returncode, 2, r2.stdout + r2.stderr)
+
+
+# --------------------------------------------------------------------------
+# 8. Architect verdict on bbbc8f7 (POLY-3.md @ c9ae61a, note @ c195c37):
+# R1 (AC6), R2, R3 -- RED against bbbc8f7/040a43b. R4 is a doc-only nit,
+# no test.
+# --------------------------------------------------------------------------
+
+class LoopStatsSharedReaderTests(unittest.TestCase):
+    """R1 (AC6): `loop_stats.scorecard` must read cost via
+    `cairn.token_actuals(data_dir, issue_id)["cost_usd"]`, not
+    `cairn.build_tokens_payload`, and must add a per-agent `"tokens"` key
+    from `token_actuals(..., role=role)`. The pre-existing parity test
+    (`LoopStatsParityTests`) only proves the two readers CAN agree on a
+    fixture that doesn't distinguish them; it doesn't prove which one
+    `scorecard` actually calls. This fixture is built so the two readers
+    DISAGREE (`token_actuals` rounds to 6dp for the calibration record,
+    `build_tokens_payload`'s issue total rounds to 2dp for display,
+    cairn.py's own §6 docstring) -- 100 input tokens at
+    `claude-haiku-4-5-20251001`'s real $1/MTok input rate costs exactly
+    $0.0001, which is genuinely non-zero at 6dp but rounds to $0.00 at 2dp.
+    """
+
+    def setUp(self):
+        self.root = helpers.make_empty_tmp_dir(self)
+        git(self.root, "init", "-q", "-b", "main")
+        git(self.root, "config", "user.email", "t@example.com")
+        git(self.root, "config", "user.name", "t")
+        self.data_dir = helpers.copy_fixture_data_dir(self.root / "process")
+        write_file(self.root, "seed.txt")
+        commit_as(self.root, "seed", "seed", when="2020-01-01T00:00:00+00:00")
+        git(self.root, "checkout", "-q", "-b", "feature/pt-1-thing")
+        write_file(self.root, "app.py", "x = 1\n")
+        commit_as(self.root, "backend-lead", "feat", when="2020-01-02T00:00:00+00:00")
+
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-02T01:00:00Z", issue="PT-1", role="backend-lead",
+                      model="claude-haiku-4-5-20251001", input=100),
+        ])
+        self.transcripts = self.root / "transcripts"
+        self.transcripts.mkdir()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        self.since = now - datetime.timedelta(minutes=10)
+        recent = lambda m: (now + datetime.timedelta(minutes=m)).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        write_jsonl(self.transcripts / "b.jsonl", [
+            {"type": "agent-setting", "agentSetting": "backend-lead", "sessionId": "b1"},
+            {"type": "assistant", "timestamp": recent(-3),
+             "message": {"content": [{"type": "tool_use", "name": "Read", "input": {"file_path": "x.py"}}]}},
+        ])
+
+    def test_scorecard_reads_cost_and_per_agent_tokens_through_token_actuals(self):
+        card = loop_stats.scorecard(self.root, self.data_dir, "PT-1", base="main",
+                                     since=self.since, transcripts_dir=self.transcripts)
+        expected_cost = cairn.token_actuals(self.data_dir, "PT-1")["cost_usd"]
+        self.assertAlmostEqual(expected_cost, 0.0001, places=6)
+        self.assertAlmostEqual(card["cost_usd"], expected_cost, places=6)
+        # build_tokens_payload's own 2dp-rounded figure for the same
+        # fixture -- scorecard must NOT be reporting this value instead.
+        legacy = cairn.build_tokens_payload(self.data_dir)
+        legacy_cost = next(r["total"]["cost_usd"] for r in legacy["issues"] if r["issue"] == "PT-1")
+        self.assertEqual(legacy_cost, 0.0)
+        self.assertNotAlmostEqual(card["cost_usd"], legacy_cost, places=4)
+
+        self.assertIn("backend-lead", card["per_agent"])
+        expected_tokens = cairn.token_actuals(self.data_dir, "PT-1", role="backend-lead")["tokens"]
+        self.assertEqual(expected_tokens, 100)
+        self.assertEqual(card["per_agent"]["backend-lead"].get("tokens"), expected_tokens)
+
+
+class UnboundedWindowForbiddenTests(unittest.TestCase):
+    """R2: an empty `base..ref` range (no feature-branch divergence) with
+    no closed sibling leaves `from_ts` with no floor at all -- `close`
+    must refuse (exit 1) rather than let W stay unbounded. Today it
+    silently proceeds and `gate_cycle_actuals`/`token_actuals` read the
+    assignee's WHOLE-repo/whole-file history instead."""
+
+    def test_close_exits_one_when_the_window_has_no_floor(self):
+        root = helpers.make_empty_tmp_dir(self)
+        git(root, "init", "-q", "-b", "main")
+        git(root, "config", "user.email", "seed@example.com")
+        git(root, "config", "user.name", "seed")
+        (root / "process").mkdir()
+        data_dir = helpers.copy_fixture_data_dir(root / "process")
+        write_issue(data_dir, "PT-9", parent="PT-1", status="in-progress", stage="execute",
+                    assignee="backend-lead", estimate_tokens=100000, estimate_gate_cycles=1)
+        commit_as(root, "backend-lead", "seed: tracker + PT-9", when="2020-01-01T00:00:00+00:00")
+        # No feature-branch checkout -- base=main and ref=HEAD are the SAME
+        # commit, so `git log main..HEAD` is empty (no parent flip), and no
+        # calibration.jsonl exists yet (no sibling floor either).
+
+        r = cairn_cmd(root, data_dir, "close", "PT-9", "--no-flush")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertTrue(
+            any(s in r.stderr.lower() for s in ("unbounded", "no floor", "window")),
+            f"expected a message naming the unbounded-window refusal, got: {r.stderr!r}",
+        )
+        fm, _ = cairn.parse_frontmatter((data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        self.assertEqual(fm.get("status"), "in-progress")  # refused before any write
+
+
+class TokenActualsSourceFilterTests(unittest.TestCase):
+    """R3: `token_actuals` must filter `source == "otel"` (design note §2
+    formula) -- a `transcript-backfill` line whose `generated` falls
+    inside W must not be double-counted alongside the live otel stream."""
+
+    def test_transcript_backfill_line_in_window_is_not_counted(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        write_token_usage(data_dir, [
+            token_row(generated="2020-01-02T00:30:00Z", issue="PT-1", role="backend-lead",
+                      source="transcript-backfill", input=999999),
+            token_row(generated="2020-01-02T00:45:00Z", issue="PT-1", role="backend-lead",
+                      source="otel", input=100),
+        ])
+        result = cairn.token_actuals(
+            data_dir, "PT-1", role="backend-lead",
+            since="2020-01-01T00:00:00Z", until="2020-01-03T00:00:00Z", prices=TEST_PRICES,
+        )
+        self.assertEqual(result["tokens"], 100)
+        self.assertEqual(result["lines"], 1)
 
 
 if __name__ == "__main__":
