@@ -928,8 +928,23 @@ def _glob_to_regex(pattern: str) -> "re.Pattern[str]":
     one; folding both sides into the `**` expansion would let it match
     an empty segment inside a `//` on its own. This asymmetric split is
     what makes the zero-segments case collapse to exactly one `/`.
+
+    Architect's gate-4 verdict (defect A, POLY-2.md @ c311ae7): consecutive
+    `**` segments (`a/**/**/b`, or the whole pattern `**/**`) are collapsed
+    to one BEFORE translation -- `a/**/**/b` means the same thing as
+    `a/**/b` ("zero or more segments" twice in a row is still "zero or
+    more segments"), but the untranslated pair compiled to
+    `(?:.*/)?(?:/.*)?`, which requires TWO separators where the zero-
+    segments case has none -- a lint-clean pattern that matched nothing at
+    all, silently flagging every covered file as stray.
     """
     segments = pattern.split("/")
+    collapsed: List[str] = []
+    for seg in segments:
+        if seg == "**" and collapsed and collapsed[-1] == "**":
+            continue
+        collapsed.append(seg)
+    segments = collapsed
     n = len(segments)
     parts: List[str] = []
     for i, seg in enumerate(segments):
@@ -6736,6 +6751,19 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
     if paths_val is None:
         print(f"guard-push: {args.id} has no paths: declared -- warn-only, not enforced", file=sys.stderr)
         return 0
+    # Architect's gate-4 verdict (defect B, POLY-2.md @ c311ae7): a
+    # malformed `paths:` (a scalar string -- iterated character by
+    # character -- or a non-string entry, which raises) must never be
+    # indistinguishable from a real stray-file failure (exit 1). Validated
+    # here, before any matcher is built, so a config error always exits 2.
+    if not isinstance(paths_val, list):
+        print(f"guard-push: {args.id}'s paths: must be a list, got {type(paths_val).__name__}", file=sys.stderr)
+        return 2
+    for idx, entry in enumerate(paths_val):
+        ok, reason = validate_path_glob(entry)
+        if not ok:
+            print(f"guard-push: {args.id}'s paths[{idx}] {entry!r} invalid -- {reason}", file=sys.stderr)
+            return 2
     if assignee is None:
         print(f"guard-push: {args.id} has paths: declared but assignee: null -- cannot attribute commits", file=sys.stderr)
         return 2
