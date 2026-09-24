@@ -161,3 +161,12 @@ origin yet as of this commit). test_guard_push.py + test_paths_field.py:
 - document the quoting rule on the TRACKER.md `paths` row.
 
 Do not add a parser exception. The YAML subset stays a strict subset of YAML, and an unquoted `*x` really is an alias in YAML.
+
+### @qa-engineer — 2026-09-23
+
+**Verdict gate -- PASS @ 6863a4e** (code: dc3b393 + 9d8fe71; tracker-only: 8c41351, POLY-9 backlog).
+
+Python: `run_tests.py --gate verdict` (full suite, no -p) -- 1707 tests, 0 failures, 0 errors, 4 skipped.
+JS: `node --test "tests/js/**/*.test.js"` -- 479 tests, 477 pass, 2 fail. Both failures are pre-existing and unrelated (dashboard/node_modules/layerchart missing -- ENOENT on package.json and BarChart.base.svelte), matching implementation-lead's own green-gate comment on this same baseline. No POLY-2 code touches the JS suite.
+
+Sign-off: acceptance criteria all covered by scripts/cairn/tests/test_guard_push.py, test_paths_field.py, test_agent_worktree_protocol_block.py, test_frontmatter_rewrite.py -- green against 6863a4e. Ready for /finish-feature.
