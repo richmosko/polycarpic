@@ -1971,6 +1971,36 @@
     drawer.appendChild(inlineField("title", "text", issue.title, issue, false, readOnly));
     drawer.appendChild(inlineSelect("status", Object.keys(STATUS_LABELS), issue.status, issue, STATUS_LABELS, readOnly));
     drawer.appendChild(inlineField("assignee", "text", issue.assignee || "", issue, false, readOnly));
+    // POLY-2 (architect's gate-1 ruling § "Board drawer"): render declared
+    // `paths:` as a read-only monospace list right under assignee -- not
+    // an inlineField, since paths is CLI/lint-owned (cairn new --paths /
+    // cairn set paths=), not board-editable. Hidden entirely when the key
+    // is absent (undeclared); an explicit `paths: []` still renders, as
+    // its own distinct "may touch nothing" state.
+    if (Array.isArray(issue.paths)) {
+      var pathsWrap = document.createElement("div");
+      pathsWrap.className = "paths-field";
+      var pathsLabel = document.createElement("div");
+      pathsLabel.className = "paths-label";
+      pathsLabel.textContent = "Paths";
+      pathsWrap.appendChild(pathsLabel);
+      if (issue.paths.length) {
+        var pathsList = document.createElement("ul");
+        pathsList.className = "paths-list";
+        issue.paths.forEach(function (glob) {
+          var li = document.createElement("li");
+          li.textContent = glob;
+          pathsList.appendChild(li);
+        });
+        pathsWrap.appendChild(pathsList);
+      } else {
+        var pathsEmpty = document.createElement("div");
+        pathsEmpty.className = "paths-empty";
+        pathsEmpty.textContent = "(may touch nothing)";
+        pathsWrap.appendChild(pathsEmpty);
+      }
+      drawer.appendChild(pathsWrap);
+    }
     drawer.appendChild(inlineField("milestone", "text", issue.milestone || "", issue, false, readOnly));
     drawer.appendChild(inlineField("labels", "text", (issue.labels || []).join(", "), issue, true, readOnly));
     drawer.appendChild(inlineSelect("priority", ["", "P0", "P1", "P2", "P3"], issue.priority, issue, PRIORITY_LABELS, readOnly));
