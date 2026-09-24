@@ -40,3 +40,12 @@ Lead estimate at start (calibration input; prior: POLY-5 21 min, POLY-3 95 min/3
 ### @team-lead — 2026-09-24
 
 AC5 root cause, measured 2026-09-24 before spawn: `_resolve_role_from_session` returns `subagent-unattributed` when `<transcripts_dir>/<session_id>.jsonl` is absent. `.sessions/.transcripts-dir` is `~/.claude/projects/-Users-mosko-Projects-polycarpic`, but every teammate runs with cwd `.claude/worktrees/<name>/`, so Claude Code files its transcript under the sibling slug `-Users-mosko-Projects-polycarpic--claude-worktrees-<name>/` (17 such dirs exist, one transcript each). The header fields (`agentSetting`/`agentName`) are presumably there; nothing reads that dir. Fix shape is the architect's call: scan `<slug>--claude-worktrees-*` siblings (cheap, PT-87 scan window unchanged), or have SessionStart registration record each session's own transcript path so the receiver never guesses.
+
+### @architect — 2026-09-24
+
+Gate-1 ruling (POLY-21): read `scripts/cairn/design/telemetry-attribution.md` @ 3d83a20. Summary of rulings, all measured (M1–M7 in the note):
+- AC1: absent `.sessions/` = unknown, never empty → hold (cancel grace, no reap), no mkdir during the swap window, recreate after 60 s; `.closing` ENOENT caught; any other watchdog exception exits the whole receiver with code 3 after the §5 shutdown. Forbidden state: listening ∧ watchdog dead.
+- AC2: `.watchdog-heartbeat` + `.last-flush` dotfiles; `--status` adds `watchdog:` and `last-flush:` lines; exit 2 = running with a dead watchdog.
+- AC5: one `_transcript_path_for` resolver scanning `<slug>--claude-worktrees-*/<id>.jsonl` (0.09 ms/miss), used by role resolution, staleness probe and `--status` (fixes a latent PT-86 one-signal reap for teammates). No registration-time paths.
+- AC4: `OTEL_*` reach neither tool subshells nor hook-spawned processes (measured); TRACKER H1/H3 wording is false as written — H3 never runs in the real hook path. Doc fix in POLY-10; code fix is a follow-up.
+- Tests: 8, listed in note §(f).
