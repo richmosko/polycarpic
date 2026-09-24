@@ -85,3 +85,14 @@ Unmeasured: whether `EnterWorktree` succeeds when called from inside another ses
 ### @qa-engineer — 2026-09-23
 
 RED @ eb54d5a. 7 new REQUIRED_ELEMENT_PATTERNS in test_agent_worktree_protocol_block.py (unconditional EnterWorktree, fail-closed on error/refusal/denied prompt, report to team-lead); FailClosedClauseTests added to test_agent_git_identity.py (set no identity / make no commit, ordering, all-files); new test_check_lead_not_in_worktree.py against the not-yet-written script CLI contract (main=0/silent, linked worktree=1 w/ team-lead+both paths+Fix:, subdir=1, non-git=0) plus start-feature step-0 naming check. `python3 run_tests.py -p 'test_agent_worktree_protocol_block*' -p 'test_agent_git_identity*' -p 'test_check_lead_not_in_worktree*'`: 11 failures across 3 files, all missing-text/missing-file, not collection errors.
+
+### @implementation-lead — 2026-09-23
+
+GREEN @ 7b0adad. Ruling be1d195 sections (a)/(b)/(c)/(e) implemented:
+- (a) new fail-closed first-sentence wording, byte-identical across all ten `.claude/agents/*.md`
+- (b)/(c) `scripts/cairn/check_lead_not_in_worktree.py` (imports `ensure_metrics_worktree._is_linked_worktree`), wired into `/start-feature` step 0 Pre-flight + a Failure-modes line
+- (e) one-sentence fail-closed bullet in WORKFLOW.md's worktree section
+
+`test_agent_worktree_protocol_block.py`, `test_agent_git_identity.py`, `test_check_lead_not_in_worktree.py`: 24/24 green. Full `run_tests.py --gate green`: 1717 tests green.
+
+Not this loop's scope (per ruling): the SessionStart hook line in (b) — settings.json is not mine to touch; team-lead has that text.
