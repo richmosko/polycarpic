@@ -1,7 +1,7 @@
 ---
 id: POLY-13
 title: POLY-3 execute: schema, close, estimate, bloat, loop-stats seam, docs
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-3
 blocked_by: []
@@ -10,9 +10,11 @@ paths: [scripts/cairn/cairn.py, scripts/cairn/loop_stats.py, scripts/cairn/otel_
 stage: execute
 estimate.tokens: 1200000
 estimate.gate_cycles: 2
-labels: [cairn, workflow]
+actual.gate_cycles: 3
+actual.wall_clock: 75
+labels: [cairn, workflow, bloat]
 priority: P2
 pr: null
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-24
 ---
