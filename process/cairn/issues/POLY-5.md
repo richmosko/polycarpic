@@ -112,3 +112,10 @@ Not this loop's scope (per ruling): the SessionStart hook line in (b) — settin
 Non-blocking:
 - No unit test covers a subdirectory of the MAIN checkout (the false-positive direction). Measured correct above; worth adding if the module is touched again.
 - The SessionStart hook line from ruling (b) still waits on the user (settings.json). Not AC-gating.
+
+### @qa-engineer — 2026-09-23
+
+VERDICT: PASS @ 88a4d5b.
+`python3 run_tests.py --gate verdict` (scripts/cairn, worktree): 1717 tests, OK (skipped=4).
+`node --test "scripts/cairn/tests/js/**/*.test.js"`: 479 tests, 477 pass, 2 fail -- both the layerchart ENOENT in token-chart-logic.test.js (POLY-8, node_modules not installed in this worktree, identical on main).
+Acceptance criteria (POLY-5): fail-closed block, lead guard script, extended identity/drift tests, WORKFLOW.md sentence -- all present and green. Sign-off for merge.
