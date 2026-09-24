@@ -215,6 +215,7 @@ Reuse `lib/session/store.py` rather than introducing a second session abstractio
 | `parent` | id \| null | ✅ | Sub-issue linkage. One level is expected; the parser tolerates deeper nesting but the board renders two. |
 | `blocked_by` | list[id] | — | Issues that must resolve before this one can start. **Same-root ids only.** An absent key ≡ `[]`. `cairn check` lints dangling refs, self-reference, and cycles. See [Dependencies](#dependencies). |
 | `assignee` | string \| null | ✅ | Bare agent role (`backend-lead`) matching a file in `.claude/agents/`, or `@handle` for a human. Replaces Linear's `agent:<role>` labels — attribution becomes a field, not a label. |
+| `paths` | list[string] | — | Repo-relative glob patterns the assignee's commits must stay inside (POLY-2). An **absent** key means undeclared — opt-in, not a hard gate — distinct from an explicit `[]` ("may touch nothing"). `cairn check` validates shape only, never existence. See [Path ownership](#path-ownership-poly-2). |
 | `labels` | list[string] | ✅ | Free-form, lowercase-kebab. May be `[]`. |
 | `priority` | `P0`–`P3` \| null | — | Backlog ordering only. Not a due date. |
 | `pr` | url \| null | — | Written by `/finish-feature`. Lets the board link out. |
@@ -384,6 +385,22 @@ An issue may declare others as blocking it: `blocked_by: [PT-9, PT-12]`. The rel
 
 `cairn check` errors on a dangling reference, a self-reference, and any dependency cycle (reported once per cycle, with the full path). Self-references and dangling refs are excluded from the cycle walk, so one typo yields one error.
 
+### Path ownership (POLY-2)
+
+Worktree isolation guarantees one writer per checkout, but several agents push to the same feature branch over the course of a loop. An issue's `paths:` list declares the repo-relative globs its assignee's commits may touch; `cairn guard-push <ID>` checks that declaration at push time, not at commit time — every agent's own worktree protocol (`process/WORKFLOW.md` → Worktree protocol) runs it immediately before `git push` and skips the push on a non-zero exit.
+
+**Opt-in, not a hard gate (kickoff decision, `docs/project_kickoff.md` § 2.1).** An issue with no `paths:` key passes `guard-push` with a warning on stderr, exit 0 — most sub-issues never need this, and a repo that predates POLY-2 keeps working unchanged. Declaring `paths: []` is a different, explicit state: "this assignee may touch nothing," never conflated with "undeclared."
+
+**`cairn guard-push <ID>` (ruled by the architect, gate-1, POLY-2):**
+
+- **Range.** `base = git merge-base <main-ref> HEAD`, where `<main-ref>` is `origin/main` if it resolves, else local `main`; neither resolving is exit 2. The range is `base..HEAD`, `--no-merges` — a merge of `main` into the feature branch never counts, since the fork point is the only anchor that stays correct after that merge.
+- **Attribution.** Files touched by commits whose author name (`%an`) equals the issue's **assignee**, exactly — keyed on the issue, never on the invoking identity, so the lead can audit a teammate's commits from the main checkout. `--no-renames` lists both sides of a rename; deletions count as touches.
+- **Glob semantics.** Patterns are repo-relative, `/`-separated. `**` as a WHOLE segment matches zero or more segments (`src/auth/**` matches `src/auth/a.py` and `src/auth/x/y.py`, not `src/authz/a.py`). `*` matches within one segment, never crossing `/`; `?` matches one non-`/` char. No `[...]` classes, no special-casing of dotfiles. A pattern with no wildcards matches exactly one path.
+- **Exit codes.** `0` pass (including every opt-out below); `1` stray files, every offending path listed, sorted, one per line; `2` usage/config error (unknown id, unresolvable base, or `paths:` set with a null assignee — nothing to attribute to).
+- **Opt-outs, all exit 0:** no `paths:` declared (warn only); assignee is an `@handle` (a human is not under the protocol); assignee has zero commits in the range.
+
+`cairn check` validates a declared `paths:` list for **shape only, never existence** — a feature creates its own files, so a glob naming a not-yet-created path is normal. Each entry must be a non-empty string, must not start with `/`, must not contain `\`, must not contain a `..` segment, and must not fuse `**` with other characters in the same segment (`a**b`).
+
 ### Archive
 
 `process/cairn/archive/` holds the same files, moved. The board reads the live directories only, unless you ask for more — **Show archived** (default off) refetches with `?archived=1` and folds archived records back in. Layout:
@@ -547,6 +564,7 @@ Board edits **rewrite only the frontmatter block**, re-emitted in canonical key 
 | `cairn migrate lifecycle-status [--dry-run]` | One-shot 0.7.0 migration: rewrites milestone/major `status:` onto the [unified vocabulary](#milestone--major-status-vocabulary) — `completed` → `done`, `active` → `in-progress`. Value-keyed, so idempotent by construction; any other value is left untouched for the lint to report. Same posture as `prefix-ids`: runs on a repo whose lint is already failing. |
 | `cairn migrate archive-issues [--dry-run]` | One-shot 0.7.1 migration (PT-50): moves every legacy flat `archive/*.md` issue into `archive/issues/` via `git mv`. Filesystem-only — touches zero bytes inside any file. Idempotent — safe to re-run after an interruption; a destination that already exists with *differing* content refuses the entire run rather than guessing a winner. Same posture as the other two: runs on a repo whose lint is already failing (that's what it fixes). |
 | `cairn serve [--repos a,b]` | The board. `--repos` (PT-3) replaces `config.yml`'s `roots:` for that invocation — read-only cross-project aggregation, see [Multi-root](#multi-root-pt-3-2026-08-21). |
+| `cairn guard-push PT-14` | Push-time check (POLY-2): fails naming every file the issue's assignee touched outside its declared `paths:`. Every agent's worktree protocol runs this immediately before `git push` and skips the push on a non-zero exit — see [Path ownership](#path-ownership-poly-2). |
 
 **The CLI is legitimate under "agents never need a server" (ruled 2026-08-19)** — that constraint reads as *no MCP, no HTTP, no JSON payloads in context*, which a local script printing one line satisfies.
 

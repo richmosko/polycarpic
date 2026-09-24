@@ -1006,6 +1006,31 @@ table.issue-list tr:hover { background: var(--accent); cursor: pointer; }
   font-family: var(--font-heading);
 }
 
+/* POLY-2: the drawer's read-only `paths:` display -- monospace per the
+   architect's gate-1 ruling, distinct from .file-link's heading font
+   above since these are glob PATTERNS, not a single resolved path. */
+.paths-field {
+  margin: 6px 0;
+}
+.paths-label {
+  font-size: 11px;
+  font-family: var(--font-heading);
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.paths-list {
+  margin: 2px 0 0;
+  padding-left: 18px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.paths-empty {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
 /* PT-40: the record drawer's (milestone/major card) progress line and
    read-only note -- same font sizing as the issue drawer's file/PR/parent
    lines above, distinct classes since they're record-card-only. */
