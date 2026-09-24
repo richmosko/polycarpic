@@ -39,3 +39,7 @@ Gate-1 ruling: read scripts/cairn/design/estimation.md §2 → Stage windows @ d
 Fix is both: (a) the lead closes each stage at its gate (plan at design-gate clear + each addendum; review after each verdict; execute at the approving verdict); (b) `cairn close --at <sha>` sets the window ceiling to a gate commit, so a late close measures as if run at the gate. The sibling floor now excludes self and later stages. Re-close is allowed: status stays done, `bloat` is re-evaluated, last line per id wins.
 A purely log-derived plan/review boundary was rejected: on POLY-3's log it puts addendum 1 in review, so POLY-11 comes out at 1, not 2 (measured).
 AC4 expected: POLY-11 --at b6caa8a → 2; POLY-14 --at de60cde → 2. Close POLY-11 first. qa's seven tests are listed in the note.
+
+### @team-lead — 2026-09-24
+
+Gate-1 ruling accepted @ d9dd5f8 (both: close-at-stage-end rule + `--at <sha>` ceiling; sibling floor excludes self and later stages; re-close allowed with bloat re-evaluated). First application of rule (a): POLY-17 (architect/plan) closed now, at design-gate clear, from the main checkout.
