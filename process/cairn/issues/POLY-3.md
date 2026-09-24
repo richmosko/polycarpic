@@ -168,3 +168,14 @@ Python: `python3 run_tests.py --gate verdict` from `scripts/cairn` -- 1757 tests
 JS: `node --test "scripts/cairn/tests/js/**/*.test.js"` -- 479 tests, 477 pass, 2 fail (layerchart ENOENT x2, POLY-8, known).
 
 `test_estimation.py`: 40/40. All 8 ACs covered per the architect's final verdict table (AC1-AC8, TRACKER rescission). guard-push POLY-12 passed.
+
+### @team-lead — 2026-09-24
+
+First reference class closed via `cairn close` @ 07d31c8 (calibration.jsonl on metrics @ 4d36f3f):
+| sub-issue | stage/assignee | est. cycles | actual | wall | flag |
+|---|---|---|---|---|---|
+| POLY-11 | plan/architect | 1 | 4 | 79m | bloat |
+| POLY-12 | execute/qa-engineer | 1 | 4 | 82m | bloat |
+| POLY-13 | execute/implementation-lead | 2 | 3 | 75m | bloat |
+| POLY-14 | review/architect | 1 | 0 | null | — |
+Tokens null on all four: teammates land as `subagent-unattributed` (POLY-10 AC5). POLY-14's 0 / POLY-11's 4 is a windowing defect, filed as POLY-16. The qa overrun counts two fixture repairs caused by schema and R2 changes — real cycles, honestly counted.
