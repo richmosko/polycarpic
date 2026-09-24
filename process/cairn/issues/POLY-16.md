@@ -32,3 +32,10 @@ Options for the architect: (a) WORKFLOW rule — the lead closes a plan sub-issu
 
 Feature started. Branch: `feature/poly-16-stage-aware-close-windows`.
 Lead estimate at start (calibration input; prior points: POLY-5 est 1–2 h / actual 21 min, POLY-3 est 60 min & 8 commits / actual 95 min & 32 commits): 14 commits, 2 gate cycles, ~45 min spawn→merge. Reference: `cairn estimate` on the sub-issues below.
+
+### @architect — 2026-09-24
+
+Gate-1 ruling: read scripts/cairn/design/estimation.md §2 → Stage windows @ d9dd5f8.
+Fix is both: (a) the lead closes each stage at its gate (plan at design-gate clear + each addendum; review after each verdict; execute at the approving verdict); (b) `cairn close --at <sha>` sets the window ceiling to a gate commit, so a late close measures as if run at the gate. The sibling floor now excludes self and later stages. Re-close is allowed: status stays done, `bloat` is re-evaluated, last line per id wins.
+A purely log-derived plan/review boundary was rejected: on POLY-3's log it puts addendum 1 in review, so POLY-11 comes out at 1, not 2 (measured).
+AC4 expected: POLY-11 --at b6caa8a → 2; POLY-14 --at de60cde → 2. Close POLY-11 first. qa's seven tests are listed in the note.
