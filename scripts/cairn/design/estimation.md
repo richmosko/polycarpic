@@ -94,19 +94,101 @@ All three sources are computed over one **window** W = (from_ts, close_ts]:
   - The parent flip is the author time of the oldest commit in `<base>..<ref>`,
     i.e. `/start-feature`'s "feature started" commit, which is the same default
     `loop-stats` uses for `since`.
-  - The sibling floor is the latest calibration `window.to` of a closed
-    sub-issue with the same `parent` and the same `assignee`. It is absent when
-    there is none.
+  - The sibling floor is the latest calibration `window.to` (last line per
+    id) of a closed sub-issue with the same `parent`, the same `assignee`, a
+    **different id**, and a stage **no later** than this one's
+    (plan < execute < review). It is absent when there is none. Excluding
+    self makes a re-close re-measure from the same floor; excluding later
+    stages keeps a plan re-close from flooring at its own review's close
+    (POLY-16).
   - The sub-issue file's own creation time is **not** used. Sub-issues are
     often written after the work has started (as POLY-11 was), and the
     assignee/role filters already keep other agents' commits and tokens out of
     W.
   - There is no `--since` override: a hand-set window would let a calibration
     record be fudged.
-- `close_ts` is the wall time at which `cairn close` runs.
-- Known limit: two same-(parent, assignee) sub-issues that are open at the
-  same time split their work at the first close. The protocol opens a review
-  sub-issue only after the plan closes.
+- `close_ts` is the wall time at which `cairn close` runs, unless `--at <sha>`
+  is given (below).
+
+### Stage windows (POLY-16 ruling)
+
+**Finding.** The floor above is only real if each stage is closed when it
+ends. POLY-3 closed all four sub-issues at finish-feature, so the architect's
+plan sub-issue (POLY-11) absorbed every architect commit (gate_cycles=4) and
+the review sub-issue (POLY-14) got 0. Measured on POLY-3's first-parent log
+(`git log --first-parent 1389297^1..1389297^2`, author per commit), the
+architect's runs are: {6979191, 82c0677, de28e82} ruling · {85c5fd6, b6caa8a}
+addendum 1 · {c195c37, c9ae61a} verdict · {de60cde} re-verdict.
+
+**Why the log alone cannot split them.** Addendum 1 and the first verdict
+both follow a green build, both touch the design note, and both are followed
+by a qa red. Author order does not decide the stage of a multi-stage author's
+run, and commit subjects are not a contract. So a boundary derived purely from
+the log (e.g. "plan ends at the first execute commit") would put addendum 1
+in review and give POLY-11 = 1. The stage boundary is a **gate event**, and
+only the lead knows when it happened.
+
+**Ruling: both.** (a) is the rule; (b) is the mechanism that makes (a)
+exact and lets a late close be corrected.
+
+- **(a) Close at stage end (WORKFLOW → Estimation).** The lead runs every
+  close, immediately after the gate commit that ends the stage, and commits
+  the issue file by pathspec:
+  - **plan**: when the design gate clears, and again after each addendum;
+  - **review**: after each verdict (changes-requested and approve);
+  - **execute** (qa and builder): at the approving verdict.
+- **(b) `--at <sha>` sets the ceiling.** `close_ts` becomes the author time of
+  `<sha>`, and `ref` becomes `<sha>`. `<sha>` must be on `ref`'s first-parent
+  history, after the parent flip; otherwise `close` exits 1. The calibration
+  record carries `"window": {"from", "to", "at": "<sha>" | null}`. This does
+  not reopen the fudge that §2 forbids for `--since`: the ceiling can only
+  land on a real, recorded commit. It is how a close run late (as in POLY-3)
+  is measured as if it had run at the gate.
+
+**Per-stage window**, all W = (from_ts, close_ts]:
+
+| stage | from_ts | close_ts |
+|---|---|---|
+| plan | parent flip (no earlier-stage sibling exists) | design-gate or latest addendum commit |
+| execute | max(flip, floor from an earlier-stage same-assignee sibling) | approving verdict |
+| review | max(flip, plan sub-issue's `window.to`) | the verdict just issued |
+
+- **Two review rounds.** One review sub-issue, closed after each verdict. The
+  second close has the same floor (self is excluded), so W grows to cover both
+  rounds and gives 2. The last line per id wins.
+- **Same-stage siblings** (qa + builder, both execute) are unchanged. Each
+  counts only its own commits, and the other's commits do not break its run.
+  They do not floor each other either: different assignees.
+- **Two sub-issues with the same (parent, assignee, stage)** are outside the
+  protocol (one per agent, stage). Known limit: they split at the first close.
+
+**Re-close.** `close` on a `done` sub-issue is allowed. It rewrites
+`actual.*` and `ratio`, adds or **removes** the `bloat` label to match the new
+evaluation, leaves `status: done`, and appends a line. Re-closing at the same
+`--at` is idempotent in `actual.*` and `window`.
+
+**POLY-3 re-close (AC4), expected:** POLY-11 `--at b6caa8a` gives W =
+(532a5f2, b6caa8a] and 2 cycles. POLY-14 `--at de60cde` gives W = (b6caa8a,
+de60cde] and 2 cycles (c9ae61a and de60cde are split by 040a43b). Order:
+POLY-11 first, because POLY-14's floor reads its new line.
+(Measured from the commit log above; token numbers are unmeasured until the
+re-close runs.)
+
+**Tests (qa, `test_estimation.py`):**
+1. The back-to-back pair: one assignee, plan and review, both closed at the
+   end with `--at` at their gate commits; each gets its own commits.
+2. The same pair closed with no `--at` reproduces the POLY-3 collapse. This
+   pins that the default is still `now`.
+3. Same-stage siblings: the qa and builder commits interleave. Each gets 1
+   cycle, and neither floors the other.
+4. Two review rounds: close after verdict 1 gives 1; close after verdict 2
+   gives 2; the last line per id holds 2.
+5. Re-close idempotence: the same `--at` twice gives identical `actual.*` and
+   `window`, two lines, and `status` stays `done`. A re-close that no longer
+   overruns removes `bloat`.
+6. Plan re-close after review is closed: the floor ignores the later-stage
+   sibling.
+7. `--at` off first-parent history, or at/before the parent flip, exits 1.
 
 ### Tokens — OTel receiver, `process/cairn/metrics/token-usage.jsonl`
 
@@ -323,7 +405,8 @@ def gate_cycle_actuals(repo_root, base, ref, assignee, same_stage_authors,
 
 ## 7. CLI surface
 
-- `cairn close <ID> [--base main] [--ref HEAD] [--no-flush] [--dry-run]`. It
+- `cairn close <ID> [--base main] [--ref HEAD] [--at <sha>] [--no-flush] [--dry-run]`
+  (`--at`: §2 → Stage windows). It
   requires `stage` + `parent` + `assignee` and at least one `estimate.*` field
   (otherwise it exits 1 and names the missing key). It then:
   1. flushes the receiver;
