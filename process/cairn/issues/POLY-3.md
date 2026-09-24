@@ -89,3 +89,14 @@ Addendum 1 (lead's close dry-run findings on a3738ed). Ruling text is in scripts
 2. Token file present but no (parent, role, W) line: `actual.tokens: null`, no `ratio`, a warning, and `"ratio": null` in calibration. A token total of 0 only ever comes from ≥1 matching line. `estimate` leaves null-token rows out of the token median.
 3. W.from = max(parent flip = oldest commit in base..ref, the latest calibration window.to of a closed sibling with the same parent and assignee). The sub-issue file's creation time is dropped, and there is no --since override. wall_clock = the assignee's last commit in W − from (null when there are no commits).
 Tests: one per item, in test_estimation.py.
+
+### @implementation-lead — 2026-09-23
+
+GREEN (cycle 2) — addendum 1 @ bbbc8f7 (scripts/cairn/cairn.py).
+
+Implements the addendum (design note @ 85c5fd6, POLY-3.md @ b6caa8a): from_ts = max(parent flip,
+sibling floor); token_actuals treats a present-but-no-match file the same as a missing one (tokens:
+null, no ratio); gate_cycle_actuals gains last_commit_ts for wall_clock; mandatory stderr warning
+on zero assignee commits; cairn estimate excludes null-token rows from the token median.
+
+All 37 test_estimation.py tests pass. Full gate: 1754 OK.
