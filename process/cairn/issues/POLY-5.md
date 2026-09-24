@@ -81,3 +81,7 @@ Spawn: 2026-09-23, branch tip 3a7bdc6.
 > **Fail closed (POLY-5).** A teammate calls `EnterWorktree` unconditionally, even from inside `.claude/worktrees/`, and if the call errors, is refused, or its permission prompt is denied it sets no identity, writes and commits nothing, and reports to team-lead instead of working in place — while `scripts/cairn/check_lead_not_in_worktree.py` (`/start-feature` step 0) exits non-zero when the lead's own cwd is a linked worktree.
 
 Unmeasured: whether `EnterWorktree` succeeds when called from inside another session's worktree. Either outcome is safe under (a): success isolates the teammate, failure fails closed.
+
+### @qa-engineer — 2026-09-23
+
+RED @ eb54d5a. 7 new REQUIRED_ELEMENT_PATTERNS in test_agent_worktree_protocol_block.py (unconditional EnterWorktree, fail-closed on error/refusal/denied prompt, report to team-lead); FailClosedClauseTests added to test_agent_git_identity.py (set no identity / make no commit, ordering, all-files); new test_check_lead_not_in_worktree.py against the not-yet-written script CLI contract (main=0/silent, linked worktree=1 w/ team-lead+both paths+Fix:, subdir=1, non-git=0) plus start-feature step-0 naming check. `python3 run_tests.py -p 'test_agent_worktree_protocol_block*' -p 'test_agent_git_identity*' -p 'test_check_lead_not_in_worktree*'`: 11 failures across 3 files, all missing-text/missing-file, not collection errors.
