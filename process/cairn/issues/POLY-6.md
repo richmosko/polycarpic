@@ -31,3 +31,8 @@ Filed from a POLY-4 side conversation (2026-09-23). Not scheduled; no milestone.
 - [ ] Repo-convention tests move out of `scripts/cairn/tests/` into a workflow-tests location with their own discovery entry point (or a second `-s` root in `run_tests.py`); cairn's suite contains only tracker/tooling tests
 - [ ] CI (when introduced) runs path-filtered jobs: one for `scripts/cairn/` + workflow tests, one per product package; a change in one does not run the other's suite
 - [ ] `process/WORKFLOW.md` (Shared / reusable components) notes that cairn's test boundary is spin-off-clean
+- [ ] One-shot migration commands that have already run on this repo (`migrate-prefix-ids`, `migrate-lifecycle-status`, `migrate-archive-issues`, token backfill) are retired together with their tests (~130 of the ~1700 suite); a migration a fresh template instance still needs stays in the template, not here
+
+### @team-lead — 2026-09-23
+
+Scope added 2026-09-24 (user, after the POLY-2 finish gate ran 1707 tests): retire the one-shot migrations and their ~130 tests as part of the same isolation effort. The whole suite costs ~24 s on 8 workers; the point is boundary, not wall-clock.

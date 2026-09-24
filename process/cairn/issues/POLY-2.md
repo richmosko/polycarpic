@@ -1,7 +1,7 @@
 ---
 id: POLY-2
 title: Path-ownership push check for concurrent writers
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: [POLY-1]
@@ -174,3 +174,7 @@ Sign-off: acceptance criteria all covered by scripts/cairn/tests/test_guard_push
 ### @team-lead — 2026-09-23
 
 PR opened: https://github.com/richmosko/polycarpic/pull/6. Finish gate at 632e573: 1707 py / 0 failures / 4 skipped; JS 477/479 (POLY-8 gap, identical on main); `cairn gate --head 6863a4e` PASS. Awaiting merge call (delivery autonomy: stop-at-merge).
+
+### @team-lead — 2026-09-23
+
+Validate passed; merging via PR #6 (merge commit). Closing.
