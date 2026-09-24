@@ -1,7 +1,7 @@
 ---
 id: POLY-3
 title: Effort estimation loop in cairn (tokens + gate cycles)
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: [POLY-2]
@@ -37,3 +37,11 @@ sub-issues are the first hand-estimated reference class.
 - [ ] `loop-stats` reuses the same actuals source rather than a second reader
 - [ ] Unit tests in `scripts/cairn/tests/` for close, estimate, and the unset-threshold path
 - [ ] `process/WORKFLOW.md` gains a short *Estimation* section: when the lead decomposes, when the architect reviews, when close runs
+
+## Comments
+
+### @team-lead — 2026-09-23
+
+Feature started. Branch: `feature/poly-3-effort-estimation-loop`.
+Lead estimate at start, recorded for calibration at done: loop size ≈ 2–3× POLY-5 (eight ACs, an architect design note gate before code, new schema + two CLI commands + close-time actuals). Guess: 8 commits, 3 gate cycles, ~60 min team wall-clock from spawn to merge. Prior data point: POLY-5 estimated 1–2 h, actual 21 min.
+Known conflict for the design note: `process/TRACKER.md` line ~227 lists `estimate` under "deliberately absent, so they don't get re-proposed"; POLY-3 AC2 adds it on sub-issues. The design note must rescind that sentence explicitly.

@@ -15,7 +15,13 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: POLY-3 (effort estimation loop), POLY-6 (test-suite isolation + first CI job)._
+- **Feature:** Effort estimation loop in cairn (tokens + gate cycles)
+- **Issue:** POLY-3 (cairn)
+- **Milestone:** POLY-A
+- **Branch:** `feature/poly-3-effort-estimation-loop`
+- **Started:** 2026-09-23
+- **Goal:** Sub-issues carry a token + gate-cycle estimate; `cairn close` writes actuals from OTel and the commit log plus a calibration record; `cairn estimate` seeds new estimates from closed reference classes.
+- **Status:** In Progress
 
 ## Releases
 
