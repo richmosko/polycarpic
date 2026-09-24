@@ -15,7 +15,13 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: POLY-2 (path-ownership push check), POLY-5 (fail-closed worktree isolation), POLY-3._
+- **Feature:** Path-ownership push check for concurrent writers
+- **Issue:** `POLY-2` (cairn)
+- **Milestone:** POLY-A
+- **Branch:** `feature/poly-2-path-ownership-push-check`
+- **Started:** 2026-09-23
+- **Goal:** Issues declare `paths:` globs; `cairn guard-push <ID>` fails a teammate's push on any file its commits touch outside them.
+- **Status:** In Progress
 
 ## Releases
 

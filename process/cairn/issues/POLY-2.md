@@ -1,7 +1,7 @@
 ---
 id: POLY-2
 title: Path-ownership push check for concurrent writers
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: [POLY-1]
@@ -29,3 +29,9 @@ commits by git author identity.
 - [ ] The shared worktree-protocol block runs `cairn guard-push` before `git push` and the push is skipped on failure
 - [ ] Unit tests in `scripts/cairn/tests/` cover: in-bounds commit, stray file, no `paths:` declared, glob semantics (`src/auth/**`)
 - [ ] The board's issue drawer shows the declared paths on a sub-issue
+
+## Comments
+
+### @team-lead — 2026-09-23
+
+Feature started. Branch: `feature/poly-2-path-ownership-push-check`. Roster: implementation-lead + qa-engineer; architect reviews at gate 3.
