@@ -1171,7 +1171,11 @@ class ReCloseIdempotenceTests(StageWindowTestBase):
         self.assertNotIn("bloat", fm2.get("labels") or [])
 
         lines = self.calibration_lines("PT-14")
-        self.assertEqual(lines[-1]["bloat"], False)
+        # Design note §3: `bloat` is `null` ("not evaluated"), not `false`,
+        # when the token threshold is unset AND gate cycles are within
+        # estimate -- distinct from a `false` that would claim an
+        # evaluation this fixture (no bloat_ratio config) never ran.
+        self.assertIsNone(lines[-1]["bloat"])
         self.assertEqual(lines[-1]["bloat_reasons"], [])
 
 
