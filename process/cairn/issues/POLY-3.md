@@ -179,3 +179,13 @@ First reference class closed via `cairn close` @ 07d31c8 (calibration.jsonl on m
 | POLY-13 | execute/implementation-lead | 2 | 3 | 75m | bloat |
 | POLY-14 | review/architect | 1 | 0 | null | — |
 Tokens null on all four: teammates land as `subagent-unattributed` (POLY-10 AC5). POLY-14's 0 / POLY-11's 4 is a windowing defect, filed as POLY-16. The qa overrun counts two fixture repairs caused by schema and R2 changes — real cycles, honestly counted.
+
+### @qa-engineer — 2026-09-24
+
+**QA re-verified: PASS** at `b6455f8` (branch moved past the `07d31c8` you named -- `b6455f8` is a further tracker-only commit, no code; re-ran at the true current tip per "re-verify at tip").
+
+Python: `python3 run_tests.py --gate verdict` from `scripts/cairn` -- 1757 tests, OK (skipped=4), clean on the first run (no repeat of the prior transient otel self-stop flake).
+
+JS: `node --test "scripts/cairn/tests/js/**/*.test.js"` -- 477/479, 2 known layerchart ENOENT (POLY-8), unchanged.
+
+`prices.json`'s new `claude-opus-5-5` row (ba0a246) doesn't affect `test_estimation.py`'s fixtures -- they inject their own `TEST_PRICES` dict rather than reading the real price table, except `LoopStatsSharedReaderTests` and `LoopStatsParityTests`, which pin `claude-haiku-4-5-20251001` -- unaffected by an added row.
