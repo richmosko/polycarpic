@@ -41,3 +41,8 @@ Related finding (POLY-4 loop, iterm2 split-pane mode): every teammate's first `E
 ### @team-lead — 2026-09-23
 
 Feature started. Branch: `feature/poly-5-fail-closed-worktree-isolation`.
+
+### @team-lead — 2026-09-23
+
+Lead estimate at start, recorded for calibration at done (POLY-3 input): loop size ≈ POLY-1, roughly 1–2 h of team wall-clock from spawn to merge. The closing comment records the actual (spawn timestamp → merge timestamp) and the delta.
+Spawn: 2026-09-23, branch tip 3a7bdc6.
