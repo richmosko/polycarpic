@@ -236,7 +236,7 @@ def _check_archived_record_status(errors: List[str], stem: str, status: Any) -> 
 
 ISSUE_FIELD_ORDER = [
     "id", "title", "status", "milestone", "parent", "blocked_by", "assignee",
-    "labels", "priority", "pr", "created", "updated",
+    "paths", "labels", "priority", "pr", "created", "updated",
 ]
 
 COMMENTS_HEADING_RE = re.compile(r"^## Comments\s*$")
@@ -689,7 +689,15 @@ NULLABLE_FIELDS = (
 # writes `[]`, never `null` (labels already worked this way; blocked_by
 # follows the same precedent). The list branch in _coerce_cli_value must
 # be checked *before* the nullable branch for exactly this reason.
-LIST_FIELDS = ("labels", "blocked_by")
+#
+# POLY-2 (architect's gate-1 ruling § 4): `paths` joins this tuple so
+# `--paths a,b` (cmd_new) and `paths=a,b` (cmd_set) share `_split_csv`
+# rather than a third copy of the same comma-split. `paths=` (empty
+# string) coerces to `[]` -- explicit "may touch nothing" -- same as
+# labels/blocked_by already do; an ABSENT `paths:` key (never set at
+# all) is a different state, "undeclared", and is never produced by this
+# path -- only `cmd_new` omitting `--paths` entirely produces it.
+LIST_FIELDS = ("labels", "blocked_by", "paths")
 
 
 def _split_csv(value: str) -> List[str]:
@@ -847,6 +855,102 @@ def validate_board_swimlane(value: Any) -> Tuple[bool, str]:
     if value not in _VALID_SWIMLANE_VALUES:
         return False, f"board.swimlane must be one of {sorted(_VALID_SWIMLANE_VALUES)}, got {value!r}"
     return True, ""
+
+
+def validate_path_glob(entry: Any) -> Tuple[bool, str]:
+    """The ONE validity check for a single entry of an issue's `paths:`
+    list (POLY-2, architect's gate-1 ruling § 4). Shape only, never
+    existence -- a feature creates its own files, so a glob naming a path
+    that doesn't exist yet on disk is completely normal and must never
+    fail this. Same one-validator shape as validate_board_columns/
+    validate_board_swimlane above: check_repo (`cairn check`) is the only
+    caller today, but a second caller (e.g. a board-side pre-submit
+    check) would read this, not a second copy of the condition.
+
+    Rejects: not a non-empty string; a leading `/` (paths are
+    repo-relative, never absolute); any `\\`; a bare `..` path segment;
+    and `**` fused to other characters within one segment (`a**b`,
+    `**b`, `a**`) -- `**` is only meaningful as a WHOLE segment (see
+    _glob_to_regex).
+    """
+    if not isinstance(entry, str) or not entry:
+        return False, "must be a non-empty string"
+    if entry.startswith("/"):
+        return False, "must not start with '/' -- paths are repo-relative"
+    if "\\" in entry:
+        return False, "must not contain '\\\\'"
+    for seg in entry.split("/"):
+        if seg == "..":
+            return False, "must not contain a '..' segment"
+        if "**" in seg and seg != "**":
+            return False, f"'**' must be a whole path segment, not fused with other characters (got {seg!r})"
+    return True, ""
+
+
+def _translate_glob_segment(seg: str) -> str:
+    """One non-`**` path segment -> its regex equivalent. `*` matches
+    within the segment only (never crosses `/`); `?` matches exactly one
+    non-`/` char; every other char -- including `[`/`]` -- is literal, no
+    bracket-class support (POLY-2 ruling § 2: hand-rolled, stdlib only,
+    deliberately narrower than shell glob)."""
+    out = []
+    for ch in seg:
+        if ch == "*":
+            out.append("[^/]*")
+        elif ch == "?":
+            out.append("[^/]")
+        else:
+            out.append(re.escape(ch))
+    return "".join(out)
+
+
+def _glob_to_regex(pattern: str) -> "re.Pattern[str]":
+    """Translate one `paths:` glob entry into a compiled, fully-anchored
+    regex (POLY-2, architect's gate-1 ruling § 2). Hand-rolled, stdlib
+    `re` only -- not `fnmatch` (no `**` semantics) and not
+    `PurePath.full_match` (needs Python 3.13+; cairn has no stated
+    version floor).
+
+    `**` as a WHOLE path segment matches zero or more path segments,
+    including the separators either side of it -- `src/auth/**` matches
+    `src/auth/a.py` (one extra segment) and `src/auth/x/y.py` (two), but
+    not `src/authz/a.py` (a different segment, not an extension of
+    `auth`). A pattern with no wildcards matches exactly one path.
+
+    Implementation note: a `**` segment's own regex expansion always
+    swallows the separator on exactly one side of itself (trailing:
+    absorbs the separator BEFORE it, since `(?:/.*)?` embeds an optional
+    leading `/`; leading/internal: absorbs the separator AFTER it, since
+    `(?:.*/)?` embeds an optional trailing `/`) -- the OTHER side's
+    separator is a plain literal `/`, emitted by the normal segment-join
+    logic below. Emitting a literal `/` on both sides of a `**` that
+    matches zero segments would require two slashes where the input has
+    one; folding both sides into the `**` expansion would let it match
+    an empty segment inside a `//` on its own. This asymmetric split is
+    what makes the zero-segments case collapse to exactly one `/`.
+    """
+    segments = pattern.split("/")
+    n = len(segments)
+    parts: List[str] = []
+    for i, seg in enumerate(segments):
+        is_globstar = seg == "**"
+        # Emit the literal '/' this segment is joined to the previous one
+        # by -- unless the previous segment was '**' (it already absorbed
+        # this separator into its own expansion) or THIS segment is a
+        # trailing '**' (its own '(?:/.*)?' expansion embeds the leading
+        # '/' itself).
+        if i > 0 and segments[i - 1] != "**" and not (is_globstar and i == n - 1):
+            parts.append("/")
+        if is_globstar:
+            if n == 1:
+                parts.append(".*")
+            elif i == n - 1:
+                parts.append("(?:/.*)?")
+            else:
+                parts.append("(?:.*/)?")
+        else:
+            parts.append(_translate_glob_segment(seg))
+    return re.compile("^" + "".join(parts) + "$")
 
 
 def load_config(data_dir: Path) -> Dict[str, Any]:
@@ -1587,6 +1691,23 @@ def check_repo(data_dir: Path) -> List[str]:
         priority = fm.get("priority")
         if priority is not None and priority not in PRIORITIES:
             errors.append(f"{label}: unknown priority {priority!r}")
+        # POLY-2 (architect's gate-1 ruling § 4): `paths:` is validated for
+        # SHAPE only, never existence -- a feature creates its own files,
+        # so a glob naming a not-yet-created path is normal, not an error.
+        # An absent key is fine (undeclared); an explicit `[]` is fine too
+        # (validate_path_glob never runs against an empty list). Routed
+        # through the one shared validator (validate_path_glob) rather
+        # than an inline copy of the condition, same one-validator
+        # discipline as board.columns/board.swimlane above.
+        paths_val = fm.get("paths")
+        if paths_val is not None:
+            if not isinstance(paths_val, list):
+                errors.append(f"{label}: paths must be a list of glob strings, got {type(paths_val).__name__}")
+            else:
+                for idx, entry in enumerate(paths_val):
+                    ok, reason = validate_path_glob(entry)
+                    if not ok:
+                        errors.append(f"{label}: paths[{idx}] {entry!r} invalid -- {reason}")
         # PT-26: blocked_by dangling reference + self-reference. Same terse
         # vocabulary as the dangling-parent check above (architect's
         # ruling #2) -- a self-reference gets its OWN message, never
@@ -5450,6 +5571,12 @@ def cmd_new(args: argparse.Namespace) -> int:
         "priority": args.priority,
         "pr": None,
     }
+    # POLY-2 (architect's gate-1 ruling § 4): an absent `--paths` must
+    # leave the key OUT of fields entirely -- "undeclared" is not the same
+    # state as an explicit `paths: []` ("may touch nothing"), so this
+    # can't reuse the `else []` shape labels/blocked_by use just above.
+    if args.paths:
+        fields["paths"] = _split_csv(args.paths)
     path = allocate_and_create_issue(data_dir, fields)
     frontmatter, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
     print(frontmatter["id"])
@@ -6139,6 +6266,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_new.add_argument("--priority", default=None)
     p_new.add_argument("--labels", default=None, help="comma-separated")
     p_new.add_argument("--blocked-by", default=None, help="comma-separated issue ids")
+    p_new.add_argument("--paths", default=None, help="comma-separated repo-relative glob patterns (POLY-2); omitted -> undeclared, not []")
     p_new.set_defaults(func=cmd_new)
 
     p_ls = sub.add_parser("ls", parents=[common], help="list issues")
@@ -6203,6 +6331,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
     p_guard = sub.add_parser("guard-commit", parents=[common], help="pre-commit body: refuse a staged tracker file with comments by >1 author")
     p_guard.set_defaults(func=cmd_guard_commit)
+
+    p_guard_push = sub.add_parser("guard-push", parents=[common], help="push-time check (POLY-2): fail if the issue's assignee touched a file outside its declared paths:")
+    p_guard_push.add_argument("id")
+    p_guard_push.set_defaults(func=cmd_guard_push)
 
     # PT-28 (architect's ruling § 5): a NAMED migration, not a bare
     # "migrate" -- each one-shot tracker migration gets its own
@@ -6522,6 +6654,119 @@ def cmd_guard_commit(args: argparse.Namespace) -> int:
         return 0
     for rel, authors in bad:
         print(f"guard-commit: {rel} stages comments by {', '.join('@' + a for a in authors)} -- a pathspec commit carries every uncommitted hunk in the file; commit your own comment only (the other author commits theirs)", file=sys.stderr)
+    return 1
+
+
+def _resolve_push_base_ref(root: Path) -> Optional[str]:
+    """`origin/main` if it resolves, else local `main`, else `None`
+    (POLY-2, architect's gate-1 ruling § 1). Checked with `git rev-parse
+    --verify --quiet`, which exits non-zero -- never raises -- on an
+    unresolvable ref, so a repo with no `origin` remote or no local
+    `main` falls through cleanly to the next candidate / to `None`."""
+    for ref in ("origin/main", "main"):
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "--quiet", ref],
+            cwd=root, capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            return ref
+    return None
+
+
+def _files_touched_by_author(root: Path, base: str, assignee: str) -> Set[str]:
+    """Files changed by commits authored by `assignee` (git `%an`, exact
+    match) in `base..HEAD` -- `--no-merges` (a merge of `main` into the
+    feature branch must never count, POLY-2 ruling § 1) and `--no-renames`
+    (both sides of a rename are listed, ruling § 3). Deletions count as
+    touches -- `--name-only`'s default diff-filter already includes them.
+
+    The git log format is `%x01%an` -- a `\\x01`-prefixed author name --
+    rather than the ruling's literal `%an`: with a bare `%an`, two
+    adjacent commits whose bodies are empty print with NO blank line
+    between the first commit's file list and the second commit's author
+    line (measured), so a plain per-line state machine can't tell an
+    author name from a same-shaped file path. `\\x01` never appears in a
+    git author name or a repo-relative path, so splitting the raw stdout
+    on it recovers the exact same author -> files mapping the ruling's
+    command produces, unambiguously.
+    """
+    result = subprocess.run(
+        ["git", "log", "--no-merges", "--no-renames", "--format=%x01%an", "--name-only", f"{base}..HEAD"],
+        cwd=root, capture_output=True, text=True, check=True,
+    )
+    files: Set[str] = set()
+    for block in result.stdout.split("\x01"):
+        if not block:
+            continue
+        lines = block.split("\n")
+        author = lines[0]
+        if author != assignee:
+            continue
+        # lines[1] is the mandatory blank line git emits between the
+        # format output and the --name-only file list; real filenames
+        # start at lines[2].
+        for line in lines[2:]:
+            if line:
+                files.add(line)
+    return files
+
+
+def cmd_guard_push(args: argparse.Namespace) -> int:
+    """`cairn guard-push <ID>` (POLY-2, architect's gate-1 ruling): fails
+    loudly when the ISSUE'S ASSIGNEE's own commits between the branch
+    base and HEAD touch a file outside that issue's declared `paths:`.
+    Keys on the issue's assignee, never on the invoking identity -- this
+    is what lets the lead run it from the main checkout as a valid audit
+    of a teammate's commits.
+
+    Exit codes: 0 pass (including every opt-out case below), 1 stray
+    files found (each listed on its own stderr line, sorted), 2 usage/
+    config error (unknown id, unresolvable base, or `paths:` set with a
+    null assignee -- there is nothing to attribute commits to).
+    """
+    data_dir = resolve_data_dir(args)
+    path = find_record_path(data_dir, args.id)
+    if path is None:
+        print(f"guard-push: no such record: {args.id}", file=sys.stderr)
+        return 2
+    fm, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+    paths_val = fm.get("paths")
+    assignee = fm.get("assignee")
+
+    if paths_val is None:
+        print(f"guard-push: {args.id} has no paths: declared -- warn-only, not enforced", file=sys.stderr)
+        return 0
+    if assignee is None:
+        print(f"guard-push: {args.id} has paths: declared but assignee: null -- cannot attribute commits", file=sys.stderr)
+        return 2
+    if assignee.startswith("@"):
+        print(f"guard-push: {args.id} assignee {assignee} is human -- not under the protocol", file=sys.stderr)
+        return 0
+
+    root = _git_toplevel(Path.cwd())
+    if root is None:
+        print("guard-push: not inside a git repository", file=sys.stderr)
+        return 2
+    base_ref = _resolve_push_base_ref(root)
+    if base_ref is None:
+        print("guard-push: cannot resolve origin/main or main as a base ref", file=sys.stderr)
+        return 2
+    merge_base = subprocess.run(["git", "merge-base", base_ref, "HEAD"], cwd=root, capture_output=True, text=True)
+    if merge_base.returncode != 0:
+        print(f"guard-push: cannot compute merge-base against {base_ref}: {merge_base.stderr.strip()}", file=sys.stderr)
+        return 2
+    base = merge_base.stdout.strip()
+
+    touched = _files_touched_by_author(root, base, assignee)
+    if not touched:
+        return 0
+
+    matchers = [_glob_to_regex(p) for p in paths_val]
+    stray = sorted(f for f in touched if not any(m.match(f) for m in matchers))
+    if not stray:
+        return 0
+    for f in stray:
+        print(f, file=sys.stderr)
     return 1
 
 
