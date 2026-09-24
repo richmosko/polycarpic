@@ -44,9 +44,11 @@ import queue
 import re
 import socketserver
 import stat
+import statistics
 import sys
 import tempfile
 import threading
+import time
 import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
@@ -236,7 +238,16 @@ def _check_archived_record_status(errors: List[str], stem: str, status: Any) -> 
 
 ISSUE_FIELD_ORDER = [
     "id", "title", "status", "milestone", "parent", "blocked_by", "assignee",
-    "paths", "labels", "priority", "pr", "created", "updated",
+    "paths",
+    # POLY-3 (design note §1): effort estimation -- flat dotted keys, not
+    # nested maps (dump_frontmatter has no dict-emitting branch, and a
+    # nested shape would need three new surfaces: the dumper, a
+    # `key.sub=value` cmd_set path syntax, and apply_patch's merge). All
+    # seven are optional; an absent key is omitted from the dump, same as
+    # `paths` already is.
+    "stage", "estimate.tokens", "estimate.gate_cycles",
+    "actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio",
+    "labels", "priority", "pr", "created", "updated",
 ]
 
 COMMENTS_HEADING_RE = re.compile(r"^## Comments\s*$")
@@ -1353,6 +1364,25 @@ def check_repo(data_dir: Path) -> List[str]:
         elif board_val is not None:
             errors.append(f"config.yml: board must be a mapping, got {type(board_val).__name__}")
 
+        # POLY-3 (design note §1): estimation.bloat_ratio -- absent/null is
+        # fine (the token bloat rule stays skipped until POLY-A sets a
+        # baseline); present must be a float()-parseable value > 1.0. Any
+        # other estimation.* key is a typo guard, same posture as board.*.
+        estimation_val = cfg.get("estimation")
+        if isinstance(estimation_val, dict):
+            unknown_keys = sorted(set(estimation_val.keys()) - {"bloat_ratio"})
+            if unknown_keys:
+                errors.append(f"config.yml: estimation has unknown key(s) {unknown_keys} -- expected only bloat_ratio")
+            if "bloat_ratio" in estimation_val:
+                bloat_ratio_val = estimation_val["bloat_ratio"]
+                try:
+                    if not (float(bloat_ratio_val) > 1.0):
+                        errors.append(f"config.yml: estimation.bloat_ratio must be > 1.0, got {bloat_ratio_val!r}")
+                except (TypeError, ValueError):
+                    errors.append(f"config.yml: estimation.bloat_ratio {bloat_ratio_val!r} must be a float-parseable number")
+        elif estimation_val is not None:
+            errors.append(f"config.yml: estimation must be a mapping, got {type(estimation_val).__name__}")
+
     # PT-28: built once per call, only when the prefix validated -- every
     # id-shape check below reads through these four, never rebuilding its
     # own regex inline (that would be the exact "two copies must agree"
@@ -1723,6 +1753,41 @@ def check_repo(data_dir: Path) -> List[str]:
                     ok, reason = validate_path_glob(entry)
                     if not ok:
                         errors.append(f"{label}: paths[{idx}] {entry!r} invalid -- {reason}")
+        # POLY-3 (design note §1): stage/estimate.*/actual.*/ratio.
+        stage = fm.get("stage")
+        if stage is not None and stage not in ("plan", "execute", "review"):
+            errors.append(f"{label}: unknown stage {stage!r} -- expected one of plan, execute, review")
+        if stage is not None and parent is None:
+            errors.append(f"{label}: stage {stage!r} set but parent is null -- stage belongs to a sub-issue")
+        for field_name in (
+            "estimate.tokens", "estimate.gate_cycles",
+            "actual.tokens", "actual.gate_cycles", "actual.wall_clock",
+        ):
+            value = fm.get(field_name)
+            if value is None:
+                continue
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                errors.append(f"{label}: {field_name} must be a non-negative integer, got {value!r}")
+            elif field_name == "estimate.tokens" and value == 0:
+                errors.append(f"{label}: estimate.tokens must be > 0 -- 0 would make the ratio undefined")
+        actual_tokens = fm.get("actual.tokens")
+        estimate_tokens = fm.get("estimate.tokens")
+        ratio = fm.get("ratio")
+        if ratio is not None:
+            try:
+                if float(ratio) < 0:
+                    errors.append(f"{label}: ratio must be >= 0, got {ratio!r}")
+            except (TypeError, ValueError):
+                errors.append(f"{label}: ratio {ratio!r} must be a float-parseable string")
+            if actual_tokens is None or estimate_tokens is None:
+                errors.append(f"{label}: ratio present without both actual.tokens and estimate.tokens")
+        if status != "done":
+            for field_name in ("actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio"):
+                if fm.get(field_name) is not None:
+                    errors.append(
+                        f"{label}: {field_name} is set but status is {status!r}, not done -- "
+                        "actuals are close-time output only"
+                    )
         # PT-26: blocked_by dangling reference + self-reference. Same terse
         # vocabulary as the dangling-parent check above (architect's
         # ruling #2) -- a self-reference gets its OWN message, never
@@ -3903,6 +3968,152 @@ def build_tokens_payload_cached(data_dir: Path) -> Dict[str, Any]:
     return payload
 
 
+# --------------------------------------------------------------------------
+# POLY-3: effort estimation -- shared actuals readers (design note §6, AC6)
+# --------------------------------------------------------------------------
+
+def token_actuals(
+    data_dir: Path, issue_id: str, role: Optional[str] = None,
+    since: Optional[str] = None, until: Optional[str] = None,
+    prices: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """The ONE seam `cairn close` and `loop-stats` both read tokens
+    through (design note §6, AC6) -- pure, never prints, never raises.
+
+    `since`/`until` are `%Y-%m-%dT%H:%M:%SZ` strings, compared lexically
+    against each line's `generated` stamp -- the same convention
+    `build_tokens_payload` already uses for its own window bounds. The
+    window is left-open (`generated <= since` is excluded, matching the
+    design note's `(created_ts, close_ts]`): a line generated in the same
+    flush as the sub-issue's own creation commit must not double-count
+    into it.
+
+    `build_tokens_payload` is deliberately NOT reused here (architect's
+    design note §6): it sums a whole issue with no time filter, so it
+    cannot separate two same-(parent, role) sub-issues sharing one parent
+    issue's token stream.
+
+    A missing `token-usage.jsonl` gives `tokens: None` (never `0` -- "no
+    data" must not look like "measured zero"), `lines: 0`.
+    """
+    data_dir = Path(data_dir)
+    prices = load_prices() if prices is None else prices
+    models = prices.get("models") or {}
+    usage_path = data_dir / TOKEN_USAGE_REL
+
+    if not usage_path.is_file():
+        result = {c: 0 for c in _TOKEN_COUNTERS}
+        result["tokens"] = None
+        result["cost_usd"] = None
+        result["lines"] = 0
+        return result
+
+    rows, _warning = _read_token_usage_lines(usage_path)
+    totals = {c: 0 for c in _TOKEN_COUNTERS}
+    lines = 0
+    raw_cost = 0.0
+    any_unpriced = False
+    for row in rows:
+        if row.get("issue") != issue_id:
+            continue
+        if role is not None and row.get("role") != role:
+            continue
+        generated = row.get("generated")
+        if since is not None and (generated is None or generated <= since):
+            continue
+        if until is not None and (generated is None or generated > until):
+            continue
+        for c in _TOKEN_COUNTERS:
+            totals[c] += row.get(c, 0) or 0
+        lines += 1
+        rate = models.get(row.get("model"))
+        if rate is None:
+            any_unpriced = True
+        else:
+            raw_cost += _row_cost_usd(row, rate)
+
+    result = dict(totals)
+    result["tokens"] = sum(totals.values())
+    # 6dp, not `build_tokens_payload`'s 2dp: that function's rounding is a
+    # UI-display convention (real usage sums to real dollars); this seam
+    # feeds the calibration record, where a small-window sub-issue's own
+    # cost can be a fraction of a cent, and 2dp would silently round it to
+    # 0.0 -- indistinguishable from "no cost", which token_actuals must
+    # never claim for a genuinely priced, non-empty window.
+    result["cost_usd"] = None if any_unpriced else round(raw_cost, 6)
+    result["lines"] = lines
+    return result
+
+
+def _parse_iso_any(value: str) -> datetime.datetime:
+    """Real `datetime` parse of an ISO-8601 timestamp in either the
+    otel receiver's `...Z` form or git's `%aI` `...+00:00` form -- unlike
+    `token_actuals`'s lexical comparison (both its sides are always `...Z`
+    in practice), `gate_cycle_actuals` compares git author dates against
+    caller-supplied `since`/`until`, and the two sides are not guaranteed
+    to share one literal suffix, so a real parse is used instead of a
+    string comparison."""
+    dt = datetime.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
+
+
+def gate_cycle_actuals(
+    repo_root: Path, base: str, ref: str, assignee: str,
+    same_stage_authors: List[str], since: Optional[str] = None,
+    until: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Design note §2/§6: one gate cycle is one maximal run of
+    `assignee`'s commits in `ref`'s first-parent history, where a run is
+    broken only by a commit whose author is neither `assignee` nor a
+    same-stage sibling (`same_stage_authors`).
+
+    Traverses `ref`'s full first-parent history rather than a literal
+    `git log base..ref` range: `since`/`until` (the sub-issue's own
+    creation-to-close window) already scope this precisely to the
+    sub-issue's own commits, and a range exclusion would give nothing at
+    all when those commits land directly on `base` itself, which is
+    exactly what this loop's own commits do. `base` is accepted for CLI
+    symmetry with `cairn close --base/--ref` and `loop-stats`, not used
+    to exclude history here. The window is left-open on `since`, matching
+    `token_actuals`'s own `(created_ts, close_ts]` boundary -- the
+    sub-issue's own creation commit never counts as gate-cycle work.
+
+    Zero commits by `assignee` in the window gives `gate_cycles: 0`.
+    """
+    repo_root = Path(repo_root)
+    since_dt = _parse_iso_any(since) if since else None
+    until_dt = _parse_iso_any(until) if until else None
+    result = subprocess.run(
+        ["git", "log", "--first-parent", "--reverse", "--format=%an%x1f%aI", ref],
+        cwd=repo_root, capture_output=True, text=True, check=True,
+    )
+    allowed_siblings = set(same_stage_authors)
+    gate_cycles = 0
+    commits = 0
+    in_run = False
+    for line in result.stdout.splitlines():
+        if not line:
+            continue
+        author, author_date = line.split("\x1f", 1)
+        dt = _parse_iso_any(author_date)
+        if since_dt is not None and dt <= since_dt:
+            continue
+        if until_dt is not None and dt > until_dt:
+            continue
+        if author == assignee:
+            commits += 1
+            if not in_run:
+                gate_cycles += 1
+                in_run = True
+        elif author in allowed_siblings:
+            continue  # same-stage sibling -- doesn't break the run
+        else:
+            in_run = False
+    return {"gate_cycles": gate_cycles, "commits": commits}
+
+
 def build_roster_payload(data_dir: Path) -> Dict[str, Any]:
     """`GET /api/roster`'s payload (PT-56) -- architect's presence-source
     ruling in full: identity from `_read_agent_identities` (never
@@ -5535,11 +5746,28 @@ def resolve_data_dir(args: argparse.Namespace) -> Path:
     return data_dir
 
 
+# POLY-3 (design note §1): `estimate.*`/`actual.*` are non-negative ints
+# on disk (the YAML subset has no float type). `cairn set POLY-9
+# estimate.tokens=400000` must therefore write an int, not the bare
+# string `_coerce_cli_value` would otherwise pass through unchanged.
+ESTIMATION_INT_FIELDS = (
+    "estimate.tokens", "estimate.gate_cycles",
+    "actual.tokens", "actual.gate_cycles", "actual.wall_clock",
+)
+
+
 def _coerce_cli_value(key: str, value: str) -> Any:
     if key in LIST_FIELDS:
         return _split_csv(value)
     if key in NULLABLE_FIELDS and value == "":
         return None
+    if key in ESTIMATION_INT_FIELDS:
+        if value == "":
+            return None
+        try:
+            return int(value)
+        except ValueError:
+            raise CairnError(f"{key} must be an integer, got {value!r}")
     if value.lower() == "null":
         return None
     return value
@@ -5667,7 +5895,11 @@ def cmd_set(args: argparse.Namespace) -> int:
         if key not in field_order:
             print(f"error: unknown field {key!r} for {schema} {args.id}", file=sys.stderr)
             return 1
-        coerced = _coerce_cli_value(key, value)
+        try:
+            coerced = _coerce_cli_value(key, value)
+        except CairnError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 1
         # PT-28 (Validate-phase fix): `milestone=0.6` must normalize the
         # same way `cairn ls --milestone 0.6` does -- _coerce_cli_value
         # already turned "" / "null" into None (clear the field), which
@@ -6351,6 +6583,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_guard_push.add_argument("id")
     p_guard_push.set_defaults(func=cmd_guard_push)
 
+    p_close = sub.add_parser("close", parents=[common], help="close a sub-issue (POLY-3): pull actuals, write ratio/bloat, append a calibration record")
+    p_close.add_argument("id")
+    p_close.add_argument("--base", default="main")
+    p_close.add_argument("--ref", default="HEAD")
+    p_close.add_argument("--no-flush", dest="no_flush", action="store_true", help="skip signaling the otel receiver to flush before reading actuals")
+    p_close.add_argument("--dry-run", action="store_true", help="print the computed actuals without writing either file")
+    p_close.set_defaults(func=cmd_close)
+
+    p_estimate = sub.add_parser("estimate", parents=[common], help="print reference-class actuals to seed a new estimate (POLY-3)")
+    p_estimate.add_argument("id")
+    p_estimate.add_argument("--limit", type=int, default=5)
+    p_estimate.add_argument("--json", action="store_true")
+    p_estimate.set_defaults(func=cmd_estimate)
+
     # PT-28 (architect's ruling § 5): a NAMED migration, not a bare
     # "migrate" -- each one-shot tracker migration gets its own
     # sub-subcommand under `migrate`, so an invocation in a shell history
@@ -6493,6 +6739,15 @@ def check_budgets(data_dir: Path) -> List[str]:
                 block.pop(0)
             if len(block) > COMMENT_LINE_CAP:
                 warnings.append(f"{p.name}: comment by @{m.group(1)} ({m.group(2)}) is {len(block)} lines (cap {COMMENT_LINE_CAP}) -- verdicts as a table, constructions to a review-log file")
+        # POLY-3 (design note §1): "a sub-issue with status: done and a
+        # stage but no actual.* is a WARNING, not an error" -- it was
+        # closed by `cairn set status=done` rather than `cairn close`.
+        try:
+            fm, _ = parse_frontmatter(text)
+        except CairnError:
+            fm = {}
+        if fm.get("status") == "done" and fm.get("stage") is not None and fm.get("actual.tokens") is None:
+            warnings.append(f"{p.name}: status done with stage {fm['stage']!r} but no actual.* -- closed via `cairn set` rather than `cairn close`")
     for name in DOC_LINT_FILES:
         doc = _docs_dir(data_dir) / name
         if not doc.exists():
@@ -6796,6 +7051,319 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
     for f in stray:
         print(f, file=sys.stderr)
     return 1
+
+
+# --------------------------------------------------------------------------
+# POLY-3: `cairn close` / `cairn estimate` (design note §7)
+# --------------------------------------------------------------------------
+
+def _normalize_iso_z(value: str) -> str:
+    """Any ISO-8601 timestamp (git's `+00:00` offset or the receiver's
+    `Z`) -> the `%Y-%m-%dT%H:%M:%SZ` form `token-usage.jsonl`'s
+    `generated` stamps use, so `token_actuals`'s lexical `since`/`until`
+    comparison never mixes two suffix conventions for what is the same
+    instant."""
+    dt = _parse_iso_any(value).astimezone(datetime.timezone.utc)
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _same_stage_sibling_assignees(data_dir: Path, issue_id: str, parent: str, stage: str, assignee: str) -> List[str]:
+    """Other sub-issues under the same `parent` and `stage` -- their
+    assignees are the "same-stage sibling" authors whose commits don't
+    break `assignee`'s own gate-cycle run (design note §2)."""
+    siblings: List[str] = []
+    for p in _dir_glob(Path(data_dir) / "issues"):
+        if p.stem == issue_id:
+            continue
+        try:
+            fm, _ = parse_frontmatter(p.read_text(encoding="utf-8"))
+        except CairnError:
+            continue
+        if fm.get("parent") == parent and fm.get("stage") == stage:
+            sib_assignee = fm.get("assignee")
+            if sib_assignee and sib_assignee != assignee:
+                siblings.append(sib_assignee)
+    return siblings
+
+
+def _flush_receiver_and_wait(repo_root: Path, usage_path: Path, timeout: float = 5.0) -> None:
+    """Design note §2/§7: best-effort -- signals the running otel receiver
+    to flush (`otel_receiver.py --flush-now`), then polls
+    `token-usage.jsonl` for up to `timeout` seconds for its `generated`
+    stamp to advance. Never raises: no running receiver, or a flush that
+    doesn't land in time, degrades to reading whatever is already on disk
+    -- the same never-block posture `token_actuals` already takes for a
+    missing file entirely."""
+    def _latest_generated() -> Optional[str]:
+        if not usage_path.is_file():
+            return None
+        lines, _ = _read_token_usage_lines(usage_path)
+        gens = [l.get("generated") for l in lines if l.get("generated")]
+        return max(gens) if gens else None
+
+    before = _latest_generated()
+    receiver_script = Path(__file__).resolve().parent / "otel_receiver.py"
+    try:
+        subprocess.run(
+            [sys.executable, str(receiver_script), "--flush-now", "--repo-root", str(repo_root)],
+            cwd=repo_root, capture_output=True, text=True, timeout=timeout,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if _latest_generated() != before:
+            return
+        time.sleep(0.2)
+
+
+def _append_calibration_record(data_dir: Path, record: Dict[str, Any]) -> None:
+    import backfill_tokens  # sibling module; imported here so `cairn` stays import-light
+    out_path = Path(data_dir) / "metrics" / "calibration.jsonl"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    lock_path = out_path.parent / ".lock"
+    backfill_tokens._acquire_lock(lock_path)
+    try:
+        existing = out_path.read_text(encoding="utf-8") if out_path.exists() else ""
+        if existing and not existing.endswith("\n"):
+            existing += "\n"
+        backfill_tokens._atomic_write_text(out_path, existing + json.dumps(record) + "\n")
+    finally:
+        backfill_tokens._release_lock(lock_path)
+
+
+def cmd_close(args: argparse.Namespace) -> int:
+    """`cairn close <ID>` (design note §7, §2, §3, §5): pulls actuals for
+    a sub-issue's assignee from the OTel receiver and the commit log,
+    writes `actual.*`/`ratio`/`status: done`/a `bloat` label through one
+    `apply_patch`, and appends a calibration record. Never commits either
+    file -- the caller commits the issue file by pathspec; the metrics
+    branch is committed the usual way (WORKFLOW.md → Metrics branch).
+    """
+    data_dir = resolve_data_dir(args)
+    path = find_record_path(data_dir, args.id)
+    if path is None:
+        print(f"close: no such issue: {args.id}", file=sys.stderr)
+        return 1
+    fm, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+
+    stage = fm.get("stage")
+    parent = fm.get("parent")
+    assignee = fm.get("assignee")
+    missing = []
+    if stage is None:
+        missing.append("stage")
+    if parent is None:
+        missing.append("parent")
+    if assignee is None:
+        missing.append("assignee")
+    if fm.get("estimate.tokens") is None and fm.get("estimate.gate_cycles") is None:
+        missing.append("estimate.tokens or estimate.gate_cycles")
+    if missing:
+        print(f"close: {args.id} is missing required field(s): {', '.join(missing)}", file=sys.stderr)
+        return 1
+
+    root = _git_toplevel(Path.cwd())
+    if root is None:
+        print("close: not inside a git repository", file=sys.stderr)
+        return 2
+
+    # `root` comes back from `git rev-parse --show-toplevel`, which resolves
+    # symlinks (e.g. macOS's /var -> /private/var tmp dirs); `path` does not
+    # -- resolving it too keeps `relpath` from producing a bogus `../..`
+    # climb when the two sides disagree about which form is canonical.
+    rel = os.path.relpath(path.resolve(), root)
+    created_log = subprocess.run(
+        ["git", "log", "--diff-filter=A", "--format=%aI", "--", rel],
+        cwd=root, capture_output=True, text=True,
+    ).stdout.strip().splitlines()
+    if created_log:
+        created_ts = _normalize_iso_z(created_log[-1])  # oldest -- git log is newest-first
+    else:
+        created_ts = f"{fm.get('created')}T00:00:00Z"
+        print(f"close: warning: {args.id}'s file was never committed -- falling back to created: at 00:00 UTC", file=sys.stderr)
+
+    usage_path = data_dir / TOKEN_USAGE_REL
+    if not args.no_flush and not args.dry_run:
+        _flush_receiver_and_wait(root, usage_path)
+
+    close_ts = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    token_result = token_actuals(data_dir, parent, role=assignee, since=created_ts, until=close_ts)
+    if token_result["tokens"] is None:
+        print(f"close: warning: {usage_path} not found -- actual.tokens left null", file=sys.stderr)
+
+    same_stage_authors = _same_stage_sibling_assignees(data_dir, args.id, parent, stage, assignee)
+    gate_result = gate_cycle_actuals(root, args.base, args.ref, assignee, same_stage_authors, since=created_ts, until=close_ts)
+
+    created_dt = _parse_iso_any(created_ts)
+    close_dt = _parse_iso_any(close_ts)
+    wall_clock = round((close_dt - created_dt).total_seconds() / 60)
+
+    estimate_tokens = fm.get("estimate.tokens")
+    estimate_gate_cycles = fm.get("estimate.gate_cycles")
+
+    ratio_val: Optional[float] = None
+    if token_result["tokens"] is not None and estimate_tokens:
+        ratio_val = token_result["tokens"] / estimate_tokens
+
+    config = load_config(data_dir)
+    bloat_ratio_raw = (config.get("estimation") or {}).get("bloat_ratio")
+    bloat_ratio: Optional[float] = None
+    if bloat_ratio_raw is not None:
+        try:
+            bloat_ratio = float(bloat_ratio_raw)
+        except (TypeError, ValueError):
+            bloat_ratio = None
+    else:
+        print("close: bloat: token threshold unset (estimation.bloat_ratio) — skipped", file=sys.stderr)
+
+    gate_bloat = estimate_gate_cycles is not None and gate_result["gate_cycles"] > estimate_gate_cycles
+    token_bloat = bloat_ratio is not None and ratio_val is not None and ratio_val > bloat_ratio
+    bloat_reasons = []
+    if gate_bloat:
+        bloat_reasons.append("gate_cycles")
+    if token_bloat:
+        bloat_reasons.append("tokens")
+    if gate_bloat or token_bloat:
+        calibration_bloat: Optional[bool] = True
+    elif bloat_ratio_raw is not None:
+        calibration_bloat = False
+    else:
+        calibration_bloat = None  # not evaluated: threshold unset and no gate overrun
+
+    patch: Dict[str, Any] = {
+        "status": "done",
+        "actual.gate_cycles": gate_result["gate_cycles"],
+        "actual.wall_clock": wall_clock,
+    }
+    if token_result["tokens"] is not None:
+        patch["actual.tokens"] = token_result["tokens"]
+    if ratio_val is not None:
+        patch["ratio"] = f"{ratio_val:.2f}"
+    labels = list(fm.get("labels") or [])
+    if bloat_reasons and "bloat" not in labels:
+        labels.append("bloat")
+        patch["labels"] = labels
+
+    ref_sha = subprocess.run(
+        ["git", "rev-parse", args.ref], cwd=root, capture_output=True, text=True,
+    ).stdout.strip() or None
+
+    record = {
+        "schema": 1, "closed": close_ts, "id": args.id, "parent": parent,
+        "stage": stage, "assignee": assignee, "labels": labels,
+        "milestone": fm.get("milestone"),
+        "estimate": {"tokens": estimate_tokens, "gate_cycles": estimate_gate_cycles},
+        "actual": {
+            "tokens": token_result["tokens"], "gate_cycles": gate_result["gate_cycles"],
+            "wall_clock": wall_clock, "input": token_result["input"],
+            "cache_write": token_result["cache_write"], "cache_read": token_result["cache_read"],
+            "output": token_result["output"], "cost_usd": token_result["cost_usd"],
+        },
+        "ratio": ratio_val, "bloat": calibration_bloat, "bloat_reasons": bloat_reasons,
+        "window": {"from": created_ts, "to": close_ts},
+        "base": args.base, "ref_sha": ref_sha,
+    }
+
+    print(
+        f"close {args.id}: tokens={token_result['tokens']} gate_cycles={gate_result['gate_cycles']} "
+        f"wall_clock={wall_clock}m ratio={patch.get('ratio')} bloat={bloat_reasons or 'no'}"
+    )
+    if args.dry_run:
+        print("close: --dry-run -- nothing written")
+        return 0
+
+    apply_patch(path, patch)
+    _append_calibration_record(data_dir, record)
+    return 0
+
+
+def cmd_estimate(args: argparse.Namespace) -> int:
+    """`cairn estimate <ID>` (design note §4): prints the closest
+    reference classes (same stage + assignee, then same stage + shared
+    labels) with their actuals, to seed a new estimate. Reads only the
+    calibration records -- never the token log or git -- so it is fast
+    and deterministic. Never writes.
+    """
+    data_dir = resolve_data_dir(args)
+    path = find_record_path(data_dir, args.id)
+    if path is None:
+        print(f"estimate: no such issue: {args.id}", file=sys.stderr)
+        return 1
+    fm, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+    stage = fm.get("stage")
+    parent = fm.get("parent")
+    if stage is None or parent is None:
+        print(f"estimate: {args.id} has no stage/parent set -- both are required to query reference classes", file=sys.stderr)
+        return 1
+    assignee = fm.get("assignee")
+    labels = set(fm.get("labels") or [])
+
+    cal_path = Path(data_dir) / "metrics" / "calibration.jsonl"
+    rows_by_id: Dict[str, Dict[str, Any]] = {}
+    if cal_path.is_file():
+        for line in cal_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if row.get("id") == args.id:
+                continue  # self-exclusion
+            rows_by_id[row["id"]] = row  # last line per id wins
+
+    tier_a = sorted(
+        (r for r in rows_by_id.values() if r.get("stage") == stage and r.get("assignee") == assignee),
+        key=lambda r: r.get("closed") or "", reverse=True,
+    )[: args.limit]
+    tier_b = sorted(
+        (
+            r for r in rows_by_id.values()
+            if r.get("stage") == stage and r.get("assignee") != assignee
+            and (set(r.get("labels") or []) & labels)
+        ),
+        key=lambda r: (len(set(r.get("labels") or []) & labels), r.get("closed") or ""), reverse=True,
+    )[: args.limit]
+
+    if not tier_a and not tier_b:
+        print("no closed reference classes yet — hand-estimate")
+        return 0
+
+    if args.json:
+        print(json.dumps({"tier_a": tier_a, "tier_b": tier_b}, indent=1, default=str))
+        return 0
+
+    out = [f"reference classes for {args.id} ({stage} / {assignee} / {sorted(labels)})"]
+    suggestion = None
+    for tier_name, tier_desc, rows in (("A", "same stage + assignee", tier_a), ("B", "same stage, shared labels", tier_b)):
+        if not rows:
+            continue
+        out.append(f"tier {tier_name} — {tier_desc} ({len(rows)})")
+        out.append("  id       closed      est.tok  act.tok  ratio  est.gc  act.gc  wall  bloat")
+        for r in rows:
+            est, act = r.get("estimate") or {}, r.get("actual") or {}
+            out.append(
+                f"  {r.get('id', ''):<8} {str(r.get('closed') or '')[:10]:<11} "
+                f"{est.get('tokens', ''):<8} {act.get('tokens', ''):<8} "
+                f"{r.get('ratio', ''):<6} {est.get('gate_cycles', ''):<7} "
+                f"{act.get('gate_cycles', ''):<7} {act.get('wall_clock', ''):<5} "
+                f"{'yes' if r.get('bloat') else 'no'}"
+            )
+        tok_median = int(statistics.median(r["actual"]["tokens"] for r in rows))
+        gc_median = int(statistics.median(r["actual"]["gate_cycles"] for r in rows))
+        wall_median = int(statistics.median(r["actual"]["wall_clock"] for r in rows))
+        out.append(f"  median actual: tokens {tok_median} · gate_cycles {gc_median} · wall {wall_median}m")
+        if suggestion is None:
+            suggestion = (tok_median, gc_median, tier_name)
+
+    if suggestion is not None:
+        tok, gc, tier_name = suggestion
+        out.append(f"suggested: estimate.tokens={tok} estimate.gate_cycles={gc}   (tier {tier_name} median)")
+    print("\n".join(out))
+    return 0
 
 
 def cmd_loop_stats(args: argparse.Namespace) -> int:

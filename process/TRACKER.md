@@ -216,6 +216,13 @@ Reuse `lib/session/store.py` rather than introducing a second session abstractio
 | `blocked_by` | list[id] | — | Issues that must resolve before this one can start. **Same-root ids only.** An absent key ≡ `[]`. `cairn check` lints dangling refs, self-reference, and cycles. See [Dependencies](#dependencies). |
 | `assignee` | string \| null | ✅ | Bare agent role (`backend-lead`) matching a file in `.claude/agents/`, or `@handle` for a human. Replaces Linear's `agent:<role>` labels — attribution becomes a field, not a label. |
 | `paths` | list[string] | — | Repo-relative glob patterns the assignee's commits must stay inside (POLY-2). An **absent** key means undeclared — opt-in, not a hard gate — distinct from an explicit `[]` ("may touch nothing"). `cairn check` validates shape only, never existence. See [Path ownership](#path-ownership-poly-2). |
+| `stage` | `plan` \| `execute` \| `review` \| absent | — | **Sub-issues only** (POLY-3). Requires a non-null `parent`; `cairn check` errors otherwise. |
+| `estimate.tokens` | int > 0 \| absent | — | Sub-issue effort estimate, tokens (POLY-3, kickoff § 2.12). Flat dotted key, not a nested map — see [Effort estimation](#effort-estimation-poly-3). |
+| `estimate.gate_cycles` | int ≥ 0 \| absent | — | Sub-issue effort estimate, gate cycles (one red→green pass or one review round). |
+| `actual.tokens` | int ≥ 0 \| absent | — | Written by `cairn close`, never by hand. `cairn check` errors if set while `status` isn't `done`. |
+| `actual.gate_cycles` | int ≥ 0 \| absent | — | Written by `cairn close`. Same non-`done` restriction as `actual.tokens`. |
+| `actual.wall_clock` | int ≥ 0 \| absent | — | Minutes, created → closed. Written by `cairn close`; recorded, never compared against a bound. |
+| `ratio` | decimal string \| absent | — | `actual.tokens / estimate.tokens`, 2dp, quoted (the YAML subset has no float type). Present iff both `actual.tokens` and `estimate.tokens` are set; `cairn check` errors on a `ratio` without both operands. |
 | `labels` | list[string] | ✅ | Free-form, lowercase-kebab. May be `[]`. |
 | `priority` | `P0`–`P3` \| null | — | Backlog ordering only. Not a due date. |
 | `pr` | url \| null | — | Written by `/finish-feature`. Lets the board link out. |
@@ -224,7 +231,22 @@ Reuse `lib/session/store.py` rather than introducing a second session abstractio
 
 **Dates are date-only, everywhere.** Precise timestamps are git's job (`git log --follow <file>`). `updated` earns its place only because `git checkout` resets file mtimes, so mtime can't order issues across clones.
 
-**Deliberately absent, so they don't get re-proposed:** `estimate` (the workflow never reads one), `branch` (derivable — `feature/pt-14-<slug>`), and `major` on issues (derivable via `milestone` → milestone file → `major`; two sources would drift).
+**Deliberately absent, so they don't get re-proposed:** `branch` (derivable — `feature/pt-14-<slug>`), and `major` on issues (derivable via `milestone` → milestone file → `major`; two sources would drift). **`estimate` is no longer on this list** — POLY-3 (kickoff § 2.12) rescinds the prior "the workflow never reads one" clause: the workflow now reads `estimate.*` at `cairn close` (ratio, bloat) and at `cairn estimate` (reference classes). See [Effort estimation](#effort-estimation-poly-3).
+
+### Effort estimation (POLY-3)
+
+Full design: `scripts/cairn/design/estimation.md` (architect's design note, approved
+`de28e82`). Sub-issues carry an `estimate.*`/`actual.*`/`ratio` block (schema
+above); `cairn close <ID>` pulls actuals for the sub-issue's assignee from the
+OTel receiver (`token_actuals`) and the per-agent commit log
+(`gate_cycle_actuals`), writes `actual.*`/`ratio`/`status: done`, adds the
+`bloat` label when gate cycles overrun the estimate (or, once
+`config.yml` → `estimation.bloat_ratio` is set, when the token ratio does),
+and appends a calibration record to `process/cairn/metrics/calibration.jsonl`.
+`cairn estimate <ID>` queries those calibration records for the closest
+reference classes (same stage + assignee, then same stage + shared labels) to
+seed a new estimate. `estimation.bloat_ratio` ships unset; the token-ratio
+bloat rule stays skipped until POLY-A's baseline sets it.
 
 ### Milestone file
 

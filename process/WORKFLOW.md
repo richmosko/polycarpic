@@ -636,6 +636,30 @@ Sections that already have comments show a `💬 N` count badge next to the head
 - **PRs** reference the cairn issue in the body (`Tracker: PT-14 — process/cairn/issues/PT-14.md`), written by `/finish-feature`; `/merge-pr` lands the `done` flip as the branch's final commit.
 - **The tracker is cairn** — files in git under `process/cairn/`, per-repo, no accounts, no caps, no MCP (full spec: [`TRACKER.md`](TRACKER.md)). Set up via `/setup-tracker` on first session; view via `/cairn` (the board at `localhost:8766`). Agents read and write the issue files directly, or via the `scripts/cairn/cairn` CLI for the two operations plain edits can't do safely (race-free ID allocation, frontmatter-only rewrites) and for context-economical listing.
 
+### Estimation
+
+Effort is estimated in **tokens** (cost) and **gate cycles** (bloat — one
+red→green pass or one review round); wall-clock is recorded but secondary,
+and human minutes never appear (kickoff § 2.12; full design:
+[`scripts/cairn/design/estimation.md`](../scripts/cairn/design/estimation.md)).
+Schema: [`TRACKER.md` → Effort estimation](TRACKER.md#effort-estimation-poly-3).
+
+- **When the lead decomposes:** each feature issue is split into cairn
+  sub-issues, one per (agent, stage) — usually one per agent, with the
+  architect typically holding a separate `plan` and `review` sub-issue. Each
+  sub-issue gets a hand estimate (`estimate.tokens`/`estimate.gate_cycles`)
+  before work starts; `cairn estimate <ID>` seeds that guess from closed
+  reference classes once any exist.
+- **When the architect reviews:** a design pass precedes implementation on
+  any estimation-loop change itself (this loop's own POLY-11 is the
+  precedent) — sub-issues are hand-estimated reference classes until the
+  first calibration records exist.
+- **When close runs:** the assignee (or the lead, on their behalf) runs
+  `cairn close <ID>` at the end of a sub-issue's own loop. It pulls actuals
+  from the OTel receiver and the commit log, writes `actual.*`/`ratio`/
+  `status: done`, flags `bloat` on an overrun, and appends a calibration
+  record — never run by hand-editing the frontmatter.
+
 ### Metrics branch
 
 `process/cairn/metrics/` (hook-recorded test runs, backfilled/otel token usage) is a **nested git worktree of an orphan `metrics` branch, never merged into `main` or any feature/phase branch** (team-lead ruling, `process/cairn/issues/POLY-4.md` @ 5495132) — these files are append-only, cross-session, cross-teammate ledgers that would otherwise dirty every branch's working tree on every test run or receiver flush, with no meaningful diff to review. The branch carries its own `.gitattributes` (`*.jsonl merge=union`, so concurrent appends from different sessions merge rather than conflict) and its own `.gitignore` for the otel receiver's runtime scratch (pidfile, `.lock`, `.sessions/`, its log). Bootstrap is idempotent and automatic in the **main checkout only** (a no-op in any linked worktree — every session's writes already reach the main checkout's copy): `scripts/cairn/ensure_metrics_worktree.py` runs as a SessionStart hook step, mounting the worktree (a local `refs/remotes/origin/metrics` if one exists, regardless of whether that run's own fetch succeeded; a fresh orphan only when `git ls-remote` positively confirms origin has no `metrics` ref at all — an unreachable/unauthenticated origin is never guessed to mean "absent") the first time the checkout needs it. A pre-existing non-worktree directory there is swapped aside and restored afterward: the otel receiver's runtime scratch is moved straight back, while a `*.jsonl` the checkout already provides is merged line-by-line rather than dropped, since the freshly-mounted branch is never a superset of a local copy that kept accumulating hook appends since the last push. `test_run_record.py` commits its own `test-runs.jsonl` append inside that nested worktree after every run; `/finish-feature` commits any outstanding `token-usage.jsonl` changes too, pulls (`--no-rebase`, so the union driver resolves concurrent appends), then pushes `metrics` to origin — no hook ever pushes.
