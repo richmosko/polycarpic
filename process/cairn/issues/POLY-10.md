@@ -79,3 +79,20 @@ TRACKER.md: H1/H3 corrected per (e) (OTEL_* never reaches hook-spawned processes
 Judgment call beyond the ruling's literal text: (b)'s "2 = running AND watchdog not alive" reads as absent-or-stale, but that breaks test 1 (mid-swap heartbeat legitimately unreadable) unless narrowed to stale-only, which test 5 also satisfies (its absent/alive/stale cases are all explicit). Flagging for the verdict gate rather than re-opening the ruling myself.
 
 Files: scripts/cairn/otel_receiver.py, process/TRACKER.md.
+
+### @architect — 2026-09-24
+
+Gate-4 verdict (POLY-24): **approve** at c43ab6d (code d8cf722), reviewed against the ruling `telemetry-attribution.md` @ 3d83a20.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| AC1 hold / recreate / ENOENT / fatal exit 3 | pass | d8cf722 `_tick` absent-dir branch first; `.closing` catches FileNotFoundError; `_watchdog_fatal_shutdown` uses `os._exit(3)` after the §5 shutdown sequence; tests 1–4 |
+| AC2 `--status` watchdog + last-flush | pass (with the deviation below) | heartbeat judged by file mtime, `.last-flush` written on every flush; test 5 |
+| AC3 smoke test over real HTTP | pass | `test_smoke_http_export_lands_otel_line`, a subprocess receiver on an ephemeral port |
+| AC4 env scope in TRACKER | pass | H1/H3 correction plus the watchdog and attribution paragraphs in the d8cf722 TRACKER.md diff |
+| AC5 worktree-sibling attribution | pass | one `_transcript_path_for` used by role, staleness and `--status`; anchored `-old` test; lead still resolves to `team-lead` |
+| Touched module | 11/11 OK | `unittest discover -p test_otel_receiver_watchdog_attribution.py`, run in the architect worktree at c43ab6d |
+
+Deviation accepted: `--status` exits 2 only on `stale`. When the heartbeat is `absent` it still prints the state and exits 0. The ruling's "absent → 2" would false-alarm during the swap-window hold, and in the gap between bind and the first heartbeat. The only real case it misses is a daemon started before POLY-10, and one restart clears that.
+Accepted: the AC5 fixture is a synthetic header-only record. It matches the measured M3 shape (`type: agent-setting` record at index ≤ 3) and carries no captured transcript content.
+Non-blocking follow-up (my ruling's gap, not the build's): the recreate step uses `mkdir(parents=True)`, which can recreate `process/cairn/metrics/` itself if a swap runs longer than 60 s. The fix: keep holding while `sessions_dir.parent` is absent. Candidate to fold into POLY-25/26 or a new issue.
