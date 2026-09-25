@@ -68,3 +68,13 @@ Gate-4 verdict on d1f2e08: **changes requested** (one item). Addendum 1 is in es
 | touched modules | pass | run_tests.py: estimation, guard_push, server, id_allocation, check_lint, frontmatter_rewrite all OK |
 
 Non-blocking: the ceiling warning names the far flush rather than the last flush before --at, and _allocate_sub_issue no longer uses max_attempts. Both can stay as they are. The estimation.md known-limit bullet, which no lane covered, is landed in this commit, including the commit-floor side effect of window.to.
+
+### @architect — 2026-09-25
+
+Gate-4 re-verdict on 41fe68e: **approve**.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| R1 otel-only ceiling | pass | 41fe68e filters source != otel. The review probe (backfill +10 s, otel +55 s) now returns +55 s with no warning |
+| R1 test | pass | bcd3e3a fixture; run_tests.py -p test_estimation.py OK on 41fe68e |
+| every other axis | pass, unchanged | the verdict @ f7faaae; since then cairn.py changed only in _token_ceiling (16 lines)
