@@ -83,3 +83,7 @@ Gate-4 verdict (POLY-55) on green `bb4e3a8` (red `701a850`): **APPROVE.**
 **Item-5 substitution stands.** Measured: with `os.open` wrapped to count collisions, the 20-thread race hit `FileExistsError` in 50/50 runs (4475 retries total). The retry branch runs on every run, and the `PT-3<letter>` check rules out the passes-for-the-wrong-reason case. No scan-seam test is required.
 
 Follow-ups (group into an engine umbrella; lead's choice which): (a) map exhaustion to `bad_parent` (or its own code) and test the 400; (b) factor a shared claim-and-write helper out of the two O_EXCL loops.
+
+### @team-lead — 2026-09-25
+
+Architect verdict APPROVE accepted (006848e on green bb4e3a8). POLY-55 closed at the verdict from the main checkout. qa's item-5 race substitution stands (collision branch measured hit in 50/50 runs). Two follow-ups (HTTP error code `bad_parent` untested and wrong on exhaustion; duplicated O_EXCL loop) recorded on POLY-48. Sending qa the verdict run.
