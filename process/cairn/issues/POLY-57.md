@@ -36,3 +36,32 @@ updated: 2026-09-25
 ### @team-lead — 2026-09-25
 
 Feature started. Branch: `feature/poly-57-cairn-docs-cleanup`.
+
+### @architect — 2026-09-25
+
+**Gate-1 ruling (POLY-57a), base `f686787`.** Reference list, tests, and thresholds: `process/reviews/POLY-57/ruling.md`.
+
+1. **Split.** Living: `estimation.md` → `scripts/cairn/docs/`. Rulings, moved unchanged (`git mv`, blob shas pinned in ruling.md §1): test-boundary-ci → `process/reviews/POLY-6/ruling.md`, telemetry-attribution → POLY-10, backfill-sibling-scan → POLY-26, estimation-engine-fixes → POLY-48, sub-issue-letter-ids → POLY-51. Theme data (`variants.json`, `gen_variants.py`, `NOTICE.md`, `bootstrap.snippet.html`) → `scripts/cairn/board/theme/`; `gen_variants.py` resolves `cairn_dir = SCRIPT_DIR.parents[1]`, and its three emitted headers are regenerated. `dist/index.html` L14–16 is edited by hand alongside `dashboard/index.html` (no `node_modules`, measured). Done means the ruling.md §2 `git grep` predicate returns nothing.
+2. **Stale statements.** POLY-6, POLY-10, POLY-26, POLY-51: none (measured: their TRACKER text already landed). POLY-48: two.
+   - `estimation.md` §2 Tokens: `from_ts < generated <= close_ts` → `from_ts < generated <= to_ts   (to_ts = close_ts; with --at, the first otel flush within 1800 s after it)`.
+   - `TRACKER.md` L419: "An issue's `paths:` list declares" → "An issue's `paths:`, unioned with the `paths:` of every other issue sharing its `parent` and `assignee`, declares" (the rest of the sentence is unchanged).
+3. **One line each.** Both `process/WORKFLOW.md` (after the "Rulings live in the file" bullet, L242) and `.claude/agents/architect.md` (after the "Comment budget" bullet in → Rulings) get this line:
+   ```
+   - **A ruling is an issue comment within budget, or `process/reviews/<ID>/ruling.md`**; never a file under `scripts/cairn/docs/`.
+   ```
+4. **`scripts/cairn/docs/README.md`**, verbatim:
+   ```
+   # cairn docs
+
+   Living docs only: text that states how cairn behaves now.
+   When a statement stops being true, correct it in place.
+
+   Not here:
+   - Gate rulings: an issue comment, or `process/reviews/<ID>/ruling.md`.
+   - History, rationale, agent prose: the issue file and the git log.
+   - Vendored theme data: `../board/theme/`.
+   ```
+5. **cairn.py split.** Sketch in ruling.md §6; filed as POLY-58 (todo, POLY-A). Not in this loop.
+
+**Tests (qa, red first):** `scripts/cairn/tests/test_docs_layout.py` (cairn side) plus one `tests/workflow/` check (ruling blobs, grep predicate). Retarget the two theme tests to `board/theme/`. Details are in ruling.md §4.
+**Guards:** suite + `tests/workflow` green; `cairn check` clean; dist fresh; the generator leaves the tree clean; the TRACKER/estimation diff contains only path edits plus the two sentences.
