@@ -1,7 +1,7 @@
 ---
 id: POLY-26
 title: backfill_tokens.py scans only the main project slug; backfilled teammate lines are unattributed
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -85,3 +85,9 @@ Verdict run at 9e2fbf2 (feature tip, only tracker commits since green 68c8dfa): 
 ### @team-lead — 2026-09-25
 
 PR opened: https://github.com/richmosko/polycarpic/pull/14. Verdict PASS already recorded (qa cb73cd4 at 9e2fbf2; architect 5ad725f at 68c8dfa); head-match `gate --head 68c8dfa` PASS. Awaiting the required `cairn` check and the merge call.
+
+### @team-lead — 2026-09-25
+
+Validate passed; merging via PR #14. Closing.
+
+Calibration (lead's start estimate vs actual): est ~45 min / 10 commits / 1 gate cycle / ~$25 → actual 34 min loop window (19:02–19:36Z) / 16 commits incl. tracker chores / 1 gate cycle (verdict commit counted as a second qa run, see POLY-48 note) / $16.86 loop cost at the scorecard. Sub-issue actuals: POLY-41 $1.91 (1.27), POLY-42 $2.66 (0.89), POLY-43 $2.35 (0.67), POLY-44 $0.72 (0.72). Estimation note for POLY-48: qa's verdict commit after the green build counts as a second gate cycle on the execute sub-issue and trips the bloat flag; the verdict is not a rework cycle.
