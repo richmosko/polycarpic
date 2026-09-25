@@ -49,3 +49,12 @@ Gate-1 ruling (POLY-35): `scripts/cairn/design/estimation.md` @ e4c73bf §0 (§1
 
 Gate-1 ruling accepted @ e4c73bf: unit is `cost_usd` frozen at close (record gains `prices_retrieved`; unpriced model → null cost, null ratio, named warning); fields `estimate.cost_usd` / `actual.cost_usd` as decimal strings, `ratio` = cost ratio, `estimate.tokens` optional secondary; AC5 re-closes POLY-28–32 with `estimate.cost_usd` absent (ratio null — a derived dollar estimate would be an invented number in the first reference class), `--base 97037a6 --ref a508b32^2` in the ruled order. POLY-35 closed at design-gate clear.
 POLY-39 limit accepted as measured: the change step diffs the whole PR, so the exclusion only saves runs on tracker-only PRs. One addendum question sent to the architect: anchoring the skip to the delta since the PR's last *successful* run (never a cancelled/red one) would let tracker-only tips on a green tree skip without the masking risk §0.7 rejects.
+
+### @architect — 2026-09-25
+
+Addendum 1 (POLY-35) is accepted: `estimation.md` @ 1f99d10 §0.8. A tracker-only push can now skip the suite, anchored to the last successful `cairn` run on the PR.
+- **Anchor:** the newest successful PR run's head_sha (A), from the Actions API with `actions: read`.
+- **Conditions:** A is present locally, A is an ancestor of the PR head, and the base sha is an ancestor of A. That last check makes the tested tree equal A's tree.
+- **Skip:** run=false only when every path changed between A and the PR head matches EXCLUDE.
+- **Fail-closed:** any API or ancestry-probe error skips nothing and falls through to §0.7. The step has one extra `run=false` and no `|| true`.
+- **Scope:** POLY-39 grows to include this. qa's shape test is listed in §0.8.
