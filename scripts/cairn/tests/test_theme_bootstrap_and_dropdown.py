@@ -73,7 +73,7 @@ import helpers  # noqa: F401
 REPO_ROOT = helpers.CAIRN_DIR.parent.parent
 BOARD_HTML = helpers.CAIRN_DIR / "board" / "board.html"
 DASHBOARD_INDEX_HTML = helpers.CAIRN_DIR / "dashboard" / "index.html"
-VARIANTS_JSON = helpers.CAIRN_DIR / "design" / "variants.json"
+VARIANTS_JSON = helpers.CAIRN_DIR / "board" / "theme" / "variants.json"
 APP_CSS = helpers.CAIRN_DIR / "dashboard" / "src" / "app.css"
 BOARD_JS = helpers.CAIRN_DIR / "board" / "board.js"
 BOARD_CSS = helpers.CAIRN_DIR / "board" / "board.css"

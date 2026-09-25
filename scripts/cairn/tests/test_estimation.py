@@ -588,7 +588,7 @@ class CloseRefusesFromWorktreeTests(CloseCommandTestBase):
         before_raw = issue_path.read_bytes()
 
         r = cairn_cmd(self.worktree_root, self.worktree_data_dir, "close", "PT-9", "--no-flush")
-        # Ruling (design/estimation-engine-fixes.md §1(d)): exit 2, exactly.
+        # Ruling (process/reviews/POLY-48/ruling.md §1(d)): exit 2, exactly.
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
         self.assertIn(str(self.root), r.stdout + r.stderr)
 

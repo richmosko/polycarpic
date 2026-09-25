@@ -1,5 +1,5 @@
 """POLY-6 gate-red (qa-engineer), pinned to the architect's gate-1 ruling
-(scripts/cairn/design/test-boundary-ci.md @ 615b94e). This file lives
+(process/reviews/POLY-6/ruling.md @ 615b94e). This file lives
 under `tests/workflow/` itself, so it is subject to its own guard
 (NoWorkflowTestTouchesCairnTests below) -- it must never import `cairn`,
 `helpers`, or put `scripts/cairn` on `sys.path`.
@@ -182,7 +182,7 @@ class CiWorkflowShapeTests(unittest.TestCase):
 
 
 class CiExcludePatternTests(unittest.TestCase):
-    """POLY-39 (ruling scripts/cairn/design/estimation.md @ e4c73bf, §0.7):
+    """POLY-39 (ruling scripts/cairn/docs/estimation.md @ e4c73bf, §0.7):
     the `changes` step gains an `EXCLUDE` regex that filters tracker-data
     paths (`process/cairn/{issues,milestones,majors,archive}/**`) out
     before `PATTERN` is applied via `grep -vE ... | grep -qE ...` semantics
@@ -261,7 +261,7 @@ class CiExcludePatternTests(unittest.TestCase):
 
 
 class CiAnchoredSkipTests(unittest.TestCase):
-    """POLY-39 addendum 1 (scripts/cairn/design/estimation.md @ 1f99d10,
+    """POLY-39 addendum 1 (scripts/cairn/docs/estimation.md @ 1f99d10,
     §0.8): the `changes` step gains an anchor-lookup extension -- skip
     (run=false) when every line of the diff against the newest successful
     PR run on this branch matches EXCLUDE, falling through to §0.7 when no
