@@ -6976,6 +6976,55 @@ def _flush_receiver_and_wait(repo_root: Path, usage_path: Path, timeout: float =
         time.sleep(0.2)
 
 
+def _token_ceiling(
+    usage_path: Path, at_sha: str, at_ts: str, max_gap_seconds: int,
+) -> Tuple[str, Optional[str]]:
+    """POLY-48 item 4 (POLY-47, gate-1 ruling estimation-engine-fixes.md
+    §1(b)): the TOKEN-side ceiling for a `--at <sha>` close. `at_ts`
+    (the commit's own author time) almost never lines up with a flush
+    boundary -- the flush actually carrying this stage's last tokens can
+    land seconds to minutes after the commit, and the plain commit-time
+    ceiling drops that whole interval's usage (POLY-41, measured 55 s).
+
+    Returns `(to_ts, warning)`:
+    - `to_ts` is the smallest `generated` stamp over ALL lines in
+      `token-usage.jsonl` strictly after `at_ts` -- a flush is a global
+      event, not scoped to one issue/role -- provided it lands within
+      `max_gap_seconds` of `at_ts` (the receiver's own flush interval).
+      That flush is never double-counted: the next same-assignee stage's
+      floor reads this close's `window.to`, i.e. `to_ts` itself.
+    - Otherwise `to_ts` falls back to `at_ts` (unchanged from before this
+      fix), and `warning` is the stderr line `cmd_close` should print,
+      naming the nearest flush actually found after `at_ts` (even one
+      excluded for being too far away) or, when none exists at all,
+      `at_ts` itself. `warning` is `None` when a flush was admitted.
+
+    No special tip case: when `--at` names the branch's own tip, the
+    caller's forced flush (`_flush_receiver_and_wait`) already ran first,
+    so IT is the first flush after the commit and shows up here as an
+    ordinary candidate.
+    """
+    at_dt = _parse_iso_any(at_ts)
+    nearest_after: Optional[Tuple[datetime.datetime, str]] = None
+    if usage_path.is_file():
+        rows, _ = _read_token_usage_lines(usage_path)
+        for row in rows:
+            gen = row.get("generated")
+            if not gen:
+                continue
+            gen_dt = _parse_iso_any(gen)
+            if gen_dt > at_dt and (nearest_after is None or gen_dt < nearest_after[0]):
+                nearest_after = (gen_dt, gen)
+    if nearest_after is not None and (nearest_after[0] - at_dt).total_seconds() <= max_gap_seconds:
+        return nearest_after[1], None
+    last_flush = nearest_after[1] if nearest_after is not None else at_ts
+    warning = (
+        f"close: warning: no flush within {max_gap_seconds} s after --at {at_sha}; "
+        f"tokens after {last_flush} unattributed"
+    )
+    return at_ts, warning
+
+
 def _parent_flip(repo_root: Path, base: str, ref: str) -> Optional[str]:
     """Addendum 1 (design note @ 85c5fd6 §2): the author date of the
     OLDEST commit in `<base>..<ref>` -- `/start-feature`'s own "feature
@@ -7235,14 +7284,33 @@ def cmd_close(args: argparse.Namespace) -> int:
         _flush_receiver_and_wait(root, usage_path)
 
     # POLY-16 ruling: `--at` pins close_ts to the ceiling commit's own
-    # author time; the default ceiling is real wall-clock now().
+    # author time; the default ceiling is real wall-clock now(). Commits
+    # and wall-clock (gate_cycle_actuals below) stay bounded by close_ts,
+    # unchanged (POLY-48 item 4, gate-1 ruling
+    # estimation-engine-fixes.md §1(b)) -- only the TOKEN ceiling differs.
     close_ts = at_ts if at_sha is not None else datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # POLY-34 (ruling §0.2): prices loaded once here (not inside
     # token_actuals) so `prices_retrieved` can be stamped on the
     # calibration record from the exact table that priced this close.
     prices = load_prices()
-    token_result = token_actuals(data_dir, parent, role=assignee, since=from_ts, until=close_ts, prices=prices)
+
+    # POLY-48 item 4 (POLY-47): with `--at`, admit the first flush after
+    # the ceiling commit (within one flush interval) as the TOKEN
+    # window's upper bound, rather than the commit's own timestamp --
+    # see `_token_ceiling`. Without `--at`, close_ts is already real
+    # wall-clock now() and the forced flush above already ran
+    # synchronously, so there is no ceiling to admit.
+    token_until_ts = close_ts
+    if at_sha is not None:
+        import otel_receiver  # sibling module; imported here so cairn stays import-light (mirrors _append_calibration_record's backfill_tokens import) -- safe despite otel_receiver itself importing cairn, since by now cairn is already fully loaded
+        token_until_ts, ceiling_warning = _token_ceiling(
+            usage_path, at_sha, close_ts, otel_receiver.DEFAULT_FLUSH_INTERVAL_SECONDS,
+        )
+        if ceiling_warning is not None:
+            print(ceiling_warning, file=sys.stderr)
+
+    token_result = token_actuals(data_dir, parent, role=assignee, since=from_ts, until=token_until_ts, prices=prices)
     if token_result["tokens"] is None:
         if usage_path.is_file():
             print(
@@ -7362,7 +7430,11 @@ def cmd_close(args: argparse.Namespace) -> int:
         },
         "ratio": ratio_val, "ratio_tokens": ratio_tokens_val, "prices_retrieved": prices.get("retrieved"),
         "bloat": calibration_bloat, "bloat_reasons": bloat_reasons,
-        "window": {"from": from_ts, "to": close_ts, "at": at_sha},
+        # POLY-48 item 4: window.to is the admitted TOKEN ceiling
+        # (token_until_ts), not the commit-time close_ts -- the next
+        # same-assignee stage's floor reads this value (_sibling_floor),
+        # so the admitted flush is never counted twice.
+        "window": {"from": from_ts, "to": token_until_ts, "at": at_sha},
         "base": args.base, "ref_sha": ref_sha,
     }
 
