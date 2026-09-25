@@ -1538,6 +1538,62 @@ class DeadPidIsMarkedDeadWithoutWaitingForAnyReapTests(unittest.TestCase):
         self.assertIn("session alive: alive", status.stdout, f"got {status.stdout!r}")
 
 
+class DeadPidOnlySessionIsDroppedByOrdinaryWatchdogBeatsAloneTests(unittest.TestCase):
+    """POLY-49 AC: "a registered session whose pid is gone is dropped by
+    the next watchdog beat." The grace/self-stop arming check (`if
+    live_session_ids(sessions_dir): ... return True`, `_tick` in
+    otel_receiver.py) reads the RAW REGISTRY FILE LIST, not pid
+    liveness (`live_session_ids`'s own docstring: "deliberately does not
+    probe liveness itself") -- a dead-but-not-yet-REAPED entry still
+    counts as non-empty and blocks self-stop arming. Reaping only
+    happens `if nudged or due_for_periodic_reap` -- an ORDINARY tick,
+    with no nudge and no periodic-reap window elapsed, reaps nothing at
+    all. So a session whose pid dies without a clean `--session-ended`
+    (killed abruptly -- exactly a teammate process being killed) is
+    never dropped by ordinary watchdog beats alone; it silently pins the
+    receiver up for however long until an UNRELATED nudge or the full
+    periodic-reap window happens to fire -- one plausible contributor to
+    the carried "session registry stale" / "under-capture" findings."""
+
+    def test_the_only_session_having_a_dead_pid_is_dropped_within_a_few_ordinary_beats(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        gone_pid = _dead_pid()
+        grace = 0.3
+        # periodic_reap_seconds set far past this test's wait window --
+        # only the ORDINARY WATCHDOG_TICK_SECONDS (0.2s) cadence is
+        # exercised, and nothing here ever calls --session-ended to nudge
+        # a reap either.
+        start = run_fake_receiver(
+            fake_root,
+            ["--ensure-running", "--session-id", "gone", "--session-pid", str(gone_pid),
+             "--grace-period-seconds", str(grace), "--periodic-reap-seconds", "300"],
+            env=env,
+        )
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        _wait_for_status_running(fake_root, env)
+
+        deadline = time.time() + grace + 3.0
+        stopped = False
+        last_status = None
+        while time.time() < deadline:
+            last_status = run_fake_receiver(fake_root, ["--status"], env=env)
+            if last_status.returncode == 1:
+                stopped = True
+                break
+            time.sleep(0.2)
+        self.assertTrue(
+            stopped,
+            f"the only registered session (dead pid, no --session-ended anywhere in this test, "
+            f"periodic-reap-seconds far off) must be DROPPED by ordinary watchdog beats alone so "
+            f"the empty-live-set self-stop can arm -- instead the dead entry silently pinned the "
+            f"receiver up -- last --status: {last_status.stdout if last_status else None!r}",
+        )
+
+
 class PeriodicReapSweepTests(unittest.TestCase):
     """Team-lead: '12afe1d added a slow periodic reap ... untested as far
     as I can see: (a) a dead-pid + stale-transcript session is reaped by
