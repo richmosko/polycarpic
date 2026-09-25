@@ -16,7 +16,7 @@ Found on POLY-3's first reference class: same-assignee sub-issues closed back-to
 
 ## Acceptance criteria
 
-- [ ] Architect ruling (design note `scripts/cairn/design/estimation.md` §2 revised) picks the fix: close-at-stage-end as a workflow rule, stage-aware windows in `cairn close`, or both — with the window definition stated per stage
+- [ ] Architect ruling (design note `scripts/cairn/docs/estimation.md` §2 revised) picks the fix: close-at-stage-end as a workflow rule, stage-aware windows in `cairn close`, or both — with the window definition stated per stage
 - [ ] `cairn close` implements the ruled windowing; a plan and a review sub-issue for the same assignee, closed back-to-back, each get their own commits; unit tests in `scripts/cairn/tests/test_estimation.py` cover the pair and the same-stage sibling case
 - [ ] `process/WORKFLOW.md` → Estimation states when each stage's close runs (plan at design-gate clear, execute at verdict, review after each verdict) and who runs it
 - [ ] POLY-3's reference class is re-closed under the fix on this branch: POLY-11 ≈ 2 gate cycles, POLY-14 ≈ 2, calibration records appended (readers take the last line per id)
@@ -35,7 +35,7 @@ Lead estimate at start (calibration input; prior points: POLY-5 est 1–2 h / ac
 
 ### @architect — 2026-09-24
 
-Gate-1 ruling: read scripts/cairn/design/estimation.md §2 → Stage windows @ d9dd5f8.
+Gate-1 ruling: read scripts/cairn/docs/estimation.md §2 → Stage windows @ d9dd5f8.
 Fix is both: (a) the lead closes each stage at its gate (plan at design-gate clear + each addendum; review after each verdict; execute at the approving verdict); (b) `cairn close --at <sha>` sets the window ceiling to a gate commit, so a late close measures as if run at the gate. The sibling floor now excludes self and later stages. Re-close is allowed: status stays done, `bloat` is re-evaluated, last line per id wins.
 A purely log-derived plan/review boundary was rejected: on POLY-3's log it puts addendum 1 in review, so POLY-11 comes out at 1, not 2 (measured).
 AC4 expected: POLY-11 --at b6caa8a → 2; POLY-14 --at de60cde → 2. Close POLY-11 first. qa's seven tests are listed in the note.

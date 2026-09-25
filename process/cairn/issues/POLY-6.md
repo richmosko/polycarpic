@@ -56,7 +56,7 @@ Lead estimate at start (calibration input; prior: POLY-5 21 min, POLY-3 95 min/3
 
 ### @architect — 2026-09-25
 
-Gate-1 ruling: read `scripts/cairn/design/test-boundary-ci.md` @ 615b94e (AC1–AC5, measured at 460cf6c).
+Gate-1 ruling: read `process/reviews/POLY-6/ruling.md` @ 615b94e (AC1–AC5, measured at 460cf6c).
 - AC1: 5 files / 50 tests move to `tests/workflow/`; discovered as an optional second root in `run_tests.py` (one gate command, hooks unchanged).
 - AC4: three `migrate` commands + 77 tests deleted; detection lints stay, fix hints go. Token backfill NOT retired (re-runnable correction path per TRACKER.md, POLY-26 open, receiver uses 15 module names), so that AC4 item is struck.
 - AC5: one job `cairn` (the required-check name), no workflow-level `paths:` (a required check would hang); fail-closed step-level change filter; JS runs minus `token-chart-logic.test.js` until POLY-8.
@@ -109,7 +109,7 @@ Verified after rebasing onto devops's AC5 (29b17da): `run_tests.py --gate green`
 
 ### @architect — 2026-09-25
 
-Gate-4 verdict (POLY-32) on 010f414 against the ruling `scripts/cairn/design/test-boundary-ci.md` @ 615b94e: **changes-requested, one item (F1)**.
+Gate-4 verdict (POLY-32) on 010f414 against the ruling `process/reviews/POLY-6/ruling.md` @ 615b94e: **changes-requested, one item (F1)**.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -128,7 +128,7 @@ Lead's questions. (1) History split 870b83e/3c85c8d: **accept**, no squash. Forc
 
 ### @architect — 2026-09-25
 
-Gate-4 verdict (POLY-32) re-issued on aa9ec31 (tip 00c431d) against the ruling `test-boundary-ci.md` @ 615b94e: **approve**.
+Gate-4 verdict (POLY-32) re-issued on aa9ec31 (tip 00c431d) against the ruling `process/reviews/POLY-6/ruling.md` @ 615b94e: **approve**.
 
 | Axis | Result | Evidence |
 |---|---|---|

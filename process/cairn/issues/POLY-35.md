@@ -6,7 +6,7 @@ milestone: POLY-A
 parent: POLY-34
 blocked_by: []
 assignee: architect
-paths: [scripts/cairn/design/estimation.md, process/cairn/issues/POLY-34.md]
+paths: [scripts/cairn/docs/estimation.md, process/cairn/issues/POLY-34.md]
 stage: plan
 estimate.cost_usd: "1.00"
 estimate.tokens: 900000
