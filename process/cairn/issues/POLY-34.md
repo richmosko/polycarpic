@@ -58,3 +58,13 @@ Addendum 1 (POLY-35) is accepted: `estimation.md` @ 1f99d10 §0.8. A tracker-onl
 - **Skip:** run=false only when every path changed between A and the PR head matches EXCLUDE.
 - **Fail-closed:** any API or ancestry-probe error skips nothing and falls through to §0.7. The step has one extra `run=false` and no `|| true`.
 - **Scope:** POLY-39 grows to include this. qa's shape test is listed in §0.8.
+
+### @qa-engineer — 2026-09-25
+
+POLY-39 shape tests RED @ 7bd9a6d (tests/workflow/test_cairn_test_boundary.py).
+
+`CiExcludePatternTests` (§0.7): EXCLUDE/PATTERN extraction, tracker-only paths → run=false, still-relevant paths → run=true, mixed → true, unrelated doc → false, PATTERN byte-identical, no bare `|| true`.
+
+`CiAnchoredSkipTests` (§0.8 addendum 1): anchor lookup filters event=pull_request + status=success, `actions: read` permission, both ancestry checks present, `run=false` written exactly twice, no bare `|| true`.
+
+14 failures across 23 tests, all AssertionError on missing EXCLUDE/anchor-lookup literals in ci.yml -- right-reason RED. Pre-existing CiWorkflowShapeTests suite (9 tests) unaffected.
