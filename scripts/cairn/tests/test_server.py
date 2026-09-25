@@ -411,6 +411,33 @@ class CreateIssueTests(ServerTestCase):
         error_payload = json.loads(ctx.exception.read())
         self.assertEqual(error_payload["error"], "legacy_archive")
 
+    def test_any_other_cairn_error_on_create_is_409_allocation_failed(self):
+        # Ruling (design/estimation-engine-fixes.md §1, "Confirmed as
+        # filed"): any CairnError out of allocate_and_create_issue that is
+        # neither BadParentError nor the legacy-archive guard maps to 409
+        # allocation_failed. The real trigger (allocate_and_create_issue's
+        # own max_attempts exhaustion) needs a genuine O_EXCL race --
+        # already covered at the unit level by
+        # test_id_allocation.py's ConcurrentAllocationTests -- so this
+        # test isolates the HTTP MAPPING alone: a real CairnError raised
+        # by the real allocation function (monkeypatched to always raise
+        # one, its own retry/race behavior being out of scope here), read
+        # through the real server and a real HTTP round trip.
+        real_allocate = cairn.allocate_and_create_issue
+
+        def _always_exhausted(data_dir, fields, max_attempts=50):
+            raise cairn.CairnError("could not allocate an ID for prefix 'PT' after 50 attempts")
+
+        cairn.allocate_and_create_issue = _always_exhausted
+        try:
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                http_post(f"{self.base_url}/api/issue", {"title": "no id left to allocate"})
+        finally:
+            cairn.allocate_and_create_issue = real_allocate
+        self.assertEqual(ctx.exception.code, 409)
+        error_payload = json.loads(ctx.exception.read())
+        self.assertEqual(error_payload["error"], "allocation_failed")
+
 
 class PatchIssueTests(ServerTestCase):
     def _seen(self, issue_id: str) -> str:
