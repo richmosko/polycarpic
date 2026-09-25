@@ -638,60 +638,11 @@ def resolve_issue(
     return "main"
 
 
-_WORKTREE_TRANSCRIPT_SUFFIX_CACHE: Optional[str] = None
-
-
-def _worktree_transcript_suffix() -> str:
-    """POLY-10 gate-1 ruling (c): the directory-name suffix Claude Code
-    appends to a teammate's transcript-dir slug when it runs inside
-    `.claude/worktrees/<name>/` -- derived from `backfill_tokens.
-    _transcript_dir_slug`, never hard-coded, so a slug-rule change moves
-    both. `_transcript_dir_slug` substitutes `/`, `_`, `.` one-for-one, so
-    `slug(repo_root + "/.claude/worktrees")` is always exactly
-    `slug(repo_root) + slug("/.claude/worktrees")` -- a plain prefix-strip
-    against the real repo root's own slug is therefore exact, not a guess,
-    and (since neither operand depends on repo_root's actual content) the
-    result is the same constant, `--claude-worktrees`, on every machine;
-    cached at first call rather than recomputed per lookup."""
-    global _WORKTREE_TRANSCRIPT_SUFFIX_CACHE
-    if _WORKTREE_TRANSCRIPT_SUFFIX_CACHE is None:
-        repo_root = backfill_tokens._repo_root()
-        repo_slug = backfill_tokens._transcript_dir_slug(repo_root)
-        worktrees_slug = backfill_tokens._transcript_dir_slug(repo_root / ".claude" / "worktrees")
-        if worktrees_slug.startswith(repo_slug):
-            _WORKTREE_TRANSCRIPT_SUFFIX_CACHE = worktrees_slug[len(repo_slug):]
-        else:
-            _WORKTREE_TRANSCRIPT_SUFFIX_CACHE = "--claude-worktrees"  # unreachable given the slug rule; a safe literal fallback
-    return _WORKTREE_TRANSCRIPT_SUFFIX_CACHE
-
-
-def _transcript_path_for(session_id: str, transcripts_dir: Path) -> Optional[Path]:
-    """POLY-10 gate-1 ruling (c): `transcripts_dir/<id>.jsonl` if it's a
-    file (the direct, pre-worktree lookup, unchanged); else the FIRST file
-    matching `transcripts_dir.parent / f"{transcripts_dir.name}<suffix>-*"
-    / f"{id}.jsonl"` -- a teammate's own transcript, filed by Claude Code
-    under the sibling `<slug><suffix>-<worktree-name>/` dir because every
-    team-agent session's cwd is `.claude/worktrees/<name>/`, never the main
-    checkout. `None` if neither exists. The anchored prefix (`transcripts_
-    dir.name` immediately followed by `<suffix>-`) deliberately excludes a
-    near-neighbour project's own dir (`<slug>-old<suffix>-x`) -- PT-87's
-    invariant that this must never read another project's transcripts.
-    Reads only `<session_id>.jsonl` by exact name inside a matched dir, no
-    directory listing of transcript contents."""
-    direct = transcripts_dir / f"{session_id}.jsonl"
-    if direct.is_file():
-        return direct
-    parent = transcripts_dir.parent
-    if not parent.is_dir():
-        return None
-    pattern = f"{transcripts_dir.name}{_worktree_transcript_suffix()}-*"
-    for candidate_dir in sorted(parent.glob(pattern)):
-        if not candidate_dir.is_dir():
-            continue
-        candidate = candidate_dir / f"{session_id}.jsonl"
-        if candidate.is_file():
-            return candidate
-    return None
+# POLY-26 gate-1 ruling §1: `_worktree_transcript_suffix`/`_transcript_
+# path_for` (and their cache) moved into `backfill_tokens.py`, the module
+# that also owns `_transcript_dir_slug` and now `_worktree_sibling_dirs` --
+# one implementation, imported here, never copied. See `backfill_tokens.
+# _transcript_path_for` for the lookup contract.
 
 
 def _resolve_role_from_session(
@@ -726,7 +677,7 @@ def _resolve_role_from_session(
     if session_id in cache:
         return cache[session_id]
 
-    transcript_path = _transcript_path_for(session_id, transcripts_dir)
+    transcript_path = backfill_tokens._transcript_path_for(session_id, transcripts_dir)
     if transcript_path is None:
         return "subagent-unattributed"  # NOT cached -- retry on the next datapoint
 
@@ -1207,7 +1158,7 @@ def _transcript_is_stale(session_id: str, transcripts_dir: Path, now: Optional[f
     signals" guarantee to one for every teammate) hasn't been touched in
     >= 30 minutes. No transcript at all counts as stale (nothing to
     protect) -- it either never existed or already aged out."""
-    transcript_path = _transcript_path_for(session_id, transcripts_dir)
+    transcript_path = backfill_tokens._transcript_path_for(session_id, transcripts_dir)
     if transcript_path is None:
         return True
     try:
