@@ -7172,15 +7172,18 @@ def cmd_estimate(args: argparse.Namespace) -> int:
                 f"{_cell(act.get('tokens')):<9} "
                 f"{'yes' if r.get('bloat') else 'no'}"
             )
-        # POLY-34 (ruling §0.4): the cost median excludes schema-1 rows
-        # (their `cost_usd` was priced under the old ratio's semantics,
-        # never validated against this axis) and null `actual.cost_usd`
-        # (an unpriced model, or a schema-1 row with no cost at all) --
-        # the same "no evidence must never enter a median" rule the token
-        # median already followed (addendum 1, design note @ 85c5fd6 §2).
+        # POLY-34 (architect verdict R1, @ 6a6df12; §9.1 item 9 rewritten
+        # @ 0a0b1f7): only a null `actual.cost_usd` is excluded from the
+        # cost median (an unpriced model, or a schema-1 row with no cost
+        # at all) -- the same "no evidence must never enter a median"
+        # rule the token median already followed (addendum 1, design
+        # note @ 85c5fd6 §2). A schema-1 row's non-null `cost_usd` STILL
+        # COUNTS: it came from the same `token_actuals` pricing as a
+        # schema-2 row's -- only its `ratio` (the token ratio) is
+        # incomparable, which is why that column prints a dash instead.
         cost_values = [
             r["actual"]["cost_usd"] for r in rows
-            if r.get("schema") == 2 and r["actual"].get("cost_usd") is not None
+            if r["actual"].get("cost_usd") is not None
         ]
         cost_median = round(statistics.median(cost_values), 2) if cost_values else None
         gc_median = int(statistics.median(r["actual"]["gate_cycles"] for r in rows))
