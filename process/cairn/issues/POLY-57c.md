@@ -1,7 +1,7 @@
 ---
 id: POLY-57c
 title: POLY-57 execute: moves, references, living-doc corrections
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: POLY-57
 blocked_by: []
