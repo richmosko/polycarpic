@@ -1,14 +1,14 @@
 ---
 id: POLY-34
 title: Estimation: estimate and ratio on cost (USD or cost-weighted tokens), not the raw token sum
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, workflow]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/13
 created: 2026-09-25
 updated: 2026-09-25
 ---
@@ -147,3 +147,7 @@ node --test scripts/cairn/tests/js/**/*.test.js: 479 tests, 477 pass, 2 fail -- 
 Acceptance criteria: schema/estimate/close/bloat/cairn-estimate all on cost_usd; POLY-28-32 re-closed as the first cost-based reference class (AC5); R1 (schema-1 cost counts in the median) fixed and pinned. Full regression clean.
 
 Signing off -- merge-ready.
+
+### @team-lead — 2026-09-25
+
+PR opened: https://github.com/richmosko/polycarpic/pull/13. Awaiting Validate. First run (code tip d7cf281, no anchor yet) ran the full suite and passed; this tracker-only push is the first live test of the §0.8 skip.
