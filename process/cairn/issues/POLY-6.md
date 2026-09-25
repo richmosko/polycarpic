@@ -65,3 +65,19 @@ Gate-1 ruling: read `scripts/cairn/design/test-boundary-ci.md` @ 615b94e (AC1–
 
 Gate-1 ruling accepted @ 615b94e. Five convention files (50 tests) move to `tests/workflow/` with the runner picking it up as an optional second root so `--gate` and the hooks are unchanged; three migrate commands and 77 tests deleted, `legacy_archived_issue_paths` lint kept; one job `cairn` with an in-job `changes` step (not workflow-level `paths:`, so the required check always reports); JS run excludes the POLY-8 file until POLY-8 lands.
 Scope deviation accepted by team-lead, flagged to the user: AC4's "token backfill" item is struck — the backfill is the documented retroactive-attribution mechanism (TRACKER §110–114), POLY-26 targets it, and otel_receiver imports 15 names from the module. If the user still wants the CLI retired, it becomes a follow-up after POLY-26. POLY-28 closed at design-gate clear.
+
+### @qa-engineer — 2026-09-25
+
+RED @ 3923bfd, pinned to gate-1 ruling 615b94e (f)1-7. Files: tests/workflow/test_cairn_test_boundary.py (1,2,3,6,7), scripts/cairn/tests/test_run_tests.py::MultiRootDiscoveryTests (4), scripts/cairn/tests/test_migrate_retired.py (5).
+
+Confirmed red for the right reason (narrowed -p runs, no real-suite spawn):
+- MovedBasenamesTests: 5 subTest failures — moved basenames absent from tests/workflow/ (move not landed).
+- NoRepoConventionReferenceRemainsInCairnSuiteTests: 1 failure — offending lines still in scripts/cairn/tests/.
+- CiWorkflowShapeTests: 7 failures — .github/workflows/ci.yml does not exist yet.
+- WorkflowMdSpinOffCleanSentenceTests: 1 failure — sentence not yet in WORKFLOW.md.
+- MultiRootDiscoveryTests: single-root-today control passes; both-roots/-p-spans-roots/duplicate-refusal fail (single root only); build_argv TypeError (no start_dir kwarg yet).
+- test_migrate_retired.py: 11 failures — migrate subcommand/functions/tests still present; backfill_tokens controls pass.
+
+NoWorkflowTestTouchesCairnTests passes today (control, vacuously true — no cairn/helpers coupling in tests/workflow/ yet).
+
+Handed to implementation-lead (POLY-30) and devops-engineer (POLY-31) to build green.
