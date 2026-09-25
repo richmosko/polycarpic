@@ -23,6 +23,7 @@ Grouped fix loop for the OTel receiver and its metrics worktree (user decision 2
 
 - **under-capture on the POLY-48 loop (2026-09-25):** ≈40 min, 4 roles, one flush at 21:24:40Z carrying ≈0.49M tokens total (`records: 4` per teammate role); the POLY-51 plan stage alone captured 3.0M. No flush between 20:37:05Z and 21:24:40Z although the interval is 1800 s (the 21:07 flush reported 0 lines). Either exports are not reaching the receiver or the aggregator drops them; see POLY-48's closing comment for the numbers.
 - **self-stop sweep flake on CI (PR #16, run 36191961863, 2026-09-25):** `test_otel_receiver_self_stop.PeriodicReapSweepTests.test_a_dead_pid_with_a_stale_transcript_is_reaped_by_the_periodic_sweep_alone` expected `sessions: 2` but the periodic sweep had already reaped the dead session on the 4-worker runner; green on rerun and locally. Same timing class as the watchdog flake above.
+- **session registry stale, live session missing (POLY-48 loop, 2026-09-25):** `--status` reported one session (`bcc9a749…: alive`) for the whole loop and after that session's teammate processes were killed; the live lead session and its teammates never appeared. Likely contributor to the under-capture above: a receiver started by an earlier session is not joined by a later session's hook, and liveness keys on something other than the process.
 
 ## Acceptance criteria
 
@@ -31,6 +32,7 @@ Grouped fix loop for the OTel receiver and its metrics worktree (user decision 2
 - [ ] `--flush-now` from a linked worktree resolves the main checkout's pidfile, or fails loudly naming it
 - [ ] A 30-minute, 3-teammate loop yields per-role token totals within the same order of magnitude as the transcript-derived backfill for the same window; the flush cadence honours the interval (a flush per 1800 s while sessions are alive)
 - [ ] The self-stop periodic-sweep test is deterministic (injected clock or explicit sweep trigger); 10 consecutive 4-worker runs green
+- [ ] `--status` lists every session whose hook ran since the receiver started; a session is marked dead within one watchdog beat of its process exiting; an empty live set arms the self-stop
 
 ## Comments
 
