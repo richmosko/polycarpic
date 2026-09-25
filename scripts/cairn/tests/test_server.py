@@ -362,6 +362,19 @@ class CreateIssueTests(ServerTestCase):
         raw = new_path.read_text(encoding="utf-8")
         self.assertIn('milestone: "1.0"', raw)
 
+    def test_post_with_parent_allocates_a_letter_id(self):
+        # POLY-51 (ruling §2, §6 item 11): allocate_and_create_issue is the
+        # single funnel for cmd_new AND _create_issue -- the letter path
+        # must be reachable from the board's create-issue POST too, not
+        # just the CLI. PT-4 (fixture) is a plain top-level issue.
+        resp = http_post(f"{self.base_url}/api/issue", {"title": "HTTP sub-issue", "parent": "PT-4"})
+        self.assertEqual(resp.status, 200)
+        payload = json.loads(resp.read())
+        self.assertEqual(payload["id"], "PT-4a")
+        self.assertEqual(payload["parent"], "PT-4")
+        new_path = self.data_dir / "issues" / "PT-4a.md"
+        self.assertTrue(new_path.exists())
+
 
 class PatchIssueTests(ServerTestCase):
     def _seen(self, issue_id: str) -> str:
