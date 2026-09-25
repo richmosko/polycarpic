@@ -1411,6 +1411,28 @@ class AtCeilingAdmitsTrailingFlushTests(StageWindowTestBase):
         self.assertEqual(len(lines), 1)
         self.assertEqual(lines[0]["window"]["to"], "2020-01-02T01:00:01Z")
 
+    def test_a_transcript_backfill_line_does_not_count_as_the_flush(self):
+        # Addendum 1 (architect's review of d1f2e08,
+        # scripts/cairn/design/estimation-engine-fixes.md): a
+        # transcript-backfill line's `generated` is the backfill RUN
+        # time, not a flush -- the candidate set for the ceiling is
+        # `source == "otel"` lines only. Measured on d1f2e08: a backfill
+        # line at +10s and a real otel flush at +55s gave a +10s ceiling,
+        # dropping the +55s flush's tokens entirely (no warning printed).
+        gate_sha = self._seed_and_gate("2020-01-02T01:00:00+00:00")
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-02T01:00:10Z", issue="PT-1", role="backend-lead",
+                      source="transcript-backfill", input=999999),
+            token_row(generated="2020-01-02T01:00:55Z", issue="PT-1", role="backend-lead",
+                      source="otel", input=1000),
+        ])
+        r = self.close("PT-9", "--at", gate_sha)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.issue_fm("PT-9").get("actual.tokens"), 1000)
+        lines = self.calibration_lines("PT-9")
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["window"]["to"], "2020-01-02T01:00:55Z", "the otel flush, not the earlier backfill line, must be the ceiling")
+
     def test_a_flush_over_1800s_after_the_at_commit_is_excluded_and_warns(self):
         gate_sha = self._seed_and_gate("2020-01-02T01:00:00+00:00")
         write_token_usage(self.data_dir, [
