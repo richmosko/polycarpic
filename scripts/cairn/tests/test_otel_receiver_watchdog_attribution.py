@@ -375,11 +375,17 @@ class WatchdogHoldsOnAbsentSessionsDirTests(unittest.TestCase):
 # --------------------------------------------------------------------------
 
 class WatchdogRecreatesAfterAbsentBoundTests(unittest.TestCase):
-    """Ruling (a).3: absent past `REGISTRY_ABSENT_RECREATE_SECONDS` (a
-    test-scale override) recreates the dir plus its two startup markers
-    and logs one `recreated` line; the watchdog thread stays alive and
-    keeps ticking throughout (proved by the ordinary self-stop that must
-    still follow, same discipline as test 1)."""
+    """Ruling (a).3 + POLY-49 gate-1 ruling §2 (AC2): absent past
+    `REGISTRY_ABSENT_RECREATE_SECONDS` (a test-scale override) recreates
+    the dir plus its two startup markers and logs one `recreated` line;
+    the watchdog thread stays alive and keeps ticking throughout (proved
+    by the ordinary self-stop that must still follow, same discipline as
+    test 1). §2: widened poll bounds (real wall-clock racing real
+    subprocess/thread-scheduling overhead under an 8-worker full run --
+    the 2026-09-25 flake) plus a lower-bound assertion that can only ever
+    flake DOWNWARD (a false pass), never upward into a false red: the dir
+    must still be ABSENT at `0.3s` after the rmtree, well inside the
+    `0.5s` recreate bound, proving the hold isn't instant/accidental."""
 
     def test_watchdog_recreates_after_absent_bound(self):
         port = _free_port()
@@ -407,7 +413,15 @@ class WatchdogRecreatesAfterAbsentBoundTests(unittest.TestCase):
         shutil.rmtree(_sessions_dir_path(fake_root))
         sessions_dir = _sessions_dir_path(fake_root)
 
-        deadline = time.time() + recreate_bound + 4.0
+        # Lower bound: monotonic, cannot flake upward -- a premature
+        # recreate (holding logic broken/skipped) would show up here.
+        time.sleep(0.3)
+        self.assertFalse(
+            sessions_dir.is_dir(),
+            f"the registry dir must still be held ABSENT at 0.3s, well inside the {recreate_bound}s bound",
+        )
+
+        deadline = time.time() + recreate_bound + 15.0
         while time.time() < deadline and not sessions_dir.is_dir():
             time.sleep(0.1)
         self.assertTrue(
@@ -431,12 +445,84 @@ class WatchdogRecreatesAfterAbsentBoundTests(unittest.TestCase):
         still_pid = int(_pidfile_path(fake_root).read_text(encoding="utf-8").strip())
         self.assertEqual(still_pid, pid_at_start, "the SAME process must have survived recreation -- not a crash-and-respawn")
 
-        stopped = _wait_for_status_not_running(fake_root, env, timeout=grace + 4.0)
+        stopped = _wait_for_status_not_running(fake_root, env, timeout=grace + 15.0)
         self.assertEqual(
             stopped.returncode, 1,
             f"the watchdog thread must still be alive and ticking after recreating the registry dir -- "
             f"the now-genuinely-empty registry must still self-stop through the ordinary grace path -- "
             f"{stopped.stdout!r} {stopped.stderr!r}",
+        )
+
+
+class RegistryParentAbsentHoldsWithoutMkdirTests(unittest.TestCase):
+    """POLY-27 (POLY-49 gate-1 ruling §6): the recreate step must never
+    use `mkdir(parents=True)` -- doing so can recreate `process/cairn/
+    metrics/` ITSELF while `ensure_metrics_worktree.py` has it swapped
+    aside mid-`git worktree add`, making the target non-empty and
+    failing the add (the original POLY-27 defect). When the registry
+    dir's PARENT (not just `.sessions/` itself) is absent past the
+    recreate bound, the watchdog must keep holding -- no mkdir at all --
+    and log the holding line once per absence episode."""
+
+    def test_parent_absent_past_the_bound_never_recreates_and_logs_holding_once(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+        recreate_bound = 0.5
+
+        start = run_fake_receiver(
+            fake_root,
+            ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid()),
+             "--registry-absent-recreate-seconds", str(recreate_bound)],
+            env=env,
+        )
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(fake_root, env)
+        self.assertEqual(running.returncode, 0, running.stdout + running.stderr)
+
+        metrics_dir = _metrics_dir(fake_root)
+        parent_swapped_aside = metrics_dir.parent / "metrics.PARENT-SWAPPED"
+        metrics_dir.rename(parent_swapped_aside)
+        try:
+            # Well past the recreate bound -- if the fix used
+            # mkdir(parents=True) instead of holding, this would recreate
+            # process/cairn/metrics/ itself (and its .sessions/ child)
+            # out from under the "swap".
+            time.sleep(recreate_bound + 3.0)
+            self.assertFalse(
+                metrics_dir.is_dir(),
+                f"the parent-absent case must NEVER mkdir -- {metrics_dir} must still not exist",
+            )
+            mid_swap = run_fake_receiver(fake_root, ["--status"], env=env)
+            self.assertEqual(mid_swap.returncode, 0, f"the process itself must not have crashed -- {mid_swap.stdout!r} {mid_swap.stderr!r}")
+        finally:
+            # Cleanup must survive either outcome: today's (pre-fix) code
+            # can still have recreated `metrics_dir` via mkdir(parents=
+            # True) despite the assertion above having already failed and
+            # recorded that -- never let teardown itself mask the real
+            # failure or leak a background receiver.
+            if metrics_dir.exists():
+                shutil.rmtree(metrics_dir, ignore_errors=True)
+            parent_swapped_aside.rename(metrics_dir)
+
+        log_lines = _log_lines(fake_root)
+        holding_lines = [l for l in log_lines if "registry parent absent" in l and "holding" in l]
+        self.assertTrue(holding_lines, f"expected a 'registry parent absent, holding' line -- got {log_lines!r}")
+        self.assertEqual(
+            len(holding_lines), 1,
+            f"the holding line must log ONCE per absence episode, not once per tick -- got {holding_lines!r}",
+        )
+
+        # Decisive proof the watchdog thread itself survived the whole
+        # episode: the ordinary self-stop lifecycle must still work once
+        # the parent is restored and the last session ends.
+        end = run_fake_receiver(fake_root, ["--session-ended", "s1"], env=env)
+        self.assertEqual(end.returncode, 0, end.stdout + end.stderr)
+        stopped = _wait_for_status_not_running(fake_root, env, timeout=15.0)
+        self.assertEqual(
+            stopped.returncode, 1,
+            f"the watchdog thread must still be doing its job after the parent-absent episode -- {stopped.stdout!r} {stopped.stderr!r}",
         )
 
 

@@ -17,10 +17,13 @@ branch content.
 from __future__ import annotations
 
 import importlib.util
+import os
+import shutil
 import subprocess
 import sys
 import unittest
 from pathlib import Path
+from typing import Optional
 
 import helpers  # noqa: F401
 
@@ -99,11 +102,37 @@ def _build_fake_repo_with_pushed_metrics_branch(testcase, seed_lines: "list[str]
     return checkout_root, bare_remote
 
 
-def _run_script(checkout_root: Path) -> subprocess.CompletedProcess:
+def _run_script(checkout_root: Path, env: "Optional[dict]" = None) -> subprocess.CompletedProcess:
     return subprocess.run(
         [sys.executable, str(checkout_root / "scripts" / "cairn" / "ensure_metrics_worktree.py")],
-        cwd=str(checkout_root), capture_output=True, text=True,
+        cwd=str(checkout_root), capture_output=True, text=True, env=env,
     )
+
+
+def _make_failing_worktree_add_git_shim(testcase) -> Path:
+    """POLY-49 ruling §8: a `git` shim placed FIRST on `PATH` that exits
+    128 on exactly `git worktree add <path> <branch>` (positional, no
+    `--orphan`) and execs the REAL git for every other invocation
+    (fetch, rev-parse, ls-remote, the orphan-create path, ...). Returns
+    the shim's directory -- prepend it to a subprocess env's `PATH`.
+    A real `os.execvp` handoff, not a Python re-implementation of git."""
+    shim_dir = helpers.make_empty_tmp_dir(testcase)
+    real_git = shutil.which("git")
+    testcase.assertIsNotNone(real_git, "this test environment has no git on PATH at all")
+    shim_path = shim_dir / "git"
+    shim_path.write_text(
+        "#!/usr/bin/env python3\n"
+        "import os, sys\n"
+        f"REAL_GIT = {real_git!r}\n"
+        "args = sys.argv[1:]\n"
+        "if len(args) >= 3 and args[0] == 'worktree' and args[1] == 'add' and args[2] != '--orphan':\n"
+        "    sys.stderr.write('shim: refusing this worktree add\\n')\n"
+        "    sys.exit(128)\n"
+        "os.execv(REAL_GIT, [REAL_GIT] + args)\n",
+        encoding="utf-8",
+    )
+    shim_path.chmod(0o755)
+    return shim_dir
 
 
 class FirstMountMergesLocalAppendsTests(unittest.TestCase):
@@ -288,6 +317,10 @@ class NoNetworkNoLocalMetricsSkipsWithOneStderrLineTests(unittest.TestCase):
             "could not confirm origin's metrics branch state", result.stderr,
             f"expected the one-line skip diagnostic -- got stderr {result.stderr!r}",
         )
+        # Ruling §8: "exactly one stderr line" -- not just "contains the
+        # phrase somewhere among others".
+        stderr_lines = [l for l in result.stderr.splitlines() if l.strip()]
+        self.assertEqual(len(stderr_lines), 1, f"expected exactly one stderr line -- got {stderr_lines!r}")
         metrics_dir = checkout_root / "process" / "cairn" / "metrics"
         self.assertFalse(metrics_dir.exists(), f"nothing must be created on this skip -- found {metrics_dir}")
         have_local_branch = _git(checkout_root, "rev-parse", "--verify", "refs/heads/metrics")
@@ -298,25 +331,19 @@ class NoNetworkNoLocalMetricsSkipsWithOneStderrLineTests(unittest.TestCase):
 
 
 class FailedWorktreeAddRestoresBackupExactlyTests(unittest.TestCase):
-    """3d: `git worktree add` itself can fail after the swap-aside has
-    already renamed a pre-existing `process/cairn/metrics/` (the otel
-    receiver's runtime scratch) out of the way -- here, forced by the
-    `metrics` branch already being checked out in a second linked
-    worktree, the same class of failure the swap must survive. Nothing
-    now occupies the target path afterward, so the backup must be
-    renamed straight back, byte-for-byte, never stranded at
-    `metrics.pre-worktree`."""
+    """3d (ruling §8): a `git` shim placed first on `PATH` exits 128 on
+    exactly `git worktree add <path> <branch>` (execs the real git for
+    every other call, including the orphan-create shape) -- forcing the
+    add to fail deterministically without depending on any other
+    concurrent-worktree side effect. Nothing recreates `METRICS_PATH`
+    afterward, so the backup's contents must be merged back into the
+    path byte-for-byte, and no `*.bak*`/`*.pre-worktree*` artifact may
+    survive."""
 
-    def test_add_failure_with_nothing_recreated_renames_the_backup_straight_back(self):
+    def test_add_failure_via_path_shim_merges_the_backup_back_no_bak_left(self):
         seed_lines = ['{"n": 1}']
         checkout_root, _bare_remote = _build_fake_repo_with_pushed_metrics_branch(self, seed_lines)
-
-        # Give the branch a local ref and check it out in ANOTHER linked
-        # worktree first, so this session's own `git worktree add` on the
-        # same branch fails exactly the way a concurrent recreate would.
-        elsewhere = helpers.make_empty_tmp_dir(self) / "elsewhere"
-        result = _git(checkout_root, "worktree", "add", str(elsewhere), "metrics")
-        self.assertEqual(result.returncode, 0, result.stderr)
+        shim_dir = _make_failing_worktree_add_git_shim(self)
 
         metrics_dir = checkout_root / "process" / "cairn" / "metrics"
         metrics_dir.mkdir(parents=True)
@@ -325,10 +352,14 @@ class FailedWorktreeAddRestoresBackupExactlyTests(unittest.TestCase):
         sessions_dir.mkdir()
         (sessions_dir / "abc.json").write_text('{"pid": 12345}\n', encoding="utf-8")
 
-        result = _run_script(checkout_root)
+        env = dict(os.environ)
+        env["PATH"] = str(shim_dir) + os.pathsep + env.get("PATH", "")
+        result = _run_script(checkout_root, env=env)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("git worktree add failed", result.stderr, f"got stderr {result.stderr!r}")
 
+        for stray in checkout_root.joinpath("process", "cairn").glob("metrics*.bak*"):
+            self.fail(f"a stray backup artifact survived: {stray}")
         self.assertFalse(
             (checkout_root / "process" / "cairn" / "metrics.pre-worktree").exists(),
             "the backup must never be left stranded after a failed add",
