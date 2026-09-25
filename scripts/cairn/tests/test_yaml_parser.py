@@ -192,6 +192,41 @@ class LoudErrorTests(unittest.TestCase):
         self.assertTrue(str(ctx.exception).strip())
 
 
+class UnquotedLeadingStarHintTests(unittest.TestCase):
+    """POLY-9 (parent POLY-49). Ruled (architect, POLY-9.md): no parser
+    exception for an unquoted `*x` -- it really is a YAML alias, scope is
+    a hint only. A hand-typed `paths:` entry like `- **/**` or `- *.py`
+    hits this same `raw[0] in "&*"` check before `validate_path_glob`
+    ever runs; the fix is the error TEXT, not new leniency. The message
+    must tell the author to quote the entry, and show the quoted form."""
+
+    def test_block_list_item_leading_star_error_hints_to_quote_it(self):
+        with self.assertRaises(cairn.YamlError) as ctx:
+            cairn.parse_yaml_subset("paths:\n  - *.py\n")
+        message = str(ctx.exception)
+        self.assertIn(
+            "quote", message.lower(),
+            f"the error for an unquoted *-leading entry must tell the author to quote it -- got {message!r}",
+        )
+        self.assertIn(
+            '"*.py"', message,
+            f"the hint must show the quoted form of the offending entry, not just say 'quote it' -- got {message!r}",
+        )
+
+    def test_mapping_value_leading_star_error_hints_to_quote_it(self):
+        with self.assertRaises(cairn.YamlError) as ctx:
+            cairn.parse_yaml_subset("glob: **/**\n")
+        message = str(ctx.exception)
+        self.assertIn(
+            "quote", message.lower(),
+            f"a mapping-value *-leading scalar must get the same quoting hint as a list item -- got {message!r}",
+        )
+        self.assertIn(
+            '"**/**"', message,
+            f"the hint must show the quoted form -- got {message!r}",
+        )
+
+
 class LoadConfigTests(unittest.TestCase):
     def test_load_config_from_fixture(self):
         config = cairn.load_config(helpers.FIXTURE_DATA_DIR)

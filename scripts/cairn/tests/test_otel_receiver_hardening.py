@@ -492,5 +492,84 @@ class SessionStartHookStderrTests(unittest.TestCase):
         )
 
 
+# --------------------------------------------------------------------------
+# POLY-49 (carried, no separate sub-issue): "flush from a worktree" --
+# `--flush-now` run from a teammate worktree finds no pidfile and does
+# nothing silently (architect + qa, observed in the POLY-26 loop).
+# `repo_root` (and so `pidfile`) is derived from `Path(__file__)`'s own
+# on-disk location (module docstring above) -- inside a LINKED worktree
+# that resolves to the worktree's own (never-mounted) `process/cairn/
+# metrics/`, not the main checkout's real one. A REAL git repo + a REAL
+# `git worktree add` linked worktree, never a synthetic stand-in --
+# same posture as test_worktree_metrics_path_resolution.py's git-backed
+# fixtures.
+# --------------------------------------------------------------------------
+
+
+def _git_env() -> dict:
+    env = _minimal_env()
+    env.update({
+        "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "test@example.com",
+        "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "test@example.com",
+    })
+    return env
+
+
+def _make_git_main_checkout_with_worktree(testcase, otel_port: int):
+    """(main_root, worktree_path) -- a REAL git repo carrying the engine
+    copy + config.yml (committed, so `git worktree add` shares them),
+    plus a REAL linked worktree of it."""
+    main_root = make_fake_engine_root(testcase, otel_port=otel_port)
+    genv = _git_env()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(main_root), check=True, env=genv)
+    subprocess.run(["git", "add", "-A"], cwd=str(main_root), check=True, env=genv)
+    subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=str(main_root), check=True, env=genv)
+
+    worktree_parent = helpers.make_empty_tmp_dir(testcase)
+    worktree_path = worktree_parent / "x"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "worktree-x", str(worktree_path)],
+        cwd=str(main_root), check=True, env=genv,
+    )
+    return main_root, worktree_path
+
+
+class FlushNowFromALinkedWorktreeTests(unittest.TestCase):
+    def test_flush_now_from_a_worktree_either_reaches_the_main_checkout_or_names_its_real_pidfile(self):
+        port = _free_port()
+        main_root, worktree_path = _make_git_main_checkout_with_worktree(self, otel_port=port)
+        env = _minimal_env(
+            CLAUDE_CODE_ENABLE_TELEMETRY="1",
+            OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{port}",
+        )
+        self.addCleanup(_stop_fake_receiver, main_root, env)
+
+        start = run_fake_receiver(main_root, ["--ensure-running"], env=env)
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(main_root, env)
+        self.assertEqual(running.returncode, 0, f"precondition: the main checkout's receiver must be up -- {running.stdout!r} {running.stderr!r}")
+        real_pidfile = _pidfile_path(main_root)
+        self.assertTrue(real_pidfile.is_file(), "precondition: the main checkout's own pidfile must exist")
+
+        worktree_script = worktree_path / "scripts" / "cairn" / "otel_receiver.py"
+        result = subprocess.run(
+            [sys.executable, str(worktree_script), "--flush-now"],
+            capture_output=True, text=True, cwd=str(worktree_path), env=env,
+        )
+        combined = result.stdout + result.stderr
+
+        if result.returncode == 0:
+            return  # it reached the main checkout's real receiver -- AC's first disjunct
+
+        # macOS resolves /tmp -> /private/tmp (and /var -> /private/var);
+        # compare resolved forms so that symlink alone never produces a
+        # spurious mismatch in either direction.
+        self.assertIn(
+            str(real_pidfile.resolve()), combined,
+            f"a failed --flush-now from a linked worktree must name the MAIN CHECKOUT's real "
+            f"pidfile ({real_pidfile}), not the worktree's own (never-mounted) one -- got {combined!r}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1416,6 +1416,128 @@ class CapabilityMarkerNudgeGateTests(unittest.TestCase):
 # every registered session has crashed.
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# POLY-49 (carried, no separate sub-issue): three findings from the
+# POLY-48 loop, session-registry group. No ruling needed -- each is
+# testable directly against the documented `--ensure-running`/`--status`
+# CLI seam (module docstring above).
+# --------------------------------------------------------------------------
+
+
+class EnsureRunningAgainstAnAlreadyRunningReceiverRegistersTheCallerTests(unittest.TestCase):
+    """2026-09-25 finding: with the receiver already up from an earlier
+    session, `.sessions/` kept only that earlier session's id -- a new
+    session's own SessionStart hook call never appeared. The REAL hook
+    command (`.claude/settings.json`) never passes `--session-id`
+    explicitly -- only `--session-pid "$PPID"` -- and relies entirely on
+    `_session_id_from_stdin()` reading the hook's own JSON payload
+    (`{"session_id": ...}`) off stdin. This reproduces that exact
+    invocation shape, piped stdin included, against a receiver already
+    started by an EARLIER `--ensure-running` call -- not a fresh spawn."""
+
+    def test_a_second_sessions_hook_stdin_payload_registers_against_the_running_receiver(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        first = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid())], env=env,
+        )
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        _wait_for_status_running(fake_root, env)
+
+        script = fake_root / "scripts" / "cairn" / "otel_receiver.py"
+        payload = json.dumps({"session_id": "s2", "hook_event_name": "SessionStart"})
+        second = subprocess.run(
+            [sys.executable, str(script), "--ensure-running", "--session-pid", str(os.getpid())],
+            input=payload, capture_output=True, text=True, cwd=str(fake_root), env=env,
+        )
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+
+        status = run_fake_receiver(fake_root, ["--status"], env=env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn(
+            "sessions: 2", status.stdout,
+            f"the SECOND session's hook call (stdin-sourced id, exactly the real hook's shape) "
+            f"must register against the ALREADY-RUNNING receiver, not be silently dropped -- "
+            f"got {status.stdout!r}",
+        )
+        self.assertIn("session s2", status.stdout, f"the stdin-sourced session id must be listed by name -- {status.stdout!r}")
+
+
+class StatusListsEverySessionWhoseHookRanTests(unittest.TestCase):
+    """POLY-49 AC: "`--status` lists every session whose hook ran since
+    the receiver started." Four registrations via the documented
+    `--session-id`/`--session-pid` flags (the explicit-id path, isolating
+    this from the stdin-fallback finding above), one plain re-spawn call
+    with none at all (back-compat, must add nothing) -- all four original
+    ids must still be listed, by name, after all five calls."""
+
+    def test_every_registered_session_is_listed_by_name(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        pid = os.getpid()
+        for session_id in ("s1", "s2", "s3", "s4"):
+            r = run_fake_receiver(
+                fake_root, ["--ensure-running", "--session-id", session_id, "--session-pid", str(pid)], env=env,
+            )
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        _wait_for_status_running(fake_root, env)
+
+        # A bare re-spawn call, no session id at all -- must add nothing.
+        bare = run_fake_receiver(fake_root, ["--ensure-running"], env=env)
+        self.assertEqual(bare.returncode, 0, bare.stdout + bare.stderr)
+
+        status = run_fake_receiver(fake_root, ["--status"], env=env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn("sessions: 4", status.stdout, status.stdout)
+        for session_id in ("s1", "s2", "s3", "s4"):
+            self.assertIn(f"session {session_id}", status.stdout, f"missing {session_id!r} -- {status.stdout!r}")
+
+
+class DeadPidIsMarkedDeadWithoutWaitingForAnyReapTests(unittest.TestCase):
+    """POLY-49 AC: "a session is marked dead within one watchdog beat of
+    its process exiting." `_status`'s own docstring already promises a
+    FRESH, non-mutating liveness probe on every call -- so a dead pid
+    must read `dead` on the very next `--status`, with no wait, no
+    `--session-ended`, and no periodic-reap window elapsed at all (a
+    beat count of zero, the tightest bound "one watchdog beat" could
+    mean). Registration alone must never mark a session merely for
+    having a not-yet-confirmed-live pid, either -- a fresh live one
+    reads `alive` on the same immediate probe."""
+
+    def test_a_dead_pid_reads_dead_on_the_very_next_status_call_no_wait(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        alive_pid = os.getpid()
+        gone_pid = _dead_pid()
+
+        r1 = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "alive", "--session-pid", str(alive_pid)], env=env,
+        )
+        self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
+        _wait_for_status_running(fake_root, env)
+
+        r2 = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "gone", "--session-pid", str(gone_pid)], env=env,
+        )
+        self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+
+        # No sleep, no --session-ended, no periodic-reap window -- the
+        # very next --status call must already read it honestly.
+        status = run_fake_receiver(fake_root, ["--status"], env=env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn("session gone: dead", status.stdout, f"got {status.stdout!r}")
+        self.assertIn("session alive: alive", status.stdout, f"got {status.stdout!r}")
+
+
 class PeriodicReapSweepTests(unittest.TestCase):
     """Team-lead: '12afe1d added a slow periodic reap ... untested as far
     as I can see: (a) a dead-pid + stale-transcript session is reaped by
