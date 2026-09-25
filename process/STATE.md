@@ -15,7 +15,13 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: POLY-26 (backfill sibling scan), POLY-33 (check-warning fix), POLY-15 (unpriced-model cost)._
+- **Feature:** backfill_tokens.py scans only the main project slug; backfilled teammate lines are unattributed
+- **Issue:** POLY-26 (cairn)
+- **Milestone:** POLY-A
+- **Branch:** `feature/poly-26-backfill-sibling-scan`
+- **Started:** 2026-09-25
+- **Goal:** move the POLY-10 transcript-path resolver into `backfill_tokens.py` and make the backfill scan the repo's worktree-sibling transcript dirs, so backfilled teammate lines carry their role.
+- **Status:** In Progress
 
 ## Releases
 
