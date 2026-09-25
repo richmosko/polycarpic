@@ -754,8 +754,11 @@ paragraph's "token ratio" to "cost ratio".
    `bloat_reasons` (test_estimation.py ~l.524/542) to `"cost"`. With
    `bloat_ratio: 1.5`, a cost ratio of 1.6 flags `"cost"`. When unset, the
    `cost threshold unset` line prints and the gate rule still flags.
-9. **Estimate.** Schema-1 and null-cost rows are excluded from the cost
-   median. The suggestion line is
+9. **Estimate.** Rows with a null `actual.cost_usd` are excluded from the
+   cost median. A schema-1 row with a non-null cost **counts** (review
+   ruling: its `cost_usd` came from the same `token_actuals` pricing; only
+   its `ratio` changed meaning), so one priced schema-1 row among nulls
+   gives that row's cost as the median. The suggestion line is
    `estimate.cost_usd=X.XX estimate.gate_cycles=N`. A tier with all-null
    costs gives the gate-only suggestion ending `no non-null cost actuals`.
    The header string is pinned, and a schema-1 row prints ratio `-`.
