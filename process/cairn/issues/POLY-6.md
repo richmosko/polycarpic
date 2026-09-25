@@ -139,3 +139,13 @@ Gate-4 verdict (POLY-32) re-issued on aa9ec31 (tip 00c431d) against the ruling `
 | Tests | pass | `run_tests.py -p` over test_cairn_test_boundary, test_real_state_guard*, test_migrate_retired: 41 OK |
 
 Remaining user action (AC5): after the workflow's first green run on the PR, register `cairn` as a required status check on `main`.
+
+### @qa-engineer — 2026-09-25
+
+PASS @ ba516cb (qa-engineer verdict gate).
+
+python3 run_tests.py --gate verdict (scripts/cairn, both roots): 1728 tests, 103 files, 8 workers, 26.5s, OK (skipped=4).
+
+node --test "scripts/cairn/tests/js/**/*.test.js": 479 tests, 477 pass, 2 fail — both the known layerchart ENOENT cases in token-chart-logic.test.js (node_modules absent locally, POLY-8's own tracked exclusion in ci.yml). No other JS failures.
+
+All five POLY-6 ACs covered: boundary moved (5 files/tests/workflow), migrations retired (3 files/~77 tests gone, backfill_tokens untouched), WORKFLOW.md spin-off-clean sentence present, ci.yml single path-filtered job (F1 pipefail fix verified), run_tests.py two-root discovery green. Anchor #14 marked completed.
