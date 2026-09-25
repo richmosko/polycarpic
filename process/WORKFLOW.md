@@ -240,6 +240,7 @@ Async messaging guarantees crossings: idle notifications, acks, and status repor
 Eight rules, each paid for once. They apply to every Implement→Validate loop.
 
 - **Rulings live in the file before they are messaged.** A gating ruling, and any ruling that changes an earlier one, is committed to the issue file first; the message that follows says "read the file", never restates the ruling. Restated rulings and their reversals race through mailboxes and get acted on out of order (four crossings in one loop).
+- **A ruling is an issue comment within budget, or `process/reviews/<ID>/ruling.md`**; never a file under `scripts/cairn/docs/`.
 - **A seam agreement waits on an in-flight ruling.** When the TDD pair knows a gating ruling is coming, they do not agree function names or flags by message first; the ruling names the seam and the pair writes against it.
 - **Operative text carries what to do; the ledger carries why.** Acceptance criteria are amended in place when a ruling changes them — a correction that lives only in a comment a hundred lines down is read by nobody who builds from the criteria. Reviewer instructions ("say why", "state both halves") never ship inside documentation; a ruling that dictates doc text supplies the sentences.
 - **Doc text about a measurement is written after the measurement lands**, never ahead of it. Two TRACKER sentences went false in opposite directions in one loop by being written first.
@@ -644,7 +645,7 @@ from the raw token sum, which a model swap or a caching change could move by
 an order of magnitude with no change in work) and **gate cycles** (bloat —
 one red→green pass or one review round); raw tokens and wall-clock are
 recorded but secondary, and human minutes never appear (kickoff § 2.12; full
-design: [`scripts/cairn/design/estimation.md`](../scripts/cairn/design/estimation.md)).
+design: [`scripts/cairn/docs/estimation.md`](../scripts/cairn/docs/estimation.md)).
 Schema: [`TRACKER.md` → Effort estimation](TRACKER.md#effort-estimation-poly-3).
 
 - **When the lead decomposes:** each feature issue is split into cairn
