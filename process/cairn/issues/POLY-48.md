@@ -1,14 +1,14 @@
 ---
 id: POLY-48
 title: Estimation-engine fixes (grouped): unpriced-model cost, check warning key, fixture hygiene, close --at flush ceiling, guard-push same-assignee scope, JS gate node_modules
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, estimation]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/16
 created: 2026-09-25
 updated: 2026-09-25
 ---
@@ -85,3 +85,7 @@ Loop closed at the approving verdicts (architect approve @ d5a806a, qa PASS @ 38
 
 1. **Lead process error — closes not at stage end.** All four sub-issues were closed back-to-back after the loop instead of immediately after each stage's gate commit (estimation.md §(a), WORKFLOW → Estimation). No receiver flush existed for POLY-48 before the one the first close forced (21:24:40Z), so 48a/48b/48c all resolved `window.to` to that flush and 48a (plan) absorbed the architect's review usage; 48d (review) got an empty window (from = to = 21:24:40Z, tokens null, gate_cycles 0). Not recoverable by re-closing: one aggregate per role, no stage boundary inside it. The POLY-47 ceiling rule is not at fault; the old rule would have found zero lines for every stage.
 2. **Receiver under-capture (→ POLY-49).** The whole loop (≈40 min, 4 roles) captured ≈0.49M tokens, ≈$0.11; the POLY-51 plan stage alone captured 3.0M / $1.59. No flush landed between 20:37:05Z and 21:24:40Z despite the 1800 s interval (the 21:07 flush reported 0 lines), and each teammate role shows `records: 4`. Carried to POLY-49 as a criterion.
+
+### @team-lead — 2026-09-25
+
+PR opened: https://github.com/richmosko/polycarpic/pull/16. Awaiting Validate.

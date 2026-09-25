@@ -21,7 +21,8 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-48-estimation-engine-fixes`
 - **Started:** 2026-09-25
 - **Goal:** one PR that closes every estimation-engine defect found across the POLY-3 → POLY-51 loops, so the cost/estimate numbers the tracker reports can be trusted.
-- **Status:** In Progress
+- **PR:** https://github.com/richmosko/polycarpic/pull/16
+- **Status:** In Review
 
 _Next after this: POLY-49 (receiver hardening), POLY-50 (backfill attribution), then POLY-56 (checklists)._
 
