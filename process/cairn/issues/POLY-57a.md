@@ -1,7 +1,7 @@
 ---
 id: POLY-57a
 title: POLY-57 plan: gate-1 ruling
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-57
 blocked_by: []
@@ -10,6 +10,10 @@ paths: [process/cairn/issues/POLY-57*.md, process/cairn/issues/POLY-58.md, proce
 stage: plan
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 1
+actual.cost_usd: null
+actual.tokens: null
+actual.gate_cycles: 1
+actual.wall_clock: 7
 labels: [cairn, docs]
 priority: null
 pr: null
