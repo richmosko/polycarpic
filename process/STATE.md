@@ -15,13 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Estimation: estimate and ratio on cost, not the raw token sum
-- **Issue:** POLY-34 (cairn)
-- **Milestone:** POLY-A
-- **Branch:** `feature/poly-34-estimate-on-cost-axis`
-- **Started:** 2026-09-25
-- **Goal:** Sub-issue estimates, ratios, the bloat threshold and `cairn estimate` work in dollars (or cost-weighted tokens) so cache-read volume stops distorting calibration; POLY-6's class re-closed as the first cost-based reference.
-- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/13
+_None — between loops. Next: POLY-26 (backfill sibling scan), POLY-33 (check-warning fix), POLY-15 (unpriced-model cost)._
 
 ## Releases
 

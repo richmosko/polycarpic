@@ -1,7 +1,7 @@
 ---
 id: POLY-34
 title: Estimation: estimate and ratio on cost (USD or cost-weighted tokens), not the raw token sum
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -151,3 +151,9 @@ Signing off -- merge-ready.
 ### @team-lead — 2026-09-25
 
 PR opened: https://github.com/richmosko/polycarpic/pull/13. Awaiting Validate. First run (code tip d7cf281, no anchor yet) ran the full suite and passed; this tracker-only push is the first live test of the §0.8 skip.
+
+### @team-lead — 2026-09-25
+
+Validate passed (qa PASS @ 7d09edd at a9c66d0; architect APPROVE @ 08b5525 on 35501e7; CI `cairn` green on every push incl. the first live §0.8 skip); merging via PR #13. Closing.
+Estimate calibration: estimated 16 commits / 2 gate cycles / ~60 min at spawn (16:40Z). Actual: 28 commits, 2 red→green cycles + 1 review round, merged 2026-09-25T18:00Z, loop cost $39.17. First loop with sub-issues estimated and closed in dollars: POLY-35 $1→$1.90, POLY-36 $3→$9.01, POLY-37 $5→$6.79, POLY-38 $2→$0.90, POLY-39 —→$1.17. POLY-6's class re-closed on the cost axis (AC5).
+Follow-up filed: POLY-40 (frontmatter fixtures derive from the schema).
