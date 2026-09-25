@@ -1,7 +1,7 @@
 ---
 id: POLY-51
 title: Sub-issue IDs get a letter suffix on the parent (POLY-1234a); existing numbered sub-issues are not renamed
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -100,3 +100,9 @@ All 11 red tests from POLY-53 (test_sub_issue_ids.py, test_sub_issue_id_lint.py,
 ### @team-lead — 2026-09-25
 
 PR opened: https://github.com/richmosko/polycarpic/pull/15. Verdicts already recorded (qa 92a9e23 at 13bbc5f; architect 006848e at bb4e3a8); head-match `gate --head bb4e3a8` PASS. Awaiting the required `cairn` check and the merge call.
+
+### @team-lead — 2026-09-25
+
+Validate passed; merging via PR #15. Closing.
+
+Calibration (lead's start estimate vs actual): est ~45 min / 12 commits / 1 gate cycle / ~$20 → actual ~50 min loop window (19:46–20:36Z) / 15 commits incl. tracker chores / 1 gate cycle / $17.49 loop cost at the scorecard. Sub-issue actuals: POLY-52 $1.59 (1.06), POLY-53 $4.52 (1.81 — qa's verdict commit counted as a second cycle, POLY-48 note), POLY-54 $3.78 (1.08), POLY-55 $0.71 (0.71). This loop's own sub-issues were the last minted under the numeric scheme; the next loop's are the first letter ids.
