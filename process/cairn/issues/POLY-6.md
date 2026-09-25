@@ -60,3 +60,8 @@ Gate-1 ruling: read `scripts/cairn/design/test-boundary-ci.md` @ 615b94e (AC1–
 - AC1: 5 files / 50 tests move to `tests/workflow/`; discovered as an optional second root in `run_tests.py` (one gate command, hooks unchanged).
 - AC4: three `migrate` commands + 77 tests deleted; detection lints stay, fix hints go. Token backfill NOT retired (re-runnable correction path per TRACKER.md, POLY-26 open, receiver uses 15 module names), so that AC4 item is struck.
 - AC5: one job `cairn` (the required-check name), no workflow-level `paths:` (a required check would hang); fail-closed step-level change filter; JS runs minus `token-chart-logic.test.js` until POLY-8.
+
+### @team-lead — 2026-09-25
+
+Gate-1 ruling accepted @ 615b94e. Five convention files (50 tests) move to `tests/workflow/` with the runner picking it up as an optional second root so `--gate` and the hooks are unchanged; three migrate commands and 77 tests deleted, `legacy_archived_issue_paths` lint kept; one job `cairn` with an in-job `changes` step (not workflow-level `paths:`, so the required check always reports); JS run excludes the POLY-8 file until POLY-8 lands.
+Scope deviation accepted by team-lead, flagged to the user: AC4's "token backfill" item is struck — the backfill is the documented retroactive-attribution mechanism (TRACKER §110–114), POLY-26 targets it, and otel_receiver imports 15 names from the module. If the user still wants the CLI retired, it becomes a follow-up after POLY-26. POLY-28 closed at design-gate clear.
