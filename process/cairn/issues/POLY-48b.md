@@ -23,3 +23,7 @@ updated: 2026-09-25
 ### @qa-engineer — 2026-09-25
 
 Red tests pushed @ 2e41831 (5 no-ruling cairn.py defects, 6 failing cases) and @ 2d394be (POLY-47 + hardened guard-push/close-worktree cases per the landed ruling, 8 failing cases total across both commits). Lane-2 green build pushed @ a428df5: POLY-40 fixture derivation (test_frontmatter_rewrite.py, verified robust to a simulated schema addition) + POLY-8 JS gate independence (token-chart-logic.test.js skips the 2 layerchart-dependent tests by name when dashboard/node_modules is absent; full JS suite 479 pass/0 fail/2 skipped). Awaiting implementation-lead's green on cairn.py for the remaining red tests.
+
+### @qa-engineer — 2026-09-25
+
+VERDICT: PASS, pinned to d1f2e08. Full suite at that exact sha: Python run_tests.py --gate finish -> 1804 tests, 0 fail, 4 skipped. JS node --test -> 481 tests, 479 pass, 0 fail, 2 skipped. All 8 previously-red cases (test_check_budgets, test_guard_push, test_server, test_id_allocation, test_estimation, test_frontmatter_rewrite, test_js_suite_node_modules_independence -- 202 tests total) confirmed green at d1f2e08 in a detached checkout.
