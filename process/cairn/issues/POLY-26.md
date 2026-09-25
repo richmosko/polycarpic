@@ -35,3 +35,20 @@ Gate-1 ruling: scripts/cairn/design/backfill-sibling-scan.md (this commit). Reso
 ### @team-lead — 2026-09-25
 
 Gate-1 ruling accepted at 2f245a3 (`scripts/cairn/design/backfill-sibling-scan.md`, 2e1b462). Scope per §3: no write to `token-usage.jsonl` this loop; AC4 "re-run" = `--dry-run` from the main checkout; follow-ups POLY-45 (issue attribution on worktree branches) and POLY-46 (write-path double-count guard). POLY-41 closed at the gate without `--at`: the ceiling at 2f245a3 (19:16:20Z) excluded the receiver flush at 19:17:15Z that carried the plan-stage usage ($0.04 vs $1.91) — filed as POLY-47.
+
+### @team-lead — 2026-09-25
+
+AC4 (§3 acceptance) — `backfill_tokens.py --dry-run` from the main checkout at 68c8dfa:
+
+```
+scanned 38 transcript file(s) under ~/.claude/projects/-Users-mosko-Projects-polycarpic
+  of which 30 under 25 worktree sibling dir(s) -Users-mosko-Projects-polycarpic--claude-worktrees-*
+in-scope assistant/usage records: 7309 (4016 unique, 3293 duplicate)
+window: 2026-09-23 .. 2026-09-25 · buckets: 28 · nothing written
+```
+
+Role set across buckets: architect, implementation-lead, qa-engineer, team-lead, claude (192 records with agentSetting `claude`, the catch-all agent, kept verbatim by design). No `subagent-unattributed` bucket. m = 25 = the live sibling-dir count; k = 30 > 0. Sibling teammate lines carry their role (POLY-45 still puts most of them under the milestone bucket, as ruled).
+
+Side finding for the backfill group: stderr `cairn: warning: milestone_windows dropped colliding milestone window(s) ['POLY-A', 'POLY-B']` — both milestone files resolve to the same creation id/timestamp, so every record that would have matched a milestone window falls back to `main` instead of `milestone:POLY-A`. Not this loop's scope; to be tracked with POLY-45/46.
+
+qa bubble-up during the red gate: `test_otel_receiver_watchdog_attribution.WatchdogRecreatesAfterAbsentBoundTests.test_watchdog_recreates_after_absent_bound` flaked once under the 8-worker full run (0.5 s recreate bound missed), clean on 4 reruns. Timing-sensitivity class; to be tracked with the receiver group.
