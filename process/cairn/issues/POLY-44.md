@@ -1,7 +1,7 @@
 ---
 id: POLY-44
 title: POLY-26 review: architect review of the green build
-status: todo
+status: done
 milestone: POLY-A
 parent: POLY-26
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [scripts/cairn/design/backfill-sibling-scan.md, process/cairn/issues/POLY
 stage: review
 estimate.cost_usd: "1.00"
 estimate.gate_cycles: 1
+actual.cost_usd: "0.7202"
+actual.tokens: 2164323
+actual.gate_cycles: 1
+actual.wall_clock: 13
+ratio: "0.72"
 labels: [cairn, telemetry]
 priority: P3
 pr: null

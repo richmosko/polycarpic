@@ -67,3 +67,7 @@ Verdict (POLY-44) on green 68c8dfa, against scripts/cairn/design/backfill-siblin
 | §4 tests | pass | 7 new tests at 5872a43 unchanged in green; existing tests 0 deletions; 5 modules, 137 tests OK (unittest, this worktree) |
 
 No debt findings. Note: the new `Path.is_relative_to` needs Python ≥ 3.9 (local 3.14).
+
+### @team-lead — 2026-09-25
+
+Architect verdict PASS accepted (5ad725f on green 68c8dfa). POLY-44 closed at the verdict without `--at` (POLY-47 again: ceiling at 3120e92 read $0.21, without it $0.49). Guard-push design gap surfaced by the review push: `guard-push` scans every same-assignee commit since merge-base, so the second sub-issue an agent holds on one branch trips on the first one's files; POLY-44 declared the union as the workaround. To be tracked in the cairn-engine umbrella. Sending qa the verdict run at tip 3120e92.
