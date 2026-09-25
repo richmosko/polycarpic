@@ -52,3 +52,18 @@ Role set across buckets: architect, implementation-lead, qa-engineer, team-lead,
 Side finding for the backfill group: stderr `cairn: warning: milestone_windows dropped colliding milestone window(s) ['POLY-A', 'POLY-B']` — both milestone files resolve to the same creation id/timestamp, so every record that would have matched a milestone window falls back to `main` instead of `milestone:POLY-A`. Not this loop's scope; to be tracked with POLY-45/46.
 
 qa bubble-up during the red gate: `test_otel_receiver_watchdog_attribution.WatchdogRecreatesAfterAbsentBoundTests.test_watchdog_recreates_after_absent_bound` flaked once under the 8-worker full run (0.5 s recreate bound missed), clean on 4 reruns. Timing-sensitivity class; to be tracked with the receiver group.
+### @architect — 2026-09-25
+
+Verdict (POLY-44) on green 68c8dfa, against scripts/cairn/design/backfill-sibling-scan.md: **PASS**.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| §1 resolver moved, one copy | pass | 68c8dfa: suffix/cache/`_transcript_path_for` + `_worktree_sibling_dirs` in backfill_tokens.py; receiver defines none, both call sites use `backfill_tokens._transcript_path_for` |
+| §1 receiver byte-identical | pass | same lookup order + anchor; only delta is `glob.escape`, a no-op for a slug without `[*?` (ruled) |
+| §2 roots + anchor + dedupe | pass | `roots = [dir] + _worktree_sibling_dirs(dir)`, set-union of rglob; seen_keys run-global; tests 2–4 |
+| §2 stdout | pass | line 1 unchanged; line 2 prints counts + `<name>--claude-worktrees-*` only; no sibling path |
+| §3 token-usage.jsonl untouched | pass | 2f245a3..68c8dfa touches no metrics path |
+| §3 TRACKER sentence | pass | rewritten, names POLY-45 |
+| §4 tests | pass | 7 new tests at 5872a43 unchanged in green; existing tests 0 deletions; 5 modules, 137 tests OK (unittest, this worktree) |
+
+No debt findings. Note: the new `Path.is_relative_to` needs Python ≥ 3.9 (local 3.14).
