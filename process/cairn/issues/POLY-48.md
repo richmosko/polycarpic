@@ -1,7 +1,7 @@
 ---
 id: POLY-48
 title: Estimation-engine fixes (grouped): unpriced-model cost, check warning key, fixture hygiene, close --at flush ceiling, guard-push same-assignee scope, JS gate node_modules
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -31,3 +31,7 @@ Two more members carried here from the POLY-51 review (architect verdict 006848e
 - **HTTP error code for letter-path refusals:** over `_create_issue`, a–z exhaustion (and the other `--parent` refusals) return 400 with code `legacy_archive`; the POLY-51 ruling §2 reserved that code for the legacy-archive guard and specified `bad_parent`, which no test pins. Fix the code and add the HTTP test.
 - **Shared claim-and-write helper:** the O_EXCL create loop is duplicated between the numeric and letter paths of `allocate_and_create_issue` (~20 lines). Factor one helper; both paths call it.
 - **`cairn close` from a teammate worktree writes `actual.cost_usd: None`** (architect, POLY-52): a worktree has no metrics mount, so `close` finds no `token-usage.jsonl` and records nulls. It should refuse with a message naming the main checkout, not write.
+
+### @team-lead — 2026-09-25
+
+Feature started. Branch: `feature/poly-48-estimation-engine-fixes`.
