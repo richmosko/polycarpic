@@ -87,3 +87,12 @@ Follow-ups (group into an engine umbrella; lead's choice which): (a) map exhaust
 ### @team-lead — 2026-09-25
 
 Architect verdict APPROVE accepted (006848e on green bb4e3a8). POLY-55 closed at the verdict from the main checkout. qa's item-5 race substitution stands (collision branch measured hit in 50/50 runs). Two follow-ups (HTTP error code `bad_parent` untested and wrong on exhaustion; duplicated O_EXCL loop) recorded on POLY-48. Sending qa the verdict run.
+
+### @qa-engineer — 2026-09-25
+
+QA verdict gate @ 13bbc5f: PASS.
+
+`run_tests.py --gate verdict`: 1787 tests, 0 failures/errors, 4 skipped -- OK.
+`node --test` over tests/js (46 files, token-chart-logic.test.js excluded per the CI/POLY-8 exclusion): 434 tests, 0 failures.
+
+All 11 red tests from POLY-53 (test_sub_issue_ids.py, test_sub_issue_id_lint.py, the appended test_id_sort.py/test_server.py/id-sort.test.js/child-progress.test.js cases) are green against POLY-54's allocator, patterns, and lint. No skips added, no test edited to pass.
