@@ -21,18 +21,18 @@ import helpers  # noqa: F401
 
 import cairn
 
-# POLY-3: `stage`/`estimate.*`/`actual.*`/`ratio` joined ISSUE_FIELD_ORDER as
-# optional, absent-means-undeclared fields -- same "canonical keys lead, but
-# only the ones a fixture actually declares" precedent POLY-2 set for
-# `paths`. Every fixture below that asserts a "leading canonical keys"
-# invariant against a dict/file that never declares these must exclude them
-# from the expected order the same way it already excludes `paths`.
-# POLY-34 (ruling §0.3): `estimate.cost_usd`/`actual.cost_usd` joined the
-# same optional block, same reasoning.
-_OPTIONAL_UNDECLARED_FIELDS = (
-    "paths", "stage", "estimate.cost_usd", "estimate.tokens", "estimate.gate_cycles",
-    "actual.cost_usd", "actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio",
-)
+# POLY-40: three loops in a row, a schema change to ISSUE_FIELD_ORDER broke
+# these same fixtures -- they used to hardcode the optional/undeclared field
+# set by name. Derived instead: given the raw frontmatter text a fixture
+# actually wrote, the undeclared set is whatever ISSUE_FIELD_ORDER lists that
+# text doesn't. Adding a new optional schema key now needs no edit here.
+def _fields_declared_in(frontmatter_text: str) -> set:
+    return {line.split(":", 1)[0] for line in frontmatter_text.splitlines() if ":" in line}
+
+
+def _undeclared_optional_fields(frontmatter_text: str) -> list:
+    declared = _fields_declared_in(frontmatter_text)
+    return [f for f in cairn.ISSUE_FIELD_ORDER if f not in declared]
 
 
 def write_issue(path: Path, frontmatter_text: str, body: str) -> None:
@@ -46,43 +46,55 @@ def tail_bytes_after_second_fence(raw: bytes) -> bytes:
     return raw[second + len(b"---\n"):]
 
 
+
+# POLY-40: the three list-shaped fields -- everything else in
+# ISSUE_FIELD_ORDER is a scalar (or legitimately null). A schema change
+# adding a new scalar optional key needs no edit here; a new LIST-shaped
+# key is a rarer, more deliberate shape decision that does.
+_LIST_FIELDS = ("blocked_by", "paths", "labels")
+
+
+def _fields_with_every_schema_key(**overrides) -> dict:
+    """Every ISSUE_FIELD_ORDER key, defaulted (list fields `[]`, everything
+    else `None`), then `overrides` applied -- so a test asserting "full
+    canonical order regardless of input order" doesn't have to hand-
+    enumerate the whole schema (POLY-40: that hand-enumeration is exactly
+    what broke three loops in a row when ISSUE_FIELD_ORDER grew a key)."""
+    fields = {k: ([] if k in _LIST_FIELDS else None) for k in cairn.ISSUE_FIELD_ORDER}
+    fields.update(overrides)
+    return fields
+
+
 class DumpFrontmatterTests(unittest.TestCase):
     def test_canonical_key_order_regardless_of_input_order(self):
-        # POLY-2/POLY-3: `paths` and (later) `stage`/`estimate.*`/
-        # `actual.*`/`ratio` are all members of ISSUE_FIELD_ORDER, so every
-        # one of them must be present in `fields` for this test's own claim
-        # (full canonical order regardless of input order) to mean what it
-        # says -- an absent optional field would legitimately not appear in
-        # the output at all (see each field's own "absent means undeclared"
-        # rule), which is a different, narrower assertion.
-        fields = {
-            "updated": "2026-08-19",
-            "id": "PT-1",
-            "title": "Thing",
-            "created": "2026-08-14",
-            "status": "todo",
-            "milestone": None,
-            "parent": None,
-            "blocked_by": [],
-            "assignee": None,
-            "paths": [],
-            "stage": None,
-            "estimate.cost_usd": None,
-            "estimate.tokens": None,
-            "estimate.gate_cycles": None,
-            "actual.cost_usd": None,
-            "actual.tokens": None,
-            "actual.gate_cycles": None,
-            "actual.wall_clock": None,
-            "ratio": None,
-            "labels": [],
-            "priority": None,
-            "pr": None,
-        }
+        # POLY-2/POLY-3: every ISSUE_FIELD_ORDER key must be present in
+        # `fields` for this test's own claim (full canonical order
+        # regardless of input order) to mean what it says -- an absent
+        # optional field would legitimately not appear in the output at
+        # all (see each field's own "absent means undeclared" rule), which
+        # is a different, narrower assertion. `_fields_with_every_schema_key`
+        # guarantees that regardless of what ISSUE_FIELD_ORDER currently
+        # holds.
+        fields = _fields_with_every_schema_key(
+            updated="2026-08-19", id="PT-1", title="Thing", created="2026-08-14", status="todo",
+        )
         text = cairn.dump_frontmatter(fields)
         lines = [line for line in text.splitlines() if ":" in line]
         keys_in_order = [line.split(":", 1)[0] for line in lines]
         self.assertEqual(keys_in_order, cairn.ISSUE_FIELD_ORDER)
+
+    def test_canonical_order_string_is_pinned(self):
+        # POLY-40: the test above compares dump_frontmatter's output
+        # against ISSUE_FIELD_ORDER itself, which can't catch a
+        # REORDERING of that list (both sides would move together). This
+        # is the one assertion the AC asks to keep explicit -- a literal
+        # string a reordering in cairn.py actually breaks.
+        self.assertEqual(
+            " ".join(cairn.ISSUE_FIELD_ORDER),
+            "id title status milestone parent blocked_by assignee paths stage "
+            "estimate.cost_usd estimate.tokens estimate.gate_cycles actual.cost_usd "
+            "actual.tokens actual.gate_cycles actual.wall_clock ratio labels priority pr created updated",
+        )
 
     def test_fenced_by_triple_dash(self):
         fields = {k: None for k in cairn.ISSUE_FIELD_ORDER}
@@ -264,7 +276,10 @@ class UnknownFrontmatterKeyPreservationTests(unittest.TestCase):
         # must survive a patch (each field's own "absent means undeclared"
         # rule) -- so the canonical-keys-lead prefix here is ISSUE_FIELD_ORDER
         # minus the fields this fixture never had, not the full order.
-        expected_leading_keys = [f for f in cairn.ISSUE_FIELD_ORDER if f not in _OPTIONAL_UNDECLARED_FIELDS]
+        # POLY-40: derived from what the fixture text actually declares,
+        # not a hand-maintained list of field names.
+        declared = _fields_declared_in(self._canonical_frontmatter_text())
+        expected_leading_keys = [f for f in cairn.ISSUE_FIELD_ORDER if f in declared]
         keys = self._frontmatter_keys_in_file()
         self.assertEqual(
             keys[: len(expected_leading_keys)], expected_leading_keys,
@@ -541,13 +556,12 @@ class PT13MilestoneFieldOrderAndNoUpdatedInjectionTests(unittest.TestCase):
     def test_issue_field_order_and_updated_bump_are_unaffected(self):
         # Regression guard -- PT-13 must not touch the issue-file path.
         issue_path = self.tmp / "PT-1.md"
-        write_issue(
-            issue_path,
+        fixture_text = (
             "id: PT-1\ntitle: Thing\nstatus: todo\nmilestone: null\nparent: null\n"
             "blocked_by: []\nassignee: null\nlabels: []\npriority: null\npr: null\n"
-            "created: 2026-08-01\nupdated: 2026-08-01\n",
-            "Body.\n",
+            "created: 2026-08-01\nupdated: 2026-08-01\n"
         )
+        write_issue(issue_path, fixture_text, "Body.\n")
         cairn.apply_patch(issue_path, {"status": "in-review"})
         raw = issue_path.read_text(encoding="utf-8")
         inner = raw.split("---\n", 2)[1]
@@ -556,7 +570,8 @@ class PT13MilestoneFieldOrderAndNoUpdatedInjectionTests(unittest.TestCase):
         # estimation field, and that absence must survive a patch --
         # expected order is ISSUE_FIELD_ORDER minus the fields this fixture
         # never had.
-        self.assertEqual(keys, [f for f in cairn.ISSUE_FIELD_ORDER if f not in _OPTIONAL_UNDECLARED_FIELDS])
+        # POLY-40: derived from what the fixture text actually declares.
+        self.assertEqual(keys, [f for f in cairn.ISSUE_FIELD_ORDER if f not in _undeclared_optional_fields(fixture_text)])
         frontmatter, _ = cairn.parse_frontmatter(raw)
         self.assertEqual(frontmatter["updated"], datetime.date.today().isoformat())
 

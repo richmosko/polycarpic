@@ -800,7 +800,25 @@ function normalizeMarksBodyLines(text) {
     .filter((line) => line.length > 0);
 }
 
-test("layerchart is still the pinned version our copied marks body was taken from", () => {
+// POLY-8: both tests below read real files under dashboard/node_modules/
+// layerchart/ directly -- on a clone/worktree that never ran `npm install`
+// under scripts/cairn/dashboard/ (identical on main, 479/481 JS tests
+// pass), that throws an uncaught ENOENT rather than a clean assertion
+// failure, and the finish-feature gate runs this whole file as a HARD
+// GATE. Skipped, loudly and by name, when the dashboard dependencies
+// aren't installed in THIS checkout -- same posture the analogous
+// svelte-check gate step already takes (SKILL.md's `-d .../node_modules`
+// guard + NOTE line, test_svelte_check_gate.py).
+const LAYERCHART_INSTALLED = fs.existsSync(LAYERCHART_PACKAGE_JSON);
+const LAYERCHART_ABSENT_SKIP_REASON =
+  `layerchart not installed at ${LAYERCHART_PACKAGE_JSON} -- dashboard dependencies absent in this ` +
+  `checkout/worktree; run \`npm install\` under scripts/cairn/dashboard/ to exercise this guard`;
+
+test("layerchart is still the pinned version our copied marks body was taken from", (t) => {
+  if (!LAYERCHART_INSTALLED) {
+    t.skip(LAYERCHART_ABSENT_SKIP_REASON);
+    return;
+  }
   const pkg = JSON.parse(fs.readFileSync(LAYERCHART_PACKAGE_JSON, "utf8"));
   assert.equal(
     pkg.version, PINNED_LAYERCHART_VERSION,
@@ -811,7 +829,11 @@ test("layerchart is still the pinned version our copied marks body was taken fro
   );
 });
 
-test("TokenCostChart.svelte's marks override is a verbatim copy of layerchart's default body -- three-way: upstream, the pinned constant, and the component's own copy", () => {
+test("TokenCostChart.svelte's marks override is a verbatim copy of layerchart's default body -- three-way: upstream, the pinned constant, and the component's own copy", (t) => {
+  if (!LAYERCHART_INSTALLED) {
+    t.skip(LAYERCHART_ABSENT_SKIP_REASON);
+    return;
+  }
   const upstreamBlock = extractBlock(
     fs.readFileSync(LAYERCHART_BARCHART_BASE, "utf8"), MARKS_BODY_ANCHOR_RE, "layerchart's BarChart.base.svelte",
   );
