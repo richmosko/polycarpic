@@ -68,3 +68,7 @@ POLY-39 shape tests RED @ 7bd9a6d (tests/workflow/test_cairn_test_boundary.py).
 `CiAnchoredSkipTests` (§0.8 addendum 1): anchor lookup filters event=pull_request + status=success, `actions: read` permission, both ancestry checks present, `run=false` written exactly twice, no bare `|| true`.
 
 14 failures across 23 tests, all AssertionError on missing EXCLUDE/anchor-lookup literals in ci.yml -- right-reason RED. Pre-existing CiWorkflowShapeTests suite (9 tests) unaffected.
+
+### @devops-engineer — 2026-09-25
+
+POLY-39 landed @ 4774ef2: applied §0.7 exclusion pattern and §0.8 anchored-skip addendum to .github/workflows/ci.yml's `changes` step, byte-identical to the ruling text. Fail-closed throughout (no `|| true`); permissions gains `actions: read`, the step gains `GH_TOKEN`. qa's shape tests (CiExcludePatternTests + CiAnchoredSkipTests) pass: `python3 -m unittest tests.workflow.test_cairn_test_boundary -k Ci` → 19/19 OK.
