@@ -1,7 +1,7 @@
 ---
 id: POLY-57
 title: Cairn docs: living docs only, rulings as audit records
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -100,3 +100,7 @@ AC amended in place (user decision 2026-09-25): `estimation.md` is pruned to cur
 ### @team-lead — 2026-09-25
 
 PR opened: https://github.com/richmosko/polycarpic/pull/18. Awaiting Validate.
+
+### @team-lead — 2026-09-25
+
+Validate passed; merging via PR #18. Closing.
