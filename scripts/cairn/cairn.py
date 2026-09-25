@@ -6490,11 +6490,17 @@ def check_budgets(data_dir: Path) -> List[str]:
         # POLY-3 (design note §1): "a sub-issue with status: done and a
         # stage but no actual.* is a WARNING, not an error" -- it was
         # closed by `cairn set status=done` rather than `cairn close`.
+        # POLY-33: keyed on `actual.gate_cycles`, not `actual.tokens` --
+        # `cairn close` always writes gate_cycles (0 included), but a
+        # legitimate close with no matching token-usage.jsonl line writes
+        # actual.tokens: null (design note §2 addendum 1, "no evidence").
+        # Keying on tokens made every such close indistinguishable from a
+        # `cairn set status=done` close it never was.
         try:
             fm, _ = parse_frontmatter(text)
         except CairnError:
             fm = {}
-        if fm.get("status") == "done" and fm.get("stage") is not None and fm.get("actual.tokens") is None:
+        if fm.get("status") == "done" and fm.get("stage") is not None and fm.get("actual.gate_cycles") is None:
             warnings.append(f"{p.name}: status done with stage {fm['stage']!r} but no actual.* -- closed via `cairn set` rather than `cairn close`")
     for name in DOC_LINT_FILES:
         doc = _docs_dir(data_dir) / name
