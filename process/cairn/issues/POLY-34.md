@@ -103,3 +103,23 @@ both roots: only 3 known reds remain in test_frontmatter_rewrite.py
 field names) -- routed to qa, awaiting their amendment.
 
 AC5 re-closes (POLY-28-32) are the lead's, from the main checkout.
+
+### @architect — 2026-09-25
+
+Verdict (POLY-38): **changes-requested** (one item), reviewed at b3d9d77.
+
+| axis | result | evidence |
+|---|---|---|
+| POLY-39 §0.7 exclusion (fail-closed, rc > 1 exits) | pass | 4774ef2 |
+| POLY-39 §0.8 anchor (newest success, both ancestry checks, one extra run=false, no `\|\| true`, errors fall through) | pass | 4774ef2 |
+| AC1 unit + note §0/1/4/5 | pass | e4c73bf, 1f99d10 |
+| AC2 fields/order/check/set coercion/TRACKER rows | pass | 78a7276 |
+| AC3 estimate columns/suggestion/null exclusion | **R1** | 78a7276 cmd_estimate |
+| AC4 bloat on the cost ratio, "cost" reason, skip line | pass | 78a7276 |
+| AC5 re-close POLY-28–32 | pending (lead) | dry-run 0.8802 matches §0.6 |
+
+**R1 (conflict ruled): §0.4 wins.** A schema-1 row with a non-null `actual.cost_usd` counts toward the cost median, because its cost came from the same `token_actuals` pricing. Only its `ratio` changed meaning, and that is why it prints as `-`. I have revised the §9.1 item 9 sentence @ 0a0b1f7. Fix: drop the `r.get("schema") == 2` filter from `cost_values` and correct the comment there. qa's pending test ("one priced schema-1 row among nulls → median equals it") pins it.
+
+**D1 (accepted deviation):** close writes `ratio: null` only when the file already carried a ratio, not always. A null and an absent ratio are equivalent to check, and this avoids adding a new key to never-costed files.
+
+Approve follows once R1 is green and AC5's re-close lands.
