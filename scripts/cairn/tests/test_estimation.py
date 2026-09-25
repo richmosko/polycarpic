@@ -554,6 +554,45 @@ class CloseWritesActualsTests(CloseCommandTestBase):
         self.assertNotIn("ratio", fm)
 
 
+class CloseRefusesFromWorktreeTests(CloseCommandTestBase):
+    """POLY-48 (carried AC, architect review of POLY-52): a teammate
+    worktree has no metrics mount -- `token-usage.jsonl` never lands
+    there -- so `close` run from inside one always reads a null
+    `actual.tokens`/`actual.cost_usd`, silently. It must refuse instead,
+    naming the main checkout, and must not write anything at all.
+
+    A REAL linked worktree (`git worktree add`), discriminated the same
+    way `ensure_metrics_worktree.py`'s `_is_linked_worktree` /
+    `run_tests.py`'s `_resolve_worktree_main_checkout` already do
+    (`--git-dir` != `--git-common-dir`) -- not a bare directory pretending
+    to be one."""
+
+    def setUp(self):
+        super().setUp()
+        # A fresh, auto-cleaned tmp dir of its own (never a path derived
+        # from self.root's parent -- that's the shared system tmpdir, and
+        # a fixed sibling name collides across separate test runs/repeats).
+        self.worktree_root = helpers.make_empty_tmp_dir(self) / "wt"
+        git(self.root, "worktree", "add", "-q", "-b", "teammate-worktree", str(self.worktree_root), "feature")
+        # The worktree's OWN checked-out copy of the data dir -- a linked
+        # worktree carries its own full working tree, no metrics/ mount.
+        self.worktree_data_dir = self.worktree_root / self.data_dir.relative_to(self.root)
+
+    def test_close_from_a_worktree_refuses_and_names_the_main_checkout(self):
+        self.seed_subissue()
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "green", when="2020-01-02T02:00:00+00:00")
+        git(self.worktree_root, "pull", "-q", str(self.root), "feature")
+
+        r = cairn_cmd(self.worktree_root, self.worktree_data_dir, "close", "PT-9", "--no-flush")
+        self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn(str(self.root), r.stdout + r.stderr)
+
+        fm, _ = cairn.parse_frontmatter((self.worktree_data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        self.assertIsNone(fm.get("actual.cost_usd"))
+        self.assertNotEqual(fm.get("status"), "done", "a refused close must not write status: done")
+
+
 class CloseBloatFlagTests(CloseCommandTestBase):
     """POLY-34 (ruling §0.5, §9.1 item 8): the token-ratio bloat rule is
     gone -- the threshold now gates the COST ratio, and the reason string

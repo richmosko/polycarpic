@@ -19,6 +19,17 @@ def _issue(data_dir: Path, body: str) -> Path:
     return p
 
 
+def _closed_issue(data_dir: Path, *, stage: str = "execute", extra_fm: str = "") -> Path:
+    """A `status: done` issue with a `stage`, plus whatever `actual.*`
+    lines the caller supplies via `extra_fm` (raw YAML lines, each
+    including its own trailing newline)."""
+    p = data_dir / "issues" / "PT-1.md"
+    fm = GOOD_FRONTMATTER.format(id="PT-1", status="done", milestone="null", parent="null", priority="null")
+    fm = fm + f"stage: {stage}\n" + extra_fm
+    p.write_text("---\n" + fm + "---\n\nBody.\n", encoding="utf-8")
+    return p
+
+
 class CommentAndSizeWarningTests(unittest.TestCase):
     def test_a_comment_over_forty_lines_warns_and_names_it(self):
         """Mutation: count lines of the whole file instead of the comment
@@ -57,6 +68,29 @@ class CommentAndSizeWarningTests(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("warning:", r.stderr)
         self.assertIn("ok", r.stdout)
+
+
+class ClosedViaCairnSetWarningTests(unittest.TestCase):
+    """POLY-33: the warning must key on `actual.gate_cycles is None`, not
+    `actual.tokens is None` -- a legitimate `cairn close` writes
+    `actual.gate_cycles` always (0 included) but leaves `actual.tokens:
+    null` whenever no receiver line matched the window."""
+
+    def test_null_token_but_present_gate_cycles_does_not_warn(self):
+        """Mutation: key back on actual.tokens -> this legitimate close
+        (gate_cycles: 0, tokens: null) trips the warning again."""
+        data_dir = make_tree(self)
+        _closed_issue(data_dir, extra_fm="actual.gate_cycles: 0\nactual.tokens: null\n")
+        self.assertEqual(cairn.check_budgets(data_dir), [])
+
+    def test_missing_gate_cycles_still_warns(self):
+        """The actual `cairn set status=done` case: no actual.* written
+        at all -- still a warning."""
+        data_dir = make_tree(self)
+        _closed_issue(data_dir, extra_fm="")
+        warnings = cairn.check_budgets(data_dir)
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("closed via `cairn set`", warnings[0])
 
 
 class DocsPhraseLintTests(unittest.TestCase):

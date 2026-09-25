@@ -375,6 +375,27 @@ class CreateIssueTests(ServerTestCase):
         new_path = self.data_dir / "issues" / "PT-4a.md"
         self.assertTrue(new_path.exists())
 
+    def test_letter_exhaustion_over_the_parent_flag_is_bad_parent_not_legacy_archive(self):
+        # POLY-48 (carried AC, POLY-51 review @ 006848e): a-z exhaustion is
+        # one of the letter path's `parent`-validity refusals -- it must
+        # raise BadParentError (-> HTTP 400 `bad_parent`), not the bare
+        # CairnError the legacy-archive guard maps to 400 `legacy_archive`.
+        # No test previously pinned this; exhaust PT-4's a..z letters by
+        # writing the sibling files directly, then ask for one more.
+        for i in range(26):
+            letter = chr(ord("a") + i)
+            (self.data_dir / "issues" / f"PT-4{letter}.md").write_text(
+                "---\nid: PT-4" + letter + "\ntitle: filler\nstatus: todo\nmilestone: null\n"
+                "parent: PT-4\nblocked_by: []\nassignee: null\nlabels: []\npriority: null\npr: null\n"
+                "created: 2026-09-25\nupdated: 2026-09-25\n---\n\nBody.\n",
+                encoding="utf-8",
+            )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            http_post(f"{self.base_url}/api/issue", {"title": "one too many", "parent": "PT-4"})
+        self.assertEqual(ctx.exception.code, 400)
+        error_payload = json.loads(ctx.exception.read())
+        self.assertEqual(error_payload["error"], "bad_parent")
+
 
 class PatchIssueTests(ServerTestCase):
     def _seen(self, issue_id: str) -> str:

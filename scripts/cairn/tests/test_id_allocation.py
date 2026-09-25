@@ -3,6 +3,7 @@ allocation over issues/ AND archive/ combined.
 """
 from __future__ import annotations
 
+import inspect
 import unittest
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -82,6 +83,29 @@ class AllocationTests(unittest.TestCase):
         (data_dir / "config.yml").write_text("prefix: PT\nport: 8766\ndata_dir: process/cairn\n", encoding="utf-8")
         path = cairn.allocate_and_create_issue(data_dir, base_fields("First ever"))
         self.assertEqual(path.name, "PT-1.md")
+
+
+class SharedClaimAndWriteHelperTests(unittest.TestCase):
+    """POLY-48 (carried AC, POLY-51 review @ 006848e): the O_CREAT|O_EXCL
+    claim-and-write loop is ~20 duplicated lines between the numeric path
+    (`allocate_and_create_issue`) and the letter path
+    (`_allocate_sub_issue`). One helper must do the claim; both paths call
+    it.
+
+    Behavior-preserving refactor -- there's no new externally-observable
+    outcome to pin, so this test inspects the source for exactly one
+    O_CREAT|O_EXCL open() call in the whole module, the structural
+    signature of "one shared helper" vs. "two copies of the same loop"."""
+
+    def test_the_o_excl_claim_call_appears_exactly_once_in_the_module(self):
+        source = inspect.getsource(cairn)
+        occurrences = source.count("os.O_CREAT | os.O_EXCL | os.O_WRONLY")
+        self.assertEqual(
+            occurrences, 1,
+            f"found {occurrences} os.open(..., O_CREAT|O_EXCL|O_WRONLY) call sites -- "
+            "the numeric and letter allocation paths must funnel through one shared "
+            "claim-and-write helper, not each carry their own copy of the loop",
+        )
 
 
 class ConcurrentAllocationTests(unittest.TestCase):
