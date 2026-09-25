@@ -396,6 +396,21 @@ class CreateIssueTests(ServerTestCase):
         error_payload = json.loads(ctx.exception.read())
         self.assertEqual(error_payload["error"], "bad_parent")
 
+    def test_legacy_archive_layout_still_maps_to_400_legacy_archive(self):
+        # Regression guard for the same ruling: splitting BadParentError's
+        # code off the generic CairnError branch must not disturb the
+        # legacy-archive guard's own mapping -- a flat `archive/*.md` file
+        # (not `archive/issues/`) still refuses allocation with 400
+        # `legacy_archive`, unaffected by the parent-flag scenario above.
+        (self.data_dir / "archive" / "PT-99.md").write_text(
+            "---\nid: PT-99\ntitle: Legacy layout\nstatus: done\n---\n\nBody.\n", encoding="utf-8",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            http_post(f"{self.base_url}/api/issue", {"title": "blocked by legacy layout"})
+        self.assertEqual(ctx.exception.code, 400)
+        error_payload = json.loads(ctx.exception.read())
+        self.assertEqual(error_payload["error"], "legacy_archive")
+
 
 class PatchIssueTests(ServerTestCase):
     def _seen(self, issue_id: str) -> str:

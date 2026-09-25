@@ -344,6 +344,42 @@ class SameAssigneeSiblingSubIssueScopeTests(GuardPushTestBase):
         self.assertIn("lib/unrelated.py", r.stdout + r.stderr)
         self.assertNotIn("src/auth/a.py", r.stdout + r.stderr)
 
+    def test_a_different_assignees_sibling_paths_are_not_admitted(self):
+        """Ruling (design/estimation-engine-fixes.md §1(c)): the union is
+        scoped to siblings with the SAME assignee -- a same-parent sibling
+        held by someone else must not widen this assignee's allowed
+        globs."""
+        write_issue(self.data_dir, "PT-1", "backend-lead", paths=("src/auth/**",), parent="PT-0")
+        write_issue(self.data_dir, "PT-2", "frontend-lead", paths=("src/ui/**",), parent="PT-0")
+        commit_as(self.root, "seed", "seed: tracker + fixture main files")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "src/auth/a.py")
+        write_file(self.root, "src/ui/b.py")
+        commit_as(self.root, "backend-lead", "PT-1 work plus a file only PT-2 (someone else's) declares")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("src/ui/b.py", r.stdout + r.stderr)
+
+    def test_a_siblings_malformed_paths_is_a_usage_error_naming_the_sibling(self):
+        """Ruling: a sibling's malformed `paths:` exits 2 naming the
+        sibling -- the union-building scan must surface a config error on
+        the SIBLING record it read, not silently skip it or crash."""
+        write_issue(self.data_dir, "PT-1", "backend-lead", paths=("src/auth/**",), parent="PT-0")
+        (self.data_dir / "issues" / "PT-2.md").write_text(
+            "---\nid: PT-2\ntitle: Malformed sibling\nstatus: in-progress\nmilestone: null\nparent: PT-0\n"
+            "blocked_by: []\nassignee: backend-lead\nlabels: []\npriority: null\npr: null\n"
+            "created: 2026-09-23\nupdated: 2026-09-23\npaths: src/billing/**\n"  # scalar, not a list
+            "---\n\nBody.\n",
+            encoding="utf-8",
+        )
+        commit_as(self.root, "seed", "seed: tracker + fixture main files")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "src/auth/a.py")
+        commit_as(self.root, "backend-lead", "in-bounds by PT-1's own paths")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("PT-2", r.stdout + r.stderr)
+
 
 class BranchBaseTests(GuardPushTestBase):
     def test_files_merged_in_from_main_are_excluded_from_the_range(self):
