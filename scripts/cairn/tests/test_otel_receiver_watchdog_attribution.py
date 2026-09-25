@@ -775,6 +775,210 @@ class SmokeHttpExportLandsOtelLineTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------
+# POLY-49 gate-1 ruling §1 fix #1, "red tests qa writes" item 1: interval
+# flush from the watchdog, independent of exports. Today (M9): "interval
+# flush lives only in _on_export; no export -> no interval flush" -- a
+# daemon that never receives a POST at all must still advance
+# `.last-flush` on its own, purely from WATCHDOG_TICK_SECONDS ticking
+# past `--flush-interval`.
+# --------------------------------------------------------------------------
+
+
+class IntervalFlushWithNoExportsTests(unittest.TestCase):
+    def test_last_flush_advances_within_10s_with_zero_exports(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        start = run_fake_receiver(
+            fake_root,
+            ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid()),
+             "--flush-interval", "1"],
+            env=env,
+        )
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(fake_root, env)
+        self.assertEqual(running.returncode, 0, running.stdout + running.stderr)
+        self.assertIn("last-flush: never", running.stdout, f"precondition: no flush yet -- {running.stdout!r}")
+
+        # No export POST anywhere in this test -- the only thing that can
+        # possibly advance last-flush is the watchdog's own interval
+        # trigger, ticking against --flush-interval 1.
+        deadline = time.time() + 10.0
+        advanced = False
+        last_status = None
+        while time.time() < deadline:
+            last_status = run_fake_receiver(fake_root, ["--status"], env=env)
+            if "last-flush: never" not in last_status.stdout:
+                advanced = True
+                break
+            time.sleep(0.2)
+        self.assertTrue(
+            advanced,
+            f"last-flush must advance within 10s from the watchdog's own interval trigger alone, "
+            f"with zero exports ever POSTed -- last --status: {last_status.stdout if last_status else None!r}",
+        )
+
+
+# --------------------------------------------------------------------------
+# POLY-49 gate-1 ruling §1 fix #2, "red tests qa writes" item 2: the
+# foreign-session filter. The endpoint is now user-global (M6/M7), so
+# every project's live sessions post to the same :4318 -- a datapoint
+# whose session_id has no transcript ANYWHERE in this repo's
+# transcripts_dir (direct or worktree-sibling) must be dropped before
+# fold, never landing a line; a datapoint carrying no session.id at all
+# is kept unconditionally (unchanged path).
+# --------------------------------------------------------------------------
+
+
+def _strip_session_id(payload: dict) -> dict:
+    payload = json.loads(json.dumps(payload))  # deep copy
+    for rm in payload.get("resourceMetrics", []):
+        for sm in rm.get("scopeMetrics", []):
+            for metric in sm.get("metrics", []):
+                for dp in metric.get("sum", {}).get("dataPoints", []):
+                    dp["attributes"] = [a for a in dp.get("attributes", []) if a.get("key") != "session.id"]
+    return payload
+
+
+def _post_payload(port: int, payload: dict) -> None:
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{port}/v1/metrics", data=body,
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        assert resp.status < 300, f"export POST rejected: {resp.status}"
+
+
+class ForeignSessionFilterTests(unittest.TestCase):
+    FOREIGN_SESSION_ID = "fake-session-abc123"  # basic.json's session.id
+
+    def _spawn(self, out_path: Path, pidfile: Path, transcripts_dir: Path, port: int) -> subprocess.Popen:
+        proc = subprocess.Popen(
+            [sys.executable, str(SCRIPT_PATH), "--port", str(port), "--out-file", str(out_path),
+             "--pidfile", str(pidfile), "--transcripts-dir", str(transcripts_dir)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env=_minimal_env(CLAUDE_CODE_ENABLE_TELEMETRY="1"),
+        )
+        self.addCleanup(_kill_if_alive, proc)
+        _wait_until_listening(port)
+        return proc
+
+    def _flush_and_read(self, proc: subprocess.Popen, out_path: Path) -> list:
+        os.kill(proc.pid, signal.SIGUSR1)
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            if out_path.is_file():
+                time.sleep(0.3)  # let one flush settle before reading
+                return read_jsonl(out_path)
+            time.sleep(0.1)
+        return read_jsonl(out_path) if out_path.is_file() else []
+
+    def test_foreign_session_with_no_transcript_anywhere_is_dropped(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)  # empty -- no transcript for FOREIGN_SESSION_ID
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        _post_payload(port, json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        lines = self._flush_and_read(proc, out_path)
+        otel_lines = [l for l in lines if l.get("source") == "otel"]
+        self.assertEqual(
+            len(otel_lines), 0,
+            f"a session with NO transcript anywhere in this repo must be dropped before fold, "
+            f"landing NO otel line -- got {otel_lines!r}",
+        )
+
+    def test_own_session_with_a_direct_transcript_is_kept(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)
+        (transcripts_dir / f"{self.FOREIGN_SESSION_ID}.jsonl").write_text(
+            json.dumps({"type": "agent-setting", "agentSetting": "qa-engineer"}) + "\n", encoding="utf-8",
+        )
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        _post_payload(port, json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        lines = self._flush_and_read(proc, out_path)
+        otel_lines = [l for l in lines if l.get("source") == "otel"]
+        self.assertEqual(len(otel_lines), 1, f"a session with a transcript in this repo must be kept -- got {lines!r}")
+
+    def test_own_session_with_only_a_worktree_sibling_transcript_is_kept(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)
+        sibling_dir = transcripts_dir.parent / f"{transcripts_dir.name}--claude-worktrees-x"
+        sibling_dir.mkdir()
+        (sibling_dir / f"{self.FOREIGN_SESSION_ID}.jsonl").write_text(
+            json.dumps({"type": "agent-setting", "agentSetting": "architect"}) + "\n", encoding="utf-8",
+        )
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        _post_payload(port, json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        lines = self._flush_and_read(proc, out_path)
+        otel_lines = [l for l in lines if l.get("source") == "otel"]
+        self.assertEqual(
+            len(otel_lines), 1,
+            f"a session whose transcript lives ONLY under a worktree-sibling dir must still be kept, "
+            f"same resolver as role attribution -- got {lines!r}",
+        )
+
+    def test_no_session_id_attribute_at_all_is_kept_unconditionally(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)  # empty -- proves this path never even consults it
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        payload = _strip_session_id(json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        _post_payload(port, payload)
+        lines = self._flush_and_read(proc, out_path)
+        otel_lines = [l for l in lines if l.get("source") == "otel"]
+        self.assertEqual(
+            len(otel_lines), 1,
+            f"a datapoint with NO session.id attribute at all must be kept unconditionally -- got {lines!r}",
+        )
+
+    def test_a_dropped_flush_logs_a_count_only_line_naming_no_session_id(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        _post_payload(port, json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        self._flush_and_read(proc, out_path)
+        os.kill(proc.pid, signal.SIGTERM)
+        try:
+            stdout, stderr = proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, stderr = proc.communicate(timeout=5)
+        # Ruling §1 fix #2's exact wording -- a bare "dropped" substring
+        # check would false-positive against the UNRELATED
+        # `cairn: warning: milestone_windows dropped colliding milestone
+        # window(s)...` line this same daemon already emits.
+        self.assertRegex(
+            stderr, r"otel_receiver: dropped \d+ datapoint\(s\) from \d+ session\(s\) with no transcript in this repo",
+            f"expected the exact drop-count stderr line -- got stderr {stderr!r}",
+        )
+        self.assertNotIn(
+            self.FOREIGN_SESSION_ID, stderr,
+            f"the drop-count line must name counts only, never a session id -- got stderr {stderr!r}",
+        )
+
+
+# --------------------------------------------------------------------------
 # (f) test 7
 # --------------------------------------------------------------------------
 
