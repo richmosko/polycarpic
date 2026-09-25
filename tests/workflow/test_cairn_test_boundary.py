@@ -181,6 +181,137 @@ class CiWorkflowShapeTests(unittest.TestCase):
         self.assertIn("POLY-8", self.text, "the JS token-chart-logic exclusion must name POLY-8")
 
 
+class CiExcludePatternTests(unittest.TestCase):
+    """POLY-39 (ruling scripts/cairn/design/estimation.md @ e4c73bf, §0.7):
+    the `changes` step gains an `EXCLUDE` regex that filters tracker-data
+    paths (`process/cairn/{issues,milestones,majors,archive}/**`) out
+    before `PATTERN` is applied via `grep -vE ... | grep -qE ...` semantics
+    (simulated here in Python `re`, never a subprocess -- ci.yml itself is
+    the only thing under test). `PATTERN` stays byte-identical to its
+    pre-POLY-39 value, and the step never swallows a non-zero grep exit
+    status with a bare `|| true`."""
+
+    PATTERN_LITERAL = (
+        r'^(scripts/cairn/|\.claude/|process/|tests/workflow/'
+        r'|\.github/workflows/|\.githooks/|docs/DESIGN/)'
+    )
+
+    def setUp(self):
+        if not CI_WORKFLOW.is_file():
+            self.fail(f"{CI_WORKFLOW} does not exist yet")
+        self.text = CI_WORKFLOW.read_text(encoding="utf-8")
+        self.block = self._step_block("changes")
+
+    def _step_block(self, step_id: str) -> str:
+        idx = self.text.find(f"id: {step_id}")
+        self.assertNotEqual(idx, -1, f"no step with id: {step_id} found")
+        rest = self.text[idx:]
+        next_step = re.search(r"\n\s*- name:", rest)
+        return rest[: next_step.start()] if next_step else rest
+
+    def _exclude_and_pattern(self):
+        m_exclude = re.search(r"EXCLUDE='([^']*)'", self.block)
+        m_pattern = re.search(r"PATTERN='([^']*)'", self.block)
+        self.assertIsNotNone(
+            m_exclude,
+            "the changes step has no EXCLUDE='...' literal yet (ruling section 0.7)",
+        )
+        self.assertIsNotNone(m_pattern, "the changes step has no PATTERN='...' literal")
+        return re.compile(m_exclude.group(1)), re.compile(m_pattern.group(1))
+
+    def _run(self, changed_paths: list) -> bool:
+        """Mirrors `grep -vE "$EXCLUDE" <<<"$CHANGED" | grep -qE "$PATTERN"`:
+        filter changed paths through EXCLUDE first, then test the survivors
+        against PATTERN."""
+        exclude_re, pattern_re = self._exclude_and_pattern()
+        relevant = [p for p in changed_paths if not exclude_re.search(p)]
+        return any(pattern_re.search(p) for p in relevant)
+
+    def test_tracker_only_paths_give_run_false(self):
+        for p in [
+            "process/cairn/issues/POLY-1.md",
+            "process/cairn/milestones/POLY-A.md",
+            "process/cairn/majors/POLY-V1.md",
+            "process/cairn/archive/POLY-0.md",
+        ]:
+            with self.subTest(path=p):
+                self.assertFalse(self._run([p]), f"{p} alone must not trigger the cairn job")
+
+    def test_still_relevant_paths_give_run_true(self):
+        for p in ["process/STATE.md", "process/cairn/config.yml", "scripts/cairn/cairn.py"]:
+            with self.subTest(path=p):
+                self.assertTrue(self._run([p]), f"{p} must still trigger the cairn job")
+
+    def test_tracker_and_code_mixed_gives_run_true(self):
+        self.assertTrue(self._run(["process/cairn/issues/POLY-1.md", "scripts/cairn/cairn.py"]))
+
+    def test_unrelated_doc_path_gives_run_false(self):
+        self.assertFalse(self._run(["docs/PRD/index.html"]))
+
+    def test_pattern_literal_unchanged_from_the_pre_poly_39_shape(self):
+        _, pattern_re = self._exclude_and_pattern()
+        self.assertEqual(pattern_re.pattern, self.PATTERN_LITERAL)
+
+    def test_changes_step_never_swallows_grep_exit_status_with_bare_or_true(self):
+        self.assertNotRegex(
+            self.block, r"\|\|\s*true",
+            "the changes step must not swallow a non-zero grep exit status with "
+            "`|| true` (ruling section 0.7 fail-closed exclusion)",
+        )
+
+
+class CiAnchoredSkipTests(unittest.TestCase):
+    """POLY-39 addendum 1 (scripts/cairn/design/estimation.md @ 1f99d10,
+    §0.8): the `changes` step gains an anchor-lookup extension -- skip
+    (run=false) when every line of the diff against the newest successful
+    PR run on this branch matches EXCLUDE, falling through to §0.7 when no
+    sound anchor exists. Text-only shape checks, per the addendum's own
+    "qa shape test" bullet -- no subprocess, no `gh` call."""
+
+    def setUp(self):
+        if not CI_WORKFLOW.is_file():
+            self.fail(f"{CI_WORKFLOW} does not exist yet")
+        self.text = CI_WORKFLOW.read_text(encoding="utf-8")
+        self.block = self._step_block("changes")
+
+    def _step_block(self, step_id: str) -> str:
+        idx = self.text.find(f"id: {step_id}")
+        self.assertNotEqual(idx, -1, f"no step with id: {step_id} found")
+        rest = self.text[idx:]
+        next_step = re.search(r"\n\s*- name:", rest)
+        return rest[: next_step.start()] if next_step else rest
+
+    def test_anchor_lookup_asks_for_successful_pull_request_runs(self):
+        self.assertIn("event=pull_request", self.block, "anchor lookup must filter event=pull_request")
+        self.assertIn("status=success", self.block, "anchor lookup must filter status=success")
+
+    def test_workflow_grants_actions_read(self):
+        self.assertIn(
+            "actions: read", self.text,
+            "permissions must add actions: read for the anchor lookup (addendum 1)",
+        )
+
+    def test_both_ancestry_checks_appear(self):
+        self.assertEqual(
+            self.block.count("merge-base --is-ancestor"), 2,
+            "expected both ancestry checks (anchor -> PR head, base -> anchor) "
+            "in the changes step (addendum 1)",
+        )
+
+    def test_run_false_write_appears_exactly_twice(self):
+        self.assertEqual(
+            len(re.findall(r'echo\s+"run=false"', self.block)), 2,
+            "expected exactly two run=false writes: the §0.7 no-match case "
+            "and the addendum-1 anchor skip",
+        )
+
+    def test_step_still_has_no_bare_or_true(self):
+        self.assertNotRegex(
+            self.block, r"\|\|\s*true",
+            "the anchor path may only ever add a false -- never a swallowed exit status",
+        )
+
+
 class WorkflowMdSpinOffCleanSentenceTests(unittest.TestCase):
     """(f)7: WORKFLOW.md contains the (e) sentence's first bold clause."""
 

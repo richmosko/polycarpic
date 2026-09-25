@@ -170,3 +170,7 @@ Validate passed (qa PASS @ c93342d, re-verified @ 7ca97a1 at da31076; architect 
 Estimate calibration: estimated 18 commits / 2 gate cycles / ~70 min at spawn. Actual: 23 commits, 1 red→green + 1 review round + 1 CI-hermeticity fix, ~65 min active team time (window spans an overnight pause), merged 2026-09-25T16:32Z. Loop cost $37.77.
 Sub-issue actuals (tokens / cost / ratio on raw tokens): POLY-28 0.84M / $0.88 / 1.20 · POLY-29 12.3M / $3.79 / 17.6 · POLY-30 37.6M / $9.43 / 31.3 · POLY-31 3.0M / $1.10 / 5.0 · POLY-32 4.0M / $2.07 / 10.0. Cache reads are 91–99% of tokens and ≈83% of cost → the raw-sum ratio is a poor proxy; filed as POLY-34 (estimate on cost).
 Struck from AC4 by ruling: token backfill retirement (documented retroactive-attribution mechanism; POLY-26 depends on it). User action still open: register `cairn` as a required check on main.
+
+### @team-lead — 2026-09-25
+
+Post-merge (user, 2026-09-25): `cairn` registered as a required status check on `main` via a full branch-protection PUT — strict mode on, admins included, PR required with zero approvals, no force-push/deletion, all preserved. AC5 complete end to end. The PATCH endpoint 404s when no checks block exists yet; the PUT is the working form (recorded for the next repo bootstrapped from the template).

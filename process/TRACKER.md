@@ -221,12 +221,14 @@ Reuse `lib/session/store.py` rather than introducing a second session abstractio
 | `assignee` | string \| null | ✅ | Bare agent role (`backend-lead`) matching a file in `.claude/agents/`, or `@handle` for a human. Replaces Linear's `agent:<role>` labels — attribution becomes a field, not a label. |
 | `paths` | list[string] | — | Repo-relative glob patterns the assignee's commits must stay inside (POLY-2). An **absent** key means undeclared — opt-in, not a hard gate — distinct from an explicit `[]` ("may touch nothing"). `cairn check` validates shape only, never existence. See [Path ownership](#path-ownership-poly-2). |
 | `stage` | `plan` \| `execute` \| `review` \| absent | — | **Sub-issues only** (POLY-3). Requires a non-null `parent`; `cairn check` errors otherwise. |
-| `estimate.tokens` | int > 0 \| absent | — | Sub-issue effort estimate, tokens (POLY-3, kickoff § 2.12). Flat dotted key, not a nested map — see [Effort estimation](#effort-estimation-poly-3). |
+| `estimate.cost_usd` | decimal string > 0 \| absent | — | Sub-issue effort estimate, dollars (POLY-34, kickoff § 2.12; supersedes the token-axis estimate as the field `ratio`/bloat drive on). Quoted decimal string — the YAML subset has no float type. `cairn set` coerces a bare number (`3` → `"3.00"`). |
+| `estimate.tokens` | int > 0 \| absent | — | Sub-issue effort estimate, tokens — **optional secondary** (POLY-34): still validated and carried into the calibration record, drives nothing. Flat dotted key, not a nested map — see [Effort estimation](#effort-estimation-poly-3). |
 | `estimate.gate_cycles` | int ≥ 0 \| absent | — | Sub-issue effort estimate, gate cycles (one red→green pass or one review round). |
-| `actual.tokens` | int ≥ 0 \| absent | — | Written by `cairn close`, never by hand. `cairn check` errors if set while `status` isn't `done`. |
+| `actual.cost_usd` | decimal string ≥ 0 \| absent | — | Written by `cairn close`, 4dp, never by hand. `null` when an unpriced model appears in the window (never partial, never `0`). Same non-`done` restriction as `actual.tokens`. |
+| `actual.tokens` | int ≥ 0 \| absent | — | Written by `cairn close`, never by hand — secondary. `cairn check` errors if set while `status` isn't `done`. |
 | `actual.gate_cycles` | int ≥ 0 \| absent | — | Written by `cairn close`. Same non-`done` restriction as `actual.tokens`. |
 | `actual.wall_clock` | int ≥ 0 \| absent | — | Minutes, window start → assignee's last commit in the window. Written by `cairn close`; absent (not `0`) with zero commits by the assignee in the window; recorded, never compared against a bound. |
-| `ratio` | decimal string \| absent | — | `actual.tokens / estimate.tokens`, 2dp, quoted (the YAML subset has no float type). Present iff both `actual.tokens` and `estimate.tokens` are set; `cairn check` errors on a `ratio` without both operands. |
+| `ratio` | decimal string \| absent | — | **Cost ratio** (POLY-34): `actual.cost_usd / estimate.cost_usd`, 2dp, quoted (the YAML subset has no float type). Present iff both `actual.cost_usd` and `estimate.cost_usd` are set; `cairn check` errors on a `ratio` without both cost operands — a token-only pair is no longer sufficient. |
 | `labels` | list[string] | ✅ | Free-form, lowercase-kebab. May be `[]`. |
 | `priority` | `P0`–`P3` \| null | — | Backlog ordering only. Not a due date. |
 | `pr` | url \| null | — | Written by `/finish-feature`. Lets the board link out. |
@@ -240,17 +242,20 @@ Reuse `lib/session/store.py` rather than introducing a second session abstractio
 ### Effort estimation (POLY-3)
 
 Full design: `scripts/cairn/design/estimation.md` (architect's design note, approved
-`de28e82`). Sub-issues carry an `estimate.*`/`actual.*`/`ratio` block (schema
-above); `cairn close <ID>` pulls actuals for the sub-issue's assignee from the
-OTel receiver (`token_actuals`) and the per-agent commit log
-(`gate_cycle_actuals`), writes `actual.*`/`ratio`/`status: done`, adds the
-`bloat` label when gate cycles overrun the estimate (or, once
-`config.yml` → `estimation.bloat_ratio` is set, when the token ratio does),
-and appends a calibration record to `process/cairn/metrics/calibration.jsonl`.
-`cairn estimate <ID>` queries those calibration records for the closest
-reference classes (same stage + assignee, then same stage + shared labels) to
-seed a new estimate. `estimation.bloat_ratio` ships unset; the token-ratio
-bloat rule stays skipped until POLY-A's baseline sets it.
+`de28e82`; the cost axis is POLY-34's §0, gate-1 ruling `e4c73bf`). Sub-issues
+carry an `estimate.*`/`actual.*`/`ratio` block (schema above); `cairn close
+<ID>` pulls actuals for the sub-issue's assignee from the OTel receiver
+(`token_actuals`, priced from `scripts/cairn/prices.json`) and the per-agent
+commit log (`gate_cycle_actuals`), writes `actual.*`/`ratio`/`status: done`,
+adds the `bloat` label when gate cycles overrun the estimate (or, once
+`config.yml` → `estimation.bloat_ratio` is set, when the **cost** ratio
+does), and appends a calibration record to
+`process/cairn/metrics/calibration.jsonl`. `cairn estimate <ID>` queries
+those calibration records for the closest reference classes (same stage +
+assignee, then same stage + shared labels) to seed a new estimate, on the
+cost axis (dollars), with raw tokens kept as a printed secondary.
+`estimation.bloat_ratio` ships unset; the cost-ratio bloat rule stays skipped
+until POLY-A's baseline sets it.
 
 ### Milestone file
 

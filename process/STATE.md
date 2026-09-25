@@ -15,7 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: POLY-34 (estimate on cost axis), POLY-26 (backfill sibling scan), POLY-33 (check-warning fix)._
+_None — between loops. Next: POLY-26 (backfill sibling scan), POLY-33 (check-warning fix), POLY-15 (unpriced-model cost)._
 
 ## Releases
 

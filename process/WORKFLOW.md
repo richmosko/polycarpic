@@ -638,16 +638,19 @@ Sections that already have comments show a `💬 N` count badge next to the head
 
 ### Estimation
 
-Effort is estimated in **tokens** (cost) and **gate cycles** (bloat — one
-red→green pass or one review round); wall-clock is recorded but secondary,
-and human minutes never appear (kickoff § 2.12; full design:
-[`scripts/cairn/design/estimation.md`](../scripts/cairn/design/estimation.md)).
+Effort is estimated in **dollars** (`estimate.cost_usd`/`actual.cost_usd`,
+priced at close time from `scripts/cairn/prices.json` — POLY-34 revises this
+from the raw token sum, which a model swap or a caching change could move by
+an order of magnitude with no change in work) and **gate cycles** (bloat —
+one red→green pass or one review round); raw tokens and wall-clock are
+recorded but secondary, and human minutes never appear (kickoff § 2.12; full
+design: [`scripts/cairn/design/estimation.md`](../scripts/cairn/design/estimation.md)).
 Schema: [`TRACKER.md` → Effort estimation](TRACKER.md#effort-estimation-poly-3).
 
 - **When the lead decomposes:** each feature issue is split into cairn
   sub-issues, one per (agent, stage) — usually one per agent, with the
   architect typically holding a separate `plan` and `review` sub-issue. Each
-  sub-issue gets a hand estimate (`estimate.tokens`/`estimate.gate_cycles`)
+  sub-issue gets a hand estimate (`estimate.cost_usd`/`estimate.gate_cycles`)
   before work starts; `cairn estimate <ID>` seeds that guess from closed
   reference classes once any exist.
 - **When the architect reviews:** a design pass precedes implementation on

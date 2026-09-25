@@ -72,7 +72,9 @@ def issue_text(
     issue_id: str, *, title: str = "Sub-issue", status: str = "todo",
     parent: Optional[str] = None, assignee: Optional[str] = None,
     labels: Optional[list] = None, stage: Optional[str] = None,
+    estimate_cost_usd: Optional[str] = None,
     estimate_tokens: Optional[int] = None, estimate_gate_cycles: Optional[int] = None,
+    actual_cost_usd: Optional[str] = None,
     actual_tokens=None, actual_gate_cycles=None, actual_wall_clock=None,
     ratio: Optional[str] = None,
 ) -> str:
@@ -84,8 +86,13 @@ def issue_text(
         f"assignee: {'null' if assignee is None else assignee}\n"
         f"labels: [{', '.join(labels)}]\n"
         + _opt("stage", stage)
+        # POLY-34 (ruling §0.3): estimate.cost_usd / actual.cost_usd are
+        # decimal STRINGS (the YAML subset is int-only), same quoting
+        # convention as `ratio`.
+        + (f'estimate.cost_usd: "{estimate_cost_usd}"\n' if estimate_cost_usd is not None else "")
         + _opt("estimate.tokens", estimate_tokens)
         + _opt("estimate.gate_cycles", estimate_gate_cycles)
+        + (f'actual.cost_usd: "{actual_cost_usd}"\n' if actual_cost_usd is not None else "")
         + _opt("actual.tokens", actual_tokens)
         + _opt("actual.gate_cycles", actual_gate_cycles)
         + _opt("actual.wall_clock", actual_wall_clock)
@@ -123,6 +130,31 @@ def write_token_usage(data_dir: Path, rows: list) -> Path:
 TEST_PRICES = {"models": {"test-model": {
     "input": 1.0, "cache_read": 1.0, "output": 1.0, "cache_write_1h": 1.0,
 }}}
+
+# POLY-34 (ruling §0.2/§0.6): `cairn close` (CLI subprocess) always prices
+# through `load_prices()`'s DEFAULT -- the real `scripts/cairn/prices.json`
+# -- there is no `--data-dir`-scoped price fixture. Cost-axis close tests
+# therefore price against a REAL model from that file (read once via
+# `cairn.load_prices()`, never hand-copied), so a real price-table edit
+# can't silently desync the fixture from what `close` actually charges.
+REAL_PRICED_MODEL = "claude-haiku-4-5-20251001"
+
+
+def _real_rate(model: str = REAL_PRICED_MODEL) -> dict:
+    return cairn.load_prices()["models"][model]
+
+
+def _expected_row_cost(rate: dict, *, input=0, cache_write=0, cache_read=0, output=0) -> float:
+    """Mirrors `cairn._row_cost_usd`'s unsplit-`cache_write` branch (every
+    otel-sourced `token-usage.jsonl` line, per that function's own
+    docstring) -- the one path these fixtures exercise."""
+    mtok = 1_000_000.0
+    return (
+        input / mtok * rate["input"]
+        + cache_read / mtok * rate["cache_read"]
+        + output / mtok * rate["output"]
+        + cache_write / mtok * rate["cache_write_1h"]
+    )
 
 
 # -- git-repo helpers (mirrors tests/test_guard_push.py's own copies) -------
@@ -225,10 +257,26 @@ class CheckEstimationFieldsTests(unittest.TestCase):
         errors = cairn.check_repo(self.data_dir)
         self.assertFalse(any("PT-9" in e for e in errors), errors)
 
-    def test_fully_populated_done_subissue_is_clean(self):
+    def test_token_only_backed_ratio_is_no_longer_clean(self):
+        # POLY-34 (ruling §0.3): this is the pre-POLY-34
+        # "fully populated done sub-issue is clean" fixture, UNCHANGED --
+        # `ratio` backed only by token operands (no estimate.cost_usd /
+        # actual.cost_usd) must now be a check ERROR, not clean, since
+        # `ratio` requires both COST operands under the redefined rule.
         write_issue(self.data_dir, "PT-9", parent="PT-1", status="done", stage="execute",
                     assignee="backend-lead", estimate_tokens=400000, estimate_gate_cycles=1,
                     actual_tokens=512340, actual_gate_cycles=2, actual_wall_clock=47, ratio="1.28")
+        errors = cairn.check_repo(self.data_dir)
+        self.assertTrue(any("PT-9" in e and "ratio" in e.lower() for e in errors), errors)
+
+    def test_fully_populated_done_subissue_is_clean(self):
+        # POLY-34 (ruling §0.3): "fully populated" now means all nine
+        # estimation keys, cost fields included -- ratio is backed by the
+        # cost operands; tokens ride along as the optional secondary.
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="done", stage="execute",
+                    assignee="backend-lead", estimate_cost_usd="3.00", estimate_tokens=400000,
+                    estimate_gate_cycles=1, actual_cost_usd="3.7907", actual_tokens=512340,
+                    actual_gate_cycles=2, actual_wall_clock=47, ratio="1.26")
         errors = cairn.check_repo(self.data_dir)
         self.assertEqual(errors, [])
 
@@ -419,9 +467,11 @@ class CloseCommandTestBase(unittest.TestCase):
         commit_as(self.root, "seed", "feature: started", when="2020-01-01T12:00:00+00:00")
 
     def seed_subissue(self, issue_id="PT-9", assignee="backend-lead", estimate_tokens=100000,
-                       estimate_gate_cycles=1, created_when="2020-01-02T00:00:00+00:00"):
+                       estimate_gate_cycles=1, created_when="2020-01-02T00:00:00+00:00",
+                       estimate_cost_usd=None):
         write_issue(self.data_dir, issue_id, parent="PT-1", status="in-progress", stage="execute",
-                    assignee=assignee, estimate_tokens=estimate_tokens, estimate_gate_cycles=estimate_gate_cycles)
+                    assignee=assignee, estimate_tokens=estimate_tokens, estimate_gate_cycles=estimate_gate_cycles,
+                    estimate_cost_usd=estimate_cost_usd)
         commit_as(self.root, assignee, f"add {issue_id}", when=created_when)
 
     def calibration_lines(self) -> list:
@@ -433,6 +483,10 @@ class CloseCommandTestBase(unittest.TestCase):
 
 class CloseWritesActualsTests(CloseCommandTestBase):
     def test_close_writes_actuals_ratio_status_done_and_one_calibration_line(self):
+        # POLY-34 (ruling §0.3): no `estimate.cost_usd`, and `test-model`
+        # (this fixture's default) is unpriced against the real
+        # `prices.json` `cairn close` reads -- `ratio` must be null even
+        # though `actual.tokens` is a real, non-null secondary.
         self.seed_subissue()
         write_token_usage(self.data_dir, [
             token_row(generated="2020-01-02T01:00:00Z", issue="PT-1", role="backend-lead",
@@ -447,8 +501,7 @@ class CloseWritesActualsTests(CloseCommandTestBase):
         fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
         self.assertEqual(fm.get("status"), "done")
         self.assertEqual(fm.get("actual.tokens"), 4000)
-        self.assertIsInstance(fm.get("ratio"), str)
-        self.assertAlmostEqual(float(fm["ratio"]), 4000 / 100000, places=2)
+        self.assertIsNone(fm.get("ratio"))
 
         lines = self.calibration_lines()
         self.assertEqual(len(lines), 1, lines)
@@ -502,11 +555,17 @@ class CloseWritesActualsTests(CloseCommandTestBase):
 
 
 class CloseBloatFlagTests(CloseCommandTestBase):
-    def test_unset_threshold_flags_gate_overrun_but_skips_token_ratio(self):
-        self.seed_subissue(estimate_tokens=1000, estimate_gate_cycles=1)
+    """POLY-34 (ruling §0.5, §9.1 item 8): the token-ratio bloat rule is
+    gone -- the threshold now gates the COST ratio, and the reason string
+    is `"cost"`, not `"tokens"`."""
+
+    def test_unset_threshold_flags_gate_overrun_but_skips_cost_ratio(self):
+        self.seed_subissue(estimate_cost_usd="0.001", estimate_gate_cycles=1)
         write_token_usage(self.data_dir, [
-            # ratio 5.0 -- would flag if a threshold were set.
-            token_row(generated="2020-01-02T00:30:00Z", issue="PT-1", role="backend-lead", input=5000),
+            # cost ratio 5.0 (0.005 / 0.001 at REAL_PRICED_MODEL's $1/MTok
+            # input rate) -- would flag if a threshold were set.
+            token_row(generated="2020-01-02T00:30:00Z", issue="PT-1", role="backend-lead",
+                      model=REAL_PRICED_MODEL, input=5000),
         ])
         write_file(self.root, "impl1.py", "x\n")
         commit_as(self.root, "backend-lead", "red", when="2020-01-02T01:00:00+00:00")
@@ -518,18 +577,24 @@ class CloseBloatFlagTests(CloseCommandTestBase):
         r = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--no-flush")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertIn("estimation.bloat_ratio", r.stdout + r.stderr)
+        self.assertIn("cost threshold unset", r.stdout + r.stderr)
         fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
         self.assertIn("bloat", fm.get("labels") or [])
         lines = self.calibration_lines()
         self.assertIn("gate_cycles", lines[0].get("bloat_reasons", []))
+        self.assertNotIn("cost", lines[0].get("bloat_reasons", []))
         self.assertNotIn("tokens", lines[0].get("bloat_reasons", []))
 
-    def test_threshold_set_flags_token_ratio_overrun(self):
+    def test_threshold_set_flags_cost_ratio_overrun(self):
         cfg = self.data_dir / "config.yml"
         cfg.write_text(cfg.read_text(encoding="utf-8") + "estimation:\n  bloat_ratio: 1.5\n", encoding="utf-8")
-        self.seed_subissue(estimate_tokens=1000, estimate_gate_cycles=5)
+        self.seed_subissue(estimate_cost_usd="1.00", estimate_gate_cycles=5)
         write_token_usage(self.data_dir, [
-            token_row(generated="2020-01-02T00:30:00Z", issue="PT-1", role="backend-lead", input=1600),
+            # cost ratio 1.6 (1.6 / 1.00 at REAL_PRICED_MODEL's $1/MTok
+            # input rate) -- gate_cycles (1 real commit against a limit of
+            # 5) is NOT overrun, isolating the cost rule.
+            token_row(generated="2020-01-02T00:30:00Z", issue="PT-1", role="backend-lead",
+                      model=REAL_PRICED_MODEL, input=1_600_000),
         ])
         write_file(self.root, "impl.py", "x\n")
         commit_as(self.root, "backend-lead", "green", when="2020-01-02T02:00:00+00:00")
@@ -539,7 +604,8 @@ class CloseBloatFlagTests(CloseCommandTestBase):
         fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
         self.assertIn("bloat", fm.get("labels") or [])
         lines = self.calibration_lines()
-        self.assertIn("tokens", lines[0].get("bloat_reasons", []))
+        self.assertIn("cost", lines[0].get("bloat_reasons", []))
+        self.assertNotIn("gate_cycles", lines[0].get("bloat_reasons", []))
 
 
 # --------------------------------------------------------------------------
@@ -548,15 +614,21 @@ class CloseBloatFlagTests(CloseCommandTestBase):
 
 def calibration_row(id_, *, parent="PT-1", stage="execute", assignee="backend-lead", labels=None,
                      closed="2026-09-01T00:00:00Z", est_tokens=100000, est_gc=1,
-                     act_tokens=100000, act_gc=1, wall=30, ratio=1.0, bloat=False) -> dict:
+                     act_tokens=100000, act_gc=1, wall=30, ratio=1.0, bloat=False,
+                     # POLY-34 (ruling §0.3, §3): schema 2 is the new default; a
+                     # caller that wants a legacy pre-POLY-34 row (item 9: "a
+                     # schema-1 row prints ratio `-`") passes schema=1 explicitly.
+                     schema=2, est_cost=None, act_cost=0.1, ratio_tokens=None,
+                     prices_retrieved="2026-09-24") -> dict:
     return {
-        "schema": 1, "closed": closed, "id": id_, "parent": parent, "stage": stage, "assignee": assignee,
+        "schema": schema, "closed": closed, "id": id_, "parent": parent, "stage": stage, "assignee": assignee,
         "labels": labels or [], "milestone": "PT-1.0",
-        "estimate": {"tokens": est_tokens, "gate_cycles": est_gc},
+        "estimate": {"cost_usd": est_cost, "tokens": est_tokens, "gate_cycles": est_gc},
         "actual": {"tokens": act_tokens, "gate_cycles": act_gc, "wall_clock": wall,
-                   "input": 0, "cache_write": 0, "cache_read": act_tokens, "output": 0, "cost_usd": 0.1},
-        "ratio": ratio, "bloat": bloat, "bloat_reasons": [],
-        "window": {"from": "2026-08-31T00:00:00Z", "to": closed},
+                   "input": 0, "cache_write": 0, "cache_read": act_tokens, "output": 0, "cost_usd": act_cost},
+        "ratio": ratio, "ratio_tokens": ratio_tokens, "prices_retrieved": prices_retrieved,
+        "bloat": bloat, "bloat_reasons": [],
+        "window": {"from": "2026-08-31T00:00:00Z", "to": closed, "at": None},
         "base": "main", "ref_sha": "abc1234",
     }
 
@@ -613,14 +685,17 @@ class EstimateCommandTests(unittest.TestCase):
         self.assertIn("no closed reference classes yet — hand-estimate", r.stdout)
 
     def test_median_suggestion_line(self):
+        # POLY-34 (ruling §0.4): the suggestion is on the cost axis now --
+        # act_cost varies per row (act_tokens is still recorded but drives
+        # nothing) so the median is meaningfully $4.80, not a token count.
         write_calibration(self.data_dir, [
-            calibration_row("PT-101", assignee="backend-lead", act_tokens=400000, act_gc=2, closed="2026-09-01T00:00:00Z"),
-            calibration_row("PT-102", assignee="backend-lead", act_tokens=480000, act_gc=2, closed="2026-09-02T00:00:00Z"),
-            calibration_row("PT-103", assignee="backend-lead", act_tokens=560000, act_gc=2, closed="2026-09-03T00:00:00Z"),
+            calibration_row("PT-101", assignee="backend-lead", act_cost=4.0, act_gc=2, closed="2026-09-01T00:00:00Z"),
+            calibration_row("PT-102", assignee="backend-lead", act_cost=4.8, act_gc=2, closed="2026-09-02T00:00:00Z"),
+            calibration_row("PT-103", assignee="backend-lead", act_cost=5.6, act_gc=2, closed="2026-09-03T00:00:00Z"),
         ])
         r = self.run_estimate()
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn("suggested: estimate.tokens=480000 estimate.gate_cycles=2", r.stdout)
+        self.assertIn("suggested: estimate.cost_usd=4.80 estimate.gate_cycles=2", r.stdout)
 
     def test_missing_stage_or_parent_exits_one(self):
         write_issue(self.data_dir, "PT-10", parent=None, status="todo", stage=None, assignee="backend-lead")
@@ -1246,6 +1321,376 @@ class AtCeilingValidationTests(StageWindowTestBase):
         # The parent-flip commit itself -- AT the floor, not after it.
         r = self.close("PT-11", "--at", self.parent_flip_sha)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+
+
+# --------------------------------------------------------------------------
+# 10. POLY-34 ruling (scripts/cairn/design/estimation.md @ e4c73bf, §0) --
+# estimate/ratio/bloat move to the cost axis. RED against 5cc9d83, which
+# predates the implementation. §9.1 item numbers below match the ruling's
+# own test list.
+# --------------------------------------------------------------------------
+
+class CostAxisCheckTests(unittest.TestCase):
+    """§9.1 item 1: `cairn check` validation for `estimate.cost_usd` /
+    `actual.cost_usd` / the redefined `ratio`."""
+
+    def setUp(self):
+        self.data_dir = helpers.make_tmp_data_dir(self)
+
+    def _write_raw(self, extra_line: str, **kwargs):
+        p = Path(self.data_dir) / "issues" / "PT-9.md"
+        p.write_text(
+            issue_text("PT-9", parent="PT-1", **kwargs).replace("---\n\nBody.\n", f"{extra_line}\n---\n\nBody.\n", 1),
+            encoding="utf-8",
+        )
+
+    def test_estimate_cost_usd_zero_string_is_an_error(self):
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="in-progress", stage="execute",
+                    assignee="backend-lead", estimate_cost_usd="0")
+        errors = cairn.check_repo(self.data_dir)
+        self.assertTrue(any("PT-9" in e and "estimate.cost_usd" in e for e in errors), errors)
+
+    def test_estimate_cost_usd_zero_point_zero_zero_is_an_error(self):
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="in-progress", stage="execute",
+                    assignee="backend-lead", estimate_cost_usd="0.00")
+        errors = cairn.check_repo(self.data_dir)
+        self.assertTrue(any("PT-9" in e and "estimate.cost_usd" in e for e in errors), errors)
+
+    def test_estimate_cost_usd_non_numeric_is_an_error(self):
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="in-progress", stage="execute",
+                    assignee="backend-lead", estimate_cost_usd="abc")
+        errors = cairn.check_repo(self.data_dir)
+        self.assertTrue(any("PT-9" in e and "estimate.cost_usd" in e for e in errors), errors)
+
+    def test_estimate_cost_usd_bare_int_is_accepted(self):
+        # A real writer emits a decimal string, but §0.3 says check accepts
+        # "a string or int" -- written by hand, as the sibling non-int-
+        # estimate test above does.
+        self._write_raw("estimate.cost_usd: 3", status="in-progress", stage="execute", assignee="backend-lead")
+        errors = cairn.check_repo(self.data_dir)
+        self.assertFalse(any("PT-9" in e for e in errors), errors)
+
+    def test_actual_cost_usd_on_non_done_issue_is_an_error(self):
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="in-progress", stage="execute",
+                    assignee="backend-lead", estimate_cost_usd="3.00", actual_cost_usd="3.7907")
+        errors = cairn.check_repo(self.data_dir)
+        self.assertTrue(
+            any("PT-9" in e and ("actual" in e.lower() or "done" in e.lower()) for e in errors), errors,
+        )
+
+    def test_ratio_with_token_operands_but_no_cost_operands_is_an_error(self):
+        # Both actual.tokens and estimate.tokens ARE present -- the
+        # pre-POLY-34 rule would accept this. The redefined rule (§0.3)
+        # requires the COST operands instead, so this must now fail.
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="done", stage="execute",
+                    assignee="backend-lead", estimate_tokens=100000, actual_tokens=150000,
+                    actual_gate_cycles=1, actual_wall_clock=10, ratio="1.50")
+        errors = cairn.check_repo(self.data_dir)
+        self.assertTrue(any("PT-9" in e and "ratio" in e.lower() for e in errors), errors)
+
+    def test_ratio_null_with_no_cost_operands_is_accepted(self):
+        self._write_raw(
+            "ratio: null", status="done", stage="execute", assignee="backend-lead",
+            estimate_tokens=100000, actual_tokens=150000, actual_gate_cycles=1, actual_wall_clock=10,
+        )
+        errors = cairn.check_repo(self.data_dir)
+        self.assertEqual(errors, [], errors)
+
+    def test_ratio_with_both_cost_operands_is_clean(self):
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="done", stage="execute",
+                    assignee="backend-lead", estimate_cost_usd="3.00", actual_cost_usd="3.7907",
+                    actual_gate_cycles=1, actual_wall_clock=10, ratio="1.26")
+        errors = cairn.check_repo(self.data_dir)
+        self.assertEqual(errors, [], errors)
+
+
+class CostAxisSetTests(unittest.TestCase):
+    """§9.1 item 2: `cairn set <ID> estimate.cost_usd=...`."""
+
+    def setUp(self):
+        self.data_dir = helpers.make_tmp_data_dir(self)
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="in-progress", stage="execute", assignee="backend-lead")
+
+    def _set(self, kv: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [str(helpers.CAIRN_BIN), "set", "PT-9", kv, "--data-dir", str(self.data_dir)],
+            capture_output=True, text=True,
+        )
+
+    def _fm(self) -> dict:
+        fm, _ = cairn.parse_frontmatter((Path(self.data_dir) / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        return fm
+
+    def test_bare_int_writes_two_decimal_places(self):
+        r = self._set("estimate.cost_usd=3")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        fm = self._fm()
+        self.assertEqual(fm.get("estimate.cost_usd"), "3.00")
+        self.assertIsInstance(fm.get("estimate.cost_usd"), str)
+
+    def test_non_numeric_exits_nonzero_for_the_right_reason(self):
+        r = self._set("estimate.cost_usd=abc")
+        self.assertNotEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn(
+            "unknown field", r.stderr,
+            "must fail on decimal coercion, not because the field is still unrecognized",
+        )
+
+    def test_empty_value_writes_null(self):
+        set_r = self._set("estimate.cost_usd=3")
+        self.assertEqual(set_r.returncode, 0, set_r.stdout + set_r.stderr)
+        r = self._set("estimate.cost_usd=")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIsNone(self._fm().get("estimate.cost_usd"))
+
+
+class CostAxisRoundTripTests(unittest.TestCase):
+    """§9.1 item 3: all nine estimation keys, in §0.3 order, round-trip
+    byte-identical."""
+
+    def test_issue_field_order_places_the_nine_estimation_keys_per_the_ruling(self):
+        order = cairn.ISSUE_FIELD_ORDER
+        expected = [
+            "paths", "stage", "estimate.cost_usd", "estimate.tokens", "estimate.gate_cycles",
+            "actual.cost_usd", "actual.tokens", "actual.gate_cycles", "actual.wall_clock",
+            "ratio", "labels",
+        ]
+        actual = [k for k in order if k in expected]
+        self.assertEqual(actual, expected, order)
+
+    def test_all_nine_estimation_keys_round_trip_byte_identical(self):
+        fields = {
+            "id": "PT-9", "title": "Thing", "status": "done", "milestone": None, "parent": "PT-1",
+            "blocked_by": [], "assignee": "backend-lead", "paths": [],
+            "stage": "execute",
+            "estimate.cost_usd": "3.00", "estimate.tokens": 400000, "estimate.gate_cycles": 1,
+            "actual.cost_usd": "3.7907", "actual.tokens": 512340, "actual.gate_cycles": 2,
+            "actual.wall_clock": 47,
+            "ratio": "1.26",
+            "labels": [], "priority": None, "pr": None,
+            "created": "2026-09-23", "updated": "2026-09-23",
+        }
+        text = cairn.dump_frontmatter(fields)
+        reparsed, _ = cairn.parse_frontmatter(text + "\nBody.\n")
+        self.assertEqual(reparsed, fields)
+        self.assertEqual(cairn.dump_frontmatter(reparsed), text)
+        # §0.3 order: each cost field precedes its token sibling.
+        self.assertLess(text.index("estimate.cost_usd"), text.index("estimate.tokens"), text)
+        self.assertLess(text.index("actual.cost_usd"), text.index("actual.tokens"), text)
+
+
+class CloseCostAxisPricedTests(CloseCommandTestBase):
+    """§9.1 item 4: a fully priced window writes `actual.cost_usd` at 4dp
+    and a cost `ratio` at 2dp; the calibration record gains `schema: 2`,
+    `ratio_tokens` and `prices_retrieved`."""
+
+    def test_close_writes_cost_ratio_and_schema_2_calibration_fields(self):
+        self.seed_subissue(estimate_cost_usd="0.0050", estimate_tokens=100000, estimate_gate_cycles=1)
+        rate = _real_rate()
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-02T01:00:00Z", issue="PT-1", role="backend-lead",
+                      model=REAL_PRICED_MODEL, input=1000, cache_write=1000, cache_read=1000, output=1000),
+        ])
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "green build", when="2020-01-02T02:00:00+00:00")
+
+        r = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--no-flush")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+        expected_cost = _expected_row_cost(rate, input=1000, cache_write=1000, cache_read=1000, output=1000)
+        fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        self.assertEqual(fm.get("actual.cost_usd"), f"{expected_cost:.4f}")
+        expected_ratio = round(expected_cost / 0.0050, 2)
+        self.assertEqual(fm.get("ratio"), f"{expected_ratio:.2f}")
+
+        lines = self.calibration_lines()
+        self.assertEqual(len(lines), 1, lines)
+        record = lines[0]
+        self.assertEqual(record.get("schema"), 2)
+        self.assertAlmostEqual(record.get("ratio"), expected_ratio, places=2)
+        self.assertIsNotNone(record.get("ratio_tokens"))
+        self.assertEqual(record.get("prices_retrieved"), cairn.load_prices().get("retrieved"))
+        self.assertAlmostEqual(record.get("estimate", {}).get("cost_usd"), 0.0050, places=4)
+
+
+class CloseCostAxisUnpricedTests(CloseCommandTestBase):
+    """§9.1 item 5: an unpriced model in the window gives a null cost and
+    ratio, names the model, and `token_actuals` exposes `unpriced_models`."""
+
+    def test_unpriced_model_in_window_gives_null_cost_and_names_the_model(self):
+        cfg = self.data_dir / "config.yml"
+        cfg.write_text(cfg.read_text(encoding="utf-8") + "estimation:\n  bloat_ratio: 1.5\n", encoding="utf-8")
+        self.seed_subissue(estimate_cost_usd="1.00", estimate_gate_cycles=1)
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-02T01:00:00Z", issue="PT-1", role="backend-lead",
+                      model="an-unpriced-model", input=1000),
+        ])
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "green", when="2020-01-02T02:00:00+00:00")
+
+        r = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--no-flush")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("an-unpriced-model", r.stderr)
+        fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        self.assertIsNone(fm.get("actual.cost_usd"))
+        self.assertIsNone(fm.get("ratio"))
+        self.assertIsInstance(fm.get("actual.tokens"), int)
+        lines = self.calibration_lines()
+        self.assertNotIn("cost", lines[0].get("bloat_reasons", []))
+
+    def test_token_actuals_lists_unpriced_models(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        write_token_usage(data_dir, [
+            token_row(generated="2020-01-02T00:00:00Z", issue="PT-1", role="backend-lead",
+                      model="an-unpriced-model", input=100),
+        ])
+        result = cairn.token_actuals(
+            data_dir, "PT-1", role="backend-lead",
+            since="2020-01-01T00:00:00Z", until="2020-01-03T00:00:00Z", prices=TEST_PRICES,
+        )
+        self.assertEqual(result.get("unpriced_models"), ["an-unpriced-model"])
+
+    def test_token_actuals_unpriced_models_empty_when_all_priced(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        write_token_usage(data_dir, [
+            token_row(generated="2020-01-02T00:00:00Z", issue="PT-1", role="backend-lead",
+                      model="test-model", input=100),
+        ])
+        result = cairn.token_actuals(
+            data_dir, "PT-1", role="backend-lead",
+            since="2020-01-01T00:00:00Z", until="2020-01-03T00:00:00Z", prices=TEST_PRICES,
+        )
+        self.assertEqual(result.get("unpriced_models"), [])
+
+
+class CloseEstimateTokensOnlyTests(CloseCommandTestBase):
+    """§9.1 item 6: an `estimate.tokens`-only sub-issue closes with a null
+    `ratio` and a non-null `ratio_tokens` in the record."""
+
+    def test_close_with_estimate_tokens_only_gives_null_ratio_and_non_null_ratio_tokens(self):
+        self.seed_subissue(estimate_tokens=100000, estimate_gate_cycles=1)  # no estimate_cost_usd
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-02T01:00:00Z", issue="PT-1", role="backend-lead",
+                      model=REAL_PRICED_MODEL, input=1000, cache_write=1000, cache_read=1000, output=1000),
+        ])
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "green", when="2020-01-02T02:00:00+00:00")
+
+        r = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--no-flush")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        self.assertIsNone(fm.get("ratio"))
+        lines = self.calibration_lines()
+        self.assertIsNotNone(lines[0].get("ratio_tokens"))
+
+
+class RecloseClearsStaleRatioTests(CloseCommandTestBase):
+    """§9.1 item 7: re-closing a `done` file that carries a stale
+    token-axis `ratio` and no `estimate.cost_usd` clears `ratio` to null,
+    and `cairn check` stays clean."""
+
+    def test_re_close_clears_a_stale_token_ratio_and_check_passes(self):
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="done", stage="execute",
+                    assignee="backend-lead", estimate_tokens=100000, estimate_gate_cycles=1,
+                    actual_tokens=128000, actual_gate_cycles=1, actual_wall_clock=30,
+                    ratio="1.20")
+        commit_as(self.root, "backend-lead", "add PT-9", when="2020-01-02T00:00:00+00:00")
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-02T01:00:00Z", issue="PT-1", role="backend-lead",
+                      model=REAL_PRICED_MODEL, input=1000),
+        ])
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "work", when="2020-01-02T02:00:00+00:00")
+
+        r = cairn_cmd(self.root, self.data_dir, "close", "PT-9", "--no-flush")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
+        self.assertIsNone(fm.get("ratio"))
+        errors = cairn.check_repo(self.data_dir)
+        self.assertEqual(errors, [], errors)
+
+
+class EstimateCostAxisTests(unittest.TestCase):
+    """§9.1 item 9: `cairn estimate` on the cost axis -- header, cost
+    median (schema-1/null-cost rows excluded), the suggestion line, the
+    all-null-cost gate-only fallback, and a schema-1 row's ratio cell."""
+
+    def setUp(self):
+        self.data_dir = helpers.make_tmp_data_dir(self)
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="todo", stage="execute",
+                    assignee="backend-lead", labels=["cairn", "workflow"])
+
+    def run_estimate(self, issue_id="PT-9", *extra):
+        return subprocess.run(
+            [str(helpers.CAIRN_BIN), "estimate", issue_id, "--data-dir", str(self.data_dir), *extra],
+            capture_output=True, text=True,
+        )
+
+    def test_header_names_the_cost_axis_columns_in_order(self):
+        write_calibration(self.data_dir, [calibration_row("PT-101", assignee="backend-lead")])
+        r = self.run_estimate()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        header_line = next((l for l in r.stdout.splitlines() if "closed" in l and " id " in f" {l} "), None)
+        self.assertIsNotNone(header_line, r.stdout)
+        cols = ["id", "closed", "est.$", "act.$", "ratio", "est.gc", "act.gc", "wall", "act.tok", "bloat"]
+        positions = [header_line.find(c) for c in cols]
+        self.assertTrue(all(p != -1 for p in positions), (cols, header_line))
+        self.assertEqual(positions, sorted(positions), (cols, header_line))
+
+    def test_null_cost_rows_excluded_but_a_schema_one_cost_counts(self):
+        # Architect verdict R1 (@ 6a6df12, §9.1 item 9 rewritten @ 0a0b1f7):
+        # §0.4 wins -- a schema-1 row's `actual.cost_usd` came from the
+        # same `token_actuals` pricing as a schema-2 row's; only its
+        # `ratio` changed meaning. It COUNTS toward the cost median. Only
+        # a null `actual.cost_usd` is excluded.
+        write_calibration(self.data_dir, [
+            calibration_row("PT-100", assignee="backend-lead", schema=1, act_cost=2.0, closed="2026-09-01T00:00:00Z"),
+            calibration_row("PT-101", assignee="backend-lead", act_cost=None, closed="2026-09-02T00:00:00Z"),
+            calibration_row("PT-102", assignee="backend-lead", act_cost=4.0, closed="2026-09-03T00:00:00Z"),
+        ])
+        r = self.run_estimate()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("cost $3.00", r.stdout)  # median of [2.0, 4.0]
+
+    def test_a_lone_priced_schema_one_row_among_null_cost_rows_still_medians(self):
+        # Team-lead's live finding on the real tree (`cairn estimate
+        # POLY-37`): tier A is entirely schema-1 (POLY-13/19/23/30 --
+        # POLY-6's own reference class, pre-dating this feature's AC5
+        # re-close), one of them (POLY-30, $9.43) genuinely priced.
+        write_calibration(self.data_dir, [
+            calibration_row("PT-100", assignee="backend-lead", schema=1, act_cost=None, closed="2026-09-01T00:00:00Z"),
+            calibration_row("PT-101", assignee="backend-lead", schema=1, act_cost=None, closed="2026-09-02T00:00:00Z"),
+            calibration_row("PT-102", assignee="backend-lead", schema=1, act_cost=9.43, closed="2026-09-03T00:00:00Z"),
+        ])
+        r = self.run_estimate()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("cost $9.43", r.stdout)
+
+    def test_suggestion_line_is_cost_and_gate_cycles(self):
+        write_calibration(self.data_dir, [
+            calibration_row("PT-101", assignee="backend-lead", act_cost=4.0, act_gc=2, closed="2026-09-01T00:00:00Z"),
+        ])
+        r = self.run_estimate()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("suggested: estimate.cost_usd=4.00 estimate.gate_cycles=2", r.stdout)
+
+    def test_all_null_cost_tier_gives_gate_only_suggestion(self):
+        write_calibration(self.data_dir, [
+            calibration_row("PT-101", assignee="backend-lead", act_cost=None, act_gc=3, closed="2026-09-01T00:00:00Z"),
+        ])
+        r = self.run_estimate()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("suggested: estimate.gate_cycles=3", r.stdout)
+        self.assertIn("no non-null cost actuals", r.stdout)
+
+    def test_schema_one_row_prints_ratio_dash(self):
+        write_calibration(self.data_dir, [
+            calibration_row("PT-101", assignee="backend-lead", schema=1, ratio=1.28, closed="2026-09-01T00:00:00Z"),
+        ])
+        r = self.run_estimate()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        line = next(l for l in r.stdout.splitlines() if "PT-101" in l)
+        self.assertRegex(line, r"\s-\s", line)
 
 
 if __name__ == "__main__":

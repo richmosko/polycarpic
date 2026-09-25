@@ -10,10 +10,11 @@ paths: [.github/**, process/WORKFLOW.md, process/cairn/issues/POLY-6.md]
 stage: execute
 estimate.tokens: 600000
 estimate.gate_cycles: 2
+actual.cost_usd: "1.1035"
 actual.tokens: 3026027
 actual.gate_cycles: 2
 actual.wall_clock: 987
-ratio: "5.04"
+ratio: null
 labels: [workflow, ci]
 priority: P2
 pr: null

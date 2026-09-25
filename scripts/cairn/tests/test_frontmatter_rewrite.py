@@ -27,9 +27,11 @@ import cairn
 # `paths`. Every fixture below that asserts a "leading canonical keys"
 # invariant against a dict/file that never declares these must exclude them
 # from the expected order the same way it already excludes `paths`.
+# POLY-34 (ruling §0.3): `estimate.cost_usd`/`actual.cost_usd` joined the
+# same optional block, same reasoning.
 _OPTIONAL_UNDECLARED_FIELDS = (
-    "paths", "stage", "estimate.tokens", "estimate.gate_cycles",
-    "actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio",
+    "paths", "stage", "estimate.cost_usd", "estimate.tokens", "estimate.gate_cycles",
+    "actual.cost_usd", "actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio",
 )
 
 
@@ -65,8 +67,10 @@ class DumpFrontmatterTests(unittest.TestCase):
             "assignee": None,
             "paths": [],
             "stage": None,
+            "estimate.cost_usd": None,
             "estimate.tokens": None,
             "estimate.gate_cycles": None,
+            "actual.cost_usd": None,
             "actual.tokens": None,
             "actual.gate_cycles": None,
             "actual.wall_clock": None,

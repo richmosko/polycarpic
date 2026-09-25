@@ -10,10 +10,11 @@ paths: [scripts/cairn/**, tests/**, process/WORKFLOW.md, process/TRACKER.md, .cl
 stage: execute
 estimate.tokens: 1200000
 estimate.gate_cycles: 2
+actual.cost_usd: "9.4330"
 actual.tokens: 37601904
 actual.gate_cycles: 2
 actual.wall_clock: 988
-ratio: "31.33"
+ratio: null
 labels: [workflow, cairn, tests, ci]
 priority: P2
 pr: null
