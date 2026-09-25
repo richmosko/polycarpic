@@ -29,7 +29,7 @@ import json
 import re
 import unittest
 
-import helpers  # noqa: F401
+import workflow_helpers
 
 from test_agent_worktree_protocol_block import (
     AGENT_FILES,
@@ -38,7 +38,7 @@ from test_agent_worktree_protocol_block import (
     extract_worktree_protocol_block,
 )
 
-SETTINGS_PATH = helpers.CAIRN_DIR.parent.parent / ".claude" / "settings.json"
+SETTINGS_PATH = workflow_helpers.REPO_ROOT / ".claude" / "settings.json"
 
 IDENTITY_DOMAIN = "@agents.polycarpic.local"
 

@@ -111,7 +111,7 @@ gh release create vX.Y.Z --generate-notes --draft --title "vX.Y.Z — <milestone
 
 The lead does *not* publish on the user's behalf — release notes are a Principal decision.
 
-**d. Replace the single row in `## Releases` in process/STATE.md** — never append; the section holds exactly one row (the latest tag), machine-checked at ≤ 200 characters by `scripts/cairn/tests/test_state_releases_bound.py`. Older releases live at [GitHub Releases](https://github.com/<owner>/<repo>/releases), never in this file (ruled 2026-09-02, PT-75; see `TEMPLATE_DECISIONS.md`). Fixed row template (quoted identically in `process/WORKFLOW.md` → Release process):
+**d. Replace the single row in `## Releases` in process/STATE.md** — never append; the section holds exactly one row (the latest tag), machine-checked at ≤ 200 characters by `tests/workflow/test_state_releases_bound.py`. Older releases live at [GitHub Releases](https://github.com/<owner>/<repo>/releases), never in this file (ruled 2026-09-02, PT-75; see `TEMPLATE_DECISIONS.md`). Fixed row template (quoted identically in `process/WORKFLOW.md` → Release process):
    ```
    | vX.Y.Z | YYYY-MM-DD | <major-line> | <milestone-id> (<short milestone name>) — [release](https://github.com/<owner>/<repo>/releases/tag/vX.Y.Z) | <branch> | Draft|Published |
    ```

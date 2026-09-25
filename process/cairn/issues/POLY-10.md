@@ -10,7 +10,7 @@ labels: [cairn, telemetry]
 priority: P1
 pr: https://github.com/richmosko/polycarpic/pull/11
 created: 2026-09-23
-updated: 2026-09-24
+updated: 2026-09-25
 ---
 The OTel receiver (`scripts/cairn/otel_receiver.py`) ran for a day without writing `process/cairn/metrics/token-usage.jsonl`: its watchdog thread died on a missing `.sessions/.closing` path (the metrics dir was swapped aside under it by `ensure_metrics_worktree.py`). After a bare restart it flushes, but every teammate session lands as `role: subagent-unattributed` (16 lines) instead of its agent name, so no sub-issue can ever match its assignee's tokens and every `cairn close` writes `actual.tokens: null`. See the two team-lead comments for the evidence.
 
@@ -118,3 +118,7 @@ PR opened: https://github.com/richmosko/polycarpic/pull/11. Awaiting Validate.
 Validate passed (qa PASS @ a857b6c at 2755393; architect APPROVE @ 10040ad on c43ab6d); merging via PR #11. Closing.
 Estimate calibration: estimated 16 commits / 2 gate cycles / ~50 min at spawn (22:22Z). Actual: 13 commits (2 code, 11 chore), 1 red→green cycle, review approved first pass, spawn → merge 2026-09-24T23:35Z ≈ 62 min (one qa turn lost to an API error). Loop cost $25.54. Sub-issues at their gates: POLY-21 1/1, POLY-22 2/2, POLY-23 1/2, POLY-24 1/1 — first loop with every sub-issue inside estimate.
 Post-merge: live receiver restarted bare; first flush after that is the AC5 live proof. Follow-ups: POLY-25, POLY-26, POLY-27.
+
+### @team-lead — 2026-09-25
+
+Post-merge note (POLY-6 loop, 2026-09-25): the receiver's health dotfiles `.sessions/.watchdog-heartbeat` (rewritten every second) and `.sessions/.last-flush` tripped `scripts/cairn/tests/helpers.py`'s real-state guard ("content-changed") in any checkout with the live receiver — i.e. the main checkout only, since worktrees carry no metrics mount, which is why builders' gates never saw it. Fixed on the POLY-6 branch @ 3ec874c: the guard tolerates content changes to exactly those two files; removals still trip. Architect ruled it a test-harness fix, recorded here rather than in a design note.

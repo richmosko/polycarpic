@@ -7,9 +7,9 @@ import json
 import subprocess
 import unittest
 
-import helpers  # noqa: F401
+import workflow_helpers
 
-HOOK = helpers.CAIRN_DIR.parent.parent / ".claude" / "hooks" / "message_cap.py"
+HOOK = workflow_helpers.REPO_ROOT / ".claude" / "hooks" / "message_cap.py"
 
 
 def run_hook(payload) -> subprocess.CompletedProcess:

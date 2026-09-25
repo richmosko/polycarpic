@@ -79,8 +79,9 @@ MILESTONE_KINDS = {"process", "product"}
 # vocabulary are related but distinct, and a milestone must never be able
 # to carry `status: backlog` just because the two sets happened to be the
 # same object. `completed` -> `done`, `active` -> `in-progress` is the
-# migration this replaces (see migrate_lifecycle_status below); `paused`
-# was already documented for milestones and is extended to majors here.
+# rewrite the retired `migrate lifecycle-status` one-shot used to apply
+# (POLY-6 deleted it; the detection lint stays); `paused` was already
+# documented for milestones and is extended to majors here.
 RECORD_STATUSES = {"planned", "in-progress", "paused", "done", "cancelled"}
 MILESTONE_FIELD_ORDER = ["id", "name", "kind", "major", "status", "target_tag", "ga"]
 MAJOR_FIELD_ORDER = ["id", "status", "owner", "target_ship", "health"]
@@ -160,37 +161,6 @@ def _issue_id_re(prefix: str) -> "re.Pattern[str]":
     return re.compile(rf"^{re.escape(prefix)}-\d+$")
 
 
-def _migrate_hint_if_bare(stem: str, prefix: str) -> str:
-    """The ruling's error-string recipe (§ 6) -- named so it appears once,
-    not re-typed at every id-shape error site. Only attached when `stem`
-    doesn't already carry `prefix` at all: `cairn migrate prefix-ids` only
-    ever prefixes a bare stem (PT-28's addendum § A.2 predicate), so a
-    stem that's ALREADY prefixed but the wrong shape (e.g. a major named
-    "PT-1", or a reserved letter like "PT-V") needs a human fix, not the
-    migration command -- attaching this hint there would send someone to
-    run a tool that can't help.
-    """
-    if stem.startswith(prefix + "-"):
-        return ""
-    return "  fix: scripts/cairn/cairn migrate prefix-ids --dry-run   (then re-run without --dry-run)"
-
-
-def _lifecycle_migrate_hint_if_renamed(value: Any) -> str:
-    """PT-39 (architect's ruling § 3 item 1): the migration-hint recipe for
-    a milestone/major status lint error -- same pattern as
-    _migrate_hint_if_bare above (named once, not re-typed at each call
-    site). Only attached when `value` is literally one of the two OLD
-    vocabulary values this migration knows how to rewrite ("completed" ->
-    "done", "active" -> "in-progress") -- a garbage value ("wip") isn't
-    something `cairn migrate lifecycle-status` can fix, so pointing at it
-    there would send someone to run a tool that can't help (same
-    reasoning as _migrate_hint_if_bare's already-prefixed-stem check).
-    """
-    if value in ("completed", "active"):
-        return "  fix: scripts/cairn/cairn migrate lifecycle-status --dry-run   (then re-run without --dry-run)"
-    return ""
-
-
 def _check_record_status(errors: List[str], stem: str, status: Any) -> None:
     """PT-39 (architect's ruling § 3 item 1): the ONE status-validity check
     for a milestone/major record, called once per major and once per
@@ -203,7 +173,6 @@ def _check_record_status(errors: List[str], stem: str, status: Any) -> None:
         errors.append(
             f"{stem}: missing or invalid status {status!r} -- "
             f"expected one of {sorted(RECORD_STATUSES)}"
-            f"{_lifecycle_migrate_hint_if_renamed(status)}"
         )
 
 
@@ -1130,12 +1099,14 @@ def legacy_archived_issue_paths(data_dir: Path) -> List[Path]:
     """The legacy flat `archive/*.md` layout PT-52 stopped reading -- NOT
     a general-purpose helper; it exists for exactly two callers, and both
     must stay in lockstep: `check_repo`'s legacy-layout lint scan (so the
-    reported count is accurate) and `migrate_archive_issues`'s source glob
-    (so the migration moves precisely the files the lint complained
-    about). If the lint ever reported a file the migration didn't move,
-    the error would be unactionable -- one definition point is what keeps
-    that impossible. `_dir_glob` is non-recursive, so this never touches
-    `archive/issues/`, `archive/milestones/`, or `archive/majors/`.
+    reported count is accurate) and `allocate_and_create_issue`'s
+    allocation guard (so it refuses to allocate over exactly the files the
+    lint complains about). POLY-6 deleted the third caller,
+    `migrate_archive_issues` (its source glob used this same helper) --
+    if the lint ever reported a file the allocation guard didn't also
+    see, the error would be unactionable -- one definition point is what
+    keeps that impossible. `_dir_glob` is non-recursive, so this never
+    touches `archive/issues/`, `archive/milestones/`, or `archive/majors/`.
     """
     data_dir = Path(data_dir)
     return _dir_glob(data_dir / "archive")
@@ -1241,19 +1212,20 @@ def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attemp
     archived issue (PT-52 §1 collapsed `archived_issue_paths` to
     `archive/issues/` only) -- on an unmigrated repo, allocating anyway
     would silently re-issue an id an archived issue already holds, the one
-    invariant the id scheme exists to protect, and NOT repairable by
-    running the migration afterwards (the new issue would already exist).
-    Refuse before any O_EXCL attempt: one non-recursive glob per
-    allocation, on an operation measured in units per day. Self-clearing --
-    run the migration and this raise stops firing.
+    invariant the id scheme exists to protect, and NOT repairable
+    afterwards (the new issue would already exist). Refuse before any
+    O_EXCL attempt: one non-recursive glob per allocation, on an operation
+    measured in units per day. Self-clearing -- moving the legacy files
+    into archive/issues/ and this raise stops firing. POLY-6 gate-1
+    ruling (section (b)): the fix hint naming the now-deleted
+    `migrate archive-issues` command is gone.
     """
     data_dir = Path(data_dir)
     legacy = legacy_archived_issue_paths(data_dir)
     if legacy:
         raise CairnError(
             f"{len(legacy)} archived issue(s) at the legacy archive/*.md layout -- refusing to allocate a "
-            f"new id (it could collide with one an archived issue already holds). "
-            f"fix: scripts/cairn/cairn migrate archive-issues --dry-run   (then re-run without --dry-run)"
+            f"new id (it could collide with one an archived issue already holds)."
         )
     config = load_config(data_dir)
     prefix = config["prefix"]
@@ -1407,7 +1379,7 @@ def check_repo(data_dir: Path) -> List[str]:
             # validated a major's id shape at all, only id==filename.
             errors.append(
                 f"{p.stem}: major id shape {p.stem!r} does not match {major_re.pattern!r} "
-                f"(configured prefix {prefix!r}){_migrate_hint_if_bare(p.stem, prefix)}"
+                f"(configured prefix {prefix!r})"
             )
         if fm.get("title") is not None:
             errors.append(f"{p.stem}: unexpected title {fm['title']!r} -- title is issue-only")
@@ -1574,7 +1546,7 @@ def check_repo(data_dir: Path) -> List[str]:
                 errors.append(
                     f"{stem}: unrecognised milestone id {stem!r} -- expected {prefix}-<letter> "
                     f"(e.g. {prefix}-A) for kind: process, or {prefix}-<version> / {prefix}-M<n> "
-                    f"for kind: product{_migrate_hint_if_bare(stem, prefix)}"
+                    f"for kind: product"
                 )
             elif kind == "process" and not is_definition_shape:
                 errors.append(
@@ -1691,7 +1663,7 @@ def check_repo(data_dir: Path) -> List[str]:
             if issue_re is not None and not issue_re.match(p.stem):
                 errors.append(
                     f"{p.stem}: issue id shape {p.stem!r} does not match {issue_re.pattern!r} "
-                    f"(configured prefix {prefix!r}){_migrate_hint_if_bare(p.stem, prefix)}"
+                    f"(configured prefix {prefix!r})"
                 )
         else:
             errors.append(f"{p.stem}: id {issue_id!r} does not match filename {p.stem!r}")
@@ -1824,14 +1796,17 @@ def check_repo(data_dir: Path) -> List[str]:
     # PT-52 (architect's ruling § 2): the engine no longer reads the
     # legacy flat archive/*.md layout at all -- this scan is the ONLY
     # remaining reader of it, via legacy_archived_issue_paths (its other
-    # caller is migrate_archive_issues' source glob; the two must never
-    # disagree about what counts as legacy, or this error becomes
+    # caller is allocate_and_create_issue's allocation guard; the two must
+    # never disagree about what counts as legacy, or this error becomes
     # unactionable). Under PT-50 this meant "lint fails, everything still
     # works"; it now means "the engine cannot see these files" -- the
-    # wording below says that, keeps the literal fix command, and warns
-    # about the cascade (a legacy file's dangling parent/blocked_by/
-    # milestone refs surface as SEPARATE errors elsewhere in this list,
-    # which read as unrelated unless this one flags the actual cause).
+    # wording below says that and warns about the cascade (a legacy
+    # file's dangling parent/blocked_by/milestone refs surface as
+    # SEPARATE errors elsewhere in this list, which read as unrelated
+    # unless this one flags the actual cause). POLY-6 gate-1 ruling
+    # (section (b)): the fix hint naming the now-deleted
+    # `migrate archive-issues` command is gone -- fixing this is a manual
+    # `git mv` into archive/issues/ until a fresh migration exists for it.
     # Inserted FIRST, not appended: a root cause read after fifteen
     # cascade symptoms gets read last.
     legacy_archived = legacy_archived_issue_paths(data_dir)
@@ -1840,334 +1815,12 @@ def check_repo(data_dir: Path) -> List[str]:
             0,
             f"{len(legacy_archived)} archived issue(s) at the legacy archive/*.md layout are NOT read "
             f"by the engine -- invisible to the board, to id allocation, and to reference resolution "
-            f"(dangling-reference errors below may be caused by this). "
-            f"fix: scripts/cairn/cairn migrate archive-issues --dry-run   (then re-run without --dry-run)"
+            f"(dangling-reference errors below may be caused by this)."
         )
 
     # PT-94 D13: the operative docs are linted with the data dir.
     errors.extend(check_docs(data_dir))
     return errors
-
-
-# --------------------------------------------------------------------------
-# PT-28: `cairn migrate prefix-ids` -- one-shot 0.6.1 migration
-#
-# Architect's finalized ruling + addendum (process/cairn/issues/PT-28.md,
-# dbdbb7e § 5, corrected by 4ac505e § A.2). Named migration ("prefix-ids"),
-# not a bare "migrate" -- each breaking tracker change gets its own name so
-# an invocation in a runbook still means one specific thing a year later.
-# --------------------------------------------------------------------------
-
-def _migration_prefix(data_dir: Path) -> str:
-    """Read+validate `prefix:` for a migration run. Raises CairnError (hard
-    stop, nothing written) on a missing config.yml, a parse failure, or a
-    prefix that doesn't match PREFIX_RE -- every rewrite below depends on
-    this value, so there is no partial-migration path when it's absent.
-    """
-    config_path = Path(data_dir) / "config.yml"
-    if not config_path.exists():
-        raise CairnError(f"no config.yml found at {config_path} -- cannot determine prefix, nothing migrated")
-    cfg = parse_yaml_subset(config_path.read_text(encoding="utf-8"))
-    raw_prefix = cfg.get("prefix")
-    if raw_prefix is None or not PREFIX_RE.match(str(raw_prefix)):
-        raise CairnError(
-            f"config.yml: prefix {raw_prefix!r} must match {PREFIX_RE.pattern} -- cannot migrate, nothing written"
-        )
-    return str(raw_prefix)
-
-
-def migrate_prefix_ids(data_dir: Path, dry_run: bool = False) -> Dict[str, Any]:
-    """Run (`dry_run=False`) or preview (`dry_run=True`) the prefix-ids
-    migration. Returns a report describing every change made or planned --
-    {"prefix": str, "majors": [...], "milestones": [...], "issues": [...]}
-    -- which cmd_migrate_prefix_ids renders for both --dry-run and a real
-    run (the plan IS the report; there is no second, separately-maintained
-    "describe what would happen" path).
-
-    Does NOT gate on `check_repo` first (architect's ruling: that would
-    deadlock the exact situation this command exists to resolve -- a repo
-    whose lint is already failing on bare ids).
-
-    Idempotency and crash-recovery (addendum § A.2, corrected): phase 1's
-    unit of work is keyed on the FILENAME STEM, not the id -- "the old-
-    named file is still present" stays true exactly until that file's
-    work is finished, which survives a crash between the write and the
-    unlink (an id-keyed predicate does not: migrating one file is two
-    observable actions, the content-write and the rename, and an id-based
-    check can't tell those apart). If the new-named file already exists on
-    entry, a prior run wrote it -- it was written atomically, so it is
-    complete; do not rewrite it, only unlink the stale old file.
-
-    Phase 2 (issues/) is keyed on VALUE per file: a `milestone:` ref is
-    rewritten iff it's non-null and not already prefixed. Idempotent by
-    construction.
-
-    Touches exactly three fields across the whole run: `id:`, `major:`,
-    `milestone:`. Everything else (target_tag included -- addendum § A.1:
-    it is a git tag name, not a cairn id) is carried through byte-for-byte
-    via dump_frontmatter's "emit keys actually present" contract.
-    """
-    data_dir = Path(data_dir)
-    prefix = _migration_prefix(data_dir)
-    stamp = prefix + "-"
-    report: Dict[str, Any] = {"prefix": prefix, "majors": [], "milestones": [], "issues": []}
-
-    for subdir, report_key in (("majors", "majors"), ("milestones", "milestones")):
-        dir_path = data_dir / subdir
-        for p in _dir_glob(dir_path):
-            if p.stem.startswith(stamp):
-                continue  # already migrated -- the hyphen-qualified check (§5)
-            new_name = f"{stamp}{p.stem}.md"
-            new_path = dir_path / new_name
-            if new_path.exists():
-                # A prior run wrote the new file completely before being
-                # interrupted before the unlink -- finish just that, don't
-                # re-derive or rewrite content that's already correct.
-                report[report_key].append({"old": p.name, "new": new_name, "resumed": True})
-                if not dry_run:
-                    p.unlink()
-                continue
-            fm, body = parse_frontmatter(p.read_text(encoding="utf-8"))
-            fm = dict(fm)
-            fm["id"] = f"{stamp}{p.stem}"
-            if subdir == "milestones":
-                major = fm.get("major")
-                if major is not None and not str(major).startswith(stamp):
-                    fm["major"] = f"{stamp}{major}"
-            report[report_key].append({"old": p.name, "new": new_name, "resumed": False})
-            if not dry_run:
-                # id: (and major:, for a milestone) written together in
-                # ONE atomic write to the NEW path -- "new file exists
-                # with the right id but a stale major:" must not be a
-                # reachable crash state (addendum § A.2).
-                _atomic_write(new_path, dump_frontmatter(fm) + body)
-                p.unlink()
-
-    # PT-28 fix (found dogfooding the migration against this repo's own
-    # fixture tree, see the commit body): archive/ too, not just issues/ --
-    # check_repo validates an archived issue's `milestone:` ref exactly the
-    # same way it validates a live one (its known_ids/parsed_issues loop
-    # reads both directories), so skipping archive/ here would leave any
-    # archived issue with a bare ref that lints dangling the moment its
-    # milestone file is renamed -- a repo with archived history could never
-    # reach a clean post-migration state.
-    for p in list(_dir_glob(data_dir / "issues")) + archived_issue_paths(data_dir):
-        fm, body = parse_frontmatter(p.read_text(encoding="utf-8"))
-        milestone = fm.get("milestone")
-        if milestone is None or str(milestone).startswith(stamp):
-            continue  # null refs survive untouched; already-prefixed refs are idempotent no-ops
-        new_milestone = f"{stamp}{milestone}"
-        report["issues"].append({"file": p.name, "old_milestone": str(milestone), "new_milestone": new_milestone})
-        if not dry_run:
-            fm = dict(fm)
-            fm["milestone"] = new_milestone
-            _atomic_write(p, dump_frontmatter(fm) + body)
-
-    return report
-
-
-def _format_migration_report(report: Dict[str, Any], dry_run: bool) -> str:
-    """Human-legible plan/summary for cmd_migrate_prefix_ids -- one line per
-    change (or "nothing to do"), loosely worded (INTERFACE.md convention:
-    pin content, not exact wording) so it reads sensibly for either mode.
-    """
-    verb = "would rename" if dry_run else "renamed"
-    ref_verb = "would rewrite" if dry_run else "rewrote"
-    lines = []
-    for key, label in (("majors", "major"), ("milestones", "milestone")):
-        for entry in report[key]:
-            if entry["resumed"]:
-                lines.append(f"{label} {entry['old']} -> {entry['new']} (already written by a prior run, resuming)")
-            else:
-                lines.append(f"{verb} {label} {entry['old']} -> {entry['new']}")
-    for entry in report["issues"]:
-        lines.append(
-            f"{ref_verb} {entry['file']}: milestone {entry['old_milestone']!r} -> {entry['new_milestone']!r}"
-        )
-    if not lines:
-        return "nothing to do -- every id is already prefixed"
-    return "\n".join(lines)
-
-
-# --------------------------------------------------------------------------
-# PT-39: `cairn migrate lifecycle-status` -- unify milestone/major status
-# vocabulary onto RECORD_STATUSES.
-#
-# Architect's ruling (temp/arch-ruling-pt39-lifecycle.md § 2): PT-28's
-# named-migration precedent verbatim -- a NAMED migration, not a bare
-# "migrate", same reasoning as prefix-ids (an invocation in a runbook
-# still means one specific thing a year later).
-# --------------------------------------------------------------------------
-
-_LIFECYCLE_STATUS_RENAMES = {"completed": "done", "active": "in-progress"}
-
-
-def migrate_lifecycle_status(data_dir: Path, dry_run: bool = False) -> Dict[str, Any]:
-    """Run (`dry_run=False`) or preview (`dry_run=True`) the
-    lifecycle-status migration. Returns a report describing every change
-    made or planned -- {"majors": [...], "milestones": [...]} -- which
-    cmd_migrate_lifecycle_status renders for both --dry-run and a real
-    run (the plan IS the report, same convention as migrate_prefix_ids).
-
-    Rewrites `status:` in majors/*.md and milestones/*.md ONLY -- never
-    archive/majors/ or archive/milestones/ (those subdirs don't predate
-    PT-39; nothing there could carry the old vocabulary that wasn't
-    already caught by a live-tree migration first) and never issues/ or
-    archive/ (issues already use STATUSES, untouched by this migration).
-
-    `completed` -> `done`, `active` -> `in-progress`; any other value
-    (including an already-migrated one, or a garbage value like "wip")
-    is left byte-for-byte untouched -- value-keyed, so idempotent by
-    construction with no crash-recovery phase needed (unlike
-    migrate_prefix_ids's filename-keyed phase 1, there is no
-    old-name/new-name pair here to leave half-renamed).
-
-    Does NOT gate on `check_repo` first (same reasoning as prefix-ids:
-    that would deadlock the exact situation this command exists to
-    resolve -- a repo whose lint is already failing on the old
-    vocabulary). Single-writer rule: rewrites go through
-    parse_frontmatter/dump_frontmatter/_atomic_write, the same path
-    apply_patch uses -- no second writer.
-    """
-    data_dir = Path(data_dir)
-    report: Dict[str, Any] = {"majors": [], "milestones": []}
-    for subdir, report_key in (("majors", "majors"), ("milestones", "milestones")):
-        for p in _dir_glob(data_dir / subdir):
-            fm, body = parse_frontmatter(p.read_text(encoding="utf-8"))
-            old_status = fm.get("status")
-            new_status = _LIFECYCLE_STATUS_RENAMES.get(old_status)
-            if new_status is None:
-                continue  # not one of the two known old values -- a lint concern, not this command's
-            report[report_key].append({"file": p.name, "old_status": old_status, "new_status": new_status})
-            if not dry_run:
-                fm = dict(fm)
-                fm["status"] = new_status
-                _atomic_write(p, dump_frontmatter(fm) + body)
-    return report
-
-
-def _format_lifecycle_migration_report(report: Dict[str, Any], dry_run: bool) -> str:
-    """Human-legible plan/summary for cmd_migrate_lifecycle_status -- same
-    shape as _format_migration_report (INTERFACE.md convention: pin
-    content, not exact wording).
-    """
-    verb = "would rewrite" if dry_run else "rewrote"
-    lines = []
-    for key, label in (("majors", "major"), ("milestones", "milestone")):
-        for entry in report[key]:
-            lines.append(
-                f"{verb} {label} {entry['file']}: status {entry['old_status']!r} -> {entry['new_status']!r}"
-            )
-    if not lines:
-        return "nothing to do -- every major/milestone already uses the unified vocabulary"
-    return "\n".join(lines)
-
-
-# --------------------------------------------------------------------------
-# PT-50: `cairn migrate archive-issues` -- move every legacy flat
-# `archive/*.md` issue into `archive/issues/`, matching milestones/majors'
-# existing archive/<schema>/ shape and closing the asymmetry PT-39 left
-# behind.
-#
-# Architect's ruling (process/cairn/issues/PT-50.md, § 1): a NAMED
-# migration, not a bare "migrate" -- same PT-28 precedent as prefix-ids/
-# lifecycle-status (an invocation in a shell history means one specific
-# thing forever). Filesystem-only: unlike the other two migrations, this
-# one touches zero bytes inside any file, only paths.
-# --------------------------------------------------------------------------
-
-def migrate_archive_issues(data_dir: Path, dry_run: bool = False) -> Dict[str, Any]:
-    """Run (`dry_run=False`) or preview (`dry_run=True`) the
-    archive-issues migration. Returns a report describing every change
-    made or planned -- {"issues": [{"old", "new", "resumed"}, ...]} --
-    which cmd_migrate_archive_issues renders for both --dry-run and a
-    real run (the plan IS the report, same convention as the other two
-    migrations).
-
-    Moves every `archive/*.md` file to `archive/issues/<name>` via
-    `_git_mv_or_rename`, so git records a rename. Never touches
-    `archive/milestones/` or `archive/majors/` -- `legacy_archived_issue_
-    paths`'s underlying `_dir_glob` is non-recursive, so those two subdirs
-    are invisible to it.
-
-    Does NOT gate on `check_repo` first -- same reasoning as the other
-    two migrations: it must run on the repo whose lint it is fixing (the
-    legacy-layout error this migration exists to resolve). This
-    migration's read path (legacy_archived_issue_paths) is separate from
-    the engine's own archived-issue read path (archived_issue_paths, PT-52
-    -- archive/issues/ only), so PT-52's deletion cannot break it.
-
-    Idempotency and crash-recovery: keyed on the SOURCE file's presence
-    (prefix-ids' filename-keyed precedent) -- "archive/<id>.md exists" is
-    the whole unit of work, so a crash before or after a single rename
-    always leaves a well-defined next state. If the destination already
-    exists on entry (a prior run wrote it and crashed before unlinking
-    the source): byte-identical content means the prior run completed
-    that file's work -- report `resumed: True` and unlink the stale
-    source, never re-copy. Differing content means a human put a
-    genuinely different file at the destination; a rename can never
-    produce that on its own, so this command has no basis to pick a
-    winner and REFUSES THE ENTIRE RUN, naming the offending file, moving
-    nothing (archive_major's two-phase all-or-nothing precedent: the
-    whole set is validated -- reads only -- before any file moves).
-    """
-    data_dir = Path(data_dir)
-    archive_dir = data_dir / "archive"
-    archive_issues_dir = archive_dir / "issues"
-    # PT-52: routed through legacy_archived_issue_paths -- its ONLY other
-    # caller is check_repo's lint scan, deliberately, so the two can never
-    # disagree about what counts as legacy (§2).
-    sources = legacy_archived_issue_paths(data_dir)
-
-    # Phase 1 (reads only): validate the WHOLE set before moving anything.
-    plan: List[Dict[str, Any]] = []
-    for p in sources:
-        dest = archive_issues_dir / p.name
-        if dest.exists():
-            if dest.read_bytes() == p.read_bytes():
-                plan.append({"old": p.name, "new": dest.name, "resumed": True, "_src": p, "_dest": dest})
-            else:
-                raise CairnError(
-                    f"{p.name}: already exists at archive/issues/{p.name} with different content -- "
-                    f"refusing to overwrite; nothing moved"
-                )
-        else:
-            plan.append({"old": p.name, "new": dest.name, "resumed": False, "_src": p, "_dest": dest})
-
-    report: Dict[str, Any] = {
-        "issues": [{"old": e["old"], "new": e["new"], "resumed": e["resumed"]} for e in plan]
-    }
-    if dry_run:
-        return report
-
-    # Phase 2: every entry validated above -- now safe to move files.
-    if plan:
-        archive_issues_dir.mkdir(parents=True, exist_ok=True)
-    for e in plan:
-        if e["resumed"]:
-            e["_src"].unlink()
-        else:
-            _git_mv_or_rename(e["_src"], e["_dest"])
-    return report
-
-
-def _format_archive_issues_migration_report(report: Dict[str, Any], dry_run: bool) -> str:
-    """Human-legible plan/summary for cmd_migrate_archive_issues -- same
-    shape as the other two migrations' formatters (INTERFACE.md
-    convention: pin content, not exact wording).
-    """
-    verb = "would move" if dry_run else "moved"
-    lines = []
-    for entry in report["issues"]:
-        if entry["resumed"]:
-            lines.append(
-                f"issue {entry['old']} -> archive/issues/{entry['new']} (already written by a prior run, resuming)"
-            )
-        else:
-            lines.append(f"{verb} issue {entry['old']} -> archive/issues/{entry['new']}")
-    if not lines:
-        return "nothing to do -- no archived issues at the legacy archive/*.md layout"
-    return "\n".join(lines)
 
 
 # --------------------------------------------------------------------------
@@ -6370,89 +6023,6 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_migrate_prefix_ids(args: argparse.Namespace) -> int:
-    """`cairn migrate prefix-ids [--dry-run]` (PT-28, architect's ruling § 5).
-
-    Deliberately does NOT gate on a clean `cairn check` first -- that would
-    deadlock the exact bare-id situation this command exists to resolve.
-    `resolve_data_dir` still hard-errors on a missing config.yml (nothing
-    written, per ExitCodeTests); `migrate_prefix_ids` itself hard-errors on
-    a missing/malformed `prefix:` the same way. Exit code is 0 for any
-    completed run (dry or real, migrated or "nothing to do") -- an
-    UNRELATED lint error surviving the migration (e.g. a dangling parent
-    ref this command never touches) is reported, not treated as this
-    command's own failure; only "could not proceed" (bad prefix, an
-    unwritable file) is non-zero, per the ruling's Exit codes section.
-    """
-    data_dir = resolve_data_dir(args)
-    report = migrate_prefix_ids(data_dir, dry_run=args.dry_run)
-    print(_format_migration_report(report, args.dry_run))
-    if args.dry_run:
-        return 0
-    errors = check_repo(data_dir)
-    if errors:
-        print(f"\nwarning: {len(errors)} lint error(s) remain after migration:", file=sys.stderr)
-        for e in errors:
-            print(f"  {e}", file=sys.stderr)
-    else:
-        print("\nok")
-    return 0
-
-
-def cmd_migrate_lifecycle_status(args: argparse.Namespace) -> int:
-    """`cairn migrate lifecycle-status [--dry-run]` (PT-39, architect's
-    ruling § 2).
-
-    Same posture as cmd_migrate_prefix_ids: does NOT gate on a clean
-    `cairn check` first -- that would deadlock the exact old-vocabulary
-    situation this command exists to resolve. Exit code is 0 for any
-    completed run (dry or real, migrated or "nothing to do") -- an
-    UNRELATED lint error surviving the migration is reported, not treated
-    as this command's own failure.
-    """
-    data_dir = resolve_data_dir(args)
-    report = migrate_lifecycle_status(data_dir, dry_run=args.dry_run)
-    print(_format_lifecycle_migration_report(report, args.dry_run))
-    if args.dry_run:
-        return 0
-    errors = check_repo(data_dir)
-    if errors:
-        print(f"\nwarning: {len(errors)} lint error(s) remain after migration:", file=sys.stderr)
-        for e in errors:
-            print(f"  {e}", file=sys.stderr)
-    else:
-        print("\nok")
-    return 0
-
-
-def cmd_migrate_archive_issues(args: argparse.Namespace) -> int:
-    """`cairn migrate archive-issues [--dry-run]` (PT-50, architect's
-    ruling § 1).
-
-    Same posture as the other two migrations: does NOT gate on a clean
-    `cairn check` first -- that would deadlock the exact legacy-layout
-    situation this command exists to resolve. Exit code is 0 for any
-    COMPLETED run (dry or real, migrated or "nothing to do") -- a
-    surviving UNRELATED lint error is reported as a warning, not treated
-    as this command's own failure. A differing-destination refusal raises
-    CairnError (main() turns that into a nonzero exit, nothing written --
-    same posture as a missing/malformed prefix in migrate_prefix_ids).
-    """
-    data_dir = resolve_data_dir(args)
-    report = migrate_archive_issues(data_dir, dry_run=args.dry_run)
-    print(_format_archive_issues_migration_report(report, args.dry_run))
-    if args.dry_run:
-        return 0
-    errors = check_repo(data_dir)
-    if errors:
-        print(f"\nwarning: {len(errors)} lint error(s) remain after migration:", file=sys.stderr)
-        for e in errors:
-            print(f"  {e}", file=sys.stderr)
-    else:
-        print("\nok")
-    return 0
-
-
 def cmd_snapshot(args: argparse.Namespace) -> int:
     data_dir = resolve_data_dir(args)
     sys.stdout.write(build_snapshot_markdown(data_dir))
@@ -6621,38 +6191,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_estimate.add_argument("--limit", type=int, default=5)
     p_estimate.add_argument("--json", action="store_true")
     p_estimate.set_defaults(func=cmd_estimate)
-
-    # PT-28 (architect's ruling § 5): a NAMED migration, not a bare
-    # "migrate" -- each one-shot tracker migration gets its own
-    # sub-subcommand under `migrate`, so an invocation in a shell history
-    # or a runbook still means one specific thing regardless of which
-    # cairn version wrote it.
-    p_migrate = sub.add_parser("migrate", parents=[common], help="run a one-shot tracker migration")
-    migrate_sub = p_migrate.add_subparsers(dest="migration", required=True)
-    p_migrate_prefix_ids = migrate_sub.add_parser(
-        "prefix-ids", parents=[common],
-        help="prefix bare major/milestone ids with the configured prefix: (PT-28)",
-    )
-    p_migrate_prefix_ids.add_argument(
-        "--dry-run", action="store_true", help="preview the plan without writing or renaming anything",
-    )
-    p_migrate_prefix_ids.set_defaults(func=cmd_migrate_prefix_ids)
-    p_migrate_lifecycle_status = migrate_sub.add_parser(
-        "lifecycle-status", parents=[common],
-        help="unify milestone/major status onto RECORD_STATUSES: completed->done, active->in-progress (PT-39)",
-    )
-    p_migrate_lifecycle_status.add_argument(
-        "--dry-run", action="store_true", help="preview the plan without writing anything",
-    )
-    p_migrate_lifecycle_status.set_defaults(func=cmd_migrate_lifecycle_status)
-    p_migrate_archive_issues = migrate_sub.add_parser(
-        "archive-issues", parents=[common],
-        help="move legacy flat archive/*.md issues into archive/issues/ (PT-50)",
-    )
-    p_migrate_archive_issues.add_argument(
-        "--dry-run", action="store_true", help="preview the plan without moving anything",
-    )
-    p_migrate_archive_issues.set_defaults(func=cmd_migrate_archive_issues)
 
     p_snapshot = sub.add_parser(
         "snapshot", parents=[common],

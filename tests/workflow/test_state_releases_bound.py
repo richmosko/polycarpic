@@ -13,7 +13,7 @@ frames down. `STATE_MD.exists()` is asserted explicitly in `setUp` (PT-45's
 own precondition shape) so a `git subtree split` or spun-off repo that
 drags this file out without `process/STATE.md` fails legibly too.
 
-Reads `process/STATE.md` AS TEXT (`helpers.CAIRN_DIR.parent.parent`),
+Reads `process/STATE.md` AS TEXT (`workflow_helpers.REPO_ROOT`),
 never parsed as structured markdown -- there is no markdown-table parser
 in this codebase's dependency tree (same reasoning as PT-36/PT-45 reading
 their targets as text), so every extractor below is a regex anchored on
@@ -48,9 +48,9 @@ from __future__ import annotations
 import re
 import unittest
 
-import helpers  # noqa: F401
+import workflow_helpers
 
-STATE_MD = helpers.CAIRN_DIR.parent.parent / "process" / "STATE.md"
+STATE_MD = workflow_helpers.REPO_ROOT / "process" / "STATE.md"
 
 # Anchored on the STRUCTURAL shape: a `## Releases` heading, running until
 # the next `## `-level heading or EOF. Not a bare "grep for '| v'" search,

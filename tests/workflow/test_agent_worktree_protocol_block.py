@@ -23,9 +23,9 @@ from __future__ import annotations
 import re
 import unittest
 
-import helpers  # noqa: F401
+import workflow_helpers
 
-AGENTS_DIR = helpers.CAIRN_DIR.parent.parent / ".claude" / "agents"
+AGENTS_DIR = workflow_helpers.REPO_ROOT / ".claude" / "agents"
 
 # The ten agent definitions this repo ships -- every one of them, no
 # exceptions named in the ruling (mcp-broker included: it is a spawned

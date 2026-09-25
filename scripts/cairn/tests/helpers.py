@@ -137,6 +137,22 @@ def _read_jsonl_lines(path: Path) -> List[str]:
     return [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+# POLY-6 (team-lead finding, main checkout @ 010f414): the live otel
+# receiver rewrites these two health dotfiles directly inside
+# `.sessions/` -- `.watchdog-heartbeat` every second (otel_receiver.py's
+# WATCHDOG_HEARTBEAT_MARKER_NAME) and `.last-flush` on each flush
+# (LAST_FLUSH_MARKER_NAME) -- so any checkout running the live receiver
+# (the main one; a teammate's worktree has no metrics mount, which is
+# why this never tripped there) trips the guard deterministically on
+# their CONTENT alone. Hardcoded, not imported from otel_receiver.py:
+# helpers.py is pulled in by every test module in this suite, and these
+# two names are a stable, narrow surface not worth a module-level
+# import's cost/risk for. Named here so their disappearance still counts
+# as a `removed` finding below -- only a CONTENT change on these two is
+# tolerated, never their absence.
+_SESSIONS_HEALTH_DOTFILES = frozenset({".watchdog-heartbeat", ".last-flush"})
+
+
 def _snapshot_dir_contents(dir_path: Path) -> Dict[str, bytes]:
     """{filename: bytes} for every FILE directly inside `dir_path` (not
     recursive -- `.sessions/` is flat). `{}` for a missing directory."""
@@ -283,7 +299,10 @@ def diagnose_real_state(snapshot: Dict[str, Any]) -> List[str]:
     new_sessions = _snapshot_dir_contents(snapshot["sessions_dir"])
     removed = sorted(set(old_sessions) - set(new_sessions))
     changed = sorted(
-        name for name in old_sessions if name in new_sessions and new_sessions[name] != old_sessions[name]
+        name for name in old_sessions
+        if name in new_sessions
+        and new_sessions[name] != old_sessions[name]
+        and name not in _SESSIONS_HEALTH_DOTFILES
     )
     if removed or changed:
         findings.append(

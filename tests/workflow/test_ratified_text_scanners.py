@@ -64,9 +64,9 @@ import re
 import unittest
 from pathlib import Path
 
-import helpers  # noqa: F401
+import workflow_helpers
 
-REPO_ROOT = helpers.CAIRN_DIR.parent.parent  # scripts/cairn -> scripts -> repo root
+REPO_ROOT = workflow_helpers.REPO_ROOT
 
 # Shared structural extraction (test_skill_id_literals.py, PT-45): fenced
 # ```blocks``` matched first, then masked out, so a single-backtick scan

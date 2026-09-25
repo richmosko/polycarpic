@@ -658,9 +658,16 @@ class RunnerSelfRecordsTests(unittest.TestCase):
         # Piped through `> /dev/null` -- exactly the shape every gate
         # owner's `| tail` reduces to for this purpose: nothing of the
         # runner's own stdout survives to be scraped afterward.
+        # CI (POLY-6, ruling section (c) step 4) sets CAIRN_TEST_RUNS_FILE
+        # on the outer run_tests.py step; inherited unmodified, this
+        # child's own self-record would land at that override path
+        # instead of `tmp`'s ledger this test inspects (same fix as
+        # SelfRecordSessionTests below).
+        env = dict(os.environ)
+        env.pop("CAIRN_TEST_RUNS_FILE", None)
         result = subprocess.run(
             f'cd "{engine_dir}" && {sys.executable} run_tests.py --gate red > /dev/null',
-            shell=True, capture_output=True, text=True,
+            shell=True, capture_output=True, text=True, env=env,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         records_path = tmp / "process" / "cairn" / "metrics" / "test-runs.jsonl"
