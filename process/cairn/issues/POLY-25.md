@@ -3,14 +3,14 @@ id: POLY-25
 title: otel_receiver H3 endpoint/port agreement check never runs: OTEL_* vars do not reach hook-spawned processes
 status: backlog
 milestone: POLY-A
-parent: null
+parent: POLY-49
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P3
 pr: null
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-25
 ---
 
 

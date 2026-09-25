@@ -3,14 +3,14 @@ id: POLY-9
 title: Unquoted leading-* paths: entry hits the YAML alias check before lint
 status: backlog
 milestone: null
-parent: null
+parent: POLY-49
 blocked_by: []
 assignee: null
 labels: [cairn, workflow]
 priority: P3
 pr: null
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-25
 ---
 
 Found during POLY-2 (qa-engineer, architect re-review @ 8c41351). A hand-typed

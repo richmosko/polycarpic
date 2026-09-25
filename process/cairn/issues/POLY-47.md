@@ -3,7 +3,7 @@ id: POLY-47
 title: cairn close --at: commit-time ceiling excludes the receiver flush that carries the stage's usage
 status: backlog
 milestone: POLY-A
-parent: null
+parent: POLY-48
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]

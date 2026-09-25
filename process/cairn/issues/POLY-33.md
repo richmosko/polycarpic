@@ -3,14 +3,14 @@ id: POLY-33
 title: cairn check: 'closed via cairn set' warning keys on actual.tokens, which a legitimate close leaves null
 status: backlog
 milestone: POLY-A
-parent: null
+parent: POLY-48
 blocked_by: []
 assignee: null
 labels: [cairn]
 priority: P3
 pr: null
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-25
 ---
 
 

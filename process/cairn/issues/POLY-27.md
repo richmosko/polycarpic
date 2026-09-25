@@ -3,14 +3,14 @@ id: POLY-27
 title: otel_receiver watchdog: recreate-after-60s must hold while the metrics parent dir is absent (mid-swap mkdir -p breaks git worktree add)
 status: backlog
 milestone: POLY-A
-parent: null
+parent: POLY-49
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P3
 pr: null
 created: 2026-09-24
-updated: 2026-09-24
+updated: 2026-09-25
 ---
 
 
