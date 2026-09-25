@@ -1,7 +1,7 @@
 ---
 id: POLY-6
 title: Separate repo-convention tests from cairn's suite; path-filtered CI per component
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -163,3 +163,10 @@ python3 run_tests.py --gate verdict (scripts/cairn, both roots): 1728 tests, 103
 node --test "scripts/cairn/tests/js/**/*.test.js": 479 tests, 477 pass, 2 fail — both the known layerchart ENOENT cases in token-chart-logic.test.js (node_modules absent locally, POLY-8's tracked exclusion in ci.yml). Same counts as the prior verdict @ ba516cb.
 
 The CI-red self-record env leak (CAIRN_TEST_RUNS_FILE inherited by 4 fake-engine-root subprocess tests) is fixed at this tip and verified both with the override unset and set. No other change since the ba516cb verdict besides that fix and tracker bookkeeping.
+
+### @team-lead — 2026-09-25
+
+Validate passed (qa PASS @ c93342d, re-verified @ 7ca97a1 at da31076; architect APPROVE @ 75cc704; CI `cairn` green on the tip); merging via PR #12. Closing.
+Estimate calibration: estimated 18 commits / 2 gate cycles / ~70 min at spawn. Actual: 23 commits, 1 red→green + 1 review round + 1 CI-hermeticity fix, ~65 min active team time (window spans an overnight pause), merged 2026-09-25T16:32Z. Loop cost $37.77.
+Sub-issue actuals (tokens / cost / ratio on raw tokens): POLY-28 0.84M / $0.88 / 1.20 · POLY-29 12.3M / $3.79 / 17.6 · POLY-30 37.6M / $9.43 / 31.3 · POLY-31 3.0M / $1.10 / 5.0 · POLY-32 4.0M / $2.07 / 10.0. Cache reads are 91–99% of tokens and ≈83% of cost → the raw-sum ratio is a poor proxy; filed as POLY-34 (estimate on cost).
+Struck from AC4 by ruling: token backfill retirement (documented retroactive-attribution mechanism; POLY-26 depends on it). User action still open: register `cairn` as a required check on main.

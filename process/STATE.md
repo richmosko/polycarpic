@@ -15,13 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Separate repo-convention tests from cairn's suite; retire one-shot migrations; first path-filtered CI job
-- **Issue:** POLY-6 (cairn)
-- **Milestone:** POLY-A
-- **Branch:** `feature/poly-6-test-boundary-ci`
-- **Started:** 2026-09-24
-- **Goal:** cairn's test suite is spin-off-clean, dead migrations and their tests are gone, and one GitHub Actions job runs the suite path-filtered as a required check on main.
-- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/12
+_None — between loops. Next: POLY-34 (estimate on cost axis), POLY-26 (backfill sibling scan), POLY-33 (check-warning fix)._
 
 ## Releases
 
