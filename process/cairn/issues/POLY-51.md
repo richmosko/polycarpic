@@ -44,3 +44,7 @@ Gate-1 ruling: `scripts/cairn/design/sub-issue-letter-ids.md` (this commit). Sub
 - New lint: a suffixed id's `parent:` must equal its stem minus the letter.
 - Measured: 9 id-shape concerns across 10 regex lines; 3 change (issue re, py sort, js sort) + allocator + new lint; branch-side 3 and the token sort stay untouched (AC3). Every other consumer is string-equality or filename lookup — estimation is shape-blind (§4).
 - Tests: § 6, 11 new cases; 9 existing test files must pass unchanged. Guard: 0 existing tests edited; board-logic.js diff = one regex line.
+
+### @team-lead — 2026-09-25
+
+Gate-1 ruling accepted at f22c704 (`scripts/cairn/design/sub-issue-letter-ids.md`) as written, §0–§6. Notes for the record: the no-rename rule covers all 37 numbered sub-issues live today (30 stage sub-issues + the 11 umbrella members reparented under POLY-48/49/50), not only the 26 listed in AC4. Two rules beyond the AC, both accepted: `--parent` must resolve and be depth 1 (legacy numbered sub-issues cannot be parents either); lint requires a suffixed id's `parent` to equal its stem minus the letter. Uppercase suffixes rejected. POLY-52 closed at the gate from the main checkout.

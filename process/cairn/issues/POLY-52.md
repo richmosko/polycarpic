@@ -1,7 +1,7 @@
 ---
 id: POLY-52
 title: POLY-51 plan: sub-issue letter-id ruling
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-51
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [scripts/cairn/design/sub-issue-letter-ids.md, process/cairn/issues/POLY-
 stage: plan
 estimate.cost_usd: "1.50"
 estimate.gate_cycles: 1
+actual.cost_usd: "1.5906"
+actual.tokens: 3019167
+actual.gate_cycles: 1
+actual.wall_clock: 7
+ratio: "1.06"
 labels: [cairn]
 priority: P3
 pr: null
