@@ -71,3 +71,13 @@ No debt findings. Note: the new `Path.is_relative_to` needs Python ≥ 3.9 (loca
 ### @team-lead — 2026-09-25
 
 Architect verdict PASS accepted (5ad725f on green 68c8dfa). POLY-44 closed at the verdict without `--at` (POLY-47 again: ceiling at 3120e92 read $0.21, without it $0.49). Guard-push design gap surfaced by the review push: `guard-push` scans every same-assignee commit since merge-base, so the second sub-issue an agent holds on one branch trips on the first one's files; POLY-44 declared the union as the workaround. To be tracked in the cairn-engine umbrella. Sending qa the verdict run at tip 3120e92.
+
+### @qa-engineer — 2026-09-25
+
+Verdict run at 9e2fbf2 (feature tip, only tracker commits since green 68c8dfa): PASS.
+
+- `run_tests.py --gate verdict`: 1772 tests, 103 files, 8 workers, 27.2s -- OK (skipped=4).
+- JS suite (46 files, excludes token-chart-logic.test.js per the CI exclusion, POLY-8): 432 tests -- all pass.
+- Flushed the receiver from the main checkout (otel_receiver.py --flush-now, exit 0) per the lead's instruction, before this comment.
+- BackfillWorktreeSiblingScanTests (7 tests, test_backfill_tokens.py) all green: sibling scan attributes teammate lines, near-neighbour <slug>-old dirs never scanned, nested subagents/ transcripts under a sibling scanned, cross-root duplicate requestId dedupes once, --dry-run reports sibling file/dir counts, _transcript_path_for/_worktree_sibling_dirs live only in backfill_tokens.py (not hasattr(otel_receiver, "_transcript_path_for") holds), glob metacharacters in a slug matched literally.
+- No regression: every pre-existing test in test_backfill_tokens.py (43), test_otel_receiver_watchdog_attribution.py, test_otel_receiver.py, test_otel_receiver_hardening.py, test_otel_receiver_self_stop.py still green.
