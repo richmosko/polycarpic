@@ -1,7 +1,7 @@
 ---
 id: POLY-49
 title: Receiver hardening (grouped)
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -41,3 +41,7 @@ Grouped fix loop for the OTel receiver and its metrics worktree (user decision 2
 ### @team-lead — 2026-09-25
 
 Grouped 2026-09-25 from the POLY-26 loop's follow-ups; spec is in the body above.
+
+### @team-lead — 2026-09-25
+
+Feature started. Branch: `feature/poly-49-receiver-hardening`.
