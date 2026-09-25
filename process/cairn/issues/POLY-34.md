@@ -33,3 +33,14 @@ AC: (1) architect rules the estimate unit — `cost_usd` or cost-weighted tokens
 
 Feature started. Branch: `feature/poly-34-estimate-on-cost-axis`.
 Lead estimate at start (calibration input): 16 commits, 2 gate cycles, ~60 min spawn→merge. Token estimates below are the first seeded from `cairn estimate`'s reference classes (raw-token unit, cache-inclusive) rather than hand guesses; a dollar guess is recorded beside each for comparison once this loop moves the axis: plan 0.9M / $1 · qa execute 8M / $3 · impl execute 15M / $5 · review 3M / $2.
+
+### @architect — 2026-09-25
+
+Gate-1 ruling (POLY-35): `scripts/cairn/design/estimation.md` @ e4c73bf §0 (§1/3/4/5/8/9 revised to match). Summary:
+- (a) Unit = `cost_usd` from prices.json at close. Measured: POLY-6's $/MTok ranges 0.25–1.04 (4.2×). Weighted tokens are rejected because they are model-relative (cache_read/input is 0.05 on opus-5-5 vs 0.10 on sonnet-5) or else just $/const. A repricing needs a re-close; the record adds `prices_retrieved`. An unpriced model gives cost null, ratio null, and a warning naming the model.
+- (b) `estimate.cost_usd` ("3.00", set coerces 2 dp, > 0) and `actual.cost_usd` (close-written, 4 dp). `ratio` = cost ratio. `estimate.tokens` becomes an optional secondary. Close always writes the four computed keys, null included. Check: a ratio requires both cost operands.
+- (c) `cairn estimate`: the cost median excludes null/schema-1 rows. Suggestion is `estimate.cost_usd=X.XX estimate.gate_cycles=N`.
+- (d) `bloat_ratio` applies to the cost ratio with reason `"cost"`. The unset path is unchanged; its skip line says "cost".
+- (e) AC5: POLY-28–32 are re-closed with `estimate.cost_usd` absent, so ratio is null. A derived estimate would be invented or circular. Command: `--base 97037a6 --ref a508b32^2`, order 28 (`--at 4601a09`) → 29/30/31 (`c93342d`) → 32 (`75cc704`). Expected costs are in §0.6.
+- POLY-39: verified that no test reads the real tracker tree, and CI runs no `cairn check`. The pattern is fail-closed (`grep -v` EXCLUDE, then PATTERN), per §0.7. **Limit:** `CHANGED` is the cumulative PR diff, so code PRs (this one included) still run the full suite on every push. Only tracker-only PRs skip. A `before`-diff is rejected as fail-open.
+- (f) Tests are in §9.1, with the POLY-39 shape test first.
