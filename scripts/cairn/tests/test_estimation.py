@@ -1,6 +1,6 @@
 """POLY-3 failing acceptance tests: the effort-estimation loop (tokens +
 gate cycles). Pinned to the architect's design note
-(`scripts/cairn/design/estimation.md`, approved at `de28e82`) — read that
+(`scripts/cairn/docs/estimation.md`, approved at `de28e82`) — read that
 file's own section numbers (§1-§9) for the full rationale; this docstring
 only restates the seams these tests hold the implementation to.
 
@@ -30,7 +30,7 @@ lint/CLI behavior that plain doesn't happen yet.
   time, so the window always contains them regardless of when the suite
   runs — no dependency on close_ts's actual value.
 
-## Architect addendum 1 (scripts/cairn/design/estimation.md @ 85c5fd6)
+## Architect addendum 1 (scripts/cairn/docs/estimation.md @ 85c5fd6)
 
 Three more RED tests below (`AddendumOneTestBase` and its subclasses),
 landed against `a3738ed` (POLY-13's green, which predates the addendum):
@@ -779,7 +779,7 @@ class LoopStatsParityTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------
-# 7. Architect addendum 1 (scripts/cairn/design/estimation.md @ 85c5fd6) --
+# 7. Architect addendum 1 (scripts/cairn/docs/estimation.md @ 85c5fd6) --
 # RED against a3738ed, which predates the addendum.
 # --------------------------------------------------------------------------
 
@@ -1380,8 +1380,8 @@ class AtCeilingValidationTests(StageWindowTestBase):
 
 
 class AtCeilingAdmitsTrailingFlushTests(StageWindowTestBase):
-    """POLY-47 (gate-1 ruling §1(b), scripts/cairn/design/estimation-
-    engine-fixes.md): `--at <sha>`'s token ceiling admits the first flush
+    """POLY-47 (gate-1 ruling §1(b), process/reviews/POLY-48/ruling.md):
+    `--at <sha>`'s token ceiling admits the first flush
     `generated` after the commit's own author time, provided it lands
     within 1800s (the receiver's own DEFAULT_FLUSH_INTERVAL_SECONDS) --
     not just lines with `generated <= commit time`, which today drops the
@@ -1413,7 +1413,7 @@ class AtCeilingAdmitsTrailingFlushTests(StageWindowTestBase):
 
     def test_a_transcript_backfill_line_does_not_count_as_the_flush(self):
         # Addendum 1 (architect's review of d1f2e08,
-        # scripts/cairn/design/estimation-engine-fixes.md): a
+        # process/reviews/POLY-48/ruling.md): a
         # transcript-backfill line's `generated` is the backfill RUN
         # time, not a flush -- the candidate set for the ceiling is
         # `source == "otel"` lines only. Measured on d1f2e08: a backfill
@@ -1449,7 +1449,7 @@ class AtCeilingAdmitsTrailingFlushTests(StageWindowTestBase):
 
 
 # --------------------------------------------------------------------------
-# 10. POLY-34 ruling (scripts/cairn/design/estimation.md @ e4c73bf, §0) --
+# 10. POLY-34 ruling (scripts/cairn/docs/estimation.md @ e4c73bf, §0) --
 # estimate/ratio/bloat move to the cost axis. RED against 5cc9d83, which
 # predates the implementation. §9.1 item numbers below match the ruling's
 # own test list.

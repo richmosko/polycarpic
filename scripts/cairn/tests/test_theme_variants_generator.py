@@ -1,11 +1,14 @@
 """PT-69 architect ruling guard (issue thread, 2026-08-29, "theme-variant
 architecture"): the variant-token pipeline is hand-vendored data
-(`scripts/cairn/design/variants.json`) emitted by a stdlib-only, zero-network
-generator (`scripts/cairn/design/gen_variants.py`) into three checked-in CSS
-files. Nothing under test exists yet when this file is written -- every
-class below is a genuinely-absent construct, never an import error, per this
-suite's established discipline (see test_dashboard_chart_ramp.py's own
-docstring on the same point).
+(`scripts/cairn/board/vendor/variants.json`) emitted by a stdlib-only,
+zero-network generator (`scripts/cairn/board/vendor/gen_variants.py`) into
+three checked-in CSS files. POLY-57 moved this pair (plus `NOTICE.md`) out
+of cairn's old design-notes directory into `board/vendor/` -- the same
+directory that already vendors fonts and JS for the board, per that
+directory's own NOTICE.md precedent. Nothing under test exists yet when
+this file is written -- every class below is a genuinely-absent construct,
+never an import error, per this suite's established discipline (see
+test_dashboard_chart_ramp.py's own docstring on the same point).
 
 CLI CONTRACT this file assumes (spec-by-test -- no generator existed when
 this was written, so this IS the contract implementation-lead builds to,
@@ -48,10 +51,10 @@ from pathlib import Path
 import helpers  # noqa: F401
 
 REPO_ROOT = helpers.CAIRN_DIR.parent.parent
-DESIGN_DIR = helpers.CAIRN_DIR / "design"
-VARIANTS_JSON = DESIGN_DIR / "variants.json"
-GEN_VARIANTS_PY = DESIGN_DIR / "gen_variants.py"
-NOTICE_MD = DESIGN_DIR / "NOTICE.md"
+VENDOR_DIR = helpers.CAIRN_DIR / "board" / "vendor"
+VARIANTS_JSON = VENDOR_DIR / "variants.json"
+GEN_VARIANTS_PY = VENDOR_DIR / "gen_variants.py"
+NOTICE_MD = VENDOR_DIR / "NOTICE.md"
 
 BOARD_VARIANTS_CSS = helpers.CAIRN_DIR / "board" / "variants.css"
 DASHBOARD_VARIANTS_CSS = helpers.CAIRN_DIR / "dashboard" / "src" / "variants.css"

@@ -112,7 +112,7 @@ Design + full rationale: `process/cairn/issues/PT-51.md`'s `@architect` ruling c
 
 ## Effort estimation (POLY-3)
 
-Full design: `scripts/cairn/design/estimation.md` (architect's design note, approved
+Full design: `scripts/cairn/docs/estimation.md` (architect's design note, approved
 `de28e82`) — authoritative; this entry is just the pointer + the bits
 `tests/test_estimation.py` imports directly.
 
