@@ -63,3 +63,23 @@ Build green (POLY-54): `_issue_id_re`/`_ID_SORT_RE` (cairn.py) and `ID_SORT_RE` 
 ### @team-lead — 2026-09-25
 
 Green verified at bb4e3a8 from the main checkout: 206 tests across the seven affected files OK, JS 434/434, `cairn check` clean on the live tree, no test file changed between red 701a850 and green. Live smoke on a throwaway copy of `process/cairn`: `cairn new --parent POLY-51` → POLY-51a, again → POLY-51b; `--parent POLY-52` → "parent POLY-52 is itself a sub-issue -- sub-issues nest one level"; `cairn ls` orders POLY-51, POLY-51a, POLY-51b, POLY-52. Review (POLY-55) dispatched.
+
+### @architect — 2026-09-25
+
+Gate-4 verdict (POLY-55) on green `bb4e3a8` (red `701a850`): **APPROVE.**
+
+| Axis | Result | Evidence |
+|---|---|---|
+| §1 patterns | pass: `_issue_id_re` widened, `ID_RE` numeric-only, both sort regexes widened, 3-tuple key kept | `bb4e3a8` cairn.py L165/L231/L1974, board-logic.js L480 |
+| §2 allocator | pass: letter path branches on `fields.parent` in the single funnel; resolves the parent, checks depth on the record and the shape, max+1 over live+archive, O_EXCL retry, errors past `z`, no numeric fallback | `bb4e3a8` `_allocate_sub_issue`, `_next_sub_issue_letter` |
+| §2 HTTP codes | **deviation, non-blocking**: a–z exhaustion is a plain `CairnError` → 400 `legacy_archive`; the ruling reserved that code for the legacy guard alone. No `bad_parent` test. | `bb4e3a8` `_create_issue` |
+| §3 consumers / AC3 | pass: agreement lint added; token sort, backfill, branch invariant untouched | `git diff 0b57918 bb4e3a8 --stat` |
+| §4 estimation shape-blind | pass: no estimation code touched | same |
+| §5 TRACKER text | pass: all five edits landed | `bb4e3a8` TRACKER.md |
+| §6 tests | pass: 0 test files touched red→green; the `test_sub_issue*` and `test_id_*` modules pass | lead's run + mine at `afe113d` |
+| Guard: ≤ 60 non-comment lines in cairn.py | **79 measured; the limit was tagged (unmeasured), so it cannot gate.** About 20 lines are the numeric path's fill + O_EXCL + write body, copied into the letter loop | line count over `git diff 0b57918 bb4e3a8 -- cairn.py`, excluding blank, comment and docstring lines |
+| Guard: board-logic.js = 1 regex line | pass | same diff |
+
+**Item-5 substitution stands.** Measured: with `os.open` wrapped to count collisions, the 20-thread race hit `FileExistsError` in 50/50 runs (4475 retries total). The retry branch runs on every run, and the `PT-3<letter>` check rules out the passes-for-the-wrong-reason case. No scan-seam test is required.
+
+Follow-ups (group into an engine umbrella; lead's choice which): (a) map exhaustion to `bad_parent` (or its own code) and test the 400; (b) factor a shared claim-and-write helper out of the two O_EXCL loops.
