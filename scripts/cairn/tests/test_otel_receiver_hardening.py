@@ -571,5 +571,117 @@ class FlushNowFromALinkedWorktreeTests(unittest.TestCase):
         )
 
 
+# --------------------------------------------------------------------------
+# POLY-25 (POLY-49 gate-1 ruling §5): H3 without OTEL_* reaching hook
+# env at all (Claude Code >= 2.1.282, M7/M8). `_exporter_endpoint(
+# environ, user_settings_path) -> (endpoint, source)`: env var wins,
+# then `env` inside `user_settings_path` (unreadable/malformed ->
+# skipped), else `(None, "default")`. Project settings are NEVER
+# consulted (M7) -- there is no project-settings argument to this
+# function at all, by design.
+# --------------------------------------------------------------------------
+
+
+class ExporterEndpointResolverTests(unittest.TestCase):
+    def test_resolver_exists(self):
+        self.assertTrue(
+            hasattr(otel_receiver, "_exporter_endpoint"),
+            "otel_receiver._exporter_endpoint does not exist yet -- POLY-25 (ruling §5) is unimplemented",
+        )
+
+    def test_env_var_wins_over_the_user_settings_file(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"
+        settings_path.write_text(
+            json.dumps({"env": {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:9001"}}), encoding="utf-8",
+        )
+        endpoint, source = otel_receiver._exporter_endpoint(
+            {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:9002"}, settings_path,
+        )
+        self.assertEqual((endpoint, source), ("http://127.0.0.1:9002", "env"), f"got {(endpoint, source)!r}")
+
+    def test_user_settings_file_used_when_env_var_absent(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"
+        settings_path.write_text(
+            json.dumps({"env": {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:9001"}}), encoding="utf-8",
+        )
+        endpoint, source = otel_receiver._exporter_endpoint({}, settings_path)
+        self.assertEqual((endpoint, source), ("http://127.0.0.1:9001", "user-settings"), f"got {(endpoint, source)!r}")
+
+    def test_neither_present_falls_back_to_default(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"  # never created
+        endpoint, source = otel_receiver._exporter_endpoint({}, settings_path)
+        self.assertEqual((endpoint, source), (None, "default"), f"got {(endpoint, source)!r}")
+
+    def test_malformed_user_settings_file_is_skipped_not_raised(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"
+        settings_path.write_text("{ not valid json", encoding="utf-8")
+        endpoint, source = otel_receiver._exporter_endpoint({}, settings_path)
+        self.assertEqual(
+            (endpoint, source), (None, "default"),
+            f"a malformed user settings file must be skipped, never raise -- got {(endpoint, source)!r}",
+        )
+
+    def test_user_settings_file_with_no_matching_key_falls_back_to_default(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"
+        settings_path.write_text(json.dumps({"env": {"SOME_OTHER_KEY": "x"}}), encoding="utf-8")
+        endpoint, source = otel_receiver._exporter_endpoint({}, settings_path)
+        self.assertEqual((endpoint, source), (None, "default"), f"got {(endpoint, source)!r}")
+
+    def test_project_settings_are_never_consulted(self):
+        # M7: project/local settings no longer initialise the exporter at
+        # all on Claude Code >= 2.1.282 -- the resolver must have no
+        # project-settings parameter to accidentally fall back to.
+        import inspect
+        if not hasattr(otel_receiver, "_exporter_endpoint"):
+            self.skipTest("_exporter_endpoint not implemented yet -- covered by test_resolver_exists")
+        sig = inspect.signature(otel_receiver._exporter_endpoint)
+        param_names = set(sig.parameters)
+        self.assertNotIn(
+            "project_settings_path", param_names,
+            f"the resolver must take no project-settings path at all (M7: they're dead) -- got params {param_names}",
+        )
+
+
+# --------------------------------------------------------------------------
+# "Red tests qa writes" item 3: --status gains an exporter-endpoint line
+# naming its source (ruling §1 fix #3).
+# --------------------------------------------------------------------------
+
+
+class StatusExporterEndpointLineTests(unittest.TestCase):
+    def test_status_reports_exporter_endpoint_from_env(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _minimal_env(
+            CLAUDE_CODE_ENABLE_TELEMETRY="1",
+            OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{port}",
+        )
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+        result = run_fake_receiver(fake_root, ["--ensure-running"], env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        status = _wait_for_status_running(fake_root, env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn(
+            f"exporter-endpoint: http://127.0.0.1:{port} (source: env)", status.stdout,
+            f"got {status.stdout!r}",
+        )
+
+    def test_status_reports_exporter_endpoint_default_when_nothing_set(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root_with_default_port(self, default_port=port)
+        env = _minimal_env(CLAUDE_CODE_ENABLE_TELEMETRY="1")
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+        result = run_fake_receiver(fake_root, ["--ensure-running"], env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        status = _wait_for_status_running(fake_root, env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn("(source: default)", status.stdout, f"got {status.stdout!r}")
+
+
 if __name__ == "__main__":
     unittest.main()
