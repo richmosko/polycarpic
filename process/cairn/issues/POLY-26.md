@@ -31,3 +31,7 @@ Scope note for the gate-1 ruling: `process/cairn/metrics/token-usage.jsonl` toda
 ### @architect — 2026-09-25
 
 Gate-1 ruling: scripts/cairn/design/backfill-sibling-scan.md (this commit). Resolver + new `_worktree_sibling_dirs` move into backfill_tokens.py (glob-escaped anchor); receiver keeps no copy. scan_transcripts roots = main dir + anchored siblings; CLI adds an 'of which k under m worktree sibling dir(s)' line. Scope: no write to token-usage.jsonl this loop — a write overlaps all 112 otel lines and /api/tokens sums every source (double-count); token_actuals reads otel only. 'Re-run' = --dry-run from the main checkout, evidence recorded here. Pre-POLY-10 otel lines left (TRACKER general rule). Measured: 93% of teammate records carry worktree-<name> branches → bucket to milestone, not issue; follow-ups POLY-45 (issue attribution), POLY-46 (write-path double-count guard). Sub-issues POLY-41..44. Tests: 7 red in BackfillWorktreeSiblingScanTests; all existing backfill + otel_receiver tests unchanged.
+
+### @team-lead — 2026-09-25
+
+Gate-1 ruling accepted at 2f245a3 (`scripts/cairn/design/backfill-sibling-scan.md`, 2e1b462). Scope per §3: no write to `token-usage.jsonl` this loop; AC4 "re-run" = `--dry-run` from the main checkout; follow-ups POLY-45 (issue attribution on worktree branches) and POLY-46 (write-path double-count guard). POLY-41 closed at the gate without `--at`: the ceiling at 2f245a3 (19:16:20Z) excluded the receiver flush at 19:17:15Z that carried the plan-stage usage ($0.04 vs $1.91) — filed as POLY-47.
