@@ -45,3 +45,15 @@ Grouped 2026-09-25 from the POLY-26 loop's follow-ups; spec is in the body above
 ### @team-lead — 2026-09-25
 
 Feature started. Branch: `feature/poly-49-receiver-hardening`.
+
+### @architect — 2026-09-25
+
+**Gate-1 ruling** — full text + measurements: `process/reviews/POLY-49/ruling.md`. Sub-issues: 49a plan, 49b red (qa), 49c build (impl-lead), 49d review.
+
+- **AC4 cause (measured, M1–M8):** Claude Code 2.1.282 ignores telemetry vars in project/local settings. Same env block: 2.1.280 → 3 exports, 2.1.282 → 0; 0 connections to :4318 in 150 s from 4 live 2.1.282 agents. The receiver parses 2.1.282 payloads fine (4 points/export, delta). Registration failed for the same reason: `CLAUDE_CODE_ENABLE_TELEMETRY` no longer reaches hook env, and H1 returns before `register_session`.
+- **User action (settings, user-only):** add the five telemetry keys (`CLAUDE_CODE_ENABLE_TELEMETRY`, `OTEL_METRICS_EXPORTER`, `OTEL_LOGS_EXPORTER`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, values as today) to `~/.claude/settings.json` → `env`; remove them from `.claude/settings.json` → `env`. Verified: user-scope env initialises the 2.1.282 exporter and reaches hooks (flag only, no `OTEL_*`).
+- **Receiver:** the watchdog runs the interval flush (no export needed); a foreign-session filter drops datapoints with no transcript in this repo (the endpoint is now user-global); `--status` shows `exporter-endpoint`. AC4 verification is blocked-on-user until the delta is applied.
+- **AC2/AC5:** widen poll bounds and remove the transient `sessions: 2` race; no clock injection.
+- **AC3:** new `worktree_root.py` (resolver moved from `run_tests.py`); `main()` anchors every default path on the main checkout; loud pidfile error.
+- **AC6/AC7:** register before H1; H1 decline prints one stderr line. Every tick reaps by pid alone; the PT-86 transcript second signal is withdrawn.
+- **POLY-25:** endpoint from env → user settings file → default; project settings not consulted. **POLY-27:** recreate only if the parent exists, otherwise hold. **POLY-9:** exact hint text in §7. **POLY-7:** mirror the broken-origin test, plus a PATH shim for 3d.
