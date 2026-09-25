@@ -3,9 +3,9 @@
  *
  * PT-69 (architect's theme-variant ruling, §1/§2): one attribute-qualified
  * CSS block per (dimension, variant, mode), sourced from
- * scripts/cairn/design/variants.json and emitted by
- * scripts/cairn/design/gen_variants.py -- regenerate with
- * `python3 scripts/cairn/design/gen_variants.py`, never edit this file by
+ * scripts/cairn/board/theme/variants.json and emitted by
+ * scripts/cairn/board/theme/gen_variants.py -- regenerate with
+ * `python3 scripts/cairn/board/theme/gen_variants.py`, never edit this file by
  * hand (scripts/cairn/tests/test_theme_variants_generator.py asserts this
  * file is byte-identical to what the generator currently produces).
  *
@@ -16,7 +16,7 @@
  * !important) because an attribute-qualified selector always outranks a
  * bare :root/.dark.
  *
- * See scripts/cairn/design/NOTICE.md for provenance (source, extraction
+ * See scripts/cairn/board/theme/NOTICE.md for provenance (source, extraction
  * date, per-dimension notes).
  */
 

@@ -10,7 +10,7 @@ by an agent, re-vendor by hand when the upstream preset changes.
 `gen_variants.py` (same directory) is the authoring tool that turns `variants.json` into
 the three checked-in `variants.css` copies (`scripts/cairn/board/variants.css`,
 `scripts/cairn/dashboard/src/variants.css`, `docs/DESIGN/variants.css`). It is
-stdlib-only, zero network — regenerate with `python3 scripts/cairn/design/gen_variants.py`
+stdlib-only, zero network — regenerate with `python3 scripts/cairn/board/theme/gen_variants.py`
 after any edit to `variants.json`.
 
 ## Source and method
@@ -92,5 +92,5 @@ If the upstream preset generator changes, or a new dimension option is added:
    `test_theme_variants_generator.py`'s `EXPECTED_VARS_BY_DIM`) and update `variants.json`.
 5. Re-run the dataviz skill's ordinal validator for any Chart Color change (new ramp
    needed every time — PT-61's finding recurs per hue, not just for some).
-6. `python3 scripts/cairn/design/gen_variants.py` to regenerate the three checked-in
+6. `python3 scripts/cairn/board/theme/gen_variants.py` to regenerate the three checked-in
    `variants.css` copies.

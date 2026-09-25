@@ -4,11 +4,11 @@
  * PT-69 (architect's theme-variant ruling): docs-side reference copy of
  * the theme-variant blocks, alongside docs/DESIGN/tokens.css's own
  * default-preset reference copy. Sourced from
- * scripts/cairn/design/variants.json, emitted by
- * scripts/cairn/design/gen_variants.py -- regenerate with
- * `python3 scripts/cairn/design/gen_variants.py`, never edit this file by
+ * scripts/cairn/board/theme/variants.json, emitted by
+ * scripts/cairn/board/theme/gen_variants.py -- regenerate with
+ * `python3 scripts/cairn/board/theme/gen_variants.py`, never edit this file by
  * hand. See docs/DESIGN/design-system-spec.md's "Theme & color variants"
- * section for the full spec, and scripts/cairn/design/NOTICE.md for
+ * section for the full spec, and scripts/cairn/board/theme/NOTICE.md for
  * provenance.
  */
 
