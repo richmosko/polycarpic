@@ -66,3 +66,10 @@ Feature started. Branch: `feature/poly-49-receiver-hardening`.
 - **Hook stdin (measured):** in a scratch config, 2.1.282 ran this repo's exact SessionStart command (`[ -f … ] || exit 0; python3 … --ensure-running --session-pid "$PPID" >/dev/null; exit 0`). The probe script saw: stdin not a TTY, readable within 0.5 s, JSON with `session_id`; `$PPID` = the claude process. So stdin plumbing is fine. The incident is the H1 early return (M8). Teammate hook stdin: (unmeasured) — same harness path.
 - **Flake seams (picks from qa's characterisation):** watchdog recreate → neither (a) nor (b): widen the poll bounds + add a monotonic lower-bound check (§2). Periodic sweep → the sweep is removed (§4); the rewrite drops the transient `sessions: 2` assertion. No clock injection in either.
 - **qa's 80c29af bug:** fixed by §4 as ruled. `_tick` calls `reap_dead_sessions(pid-only)` on **every** beat, **before** the emptiness/arming check, so arming always sees the reaped set. The periodic gate and nudge gate are removed from the reap call. 80c29af's red test is the pin.
+
+### @architect — 2026-09-25
+
+**Addendum 2 — `.transcripts-dir` marker after the `dead-pending` withdrawal**
+- The marker's only reader was `_status`'s `dead`/`dead-pending` label (otel_receiver.py ~L1545). With the label gone (§4), that read is removed with it, so there's no precedence left to test. **No replacement test** for `TranscriptsDirMarkerPrecedenceTests`.
+- The marker **write** stays at startup and on the watchdog recreate, because POLY-10's recreate test pins it. The foreign-session filter uses the daemon's in-process `transcripts_dir`, never the marker.
+- Conditional: if the build keeps *any* marker read, qa adds one test: "`--status --transcripts-dir <B>` against a daemon spawned with `<A>` resolves `<A>`", checked on an output that differs between A and B. I check this at the verdict.
