@@ -1,7 +1,7 @@
 ---
 id: POLY-49b
 title: POLY-49 execute: red tests
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: POLY-49
 blocked_by: [POLY-49a]
