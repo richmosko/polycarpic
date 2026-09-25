@@ -6987,16 +6987,20 @@ def _token_ceiling(
     ceiling drops that whole interval's usage (POLY-41, measured 55 s).
 
     Returns `(to_ts, warning)`:
-    - `to_ts` is the smallest `generated` stamp over ALL lines in
-      `token-usage.jsonl` strictly after `at_ts` -- a flush is a global
-      event, not scoped to one issue/role -- provided it lands within
+    - `to_ts` is the smallest `generated` stamp over lines with
+      `source == "otel"` in `token-usage.jsonl` strictly after `at_ts` --
+      a flush is a global event, not scoped to one issue/role, but a
+      `transcript-backfill` line's `generated` is the backfill RUN time,
+      not a flush (architect's review of d1f2e08, addendum 1 -- a
+      backfill line landing inside the gap was previously mistaken for
+      the flush and hid the real one) -- provided it lands within
       `max_gap_seconds` of `at_ts` (the receiver's own flush interval).
       That flush is never double-counted: the next same-assignee stage's
       floor reads this close's `window.to`, i.e. `to_ts` itself.
     - Otherwise `to_ts` falls back to `at_ts` (unchanged from before this
       fix), and `warning` is the stderr line `cmd_close` should print,
-      naming the nearest flush actually found after `at_ts` (even one
-      excluded for being too far away) or, when none exists at all,
+      naming the nearest otel flush actually found after `at_ts` (even
+      one excluded for being too far away) or, when none exists at all,
       `at_ts` itself. `warning` is `None` when a flush was admitted.
 
     No special tip case: when `--at` names the branch's own tip, the
@@ -7009,6 +7013,8 @@ def _token_ceiling(
     if usage_path.is_file():
         rows, _ = _read_token_usage_lines(usage_path)
         for row in rows:
+            if row.get("source") != "otel":
+                continue
             gen = row.get("generated")
             if not gen:
                 continue
