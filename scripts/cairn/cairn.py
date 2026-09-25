@@ -7088,6 +7088,40 @@ def _append_calibration_record(data_dir: Path, record: Dict[str, Any]) -> None:
         backfill_tokens._release_lock(lock_path)
 
 
+def _linked_worktree_main_checkout(start: Path) -> Optional[Path]:
+    """POLY-48 item 9 (`close` from a worktree, gate-1 ruling
+    estimation-engine-fixes.md §1(d)): `git rev-parse --git-dir` vs
+    `--git-common-dir` is the one reliable test for "is `start` inside a
+    LINKED git worktree" -- the two paths are identical in the main
+    checkout and differ in a linked worktree, regardless of layout (never
+    a `.git`-file-vs-directory guess, which a submodule can also produce).
+
+    Returns the main checkout's root (the common dir's parent) when
+    `start` is inside a linked worktree; `None` when it's the main
+    checkout, or when git itself is unavailable/not a repo at all --
+    `_git_toplevel`'s own check already covers that case with its own
+    message.
+    """
+    def _rev_parse(flag: str) -> Optional[str]:
+        try:
+            out = subprocess.run(
+                ["git", "rev-parse", flag], cwd=start, capture_output=True, text=True, check=True,
+            ).stdout.strip()
+        except (subprocess.CalledProcessError, OSError):
+            return None
+        return out or None
+
+    git_dir = _rev_parse("--git-dir")
+    common_dir = _rev_parse("--git-common-dir")
+    if git_dir is None or common_dir is None:
+        return None
+    git_dir_path = (start / git_dir).resolve()
+    common_dir_path = (start / common_dir).resolve()
+    if git_dir_path == common_dir_path:
+        return None  # the main checkout: git-dir IS the common dir
+    return common_dir_path.parent
+
+
 def cmd_close(args: argparse.Namespace) -> int:
     """`cairn close <ID>` (design note §7, §2, §3, §5): pulls actuals for
     a sub-issue's assignee from the OTel receiver and the commit log,
@@ -7103,7 +7137,22 @@ def cmd_close(args: argparse.Namespace) -> int:
     `actual.*`/`ratio`, adds or removes `bloat` to match the new
     evaluation, leaves `status: done`, and appends a fresh calibration
     line -- the last line per id is the record readers trust.
+
+    POLY-48 item 9: refuses outright, before any flush or read (including
+    `--dry-run`), when run from a linked git worktree -- a worktree has
+    no `process/cairn/metrics/` mount (`ensure_metrics_worktree.py` is a
+    no-op there), so it would otherwise silently write null actuals
+    instead of ever reading the real token log.
     """
+    main_checkout = _linked_worktree_main_checkout(Path.cwd())
+    if main_checkout is not None:
+        print(
+            f"close: {args.id}: run from the main checkout ({main_checkout}) -- a worktree has no metrics "
+            "mount; nothing written",
+            file=sys.stderr,
+        )
+        return 2
+
     data_dir = resolve_data_dir(args)
     path = find_record_path(data_dir, args.id)
     if path is None:
