@@ -31,3 +31,7 @@ Found on PR #12 (POLY-6, 2026-09-25): the `changes` step's pattern includes `pro
 ### @team-lead — 2026-09-25
 
 Pulled into the POLY-34 loop as its first deliverable (user, 2026-09-25): devops-engineer owns the pattern change, qa-engineer the shape test, the architect verifies in the gate-1 ruling that no test reads the real tracker tree. Goes green before the cost-axis work so the rest of this loop's pushes stop triggering runs.
+
+### @team-lead — 2026-09-25
+
+Live measurement on PR #13 (2026-09-25): run 36168991108 on the code tip d7cf281 ran the full suite (no anchor yet) and passed; run 36169164996 on dbc738e (in-review flip: POLY-34.md + process/STATE.md) correctly did NOT skip — STATE.md is read by tests and is not excluded. This comment is the first tracker-only push after a green code tip; its run is the §0.8 measurement.
