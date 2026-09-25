@@ -80,3 +80,19 @@ AC amended in place (user decision 2026-09-25): `estimation.md` is pruned to cur
 ### @architect — 2026-09-25
 
 **Addendum 2 (POLY-57a).** The ruling.md §2 predicate matches filenames only: `cairn/design/`, `test-boundary-ci.md`, `telemetry-attribution.md`, `backfill-sibling-scan.md`, `sub-issue-letter-ids.md`, `estimation-engine-fixes.md`; branch names and topic words are not matched.
+
+### @architect — 2026-09-25
+
+**Verdict (POLY-57d) @ `367be73`: approve.**
+
+| Axis | Result | Evidence |
+|---|---|---|
+| TRACKER.md diff | 3 path edits + the one ruled L419 sentence; nothing else | `git diff --word-diff f686787 367be73` |
+| WORKFLOW.md / architect.md | one ruled line each (after L242 / after Comment budget) + 1 WORKFLOW link edit | same diff |
+| docs/README.md | 9 lines, verbatim from the ruling | `367be73` |
+| docs/estimation.md | 770 → 275; ruled formula + path kept; prune accepted by lead at 367be73 | POLY-57e |
+| Ruling blobs | POLY-6/10/26/48/51 blobs = ruling.md §1 pins | `git ls-tree -r 367be73 process/reviews` |
+| §2 predicate (addendum 2) | no hits | `git grep` at 367be73 |
+| design/ gone; theme under board/theme/ | yes | `git ls-tree` |
+| Generator | runs, tree clean after | `gen_variants.py`; `git status` |
+| Dist / check | fresh; `cairn check` ok | `check_dist_freshness.py` exit 0 |
