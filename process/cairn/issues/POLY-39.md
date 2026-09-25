@@ -1,7 +1,7 @@
 ---
 id: POLY-39
 title: CI: tracker data commits (process/cairn/issues|milestones|majors|archive) trigger the cairn job; narrow the change pattern
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-34
 blocked_by: []
@@ -10,6 +10,10 @@ paths: [.github/**, process/cairn/issues/POLY-34.md, process/cairn/issues/POLY-3
 stage: execute
 estimate.tokens: 2000000
 estimate.gate_cycles: 1
+actual.cost_usd: "1.1707"
+actual.tokens: 3520064
+actual.gate_cycles: 1
+actual.wall_clock: 16
 labels: [ci, cairn]
 priority: P2
 pr: null
