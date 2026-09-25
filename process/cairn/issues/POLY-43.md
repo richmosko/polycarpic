@@ -1,7 +1,7 @@
 ---
 id: POLY-43
 title: POLY-26 execute: move resolver, sibling scan, TRACKER sentence
-status: todo
+status: done
 milestone: POLY-A
 parent: POLY-26
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [scripts/cairn/backfill_tokens.py, scripts/cairn/otel_receiver.py, proces
 stage: execute
 estimate.cost_usd: "3.50"
 estimate.gate_cycles: 1
+actual.cost_usd: "2.3532"
+actual.tokens: 7672084
+actual.gate_cycles: 1
+actual.wall_clock: 25
+ratio: "0.67"
 labels: [cairn, telemetry]
 priority: P3
 pr: null
