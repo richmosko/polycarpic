@@ -4,7 +4,7 @@
 /* PT-69 (architect's ruling §2): variant deltas, immediately after the
    three imports above -- still ahead of any rule, so Tailwind v4's
    "@import must lead the file" rule holds. Generated -- see
-   scripts/cairn/design/gen_variants.py. */
+   scripts/cairn/board/theme/gen_variants.py. */
 @import './variants.css';
 
 /* PT-106 (architect's ruling, PT-106.md @ f26390c): root .gitignore
@@ -47,7 +47,7 @@
 	   2026-08-26 extraction. Darkened by the minimum amount that clears
 	   the floor UNDER BOTH the quantized-hex and float contrast models
 	   (4.58:1 quantized / 4.56:1 float, both well past the floor+0.05
-	   requirement) -- same derivation scripts/cairn/design/
+	   requirement) -- same derivation scripts/cairn/board/theme/
 	   gen_variants.py's derive_muted_foreground() applies to every other
 	   Base Color variant. .dark's own --muted-foreground below already
 	   clears the floor and is untouched. */

@@ -108,6 +108,7 @@ The team-mode task system fires `task_assignment` notifications into your mailbo
 - **A ruling cites its measurement or tags the claim `(unmeasured)`**; an unmeasured claim cannot gate a build. The ruling carries the seam and the guard thresholds, so nothing is left to propose by message.
 - **Ruling budget**: one gating ruling plus at most two addenda (≤ 15 lines each) before the build; a builder's measured objection reopens the ruling once, re-issued whole.
 - **Comment budget**: ≤ 40 lines; constructions, harness output, and retro prose go to `temp/` or `process/reviews/<ID>/`, referenced by path. `cairn check` warns over the cap and over 24 KB per issue file.
+- **A ruling is an issue comment within budget, or `process/reviews/<ID>/ruling.md`**; never a file under `scripts/cairn/docs/`.
 - **Commit at the gate by pathspec.** `cairn comment` refuses while another author's comment is uncommitted in the file; the pre-commit guard refuses a file staging comments by two authors. Neither is overridden by message.
 
 ## Hand-off protocol

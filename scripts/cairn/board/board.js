@@ -531,11 +531,11 @@
   //
   // Option catalogs -- id (matches variants.json's variant keys / the
   // data-cairn-* attribute values the generated CSS selects on) + display
-  // label. Kept in sync BY HAND with scripts/cairn/design/variants.json;
+  // label. Kept in sync BY HAND with scripts/cairn/board/theme/variants.json;
   // the CSS token VALUES those ids resolve to are fully generated
   // (gen_variants.py) and byte-compared against variants.json, so drift
   // here can only ever mean "wrong menu label/order", never "wrong
-  // color" -- see scripts/cairn/design/NOTICE.md.
+  // color" -- see scripts/cairn/board/theme/NOTICE.md.
   // ------------------------------------------------------------------
   var THEME_MODE_OPTIONS = [
     { id: "system", label: "System" },

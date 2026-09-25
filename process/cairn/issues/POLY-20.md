@@ -6,7 +6,7 @@ milestone: POLY-A
 parent: POLY-16
 blocked_by: []
 assignee: architect
-paths: [scripts/cairn/design/estimation.md, process/cairn/issues/POLY-16.md]
+paths: [scripts/cairn/docs/estimation.md, process/cairn/issues/POLY-16.md]
 stage: review
 estimate.tokens: 400000
 estimate.gate_cycles: 1

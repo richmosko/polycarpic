@@ -37,7 +37,7 @@ Survey for the gate-1 ruling: the engine has two ID patterns — `ID_RE` (`^([A-
 
 ### @architect — 2026-09-25
 
-Gate-1 ruling: `scripts/cairn/design/sub-issue-letter-ids.md` (this commit). Sub-issues POLY-52 (plan, architect), POLY-53 (execute, qa-engineer), POLY-54 (execute, implementation-lead), POLY-55 (review, architect) — numeric, since the letter scheme does not exist until green.
+Gate-1 ruling: `process/reviews/POLY-51/ruling.md` (this commit). Sub-issues POLY-52 (plan, architect), POLY-53 (execute, qa-engineer), POLY-54 (execute, implementation-lead), POLY-55 (review, architect) — numeric, since the letter scheme does not exist until green.
 
 - Patterns: `_issue_id_re` widens to `^<P>-\d+[a-z]?$`; `ID_RE` stays numeric-only (the counter never sees suffixes); new `_sub_issue_letter_re(parent)`; both sort regexes (py L1854, js L474) widen to `^(.*?)-(\d+)[a-z]?$` with the 3-tuple key unchanged — the full-string tiebreak already orders 26 < 26a < 26b < 27.
 - Allocator: the letter path branches on `fields.parent` inside `allocate_and_create_issue` (CLI + HTTP); parent must resolve; depth 1 only (checked on the record, so legacy numbered sub-issues are refused as parents too); max+1 over live + archive, no gap reuse, O_EXCL retry, error past `z`; no numeric fallback.
@@ -47,7 +47,7 @@ Gate-1 ruling: `scripts/cairn/design/sub-issue-letter-ids.md` (this commit). Sub
 
 ### @team-lead — 2026-09-25
 
-Gate-1 ruling accepted at f22c704 (`scripts/cairn/design/sub-issue-letter-ids.md`) as written, §0–§6. Notes for the record: the no-rename rule covers all 37 numbered sub-issues live today (30 stage sub-issues + the 11 umbrella members reparented under POLY-48/49/50), not only the 26 listed in AC4. Two rules beyond the AC, both accepted: `--parent` must resolve and be depth 1 (legacy numbered sub-issues cannot be parents either); lint requires a suffixed id's `parent` to equal its stem minus the letter. Uppercase suffixes rejected. POLY-52 closed at the gate from the main checkout.
+Gate-1 ruling accepted at f22c704 (`process/reviews/POLY-51/ruling.md`) as written, §0–§6. Notes for the record: the no-rename rule covers all 37 numbered sub-issues live today (30 stage sub-issues + the 11 umbrella members reparented under POLY-48/49/50), not only the 26 listed in AC4. Two rules beyond the AC, both accepted: `--parent` must resolve and be depth 1 (legacy numbered sub-issues cannot be parents either); lint requires a suffixed id's `parent` to equal its stem minus the letter. Uppercase suffixes rejected. POLY-52 closed at the gate from the main checkout.
 
 ### @qa-engineer — 2026-09-25
 
@@ -58,7 +58,7 @@ Caught myself on a real gap: the first draft only asserted id-uniqueness and pas
 Requesting a ruling on whether the concurrency substitution is acceptable, or whether the implementer should also add an internal scan-seam test matching the ruling's literal monkeypatch phrasing once that seam exists.
 ### @implementation-lead — 2026-09-25
 
-Build green (POLY-54): `_issue_id_re`/`_ID_SORT_RE` (cairn.py) and `ID_SORT_RE` (board-logic.js) widened to `[a-z]?`; `ID_RE` unchanged; letter path added to `allocate_and_create_issue` (new `_allocate_sub_issue`/`_next_sub_issue_letter`, same O_CREAT|O_EXCL retry discipline) with the three `--parent` refusals raising a new `BadParentError` (400 `bad_parent` over HTTP, distinct from `legacy_archive`); `check_repo` gained the suffixed-id↔parent agreement rule; TRACKER.md's five §5 edits landed. 0 existing tests edited. `run_tests.py --gate green`: 1787 tests OK. `node --test` over tests/js (excluding token-chart-logic.test.js): 434 pass. Ruling: scripts/cairn/design/sub-issue-letter-ids.md @ f22c704.
+Build green (POLY-54): `_issue_id_re`/`_ID_SORT_RE` (cairn.py) and `ID_SORT_RE` (board-logic.js) widened to `[a-z]?`; `ID_RE` unchanged; letter path added to `allocate_and_create_issue` (new `_allocate_sub_issue`/`_next_sub_issue_letter`, same O_CREAT|O_EXCL retry discipline) with the three `--parent` refusals raising a new `BadParentError` (400 `bad_parent` over HTTP, distinct from `legacy_archive`); `check_repo` gained the suffixed-id↔parent agreement rule; TRACKER.md's five §5 edits landed. 0 existing tests edited. `run_tests.py --gate green`: 1787 tests OK. `node --test` over tests/js (excluding token-chart-logic.test.js): 434 pass. Ruling: process/reviews/POLY-51/ruling.md @ f22c704.
 
 ### @team-lead — 2026-09-25
 

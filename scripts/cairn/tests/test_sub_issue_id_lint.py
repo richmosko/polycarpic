@@ -1,6 +1,6 @@
 """Tests for POLY-51's `cairn check` widening: sub-issue letter ids.
 
-Contract: scripts/cairn/design/sub-issue-letter-ids.md (ruling §1, §3),
+Contract: process/reviews/POLY-51/ruling.md (ruling §1, §3),
 ruling §6 item 7. A separate file from test_sub_issue_ids.py because it
 reuses test_check_lint.py's `make_tree`/`write_issue` scaffolding (the
 established cross-test-file import pattern, e.g.

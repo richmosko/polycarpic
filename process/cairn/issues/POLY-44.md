@@ -6,7 +6,7 @@ milestone: POLY-A
 parent: POLY-26
 blocked_by: []
 assignee: architect
-paths: [scripts/cairn/design/backfill-sibling-scan.md, process/cairn/issues/POLY-26.md, process/cairn/issues/POLY-41.md, process/cairn/issues/POLY-42.md, process/cairn/issues/POLY-43.md, process/cairn/issues/POLY-44.md, process/cairn/issues/POLY-45.md, process/cairn/issues/POLY-46.md]
+paths: [process/reviews/POLY-26/ruling.md, process/cairn/issues/POLY-26.md, process/cairn/issues/POLY-41.md, process/cairn/issues/POLY-42.md, process/cairn/issues/POLY-43.md, process/cairn/issues/POLY-44.md, process/cairn/issues/POLY-45.md, process/cairn/issues/POLY-46.md]
 stage: review
 estimate.cost_usd: "1.00"
 estimate.gate_cycles: 1

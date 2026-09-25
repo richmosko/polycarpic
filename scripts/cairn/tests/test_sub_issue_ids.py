@@ -1,6 +1,6 @@
 """Tests for POLY-51: sub-issue letter ids (`cairn new --parent <ID>`).
 
-Contract: scripts/cairn/design/sub-issue-letter-ids.md (architect's gate-1
+Contract: process/reviews/POLY-51/ruling.md (architect's gate-1
 ruling, POLY-51 @ f22c704). Covers ruling §6 items 1-8 -- items 9 and 10
 (the Python/JS `_id_sort_key`/`idSortKey` drift pair, PT-25) live next to
 their existing siblings in test_id_sort.py and tests/js/id-sort.test.js;

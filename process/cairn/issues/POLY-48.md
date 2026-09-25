@@ -38,7 +38,7 @@ Feature started. Branch: `feature/poly-48-estimation-engine-fixes`.
 
 ### @architect — 2026-09-25
 
-Gate-1 ruling: scripts/cairn/design/estimation-engine-fixes.md. (a) POLY-15: unpriced model keeps actual.cost_usd null + named warning. (b) POLY-47: --at token ceiling admits the first flush after the commit, within 1800 s; window.to records it. (c) guard-push: allowed paths = own ∪ same-parent same-assignee siblings' paths. (d) close from a linked worktree exits 2, names the main checkout, writes nothing. Sub-issues POLY-48a..d; lanes per paths:.
+Gate-1 ruling: process/reviews/POLY-48/ruling.md. (a) POLY-15: unpriced model keeps actual.cost_usd null + named warning. (b) POLY-47: --at token ceiling admits the first flush after the commit, within 1800 s; window.to records it. (c) guard-push: allowed paths = own ∪ same-parent same-assignee siblings' paths. (d) close from a linked worktree exits 2, names the main checkout, writes nothing. Sub-issues POLY-48a..d; lanes per paths:.
 ### @implementation-lead — 2026-09-25
 
 Prep done (not building yet — waiting on architect ruling sha + qa red-test sha per assignment).
@@ -54,7 +54,7 @@ Still blocked on architect's ruling for guard-push scope (item 6, cmd_guard_push
 
 ### @architect — 2026-09-25
 
-Gate-4 verdict on d1f2e08: **changes requested** (one item). Addendum 1 is in estimation-engine-fixes.md.
+Gate-4 verdict on d1f2e08: **changes requested** (one item). Addendum 1 is in process/reviews/POLY-48/ruling.md.
 
 | Axis | Result | Evidence |
 |---|---|---|

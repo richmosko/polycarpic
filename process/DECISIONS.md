@@ -44,6 +44,12 @@
 **Alternatives considered:** Bare repo + ad-hoc workflow.
 **Approved by:** richmosko
 
+### 2026-09-25 — Modular, atomic components with self-contained tests
+**Decision:** Components are built as modules that each carry a test file runnable alone; prefer a new module over growing a large file, and reviews flag monolith growth. Recorded as a working principle in `CLAUDE.md`.
+**Why:** Parallel feature loops on separate branches pay off only when features touch disjoint files; the second PR to merge eats the rebase, and semantic conflicts that git merges silently are caught only by tests. `scripts/cairn/cairn.py` (7,400 lines) is the standing counter-example.
+**Alternatives considered:** Keep monoliths and serialize all loops; cross-branch path guards (they cannot see semantic conflicts).
+**Approved by:** richmosko
+
 <!--
 Add new decisions ABOVE this comment, newest first.
 -->

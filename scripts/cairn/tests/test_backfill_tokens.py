@@ -1078,8 +1078,8 @@ def _write_sibling_fixture_record(
 
 
 class BackfillWorktreeSiblingScanTests(unittest.TestCase):
-    """POLY-26 gate-1 ruling (`scripts/cairn/design/backfill-sibling-
-    scan.md` §4): `scan_transcripts` must walk the repo's own worktree-
+    """POLY-26 gate-1 ruling (`process/reviews/POLY-26/ruling.md`
+    §4): `scan_transcripts` must walk the repo's own worktree-
     sibling transcript dirs (`<slug>--claude-worktrees-*`) alongside the
     main slug dir, using the SAME anchored-prefix resolver §1 moves into
     this module (out of `otel_receiver.py`, which keeps no copy).

@@ -92,7 +92,7 @@ from typing import Dict, List, Optional, Tuple
 SCRIPT_DIR = Path(__file__).resolve().parent
 TESTS_DIR = SCRIPT_DIR / "tests"
 
-# POLY-6 gate-1 ruling (scripts/cairn/design/test-boundary-ci.md @ 615b94e,
+# POLY-6 gate-1 ruling (process/reviews/POLY-6/ruling.md @ 615b94e,
 # section (a) Mechanics): "a second root in run_tests.py, not a separate
 # entry point" -- one command keeps one gate, one ledger row, and leaves
 # test_run_guard/test_run_record, the settings prefilter, and both skills'

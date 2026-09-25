@@ -345,7 +345,7 @@ class SameAssigneeSiblingSubIssueScopeTests(GuardPushTestBase):
         self.assertNotIn("src/auth/a.py", r.stdout + r.stderr)
 
     def test_a_different_assignees_sibling_paths_are_not_admitted(self):
-        """Ruling (design/estimation-engine-fixes.md §1(c)): the union is
+        """Ruling (process/reviews/POLY-48/ruling.md §1(c)): the union is
         scoped to siblings with the SAME assignee -- a same-parent sibling
         held by someone else must not widen this assignee's allowed
         globs."""

@@ -29,7 +29,7 @@ sub-issues are the first hand-estimated reference class.
 
 ## Acceptance criteria
 
-- [ ] Architect design note beside cairn (`scripts/cairn/design/estimation.md`) covering: sub-issue fields, actuals sources, calibration record format, reference-class query — reviewed by team-lead before code
+- [ ] Architect design note beside cairn (`scripts/cairn/docs/estimation.md`) covering: sub-issue fields, actuals sources, calibration record format, reference-class query — reviewed by team-lead before code
 - [ ] `process/TRACKER.md` schema gains on sub-issues: `stage` (plan | execute | review), `estimate: {tokens, gate_cycles}`, `actual: {tokens, gate_cycles, wall_clock}`, `ratio`; `cairn check` validates them
 - [ ] `cairn close <ID>` pulls actuals for the sub-issue's assignee from the OTel receiver and the commit log, writes `actual` + `ratio`, and appends a calibration record under `process/cairn/metrics/`
 - [ ] `cairn estimate <ID>` prints the closest reference classes (same stage + assignee, then same labels) with their actuals, to seed a new estimate
@@ -48,7 +48,7 @@ Known conflict for the design note: `process/TRACKER.md` line ~227 lists `estima
 
 ### @architect — 2026-09-23
 
-Design note (AC1) at `scripts/cairn/design/estimation.md` @ 6979191 — for team-lead review before code.
+Design note (AC1) at `scripts/cairn/docs/estimation.md` @ 6979191 — for team-lead review before code.
 Key calls: flat dotted keys (`estimate.tokens` …) not nested maps (dumper/set/patch have no dict support); `ratio` a quoted decimal string (parser is int-only); tokens attributable only as (parent, role, flush window), so `close` flushes the receiver first; one gate cycle = a maximal run of the assignee's commits broken only by a different-stage or lead commit; calibration at `process/cairn/metrics/calibration.jsonl` (metrics branch); shared seam `token_actuals` / `gate_cycle_actuals` in cairn.py. §8 rescinds TRACKER.md's "deliberately absent: estimate" for sub-issues.
 
 ### @team-lead — 2026-09-23
@@ -84,7 +84,7 @@ fixture update on top of this commit.
 
 ### @architect — 2026-09-23
 
-Addendum 1 (lead's close dry-run findings on a3738ed). Ruling text is in scripts/cairn/design/estimation.md @ 85c5fd6, §2. Summary:
+Addendum 1 (lead's close dry-run findings on a3738ed). Ruling text is in scripts/cairn/docs/estimation.md @ 85c5fd6, §2. Summary:
 1. Zero assignee commits in W: a warning on stderr is mandatory, and a test pins it. The current build is non-conformant.
 2. Token file present but no (parent, role, W) line: `actual.tokens: null`, no `ratio`, a warning, and `"ratio": null` in calibration. A token total of 0 only ever comes from ≥1 matching line. `estimate` leaves null-token rows out of the token median.
 3. W.from = max(parent flip = oldest commit in base..ref, the latest calibration window.to of a closed sibling with the same parent and assignee). The sub-issue file's creation time is dropped, and there is no --since override. wall_clock = the assignee's last commit in W − from (null when there are no commits).

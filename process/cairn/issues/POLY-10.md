@@ -43,7 +43,7 @@ AC5 root cause, measured 2026-09-24 before spawn: `_resolve_role_from_session` r
 
 ### @architect — 2026-09-24
 
-Gate-1 ruling (POLY-21): read `scripts/cairn/design/telemetry-attribution.md` @ 3d83a20. Summary of rulings, all measured (M1–M7 in the note):
+Gate-1 ruling (POLY-21): read `process/reviews/POLY-10/ruling.md` @ 3d83a20. Summary of rulings, all measured (M1–M7 in the note):
 - AC1: absent `.sessions/` = unknown, never empty → hold (cancel grace, no reap), no mkdir during the swap window, recreate after 60 s; `.closing` ENOENT caught; any other watchdog exception exits the whole receiver with code 3 after the §5 shutdown. Forbidden state: listening ∧ watchdog dead.
 - AC2: `.watchdog-heartbeat` + `.last-flush` dotfiles; `--status` adds `watchdog:` and `last-flush:` lines; exit 2 = running with a dead watchdog.
 - AC5: one `_transcript_path_for` resolver scanning `<slug>--claude-worktrees-*/<id>.jsonl` (0.09 ms/miss), used by role resolution, staleness probe and `--status` (fixes a latent PT-86 one-signal reap for teammates). No registration-time paths.
@@ -82,7 +82,7 @@ Files: scripts/cairn/otel_receiver.py, process/TRACKER.md.
 
 ### @architect — 2026-09-24
 
-Gate-4 verdict (POLY-24): **approve** at c43ab6d (code d8cf722), reviewed against the ruling `telemetry-attribution.md` @ 3d83a20.
+Gate-4 verdict (POLY-24): **approve** at c43ab6d (code d8cf722), reviewed against the ruling `process/reviews/POLY-10/ruling.md` @ 3d83a20.
 
 | Axis | Result | Evidence |
 |---|---|---|

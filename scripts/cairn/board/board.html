@@ -9,9 +9,9 @@
      variant/mode is already in effect at first paint (no FOUC). Reads
      the origin-global `cairn.theme` localStorage key and sets
      data-cairn-base/theme/chart + the .dark class synchronously.
-     Generated from scripts/cairn/design/variants.json by
-     scripts/cairn/design/gen_variants.py (see
-     scripts/cairn/design/bootstrap.snippet.html) -- byte-identical to
+     Generated from scripts/cairn/board/theme/variants.json by
+     scripts/cairn/board/theme/gen_variants.py (see
+     scripts/cairn/board/theme/bootstrap.snippet.html) -- byte-identical to
      the copy in dashboard/index.html's <head>
      (test_theme_bootstrap_and_dropdown.py asserts this). -->
 <script id="cairn-theme-bootstrap">
@@ -71,7 +71,7 @@
 <!-- PT-69 (architect's ruling §2): variant deltas, linked AFTER
      tokens.css (so its defaults are already declared) and BEFORE
      board.css (so board.css's own rules see whichever variant is
-     selected). Generated -- see scripts/cairn/design/gen_variants.py. -->
+     selected). Generated -- see scripts/cairn/board/theme/gen_variants.py. -->
 <link rel="stylesheet" href="/board/variants.css">
 <link rel="stylesheet" href="/board/board.css">
 </head>

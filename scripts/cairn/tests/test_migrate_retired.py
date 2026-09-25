@@ -1,5 +1,5 @@
 """POLY-6 gate-red (qa-engineer), pinned to the architect's gate-1 ruling
-(scripts/cairn/design/test-boundary-ci.md @ 615b94e, section (b) AC4 --
+(process/reviews/POLY-6/ruling.md @ 615b94e, section (b) AC4 --
 "Three migrations: delete ... Token backfill: not retired").
 
 Guards the cairn.py CLI surface after implementation-lead (POLY-30)

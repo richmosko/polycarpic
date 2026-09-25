@@ -50,7 +50,7 @@
      0.013 58.071), which fails WCAG AA against --muted above (4.39:1 <
      4.5:1 floor) -- clears the floor under BOTH the quantized-hex and
      float contrast models (4.58:1 / 4.56:1). See app.css's own copy of
-     this comment and scripts/cairn/design/gen_variants.py's
+     this comment and scripts/cairn/board/theme/gen_variants.py's
      derive_muted_foreground() for the full rationale/method. */
   --muted-foreground: oklch(0.5450 0.013 58.071);
   --accent: oklch(0.97 0.001 106.424);

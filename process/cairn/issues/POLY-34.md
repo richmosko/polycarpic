@@ -16,7 +16,7 @@ POLY-6's calibration records (the first loop with every role attributed) show ca
 
 ## Acceptance criteria
 
-- [ ] Architect rules the estimate unit — `cost_usd` (from the price table at close time) or cost-weighted tokens — and revises `scripts/cairn/design/estimation.md` §1 (fields), §4 (estimate output), §5 (bloat); the raw counters stay in the calibration record
+- [ ] Architect rules the estimate unit — `cost_usd` (from the price table at close time) or cost-weighted tokens — and revises `scripts/cairn/docs/estimation.md` §1 (fields), §4 (estimate output), §5 (bloat); the raw counters stay in the calibration record
 - [ ] Sub-issue schema gains the cost fields (e.g. `estimate.cost_usd` / `actual.cost_usd`, decimal strings like `ratio`), `ratio` is computed on the ruled axis, `actual.tokens` stays as a secondary; `cairn check` validates; TRACKER.md rows updated
 - [ ] `cairn estimate` tiers, medians and the suggestion line use the new axis; null-cost rows (unpriced model) are excluded from the cost median the way null-token rows are today
 - [ ] `estimation.bloat_ratio` is defined on the new axis; the unset-threshold path is unchanged
@@ -36,7 +36,7 @@ Lead estimate at start (calibration input): 16 commits, 2 gate cycles, ~60 min s
 
 ### @architect — 2026-09-25
 
-Gate-1 ruling (POLY-35): `scripts/cairn/design/estimation.md` @ e4c73bf §0 (§1/3/4/5/8/9 revised to match). Summary:
+Gate-1 ruling (POLY-35): `scripts/cairn/docs/estimation.md` @ e4c73bf §0 (§1/3/4/5/8/9 revised to match). Summary:
 - (a) Unit = `cost_usd` from prices.json at close. Measured: POLY-6's $/MTok ranges 0.25–1.04 (4.2×). Weighted tokens are rejected because they are model-relative (cache_read/input is 0.05 on opus-5-5 vs 0.10 on sonnet-5) or else just $/const. A repricing needs a re-close; the record adds `prices_retrieved`. An unpriced model gives cost null, ratio null, and a warning naming the model.
 - (b) `estimate.cost_usd` ("3.00", set coerces 2 dp, > 0) and `actual.cost_usd` (close-written, 4 dp). `ratio` = cost ratio. `estimate.tokens` becomes an optional secondary. Close always writes the four computed keys, null included. Check: a ratio requires both cost operands.
 - (c) `cairn estimate`: the cost median excludes null/schema-1 rows. Suggestion is `estimate.cost_usd=X.XX estimate.gate_cycles=N`.

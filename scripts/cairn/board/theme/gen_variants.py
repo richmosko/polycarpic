@@ -290,9 +290,9 @@ _BOARD_HEADER = """\
  *
  * PT-69 (architect's theme-variant ruling, §1/§2): one attribute-qualified
  * CSS block per (dimension, variant, mode), sourced from
- * scripts/cairn/design/variants.json and emitted by
- * scripts/cairn/design/gen_variants.py -- regenerate with
- * `python3 scripts/cairn/design/gen_variants.py`, never edit this file by
+ * scripts/cairn/board/theme/variants.json and emitted by
+ * scripts/cairn/board/theme/gen_variants.py -- regenerate with
+ * `python3 scripts/cairn/board/theme/gen_variants.py`, never edit this file by
  * hand (scripts/cairn/tests/test_theme_variants_generator.py asserts this
  * file is byte-identical to what the generator currently produces).
  *
@@ -303,7 +303,7 @@ _BOARD_HEADER = """\
  * !important) because an attribute-qualified selector always outranks a
  * bare :root/.dark.
  *
- * See scripts/cairn/design/NOTICE.md for provenance (source, extraction
+ * See scripts/cairn/board/theme/NOTICE.md for provenance (source, extraction
  * date, per-dimension notes).
  */
 
@@ -314,9 +314,9 @@ _DASHBOARD_HEADER = """\
  *
  * PT-69 (architect's theme-variant ruling, §1/§2): one attribute-qualified
  * CSS block per (dimension, variant, mode), sourced from
- * scripts/cairn/design/variants.json and emitted by
- * scripts/cairn/design/gen_variants.py -- regenerate with
- * `python3 scripts/cairn/design/gen_variants.py`, never edit this file by
+ * scripts/cairn/board/theme/variants.json and emitted by
+ * scripts/cairn/board/theme/gen_variants.py -- regenerate with
+ * `python3 scripts/cairn/board/theme/gen_variants.py`, never edit this file by
  * hand (scripts/cairn/tests/test_theme_variants_generator.py asserts this
  * file is byte-identical to what the generator currently produces).
  *
@@ -327,7 +327,7 @@ _DASHBOARD_HEADER = """\
  * own :root/.dark; the blocks below only carry the DELTA a non-default
  * selection needs.
  *
- * See scripts/cairn/design/NOTICE.md for provenance (source, extraction
+ * See scripts/cairn/board/theme/NOTICE.md for provenance (source, extraction
  * date, per-dimension notes).
  */
 
@@ -340,11 +340,11 @@ _DOCS_HEADER = """\
  * PT-69 (architect's theme-variant ruling): docs-side reference copy of
  * the theme-variant blocks, alongside docs/DESIGN/tokens.css's own
  * default-preset reference copy. Sourced from
- * scripts/cairn/design/variants.json, emitted by
- * scripts/cairn/design/gen_variants.py -- regenerate with
- * `python3 scripts/cairn/design/gen_variants.py`, never edit this file by
+ * scripts/cairn/board/theme/variants.json, emitted by
+ * scripts/cairn/board/theme/gen_variants.py -- regenerate with
+ * `python3 scripts/cairn/board/theme/gen_variants.py`, never edit this file by
  * hand. See docs/DESIGN/design-system-spec.md's "Theme & color variants"
- * section for the full spec, and scripts/cairn/design/NOTICE.md for
+ * section for the full spec, and scripts/cairn/board/theme/NOTICE.md for
  * provenance.
  */
 
@@ -509,7 +509,7 @@ def _target_paths(out_dir: Path | None) -> list:
     """
     if out_dir is not None:
         return [out_dir / rel_path for rel_path, _, _ in _TARGETS]
-    cairn_dir = SCRIPT_DIR.parent  # scripts/cairn/design -> scripts/cairn
+    cairn_dir = SCRIPT_DIR.parents[1]  # scripts/cairn/board/theme -> scripts/cairn
     repo_root = cairn_dir.parents[1]  # scripts/cairn -> repo root
     return [
         cairn_dir / "board" / "variants.css",

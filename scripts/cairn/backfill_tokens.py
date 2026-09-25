@@ -122,7 +122,7 @@ _WORKTREE_TRANSCRIPT_SUFFIX_CACHE: Optional[str] = None
 
 def _worktree_transcript_suffix() -> str:
     """POLY-10 gate-1 ruling (c), moved here verbatim by the POLY-26 gate-1
-    ruling (`scripts/cairn/design/backfill-sibling-scan.md` §1) -- this
+    ruling (`process/reviews/POLY-26/ruling.md` §1) -- this
     module is the single owner of worktree-sibling transcript-path logic;
     `otel_receiver.py` imports this function rather than keeping its own
     copy. The directory-name suffix Claude Code appends to a teammate's

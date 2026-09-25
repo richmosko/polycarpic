@@ -1,6 +1,6 @@
 name: ci
 
-# POLY-6 / POLY-31, ruling scripts/cairn/design/test-boundary-ci.md @ 615b94e section (c).
+# POLY-6 / POLY-31, ruling process/reviews/POLY-6/ruling.md @ 615b94e section (c).
 # One job, id+name `cairn` -- that is the required-check name registered on `main`.
 # No workflow-level `on.*.paths:` filter: a required check whose workflow never
 # triggers stays "Expected" and blocks the merge forever. The filter lives in the
@@ -51,10 +51,7 @@ jobs:
           PATTERN='^(scripts/cairn/|\.claude/|process/|tests/workflow/|\.github/workflows/|\.githooks/|docs/DESIGN/)'
           EXCLUDE='^process/cairn/(issues|milestones|majors|archive)/'
 
-          # Addendum 1 (POLY-39 §0.8): skip only when the tree being checked
-          # differs from a tree that already went green in tracker paths only.
-          # Any gh/API/git failure here takes no skip and falls through to the
-          # plain diff test below -- this block may only ever add a `run=false`.
+          # Skip only when every change since the last successful run on this branch is tracker-only; any gh/API/git failure here falls through to the plain diff test below, never adding a skip on its own (POLY-39).
           rc=0; ANCHOR="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=pull_request&status=success&branch=$HEAD_REF&per_page=1" --jq '.workflow_runs[0].head_sha // empty')" || rc=$?
           if [ "$rc" -ne 0 ]; then
             ANCHOR=""

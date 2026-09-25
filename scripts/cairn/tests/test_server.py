@@ -412,7 +412,7 @@ class CreateIssueTests(ServerTestCase):
         self.assertEqual(error_payload["error"], "legacy_archive")
 
     def test_any_other_cairn_error_on_create_is_409_allocation_failed(self):
-        # Ruling (design/estimation-engine-fixes.md §1, "Confirmed as
+        # Ruling (process/reviews/POLY-48/ruling.md §1, "Confirmed as
         # filed"): any CairnError out of allocate_and_create_issue that is
         # neither BadParentError nor the legacy-archive guard maps to 409
         # allocation_failed. The real trigger (allocate_and_create_issue's
