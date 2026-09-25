@@ -449,7 +449,8 @@ with its role. Sub-issue tokens are therefore:
 ```
 actual.tokens(S) = Σ (input + cache_write + cache_read + output)
     over lines with source == "otel", issue == S.parent, role == S.assignee,
-                    from_ts < generated <= close_ts
+                    from_ts < generated <= to_ts   (to_ts = close_ts; with --at, the
+                    first otel flush within 1800 s after it)
 ```
 
 `cairn close` first signals the receiver (`otel_receiver.py --flush-now`) and
@@ -459,7 +460,7 @@ review. Known limits, stated rather than papered over:
 
 - The first line in W may carry up to one flush interval of pre-W tokens.
 - With `--at`, the token ceiling is the first **otel** flush after the commit,
-  within one flush interval (POLY-47; `estimation-engine-fixes.md` §1(b)).
+  within one flush interval (POLY-47; `process/reviews/POLY-48/ruling.md` §1(b)).
   That flush may carry up to one interval of post-gate same-role tokens, and
   because `window.to` records it, the next same-assignee stage's commit floor
   moves with it: a same-assignee commit inside (commit, flush] counts in
