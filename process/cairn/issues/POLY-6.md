@@ -81,3 +81,20 @@ Confirmed red for the right reason (narrowed -p runs, no real-suite spawn):
 NoWorkflowTestTouchesCairnTests passes today (control, vacuously true — no cairn/helpers coupling in tests/workflow/ yet).
 
 Handed to implementation-lead (POLY-30) and devops-engineer (POLY-31) to build green.
+
+### @devops-engineer — 2026-09-25
+
+AC5 landed @ 29b17da: `.github/workflows/ci.yml` per ruling 615b94e §(c) — one job
+`cairn` (the required-check name), no workflow-level `on.*.paths`, a step-level
+`changes` gate (fail-closed on diff error) over the ruled paths, full-SHA-pinned
+checkout@v7.0.1/setup-python@v7.0.0(3.14)/setup-node@v7.0.0(26), Python suite via
+`run_tests.py` (no `--gate`), JS via `node --test` excluding
+`token-chart-logic.test.js` (POLY-8 comment inline), concurrency
+cancel-in-progress. All 7 of qa's `CiWorkflowShapeTests` pass locally.
+
+Required-check registration (user action, after this workflow's first green PR run):
+
+gh api -X PATCH repos/richmosko/polycarpic/branches/main/protection/required_status_checks \
+  -f strict=true -f 'checks[][context]=cairn' -F 'checks[][app_id]=null'
+
+(or via UI: Settings → Branches → main → Require status checks → add `cairn`.)
