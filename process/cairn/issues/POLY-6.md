@@ -98,3 +98,11 @@ gh api -X PATCH repos/richmosko/polycarpic/branches/main/protection/required_sta
   -f strict=true -f 'checks[][context]=cairn' -F 'checks[][app_id]=null'
 
 (or via UI: Settings → Branches → main → Require status checks → add `cairn`.)
+
+### @implementation-lead — 2026-09-25
+
+Build-green (implementation-lead), POLY-30 @ 3c85c8d: AC1 — moved the 5 ruled files (50 tests) to tests/workflow/ with workflow_helpers.REPO_ROOT (no cairn/helpers coupling); run_tests.py picks up tests/workflow/ as an optional second root (build_argv gains start_dir, each child's cwd/-s derive from its own absolute path, duplicate basenames exit 2 pre-run). AC4 — deleted migrate-prefix-ids/lifecycle-status/archive-issues (cmd_*, migrate_*, renderers, subparser) and their 3 test files (77 tests); detection lints kept, dead-command fix hints removed; legacy_archived_issue_paths kept (2 callers); token backfill untouched. AC3 — WORKFLOW.md spin-off-clean sentence added; moved-path refs fixed in WORKFLOW.md/merge-pr/SKILL.md; TRACKER.md migrate rows/instruction removed (history kept); INTERFACE.md caller count updated.
+
+One pre-existing test_run_tests.py assertion pinned single-root --list output; updated for both roots (in path order).
+
+Verified after rebasing onto devops's AC5 (29b17da): `run_tests.py --gate green` — 103 files, 1727 tests, OK (skipped=4).
