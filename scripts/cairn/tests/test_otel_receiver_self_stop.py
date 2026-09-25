@@ -85,6 +85,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -134,12 +135,21 @@ def make_fake_engine_root(testcase, otel_port: Optional[int] = None) -> Path:
     return root
 
 
+# POLY-49 gate-1 ruling addendum 1 (architect, POLY-49.md @ 646bdb3):
+# "helpers' _base_env sets CLAUDE_CONFIG_DIR=<per-test tmp dir, empty>
+# for every receiver subprocess" -- module-level, shared, never written
+# into, so POLY-25's resolver never reads the REAL ~/.claude/
+# settings.json this machine may hold once the ruling's user-action
+# delta lands there.
+_HERMETIC_CLAUDE_CONFIG_DIR = tempfile.mkdtemp(prefix="cairn-test-empty-claude-config-")
+
+
 def _minimal_env(**overrides: str) -> dict:
     """A from-scratch env -- this is itself a live Claude Code session,
     which already has telemetry enabled in ITS OWN environment. Never
     inherit os.environ wholesale (same reasoning as the hardening
     suite's helper of the same name)."""
-    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "CLAUDE_CONFIG_DIR": _HERMETIC_CLAUDE_CONFIG_DIR}
     if "HOME" in os.environ:
         base["HOME"] = os.environ["HOME"]
     base.update(overrides)

@@ -81,6 +81,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -139,6 +140,19 @@ def make_fake_engine_root_with_default_port(testcase, default_port: int, otel_po
     return root
 
 
+# POLY-49 gate-1 ruling addendum 1 (architect, POLY-49.md @ 646bdb3):
+# "helpers' _base_env sets CLAUDE_CONFIG_DIR=<per-test tmp dir, empty>
+# for every receiver subprocess." Module-level and shared (never
+# written into by anything -- only tests that explicitly override
+# CLAUDE_CONFIG_DIR write a settings.json anywhere), so every test in
+# this file is hermetic against the REAL ~/.claude/settings.json this
+# actual machine may hold once the ruling's user-action delta is
+# applied there -- without it, POLY-25's resolver would read a real,
+# environment-dependent endpoint and make "default"/"env" assertions
+# here flaky depending on who/where the suite runs.
+_HERMETIC_CLAUDE_CONFIG_DIR = tempfile.mkdtemp(prefix="cairn-test-empty-claude-config-")
+
+
 def _minimal_env(**overrides: str) -> dict:
     """A from-scratch env, never `os.environ` inherited wholesale -- this
     is itself a live Claude Code session, which per the architect's own
@@ -146,7 +160,7 @@ def _minimal_env(**overrides: str) -> dict:
     (settings.local.json or shell, not settings.json). Inheriting
     `os.environ` into these subprocesses would make every "telemetry
     off" test flaky-or-wrong depending on who is running the suite."""
-    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "CLAUDE_CONFIG_DIR": _HERMETIC_CLAUDE_CONFIG_DIR}
     if "HOME" in os.environ:
         base["HOME"] = os.environ["HOME"]
     base.update(overrides)
@@ -744,6 +758,28 @@ class StatusExporterEndpointLineTests(unittest.TestCase):
         status = _wait_for_status_running(fake_root, env)
         self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
         self.assertIn("(source: default)", status.stdout, f"got {status.stdout!r}")
+
+    def test_status_reports_exporter_endpoint_from_user_settings_when_env_absent(self):
+        # Ruling addendum 1: CLAUDE_CONFIG_DIR/settings.json's own `env`
+        # block, not the repo's `.claude/settings.json` (M7: project
+        # settings are never a source) -- a DIFFERENT, dedicated tmp dir
+        # than the hermetic default `_minimal_env` otherwise pins.
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        user_config_dir = helpers.make_empty_tmp_dir(self)
+        (user_config_dir / "settings.json").write_text(
+            json.dumps({"env": {"OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{port}"}}), encoding="utf-8",
+        )
+        env = _minimal_env(CLAUDE_CODE_ENABLE_TELEMETRY="1", CLAUDE_CONFIG_DIR=str(user_config_dir))
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+        result = run_fake_receiver(fake_root, ["--ensure-running"], env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        status = _wait_for_status_running(fake_root, env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn(
+            f"exporter-endpoint: http://127.0.0.1:{port} (source: user-settings)", status.stdout,
+            f"got {status.stdout!r}",
+        )
 
 
 if __name__ == "__main__":
