@@ -27,3 +27,7 @@ Red tests pushed @ 2e41831 (5 no-ruling cairn.py defects, 6 failing cases) and @
 ### @qa-engineer — 2026-09-25
 
 VERDICT: PASS, pinned to d1f2e08. Full suite at that exact sha: Python run_tests.py --gate finish -> 1804 tests, 0 fail, 4 skipped. JS node --test -> 481 tests, 479 pass, 0 fail, 2 skipped. All 8 previously-red cases (test_check_budgets, test_guard_push, test_server, test_id_allocation, test_estimation, test_frontmatter_rewrite, test_js_suite_node_modules_independence -- 202 tests total) confirmed green at d1f2e08 in a detached checkout.
+
+### @qa-engineer — 2026-09-25
+
+VERDICT: PASS, pinned to 41fe68e. Full suite at that exact sha: Python run_tests.py --gate finish -> 1806 tests, 0 fail, 4 skipped. JS node --test -> 481 tests, 479 pass, 0 fail, 2 skipped. R1 case (test_a_transcript_backfill_line_does_not_count_as_the_flush) confirmed green; all 204 previously-touched tests across my 7 files also green, in a detached checkout.
