@@ -1,6 +1,6 @@
 name: ci
 
-# POLY-6 / POLY-31, ruling scripts/cairn/design/test-boundary-ci.md @ 615b94e section (c).
+# POLY-6 / POLY-31, ruling process/reviews/POLY-6/ruling.md @ 615b94e section (c).
 # One job, id+name `cairn` -- that is the required-check name registered on `main`.
 # No workflow-level `on.*.paths:` filter: a required check whose workflow never
 # triggers stays "Expected" and blocks the merge forever. The filter lives in the

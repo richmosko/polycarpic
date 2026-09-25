@@ -296,7 +296,7 @@ class BadParentError(CairnError):
     where X doesn't resolve, or X is itself a sub-issue (suffixed or a
     legacy numbered one -- sub-issues nest one level only) (POLY-51 ruling
     §2 steps 2-3) -- AND, since POLY-48 item 7 (gate-1 ruling
-    estimation-engine-fixes.md §1, "confirmed as filed"), a..z letter
+    process/reviews/POLY-48/ruling.md §1, "confirmed as filed"), a..z letter
     exhaustion under an otherwise-valid parent (both raise sites:
     `_next_sub_issue_letter` and `_allocate_sub_issue`'s retry loop). A
     client can fix any of these four cases by retrying with a different
@@ -5407,7 +5407,7 @@ def make_server(
                 "pr": None,
             }
             # PT-52 §3 / POLY-51 ruling §2 / POLY-48 item 7 (gate-1 ruling
-            # estimation-engine-fixes.md §1, "confirmed as filed"):
+            # process/reviews/POLY-48/ruling.md §1, "confirmed as filed"):
             # allocate_and_create_issue raises one of three named errors,
             # each caught before the plain-`CairnError` fallback (both
             # subclass it) so they map to distinct, truthful HTTP codes:
@@ -6785,7 +6785,7 @@ def _files_touched_by_author(root: Path, base: str, assignee: str) -> Set[str]:
 
 def _sibling_guard_paths(data_dir: Path, issue_id: str, parent: str, assignee: str) -> List[str]:
     """POLY-48 item 6 (guard-push same-assignee scope, gate-1 ruling
-    estimation-engine-fixes.md §1(c)): the `paths:` globs of every OTHER
+    process/reviews/POLY-48/ruling.md §1(c)): the `paths:` globs of every OTHER
     live issue sharing this one's `parent` and `assignee` (any stage, any
     status) -- unioned into the caller's own allowed set, so the second
     same-assignee sub-issue under one parent doesn't trip on the first
@@ -6979,7 +6979,7 @@ def _flush_receiver_and_wait(repo_root: Path, usage_path: Path, timeout: float =
 def _token_ceiling(
     usage_path: Path, at_sha: str, at_ts: str, max_gap_seconds: int,
 ) -> Tuple[str, Optional[str]]:
-    """POLY-48 item 4 (POLY-47, gate-1 ruling estimation-engine-fixes.md
+    """POLY-48 item 4 (POLY-47, gate-1 ruling process/reviews/POLY-48/ruling.md
     §1(b)): the TOKEN-side ceiling for a `--at <sha>` close. `at_ts`
     (the commit's own author time) almost never lines up with a flush
     boundary -- the flush actually carrying this stage's last tokens can
@@ -7145,7 +7145,7 @@ def _append_calibration_record(data_dir: Path, record: Dict[str, Any]) -> None:
 
 def _linked_worktree_main_checkout(start: Path) -> Optional[Path]:
     """POLY-48 item 9 (`close` from a worktree, gate-1 ruling
-    estimation-engine-fixes.md §1(d)): `git rev-parse --git-dir` vs
+    process/reviews/POLY-48/ruling.md §1(d)): `git rev-parse --git-dir` vs
     `--git-common-dir` is the one reliable test for "is `start` inside a
     LINKED git worktree" -- the two paths are identical in the main
     checkout and differ in a linked worktree, regardless of layout (never
@@ -7293,7 +7293,7 @@ def cmd_close(args: argparse.Namespace) -> int:
     # author time; the default ceiling is real wall-clock now(). Commits
     # and wall-clock (gate_cycle_actuals below) stay bounded by close_ts,
     # unchanged (POLY-48 item 4, gate-1 ruling
-    # estimation-engine-fixes.md §1(b)) -- only the TOKEN ceiling differs.
+    # process/reviews/POLY-48/ruling.md §1(b)) -- only the TOKEN ceiling differs.
     close_ts = at_ts if at_sha is not None else datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # POLY-34 (ruling §0.2): prices loaded once here (not inside
