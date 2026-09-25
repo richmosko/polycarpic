@@ -260,6 +260,58 @@ class CiExcludePatternTests(unittest.TestCase):
         )
 
 
+class CiAnchoredSkipTests(unittest.TestCase):
+    """POLY-39 addendum 1 (scripts/cairn/design/estimation.md @ 1f99d10,
+    §0.8): the `changes` step gains an anchor-lookup extension -- skip
+    (run=false) when every line of the diff against the newest successful
+    PR run on this branch matches EXCLUDE, falling through to §0.7 when no
+    sound anchor exists. Text-only shape checks, per the addendum's own
+    "qa shape test" bullet -- no subprocess, no `gh` call."""
+
+    def setUp(self):
+        if not CI_WORKFLOW.is_file():
+            self.fail(f"{CI_WORKFLOW} does not exist yet")
+        self.text = CI_WORKFLOW.read_text(encoding="utf-8")
+        self.block = self._step_block("changes")
+
+    def _step_block(self, step_id: str) -> str:
+        idx = self.text.find(f"id: {step_id}")
+        self.assertNotEqual(idx, -1, f"no step with id: {step_id} found")
+        rest = self.text[idx:]
+        next_step = re.search(r"\n\s*- name:", rest)
+        return rest[: next_step.start()] if next_step else rest
+
+    def test_anchor_lookup_asks_for_successful_pull_request_runs(self):
+        self.assertIn("event=pull_request", self.block, "anchor lookup must filter event=pull_request")
+        self.assertIn("status=success", self.block, "anchor lookup must filter status=success")
+
+    def test_workflow_grants_actions_read(self):
+        self.assertIn(
+            "actions: read", self.text,
+            "permissions must add actions: read for the anchor lookup (addendum 1)",
+        )
+
+    def test_both_ancestry_checks_appear(self):
+        self.assertEqual(
+            self.block.count("merge-base --is-ancestor"), 2,
+            "expected both ancestry checks (anchor -> PR head, base -> anchor) "
+            "in the changes step (addendum 1)",
+        )
+
+    def test_run_false_write_appears_exactly_twice(self):
+        self.assertEqual(
+            len(re.findall(r'echo\s+"run=false"', self.block)), 2,
+            "expected exactly two run=false writes: the §0.7 no-match case "
+            "and the addendum-1 anchor skip",
+        )
+
+    def test_step_still_has_no_bare_or_true(self):
+        self.assertNotRegex(
+            self.block, r"\|\|\s*true",
+            "the anchor path may only ever add a false -- never a swallowed exit status",
+        )
+
+
 class WorkflowMdSpinOffCleanSentenceTests(unittest.TestCase):
     """(f)7: WORKFLOW.md contains the (e) sentence's first bold clause."""
 
