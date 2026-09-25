@@ -199,6 +199,47 @@ head and a new run. Diffing against `github.event.before` instead is
 check green on a broken tree. Closing that hole needs a check-runs API query
 on `before`; that is out of scope and an open question for the lead.
 
+### 0.8 Addendum 1 — skip anchored to the last successful run (accepted)
+
+The rule: skip only when the tree being checked differs from a tree that
+already went green **in tracker paths only**. This extends the §0.7 step;
+if the anchor check doesn't skip, the step falls through to §0.7 unchanged.
+
+- **Anchor lookup.** List this workflow's successful PR runs on this branch:
+  `gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=pull_request&status=success&branch=$HEAD_REF&per_page=1" --jq '.workflow_runs[0].head_sha // empty'`.
+  An empty result means no anchor, so fall through to §0.7.
+  The job's `permissions` add `actions: read`, and the step gets
+  `GH_TOKEN: ${{ github.token }}`.
+- **Pick the anchor.** Use only the newest result, A. Don't walk back to
+  older runs: an older anchor is an ancestor of A, so it can't contain a
+  base that A lacks. If any of these three checks fails, fall through to
+  §0.7:
+  1. `git cat-file -e A` succeeds.
+  2. `git merge-base --is-ancestor A "$PR_HEAD"` holds, where
+     PR_HEAD = `pull_request.head.sha`.
+  3. `git merge-base --is-ancestor "$BASE_SHA" A` holds. A contains the
+     current base, so the tree A's run tested (refs/pull/N/merge) equals
+     A's own tree, and a move on `main` can never ride along on a skip.
+- **Skip test.** Set run=false only if every line of
+  `git diff --name-only A "$PR_HEAD"` matches EXCLUDE (an empty diff counts
+  as a match). A green run on A is either a real run of the suite or a sound
+  skip, so by induction the invariant holds.
+- **Fail closed.** If `gh` fails, the output isn't JSON, or any git command
+  exits non-zero other than an ancestry "no" (exit 1), take no skip and fall
+  through to §0.7. The anchor path may only ever *add* a false. There is
+  exactly one `run=false` write in it, and no `|| true` anywhere. A
+  `workflow_dispatch` event bypasses the anchor path, as it does today.
+- **Measured effect (unmeasured until the first push after this lands).**
+  Each tracker-only push after a green code tip should skip the suite. The
+  job still starts, running only checkout and the API call.
+- **qa shape test.** The anchor lookup asks for `status=success` and
+  `event=pull_request`. The workflow grants `actions: read`. Both ancestry
+  checks appear. `run=false` appears exactly twice in the step (§0.7 plus the
+  anchor). The step has no `|| true`.
+
+POLY-35 re-closes after this addendum. POLY-39's scope grows to cover this
+step.
+
 ## 1. Sub-issue fields
 
 > POLY-34: the cost fields and the redefined `ratio` are in §0.3, which
