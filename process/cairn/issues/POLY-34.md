@@ -72,3 +72,13 @@ POLY-39 shape tests RED @ 7bd9a6d (tests/workflow/test_cairn_test_boundary.py).
 ### @devops-engineer — 2026-09-25
 
 POLY-39 landed @ 4774ef2: applied §0.7 exclusion pattern and §0.8 anchored-skip addendum to .github/workflows/ci.yml's `changes` step, byte-identical to the ruling text. Fail-closed throughout (no `|| true`); permissions gains `actions: read`, the step gains `GH_TOKEN`. qa's shape tests (CiExcludePatternTests + CiAnchoredSkipTests) pass: `python3 -m unittest tests.workflow.test_cairn_test_boundary -k Ci` → 19/19 OK.
+
+### @qa-engineer — 2026-09-25
+
+Cost-axis RED @ f9e54be (scripts/cairn/tests/test_estimation.py, §9.1 items 1-9).
+
+New classes: CostAxisCheckTests, CostAxisSetTests, CostAxisRoundTripTests, CloseCostAxisPricedTests, CloseCostAxisUnpricedTests (+ token_actuals unpriced_models), CloseEstimateTokensOnlyTests, RecloseClearsStaleRatioTests, EstimateCostAxisTests (header/median/suggestion/schema-1 dash).
+
+Rewrote: CloseBloatFlagTests' two tests (tokens→cost bloat_reasons) and EstimateCommandTests.test_median_suggestion_line (token→cost suggestion), both directly superseded by the ruling.
+
+25/73 failures, all right-reason (current code computes token ratios, no cost fields, no unpriced_models key, 'token threshold unset' not 'cost'). Other 48 pre-existing tests untouched, still green. POLY-39 confirmed green @ 4774ef2 (devops).
