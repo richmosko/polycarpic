@@ -3,14 +3,14 @@ id: POLY-15
 title: prices.json lacks claude-opus-5-5; one unpriced model nulls an issue's whole cost
 status: backlog
 milestone: POLY-A
-parent: null
+parent: POLY-48
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P3
 pr: null
 created: 2026-09-23
-updated: 2026-09-24
+updated: 2026-09-25
 ---
 
 

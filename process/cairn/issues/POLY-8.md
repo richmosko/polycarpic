@@ -3,14 +3,14 @@ id: POLY-8
 title: finish-feature JS gate: token-chart-logic.test.js needs the dashboard's node_modules installed
 status: backlog
 milestone: null
-parent: null
+parent: POLY-48
 blocked_by: []
 assignee: null
 labels: [workflow, cairn, tests]
 priority: P3
 pr: null
 created: 2026-09-23
-updated: 2026-09-23
+updated: 2026-09-25
 ---
 
 

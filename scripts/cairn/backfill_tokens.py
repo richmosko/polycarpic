@@ -60,6 +60,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import glob
 import json
 import os
 import re
@@ -114,6 +115,75 @@ def _transcript_dir_slug(repo_root: Path) -> str:
     `/Users/mosko/Projects/project_template` ->
     `-Users-mosko-Projects-project-template`."""
     return re.sub(r"[/_.]", "-", str(repo_root))
+
+
+_WORKTREE_TRANSCRIPT_SUFFIX_CACHE: Optional[str] = None
+
+
+def _worktree_transcript_suffix() -> str:
+    """POLY-10 gate-1 ruling (c), moved here verbatim by the POLY-26 gate-1
+    ruling (`scripts/cairn/design/backfill-sibling-scan.md` §1) -- this
+    module is the single owner of worktree-sibling transcript-path logic;
+    `otel_receiver.py` imports this function rather than keeping its own
+    copy. The directory-name suffix Claude Code appends to a teammate's
+    transcript-dir slug when it runs inside `.claude/worktrees/<name>/` --
+    derived from `_transcript_dir_slug`, never hard-coded, so a slug-rule
+    change moves both. `_transcript_dir_slug` substitutes `/`, `_`, `.`
+    one-for-one, so `slug(repo_root + "/.claude/worktrees")` is always
+    exactly `slug(repo_root) + slug("/.claude/worktrees")` -- a plain
+    prefix-strip against the real repo root's own slug is therefore exact,
+    not a guess, and (since neither operand depends on repo_root's actual
+    content) the result is the same constant, `--claude-worktrees`, on
+    every machine; cached at first call rather than recomputed per lookup.
+    """
+    global _WORKTREE_TRANSCRIPT_SUFFIX_CACHE
+    if _WORKTREE_TRANSCRIPT_SUFFIX_CACHE is None:
+        repo_root = _repo_root()
+        repo_slug = _transcript_dir_slug(repo_root)
+        worktrees_slug = _transcript_dir_slug(repo_root / ".claude" / "worktrees")
+        if worktrees_slug.startswith(repo_slug):
+            _WORKTREE_TRANSCRIPT_SUFFIX_CACHE = worktrees_slug[len(repo_slug):]
+        else:
+            _WORKTREE_TRANSCRIPT_SUFFIX_CACHE = "--claude-worktrees"  # unreachable given the slug rule; a safe literal fallback
+    return _WORKTREE_TRANSCRIPT_SUFFIX_CACHE
+
+
+def _worktree_sibling_dirs(transcripts_dir: Path) -> List[Path]:
+    """POLY-26 gate-1 ruling §1: the shared helper both `_transcript_path_
+    for` (a single-session lookup) and `scan_transcripts` (an every-file
+    enumeration) build on. `glob.escape` on `transcripts_dir.name` is
+    required, not cosmetic -- a slug is a path with `/`, `_`, `.` replaced,
+    so a `[`, `]`, or `?` surviving from the real repo path would otherwise
+    be read back as glob syntax instead of a literal character. Anchored:
+    only a dir named EXACTLY `<transcripts_dir.name><suffix>-*` matches --
+    a near-neighbour like `<slug>-old<suffix>-x` never does (its name does
+    not start with `<slug><suffix>-`), which is PT-87's cross-project
+    isolation invariant. `[]` when the parent isn't even a dir."""
+    parent = transcripts_dir.parent
+    if not parent.is_dir():
+        return []
+    pattern = glob.escape(transcripts_dir.name) + _worktree_transcript_suffix() + "-*"
+    return sorted(d for d in parent.glob(pattern) if d.is_dir())
+
+
+def _transcript_path_for(session_id: str, transcripts_dir: Path) -> Optional[Path]:
+    """POLY-10 gate-1 ruling (c), moved here verbatim by the POLY-26 gate-1
+    ruling §1: `transcripts_dir/<id>.jsonl` if it's a file (the direct,
+    pre-worktree lookup, unchanged); else the FIRST file matching
+    `<sibling>/<id>.jsonl` across `_worktree_sibling_dirs(transcripts_dir)`
+    -- a teammate's own transcript, filed by Claude Code under a sibling
+    `<slug><suffix>-<worktree-name>/` dir because every team-agent
+    session's cwd is `.claude/worktrees/<name>/`, never the main checkout.
+    `None` if neither exists. Reads only `<session_id>.jsonl` by exact name
+    inside a matched dir, no directory listing of transcript contents."""
+    direct = transcripts_dir / f"{session_id}.jsonl"
+    if direct.is_file():
+        return direct
+    for candidate_dir in _worktree_sibling_dirs(transcripts_dir):
+        candidate = candidate_dir / f"{session_id}.jsonl"
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def _resolve_tracker_prefix(repo_root: Path) -> str:
@@ -480,13 +550,19 @@ def _process_file(
 def scan_transcripts(
     transcript_dir: Path, prefix: str, roster: Set[str], repo_root: Optional[Path] = None
 ) -> Tuple[Dict[Tuple[str, str, str], Dict[str, Any]], Dict[str, Any], List[Path], List[Tuple[str, str]]]:
-    """Recursively scans `transcript_dir` for `*.jsonl` files (nested
-    subagent transcripts live at `<session>/subagents/agent-*.jsonl`; no
-    exclude list needed -- `memory/` and `<session>/tool-results/` hold no
-    `.jsonl`, per the architect's ruling § 3). Returns
-    `(buckets, stats, files_scanned, milestone_windows_table)`; raises
-    `BackfillError` on the first fail-loud condition, before any bucket
-    accumulates a partial count from that record.
+    """Recursively scans `transcript_dir` AND this repo's own worktree-
+    sibling transcript dirs (`_worktree_sibling_dirs`, POLY-26 gate-1
+    ruling §2) for `*.jsonl` files (nested subagent transcripts live at
+    `<session>/subagents/agent-*.jsonl`; no exclude list needed --
+    `memory/` and `<session>/tool-results/` hold no `.jsonl`, per the
+    architect's ruling § 3). A near-neighbour dir (`<slug>-old<suffix>-x`
+    or `<slug>-old/`) is never a root -- the same anchored-prefix helper
+    the resolver uses. `seen_keys` (the caller-global dedupe set) stays
+    run-global across every root, so a record duplicated across main and
+    a sibling counts once, not twice. Returns `(buckets, stats,
+    files_scanned, milestone_windows_table)`; raises `BackfillError` on
+    the first fail-loud condition, before any bucket accumulates a
+    partial count from that record.
 
     PT-84: `cairn.milestone_windows(repo_root)` is computed ONCE here, before
     the file loop -- one `git log` per milestone (14 today), not one per
@@ -503,7 +579,8 @@ def scan_transcripts(
     seen_keys: Set[str] = set()
     stats = _new_stats()
     milestone_windows_table = cairn.milestone_windows(repo_root if repo_root is not None else _repo_root())
-    files = sorted(transcript_dir.rglob("*.jsonl"))
+    roots = [transcript_dir] + _worktree_sibling_dirs(transcript_dir)
+    files = sorted({path for root in roots for path in root.rglob("*.jsonl")})
     for path in files:
         _process_file(path, prefix, issue_re, roster, buckets, seen_keys, stats, milestone_windows_table)
     return buckets, stats, files, milestone_windows_table
@@ -758,6 +835,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     new_lines = _build_lines(buckets, generated, milestone_windows_table)
 
     print(f"scanned {len(files)} transcript file(s) under {transcript_dir}")
+    sibling_dirs = _worktree_sibling_dirs(transcript_dir)
+    sibling_file_count = sum(1 for path in files if not path.is_relative_to(transcript_dir))
+    print(
+        f"  of which {sibling_file_count} under {len(sibling_dirs)} worktree sibling dir(s) "
+        f"{transcript_dir.name}{_worktree_transcript_suffix()}-*"
+    )
     print(
         f"in-scope assistant/usage records: {stats['candidates']} "
         f"({stats['unique']} unique, {stats['duplicates']} duplicate)"

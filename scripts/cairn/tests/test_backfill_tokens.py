@@ -101,6 +101,7 @@ import helpers  # noqa: F401
 
 import backfill_tokens
 import cairn
+import otel_receiver
 
 SCRIPT_PATH = helpers.CAIRN_DIR / "backfill_tokens.py"
 TRANSCRIPTS_FIXTURES = helpers.FIXTURES_DIR / "transcripts"
@@ -1036,6 +1037,193 @@ class BackfillMergeSemanticsTests(unittest.TestCase):
         for a, b in zip(first_backfill, second_backfill):
             for counter in ("input", "cache_write", "cache_read", "output"):
                 self.assertEqual(a[counter], b[counter], f"{a['issue']}/{a['role']}/{a['model']} {counter} changed across an idempotent rerun")
+
+
+def _write_sibling_fixture_record(
+    path: Path,
+    branch: str,
+    agent_setting: Optional[str] = None,
+    request_id: str = "req-1",
+    uuid_val: str = "uuid-1",
+) -> None:
+    """One header record (PT-87 shape, `agent-setting` type when a role is
+    given) followed by one in-scope `assistant`/`usage` record -- the
+    minimal file `scan_transcripts`'s per-file walk needs to both resolve
+    a role AND contribute a bucket. Scrubbed: no message content, no
+    prompts, no tool output -- just the fields `_process_record` requires
+    plus the two header fields `_scan_header_fields` reads."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    header: dict = {"type": "agent-setting" if agent_setting else "assistant"}
+    if agent_setting:
+        header["agentSetting"] = agent_setting
+    record = {
+        "type": "assistant",
+        "gitBranch": branch,
+        "requestId": request_id,
+        "uuid": uuid_val,
+        "timestamp": "2026-09-25T00:00:00Z",
+        "message": {
+            "model": "claude-sonnet-5",
+            "usage": {
+                "input_tokens": 1,
+                "cache_creation_input_tokens": 2,
+                "cache_read_input_tokens": 3,
+                "output_tokens": 4,
+            },
+        },
+    }
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(json.dumps(header) + "\n")
+        f.write(json.dumps(record) + "\n")
+
+
+class BackfillWorktreeSiblingScanTests(unittest.TestCase):
+    """POLY-26 gate-1 ruling (`scripts/cairn/design/backfill-sibling-
+    scan.md` §4): `scan_transcripts` must walk the repo's own worktree-
+    sibling transcript dirs (`<slug>--claude-worktrees-*`) alongside the
+    main slug dir, using the SAME anchored-prefix resolver §1 moves into
+    this module (out of `otel_receiver.py`, which keeps no copy).
+
+    Fixture (built once in setUp, mirroring §4's named tree exactly):
+        <tmp>/projects/<slug>/lead-session.jsonl                    team-lead, POLY-7 (no header fields)
+        <tmp>/projects/<slug>--claude-worktrees-arch/arch-session.jsonl        architect, POLY-7
+        <tmp>/projects/<slug>--claude-worktrees-arch/arch-session/subagents/agent-1.jsonl  architect, POLY-7 (nested)
+        <tmp>/projects/<slug>-old--claude-worktrees-x/decoy1-session.jsonl     qa-engineer decoy (near-neighbour sibling)
+        <tmp>/projects/<slug>-old/decoy2-session.jsonl                        qa-engineer decoy (near-neighbour main-shaped dir)
+    """
+
+    def setUp(self):
+        self.tmp = helpers.make_empty_tmp_dir(self)
+        self.projects_dir = self.tmp / "projects"
+        self.slug = "-fake-slug"
+        self.main_dir = self.projects_dir / self.slug
+        self.sibling_dir = self.projects_dir / f"{self.slug}--claude-worktrees-arch"
+        self.decoy_sibling_dir = self.projects_dir / f"{self.slug}-old--claude-worktrees-x"
+        self.decoy_main_dir = self.projects_dir / f"{self.slug}-old"
+
+        _write_sibling_fixture_record(
+            self.main_dir / "lead-session.jsonl",
+            branch="feature/POLY-7-x", request_id="req-lead-1", uuid_val="uuid-lead-1",
+        )
+        _write_sibling_fixture_record(
+            self.sibling_dir / "arch-session.jsonl",
+            branch="feature/POLY-7-x", agent_setting="architect",
+            request_id="req-arch-1", uuid_val="uuid-arch-1",
+        )
+        _write_sibling_fixture_record(
+            self.sibling_dir / "arch-session" / "subagents" / "agent-1.jsonl",
+            branch="feature/POLY-7-x", agent_setting="architect",
+            request_id="req-arch-nested-1", uuid_val="uuid-arch-nested-1",
+        )
+        _write_sibling_fixture_record(
+            self.decoy_sibling_dir / "decoy1-session.jsonl",
+            branch="feature/POLY-7-x", agent_setting="qa-engineer",
+            request_id="req-decoy1-1", uuid_val="uuid-decoy1-1",
+        )
+        _write_sibling_fixture_record(
+            self.decoy_main_dir / "decoy2-session.jsonl",
+            branch="feature/POLY-7-x", agent_setting="qa-engineer",
+            request_id="req-decoy2-1", uuid_val="uuid-decoy2-1",
+        )
+
+    def _scan(self):
+        return backfill_tokens.scan_transcripts(
+            self.main_dir, prefix="POLY", roster={"architect", "team-lead", "qa-engineer"},
+            repo_root=helpers.CAIRN_DIR.parent.parent,
+        )
+
+    def test_sibling_transcript_is_scanned_and_attributed(self):
+        buckets, stats, files, _ = self._scan()
+        keys = set(buckets.keys())
+        self.assertIn(("POLY-7", "architect", "claude-sonnet-5"), keys, keys)
+        self.assertIn(("POLY-7", "team-lead", "claude-sonnet-5"), keys, keys)
+
+    def test_near_neighbour_dirs_are_never_scanned(self):
+        buckets, stats, files, _ = self._scan()
+        roles = {role for (_issue, role, _model) in buckets}
+        self.assertNotIn("qa-engineer", roles, f"a near-neighbour dir's role must never contribute a bucket -- got {roles!r}")
+        self.assertNotIn(
+            self.decoy_sibling_dir / "decoy1-session.jsonl", files,
+            "the `<slug>-old--claude-worktrees-*` decoy must never be scanned",
+        )
+        self.assertNotIn(
+            self.decoy_main_dir / "decoy2-session.jsonl", files,
+            "the `<slug>-old` decoy must never be scanned",
+        )
+
+    def test_nested_subagent_transcript_under_a_sibling_is_scanned(self):
+        buckets, stats, files, _ = self._scan()
+        self.assertIn(
+            self.sibling_dir / "arch-session" / "subagents" / "agent-1.jsonl", files,
+            f"a nested subagents/ transcript under a worktree-sibling dir must be scanned -- got {files!r}",
+        )
+
+    def test_record_duplicated_across_roots_counts_once(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-dup-slug"
+        sibling_dir = tmp / "projects" / "-dup-slug--claude-worktrees-x"
+        _write_sibling_fixture_record(
+            main_dir / "session-a.jsonl", branch="feature/POLY-7-x",
+            request_id="dup-1", uuid_val="uuid-a",
+        )
+        _write_sibling_fixture_record(
+            sibling_dir / "session-b.jsonl", branch="feature/POLY-7-x", agent_setting="architect",
+            request_id="dup-1", uuid_val="uuid-b",
+        )
+        _buckets, stats, _files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster={"architect"}, repo_root=helpers.CAIRN_DIR.parent.parent,
+        )
+        self.assertEqual(
+            stats["duplicates"], 1,
+            f"the same requestId seen across main + sibling roots must dedupe to ONE record, not two -- stats={stats!r}",
+        )
+
+    def test_cli_reports_sibling_counts(self):
+        out_path = self.tmp / "token-usage.jsonl"
+        result = run_backfill_in_process([
+            "--transcripts-dir", str(self.main_dir),
+            "--out-file", str(out_path),
+            "--dry-run",
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            f"scanned 3 transcript file(s) under {self.main_dir}", result.stdout,
+            result.stdout,
+        )
+        self.assertIn(
+            f"  of which 2 under 1 worktree sibling dir(s) {self.slug}--claude-worktrees-*", result.stdout,
+            result.stdout,
+        )
+
+    def test_resolver_lives_in_backfill_only(self):
+        direct = backfill_tokens._transcript_path_for("lead-session", self.main_dir)
+        self.assertEqual(direct, self.main_dir / "lead-session.jsonl", "a direct hit in the main dir must resolve unchanged")
+
+        sibling = backfill_tokens._transcript_path_for("arch-session", self.main_dir)
+        self.assertEqual(sibling, self.sibling_dir / "arch-session.jsonl", "a miss in the main dir must fall through to the true sibling")
+
+        decoy = backfill_tokens._transcript_path_for("decoy1-session", self.main_dir)
+        self.assertIsNone(decoy, "a session id that exists ONLY under a near-neighbour decoy dir must resolve to None")
+
+        self.assertFalse(
+            hasattr(otel_receiver, "_transcript_path_for"),
+            "the resolver must move into backfill_tokens.py -- no alias/duplicate left behind in otel_receiver.py",
+        )
+
+    def test_glob_metacharacters_in_the_slug_are_literal(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "p[1]"
+        sibling_dir = tmp / "projects" / "p[1]--claude-worktrees-x"
+        _write_sibling_fixture_record(
+            sibling_dir / "bracket-session.jsonl", branch="feature/POLY-7-x", agent_setting="architect",
+            request_id="req-bracket-1", uuid_val="uuid-bracket-1",
+        )
+        main_dir.mkdir(parents=True, exist_ok=True)
+        siblings = backfill_tokens._worktree_sibling_dirs(main_dir)
+        self.assertEqual(
+            siblings, [sibling_dir],
+            f"a `[`/`]` in the slug (from a repo path containing them) must be matched literally, not as glob syntax -- got {siblings!r}",
+        )
 
 
 if __name__ == "__main__":

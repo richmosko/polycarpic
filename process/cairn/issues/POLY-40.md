@@ -3,7 +3,7 @@ id: POLY-40
 title: Test hygiene: frontmatter round-trip fixtures derive optional fields from the schema instead of hardcoding them
 status: backlog
 milestone: POLY-A
-parent: null
+parent: POLY-48
 blocked_by: []
 assignee: null
 labels: [cairn, tests]
