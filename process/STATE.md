@@ -15,7 +15,15 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: POLY-57 (cairn docs cleanup, doc-update loop), then the grouped umbrellas POLY-49 (receiver hardening), POLY-50 (backfill attribution), then POLY-56 (checklists)._
+- **Feature:** Cairn docs: living docs only, rulings as audit records
+- **Issue:** POLY-57 (cairn)
+- **Milestone:** POLY-A
+- **Branch:** `feature/poly-57-cairn-docs-cleanup`
+- **Started:** 2026-09-25
+- **Goal:** `scripts/cairn/docs/` holds only living docs; rulings become audit records under `process/reviews/`; living docs and agent files gain only what is strictly necessary.
+- **Status:** In Progress
+
+_Next after this: POLY-49 (receiver hardening), POLY-50 (backfill attribution), then POLY-56 (checklists)._
 
 ## Releases
 

@@ -1,7 +1,7 @@
 ---
 id: POLY-57
 title: Cairn docs: living docs only, rulings as audit records
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -32,3 +32,7 @@ updated: 2026-09-25
 - [ ] Tests, `cairn check`, and the docs links all pass after the moves
 
 ## Comments
+
+### @team-lead — 2026-09-25
+
+Feature started. Branch: `feature/poly-57-cairn-docs-cleanup`.
