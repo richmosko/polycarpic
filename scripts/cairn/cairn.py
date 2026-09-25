@@ -212,10 +212,13 @@ ISSUE_FIELD_ORDER = [
     # nested maps (dump_frontmatter has no dict-emitting branch, and a
     # nested shape would need three new surfaces: the dumper, a
     # `key.sub=value` cmd_set path syntax, and apply_patch's merge). All
-    # seven are optional; an absent key is omitted from the dump, same as
+    # are optional; an absent key is omitted from the dump, same as
     # `paths` already is.
-    "stage", "estimate.tokens", "estimate.gate_cycles",
-    "actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio",
+    # POLY-34 (ruling §0.3): estimate.cost_usd/actual.cost_usd lead their
+    # token siblings -- cost is the driving axis now, tokens are the
+    # secondary.
+    "stage", "estimate.cost_usd", "estimate.tokens", "estimate.gate_cycles",
+    "actual.cost_usd", "actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio",
     "labels", "priority", "pr", "created", "updated",
 ]
 
@@ -1742,8 +1745,29 @@ def check_repo(data_dir: Path) -> List[str]:
                 errors.append(f"{label}: {field_name} must be a non-negative integer, got {value!r}")
             elif field_name == "estimate.tokens" and value == 0:
                 errors.append(f"{label}: estimate.tokens must be > 0 -- 0 would make the ratio undefined")
-        actual_tokens = fm.get("actual.tokens")
-        estimate_tokens = fm.get("estimate.tokens")
+        # POLY-34 (ruling §0.3): estimate.cost_usd / actual.cost_usd --
+        # decimal strings (or, hand-written, a bare int/float) -- the
+        # `ratio` operands below are now these, not the token pair.
+        estimate_cost_usd = fm.get("estimate.cost_usd")
+        if estimate_cost_usd is not None:
+            if isinstance(estimate_cost_usd, bool) or not isinstance(estimate_cost_usd, (str, int, float)):
+                errors.append(f"{label}: estimate.cost_usd must be a positive number, got {estimate_cost_usd!r}")
+            else:
+                try:
+                    if not (float(estimate_cost_usd) > 0):
+                        errors.append(f"{label}: estimate.cost_usd must be > 0, got {estimate_cost_usd!r}")
+                except (TypeError, ValueError):
+                    errors.append(f"{label}: estimate.cost_usd {estimate_cost_usd!r} must be a float-parseable number")
+        actual_cost_usd = fm.get("actual.cost_usd")
+        if actual_cost_usd is not None:
+            if isinstance(actual_cost_usd, bool) or not isinstance(actual_cost_usd, (str, int, float)):
+                errors.append(f"{label}: actual.cost_usd must be a float-parseable number, got {actual_cost_usd!r}")
+            else:
+                try:
+                    if float(actual_cost_usd) < 0:
+                        errors.append(f"{label}: actual.cost_usd must be >= 0, got {actual_cost_usd!r}")
+                except (TypeError, ValueError):
+                    errors.append(f"{label}: actual.cost_usd {actual_cost_usd!r} must be a float-parseable number")
         ratio = fm.get("ratio")
         if ratio is not None:
             try:
@@ -1751,10 +1775,10 @@ def check_repo(data_dir: Path) -> List[str]:
                     errors.append(f"{label}: ratio must be >= 0, got {ratio!r}")
             except (TypeError, ValueError):
                 errors.append(f"{label}: ratio {ratio!r} must be a float-parseable string")
-            if actual_tokens is None or estimate_tokens is None:
-                errors.append(f"{label}: ratio present without both actual.tokens and estimate.tokens")
+            if actual_cost_usd is None or estimate_cost_usd is None:
+                errors.append(f"{label}: ratio present without both actual.cost_usd and estimate.cost_usd")
         if status != "done":
-            for field_name in ("actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio"):
+            for field_name in ("actual.cost_usd", "actual.tokens", "actual.gate_cycles", "actual.wall_clock", "ratio"):
                 if fm.get(field_name) is not None:
                     errors.append(
                         f"{label}: {field_name} is set but status is {status!r}, not done -- "
@@ -3662,6 +3686,7 @@ def token_actuals(
         result["tokens"] = None
         result["cost_usd"] = None
         result["lines"] = 0
+        result["unpriced_models"] = []
         return result
 
     rows, _warning = _read_token_usage_lines(usage_path)
@@ -3669,6 +3694,10 @@ def token_actuals(
     lines = 0
     raw_cost = 0.0
     any_unpriced = False
+    # POLY-34 (ruling §0.2): names the unpriced model(s) in W -- `close`
+    # prints them in its warning rather than just "some model was
+    # unpriced".
+    unpriced_models: set = set()
     for row in rows:
         # Architect's review of bbbc8f7 (R3, design note §2 formula): only
         # `source == "otel"` lines count -- a `transcript-backfill` line
@@ -3692,6 +3721,7 @@ def token_actuals(
         rate = models.get(row.get("model"))
         if rate is None:
             any_unpriced = True
+            unpriced_models.add(row.get("model"))
         else:
             raw_cost += _row_cost_usd(row, rate)
 
@@ -3711,6 +3741,7 @@ def token_actuals(
         # never claim for a genuinely priced, non-empty window.
         result["cost_usd"] = None if any_unpriced else round(raw_cost, 6)
     result["lines"] = lines
+    result["unpriced_models"] = sorted(unpriced_models)
     return result
 
 
@@ -5432,12 +5463,28 @@ ESTIMATION_INT_FIELDS = (
     "actual.tokens", "actual.gate_cycles", "actual.wall_clock",
 )
 
+# POLY-34 (ruling §0.3): `estimate.cost_usd` is a decimal STRING on disk
+# (the YAML subset is int-only) -- `cairn set POLY-9 estimate.cost_usd=3`
+# writes "3.00", not the int 3 `_coerce_cli_value` would otherwise pass
+# through. `actual.cost_usd` is close-written only, never through this path.
+ESTIMATION_DECIMAL_FIELDS = ("estimate.cost_usd",)
+
 
 def _coerce_cli_value(key: str, value: str) -> Any:
     if key in LIST_FIELDS:
         return _split_csv(value)
     if key in NULLABLE_FIELDS and value == "":
         return None
+    if key in ESTIMATION_DECIMAL_FIELDS:
+        if value == "":
+            return None
+        try:
+            parsed = float(value)
+        except ValueError:
+            raise CairnError(f"{key} must be a positive number, got {value!r}")
+        if not (parsed > 0):
+            raise CairnError(f"{key} must be a positive number, got {value!r}")
+        return f"{parsed:.2f}"
     if key in ESTIMATION_INT_FIELDS:
         if value == "":
             return None
@@ -6831,8 +6878,12 @@ def cmd_close(args: argparse.Namespace) -> int:
         missing.append("parent")
     if assignee is None:
         missing.append("assignee")
-    if fm.get("estimate.tokens") is None and fm.get("estimate.gate_cycles") is None:
-        missing.append("estimate.tokens or estimate.gate_cycles")
+    if (
+        fm.get("estimate.cost_usd") is None
+        and fm.get("estimate.tokens") is None
+        and fm.get("estimate.gate_cycles") is None
+    ):
+        missing.append("estimate.cost_usd, estimate.tokens, or estimate.gate_cycles")
     if missing:
         print(f"close: {args.id} is missing required field(s): {', '.join(missing)}", file=sys.stderr)
         return 1
@@ -6895,7 +6946,11 @@ def cmd_close(args: argparse.Namespace) -> int:
     # author time; the default ceiling is real wall-clock now().
     close_ts = at_ts if at_sha is not None else datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    token_result = token_actuals(data_dir, parent, role=assignee, since=from_ts, until=close_ts)
+    # POLY-34 (ruling §0.2): prices loaded once here (not inside
+    # token_actuals) so `prices_retrieved` can be stamped on the
+    # calibration record from the exact table that priced this close.
+    prices = load_prices()
+    token_result = token_actuals(data_dir, parent, role=assignee, since=from_ts, until=close_ts, prices=prices)
     if token_result["tokens"] is None:
         if usage_path.is_file():
             print(
@@ -6905,6 +6960,12 @@ def cmd_close(args: argparse.Namespace) -> int:
             )
         else:
             print(f"close: warning: {usage_path} not found -- actual.tokens: null", file=sys.stderr)
+    if token_result["unpriced_models"]:
+        print(
+            f"close: warning: unpriced model(s) {token_result['unpriced_models']} in window "
+            "-- actual.cost_usd: null",
+            file=sys.stderr,
+        )
 
     same_stage_authors = _same_stage_sibling_assignees(data_dir, args.id, parent, stage, assignee)
     gate_result = gate_cycle_actuals(root, args.base, args.ref, assignee, same_stage_authors, since=from_ts, until=close_ts)
@@ -6921,12 +6982,22 @@ def cmd_close(args: argparse.Namespace) -> int:
     if last_ts is not None and from_ts is not None:
         wall_clock = round((_parse_iso_any(last_ts) - _parse_iso_any(from_ts)).total_seconds() / 60)
 
+    estimate_cost_usd_raw = fm.get("estimate.cost_usd")
+    estimate_cost_val: Optional[float] = float(estimate_cost_usd_raw) if estimate_cost_usd_raw is not None else None
     estimate_tokens = fm.get("estimate.tokens")
     estimate_gate_cycles = fm.get("estimate.gate_cycles")
 
+    actual_cost_val = token_result["cost_usd"]
+
+    # POLY-34 (ruling §0.3): `ratio` is now the COST ratio; the token
+    # ratio is kept in the calibration record only, as `ratio_tokens`,
+    # for continuity -- nothing reads it.
     ratio_val: Optional[float] = None
+    if actual_cost_val is not None and estimate_cost_val:
+        ratio_val = actual_cost_val / estimate_cost_val
+    ratio_tokens_val: Optional[float] = None
     if token_result["tokens"] is not None and estimate_tokens:
-        ratio_val = token_result["tokens"] / estimate_tokens
+        ratio_tokens_val = token_result["tokens"] / estimate_tokens
 
     config = load_config(data_dir)
     bloat_ratio_raw = (config.get("estimation") or {}).get("bloat_ratio")
@@ -6937,32 +7008,40 @@ def cmd_close(args: argparse.Namespace) -> int:
         except (TypeError, ValueError):
             bloat_ratio = None
     else:
-        print("close: bloat: token threshold unset (estimation.bloat_ratio) — skipped", file=sys.stderr)
+        print("close: bloat: cost threshold unset (estimation.bloat_ratio) — skipped", file=sys.stderr)
 
     gate_bloat = estimate_gate_cycles is not None and gate_result["gate_cycles"] > estimate_gate_cycles
-    token_bloat = bloat_ratio is not None and ratio_val is not None and ratio_val > bloat_ratio
+    cost_bloat = bloat_ratio is not None and ratio_val is not None and ratio_val > bloat_ratio
     bloat_reasons = []
     if gate_bloat:
         bloat_reasons.append("gate_cycles")
-    if token_bloat:
-        bloat_reasons.append("tokens")
-    if gate_bloat or token_bloat:
+    if cost_bloat:
+        bloat_reasons.append("cost")
+    if gate_bloat or cost_bloat:
         calibration_bloat: Optional[bool] = True
     elif bloat_ratio_raw is not None:
         calibration_bloat = False
     else:
         calibration_bloat = None  # not evaluated: threshold unset and no gate overrun
 
+    # POLY-34 (ruling §0.3): close always writes actual.cost_usd/
+    # actual.tokens/actual.wall_clock as a value or null -- a stale value
+    # from an earlier close must not survive a re-close that no longer
+    # computes one. `ratio` is the one exception: it is only written when
+    # a value now exists OR the file already carried one to clear (a
+    # sub-issue that was never closed with a cost estimate must not grow
+    # a `ratio: null` line it never had).
     patch: Dict[str, Any] = {
         "status": "done",
         "actual.gate_cycles": gate_result["gate_cycles"],
+        "actual.wall_clock": wall_clock,
+        "actual.tokens": token_result["tokens"],
+        "actual.cost_usd": (f"{actual_cost_val:.4f}" if actual_cost_val is not None else None),
     }
-    if wall_clock is not None:
-        patch["actual.wall_clock"] = wall_clock
-    if token_result["tokens"] is not None:
-        patch["actual.tokens"] = token_result["tokens"]
     if ratio_val is not None:
         patch["ratio"] = f"{ratio_val:.2f}"
+    elif fm.get("ratio") is not None:
+        patch["ratio"] = None
     # POLY-16 ruling: a re-close adds OR REMOVES the `bloat` label to match
     # the new evaluation -- a revised estimate (or a corrected window) that
     # no longer overruns must not leave the label stuck from an earlier close.
@@ -6979,24 +7058,26 @@ def cmd_close(args: argparse.Namespace) -> int:
     ).stdout.strip() or None
 
     record = {
-        "schema": 1, "closed": close_ts, "id": args.id, "parent": parent,
+        "schema": 2, "closed": close_ts, "id": args.id, "parent": parent,
         "stage": stage, "assignee": assignee, "labels": labels,
         "milestone": fm.get("milestone"),
-        "estimate": {"tokens": estimate_tokens, "gate_cycles": estimate_gate_cycles},
+        "estimate": {"cost_usd": estimate_cost_val, "tokens": estimate_tokens, "gate_cycles": estimate_gate_cycles},
         "actual": {
             "tokens": token_result["tokens"], "gate_cycles": gate_result["gate_cycles"],
             "wall_clock": wall_clock, "input": token_result["input"],
             "cache_write": token_result["cache_write"], "cache_read": token_result["cache_read"],
-            "output": token_result["output"], "cost_usd": token_result["cost_usd"],
+            "output": token_result["output"], "cost_usd": actual_cost_val,
         },
-        "ratio": ratio_val, "bloat": calibration_bloat, "bloat_reasons": bloat_reasons,
+        "ratio": ratio_val, "ratio_tokens": ratio_tokens_val, "prices_retrieved": prices.get("retrieved"),
+        "bloat": calibration_bloat, "bloat_reasons": bloat_reasons,
         "window": {"from": from_ts, "to": close_ts, "at": at_sha},
         "base": args.base, "ref_sha": ref_sha,
     }
 
     print(
-        f"close {args.id}: tokens={token_result['tokens']} gate_cycles={gate_result['gate_cycles']} "
-        f"wall_clock={wall_clock}m ratio={patch.get('ratio')} bloat={bloat_reasons or 'no'}"
+        f"close {args.id}: cost={patch['actual.cost_usd']} tokens={token_result['tokens']} "
+        f"gate_cycles={gate_result['gate_cycles']} wall_clock={wall_clock}m "
+        f"ratio={patch.get('ratio')} bloat={bloat_reasons or 'no'}"
     )
     if args.dry_run:
         print("close: --dry-run -- nothing written")
@@ -7070,44 +7151,57 @@ def cmd_estimate(args: argparse.Namespace) -> int:
         if not rows:
             continue
         out.append(f"tier {tier_name} — {tier_desc} ({len(rows)})")
-        out.append("  id       closed      est.tok  act.tok  ratio  est.gc  act.gc  wall  bloat")
+        # POLY-34 (ruling §0.4): cost columns lead; tokens is a printed
+        # secondary (`act.tok`), never an estimate/median input.
+        out.append("  id       closed      est.$    act.$     ratio  est.gc  act.gc  wall  act.tok   bloat")
         for r in rows:
             est, act = r.get("estimate") or {}, r.get("actual") or {}
 
             def _cell(v: Any) -> str:
                 return "null" if v is None else str(v)
 
+            # A schema-1 row's stored `ratio` is the OLD token ratio --
+            # not comparable to a schema-2 cost ratio, so it prints as a
+            # dash rather than a misleading number.
+            ratio_cell = "-" if r.get("schema") != 2 else _cell(r.get("ratio"))
             out.append(
                 f"  {r.get('id', ''):<8} {str(r.get('closed') or '')[:10]:<11} "
-                f"{_cell(est.get('tokens')):<8} {_cell(act.get('tokens')):<8} "
-                f"{_cell(r.get('ratio')):<6} {_cell(est.get('gate_cycles')):<7} "
+                f"{_cell(est.get('cost_usd')):<8} {_cell(act.get('cost_usd')):<9} "
+                f"{ratio_cell:<6} {_cell(est.get('gate_cycles')):<7} "
                 f"{_cell(act.get('gate_cycles')):<7} {_cell(act.get('wall_clock')):<5} "
+                f"{_cell(act.get('tokens')):<9} "
                 f"{'yes' if r.get('bloat') else 'no'}"
             )
-        # Addendum 1 (design note @ 85c5fd6 §2): a null `actual.tokens` --
-        # "no evidence", not "measured zero" -- must never enter the token
-        # median (a real median call on a `None` raises `TypeError`, and
-        # folding it in as 0 would poison every reference-class estimate
-        # downstream). Gate-cycle and wall-clock medians are unaffected --
-        # a sub-issue with no token evidence still has real commits.
-        token_values = [r["actual"]["tokens"] for r in rows if r["actual"].get("tokens") is not None]
-        tok_median = int(statistics.median(token_values)) if token_values else None
+        # POLY-34 (ruling §0.4): the cost median excludes schema-1 rows
+        # (their `cost_usd` was priced under the old ratio's semantics,
+        # never validated against this axis) and null `actual.cost_usd`
+        # (an unpriced model, or a schema-1 row with no cost at all) --
+        # the same "no evidence must never enter a median" rule the token
+        # median already followed (addendum 1, design note @ 85c5fd6 §2).
+        cost_values = [
+            r["actual"]["cost_usd"] for r in rows
+            if r.get("schema") == 2 and r["actual"].get("cost_usd") is not None
+        ]
+        cost_median = round(statistics.median(cost_values), 2) if cost_values else None
         gc_median = int(statistics.median(r["actual"]["gate_cycles"] for r in rows))
         wall_values = [r["actual"]["wall_clock"] for r in rows if r["actual"].get("wall_clock") is not None]
         wall_median = int(statistics.median(wall_values)) if wall_values else None
+        token_values = [r["actual"]["tokens"] for r in rows if r["actual"].get("tokens") is not None]
+        tok_median = int(statistics.median(token_values)) if token_values else None
         out.append(
-            f"  median actual: tokens {tok_median if tok_median is not None else 'n/a'} · "
-            f"gate_cycles {gc_median} · wall {wall_median if wall_median is not None else 'n/a'}m"
+            f"  median actual: cost {'$' + format(cost_median, '.2f') if cost_median is not None else 'n/a'} · "
+            f"gate_cycles {gc_median} · wall {wall_median if wall_median is not None else 'n/a'}m · "
+            f"tokens {tok_median if tok_median is not None else 'n/a'}"
         )
         if suggestion is None:
-            suggestion = (tok_median, gc_median, tier_name)
+            suggestion = (cost_median, gc_median, tier_name)
 
     if suggestion is not None:
-        tok, gc, tier_name = suggestion
-        if tok is not None:
-            out.append(f"suggested: estimate.tokens={tok} estimate.gate_cycles={gc}   (tier {tier_name} median)")
+        cost, gc, tier_name = suggestion
+        if cost is not None:
+            out.append(f"suggested: estimate.cost_usd={cost:.2f} estimate.gate_cycles={gc}   (tier {tier_name} median)")
         else:
-            out.append(f"suggested: estimate.gate_cycles={gc}   (tier {tier_name} median; no non-null token actuals)")
+            out.append(f"suggested: estimate.gate_cycles={gc}   (tier {tier_name} median; no non-null cost actuals)")
     print("\n".join(out))
     return 0
 
