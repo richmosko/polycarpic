@@ -6783,18 +6783,60 @@ def _files_touched_by_author(root: Path, base: str, assignee: str) -> Set[str]:
     return files
 
 
+def _sibling_guard_paths(data_dir: Path, issue_id: str, parent: str, assignee: str) -> List[str]:
+    """POLY-48 item 6 (guard-push same-assignee scope, gate-1 ruling
+    estimation-engine-fixes.md §1(c)): the `paths:` globs of every OTHER
+    live issue sharing this one's `parent` and `assignee` (any stage, any
+    status) -- unioned into the caller's own allowed set, so the second
+    same-assignee sub-issue under one parent doesn't trip on the first
+    one's already-pushed files. Rejected alternative: time-scoping to a
+    sibling's close (`window.to`) -- that lives in the metrics worktree
+    mount, which a teammate worktree doesn't have.
+
+    A sibling's own malformed `paths:` raises `CairnError` naming that
+    sibling (the same validation the caller already runs on its own
+    `paths:`), letting `cmd_guard_push` turn it into an exit-2 line
+    without silently dropping the sibling's globs.
+    """
+    globs: List[str] = []
+    for p in _dir_glob(Path(data_dir) / "issues"):
+        if p.stem == issue_id:
+            continue
+        try:
+            sib_fm, _ = parse_frontmatter(p.read_text(encoding="utf-8"))
+        except CairnError:
+            continue
+        if sib_fm.get("parent") != parent or sib_fm.get("assignee") != assignee:
+            continue
+        sib_paths = sib_fm.get("paths")
+        if sib_paths is None:
+            continue
+        if not isinstance(sib_paths, list):
+            raise CairnError(f"{p.stem}'s paths: must be a list, got {type(sib_paths).__name__}")
+        for idx, entry in enumerate(sib_paths):
+            ok, reason = validate_path_glob(entry)
+            if not ok:
+                raise CairnError(f"{p.stem}'s paths[{idx}] {entry!r} invalid -- {reason}")
+        globs.extend(sib_paths)
+    return globs
+
+
 def cmd_guard_push(args: argparse.Namespace) -> int:
     """`cairn guard-push <ID>` (POLY-2, architect's gate-1 ruling): fails
     loudly when the ISSUE'S ASSIGNEE's own commits between the branch
-    base and HEAD touch a file outside that issue's declared `paths:`.
-    Keys on the issue's assignee, never on the invoking identity -- this
-    is what lets the lead run it from the main checkout as a valid audit
-    of a teammate's commits.
+    base and HEAD touch a file outside that issue's declared `paths:`,
+    UNIONED with the `paths:` of every other same-parent, same-assignee
+    sibling (POLY-48 item 6) -- top-level issues (no `parent`) are
+    unchanged, since there is no sibling set to union. Keys on the
+    issue's assignee, never on the invoking identity -- this is what lets
+    the lead run it from the main checkout as a valid audit of a
+    teammate's commits.
 
     Exit codes: 0 pass (including every opt-out case below), 1 stray
     files found (each listed on its own stderr line, sorted), 2 usage/
-    config error (unknown id, unresolvable base, or `paths:` set with a
-    null assignee -- there is nothing to attribute commits to).
+    config error (unknown id, unresolvable base, `paths:` set with a null
+    assignee -- there is nothing to attribute commits to -- or a
+    sibling's own `paths:` malformed).
     """
     data_dir = resolve_data_dir(args)
     path = find_record_path(data_dir, args.id)
@@ -6804,6 +6846,7 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
     fm, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
     paths_val = fm.get("paths")
     assignee = fm.get("assignee")
+    parent = fm.get("parent")
 
     if paths_val is None:
         print(f"guard-push: {args.id} has no paths: declared -- warn-only, not enforced", file=sys.stderr)
@@ -6828,6 +6871,14 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
         print(f"guard-push: {args.id} assignee {assignee} is human -- not under the protocol", file=sys.stderr)
         return 0
 
+    allowed_globs = list(paths_val)
+    if parent is not None:
+        try:
+            allowed_globs += _sibling_guard_paths(data_dir, args.id, parent, assignee)
+        except CairnError as e:
+            print(f"guard-push: {e}", file=sys.stderr)
+            return 2
+
     root = _git_toplevel(Path.cwd())
     if root is None:
         print("guard-push: not inside a git repository", file=sys.stderr)
@@ -6846,7 +6897,7 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
     if not touched:
         return 0
 
-    matchers = [_glob_to_regex(p) for p in paths_val]
+    matchers = [_glob_to_regex(p) for p in allowed_globs]
     stray = sorted(f for f in touched if not any(m.match(f) for m in matchers))
     if not stray:
         return 0
