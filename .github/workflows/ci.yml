@@ -43,7 +43,7 @@ jobs:
           # the job goes red -- it must never fall through to a silent `run=false`.
           CHANGED="$(git diff --name-only "$BASE_SHA" HEAD)"
           PATTERN='^(scripts/cairn/|\.claude/|process/|tests/workflow/|\.github/workflows/|\.githooks/|docs/DESIGN/)'
-          if echo "$CHANGED" | grep -qE "$PATTERN"; then
+          if grep -qE "$PATTERN" <<<"$CHANGED"; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
