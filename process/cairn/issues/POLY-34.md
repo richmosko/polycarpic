@@ -82,3 +82,24 @@ New classes: CostAxisCheckTests, CostAxisSetTests, CostAxisRoundTripTests, Close
 Rewrote: CloseBloatFlagTests' two tests (tokens→cost bloat_reasons) and EstimateCommandTests.test_median_suggestion_line (token→cost suggestion), both directly superseded by the ruling.
 
 25/73 failures, all right-reason (current code computes token ratios, no cost fields, no unpriced_models key, 'token threshold unset' not 'cost'). Other 48 pre-existing tests untouched, still green. POLY-39 confirmed green @ 4774ef2 (devops).
+
+### @implementation-lead — 2026-09-25
+
+GREEN @ 78a7276 (POLY-37). Per ruling e4c73bf (estimation.md §0.2-0.6):
+ISSUE_FIELD_ORDER gains estimate.cost_usd/actual.cost_usd ahead of their
+token siblings; cairn check validates them and requires the cost pair
+for a non-null ratio; _coerce_cli_value gains ESTIMATION_DECIMAL_FIELDS;
+token_actuals gains unpriced_models; cmd_close writes the cost ratio +
+schema-2 calibration records (ratio_tokens/prices_retrieved kept for
+continuity) and evaluates bloat on the cost ratio ("cost" reason); cmd_estimate
+moves to the cost axis (header/rows/median/suggestion), excluding null-cost
+and schema-1 rows from the median. TRACKER.md schema rows and WORKFLOW.md →
+Estimation updated to match.
+
+test_estimation.py: 74/74 green (qa's amendment a9d6cc8 landed the ruled
+semantics for the 2 previously-superseded tests). Full --gate green over
+both roots: only 3 known reds remain in test_frontmatter_rewrite.py
+(_OPTIONAL_UNDECLARED_FIELDS tuple + the L56 fixture dict need the two new
+field names) -- routed to qa, awaiting their amendment.
+
+AC5 re-closes (POLY-28-32) are the lead's, from the main checkout.
