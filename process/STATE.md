@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-6-test-boundary-ci`
 - **Started:** 2026-09-24
 - **Goal:** cairn's test suite is spin-off-clean, dead migrations and their tests are gone, and one GitHub Actions job runs the suite path-filtered as a required check on main.
-- **Status:** In Progress
+- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/12
 
 ## Releases
 

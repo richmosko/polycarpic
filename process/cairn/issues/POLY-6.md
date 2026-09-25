@@ -1,14 +1,14 @@
 ---
 id: POLY-6
 title: Separate repo-convention tests from cairn's suite; path-filtered CI per component
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [workflow, cairn, tests, ci]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/12
 created: 2026-09-23
 updated: 2026-09-25
 ---
@@ -149,3 +149,7 @@ python3 run_tests.py --gate verdict (scripts/cairn, both roots): 1728 tests, 103
 node --test "scripts/cairn/tests/js/**/*.test.js": 479 tests, 477 pass, 2 fail — both the known layerchart ENOENT cases in token-chart-logic.test.js (node_modules absent locally, POLY-8's own tracked exclusion in ci.yml). No other JS failures.
 
 All five POLY-6 ACs covered: boundary moved (5 files/tests/workflow), migrations retired (3 files/~77 tests gone, backfill_tokens untouched), WORKFLOW.md spin-off-clean sentence present, ci.yml single path-filtered job (F1 pipefail fix verified), run_tests.py two-root discovery green. Anchor #14 marked completed.
+
+### @team-lead — 2026-09-25
+
+PR opened: https://github.com/richmosko/polycarpic/pull/12. Awaiting Validate; the PR's `cairn` job is the workflow's first real run.
