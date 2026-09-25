@@ -76,3 +76,7 @@ Feature started. Branch: `feature/poly-57-cairn-docs-cleanup`.
 ### @team-lead — 2026-09-25
 
 AC amended in place (user decision 2026-09-25): `estimation.md` is pruned to current behaviour in this loop, not filed as a follow-up. Sequence: after POLY-57c's green, the architect prunes in a new execute sub-issue (POLY-57e, paths `scripts/cairn/docs/estimation.md`); the lead reads the diff against the "strictly necessary" rule; qa's verdict runs on the final sha.
+
+### @architect — 2026-09-25
+
+**Addendum 2 (POLY-57a).** The ruling.md §2 predicate matches filenames only: `cairn/design/`, `test-boundary-ci.md`, `telemetry-attribution.md`, `backfill-sibling-scan.md`, `sub-issue-letter-ids.md`, `estimation-engine-fixes.md`; branch names and topic words are not matched.
