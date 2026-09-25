@@ -10,11 +10,11 @@ paths: [scripts/cairn/design/estimation.md, process/cairn/issues/POLY-34.md]
 stage: plan
 estimate.tokens: 900000
 estimate.gate_cycles: 1
-actual.tokens: 166012
-actual.gate_cycles: 1
-actual.wall_clock: 9
-ratio: "0.18"
-labels: [cairn, workflow]
+actual.tokens: 2946133
+actual.gate_cycles: 2
+actual.wall_clock: 12
+ratio: "3.27"
+labels: [cairn, workflow, bloat]
 priority: P2
 pr: null
 created: 2026-09-25
