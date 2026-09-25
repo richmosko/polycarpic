@@ -561,11 +561,25 @@ class RedRunSelfRecordsWithFailureDetailTests(unittest.TestCase):
             return []
         return [json.loads(l) for l in records_path.read_text(encoding="utf-8").splitlines() if l.strip()]
 
+    def _env_without_test_runs_override(self) -> dict:
+        # CI (POLY-6, ruling section (c) step 4) sets CAIRN_TEST_RUNS_FILE
+        # on the whole `python3 scripts/cairn/run_tests.py` step so the
+        # OUTER run's own self-record doesn't touch the real ledger --
+        # every subprocess run.py spawns here inherits it too, redirecting
+        # the fake engine root's own self-record to that SAME override
+        # path instead of `tmp`'s ledger this class inspects. Strip it,
+        # same as this file's other fake-engine-root classes already do
+        # (ChildArgvTests' siblings, RunnerRefusesAnIndirectUntieredFullRunTests).
+        env = dict(os.environ)
+        env.pop("CAIRN_TEST_RUNS_FILE", None)
+        return env
+
     def test_a_red_narrowed_run_records_ok_false_with_failure_counts(self):
         tmp, engine_dir = self._fake_engine_root(self.RED_SUITE)
         result = subprocess.run(
             [sys.executable, str(engine_dir / "run_tests.py"), "-p", "test_mixed.py"],
             cwd=str(engine_dir), capture_output=True, text=True,
+            env=self._env_without_test_runs_override(),
         )
         self.assertEqual(result.returncode, 1, repr(result.stdout + result.stderr))
         lines = self._records(tmp)
@@ -581,6 +595,7 @@ class RedRunSelfRecordsWithFailureDetailTests(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, str(engine_dir / "run_tests.py"), "-p", "test_mixed.py"],
             cwd=str(engine_dir), capture_output=True, text=True,
+            env=self._env_without_test_runs_override(),
         )
         self.assertEqual(result.returncode, 0, repr(result.stdout + result.stderr))
         lines = self._records(tmp)
@@ -598,6 +613,7 @@ class RedRunSelfRecordsWithFailureDetailTests(unittest.TestCase):
         result = subprocess.run(
             f'cd "{engine_dir}" && {sys.executable} run_tests.py -p test_mixed.py > /dev/null 2>&1',
             shell=True, capture_output=True, text=True,
+            env=self._env_without_test_runs_override(),
         )
         self.assertEqual(result.returncode, 1)
         lines = self._records(tmp)
