@@ -41,3 +41,13 @@ test("distinct prefixes sort by prefix first, then number", () => {
   var ids = ["SB-2", "PT-10", "SB-1", "PT-2"];
   assert.deepEqual(ids.slice().sort(byIdSortKey), ["PT-2", "PT-10", "SB-1", "SB-2"]);
 });
+
+// POLY-51 (ruling §1/§6 item 10): the widened ID_SORT_RE (trailing [a-z]?)
+// keeps a sub-issue right after its own number, in letter order, ahead of
+// the next numbered issue -- POLY-26 < POLY-26a < POLY-26b < POLY-27. Same
+// case list as test_id_sort.py's Python-side drift-pair test, per this
+// file's own header comment.
+test("POLY-51: numbered id sorts before its own lettered sub-issues, ahead of the next numbered issue", () => {
+  var ids = ["POLY-27", "POLY-26b", "POLY-26", "POLY-26a"];
+  assert.deepEqual(ids.slice().sort(byIdSortKey), ["POLY-26", "POLY-26a", "POLY-26b", "POLY-27"]);
+});

@@ -69,3 +69,19 @@ test("childrenOf is repo-scoped the same way childProgress is", () => {
   var kids = CairnLogic.childrenOf(issues, { id: "PT-14", repo: "SB" });
   assert.deepEqual(kids, []);
 });
+
+// POLY-51 (ruling §6 item 10): a mixed child set -- lettered sub-issues
+// (POLY-51) alongside a legacy numbered sub-issue under the same parent --
+// must sort as one list: numbered-then-lettered-within-the-same-number,
+// same order idSortKey/id-sort.test.js already pins.
+test("childrenOf sorts numbered and lettered sub-issues together, letters after their own number", () => {
+  var issues = [
+    { id: "PT-26", parent: null, repo: "PT", status: "todo", title: "Parent" },
+    { id: "PT-27", parent: null, repo: "PT", status: "todo", title: "Unrelated next issue" },
+    { id: "PT-28", parent: "PT-26", repo: "PT", status: "todo", title: "Legacy numbered sub-issue" },
+    { id: "PT-26b", parent: "PT-26", repo: "PT", status: "done", title: "Second lettered sub-issue" },
+    { id: "PT-26a", parent: "PT-26", repo: "PT", status: "todo", title: "First lettered sub-issue" },
+  ];
+  var kids = CairnLogic.childrenOf(issues, { id: "PT-26", repo: "PT" });
+  assert.deepEqual(kids.map(function (i) { return i.id; }), ["PT-26a", "PT-26b", "PT-28"]);
+});

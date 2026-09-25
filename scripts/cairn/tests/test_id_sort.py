@@ -41,6 +41,14 @@ class IdSortKeyTests(unittest.TestCase):
         ordered = sorted(ids, key=cairn._id_sort_key)
         self.assertEqual(ordered, ["PT-2", "PT-10", "SB-1", "SB-2"])
 
+    def test_numbered_then_lettered_sub_issues_sort_together(self):
+        # POLY-51 (ruling §1/§6 item 9): the widened _ID_SORT_RE keeps a
+        # sub-issue right after its own number, in letter order, ahead of
+        # the next numbered issue -- PT-26 < PT-26a < PT-26b < PT-27.
+        ids = ["PT-27", "PT-26b", "PT-26", "PT-26a"]
+        ordered = sorted(ids, key=cairn._id_sort_key)
+        self.assertEqual(ordered, ["PT-26", "PT-26a", "PT-26b", "PT-27"])
+
 
 if __name__ == "__main__":
     unittest.main()

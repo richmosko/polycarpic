@@ -216,7 +216,7 @@ Reuse `lib/session/store.py` rather than introducing a second session abstractio
 | `title` | string | ✅ | One line. No trailing period. |
 | `status` | enum | ✅ | See [Status vocabulary](#status-vocabulary). |
 | `milestone` | string \| null | ✅ | Milestone id (`PT-1.0`, `PT-M2`, `PT-A`). `null` = unassigned. |
-| `parent` | id \| null | ✅ | Sub-issue linkage. One level is expected; the parser tolerates deeper nesting but the board renders two. |
+| `parent` | id \| null | ✅ | Sub-issue linkage. One level; `cairn new --parent` refuses a sub-issue as parent. The parser tolerates deeper nesting via a hand-edited `parent:`, but the board renders two. |
 | `blocked_by` | list[id] | — | Issues that must resolve before this one can start. **Same-root ids only.** An absent key ≡ `[]`. `cairn check` lints dangling refs, self-reference, and cycles. See [Dependencies](#dependencies). |
 | `assignee` | string \| null | ✅ | Bare agent role (`backend-lead`) matching a file in `.claude/agents/`, or `@handle` for a human. Replaces Linear's `agent:<role>` labels — attribution becomes a field, not a label. |
 | `paths` | list[string] | — | Repo-relative glob patterns the assignee's commits must stay inside (POLY-2). An **absent** key means undeclared — opt-in, not a hard gate — distinct from an explicit `[]` ("may touch nothing"). `cairn check` validates shape only, never existence. See [Path ownership](#path-ownership-poly-2). |
@@ -313,10 +313,10 @@ A fresh project bootstraps with `PT-A — Bootstrap & Research` and `PT-B — Pl
 definition  (kind: process)   ^<P>-(?!M|V)[A-Z][a-z]?$
 development (kind: product)   ^<P>-(?:M\d+[a-z]?|\d+\.\d+(?:\.\d+)?)$
 major                         ^<P>-V\d+$
-issue                         ^<P>-\d+$
+issue                         ^<P>-\d+[a-z]?$
 ```
 
-**The regexes are built from `config.yml`'s `prefix:`, never a literal.** That makes a missing, malformed, or non-`^[A-Z]{2,5}$` prefix a hard lint error — `check_repo` otherwise tolerates an absent `config.yml`, and a lint that quietly stops linting is worse than no lint. It also means the four shapes are separable by the first character class after the prefix: a digit is an issue (no dot) or a development milestone (dot), `V`+digit is a major, `M`+digit is a development milestone, and any other capital is a definition milestone.
+**The regexes are built from `config.yml`'s `prefix:`, never a literal.** That makes a missing, malformed, or non-`^[A-Z]{2,5}$` prefix a hard lint error — `check_repo` otherwise tolerates an absent `config.yml`, and a lint that quietly stops linting is worse than no lint. It also means the four shapes are separable by the first character class after the prefix: a digit is an issue (an issue may end in one lowercase letter — a sub-issue, see [Sub-issues](#sub-issues)) or a development milestone (dot), `V`+digit is a major, `M`+digit is a development milestone, and any other capital is a definition milestone.
 
 Four errors: (1) `kind: process` on a development-shaped id; (2) `kind: product` on a definition-shaped id; (3) an id matching neither shape (`mvp`, `PT-V`, `PT-1.0-rc`); (4) `kind:` missing or not one of `product` | `process` — the id rule is meaningless without it and there is no safe default. Nothing here constrains `target_tag` or `ga` against the id shape: an `M<n>` milestone that never tags is legitimate.
 
@@ -400,7 +400,7 @@ This shape lets an agent append a comment with a **plain `Edit`** — the anchor
 
 ### Sub-issues
 
-A sub-issue is an ordinary issue file with `parent: PT-14`. It has its own status and can be assigned independently. The board renders a `2/3` badge on the parent and nests children in the detail drawer. There is no separate file type and no ordering field — children sort by ID.
+A sub-issue is an ordinary issue file with `parent: PT-14`. It has its own status and can be assigned independently. The board renders a `2/3` badge on the parent and nests children in the detail drawer. There is no separate file type and no ordering field — children sort by ID — numeric, then letter (`PT-14` < `PT-14a` < `PT-14b` < `PT-15`). `cairn check` errors when a suffixed id's `parent:` is not its own stem minus the letter.
 
 ### Dependencies
 
@@ -461,6 +461,8 @@ That invariant is not hygiene — it is what lets the board's arithmetic stay ho
 ## ID scheme and collision-free allocation
 
 **Format:** `<PREFIX>-<n>` — `PT-14`. Prefix from `config.yml`; `n` a plain incrementing integer. **Ruled 2026-08-19:** `/setup-tracker` derives the prefix from the repo name (`project_template` → `PT`) and asks the user to confirm or override it — once, at setup, never again. Two projects sharing a prefix is harmless (IDs never leave their repo) but confusing when pasting between sessions, and one prompt is cheaper than the confusion. Readable in branch names (`feature/pt-14-google-oauth`), commit subjects (`feat(PT-14): …`), and conversation. No ULIDs, no hashes — an ID a human has to read aloud is worth the allocation work.
+
+**Sub-issues** (POLY-51): `cairn new --parent PT-14` allocates `PT-14a`, `PT-14b`, … in creation order over `issues/` and `archive/issues/`; letters are never reused, `z` is the last (the 27th child is an error), and a sub-issue cannot itself be a parent. Top-level issues keep the numeric counter; suffixed ids never advance it. Sub-issues created before POLY-51 keep their numbered ids; both forms are valid.
 
 **The race:** `max(existing) + 1` by directory scan is not atomic — two agents scanning concurrently both see `14`, both write `PT-15.md`, one silently clobbers the other. The fix has two layers:
 
@@ -588,7 +590,7 @@ Board edits **rewrite only the frontmatter block**, re-emitted in canonical key 
 | `cairn comment PT-14 --author qa-engineer --body -` | Correct delimiter + date, from stdin. |
 | `cairn show PT-14` | Rendered single issue, plus its children when it has any. |
 | `cairn archive (--done-before <date> \| --milestone <id> \| --major <id>) [--dry-run]` | Bulk `git mv`, with the preconditions in [Archive](#archive) — exactly one selector, and `--dry-run` previews without moving anything. |
-| `cairn check` | Lint: id/filename mismatch, dangling `parent`, unknown `milestone`, bad `status` (issues **and** milestones/majors, each against its own vocabulary — see [Milestone / major status vocabulary](#milestone--major-status-vocabulary)), an archived issue whose milestone isn't `done`/`cancelled` (see [Archive](#archive)), milestone id-shape ↔ `kind` agreement (see [Milestone ids](#milestone-ids--definition-vs-development)), `blocked_by` dependency integrity (dangling ref, self-reference, cycles — see [Dependencies](#dependencies)), unsupported YAML, `config.yml`'s `roots:` shape (list of non-empty relative-path strings — reachability is a runtime concern, not lint, see [Multi-root](#multi-root-pt-3-2026-08-21)), milestone/major/issue id **prefix shape** (see [Milestone ids](#milestone-ids--definition-vs-development)), `config.yml`'s `prefix:` (present and matching `^[A-Z]{2,5}$` — every id regex is derived from it), any archived issue still at the legacy flat `archive/*.md` layout (PT-50 — see [Archive](#archive)). |
+| `cairn check` | Lint: id/filename mismatch, dangling `parent`, unknown `milestone`, bad `status` (issues **and** milestones/majors, each against its own vocabulary — see [Milestone / major status vocabulary](#milestone--major-status-vocabulary)), an archived issue whose milestone isn't `done`/`cancelled` (see [Archive](#archive)), milestone id-shape ↔ `kind` agreement (see [Milestone ids](#milestone-ids--definition-vs-development)), suffixed-id ↔ `parent` agreement (see [Sub-issues](#sub-issues)), `blocked_by` dependency integrity (dangling ref, self-reference, cycles — see [Dependencies](#dependencies)), unsupported YAML, `config.yml`'s `roots:` shape (list of non-empty relative-path strings — reachability is a runtime concern, not lint, see [Multi-root](#multi-root-pt-3-2026-08-21)), milestone/major/issue id **prefix shape** (see [Milestone ids](#milestone-ids--definition-vs-development)), `config.yml`'s `prefix:` (present and matching `^[A-Z]{2,5}$` — every id regex is derived from it), any archived issue still at the legacy flat `archive/*.md` layout (PT-50 — see [Archive](#archive)). |
 | `cairn serve [--repos a,b]` | The board. `--repos` (PT-3) replaces `config.yml`'s `roots:` for that invocation — read-only cross-project aggregation, see [Multi-root](#multi-root-pt-3-2026-08-21). |
 | `cairn guard-push PT-14` | Push-time check (POLY-2): fails naming every file the issue's assignee touched outside its declared `paths:`. Every agent's worktree protocol runs this immediately before `git push` and skips the push on a non-zero exit — see [Path ownership](#path-ownership-poly-2). |
 
