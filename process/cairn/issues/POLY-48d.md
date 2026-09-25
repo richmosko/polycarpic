@@ -1,7 +1,7 @@
 ---
 id: POLY-48d
 title: POLY-48 review: architect review of the green build
-status: todo
+status: done
 milestone: POLY-A
 parent: POLY-48
 blocked_by: []
@@ -10,6 +10,10 @@ paths: [scripts/cairn/design/estimation-engine-fixes.md, scripts/cairn/design/es
 stage: review
 estimate.cost_usd: "1.00"
 estimate.gate_cycles: 1
+actual.cost_usd: null
+actual.tokens: null
+actual.gate_cycles: 0
+actual.wall_clock: null
 labels: [cairn]
 priority: P3
 pr: null

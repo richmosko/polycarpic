@@ -1,7 +1,7 @@
 ---
 id: POLY-48a
 title: POLY-48 plan: estimation-engine fixes ruling
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-48
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [scripts/cairn/design/estimation-engine-fixes.md, process/cairn/issues/PO
 stage: plan
 estimate.cost_usd: "1.50"
 estimate.gate_cycles: 1
+actual.cost_usd: "0.0315"
+actual.tokens: 119438
+actual.gate_cycles: 1
+actual.wall_clock: 6
+ratio: "0.02"
 labels: [cairn]
 priority: P3
 pr: null
