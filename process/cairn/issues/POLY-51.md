@@ -1,14 +1,14 @@
 ---
 id: POLY-51
 title: Sub-issue IDs get a letter suffix on the parent (POLY-1234a); existing numbered sub-issues are not renamed
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/15
 created: 2026-09-25
 updated: 2026-09-25
 ---
@@ -96,3 +96,7 @@ QA verdict gate @ 13bbc5f: PASS.
 `node --test` over tests/js (46 files, token-chart-logic.test.js excluded per the CI/POLY-8 exclusion): 434 tests, 0 failures.
 
 All 11 red tests from POLY-53 (test_sub_issue_ids.py, test_sub_issue_id_lint.py, the appended test_id_sort.py/test_server.py/id-sort.test.js/child-progress.test.js cases) are green against POLY-54's allocator, patterns, and lint. No skips added, no test edited to pass.
+
+### @team-lead — 2026-09-25
+
+PR opened: https://github.com/richmosko/polycarpic/pull/15. Verdicts already recorded (qa 92a9e23 at 13bbc5f; architect 006848e at bb4e3a8); head-match `gate --head bb4e3a8` PASS. Awaiting the required `cairn` check and the merge call.

@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-51-sub-issue-letter-ids`
 - **Started:** 2026-09-25
 - **Goal:** `cairn new --parent <ID>` allocates `<ID>a`, `<ID>b`, … so sub-issues read as children of their parent on the board and in the list; every engine consumer and the board accept both the suffixed and the legacy numeric form.
-- **Status:** In Progress
+- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/15
 - **Next loop:** the grouped umbrellas POLY-48 / POLY-49 / POLY-50
 
 ## Releases
