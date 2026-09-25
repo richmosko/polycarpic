@@ -257,10 +257,26 @@ class CheckEstimationFieldsTests(unittest.TestCase):
         errors = cairn.check_repo(self.data_dir)
         self.assertFalse(any("PT-9" in e for e in errors), errors)
 
-    def test_fully_populated_done_subissue_is_clean(self):
+    def test_token_only_backed_ratio_is_no_longer_clean(self):
+        # POLY-34 (ruling §0.3): this is the pre-POLY-34
+        # "fully populated done sub-issue is clean" fixture, UNCHANGED --
+        # `ratio` backed only by token operands (no estimate.cost_usd /
+        # actual.cost_usd) must now be a check ERROR, not clean, since
+        # `ratio` requires both COST operands under the redefined rule.
         write_issue(self.data_dir, "PT-9", parent="PT-1", status="done", stage="execute",
                     assignee="backend-lead", estimate_tokens=400000, estimate_gate_cycles=1,
                     actual_tokens=512340, actual_gate_cycles=2, actual_wall_clock=47, ratio="1.28")
+        errors = cairn.check_repo(self.data_dir)
+        self.assertTrue(any("PT-9" in e and "ratio" in e.lower() for e in errors), errors)
+
+    def test_fully_populated_done_subissue_is_clean(self):
+        # POLY-34 (ruling §0.3): "fully populated" now means all nine
+        # estimation keys, cost fields included -- ratio is backed by the
+        # cost operands; tokens ride along as the optional secondary.
+        write_issue(self.data_dir, "PT-9", parent="PT-1", status="done", stage="execute",
+                    assignee="backend-lead", estimate_cost_usd="3.00", estimate_tokens=400000,
+                    estimate_gate_cycles=1, actual_cost_usd="3.7907", actual_tokens=512340,
+                    actual_gate_cycles=2, actual_wall_clock=47, ratio="1.26")
         errors = cairn.check_repo(self.data_dir)
         self.assertEqual(errors, [])
 
@@ -467,6 +483,10 @@ class CloseCommandTestBase(unittest.TestCase):
 
 class CloseWritesActualsTests(CloseCommandTestBase):
     def test_close_writes_actuals_ratio_status_done_and_one_calibration_line(self):
+        # POLY-34 (ruling §0.3): no `estimate.cost_usd`, and `test-model`
+        # (this fixture's default) is unpriced against the real
+        # `prices.json` `cairn close` reads -- `ratio` must be null even
+        # though `actual.tokens` is a real, non-null secondary.
         self.seed_subissue()
         write_token_usage(self.data_dir, [
             token_row(generated="2020-01-02T01:00:00Z", issue="PT-1", role="backend-lead",
@@ -481,8 +501,7 @@ class CloseWritesActualsTests(CloseCommandTestBase):
         fm, _ = cairn.parse_frontmatter((self.data_dir / "issues" / "PT-9.md").read_text(encoding="utf-8"))
         self.assertEqual(fm.get("status"), "done")
         self.assertEqual(fm.get("actual.tokens"), 4000)
-        self.assertIsInstance(fm.get("ratio"), str)
-        self.assertAlmostEqual(float(fm["ratio"]), 4000 / 100000, places=2)
+        self.assertIsNone(fm.get("ratio"))
 
         lines = self.calibration_lines()
         self.assertEqual(len(lines), 1, lines)
