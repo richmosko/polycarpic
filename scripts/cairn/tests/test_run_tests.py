@@ -730,6 +730,113 @@ class RunnerRefusesAnIndirectUntieredFullRunTests(unittest.TestCase):
         self.assertIn(marker, result.stderr, f"runner refusal must share the guard's own marker sentence -- got {result.stderr!r}")
 
 
+class MultiRootDiscoveryTests(unittest.TestCase):
+    """POLY-6 gate-red (qa-engineer), pinned to the architect's gate-1
+    ruling (scripts/cairn/design/test-boundary-ci.md @ 615b94e, section
+    (a) Mechanics -- "a second root in run_tests.py, not a separate entry
+    point"). `WORKFLOW_TESTS_DIR = SCRIPT_DIR.parent.parent / "tests" /
+    "workflow"` per the ruling: for a fake engine root at `tmp`
+    (SCRIPT_DIR = tmp/scripts/cairn), that is `tmp/tests/workflow`.
+
+    Fake engine roots only (PT-94 D11): never spawns the real ~1700-test
+    suite. `--list`/narrowed calls are exempt from the PT-119 untiered-
+    full-run backstop on their own; the one bare, unnarrowed run below
+    strips Claude Code's own env so it isn't refused for the wrong
+    reason."""
+
+    def _fake_engine_root(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        engine_dir = tmp / "scripts" / "cairn"
+        engine_dir.mkdir(parents=True)
+        engine_dir.joinpath("run_tests.py").write_bytes((helpers.CAIRN_DIR / "run_tests.py").read_bytes())
+        (engine_dir / "tests").mkdir()
+        return tmp, engine_dir
+
+    @staticmethod
+    def _write_test_file(directory: Path, name: str, passes: bool = True) -> None:
+        directory.mkdir(parents=True, exist_ok=True)
+        (directory / name).write_text(
+            "import unittest\n\n\nclass T(unittest.TestCase):\n"
+            f"    def test_one(self):\n        self.assertTrue({passes!r})\n",
+            encoding="utf-8",
+        )
+
+    def _list(self, engine_dir: Path, *args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(engine_dir / "run_tests.py"), "--list", *args],
+            cwd=str(engine_dir), capture_output=True, text=True,
+        )
+
+    def _human_terminal_env(self) -> dict:
+        # Same technique as RunnerRefusesAnIndirectUntieredFullRunTests
+        # above: a bare, unnarrowed, un-gated run is otherwise refused by
+        # the PT-119 backstop whenever CLAUDECODE leaks into the child --
+        # exactly the env this suite itself runs under.
+        env = dict(os.environ)
+        for key in list(env):
+            if key.startswith("CLAUDE") or key == "AI_AGENT":
+                env.pop(key, None)
+        env.pop("CAIRN_TEST_RUNS_FILE", None)
+        return env
+
+    def test_second_root_absent_behaves_exactly_like_today(self):
+        tmp, engine_dir = self._fake_engine_root()
+        self._write_test_file(engine_dir / "tests", "test_a.py")
+        result = self._list(engine_dir)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual([l for l in result.stdout.splitlines() if l], ["test_a.py"])
+
+    def test_both_roots_are_discovered_when_the_workflow_dir_exists(self):
+        tmp, engine_dir = self._fake_engine_root()
+        self._write_test_file(engine_dir / "tests", "test_a.py")
+        self._write_test_file(tmp / "tests" / "workflow", "test_b.py")
+        result = self._list(engine_dir)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(sorted(l for l in result.stdout.splitlines() if l), ["test_a.py", "test_b.py"])
+
+    def test_a_narrowing_pattern_spans_both_roots(self):
+        tmp, engine_dir = self._fake_engine_root()
+        self._write_test_file(engine_dir / "tests", "test_area_alpha.py")
+        self._write_test_file(engine_dir / "tests", "test_other.py")
+        self._write_test_file(tmp / "tests" / "workflow", "test_area_beta.py")
+        result = self._list(engine_dir, "-p", "test_area*.py")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            sorted(l for l in result.stdout.splitlines() if l),
+            ["test_area_alpha.py", "test_area_beta.py"],
+        )
+
+    def test_a_duplicate_basename_across_roots_exits_2_before_anything_runs(self):
+        tmp, engine_dir = self._fake_engine_root()
+        # Opposite outcomes in each root -- a run that executed either
+        # file (rather than refusing before running anything) would show
+        # up as a "Ran N tests" line, which must never appear.
+        self._write_test_file(engine_dir / "tests", "test_dup.py", passes=True)
+        self._write_test_file(tmp / "tests" / "workflow", "test_dup.py", passes=False)
+        result = subprocess.run(
+            [sys.executable, str(engine_dir / "run_tests.py")],
+            cwd=str(engine_dir), capture_output=True, text=True,
+            env=self._human_terminal_env(),
+        )
+        self.assertEqual(result.returncode, 2, repr(result.stdout + result.stderr))
+        self.assertIn("test_dup.py", result.stderr)
+        self.assertNotRegex(
+            result.stdout, r"Ran \d+ tests?",
+            "a duplicate-basename refusal must run nothing from either root",
+        )
+
+    def test_build_argv_gains_an_optional_start_dir_defaulting_to_todays_tests(self):
+        default_argv = run_tests.build_argv(sys.executable, "test_x.py")
+        self.assertEqual(
+            default_argv,
+            [sys.executable, "-m", "unittest", "discover", "-s", "tests", "-p", "test_x.py"],
+            "the default argv must stay byte-identical to today's (no start_dir passed)",
+        )
+        custom_argv = run_tests.build_argv(sys.executable, "test_x.py", start_dir="tests/workflow")
+        self.assertIn("tests/workflow", custom_argv)
+        self.assertNotIn("-t", custom_argv)
+
+
 # --------------------------------------------------------------------------
 # PT-97 delta 7 (blocking, PT-97.md @ f66fe09): _self_record derives its
 # repo root from the SCRIPT'S OWN __file__ location -- for a real
