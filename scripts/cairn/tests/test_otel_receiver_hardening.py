@@ -571,6 +571,69 @@ class FlushNowFromALinkedWorktreeTests(unittest.TestCase):
         )
 
 
+class StatusAndEnsureRunningFromALinkedWorktreeHitTheMainCheckoutTests(unittest.TestCase):
+    """POLY-49 gate-1 ruling §3: `main()` computes `repo_root =
+    worktree_root.main_checkout_root(...)` once; EVERY default path
+    (pidfile, sessions dir, out-file, ...) derives from it, so
+    `--status` and `--ensure-running` from a linked worktree must ALSO
+    hit the main checkout's real metrics dir, not the worktree's own
+    (never-mounted) one -- same defect class as --flush-now, different
+    commands."""
+
+    def test_status_from_a_worktree_reports_the_main_checkouts_running_receiver(self):
+        port = _free_port()
+        main_root, worktree_path = _make_git_main_checkout_with_worktree(self, otel_port=port)
+        env = _minimal_env(
+            CLAUDE_CODE_ENABLE_TELEMETRY="1",
+            OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{port}",
+        )
+        self.addCleanup(_stop_fake_receiver, main_root, env)
+
+        start = run_fake_receiver(main_root, ["--ensure-running"], env=env)
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(main_root, env)
+        self.assertEqual(running.returncode, 0, f"precondition: main checkout's receiver must be up -- {running.stdout!r} {running.stderr!r}")
+
+        worktree_script = worktree_path / "scripts" / "cairn" / "otel_receiver.py"
+        result = subprocess.run(
+            [sys.executable, str(worktree_script), "--status"],
+            capture_output=True, text=True, cwd=str(worktree_path), env=env,
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f"--status from the linked worktree must report the MAIN checkout's receiver as running "
+            f"-- got rc={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}",
+        )
+        self.assertIn("running: True", result.stdout, result.stdout)
+
+    def test_ensure_running_from_a_worktree_registers_into_the_main_checkouts_registry(self):
+        port = _free_port()
+        main_root, worktree_path = _make_git_main_checkout_with_worktree(self, otel_port=port)
+        env = _minimal_env(
+            CLAUDE_CODE_ENABLE_TELEMETRY="1",
+            OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{port}",
+        )
+        self.addCleanup(_stop_fake_receiver, main_root, env)
+
+        start = run_fake_receiver(main_root, ["--ensure-running"], env=env)
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        _wait_for_status_running(main_root, env)
+
+        worktree_script = worktree_path / "scripts" / "cairn" / "otel_receiver.py"
+        result = subprocess.run(
+            [sys.executable, str(worktree_script), "--ensure-running", "--session-id", "wt1", "--session-pid", str(os.getpid())],
+            capture_output=True, text=True, cwd=str(worktree_path), env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        status = run_fake_receiver(main_root, ["--status"], env=env)
+        self.assertIn(
+            "session wt1", status.stdout,
+            f"--ensure-running from the linked worktree must register into the MAIN checkout's "
+            f"registry, not a worktree-local one nothing ever reads -- got {status.stdout!r}",
+        )
+
+
 # --------------------------------------------------------------------------
 # POLY-25 (POLY-49 gate-1 ruling §5): H3 without OTEL_* reaching hook
 # env at all (Claude Code >= 2.1.282, M7/M8). `_exporter_endpoint(
