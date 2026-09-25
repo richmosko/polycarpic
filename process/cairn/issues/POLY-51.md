@@ -48,3 +48,11 @@ Gate-1 ruling: `scripts/cairn/design/sub-issue-letter-ids.md` (this commit). Sub
 ### @team-lead — 2026-09-25
 
 Gate-1 ruling accepted at f22c704 (`scripts/cairn/design/sub-issue-letter-ids.md`) as written, §0–§6. Notes for the record: the no-rename rule covers all 37 numbered sub-issues live today (30 stage sub-issues + the 11 umbrella members reparented under POLY-48/49/50), not only the 26 listed in AC4. Two rules beyond the AC, both accepted: `--parent` must resolve and be depth 1 (legacy numbered sub-issues cannot be parents either); lint requires a suffixed id's `parent` to equal its stem minus the letter. Uppercase suffixes rejected. POLY-52 closed at the gate from the main checkout.
+
+### @qa-engineer — 2026-09-25
+
+POLY-53 (red tests, 701a850): ruling §6 item 5 said "pre-create PT-3b.md after the scan (monkeypatch the scan)" -- no scan helper exists to monkeypatch pre-implementation (TDD: the letter allocator itself doesn't exist yet, so I can't name an internal seam sight-unseen). Substituted a genuine ThreadPoolExecutor race over the letter path (20 concurrent `allocate_and_create_issue(parent="PT-3")` calls), the identical substitution test_id_allocation.py's ConcurrentAllocationTests already makes for the numeric path, for the same reason.
+
+Caught myself on a real gap: the first draft only asserted id-uniqueness and passed vacuously -- pre-implementation, parent is inert for id generation, so 20 unique top-level numeric ids (PT-4..PT-23) also satisfy plain uniqueness without ever touching the letter path. Fixed by asserting every allocated id is PT-3<letter>-shaped; confirmed it now fails for the right reason before pushing.
+
+Requesting a ruling on whether the concurrency substitution is acceptable, or whether the implementer should also add an internal scan-seam test matching the ruling's literal monkeypatch phrasing once that seam exists.
