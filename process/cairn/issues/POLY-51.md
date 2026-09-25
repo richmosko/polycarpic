@@ -34,3 +34,13 @@ Feature started. Branch: `feature/poly-51-sub-issue-letter-ids`.
 Lead's estimate at start (calibration record): ~45 min wall clock, ~12 commits, 1 gate cycle, ~$20 team cost. Reference: POLY-26 (same engine area, one shared helper + scan change) took 34 min / $16.86 against 45 min / $25.
 
 Survey for the gate-1 ruling: the engine has two ID patterns — `ID_RE` (`^([A-Za-z][A-Za-z0-9]*)-(\d+)$`, used by `_next_id_candidate` to find the max numeric id) and `_issue_id_re(prefix)` (`^<P>-\d+$`, used by `check_repo`'s shape classifier). TRACKER.md §"four shapes" separates records by the first character class after the prefix, so `POLY-26a` (digit first) stays in the issue class once the issue pattern admits a trailing `[a-z]`. The board sorts by `ID_SORT_RE = /^(.*?)-(\d+)$/` in board-logic.js, which would misplace a suffixed id. Allocation is `allocate_and_create_issue` (O_EXCL, one glob per attempt); a `--parent` path needs a per-parent letter allocator with the same O_EXCL discipline.
+
+### @architect — 2026-09-25
+
+Gate-1 ruling: `scripts/cairn/design/sub-issue-letter-ids.md` (this commit). Sub-issues POLY-52 (plan, architect), POLY-53 (execute, qa-engineer), POLY-54 (execute, implementation-lead), POLY-55 (review, architect) — numeric, since the letter scheme does not exist until green.
+
+- Patterns: `_issue_id_re` widens to `^<P>-\d+[a-z]?$`; `ID_RE` stays numeric-only (the counter never sees suffixes); new `_sub_issue_letter_re(parent)`; both sort regexes (py L1854, js L474) widen to `^(.*?)-(\d+)[a-z]?$` with the 3-tuple key unchanged — the full-string tiebreak already orders 26 < 26a < 26b < 27.
+- Allocator: the letter path branches on `fields.parent` inside `allocate_and_create_issue` (CLI + HTTP); parent must resolve; depth 1 only (checked on the record, so legacy numbered sub-issues are refused as parents too); max+1 over live + archive, no gap reuse, O_EXCL retry, error past `z`; no numeric fallback.
+- New lint: a suffixed id's `parent:` must equal its stem minus the letter.
+- Measured: 9 id-shape concerns across 10 regex lines; 3 change (issue re, py sort, js sort) + allocator + new lint; branch-side 3 and the token sort stay untouched (AC3). Every other consumer is string-equality or filename lookup — estimation is shape-blind (§4).
+- Tests: § 6, 11 new cases; 9 existing test files must pass unchanged. Guard: 0 existing tests edited; board-logic.js diff = one regex line.
