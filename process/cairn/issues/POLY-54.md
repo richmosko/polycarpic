@@ -1,7 +1,7 @@
 ---
 id: POLY-54
 title: POLY-51 execute: letter allocator, id patterns, board sort, TRACKER text
-status: todo
+status: done
 milestone: POLY-A
 parent: POLY-51
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [scripts/cairn/cairn.py, scripts/cairn/board/board-logic.js, process/TRAC
 stage: execute
 estimate.cost_usd: "3.50"
 estimate.gate_cycles: 1
+actual.cost_usd: "3.7782"
+actual.tokens: 13358693
+actual.gate_cycles: 1
+actual.wall_clock: 42
+ratio: "1.08"
 labels: [cairn]
 priority: P3
 pr: null
