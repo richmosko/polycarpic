@@ -8,6 +8,7 @@ blocked_by: []
 assignee: qa-engineer
 paths: [scripts/cairn/tests/**, tests/workflow/**, process/cairn/issues/POLY-34.md]
 stage: execute
+estimate.cost_usd: "3.00"
 estimate.tokens: 8000000
 estimate.gate_cycles: 2
 labels: [cairn, workflow]

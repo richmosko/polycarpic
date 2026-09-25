@@ -8,6 +8,7 @@ blocked_by: []
 assignee: implementation-lead
 paths: [scripts/cairn/cairn.py, scripts/cairn/loop_stats.py, process/TRACKER.md, process/WORKFLOW.md, process/cairn/config.yml, process/cairn/issues/POLY-34.md]
 stage: execute
+estimate.cost_usd: "5.00"
 estimate.tokens: 15000000
 estimate.gate_cycles: 2
 labels: [cairn, workflow]
