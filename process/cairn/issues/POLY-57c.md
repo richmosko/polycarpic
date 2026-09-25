@@ -1,7 +1,7 @@
 ---
 id: POLY-57c
 title: POLY-57 execute: moves, references, living-doc corrections
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-57
 blocked_by: []
@@ -10,6 +10,10 @@ paths: [scripts/cairn/design/**, scripts/cairn/docs/**, scripts/cairn/board/**, 
 stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2
+actual.cost_usd: null
+actual.tokens: null
+actual.gate_cycles: 1
+actual.wall_clock: 33
 labels: [cairn, docs]
 priority: null
 pr: null
