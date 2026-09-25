@@ -783,6 +783,12 @@ No skill — it's light enough to do by hand:
 3. **Record it** — add an ARCH *Integration Points* entry ("consumes `lib@v1.2.0`") and a `DECISIONS.md` entry (what, why, version).
 4. **Cross-link if it's yours.** If the borrowed repo is another of your template instances, note the linkage in both repos' `DECISIONS.md` (cairn is per-repo — there is no cross-repo board to link in). If it's third-party, note the upstream source + license instead.
 
+**cairn's test boundary is spin-off-clean.** `scripts/cairn/tests/` holds only tests whose subject is
+code under `scripts/cairn/`; this repo's own convention tests (STATE.md shape, agent-definition
+blocks, workflow-doc scanners, non-cairn hooks) live in `tests/workflow/`, which `run_tests.py`
+picks up as a second root only when it exists — so `/spin-off-component` can extract
+`scripts/cairn/` with its suite intact.
+
 ## Importing existing artifacts
 
 When a project comes with pre-existing PRD or ARCH documents (or similar), the `/generate-prd` and `/generate-archdoc` skills support an **import mode**: pass the source path as the skill's argument and the doc-gen flow analyzes the legacy content, maps it to the template's framework, and runs the interview **only for the gaps**.
@@ -912,7 +918,7 @@ Releases are **human decisions**, never automatic. The `/merge-pr` skill prompts
    The `--generate-notes` flag auto-populates from PR titles merged since the previous tag. The `--draft` flag holds it unpublished so you can curate for end-user framing (turn engineering subject lines into user-facing prose) before publishing.
 5. Edit the draft at `https://github.com/<owner>/<repo>/releases` — re-group by user impact, soften jargon, add migration notes if applicable.
 6. **Publish** when curated. The release is then immutable, has its own URL, RSS feed, and API endpoint — no extra file in the repo to maintain.
-7. **Replace** the single data row in `STATE.md` → Releases with this release — never append. The section holds exactly one row (the latest tag); older releases live at [GitHub Releases](https://github.com/<owner>/<repo>/releases), never in this file (ruled 2026-09-02, PT-75). Hard limit: the whole markdown row — outer pipes, link URL, everything — is **≤ 200 characters**, machine-checked by `scripts/cairn/tests/test_state_releases_bound.py`. Fixed row template (quoted identically in `.claude/skills/merge-pr/SKILL.md`):
+7. **Replace** the single data row in `STATE.md` → Releases with this release — never append. The section holds exactly one row (the latest tag); older releases live at [GitHub Releases](https://github.com/<owner>/<repo>/releases), never in this file (ruled 2026-09-02, PT-75). Hard limit: the whole markdown row — outer pipes, link URL, everything — is **≤ 200 characters**, machine-checked by `tests/workflow/test_state_releases_bound.py`. Fixed row template (quoted identically in `.claude/skills/merge-pr/SKILL.md`):
    ```
    | vX.Y.Z | YYYY-MM-DD | <major-line> | <milestone-id> (<short milestone name>) — [release](https://github.com/<owner>/<repo>/releases/tag/vX.Y.Z) | <branch> | Draft|Published |
    ```

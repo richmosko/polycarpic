@@ -92,6 +92,15 @@ from typing import Dict, List, Optional, Tuple
 SCRIPT_DIR = Path(__file__).resolve().parent
 TESTS_DIR = SCRIPT_DIR / "tests"
 
+# POLY-6 gate-1 ruling (scripts/cairn/design/test-boundary-ci.md @ 615b94e,
+# section (a) Mechanics): "a second root in run_tests.py, not a separate
+# entry point" -- one command keeps one gate, one ledger row, and leaves
+# test_run_guard/test_run_record, the settings prefilter, and both skills'
+# gate lines unchanged. Picked up only when the directory exists, so a
+# spun-off cairn or a fake-engine-root copy (SCRIPT_DIR.parent.parent has
+# no tests/workflow) behaves exactly as today.
+WORKFLOW_TESTS_DIR = SCRIPT_DIR.parent.parent / "tests" / "workflow"
+
 # PT-119 gate-1 ruling, re-issued (PT-119.md @6cd7e44): kept byte-identical
 # to `.claude/hooks/_test_run_shared.REFUSAL_MESSAGE` -- used ONLY as a
 # fallback when that module can't be imported (a fake-engine-root test
@@ -178,8 +187,11 @@ def order_by_size(files: List[Path]) -> List[Path]:
     return sorted(files, key=lambda p: (-p.stat().st_size, p.name))
 
 
-def build_argv(python_exe: str, file_name) -> List[str]:
-    return [python_exe, "-m", "unittest", "discover", "-s", "tests", "-p", str(file_name)]
+def build_argv(python_exe: str, file_name, start_dir: str = "tests") -> List[str]:
+    # POLY-6 gate-1 ruling: `start_dir` defaults to "tests" so the argv
+    # stays byte-identical to before this parameter existed -- a second
+    # root passes its own start_dir (e.g. "workflow") instead.
+    return [python_exe, "-m", "unittest", "discover", "-s", start_dir, "-p", str(file_name)]
 
 
 def _last_match(pattern: "re.Pattern", text: str):
@@ -275,8 +287,22 @@ def parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
 
 
 def _run_one(file: Path, cwd: Path, runner) -> Dict[str, object]:
+    # POLY-6 gate-1 ruling (section (a) Mechanics): "each child runs with
+    # cwd = file.parent.parent and -s <file.parent.name>" -- derived from
+    # the discovered file's OWN absolute path, not the shared `cwd`
+    # argument, so files from different roots (scripts/cairn/tests vs.
+    # tests/workflow) each get their own correct cwd/start_dir in the same
+    # batch. A relative file (unit tests passing bare Path("test_x.py")
+    # fixtures) has no such structure -- falls back to the passed-in
+    # `cwd` and today's default start_dir, unchanged.
+    if file.is_absolute():
+        child_cwd = file.parent.parent
+        argv = build_argv(sys.executable, file.name, start_dir=file.parent.name)
+    else:
+        child_cwd = cwd
+        argv = build_argv(sys.executable, file.name)
     t0 = time.time()
-    completed = runner(build_argv(sys.executable, file.name), cwd=str(cwd),
+    completed = runner(argv, cwd=str(child_cwd),
                         capture_output=True, text=True)
     seconds = time.time() - t0
     try:
@@ -475,6 +501,33 @@ def _self_record(args: argparse.Namespace, agg: Dict[str, object]) -> None:
         pass
 
 
+def _discovery_roots() -> List[Path]:
+    roots = [TESTS_DIR]
+    if WORKFLOW_TESTS_DIR.is_dir():
+        roots.append(WORKFLOW_TESTS_DIR)
+    return roots
+
+
+def _discover_all(patterns: List[str]) -> Tuple[List[Path], Dict[str, List[Path]]]:
+    """Unions `discover_files` over every configured root (today: just
+    `TESTS_DIR`; `TESTS_DIR` + `WORKFLOW_TESTS_DIR` once the latter
+    exists). Basenames must be unique across roots (`times`/`failed_files`
+    are keyed by name) -- a name resolving to more than one DISTINCT path
+    is returned as a duplicate rather than silently picking one; a name
+    resolving to the same path via more than one root call (never happens
+    for real roots, but does for a test double patching `discover_files`
+    itself) collapses via set equality, not a false duplicate."""
+    by_name: Dict[str, set] = {}
+    for root in _discovery_roots():
+        for f in discover_files(root, patterns):
+            by_name.setdefault(f.name, set()).add(f)
+    duplicates = {name: sorted(paths) for name, paths in by_name.items() if len(paths) > 1}
+    if duplicates:
+        return [], duplicates
+    files = sorted(next(iter(paths)) for paths in by_name.values())
+    return files, {}
+
+
 def main(argv: Optional[List[str]] = None) -> int:
     args = parse_args(argv)
 
@@ -490,7 +543,17 @@ def main(argv: Optional[List[str]] = None) -> int:
     if __name__ == "__main__" and _refuse_if_untiered_and_unclaimed(args):
         return 2
 
-    files = discover_files(TESTS_DIR, args.pattern)
+    files, duplicates = _discover_all(args.pattern)
+
+    if duplicates:
+        # POLY-6 gate-1 ruling: a duplicate basename across roots exits 2
+        # BEFORE anything runs -- `times`/`failed_files` are keyed by
+        # name, so two distinct files sharing one would silently clobber
+        # each other's result.
+        for name in sorted(duplicates):
+            paths = ", ".join(str(p) for p in duplicates[name])
+            print(f"duplicate test file basename across roots: {name} ({paths})", file=sys.stderr)
+        return 2
 
     if not files:
         # Gate-4 verdict delta 1 (blocking): the tiered rule has every

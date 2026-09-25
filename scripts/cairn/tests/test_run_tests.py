@@ -89,7 +89,15 @@ class DiscoveryTests(unittest.TestCase):
         self.assertEqual([p.name for p in got], ["test_run_tests.py"])
 
     def test_cli_list_prints_exactly_the_discovered_names_and_exits_zero(self):
+        # POLY-6: `--list` spans both roots once `tests/workflow/` exists
+        # (ruling section (a) Mechanics) -- cairn's own root sorts first
+        # ("scripts" < "tests" under the shared repo-root prefix), so the
+        # expected order is cairn's names, then workflow's, each
+        # internally sorted.
+        workflow_dir = helpers.CAIRN_DIR.parent.parent / "tests" / "workflow"
         expected_names = [p.name for p in sorted(helpers.TESTS_DIR.glob("test_*.py"))]
+        if workflow_dir.is_dir():
+            expected_names += [p.name for p in sorted(workflow_dir.glob("test_*.py"))]
         result = subprocess.run(
             [sys.executable, str(helpers.CAIRN_DIR / "run_tests.py"), "--list"],
             cwd=helpers.CAIRN_DIR, capture_output=True, text=True,

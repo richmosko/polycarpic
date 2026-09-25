@@ -362,9 +362,7 @@ milestone came to carry `status: active`, a value its own documented enum never 
 status=done` is the one way to mark one finished.
 
 **No grandfather clause**, the same call as [prefixed ids](#milestone-ids--definition-vs-development):
-`completed` and `active` fail the lint. **Migration is a command, not a recipe** —
-`cairn migrate lifecycle-status --dry-run` to review, then without the flag to apply; it is
-idempotent and safe to re-run after an interruption. The break is lint-only: an unmigrated repo's
+`completed` and `active` fail the lint. The break is lint-only: an unmigrated repo's
 board and CLI keep working (the board renders an unknown status via its label fallback, never
 `undefined`), only `cairn check` fails.
 
@@ -586,9 +584,6 @@ Board edits **rewrite only the frontmatter block**, re-emitted in canonical key 
 | `cairn show PT-14` | Rendered single issue, plus its children when it has any. |
 | `cairn archive (--done-before <date> \| --milestone <id> \| --major <id>) [--dry-run]` | Bulk `git mv`, with the preconditions in [Archive](#archive) — exactly one selector, and `--dry-run` previews without moving anything. |
 | `cairn check` | Lint: id/filename mismatch, dangling `parent`, unknown `milestone`, bad `status` (issues **and** milestones/majors, each against its own vocabulary — see [Milestone / major status vocabulary](#milestone--major-status-vocabulary)), an archived issue whose milestone isn't `done`/`cancelled` (see [Archive](#archive)), milestone id-shape ↔ `kind` agreement (see [Milestone ids](#milestone-ids--definition-vs-development)), `blocked_by` dependency integrity (dangling ref, self-reference, cycles — see [Dependencies](#dependencies)), unsupported YAML, `config.yml`'s `roots:` shape (list of non-empty relative-path strings — reachability is a runtime concern, not lint, see [Multi-root](#multi-root-pt-3-2026-08-21)), milestone/major/issue id **prefix shape** (see [Milestone ids](#milestone-ids--definition-vs-development)), `config.yml`'s `prefix:` (present and matching `^[A-Z]{2,5}$` — every id regex is derived from it), any archived issue still at the legacy flat `archive/*.md` layout (PT-50 — see [Archive](#archive)). |
-| `cairn migrate prefix-ids [--dry-run]` | One-shot 0.6.1 migration: prefixes bare major/milestone ids and retargets every `major:`/`milestone:` reference. Idempotent — safe to re-run after an interruption. Runs on a repo whose lint is failing; that is its purpose. |
-| `cairn migrate lifecycle-status [--dry-run]` | One-shot 0.7.0 migration: rewrites milestone/major `status:` onto the [unified vocabulary](#milestone--major-status-vocabulary) — `completed` → `done`, `active` → `in-progress`. Value-keyed, so idempotent by construction; any other value is left untouched for the lint to report. Same posture as `prefix-ids`: runs on a repo whose lint is already failing. |
-| `cairn migrate archive-issues [--dry-run]` | One-shot 0.7.1 migration (PT-50): moves every legacy flat `archive/*.md` issue into `archive/issues/` via `git mv`. Filesystem-only — touches zero bytes inside any file. Idempotent — safe to re-run after an interruption; a destination that already exists with *differing* content refuses the entire run rather than guessing a winner. Same posture as the other two: runs on a repo whose lint is already failing (that's what it fixes). |
 | `cairn serve [--repos a,b]` | The board. `--repos` (PT-3) replaces `config.yml`'s `roots:` for that invocation — read-only cross-project aggregation, see [Multi-root](#multi-root-pt-3-2026-08-21). |
 | `cairn guard-push PT-14` | Push-time check (POLY-2): fails naming every file the issue's assignee touched outside its declared `paths:`. Every agent's worktree protocol runs this immediately before `git push` and skips the push on a non-zero exit — see [Path ownership](#path-ownership-poly-2). |
 
