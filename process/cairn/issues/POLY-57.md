@@ -30,6 +30,7 @@ updated: 2026-09-25
 - [ ] Living docs corrected in place only where a ruling changed a stated behaviour, one sentence each; diff of TRACKER.md and estimation.md reviewed line by line against that rule
 - [ ] WORKFLOW.md and the architect agent file gain one line each: a ruling is an issue comment within budget, or `process/reviews/<ID>/ruling.md`; never a file under `scripts/cairn/docs/`
 - [ ] Tests, `cairn check`, and the docs links all pass after the moves
+- [ ] `scripts/cairn/docs/estimation.md` is pruned to current behaviour (user decision 2026-09-25, in this loop): history, rationale, loop narratives, and superseded rules go; every statement that remains is true now, and no behaviour statement is lost
 
 ## Comments
 
@@ -71,3 +72,7 @@ Feature started. Branch: `feature/poly-57-cairn-docs-cleanup`.
 **Addendum 1 (POLY-57a) — two facts, no change to the ruling.**
 - The `--at` ceiling bullet (`estimation.md` L461) was already corrected at `f7faaae`. The one remaining POLY-48 statement is the §2 Tokens formula line (`<= close_ts`), which ruling item 2 corrects.
 - Generator path math: under `board/theme/`, `SCRIPT_DIR.parents[1]` resolves to `scripts/cairn` (ruling item 1). Two functional test paths break on the move and are qa's to fix: `test_theme_variants_generator.py` L51 (`DESIGN_DIR`) and `test_theme_bootstrap_and_dropdown.py` L76.
+
+### @team-lead — 2026-09-25
+
+AC amended in place (user decision 2026-09-25): `estimation.md` is pruned to current behaviour in this loop, not filed as a follow-up. Sequence: after POLY-57c's green, the architect prunes in a new execute sub-issue (POLY-57e, paths `scripts/cairn/docs/estimation.md`); the lead reads the diff against the "strictly necessary" rule; qa's verdict runs on the final sha.
