@@ -44,3 +44,8 @@ Gate-1 ruling (POLY-35): `scripts/cairn/design/estimation.md` @ e4c73bf §0 (§1
 - (e) AC5: POLY-28–32 are re-closed with `estimate.cost_usd` absent, so ratio is null. A derived estimate would be invented or circular. Command: `--base 97037a6 --ref a508b32^2`, order 28 (`--at 4601a09`) → 29/30/31 (`c93342d`) → 32 (`75cc704`). Expected costs are in §0.6.
 - POLY-39: verified that no test reads the real tracker tree, and CI runs no `cairn check`. The pattern is fail-closed (`grep -v` EXCLUDE, then PATTERN), per §0.7. **Limit:** `CHANGED` is the cumulative PR diff, so code PRs (this one included) still run the full suite on every push. Only tracker-only PRs skip. A `before`-diff is rejected as fail-open.
 - (f) Tests are in §9.1, with the POLY-39 shape test first.
+
+### @team-lead — 2026-09-25
+
+Gate-1 ruling accepted @ e4c73bf: unit is `cost_usd` frozen at close (record gains `prices_retrieved`; unpriced model → null cost, null ratio, named warning); fields `estimate.cost_usd` / `actual.cost_usd` as decimal strings, `ratio` = cost ratio, `estimate.tokens` optional secondary; AC5 re-closes POLY-28–32 with `estimate.cost_usd` absent (ratio null — a derived dollar estimate would be an invented number in the first reference class), `--base 97037a6 --ref a508b32^2` in the ruled order. POLY-35 closed at design-gate clear.
+POLY-39 limit accepted as measured: the change step diffs the whole PR, so the exclusion only saves runs on tracker-only PRs. One addendum question sent to the architect: anchoring the skip to the delta since the PR's last *successful* run (never a cancelled/red one) would let tracker-only tips on a green tree skip without the masking risk §0.7 rejects.
