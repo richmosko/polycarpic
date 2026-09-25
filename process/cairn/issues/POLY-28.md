@@ -10,10 +10,11 @@ paths: [scripts/cairn/design/test-boundary-ci.md, process/cairn/issues/POLY-6.md
 stage: plan
 estimate.tokens: 700000
 estimate.gate_cycles: 1
+actual.cost_usd: "0.8802"
 actual.tokens: 842889
 actual.gate_cycles: 1
 actual.wall_clock: 948
-ratio: "1.20"
+ratio: null
 labels: [workflow, cairn, tests, ci]
 priority: P2
 pr: null

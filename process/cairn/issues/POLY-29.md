@@ -10,10 +10,11 @@ paths: [scripts/cairn/tests/**, tests/**, process/cairn/issues/POLY-6.md]
 stage: execute
 estimate.tokens: 700000
 estimate.gate_cycles: 2
+actual.cost_usd: "3.7907"
 actual.tokens: 12318784
 actual.gate_cycles: 3
 actual.wall_clock: 991
-ratio: "17.60"
+ratio: null
 labels: [workflow, cairn, tests, ci, bloat]
 priority: P2
 pr: null
