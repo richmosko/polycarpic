@@ -416,7 +416,7 @@ An issue may declare others as blocking it: `blocked_by: [PT-9, PT-12]`. The rel
 
 ### Path ownership (POLY-2)
 
-Worktree isolation guarantees one writer per checkout, but several agents push to the same feature branch over the course of a loop. An issue's `paths:`, unioned with the `paths:` of every other issue sharing its `parent` and `assignee`, declares the repo-relative globs its assignee's commits may touch; `cairn guard-push <ID>` checks that declaration at push time, not at commit time — every agent's own worktree protocol (`process/WORKFLOW.md` → Worktree protocol) runs it immediately before `git push` and skips the push on a non-zero exit.
+Worktree isolation guarantees one writer per checkout, but several agents push to the same feature branch over the course of a loop. An issue's `paths:` (which always include the issue's own file), unioned with the `paths:` of every other issue sharing its `parent` and `assignee`, declares the repo-relative globs its assignee's commits may touch; `cairn guard-push <ID>` checks that declaration at push time, not at commit time — every agent's own worktree protocol (`process/WORKFLOW.md` → Worktree protocol) runs it immediately before `git push` and skips the push on a non-zero exit.
 
 **Opt-in, not a hard gate (kickoff decision, `docs/project_kickoff.md` § 2.1).** An issue with no `paths:` key passes `guard-push` with a warning on stderr, exit 0 — most sub-issues never need this, and a repo that predates POLY-2 keeps working unchanged. Declaring `paths: []` is a different, explicit state: "this assignee may touch nothing," never conflated with "undeclared."
 
