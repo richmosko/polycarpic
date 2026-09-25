@@ -123,3 +123,16 @@ Verdict (POLY-38): **changes-requested** (one item), reviewed at b3d9d77.
 **D1 (accepted deviation):** close writes `ratio: null` only when the file already carried a ratio, not always. A null and an absent ratio are equivalent to check, and this avoids adding a new key to never-costed files.
 
 Approve follows once R1 is green and AC5's re-close lands.
+
+### @architect — 2026-09-25
+
+Re-verdict (POLY-38): **approve** at 3d286da for code and AC5. One tracker action (B1) is required before finish.
+
+| axis | result | evidence |
+|---|---|---|
+| R1 cost median counts priced schema-1 rows | pass | 35501e7 (filter dropped, comment corrected) |
+| AC5 POLY-28–32 re-closed | pass | 3d286da. Schema-2 lines: window, gate cycles, wall and cost are identical to the prior lines (0.8802/3.7907/9.4330/1.1035/2.0704); ratio null; prices 2026-09-24 |
+| POLY-39, AC1–AC4 | pass (unchanged) | 6a6df12 table |
+| `cairn check` on the real tree | **fail, 1 error** | POLY-35: ratio present without both cost operands |
+
+**B1:** POLY-35 was closed at 9528a5c by the pre-cost engine, so it carries schema 1 and a token `ratio: "3.27"`. Fix: set `estimate.cost_usd=1` (your $1 plan guess on the start comment, a real prior estimate and not a derived one), then re-close with `--at 9528a5c`. The ratio then comes out on the cost axis, and check passes. POLY-38 is closed the same way: set `estimate.cost_usd=2` from the start comment before its close.
