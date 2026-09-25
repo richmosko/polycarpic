@@ -1,7 +1,7 @@
 ---
 id: POLY-48c
 title: POLY-48 execute: cairn.py fixes and TRACKER text
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: POLY-48
 blocked_by: []
