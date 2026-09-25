@@ -21,7 +21,8 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-57-cairn-docs-cleanup`
 - **Started:** 2026-09-25
 - **Goal:** `scripts/cairn/docs/` holds only living docs; rulings become audit records under `process/reviews/`; living docs and agent files gain only what is strictly necessary.
-- **Status:** In Progress
+- **PR:** https://github.com/richmosko/polycarpic/pull/18
+- **Status:** In Review
 
 _Next after this: POLY-49 (receiver hardening), POLY-50 (backfill attribution), then POLY-56 (checklists)._
 

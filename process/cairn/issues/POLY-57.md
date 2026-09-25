@@ -1,14 +1,14 @@
 ---
 id: POLY-57
 title: Cairn docs: living docs only, rulings as audit records
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, docs]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/18
 created: 2026-09-25
 updated: 2026-09-25
 ---
@@ -96,3 +96,7 @@ AC amended in place (user decision 2026-09-25): `estimation.md` is pruned to cur
 | design/ gone; theme under board/theme/ | yes | `git ls-tree` |
 | Generator | runs, tree clean after | `gen_variants.py`; `git status` |
 | Dist / check | fresh; `cairn check` ok | `check_dist_freshness.py` exit 0 |
+
+### @team-lead — 2026-09-25
+
+PR opened: https://github.com/richmosko/polycarpic/pull/18. Awaiting Validate.
