@@ -158,7 +158,11 @@ def _development_milestone_id_re(prefix: str) -> "re.Pattern[str]":
 
 
 def _issue_id_re(prefix: str) -> "re.Pattern[str]":
-    return re.compile(rf"^{re.escape(prefix)}-\d+$")
+    # POLY-51 (ruling §1): widened to admit a sub-issue's trailing lowercase
+    # letter (`PT-14a`) alongside the plain numeric shape -- both are valid
+    # issue ids now; uppercase (`PT-14A`) is deliberately NOT admitted (macOS
+    # case-insensitive-filesystem collision risk, ruling §1).
+    return re.compile(rf"^{re.escape(prefix)}-\d+[a-z]?$")
 
 
 def _check_record_status(errors: List[str], stem: str, status: Any) -> None:
@@ -226,6 +230,15 @@ COMMENTS_HEADING_RE = re.compile(r"^## Comments\s*$")
 COMMENT_DELIM_RE = re.compile(r"^### @([a-z0-9][a-z0-9-]*) — (\d{4}-\d{2}-\d{2})\s*$")
 ID_RE = re.compile(r"^([A-Za-z][A-Za-z0-9]*)-(\d+)$")
 
+# POLY-51 (ruling §1): a sub-issue id split into its parent's id (group 1,
+# includes the parent's own prefix+number) and its single lowercase letter
+# (group 2) -- shared by allocate_and_create_issue's depth-1 guard (§2 step
+# 3) and check_repo's suffixed-id<->parent agreement check (§3), so both
+# read the exact same "is this a sub-issue, and who must its parent be"
+# shape. Deliberately NOT `ID_RE` widened: `ID_RE` stays numeric-only on
+# purpose (§1) so a suffixed stem never advances the top-level counter.
+_SUFFIXED_ISSUE_ID_RE = re.compile(r"^([A-Za-z][A-Za-z0-9]*-\d+)([a-z])$")
+
 BOARD_DIR = Path(__file__).resolve().parent / "board"
 
 # PT-54 (architect ruling §1): sibling of BOARD_DIR, same cwd-independent
@@ -275,6 +288,18 @@ class ConflictError(CairnError):
     def __init__(self, message: str, current: Optional[Dict[str, Any]] = None):
         super().__init__(message)
         self.current = current
+
+
+class BadParentError(CairnError):
+    """Raised by allocate_and_create_issue's letter path (POLY-51 ruling §2
+    steps 2-3): `--parent X` where X doesn't resolve, or X is itself a
+    sub-issue (suffixed or a legacy numbered one -- sub-issues nest one
+    level only). NOT raised for a..z letter exhaustion under a valid parent
+    (that stays a plain CairnError -- there's nothing invalid about the
+    parent itself). A distinct subclass exists only so `_create_issue` can
+    map these three `parent`-validity refusals to 400 `bad_parent`, while
+    the legacy-archive guard keeps its own `legacy_archive` code.
+    """
 
 
 # --------------------------------------------------------------------------
@@ -1202,15 +1227,94 @@ def _next_id_candidate(data_dir: Path, prefix: str) -> int:
     return max_n + 1
 
 
+def _sub_issue_letter_re(parent_id: str) -> "re.Pattern[str]":
+    """`^<parent_id>([a-z])$` -- matches ONLY a direct lettered sub-issue of
+    `parent_id`, never an unrelated id that happens to start with the same
+    characters (`PT-30` does not match `_sub_issue_letter_re("PT-3")`: its
+    trailing char is `0`, not in `[a-z]`)."""
+    return re.compile(rf"^{re.escape(parent_id)}([a-z])$")
+
+
+def _next_sub_issue_letter(data_dir: Path, parent_id: str) -> str:
+    """The next unused lowercase letter for `parent_id`'s sub-issues (POLY-51
+    ruling §2 step 4): max(letters) + 1 over stems matching
+    `_sub_issue_letter_re(parent_id)` in both `issues/` and
+    `archive/issues/` -- no gap reuse (`a`, `c` present -> `d`, never `b`).
+    Raises CairnError, before any file is written, once a..z is already
+    exhausted among the existing siblings.
+    """
+    letter_re = _sub_issue_letter_re(parent_id)
+    data_dir = Path(data_dir)
+    live_dir = data_dir / "issues"
+    candidates: List[Path] = list(live_dir.glob(f"{parent_id}?.md")) if live_dir.exists() else []
+    candidates += [p for p in archived_issue_paths(data_dir) if p.stem.startswith(parent_id)]
+    max_ord = -1
+    for p in candidates:
+        m = letter_re.match(p.stem)
+        if m:
+            max_ord = max(max_ord, ord(m.group(1)) - ord("a"))
+    next_ord = max_ord + 1
+    if next_ord >= 26:
+        raise CairnError(f"parent {parent_id} has exhausted sub-issue letters a..z")
+    return chr(ord("a") + next_ord)
+
+
+def _allocate_sub_issue(
+    data_dir: Path, issues_dir: Path, parent_id: str, fields: Dict[str, Any], today_str: str, max_attempts: int,
+) -> Path:
+    """The `--parent X` half of `allocate_and_create_issue` (POLY-51 ruling
+    §2): validates `X`, then claims `X<letter>` with the same O_CREAT|O_EXCL
+    retry-on-collision discipline the numeric path uses.
+    """
+    parent_path = find_issue_path(data_dir, parent_id)
+    if parent_path is None:
+        raise BadParentError(f"parent {parent_id}: no such issue")
+    parent_fm, _ = parse_frontmatter(parent_path.read_text(encoding="utf-8"))
+    # Depth 1 only: `X` may not itself be a sub-issue -- checked on the
+    # RECORD (its own `parent:`), which also catches a legacy numbered
+    # sub-issue (e.g. POLY-28) that a shape check alone would miss, and on
+    # the SHAPE (`_SUFFIXED_ISSUE_ID_RE`), which catches a suffixed id whose
+    # frontmatter was hand-edited to drop its own `parent:`.
+    if parent_fm.get("parent") is not None or _SUFFIXED_ISSUE_ID_RE.match(parent_id):
+        raise BadParentError(f"parent {parent_id} is itself a sub-issue -- sub-issues nest one level")
+
+    letter = _next_sub_issue_letter(data_dir, parent_id)
+    for _ in range(max_attempts):
+        issue_id = f"{parent_id}{letter}"
+        path = issues_dir / f"{issue_id}.md"
+        full_fields = dict(fields)
+        full_fields["id"] = issue_id
+        full_fields["created"] = today_str
+        full_fields["updated"] = today_str
+        content = dump_frontmatter(full_fields) + "\n"
+        try:
+            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            next_ord = ord(letter) - ord("a") + 1
+            if next_ord >= 26:
+                raise CairnError(f"parent {parent_id} has exhausted sub-issue letters a..z")
+            letter = chr(ord("a") + next_ord)
+            continue
+        try:
+            os.write(fd, content.encode("utf-8"))
+        finally:
+            os.close(fd)
+        return path
+    raise CairnError(f"could not allocate a sub-issue id for parent {parent_id!r} after {max_attempts} attempts")
+
+
 def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attempts: int = 50) -> Path:
-    """Atomically claim the next free ID and create issues/<PREFIX>-<n>.md.
+    """Atomically claim the next free ID and create issues/<PREFIX>-<n>.md
+    -- or, when `fields["parent"]` is set, `issues/<PARENT><letter>.md`
+    (POLY-51 ruling §2).
 
     `fields` supplies everything except id/created/updated, which this
     function fills in. `prefix` comes from load_config(data_dir)["prefix"].
 
     PT-52 §3 (architect's ruling, required companion to the legacy-read
     deletion): the single allocation path both `cmd_new` and the HTTP
-    `_create_issue` funnel through, so it's also the single place to guard.
+    `_create_issue` funnel through, so it's also the single place to guard
+    -- for BOTH the numeric and the letter path (POLY-51 ruling §2 step 1).
     `_next_id_candidate` no longer counts ids held by a legacy-layout
     archived issue (PT-52 §1 collapsed `archived_issue_paths` to
     `archive/issues/` only) -- on an unmigrated repo, allocating anyway
@@ -1234,8 +1338,13 @@ def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attemp
     prefix = config["prefix"]
     issues_dir = data_dir / "issues"
     issues_dir.mkdir(parents=True, exist_ok=True)
-    n = _next_id_candidate(data_dir, prefix)
     today_str = _today()
+
+    parent = fields.get("parent")
+    if parent is not None:
+        return _allocate_sub_issue(data_dir, issues_dir, str(parent), fields, today_str, max_attempts)
+
+    n = _next_id_candidate(data_dir, prefix)
 
     for _ in range(max_attempts):
         issue_id = f"{prefix}-{n}"
@@ -1708,6 +1817,17 @@ def check_repo(data_dir: Path) -> List[str]:
         parent = fm.get("parent")
         if parent is not None and parent not in known_ids:
             errors.append(f"{label}: dangling parent {parent!r}")
+        # POLY-51 (ruling §3 new rule): a stem shaped `<P>-<n><letter>`
+        # must declare `parent: <P>-<n>` -- the shape alone can't catch a
+        # lie like `parent: PT-4` on a file named `PT-3a.md`, only this
+        # agreement check can. Numbered sub-issues (pre-POLY-51 shape)
+        # carry no such constraint -- their `parent:` is free-form, as
+        # always.
+        suffix_m = _SUFFIXED_ISSUE_ID_RE.match(label)
+        if suffix_m and parent != suffix_m.group(1):
+            errors.append(
+                f"{label}: suffixed id implies parent {suffix_m.group(1)}, found {parent!r}"
+            )
         priority = fm.get("priority")
         if priority is not None and priority not in PRIORITIES:
             errors.append(f"{label}: unknown priority {priority!r}")
@@ -1851,7 +1971,7 @@ def check_repo(data_dir: Path) -> List[str]:
 # Snapshot
 # --------------------------------------------------------------------------
 
-_ID_SORT_RE = re.compile(r"^(.*?)-(\d+)$")
+_ID_SORT_RE = re.compile(r"^(.*?)-(\d+)[a-z]?$")
 
 
 def _id_sort_key(issue_id: Any) -> Tuple[str, int, str]:
@@ -1863,6 +1983,13 @@ def _id_sort_key(issue_id: Any) -> Tuple[str, int, str]:
     pure string key for anything that doesn't match the "<prefix>-<digits>"
     shape, so a malformed id still sorts (just not meaningfully) instead of
     raising.
+
+    POLY-51 (ruling §1): the trailing `[a-z]?` keeps a sub-issue's own
+    number as the sort tuple's numeric slot -- "PT-26a" and "PT-26" both key
+    to (prefix="PT", n=26); the third tuple element (the full id string) is
+    the tiebreak, and a string is always less than its own suffixed
+    extension ("PT-26" < "PT-26a" < "PT-26b"), so PT-26 < PT-26a < PT-26b <
+    PT-27 falls out with NO change to the tuple shape or its callers.
     """
     s = str(issue_id or "")
     m = _ID_SORT_RE.match(s)
@@ -5242,8 +5369,19 @@ def make_server(
             # it would surface as an uncaught-exception 500. 400
             # legacy_archive is the truthful status: a client retry can't
             # fix this, only running the migration can.
+            #
+            # POLY-51 (ruling §2): the letter path's three `parent`-validity
+            # refusals raise the more specific BadParentError -- caught
+            # FIRST (it subclasses CairnError) so they map to 400
+            # `bad_parent` instead of falling into the legacy-archive
+            # branch's code, which would be a truthful status for the wrong
+            # reason (a client CAN fix a bad `parent`, just not by retrying
+            # the identical request).
             try:
                 new_path = allocate_and_create_issue(data_dir, fields)
+            except BadParentError as e:
+                self._send_json(400, {"error": "bad_parent", "message": str(e)})
+                return
             except CairnError as e:
                 self._send_json(400, {"error": "legacy_archive", "message": str(e)})
                 return

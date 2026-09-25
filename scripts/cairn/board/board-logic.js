@@ -471,7 +471,13 @@ var CairnLogic = (function () {
   // back to [full, -1, full] for anything that doesn't match
   // "<prefix>-<digits>", so a malformed id still sorts (just not
   // meaningfully) instead of throwing.
-  var ID_SORT_RE = /^(.*?)-(\d+)$/;
+  //
+  // POLY-51 (ruling §1): the trailing `[a-z]?` keeps a sub-issue's own
+  // number as the tuple's numeric slot ("PT-26a" keys to the same
+  // [prefix, n] as "PT-26"); the full-string tiebreak (a string is always
+  // less than its own suffixed extension) is what orders PT-26 < PT-26a <
+  // PT-26b < PT-27, with no change to the tuple shape or its callers.
+  var ID_SORT_RE = /^(.*?)-(\d+)[a-z]?$/;
   function idSortKey(id) {
     var s = id == null ? "" : String(id);
     var m = ID_SORT_RE.exec(s);
