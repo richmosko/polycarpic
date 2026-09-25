@@ -35,7 +35,7 @@ Exit 0 → already up. **PT-49: read `engine.stale` off that same response** (no
 ### 3. Handle `stop`
 
 ```bash
-pid="$(lsof -ti :${CAIRN_PORT:-8766} 2>/dev/null | head -1)"
+pid="$(lsof -ti TCP:${CAIRN_PORT:-8766} -sTCP:LISTEN 2>/dev/null | head -1)"   # LISTEN only: a bare port match returns client connections (browser, curl) first
 [ -z "$pid" ] && pid="$(pgrep -f 'cairn(\.py)? serve' | head -1)"
 if [ -n "$pid" ]; then kill "$pid" && echo "Stopped cairn board (PID $pid)"; else echo "No cairn server found."; fi
 ```
