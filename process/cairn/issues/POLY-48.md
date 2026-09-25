@@ -39,3 +39,15 @@ Feature started. Branch: `feature/poly-48-estimation-engine-fixes`.
 ### @architect — 2026-09-25
 
 Gate-1 ruling: scripts/cairn/design/estimation-engine-fixes.md. (a) POLY-15: unpriced model keeps actual.cost_usd null + named warning. (b) POLY-47: --at token ceiling admits the first flush after the commit, within 1800 s; window.to records it. (c) guard-push: allowed paths = own ∪ same-parent same-assignee siblings' paths. (d) close from a linked worktree exits 2, names the main checkout, writes nothing. Sub-issues POLY-48a..d; lanes per paths:.
+### @implementation-lead — 2026-09-25
+
+Prep done (not building yet — waiting on architect ruling sha + qa red-test sha per assignment).
+
+No-ruling items, confirmed straightforward:
+- POLY-33: one-line fix, cairn.py:6497 key `actual.tokens is None` -> `actual.gate_cycles is None`.
+- bad_parent (item 7): only a-z letter exhaustion (cairn.py:~1295, plain CairnError) still maps to `legacy_archive`; the other two `--parent` refusals already return `bad_parent` since POLY-51. Architect's own POLY-51 follow-up (a) already names this fix.
+- Shared helper (item 8): the two O_EXCL loops (cairn.py:1281-1303, 1349-1366) are near-identical, factor one helper.
+
+Bubble-up: POLY-15 AC2 looks already resolved by POLY-34's landed ruling (estimation.md §0.2 "unchanged posture") and TRACKER.md:227 (null-on-unpriced, never partial, already stated). Worth confirming with architect whether item 1 just needs POLY-15 closed with a link to POLY-34, rather than a fresh ruling.
+
+Still blocked on architect's ruling for guard-push scope (item 6, cmd_guard_push ~6732) and close-from-worktree refusal (item 9, cmd_close ~6986 / resolve_data_dir).
