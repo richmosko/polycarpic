@@ -1,6 +1,6 @@
 """POLY-57 RED tests (repo-side): gate-1 rulings become audit records
-under `process/reviews/<ID>/ruling.md`, moved byte-for-byte out of the
-old `scripts/cairn/design/` directory. Gate-1 ruling
+under `process/reviews/<ID>/ruling.md`, moved byte-for-byte out of
+cairn's old design-notes directory. Gate-1 ruling
 (process/reviews/POLY-57/ruling.md @ ab8063b) §4: this check belongs in
 `tests/workflow/`, not `scripts/cairn/tests/`, because its subject spans
 the whole repo (TRACKER.md, WORKFLOW.md, every issue file, cairn's own
@@ -36,8 +36,9 @@ import workflow_helpers
 
 REPO_ROOT = workflow_helpers.REPO_ROOT
 
-# The five rulings that moved out of scripts/cairn/design/, and the git
-# blob sha1 each held at f686787 -- the tip this feature branched from.
+# The five rulings that moved out of cairn's old design-notes directory,
+# and the git blob sha1 each held at f686787 -- the tip this feature
+# branched from.
 # Computed with `git rev-parse f686787:<old path>` from the main
 # checkout; a byte-identical move preserves this hash exactly (git's
 # blob hash is content-only, path-independent).
@@ -49,18 +50,22 @@ RULING_BLOBS = {
     "POLY-51": "62fb1aa5b4e5cb757ae670708f6e25c01ce8b546",
 }
 
-# The ruling's own §2 "Predicate for done" command -- same argv git grep
-# receives at runtime, but every needle is built from two literals (never
-# one contiguous string in this file's own source text) so this guard's
-# own source, which necessarily names its targets, can't match itself.
+# The ruling's own §2 "Predicate for done" command, corrected by addendum
+# 2 (POLY-57a, issue comment 2026-09-25): needles match FILENAMES only,
+# each carrying its `.md` suffix (the directory needle keeps its trailing
+# slash) -- otherwise a branch name like `feature/poly-6-test-boundary-ci`
+# or a bare topic word would false-positive. Same argv git grep receives
+# at runtime, but every needle is built from two literals (never one
+# contiguous string in this file's own source text) so this guard's own
+# source, which necessarily names its targets, can't match itself.
 GREP_PREDICATE_CMD = [
     "git", "grep", "-n",
-    "-e", "cairn" + "/design",
-    "-e", "test-boundary" + "-ci",
-    "-e", "telemetry" + "-attribution",
-    "-e", "backfill-sibling" + "-scan",
-    "-e", "sub-issue-letter" + "-ids",
-    "-e", "estimation-engine" + "-fixes",
+    "-e", "cairn" + "/design/",
+    "-e", "test-boundary-ci" + ".md",
+    "-e", "telemetry-attribution" + ".md",
+    "-e", "backfill-sibling-scan" + ".md",
+    "-e", "sub-issue-letter-ids" + ".md",
+    "-e", "estimation-engine-fixes" + ".md",
     "--",
     ":!process/reviews",
     ":!process/cairn/issues/POLY-57*",
