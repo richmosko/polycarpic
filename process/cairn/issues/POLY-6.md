@@ -10,7 +10,7 @@ labels: [workflow, cairn, tests, ci]
 priority: P2
 pr: null
 created: 2026-09-23
-updated: 2026-09-24
+updated: 2026-09-25
 ---
 cairn is isolated in practice, not by declaration: all tracker code and its tests live under `scripts/cairn/`, `run_tests.py` discovers only `scripts/cairn/tests/`, and there is no CI. Several files there guard repo conventions (STATE.md releases row, agent-definition drift, worktree protocol block, git identity) rather than the tracker, which couples a future `/spin-off-component` of cairn to project-specific checks. Full history in the comments below.
 
@@ -53,3 +53,10 @@ Scope added 2026-09-24 (user): the first CI workflow lands here too — one path
 
 Feature started. Branch: `feature/poly-6-test-boundary-ci`. Attached to milestone POLY-A (was unscheduled) as a workflow item, P3 → P2, at the user's request 2026-09-24.
 Lead estimate at start (calibration input; prior: POLY-5 21 min, POLY-3 95 min/32 commits, POLY-16 37 min/15, POLY-10 62 min/13): 18 commits, 2 gate cycles, ~70 min spawn→merge. Five ACs across four owners (architect, qa, implementation-lead, devops-engineer); the branch-protection registration is a user action after the workflow's first run.
+
+### @architect — 2026-09-25
+
+Gate-1 ruling: read `scripts/cairn/design/test-boundary-ci.md` @ 615b94e (AC1–AC5, measured at 460cf6c).
+- AC1: 5 files / 50 tests move to `tests/workflow/`; discovered as an optional second root in `run_tests.py` (one gate command, hooks unchanged).
+- AC4: three `migrate` commands + 77 tests deleted; detection lints stay, fix hints go. Token backfill NOT retired (re-runnable correction path per TRACKER.md, POLY-26 open, receiver uses 15 module names), so that AC4 item is struck.
+- AC5: one job `cairn` (the required-check name), no workflow-level `paths:` (a required check would hang); fail-closed step-level change filter; JS runs minus `token-chart-logic.test.js` until POLY-8.
