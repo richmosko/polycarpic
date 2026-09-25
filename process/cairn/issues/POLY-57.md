@@ -65,3 +65,9 @@ Feature started. Branch: `feature/poly-57-cairn-docs-cleanup`.
 
 **Tests (qa, red first):** `scripts/cairn/tests/test_docs_layout.py` (cairn side) plus one `tests/workflow/` check (ruling blobs, grep predicate). Retarget the two theme tests to `board/theme/`. Details are in ruling.md §4.
 **Guards:** suite + `tests/workflow` green; `cairn check` clean; dist fresh; the generator leaves the tree clean; the TRACKER/estimation diff contains only path edits plus the two sentences.
+
+### @architect — 2026-09-25
+
+**Addendum 1 (POLY-57a) — two facts, no change to the ruling.**
+- The `--at` ceiling bullet (`estimation.md` L461) was already corrected at `f7faaae`. The one remaining POLY-48 statement is the §2 Tokens formula line (`<= close_ts`), which ruling item 2 corrects.
+- Generator path math: under `board/theme/`, `SCRIPT_DIR.parents[1]` resolves to `scripts/cairn` (ruling item 1). Two functional test paths break on the move and are qa's to fix: `test_theme_variants_generator.py` L51 (`DESIGN_DIR`) and `test_theme_bootstrap_and_dropdown.py` L76.
