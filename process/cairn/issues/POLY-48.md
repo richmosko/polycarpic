@@ -1,7 +1,7 @@
 ---
 id: POLY-48
 title: Estimation-engine fixes (grouped): unpriced-model cost, check warning key, fixture hygiene, close --at flush ceiling, guard-push same-assignee scope, JS gate node_modules
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -89,3 +89,7 @@ Loop closed at the approving verdicts (architect approve @ d5a806a, qa PASS @ 38
 ### @team-lead — 2026-09-25
 
 PR opened: https://github.com/richmosko/polycarpic/pull/16. Awaiting Validate.
+
+### @team-lead — 2026-09-25
+
+Validate passed; merging via PR #16. Closing.
