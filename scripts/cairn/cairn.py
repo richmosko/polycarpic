@@ -79,8 +79,9 @@ MILESTONE_KINDS = {"process", "product"}
 # vocabulary are related but distinct, and a milestone must never be able
 # to carry `status: backlog` just because the two sets happened to be the
 # same object. `completed` -> `done`, `active` -> `in-progress` is the
-# migration this replaces (see migrate_lifecycle_status below); `paused`
-# was already documented for milestones and is extended to majors here.
+# rewrite the retired `migrate lifecycle-status` one-shot used to apply
+# (POLY-6 deleted it; the detection lint stays); `paused` was already
+# documented for milestones and is extended to majors here.
 RECORD_STATUSES = {"planned", "in-progress", "paused", "done", "cancelled"}
 MILESTONE_FIELD_ORDER = ["id", "name", "kind", "major", "status", "target_tag", "ga"]
 MAJOR_FIELD_ORDER = ["id", "status", "owner", "target_ship", "health"]
@@ -1098,12 +1099,14 @@ def legacy_archived_issue_paths(data_dir: Path) -> List[Path]:
     """The legacy flat `archive/*.md` layout PT-52 stopped reading -- NOT
     a general-purpose helper; it exists for exactly two callers, and both
     must stay in lockstep: `check_repo`'s legacy-layout lint scan (so the
-    reported count is accurate) and `migrate_archive_issues`'s source glob
-    (so the migration moves precisely the files the lint complained
-    about). If the lint ever reported a file the migration didn't move,
-    the error would be unactionable -- one definition point is what keeps
-    that impossible. `_dir_glob` is non-recursive, so this never touches
-    `archive/issues/`, `archive/milestones/`, or `archive/majors/`.
+    reported count is accurate) and `allocate_and_create_issue`'s
+    allocation guard (so it refuses to allocate over exactly the files the
+    lint complains about). POLY-6 deleted the third caller,
+    `migrate_archive_issues` (its source glob used this same helper) --
+    if the lint ever reported a file the allocation guard didn't also
+    see, the error would be unactionable -- one definition point is what
+    keeps that impossible. `_dir_glob` is non-recursive, so this never
+    touches `archive/issues/`, `archive/milestones/`, or `archive/majors/`.
     """
     data_dir = Path(data_dir)
     return _dir_glob(data_dir / "archive")
