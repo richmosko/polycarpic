@@ -1396,6 +1396,75 @@ class EnsureRunningAgainstAnAlreadyRunningReceiverRegistersTheCallerTests(unitte
         self.assertIn("session s2", status.stdout, f"the stdin-sourced session id must be listed by name -- {status.stdout!r}")
 
 
+class RegisterBeforeH1GateTests(unittest.TestCase):
+    """POLY-49 gate-1 ruling §1/§4: Claude Code >= 2.1.282 strips
+    `CLAUDE_CODE_ENABLE_TELEMETRY` from hook env (M7/M8) -- with H1
+    gating BEFORE registration (today's order), that silently drops
+    every session's registration whenever telemetry is off in-process,
+    exactly the "missing sessions" root cause M8 measured. Ruled fix:
+    `register_session` moves ABOVE the H1 gate; H1 still gates only the
+    SPAWN, and its decline now prints one exact stderr line."""
+
+    DECLINE_MESSAGE = (
+        "otel_receiver: not starting -- CLAUDE_CODE_ENABLE_TELEMETRY is not set in this "
+        "process; Claude Code >= 2.1.282 reads telemetry vars from ~/.claude/settings.json, "
+        "not project settings"
+    )
+
+    def test_telemetry_off_still_writes_the_registration_file_no_spawn(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _minimal_env()  # no CLAUDE_CODE_ENABLE_TELEMETRY at all
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        result = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid())], env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            result.stderr.strip(), self.DECLINE_MESSAGE,
+            f"expected the exact H1-decline stderr line -- got {result.stderr!r}",
+        )
+        self.assertFalse(_log_path(fake_root).exists(), "telemetry off must spawn nothing at all")
+        self.assertFalse(_pidfile_path(fake_root).exists(), "no daemon means no pidfile")
+
+        sessions_dir = fake_root / "process" / "cairn" / "metrics" / ".sessions"
+        registration = sessions_dir / "s1"
+        self.assertTrue(
+            registration.is_file(),
+            f"the registration file must still be written even though nothing spawned -- "
+            f"expected {registration} to exist",
+        )
+        self.assertEqual(registration.read_text(encoding="utf-8").strip(), str(os.getpid()))
+
+    def test_telemetry_off_still_registers_against_an_already_running_receiver(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        running_env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, running_env)
+
+        first = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid())], env=running_env,
+        )
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        _wait_for_status_running(fake_root, running_env)
+
+        # SECOND call has telemetry OFF -- H1 would decline (irrelevant,
+        # a receiver is already up) -- registration must still happen.
+        off_env = _minimal_env()
+        second = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "s2", "--session-pid", str(os.getpid())], env=off_env,
+        )
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+
+        status = run_fake_receiver(fake_root, ["--status"], env=running_env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn(
+            "session s2", status.stdout,
+            f"a telemetry-off caller must still register against an ALREADY-RUNNING receiver -- got {status.stdout!r}",
+        )
+
+
 class StatusListsEverySessionWhoseHookRanTests(unittest.TestCase):
     """POLY-49 AC: "`--status` lists every session whose hook ran since
     the receiver started." Four registrations via the documented
