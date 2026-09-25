@@ -64,7 +64,7 @@ REPO_ROOT = helpers.CAIRN_DIR.parent.parent
 BOARD_VARIANTS_CSS = helpers.CAIRN_DIR / "board" / "variants.css"
 DOCS_VARIANTS_CSS = REPO_ROOT / "docs" / "DESIGN" / "variants.css"
 ALL_THREE_COPIES = (BOARD_VARIANTS_CSS, DASHBOARD_VARIANTS_CSS, DOCS_VARIANTS_CSS)
-GEN_VARIANTS_PY = helpers.CAIRN_DIR / "design" / "gen_variants.py"
+GEN_VARIANTS_PY = helpers.CAIRN_DIR / "board" / "theme" / "gen_variants.py"
 
 # Ruling's adopted mapping (ux-designer's design-2), verbatim.
 FLOW_MAPPING = {
