@@ -38,6 +38,7 @@ import collections
 import datetime
 import hashlib
 import http.server
+import itertools
 import json
 import os
 import queue
@@ -51,7 +52,7 @@ import threading
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple
 
 # --------------------------------------------------------------------------
 # Constants
@@ -291,14 +292,29 @@ class ConflictError(CairnError):
 
 
 class BadParentError(CairnError):
-    """Raised by allocate_and_create_issue's letter path (POLY-51 ruling §2
-    steps 2-3): `--parent X` where X doesn't resolve, or X is itself a
-    sub-issue (suffixed or a legacy numbered one -- sub-issues nest one
-    level only). NOT raised for a..z letter exhaustion under a valid parent
-    (that stays a plain CairnError -- there's nothing invalid about the
-    parent itself). A distinct subclass exists only so `_create_issue` can
-    map these three `parent`-validity refusals to 400 `bad_parent`, while
-    the legacy-archive guard keeps its own `legacy_archive` code.
+    """Raised by allocate_and_create_issue's letter path: `--parent X`
+    where X doesn't resolve, or X is itself a sub-issue (suffixed or a
+    legacy numbered one -- sub-issues nest one level only) (POLY-51 ruling
+    §2 steps 2-3) -- AND, since POLY-48 item 7 (gate-1 ruling
+    estimation-engine-fixes.md §1, "confirmed as filed"), a..z letter
+    exhaustion under an otherwise-valid parent (both raise sites:
+    `_next_sub_issue_letter` and `_allocate_sub_issue`'s retry loop). A
+    client can fix any of these four cases by retrying with a different
+    `--parent` or waiting for a letter to free up -- unlike the legacy-
+    archive guard below, which no retry of the identical request can fix.
+    A distinct subclass exists only so `_create_issue` can map it to 400
+    `bad_parent`.
+    """
+
+
+class LegacyArchiveError(CairnError):
+    """Raised by allocate_and_create_issue's legacy-layout guard (PT-52
+    §3): a repo carrying an archived issue at the pre-migration
+    `archive/*.md` layout must not allocate a new id, since it could
+    collide with one an archived issue already holds. Distinct from
+    `BadParentError` (POLY-48 item 7) so `_create_issue` can map it to its
+    own 400 `legacy_archive` -- a client retry of the identical request
+    can't fix this, only running the migration can.
     """
 
 
@@ -1240,8 +1256,8 @@ def _next_sub_issue_letter(data_dir: Path, parent_id: str) -> str:
     ruling §2 step 4): max(letters) + 1 over stems matching
     `_sub_issue_letter_re(parent_id)` in both `issues/` and
     `archive/issues/` -- no gap reuse (`a`, `c` present -> `d`, never `b`).
-    Raises CairnError, before any file is written, once a..z is already
-    exhausted among the existing siblings.
+    Raises BadParentError (POLY-48 item 7), before any file is written,
+    once a..z is already exhausted among the existing siblings.
     """
     letter_re = _sub_issue_letter_re(parent_id)
     data_dir = Path(data_dir)
@@ -1255,16 +1271,75 @@ def _next_sub_issue_letter(data_dir: Path, parent_id: str) -> str:
             max_ord = max(max_ord, ord(m.group(1)) - ord("a"))
     next_ord = max_ord + 1
     if next_ord >= 26:
-        raise CairnError(f"parent {parent_id} has exhausted sub-issue letters a..z")
+        raise BadParentError(f"parent {parent_id} has exhausted sub-issue letters a..z")
     return chr(ord("a") + next_ord)
+
+
+class _IdsExhausted(Exception):
+    """Private signal from `_claim_issue_file` (POLY-48 item 8): its `ids`
+    iterable ran out with no free id claimed. Never a `CairnError` itself
+    -- each of the two callers catches it and raises its own,
+    differently-worded error (a numeric attempt budget vs a letter
+    range), the same way they did before the loop bodies were shared.
+    """
+
+
+def _claim_issue_file(issues_dir: Path, ids: Iterable[str], fields: Dict[str, Any], today_str: str) -> Path:
+    """The O_CREAT|O_EXCL claim-and-write loop shared by the numeric and
+    letter paths of `allocate_and_create_issue` (POLY-48 item 8, follow-up
+    (b) from the POLY-51 review, POLY-51.md @ 006848e). Tries each
+    candidate id from `ids` in order, claims the first one not already on
+    disk, and writes `fields` (plus `id`/`created`/`updated`) to it
+    atomically. Returns the claimed path; raises `_IdsExhausted` once
+    `ids` is spent with nothing claimed.
+    """
+    for issue_id in ids:
+        path = issues_dir / f"{issue_id}.md"
+        full_fields = dict(fields)
+        full_fields["id"] = issue_id
+        full_fields["created"] = today_str
+        full_fields["updated"] = today_str
+        content = dump_frontmatter(full_fields) + "\n"
+        try:
+            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            continue
+        try:
+            os.write(fd, content.encode("utf-8"))
+        finally:
+            os.close(fd)
+        return path
+    raise _IdsExhausted()
+
+
+def _numeric_id_candidates(prefix: str, n: int) -> Iterator[str]:
+    """`<prefix>-<n>`, `<prefix>-<n+1>`, ... forever (POLY-48 item 8) --
+    bounded by the caller's `itertools.islice(..., max_attempts)`, the
+    numeric path's own budget."""
+    while True:
+        yield f"{prefix}-{n}"
+        n += 1
+
+
+def _letter_id_candidates(parent_id: str, letter: str) -> Iterator[str]:
+    """`<parent_id>a`, `<parent_id>b`, ... up to and including `z`, then
+    stops (POLY-48 item 8) -- the letter path's own bound, independent of
+    `max_attempts`."""
+    while True:
+        yield f"{parent_id}{letter}"
+        next_ord = ord(letter) - ord("a") + 1
+        if next_ord >= 26:
+            return
+        letter = chr(ord("a") + next_ord)
 
 
 def _allocate_sub_issue(
     data_dir: Path, issues_dir: Path, parent_id: str, fields: Dict[str, Any], today_str: str, max_attempts: int,
 ) -> Path:
     """The `--parent X` half of `allocate_and_create_issue` (POLY-51 ruling
-    §2): validates `X`, then claims `X<letter>` with the same O_CREAT|O_EXCL
-    retry-on-collision discipline the numeric path uses.
+    §2): validates `X`, then claims `X<letter>` via `_claim_issue_file`,
+    the same O_CREAT|O_EXCL retry-on-collision discipline the numeric path
+    uses.
     """
     parent_path = find_issue_path(data_dir, parent_id)
     if parent_path is None:
@@ -1279,28 +1354,10 @@ def _allocate_sub_issue(
         raise BadParentError(f"parent {parent_id} is itself a sub-issue -- sub-issues nest one level")
 
     letter = _next_sub_issue_letter(data_dir, parent_id)
-    for _ in range(max_attempts):
-        issue_id = f"{parent_id}{letter}"
-        path = issues_dir / f"{issue_id}.md"
-        full_fields = dict(fields)
-        full_fields["id"] = issue_id
-        full_fields["created"] = today_str
-        full_fields["updated"] = today_str
-        content = dump_frontmatter(full_fields) + "\n"
-        try:
-            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            next_ord = ord(letter) - ord("a") + 1
-            if next_ord >= 26:
-                raise CairnError(f"parent {parent_id} has exhausted sub-issue letters a..z")
-            letter = chr(ord("a") + next_ord)
-            continue
-        try:
-            os.write(fd, content.encode("utf-8"))
-        finally:
-            os.close(fd)
-        return path
-    raise CairnError(f"could not allocate a sub-issue id for parent {parent_id!r} after {max_attempts} attempts")
+    try:
+        return _claim_issue_file(issues_dir, _letter_id_candidates(parent_id, letter), fields, today_str)
+    except _IdsExhausted:
+        raise BadParentError(f"parent {parent_id} has exhausted sub-issue letters a..z")
 
 
 def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attempts: int = 50) -> Path:
@@ -1330,7 +1387,7 @@ def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attemp
     data_dir = Path(data_dir)
     legacy = legacy_archived_issue_paths(data_dir)
     if legacy:
-        raise CairnError(
+        raise LegacyArchiveError(
             f"{len(legacy)} archived issue(s) at the legacy archive/*.md layout -- refusing to allocate a "
             f"new id (it could collide with one an archived issue already holds)."
         )
@@ -1345,26 +1402,11 @@ def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attemp
         return _allocate_sub_issue(data_dir, issues_dir, str(parent), fields, today_str, max_attempts)
 
     n = _next_id_candidate(data_dir, prefix)
-
-    for _ in range(max_attempts):
-        issue_id = f"{prefix}-{n}"
-        path = issues_dir / f"{issue_id}.md"
-        full_fields = dict(fields)
-        full_fields["id"] = issue_id
-        full_fields["created"] = today_str
-        full_fields["updated"] = today_str
-        content = dump_frontmatter(full_fields) + "\n"
-        try:
-            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            n += 1
-            continue
-        try:
-            os.write(fd, content.encode("utf-8"))
-        finally:
-            os.close(fd)
-        return path
-    raise CairnError(f"could not allocate an ID for prefix {prefix!r} after {max_attempts} attempts")
+    candidates = itertools.islice(_numeric_id_candidates(prefix, n), max_attempts)
+    try:
+        return _claim_issue_file(issues_dir, candidates, fields, today_str)
+    except _IdsExhausted:
+        raise CairnError(f"could not allocate an ID for prefix {prefix!r} after {max_attempts} attempts")
 
 
 # --------------------------------------------------------------------------
@@ -5364,26 +5406,32 @@ def make_server(
                 "priority": payload.get("priority"),
                 "pr": None,
             }
-            # PT-52 §3: allocate_and_create_issue's legacy-layout guard
-            # raises CairnError on an unmigrated repo -- without this catch
-            # it would surface as an uncaught-exception 500. 400
-            # legacy_archive is the truthful status: a client retry can't
-            # fix this, only running the migration can.
-            #
-            # POLY-51 (ruling §2): the letter path's three `parent`-validity
-            # refusals raise the more specific BadParentError -- caught
-            # FIRST (it subclasses CairnError) so they map to 400
-            # `bad_parent` instead of falling into the legacy-archive
-            # branch's code, which would be a truthful status for the wrong
-            # reason (a client CAN fix a bad `parent`, just not by retrying
-            # the identical request).
+            # PT-52 §3 / POLY-51 ruling §2 / POLY-48 item 7 (gate-1 ruling
+            # estimation-engine-fixes.md §1, "confirmed as filed"):
+            # allocate_and_create_issue raises one of three named errors,
+            # each caught before the plain-`CairnError` fallback (both
+            # subclass it) so they map to distinct, truthful HTTP codes:
+            #   - LegacyArchiveError (the legacy-layout guard): 400
+            #     legacy_archive -- a client retry of the identical request
+            #     can't fix this, only running the migration can.
+            #   - BadParentError (an unresolvable/nested `--parent`, OR
+            #     a..z letter exhaustion under a valid parent): 400
+            #     bad_parent -- a client CAN fix this, by retrying with a
+            #     different `--parent` or once a letter frees up.
+            #   - anything else (e.g. the numeric path's own attempt-budget
+            #     exhaustion): 409 allocation_failed -- a transient
+            #     collision under concurrent allocation; retrying the same
+            #     request can plausibly succeed next time.
             try:
                 new_path = allocate_and_create_issue(data_dir, fields)
+            except LegacyArchiveError as e:
+                self._send_json(400, {"error": "legacy_archive", "message": str(e)})
+                return
             except BadParentError as e:
                 self._send_json(400, {"error": "bad_parent", "message": str(e)})
                 return
             except CairnError as e:
-                self._send_json(400, {"error": "legacy_archive", "message": str(e)})
+                self._send_json(409, {"error": "allocation_failed", "message": str(e)})
                 return
             self._send_json(200, build_issue_payload(data_dir, new_path.stem))
 
