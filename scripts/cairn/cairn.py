@@ -38,6 +38,7 @@ import collections
 import datetime
 import hashlib
 import http.server
+import itertools
 import json
 import os
 import queue
@@ -51,7 +52,7 @@ import threading
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, NamedTuple, Optional, Set, Tuple
 
 # --------------------------------------------------------------------------
 # Constants
@@ -291,14 +292,29 @@ class ConflictError(CairnError):
 
 
 class BadParentError(CairnError):
-    """Raised by allocate_and_create_issue's letter path (POLY-51 ruling §2
-    steps 2-3): `--parent X` where X doesn't resolve, or X is itself a
-    sub-issue (suffixed or a legacy numbered one -- sub-issues nest one
-    level only). NOT raised for a..z letter exhaustion under a valid parent
-    (that stays a plain CairnError -- there's nothing invalid about the
-    parent itself). A distinct subclass exists only so `_create_issue` can
-    map these three `parent`-validity refusals to 400 `bad_parent`, while
-    the legacy-archive guard keeps its own `legacy_archive` code.
+    """Raised by allocate_and_create_issue's letter path: `--parent X`
+    where X doesn't resolve, or X is itself a sub-issue (suffixed or a
+    legacy numbered one -- sub-issues nest one level only) (POLY-51 ruling
+    §2 steps 2-3) -- AND, since POLY-48 item 7 (gate-1 ruling
+    estimation-engine-fixes.md §1, "confirmed as filed"), a..z letter
+    exhaustion under an otherwise-valid parent (both raise sites:
+    `_next_sub_issue_letter` and `_allocate_sub_issue`'s retry loop). A
+    client can fix any of these four cases by retrying with a different
+    `--parent` or waiting for a letter to free up -- unlike the legacy-
+    archive guard below, which no retry of the identical request can fix.
+    A distinct subclass exists only so `_create_issue` can map it to 400
+    `bad_parent`.
+    """
+
+
+class LegacyArchiveError(CairnError):
+    """Raised by allocate_and_create_issue's legacy-layout guard (PT-52
+    §3): a repo carrying an archived issue at the pre-migration
+    `archive/*.md` layout must not allocate a new id, since it could
+    collide with one an archived issue already holds. Distinct from
+    `BadParentError` (POLY-48 item 7) so `_create_issue` can map it to its
+    own 400 `legacy_archive` -- a client retry of the identical request
+    can't fix this, only running the migration can.
     """
 
 
@@ -1240,8 +1256,8 @@ def _next_sub_issue_letter(data_dir: Path, parent_id: str) -> str:
     ruling §2 step 4): max(letters) + 1 over stems matching
     `_sub_issue_letter_re(parent_id)` in both `issues/` and
     `archive/issues/` -- no gap reuse (`a`, `c` present -> `d`, never `b`).
-    Raises CairnError, before any file is written, once a..z is already
-    exhausted among the existing siblings.
+    Raises BadParentError (POLY-48 item 7), before any file is written,
+    once a..z is already exhausted among the existing siblings.
     """
     letter_re = _sub_issue_letter_re(parent_id)
     data_dir = Path(data_dir)
@@ -1255,16 +1271,75 @@ def _next_sub_issue_letter(data_dir: Path, parent_id: str) -> str:
             max_ord = max(max_ord, ord(m.group(1)) - ord("a"))
     next_ord = max_ord + 1
     if next_ord >= 26:
-        raise CairnError(f"parent {parent_id} has exhausted sub-issue letters a..z")
+        raise BadParentError(f"parent {parent_id} has exhausted sub-issue letters a..z")
     return chr(ord("a") + next_ord)
+
+
+class _IdsExhausted(Exception):
+    """Private signal from `_claim_issue_file` (POLY-48 item 8): its `ids`
+    iterable ran out with no free id claimed. Never a `CairnError` itself
+    -- each of the two callers catches it and raises its own,
+    differently-worded error (a numeric attempt budget vs a letter
+    range), the same way they did before the loop bodies were shared.
+    """
+
+
+def _claim_issue_file(issues_dir: Path, ids: Iterable[str], fields: Dict[str, Any], today_str: str) -> Path:
+    """The O_CREAT|O_EXCL claim-and-write loop shared by the numeric and
+    letter paths of `allocate_and_create_issue` (POLY-48 item 8, follow-up
+    (b) from the POLY-51 review, POLY-51.md @ 006848e). Tries each
+    candidate id from `ids` in order, claims the first one not already on
+    disk, and writes `fields` (plus `id`/`created`/`updated`) to it
+    atomically. Returns the claimed path; raises `_IdsExhausted` once
+    `ids` is spent with nothing claimed.
+    """
+    for issue_id in ids:
+        path = issues_dir / f"{issue_id}.md"
+        full_fields = dict(fields)
+        full_fields["id"] = issue_id
+        full_fields["created"] = today_str
+        full_fields["updated"] = today_str
+        content = dump_frontmatter(full_fields) + "\n"
+        try:
+            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+        except FileExistsError:
+            continue
+        try:
+            os.write(fd, content.encode("utf-8"))
+        finally:
+            os.close(fd)
+        return path
+    raise _IdsExhausted()
+
+
+def _numeric_id_candidates(prefix: str, n: int) -> Iterator[str]:
+    """`<prefix>-<n>`, `<prefix>-<n+1>`, ... forever (POLY-48 item 8) --
+    bounded by the caller's `itertools.islice(..., max_attempts)`, the
+    numeric path's own budget."""
+    while True:
+        yield f"{prefix}-{n}"
+        n += 1
+
+
+def _letter_id_candidates(parent_id: str, letter: str) -> Iterator[str]:
+    """`<parent_id>a`, `<parent_id>b`, ... up to and including `z`, then
+    stops (POLY-48 item 8) -- the letter path's own bound, independent of
+    `max_attempts`."""
+    while True:
+        yield f"{parent_id}{letter}"
+        next_ord = ord(letter) - ord("a") + 1
+        if next_ord >= 26:
+            return
+        letter = chr(ord("a") + next_ord)
 
 
 def _allocate_sub_issue(
     data_dir: Path, issues_dir: Path, parent_id: str, fields: Dict[str, Any], today_str: str, max_attempts: int,
 ) -> Path:
     """The `--parent X` half of `allocate_and_create_issue` (POLY-51 ruling
-    §2): validates `X`, then claims `X<letter>` with the same O_CREAT|O_EXCL
-    retry-on-collision discipline the numeric path uses.
+    §2): validates `X`, then claims `X<letter>` via `_claim_issue_file`,
+    the same O_CREAT|O_EXCL retry-on-collision discipline the numeric path
+    uses.
     """
     parent_path = find_issue_path(data_dir, parent_id)
     if parent_path is None:
@@ -1279,28 +1354,10 @@ def _allocate_sub_issue(
         raise BadParentError(f"parent {parent_id} is itself a sub-issue -- sub-issues nest one level")
 
     letter = _next_sub_issue_letter(data_dir, parent_id)
-    for _ in range(max_attempts):
-        issue_id = f"{parent_id}{letter}"
-        path = issues_dir / f"{issue_id}.md"
-        full_fields = dict(fields)
-        full_fields["id"] = issue_id
-        full_fields["created"] = today_str
-        full_fields["updated"] = today_str
-        content = dump_frontmatter(full_fields) + "\n"
-        try:
-            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            next_ord = ord(letter) - ord("a") + 1
-            if next_ord >= 26:
-                raise CairnError(f"parent {parent_id} has exhausted sub-issue letters a..z")
-            letter = chr(ord("a") + next_ord)
-            continue
-        try:
-            os.write(fd, content.encode("utf-8"))
-        finally:
-            os.close(fd)
-        return path
-    raise CairnError(f"could not allocate a sub-issue id for parent {parent_id!r} after {max_attempts} attempts")
+    try:
+        return _claim_issue_file(issues_dir, _letter_id_candidates(parent_id, letter), fields, today_str)
+    except _IdsExhausted:
+        raise BadParentError(f"parent {parent_id} has exhausted sub-issue letters a..z")
 
 
 def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attempts: int = 50) -> Path:
@@ -1330,7 +1387,7 @@ def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attemp
     data_dir = Path(data_dir)
     legacy = legacy_archived_issue_paths(data_dir)
     if legacy:
-        raise CairnError(
+        raise LegacyArchiveError(
             f"{len(legacy)} archived issue(s) at the legacy archive/*.md layout -- refusing to allocate a "
             f"new id (it could collide with one an archived issue already holds)."
         )
@@ -1345,26 +1402,11 @@ def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attemp
         return _allocate_sub_issue(data_dir, issues_dir, str(parent), fields, today_str, max_attempts)
 
     n = _next_id_candidate(data_dir, prefix)
-
-    for _ in range(max_attempts):
-        issue_id = f"{prefix}-{n}"
-        path = issues_dir / f"{issue_id}.md"
-        full_fields = dict(fields)
-        full_fields["id"] = issue_id
-        full_fields["created"] = today_str
-        full_fields["updated"] = today_str
-        content = dump_frontmatter(full_fields) + "\n"
-        try:
-            fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-        except FileExistsError:
-            n += 1
-            continue
-        try:
-            os.write(fd, content.encode("utf-8"))
-        finally:
-            os.close(fd)
-        return path
-    raise CairnError(f"could not allocate an ID for prefix {prefix!r} after {max_attempts} attempts")
+    candidates = itertools.islice(_numeric_id_candidates(prefix, n), max_attempts)
+    try:
+        return _claim_issue_file(issues_dir, candidates, fields, today_str)
+    except _IdsExhausted:
+        raise CairnError(f"could not allocate an ID for prefix {prefix!r} after {max_attempts} attempts")
 
 
 # --------------------------------------------------------------------------
@@ -5364,26 +5406,32 @@ def make_server(
                 "priority": payload.get("priority"),
                 "pr": None,
             }
-            # PT-52 §3: allocate_and_create_issue's legacy-layout guard
-            # raises CairnError on an unmigrated repo -- without this catch
-            # it would surface as an uncaught-exception 500. 400
-            # legacy_archive is the truthful status: a client retry can't
-            # fix this, only running the migration can.
-            #
-            # POLY-51 (ruling §2): the letter path's three `parent`-validity
-            # refusals raise the more specific BadParentError -- caught
-            # FIRST (it subclasses CairnError) so they map to 400
-            # `bad_parent` instead of falling into the legacy-archive
-            # branch's code, which would be a truthful status for the wrong
-            # reason (a client CAN fix a bad `parent`, just not by retrying
-            # the identical request).
+            # PT-52 §3 / POLY-51 ruling §2 / POLY-48 item 7 (gate-1 ruling
+            # estimation-engine-fixes.md §1, "confirmed as filed"):
+            # allocate_and_create_issue raises one of three named errors,
+            # each caught before the plain-`CairnError` fallback (both
+            # subclass it) so they map to distinct, truthful HTTP codes:
+            #   - LegacyArchiveError (the legacy-layout guard): 400
+            #     legacy_archive -- a client retry of the identical request
+            #     can't fix this, only running the migration can.
+            #   - BadParentError (an unresolvable/nested `--parent`, OR
+            #     a..z letter exhaustion under a valid parent): 400
+            #     bad_parent -- a client CAN fix this, by retrying with a
+            #     different `--parent` or once a letter frees up.
+            #   - anything else (e.g. the numeric path's own attempt-budget
+            #     exhaustion): 409 allocation_failed -- a transient
+            #     collision under concurrent allocation; retrying the same
+            #     request can plausibly succeed next time.
             try:
                 new_path = allocate_and_create_issue(data_dir, fields)
+            except LegacyArchiveError as e:
+                self._send_json(400, {"error": "legacy_archive", "message": str(e)})
+                return
             except BadParentError as e:
                 self._send_json(400, {"error": "bad_parent", "message": str(e)})
                 return
             except CairnError as e:
-                self._send_json(400, {"error": "legacy_archive", "message": str(e)})
+                self._send_json(409, {"error": "allocation_failed", "message": str(e)})
                 return
             self._send_json(200, build_issue_payload(data_dir, new_path.stem))
 
@@ -6490,11 +6538,17 @@ def check_budgets(data_dir: Path) -> List[str]:
         # POLY-3 (design note §1): "a sub-issue with status: done and a
         # stage but no actual.* is a WARNING, not an error" -- it was
         # closed by `cairn set status=done` rather than `cairn close`.
+        # POLY-33: keyed on `actual.gate_cycles`, not `actual.tokens` --
+        # `cairn close` always writes gate_cycles (0 included), but a
+        # legitimate close with no matching token-usage.jsonl line writes
+        # actual.tokens: null (design note §2 addendum 1, "no evidence").
+        # Keying on tokens made every such close indistinguishable from a
+        # `cairn set status=done` close it never was.
         try:
             fm, _ = parse_frontmatter(text)
         except CairnError:
             fm = {}
-        if fm.get("status") == "done" and fm.get("stage") is not None and fm.get("actual.tokens") is None:
+        if fm.get("status") == "done" and fm.get("stage") is not None and fm.get("actual.gate_cycles") is None:
             warnings.append(f"{p.name}: status done with stage {fm['stage']!r} but no actual.* -- closed via `cairn set` rather than `cairn close`")
     for name in DOC_LINT_FILES:
         doc = _docs_dir(data_dir) / name
@@ -6729,18 +6783,60 @@ def _files_touched_by_author(root: Path, base: str, assignee: str) -> Set[str]:
     return files
 
 
+def _sibling_guard_paths(data_dir: Path, issue_id: str, parent: str, assignee: str) -> List[str]:
+    """POLY-48 item 6 (guard-push same-assignee scope, gate-1 ruling
+    estimation-engine-fixes.md §1(c)): the `paths:` globs of every OTHER
+    live issue sharing this one's `parent` and `assignee` (any stage, any
+    status) -- unioned into the caller's own allowed set, so the second
+    same-assignee sub-issue under one parent doesn't trip on the first
+    one's already-pushed files. Rejected alternative: time-scoping to a
+    sibling's close (`window.to`) -- that lives in the metrics worktree
+    mount, which a teammate worktree doesn't have.
+
+    A sibling's own malformed `paths:` raises `CairnError` naming that
+    sibling (the same validation the caller already runs on its own
+    `paths:`), letting `cmd_guard_push` turn it into an exit-2 line
+    without silently dropping the sibling's globs.
+    """
+    globs: List[str] = []
+    for p in _dir_glob(Path(data_dir) / "issues"):
+        if p.stem == issue_id:
+            continue
+        try:
+            sib_fm, _ = parse_frontmatter(p.read_text(encoding="utf-8"))
+        except CairnError:
+            continue
+        if sib_fm.get("parent") != parent or sib_fm.get("assignee") != assignee:
+            continue
+        sib_paths = sib_fm.get("paths")
+        if sib_paths is None:
+            continue
+        if not isinstance(sib_paths, list):
+            raise CairnError(f"{p.stem}'s paths: must be a list, got {type(sib_paths).__name__}")
+        for idx, entry in enumerate(sib_paths):
+            ok, reason = validate_path_glob(entry)
+            if not ok:
+                raise CairnError(f"{p.stem}'s paths[{idx}] {entry!r} invalid -- {reason}")
+        globs.extend(sib_paths)
+    return globs
+
+
 def cmd_guard_push(args: argparse.Namespace) -> int:
     """`cairn guard-push <ID>` (POLY-2, architect's gate-1 ruling): fails
     loudly when the ISSUE'S ASSIGNEE's own commits between the branch
-    base and HEAD touch a file outside that issue's declared `paths:`.
-    Keys on the issue's assignee, never on the invoking identity -- this
-    is what lets the lead run it from the main checkout as a valid audit
-    of a teammate's commits.
+    base and HEAD touch a file outside that issue's declared `paths:`,
+    UNIONED with the `paths:` of every other same-parent, same-assignee
+    sibling (POLY-48 item 6) -- top-level issues (no `parent`) are
+    unchanged, since there is no sibling set to union. Keys on the
+    issue's assignee, never on the invoking identity -- this is what lets
+    the lead run it from the main checkout as a valid audit of a
+    teammate's commits.
 
     Exit codes: 0 pass (including every opt-out case below), 1 stray
     files found (each listed on its own stderr line, sorted), 2 usage/
-    config error (unknown id, unresolvable base, or `paths:` set with a
-    null assignee -- there is nothing to attribute commits to).
+    config error (unknown id, unresolvable base, `paths:` set with a null
+    assignee -- there is nothing to attribute commits to -- or a
+    sibling's own `paths:` malformed).
     """
     data_dir = resolve_data_dir(args)
     path = find_record_path(data_dir, args.id)
@@ -6750,6 +6846,7 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
     fm, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
     paths_val = fm.get("paths")
     assignee = fm.get("assignee")
+    parent = fm.get("parent")
 
     if paths_val is None:
         print(f"guard-push: {args.id} has no paths: declared -- warn-only, not enforced", file=sys.stderr)
@@ -6774,6 +6871,14 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
         print(f"guard-push: {args.id} assignee {assignee} is human -- not under the protocol", file=sys.stderr)
         return 0
 
+    allowed_globs = list(paths_val)
+    if parent is not None:
+        try:
+            allowed_globs += _sibling_guard_paths(data_dir, args.id, parent, assignee)
+        except CairnError as e:
+            print(f"guard-push: {e}", file=sys.stderr)
+            return 2
+
     root = _git_toplevel(Path.cwd())
     if root is None:
         print("guard-push: not inside a git repository", file=sys.stderr)
@@ -6792,7 +6897,7 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
     if not touched:
         return 0
 
-    matchers = [_glob_to_regex(p) for p in paths_val]
+    matchers = [_glob_to_regex(p) for p in allowed_globs]
     stray = sorted(f for f in touched if not any(m.match(f) for m in matchers))
     if not stray:
         return 0
@@ -6869,6 +6974,61 @@ def _flush_receiver_and_wait(repo_root: Path, usage_path: Path, timeout: float =
         if _latest_generated() != before:
             return
         time.sleep(0.2)
+
+
+def _token_ceiling(
+    usage_path: Path, at_sha: str, at_ts: str, max_gap_seconds: int,
+) -> Tuple[str, Optional[str]]:
+    """POLY-48 item 4 (POLY-47, gate-1 ruling estimation-engine-fixes.md
+    §1(b)): the TOKEN-side ceiling for a `--at <sha>` close. `at_ts`
+    (the commit's own author time) almost never lines up with a flush
+    boundary -- the flush actually carrying this stage's last tokens can
+    land seconds to minutes after the commit, and the plain commit-time
+    ceiling drops that whole interval's usage (POLY-41, measured 55 s).
+
+    Returns `(to_ts, warning)`:
+    - `to_ts` is the smallest `generated` stamp over lines with
+      `source == "otel"` in `token-usage.jsonl` strictly after `at_ts` --
+      a flush is a global event, not scoped to one issue/role, but a
+      `transcript-backfill` line's `generated` is the backfill RUN time,
+      not a flush (architect's review of d1f2e08, addendum 1 -- a
+      backfill line landing inside the gap was previously mistaken for
+      the flush and hid the real one) -- provided it lands within
+      `max_gap_seconds` of `at_ts` (the receiver's own flush interval).
+      That flush is never double-counted: the next same-assignee stage's
+      floor reads this close's `window.to`, i.e. `to_ts` itself.
+    - Otherwise `to_ts` falls back to `at_ts` (unchanged from before this
+      fix), and `warning` is the stderr line `cmd_close` should print,
+      naming the nearest otel flush actually found after `at_ts` (even
+      one excluded for being too far away) or, when none exists at all,
+      `at_ts` itself. `warning` is `None` when a flush was admitted.
+
+    No special tip case: when `--at` names the branch's own tip, the
+    caller's forced flush (`_flush_receiver_and_wait`) already ran first,
+    so IT is the first flush after the commit and shows up here as an
+    ordinary candidate.
+    """
+    at_dt = _parse_iso_any(at_ts)
+    nearest_after: Optional[Tuple[datetime.datetime, str]] = None
+    if usage_path.is_file():
+        rows, _ = _read_token_usage_lines(usage_path)
+        for row in rows:
+            if row.get("source") != "otel":
+                continue
+            gen = row.get("generated")
+            if not gen:
+                continue
+            gen_dt = _parse_iso_any(gen)
+            if gen_dt > at_dt and (nearest_after is None or gen_dt < nearest_after[0]):
+                nearest_after = (gen_dt, gen)
+    if nearest_after is not None and (nearest_after[0] - at_dt).total_seconds() <= max_gap_seconds:
+        return nearest_after[1], None
+    last_flush = nearest_after[1] if nearest_after is not None else at_ts
+    warning = (
+        f"close: warning: no flush within {max_gap_seconds} s after --at {at_sha}; "
+        f"tokens after {last_flush} unattributed"
+    )
+    return at_ts, warning
 
 
 def _parent_flip(repo_root: Path, base: str, ref: str) -> Optional[str]:
@@ -6983,6 +7143,40 @@ def _append_calibration_record(data_dir: Path, record: Dict[str, Any]) -> None:
         backfill_tokens._release_lock(lock_path)
 
 
+def _linked_worktree_main_checkout(start: Path) -> Optional[Path]:
+    """POLY-48 item 9 (`close` from a worktree, gate-1 ruling
+    estimation-engine-fixes.md §1(d)): `git rev-parse --git-dir` vs
+    `--git-common-dir` is the one reliable test for "is `start` inside a
+    LINKED git worktree" -- the two paths are identical in the main
+    checkout and differ in a linked worktree, regardless of layout (never
+    a `.git`-file-vs-directory guess, which a submodule can also produce).
+
+    Returns the main checkout's root (the common dir's parent) when
+    `start` is inside a linked worktree; `None` when it's the main
+    checkout, or when git itself is unavailable/not a repo at all --
+    `_git_toplevel`'s own check already covers that case with its own
+    message.
+    """
+    def _rev_parse(flag: str) -> Optional[str]:
+        try:
+            out = subprocess.run(
+                ["git", "rev-parse", flag], cwd=start, capture_output=True, text=True, check=True,
+            ).stdout.strip()
+        except (subprocess.CalledProcessError, OSError):
+            return None
+        return out or None
+
+    git_dir = _rev_parse("--git-dir")
+    common_dir = _rev_parse("--git-common-dir")
+    if git_dir is None or common_dir is None:
+        return None
+    git_dir_path = (start / git_dir).resolve()
+    common_dir_path = (start / common_dir).resolve()
+    if git_dir_path == common_dir_path:
+        return None  # the main checkout: git-dir IS the common dir
+    return common_dir_path.parent
+
+
 def cmd_close(args: argparse.Namespace) -> int:
     """`cairn close <ID>` (design note §7, §2, §3, §5): pulls actuals for
     a sub-issue's assignee from the OTel receiver and the commit log,
@@ -6998,7 +7192,22 @@ def cmd_close(args: argparse.Namespace) -> int:
     `actual.*`/`ratio`, adds or removes `bloat` to match the new
     evaluation, leaves `status: done`, and appends a fresh calibration
     line -- the last line per id is the record readers trust.
+
+    POLY-48 item 9: refuses outright, before any flush or read (including
+    `--dry-run`), when run from a linked git worktree -- a worktree has
+    no `process/cairn/metrics/` mount (`ensure_metrics_worktree.py` is a
+    no-op there), so it would otherwise silently write null actuals
+    instead of ever reading the real token log.
     """
+    main_checkout = _linked_worktree_main_checkout(Path.cwd())
+    if main_checkout is not None:
+        print(
+            f"close: {args.id}: run from the main checkout ({main_checkout}) -- a worktree has no metrics "
+            "mount; nothing written",
+            file=sys.stderr,
+        )
+        return 2
+
     data_dir = resolve_data_dir(args)
     path = find_record_path(data_dir, args.id)
     if path is None:
@@ -7081,14 +7290,33 @@ def cmd_close(args: argparse.Namespace) -> int:
         _flush_receiver_and_wait(root, usage_path)
 
     # POLY-16 ruling: `--at` pins close_ts to the ceiling commit's own
-    # author time; the default ceiling is real wall-clock now().
+    # author time; the default ceiling is real wall-clock now(). Commits
+    # and wall-clock (gate_cycle_actuals below) stay bounded by close_ts,
+    # unchanged (POLY-48 item 4, gate-1 ruling
+    # estimation-engine-fixes.md §1(b)) -- only the TOKEN ceiling differs.
     close_ts = at_ts if at_sha is not None else datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # POLY-34 (ruling §0.2): prices loaded once here (not inside
     # token_actuals) so `prices_retrieved` can be stamped on the
     # calibration record from the exact table that priced this close.
     prices = load_prices()
-    token_result = token_actuals(data_dir, parent, role=assignee, since=from_ts, until=close_ts, prices=prices)
+
+    # POLY-48 item 4 (POLY-47): with `--at`, admit the first flush after
+    # the ceiling commit (within one flush interval) as the TOKEN
+    # window's upper bound, rather than the commit's own timestamp --
+    # see `_token_ceiling`. Without `--at`, close_ts is already real
+    # wall-clock now() and the forced flush above already ran
+    # synchronously, so there is no ceiling to admit.
+    token_until_ts = close_ts
+    if at_sha is not None:
+        import otel_receiver  # sibling module; imported here so cairn stays import-light (mirrors _append_calibration_record's backfill_tokens import) -- safe despite otel_receiver itself importing cairn, since by now cairn is already fully loaded
+        token_until_ts, ceiling_warning = _token_ceiling(
+            usage_path, at_sha, close_ts, otel_receiver.DEFAULT_FLUSH_INTERVAL_SECONDS,
+        )
+        if ceiling_warning is not None:
+            print(ceiling_warning, file=sys.stderr)
+
+    token_result = token_actuals(data_dir, parent, role=assignee, since=from_ts, until=token_until_ts, prices=prices)
     if token_result["tokens"] is None:
         if usage_path.is_file():
             print(
@@ -7208,7 +7436,11 @@ def cmd_close(args: argparse.Namespace) -> int:
         },
         "ratio": ratio_val, "ratio_tokens": ratio_tokens_val, "prices_retrieved": prices.get("retrieved"),
         "bloat": calibration_bloat, "bloat_reasons": bloat_reasons,
-        "window": {"from": from_ts, "to": close_ts, "at": at_sha},
+        # POLY-48 item 4: window.to is the admitted TOKEN ceiling
+        # (token_until_ts), not the commit-time close_ts -- the next
+        # same-assignee stage's floor reads this value (_sibling_floor),
+        # so the admitted flush is never counted twice.
+        "window": {"from": from_ts, "to": token_until_ts, "at": at_sha},
         "base": args.base, "ref_sha": ref_sha,
     }
 

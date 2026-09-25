@@ -554,6 +554,62 @@ class CloseWritesActualsTests(CloseCommandTestBase):
         self.assertNotIn("ratio", fm)
 
 
+class CloseRefusesFromWorktreeTests(CloseCommandTestBase):
+    """POLY-48 (carried AC, architect review of POLY-52): a teammate
+    worktree has no metrics mount -- `token-usage.jsonl` never lands
+    there -- so `close` run from inside one always reads a null
+    `actual.tokens`/`actual.cost_usd`, silently. It must refuse instead,
+    naming the main checkout, and must not write anything at all.
+
+    A REAL linked worktree (`git worktree add`), discriminated the same
+    way `ensure_metrics_worktree.py`'s `_is_linked_worktree` /
+    `run_tests.py`'s `_resolve_worktree_main_checkout` already do
+    (`--git-dir` != `--git-common-dir`) -- not a bare directory pretending
+    to be one."""
+
+    def setUp(self):
+        super().setUp()
+        # A fresh, auto-cleaned tmp dir of its own (never a path derived
+        # from self.root's parent -- that's the shared system tmpdir, and
+        # a fixed sibling name collides across separate test runs/repeats).
+        self.worktree_root = helpers.make_empty_tmp_dir(self) / "wt"
+        git(self.root, "worktree", "add", "-q", "-b", "teammate-worktree", str(self.worktree_root), "feature")
+        # The worktree's OWN checked-out copy of the data dir -- a linked
+        # worktree carries its own full working tree, no metrics/ mount.
+        self.worktree_data_dir = self.worktree_root / self.data_dir.relative_to(self.root)
+
+    def test_close_from_a_worktree_refuses_and_names_the_main_checkout(self):
+        self.seed_subissue()
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "green", when="2020-01-02T02:00:00+00:00")
+        git(self.worktree_root, "pull", "-q", str(self.root), "feature")
+
+        issue_path = self.worktree_data_dir / "issues" / "PT-9.md"
+        before_raw = issue_path.read_bytes()
+
+        r = cairn_cmd(self.worktree_root, self.worktree_data_dir, "close", "PT-9", "--no-flush")
+        # Ruling (design/estimation-engine-fixes.md §1(d)): exit 2, exactly.
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn(str(self.root), r.stdout + r.stderr)
+
+        # Nothing written at all -- byte-identical, not just "status still
+        # isn't done".
+        self.assertEqual(issue_path.read_bytes(), before_raw, "a refused close must write nothing to the issue file")
+        calibration_path = self.worktree_data_dir / "metrics" / "calibration.jsonl"
+        self.assertFalse(calibration_path.exists(), "a refused close must append no calibration line")
+
+    def test_close_from_a_worktree_with_dry_run_also_refuses(self):
+        # Ruling: "Applies to --dry-run too."
+        self.seed_subissue()
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "green", when="2020-01-02T02:00:00+00:00")
+        git(self.worktree_root, "pull", "-q", str(self.root), "feature")
+
+        r = cairn_cmd(self.worktree_root, self.worktree_data_dir, "close", "PT-9", "--no-flush", "--dry-run")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn(str(self.root), r.stdout + r.stderr)
+
+
 class CloseBloatFlagTests(CloseCommandTestBase):
     """POLY-34 (ruling §0.5, §9.1 item 8): the token-ratio bloat rule is
     gone -- the threshold now gates the COST ratio, and the reason string
@@ -1321,6 +1377,75 @@ class AtCeilingValidationTests(StageWindowTestBase):
         # The parent-flip commit itself -- AT the floor, not after it.
         r = self.close("PT-11", "--at", self.parent_flip_sha)
         self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+
+
+class AtCeilingAdmitsTrailingFlushTests(StageWindowTestBase):
+    """POLY-47 (gate-1 ruling §1(b), scripts/cairn/design/estimation-
+    engine-fixes.md): `--at <sha>`'s token ceiling admits the first flush
+    `generated` after the commit's own author time, provided it lands
+    within 1800s (the receiver's own DEFAULT_FLUSH_INTERVAL_SECONDS) --
+    not just lines with `generated <= commit time`, which today drops the
+    very flush carrying the gate's own usage whenever it lands seconds
+    after the commit (observed on POLY-41: commit 19:16:20Z, flush
+    19:17:15Z, 55s later -- $0.0396/156k tokens read with --at vs.
+    $1.9090/3.2M without it). Otherwise (no flush within 1800s) the
+    ceiling stays exactly `at_ts`, unchanged, and `close` names the gap."""
+
+    def _seed_and_gate(self, when_commit: str) -> str:
+        self.seed_subissues([
+            {"issue_id": "PT-9", "stage": "execute", "assignee": "backend-lead"},
+        ], when="2020-01-02T00:00:00+00:00")
+        write_file(self.root, "impl.py", "x\n")
+        commit_as(self.root, "backend-lead", "green build", when=when_commit)
+        return self.head_sha()
+
+    def test_a_flush_one_second_after_the_at_commit_is_admitted(self):
+        gate_sha = self._seed_and_gate("2020-01-02T01:00:00+00:00")
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-02T01:00:01Z", issue="PT-1", role="backend-lead", input=1000),
+        ])
+        r = self.close("PT-9", "--at", gate_sha)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.issue_fm("PT-9").get("actual.tokens"), 1000)
+        lines = self.calibration_lines("PT-9")
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["window"]["to"], "2020-01-02T01:00:01Z")
+
+    def test_a_transcript_backfill_line_does_not_count_as_the_flush(self):
+        # Addendum 1 (architect's review of d1f2e08,
+        # scripts/cairn/design/estimation-engine-fixes.md): a
+        # transcript-backfill line's `generated` is the backfill RUN
+        # time, not a flush -- the candidate set for the ceiling is
+        # `source == "otel"` lines only. Measured on d1f2e08: a backfill
+        # line at +10s and a real otel flush at +55s gave a +10s ceiling,
+        # dropping the +55s flush's tokens entirely (no warning printed).
+        gate_sha = self._seed_and_gate("2020-01-02T01:00:00+00:00")
+        write_token_usage(self.data_dir, [
+            token_row(generated="2020-01-02T01:00:10Z", issue="PT-1", role="backend-lead",
+                      source="transcript-backfill", input=999999),
+            token_row(generated="2020-01-02T01:00:55Z", issue="PT-1", role="backend-lead",
+                      source="otel", input=1000),
+        ])
+        r = self.close("PT-9", "--at", gate_sha)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(self.issue_fm("PT-9").get("actual.tokens"), 1000)
+        lines = self.calibration_lines("PT-9")
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["window"]["to"], "2020-01-02T01:00:55Z", "the otel flush, not the earlier backfill line, must be the ceiling")
+
+    def test_a_flush_over_1800s_after_the_at_commit_is_excluded_and_warns(self):
+        gate_sha = self._seed_and_gate("2020-01-02T01:00:00+00:00")
+        write_token_usage(self.data_dir, [
+            # 1801s after the commit -- just outside the admitted window.
+            token_row(generated="2020-01-02T01:30:01Z", issue="PT-1", role="backend-lead", input=1000),
+        ])
+        r = self.close("PT-9", "--at", gate_sha)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIsNone(self.issue_fm("PT-9").get("actual.tokens"))
+        self.assertIn("1800", r.stderr, f"expected a named 1800s-gap warning -- {r.stderr!r}")
+        lines = self.calibration_lines("PT-9")
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["window"]["to"], "2020-01-02T01:00:00Z", "unwidened -- to_ts must stay at_ts when nothing is admitted")
 
 
 # --------------------------------------------------------------------------

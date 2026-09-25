@@ -38,7 +38,7 @@ id: {id}
 title: {title}
 status: in-progress
 milestone: null
-parent: null
+parent: {parent}
 blocked_by: []
 assignee: {assignee}
 labels: []
@@ -60,11 +60,12 @@ def _paths_line(paths):
     return "paths: [" + ", ".join(paths) + "]\n"
 
 
-def write_issue(data_dir: Path, issue_id: str, assignee, paths=None, title="Sub-issue"):
+def write_issue(data_dir: Path, issue_id: str, assignee, paths=None, title="Sub-issue", parent=None):
     (data_dir / "issues" / f"{issue_id}.md").write_text(
         ISSUE_TEMPLATE.format(
             id=issue_id,
             title=title,
+            parent="null" if parent is None else parent,
             assignee="null" if assignee is None else assignee,
             paths_line=_paths_line(paths),
         ),
@@ -225,7 +226,7 @@ class GlobSemanticsTests(GuardPushTestBase):
         by sidestepping it with an explicit quote, same convention already
         used for numeric-looking milestone values."""
         (self.data_dir / "issues" / "PT-1.md").write_text(
-            ISSUE_TEMPLATE.format(id="PT-1", title="Sub-issue", assignee="backend-lead", paths_line='paths: ["**/**"]\n'),
+            ISSUE_TEMPLATE.format(id="PT-1", title="Sub-issue", parent="null", assignee="backend-lead", paths_line='paths: ["**/**"]\n'),
             encoding="utf-8",
         )
         commit_as(self.root, "seed", "seed: tracker + fixture main files")
@@ -303,6 +304,81 @@ class AttributionEdgeCaseTests(GuardPushTestBase):
         commit_as(self.root, "backend-lead", "a commit")
         r = guard_push(self.root, self.data_dir, "PT-999")
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+
+
+class SameAssigneeSiblingSubIssueScopeTests(GuardPushTestBase):
+    """POLY-48 (carried AC): one agent holding two sibling sub-issues
+    under the same parent, on the same branch, must not have the SECOND
+    sub-issue's `guard-push` trip on files that legitimately belong to
+    the FIRST sub-issue's own declared `paths:`. Both sub-issues here
+    share `parent: PT-0` and `assignee: backend-lead` but declare
+    disjoint path globs."""
+
+    def test_second_sub_issues_guard_push_ignores_first_siblings_paths(self):
+        write_issue(self.data_dir, "PT-1", "backend-lead", paths=("src/auth/**",), parent="PT-0")
+        write_issue(self.data_dir, "PT-2", "backend-lead", paths=("src/billing/**",), parent="PT-0")
+        commit_as(self.root, "seed", "seed: tracker + fixture main files")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "src/auth/a.py")
+        commit_as(self.root, "backend-lead", "PT-1: auth work")
+        write_file(self.root, "src/billing/b.py")
+        commit_as(self.root, "backend-lead", "PT-2: billing work")
+        r = guard_push(self.root, self.data_dir, "PT-2")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertNotIn("src/auth/a.py", r.stdout + r.stderr)
+
+    def test_a_genuine_stray_outside_every_siblings_paths_still_fails(self):
+        """The scope widening must not become a blanket pass -- a file
+        outside BOTH siblings' declared paths is still a real stray."""
+        write_issue(self.data_dir, "PT-1", "backend-lead", paths=("src/auth/**",), parent="PT-0")
+        write_issue(self.data_dir, "PT-2", "backend-lead", paths=("src/billing/**",), parent="PT-0")
+        commit_as(self.root, "seed", "seed: tracker + fixture main files")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "src/auth/a.py")
+        commit_as(self.root, "backend-lead", "PT-1: auth work")
+        write_file(self.root, "src/billing/b.py")
+        write_file(self.root, "lib/unrelated.py")
+        commit_as(self.root, "backend-lead", "PT-2: billing work + a genuine stray")
+        r = guard_push(self.root, self.data_dir, "PT-2")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("lib/unrelated.py", r.stdout + r.stderr)
+        self.assertNotIn("src/auth/a.py", r.stdout + r.stderr)
+
+    def test_a_different_assignees_sibling_paths_are_not_admitted(self):
+        """Ruling (design/estimation-engine-fixes.md §1(c)): the union is
+        scoped to siblings with the SAME assignee -- a same-parent sibling
+        held by someone else must not widen this assignee's allowed
+        globs."""
+        write_issue(self.data_dir, "PT-1", "backend-lead", paths=("src/auth/**",), parent="PT-0")
+        write_issue(self.data_dir, "PT-2", "frontend-lead", paths=("src/ui/**",), parent="PT-0")
+        commit_as(self.root, "seed", "seed: tracker + fixture main files")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "src/auth/a.py")
+        write_file(self.root, "src/ui/b.py")
+        commit_as(self.root, "backend-lead", "PT-1 work plus a file only PT-2 (someone else's) declares")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        self.assertIn("src/ui/b.py", r.stdout + r.stderr)
+
+    def test_a_siblings_malformed_paths_is_a_usage_error_naming_the_sibling(self):
+        """Ruling: a sibling's malformed `paths:` exits 2 naming the
+        sibling -- the union-building scan must surface a config error on
+        the SIBLING record it read, not silently skip it or crash."""
+        write_issue(self.data_dir, "PT-1", "backend-lead", paths=("src/auth/**",), parent="PT-0")
+        (self.data_dir / "issues" / "PT-2.md").write_text(
+            "---\nid: PT-2\ntitle: Malformed sibling\nstatus: in-progress\nmilestone: null\nparent: PT-0\n"
+            "blocked_by: []\nassignee: backend-lead\nlabels: []\npriority: null\npr: null\n"
+            "created: 2026-09-23\nupdated: 2026-09-23\npaths: src/billing/**\n"  # scalar, not a list
+            "---\n\nBody.\n",
+            encoding="utf-8",
+        )
+        commit_as(self.root, "seed", "seed: tracker + fixture main files")
+        git(self.root, "checkout", "-q", "-b", "feature")
+        write_file(self.root, "src/auth/a.py")
+        commit_as(self.root, "backend-lead", "in-bounds by PT-1's own paths")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
+        self.assertIn("PT-2", r.stdout + r.stderr)
 
 
 class BranchBaseTests(GuardPushTestBase):

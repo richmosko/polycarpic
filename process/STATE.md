@@ -15,7 +15,16 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: the grouped umbrellas POLY-48 (estimation-engine fixes), POLY-49 (receiver hardening), POLY-50 (backfill attribution), then POLY-56 (checklists)._
+- **Feature:** Estimation-engine fixes (grouped)
+- **Issue:** POLY-48 (cairn) — members POLY-8, POLY-15, POLY-33, POLY-40, POLY-47 plus four carried criteria (guard-push scope, `bad_parent` HTTP code, shared claim-and-write helper, `close` refusal from a worktree)
+- **Milestone:** POLY-A
+- **Branch:** `feature/poly-48-estimation-engine-fixes`
+- **Started:** 2026-09-25
+- **Goal:** one PR that closes every estimation-engine defect found across the POLY-3 → POLY-51 loops, so the cost/estimate numbers the tracker reports can be trusted.
+- **PR:** https://github.com/richmosko/polycarpic/pull/16
+- **Status:** In Review
+
+_Next after this: POLY-49 (receiver hardening), POLY-50 (backfill attribution), then POLY-56 (checklists)._
 
 ## Releases
 

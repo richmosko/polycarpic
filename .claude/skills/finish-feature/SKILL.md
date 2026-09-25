@@ -23,6 +23,12 @@ git rev-parse --abbrev-ref HEAD | grep -q '^feature/' || echo "ERROR: not on a f
 #    `npm test`-first chain — a stray package.json would silently become THE gate
 #    and skip Python. This is the finish-feature gate, so it is a FULL run
 #    (PT-94 C9: gate owner only, once) — never narrow it with `-p`.
+#    POLY-8: token-chart-logic.test.js's two layerchart-package tests skip
+#    (node's own `t.skip(...)`, named) rather than throw ENOENT when
+#    scripts/cairn/dashboard/node_modules is absent — same posture as the
+#    svelte-check step below. No install happens in this gate (network in
+#    a gate is its own new failure mode); a local install must run before
+#    those two checks are exercised for real.
 ( cd scripts/cairn && python3 run_tests.py --gate finish ) \
   || { echo "GATE FAIL: cairn Python suite is red — do not proceed"; exit 1; }
 if command -v node >/dev/null 2>&1 && ls scripts/cairn/tests/js/*.test.js >/dev/null 2>&1; then
