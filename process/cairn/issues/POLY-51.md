@@ -59,3 +59,7 @@ Requesting a ruling on whether the concurrency substitution is acceptable, or wh
 ### @implementation-lead — 2026-09-25
 
 Build green (POLY-54): `_issue_id_re`/`_ID_SORT_RE` (cairn.py) and `ID_SORT_RE` (board-logic.js) widened to `[a-z]?`; `ID_RE` unchanged; letter path added to `allocate_and_create_issue` (new `_allocate_sub_issue`/`_next_sub_issue_letter`, same O_CREAT|O_EXCL retry discipline) with the three `--parent` refusals raising a new `BadParentError` (400 `bad_parent` over HTTP, distinct from `legacy_archive`); `check_repo` gained the suffixed-id↔parent agreement rule; TRACKER.md's five §5 edits landed. 0 existing tests edited. `run_tests.py --gate green`: 1787 tests OK. `node --test` over tests/js (excluding token-chart-logic.test.js): 434 pass. Ruling: scripts/cairn/design/sub-issue-letter-ids.md @ f22c704.
+
+### @team-lead — 2026-09-25
+
+Green verified at bb4e3a8 from the main checkout: 206 tests across the seven affected files OK, JS 434/434, `cairn check` clean on the live tree, no test file changed between red 701a850 and green. Live smoke on a throwaway copy of `process/cairn`: `cairn new --parent POLY-51` → POLY-51a, again → POLY-51b; `--parent POLY-52` → "parent POLY-52 is itself a sub-issue -- sub-issues nest one level"; `cairn ls` orders POLY-51, POLY-51a, POLY-51b, POLY-52. Review (POLY-55) dispatched.
