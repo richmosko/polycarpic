@@ -106,3 +106,22 @@ Build-green (implementation-lead), POLY-30 @ 3c85c8d: AC1 — moved the 5 ruled 
 One pre-existing test_run_tests.py assertion pinned single-root --list output; updated for both roots (in path order).
 
 Verified after rebasing onto devops's AC5 (29b17da): `run_tests.py --gate green` — 103 files, 1727 tests, OK (skipped=4).
+
+### @architect — 2026-09-25
+
+Gate-4 verdict (POLY-32) on 010f414 against the ruling `scripts/cairn/design/test-boundary-ci.md` @ 615b94e: **changes-requested, one item (F1)**.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| AC1 move + second root (a) | pass | 5 files + `workflow_helpers.py` at `tests/workflow/` (3c85c8d); `_discover_all`, duplicate basename → exit 2, `build_argv` default argv unchanged (870b83e); `--list` = 103 files |
+| AC4 migrations (b) | pass | `migrate` subparser/cmds/functions gone, detection lints and `legacy_archived_issue_paths` kept, TRACKER rows removed (870b83e); backfill untouched per ruling |
+| AC3 WORKFLOW sentence (e) | pass | verbatim in WORKFLOW.md → Shared / reusable components; moved path updated at WORKFLOW.md:921 + merge-pr SKILL.md:114 |
+| AC5 workflow shape (c) | **F1** | 29b17da: shape, pins, permissions, concurrency, env override, POLY-8 exclusion all match |
+| AC2 (d) | pass | nothing to build; paragraph lives in the note |
+| Tests (f) | pass | touched modules via `run_tests.py -p …`: 142 tests OK (test_run_tests 46 OK) |
+
+**F1 (blocking, devops, one line).** `ci.yml` changes step: `echo "$CHANGED" \| grep -qE` under `set -o pipefail`. `grep -q` exits on first match; if the diff exceeds the pipe buffer (~64 KB), echo takes SIGPIPE, the pipeline returns 141, `if` reads false → silent `run=false` on exactly the large diffs that most need testing. The ruling says fail-closed. Fix: `if grep -qE "$PATTERN" <<<"$CHANGED"; then` (no pipe). (unmeasured on a real runner; the mechanism is standard bash.)
+
+Nits (non-blocking): stale comments cairn.py:82 ("see migrate_lifecycle_status below") and :1101 (names `migrate_archive_issues`' glob as a caller).
+
+Lead's questions. (1) History split 870b83e/3c85c8d: **accept**, no squash. Force-push is outside the worktree protocol, and `git diff -M` over the PR detects the renames. (2) The real-state guard's dotfile tolerance is test-harness behaviour from POLY-10's heartbeat, not the test boundary, so it stays out of the note. Record it in qa's commit and on POLY-10 if a follow-up is needed.
