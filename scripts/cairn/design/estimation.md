@@ -458,6 +458,12 @@ between two same-(parent, role) sub-issues, such as the architect's plan and
 review. Known limits, stated rather than papered over:
 
 - The first line in W may carry up to one flush interval of pre-W tokens.
+- With `--at`, the token ceiling is the first **otel** flush after the commit,
+  within one flush interval (POLY-47; `estimation-engine-fixes.md` §1(b)).
+  That flush may carry up to one interval of post-gate same-role tokens, and
+  because `window.to` records it, the next same-assignee stage's commit floor
+  moves with it: a same-assignee commit inside (commit, flush] counts in
+  neither stage.
 - If the lead checkout leaves the feature branch mid-loop, tokens go to a
   `milestone:` bucket and are lost to the sub-issue.
 - A `subagent-unattributed` role matches no assignee.

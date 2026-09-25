@@ -51,3 +51,20 @@ No-ruling items, confirmed straightforward:
 Bubble-up: POLY-15 AC2 looks already resolved by POLY-34's landed ruling (estimation.md §0.2 "unchanged posture") and TRACKER.md:227 (null-on-unpriced, never partial, already stated). Worth confirming with architect whether item 1 just needs POLY-15 closed with a link to POLY-34, rather than a fresh ruling.
 
 Still blocked on architect's ruling for guard-push scope (item 6, cmd_guard_push ~6732) and close-from-worktree refusal (item 9, cmd_close ~6986 / resolve_data_dir).
+
+### @architect — 2026-09-25
+
+Gate-4 verdict on d1f2e08: **changes requested** (one item). Addendum 1 is in estimation-engine-fixes.md.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| (a) POLY-15 null posture + TRACKER text | pass | d5d90a1 |
+| (b) POLY-47 --at token ceiling | **fail R1** | _token_ceiling admits a transcript-backfill line as the flush: probe with backfill at +10 s and otel at +55 s returned +10 s with no warning. The fault is in my ruling's wording ("all lines"); corrected in Addendum 1 to source == otel. Builder: filter to otel lines. qa: add that fixture |
+| (c) guard-push sibling union | pass | 28b11cc |
+| (d) close refuses from a worktree | pass | 844b1cc |
+| POLY-33 gate_cycles key | pass | b9a2ed9 |
+| bad_parent / LegacyArchiveError / 409 | pass | 64bb0ba; 34dbdf3 is green on this code |
+| shared claim helper | pass | 64bb0ba; both paths are net negative |
+| touched modules | pass | run_tests.py: estimation, guard_push, server, id_allocation, check_lint, frontmatter_rewrite all OK |
+
+Non-blocking: the ceiling warning names the far flush rather than the last flush before --at, and _allocate_sub_issue no longer uses max_attempts. Both can stay as they are. The estimation.md known-limit bullet, which no lane covered, is landed in this commit, including the commit-floor side effect of window.to.

@@ -85,6 +85,16 @@ too. No issue-file write, no calibration append.
 - Shared helper: one `_claim_issue_file(issues_dir, ids, fields, today)`
   taking an iterator of candidate ids; numeric and letter paths both call it.
 
+### Addendum 1 (review of `d1f2e08`) — §1(b) counts otel flushes only
+
+§1(b)'s "over **all** lines" was wrong: a `transcript-backfill` line's
+`generated` is the backfill run time, not a flush. Measured
+(`_token_ceiling` @ d1f2e08, backfill line at +10 s, otel flush at +55 s):
+the ceiling came back as +10 s, which drops the real flush, and no warning
+was printed. Corrected rule: the candidate set is lines with
+`source == "otel"` (any issue or role). Test: that fixture must yield the
++55 s flush. The known limit is now stated in `estimation.md` §2 Tokens.
+
 ## 2. Tests (qa, red first — POLY-48b)
 
 1. Unpriced: one priced + one unpriced line → `cost_usd None`, model named

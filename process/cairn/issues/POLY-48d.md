@@ -6,7 +6,7 @@ milestone: POLY-A
 parent: POLY-48
 blocked_by: []
 assignee: architect
-paths: [scripts/cairn/design/estimation-engine-fixes.md, process/cairn/issues/POLY-48.md, process/cairn/issues/POLY-48a.md, process/cairn/issues/POLY-48b.md, process/cairn/issues/POLY-48c.md, process/cairn/issues/POLY-48d.md]
+paths: [scripts/cairn/design/estimation-engine-fixes.md, scripts/cairn/design/estimation.md, process/cairn/issues/POLY-48.md, process/cairn/issues/POLY-48a.md, process/cairn/issues/POLY-48b.md, process/cairn/issues/POLY-48c.md, process/cairn/issues/POLY-48d.md]
 stage: review
 estimate.cost_usd: "1.00"
 estimate.gate_cycles: 1
