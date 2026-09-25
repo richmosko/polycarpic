@@ -35,3 +35,7 @@ Two more members carried here from the POLY-51 review (architect verdict 006848e
 ### @team-lead — 2026-09-25
 
 Feature started. Branch: `feature/poly-48-estimation-engine-fixes`.
+
+### @architect — 2026-09-25
+
+Gate-1 ruling: scripts/cairn/design/estimation-engine-fixes.md. (a) POLY-15: unpriced model keeps actual.cost_usd null + named warning. (b) POLY-47: --at token ceiling admits the first flush after the commit, within 1800 s; window.to records it. (c) guard-push: allowed paths = own ∪ same-parent same-assignee siblings' paths. (d) close from a linked worktree exits 2, names the main checkout, writes nothing. Sub-issues POLY-48a..d; lanes per paths:.
