@@ -153,3 +153,13 @@ All five POLY-6 ACs covered: boundary moved (5 files/tests/workflow), migrations
 ### @team-lead — 2026-09-25
 
 PR opened: https://github.com/richmosko/polycarpic/pull/12. Awaiting Validate; the PR's `cairn` job is the workflow's first real run.
+
+### @qa-engineer — 2026-09-25
+
+PASS @ da31076 (qa-engineer verdict re-issued, CI green at 36160150591).
+
+python3 run_tests.py --gate verdict (scripts/cairn, both roots): 1728 tests, 103 files, 8 workers, 26.4s, OK (skipped=4).
+
+node --test "scripts/cairn/tests/js/**/*.test.js": 479 tests, 477 pass, 2 fail — both the known layerchart ENOENT cases in token-chart-logic.test.js (node_modules absent locally, POLY-8's tracked exclusion in ci.yml). Same counts as the prior verdict @ ba516cb.
+
+The CI-red self-record env leak (CAIRN_TEST_RUNS_FILE inherited by 4 fake-engine-root subprocess tests) is fixed at this tip and verified both with the override unset and set. No other change since the ba516cb verdict besides that fix and tracker bookkeeping.
