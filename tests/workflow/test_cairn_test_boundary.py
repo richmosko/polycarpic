@@ -139,6 +139,30 @@ class CiWorkflowShapeTests(unittest.TestCase):
         missing = [p for p in self.RULED_PATHS if p not in self.text]
         self.assertEqual(missing, [], f"the changes step is missing these ruled paths: {missing!r}")
 
+    def _step_block(self, step_id: str) -> str:
+        """Text from `id: <step_id>` up to (not including) the next step's
+        `- name:` marker, or EOF -- good enough for a text-only YAML read
+        (no new dependency, per the ruling)."""
+        idx = self.text.find(f"id: {step_id}")
+        self.assertNotEqual(idx, -1, f"no step with id: {step_id} found")
+        rest = self.text[idx:]
+        next_step = re.search(r"\n\s*- name:", rest)
+        return rest[: next_step.start()] if next_step else rest
+
+    def test_changes_step_never_pipes_echo_into_grep_under_pipefail(self):
+        # Architect gate-4 verdict F1 (POLY-32, process/cairn/issues/POLY-6.md
+        # @ 0b3a4c5): `echo "$CHANGED" | grep -qE "$PATTERN"` under
+        # `set -euo pipefail` -- `grep -q` exits on its first match, closing
+        # its end of the pipe; `echo`'s own SIGPIPE write on a >64 KB diff
+        # then aborts the step under pipefail, silently landing on
+        # `run=false` rather than a red job. Fix: a here-string
+        # (`grep -qE "$PATTERN" <<<"$CHANGED"`) has no pipe to break.
+        block = self._step_block("changes")
+        self.assertNotRegex(
+            block, r"echo\b[^\n]*\|\s*grep",
+            "the changes step must not pipe `echo ... |` into grep under pipefail (F1)",
+        )
+
     def test_permissions_contents_is_read(self):
         self.assertRegex(
             self.text, r"permissions:\s*\n\s*contents:\s*read",
