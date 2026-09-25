@@ -1,14 +1,14 @@
 ---
 id: POLY-26
 title: backfill_tokens.py scans only the main project slug; backfilled teammate lines are unattributed
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P3
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/14
 created: 2026-09-24
 updated: 2026-09-25
 ---
@@ -81,3 +81,7 @@ Verdict run at 9e2fbf2 (feature tip, only tracker commits since green 68c8dfa): 
 - Flushed the receiver from the main checkout (otel_receiver.py --flush-now, exit 0) per the lead's instruction, before this comment.
 - BackfillWorktreeSiblingScanTests (7 tests, test_backfill_tokens.py) all green: sibling scan attributes teammate lines, near-neighbour <slug>-old dirs never scanned, nested subagents/ transcripts under a sibling scanned, cross-root duplicate requestId dedupes once, --dry-run reports sibling file/dir counts, _transcript_path_for/_worktree_sibling_dirs live only in backfill_tokens.py (not hasattr(otel_receiver, "_transcript_path_for") holds), glob metacharacters in a slug matched literally.
 - No regression: every pre-existing test in test_backfill_tokens.py (43), test_otel_receiver_watchdog_attribution.py, test_otel_receiver.py, test_otel_receiver_hardening.py, test_otel_receiver_self_stop.py still green.
+
+### @team-lead — 2026-09-25
+
+PR opened: https://github.com/richmosko/polycarpic/pull/14. Verdict PASS already recorded (qa cb73cd4 at 9e2fbf2; architect 5ad725f at 68c8dfa); head-match `gate --head 68c8dfa` PASS. Awaiting the required `cairn` check and the merge call.

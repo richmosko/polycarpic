@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-26-backfill-sibling-scan`
 - **Started:** 2026-09-25
 - **Goal:** move the POLY-10 transcript-path resolver into `backfill_tokens.py` and make the backfill scan the repo's worktree-sibling transcript dirs, so backfilled teammate lines carry their role.
-- **Status:** In Progress
+- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/14
 - **Next loop:** POLY-51 (sub-issue letter IDs), then the grouped umbrellas POLY-48 / POLY-49 / POLY-50
 
 ## Releases
