@@ -15,14 +15,14 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** backfill_tokens.py scans only the main project slug; backfilled teammate lines are unattributed
-- **Issue:** POLY-26 (cairn)
+- **Feature:** Sub-issue IDs get a letter suffix on the parent (POLY-1234a); existing numbered sub-issues are not renamed
+- **Issue:** POLY-51 (cairn)
 - **Milestone:** POLY-A
-- **Branch:** `feature/poly-26-backfill-sibling-scan`
+- **Branch:** `feature/poly-51-sub-issue-letter-ids`
 - **Started:** 2026-09-25
-- **Goal:** move the POLY-10 transcript-path resolver into `backfill_tokens.py` and make the backfill scan the repo's worktree-sibling transcript dirs, so backfilled teammate lines carry their role.
-- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/14
-- **Next loop:** POLY-51 (sub-issue letter IDs), then the grouped umbrellas POLY-48 / POLY-49 / POLY-50
+- **Goal:** `cairn new --parent <ID>` allocates `<ID>a`, `<ID>b`, … so sub-issues read as children of their parent on the board and in the list; every engine consumer and the board accept both the suffixed and the legacy numeric form.
+- **Status:** In Progress
+- **Next loop:** the grouped umbrellas POLY-48 / POLY-49 / POLY-50
 
 ## Releases
 
