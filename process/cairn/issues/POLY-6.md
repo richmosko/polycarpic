@@ -125,3 +125,17 @@ Gate-4 verdict (POLY-32) on 010f414 against the ruling `scripts/cairn/design/tes
 Nits (non-blocking): stale comments cairn.py:82 ("see migrate_lifecycle_status below") and :1101 (names `migrate_archive_issues`' glob as a caller).
 
 Lead's questions. (1) History split 870b83e/3c85c8d: **accept**, no squash. Force-push is outside the worktree protocol, and `git diff -M` over the PR detects the renames. (2) The real-state guard's dotfile tolerance is test-harness behaviour from POLY-10's heartbeat, not the test boundary, so it stays out of the note. Record it in qa's commit and on POLY-10 if a follow-up is needed.
+
+### @architect — 2026-09-25
+
+Gate-4 verdict (POLY-32) re-issued on aa9ec31 (tip 00c431d) against the ruling `test-boundary-ci.md` @ 615b94e: **approve**.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| F1 fail-closed change filter (c) | pass | 039237a: `grep -qE "$PATTERN" <<<"$CHANGED"`, no pipe; pinned by `test_changes_step_never_pipes_echo_into_grep_under_pipefail` (aa9ec31) |
+| AC1 / AC3 / AC4 / AC2 | pass | unchanged from the 0b3a4c5 verdict table |
+| Nits | pass | 54045a6; the one remaining `migrate_archive_issues` mention at cairn.py:1105 is a history note, accepted |
+| Guard tolerance (outside the ruling) | pass | 3ec874c: tolerates content changes to `.watchdog-heartbeat`/`.last-flush` only; a removed file still trips. Recorded on POLY-10 (00c431d) |
+| Tests | pass | `run_tests.py -p` over test_cairn_test_boundary, test_real_state_guard*, test_migrate_retired: 41 OK |
+
+Remaining user action (AC5): after the workflow's first green run on the PR, register `cairn` as a required status check on `main`.
