@@ -1637,15 +1637,34 @@ class EstimateCostAxisTests(unittest.TestCase):
         self.assertTrue(all(p != -1 for p in positions), (cols, header_line))
         self.assertEqual(positions, sorted(positions), (cols, header_line))
 
-    def test_schema_one_and_null_cost_rows_excluded_from_cost_median(self):
+    def test_null_cost_rows_excluded_but_a_schema_one_cost_counts(self):
+        # Architect verdict R1 (@ 6a6df12, §9.1 item 9 rewritten @ 0a0b1f7):
+        # §0.4 wins -- a schema-1 row's `actual.cost_usd` came from the
+        # same `token_actuals` pricing as a schema-2 row's; only its
+        # `ratio` changed meaning. It COUNTS toward the cost median. Only
+        # a null `actual.cost_usd` is excluded.
         write_calibration(self.data_dir, [
-            calibration_row("PT-100", assignee="backend-lead", schema=1, act_cost=999.0, closed="2026-09-01T00:00:00Z"),
+            calibration_row("PT-100", assignee="backend-lead", schema=1, act_cost=2.0, closed="2026-09-01T00:00:00Z"),
             calibration_row("PT-101", assignee="backend-lead", act_cost=None, closed="2026-09-02T00:00:00Z"),
             calibration_row("PT-102", assignee="backend-lead", act_cost=4.0, closed="2026-09-03T00:00:00Z"),
         ])
         r = self.run_estimate()
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-        self.assertIn("cost $4.00", r.stdout)
+        self.assertIn("cost $3.00", r.stdout)  # median of [2.0, 4.0]
+
+    def test_a_lone_priced_schema_one_row_among_null_cost_rows_still_medians(self):
+        # Team-lead's live finding on the real tree (`cairn estimate
+        # POLY-37`): tier A is entirely schema-1 (POLY-13/19/23/30 --
+        # POLY-6's own reference class, pre-dating this feature's AC5
+        # re-close), one of them (POLY-30, $9.43) genuinely priced.
+        write_calibration(self.data_dir, [
+            calibration_row("PT-100", assignee="backend-lead", schema=1, act_cost=None, closed="2026-09-01T00:00:00Z"),
+            calibration_row("PT-101", assignee="backend-lead", schema=1, act_cost=None, closed="2026-09-02T00:00:00Z"),
+            calibration_row("PT-102", assignee="backend-lead", schema=1, act_cost=9.43, closed="2026-09-03T00:00:00Z"),
+        ])
+        r = self.run_estimate()
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("cost $9.43", r.stdout)
 
     def test_suggestion_line_is_cost_and_gate_cycles(self):
         write_calibration(self.data_dir, [
