@@ -1,7 +1,7 @@
 ---
 id: POLY-56
 title: Checklists as the granularity layer
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [cairn, board]
 priority: P2
 pr: null
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 User decision 2026-09-25 (POLY-51 loop): sub-issues nest one level only. Anything finer than a sub-issue is a **checklist** in the issue body, visible on the card. Sub-issues stay for work that needs its own assignee, status, or cost estimate (the per-stage records); checklists cover everything else. Queued after the grouped umbrellas POLY-48 / POLY-49 / POLY-50.
@@ -35,3 +35,7 @@ User decision 2026-09-25 (POLY-51 loop): sub-issues nest one level only. Anythin
 ### @team-lead — 2026-09-25
 
 Filed 2026-09-25 from the POLY-51 loop; spec is in the body above. Authoring convention added the same day at the user's request.
+
+### @team-lead — 2026-09-26
+
+Feature started. Branch: `feature/poly-56-checklists`.
