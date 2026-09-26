@@ -1,7 +1,7 @@
 ---
 id: POLY-50
 title: Backfill attribution (grouped)
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [cairn, telemetry]
 priority: P3
 pr: null
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 Grouped fix loop for `backfill_tokens.py` (user decision 2026-09-25). One PR closes every member; together they are the prerequisites for the first real backfill write on this repo (POLY-26 ruling §3).
@@ -31,3 +31,7 @@ Grouped fix loop for `backfill_tokens.py` (user decision 2026-09-25). One PR clo
 ### @team-lead — 2026-09-25
 
 Grouped 2026-09-25 from the POLY-26 loop's follow-ups; spec is in the body above.
+
+### @team-lead — 2026-09-26
+
+Feature started. Branch: `feature/poly-50-backfill-attribution`.

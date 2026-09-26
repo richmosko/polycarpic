@@ -15,7 +15,13 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: POLY-50 (backfill attribution), POLY-56 (checklists), POLY-58 (cairn.py split). First thing next session: verify POLY-49 AC4 (live token capture) with `otel_receiver.py --status`._
+_Feature: Backfill attribution (grouped)  
+Issue: POLY-50 (cairn) — members POLY-45, POLY-46 + the milestone-window collision  
+Milestone: POLY-A  
+Branch: `feature/poly-50-backfill-attribution`  
+Started: 2026-09-26  
+Goal: make `backfill_tokens.py` attribute every record to an issue or milestone (worktree branches → active issue, no double-count against otel lines, same-timestamp milestones disambiguated) so the first real backfill write on this repo lands clean.  
+Status: In Progress_
 
 ## Releases
 
