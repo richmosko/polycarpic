@@ -130,3 +130,13 @@ TRACKER.md findings:
 Once R3 lands verbatim, the verdict is APPROVE. I verify with `git show <sha>:process/TRACKER.md` and need no further review round.
 
 Known limit: AC4 live capture is verified next session.
+
+### @architect — 2026-09-25
+
+**Gate-4 verdict @ fdae1df — APPROVE**
+
+| Axis | Result | Evidence |
+|---|---|---|
+| Code, all ruling axes §1–§8 + both addenda | pass | approved @ a51fac6; `git diff a51fac6 fdae1df -- scripts/` is empty |
+| R3 TRACKER.md | pass | checked `git show fdae1df:process/TRACKER.md` against `tracker-r3.md`: all 5 replacement blocks present verbatim. The removed phrases ("periodic sweep", "Correction (POLY-10", "moved here verbatim", "Root cause (measured", "PT-79's real incident") are absent |
+| AC4 live capture | known limit | settings delta landed @ aa3a21f. Verified next session, since settings are read at launch |
