@@ -846,6 +846,48 @@ class IntervalFlushWithNoExportsTests(unittest.TestCase):
             f"with zero exports ever POSTed -- last --status: {last_status.stdout if last_status else None!r}",
         )
 
+    def test_an_idle_receiver_does_not_hot_flush_every_tick_past_the_interval(self):
+        # Architect's gate-4 verdict finding (§1.1, R1, e106214): `flush()`
+        # returns early on no pending data and never advances
+        # `last_flush_monotonic` unless data was written -- so an IDLE
+        # receiver flushes on EVERY watchdog beat once past the interval,
+        # not once per interval. Measured (architect's probe,
+        # temp/probe_hotflush.py): --flush-interval 1, no exports, 5s ->
+        # 18 distinct .last-flush mtimes (expected <= ~5-7). Polls the
+        # marker FILE directly (not --status subprocesses, which would
+        # themselves dominate/skew the count) -- same mechanic as the
+        # architect's own probe.
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        start = run_fake_receiver(
+            fake_root,
+            ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid()),
+             "--flush-interval", "1"],
+            env=env,
+        )
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(fake_root, env)
+        self.assertEqual(running.returncode, 0, running.stdout + running.stderr)
+
+        marker = _sessions_dir_path(fake_root) / otel_receiver.LAST_FLUSH_MARKER_NAME
+        seen_mtimes = set()
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            try:
+                seen_mtimes.add(marker.stat().st_mtime_ns)
+            except OSError:
+                pass
+            time.sleep(0.02)
+        self.assertLessEqual(
+            len(seen_mtimes), 7,
+            f"an idle receiver (--flush-interval 1, zero exports, 5s window) must flush at most "
+            f"once per interval, not once per watchdog beat -- got {len(seen_mtimes)} distinct "
+            f".last-flush mtimes (architect's probe measured 18 pre-fix)",
+        )
+
 
 # --------------------------------------------------------------------------
 # POLY-49 gate-1 ruling §1 fix #2, "red tests qa writes" item 2: the
