@@ -1,7 +1,7 @@
 ---
 id: POLY-49b
 title: POLY-49 execute: red tests
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-49
 blocked_by: [POLY-49a]
@@ -10,7 +10,11 @@ paths: [scripts/cairn/tests/**, process/cairn/issues/POLY-49.md, process/cairn/i
 stage: execute
 estimate.cost_usd: "7.00"
 estimate.gate_cycles: 1
-labels: [cairn, telemetry, tests]
+actual.cost_usd: null
+actual.tokens: null
+actual.gate_cycles: 7
+actual.wall_clock: 102
+labels: [cairn, telemetry, tests, bloat]
 priority: null
 pr: null
 created: 2026-09-25
