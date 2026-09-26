@@ -36,6 +36,11 @@
   var blockersOf = CairnLogic.blockersOf;
   var blocksOf = CairnLogic.blocksOf;
   var openBlockers = CairnLogic.openBlockers;
+  // POLY-56 (gate-1 ruling R1): relocated from this file -- its `items`
+  // half is gone (checklist rows now come from the server, `issue.
+  // checklist`/`issue.checklist_items`), leaving only the description cut
+  // the drawer still needs for its own "Description" section.
+  var splitAcceptanceCriteria = CairnLogic.splitAcceptanceCriteria;
   // PT-37: STATUS_LABELS/statusLabel relocated into board-logic.js -- same
   // move PT-29 made for BOARD_COLUMNS below, and for the same reason: the
   // column header (:627) and the collapsed-lane chip (:767) had drifted to
@@ -1175,6 +1180,18 @@
     var progress = state.board ? childProgress(state.board.issues, issue) : { done: 0, total: 0 };
     if (progress.total > 0) meta.appendChild(chip("subissues", progress.done + "/" + progress.total));
     if (issue.parent) meta.appendChild(chip("subissues", "↳ " + issue.parent));
+    // POLY-56 (gate-1 ruling R1): a DISTINCT chip, deliberately not
+    // combined with the sub-issue badge above -- a checklist row is a line
+    // of text, not a sub-issue with its own status/owner, so adding the
+    // two counts together would let a "3/3" hide a sub-issue that isn't
+    // actually done. Server-computed (`issue.checklist`, build_board_
+    // payload) -- no client-side re-parse of a description this payload
+    // doesn't even carry (M2: board issues are frontmatter + this count
+    // only, never the full body).
+    var checklist = issue.checklist;
+    if (checklist && checklist.total > 0) {
+      meta.appendChild(chip("checklist", "☑ " + checklist.done + "/" + checklist.total));
+    }
     // PT-26: the blocked chip appears only when OPEN blockers exist
     // (architect's ruling #4) -- an all-resolved blocked_by list is no
     // longer a live constraint, and flagging one anyway is noise on the
@@ -1770,27 +1787,14 @@
   // The engine returns `description` as the whole pre-"## Comments" body,
   // including any "## Acceptance criteria" section, raw (see
   // process/TRACKER.md — cairn.parse_issue's "description" is
-  // split_comments(body)[0], not a separately-parsed structure). The board
-  // splits it client-side purely for display; there is no write-back path
-  // for these checkboxes in phase 1 (see TRACKER.md's "Deferred" ruling).
-  var AC_HEADING_RE = /^##\s*Acceptance criteria\s*$/;
-  var AC_ITEM_RE = /^- \[( |x|X)\]\s*(.*)$/;
-
-  function splitAcceptanceCriteria(description) {
-    var lines = (description || "").split("\n");
-    var headingIdx = -1;
-    for (var i = 0; i < lines.length; i++) {
-      if (AC_HEADING_RE.test(lines[i])) { headingIdx = i; break; }
-    }
-    if (headingIdx === -1) return { description: description || "", items: [] };
-    var items = [];
-    lines.slice(headingIdx + 1).forEach(function (line) {
-      var m = AC_ITEM_RE.exec(line);
-      if (m) items.push({ text: m[2], checked: m[1].toLowerCase() === "x" });
-    });
-    var descText = lines.slice(0, headingIdx).join("\n").replace(/\n+$/, "");
-    return { description: descText, items: items };
-  }
+  // split_comments(body)[0], not a separately-parsed structure).
+  // splitAcceptanceCriteria (board-logic.js) cuts the AC section off for
+  // display; the ITEMS themselves come from the server now
+  // (`issue.checklist_items`, POLY-56 gate-1 ruling R1) -- one parser
+  // (cairn.checklist_items), not this file's own second copy. There is
+  // still no write-back path for these checkboxes (TRACKER.md's
+  // "Deferred" ruling; POLY-56 built the CLI tick instead, `cairn
+  // check-item`, and re-deferred the board's own write-back).
 
   // PT-4: markdown rendering, display-only (edit surfaces -- the comment
   // textarea, inline fields -- always show/submit raw markdown source;
@@ -1867,6 +1871,9 @@
   // done/cancelled entries -- PT-26's "open vs resolved distinguished"
   // requirement for the "Blocked by" list; Children and "Blocks" don't
   // pass it, so they render with no resolved/open distinction at all.
+  // `opts.checklist` (POLY-56 gate-1 ruling R4) prefixes each row with a
+  // disabled checkbox, checked iff `status === "done"` -- Children only;
+  // "Blocked by"/"Blocks" don't pass it, same asymmetry as markResolved.
   function issueLinkListEl(items, opts) {
     opts = opts || {};
     var ul = document.createElement("ul");
@@ -1875,6 +1882,13 @@
       var li = document.createElement("li");
       if (opts.markResolved && (item.status === "done" || item.status === "cancelled")) {
         li.className = "resolved";
+      }
+      if (opts.checklist) {
+        var cb = document.createElement("input");
+        cb.type = "checkbox";
+        cb.checked = item.status === "done";
+        cb.disabled = true; // read-only, same as every other drawer checkbox
+        li.appendChild(cb);
       }
       var link = document.createElement("a");
       link.href = "#";
@@ -2074,7 +2088,7 @@
       childrenHeading.className = "section-heading";
       childrenHeading.textContent = "Children";
       drawer.appendChild(childrenHeading);
-      drawer.appendChild(issueLinkListEl(kids));
+      drawer.appendChild(issueLinkListEl(kids, { checklist: true }));
     }
 
     // PT-26: "Blocked by" -- open vs resolved (done/cancelled) visually
@@ -2143,19 +2157,23 @@
     drawer.appendChild(descHeading);
     renderMarkdown(drawer, split.description);
 
-    if (split.items.length) {
+    // POLY-56 (gate-1 ruling R1): rows come from the server's own parse
+    // (`issue.checklist_items`, build_issue_payload) -- no client-side
+    // re-parse of `issue.description` for the items themselves anymore.
+    var checklistItems = issue.checklist_items || [];
+    if (checklistItems.length) {
       var acHeading = document.createElement("div");
       acHeading.className = "section-heading";
       acHeading.textContent = "Acceptance criteria";
       drawer.appendChild(acHeading);
       var ul = document.createElement("ul");
       ul.className = "ac-list";
-      split.items.forEach(function (item) {
+      checklistItems.forEach(function (item) {
         var li = document.createElement("li");
         var cb = document.createElement("input");
         cb.type = "checkbox";
         cb.checked = !!item.checked;
-        cb.disabled = true; // checkbox write-back is deferred — see TRACKER.md
+        cb.disabled = true; // board write-back stays deferred -- see TRACKER.md
         li.appendChild(cb);
         var span = document.createElement("span");
         span.textContent = item.text;
