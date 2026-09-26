@@ -1,7 +1,7 @@
 ---
 id: POLY-49
 title: Receiver hardening (grouped)
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -144,3 +144,7 @@ Known limit: AC4 live capture is verified next session.
 ### @team-lead — 2026-09-25
 
 PR opened: https://github.com/richmosko/polycarpic/pull/20. Awaiting Validate. AC4 (live capture) is the known limit: verified in the next session after the telemetry keys moved to user settings (aa3a21f).
+
+### @team-lead — 2026-09-25
+
+Validate passed; merging via PR #20. Closing. AC4 (live capture) verified in the next session.
