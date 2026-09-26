@@ -53,3 +53,9 @@
 <!--
 Add new decisions ABOVE this comment, newest first.
 -->
+
+### 2026-09-26 — Backfill stops at the earliest otel day; the reader never arbitrates between sources
+**Decision:** `backfill_tokens.py` derives a cutoff from the data file (the start of the earliest otel `window_start`), drops every record at or after it, stamps its lines `generated` = cutoff, and refuses under the lock if otel lines appear before its cutoff. `/api/tokens` keeps summing every source per bucket. Ruling: `process/reviews/POLY-50/ruling.md` §2.
+**Why:** A backfill line aggregates one `(issue, role, model)` over its bucket's whole time span, so most buckets straddle the first otel day and the reader cannot split them after the fact. The cutoff under-attributes at most the records between midnight and the first otel export on that day (≤ 945 here); it never double-counts.
+**Alternatives considered:** Per-window source precedence in the reader (needs date-granular backfill lines, a schema change for no gain); a `--until` flag (a value nobody would keep in sync with the data file).
+**Approved by:** richmosko (POLY-50 plan confirmed 2026-09-26)

@@ -2406,10 +2406,18 @@ def milestone_windows(repo_root: Path, strict: bool = False) -> List[Tuple[str, 
     "outside any window" bucket) -- under-attributed, never
     mis-attributed, never a stop. `strict=True` (qa's own test surface,
     exercising the detector in isolation) restores the original raise.
+
+    POLY-50 gate-1 ruling §3 (this repo's own POLY-A/POLY-B, bootstrapped
+    in one commit): BEFORE the collision check above runs, each TIE GROUP
+    (>= 2 ids sharing one start) is given a chance to disambiguate on its
+    own STATUS history -- see the tie-handling block below for the exact
+    rule. Only a genuine residual tie (both members resolve to the same
+    status-derived start, or one can't be status-derived and isn't
+    currently `planned`) still reaches the collision check above.
     """
     import subprocess
 
-    windows: List[Tuple[str, str]] = []
+    windows: List[Tuple[str, str, str, Optional[str]]] = []  # start_iso, milestone_id, rel_path, status
     for rel in _MILESTONE_REL_PATHS:
         milestone_dir = repo_root / rel
         if not milestone_dir.is_dir():
@@ -2423,6 +2431,7 @@ def milestone_windows(repo_root: Path, strict: bool = False) -> List[Tuple[str, 
             milestone_id = frontmatter.get("id")
             if not milestone_id:
                 continue
+            status = frontmatter.get("status")
             rel_path = path.relative_to(repo_root).as_posix()
             try:
                 log = subprocess.run(
@@ -2441,9 +2450,68 @@ def milestone_windows(repo_root: Path, strict: bool = False) -> List[Tuple[str, 
             start_iso = _git_iso_to_utc_z(git_iso)
             if start_iso is None:
                 continue
-            windows.append((start_iso, str(milestone_id)))
+            windows.append((start_iso, str(milestone_id), rel_path, str(status) if status else None))
 
     windows.sort(key=lambda w: w[0])
+
+    # POLY-50 gate-1 ruling §3: for each GROUP of >= 2 milestones sharing one
+    # creation start (a `--follow` false-merge or, on this repo, two files
+    # bootstrapped in the same commit), take each member's own STATUS-derived
+    # start instead of the shared creation start -- the first commit that
+    # added a `status: in-progress|paused|done|cancelled` frontmatter line to
+    # THAT file (git log -G, oldest match = last line, newest-first log). A
+    # member CURRENTLY `planned` with no such commit is removed SILENTLY --
+    # a planned milestone owns no window yet, which is correct, not a
+    # collision, so no warning fires for it. A member that is NOT currently
+    # `planned` (e.g. `archived`) but still has no such commit (a milestone
+    # whose history never says `in-progress`/`paused`/`done`/`cancelled` --
+    # the synthetic `--follow` false-merge shape, never a real milestone's
+    # own lifecycle) is left at its ORIGINAL shared start: the unchanged
+    # collision check below still sees the tie and drops + warns, exactly
+    # as it did before this ruling -- this is a genuine engine-defect
+    # collision, not a planned-milestone non-collision, and must not be
+    # silently swallowed. Non-tied milestones are untouched -- no extra
+    # `git log` call for them, PT-84 semantics unchanged. Re-sorted
+    # afterward so the unchanged collision check sees the adjusted starts.
+    groups: Dict[str, List[int]] = {}
+    for i, (start, _milestone_id, _rel_path, _status) in enumerate(windows):
+        groups.setdefault(start, []).append(i)
+    tie_group_indices = [idxs for idxs in groups.values() if len(idxs) > 1]
+    if tie_group_indices:
+        removed: Set[int] = set()
+        adjusted_start: Dict[int, str] = {}
+        for idxs in tie_group_indices:
+            for i in idxs:
+                _start, _milestone_id, rel_path_i, status_i = windows[i]
+                try:
+                    status_log = subprocess.run(
+                        ["git", "-C", str(repo_root), "log", "--follow", "--format=%aI",
+                         "-G", r"^status: *(in-progress|paused|done|cancelled)", "--", rel_path_i],
+                        capture_output=True, text=True, timeout=10,
+                    )
+                except (OSError, subprocess.TimeoutExpired):
+                    continue  # leave at its original (still-tied) start
+                if status_log.returncode != 0:
+                    continue  # leave at its original (still-tied) start
+                status_lines = [l for l in status_log.stdout.splitlines() if l.strip()]
+                if not status_lines:
+                    if status_i == "planned":
+                        removed.add(i)  # still `planned` -- no window yet, silently
+                    # else: leave at its original (still-tied) start -- a
+                    # genuine residual tie for the unchanged check below.
+                    continue
+                status_start = _git_iso_to_utc_z(status_lines[-1])
+                if status_start is None:
+                    continue  # leave at its original (still-tied) start
+                adjusted_start[i] = status_start
+        windows = [
+            (adjusted_start.get(i, start), milestone_id, rel_path, status)
+            for i, (start, milestone_id, rel_path, status) in enumerate(windows)
+            if i not in removed
+        ]
+        windows.sort(key=lambda w: w[0])
+
+    windows = [(start, milestone_id) for start, milestone_id, _rel_path, _status in windows]
 
     ids = [milestone_id for _start, milestone_id in windows]
     dup_ids = {milestone_id for milestone_id in ids if ids.count(milestone_id) > 1}
