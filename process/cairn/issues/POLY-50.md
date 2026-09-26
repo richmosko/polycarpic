@@ -22,7 +22,7 @@ Grouped fix loop for `backfill_tokens.py` (user decision 2026-09-25). One PR clo
 
 ## Acceptance criteria
 
-- [ ] POLY-45, POLY-46 acceptance criteria met and closed by this PR
+- [x] POLY-45, POLY-46 acceptance criteria met and closed by this PR
 - [x] `worktree-*`/`HEAD` records resolve through the lead's main-dir branch timeline (ruling §1); dry run shows ≥ 95 % of resolved records on an issue
 - [x] A write excludes every record at/after the earliest otel day (`_otel_cutoff`) and stamps `generated` = cutoff (ruling §2)
 - [x] Milestones sharing a creation timestamp take their status-derived start; a still-`planned` one has no window and no warning; a true tie still drops + warns (ruling §3); tests use two milestones created in one commit

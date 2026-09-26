@@ -1,7 +1,7 @@
 ---
 id: POLY-46
 title: backfill_tokens: a write must not double-count against existing otel lines on /api/tokens
-status: backlog
+status: done
 milestone: POLY-A
 parent: POLY-50
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [cairn, telemetry]
 priority: P3
 pr: null
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 
