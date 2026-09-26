@@ -150,6 +150,11 @@ class NewCommandBodySeedingTests(unittest.TestCase):
     def test_body_dash_reads_stdin_and_seeds_it_verbatim(self):
         # Mutation: drop the body from the O_EXCL write -- the seeded
         # body must round-trip byte-for-byte, not just non-empty.
+        # `_claim_issue_file`'s own glue (M6: dump_frontmatter(...) + "\n"
+        # + body) always inserts the one blank-line separator every other
+        # issue file in this repo already has between the closing fence
+        # and its body -- hence the leading "\n" in every expectation
+        # below, not a bug in the given body text.
         data_dir = helpers.make_tmp_data_dir(self)
         body_text = "A paragraph.\n\n## Acceptance criteria\n\n- [ ] one\n- [ ] two\n"
         result = run_cairn(
@@ -159,7 +164,7 @@ class NewCommandBodySeedingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         path = self._new_file(data_dir)
         _, body = cairn.parse_frontmatter(path.read_text(encoding="utf-8"))
-        self.assertEqual(body, body_text)
+        self.assertEqual(body, "\n" + body_text)
 
     def test_body_literal_argument_seeds_it_verbatim(self):
         data_dir = helpers.make_tmp_data_dir(self)
@@ -169,7 +174,7 @@ class NewCommandBodySeedingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         path = self._new_file(data_dir)
         _, body = cairn.parse_frontmatter(path.read_text(encoding="utf-8"))
-        self.assertEqual(body, "Just a paragraph.\n")
+        self.assertEqual(body, "\nJust a paragraph.\n")
 
     def test_omitted_body_seeds_the_default_skeleton(self):
         data_dir = helpers.make_tmp_data_dir(self)
@@ -177,7 +182,7 @@ class NewCommandBodySeedingTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         path = self._new_file(data_dir)
         _, body = cairn.parse_frontmatter(path.read_text(encoding="utf-8"))
-        self.assertEqual(body, "\n## Acceptance criteria\n\n- [ ] \n")
+        self.assertEqual(body, "\n\n## Acceptance criteria\n\n- [ ] \n")
 
 
 class NewCommandTitleLintTests(unittest.TestCase):

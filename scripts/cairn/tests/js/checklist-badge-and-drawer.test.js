@@ -86,7 +86,10 @@ test("cardEl's checklist chip is guarded by total > 0", () => {
   // Mutation: drop the total > 0 guard -- a checklist chip must not
   // render for an issue with no acceptance-criteria section at all.
   const body = extractFunctionBody(readSource(), "cardEl");
-  const chipMatch = body.match(/if\s*\([^)]*\)\s*[^;{]*chip\(\s*"checklist"/);
+  // Allows either a same-line guard (`if (...) chip(...)`) or a braced
+  // block (`if (...) { ... chip("checklist", ...) ... }`) -- both are
+  // legitimate "guarded by an if" shapes; only the condition matters here.
+  const chipMatch = body.match(/if\s*\([^)]*\)\s*\{?[^}]*?chip\(\s*"checklist"/);
   assert.ok(chipMatch, "expected the checklist chip call to be guarded by an `if (...)` condition");
   assert.match(
     chipMatch[0],

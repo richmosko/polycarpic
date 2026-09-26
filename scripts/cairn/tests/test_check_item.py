@@ -8,6 +8,7 @@ command, not a cached index.
 """
 from __future__ import annotations
 
+import os
 import subprocess
 import unittest
 from pathlib import Path
@@ -193,13 +194,13 @@ class CheckItemErrorTests(unittest.TestCase):
 
 class CheckItemStaleMtimeTests(unittest.TestCase):
     def test_a_stale_mtime_between_read_and_write_is_refused(self):
-        # Mutation: skip the re-stat -- the ruling's conflict story reuses
-        # the SAME seen contract the board's HTTP write path already uses
-        # (get_seen: str(path.stat().st_mtime_ns)). Simulated here by
-        # making get_seen report two different tokens across the command's
-        # own two calls (its initial capture, then its pre-write re-stat)
-        # -- the real-world equivalent of another process touching the
-        # file in between. In-process (cairn.main) so the mock is visible
+        # Mutation: skip the re-stat -- cmd_check_item calls path.stat()
+        # exactly twice on the happy write path (st_before, then st_now
+        # just before the byte flip). This wrapper bumps the target
+        # file's real mtime (a real os.utime, not a faked stat result --
+        # the command re-reads real bytes off disk too) on that SECOND
+        # call only, simulating another process having touched the file
+        # in between. In-process (cairn.main) so the patch is visible
         # inside the same call.
         data_dir = _tree(self)
         path = data_dir / "issues" / "PT-1.md"
@@ -208,13 +209,29 @@ class CheckItemStaleMtimeTests(unittest.TestCase):
 
         import contextlib
         import io
+        import pathlib
+        import time
+
+        target_str = str(path)
+        original_stat = pathlib.Path.stat
+        calls = {"n": 0}
+
+        def counting_stat(self, *a, **kw):
+            if str(self) == target_str:
+                calls["n"] += 1
+                if calls["n"] == 2:
+                    future = time.time() + 3600
+                    os.utime(self, (future, future))
+            return original_stat(self, *a, **kw)
+
         out, err = io.StringIO(), io.StringIO()
-        with mock.patch.object(cairn, "get_seen", side_effect=["100", "200"]), \
+        with mock.patch.object(pathlib.Path, "stat", counting_stat), \
              contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             rc = cairn.main(["check-item", "PT-1", "1", "--data-dir", str(data_dir)])
 
         self.assertEqual(rc, 1, out.getvalue() + err.getvalue())
         self.assertEqual(path.read_bytes(), before, "a stale-mtime refusal must not write anything")
+        self.assertGreaterEqual(calls["n"], 2, "test sanity: path.stat() must have been called at least twice")
 
 
 class CheckItemCRLFByteRoundTripTests(unittest.TestCase):
