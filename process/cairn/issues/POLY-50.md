@@ -1,14 +1,14 @@
 ---
 id: POLY-50
 title: Backfill attribution (grouped)
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P3
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/23
 created: 2026-09-25
 updated: 2026-09-26
 ---
@@ -64,3 +64,7 @@ Gate-4 verdict — **pass** @ 0566102 (build c5cfc8b + kwarg rename). Checklist:
 **Judgment call ruled:** endorsed. A tied member with no status-transition commit that is *not* currently `planned` stays on drop + warn. §3 only licensed silent removal for a still-planned milestone; anything else (a false-merge, a quoted/non-enum `status:` the `-G` regex misses) is an ambiguity, and the ruled direction is loud under-attribution. Mutation 20 (`planned` check → `True`) is killed by the existing collision tests.
 
 **Minor, non-gating:** (a) the ruling's `worktree_resolved ≥ 5000` threshold was my error — §2 applies the cutoff before §1's resolution, so the counter covers only the written slice (535). The ratio criterion was measured on both slices instead. (b) `_truncate_fractional_seconds` in the cutoff compare is a sound addition, but no test kills its removal (it matters for a record within 1 s of the cutoff). (c) `_branch_at` rebuilds the timestamp list on every call; 0.9 s for the full run, so no action now.
+
+### @team-lead — 2026-09-26
+
+PR opened: https://github.com/richmosko/polycarpic/pull/23. Awaiting Validate.

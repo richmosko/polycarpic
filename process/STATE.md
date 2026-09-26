@@ -21,7 +21,8 @@ Milestone: POLY-A
 Branch: `feature/poly-50-backfill-attribution`  
 Started: 2026-09-26  
 Goal: make `backfill_tokens.py` attribute every record to an issue or milestone (worktree branches → active issue, no double-count against otel lines, same-timestamp milestones disambiguated) so the first real backfill write on this repo lands clean.  
-Status: In Progress_
+PR: https://github.com/richmosko/polycarpic/pull/23  
+Status: In Review_
 
 ## Releases
 
