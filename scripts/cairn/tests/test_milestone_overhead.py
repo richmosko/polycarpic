@@ -543,6 +543,127 @@ class MilestoneWindowsGitTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------
+# POLY-50 gate-1 ruling §3: >= 2 milestone files landing in the SAME
+# creation commit (a GENUINE tie -- both are pure ADDs, so no --follow
+# rename disambiguation even applies, unlike MilestoneWindowsGitTests'
+# false-merge fixtures above) take their STATUS-DERIVED start instead of
+# being dropped outright. Mirrors the real repo's own POLY-A/POLY-B shape
+# (ruling N8/N9): both created in one commit, POLY-A already in-progress,
+# POLY-B still planned.
+# --------------------------------------------------------------------------
+
+class TiedMilestoneStatusDerivedStartTests(unittest.TestCase):
+    """`git log --follow --format=%aI -G '^status: *(in-progress|paused|
+    done|cancelled)' -- <file>`, last line = the earliest commit whose
+    diff introduces one of those statuses. A member with no such commit
+    (never left `planned`) is dropped SILENTLY -- a planned milestone
+    owning no window is correct, not a collision. The existing duplicate/
+    tie check then runs UNCHANGED on the substituted starts: a residual
+    tie (both members already non-planned in the same creation commit)
+    still drops + warns, and `strict=True` still raises."""
+
+    def test_tied_planned_milestone_gets_no_window_and_no_warning(self):
+        repo_root = make_milestone_git_repo(self)
+        milestones_dir = repo_root / "process" / "cairn" / "milestones"
+        (milestones_dir / "PT-A.md").write_text(
+            milestone_text(id="PT-A", name="alpha", status="in-progress"), encoding="utf-8",
+        )
+        (milestones_dir / "PT-B.md").write_text(
+            milestone_text(id="PT-B", name="beta", status="planned"), encoding="utf-8",
+        )
+        _commit_at(repo_root, "create PT-A.md and PT-B.md together", "2026-09-23 09:44:25 +0000")
+
+        import io
+        import contextlib
+
+        stderr_capture = io.StringIO()
+        with contextlib.redirect_stderr(stderr_capture):
+            windows = cairn.milestone_windows(repo_root)
+
+        self.assertEqual(
+            windows, [("2026-09-23T09:44:25Z", "PT-A")],
+            f"a still-planned tied member must be dropped SILENTLY, leaving only the non-planned member's window -- got {windows!r}",
+        )
+        self.assertEqual(
+            stderr_capture.getvalue(), "",
+            f"a still-planned member's drop must never warn -- it isn't a collision -- got stderr: {stderr_capture.getvalue()!r}",
+        )
+
+    def test_tied_milestone_window_starts_at_status_change(self):
+        repo_root = make_milestone_git_repo(self)
+        milestones_dir = repo_root / "process" / "cairn" / "milestones"
+        (milestones_dir / "PT-A.md").write_text(
+            milestone_text(id="PT-A", name="alpha", status="in-progress"), encoding="utf-8",
+        )
+        (milestones_dir / "PT-B.md").write_text(
+            milestone_text(id="PT-B", name="beta", status="planned"), encoding="utf-8",
+        )
+        _commit_at(repo_root, "create PT-A.md and PT-B.md together", "2026-09-23 09:44:25 +0000")
+
+        (milestones_dir / "PT-B.md").write_text(
+            milestone_text(id="PT-B", name="beta", status="in-progress"), encoding="utf-8",
+        )
+        _commit_at(repo_root, "PT-B.md: planned -> in-progress", "2026-09-25 12:00:00 +0000")
+
+        windows = cairn.milestone_windows(repo_root)
+        self.assertEqual(
+            windows,
+            [("2026-09-23T09:44:25Z", "PT-A"), ("2026-09-25T12:00:00Z", "PT-B")],
+            f"PT-B's window must start at its OWN later status-change commit, ordered after PT-A, never the shared creation commit -- got {windows!r}",
+        )
+
+    def test_true_tie_still_drops_and_warns(self):
+        repo_root = make_milestone_git_repo(self)
+        milestones_dir = repo_root / "process" / "cairn" / "milestones"
+        (milestones_dir / "PT-A.md").write_text(
+            milestone_text(id="PT-A", name="alpha", status="in-progress"), encoding="utf-8",
+        )
+        (milestones_dir / "PT-B.md").write_text(
+            milestone_text(id="PT-B", name="beta", status="in-progress"), encoding="utf-8",
+        )
+        _commit_at(repo_root, "create PT-A.md and PT-B.md, both already in-progress", "2026-09-23 09:44:25 +0000")
+
+        import io
+        import contextlib
+
+        stderr_capture = io.StringIO()
+        with contextlib.redirect_stderr(stderr_capture):
+            windows = cairn.milestone_windows(repo_root)
+        ids = [mid for _start, mid in windows]
+        self.assertNotIn("PT-A", ids, f"a RESIDUAL tie (both members non-planned in the same commit) must still be DROPPED -- got {windows!r}")
+        self.assertNotIn("PT-B", ids, f"a RESIDUAL tie (both members non-planned in the same commit) must still be DROPPED -- got {windows!r}")
+        stderr_text = stderr_capture.getvalue()
+        self.assertIn("PT-A", stderr_text, f"the warning must still name the colliding milestones -- got stderr: {stderr_text!r}")
+        self.assertIn("PT-B", stderr_text, f"the warning must still name the colliding milestones -- got stderr: {stderr_text!r}")
+
+        with self.assertRaises(
+            cairn.MilestoneWindowError,
+            msg="strict=True must still raise on a residual (post-status-derivation) tie",
+        ):
+            cairn.milestone_windows(repo_root, strict=True)
+
+    def test_untied_planned_milestone_keeps_creation_window(self):
+        # A milestone with NO tie at all -- still `planned` -- must keep
+        # its plain creation-commit window. The status-derived-start rule
+        # applies ONLY to TIE GROUPS (ruling §3); an over-broad
+        # implementation that recomputed every milestone's start (or
+        # dropped every still-planned milestone outright) would fail
+        # here even though it would pass the tied-only tests above.
+        repo_root = make_milestone_git_repo(self)
+        milestones_dir = repo_root / "process" / "cairn" / "milestones"
+        (milestones_dir / "PT-SOLO.md").write_text(
+            milestone_text(id="PT-SOLO", name="solo", status="planned"), encoding="utf-8",
+        )
+        _commit_at(repo_root, "create PT-SOLO.md, alone, still planned", "2026-08-20 08:19:49 +0000")
+
+        windows = cairn.milestone_windows(repo_root)
+        self.assertEqual(
+            windows, [("2026-08-20T08:19:49Z", "PT-SOLO")],
+            f"an UNTIED still-planned milestone must keep its ordinary creation window, never dropped -- got {windows!r}",
+        )
+
+
+# --------------------------------------------------------------------------
 # ACs 2/3: both collectors attribute a main-branch record to the right
 # milestone bucket, and leave out-of-window records in `main`.
 # --------------------------------------------------------------------------

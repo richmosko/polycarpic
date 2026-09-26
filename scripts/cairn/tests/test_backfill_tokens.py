@@ -1226,5 +1226,452 @@ class BackfillWorktreeSiblingScanTests(unittest.TestCase):
         )
 
 
+# --------------------------------------------------------------------------
+# POLY-50 gate-1 ruling (process/reviews/POLY-50/ruling.md §§1-2): a
+# worktree-*/HEAD record resolves through the lead's own main-checkout
+# branch timeline (§1, POLY-45), and a write excludes every record
+# at/after the earliest otel day (§2, POLY-46).
+# --------------------------------------------------------------------------
+
+def _assistant_usage_record(
+    branch: str, timestamp: str, request_id: str, uuid_val: str, model: str = "claude-sonnet-5",
+) -> dict:
+    """Same minimal in-scope `assistant`/`usage` shape as
+    `_write_sibling_fixture_record`'s inner record, but with `branch`/
+    `timestamp` as free parameters -- these tests need precise control
+    over both to exercise the lead's branch-timeline resolver and the
+    otel cutoff, neither of which `_write_sibling_fixture_record` (fixed
+    timestamp) can express."""
+    return {
+        "type": "assistant",
+        "gitBranch": branch,
+        "requestId": request_id,
+        "uuid": uuid_val,
+        "timestamp": timestamp,
+        "message": {
+            "model": model,
+            "usage": {
+                "input_tokens": 1,
+                "cache_creation_input_tokens": 2,
+                "cache_read_input_tokens": 3,
+                "output_tokens": 4,
+            },
+        },
+    }
+
+
+def _timeline_marker_record(branch: str, timestamp: str) -> dict:
+    """A record carrying only what `_lead_branch_timeline` needs
+    (`timestamp` + `gitBranch`) -- `type: "user"`, no `message.usage`,
+    so it is a timeline INPUT only and never itself becomes a scored
+    bucket (`_process_record`'s own `type == "assistant"` keep filter
+    already excludes it)."""
+    return {"type": "user", "gitBranch": branch, "timestamp": timestamp}
+
+
+def _write_jsonl(path: Path, records: list, agent_setting: "str | None" = None) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = []
+    if agent_setting:
+        lines.append(json.dumps({"type": "agent-setting", "agentSetting": agent_setting}))
+    for record in records:
+        lines.append(json.dumps(record))
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+
+
+def _run_git(cwd: Path, *args: str, env: "dict | None" = None) -> subprocess.CompletedProcess:
+    result = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True, env=env)
+    if result.returncode != 0:
+        raise AssertionError(f"git {' '.join(args)} failed: {result.stderr}")
+    return result
+
+
+def _make_single_milestone_repo(testcase, milestone_id: str, created: str) -> Path:
+    """A throwaway git repo with exactly ONE milestone file -- deliberately
+    isolated from the tied-milestone collision fix (that seam has its own
+    tests in test_milestone_overhead.py); this repo exists only so the
+    between-loops fallback below has a real, non-colliding milestone
+    window to land in. `created`: git raw date, e.g.
+    '2026-09-20 00:00:00 +0000' (always UTC, matching every other fixture
+    in this suite)."""
+    tmp = helpers.make_empty_tmp_dir(testcase)
+    _run_git(tmp, "init", "-q", "-b", "main")
+    _run_git(tmp, "config", "user.email", "test@example.com")
+    _run_git(tmp, "config", "user.name", "Test")
+    milestones_dir = tmp / "process" / "cairn" / "milestones"
+    milestones_dir.mkdir(parents=True)
+    (milestones_dir / f"{milestone_id}.md").write_text(
+        f"---\nid: {milestone_id}\nname: fixture milestone\nkind: product\nmajor: PT-V1\n"
+        f"status: in-progress\ntarget_tag: null\nga: false\n---\n\nBody.\n",
+        encoding="utf-8",
+    )
+    env = dict(os.environ)
+    env.update({
+        "GIT_AUTHOR_DATE": created, "GIT_COMMITTER_DATE": created,
+        "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "test@example.com",
+        "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "test@example.com",
+    })
+    _run_git(tmp, "add", "-A", env=env)
+    _run_git(tmp, "commit", "-q", "-m", "add milestone", env=env)
+    return tmp
+
+
+class WorktreeBranchTimelineResolutionTests(unittest.TestCase):
+    """POLY-50 gate-1 ruling §1 (POLY-45): a `worktree-*`/`HEAD` record's
+    branch is meaningless on its own (Claude Code names it after the
+    worktree dir, never the issue branch checked out inside it) --
+    resolved instead through `_lead_branch_timeline` (every non-`worktree-
+    */HEAD` `(timestamp, gitBranch)` pair from the MAIN transcript dir
+    only) via `_branch_at` (the branch of the LAST timeline entry with
+    `entry_ts <= ts`). Each test uses its own throwaway `<tmp>/projects/
+    -fake-slug[...]` tree -- no shared setUp, matching this file's own
+    `test_record_duplicated_across_roots_counts_once` precedent."""
+
+    def _no_git_root(self):
+        # `cairn.milestone_windows` degrades to `[]` (no git repo, no
+        # directory) -- every "main" fallback in this class therefore
+        # stays plain `"main"`, deterministically, with no dependence on
+        # this checkout's own (colliding) POLY-A/POLY-B milestone files.
+        return helpers.make_empty_tmp_dir(self)
+
+    def test_worktree_record_resolves_to_lead_issue_branch(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        sibling_dir = tmp / "projects" / "-fake-slug--claude-worktrees-arch"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T00:00:00Z", "req-lead-1", "uuid-lead-1"),
+        ])
+        _write_jsonl(
+            sibling_dir / "arch-session.jsonl",
+            [_assistant_usage_record("worktree-arch", "2026-09-23T01:00:00Z", "req-arch-1", "uuid-arch-1")],
+            agent_setting="architect",
+        )
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster={"architect", "team-lead"}, repo_root=self._no_git_root(),
+        )
+        self.assertIn(
+            ("POLY-7", "architect", "claude-sonnet-5"), buckets,
+            f"a worktree-branch sibling record must resolve through the lead's own POLY-7 branch at its timestamp -- got {buckets.keys()!r}",
+        )
+
+    def test_head_record_resolves_via_timeline(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        sibling_dir = tmp / "projects" / "-fake-slug--claude-worktrees-arch"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T00:00:00Z", "req-lead-1", "uuid-lead-1"),
+        ])
+        _write_jsonl(
+            sibling_dir / "arch-session.jsonl",
+            [_assistant_usage_record("HEAD", "2026-09-23T01:00:00Z", "req-arch-1", "uuid-arch-1")],
+            agent_setting="architect",
+        )
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster={"architect", "team-lead"}, repo_root=self._no_git_root(),
+        )
+        self.assertIn(
+            ("POLY-7", "architect", "claude-sonnet-5"), buckets,
+            f"a detached-HEAD sibling record must resolve via the timeline exactly like `worktree-*` -- got {buckets.keys()!r}",
+        )
+
+    def test_timeline_excludes_worktree_and_head_entries(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        sibling_dir = tmp / "projects" / "-fake-slug--claude-worktrees-arch"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T00:00:00Z", "req-lead-1", "uuid-lead-1"),
+            # N2: the lead itself sat in a worktree early on -- this entry
+            # is timestamped AFTER the POLY-7 record above and must never
+            # shadow it in the timeline.
+            _timeline_marker_record("worktree-old", "2026-09-23T00:30:00Z"),
+        ])
+        _write_jsonl(
+            sibling_dir / "arch-session.jsonl",
+            [_assistant_usage_record("worktree-arch", "2026-09-23T01:00:00Z", "req-arch-1", "uuid-arch-1")],
+            agent_setting="architect",
+        )
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster={"architect", "team-lead"}, repo_root=self._no_git_root(),
+        )
+        self.assertIn(("POLY-7", "architect", "claude-sonnet-5"), buckets, buckets.keys())
+        self.assertNotIn(
+            ("main", "architect", "claude-sonnet-5"), buckets,
+            f"a `worktree-*` entry IN THE MAIN DIR must never enter the timeline -- got {buckets.keys()!r}",
+        )
+
+    def test_timeline_ignores_sibling_dirs(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        sibling_dir = tmp / "projects" / "-fake-slug--claude-worktrees-arch"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T00:00:00Z", "req-lead-1", "uuid-lead-1"),
+        ])
+        _write_jsonl(
+            sibling_dir / "arch-session.jsonl",
+            [
+                # A sibling record already on its OWN issue branch, LATER
+                # than the lead's POLY-7 entry -- must never leak into the
+                # (main-dir-only) timeline.
+                _assistant_usage_record("feature/POLY-9-x", "2026-09-23T01:00:00Z", "req-arch-own-1", "uuid-arch-own-1"),
+                _assistant_usage_record("worktree-arch", "2026-09-23T02:00:00Z", "req-arch-wt-1", "uuid-arch-wt-1"),
+            ],
+            agent_setting="architect",
+        )
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster={"architect", "team-lead"}, repo_root=self._no_git_root(),
+        )
+        self.assertIn(("POLY-9", "architect", "claude-sonnet-5"), buckets, buckets.keys())
+        self.assertIn(
+            ("POLY-7", "architect", "claude-sonnet-5"), buckets,
+            f"the worktree-arch record must resolve via the MAIN dir's own POLY-7 timeline, not the sibling's POLY-9 -- got {buckets.keys()!r}",
+        )
+
+    def test_record_at_switch_instant_takes_new_branch(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        sibling_dir = tmp / "projects" / "-fake-slug--claude-worktrees-arch"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            # Two lead entries at the EXACT same instant -- a same-second
+            # branch switch. `_branch_at` must return the LAST one
+            # (bisect_right), never the first (bisect_left/`<`).
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T00:00:00Z", "req-lead-1", "uuid-lead-1"),
+            _assistant_usage_record("feature/POLY-8-x", "2026-09-23T00:00:00Z", "req-lead-2", "uuid-lead-2"),
+        ])
+        _write_jsonl(
+            sibling_dir / "arch-session.jsonl",
+            [_assistant_usage_record("worktree-arch", "2026-09-23T00:00:00Z", "req-arch-1", "uuid-arch-1")],
+            agent_setting="architect",
+        )
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster={"architect", "team-lead"}, repo_root=self._no_git_root(),
+        )
+        self.assertIn(
+            ("POLY-8", "architect", "claude-sonnet-5"), buckets,
+            f"a record at the exact switch instant must take the NEW (last) branch -- got {buckets.keys()!r}",
+        )
+        self.assertNotIn(("POLY-7", "architect", "claude-sonnet-5"), buckets, buckets.keys())
+
+    def test_between_loops_resolves_to_milestone(self):
+        milestone_repo = _make_single_milestone_repo(self, "PT-M1", "2026-09-20 00:00:00 +0000")
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        sibling_dir = tmp / "projects" / "-fake-slug--claude-worktrees-arch"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("main", "2026-09-23T00:00:00Z", "req-lead-1", "uuid-lead-1"),
+        ])
+        _write_jsonl(
+            sibling_dir / "arch-session.jsonl",
+            [_assistant_usage_record("worktree-arch", "2026-09-23T01:00:00Z", "req-arch-1", "uuid-arch-1")],
+            agent_setting="architect",
+        )
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster={"architect", "team-lead"}, repo_root=milestone_repo,
+        )
+        self.assertIn(
+            ("milestone:PT-M1", "architect", "claude-sonnet-5"), buckets,
+            f"between loops (lead on `main`) a worktree record must fall to the ACTIVE MILESTONE, never a plain `main` bucket -- got {buckets.keys()!r}",
+        )
+
+    def test_before_first_lead_record_is_unresolved(self):
+        self.assertIsNone(
+            backfill_tokens._branch_at("2026-09-22T23:59:59Z", [("2026-09-23T00:00:00Z", "feature/POLY-7-x")]),
+            "a timestamp before the timeline's first entry must resolve to None, never the first entry's branch",
+        )
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        sibling_dir = tmp / "projects" / "-fake-slug--claude-worktrees-arch"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T00:00:00Z", "req-lead-1", "uuid-lead-1"),
+        ])
+        _write_jsonl(
+            sibling_dir / "arch-session.jsonl",
+            [_assistant_usage_record("worktree-arch", "2026-09-22T00:00:00Z", "req-arch-1", "uuid-arch-1")],
+            agent_setting="architect",
+        )
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster={"architect", "team-lead"}, repo_root=self._no_git_root(),
+        )
+        self.assertIn(("main", "architect", "claude-sonnet-5"), buckets, buckets.keys())
+        self.assertEqual(
+            stats.get("worktree_unresolved"), 1,
+            f"a worktree record before the timeline's first entry must count as unresolved -- got stats={stats!r}",
+        )
+
+    def test_own_issue_branch_is_not_rewritten(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        sibling_dir = tmp / "projects" / "-fake-slug--claude-worktrees-arch"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T00:00:00Z", "req-lead-1", "uuid-lead-1"),
+            # The lead moves to `main` shortly after -- if the resolution
+            # predicate were ever widened to cover an ALREADY-issue-shaped
+            # sibling branch too, this would wrongly redirect it below.
+            _assistant_usage_record("main", "2026-09-23T00:30:00Z", "req-lead-2", "uuid-lead-2"),
+        ])
+        _write_jsonl(
+            sibling_dir / "arch-session.jsonl",
+            [_assistant_usage_record("feature/POLY-9-x", "2026-09-23T01:00:00Z", "req-arch-1", "uuid-arch-1")],
+            agent_setting="architect",
+        )
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster={"architect", "team-lead"}, repo_root=self._no_git_root(),
+        )
+        self.assertIn(
+            ("POLY-9", "architect", "claude-sonnet-5"), buckets,
+            f"a sibling record ALREADY on its own issue branch must keep it, never rerouted through the lead's timeline -- got {buckets.keys()!r}",
+        )
+        self.assertNotIn(("main", "architect", "claude-sonnet-5"), buckets, buckets.keys())
+
+
+def _write_otel_lines(path: Path, overrides: list) -> None:
+    """Minimal, schema-valid `source: "otel"` lines -- every field
+    `_otel_cutoff`'s tests vary is passed via `overrides`; everything
+    else is a fixed, harmless placeholder (a real `/api/tokens` reader
+    never sees these files -- they live under a throwaway tmp dir)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lines = []
+    for override in overrides:
+        line = {
+            "source": "otel", "generated": "2026-09-24T00:00:00Z",
+            "window_start": "2026-09-24", "window_end": "2026-09-24",
+            "issue": "POLY-1", "role": "team-lead", "model": "claude-sonnet-5",
+            "input": 1, "cache_write": 0, "cache_read": 0, "output": 1,
+        }
+        line.update(override)
+        lines.append(line)
+    with open(path, "w", encoding="utf-8") as f:
+        for line in lines:
+            f.write(json.dumps(line) + "\n")
+
+
+class OtelCutoffTests(unittest.TestCase):
+    """POLY-50 gate-1 ruling §2 (POLY-46): a write excludes every record
+    at/after the earliest `otel` day (`_otel_cutoff(out_path)` = min
+    `window_start` over `source == "otel"` lines, day-start), so a
+    transcript-backfill write never double-counts against the receiver's
+    own ongoing collection."""
+
+    def test_cutoff_is_earliest_otel_day_start(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        out_path = tmp / "token-usage.jsonl"
+        _write_otel_lines(out_path, [
+            {"window_start": "2026-09-25", "generated": "2026-09-24T06:00:00Z"},
+            {"window_start": "2026-09-24", "generated": "2026-09-25T00:00:00Z"},
+        ])
+        cutoff = backfill_tokens._otel_cutoff(out_path)
+        self.assertEqual(
+            cutoff, "2026-09-24T00:00:00Z",
+            f"the cutoff must be the EARLIEST otel window_start's day-start, never the latest or a `generated` value -- got {cutoff!r}",
+        )
+
+    def test_cutoff_ignores_backfill_lines(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        out_path = tmp / "token-usage.jsonl"
+        _write_otel_lines(out_path, [{"window_start": "2026-09-25", "generated": "2026-09-25T06:00:00Z"}])
+        with open(out_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({
+                "source": "transcript-backfill", "generated": "2026-09-01T00:00:00Z",
+                "window_start": "2026-09-01", "window_end": "2026-09-01",
+                "issue": "POLY-2", "role": "team-lead", "model": "claude-sonnet-5",
+                "input": 1, "cache_write": 0, "cache_read": 0, "output": 1,
+            }) + "\n")
+        cutoff = backfill_tokens._otel_cutoff(out_path)
+        self.assertEqual(
+            cutoff, "2026-09-25T00:00:00Z",
+            f"a pre-existing transcript-backfill line must never widen the cutoff -- only source == 'otel' counts -- got {cutoff!r}",
+        )
+
+    def test_record_at_cutoff_is_excluded(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T23:59:59Z", "req-before-1", "uuid-before-1"),
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-24T00:00:00Z", "req-at-1", "uuid-at-1"),
+        ])
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster=set(), repo_root=helpers.make_empty_tmp_dir(self),
+            cutoff="2026-09-24T00:00:00Z",
+        )
+        bucket = buckets.get(("POLY-7", "team-lead", "claude-sonnet-5"))
+        self.assertIsNotNone(bucket, buckets.keys())
+        self.assertEqual(
+            bucket["records"], 1,
+            f"a record at exactly the cutoff must be excluded (`>=`, not `>`) -- one second earlier must still be kept -- got {bucket!r}",
+        )
+        self.assertEqual(stats.get("after_cutoff"), 1, stats)
+
+    def test_no_otel_lines_means_no_cutoff(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        out_path = tmp / "token-usage.jsonl"  # never created -- no otel lines at all
+        cutoff = backfill_tokens._otel_cutoff(out_path)
+        self.assertIsNone(cutoff, f"no otel lines must mean no cutoff at all, never `now`/epoch -- got {cutoff!r}")
+
+    def test_generated_is_stamped_to_cutoff(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        out_path = tmp / "token-usage.jsonl"
+        _write_otel_lines(out_path, [{"window_start": "2026-09-24", "generated": "2026-09-24T06:00:00Z"}])
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T00:00:00Z", "req-lead-1", "uuid-lead-1"),
+        ])
+        result = run_backfill_in_process([
+            "--transcripts-dir", str(main_dir), "--out-file", str(out_path),
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        backfill_lines = [l for l in read_jsonl(out_path) if l["source"] == "transcript-backfill"]
+        self.assertTrue(backfill_lines, "the golden POLY-7 record must still produce a backfill line")
+        for line in backfill_lines:
+            self.assertEqual(
+                line["generated"], "2026-09-24T00:00:00Z",
+                f"when a cutoff applies, every line's generated must be stamped to the cutoff, never `now` -- got {line!r}",
+            )
+
+    def test_dry_run_reports_cutoff_and_excluded_count(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        out_path = tmp / "token-usage.jsonl"
+        _write_otel_lines(out_path, [{"window_start": "2026-09-24", "generated": "2026-09-24T06:00:00Z"}])
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T00:00:00Z", "req-before-1", "uuid-before-1"),
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-24T00:00:00Z", "req-at-1", "uuid-at-1"),
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-25T00:00:00Z", "req-after-1", "uuid-after-1"),
+        ])
+        result = run_backfill_in_process([
+            "--transcripts-dir", str(main_dir), "--out-file", str(out_path), "--dry-run",
+        ])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "otel cutoff: 2026-09-24T00:00:00Z (2 record(s) at/after it excluded)", result.stdout,
+            f"--dry-run must report the cutoff and the excluded count exactly like a real write would -- got stdout={result.stdout!r}",
+        )
+
+    def test_write_refuses_when_otel_precedes_scan_cutoff(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        out_path = tmp / "token-usage.jsonl"
+        _write_otel_lines(out_path, [{"window_start": "2026-09-24", "generated": "2026-09-24T06:00:00Z"}])
+        scan_cutoff = backfill_tokens._otel_cutoff(out_path)
+        self.assertEqual(scan_cutoff, "2026-09-24T00:00:00Z", scan_cutoff)
+
+        # Simulate the race: an otel flush lands an EARLIER window between
+        # this scan and merge_and_write's own locked re-read.
+        _write_otel_lines(out_path, [
+            {"window_start": "2026-09-24", "generated": "2026-09-24T06:00:00Z"},
+            {"window_start": "2026-09-01", "generated": "2026-09-24T07:00:00Z"},
+        ])
+
+        with self.assertRaises(
+            backfill_tokens.BackfillError,
+            msg="a re-derived cutoff EARLIER than the scan's own cutoff must refuse the write, not merge past it",
+        ):
+            backfill_tokens.merge_and_write(out_path, [], scan_cutoff=scan_cutoff)
+
+        after_lines = read_jsonl(out_path)
+        self.assertEqual(
+            len(after_lines), 2,
+            f"a refused write must leave the file exactly as the simulated race left it -- got {after_lines!r}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
