@@ -15,16 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Receiver hardening (grouped)
-- **Issue:** POLY-49 (cairn) — members POLY-7, POLY-9, POLY-25, POLY-27 plus six carried criteria (two test flakes, worktree flush, under-capture, session registry, ensure-running registration)
-- **Milestone:** POLY-A
-- **Branch:** `feature/poly-49-receiver-hardening`
-- **Started:** 2026-09-25
-- **Goal:** the OTel receiver captures every live session's usage, its registry reflects real processes, and its tests are deterministic.
-- **PR:** https://github.com/richmosko/polycarpic/pull/20
-- **Status:** In Review
-
-_Next after this: POLY-50 (backfill attribution), POLY-56 (checklists), POLY-58 (cairn.py split)._
+_None — between loops. Next: POLY-50 (backfill attribution), POLY-56 (checklists), POLY-58 (cairn.py split). First thing next session: verify POLY-49 AC4 (live token capture) with `otel_receiver.py --status`._
 
 ## Releases
 
