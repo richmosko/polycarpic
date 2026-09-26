@@ -97,7 +97,10 @@ REAL_TOKEN_USAGE_PATH = (
     helpers.TESTS_DIR.parent.parent.parent / "process" / "cairn" / "metrics" / "token-usage.jsonl"
 )
 
-ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py")
+# POLY-49 gate-1 ruling §3: otel_receiver.py now imports the new sibling
+# module worktree_root.py unconditionally -- every fake-engine copy must
+# carry it too or the copy crashes at import time.
+ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py", "worktree_root.py")
 
 
 # --------------------------------------------------------------------------

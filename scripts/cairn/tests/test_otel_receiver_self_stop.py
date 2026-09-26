@@ -104,7 +104,10 @@ REAL_TOKEN_USAGE_PATH = REAL_METRICS_DIR / "token-usage.jsonl"
 REAL_RECEIVER_PIDFILE = REAL_METRICS_DIR / ".receiver.pid"
 REAL_SESSIONS_DIR = REAL_METRICS_DIR / ".sessions"
 
-ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py")
+# POLY-49 gate-1 ruling §3: otel_receiver.py now imports the new sibling
+# module worktree_root.py unconditionally -- every fake-engine copy must
+# carry it too or the copy crashes at import time.
+ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py", "worktree_root.py")
 
 # PT-105 (architect's ruling, PT-105.md @ e66af1e): the grace period an
 # IN-WINDOW operation must complete inside, for the two tests whose

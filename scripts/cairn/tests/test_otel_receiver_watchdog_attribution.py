@@ -72,7 +72,10 @@ REAL_TOKEN_USAGE_PATH = REAL_METRICS_DIR / "token-usage.jsonl"
 REAL_RECEIVER_PIDFILE = REAL_METRICS_DIR / ".receiver.pid"
 REAL_SESSIONS_DIR = REAL_METRICS_DIR / ".sessions"
 
-ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py")
+# POLY-49 gate-1 ruling §3: otel_receiver.py now imports the new sibling
+# module worktree_root.py unconditionally -- every fake-engine copy must
+# carry it too or the copy crashes at import time.
+ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py", "worktree_root.py")
 
 _REAL_STATE_SNAPSHOT = None
 
@@ -1050,42 +1053,20 @@ class RoleResolvesFromWorktreeSiblingTranscriptTests(unittest.TestCase):
 # (f) test 8
 # --------------------------------------------------------------------------
 
-class TranscriptIsStaleFindsWorktreeSiblingTranscriptTests(unittest.TestCase):
-    """Ruling (c)'s named latent PT-86 defect: the dead-pid liveness probe
-    must ALSO scan the worktree sibling dir. Without this,
-    `_transcript_is_stale` never finds a teammate's transcript at all, so a
-    dead-pid teammate session is always reap-eligible immediately -- the
-    "two independent signals" guarantee collapsing to one signal for every
-    teammate."""
-
-    def test_a_fresh_sibling_transcript_protects_a_dead_pid_session(self):
-        tmp = helpers.make_empty_tmp_dir(self)
-        transcripts_dir = tmp / "-Users-fake-slug"
-        transcripts_dir.mkdir()
-        sibling_dir = tmp / f"{transcripts_dir.name}--claude-worktrees-x"
-        sibling_dir.mkdir()
-        transcript = sibling_dir / "dead-pid-session.jsonl"
-        transcript.write_text(json.dumps({"type": "agent-setting", "agentSetting": "architect"}) + "\n", encoding="utf-8")
-        # Freshly written -- must NOT be reported stale.
-        self.assertFalse(
-            otel_receiver._transcript_is_stale("dead-pid-session", transcripts_dir),
-            "a fresh transcript that exists ONLY under the worktree sibling dir must not be treated as stale",
-        )
-
-    def test_a_stale_sibling_transcript_is_reported_stale(self):
-        tmp = helpers.make_empty_tmp_dir(self)
-        transcripts_dir = tmp / "-Users-fake-slug"
-        transcripts_dir.mkdir()
-        sibling_dir = tmp / f"{transcripts_dir.name}--claude-worktrees-x"
-        sibling_dir.mkdir()
-        transcript = sibling_dir / "dead-pid-session.jsonl"
-        transcript.write_text(json.dumps({"type": "agent-setting", "agentSetting": "architect"}) + "\n", encoding="utf-8")
-        old = time.time() - (31 * 60)
-        os.utime(transcript, (old, old))
-        self.assertTrue(
-            otel_receiver._transcript_is_stale("dead-pid-session", transcripts_dir),
-            "a stale sibling transcript must still be found and reported stale (reap-eligible)",
-        )
+# --------------------------------------------------------------------------
+# DELETED (POLY-49 gate-1 ruling §4, implementation-lead's fixture-gap
+# finding #3, 2026-09-25): TranscriptIsStaleFindsWorktreeSiblingTranscript
+# Tests called `otel_receiver._transcript_is_stale` directly -- withdrawn
+# along with `_is_session_dead`/`_session_liveness_probe` and the whole
+# two-signal reap predicate (liveness is pid-only now, every tick). This
+# class predates lane-2 (POLY-10 era) and was missed in the earlier
+# §4 test-deletion pass in test_otel_receiver_self_stop.py. No
+# replacement -- the worktree-sibling transcript lookup it exercised is
+# still covered by RoleResolvesFromWorktreeSiblingTranscriptTests (role
+# resolution, above) and the foreign-session filter's own worktree-
+# sibling coverage (this file's ForeignSessionFilterTests.
+# test_own_session_with_only_a_worktree_sibling_transcript_is_kept).
+# --------------------------------------------------------------------------
 
 
 if __name__ == "__main__":

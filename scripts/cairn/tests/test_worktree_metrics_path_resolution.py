@@ -219,6 +219,10 @@ def _make_main_checkout_with_worktree(testcase):
     tests_dir = cairn_dir / "tests"
     tests_dir.mkdir(parents=True)
     shutil.copy(helpers.CAIRN_DIR / "run_tests.py", cairn_dir / "run_tests.py")
+    # POLY-49 gate-1 ruling §3: run_tests.py now imports the new sibling
+    # module worktree_root.py -- must ship alongside every standalone
+    # copy or the copy crashes at import time.
+    shutil.copy(helpers.CAIRN_DIR / "worktree_root.py", cairn_dir / "worktree_root.py")
     (tests_dir / "test_trivial.py").write_text(_TRIVIAL_TEST_FILE, encoding="utf-8")
 
     subprocess.run(["git", "add", "-A"], cwd=str(main_root), check=True, env=genv)
@@ -319,6 +323,8 @@ class RecordsPathDiscriminatorTests(unittest.TestCase):
         tests_dir = cairn_dir / "tests"
         tests_dir.mkdir(parents=True)
         shutil.copy(helpers.CAIRN_DIR / "run_tests.py", cairn_dir / "run_tests.py")
+        # POLY-49 gate-1 ruling §3: see the module-level helper above.
+        shutil.copy(helpers.CAIRN_DIR / "worktree_root.py", cairn_dir / "worktree_root.py")
         (tests_dir / "test_trivial.py").write_text(_TRIVIAL_TEST_FILE, encoding="utf-8")
         subprocess.run(["git", "add", "-A"], cwd=str(main_root), check=True, env=genv)
         subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=str(main_root), check=True, env=genv)
@@ -356,6 +362,8 @@ class RecordsPathDiscriminatorTests(unittest.TestCase):
         tests_dir = cairn_dir / "tests"
         tests_dir.mkdir(parents=True)
         shutil.copy(helpers.CAIRN_DIR / "run_tests.py", cairn_dir / "run_tests.py")
+        # POLY-49 gate-1 ruling §3: see the module-level helper above.
+        shutil.copy(helpers.CAIRN_DIR / "worktree_root.py", cairn_dir / "worktree_root.py")
         (tests_dir / "test_trivial.py").write_text(_TRIVIAL_TEST_FILE, encoding="utf-8")
         # Deliberately NOT committed -- a fake engine root is scratch,
         # exactly PT-100's own "never the real committed file" fixtures.
@@ -389,6 +397,8 @@ class RecordsPathDiscriminatorTests(unittest.TestCase):
         tests_dir = cairn_dir / "tests"
         tests_dir.mkdir(parents=True)
         shutil.copy(helpers.CAIRN_DIR / "run_tests.py", cairn_dir / "run_tests.py")
+        # POLY-49 gate-1 ruling §3: see the module-level helper above.
+        shutil.copy(helpers.CAIRN_DIR / "worktree_root.py", cairn_dir / "worktree_root.py")
         (tests_dir / "test_trivial.py").write_text(_TRIVIAL_TEST_FILE, encoding="utf-8")
         # No `git init` anywhere in this fixture's ancestry -- helpers.
         # make_empty_tmp_dir's own tmp root is never inside a git repo
