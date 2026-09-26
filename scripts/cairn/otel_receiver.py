@@ -1083,9 +1083,10 @@ def _nudge_daemon(pidfile: Path, kill=os.kill) -> None:
     a polling-latency window. Load-bearing for the on-decrement reap of a
     crashed SIBLING session (see `serve`'s watchdog docstring, and
     architect review Delta 1) -- a missed nudge never delays the stop for
-    a clean exit (the registry file is already gone either way), but does
-    skip that reap until the next `end` event, flush, or the slow
-    periodic sweep (`--periodic-reap-seconds`) picks it up regardless.
+    a clean exit (the registry file is already gone either way): POLY-49
+    ruling §4 makes reaping unconditional on every ordinary
+    WATCHDOG_TICK_SECONDS beat regardless of any nudge, so a missed nudge
+    here costs at most one tick of latency, never more.
 
     Architect review, Delta 6: gated on a capability marker
     (`NUDGE_CAPABLE_MARKER_NAME`, written by `serve` at startup, inside
@@ -1867,6 +1868,18 @@ def serve(
             lines_written = len(flush(state, out_path, issue, _now_iso(), roster=roster, transcripts_dir=transcripts_dir, milestone_windows_table=milestone_windows_table))
         except (ReceiverError, backfill_tokens.BackfillError) as e:
             print(f"otel_receiver: flush refused: {e}", file=sys.stderr)
+        # Gate-4 verdict (architect, POLY-49.md @ c56d2b7), blocking: every
+        # path through this function must advance `last_flush_monotonic`,
+        # including a no-op `flush()` call -- `flush()` itself only
+        # advances it on the non-early-return path (something had
+        # accrued), so an idle receiver whose flush() call keeps hitting
+        # the `pending_min_ns is None` early return NEVER advanced the
+        # clock the watchdog's own interval check reads, and re-flushed on
+        # every tick forever once past `--flush-interval` (measured: 18
+        # distinct `.last-flush` mtimes in 5s at `--flush-interval 1`, no
+        # exports -- expected <= ~5). Set here, unconditionally, AFTER the
+        # call, regardless of what it returned or refused.
+        state.last_flush_monotonic = time.monotonic()
         # Addendum §3: the liveness probe also runs "at each flush" -- an
         # independent backstop to the on-`end` reap, for the scenario
         # where EVERY session that ever registered crashed without ever
@@ -1963,10 +1976,10 @@ def serve(
     # withdrawal of the HTTP control endpoint closed: it is derived from
     # the SAME local `pidfile` a cross-repo caller could never discover
     # in the first place (addendum A.2). A missed/coalesced signal never
-    # delays a clean stop (the registry file is already gone either way)
-    # but DOES skip the crashed-sibling reap until the next `end` event,
-    # flush, or the slow periodic reap below -- see architect review
-    # Delta 1's correction to this comment's earlier, overstated claim.
+    # delays a clean stop (the registry file is already gone either way);
+    # POLY-49 ruling §4 makes the reap itself unconditional on every
+    # ordinary WATCHDOG_TICK_SECONDS beat, so a missed nudge here costs at
+    # most one tick of latency on the crashed-sibling reap, never more.
     def _on_session_nudge(signum, frame):
         wake_event.set()
 
