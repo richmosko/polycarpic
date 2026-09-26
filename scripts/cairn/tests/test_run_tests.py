@@ -550,6 +550,10 @@ class RedRunSelfRecordsWithFailureDetailTests(unittest.TestCase):
         engine_dir = tmp / "scripts" / "cairn"
         engine_dir.mkdir(parents=True)
         engine_dir.joinpath("run_tests.py").write_bytes((helpers.CAIRN_DIR / "run_tests.py").read_bytes())
+        # POLY-49 gate-1 ruling §3: run_tests.py now imports the new
+        # sibling module worktree_root.py -- must ship alongside every
+        # standalone copy or the copy crashes at import time.
+        engine_dir.joinpath("worktree_root.py").write_bytes((helpers.CAIRN_DIR / "worktree_root.py").read_bytes())
         tests_dir = engine_dir / "tests"
         tests_dir.mkdir()
         tests_dir.joinpath("test_mixed.py").write_text(test_body, encoding="utf-8")
@@ -656,6 +660,8 @@ class RunnerRefusesAnIndirectUntieredFullRunTests(unittest.TestCase):
         engine_dir = tmp / "scripts" / "cairn"
         engine_dir.mkdir(parents=True)
         engine_dir.joinpath("run_tests.py").write_bytes((helpers.CAIRN_DIR / "run_tests.py").read_bytes())
+        # POLY-49 gate-1 ruling §3: see the sibling helper above.
+        engine_dir.joinpath("worktree_root.py").write_bytes((helpers.CAIRN_DIR / "worktree_root.py").read_bytes())
         tests_dir = engine_dir / "tests"
         tests_dir.mkdir()
         tests_dir.joinpath("test_fake_ok.py").write_text(
@@ -773,6 +779,8 @@ class MultiRootDiscoveryTests(unittest.TestCase):
         engine_dir = tmp / "scripts" / "cairn"
         engine_dir.mkdir(parents=True)
         engine_dir.joinpath("run_tests.py").write_bytes((helpers.CAIRN_DIR / "run_tests.py").read_bytes())
+        # POLY-49 gate-1 ruling §3: see the sibling helper above.
+        engine_dir.joinpath("worktree_root.py").write_bytes((helpers.CAIRN_DIR / "worktree_root.py").read_bytes())
         (engine_dir / "tests").mkdir()
         return tmp, engine_dir
 

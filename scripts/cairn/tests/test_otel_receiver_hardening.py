@@ -81,6 +81,7 @@ import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -96,7 +97,10 @@ REAL_TOKEN_USAGE_PATH = (
     helpers.TESTS_DIR.parent.parent.parent / "process" / "cairn" / "metrics" / "token-usage.jsonl"
 )
 
-ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py")
+# POLY-49 gate-1 ruling §3: otel_receiver.py now imports the new sibling
+# module worktree_root.py unconditionally -- every fake-engine copy must
+# carry it too or the copy crashes at import time.
+ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py", "worktree_root.py")
 
 
 # --------------------------------------------------------------------------
@@ -139,6 +143,19 @@ def make_fake_engine_root_with_default_port(testcase, default_port: int, otel_po
     return root
 
 
+# POLY-49 gate-1 ruling addendum 1 (architect, POLY-49.md @ 646bdb3):
+# "helpers' _base_env sets CLAUDE_CONFIG_DIR=<per-test tmp dir, empty>
+# for every receiver subprocess." Module-level and shared (never
+# written into by anything -- only tests that explicitly override
+# CLAUDE_CONFIG_DIR write a settings.json anywhere), so every test in
+# this file is hermetic against the REAL ~/.claude/settings.json this
+# actual machine may hold once the ruling's user-action delta is
+# applied there -- without it, POLY-25's resolver would read a real,
+# environment-dependent endpoint and make "default"/"env" assertions
+# here flaky depending on who/where the suite runs.
+_HERMETIC_CLAUDE_CONFIG_DIR = tempfile.mkdtemp(prefix="cairn-test-empty-claude-config-")
+
+
 def _minimal_env(**overrides: str) -> dict:
     """A from-scratch env, never `os.environ` inherited wholesale -- this
     is itself a live Claude Code session, which per the architect's own
@@ -146,7 +163,7 @@ def _minimal_env(**overrides: str) -> dict:
     (settings.local.json or shell, not settings.json). Inheriting
     `os.environ` into these subprocesses would make every "telemetry
     off" test flaky-or-wrong depending on who is running the suite."""
-    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "CLAUDE_CONFIG_DIR": _HERMETIC_CLAUDE_CONFIG_DIR}
     if "HOME" in os.environ:
         base["HOME"] = os.environ["HOME"]
     base.update(overrides)
@@ -489,6 +506,282 @@ class SessionStartHookStderrTests(unittest.TestCase):
         self.assertIn(
             "exit 0", command,
             f"a SessionStart hook must never fail a session over telemetry -- got: {command!r}",
+        )
+
+
+# --------------------------------------------------------------------------
+# POLY-49 (carried, no separate sub-issue): "flush from a worktree" --
+# `--flush-now` run from a teammate worktree finds no pidfile and does
+# nothing silently (architect + qa, observed in the POLY-26 loop).
+# `repo_root` (and so `pidfile`) is derived from `Path(__file__)`'s own
+# on-disk location (module docstring above) -- inside a LINKED worktree
+# that resolves to the worktree's own (never-mounted) `process/cairn/
+# metrics/`, not the main checkout's real one. A REAL git repo + a REAL
+# `git worktree add` linked worktree, never a synthetic stand-in --
+# same posture as test_worktree_metrics_path_resolution.py's git-backed
+# fixtures.
+# --------------------------------------------------------------------------
+
+
+def _git_env() -> dict:
+    env = _minimal_env()
+    env.update({
+        "GIT_AUTHOR_NAME": "Test", "GIT_AUTHOR_EMAIL": "test@example.com",
+        "GIT_COMMITTER_NAME": "Test", "GIT_COMMITTER_EMAIL": "test@example.com",
+    })
+    return env
+
+
+def _make_git_main_checkout_with_worktree(testcase, otel_port: int):
+    """(main_root, worktree_path) -- a REAL git repo carrying the engine
+    copy + config.yml (committed, so `git worktree add` shares them),
+    plus a REAL linked worktree of it."""
+    main_root = make_fake_engine_root(testcase, otel_port=otel_port)
+    genv = _git_env()
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=str(main_root), check=True, env=genv)
+    subprocess.run(["git", "add", "-A"], cwd=str(main_root), check=True, env=genv)
+    subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=str(main_root), check=True, env=genv)
+
+    worktree_parent = helpers.make_empty_tmp_dir(testcase)
+    worktree_path = worktree_parent / "x"
+    subprocess.run(
+        ["git", "worktree", "add", "-q", "-b", "worktree-x", str(worktree_path)],
+        cwd=str(main_root), check=True, env=genv,
+    )
+    return main_root, worktree_path
+
+
+class FlushNowFromALinkedWorktreeTests(unittest.TestCase):
+    def test_flush_now_from_a_worktree_either_reaches_the_main_checkout_or_names_its_real_pidfile(self):
+        port = _free_port()
+        main_root, worktree_path = _make_git_main_checkout_with_worktree(self, otel_port=port)
+        env = _minimal_env(
+            CLAUDE_CODE_ENABLE_TELEMETRY="1",
+            OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{port}",
+        )
+        self.addCleanup(_stop_fake_receiver, main_root, env)
+
+        start = run_fake_receiver(main_root, ["--ensure-running"], env=env)
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(main_root, env)
+        self.assertEqual(running.returncode, 0, f"precondition: the main checkout's receiver must be up -- {running.stdout!r} {running.stderr!r}")
+        real_pidfile = _pidfile_path(main_root)
+        self.assertTrue(real_pidfile.is_file(), "precondition: the main checkout's own pidfile must exist")
+
+        worktree_script = worktree_path / "scripts" / "cairn" / "otel_receiver.py"
+        result = subprocess.run(
+            [sys.executable, str(worktree_script), "--flush-now"],
+            capture_output=True, text=True, cwd=str(worktree_path), env=env,
+        )
+        combined = result.stdout + result.stderr
+
+        if result.returncode == 0:
+            return  # it reached the main checkout's real receiver -- AC's first disjunct
+
+        # macOS resolves /tmp -> /private/tmp (and /var -> /private/var);
+        # compare resolved forms so that symlink alone never produces a
+        # spurious mismatch in either direction.
+        self.assertIn(
+            str(real_pidfile.resolve()), combined,
+            f"a failed --flush-now from a linked worktree must name the MAIN CHECKOUT's real "
+            f"pidfile ({real_pidfile}), not the worktree's own (never-mounted) one -- got {combined!r}",
+        )
+
+
+class StatusAndEnsureRunningFromALinkedWorktreeHitTheMainCheckoutTests(unittest.TestCase):
+    """POLY-49 gate-1 ruling §3: `main()` computes `repo_root =
+    worktree_root.main_checkout_root(...)` once; EVERY default path
+    (pidfile, sessions dir, out-file, ...) derives from it, so
+    `--status` and `--ensure-running` from a linked worktree must ALSO
+    hit the main checkout's real metrics dir, not the worktree's own
+    (never-mounted) one -- same defect class as --flush-now, different
+    commands."""
+
+    def test_status_from_a_worktree_reports_the_main_checkouts_running_receiver(self):
+        port = _free_port()
+        main_root, worktree_path = _make_git_main_checkout_with_worktree(self, otel_port=port)
+        env = _minimal_env(
+            CLAUDE_CODE_ENABLE_TELEMETRY="1",
+            OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{port}",
+        )
+        self.addCleanup(_stop_fake_receiver, main_root, env)
+
+        start = run_fake_receiver(main_root, ["--ensure-running"], env=env)
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(main_root, env)
+        self.assertEqual(running.returncode, 0, f"precondition: main checkout's receiver must be up -- {running.stdout!r} {running.stderr!r}")
+
+        worktree_script = worktree_path / "scripts" / "cairn" / "otel_receiver.py"
+        result = subprocess.run(
+            [sys.executable, str(worktree_script), "--status"],
+            capture_output=True, text=True, cwd=str(worktree_path), env=env,
+        )
+        self.assertEqual(
+            result.returncode, 0,
+            f"--status from the linked worktree must report the MAIN checkout's receiver as running "
+            f"-- got rc={result.returncode} stdout={result.stdout!r} stderr={result.stderr!r}",
+        )
+        self.assertIn("running: True", result.stdout, result.stdout)
+
+    def test_ensure_running_from_a_worktree_registers_into_the_main_checkouts_registry(self):
+        port = _free_port()
+        main_root, worktree_path = _make_git_main_checkout_with_worktree(self, otel_port=port)
+        env = _minimal_env(
+            CLAUDE_CODE_ENABLE_TELEMETRY="1",
+            OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{port}",
+        )
+        self.addCleanup(_stop_fake_receiver, main_root, env)
+
+        start = run_fake_receiver(main_root, ["--ensure-running"], env=env)
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        _wait_for_status_running(main_root, env)
+
+        worktree_script = worktree_path / "scripts" / "cairn" / "otel_receiver.py"
+        result = subprocess.run(
+            [sys.executable, str(worktree_script), "--ensure-running", "--session-id", "wt1", "--session-pid", str(os.getpid())],
+            capture_output=True, text=True, cwd=str(worktree_path), env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        status = run_fake_receiver(main_root, ["--status"], env=env)
+        self.assertIn(
+            "session wt1", status.stdout,
+            f"--ensure-running from the linked worktree must register into the MAIN checkout's "
+            f"registry, not a worktree-local one nothing ever reads -- got {status.stdout!r}",
+        )
+
+
+# --------------------------------------------------------------------------
+# POLY-25 (POLY-49 gate-1 ruling §5): H3 without OTEL_* reaching hook
+# env at all (Claude Code >= 2.1.282, M7/M8). `_exporter_endpoint(
+# environ, user_settings_path) -> (endpoint, source)`: env var wins,
+# then `env` inside `user_settings_path` (unreadable/malformed ->
+# skipped), else `(None, "default")`. Project settings are NEVER
+# consulted (M7) -- there is no project-settings argument to this
+# function at all, by design.
+# --------------------------------------------------------------------------
+
+
+class ExporterEndpointResolverTests(unittest.TestCase):
+    def test_resolver_exists(self):
+        self.assertTrue(
+            hasattr(otel_receiver, "_exporter_endpoint"),
+            "otel_receiver._exporter_endpoint does not exist yet -- POLY-25 (ruling §5) is unimplemented",
+        )
+
+    def test_env_var_wins_over_the_user_settings_file(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"
+        settings_path.write_text(
+            json.dumps({"env": {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:9001"}}), encoding="utf-8",
+        )
+        endpoint, source = otel_receiver._exporter_endpoint(
+            {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:9002"}, settings_path,
+        )
+        self.assertEqual((endpoint, source), ("http://127.0.0.1:9002", "env"), f"got {(endpoint, source)!r}")
+
+    def test_user_settings_file_used_when_env_var_absent(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"
+        settings_path.write_text(
+            json.dumps({"env": {"OTEL_EXPORTER_OTLP_ENDPOINT": "http://127.0.0.1:9001"}}), encoding="utf-8",
+        )
+        endpoint, source = otel_receiver._exporter_endpoint({}, settings_path)
+        self.assertEqual((endpoint, source), ("http://127.0.0.1:9001", "user-settings"), f"got {(endpoint, source)!r}")
+
+    def test_neither_present_falls_back_to_default(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"  # never created
+        endpoint, source = otel_receiver._exporter_endpoint({}, settings_path)
+        self.assertEqual((endpoint, source), (None, "default"), f"got {(endpoint, source)!r}")
+
+    def test_malformed_user_settings_file_is_skipped_not_raised(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"
+        settings_path.write_text("{ not valid json", encoding="utf-8")
+        endpoint, source = otel_receiver._exporter_endpoint({}, settings_path)
+        self.assertEqual(
+            (endpoint, source), (None, "default"),
+            f"a malformed user settings file must be skipped, never raise -- got {(endpoint, source)!r}",
+        )
+
+    def test_user_settings_file_with_no_matching_key_falls_back_to_default(self):
+        settings_dir = helpers.make_empty_tmp_dir(self)
+        settings_path = settings_dir / "settings.json"
+        settings_path.write_text(json.dumps({"env": {"SOME_OTHER_KEY": "x"}}), encoding="utf-8")
+        endpoint, source = otel_receiver._exporter_endpoint({}, settings_path)
+        self.assertEqual((endpoint, source), (None, "default"), f"got {(endpoint, source)!r}")
+
+    def test_project_settings_are_never_consulted(self):
+        # M7: project/local settings no longer initialise the exporter at
+        # all on Claude Code >= 2.1.282 -- the resolver must have no
+        # project-settings parameter to accidentally fall back to.
+        import inspect
+        if not hasattr(otel_receiver, "_exporter_endpoint"):
+            self.skipTest("_exporter_endpoint not implemented yet -- covered by test_resolver_exists")
+        sig = inspect.signature(otel_receiver._exporter_endpoint)
+        param_names = set(sig.parameters)
+        self.assertNotIn(
+            "project_settings_path", param_names,
+            f"the resolver must take no project-settings path at all (M7: they're dead) -- got params {param_names}",
+        )
+
+
+# --------------------------------------------------------------------------
+# "Red tests qa writes" item 3: --status gains an exporter-endpoint line
+# naming its source (ruling §1 fix #3).
+# --------------------------------------------------------------------------
+
+
+class StatusExporterEndpointLineTests(unittest.TestCase):
+    def test_status_reports_exporter_endpoint_from_env(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _minimal_env(
+            CLAUDE_CODE_ENABLE_TELEMETRY="1",
+            OTEL_EXPORTER_OTLP_ENDPOINT=f"http://127.0.0.1:{port}",
+        )
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+        result = run_fake_receiver(fake_root, ["--ensure-running"], env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        status = _wait_for_status_running(fake_root, env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn(
+            f"exporter-endpoint: http://127.0.0.1:{port} (source: env)", status.stdout,
+            f"got {status.stdout!r}",
+        )
+
+    def test_status_reports_exporter_endpoint_default_when_nothing_set(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root_with_default_port(self, default_port=port)
+        env = _minimal_env(CLAUDE_CODE_ENABLE_TELEMETRY="1")
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+        result = run_fake_receiver(fake_root, ["--ensure-running"], env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        status = _wait_for_status_running(fake_root, env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn("(source: default)", status.stdout, f"got {status.stdout!r}")
+
+    def test_status_reports_exporter_endpoint_from_user_settings_when_env_absent(self):
+        # Ruling addendum 1: CLAUDE_CONFIG_DIR/settings.json's own `env`
+        # block, not the repo's `.claude/settings.json` (M7: project
+        # settings are never a source) -- a DIFFERENT, dedicated tmp dir
+        # than the hermetic default `_minimal_env` otherwise pins.
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        user_config_dir = helpers.make_empty_tmp_dir(self)
+        (user_config_dir / "settings.json").write_text(
+            json.dumps({"env": {"OTEL_EXPORTER_OTLP_ENDPOINT": f"http://127.0.0.1:{port}"}}), encoding="utf-8",
+        )
+        env = _minimal_env(CLAUDE_CODE_ENABLE_TELEMETRY="1", CLAUDE_CONFIG_DIR=str(user_config_dir))
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+        result = run_fake_receiver(fake_root, ["--ensure-running"], env=env)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        status = _wait_for_status_running(fake_root, env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn(
+            f"exporter-endpoint: http://127.0.0.1:{port} (source: user-settings)", status.stdout,
+            f"got {status.stdout!r}",
         )
 
 

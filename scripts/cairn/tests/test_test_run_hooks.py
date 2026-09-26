@@ -645,6 +645,10 @@ class RunnerSelfRecordsTests(unittest.TestCase):
         engine_dir = tmp / "scripts" / "cairn"
         engine_dir.mkdir(parents=True)
         engine_dir.joinpath("run_tests.py").write_bytes((helpers.CAIRN_DIR / "run_tests.py").read_bytes())
+        # POLY-49 gate-1 ruling §3: run_tests.py now imports the new
+        # sibling module worktree_root.py -- must ship alongside every
+        # standalone copy or the copy crashes at import time.
+        engine_dir.joinpath("worktree_root.py").write_bytes((helpers.CAIRN_DIR / "worktree_root.py").read_bytes())
         tests_dir = engine_dir / "tests"
         tests_dir.mkdir()
         tests_dir.joinpath("test_fake_ok.py").write_text(
@@ -696,6 +700,10 @@ class SelfRecordSessionTests(unittest.TestCase):
         engine_dir = tmp / "scripts" / "cairn"
         engine_dir.mkdir(parents=True)
         engine_dir.joinpath("run_tests.py").write_bytes((helpers.CAIRN_DIR / "run_tests.py").read_bytes())
+        # POLY-49 gate-1 ruling §3: run_tests.py now imports the new
+        # sibling module worktree_root.py -- must ship alongside every
+        # standalone copy or the copy crashes at import time.
+        engine_dir.joinpath("worktree_root.py").write_bytes((helpers.CAIRN_DIR / "worktree_root.py").read_bytes())
         tests_dir = engine_dir / "tests"
         tests_dir.mkdir()
         tests_dir.joinpath("test_fake_ok.py").write_text(
@@ -851,6 +859,10 @@ class ConcurrentPatchAndAppendTests(unittest.TestCase):
         engine_dir = tmp / "scripts" / "cairn"
         engine_dir.mkdir(parents=True)
         engine_dir.joinpath("run_tests.py").write_bytes((helpers.CAIRN_DIR / "run_tests.py").read_bytes())
+        # POLY-49 gate-1 ruling §3: run_tests.py now imports the new
+        # sibling module worktree_root.py -- must ship alongside every
+        # standalone copy or the copy crashes at import time.
+        engine_dir.joinpath("worktree_root.py").write_bytes((helpers.CAIRN_DIR / "worktree_root.py").read_bytes())
         tests_dir = engine_dir / "tests"
         tests_dir.mkdir()
         tests_dir.joinpath("test_fake_ok.py").write_text(

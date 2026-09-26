@@ -645,9 +645,23 @@ class OnceIntegrationTests(unittest.TestCase):
         repo = make_repo_on_branch(self, "main")
         out_dir = helpers.make_empty_tmp_dir(self)
         out_path = out_dir / "token-usage.jsonl"
+        # POLY-49 gate-1 ruling §1 fix #2 (foreign-session filter):
+        # basic.json's session.id ("fake-session-abc123") must have a
+        # matching transcript in the resolved transcripts_dir or its
+        # datapoint is dropped before fold -- without this override the
+        # default resolves to this REAL machine's actual
+        # ~/.claude/projects/<slug>/, which obviously has no such file,
+        # and out_path would never get written at all. Content is
+        # irrelevant -- only the file's existence is checked by the
+        # filter.
+        transcripts_dir = helpers.make_empty_tmp_dir(self)
+        (transcripts_dir / "fake-session-abc123.jsonl").write_text(
+            json.dumps({"type": "agent-setting", "agentSetting": "team-lead"}) + "\n", encoding="utf-8",
+        )
         port = 48765 + (os.getpid() % 1000)
         proc = subprocess.Popen(
-            [sys.executable, str(SCRIPT_PATH), "--once", "--port", str(port), "--out-file", str(out_path), "--repo-root", str(repo)],
+            [sys.executable, str(SCRIPT_PATH), "--once", "--port", str(port), "--out-file", str(out_path),
+             "--repo-root", str(repo), "--transcripts-dir", str(transcripts_dir)],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
         )
         try:

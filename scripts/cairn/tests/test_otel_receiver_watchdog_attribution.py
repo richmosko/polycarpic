@@ -54,6 +54,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 import urllib.request
@@ -71,7 +72,10 @@ REAL_TOKEN_USAGE_PATH = REAL_METRICS_DIR / "token-usage.jsonl"
 REAL_RECEIVER_PIDFILE = REAL_METRICS_DIR / ".receiver.pid"
 REAL_SESSIONS_DIR = REAL_METRICS_DIR / ".sessions"
 
-ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py")
+# POLY-49 gate-1 ruling §3: otel_receiver.py now imports the new sibling
+# module worktree_root.py unconditionally -- every fake-engine copy must
+# carry it too or the copy crashes at import time.
+ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py", "worktree_root.py")
 
 _REAL_STATE_SNAPSHOT = None
 
@@ -113,8 +117,17 @@ def make_fake_engine_root(testcase, otel_port: Optional[int] = None) -> Path:
     return root
 
 
+# POLY-49 gate-1 ruling addendum 1 (architect, POLY-49.md @ 646bdb3):
+# "helpers' _base_env sets CLAUDE_CONFIG_DIR=<per-test tmp dir, empty>
+# for every receiver subprocess" -- module-level, shared, never written
+# into, so POLY-25's resolver never reads the REAL ~/.claude/
+# settings.json this machine may hold once the ruling's user-action
+# delta lands there.
+_HERMETIC_CLAUDE_CONFIG_DIR = tempfile.mkdtemp(prefix="cairn-test-empty-claude-config-")
+
+
 def _minimal_env(**overrides: str) -> dict:
-    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "CLAUDE_CONFIG_DIR": _HERMETIC_CLAUDE_CONFIG_DIR}
     if "HOME" in os.environ:
         base["HOME"] = os.environ["HOME"]
     base.update(overrides)
@@ -375,11 +388,17 @@ class WatchdogHoldsOnAbsentSessionsDirTests(unittest.TestCase):
 # --------------------------------------------------------------------------
 
 class WatchdogRecreatesAfterAbsentBoundTests(unittest.TestCase):
-    """Ruling (a).3: absent past `REGISTRY_ABSENT_RECREATE_SECONDS` (a
-    test-scale override) recreates the dir plus its two startup markers
-    and logs one `recreated` line; the watchdog thread stays alive and
-    keeps ticking throughout (proved by the ordinary self-stop that must
-    still follow, same discipline as test 1)."""
+    """Ruling (a).3 + POLY-49 gate-1 ruling §2 (AC2): absent past
+    `REGISTRY_ABSENT_RECREATE_SECONDS` (a test-scale override) recreates
+    the dir plus its two startup markers and logs one `recreated` line;
+    the watchdog thread stays alive and keeps ticking throughout (proved
+    by the ordinary self-stop that must still follow, same discipline as
+    test 1). §2: widened poll bounds (real wall-clock racing real
+    subprocess/thread-scheduling overhead under an 8-worker full run --
+    the 2026-09-25 flake) plus a lower-bound assertion that can only ever
+    flake DOWNWARD (a false pass), never upward into a false red: the dir
+    must still be ABSENT at `0.3s` after the rmtree, well inside the
+    `0.5s` recreate bound, proving the hold isn't instant/accidental."""
 
     def test_watchdog_recreates_after_absent_bound(self):
         port = _free_port()
@@ -407,7 +426,15 @@ class WatchdogRecreatesAfterAbsentBoundTests(unittest.TestCase):
         shutil.rmtree(_sessions_dir_path(fake_root))
         sessions_dir = _sessions_dir_path(fake_root)
 
-        deadline = time.time() + recreate_bound + 4.0
+        # Lower bound: monotonic, cannot flake upward -- a premature
+        # recreate (holding logic broken/skipped) would show up here.
+        time.sleep(0.3)
+        self.assertFalse(
+            sessions_dir.is_dir(),
+            f"the registry dir must still be held ABSENT at 0.3s, well inside the {recreate_bound}s bound",
+        )
+
+        deadline = time.time() + recreate_bound + 15.0
         while time.time() < deadline and not sessions_dir.is_dir():
             time.sleep(0.1)
         self.assertTrue(
@@ -431,12 +458,97 @@ class WatchdogRecreatesAfterAbsentBoundTests(unittest.TestCase):
         still_pid = int(_pidfile_path(fake_root).read_text(encoding="utf-8").strip())
         self.assertEqual(still_pid, pid_at_start, "the SAME process must have survived recreation -- not a crash-and-respawn")
 
-        stopped = _wait_for_status_not_running(fake_root, env, timeout=grace + 4.0)
+        stopped = _wait_for_status_not_running(fake_root, env, timeout=grace + 15.0)
         self.assertEqual(
             stopped.returncode, 1,
             f"the watchdog thread must still be alive and ticking after recreating the registry dir -- "
             f"the now-genuinely-empty registry must still self-stop through the ordinary grace path -- "
             f"{stopped.stdout!r} {stopped.stderr!r}",
+        )
+
+
+class RegistryParentAbsentHoldsWithoutMkdirTests(unittest.TestCase):
+    """POLY-27 (POLY-49 gate-1 ruling §6): the recreate step must never
+    use `mkdir(parents=True)` -- doing so can recreate `process/cairn/
+    metrics/` ITSELF while `ensure_metrics_worktree.py` has it swapped
+    aside mid-`git worktree add`, making the target non-empty and
+    failing the add (the original POLY-27 defect). When the registry
+    dir's PARENT (not just `.sessions/` itself) is absent past the
+    recreate bound, the watchdog must keep holding -- no mkdir at all --
+    and log the holding line once per absence episode."""
+
+    def test_parent_absent_past_the_bound_never_recreates_and_logs_holding_once(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+        recreate_bound = 0.5
+
+        start = run_fake_receiver(
+            fake_root,
+            ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid()),
+             "--registry-absent-recreate-seconds", str(recreate_bound)],
+            env=env,
+        )
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(fake_root, env)
+        self.assertEqual(running.returncode, 0, running.stdout + running.stderr)
+
+        # Captured BEFORE the swap: --status is a fresh subprocess that
+        # locates the pidfile at process/cairn/metrics/.receiver.pid --
+        # once the WHOLE metrics dir (parent) is renamed away, that path
+        # genuinely doesn't exist for the duration, so a mid-swap
+        # --status call would correctly report "running: False" even
+        # with a perfectly healthy daemon still alive underneath (same
+        # renamed-aside-fd reasoning ensure_metrics_worktree.py's own
+        # docstring gives) -- a fresh CLI probe is the wrong signal here,
+        # not proof of a crash. Check the PROCESS directly instead.
+        pid_at_start = int(_pidfile_path(fake_root).read_text(encoding="utf-8").strip())
+
+        metrics_dir = _metrics_dir(fake_root)
+        parent_swapped_aside = metrics_dir.parent / "metrics.PARENT-SWAPPED"
+        metrics_dir.rename(parent_swapped_aside)
+        try:
+            # Well past the recreate bound -- if the fix used
+            # mkdir(parents=True) instead of holding, this would recreate
+            # process/cairn/metrics/ itself (and its .sessions/ child)
+            # out from under the "swap".
+            time.sleep(recreate_bound + 3.0)
+            self.assertFalse(
+                metrics_dir.is_dir(),
+                f"the parent-absent case must NEVER mkdir -- {metrics_dir} must still not exist",
+            )
+            try:
+                os.kill(pid_at_start, 0)
+            except ProcessLookupError:
+                self.fail(f"the daemon process (pid {pid_at_start}) must not have crashed during the parent-absent hold")
+        finally:
+            # Cleanup must survive either outcome: today's (pre-fix) code
+            # can still have recreated `metrics_dir` via mkdir(parents=
+            # True) despite the assertion above having already failed and
+            # recorded that -- never let teardown itself mask the real
+            # failure or leak a background receiver.
+            if metrics_dir.exists():
+                shutil.rmtree(metrics_dir, ignore_errors=True)
+            parent_swapped_aside.rename(metrics_dir)
+
+        log_lines = _log_lines(fake_root)
+        holding_lines = [l for l in log_lines if "registry parent absent" in l and "holding" in l]
+        self.assertTrue(holding_lines, f"expected a 'registry parent absent, holding' line -- got {log_lines!r}")
+        self.assertEqual(
+            len(holding_lines), 1,
+            f"the holding line must log ONCE per absence episode, not once per tick -- got {holding_lines!r}",
+        )
+
+        # Decisive proof the watchdog thread itself survived the whole
+        # episode: the ordinary self-stop lifecycle must still work once
+        # the parent is restored and the last session ends.
+        end = run_fake_receiver(fake_root, ["--session-ended", "s1"], env=env)
+        self.assertEqual(end.returncode, 0, end.stdout + end.stderr)
+        stopped = _wait_for_status_not_running(fake_root, env, timeout=15.0)
+        self.assertEqual(
+            stopped.returncode, 1,
+            f"the watchdog thread must still be doing its job after the parent-absent episode -- {stopped.stdout!r} {stopped.stderr!r}",
         )
 
 
@@ -689,6 +801,252 @@ class SmokeHttpExportLandsOtelLineTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------
+# POLY-49 gate-1 ruling §1 fix #1, "red tests qa writes" item 1: interval
+# flush from the watchdog, independent of exports. Today (M9): "interval
+# flush lives only in _on_export; no export -> no interval flush" -- a
+# daemon that never receives a POST at all must still advance
+# `.last-flush` on its own, purely from WATCHDOG_TICK_SECONDS ticking
+# past `--flush-interval`.
+# --------------------------------------------------------------------------
+
+
+class IntervalFlushWithNoExportsTests(unittest.TestCase):
+    def test_last_flush_advances_within_10s_with_zero_exports(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        start = run_fake_receiver(
+            fake_root,
+            ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid()),
+             "--flush-interval", "1"],
+            env=env,
+        )
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(fake_root, env)
+        self.assertEqual(running.returncode, 0, running.stdout + running.stderr)
+        self.assertIn("last-flush: never", running.stdout, f"precondition: no flush yet -- {running.stdout!r}")
+
+        # No export POST anywhere in this test -- the only thing that can
+        # possibly advance last-flush is the watchdog's own interval
+        # trigger, ticking against --flush-interval 1.
+        deadline = time.time() + 10.0
+        advanced = False
+        last_status = None
+        while time.time() < deadline:
+            last_status = run_fake_receiver(fake_root, ["--status"], env=env)
+            if "last-flush: never" not in last_status.stdout:
+                advanced = True
+                break
+            time.sleep(0.2)
+        self.assertTrue(
+            advanced,
+            f"last-flush must advance within 10s from the watchdog's own interval trigger alone, "
+            f"with zero exports ever POSTed -- last --status: {last_status.stdout if last_status else None!r}",
+        )
+
+    def test_an_idle_receiver_does_not_hot_flush_every_tick_past_the_interval(self):
+        # Architect's gate-4 verdict finding (§1.1, R1, e106214): `flush()`
+        # returns early on no pending data and never advances
+        # `last_flush_monotonic` unless data was written -- so an IDLE
+        # receiver flushes on EVERY watchdog beat once past the interval,
+        # not once per interval. Measured (architect's probe,
+        # temp/probe_hotflush.py): --flush-interval 1, no exports, 5s ->
+        # 18 distinct .last-flush mtimes (expected <= ~5-7). Polls the
+        # marker FILE directly (not --status subprocesses, which would
+        # themselves dominate/skew the count) -- same mechanic as the
+        # architect's own probe.
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        start = run_fake_receiver(
+            fake_root,
+            ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid()),
+             "--flush-interval", "1"],
+            env=env,
+        )
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        running = _wait_for_status_running(fake_root, env)
+        self.assertEqual(running.returncode, 0, running.stdout + running.stderr)
+
+        marker = _sessions_dir_path(fake_root) / otel_receiver.LAST_FLUSH_MARKER_NAME
+        seen_mtimes = set()
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            try:
+                seen_mtimes.add(marker.stat().st_mtime_ns)
+            except OSError:
+                pass
+            time.sleep(0.02)
+        self.assertLessEqual(
+            len(seen_mtimes), 7,
+            f"an idle receiver (--flush-interval 1, zero exports, 5s window) must flush at most "
+            f"once per interval, not once per watchdog beat -- got {len(seen_mtimes)} distinct "
+            f".last-flush mtimes (architect's probe measured 18 pre-fix)",
+        )
+
+
+# --------------------------------------------------------------------------
+# POLY-49 gate-1 ruling §1 fix #2, "red tests qa writes" item 2: the
+# foreign-session filter. The endpoint is now user-global (M6/M7), so
+# every project's live sessions post to the same :4318 -- a datapoint
+# whose session_id has no transcript ANYWHERE in this repo's
+# transcripts_dir (direct or worktree-sibling) must be dropped before
+# fold, never landing a line; a datapoint carrying no session.id at all
+# is kept unconditionally (unchanged path).
+# --------------------------------------------------------------------------
+
+
+def _strip_session_id(payload: dict) -> dict:
+    payload = json.loads(json.dumps(payload))  # deep copy
+    for rm in payload.get("resourceMetrics", []):
+        for sm in rm.get("scopeMetrics", []):
+            for metric in sm.get("metrics", []):
+                for dp in metric.get("sum", {}).get("dataPoints", []):
+                    dp["attributes"] = [a for a in dp.get("attributes", []) if a.get("key") != "session.id"]
+    return payload
+
+
+def _post_payload(port: int, payload: dict) -> None:
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        f"http://127.0.0.1:{port}/v1/metrics", data=body,
+        headers={"Content-Type": "application/json"}, method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=5) as resp:
+        assert resp.status < 300, f"export POST rejected: {resp.status}"
+
+
+class ForeignSessionFilterTests(unittest.TestCase):
+    FOREIGN_SESSION_ID = "fake-session-abc123"  # basic.json's session.id
+
+    def _spawn(self, out_path: Path, pidfile: Path, transcripts_dir: Path, port: int) -> subprocess.Popen:
+        proc = subprocess.Popen(
+            [sys.executable, str(SCRIPT_PATH), "--port", str(port), "--out-file", str(out_path),
+             "--pidfile", str(pidfile), "--transcripts-dir", str(transcripts_dir)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            env=_minimal_env(CLAUDE_CODE_ENABLE_TELEMETRY="1"),
+        )
+        self.addCleanup(_kill_if_alive, proc)
+        _wait_until_listening(port)
+        return proc
+
+    def _flush_and_read(self, proc: subprocess.Popen, out_path: Path) -> list:
+        os.kill(proc.pid, signal.SIGUSR1)
+        deadline = time.time() + 5.0
+        while time.time() < deadline:
+            if out_path.is_file():
+                time.sleep(0.3)  # let one flush settle before reading
+                return read_jsonl(out_path)
+            time.sleep(0.1)
+        return read_jsonl(out_path) if out_path.is_file() else []
+
+    def test_foreign_session_with_no_transcript_anywhere_is_dropped(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)  # empty -- no transcript for FOREIGN_SESSION_ID
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        _post_payload(port, json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        lines = self._flush_and_read(proc, out_path)
+        otel_lines = [l for l in lines if l.get("source") == "otel"]
+        self.assertEqual(
+            len(otel_lines), 0,
+            f"a session with NO transcript anywhere in this repo must be dropped before fold, "
+            f"landing NO otel line -- got {otel_lines!r}",
+        )
+
+    def test_own_session_with_a_direct_transcript_is_kept(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)
+        (transcripts_dir / f"{self.FOREIGN_SESSION_ID}.jsonl").write_text(
+            json.dumps({"type": "agent-setting", "agentSetting": "qa-engineer"}) + "\n", encoding="utf-8",
+        )
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        _post_payload(port, json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        lines = self._flush_and_read(proc, out_path)
+        otel_lines = [l for l in lines if l.get("source") == "otel"]
+        self.assertEqual(len(otel_lines), 1, f"a session with a transcript in this repo must be kept -- got {lines!r}")
+
+    def test_own_session_with_only_a_worktree_sibling_transcript_is_kept(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)
+        sibling_dir = transcripts_dir.parent / f"{transcripts_dir.name}--claude-worktrees-x"
+        sibling_dir.mkdir()
+        (sibling_dir / f"{self.FOREIGN_SESSION_ID}.jsonl").write_text(
+            json.dumps({"type": "agent-setting", "agentSetting": "architect"}) + "\n", encoding="utf-8",
+        )
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        _post_payload(port, json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        lines = self._flush_and_read(proc, out_path)
+        otel_lines = [l for l in lines if l.get("source") == "otel"]
+        self.assertEqual(
+            len(otel_lines), 1,
+            f"a session whose transcript lives ONLY under a worktree-sibling dir must still be kept, "
+            f"same resolver as role attribution -- got {lines!r}",
+        )
+
+    def test_no_session_id_attribute_at_all_is_kept_unconditionally(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)  # empty -- proves this path never even consults it
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        payload = _strip_session_id(json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        _post_payload(port, payload)
+        lines = self._flush_and_read(proc, out_path)
+        otel_lines = [l for l in lines if l.get("source") == "otel"]
+        self.assertEqual(
+            len(otel_lines), 1,
+            f"a datapoint with NO session.id attribute at all must be kept unconditionally -- got {lines!r}",
+        )
+
+    def test_a_dropped_flush_logs_a_count_only_line_naming_no_session_id(self):
+        out_dir = helpers.make_empty_tmp_dir(self)
+        out_path = out_dir / "token-usage.jsonl"
+        pidfile = out_dir / ".receiver.pid"
+        transcripts_dir = helpers.make_empty_tmp_dir(self)
+        port = _free_port()
+
+        proc = self._spawn(out_path, pidfile, transcripts_dir, port)
+        _post_payload(port, json.loads((FIXTURES / "basic.json").read_text(encoding="utf-8")))
+        self._flush_and_read(proc, out_path)
+        os.kill(proc.pid, signal.SIGTERM)
+        try:
+            stdout, stderr = proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            stdout, stderr = proc.communicate(timeout=5)
+        # Ruling §1 fix #2's exact wording -- a bare "dropped" substring
+        # check would false-positive against the UNRELATED
+        # `cairn: warning: milestone_windows dropped colliding milestone
+        # window(s)...` line this same daemon already emits.
+        self.assertRegex(
+            stderr, r"otel_receiver: dropped \d+ datapoint\(s\) from \d+ session\(s\) with no transcript in this repo",
+            f"expected the exact drop-count stderr line -- got stderr {stderr!r}",
+        )
+        self.assertNotIn(
+            self.FOREIGN_SESSION_ID, stderr,
+            f"the drop-count line must name counts only, never a session id -- got stderr {stderr!r}",
+        )
+
+
+# --------------------------------------------------------------------------
 # (f) test 7
 # --------------------------------------------------------------------------
 
@@ -750,42 +1108,20 @@ class RoleResolvesFromWorktreeSiblingTranscriptTests(unittest.TestCase):
 # (f) test 8
 # --------------------------------------------------------------------------
 
-class TranscriptIsStaleFindsWorktreeSiblingTranscriptTests(unittest.TestCase):
-    """Ruling (c)'s named latent PT-86 defect: the dead-pid liveness probe
-    must ALSO scan the worktree sibling dir. Without this,
-    `_transcript_is_stale` never finds a teammate's transcript at all, so a
-    dead-pid teammate session is always reap-eligible immediately -- the
-    "two independent signals" guarantee collapsing to one signal for every
-    teammate."""
-
-    def test_a_fresh_sibling_transcript_protects_a_dead_pid_session(self):
-        tmp = helpers.make_empty_tmp_dir(self)
-        transcripts_dir = tmp / "-Users-fake-slug"
-        transcripts_dir.mkdir()
-        sibling_dir = tmp / f"{transcripts_dir.name}--claude-worktrees-x"
-        sibling_dir.mkdir()
-        transcript = sibling_dir / "dead-pid-session.jsonl"
-        transcript.write_text(json.dumps({"type": "agent-setting", "agentSetting": "architect"}) + "\n", encoding="utf-8")
-        # Freshly written -- must NOT be reported stale.
-        self.assertFalse(
-            otel_receiver._transcript_is_stale("dead-pid-session", transcripts_dir),
-            "a fresh transcript that exists ONLY under the worktree sibling dir must not be treated as stale",
-        )
-
-    def test_a_stale_sibling_transcript_is_reported_stale(self):
-        tmp = helpers.make_empty_tmp_dir(self)
-        transcripts_dir = tmp / "-Users-fake-slug"
-        transcripts_dir.mkdir()
-        sibling_dir = tmp / f"{transcripts_dir.name}--claude-worktrees-x"
-        sibling_dir.mkdir()
-        transcript = sibling_dir / "dead-pid-session.jsonl"
-        transcript.write_text(json.dumps({"type": "agent-setting", "agentSetting": "architect"}) + "\n", encoding="utf-8")
-        old = time.time() - (31 * 60)
-        os.utime(transcript, (old, old))
-        self.assertTrue(
-            otel_receiver._transcript_is_stale("dead-pid-session", transcripts_dir),
-            "a stale sibling transcript must still be found and reported stale (reap-eligible)",
-        )
+# --------------------------------------------------------------------------
+# DELETED (POLY-49 gate-1 ruling §4, implementation-lead's fixture-gap
+# finding #3, 2026-09-25): TranscriptIsStaleFindsWorktreeSiblingTranscript
+# Tests called `otel_receiver._transcript_is_stale` directly -- withdrawn
+# along with `_is_session_dead`/`_session_liveness_probe` and the whole
+# two-signal reap predicate (liveness is pid-only now, every tick). This
+# class predates lane-2 (POLY-10 era) and was missed in the earlier
+# §4 test-deletion pass in test_otel_receiver_self_stop.py. No
+# replacement -- the worktree-sibling transcript lookup it exercised is
+# still covered by RoleResolvesFromWorktreeSiblingTranscriptTests (role
+# resolution, above) and the foreign-session filter's own worktree-
+# sibling coverage (this file's ForeignSessionFilterTests.
+# test_own_session_with_only_a_worktree_sibling_transcript_is_kept).
+# --------------------------------------------------------------------------
 
 
 if __name__ == "__main__":

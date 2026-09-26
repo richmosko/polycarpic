@@ -85,6 +85,7 @@ import signal
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import unittest
 from pathlib import Path
@@ -103,7 +104,10 @@ REAL_TOKEN_USAGE_PATH = REAL_METRICS_DIR / "token-usage.jsonl"
 REAL_RECEIVER_PIDFILE = REAL_METRICS_DIR / ".receiver.pid"
 REAL_SESSIONS_DIR = REAL_METRICS_DIR / ".sessions"
 
-ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py")
+# POLY-49 gate-1 ruling §3: otel_receiver.py now imports the new sibling
+# module worktree_root.py unconditionally -- every fake-engine copy must
+# carry it too or the copy crashes at import time.
+ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py", "worktree_root.py")
 
 # PT-105 (architect's ruling, PT-105.md @ e66af1e): the grace period an
 # IN-WINDOW operation must complete inside, for the two tests whose
@@ -134,12 +138,21 @@ def make_fake_engine_root(testcase, otel_port: Optional[int] = None) -> Path:
     return root
 
 
+# POLY-49 gate-1 ruling addendum 1 (architect, POLY-49.md @ 646bdb3):
+# "helpers' _base_env sets CLAUDE_CONFIG_DIR=<per-test tmp dir, empty>
+# for every receiver subprocess" -- module-level, shared, never written
+# into, so POLY-25's resolver never reads the REAL ~/.claude/
+# settings.json this machine may hold once the ruling's user-action
+# delta lands there.
+_HERMETIC_CLAUDE_CONFIG_DIR = tempfile.mkdtemp(prefix="cairn-test-empty-claude-config-")
+
+
 def _minimal_env(**overrides: str) -> dict:
     """A from-scratch env -- this is itself a live Claude Code session,
     which already has telemetry enabled in ITS OWN environment. Never
     inherit os.environ wholesale (same reasoning as the hardening
     suite's helper of the same name)."""
-    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin")}
+    base = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "CLAUDE_CONFIG_DIR": _HERMETIC_CLAUDE_CONFIG_DIR}
     if "HOME" in os.environ:
         base["HOME"] = os.environ["HOME"]
     base.update(overrides)
@@ -835,14 +848,15 @@ class LivenessReapTests(unittest.TestCase):
         r3 = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", "throwaway", "--session-pid", str(alive_pid)], env=env)
         self.assertEqual(r3.returncode, 0, r3.stdout + r3.stderr)
 
-        status = run_fake_receiver(fake_root, ["--status"], env=env)
-        self.assertIn("sessions: 3", status.stdout, status.stdout)
-        self.assertIn("session gone: dead", status.stdout, f"--status must report the dead pid's liveness honestly before it's reaped -- {status.stdout!r}")
-
-        # Decrementing "throwaway" (still leaves "alive" live, so the
-        # daemon does not shut down) must trip the liveness probe over
-        # every OTHER recorded session too, reaping "gone" -- whose
-        # transcript is stale, so BOTH signals agree it's safe.
+        # POLY-49 gate-1 ruling §4: liveness reaping now runs on EVERY
+        # watchdog tick, unconditionally -- not just on a nudge. A
+        # pre-decrement "sessions: 3"/"session gone: dead" snapshot here
+        # is now the same kind of transient race the ruling's §2 dropped
+        # elsewhere ("gone" may already be reaped by ordinary ticks
+        # alone before this subprocess round-trip runs); no longer
+        # asserted. Ending "throwaway" still leaves "alive" live (the
+        # daemon does not shut down) -- the decisive, non-racy proof is
+        # the EVENTUAL state below.
         end = run_fake_receiver(fake_root, ["--session-ended", "throwaway"], env=env)
         self.assertEqual(end.returncode, 0, end.stdout + end.stderr)
 
@@ -854,11 +868,17 @@ class LivenessReapTests(unittest.TestCase):
         self.assertIn("sessions: 1", status.stdout, f"the dead+stale-transcript 'gone' session must have been reaped -- {status.stdout!r}")
         self.assertNotIn("gone", status.stdout, f"a reaped session id must no longer be listed at all -- {status.stdout!r}")
 
-    def test_a_dead_pid_with_a_fresh_transcript_is_not_reaped(self):
-        # Architect's explicit companion case: a mis-detected pid (dead)
-        # whose transcript was written SECONDS ago -- a live session,
-        # wrongly flagged by the pid signal alone. The two-signal rule
-        # must protect it.
+    def test_a_dead_pid_with_a_fresh_transcript_is_reaped_too(self):
+        # INVERTED per POLY-49 gate-1 ruling §4 (architect,
+        # process/reviews/POLY-49/ruling.md): "Liveness = pid, every
+        # tick... The transcript-staleness second signal (PT-86 addendum
+        # C) is WITHDRAWN from the reap predicate -- AC7 requires drop
+        # within one beat of pid exit." A dead pid, even with a
+        # transcript written SECONDS ago, is no longer protected -- only
+        # `pid: null` (no pid captured at all) survives now
+        # (PidNullNeverReapedTests, unchanged). Was:
+        # test_a_dead_pid_with_a_fresh_transcript_is_not_reaped, asserting
+        # the opposite (the now-withdrawn two-signal rule).
         port = _free_port()
         fake_root = make_fake_engine_root(self, otel_port=port)
         env = _base_env(port)
@@ -867,7 +887,7 @@ class LivenessReapTests(unittest.TestCase):
 
         alive_pid = os.getpid()
         gone_pid = _dead_pid()
-        _write_transcript(transcripts_dir, "mis-detected", stale=False)
+        _write_transcript(transcripts_dir, "dead-fresh", stale=False)
 
         r1 = run_fake_receiver(
             fake_root,
@@ -877,23 +897,24 @@ class LivenessReapTests(unittest.TestCase):
         self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
         _wait_for_status_running(fake_root, env)
 
-        r2 = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", "mis-detected", "--session-pid", str(gone_pid)], env=env)
+        r2 = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", "dead-fresh", "--session-pid", str(gone_pid)], env=env)
         self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
 
-        r3 = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", "throwaway", "--session-pid", str(alive_pid)], env=env)
-        self.assertEqual(r3.returncode, 0, r3.stdout + r3.stderr)
-
-        # Trip the probe via a sibling decrement, same as the reap case.
-        end = run_fake_receiver(fake_root, ["--session-ended", "throwaway"], env=env)
-        self.assertEqual(end.returncode, 0, end.stdout + end.stderr)
-
-        status = run_fake_receiver(fake_root, ["--status"], env=env)
-        self.assertEqual(status.returncode, 0, f"'alive' never ended -- {status.stdout!r} {status.stderr!r}")
-        self.assertIn(
-            "mis-detected", status.stdout,
-            f"a dead pid with a FRESH transcript must survive the probe (two-signal reap, addendum C) -- got {status.stdout!r}",
+        deadline = time.time() + 10.0
+        reaped = False
+        status = None
+        while time.time() < deadline:
+            status = run_fake_receiver(fake_root, ["--status"], env=env)
+            if "dead-fresh" not in status.stdout:
+                reaped = True
+                break
+            time.sleep(0.2)
+        self.assertTrue(
+            reaped,
+            f"a dead pid must be dropped regardless of transcript freshness now -- the second signal "
+            f"is withdrawn -- last --status: {status.stdout if status else None!r}",
         )
-        self.assertIn("sessions: 2", status.stdout, f"only 'throwaway' should have left -- {status.stdout!r}")
+        self.assertIn("session alive: alive", status.stdout, f"'alive' must remain registered -- {status.stdout!r}")
 
 
 class PidNullNeverReapedTests(unittest.TestCase):
@@ -931,118 +952,41 @@ class PidNullNeverReapedTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------
-# Architect's re-review Follow-up 4 (0d9f0b5): a fourth --status token,
-# agreed with implementation-lead as `dead-pending`. Rendering a
-# definitively-dead pid as `alive` just because its transcript is still
-# fresh hides the exact entry an operator hunting "why won't the
-# receiver stop" needs to see.
+# POLY-49 gate-1 ruling §4: "The dead-pending status label can no longer
+# arise; builder removes it and any now-unused two-signal helper."
+#
+# DELETED, listed by name per the ruling's instruction ("existing tests
+# asserting the two-signal rule or dead-pending are inverted or
+# deleted"):
+#   - StatusFourStateTests (asserted the now-withdrawn `dead-pending`
+#     token; a dead pid's transcript freshness no longer affects its
+#     --status label at all)
+#   - TranscriptsDirMarkerPrecedenceTests (its ONLY proof mechanism was
+#     distinguishing `dead-pending` vs `dead` by which transcripts_dir
+#     --status read -- with the transcript signal withdrawn from
+#     labeling entirely, there is no longer any --status-visible way to
+#     prove marker precedence this way; transcripts_dir is still
+#     consulted by the NEW foreign-session export filter, not by
+#     --status, per ruling §1 fix #2 -- bubbled up to team-lead/architect
+#     as a coverage gap, not silently dropped)
+#   - DeadPidIsMarkedDeadWithoutWaitingForAnyReapTests (lane-1, this
+#     file, POLY-49 dispatch item "marked dead within one watchdog
+#     beat"): asserted a dead pid renders "dead" on the VERY NEXT
+#     --status call with zero wait. Under §4 ("every tick" reaps by pid
+#     alone, no nudge needed), that transient label is now exactly the
+#     kind of race the ruling's own §2 dropped the "sessions: 2"
+#     assertion to avoid -- the entry can already be GONE (reaped) by
+#     the time --status runs instead of reading "dead". Retired in
+#     favour of DeadPidOnlySessionIsDroppedByOrdinaryWatchdogBeatsAloneTests
+#     (below) and LivenessReapTests' inverted fresh-transcript case,
+#     both of which poll for the eventual, stable outcome rather than
+#     pinning an instant that's no longer guaranteed observable.
+#
+# `alive` (a genuinely live pid) and `unknown` (`pid: null`, addendum
+# C's third state, still never reaped -- PidNullNeverReapedTests,
+# unchanged) remain stable, non-racy labels; both are already covered
+# above/below. A dead pid's transient "dead" label is not re-pinned here.
 # --------------------------------------------------------------------------
-
-class StatusFourStateTests(unittest.TestCase):
-    """All four --status tokens, side by side, in one registry: `alive`
-    (a genuinely live pid) must stay distinct from `dead-pending` (pid
-    confirmed dead, transcript still fresh -- reap-INeligible for up to
-    30 minutes, per addendum C, but must never be reported as `alive`)
-    and from `dead` (pid dead, transcript stale -- reap-eligible) and
-    from `unknown` (no pid captured at all). No --session-ended, no
-    export, no wait long enough to trip any reap trigger -- this test is
-    purely about the LABEL, not about reaping."""
-
-    def test_all_four_status_tokens_are_distinct_and_correctly_assigned(self):
-        port = _free_port()
-        fake_root = make_fake_engine_root(self, otel_port=port)
-        env = _base_env(port)
-        transcripts_dir = _make_transcripts_dir(self)
-        self.addCleanup(_stop_fake_receiver, fake_root, env)
-
-        alive_pid = os.getpid()
-        _write_transcript(transcripts_dir, "dead-fresh", stale=False)
-        _write_transcript(transcripts_dir, "dead-stale", stale=True)
-
-        r1 = run_fake_receiver(
-            fake_root,
-            ["--ensure-running", "--session-id", "alive", "--session-pid", str(alive_pid), "--transcripts-dir", str(transcripts_dir)],
-            env=env,
-        )
-        self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
-        _wait_for_status_running(fake_root, env)
-
-        for session_id, pid in (("dead-fresh", _dead_pid()), ("dead-stale", _dead_pid()), ("no-pid", 0)):
-            r = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", session_id, "--session-pid", str(pid)], env=env)
-            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-
-        status = run_fake_receiver(fake_root, ["--status"], env=env)
-        self.assertIn("sessions: 4", status.stdout, status.stdout)
-        self.assertIn("session alive: alive", status.stdout, f"a genuinely live pid must render 'alive' -- got {status.stdout!r}")
-        self.assertIn(
-            "session dead-fresh: dead-pending", status.stdout,
-            f"a dead pid with a FRESH transcript must render the new 'dead-pending' token, NEVER 'alive' -- got {status.stdout!r}",
-        )
-        self.assertIn(
-            "session dead-stale: dead", status.stdout,
-            f"a dead pid with a STALE transcript (reap-eligible) must render plain 'dead' -- got {status.stdout!r}",
-        )
-        self.assertIn("session no-pid: unknown", status.stdout, f"a null pid must render 'unknown' -- got {status.stdout!r}")
-
-        # The four tokens must actually be four DIFFERENT strings -- a
-        # regression that collapses dead-pending back into alive or dead
-        # would still pass a substring-only check against session ids
-        # that happen not to collide, so pin the distinct token SET too.
-        tokens = {line.split(": ", 1)[1] for line in status.stdout.splitlines() if line.startswith("session ")}
-        self.assertEqual(
-            tokens, {"alive", "dead", "dead-pending", "unknown"},
-            f"expected exactly these four distinct tokens -- got {tokens} from {status.stdout!r}",
-        )
-
-
-class TranscriptsDirMarkerPrecedenceTests(unittest.TestCase):
-    """52adcb9 adds `TRANSCRIPTS_DIR_MARKER_NAME`: the running daemon
-    writes its OWN transcripts_dir to a marker at startup, and `--status`
-    (a separate, later CLI invocation) must read THAT value in
-    preference to whatever it would resolve on its own -- team-lead's
-    explicit gap-check, since nothing else in this file pins it directly
-    (StatusFourStateTests happens to pass either way the marker mechanism
-    goes, since its own --status call never supplies a competing
-    --transcripts-dir).
-
-    Proven unambiguously by giving --status an EXPLICIT, DIFFERENT
-    --transcripts-dir than the one the daemon was spawned with, holding a
-    transcript for the SAME session id in the OPPOSITE staleness state:
-    if --status used its own override instead of reading the daemon's
-    marker, the same session would render the wrong token."""
-
-    def test_status_reads_the_daemons_own_transcripts_dir_via_the_marker_not_its_own_override(self):
-        port = _free_port()
-        fake_root = make_fake_engine_root(self, otel_port=port)
-        env = _base_env(port)
-        daemon_transcripts_dir = _make_transcripts_dir(self)
-        status_own_transcripts_dir = _make_transcripts_dir(self)
-        self.addCleanup(_stop_fake_receiver, fake_root, env)
-
-        # The daemon's OWN dir (what its marker should point --status at):
-        # a FRESH transcript -> dead-pending, if read correctly.
-        _write_transcript(daemon_transcripts_dir, "dead-fresh", stale=False)
-        # --status's OWN, separately-supplied override dir: a STALE
-        # transcript for the SAME session id -- if --status wrongly used
-        # THIS instead of the daemon's marker, the session would render
-        # `dead`, not `dead-pending`.
-        _write_transcript(status_own_transcripts_dir, "dead-fresh", stale=True)
-
-        start = run_fake_receiver(
-            fake_root,
-            ["--ensure-running", "--session-id", "dead-fresh", "--session-pid", str(_dead_pid()),
-             "--transcripts-dir", str(daemon_transcripts_dir)],
-            env=env,
-        )
-        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
-        _wait_for_status_running(fake_root, env)
-
-        status = run_fake_receiver(fake_root, ["--status", "--transcripts-dir", str(status_own_transcripts_dir)], env=env)
-        self.assertIn(
-            "session dead-fresh: dead-pending", status.stdout,
-            f"--status must read the DAEMON's own transcripts_dir via its startup marker, not its own "
-            f"separately-supplied --transcripts-dir -- got {status.stdout!r}",
-        )
 
 
 # --------------------------------------------------------------------------
@@ -1062,11 +1006,18 @@ class GraceWindowFlushContentTests(unittest.TestCase):
         env = _base_env(port)
         self.addCleanup(_stop_fake_receiver, fake_root, env)
         grace = INSIDE_WINDOW_GRACE
+        # POLY-49 gate-1 ruling §1 fix #2 (foreign-session filter):
+        # basic.json's session.id ("fake-session-abc123") needs a
+        # matching transcript in the resolved transcripts_dir or its
+        # datapoint is dropped before fold, same fixture-gap class as
+        # test_otel_receiver.py::OnceIntegrationTests.
+        transcripts_dir = _make_transcripts_dir(self)
+        _write_transcript(transcripts_dir, "fake-session-abc123", stale=False)
 
         start = run_fake_receiver(
             fake_root,
             ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid()),
-             "--grace-period-seconds", str(grace)],
+             "--grace-period-seconds", str(grace), "--transcripts-dir", str(transcripts_dir)],
             env=env,
         )
         self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
@@ -1416,42 +1367,239 @@ class CapabilityMarkerNudgeGateTests(unittest.TestCase):
 # every registered session has crashed.
 # --------------------------------------------------------------------------
 
+# --------------------------------------------------------------------------
+# POLY-49 (carried, no separate sub-issue): three findings from the
+# POLY-48 loop, session-registry group. No ruling needed -- each is
+# testable directly against the documented `--ensure-running`/`--status`
+# CLI seam (module docstring above).
+# --------------------------------------------------------------------------
+
+
+class EnsureRunningAgainstAnAlreadyRunningReceiverRegistersTheCallerTests(unittest.TestCase):
+    """2026-09-25 finding: with the receiver already up from an earlier
+    session, `.sessions/` kept only that earlier session's id -- a new
+    session's own SessionStart hook call never appeared. The REAL hook
+    command (`.claude/settings.json`) never passes `--session-id`
+    explicitly -- only `--session-pid "$PPID"` -- and relies entirely on
+    `_session_id_from_stdin()` reading the hook's own JSON payload
+    (`{"session_id": ...}`) off stdin. This reproduces that exact
+    invocation shape, piped stdin included, against a receiver already
+    started by an EARLIER `--ensure-running` call -- not a fresh spawn."""
+
+    def test_a_second_sessions_hook_stdin_payload_registers_against_the_running_receiver(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        first = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid())], env=env,
+        )
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        _wait_for_status_running(fake_root, env)
+
+        script = fake_root / "scripts" / "cairn" / "otel_receiver.py"
+        payload = json.dumps({"session_id": "s2", "hook_event_name": "SessionStart"})
+        second = subprocess.run(
+            [sys.executable, str(script), "--ensure-running", "--session-pid", str(os.getpid())],
+            input=payload, capture_output=True, text=True, cwd=str(fake_root), env=env,
+        )
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+
+        status = run_fake_receiver(fake_root, ["--status"], env=env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn(
+            "sessions: 2", status.stdout,
+            f"the SECOND session's hook call (stdin-sourced id, exactly the real hook's shape) "
+            f"must register against the ALREADY-RUNNING receiver, not be silently dropped -- "
+            f"got {status.stdout!r}",
+        )
+        self.assertIn("session s2", status.stdout, f"the stdin-sourced session id must be listed by name -- {status.stdout!r}")
+
+
+class RegisterBeforeH1GateTests(unittest.TestCase):
+    """POLY-49 gate-1 ruling §1/§4: Claude Code >= 2.1.282 strips
+    `CLAUDE_CODE_ENABLE_TELEMETRY` from hook env (M7/M8) -- with H1
+    gating BEFORE registration (today's order), that silently drops
+    every session's registration whenever telemetry is off in-process,
+    exactly the "missing sessions" root cause M8 measured. Ruled fix:
+    `register_session` moves ABOVE the H1 gate; H1 still gates only the
+    SPAWN, and its decline now prints one exact stderr line."""
+
+    DECLINE_MESSAGE = (
+        "otel_receiver: not starting -- CLAUDE_CODE_ENABLE_TELEMETRY is not set in this "
+        "process; Claude Code >= 2.1.282 reads telemetry vars from ~/.claude/settings.json, "
+        "not project settings"
+    )
+
+    def test_telemetry_off_still_writes_the_registration_file_no_spawn(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _minimal_env()  # no CLAUDE_CODE_ENABLE_TELEMETRY at all
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        result = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid())], env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            result.stderr.strip(), self.DECLINE_MESSAGE,
+            f"expected the exact H1-decline stderr line -- got {result.stderr!r}",
+        )
+        self.assertFalse(_log_path(fake_root).exists(), "telemetry off must spawn nothing at all")
+        self.assertFalse(_pidfile_path(fake_root).exists(), "no daemon means no pidfile")
+
+        sessions_dir = fake_root / "process" / "cairn" / "metrics" / ".sessions"
+        registration = sessions_dir / "s1"
+        self.assertTrue(
+            registration.is_file(),
+            f"the registration file must still be written even though nothing spawned -- "
+            f"expected {registration} to exist",
+        )
+        self.assertEqual(registration.read_text(encoding="utf-8").strip(), str(os.getpid()))
+
+    def test_telemetry_off_still_registers_against_an_already_running_receiver(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        running_env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, running_env)
+
+        first = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid())], env=running_env,
+        )
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        _wait_for_status_running(fake_root, running_env)
+
+        # SECOND call has telemetry OFF -- H1 would decline (irrelevant,
+        # a receiver is already up) -- registration must still happen.
+        off_env = _minimal_env()
+        second = run_fake_receiver(
+            fake_root, ["--ensure-running", "--session-id", "s2", "--session-pid", str(os.getpid())], env=off_env,
+        )
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+
+        status = run_fake_receiver(fake_root, ["--status"], env=running_env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn(
+            "session s2", status.stdout,
+            f"a telemetry-off caller must still register against an ALREADY-RUNNING receiver -- got {status.stdout!r}",
+        )
+
+
+class StatusListsEverySessionWhoseHookRanTests(unittest.TestCase):
+    """POLY-49 AC: "`--status` lists every session whose hook ran since
+    the receiver started." Four registrations via the documented
+    `--session-id`/`--session-pid` flags (the explicit-id path, isolating
+    this from the stdin-fallback finding above), one plain re-spawn call
+    with none at all (back-compat, must add nothing) -- all four original
+    ids must still be listed, by name, after all five calls."""
+
+    def test_every_registered_session_is_listed_by_name(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        pid = os.getpid()
+        for session_id in ("s1", "s2", "s3", "s4"):
+            r = run_fake_receiver(
+                fake_root, ["--ensure-running", "--session-id", session_id, "--session-pid", str(pid)], env=env,
+            )
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        _wait_for_status_running(fake_root, env)
+
+        # A bare re-spawn call, no session id at all -- must add nothing.
+        bare = run_fake_receiver(fake_root, ["--ensure-running"], env=env)
+        self.assertEqual(bare.returncode, 0, bare.stdout + bare.stderr)
+
+        status = run_fake_receiver(fake_root, ["--status"], env=env)
+        self.assertEqual(status.returncode, 0, status.stdout + status.stderr)
+        self.assertIn("sessions: 4", status.stdout, status.stdout)
+        for session_id in ("s1", "s2", "s3", "s4"):
+            self.assertIn(f"session {session_id}", status.stdout, f"missing {session_id!r} -- {status.stdout!r}")
+
+
+class DeadPidOnlySessionIsDroppedByOrdinaryWatchdogBeatsAloneTests(unittest.TestCase):
+    """POLY-49 AC: "a registered session whose pid is gone is dropped by
+    the next watchdog beat." The grace/self-stop arming check (`if
+    live_session_ids(sessions_dir): ... return True`, `_tick` in
+    otel_receiver.py) reads the RAW REGISTRY FILE LIST, not pid
+    liveness (`live_session_ids`'s own docstring: "deliberately does not
+    probe liveness itself") -- a dead-but-not-yet-REAPED entry still
+    counts as non-empty and blocks self-stop arming. Reaping only
+    happens `if nudged or due_for_periodic_reap` -- an ORDINARY tick,
+    with no nudge and no periodic-reap window elapsed, reaps nothing at
+    all. So a session whose pid dies without a clean `--session-ended`
+    (killed abruptly -- exactly a teammate process being killed) is
+    never dropped by ordinary watchdog beats alone; it silently pins the
+    receiver up for however long until an UNRELATED nudge or the full
+    periodic-reap window happens to fire -- one plausible contributor to
+    the carried "session registry stale" / "under-capture" findings."""
+
+    def test_the_only_session_having_a_dead_pid_is_dropped_within_a_few_ordinary_beats(self):
+        port = _free_port()
+        fake_root = make_fake_engine_root(self, otel_port=port)
+        env = _base_env(port)
+        self.addCleanup(_stop_fake_receiver, fake_root, env)
+
+        gone_pid = _dead_pid()
+        grace = 0.3
+        # periodic_reap_seconds set far past this test's wait window --
+        # only the ORDINARY WATCHDOG_TICK_SECONDS (0.2s) cadence is
+        # exercised, and nothing here ever calls --session-ended to nudge
+        # a reap either.
+        start = run_fake_receiver(
+            fake_root,
+            ["--ensure-running", "--session-id", "gone", "--session-pid", str(gone_pid),
+             "--grace-period-seconds", str(grace), "--periodic-reap-seconds", "300"],
+            env=env,
+        )
+        self.assertEqual(start.returncode, 0, start.stdout + start.stderr)
+        _wait_for_status_running(fake_root, env)
+
+        deadline = time.time() + grace + 3.0
+        stopped = False
+        last_status = None
+        while time.time() < deadline:
+            last_status = run_fake_receiver(fake_root, ["--status"], env=env)
+            if last_status.returncode == 1:
+                stopped = True
+                break
+            time.sleep(0.2)
+        self.assertTrue(
+            stopped,
+            f"the only registered session (dead pid, no --session-ended anywhere in this test, "
+            f"periodic-reap-seconds far off) must be DROPPED by ordinary watchdog beats alone so "
+            f"the empty-live-set self-stop can arm -- instead the dead entry silently pinned the "
+            f"receiver up -- last --status: {last_status.stdout if last_status else None!r}",
+        )
+
+
 class PeriodicReapSweepTests(unittest.TestCase):
-    """Team-lead: '12afe1d added a slow periodic reap ... untested as far
-    as I can see: (a) a dead-pid + stale-transcript session is reaped by
-    the sweep with no nudge and no export; (b) the sweep does NOT reap a
-    dead-pid session whose transcript is fresh -- the same two-signal
-    guard on the new path.'
-
-    NEEDS a way to make `SLOW_PERIODIC_REAP_SECONDS` (5 min in
-    production) short enough to observe without a real 5-minute wait --
-    proposing `--periodic-reap-seconds N`, threaded through
-    `ensure_running`'s spawn args exactly like `--grace-period-seconds`
-    already is (same seam shape, new name). Raised with implementation-
-    lead; if it lands under a different flag name only the two `_start`
-    helper's arg list below needs to change.
-
-    Both tests keep a SECOND session ("alive", a genuinely live pid)
-    registered throughout, so the registry never goes empty and the
-    grace/shutdown machinery never engages -- the periodic sweep is the
-    ONLY thing that could possibly change 'gone's/-> 'fresh's fate here.
-    Neither test ever calls --session-ended or posts an export, so a
-    reap can only be attributed to the sweep itself, not to the other
-    two trigger sites (§3's 'on every end event' / 'at each flush')."""
-
-    PERIODIC_REAP = 0.5
+    """REWRITTEN per POLY-49 gate-1 ruling §2 (AC5): "the periodic sweep
+    disappears under §4 (reap every tick)." `--periodic-reap-seconds`
+    stays accepted on argv for back-compat but has no effect now --
+    reaping runs unconditionally on every WATCHDOG_TICK_SECONDS beat, by
+    pid liveness alone. Dropped: the transient `sessions: 2` assertion
+    (the race itself -- the 2026-09-25 PR #16 CI flake this exact
+    ruling section traces to). INVERTED: the fresh-transcript case
+    (dead pid, FRESH transcript) is no longer protected -- it must be
+    dropped within the poll too, same as a stale one, per §4's
+    withdrawn second signal. Both tests keep a SECOND session ("alive",
+    a genuinely live pid) registered throughout, so the registry never
+    goes empty and the grace/shutdown machinery never engages."""
 
     def _start(self, fake_root: Path, env: dict, transcripts_dir: Path) -> None:
         alive = run_fake_receiver(
             fake_root,
             ["--ensure-running", "--session-id", "alive", "--session-pid", str(os.getpid()),
-             "--transcripts-dir", str(transcripts_dir), "--periodic-reap-seconds", str(self.PERIODIC_REAP)],
+             "--transcripts-dir", str(transcripts_dir)],
             env=env,
         )
         self.assertEqual(alive.returncode, 0, alive.stdout + alive.stderr)
         _wait_for_status_running(fake_root, env)
 
-    def test_a_dead_pid_with_a_stale_transcript_is_reaped_by_the_periodic_sweep_alone(self):
+    def test_a_dead_pid_with_a_stale_transcript_is_dropped_within_a_10s_poll(self):
         port = _free_port()
         fake_root = make_fake_engine_root(self, otel_port=port)
         env = _base_env(port)
@@ -1463,13 +1611,12 @@ class PeriodicReapSweepTests(unittest.TestCase):
         gone = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", "gone", "--session-pid", str(_dead_pid())], env=env)
         self.assertEqual(gone.returncode, 0, gone.stdout + gone.stderr)
 
-        status = run_fake_receiver(fake_root, ["--status"], env=env)
-        self.assertIn("sessions: 2", status.stdout, status.stdout)
-
-        # Wait past the (shortened) periodic interval -- no nudge, no
-        # export, nothing else touches the registry in between.
-        deadline = time.time() + self.PERIODIC_REAP + 4.0
+        # No transient pre-drop snapshot asserted (the dropped
+        # "sessions: 2" race) -- poll straight for the eventual,
+        # stable outcome.
+        deadline = time.time() + 10.0
         reaped = False
+        status = None
         while time.time() < deadline:
             status = run_fake_receiver(fake_root, ["--status"], env=env)
             if "sessions: 1" in status.stdout:
@@ -1478,27 +1625,17 @@ class PeriodicReapSweepTests(unittest.TestCase):
             time.sleep(0.2)
         self.assertTrue(
             reaped,
-            f"a dead pid with a STALE transcript must eventually be reaped by the periodic sweep alone -- "
-            f"last status: {status.stdout!r}",
+            f"a dead pid with a STALE transcript must be dropped within a 10s poll -- last status: {status.stdout if status else None!r}",
         )
         self.assertNotIn("gone", status.stdout, f"the reaped session id must no longer be listed -- {status.stdout!r}")
 
-    def test_a_dead_pid_with_a_fresh_transcript_survives_the_periodic_sweep(self):
-        # PT-98 (architect's gate-1 ruling, process/cairn/issues/PT-98.md
-        # @ 04270d0, item (a)): converted from a blind `time.sleep(
-        # PERIODIC_REAP * 6)`. "Positive: it waits for a periodic reap to
-        # have occurred" -- there is no direct signal for "mis-detected"
-        # surviving (that's the negative half), but a THIRD session
-        # ("canary": dead pid, STALE transcript, definitely reapable,
-        # same shape as the sibling test's "gone") is registered purely
-        # as a timing sentinel. Polling for the canary's disappearance is
-        # an observable proxy for "a sweep has run" -- this test can
-        # return as soon as that's proven, typically after one sweep
-        # interval, rather than always waiting the full 6x window.
-        # Mutation: the periodic sweep's two-signal check drops the
-        # transcript-freshness half (reaps on a dead pid alone) --
-        # mis-detected would then be reaped too, and the final assertIn
-        # goes red.
+    def test_a_dead_pid_with_a_fresh_transcript_is_dropped_too_within_a_10s_poll(self):
+        # INVERTED: was test_a_dead_pid_with_a_fresh_transcript_survives_
+        # the_periodic_sweep, asserting the opposite (now-withdrawn
+        # two-signal rule). No canary/sentinel needed any more -- reaping
+        # is no longer a rare periodic event to detect indirectly, it is
+        # the SAME unconditional per-tick check the stale case above
+        # already polls for.
         port = _free_port()
         fake_root = make_fake_engine_root(self, otel_port=port)
         env = _base_env(port)
@@ -1506,39 +1643,24 @@ class PeriodicReapSweepTests(unittest.TestCase):
         self.addCleanup(_stop_fake_receiver, fake_root, env)
 
         self._start(fake_root, env, transcripts_dir)
-        _write_transcript(transcripts_dir, "mis-detected", stale=False)
-        gone = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", "mis-detected", "--session-pid", str(_dead_pid())], env=env)
+        _write_transcript(transcripts_dir, "dead-fresh", stale=False)
+        gone = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", "dead-fresh", "--session-pid", str(_dead_pid())], env=env)
         self.assertEqual(gone.returncode, 0, gone.stdout + gone.stderr)
 
-        _write_transcript(transcripts_dir, "canary", stale=True)
-        canary = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", "canary", "--session-pid", str(_dead_pid())], env=env)
-        self.assertEqual(canary.returncode, 0, canary.stdout + canary.stderr)
-
-        # Poll for the canary's reap -- same worst-case deadline the
-        # blind sleep used, typical return after one sweep interval.
-        deadline = time.time() + self.PERIODIC_REAP * 6
-        canary_reaped = False
+        deadline = time.time() + 10.0
+        reaped = False
         status = None
         while time.time() < deadline:
             status = run_fake_receiver(fake_root, ["--status"], env=env)
-            if "canary" not in status.stdout:
-                canary_reaped = True
+            if "dead-fresh" not in status.stdout:
+                reaped = True
                 break
             time.sleep(0.2)
         self.assertTrue(
-            canary_reaped,
-            f"the canary (dead pid, stale transcript) must eventually be reaped by the periodic "
-            f"sweep -- if it never is, this test proves nothing about a sweep having run at all -- "
-            f"last status: {status.stdout if status else None!r}",
+            reaped,
+            f"a dead pid must be dropped regardless of transcript freshness now -- last status: {status.stdout if status else None!r}",
         )
-
-        status = run_fake_receiver(fake_root, ["--status"], env=env)
-        self.assertEqual(status.returncode, 0, f"'alive' is still registered -- {status.stdout!r} {status.stderr!r}")
-        self.assertIn(
-            "mis-detected", status.stdout,
-            f"a dead pid with a FRESH transcript must survive the periodic sweep too, not just the "
-            f"nudge/flush triggers -- got {status.stdout!r}",
-        )
+        self.assertIn("session alive: alive", status.stdout, f"'alive' must remain registered -- {status.stdout!r}")
 
 
 if __name__ == "__main__":

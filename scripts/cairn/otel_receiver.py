@@ -186,6 +186,7 @@ from urllib.parse import urlparse
 
 import cairn
 import backfill_tokens
+import worktree_root
 
 SOURCE_NAME = "otel"
 DEFAULT_OTEL_PORT = 4318
@@ -209,35 +210,23 @@ CLOSING_MARKER_NAME = ".closing"
 # started before this change (no SIGUSR2 handler at all -- an unhandled
 # SIGUSR2 terminates a Python process outright) is never signalled.
 NUDGE_CAPABLE_MARKER_NAME = ".nudge-capable"
-# `--status` (StatusFourStateTests) must label a `dead`/`dead-pending`
-# entry using the SAME transcripts_dir the actual running daemon
-# resolved at spawn time -- which can differ from whatever this SEPARATE
-# CLI invocation would resolve on its own (its own `--transcripts-dir`
-# default, or a test's deliberate override that was only ever passed on
-# the ORIGINAL --ensure-running call, not on this one). Same pattern as
-# NUDGE_CAPABLE_MARKER_NAME: written once at daemon startup, inside
-# `_sessions_dir`, read back by whoever needs the daemon's own answer.
+# Written once at daemon startup, inside `_sessions_dir`, same pattern as
+# NUDGE_CAPABLE_MARKER_NAME. POLY-49 ruling §4 withdrew the two-signal
+# (pid + transcript-staleness) reap predicate this marker used to feed
+# `--status`'s now-removed `dead`/`dead-pending` distinction; kept as a
+# marker daemons still write (harmless, and other tooling may read it to
+# find the daemon's own resolved transcripts dir), even though `--status`
+# no longer reads it back for liveness labelling.
 TRANSCRIPTS_DIR_MARKER_NAME = ".transcripts-dir"
 DEFAULT_GRACE_PERIOD_SECONDS = 10.0  # addendum §D: default 10s
 WATCHDOG_TICK_SECONDS = 0.2  # addendum §4: "ticks <= 0.25 s"
-TRANSCRIPT_STALE_SECONDS = 30 * 60  # addendum C: the probe's second signal
-# Team-lead's ruling (PT-86, 138c03c: "the slow periodic reap sweep in
-# 12afe1d stays"), architect-reviewed at 0d9f0b5 (verified by
-# construction: exits at one sweep interval, not indefinitely, once
-# every registered session has crashed). The nudge-gated reap and the
-# flush-triggered reap both go silent when EVERY registered session has
-# crashed (no `end` event ever arrives to nudge, no export ever arrives
-# to trigger a flush) -- this THIRD, time-based trigger, independent of
-# both, is what makes that case genuinely bounded instead of pinned
-# until an unrelated future session's own SessionEnd happens to reap it.
-# Deliberately much slower than WATCHDOG_TICK_SECONDS (reaping every
-# tick regardless of a nudge was tried and rejected -- see
-# `_watchdog_loop`'s docstring -- it broke the "not yet reaped" window
-# LivenessReapTests relies on) and much slower than
-# TRANSCRIPT_STALE_SECONDS itself (no entry can become reap-eligible
-# faster than that anyway). Configurable via `--periodic-reap-seconds`,
-# same shape as `--grace-period-seconds`, so tests can shrink it to
-# sub-second without a real multi-minute wait.
+# POLY-49 ruling §4: "Liveness = pid, every tick" -- `_tick` now reaps
+# unconditionally, every WATCHDOG_TICK_SECONDS beat, with the pid-only
+# predicate, so a dead entry no longer needs a THIRD, slower, time-based
+# backstop trigger the way the old nudge-gated reap did. `--periodic-
+# reap-seconds` (and this default) stay accepted on the CLI for
+# back-compat with any caller/spawn-argv still passing them, but have no
+# effect any more.
 DEFAULT_PERIODIC_REAP_SECONDS = 5 * 60
 # POLY-10 gate-1 ruling (a).3: an absent `.sessions/` dir is *unknown*,
 # never *empty* -- the watchdog holds (no lifecycle change) for as long as
@@ -549,6 +538,23 @@ class ReceiverState:
         # a session's transcript appears on its first turn, so a miss
         # must retry on the next datapoint, not pin an early false guard.
         self.role_cache: Dict[str, str] = {}
+        # POLY-49 ruling §1.2: the foreign-session filter -- since the
+        # exporter's endpoint is now user-global (M7: >= 2.1.282 only
+        # reads OTEL_* from the user's own settings.json), EVERY project
+        # on the machine with telemetry on posts to the SAME :4318, a
+        # PT-79-class contamination risk. `known_sessions` is a POSITIVE-
+        # ONLY cache (a session confirmed to have a transcript in THIS
+        # repo, for the receiver's lifetime) -- a miss is never cached
+        # (same reasoning as `role_cache`: a session's transcript appears
+        # on its first turn, so a too-early miss must retry on the next
+        # datapoint, not pin a false "foreign" verdict forever).
+        self.known_sessions: Set[str] = set()
+        # Datapoints/sessions dropped by the filter SINCE THE LAST FLUSH
+        # (reset there, alongside pending_min_ns/max_ns) -- counts only,
+        # reported as one stderr line per flush that dropped anything;
+        # never persisted, never named by session id.
+        self.foreign_dropped_datapoints: int = 0
+        self.foreign_dropped_sessions: Set[str] = set()
 
 
 def fold(datapoints: List[Dict[str, Any]], state: ReceiverState) -> ReceiverState:
@@ -769,6 +775,22 @@ def flush(
         milestone_windows_table = cairn.milestone_windows(backfill_tokens._repo_root())
 
     with state.lock:
+        # POLY-49 ruling §1.2: report the foreign-session filter's drops
+        # SINCE THE LAST FLUSH, independent of whether anything else
+        # accrued (a flush cycle can consist ENTIRELY of foreign-dropped
+        # datapoints, e.g. every real session's exports landing on this
+        # same user-global port belong to some other project) -- placed
+        # before the `pending_min_ns is None` no-op check below so that
+        # case still gets reported. Counts only, reset every flush.
+        if state.foreign_dropped_datapoints:
+            print(
+                f"otel_receiver: dropped {state.foreign_dropped_datapoints} datapoint(s) from "
+                f"{len(state.foreign_dropped_sessions)} session(s) with no transcript in this repo",
+                file=sys.stderr,
+            )
+            state.foreign_dropped_datapoints = 0
+            state.foreign_dropped_sessions = set()
+
         if state.pending_min_ns is None:
             return []  # nothing accrued since the last flush -- a no-op, not an error
 
@@ -1061,9 +1083,10 @@ def _nudge_daemon(pidfile: Path, kill=os.kill) -> None:
     a polling-latency window. Load-bearing for the on-decrement reap of a
     crashed SIBLING session (see `serve`'s watchdog docstring, and
     architect review Delta 1) -- a missed nudge never delays the stop for
-    a clean exit (the registry file is already gone either way), but does
-    skip that reap until the next `end` event, flush, or the slow
-    periodic sweep (`--periodic-reap-seconds`) picks it up regardless.
+    a clean exit (the registry file is already gone either way): POLY-49
+    ruling §4 makes reaping unconditional on every ordinary
+    WATCHDOG_TICK_SECONDS beat regardless of any nudge, so a missed nudge
+    here costs at most one tick of latency, never more.
 
     Architect review, Delta 6: gated on a capability marker
     (`NUDGE_CAPABLE_MARKER_NAME`, written by `serve` at startup, inside
@@ -1150,47 +1173,6 @@ def live_session_ids(sessions_dir: Path) -> Dict[str, Optional[int]]:
     return ids
 
 
-def _transcript_is_stale(session_id: str, transcripts_dir: Path, now: Optional[float] = None) -> bool:
-    """Addendum C's second independent signal: a session's own transcript
-    (the same file role resolution already reads -- POLY-10: now via
-    `_transcript_path_for`, so a worktree-sibling transcript counts too;
-    previously this never found one, collapsing the "two independent
-    signals" guarantee to one for every teammate) hasn't been touched in
-    >= 30 minutes. No transcript at all counts as stale (nothing to
-    protect) -- it either never existed or already aged out."""
-    transcript_path = backfill_tokens._transcript_path_for(session_id, transcripts_dir)
-    if transcript_path is None:
-        return True
-    try:
-        mtime = transcript_path.stat().st_mtime
-    except OSError:
-        return True
-    return (now if now is not None else time.time()) - mtime >= TRANSCRIPT_STALE_SECONDS
-
-
-def _is_session_dead(pid: int, session_id: str, transcripts_dir: Path) -> bool:
-    """Addendum C: "two independent signals of death" -- reap only when
-    BOTH the pid probe fails AND the transcript has gone quiet, so a
-    single mis-detected pid (e.g. a future wrapper process between claude
-    and the hook shell) can never silently cut off a live session's
-    telemetry. The transcript stat only runs once the pid already looks
-    dead -- no extra cost on the common (session still running) path."""
-    if _pid_is_alive(pid):
-        return False
-    return _transcript_is_stale(session_id, transcripts_dir)
-
-
-def _session_liveness_probe(transcripts_dir: Path):
-    """Binds `_is_session_dead`'s two-signal check to a specific
-    `transcripts_dir` and returns it as the `is_alive(pid, session_id)`
-    callable `reap_dead_sessions` expects -- the real call sites
-    (`serve`, `--session-ended`) always pass this bound to whatever
-    `transcripts_dir` they already resolved (honouring a
-    `--transcripts-dir` test override), instead of relying on
-    `reap_dead_sessions`'s own default resolution."""
-    return lambda pid, session_id: not _is_session_dead(pid, session_id, transcripts_dir)
-
-
 def reap_dead_sessions(sessions_dir: Path, is_alive=None) -> List[str]:
     """The liveness probe (ruling item 1 / addendum §3): removes every
     recorded session confirmed dead, so a crashed session that never
@@ -1199,14 +1181,15 @@ def reap_dead_sessions(sessions_dir: Path, is_alive=None) -> List[str]:
     addendum C: "never reaped, shown as unknown"; it only ever leaves the
     registry via its own `--session-ended`. Returns the reaped ids.
 
-    `is_alive(pid, session_id) -> bool` is injectable (default: the real
-    two-signal check against this script's own on-disk transcripts_dir)
-    so a test can substitute a pure liveness function without needing a
-    real dead pid or a real transcript file.
-    """
+    `is_alive(pid, session_id) -> bool` is injectable (default: pid
+    liveness alone, `_pid_is_alive`) so a test can substitute a pure
+    liveness function without needing a real dead pid. POLY-49 ruling §4
+    withdrew the old two-signal (pid + transcript-staleness) default --
+    AC7 requires a dead-pid entry dropped within one watchdog beat of its
+    process exiting, which a transcript-freshness grace period would
+    delay."""
     if is_alive is None:
-        transcripts_dir = Path.home() / ".claude" / "projects" / backfill_tokens._transcript_dir_slug(backfill_tokens._repo_root())
-        is_alive = _session_liveness_probe(transcripts_dir)
+        is_alive = lambda pid, session_id: _pid_is_alive(pid)  # noqa: E731
     removed: List[str] = []
     for session_id, pid in live_session_ids(sessions_dir).items():
         if pid is None:
@@ -1326,6 +1309,67 @@ def _effective_endpoint_port(endpoint: Optional[str]) -> int:
     return parsed if parsed is not None else DEFAULT_OTEL_PORT
 
 
+def _default_user_settings_path(environ: Dict[str, str]) -> Path:
+    """`$CLAUDE_CONFIG_DIR/settings.json` when that var is set, else
+    `~/.claude/settings.json` -- Claude Code's OWN user-scope settings
+    file. POLY-49 ruling §5/M7: as of Claude Code 2.1.282, this is the
+    ONLY settings file the harness still reads `OTEL_*` telemetry vars
+    from for its own exporter -- project (`.claude/settings.json`) and
+    local settings are ignored for those keys now (each session prints
+    an ignored-vars notice)."""
+    config_dir = environ.get("CLAUDE_CONFIG_DIR")
+    if config_dir:
+        return Path(config_dir) / "settings.json"
+    return Path.home() / ".claude" / "settings.json"
+
+
+def _exporter_endpoint(
+    environ: Dict[str, str], user_settings_path: Optional[Path] = None,
+) -> Tuple[Optional[str], str]:
+    """POLY-25/POLY-49 ruling §5: H3's expected endpoint, without ever
+    assuming `OTEL_EXPORTER_OTLP_ENDPOINT` reaches this (hook-spawned)
+    process's own `environ` -- POLY-10 M6/M7 measured that it never does
+    in the real hook path, and M7 here additionally found that Claude
+    Code >= 2.1.282 no longer applies PROJECT/local settings' `OTEL_*`
+    vars to its own exporter either -- only its user-scope settings file
+    still works. Precedence, first hit wins:
+
+    1. `environ["OTEL_EXPORTER_OTLP_ENDPOINT"]` -- a real env var, on the
+       rare chance one actually is set (e.g. a human's own shell, or a
+       test), is still the most direct signal and wins outright.
+    2. `env.OTEL_EXPORTER_OTLP_ENDPOINT` inside `user_settings_path`
+       (default: `_default_user_settings_path(environ)`) -- an
+       unreadable file, malformed JSON, a non-dict `env`, or a missing/
+       non-string key are all treated the same as "not configured
+       there", never raised: a caller's inability to introspect its own
+       user settings must never crash the H1-H3 gate a SessionStart hook
+       depends on.
+    3. `(None, "default")` -- nothing anywhere; `_effective_endpoint_port`
+       is what turns that into the real OTLP protocol default port.
+
+    Returns `(endpoint, source)`, `source` one of `"env"`,
+    `"user-settings"`, `"default"` -- both the H3 comparison and
+    `--status`'s `exporter-endpoint:` line consume this same tuple so
+    the file is read at most once per call, never twice for two
+    different messages that must agree.
+    """
+    from_env = environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    if from_env:
+        return from_env, "env"
+    path = user_settings_path if user_settings_path is not None else _default_user_settings_path(environ)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None, "default"
+    if isinstance(data, dict):
+        env_block = data.get("env")
+        if isinstance(env_block, dict):
+            value = env_block.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+            if isinstance(value, str) and value:
+                return value, "user-settings"
+    return None, "default"
+
+
 def ensure_running(
     repo_root: Path, pidfile: Path, port: int,
     grace_period_seconds: float = DEFAULT_GRACE_PERIOD_SECONDS,
@@ -1333,6 +1377,8 @@ def ensure_running(
     transcripts_dir: Optional[Path] = None,
     periodic_reap_seconds: float = DEFAULT_PERIODIC_REAP_SECONDS,
     registry_absent_recreate_seconds: float = REGISTRY_ABSENT_RECREATE_SECONDS,
+    user_settings_path: Optional[Path] = None,
+    flush_interval: int = DEFAULT_FLUSH_INTERVAL_SECONDS,
 ) -> bool:
     """Single instance enforced by pidfile + a listen probe; a second
     start is a no-op, never an error. Returns True if a (new or
@@ -1351,6 +1397,15 @@ def ensure_running(
     and exiting. An already-running daemon keeps whatever value it was
     originally spawned with; a later `--ensure-running` cannot retune it.
 
+    `flush_interval` (POLY-49 ruling §1 fix #1), like `grace_period_seconds`,
+    only matters on a FRESH spawn -- threaded into the child's own argv the
+    same way, so the daemon's own watchdog-tick interval-flush check
+    (`serve`'s `_tick`) uses the caller's `--flush-interval` rather than
+    silently falling back to `DEFAULT_FLUSH_INTERVAL_SECONDS` (30 minutes)
+    every time, which is what a test (or an operator) shrinking the interval
+    via `--ensure-running --flush-interval N` would otherwise never see take
+    effect at all.
+
     `session_id`/`session_pid` (PT-86, addendum §B) register a live
     session -- when `session_id` is given, this happens BEFORE deciding
     whether a receiver is already up ("both sides write first, then
@@ -1361,24 +1416,47 @@ def ensure_running(
     instant the daemon is mid-shutdown is never silently dropped.
 
     `transcripts_dir`, like `grace_period_seconds`, only matters on a
-    FRESH spawn -- threaded into the child's own argv so its two-signal
-    liveness probe (addendum C) consults the same transcripts directory
-    this call resolved (a `--transcripts-dir` override in tests, or the
-    real project's own).
+    FRESH spawn -- threaded into the child's own argv so role attribution
+    (`_resolve_role_from_session`) consults the same transcripts
+    directory this call resolved (a `--transcripts-dir` override in
+    tests, or the real project's own).
+
+    `user_settings_path` (POLY-25/POLY-49 ruling §5) is the H3 endpoint
+    resolver's own override -- see `_exporter_endpoint`; `None` resolves
+    the real `$CLAUDE_CONFIG_DIR/settings.json` (else `~/.claude/
+    settings.json`), a test passes a tmp file instead.
+
+    POLY-49 ruling §4: `register_session` now runs BEFORE the H1 gate
+    (right after the config.yml check) -- registration is a fast, local
+    file write that must succeed even when telemetry is off or Claude
+    Code >= 2.1.282 has stripped `CLAUDE_CODE_ENABLE_TELEMETRY` from this
+    process's own env (M8: the real-world "session never appeared"
+    finding was H1 declining before registration ever ran). H1 still
+    gates only whether a receiver gets SPAWNED/kept up.
     """
     data_dir = repo_root / "process" / "cairn"
     if not (data_dir / "config.yml").exists():
         return False
 
-    # H1: gate on the SAME env block that controls the exporter -- one
-    # block, two consumers, checked here so a project with telemetry off
-    # gets no bound port and no idle daemon it never opted into.
-    if not _env_flag_truthy(os.environ.get("CLAUDE_CODE_ENABLE_TELEMETRY")):
-        return False
-
     sessions_dir = _sessions_dir(pidfile)
     if session_id:
         register_session(sessions_dir, session_id, session_pid)
+
+    # H1: gate on the SAME env block that controls the exporter -- one
+    # block, two consumers, checked here so a project with telemetry off
+    # gets no bound port and no idle daemon it never opted into. POLY-49
+    # ruling §4/M7: Claude Code >= 2.1.282 no longer reads this var from
+    # project/local settings for its OWN exporter either -- only its
+    # user-scope settings file works now -- so a decline here is loud
+    # about where to actually set it, not just that it's unset.
+    if not _env_flag_truthy(os.environ.get("CLAUDE_CODE_ENABLE_TELEMETRY")):
+        print(
+            "otel_receiver: not starting -- CLAUDE_CODE_ENABLE_TELEMETRY is not set in this "
+            "process; Claude Code >= 2.1.282 reads telemetry vars from ~/.claude/settings.json, "
+            "not project settings",
+            file=sys.stderr,
+        )
+        return False
 
     pid = _read_pidfile(pidfile)
     already_running = pid is not None and _pid_is_alive(pid) and _port_is_listening(port)
@@ -1409,21 +1487,24 @@ def ensure_running(
         return True  # no-op -- already up, and (if given) now registered too
 
     # H3: otel_port (config.yml, the single source of truth -- `port`
-    # here) vs. the port this process's OWN inherited
-    # OTEL_EXPORTER_OTLP_ENDPOINT effectively names (architect's
-    # amendment, 4c1b751: an UNSET endpoint still resolves to the OTLP
-    # default 4318, not "nothing to compare" -- see
-    # _effective_endpoint_port). A real disagreement doesn't lose
-    # telemetry, it silently DELIVERS it to whatever else is listening on
-    # the wrong port (PT-79's real contamination incident) -- refuse
-    # rather than start a receiver nothing will actually reach, or start
-    # one that reaches a stranger's.
-    endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT")
+    # here) vs. the port the real exporter's destination endpoint
+    # effectively names -- resolved by `_exporter_endpoint` (POLY-25/
+    # POLY-49 ruling §5), NOT read from this process's own `os.environ`
+    # (POLY-10 M6/M7: a hook-spawned process never sees `OTEL_*` there in
+    # the real hook path). An UNSET/unresolvable endpoint still resolves
+    # to the OTLP default 4318, not "nothing to compare" (architect's
+    # amendment, 4c1b751; see `_effective_endpoint_port`). A real
+    # disagreement doesn't lose telemetry, it silently DELIVERS it to
+    # whatever else is listening on the wrong port (PT-79's real
+    # contamination incident) -- refuse rather than start a receiver
+    # nothing will actually reach, or start one that reaches a
+    # stranger's.
+    endpoint, endpoint_source = _exporter_endpoint(dict(os.environ), user_settings_path)
     effective_port = _effective_endpoint_port(endpoint)
     if effective_port != port:
         endpoint_desc = (
             f"unset (falls back to the OTLP default, {DEFAULT_OTEL_PORT})"
-            if not endpoint else f"{effective_port!r}, from OTEL_EXPORTER_OTLP_ENDPOINT={endpoint!r}"
+            if not endpoint else f"{effective_port!r}, from OTEL_EXPORTER_OTLP_ENDPOINT={endpoint!r} (source: {endpoint_source})"
         )
         print(
             f"otel_receiver: refusing to start -- otel_port ({port}, from "
@@ -1460,6 +1541,7 @@ def ensure_running(
         "--grace-period-seconds", str(grace_period_seconds),
         "--periodic-reap-seconds", str(periodic_reap_seconds),
         "--registry-absent-recreate-seconds", str(registry_absent_recreate_seconds),
+        "--flush-interval", str(flush_interval),
     ]
     if transcripts_dir is not None:
         spawn_argv += ["--transcripts-dir", str(transcripts_dir)]
@@ -1495,7 +1577,10 @@ def ensure_running(
     return False
 
 
-def _status(pidfile: Path, port: int, out_path: Path, sessions_dir: Path, transcripts_dir: Path) -> int:
+def _status(
+    pidfile: Path, port: int, out_path: Path, sessions_dir: Path, transcripts_dir: Path,
+    exporter_endpoint_info: Optional[Tuple[Optional[str], str]] = None,
+) -> int:
     """--status: running?, port, out-file, plus PT-86's session count and
     per-id liveness -- a caller-facing health check (what an operator or
     a test runs to ask "is it up"), distinct from --ensure-running (what
@@ -1506,24 +1591,14 @@ def _status(pidfile: Path, port: int, out_path: Path, sessions_dir: Path, transc
     dead-but-not-yet-reaped id is reported honestly as "dead" rather than
     silently omitted; only `--session-ended` and a flush actually reap.
 
-    Four states, not three (architect review Delta 3, then Follow-up 4
-    at the re-review, 0d9f0b5 -- team-lead's final call): `alive` (pid
-    probe says alive), `dead` (BOTH signals agree -- reap-eligible right
-    now), `dead-pending` (pid probe says dead, but the transcript is
-    still fresh -- protected from reaping for up to 30 minutes; this is
-    the "why won't the receiver stop" diagnostic case an operator would
-    otherwise have to infer from `alive`, which would hide it), and
-    `unknown` (no pid ever captured -- never reaped, addendum C).
-
-    The `dead`/`dead-pending` distinction reads `TRANSCRIPTS_DIR_MARKER_NAME`,
-    written by the ACTUAL running daemon at its own startup, in
-    preference to the `transcripts_dir` this (separate) invocation
-    resolved on its own -- the two can legitimately differ (a test's
-    `--transcripts-dir` override only ever accompanies the ORIGINAL
-    `--ensure-running` spawn, not a later `--status` call) and only the
-    daemon's own answer is correct. Falls back to the passed-in
-    `transcripts_dir` when the marker is absent (no daemon has ever
-    written one -- an old daemon, or one that hasn't started yet).
+    Three states (POLY-49 ruling §4 withdrew the old four-state
+    `dead-pending` distinction along with the two-signal reap predicate
+    it diagnosed -- liveness is pid-only now, so there is no longer a
+    "reap-eligible but not yet" middle state to report): `alive` (pid
+    probe says alive), `dead` (pid probe says dead -- reap-eligible on
+    the very next watchdog beat), and `unknown` (no pid ever captured --
+    never reaped, addendum C). `transcripts_dir` is accepted for
+    signature back-compat but no longer consulted by this function.
 
     POLY-10 gate-1 ruling (b): two new lines, after `out-file:` --
     `watchdog: alive|stale|absent (last beat <iso>)` (judged by the
@@ -1535,18 +1610,20 @@ def _status(pidfile: Path, port: int, out_path: Path, sessions_dir: Path, transc
     NOT alive -- the forbidden state (a live listener over a dead
     watchdog thread) made scriptable, not just printed. `running:`,
     `port:`, `out-file:` stay the first three lines, byte-stable.
+
+    POLY-25/POLY-49 ruling §5: a last line, `exporter-endpoint: <url>
+    (source: env|user-settings|default)`, from the `_exporter_endpoint`
+    resolver's `(endpoint, source)` result -- `exporter_endpoint_info`
+    is that pre-resolved tuple (the caller already needed it for H3, so
+    this never re-reads `os.environ`/the user settings file a second
+    time); `None` (a caller that hasn't resolved one) omits the line
+    entirely rather than guessing.
     """
     pid = _read_pidfile(pidfile)
     running = pid is not None and _pid_is_alive(pid) and _port_is_listening(port)
     print(f"running: {running}")
     print(f"port: {port}")
     print(f"out-file: {out_path}")
-    try:
-        marker_text = (sessions_dir / TRANSCRIPTS_DIR_MARKER_NAME).read_text(encoding="utf-8").strip()
-        if marker_text:
-            transcripts_dir = Path(marker_text)
-    except OSError:
-        pass
 
     heartbeat_path = sessions_dir / WATCHDOG_HEARTBEAT_MARKER_NAME
     heartbeat_iso: Optional[str] = None
@@ -1578,14 +1655,16 @@ def _status(pidfile: Path, port: int, out_path: Path, sessions_dir: Path, transc
     for session_id in sorted(ids):
         entry_pid = ids[session_id]
         if entry_pid is None:
-            state = "unknown"  # addendum C/§7: no pid ever captured
+            state = "unknown"  # addendum C/§7: no pid ever captured, never reaped
         elif _pid_is_alive(entry_pid):
             state = "alive"
-        elif _transcript_is_stale(session_id, transcripts_dir):
-            state = "dead"  # both signals agree -- reap-eligible now
         else:
-            state = "dead-pending"  # pid gone, transcript still fresh -- not yet reap-eligible
+            state = "dead"  # POLY-49 ruling §4: pid-only -- reap-eligible on the next watchdog beat
         print(f"session {session_id}: {state}")
+
+    if exporter_endpoint_info is not None:
+        endpoint, source = exporter_endpoint_info
+        print(f"exporter-endpoint: {endpoint or f'http://127.0.0.1:{DEFAULT_OTEL_PORT}'} (source: {source})")
 
     if not running:
         return 1
@@ -1609,9 +1688,15 @@ def _status(pidfile: Path, port: int, out_path: Path, sessions_dir: Path, transc
 
 
 def _signal_running(pidfile: Path, sig: int, label: str) -> int:
+    """POLY-49 ruling §3: the failure text names the pidfile this call
+    actually resolved, as an ABSOLUTE path -- since `main()` now anchors
+    `pidfile` to the main checkout (`worktree_root.main_checkout_root`),
+    a failure here from a linked worktree names the MAIN CHECKOUT's real
+    pidfile, not the worktree's own never-mounted one, so an operator
+    reading stderr can go look at the right file."""
     pid = _read_pidfile(pidfile)
     if pid is None or not _pid_is_alive(pid):
-        print(f"error: no running receiver ({label} target not found via {pidfile})", file=sys.stderr)
+        print(f"error: no running receiver ({label}): pidfile {pidfile.resolve()} absent or stale", file=sys.stderr)
         return 1
     os.kill(pid, sig)
     return 0
@@ -1621,13 +1706,39 @@ def _signal_running(pidfile: Path, sig: int, label: str) -> int:
 # HTTP server -- thin wrapper over parse_export/fold/flush.
 # --------------------------------------------------------------------------
 
-def _handle_export_body(state: ReceiverState, body: bytes, content_encoding: Optional[str]) -> None:
+def _handle_export_body(state: ReceiverState, body: bytes, content_encoding: Optional[str], transcripts_dir: Path) -> None:
+    """POLY-49 ruling §1.2: the foreign-session filter runs here, BEFORE
+    `fold` -- a datapoint whose `session_id` has no transcript anywhere
+    `backfill_tokens._transcript_path_for` looks (this repo's own slug
+    dir, or a worktree-sibling of it) belongs to some OTHER project's
+    session exporting to the same user-global endpoint (M7), and is
+    dropped rather than folded into THIS repo's counts. A datapoint with
+    no `session.id` at all is kept unchanged (nothing to check). See
+    `flush`'s own reporting of `state.foreign_dropped_*` for why the
+    stderr line is emitted per-FLUSH, not per-request."""
     payload = decode_otlp_json(body, content_encoding)
     datapoints = parse_export(payload)
-    fold(datapoints, state)
+    with state.lock:
+        kept: List[Dict[str, Any]] = []
+        for dp in datapoints:
+            session_id = dp.get("session_id")
+            if not session_id or session_id in state.known_sessions:
+                kept.append(dp)
+                continue
+            if backfill_tokens._transcript_path_for(session_id, transcripts_dir) is not None:
+                state.known_sessions.add(session_id)  # positive hit -- cached for the receiver's lifetime
+                kept.append(dp)
+                continue
+            # Miss -- NOT cached (ordering assumption, unmeasured: a
+            # session's transcript exists before its first token export;
+            # a too-early miss must retry on the next datapoint rather
+            # than pin a false "foreign" verdict forever).
+            state.foreign_dropped_datapoints += 1
+            state.foreign_dropped_sessions.add(session_id)
+    fold(kept, state)
 
 
-def make_handler(state: ReceiverState, on_export=None, on_request=None):
+def make_handler(state: ReceiverState, transcripts_dir: Path, on_export=None, on_request=None):
     class Handler(http.server.BaseHTTPRequestHandler):
         server_version = "cairn-otel-receiver/1.0"
 
@@ -1642,7 +1753,7 @@ def make_handler(state: ReceiverState, on_export=None, on_request=None):
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length) if length else b""
             try:
-                _handle_export_body(state, body, self.headers.get("Content-Encoding"))
+                _handle_export_body(state, body, self.headers.get("Content-Encoding"), transcripts_dir)
             except ReceiverError as e:
                 self.send_response(400)
                 self.send_header("Content-Type", "application/json")
@@ -1679,7 +1790,7 @@ def run_once(port: int, out_path: Path, branch_repo_root: Path, prefix: str, ros
     """
     state = ReceiverState()
     got_one = threading.Event()
-    handler_cls = make_handler(state, on_request=got_one.set)
+    handler_cls = make_handler(state, transcripts_dir, on_request=got_one.set)
     httpd = http.server.HTTPServer(("127.0.0.1", port), handler_cls)
     httpd.timeout = 5
     deadline = time.monotonic() + 30
@@ -1711,7 +1822,12 @@ def serve(
     state = ReceiverState()
     sessions_dir = sessions_dir if sessions_dir is not None else _sessions_dir(pidfile)
     my_pid = os.getpid()
-    session_is_alive = _session_liveness_probe(transcripts_dir)
+    # POLY-49 ruling §4: liveness = pid, every tick -- the old two-signal
+    # (pid + transcript-staleness) probe is withdrawn from the reap
+    # predicate entirely; `transcripts_dir` stays a `serve()` parameter
+    # for role attribution (`_resolve_role_from_session`), unrelated to
+    # liveness now.
+    session_is_alive = lambda pid, session_id: _pid_is_alive(pid)  # noqa: E731
 
     # A crash can leave a stale `.closing` marker from a predecessor that
     # never got to remove it (addendum §B) -- a fresh daemon must not
@@ -1752,6 +1868,18 @@ def serve(
             lines_written = len(flush(state, out_path, issue, _now_iso(), roster=roster, transcripts_dir=transcripts_dir, milestone_windows_table=milestone_windows_table))
         except (ReceiverError, backfill_tokens.BackfillError) as e:
             print(f"otel_receiver: flush refused: {e}", file=sys.stderr)
+        # Gate-4 verdict (architect, POLY-49.md @ c56d2b7), blocking: every
+        # path through this function must advance `last_flush_monotonic`,
+        # including a no-op `flush()` call -- `flush()` itself only
+        # advances it on the non-early-return path (something had
+        # accrued), so an idle receiver whose flush() call keeps hitting
+        # the `pending_min_ns is None` early return NEVER advanced the
+        # clock the watchdog's own interval check reads, and re-flushed on
+        # every tick forever once past `--flush-interval` (measured: 18
+        # distinct `.last-flush` mtimes in 5s at `--flush-interval 1`, no
+        # exports -- expected <= ~5). Set here, unconditionally, AFTER the
+        # call, regardless of what it returned or refused.
+        state.last_flush_monotonic = time.monotonic()
         # Addendum §3: the liveness probe also runs "at each flush" -- an
         # independent backstop to the on-`end` reap, for the scenario
         # where EVERY session that ever registered crashed without ever
@@ -1787,7 +1915,7 @@ def serve(
         if (state.last_issue_bucket is not None and issue_now != state.last_issue_bucket) or elapsed >= flush_interval:
             _do_flush()
 
-    handler_cls = make_handler(state, on_export=_on_export)
+    handler_cls = make_handler(state, transcripts_dir, on_export=_on_export)
 
     class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
         # Multiple teammates are separate OS processes, each running
@@ -1848,10 +1976,10 @@ def serve(
     # withdrawal of the HTTP control endpoint closed: it is derived from
     # the SAME local `pidfile` a cross-repo caller could never discover
     # in the first place (addendum A.2). A missed/coalesced signal never
-    # delays a clean stop (the registry file is already gone either way)
-    # but DOES skip the crashed-sibling reap until the next `end` event,
-    # flush, or the slow periodic reap below -- see architect review
-    # Delta 1's correction to this comment's earlier, overstated claim.
+    # delays a clean stop (the registry file is already gone either way);
+    # POLY-49 ruling §4 makes the reap itself unconditional on every
+    # ordinary WATCHDOG_TICK_SECONDS beat, so a missed nudge here costs at
+    # most one tick of latency on the crashed-sibling reap, never more.
     def _on_session_nudge(signum, frame):
         wake_event.set()
 
@@ -1909,9 +2037,9 @@ def serve(
         st = {
             "shutdown_deadline": None,       # type: Optional[float]
             "ever_nonempty": bool(live_session_ids(sessions_dir)),
-            "last_periodic_reap": time.monotonic(),
             "last_heartbeat_write": None,    # type: Optional[float]
             "absent_since": None,            # type: Optional[float]
+            "parent_absent_logged": False,   # POLY-27: log once per absence episode, not every tick
         }
 
         def _tick(nudged: bool) -> bool:
@@ -1945,6 +2073,7 @@ def serve(
             if not sessions_dir.is_dir():
                 if st["absent_since"] is None:
                     st["absent_since"] = now_mono
+                    st["parent_absent_logged"] = False
                 if (now_mono - st["absent_since"]) < registry_absent_recreate_seconds:
                     # Hold: cancel any armed deadline (a false "empty"
                     # conclusion must not carry forward once the dir comes
@@ -1955,60 +2084,94 @@ def serve(
                         print(f"grace-window cancelled: registry dir absent at {_now_iso()}, holding, staying up", file=sys.stderr)
                         st["shutdown_deadline"] = None
                     return True
-                # Absent past the bound -- something other than a bounded
-                # swap deleted it outright (`ensure_metrics_worktree.py`'s
-                # own restore step always brings it back well within this
-                # bound). Recreate it and its two startup markers rather
-                # than hold forever; the freshly-recreated registry is
-                # empty with `ever_nonempty` UNCHANGED -- if it was already
-                # True, the normal empty-registry grace path now applies
-                # (sessions re-register on their next SessionStart, an
-                # `--ensure-running` one hook away).
-                sessions_dir.mkdir(parents=True, exist_ok=True)
-                (sessions_dir / NUDGE_CAPABLE_MARKER_NAME).write_text("", encoding="utf-8")
-                (sessions_dir / TRANSCRIPTS_DIR_MARKER_NAME).write_text(str(transcripts_dir), encoding="utf-8")
-                print(f"watchdog: registry dir absent {registry_absent_recreate_seconds}s, recreated {sessions_dir}", file=sys.stderr)
-                st["absent_since"] = None
+                # Absent past the bound. POLY-27 (ruling §6, gap in the
+                # POLY-10 ruling, architect review 10040ad):
+                # `sessions_dir.mkdir(parents=True)` would ALSO recreate
+                # `sessions_dir.parent` (`process/cairn/metrics/` itself)
+                # if that's missing too -- exactly what
+                # `ensure_metrics_worktree.py`'s swap does for its own
+                # unbounded (network-fetch-gated, M2) window: rename the
+                # WHOLE metrics dir aside, not just `.sessions/`.
+                # Recreating the parent mid-swap makes the target
+                # non-empty and fails `git worktree add` outright. So the
+                # bound only ever licenses recreating `.sessions/` ALONE
+                # (no `parents=`), when its parent is still there.
+                if sessions_dir.parent.is_dir():
+                    # Only `.sessions/` itself went missing (something
+                    # other than a bounded swap deleted it outright;
+                    # `ensure_metrics_worktree.py`'s own restore step
+                    # always brings it back well within this bound when
+                    # the parent is what it touched). Recreate it and its
+                    # two startup markers rather than hold forever; the
+                    # freshly-recreated registry is empty with
+                    # `ever_nonempty` UNCHANGED -- if it was already True,
+                    # the normal empty-registry grace path now applies
+                    # (sessions re-register on their next SessionStart, an
+                    # `--ensure-running` one hook away).
+                    sessions_dir.mkdir(exist_ok=True)
+                    (sessions_dir / NUDGE_CAPABLE_MARKER_NAME).write_text("", encoding="utf-8")
+                    (sessions_dir / TRANSCRIPTS_DIR_MARKER_NAME).write_text(str(transcripts_dir), encoding="utf-8")
+                    print(f"watchdog: registry dir absent {registry_absent_recreate_seconds}s, recreated {sessions_dir}", file=sys.stderr)
+                    st["absent_since"] = None
+                    return True
+                # The parent is ALSO absent (mid metrics-dir swap) --
+                # keep holding past the bound too, indefinitely, rather
+                # than recreate blindly; `ensure_metrics_worktree.py`'s
+                # restore step is what ends this window, not a timer.
+                # Narrow today: that swap runs once per checkout (this
+                # repo's own `process/cairn/metrics/` is already a
+                # worktree) and only after this same bound, so an
+                # unbounded hold here is a live risk only for a swap that
+                # itself never completes. Logged once per absence episode,
+                # not every tick.
+                if not st["parent_absent_logged"]:
+                    print(f"watchdog: registry parent absent, holding {sessions_dir.parent}", file=sys.stderr)
+                    st["parent_absent_logged"] = True
+                if st["shutdown_deadline"] is not None:
+                    print(f"grace-window cancelled: registry dir absent at {_now_iso()}, holding, staying up", file=sys.stderr)
+                    st["shutdown_deadline"] = None
                 return True
             st["absent_since"] = None
 
-            # §3: the probe runs "on every end event", not on a bare
-            # periodic tick that nothing prompted -- `--session-ended`
-            # (only) sends the SIGUSR2 nudge, so `nudged` distinguishes
-            # "an end event just happened, reap now" from "just the
-            # regular WATCHDOG_TICK_SECONDS poll, don't reap yet" --
-            # otherwise a session that's merely REGISTERED with an
-            # already-dead pid (a synthetic id in a test, or a genuinely
-            # crashed one that never got a chance to end cleanly) would
-            # be silently reaped by the very next tick regardless of
-            # whether anything actually decremented, which is both
-            # surprising for `--status` (a "dead" entry vanishing with
-            # nobody having ended anything) and NOT what "on every
-            # decrement" says. The other two probe triggers -- at each
-            # flush, and once more immediately before the point of no
-            # return -- are unconditional, below and in `_do_flush`.
-            #
-            # Team-lead's ruling (PT-86, 138c03c, architect re-reviewed
-            # at 0d9f0b5): when EVERY registered session has crashed,
-            # neither the nudge nor a flush ever fires, so without a
-            # THIRD, time-based trigger a fully-crashed registry pins
-            # the receiver until some UNRELATED future session's own
-            # SessionEnd happens to reap it. `due_for_periodic_reap`
-            # below is that trigger -- deliberately far slower than
-            # WATCHDOG_TICK_SECONDS (reaping every tick regardless of a
-            # nudge was tried and rejected: it broke the "not yet
-            # reaped" window LivenessReapTests relies on) so it can
-            # never race that window in this suite's fast tests. It
-            # goes through the SAME two-signal `session_is_alive` check
-            # every other reap site uses -- a session that is merely
-            # idle (alive pid, or a fresh transcript) can never be
-            # removed by this or any other trigger, only one that is
-            # confirmed dead by both signals.
-            due_for_periodic_reap = (time.monotonic() - st["last_periodic_reap"]) >= periodic_reap_seconds
-            if nudged or due_for_periodic_reap:
-                reap_dead_sessions(sessions_dir, is_alive=session_is_alive)
-                if due_for_periodic_reap:
-                    st["last_periodic_reap"] = time.monotonic()
+            # POLY-49 ruling §1.1: interval flush from the watchdog,
+            # independent of exports. `_on_export`'s own `elapsed >=
+            # flush_interval` check (below, in `serve`) only ever runs
+            # when SOMETHING is actually exporting -- AC4's measured
+            # cause (M1-M9) is Claude Code 2.1.282 sessions exporting
+            # NOTHING at all in the real hook path, so a receiver that
+            # relies solely on the export-triggered check never flushes,
+            # ever, even once `flush_interval` has long since elapsed;
+            # `--flush-now`/`--status`'s `last-flush` line is the only
+            # way anyone would ever notice. This tick-driven check closes
+            # that gap: every WATCHDOG_TICK_SECONDS beat, flush if the
+            # interval has elapsed, whether or not any export ever
+            # arrived to trigger `_on_export`. `_do_flush` itself is
+            # already a safe no-op when nothing has accrued (returns 0,
+            # still records `.last-flush`), so this never writes an empty
+            # line, only proves (via that marker) that the flush path
+            # itself keeps running on schedule.
+            if (time.monotonic() - state.last_flush_monotonic) >= flush_interval:
+                _do_flush()
+
+            # POLY-49 ruling §4: "Liveness = pid, every tick." Reaps
+            # unconditionally now, nudged or not -- AC7 requires a
+            # registered session whose pid is gone to be dropped within
+            # one watchdog beat of its process exiting, which the old
+            # nudge-gated ("on every end event") reap could miss
+            # indefinitely for a session that crashed without ever
+            # calling `--session-ended` (no nudge ever arrives to trigger
+            # it). `session_is_alive` is pid-only (see `serve`'s own
+            # assignment) -- the transcript-staleness second signal
+            # (PT-86 addendum C) is withdrawn from the reap predicate
+            # entirely, so there is no longer a slower, idle-but-fresh
+            # grace window to race; a merely-idle session (alive pid)
+            # is never touched by this. `nudged` still wakes this loop
+            # early (via SIGUSR2) so the self-stop grace re-evaluation
+            # below runs sooner than the next ordinary tick, but no
+            # longer gates reaping itself. `--periodic-reap-seconds`
+            # stays accepted on the CLI/spawn-argv for back-compat; it no
+            # longer has any effect now that every tick already reaps.
+            reap_dead_sessions(sessions_dir, is_alive=session_is_alive)
             if live_session_ids(sessions_dir):
                 st["ever_nonempty"] = True
                 # PT-90 AC2: log only when a deadline is actually armed --
@@ -2190,16 +2353,34 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument("--grace-period-seconds", "--grace", dest="grace_period_seconds", type=float, default=DEFAULT_GRACE_PERIOD_SECONDS)
     parser.add_argument("--periodic-reap-seconds", type=float, default=DEFAULT_PERIODIC_REAP_SECONDS)
     parser.add_argument("--registry-absent-recreate-seconds", type=float, default=REGISTRY_ABSENT_RECREATE_SECONDS)
+    parser.add_argument(
+        "--user-settings-path", type=Path, default=None,
+        help="override for the H3 resolver's user-scope settings file (default: $CLAUDE_CONFIG_DIR/settings.json "
+        "or ~/.claude/settings.json) -- test-only, see _exporter_endpoint",
+    )
     args = parser.parse_args(argv)
 
-    # `repo_root` anchors everything EXCEPT the branch read: prefix,
-    # roster, --out-file's default, and the transcripts-dir slug always
-    # come from the REAL project (this script's own on-disk location) --
-    # this receiver operates on ONE tracker, always, never a fake one.
-    # `--repo-root` overrides ONLY where `_current_branch` asks git,
-    # which is the sole reason a test (or an operator) would ever need a
-    # different one: to control the branch signal without touching cwd.
-    repo_root = backfill_tokens._repo_root()
+    # `repo_root` anchors everything: prefix, roster, --out-file's
+    # default, the transcripts-dir slug, the pidfile, the sessions dir,
+    # and the logfile always come from the REAL project's MAIN CHECKOUT
+    # -- this receiver operates on ONE tracker, always, never a fake one,
+    # and only ONE daemon/pidfile/sessions-dir, always the main
+    # checkout's, regardless of which worktree this CLI call's own script
+    # copy happens to be running from. POLY-49 ruling §3 (carried "flush
+    # from a worktree" finding): before this redirect, `--ensure-running`/
+    # `--session-ended`/`--status`/`--flush-now`/`--stop` invoked from a
+    # teammate's linked worktree each resolved their OWN (never-mounted)
+    # `process/cairn/metrics/` instead of the main checkout's real one --
+    # a registration, a flush signal, or a status probe from a worktree
+    # silently missed the actual running daemon entirely.
+    # `worktree_root.main_checkout_root` is a no-op (returns its input
+    # unchanged) everywhere except inside a LINKED worktree, so the main
+    # checkout's own behaviour, and a fake-engine-root test copy's, are
+    # both unaffected. `--repo-root` overrides ONLY where `_current_branch`
+    # asks git, which is the sole reason a test (or an operator) would
+    # ever need a different one: to control the branch signal without
+    # touching cwd.
+    repo_root = worktree_root.main_checkout_root(backfill_tokens._repo_root())
     branch_repo_root = args.repo_root or repo_root
     try:
         prefix = _resolve_prefix(repo_root)
@@ -2229,18 +2410,22 @@ def main(argv: Optional[List[str]] = None) -> int:
             session_id=session_id, session_pid=session_pid, transcripts_dir=transcripts_dir,
             periodic_reap_seconds=args.periodic_reap_seconds,
             registry_absent_recreate_seconds=args.registry_absent_recreate_seconds,
+            user_settings_path=args.user_settings_path,
+            flush_interval=args.flush_interval,
         )
         # Deliberately NOT nudged: the watchdog's regular
         # WATCHDOG_TICK_SECONDS tick already re-checks emptiness every
-        # cycle regardless of any nudge (only the REAP call is nudge-
-        # gated -- see `_watchdog_loop`), so a `start` still cancels a
-        # pending grace-shutdown within one tick without this. Nudging
-        # here too would make a freshly-registered (possibly
-        # already-dead-pid, e.g. a crashed session respawned before its
-        # own SessionEnd could ever fire) entry get swept on the very
-        # next tick regardless of whether anything actually ended --
-        # exactly the "on every decrement" boundary `--session-ended`'s
-        # nudge exists to draw.
+        # cycle regardless of any nudge (POLY-49 ruling §4: the reap
+        # itself is unconditional every tick now too, nudge or not), so a
+        # `start` still cancels a pending grace-shutdown within one tick
+        # without this. Nudging here too would make a freshly-registered
+        # (possibly already-dead-pid, e.g. a crashed session respawned
+        # before its own SessionEnd could ever fire) entry get swept on
+        # the very next tick regardless of whether anything actually
+        # ended -- exactly the "on every decrement" boundary
+        # `--session-ended`'s nudge used to draw (now moot for reaping,
+        # but the nudge still wakes the loop early for the self-stop
+        # grace re-evaluation).
         return 0  # never an error -- a non-cairn checkout just declines
 
     if args.session_ended is not None:
@@ -2277,7 +2462,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     if args.status:
-        return _status(pidfile, port, out_path, _sessions_dir(pidfile), transcripts_dir)
+        exporter_endpoint_info = _exporter_endpoint(dict(os.environ), args.user_settings_path)
+        return _status(pidfile, port, out_path, _sessions_dir(pidfile), transcripts_dir, exporter_endpoint_info)
 
     if args.flush_now:
         return _signal_running(pidfile, signal.SIGUSR1, "--flush-now")
