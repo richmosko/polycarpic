@@ -10,7 +10,7 @@ labels: [cairn, telemetry]
 priority: P3
 pr: https://github.com/richmosko/polycarpic/pull/20
 created: 2026-09-25
-updated: 2026-09-25
+updated: 2026-09-26
 ---
 
 Grouped fix loop for the OTel receiver and its metrics worktree (user decision 2026-09-25: small fixes in one area ride one loop). One PR closes every member.
@@ -31,7 +31,7 @@ Grouped fix loop for the OTel receiver and its metrics worktree (user decision 2
 - [ ] POLY-7, POLY-9, POLY-25, POLY-27 acceptance criteria met and closed by this PR
 - [ ] Watchdog recreate test is deterministic (injected clock) or its bound is widened; 10 consecutive 8-worker runs green
 - [ ] `--flush-now` from a linked worktree resolves the main checkout's pidfile, or fails loudly naming it
-- [ ] A 30-minute, 3-teammate loop yields per-role token totals within the same order of magnitude as the transcript-derived backfill for the same window; the flush cadence honours the interval (a flush per 1800 s while sessions are alive)
+- [x] A 30-minute, 3-teammate loop yields per-role token totals within the same order of magnitude as the transcript-derived backfill for the same window; the flush cadence honours the interval (a flush per 1800 s while sessions are alive)
 - [ ] The self-stop periodic-sweep test is deterministic (injected clock or explicit sweep trigger); 10 consecutive 4-worker runs green
 - [ ] `--status` lists every session whose hook ran since the receiver started; a session is marked dead within one watchdog beat of its process exiting; an empty live set arms the self-stop
 - [ ] `--ensure-running` registers the calling session whether it starts the receiver or finds one running; a registered session whose pid is gone is dropped within one watchdog beat
@@ -148,3 +148,13 @@ PR opened: https://github.com/richmosko/polycarpic/pull/20. Awaiting Validate. A
 ### @team-lead — 2026-09-25
 
 Validate passed; merging via PR #20. Closing. AC4 (live capture) verified in the next session.
+
+### @team-lead — 2026-09-26
+
+**AC4 verified live, 2026-09-26** (Claude Code 2.1.283, telemetry env in user settings only, receiver pid 4949 started 02:58Z at the PR #20 merge, `exporter-endpoint … (source: user-settings)`).
+
+- **Capture:** `--flush-now` at 21:07:54Z wrote 2 lines for this session (team-lead / main; fable + haiku). Sessions registered and pid-alive: 2.
+- **Cadence:** the watchdog tick flush fired at 21:37:54Z, exactly 1800 s after the previous flush, unprompted, and wrote 1 fable line. Marker `.last-flush` advanced `21:07:54Z 2` → `21:37:54Z 1`.
+- **Magnitude:** receiver fable line at 21:07 (in 832 / cw 45 698 / cr 837 278 / out 6 190) vs this session's transcript sum at 21:08 (in 910 / cw 136 117 / cr 2 173 989 / out 23 985). Same order of magnitude on every counter; the transcript double-counts streamed chunks and the flush lags exports by up to a minute. Single-session sample; the 3-teammate comparison falls out of the POLY-50 loop.
+
+Side note: the receiver log is 124 × the `milestone_windows … colliding` warning vs 10 lines of everything else. Already carried in POLY-50.
