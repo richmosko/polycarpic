@@ -1,7 +1,7 @@
 ---
 id: POLY-49c
 title: POLY-49 execute: build
-status: todo
+status: in-progress
 milestone: POLY-A
 parent: POLY-49
 blocked_by: [POLY-49b]
