@@ -848,14 +848,15 @@ class LivenessReapTests(unittest.TestCase):
         r3 = run_fake_receiver(fake_root, ["--ensure-running", "--session-id", "throwaway", "--session-pid", str(alive_pid)], env=env)
         self.assertEqual(r3.returncode, 0, r3.stdout + r3.stderr)
 
-        status = run_fake_receiver(fake_root, ["--status"], env=env)
-        self.assertIn("sessions: 3", status.stdout, status.stdout)
-        self.assertIn("session gone: dead", status.stdout, f"--status must report the dead pid's liveness honestly before it's reaped -- {status.stdout!r}")
-
-        # Decrementing "throwaway" (still leaves "alive" live, so the
-        # daemon does not shut down) must trip the liveness probe over
-        # every OTHER recorded session too, reaping "gone" -- whose
-        # transcript is stale, so BOTH signals agree it's safe.
+        # POLY-49 gate-1 ruling §4: liveness reaping now runs on EVERY
+        # watchdog tick, unconditionally -- not just on a nudge. A
+        # pre-decrement "sessions: 3"/"session gone: dead" snapshot here
+        # is now the same kind of transient race the ruling's §2 dropped
+        # elsewhere ("gone" may already be reaped by ordinary ticks
+        # alone before this subprocess round-trip runs); no longer
+        # asserted. Ending "throwaway" still leaves "alive" live (the
+        # daemon does not shut down) -- the decisive, non-racy proof is
+        # the EVENTUAL state below.
         end = run_fake_receiver(fake_root, ["--session-ended", "throwaway"], env=env)
         self.assertEqual(end.returncode, 0, end.stdout + end.stderr)
 
@@ -1005,11 +1006,18 @@ class GraceWindowFlushContentTests(unittest.TestCase):
         env = _base_env(port)
         self.addCleanup(_stop_fake_receiver, fake_root, env)
         grace = INSIDE_WINDOW_GRACE
+        # POLY-49 gate-1 ruling §1 fix #2 (foreign-session filter):
+        # basic.json's session.id ("fake-session-abc123") needs a
+        # matching transcript in the resolved transcripts_dir or its
+        # datapoint is dropped before fold, same fixture-gap class as
+        # test_otel_receiver.py::OnceIntegrationTests.
+        transcripts_dir = _make_transcripts_dir(self)
+        _write_transcript(transcripts_dir, "fake-session-abc123", stale=False)
 
         start = run_fake_receiver(
             fake_root,
             ["--ensure-running", "--session-id", "s1", "--session-pid", str(os.getpid()),
-             "--grace-period-seconds", str(grace)],
+             "--grace-period-seconds", str(grace), "--transcripts-dir", str(transcripts_dir)],
             env=env,
         )
         self.assertEqual(start.returncode, 0, start.stdout + start.stderr)

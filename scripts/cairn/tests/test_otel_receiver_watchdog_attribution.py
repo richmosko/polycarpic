@@ -494,6 +494,17 @@ class RegistryParentAbsentHoldsWithoutMkdirTests(unittest.TestCase):
         running = _wait_for_status_running(fake_root, env)
         self.assertEqual(running.returncode, 0, running.stdout + running.stderr)
 
+        # Captured BEFORE the swap: --status is a fresh subprocess that
+        # locates the pidfile at process/cairn/metrics/.receiver.pid --
+        # once the WHOLE metrics dir (parent) is renamed away, that path
+        # genuinely doesn't exist for the duration, so a mid-swap
+        # --status call would correctly report "running: False" even
+        # with a perfectly healthy daemon still alive underneath (same
+        # renamed-aside-fd reasoning ensure_metrics_worktree.py's own
+        # docstring gives) -- a fresh CLI probe is the wrong signal here,
+        # not proof of a crash. Check the PROCESS directly instead.
+        pid_at_start = int(_pidfile_path(fake_root).read_text(encoding="utf-8").strip())
+
         metrics_dir = _metrics_dir(fake_root)
         parent_swapped_aside = metrics_dir.parent / "metrics.PARENT-SWAPPED"
         metrics_dir.rename(parent_swapped_aside)
@@ -507,8 +518,10 @@ class RegistryParentAbsentHoldsWithoutMkdirTests(unittest.TestCase):
                 metrics_dir.is_dir(),
                 f"the parent-absent case must NEVER mkdir -- {metrics_dir} must still not exist",
             )
-            mid_swap = run_fake_receiver(fake_root, ["--status"], env=env)
-            self.assertEqual(mid_swap.returncode, 0, f"the process itself must not have crashed -- {mid_swap.stdout!r} {mid_swap.stderr!r}")
+            try:
+                os.kill(pid_at_start, 0)
+            except ProcessLookupError:
+                self.fail(f"the daemon process (pid {pid_at_start}) must not have crashed during the parent-absent hold")
         finally:
             # Cleanup must survive either outcome: today's (pre-fix) code
             # can still have recreated `metrics_dir` via mkdir(parents=
