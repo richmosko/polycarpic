@@ -1,7 +1,7 @@
 ---
 id: POLY-50
 title: Backfill attribution (grouped)
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -68,3 +68,7 @@ Gate-4 verdict — **pass** @ 0566102 (build c5cfc8b + kwarg rename). Checklist:
 ### @team-lead — 2026-09-26
 
 PR opened: https://github.com/richmosko/polycarpic/pull/23. Awaiting Validate.
+
+### @team-lead — 2026-09-26
+
+Validate passed; merging via PR #23. Closing.
