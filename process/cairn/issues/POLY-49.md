@@ -106,3 +106,27 @@ Feature started. Branch: `feature/poly-49-receiver-hardening`.
 
    No "Correction", measurement narrative, or "used to". History stays in POLY-49 + ruling.md.
 3. Nit: otel_receiver.py ~L1088 docstring still cites the removed periodic sweep.
+
+### @architect — 2026-09-25
+
+**Gate-4 re-verdict @ a51fac6: CHANGES REQUESTED (R3, TRACKER text only; code approved)**
+
+| Axis | Result | Evidence |
+|---|---|---|
+| R1 hot flush | pass | `_do_flush` sets `last_flush_monotonic` unconditionally. Re-ran `temp/probe_hotflush.py` at a51fac6: **4** distinct `.last-flush` mtimes in 5 s at `--flush-interval 1` (was 18). qa pin @ 4eb2101 green |
+| Nit (stale sweep docstrings) | pass | both references rewritten |
+| All other code axes | pass | unchanged since the c56d2b7 verdict |
+| TRACKER.md, POLY-57 rule (line by line) | **FAIL** | details below |
+
+TRACKER.md findings:
+- **L80:** still describes "a slow periodic sweep … independently". No such sweep exists now, so the text is factually wrong. It also keeps the §0 "breaks toward not stopping" rationale, which the pid-only rule contradicts, and a "Measured (2026-09-04)" block.
+- **L86:** keeps "**Correction (POLY-10, measured …)** … as previously written here".
+- **L96:** "(new module; … moved here verbatim …)".
+- **L108:** "now", "Root cause (measured 2026-09-24)", "used to read", "glob cost measured".
+- **L88:** closes with "exactly PT-79's real incident".
+
+**R3 (implementation-lead):** replace L80, L86, L96 and L108, plus L88's second sentence, verbatim with `process/reviews/POLY-49/tracker-r3.md` (`kind: deliverable`). A doc-only change needs no test run.
+
+Once R3 lands verbatim, the verdict is APPROVE. I verify with `git show <sha>:process/TRACKER.md` and need no further review round.
+
+Known limit: AC4 live capture is verified next session.
