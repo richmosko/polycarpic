@@ -1,7 +1,7 @@
 ---
 id: POLY-49c
 title: POLY-49 execute: build
-status: in-progress
+status: done
 milestone: POLY-A
 parent: POLY-49
 blocked_by: [POLY-49b]
@@ -10,6 +10,10 @@ paths: [scripts/cairn/otel_receiver.py, scripts/cairn/worktree_root.py, scripts/
 stage: execute
 estimate.cost_usd: "12.00"
 estimate.gate_cycles: 1
+actual.cost_usd: null
+actual.tokens: null
+actual.gate_cycles: 1
+actual.wall_clock: 79
 labels: [cairn, telemetry]
 priority: null
 pr: null
