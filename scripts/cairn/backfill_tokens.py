@@ -59,6 +59,7 @@ No network call anywhere in this script.
 from __future__ import annotations
 
 import argparse
+import bisect
 import datetime
 import glob
 import json
@@ -220,6 +221,135 @@ def _roster_names(repo_root: Path) -> Set[str]:
     if not agents_dir.is_dir():
         return set()
     return {p.stem for p in agents_dir.glob("*.md")}
+
+
+# --------------------------------------------------------------------------
+# POLY-50 gate-1 ruling §1 (POLY-45): the lead's own main-checkout branch
+# timeline, used to resolve a teammate transcript's `worktree-<name>`/`HEAD`
+# `gitBranch` (every team-agent session's cwd is `.claude/worktrees/<name>/`,
+# so its own `gitBranch` field is never an issue branch) to the issue the
+# LEAD was actually working when that record was produced.
+# --------------------------------------------------------------------------
+
+def _lead_branch_timeline(transcript_dir: Path) -> List[Tuple[str, str]]:
+    """`(timestamp, gitBranch)` pairs built from EVERY record type (not
+    just `assistant`) in `transcript_dir.rglob("*.jsonl")` -- the main
+    checkout's own transcript dir ONLY, never a worktree sibling dir (a
+    sibling's own records are exactly what this timeline resolves, so
+    including them would be circular). A record whose branch is itself
+    `worktree-*` or `HEAD` is dropped -- it carries no lead-branch signal
+    (this is the lead sitting in a worktree, not a fact about what issue
+    was active) and would otherwise make a later lookup return the same
+    unresolved answer it started with.
+
+    Sorted by `(timestamp, path, line)` so a same-instant tie breaks
+    deterministically rather than on dict/glob iteration order. Malformed
+    lines and missing fields are skipped here, silently -- this is a hint
+    source, not a record under audit; `_process_file`'s own fail-loud
+    contract for the SAME files is unchanged (a separate walk, same
+    files).
+    """
+    entries: List[Tuple[str, str, int, str]] = []
+    for path in sorted(transcript_dir.rglob("*.jsonl")):
+        try:
+            raw = path.read_bytes()
+        except OSError:
+            continue
+        raw_lines = raw.split(b"\n")
+        if raw_lines and raw_lines[-1] == b"":
+            raw_lines = raw_lines[:-1]
+        path_str = str(path)
+        for idx, raw_line in enumerate(raw_lines, start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line.decode("utf-8"))
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if not isinstance(record, dict):
+                continue
+            timestamp = record.get("timestamp")
+            branch = record.get("gitBranch")
+            if not timestamp or not branch:
+                continue
+            if branch.startswith("worktree-") or branch == "HEAD":
+                continue
+            entries.append((str(timestamp), path_str, idx, branch))
+    entries.sort(key=lambda e: (e[0], e[1], e[2]))
+    return [(ts, branch) for ts, _path, _idx, branch in entries]
+
+
+def _branch_at(ts: str, timeline: List[Tuple[str, str]]) -> Optional[str]:
+    """The branch of the LAST timeline entry with `entry_ts <= ts` -- a
+    plain string compare (POLY-50 ruling N3: every real timestamp is the
+    same fixed-width `YYYY-MM-DDTHH:MM:SS.mmmZ` shape). `bisect_right`
+    (not `bisect_left`/`<`) so a record landing on the EXACT instant of a
+    branch switch takes the NEW branch, matching how a human would narrate
+    "the lead switched branches at 10:00, so a 10:00 record is on the new
+    one." `None` before the first entry, or on an empty timeline."""
+    if not timeline:
+        return None
+    timestamps = [entry_ts for entry_ts, _branch in timeline]
+    idx = bisect.bisect_right(timestamps, ts) - 1
+    if idx < 0:
+        return None
+    return timeline[idx][1]
+
+
+# --------------------------------------------------------------------------
+# POLY-50 gate-1 ruling §2 (POLY-46): a write-path cutoff at the earliest
+# otel-sourced day, derived from the data file itself -- never a flag --
+# so a backfill write cannot double-count against lines the otel collector
+# already wrote for the same window.
+# --------------------------------------------------------------------------
+
+def _otel_cutoff(out_path: Path) -> Optional[str]:
+    """The start-of-day (`T00:00:00Z`) of the EARLIEST `window_start`
+    among existing `source == "otel"` lines in `out_path`; `None` when the
+    file is absent or holds no `otel` line. Day-start because an otel
+    line's own `window_start` is date-granular (POLY-50 ruling N5) -- a
+    later cutoff would double-count part of that first day.
+
+    A malformed existing line is already `_read_existing_lines`'s problem
+    (raises `BackfillError` naming the file and line before this function
+    ever sees it). An `otel` line missing `window_start` is THIS
+    function's own fail-loud case -- named by its (issue, role, model),
+    the only stable identifier available once the line has passed the
+    generic reader above (no original line number survives that read)."""
+    if not out_path.exists():
+        return None
+    earliest: Optional[str] = None
+    for line in _read_existing_lines(out_path):
+        if line.get("source") != "otel":
+            continue
+        window_start = line.get("window_start")
+        if not window_start:
+            raise BackfillError(
+                f"{out_path}: an otel line (issue={line.get('issue')!r}, "
+                f"role={line.get('role')!r}, model={line.get('model')!r}) is "
+                f"missing window_start -- cannot derive an otel cutoff"
+            )
+        if earliest is None or window_start < earliest:
+            earliest = window_start
+    if earliest is None:
+        return None
+    return f"{earliest}T00:00:00Z"
+
+
+def _truncate_fractional_seconds(ts: str) -> str:
+    """`_otel_cutoff` always returns a whole-second stamp (`...T00:00:00Z`);
+    a transcript record's own `timestamp` commonly carries milliseconds
+    (`...00.326Z`). Plain string compare between the two is unsound --
+    `"...00.326Z" < "...00Z"` under a bare `<` (`.` sorts before `Z`) even
+    though 00.326 is chronologically LATER than 00.000 -- the exact
+    precision-mismatch trap `cairn.milestone_for_timestamp` already
+    documents and guards against for the same reason. Truncating any
+    fractional-second component before the cutoff comparison closes the
+    same gap here."""
+    if ts.endswith("Z") and "." in ts:
+        return ts.split(".", 1)[0] + "Z"
+    return ts
 
 
 # --------------------------------------------------------------------------
@@ -387,6 +517,9 @@ def _new_stats() -> Dict[str, Any]:
         "unmapped_roles": {},  # type: Dict[str, int]
         "window_start": None,  # type: Optional[str]
         "window_end": None,  # type: Optional[str]
+        "worktree_resolved": 0,
+        "worktree_unresolved": 0,
+        "after_cutoff": 0,
     }
 
 
@@ -402,6 +535,8 @@ def _process_record(
     role: str,
     role_source_present: bool,
     milestone_windows_table: List[Tuple[str, str]],
+    lead_branch_timeline: List[Tuple[str, str]],
+    cutoff: Optional[str],
 ) -> None:
     """`location` is `"<path>:<lineno>"`, used only in error messages --
     never anything read from record content.
@@ -412,7 +547,13 @@ def _process_record(
     (architect's ruling §Q3): re-resolving per record would be both
     redundant (every record in a file already shares one answer) and
     wrong for `agentSetting`, which never appears on an `assistant`
-    record at all (§4 amendment)."""
+    record at all (§4 amendment).
+
+    `lead_branch_timeline` (POLY-50 ruling §1) resolves a `worktree-*`/
+    `HEAD` `gitBranch` to the lead's own main-checkout branch at this
+    record's timestamp before bucketing. `cutoff` (POLY-50 ruling §2,
+    POLY-46) drops a record at/after the earliest otel day -- checked
+    AFTER dedup, so `duplicates` stays comparable across a cutoff change."""
     if record.get("type") != "assistant":
         return
     message = record.get("message")
@@ -452,6 +593,22 @@ def _process_record(
         return
     seen_keys.add(dedupe_key)
     stats["unique"] += 1
+
+    if cutoff is not None and _truncate_fractional_seconds(str(timestamp)) >= cutoff:
+        stats["after_cutoff"] += 1
+        return
+
+    if branch.startswith("worktree-") or branch == "HEAD":
+        # POLY-45: a team-agent transcript's own `gitBranch` is never an
+        # issue branch (its cwd is always `.claude/worktrees/<name>/`) --
+        # resolve through the lead's own main-checkout timeline instead.
+        resolved = _branch_at(str(timestamp), lead_branch_timeline)
+        if resolved is None:
+            stats["worktree_unresolved"] += 1
+            branch = "main"
+        else:
+            stats["worktree_resolved"] += 1
+            branch = resolved
 
     issue = _bucket_for_branch(branch, prefix, issue_re)
     if issue == "main":
@@ -512,6 +669,8 @@ def _process_file(
     seen_keys: Set[str],
     stats: Dict[str, Any],
     milestone_windows_table: List[Tuple[str, str]],
+    lead_branch_timeline: List[Tuple[str, str]],
+    cutoff: Optional[str],
 ) -> None:
     # PT-87: role resolves ONCE per file, from a header scan across every
     # record type (§4 amendment, 0aa49be) -- separate from, and BEFORE,
@@ -544,11 +703,15 @@ def _process_file(
                 print(f"warning: {path}:{idx}: skipping malformed final line ({e})", file=sys.stderr)
                 continue
             raise BackfillError(f"{path}:{idx}: malformed line: {e}")
-        _process_record(record, f"{path}:{idx}", prefix, issue_re, roster, buckets, seen_keys, stats, role, role_source_present, milestone_windows_table)
+        _process_record(
+            record, f"{path}:{idx}", prefix, issue_re, roster, buckets, seen_keys, stats, role,
+            role_source_present, milestone_windows_table, lead_branch_timeline, cutoff,
+        )
 
 
 def scan_transcripts(
-    transcript_dir: Path, prefix: str, roster: Set[str], repo_root: Optional[Path] = None
+    transcript_dir: Path, prefix: str, roster: Set[str], repo_root: Optional[Path] = None,
+    cutoff: Optional[str] = None,
 ) -> Tuple[Dict[Tuple[str, str, str], Dict[str, Any]], Dict[str, Any], List[Path], List[Tuple[str, str]]]:
     """Recursively scans `transcript_dir` AND this repo's own worktree-
     sibling transcript dirs (`_worktree_sibling_dirs`, POLY-26 gate-1
@@ -573,16 +736,27 @@ def scan_transcripts(
     matching every other repo-root-anchored default in this module; a
     test passes its own fake root to point the milestone lookup at a
     throwaway tracker.
+
+    POLY-50 ruling §1: `_lead_branch_timeline(transcript_dir)` is likewise
+    built ONCE here, from the MAIN transcript dir only (never a worktree
+    sibling), and threaded down to `_process_record` so a `worktree-*`/
+    `HEAD` record resolves to the lead's own branch at that instant.
+    `cutoff` (ruling §2, POLY-46) is the caller's already-derived
+    `_otel_cutoff` (or `None`); passed straight through to every record.
     """
     issue_re = _issue_regex(prefix)
     buckets: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
     seen_keys: Set[str] = set()
     stats = _new_stats()
     milestone_windows_table = cairn.milestone_windows(repo_root if repo_root is not None else _repo_root())
+    lead_branch_timeline = _lead_branch_timeline(transcript_dir)
     roots = [transcript_dir] + _worktree_sibling_dirs(transcript_dir)
     files = sorted({path for root in roots for path in root.rglob("*.jsonl")})
     for path in files:
-        _process_file(path, prefix, issue_re, roster, buckets, seen_keys, stats, milestone_windows_table)
+        _process_file(
+            path, prefix, issue_re, roster, buckets, seen_keys, stats, milestone_windows_table,
+            lead_branch_timeline, cutoff,
+        )
     return buckets, stats, files, milestone_windows_table
 
 
@@ -740,6 +914,7 @@ def _read_existing_lines(out_path: Path) -> List[Dict[str, Any]]:
 def merge_and_write(
     out_path: Path, new_lines: List[Dict[str, Any]], source: str = SOURCE_NAME,
     milestone_windows_table: Optional[List[Tuple[str, str]]] = None,
+    cutoff: Optional[str] = None,
 ) -> None:
     """Ruling § 2: a regenerating source (this script always is one) reads
     every existing line, drops every line whose `source` matches its own,
@@ -750,11 +925,26 @@ def merge_and_write(
     `milestone_windows_table` (PT-84) orders "milestone:<id>" lines by
     creation timestamp in the final combined write, covering BOTH the
     fresh lines this call is writing and any surviving lines from the
-    other source -- a single, consistent sort of the whole file."""
+    other source -- a single, consistent sort of the whole file.
+
+    POLY-50 ruling §2 race guard: `cutoff` is the scan's OWN `_otel_cutoff`
+    result (possibly `None`). Under the SAME lock this function already
+    holds, `_otel_cutoff` is re-derived from the file as it stands right
+    now; if that re-check is earlier than what the scan used (including
+    the scan having used `None` -- i.e. an otel line appeared where there
+    was none before), an otel line landed between the scan and this write
+    that the scan's own record-level cutoff never saw -- refuse the write
+    entirely rather than risk a double-count, naming the mismatch so the
+    caller knows to simply re-run."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = out_path.parent / ".lock"
     _acquire_lock(lock_path)
     try:
+        recheck_cutoff = _otel_cutoff(out_path)
+        if recheck_cutoff is not None and (cutoff is None or recheck_cutoff < cutoff):
+            raise BackfillError(
+                f"{out_path}: otel lines appeared before the backfill cutoff; re-run"
+            )
         existing = _read_existing_lines(out_path)
         kept = [l for l in existing if l.get("source") != source]
         combined = kept + new_lines
@@ -814,10 +1004,32 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     roster = _roster_names(repo_root)
 
+    # POLY-46: the cutoff comes from the (untrusted, pre-existing) out file,
+    # not from a transcript -- deliberately NOT fatal here. A malformed
+    # existing line is a real, fail-loud condition (below), but the
+    # TRANSCRIPT scan's own fail-loud checks take priority when both would
+    # fire: this script's whole contract is "never silently under-count",
+    # and the transcript is the primary input. Deferring keeps a malformed
+    # existing data file from masking a malformed transcript's own, more
+    # actionable error -- and from ever mattering when the scan itself
+    # would have failed anyway (no write happens either way).
+    cutoff: Optional[str] = None
+    cutoff_error: Optional[BackfillError] = None
     try:
-        buckets, stats, files, milestone_windows_table = scan_transcripts(transcript_dir, prefix, roster, repo_root)
+        cutoff = _otel_cutoff(out_path)
+    except BackfillError as e:
+        cutoff_error = e
+
+    try:
+        buckets, stats, files, milestone_windows_table = scan_transcripts(
+            transcript_dir, prefix, roster, repo_root, cutoff=cutoff,
+        )
     except BackfillError as e:
         print(f"error: {e}", file=sys.stderr)
+        return 1
+
+    if cutoff_error is not None:
+        print(f"error: {cutoff_error}", file=sys.stderr)
         return 1
 
     if stats["unmapped_roles"]:
@@ -829,7 +1041,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         for name, count in sorted(stats["unmapped_roles"].items()):
             print(f"  {name}: {count}", file=sys.stderr)
 
-    generated = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # POLY-50 ruling §2: when a cutoff applies, every line this run produces
+    # is stamped with the CUTOFF, not `now` -- PT-89's receiver guard reads
+    # the newest backfill `generated` as "backfill covered up to here", and
+    # stamping `now` would make the receiver drop in-memory otel groups the
+    # backfill never actually counted. No cutoff (no otel lines yet) keeps
+    # the `now` stamp.
+    generated = cutoff if cutoff is not None else now_stamp
     window_start = stats["window_start"] or generated[:10]
     window_end = stats["window_end"] or generated[:10]
     new_lines = _build_lines(buckets, generated, milestone_windows_table)
@@ -841,6 +1060,14 @@ def main(argv: Optional[List[str]] = None) -> int:
         f"  of which {sibling_file_count} under {len(sibling_dirs)} worktree sibling dir(s) "
         f"{transcript_dir.name}{_worktree_transcript_suffix()}-*"
     )
+    print(
+        f"  worktree/HEAD records resolved via lead timeline: {stats['worktree_resolved']} "
+        f"({stats['worktree_unresolved']} before the first lead record)"
+    )
+    if cutoff is not None:
+        print(f"otel cutoff: {cutoff} ({stats['after_cutoff']} record(s) at/after it excluded)")
+    else:
+        print("otel cutoff: none (no otel lines)")
     print(
         f"in-scope assistant/usage records: {stats['candidates']} "
         f"({stats['unique']} unique, {stats['duplicates']} duplicate)"
@@ -855,7 +1082,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     try:
-        merge_and_write(out_path, new_lines, milestone_windows_table=milestone_windows_table)
+        merge_and_write(out_path, new_lines, milestone_windows_table=milestone_windows_table, cutoff=cutoff)
     except BackfillError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
