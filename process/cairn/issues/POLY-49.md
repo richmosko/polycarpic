@@ -73,3 +73,36 @@ Feature started. Branch: `feature/poly-49-receiver-hardening`.
 - The marker's only reader was `_status`'s `dead`/`dead-pending` label (otel_receiver.py ~L1545). With the label gone (§4), that read is removed with it, so there's no precedence left to test. **No replacement test** for `TranscriptsDirMarkerPrecedenceTests`.
 - The marker **write** stays at startup and on the watchdog recreate, because POLY-10's recreate test pins it. The foreign-session filter uses the daemon's in-process `transcripts_dir`, never the marker.
 - Conditional: if the build keeps *any* marker read, qa adds one test: "`--status --transcripts-dir <B>` against a daemon spawned with `<A>` resolves `<A>`", checked on an output that differs between A and B. I check this at the verdict.
+
+### @architect — 2026-09-25
+
+**Gate-4 verdict @ e106214 — CHANGES REQUESTED (2 blocking, 1 nit)**
+
+| Axis | Result | Evidence |
+|---|---|---|
+| §1.1 interval flush from watchdog | **FAIL** | `_tick` flushes when `monotonic - last_flush_monotonic >= flush_interval`. `flush()` returns early on no pending data (L794) and never advances `last_flush_monotonic` (only L945), so an idle receiver flushes on **every beat** once past the interval. Measured: `--flush-interval 1`, no exports, 5 s → **18** distinct `.last-flush` mtimes (expected ≤ 5). Probe: `temp/probe_hotflush.py` (architect worktree). In production: after 30 idle min, `git branch` + `git log` per milestone ≈ 4×/s, forever |
+| §1.2 foreign-session filter | pass | `_handle_export_body` filter + positive cache; count-only stderr line; 5 tests |
+| §1.3 `--status` exporter-endpoint | pass | last line, 3 sources tested |
+| §3 worktree_root + main() anchoring | pass | verbatim move, `run_tests` alias; 3 linked-worktree tests; loud pidfile text |
+| §4 register-before-H1, pid-only reap every beat before arming | pass | order confirmed in `ensure_running` + `_tick`; 80c29af pin green |
+| §5 endpoint resolver | pass | env → user file → default; project settings never read; 7 tests |
+| §6 POLY-27 | pass | parent guard, no `parents=`, log once per episode |
+| §7 POLY-9 | pass | exact ruled text; 2 tests; TRACKER sentence present |
+| §8 POLY-7 | pass | 3a skip + 3d PATH shim + recreated-path merge |
+| Addendum 2 marker read | pass (no test needed) | `_status` no longer reads `.transcripts-dir`; only writes remain (L1851, L2100) |
+| TRACKER.md "strictly necessary" (POLY-57 AC) | **FAIL** | +857 words in the telemetry section, mostly history/rationale ("Correction (…)", "measured", "used to", "root-caused and fixed twice over", the worktree "used to reach the wrong dir" paragraph) |
+| AC4 live capture | known limit | settings delta landed (aa3a21f). Verified next session, since settings are read at launch |
+
+**Changes (implementation-lead, re-green on one sha):**
+1. **Blocking:** make every flush path advance `state.last_flush_monotonic`, including the no-op return. Simplest seam: set it in `_do_flush` after the `flush()` call, whatever the call returned. qa pin: `IntervalFlushWithNoExportsTests` gains an upper bound: `--flush-interval 1`, no exports, 5 s window → ≤ 7 distinct `.last-flush` mtimes.
+2. **Blocking:** the TRACKER.md telemetry section states current behaviour only, in present tense:
+   - the env block lives in user settings (≥ 2.1.282)
+   - H1: registration precedes it, plus the one stderr line
+   - H3 resolver order
+   - watchdog interval flush
+   - foreign-session filter
+   - CLI anchors on the main checkout
+   - pid-only liveness every beat
+
+   No "Correction", measurement narrative, or "used to". History stays in POLY-49 + ruling.md.
+3. Nit: otel_receiver.py ~L1088 docstring still cites the removed periodic sweep.
