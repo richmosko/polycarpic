@@ -43,3 +43,7 @@ Final verdict — PASS, pinned to a51fac6.
 - Every earlier red case (POLY-7/9/25/27, worktree redirect, register-before-H1, foreign-session filter, exporter-endpoint, AC2/AC5 rewrites) still green -- covered by the --gate finish run above.
 
 Flake proof (10/10 @ -j8 watchdog-attribution, 10/10 @ -j4 self-stop, recorded at e106214) stands: inspected the R1 diff (ebb636b) -- confined to _do_flush's last_flush_monotonic assignment plus two docstring/comment updates near the nudge/reap call sites; no logic change to the registry-absent-recreate branch or the pid-only reap-every-tick branch either flaky test exercises. Not re-run at a51fac6.
+
+### @qa-engineer — 2026-09-25
+
+Validate: confirmed nothing further needed for merge. Everything after my PASS @ a51fac6 (fdae1df, 56f4c89, 6cbf90b, 627857b) touches only process/TRACKER.md, process/cairn/**, STATE.md — no scripts/** changes. No suite re-run required.
