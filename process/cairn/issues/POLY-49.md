@@ -1,14 +1,14 @@
 ---
 id: POLY-49
 title: Receiver hardening (grouped)
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P3
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/20
 created: 2026-09-25
 updated: 2026-09-25
 ---
@@ -140,3 +140,7 @@ Known limit: AC4 live capture is verified next session.
 | Code, all ruling axes §1–§8 + both addenda | pass | approved @ a51fac6; `git diff a51fac6 fdae1df -- scripts/` is empty |
 | R3 TRACKER.md | pass | checked `git show fdae1df:process/TRACKER.md` against `tracker-r3.md`: all 5 replacement blocks present verbatim. The removed phrases ("periodic sweep", "Correction (POLY-10", "moved here verbatim", "Root cause (measured", "PT-79's real incident") are absent |
 | AC4 live capture | known limit | settings delta landed @ aa3a21f. Verified next session, since settings are read at launch |
+
+### @team-lead — 2026-09-25
+
+PR opened: https://github.com/richmosko/polycarpic/pull/20. Awaiting Validate. AC4 (live capture) is the known limit: verified in the next session after the telemetry keys moved to user settings (aa3a21f).

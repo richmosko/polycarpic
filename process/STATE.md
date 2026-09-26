@@ -21,7 +21,8 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-49-receiver-hardening`
 - **Started:** 2026-09-25
 - **Goal:** the OTel receiver captures every live session's usage, its registry reflects real processes, and its tests are deterministic.
-- **Status:** In Progress
+- **PR:** https://github.com/richmosko/polycarpic/pull/20
+- **Status:** In Review
 
 _Next after this: POLY-50 (backfill attribution), POLY-56 (checklists), POLY-58 (cairn.py split)._
 
