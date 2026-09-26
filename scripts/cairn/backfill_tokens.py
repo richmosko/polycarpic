@@ -914,7 +914,7 @@ def _read_existing_lines(out_path: Path) -> List[Dict[str, Any]]:
 def merge_and_write(
     out_path: Path, new_lines: List[Dict[str, Any]], source: str = SOURCE_NAME,
     milestone_windows_table: Optional[List[Tuple[str, str]]] = None,
-    cutoff: Optional[str] = None,
+    scan_cutoff: Optional[str] = None,
 ) -> None:
     """Ruling § 2: a regenerating source (this script always is one) reads
     every existing line, drops every line whose `source` matches its own,
@@ -927,21 +927,21 @@ def merge_and_write(
     fresh lines this call is writing and any surviving lines from the
     other source -- a single, consistent sort of the whole file.
 
-    POLY-50 ruling §2 race guard: `cutoff` is the scan's OWN `_otel_cutoff`
-    result (possibly `None`). Under the SAME lock this function already
-    holds, `_otel_cutoff` is re-derived from the file as it stands right
-    now; if that re-check is earlier than what the scan used (including
-    the scan having used `None` -- i.e. an otel line appeared where there
-    was none before), an otel line landed between the scan and this write
-    that the scan's own record-level cutoff never saw -- refuse the write
-    entirely rather than risk a double-count, naming the mismatch so the
-    caller knows to simply re-run."""
+    POLY-50 ruling §2 race guard: `scan_cutoff` is the scan's OWN
+    `_otel_cutoff` result (possibly `None`). Under the SAME lock this
+    function already holds, `_otel_cutoff` is re-derived from the file as
+    it stands right now; if that re-check is earlier than what the scan
+    used (including the scan having used `None` -- i.e. an otel line
+    appeared where there was none before), an otel line landed between the
+    scan and this write that the scan's own record-level cutoff never saw
+    -- refuse the write entirely rather than risk a double-count, naming
+    the mismatch so the caller knows to simply re-run."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     lock_path = out_path.parent / ".lock"
     _acquire_lock(lock_path)
     try:
         recheck_cutoff = _otel_cutoff(out_path)
-        if recheck_cutoff is not None and (cutoff is None or recheck_cutoff < cutoff):
+        if recheck_cutoff is not None and (scan_cutoff is None or recheck_cutoff < scan_cutoff):
             raise BackfillError(
                 f"{out_path}: otel lines appeared before the backfill cutoff; re-run"
             )
@@ -1082,7 +1082,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return 0
 
     try:
-        merge_and_write(out_path, new_lines, milestone_windows_table=milestone_windows_table, cutoff=cutoff)
+        merge_and_write(out_path, new_lines, milestone_windows_table=milestone_windows_table, scan_cutoff=cutoff)
     except BackfillError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
