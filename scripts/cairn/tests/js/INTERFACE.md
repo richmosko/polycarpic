@@ -180,6 +180,18 @@ the function itself is correct, only a hypothetical bad call site wouldn't be.
   `uniqueSorted` — a milestone id shaped like an `Object.prototype` key would
   silently vanish from `order`/`groups` on a bare `{}`.
 
+- `splitAcceptanceCriteria(description) -> {description: string}` — **POLY-56
+  gate-1 ruling (§ R1)**: moved here from `board.js` (was un-testable there, no
+  jsdom in this suite). Returns only the description-cut: everything before the
+  first `^##\s*Acceptance criteria\s*$` heading in `description`, trailing
+  blank lines trimmed; the full string unchanged when no such heading exists.
+  Its item-parsing half is **deleted** by this same ruling — checklist counts
+  and items now come from the server (`cairn.checklist_items`, Python side,
+  stamped onto `/api/board`'s `issue.checklist` and `/api/issue/<id>`'s
+  `issue.checklist_items`), one parser instead of two. Callers needing the
+  items list read `issue.checklist_items` directly; this function is
+  description-display-only.
+
 ## Not extracted in this pass (stretch / out of scope)
 
 - `filteredIssues`'s full predicate chain — the richest target (and
