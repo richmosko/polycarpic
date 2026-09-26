@@ -53,6 +53,13 @@ git push
 
 **If this merge closes the milestone** (this issue was its last open one — check `cairn ls --milestone <m>`), fold the milestone flip into the same commit: `scripts/cairn/cairn set <milestone-id> status=done` and `git add` the milestone file alongside the issue file. This is the only branch the flip can legally ride — after the merge there is no branch, and a direct push to `main` is forbidden.
 
+**Wait for the head to settle before merging.** GitHub recomputes mergeability asynchronously after the push, and the strict `cairn` check runs again on the new head (`UNKNOWN` → `BLOCKED` → `CLEAN`, about a minute for a full run). Merging before that settles fails with `Pull Request is not mergeable`. Poll until the PR head is the pushed commit and the state is clean:
+
+```bash
+SHA=$(git rev-parse --short HEAD)
+until [ "$(gh pr view <pr-num> --json mergeStateStatus,headRefOid --jq '"\(.mergeStateStatus) \(.headRefOid[0:7])"')" = "CLEAN $SHA" ]; do sleep 10; done
+```
+
 Then merge with a **merge commit** — never squash (project convention, `process/DECISIONS.md` 2026-09-23: per-agent commit authorship must survive on `main`; a squash collapses every teammate's commits into one commit authored by the Principal). GitHub's repo settings allow only this method:
 
 ```bash
