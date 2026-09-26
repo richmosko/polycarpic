@@ -1377,6 +1377,7 @@ def ensure_running(
     periodic_reap_seconds: float = DEFAULT_PERIODIC_REAP_SECONDS,
     registry_absent_recreate_seconds: float = REGISTRY_ABSENT_RECREATE_SECONDS,
     user_settings_path: Optional[Path] = None,
+    flush_interval: int = DEFAULT_FLUSH_INTERVAL_SECONDS,
 ) -> bool:
     """Single instance enforced by pidfile + a listen probe; a second
     start is a no-op, never an error. Returns True if a (new or
@@ -1394,6 +1395,15 @@ def ensure_running(
     knows how long to wait after its last session ends before flushing
     and exiting. An already-running daemon keeps whatever value it was
     originally spawned with; a later `--ensure-running` cannot retune it.
+
+    `flush_interval` (POLY-49 ruling §1 fix #1), like `grace_period_seconds`,
+    only matters on a FRESH spawn -- threaded into the child's own argv the
+    same way, so the daemon's own watchdog-tick interval-flush check
+    (`serve`'s `_tick`) uses the caller's `--flush-interval` rather than
+    silently falling back to `DEFAULT_FLUSH_INTERVAL_SECONDS` (30 minutes)
+    every time, which is what a test (or an operator) shrinking the interval
+    via `--ensure-running --flush-interval N` would otherwise never see take
+    effect at all.
 
     `session_id`/`session_pid` (PT-86, addendum §B) register a live
     session -- when `session_id` is given, this happens BEFORE deciding
@@ -1530,6 +1540,7 @@ def ensure_running(
         "--grace-period-seconds", str(grace_period_seconds),
         "--periodic-reap-seconds", str(periodic_reap_seconds),
         "--registry-absent-recreate-seconds", str(registry_absent_recreate_seconds),
+        "--flush-interval", str(flush_interval),
     ]
     if transcripts_dir is not None:
         spawn_argv += ["--transcripts-dir", str(transcripts_dir)]
@@ -2387,6 +2398,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             periodic_reap_seconds=args.periodic_reap_seconds,
             registry_absent_recreate_seconds=args.registry_absent_recreate_seconds,
             user_settings_path=args.user_settings_path,
+            flush_interval=args.flush_interval,
         )
         # Deliberately NOT nudged: the watchdog's regular
         # WATCHDOG_TICK_SECONDS tick already re-checks emptiness every
