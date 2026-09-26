@@ -23,12 +23,14 @@ User decision 2026-09-25 (POLY-51 loop): sub-issues nest one level only. Anythin
 
 ## Acceptance criteria
 
-- [ ] Card badge for checklist progress: a card whose body carries checklist items shows `k/n` checked, distinct from or unified with the sub-issue `done/total` badge (architect rules). Read-only
-- [ ] Sub-issues as checkbox rows: the drawer renders children in the checklist style, checked when `status: done`, still linking to the child. Read-only
-- [ ] Checkbox write-back built per the ruling, or explicitly re-deferred with the ruling recorded in TRACKER.md
-- [ ] Convention in TRACKER.md: short title, description body, criteria as body `- [ ]` items; qa's verdict ticks them (board write-back or a CLI such as `cairn check-item <ID> <ordinal>`, architect rules the mechanism)
-- [ ] `cairn new` seeds the body (`--body -` or a template with the two headings) and warns on a title over 70 chars; `cairn check` warns on a long title or an empty description
-- [ ] Tests: parser edge cases (nested lists, `- [X]`, items inside comments ignored), badge counts, drawer rendering, title/description lint, and if built the write-back round-trip byte-for-byte on a fixture with CRLF and trailing whitespace
+Amended by the gate-1 ruling (`process/reviews/POLY-56/ruling.md`).
+
+- [ ] Card badge: a distinct `checklist` chip `☑ k/n` (shown only when n > 0), fed by a server-side `checklist {done,total}` on `/api/board` from one Python parser `checklist_items`; the drawer renders `checklist_items` from `/api/issue`, and the client-side item parse is removed. Read-only
+- [ ] Sub-issues as checkbox rows: the drawer's Children list renders a disabled checkbox per child, checked iff `status: done`, still linking to the child. Read-only
+- [ ] `cairn check-item <ID> <ordinal> [--uncheck] [--text <exact>]` built: exactly one byte changes, `updated` untouched, mtime-guarded, idempotent; board write-back re-deferred with the ruling recorded in TRACKER.md → Deferred work
+- [ ] Convention in TRACKER.md: short title, description body, criteria as body `- [ ]` items; qa's verdict ticks them with `cairn check-item`
+- [ ] `cairn new --body <text|->` seeds the body in the same `O_EXCL` write (default skeleton `## Acceptance criteria` + one empty item) and warns on a title over 70 chars; `cairn check` warns on a long title or an empty description for open, non-`stage:` issues
+- [ ] Tests: one per row of the ruling's review checklist, each catching its named mutation, including the check-item byte-for-byte round-trip on a CRLF + trailing-whitespace fixture
 
 ## Comments
 
@@ -39,3 +41,12 @@ Filed 2026-09-25 from the POLY-51 loop; spec is in the body above. Authoring con
 ### @team-lead — 2026-09-26
 
 Feature started. Branch: `feature/poly-56-checklists`.
+
+### @architect — 2026-09-26
+
+**Gate 1 — ruling:** `process/reviews/POLY-56/ruling.md`. The acceptance criteria above were amended in place to match it.
+
+- Badge: a distinct `checklist` chip. One Python parser feeds both the card and the drawer.
+- Write-back: the CLI `cairn check-item` is built (a one-byte rewrite, mtime-guarded). Board write-back is re-deferred.
+- Lint: `cairn new --body` plus a title cap of 70 chars; `cairn check` warns on open issues without `stage:`.
+- The review checklist is pre-registered in the ruling file, one named mutation per test.
