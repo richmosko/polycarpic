@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Phase:** Research — milestone `POLY-A` (Bootstrap & Research). Kickoff decisions are consolidated in [`docs/project_kickoff.md`](../docs/project_kickoff.md); next up are the workflow items from its § 2.1 / § 2.12, then Pre-Discovery into the initial PRD.  
+**Phase:** Research — milestone `POLY-B` (Research: PRD v1, user stories, product-milestone sketch). `POLY-A` (Bootstrap & Tooling) closed and archived 2026-09-27; the Plan milestone is `POLY-C`. Kickoff decisions are consolidated in [`docs/project_kickoff.md`](../docs/project_kickoff.md); next up is Pre-Discovery into the initial PRD (`/generate-prd`, product-manager drives).  
 **Started:** 2026-09-23  
 **Driver agent:** team-lead (product-manager drives once the PRD interview starts)  
 **Gate criteria:** _see [`WORKFLOW.md`](WORKFLOW.md)_
@@ -15,14 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_Feature: Telemetry follow-ups: receiver root, CI flakes, backfill (grouped)  
-Issue: POLY-59 (cairn)  
-Milestone: POLY-A  
-Branch: `feature/poly-59-telemetry-follow-ups`  
-Started: 2026-09-27  
-Goal: the receiver anchors milestone windows on this checkout's tracker (the PT-* collision lines explained), the two timing-flaky receiver tests become deterministic, the `_otel_cutoff` one-second boundary is pinned by a named mutation, and `_branch_at` reuses its lookup list (or the ruling says why not).  
-PR: https://github.com/richmosko/polycarpic/pull/34  
-Status: In Review_
+_None — between loops. `POLY-B` (Research) has no issues yet; the first Research move is the PRD interview (`/generate-prd`). Tooling follow-ups filed after the `POLY-A` close sit unmilestoned in backlog (POLY-61) until a home is chosen._
 
 ## Releases
 

@@ -2,7 +2,7 @@
 id: POLY-8
 title: finish-feature JS gate: token-chart-logic.test.js needs the dashboard's node_modules installed
 status: done
-milestone: null
+milestone: POLY-A
 parent: POLY-48
 blocked_by: []
 assignee: null

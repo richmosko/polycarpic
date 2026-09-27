@@ -2,7 +2,7 @@
 id: POLY-9
 title: Unquoted leading-* paths: entry hits the YAML alias check before lint
 status: done
-milestone: null
+milestone: POLY-A
 parent: POLY-49
 blocked_by: []
 assignee: null

@@ -1,11 +1,11 @@
 ---
 id: POLY-B
-name: Plan
+name: Research
 kind: process
 major: POLY-V1
-status: planned
+status: in-progress
 target_tag: null
 ga: false
 ---
 
-**Definition of done:** ARCH + SECURITY + INFRA approved; design system encoded in `docs/DESIGN/`; GL build-vs-adopt and migration-tool research concluded; product milestones created in `milestones/` + GA designated; first session planned.
+**Definition of done:** PRD v1 approved with the initiative roadmap section; user stories enumerated; product-milestone scope sketched in PRD §9. Split out of `POLY-A` (Bootstrap & Tooling) on 2026-09-27; the Plan milestone that previously held this id is now `POLY-C`.
