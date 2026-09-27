@@ -21,9 +21,9 @@ Grouped follow-ups from the POLY-59 loop (2026-09-27): architect bubble-up at ga
 
 ## Acceptance criteria
 
-- [ ] `--status` reports `engine: stale` when the running receiver's engine fingerprint differs from the checkout's (`cairnlib/enginesrc` reused, not copied), with a test
-- [ ] `/merge-pr` → Sync local restarts the daemon when the merged diff touches `cairnlib/` as well as `otel_receiver.py`; the skill text names both paths
-- [ ] The SIGCONT cleanup tolerates an already-exited daemon (`ProcessLookupError` swallowed), with a named mutation
+- [x] `--status` reports `engine: stale` when the running receiver's engine fingerprint differs from the checkout's (`cairnlib/enginesrc` reused, not copied), with a test
+- [x] `/merge-pr` → Sync local restarts the daemon when the merged diff touches `cairnlib/` as well as `otel_receiver.py`; the skill text names both paths
+- [x] The SIGCONT cleanup tolerates an already-exited daemon (`ProcessLookupError` swallowed), with a named mutation
 
 ## Comments
 
