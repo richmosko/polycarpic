@@ -197,9 +197,11 @@ def engine_fingerprint(source_path: Path) -> Dict[str, Any]:
 
     POLY-60 ruling R2: `mtime_ns`/`size` come from `cairnlib.enginesrc.
     engine_source_stat` (shared with `multiroot.compute_multi_etag`'s
-    directory branch) rather than this function's own inlined stat loop
-    -- `engine_source_files` supplies the same sorted file list for the
-    sha, so there is still exactly one glob per call, not two.
+    directory branch) rather than this function's own inlined stat loop.
+    `engine_source_files` is called here for the sha AND again inside
+    `engine_source_stat` -- two globs per call, not one; neither is a
+    stat loop duplicated inline, which is the invariant R2 actually asks
+    for (architect's gate-4 verdict, POLY-60.md @ 7cd5b26).
     """
     source_path = Path(source_path)
     if source_path.is_dir():

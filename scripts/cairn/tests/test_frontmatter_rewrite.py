@@ -467,12 +467,13 @@ class AppendCommentTests(unittest.TestCase):
 
 class PT7FileModePreservationTests(unittest.TestCase):
     """PT-7: a frontmatter rewrite must preserve the original file's mode.
-    `_atomic_write` writes through `tempfile.mkstemp` (mode 0600 by
-    default) then `os.replace`s it over the target -- `os.replace` is a
-    rename, so the final file's permission bits come from the *source*
-    (the 0600 temp file), silently flipping any other starting mode to
-    0600. Exercised across three distinct starting modes, on both
-    apply_patch and append_comment (both funnel through _atomic_write)."""
+    `write_record` (POLY-60 R1: `_atomic_write_bytes` under the hood) writes
+    through `tempfile.mkstemp` (mode 0600 by default) then `os.replace`s it
+    over the target -- `os.replace` is a rename, so the final file's
+    permission bits come from the *source* (the 0600 temp file), silently
+    flipping any other starting mode to 0600. Exercised across three
+    distinct starting modes, on both apply_patch and append_comment (both
+    funnel through write_record)."""
 
     def setUp(self):
         self.tmp = helpers.make_empty_tmp_dir(self)
@@ -507,7 +508,7 @@ class PT7FileModePreservationTests(unittest.TestCase):
         self.assertEqual(self._mode(), 0o600)
 
     def test_mode_survives_append_comment_too(self):
-        # append_comment shares _atomic_write with apply_patch -- same bug,
+        # append_comment shares write_record with apply_patch -- same bug,
         # same fix should cover both call sites.
         os.chmod(self.path, 0o644)
         cairn.append_comment(self.path, "mosko", "A comment.")
@@ -592,7 +593,7 @@ class SetCRLFByteExactTests(unittest.TestCase):
     re-emitted frontmatter must still be CRLF. Mutation that must turn
     this red: apply_patch reading via `read_text` again -- universal-
     newline translation silently flattens the CRLF body to LF before
-    `_atomic_write`(-bytes) puts it back.
+    `write_record` puts it back.
     """
 
     def _write(self, path: Path) -> bytes:
@@ -715,9 +716,16 @@ class CommentCRLFByteExactTests(unittest.TestCase):
         after_tail = _tail_after_second_fence(after, fence=b"---\r\n")
         self.assertTrue(after_tail.startswith(before_tail), "pre-existing body bytes were altered")
         appended = after_tail[len(before_tail):]
+        # Architect's gate-4 verdict (POLY-60.md @ 7cd5b26): the mutated
+        # output ("...eol\r\n### @b") still starts with a bare `\r\n`, so
+        # that alone doesn't catch dropping the `endswith(eol)` check --
+        # the exact separator the LF path has always produced is `eol`
+        # (finish the dangling last line) THEN a blank line (`eol` again)
+        # before the comment marker, i.e. `\r\n\r\n### @b`.
         self.assertTrue(
-            appended.startswith(b"\r\n"),
-            f"no CRLF separator inserted before the new content, got {appended[:4]!r}",
+            appended.startswith(b"\r\n\r\n### @b"),
+            f"expected a CRLF end-of-line plus a CRLF blank-line separator before the new "
+            f"comment marker, got {appended[:12]!r}",
         )
         self.assertNotIn(b"\n", appended.replace(b"\r\n", b""), "a bare LF leaked into the appended tail")
 
