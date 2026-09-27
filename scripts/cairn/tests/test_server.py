@@ -19,6 +19,7 @@ from pathlib import Path
 import helpers  # noqa: F401
 
 import cairn
+import cairnlib.server
 
 
 def http_get(url: str, headers: dict | None = None):
@@ -423,17 +424,20 @@ class CreateIssueTests(ServerTestCase):
         # by the real allocation function (monkeypatched to always raise
         # one, its own retry/race behavior being out of scope here), read
         # through the real server and a real HTTP round trip.
-        real_allocate = cairn.allocate_and_create_issue
+        # POLY-58 step 18: make_server (cairnlib.server) binds its own
+        # `allocate_and_create_issue` name at import time -- monkeypatching
+        # the cairn facade no longer reaches the call site inside it.
+        real_allocate = cairnlib.server.allocate_and_create_issue
 
         def _always_exhausted(data_dir, fields, max_attempts=50):
             raise cairn.CairnError("could not allocate an ID for prefix 'PT' after 50 attempts")
 
-        cairn.allocate_and_create_issue = _always_exhausted
+        cairnlib.server.allocate_and_create_issue = _always_exhausted
         try:
             with self.assertRaises(urllib.error.HTTPError) as ctx:
                 http_post(f"{self.base_url}/api/issue", {"title": "no id left to allocate"})
         finally:
-            cairn.allocate_and_create_issue = real_allocate
+            cairnlib.server.allocate_and_create_issue = real_allocate
         self.assertEqual(ctx.exception.code, 409)
         error_payload = json.loads(ctx.exception.read())
         self.assertEqual(error_payload["error"], "allocation_failed")
