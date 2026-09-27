@@ -1601,6 +1601,38 @@ class OtelCutoffTests(unittest.TestCase):
         )
         self.assertEqual(stats.get("after_cutoff"), 1, stats)
 
+    def test_fractional_seconds_straddling_the_cutoff(self):
+        """POLY-59 gate-1 ruling §3: the sibling test above only covers
+        whole-second stamps. A transcript record's own `timestamp`
+        commonly carries milliseconds; `_truncate_fractional_seconds`
+        must strip that fraction before the `>=` compare or the straddle
+        goes the wrong way -- a bare string compare puts `.` before `Z`,
+        so `"...59.999Z" < "...00Z"` even though 23:59:59.999 is one
+        millisecond BEFORE 00:00:00, not after. Measured (ruling): the
+        truncated compare gives False/True (kept/excluded, correct); an
+        identity (untruncated) compare gives False/False (both wrongly
+        kept)."""
+        tmp = helpers.make_empty_tmp_dir(self)
+        main_dir = tmp / "projects" / "-fake-slug"
+        _write_jsonl(main_dir / "lead-session.jsonl", [
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-23T23:59:59.999Z", "req-before-1", "uuid-before-1"),
+            _assistant_usage_record("feature/POLY-7-x", "2026-09-24T00:00:00.326Z", "req-at-1", "uuid-at-1"),
+        ])
+        buckets, stats, files, _ = backfill_tokens.scan_transcripts(
+            main_dir, prefix="POLY", roster=set(), repo_root=helpers.make_empty_tmp_dir(self),
+            cutoff="2026-09-24T00:00:00Z",
+        )
+        bucket = buckets.get(("POLY-7", "team-lead", "claude-sonnet-5"))
+        self.assertIsNotNone(bucket, buckets.keys())
+        self.assertEqual(
+            bucket["records"], 1,
+            f"the pre-cutoff record (23:59:59.999, one ms before) must be kept -- got {bucket!r}",
+        )
+        self.assertEqual(
+            stats.get("after_cutoff"), 1,
+            f"the post-cutoff record (00:00:00.326) must be excluded -- got {stats!r}",
+        )
+
     def test_no_otel_lines_means_no_cutoff(self):
         tmp = helpers.make_empty_tmp_dir(self)
         out_path = tmp / "token-usage.jsonl"  # never created -- no otel lines at all

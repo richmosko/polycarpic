@@ -721,8 +721,25 @@ class StatusReportsWatchdogAndLastFlushTests(unittest.TestCase):
         while time.time() < deadline and not heartbeat.is_file():
             time.sleep(0.05)
         self.assertTrue(heartbeat.is_file(), "the watchdog must write a heartbeat file while it runs")
+
+        # POLY-59 gate-1 ruling §2A: CI-only flake -- a heartbeat write
+        # (every WATCHDOG_HEARTBEAT_WRITE_INTERVAL_SECONDS = 1.0s) can land
+        # AFTER the os.utime() below under load, un-aging the file before
+        # --status ever reads it (CI run 36277345298). SIGSTOP the daemon
+        # first so its watchdog thread cannot race the utime with a fresh
+        # write; the SIGCONT cleanup is registered AFTER _stop_fake_
+        # receiver's own addCleanup above so it runs FIRST (LIFO) -- the
+        # daemon must be resumed before --stop is ever sent to it.
+        pid = int(_pidfile_path(fake_root).read_text(encoding="utf-8").strip())
+        os.kill(pid, signal.SIGSTOP)
+        self.addCleanup(os.kill, pid, signal.SIGCONT)
         old = time.time() - 10
         os.utime(heartbeat, (old, old))
+        # Adversarial wait: strictly longer than the 1.0s write interval --
+        # a still-live (non-SIGSTOP'd) watchdog would have overwritten the
+        # heartbeat well before this fires, proving the fix rather than
+        # merely outrunning the race.
+        time.sleep(1.5)
 
         stale = run_fake_receiver(fake_root, ["--status"], env=env)
         self.assertEqual(

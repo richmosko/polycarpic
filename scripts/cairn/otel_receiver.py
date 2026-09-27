@@ -2376,10 +2376,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     # `worktree_root.main_checkout_root` is a no-op (returns its input
     # unchanged) everywhere except inside a LINKED worktree, so the main
     # checkout's own behaviour, and a fake-engine-root test copy's, are
-    # both unaffected. `--repo-root` overrides ONLY where `_current_branch`
-    # asks git, which is the sole reason a test (or an operator) would
-    # ever need a different one: to control the branch signal without
-    # touching cwd.
+    # both unaffected. `--repo-root` overrides `branch_repo_root`, which
+    # anchors BOTH `_current_branch` and `cairn.milestone_windows(
+    # branch_repo_root)` -- a test (or an operator) needs a different
+    # root to control the branch signal and the window table it's
+    # resolved against together, never one without the other.
+    # Decoupling them is ruled out (POLY-59 gate 1): the throwaway
+    # `--repo-root` repos in test_otel_receiver.py rely on empty windows
+    # landing on `main`.
     repo_root = worktree_root.main_checkout_root(backfill_tokens._repo_root())
     branch_repo_root = args.repo_root or repo_root
     try:

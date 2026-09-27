@@ -1,16 +1,16 @@
 ---
 id: POLY-59
 title: Telemetry follow-ups: receiver root, CI flakes, backfill (grouped)
-status: backlog
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P3
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/34
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-09-27
 ---
 
 Grouped follow-ups from the POLY-50 loop (2026-09-26): architect bubble-ups at gate 1 (208f408) and gate 4 (b5ed00f), plus two CI flakes seen the same day. One PR closes every item.
@@ -28,7 +28,45 @@ Timing-sensitive; candidates for injected-clock fixes alongside POLY-49's AC2/AC
 
 ## Acceptance criteria
 
-- [ ] The PT-* window-collision lines are explained (which process, which root) and the receiver anchors `milestone_windows` on the main checkout's `process/cairn/`, with a test
-- [ ] Both flaky receiver tests are deterministic (injected clock or explicit trigger); 10 consecutive 8-worker runs green
-- [ ] A test pins the `_otel_cutoff` one-second boundary with a named mutation
-- [ ] `_branch_at` reuses its lookup list across calls (or the ruling records why not)
+- [x] The PT-* window-collision lines are explained (which process, which root) and a test pins `--ingest` from a linked worktree computing `milestone_windows` against the main checkout's `process/cairn/` (amended at gate 1: the root was never wrong — ruling §1)
+- [x] Both flaky receiver tests are deterministic (explicit trigger); 10 consecutive `run_tests.py -j 8` runs of the two modules green, plus mutations M2a/M2b (amended at gate 1 — ruling §2)
+- [x] A test pins the `_otel_cutoff` one-second boundary with a named mutation
+- [x] `_branch_at` reuses its lookup list across calls (or the ruling records why not) — ruling §4 records why not; no code change
+
+## Comments
+
+### @team-lead — 2026-09-27
+
+Feature started. Branch: `feature/poly-59-telemetry-follow-ups`. Promoted straight from backlog (user, 2026-09-27); user pre-cleared the merge once green.
+
+### @architect — 2026-09-27
+
+Gate 1 ruling: `process/reviews/POLY-59/ruling.md`. AC1: the PT-* lines are this checkout's own pre-scrub tree (db906a0's 16 milestone ids, exact match), not a mis-anchor; qa pins the worktree→main-checkout windows root with a new test, implementation-lead corrects the `main()` `--repo-root` comment. AC2: status flake = heartbeat write after `utime` (fix: SIGSTOP the daemon + 1.5 s adversarial wait); grace flake = out-file read between `server_close` and the flush (fix: wait for pidfile gone). AC3: fractional-second straddle test. AC4: no change, measured (59 calls × 130 µs, bounded by the cutoff). ACs 1/2/4 amended in place. Checklist M1–M3b in ruling §5.
+
+### @architect — 2026-09-27
+
+Gate 4 verdict — PASS. Mutations run once on a scratch copy of 6b1f6a3 (the tree rsync'd outside git; the live daemon was not touched). Baseline: the 11 touched tests green.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| AC1 explanation (PT-* = db906a0's 16 ids, pre-scrub) | pass | ruling d9a966c §1 |
+| AC1 M1 ingest windows → `_repo_root()` | red | test c553782 |
+| AC1 M1b drop `main_checkout_root` | red | test c553782 |
+| AC1 `main()` comment matches the code | pass | 6b1f6a3 |
+| AC2 M2a drop SIGSTOP | red 5/5 | test c553782 |
+| AC2 M2b `sleep(1.0)` in `_do_flush` | green; red once the pidfile wait is dropped | test c553782 |
+| AC2 10× `run_tests.py -j 8`, both modules | 10/10 rc 0 | 6b1f6a3 |
+| AC3 M3a truncation → identity | red | test c553782 |
+| AC3 M3b truncation → round up | red | test c553782 |
+| AC4 `_branch_at` | no change, as ruled | ruling d9a966c §4 |
+| Arch drift | none; the only product diff is the comment | 6b1f6a3 |
+
+Non-blocking: the status test's `addCleanup(os.kill, pid, SIGCONT)` raises `ProcessLookupError` if the daemon has already died, which would show up as a cleanup error, not a masked failure.
+
+### @team-lead — 2026-09-27
+
+PR opened: https://github.com/richmosko/polycarpic/pull/34. Awaiting Validate.
+
+### @team-lead — 2026-09-27
+
+Validate passed; merging via PR #34. Closing. The POLY-A milestone flip does not ride this PR: the milestone is being split (tooling vs PRD) in the follow-on doc PR, and closes there.

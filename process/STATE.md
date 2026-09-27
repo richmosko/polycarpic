@@ -15,7 +15,14 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. POLY-A open work: POLY-59 (telemetry umbrella, backlog). `cairn archive` refuses issues whose milestone is still open, so archiving POLY-48/POLY-49 and their done children waits for the POLY-A close. Next session decides whether POLY-A closes as the Research→Plan transition (then `cairn archive --milestone POLY-A`)._
+_Feature: Telemetry follow-ups: receiver root, CI flakes, backfill (grouped)  
+Issue: POLY-59 (cairn)  
+Milestone: POLY-A  
+Branch: `feature/poly-59-telemetry-follow-ups`  
+Started: 2026-09-27  
+Goal: the receiver anchors milestone windows on this checkout's tracker (the PT-* collision lines explained), the two timing-flaky receiver tests become deterministic, the `_otel_cutoff` one-second boundary is pinned by a named mutation, and `_branch_at` reuses its lookup list (or the ruling says why not).  
+PR: https://github.com/richmosko/polycarpic/pull/34  
+Status: In Review_
 
 ## Releases
 
