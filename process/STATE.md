@@ -15,14 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_Feature: Split cairn.py into modules  
-Issue: POLY-58 (cairn)  
-Milestone: POLY-A  
-Branch: `feature/poly-58-cairn-split`  
-Started: 2026-09-26  
-Goal: extract `scripts/cairn/cairn.py` (7,700 lines) into a `cairnlib/` package one module per commit in the ruled leaves-first order, suite green at every commit, `cairn.py` left as the CLI entry plus re-exports so `import cairn` is unchanged for every caller.  
-PR: https://github.com/richmosko/polycarpic/pull/28  
-Status: In Review_
+_None — between loops. POLY-A's `todo` queue is empty; remaining POLY-A work is backlog umbrellas (POLY-59 telemetry, POLY-60 cairn core, POLY-15/25/27/33/40/47) — next session picks which to promote, or closes the milestone as a Research→Plan transition._
 
 ## Releases
 
