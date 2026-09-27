@@ -17,12 +17,12 @@ updated: 2026-09-26
 
 ## Acceptance criteria
 
-- [ ] A gate-1 ruling re-measures the §6 sketch (line ranges, cross-module calls, which tests patch `cairn.<attr>`) and fixes the module list
-- [ ] The engine-staleness seam (ruling §4) lands first; then each of the 21 modules is extracted in its own commit, verbatim, in the ruled order, with the per-commit gate (ruling §7) green at every commit and the full suite green at build-green
-- [ ] `cairn.py` is the facade only (ruling §3): no `def`/`class`; `import cairn` exposes all 237 names in `owners.txt`, each the same object as in its owning module; the shim, `backfill_tokens.py`, `otel_receiver.py`, `loop_stats.py`, `run_tests.py` are unchanged
-- [ ] Tests that patch a `cairn` attribute patch the module where the caller looks the name up (ruling §5); test filenames do not change; the one new test file is `test_cairnlib_layout.py`
-- [ ] Editing any `cairnlib` module makes the running board report a stale engine
-- [ ] Full suite median time after ≤ before × (1 + max(0.05, spread)), measured per ruling §7
+- [x] A gate-1 ruling re-measures the §6 sketch (line ranges, cross-module calls, which tests patch `cairn.<attr>`) and fixes the module list
+- [x] The engine-staleness seam (ruling §4) lands first; then each of the 21 modules is extracted in its own commit, verbatim, in the ruled order, with the per-commit gate (ruling §7) green at every commit and the full suite green at build-green
+- [x] `cairn.py` is the facade only (ruling §3): no `def`/`class`; `import cairn` exposes all 237 names in `owners.txt`, each the same object as in its owning module; the shim, `backfill_tokens.py`, `otel_receiver.py`, `loop_stats.py`, `run_tests.py` are unchanged
+- [x] Tests that patch a `cairn` attribute patch the module where the caller looks the name up (ruling §5); test filenames do not change; the one new test file is `test_cairnlib_layout.py`
+- [x] Editing any `cairnlib` module makes the running board report a stale engine
+- [x] Full suite median time after ≤ before × (1 + max(0.05, spread)), measured per ruling §7
 
 ## Comments
 
