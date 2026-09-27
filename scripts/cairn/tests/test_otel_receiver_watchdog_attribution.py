@@ -1063,6 +1063,31 @@ class ForeignSessionFilterTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------
+# POLY-61 gate-1 ruling R6, test T5: `_sigcont_if_alive` -- the SIGCONT
+# cleanup helper StatusReportsWatchdogAndLastFlushTests.
+# test_status_reports_watchdog_and_last_flush registers via addCleanup
+# (see the SIGSTOP/SIGCONT block above) must never raise
+# ProcessLookupError for an already-exited pid. Mutation M5: remove the
+# `except ProcessLookupError` -- must turn this red.
+# --------------------------------------------------------------------------
+
+
+class SigcontCleanupToleratesExitedPidTests(unittest.TestCase):
+    def test_sigcont_cleanup_tolerates_exited_pid(self):
+        proc = subprocess.Popen([sys.executable, "-c", "pass"])
+        proc.wait()
+        # proc.wait() reaps the zombie -- the pid is now gone from the
+        # process table entirely, the exact "already-exited daemon" case
+        # R6 exists for (m6: os.kill on such a pid raises ProcessLookup
+        # Error[Errno 3]).
+        result = _sigcont_if_alive(proc.pid)
+        self.assertIsNone(
+            result,
+            f"_sigcont_if_alive must swallow ProcessLookupError for an already-exited pid, not raise -- got {result!r}",
+        )
+
+
+# --------------------------------------------------------------------------
 # (f) test 7
 # --------------------------------------------------------------------------
 
