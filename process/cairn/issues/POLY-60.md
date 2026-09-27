@@ -1,7 +1,7 @@
 ---
 id: POLY-60
 title: Cairn core: byte-exact writes, CRLF, old-style child issues (grouped)
-status: backlog
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [cairn]
 priority: P3
 pr: null
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-09-27
 ---
 
 Grouped follow-ups from the POLY-56 loop (2026-09-26): architect ruling measurement M4 (672ce44) and the gate-4 verdict (7c73f03). One PR closes every item.
@@ -30,3 +30,9 @@ Grouped follow-ups from the POLY-56 loop (2026-09-26): architect ruling measurem
 - [ ] TRACKER.md's byte-for-byte sentence is true (written after the measurement lands)
 - [ ] `cairn check` on the live tracker reports 0 title/description warnings: the 8 POLY-48/POLY-49 children rewritten to the convention or archived
 - [ ] `compute_multi_etag` and the watcher share one dir-stat helper; no duplicated stat loop in `cairnlib/multiroot.py`
+
+## Comments
+
+### @team-lead — 2026-09-27
+
+Feature started. Branch: `feature/poly-60-cairn-core-bytes`. Promoted straight from backlog (user, 2026-09-27).
