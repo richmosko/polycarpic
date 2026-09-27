@@ -28,7 +28,7 @@ Grouped fix loop for the OTel receiver and its metrics worktree (user decision 2
 
 ## Acceptance criteria
 
-- [ ] POLY-7, POLY-9, POLY-25, POLY-27 acceptance criteria met and closed by this PR
+- [x] POLY-7, POLY-9, POLY-25, POLY-27 acceptance criteria met and closed by this PR
 - [ ] Watchdog recreate test is deterministic (injected clock) or its bound is widened; 10 consecutive 8-worker runs green
 - [ ] `--flush-now` from a linked worktree resolves the main checkout's pidfile, or fails loudly naming it
 - [x] A 30-minute, 3-teammate loop yields per-role token totals within the same order of magnitude as the transcript-derived backfill for the same window; the flush cadence honours the interval (a flush per 1800 s while sessions are alive)

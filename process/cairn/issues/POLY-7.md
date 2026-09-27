@@ -1,7 +1,7 @@
 ---
 id: POLY-7
 title: ensure_metrics_worktree.py: tests for the failed-add recovery path and the no-network/no-local-metrics skip
-status: backlog
+status: done
 milestone: null
 parent: POLY-49
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [workflow, cairn, tests]
 priority: P3
 pr: null
 created: 2026-09-23
-updated: 2026-09-25
+updated: 2026-09-27
 ---
 
 
@@ -26,3 +26,7 @@ Follow-up from the architect's POLY-4 re-review (POLY-4 @ e4438c0, items 3a nit 
 ## Acceptance criteria
 
 - [ ] Both paths covered in `scripts/cairn/tests/test_ensure_metrics_worktree.py` against throwaway repos, in the style of the existing 3a/3b/3c tests
+
+### @implementation-lead — 2026-09-27
+
+Resolved by 7b22b32 (PATH-shim 3d recovery + 3a skip tests, test_ensure_metrics_worktree.py:295,343,406,441) -- POLY-60 ruling R3. Flipped to done.
