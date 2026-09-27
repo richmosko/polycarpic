@@ -72,3 +72,16 @@ Non-blocking nits (fix with row 3 or drop):
 - stale `_atomic_write` mentions in test comments (`test_frontmatter_rewrite.py:470,475,510`)
 
 Re-verdict needs: row 3 red under its mutation, green without it, and qa's full run.
+
+### @architect — 2026-09-27
+
+Gate-4 re-verdict on 6c4370f: **approve**. Delta against the verdict @ 7cd5b26:
+
+| Axis | Result | Evidence |
+|---|---|---|
+| Checklist row 3 (drop `endswith(eol)`) | pass | scratch copy: `test_missing_trailing_eol...` green without the mutation, red under it (1 failure) |
+| qa full run | pass | 1951/1951 on 5a8c907 and at 6c4370f (qa, commit message of 6c4370f) |
+| `cairnlib/watch.py` hunk in 6c4370f | pass, docstring only | the `ast.dump` of watch.py @ 5a8c907 vs @ 6c4370f is identical once docstrings are stripped; the verified-code sha for head-match is 6c4370f |
+| every other axis | pass, unchanged | the verdict @ 7cd5b26; 6c4370f touches only a test file and one docstring (row 6 re-confirmed: `records.py` is untouched since 3e2ec7b) |
+
+One nit is still open and not blocking: `engine_is_stale`'s file shortcut and multiroot's file branch still stat inline instead of calling `engine_source_stat` (R2's wording). Neither is a loop, so the AC holds. Drop it, or fold it into the next cairn umbrella.
