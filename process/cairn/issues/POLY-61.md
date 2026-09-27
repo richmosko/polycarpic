@@ -1,7 +1,7 @@
 ---
 id: POLY-61
 title: Receiver engine-staleness self-check, SIGCONT cleanup (grouped)
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -62,3 +62,7 @@ Scratch setup needed `.claude/settings.json` and `.gitignore` copied beside `scr
 ### @team-lead — 2026-09-27
 
 PR opened: https://github.com/richmosko/polycarpic/pull/36. Awaiting Validate.
+
+### @team-lead — 2026-09-27
+
+Validate passed; merging via PR #36. Closing. Archives with POLY-A in the follow-on doc PR.
