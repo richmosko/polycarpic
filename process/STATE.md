@@ -21,7 +21,8 @@ Milestone: POLY-A
 Branch: `feature/poly-59-telemetry-follow-ups`  
 Started: 2026-09-27  
 Goal: the receiver anchors milestone windows on this checkout's tracker (the PT-* collision lines explained), the two timing-flaky receiver tests become deterministic, the `_otel_cutoff` one-second boundary is pinned by a named mutation, and `_branch_at` reuses its lookup list (or the ruling says why not).  
-Status: In Progress_
+PR: https://github.com/richmosko/polycarpic/pull/34  
+Status: In Review_
 
 ## Releases
 

@@ -1,14 +1,14 @@
 ---
 id: POLY-59
 title: Telemetry follow-ups: receiver root, CI flakes, backfill (grouped)
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P3
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/34
 created: 2026-09-26
 updated: 2026-09-27
 ---
@@ -62,3 +62,7 @@ Gate 4 verdict — PASS. Mutations run once on a scratch copy of 6b1f6a3 (the tr
 | Arch drift | none; the only product diff is the comment | 6b1f6a3 |
 
 Non-blocking: the status test's `addCleanup(os.kill, pid, SIGCONT)` raises `ProcessLookupError` if the daemon has already died, which would show up as a cleanup error, not a masked failure.
+
+### @team-lead — 2026-09-27
+
+PR opened: https://github.com/richmosko/polycarpic/pull/34. Awaiting Validate.
