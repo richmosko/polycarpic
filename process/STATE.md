@@ -21,7 +21,8 @@ Milestone: POLY-A
 Branch: `feature/poly-58-cairn-split`  
 Started: 2026-09-26  
 Goal: extract `scripts/cairn/cairn.py` (7,700 lines) into a `cairnlib/` package one module per commit in the ruled leaves-first order, suite green at every commit, `cairn.py` left as the CLI entry plus re-exports so `import cairn` is unchanged for every caller.  
-Status: In Progress_
+PR: https://github.com/richmosko/polycarpic/pull/28  
+Status: In Review_
 
 ## Releases
 

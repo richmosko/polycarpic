@@ -1,14 +1,14 @@
 ---
 id: POLY-58
 title: Split cairn.py into modules
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, refactor]
 priority: P3
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/28
 created: 2026-09-25
 updated: 2026-09-26
 ---
@@ -90,3 +90,7 @@ measured 0.68 ms, so accepted.
 
 **Required before merge:** the §3 paragraph in `scripts/cairn/tests/INTERFACE.md` is missing
 (`grep -c cairnlib` = 0). It is doc-only, and I will check it against the landing commit object; no re-verdict needed.
+
+### @team-lead — 2026-09-26
+
+PR opened: https://github.com/richmosko/polycarpic/pull/28. Awaiting Validate.
