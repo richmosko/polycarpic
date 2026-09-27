@@ -47,6 +47,9 @@ import cairn
 
 REPO_ROOT = helpers.CAIRN_DIR.parent.parent
 CAIRN_PY = helpers.CAIRN_PY
+# POLY-58 step 8: check_repo lives in cairnlib/lint.py now, not cairn.py
+# (the facade re-exports it, but carries no source text of its own).
+LINT_PY = helpers.CAIRN_DIR / "cairnlib" / "lint.py"
 
 INLINE_ARCHIVE_MILESTONES_GLOB_RE = re.compile(
     r"_dir_glob\(\s*data_dir\s*/\s*[\"']archive[\"']\s*/\s*[\"']milestones[\"']\s*\)"
@@ -140,7 +143,7 @@ class ArchivedMilestonePathsHelperTests(unittest.TestCase):
 
 class CheckRepoUsesTheHelperTests(unittest.TestCase):
     def test_check_repo_body_no_longer_inlines_the_archive_milestones_glob(self):
-        source = CAIRN_PY.read_text(encoding="utf-8")
+        source = LINT_PY.read_text(encoding="utf-8")
         match = re.search(r"\ndef check_repo\(", source)
         self.assertIsNotNone(match, "could not find def check_repo( in cairn.py")
         start = match.start() + 1
@@ -159,7 +162,7 @@ class CheckRepoUsesTheHelperTests(unittest.TestCase):
         )
 
     def test_check_repo_body_calls_the_new_helper(self):
-        source = CAIRN_PY.read_text(encoding="utf-8")
+        source = LINT_PY.read_text(encoding="utf-8")
         match = re.search(r"\ndef check_repo\(", source)
         self.assertIsNotNone(match)
         start = match.start() + 1
