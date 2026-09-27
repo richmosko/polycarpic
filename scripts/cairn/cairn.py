@@ -4843,8 +4843,13 @@ def compute_multi_etag(
         hasher.update(f"engine_boot_sha:{boot_sha}\n".encode("utf-8"))
         if source_path is not None:
             try:
-                st = Path(source_path).stat()
-                hasher.update(f"engine_source:{st.st_mtime_ns}:{st.st_size}\n".encode("utf-8"))
+                p = Path(source_path)
+                if p.is_dir():
+                    fp = engine_fingerprint(p)
+                    hasher.update(f"engine_source:{fp['mtime_ns']}:{fp['size']}\n".encode("utf-8"))
+                else:
+                    st = p.stat()
+                    hasher.update(f"engine_source:{st.st_mtime_ns}:{st.st_size}\n".encode("utf-8"))
             except OSError:
                 hasher.update(b"engine_source:missing\n")
     for root in roots:
@@ -5049,8 +5054,31 @@ def engine_fingerprint(source_path: Path) -> Dict[str, Any]:
     `source_path` (§2). Captured ONCE, at server construction
     (`make_server`), and held on the handler closure as the immutable
     "boot" fingerprint every later `engine_is_stale` call compares
-    against -- never recomputed mid-process."""
+    against -- never recomputed mid-process.
+
+    POLY-58 §4: `source_path` may also be a directory (the post-split
+    `cairnlib/` package) -- `mtime_ns` is the max and `size` the sum over
+    the directory's `*.py` files, `sha` is sha256 over the sorted
+    `(name, NUL, bytes)` of the same files, first 12 hex. A file keeps
+    the original single-file behavior unchanged."""
     source_path = Path(source_path)
+    if source_path.is_dir():
+        hasher = hashlib.sha256()
+        mtimes = []
+        total_size = 0
+        for f in sorted(source_path.glob("*.py")):
+            data = f.read_bytes()
+            st = f.stat()
+            mtimes.append(st.st_mtime_ns)
+            total_size += st.st_size
+            hasher.update(f.name.encode("utf-8"))
+            hasher.update(b"\x00")
+            hasher.update(data)
+        return {
+            "sha": hasher.hexdigest()[:12],
+            "mtime_ns": max(mtimes) if mtimes else 0,
+            "size": total_size,
+        }
     data = source_path.read_bytes()
     st = source_path.stat()
     return {"sha": hashlib.sha256(data).hexdigest()[:12], "mtime_ns": st.st_mtime_ns, "size": st.st_size}
@@ -5063,8 +5091,24 @@ def engine_is_stale(source_path: Path, boot: Dict[str, Any]) -> bool:
     and compare shas; only a DIFFERING sha is stale -- a `git checkout`
     that touches mtime without changing bytes must never raise a false
     alarm. Source missing/unreadable -> not stale (never invent an
-    alarm from a read failure), one stderr line."""
+    alarm from a read failure), one stderr line.
+
+    POLY-58 §4: `source_path` may also be a directory -- there is no
+    single-stat shortcut across multiple files, so a directory always
+    recomputes the full fingerprint and compares shas directly."""
     source_path = Path(source_path)
+    try:
+        is_dir = source_path.is_dir()
+    except OSError as e:
+        print(f"cairn: warning: engine staleness check could not stat {source_path}: {e}", file=sys.stderr)
+        return False
+    if is_dir:
+        try:
+            current = engine_fingerprint(source_path)
+        except OSError as e:
+            print(f"cairn: warning: engine staleness check could not read {source_path}: {e}", file=sys.stderr)
+            return False
+        return current["sha"] != boot["sha"]
     try:
         st = source_path.stat()
     except OSError as e:
