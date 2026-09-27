@@ -30,3 +30,27 @@ measured spread, 0.0137, is below it).
 
 The architect re-measures the same command, same protocol, at build-green for the
 verdict.
+
+## Post-split (gate 3, build-green)
+
+qa-engineer, 2026-09-27, on `94e3a83` (implementation-lead's build-green: 21
+`cairnlib/` modules + step 0, `cairn.py` a pure facade). Same machine, same
+command and protocol as above; one warm-up run discarded (not tabulated), then
+5 timed runs. Every run: 1926 tests, 111 files, 8 workers, `OK (skipped=4)` —
+full suite green, 0 failures, 0 errors.
+
+| Run | Real (s) |
+|---|---|
+| 1 | 47.13 |
+| 2 | 46.67 |
+| 3 | 46.95 |
+| 4 | 47.12 |
+| 5 | 47.06 |
+
+**After-median = 47.06 s.** min = 46.67, max = 47.13, spread = 0.46 / 47.06 =
+0.0098.
+
+**Result: 47.06 s ≤ 48.24 s threshold — PASS** (full suite time did not grow
+beyond the ruling §7 bound). Architect: re-measure/spot-check at verdict per
+the ruling if you want an independent sample; this run used the identical
+method and machine as the before-baseline above.
