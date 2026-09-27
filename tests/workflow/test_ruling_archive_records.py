@@ -18,7 +18,7 @@ avoid self-matching -- see GREP_PREDICATE_CMD below):
    old basenames (and the old design/ directory) anywhere in the repo,
    excluding `process/reviews/` (the audit records themselves, which are
    frozen and keep their own internal cross-references stale on purpose)
-   and `process/cairn/issues/POLY-57*` (this feature's own issue files,
+   and `process/cairn/{issues,archive/issues}/POLY-57*` (this feature's own issue files,
    which narrate the move using the old names as history) -- must return
    nothing.
 
@@ -69,6 +69,7 @@ GREP_PREDICATE_CMD = [
     "--",
     ":!process/reviews",
     ":!process/cairn/issues/POLY-57*",
+    ":!process/cairn/archive/issues/POLY-57*",
 ]
 
 

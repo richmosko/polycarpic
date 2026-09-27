@@ -2,7 +2,7 @@
 id: POLY-7
 title: ensure_metrics_worktree.py: tests for the failed-add recovery path and the no-network/no-local-metrics skip
 status: done
-milestone: null
+milestone: POLY-A
 parent: POLY-49
 blocked_by: []
 assignee: null
