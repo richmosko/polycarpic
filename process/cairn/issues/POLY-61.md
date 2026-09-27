@@ -1,8 +1,8 @@
 ---
 id: POLY-61
 title: Receiver engine-staleness self-check, SIGCONT cleanup (grouped)
-status: backlog
-milestone: null
+status: in-progress
+milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
@@ -24,3 +24,9 @@ Grouped follow-ups from the POLY-59 loop (2026-09-27): architect bubble-up at ga
 - [ ] `--status` reports `engine: stale` when the running receiver's engine fingerprint differs from the checkout's (`cairnlib/enginesrc` reused, not copied), with a test
 - [ ] `/merge-pr` → Sync local restarts the daemon when the merged diff touches `cairnlib/` as well as `otel_receiver.py`; the skill text names both paths
 - [ ] The SIGCONT cleanup tolerates an already-exited daemon (`ProcessLookupError` swallowed), with a named mutation
+
+## Comments
+
+### @team-lead — 2026-09-27
+
+Feature started. Branch: `feature/poly-61-receiver-staleness-check`. Filed under the archived `POLY-A` (Bootstrap & Tooling) by the user, 2026-09-27; merge pre-cleared once green. Archived with POLY-A at close.
