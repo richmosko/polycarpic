@@ -30,3 +30,7 @@ Grouped follow-ups from the POLY-59 loop (2026-09-27): architect bubble-up at ga
 ### @team-lead — 2026-09-27
 
 Feature started. Branch: `feature/poly-61-receiver-staleness-check`. Filed under the archived `POLY-A` (Bootstrap & Tooling) by the user, 2026-09-27; merge pre-cleared once green. Archived with POLY-A at close.
+
+### @architect — 2026-09-27
+
+Gate 1 ruling: `process/reviews/POLY-61/ruling.md`. R1 seam: `.engine-fingerprint` JSON marker in `.sessions/`, computed once at `serve()` entry over otel_receiver.py, backfill_tokens.py, cairn.py, worktree_root.py and cairnlib/ via `cairnlib.watch.engine_fingerprint`; rewritten unchanged on registry recreate. R2 `--status` line `engine: current|stale (<names>)|unknown (…)`, compared against the recorded paths. R3 exit 3 = running + engine stale (precedence 1>2>3>0). R4 `--ensure-running` warns on stderr and never restarts. R5 merge-pr text verbatim. R6 `_sigcont_if_alive`. Tests T1–T5, one named mutation each (M1–M5); guards G1–G5.
