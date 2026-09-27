@@ -15,14 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_Feature: Checklists as the granularity layer  
-Issue: POLY-56 (cairn)  
-Milestone: POLY-A  
-Branch: `feature/poly-56-checklists`  
-Started: 2026-09-26  
-Goal: make body `- [ ]` checklists the layer below sub-issues — card badge, drawer rows, `cairn new`/`cairn check` enforcing the short-title/body-criteria convention, and checkbox write-back built or explicitly re-deferred per the gate-1 ruling.  
-PR: https://github.com/richmosko/polycarpic/pull/25  
-Status: In Review_
+_None — between loops. Next: POLY-58 (cairn.py split). Three unplaced `temp/` notes (receiver PT-* window collisions + CI flakes; POLY-50 verdict follow-ups; POLY-56 CRLF + lint-noise items) await `/sweep-temp` into batched issues._
 
 ## Releases
 
