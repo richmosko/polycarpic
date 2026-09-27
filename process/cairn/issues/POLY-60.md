@@ -25,12 +25,12 @@ Grouped follow-ups from the POLY-56 loop (2026-09-26): architect ruling measurem
 
 ## Acceptance criteria
 
-- [ ] Every write path goes through `read_record`/`write_record` (ruling R1); one test per path (`set`, `comment`, `check-item`, `close`, `archive`) on a CRLF + trailing-whitespace fixture asserts every byte outside that path's edited span is unchanged; the text-mode `_atomic_write` is gone
-- [ ] `parse_frontmatter` accepts `---\r` fences (frontmatter values carry no `\r`, body unchanged); `check-item` on a fully-CRLF file exits 0 and changes exactly one byte
-- [ ] TRACKER.md Write-back carries the R4 sentence verbatim; `tests/INTERFACE.md` lists the new seam and module
-- [ ] POLY-7, 8, 9, 15, 25, 27, 33, 40, 47 set `done`, each with a comment naming its R3 sha; POLY-49 criterion 1 ticked; `cairn check` on the live tracker reports 0 title/description warnings
-- [ ] `cairnlib/enginesrc.py` (`engine_source_files`, `engine_source_stat`) is the only dir-stat loop; `compute_multi_etag` and `watch.engine_fingerprint`/`engine_is_stale` call it
-- [ ] Every row of the review checklist in `process/reviews/POLY-60/ruling.md` has its test, and each test fails under its named mutation
+- [x] Every write path goes through `read_record`/`write_record` (ruling R1); one test per path (`set`, `comment`, `check-item`, `close`, `archive`) on a CRLF + trailing-whitespace fixture asserts every byte outside that path's edited span is unchanged; the text-mode `_atomic_write` is gone
+- [x] `parse_frontmatter` accepts `---\r` fences (frontmatter values carry no `\r`, body unchanged); `check-item` on a fully-CRLF file exits 0 and changes exactly one byte
+- [x] TRACKER.md Write-back carries the R4 sentence verbatim; `tests/INTERFACE.md` lists the new seam and module
+- [x] POLY-7, 8, 9, 15, 25, 27, 33, 40, 47 set `done`, each with a comment naming its R3 sha; POLY-49 criterion 1 ticked; `cairn check` on the live tracker reports 0 title/description warnings
+- [x] `cairnlib/enginesrc.py` (`engine_source_files`, `engine_source_stat`) is the only dir-stat loop; `compute_multi_etag` and `watch.engine_fingerprint`/`engine_is_stale` call it
+- [x] Every row of the review checklist in `process/reviews/POLY-60/ruling.md` has its test, and each test fails under its named mutation
 
 ## Comments
 
