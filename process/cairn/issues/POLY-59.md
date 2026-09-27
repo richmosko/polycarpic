@@ -42,3 +42,23 @@ Feature started. Branch: `feature/poly-59-telemetry-follow-ups`. Promoted straig
 ### @architect — 2026-09-27
 
 Gate 1 ruling: `process/reviews/POLY-59/ruling.md`. AC1: the PT-* lines are this checkout's own pre-scrub tree (db906a0's 16 milestone ids, exact match), not a mis-anchor; qa pins the worktree→main-checkout windows root with a new test, implementation-lead corrects the `main()` `--repo-root` comment. AC2: status flake = heartbeat write after `utime` (fix: SIGSTOP the daemon + 1.5 s adversarial wait); grace flake = out-file read between `server_close` and the flush (fix: wait for pidfile gone). AC3: fractional-second straddle test. AC4: no change, measured (59 calls × 130 µs, bounded by the cutoff). ACs 1/2/4 amended in place. Checklist M1–M3b in ruling §5.
+
+### @architect — 2026-09-27
+
+Gate 4 verdict — PASS. Mutations run once on a scratch copy of 6b1f6a3 (the tree rsync'd outside git; the live daemon was not touched). Baseline: the 11 touched tests green.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| AC1 explanation (PT-* = db906a0's 16 ids, pre-scrub) | pass | ruling d9a966c §1 |
+| AC1 M1 ingest windows → `_repo_root()` | red | test c553782 |
+| AC1 M1b drop `main_checkout_root` | red | test c553782 |
+| AC1 `main()` comment matches the code | pass | 6b1f6a3 |
+| AC2 M2a drop SIGSTOP | red 5/5 | test c553782 |
+| AC2 M2b `sleep(1.0)` in `_do_flush` | green; red once the pidfile wait is dropped | test c553782 |
+| AC2 10× `run_tests.py -j 8`, both modules | 10/10 rc 0 | 6b1f6a3 |
+| AC3 M3a truncation → identity | red | test c553782 |
+| AC3 M3b truncation → round up | red | test c553782 |
+| AC4 `_branch_at` | no change, as ruled | ruling d9a966c §4 |
+| Arch drift | none; the only product diff is the comment | 6b1f6a3 |
+
+Non-blocking: the status test's `addCleanup(os.kill, pid, SIGCONT)` raises `ProcessLookupError` if the daemon has already died, which would show up as a cleanup error, not a masked failure.
