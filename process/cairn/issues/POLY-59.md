@@ -1,7 +1,7 @@
 ---
 id: POLY-59
 title: Telemetry follow-ups: receiver root, CI flakes, backfill (grouped)
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -66,3 +66,7 @@ Non-blocking: the status test's `addCleanup(os.kill, pid, SIGCONT)` raises `Proc
 ### @team-lead — 2026-09-27
 
 PR opened: https://github.com/richmosko/polycarpic/pull/34. Awaiting Validate.
+
+### @team-lead — 2026-09-27
+
+Validate passed; merging via PR #34. Closing. The POLY-A milestone flip does not ride this PR: the milestone is being split (tooling vs PRD) in the follow-on doc PR, and closes there.
