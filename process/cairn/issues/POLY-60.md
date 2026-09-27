@@ -1,14 +1,14 @@
 ---
 id: POLY-60
 title: Cairn core: byte-exact writes, CRLF, old-style child issues (grouped)
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn]
 priority: P3
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/30
 created: 2026-09-26
 updated: 2026-09-27
 ---
@@ -85,3 +85,7 @@ Gate-4 re-verdict on 6c4370f: **approve**. Delta against the verdict @ 7cd5b26:
 | every other axis | pass, unchanged | the verdict @ 7cd5b26; 6c4370f touches only a test file and one docstring (row 6 re-confirmed: `records.py` is untouched since 3e2ec7b) |
 
 One nit is still open and not blocking: `engine_is_stale`'s file shortcut and multiroot's file branch still stat inline instead of calling `engine_source_stat` (R2's wording). Neither is a loop, so the AC holds. Drop it, or fold it into the next cairn umbrella.
+
+### @team-lead — 2026-09-27
+
+PR opened: https://github.com/richmosko/polycarpic/pull/30. Awaiting Validate.
