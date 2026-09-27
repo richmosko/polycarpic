@@ -59,3 +59,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** A backfill line aggregates one `(issue, role, model)` over its bucket's whole time span, so most buckets straddle the first otel day and the reader cannot split them after the fact. The cutoff under-attributes at most the records between midnight and the first otel export on that day (≤ 945 here); it never double-counts.
 **Alternatives considered:** Per-window source precedence in the reader (needs date-granular backfill lines, a schema change for no gain); a `--until` flag (a value nobody would keep in sync with the data file).
 **Approved by:** richmosko (POLY-50 plan confirmed 2026-09-26)
+
+### 2026-09-26 — Checklist ticks go through a CLI; board write-back stays deferred
+**Decision:** `cairn check-item <ID> <ordinal> [--uncheck] [--text <exact>]` is the one path that flips a body `- [ ]` item: exactly one byte changes, `updated` is untouched, the write is mtime-guarded and idempotent. The board's checkboxes stay `disabled`; qa's verdict ticks criteria with the CLI and commits the file by pathspec. Ruling: `process/reviews/POLY-56/ruling.md` R2.
+**Why:** Cairn has had zero body-rewriting paths since 2026-08-19, and the loop's evidence chain is commits by pathspec. A CLI tick lives inside that discipline; a board tick would need a stale-snapshot check against a teammate editing the same body in a worktree and a server-side rewrite path with no commit attached.
+**Alternatives considered:** Board write-back with an anchored rewrite (text + ordinal) and a conflict check (deferred, not rejected: it can be built on top of the same `check-item` core once the board has a commit story); leaving write-back deferred entirely (qa would keep ticking by hand, which is what produced the by-hand edits this issue set out to remove).
+**Approved by:** richmosko (POLY-56 plan confirmed 2026-09-26)

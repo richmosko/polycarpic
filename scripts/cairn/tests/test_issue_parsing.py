@@ -237,5 +237,73 @@ class ParseIssueTests(unittest.TestCase):
         self.assertEqual(issue["comments"], [])
 
 
+class ChecklistItemsTests(unittest.TestCase):
+    """POLY-56 gate-1 ruling (process/reviews/POLY-56/ruling.md § R1): the
+    ONE parser, cairn.checklist_items(description) -> [{ordinal, text,
+    checked, line}]. Scope is every line after the first `^##\\s*Acceptance
+    criteria\\s*$` heading in the pre-`## Comments` description; item regex
+    `^- \\[( |x|X)\\] ?(.*?)\\r?$`, column 0 only. `description` here is
+    always the ALREADY comments-stripped half (split_comments's pre-half);
+    the wiring that guarantees callers pass that half, not the raw body,
+    is pinned separately in test_checklist_payload.py against the real
+    build_issue_payload/build_board_payload callers.
+    """
+
+    def test_items_before_the_heading_are_ignored(self):
+        # Mutation (ruling's review checklist): drop the heading scan --
+        # a checklist-shaped line filed before any "## Acceptance
+        # criteria" heading exists must never count.
+        desc = "- [ ] not counted, no heading yet\n\n## Acceptance criteria\n\n- [ ] counted\n"
+        items = cairn.checklist_items(desc)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["text"], "counted")
+        self.assertEqual(items[0]["ordinal"], 1)
+        self.assertFalse(items[0]["checked"])
+
+    def test_no_heading_at_all_yields_no_items(self):
+        desc = "Just a paragraph. No heading anywhere in this description.\n"
+        self.assertEqual(cairn.checklist_items(desc), [])
+
+    def test_uppercase_x_is_checked(self):
+        # Mutation: lowercase-only x match -- an uppercase [X] must still
+        # read as checked.
+        desc = "## Acceptance criteria\n\n- [X] uppercase checked\n- [ ] unchecked\n"
+        items = cairn.checklist_items(desc)
+        self.assertEqual(len(items), 2)
+        self.assertTrue(items[0]["checked"])
+        self.assertFalse(items[1]["checked"])
+
+    def test_indented_items_are_not_counted(self):
+        # Mutation: accept leading whitespace in the item regex -- a
+        # nested/indented checklist line is finer-grained than the
+        # convention's granularity layer and must not count as its own
+        # acceptance-criteria row.
+        desc = "## Acceptance criteria\n\n  - [ ] indented, must not count\n- [ ] top-level counted\n"
+        items = cairn.checklist_items(desc)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["text"], "top-level counted")
+
+    def test_crlf_item_text_has_no_trailing_cr(self):
+        # Mutation: remove the \\r? strip -- a CRLF-authored issue file
+        # must not leak a trailing \\r into the rendered item text.
+        desc = "## Acceptance criteria\r\n\r\n- [ ] crlf item\r\n"
+        items = cairn.checklist_items(desc)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["text"], "crlf item")
+        self.assertFalse(items[0]["text"].endswith("\r"))
+
+    def test_ordinals_are_one_based_over_ac_items_only(self):
+        desc = (
+            "Intro paragraph.\n\n"
+            "## Acceptance criteria\n\n"
+            "- [ ] first\n"
+            "- [x] second\n"
+            "- [ ] third\n"
+        )
+        items = cairn.checklist_items(desc)
+        self.assertEqual([i["ordinal"] for i in items], [1, 2, 3])
+        self.assertEqual([i["text"] for i in items], ["first", "second", "third"])
+
+
 if __name__ == "__main__":
     unittest.main()

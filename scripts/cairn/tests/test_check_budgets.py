@@ -93,6 +93,96 @@ class ClosedViaCairnSetWarningTests(unittest.TestCase):
         self.assertIn("closed via `cairn set`", warnings[0])
 
 
+def _lint_issue(data_dir: Path, *, title: str = "Thing", status: str = "todo", body: str = "Body.\n",
+                 stage: str | None = None) -> Path:
+    p = data_dir / "issues" / "PT-1.md"
+    fm = (
+        f"id: PT-1\ntitle: {title}\nstatus: {status}\nmilestone: null\nparent: null\n"
+        "assignee: null\nlabels: []\npriority: null\npr: null\n"
+        "created: 2026-09-01\nupdated: 2026-09-01\n"
+    )
+    if stage is not None:
+        fm += f"stage: {stage}\n"
+    p.write_text("---\n" + fm + "---\n\n" + body, encoding="utf-8")
+    return p
+
+
+class TitleAndDescriptionLintTests(unittest.TestCase):
+    """POLY-56 gate-1 ruling § R3: `cairn check` warns (never fails) on a
+    title over TITLE_CHAR_CAP (70) chars or an empty pre-Comments,
+    pre-AC-heading description, scoped to live issues with status not in
+    {done, cancelled} and no `stage:` field."""
+
+    def test_open_issue_with_a_long_title_warns(self):
+        # Mutation: `>=` instead of `>` -- also covered by the boundary
+        # test below, this pins the over-cap case itself.
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, title="x" * (cairn.TITLE_CHAR_CAP + 1))
+        warnings = cairn.check_budgets(data_dir)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("PT-1.md", warnings[0])
+        self.assertIn("title is", warnings[0])
+        self.assertIn(str(cairn.TITLE_CHAR_CAP), warnings[0])
+
+    def test_open_issue_with_title_exactly_at_the_cap_is_silent(self):
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, title="x" * cairn.TITLE_CHAR_CAP)
+        self.assertEqual(cairn.check_budgets(data_dir), [])
+
+    def test_done_issue_with_a_long_title_does_not_warn(self):
+        # Mutation: lint done issues too -- the ruling scopes this to
+        # status not in {done, cancelled}.
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, title="x" * (cairn.TITLE_CHAR_CAP + 1), status="done")
+        self.assertEqual(cairn.check_budgets(data_dir), [])
+
+    def test_cancelled_issue_with_a_long_title_does_not_warn(self):
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, title="x" * (cairn.TITLE_CHAR_CAP + 1), status="cancelled")
+        self.assertEqual(cairn.check_budgets(data_dir), [])
+
+    def test_sub_issue_with_a_stage_field_and_a_long_title_does_not_warn(self):
+        # Mutation: exempt nothing for stage: -- a per-stage sub-issue is
+        # exempt from BOTH lints regardless of its status.
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, title="x" * (cairn.TITLE_CHAR_CAP + 1), status="todo", stage="execute", body="")
+        self.assertEqual(cairn.check_budgets(data_dir), [])
+
+    def test_open_issue_with_an_empty_description_warns(self):
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, body="\n## Acceptance criteria\n\n- [ ] item\n")
+        warnings = cairn.check_budgets(data_dir)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("PT-1.md", warnings[0])
+        self.assertIn("empty description", warnings[0])
+
+    def test_open_issue_with_only_whitespace_before_the_heading_warns(self):
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, body="   \n\n## Acceptance criteria\n\n- [ ] item\n")
+        warnings = cairn.check_budgets(data_dir)
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("empty description", warnings[0])
+
+    def test_open_issue_with_a_real_paragraph_before_the_heading_is_silent(self):
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, body="A real paragraph explaining why.\n\n## Acceptance criteria\n\n- [ ] item\n")
+        self.assertEqual(cairn.check_budgets(data_dir), [])
+
+    def test_done_issue_with_an_empty_description_does_not_warn(self):
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, body="\n## Acceptance criteria\n\n- [x] item\n", status="done")
+        self.assertEqual(cairn.check_budgets(data_dir), [])
+
+    def test_cli_surfaces_both_lint_warnings_on_stderr_and_still_exits_zero(self):
+        data_dir = make_tree(self)
+        _lint_issue(data_dir, title="x" * (cairn.TITLE_CHAR_CAP + 1), body="")
+        r = subprocess.run([str(helpers.CAIRN_BIN), "check", "--data-dir", str(data_dir)], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("title is", r.stderr)
+        self.assertIn("empty description", r.stderr)
+        self.assertIn("ok", r.stdout)
+
+
 class DocsPhraseLintTests(unittest.TestCase):
     """The docs live two levels above the data dir (process/cairn ->
     process/). A tree with no process/WORKFLOW.md skips the lint."""

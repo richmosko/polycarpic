@@ -525,6 +525,27 @@ var CairnLogic = (function () {
     return childRecords(issues, issue).sort(compareByIdSortKey);
   }
 
+  // POLY-56 (gate-1 ruling R1): relocated from board.js -- moving it here
+  // is what gives it a JS test surface at all (M3: "lives in board.js, not
+  // board-logic.js, so no JS test reaches it"). Its `items` half is GONE:
+  // checklist rows are now server-parsed (`cairn.checklist_items`, one
+  // parser, not two that could disagree) and arrive as `issue.
+  // checklist_items`/`issue.checklist` on the API payloads. What survives
+  // is only the description CUT the drawer's "Description" section still
+  // needs -- the text before the first "## Acceptance criteria" heading.
+  var AC_HEADING_RE = /^##\s*Acceptance criteria\s*$/;
+
+  function splitAcceptanceCriteria(description) {
+    var lines = (description || "").split("\n");
+    var headingIdx = -1;
+    for (var i = 0; i < lines.length; i++) {
+      if (AC_HEADING_RE.test(lines[i])) { headingIdx = i; break; }
+    }
+    if (headingIdx === -1) return { description: description || "" };
+    var descText = lines.slice(0, headingIdx).join("\n").replace(/\n+$/, "");
+    return { description: descText };
+  }
+
   // PT-26: the blocker records named in `issue.blocked_by`, sorted
   // numerically by id. Repo-scoped from the FIRST line: `blocked_by`
   // entries are same-root-only by construction (TRACKER.md § Dependencies
@@ -1270,6 +1291,7 @@ var CairnLogic = (function () {
     idSortKey: idSortKey,
     childProgress: childProgress,
     childrenOf: childrenOf,
+    splitAcceptanceCriteria: splitAcceptanceCriteria,
     blockersOf: blockersOf,
     blocksOf: blocksOf,
     openBlockers: openBlockers,

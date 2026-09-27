@@ -231,6 +231,21 @@ COMMENTS_HEADING_RE = re.compile(r"^## Comments\s*$")
 COMMENT_DELIM_RE = re.compile(r"^### @([a-z0-9][a-z0-9-]*) — (\d{4}-\d{2}-\d{2})\s*$")
 ID_RE = re.compile(r"^([A-Za-z][A-Za-z0-9]*)-(\d+)$")
 
+# POLY-56 (gate-1 ruling R1): the ONE checklist parser, Python-side --
+# board.js's client-side splitAcceptanceCriteria/AC_ITEM_RE is deleted, so
+# this pair is the sole source of truth for "what counts as a checklist
+# item" (both the board payload's counts and check-item's target line read
+# through it). Scope is column 0 only (an indented/nested `- [ ]` is not
+# counted) starting after the first line matching AC_HEADING_RE. `\s*`
+# before AC_HEADING_RE's `$` already absorbs a trailing `\r` on a CRLF
+# heading line, same as the JS original. The item regex's trailing `\r?`
+# is what keeps a CRLF file's item TEXT clean of the carriage return
+# without going through any newline-translating read -- the one place this
+# matters is check-item's byte-exact rewrite, which decodes raw bytes
+# rather than using `read_text` (see cmd_check_item).
+AC_HEADING_RE = re.compile(r"^##\s*Acceptance criteria\s*$")
+_CHECKLIST_ITEM_RE = re.compile(r"^- \[( |x|X)\] ?(.*?)\r?$")
+
 # POLY-51 (ruling §1): a sub-issue id split into its parent's id (group 1,
 # includes the parent's own prefix+number) and its single lowercase letter
 # (group 2) -- shared by allocate_and_create_issue's depth-1 guard (§2 step
@@ -596,6 +611,58 @@ def parse_issue(text: str) -> Dict[str, Any]:
     return issue
 
 
+def checklist_items(description: str) -> List[Dict[str, Any]]:
+    """`- [ ]`/`- [x]` rows under the first `## Acceptance criteria` heading
+    in `description` (the pre-`## Comments` half `split_comments` already
+    cut -- items under Comments are never seen, same as before POLY-56).
+
+    Returns `[{ordinal, text, checked, line}]`, oldest-first, `ordinal`
+    1-based and `line` the 0-based index of that row within
+    `description.split("\\n")` -- the SAME index a caller gets by splitting
+    the containing issue's `body` the identical way, since `description` is
+    always body's own leading slice (POLY-56 gate-1 ruling R1/R2: this is
+    what lets cmd_check_item locate a row's byte offset without a second,
+    diverging split).
+
+    No `## Acceptance criteria` heading -> `[]`. Column 0 only -- an
+    indented/nested `- [ ]` under a real item is not counted.
+    """
+    lines = (description or "").split("\n")
+    heading_idx = None
+    for i, line in enumerate(lines):
+        if AC_HEADING_RE.match(line):
+            heading_idx = i
+            break
+    if heading_idx is None:
+        return []
+    items: List[Dict[str, Any]] = []
+    ordinal = 0
+    for i in range(heading_idx + 1, len(lines)):
+        m = _CHECKLIST_ITEM_RE.match(lines[i])
+        if not m:
+            continue
+        ordinal += 1
+        items.append({
+            "ordinal": ordinal,
+            "text": m.group(2),
+            "checked": m.group(1).lower() == "x",
+            "line": i,
+        })
+    return items
+
+
+def _description_before_ac(description: str) -> str:
+    """`description`, cut at the first `## Acceptance criteria` heading --
+    the JS drawer's `splitAcceptanceCriteria` description half, re-expressed
+    here for `check_budgets`' empty-description lint (POLY-56 R3). No
+    heading -> `description` unchanged."""
+    lines = (description or "").split("\n")
+    for i, line in enumerate(lines):
+        if AC_HEADING_RE.match(line):
+            return "\n".join(lines[:i])
+    return description or ""
+
+
 # --------------------------------------------------------------------------
 # Write-back: frontmatter-only rewrite, byte-preserving body
 # --------------------------------------------------------------------------
@@ -690,6 +757,35 @@ def _atomic_write(path: Path, text: str) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as f:
             f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        if original_mode is not None:
+            os.chmod(tmp_name, original_mode)
+        os.replace(tmp_name, str(path))
+    except BaseException:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    """The binary sibling of `_atomic_write` (POLY-56 gate-1 ruling R2):
+    same same-directory temp file + `os.replace` + mode-preservation
+    discipline, but `wb` instead of text mode -- `cmd_check_item`'s one-byte
+    rewrite must never go through a newline-translating write, which is
+    exactly the mutation the CRLF round-trip test is pinned to catch.
+    """
+    path = Path(path)
+    try:
+        original_mode = stat.S_IMODE(path.stat().st_mode)
+    except FileNotFoundError:
+        original_mode = None
+    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
             f.flush()
             os.fsync(f.fileno())
         if original_mode is not None:
@@ -1294,7 +1390,9 @@ class _IdsExhausted(Exception):
     """
 
 
-def _claim_issue_file(issues_dir: Path, ids: Iterable[str], fields: Dict[str, Any], today_str: str) -> Path:
+def _claim_issue_file(
+    issues_dir: Path, ids: Iterable[str], fields: Dict[str, Any], today_str: str, body: str = "",
+) -> Path:
     """The O_CREAT|O_EXCL claim-and-write loop shared by the numeric and
     letter paths of `allocate_and_create_issue` (POLY-48 item 8, follow-up
     (b) from the POLY-51 review, POLY-51.md @ 006848e). Tries each
@@ -1302,6 +1400,12 @@ def _claim_issue_file(issues_dir: Path, ids: Iterable[str], fields: Dict[str, An
     disk, and writes `fields` (plus `id`/`created`/`updated`) to it
     atomically. Returns the claimed path; raises `_IdsExhausted` once
     `ids` is spent with nothing claimed.
+
+    POLY-56 (gate-1 ruling R3): `body` rides the SAME O_EXCL write (M6) --
+    no second rewrite, so a seeded issue never has a moment where the file
+    exists with frontmatter but no body. Default `""` preserves every
+    existing caller's exact prior output (frontmatter block + one blank
+    line, nothing after).
     """
     for issue_id in ids:
         path = issues_dir / f"{issue_id}.md"
@@ -1309,7 +1413,7 @@ def _claim_issue_file(issues_dir: Path, ids: Iterable[str], fields: Dict[str, An
         full_fields["id"] = issue_id
         full_fields["created"] = today_str
         full_fields["updated"] = today_str
-        content = dump_frontmatter(full_fields) + "\n"
+        content = dump_frontmatter(full_fields) + "\n" + body
         try:
             fd = os.open(str(path), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
         except FileExistsError:
@@ -1345,6 +1449,7 @@ def _letter_id_candidates(parent_id: str, letter: str) -> Iterator[str]:
 
 def _allocate_sub_issue(
     data_dir: Path, issues_dir: Path, parent_id: str, fields: Dict[str, Any], today_str: str, max_attempts: int,
+    body: str = "",
 ) -> Path:
     """The `--parent X` half of `allocate_and_create_issue` (POLY-51 ruling
     §2): validates `X`, then claims `X<letter>` via `_claim_issue_file`,
@@ -1365,18 +1470,23 @@ def _allocate_sub_issue(
 
     letter = _next_sub_issue_letter(data_dir, parent_id)
     try:
-        return _claim_issue_file(issues_dir, _letter_id_candidates(parent_id, letter), fields, today_str)
+        return _claim_issue_file(issues_dir, _letter_id_candidates(parent_id, letter), fields, today_str, body)
     except _IdsExhausted:
         raise BadParentError(f"parent {parent_id} has exhausted sub-issue letters a..z")
 
 
-def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attempts: int = 50) -> Path:
+def allocate_and_create_issue(
+    data_dir: Path, fields: Dict[str, Any], max_attempts: int = 50, body: str = "",
+) -> Path:
     """Atomically claim the next free ID and create issues/<PREFIX>-<n>.md
     -- or, when `fields["parent"]` is set, `issues/<PARENT><letter>.md`
     (POLY-51 ruling §2).
 
     `fields` supplies everything except id/created/updated, which this
     function fills in. `prefix` comes from load_config(data_dir)["prefix"].
+    `body` (POLY-56 gate-1 ruling R3), when given, is written verbatim
+    after the frontmatter's trailing blank line, in the same O_EXCL write
+    -- default `""` is byte-identical to every pre-POLY-56 caller.
 
     PT-52 §3 (architect's ruling, required companion to the legacy-read
     deletion): the single allocation path both `cmd_new` and the HTTP
@@ -1409,12 +1519,12 @@ def allocate_and_create_issue(data_dir: Path, fields: Dict[str, Any], max_attemp
 
     parent = fields.get("parent")
     if parent is not None:
-        return _allocate_sub_issue(data_dir, issues_dir, str(parent), fields, today_str, max_attempts)
+        return _allocate_sub_issue(data_dir, issues_dir, str(parent), fields, today_str, max_attempts, body)
 
     n = _next_id_candidate(data_dir, prefix)
     candidates = itertools.islice(_numeric_id_candidates(prefix, n), max_attempts)
     try:
-        return _claim_issue_file(issues_dir, candidates, fields, today_str)
+        return _claim_issue_file(issues_dir, candidates, fields, today_str, body)
     except _IdsExhausted:
         raise CairnError(f"could not allocate an ID for prefix {prefix!r} after {max_attempts} attempts")
 
@@ -4261,12 +4371,24 @@ def build_board_payload(
         issue_paths += archived_issue_paths(data_dir)  # PT-52: archive/issues/ only
 
     def _stamped(p: Path) -> Dict[str, Any]:
-        fm = dict(_read_frontmatter_dict(p))
+        # POLY-56 (gate-1 ruling R1): the board's checklist chip needs a
+        # count, and a count needs the body -- so this reads the whole
+        # file now, not just the frontmatter `_read_frontmatter_dict`
+        # used to stop at (M2/M6: negligible at today's ~70-file scale).
+        # `checklist` is a count only; the full `description` is
+        # deliberately NOT added here -- that stays build_issue_payload's
+        # job alone, unchanged from before this ruling.
+        frontmatter, body = parse_frontmatter(p.read_text(encoding="utf-8"))
+        fm = dict(frontmatter)
         # is_archived_path (PT-42's pre-PR extraction) is True for all
         # three archive shapes (archive/<id>.md, archive/milestones/
         # <id>.md, archive/majors/<id>.md) and none of the three live
         # shapes -- one derivation, not a per-record-type branch.
         fm["archived"] = is_archived_path(data_dir, p)
+        description, _comments = split_comments(body)
+        items = checklist_items(description)
+        done = sum(1 for it in items if it["checked"])
+        fm["checklist"] = {"done": done, "total": len(items)}
         return fm
 
     def _stamped_with_body(p: Path, include_released: bool = False) -> Dict[str, Any]:
@@ -4351,6 +4473,10 @@ def build_issue_payload(data_dir: Path, issue_id: str) -> Optional[Dict[str, Any
     # inline editors already suppress on `read_only`, no client change
     # needed beyond that one flag's computation widening.
     issue["archived"] = is_archived_path(data_dir, path)
+    # POLY-56 (gate-1 ruling R1): the drawer's Acceptance-criteria rows now
+    # come from here, not a client-side re-parse of `description` -- one
+    # parser (checklist_items), not two that could disagree.
+    issue["checklist_items"] = checklist_items(issue["description"])
     return issue
 
 
@@ -5788,9 +5914,25 @@ def _normalize_milestone_input(value: Optional[str], prefix: str) -> Optional[st
     return f"{prefix}-{value}"
 
 
+# POLY-56 (gate-1 ruling R3): the body `cairn new` seeds when `--body` is
+# absent -- an empty Acceptance-criteria item, so the file is already
+# shaped for the authoring convention (TRACKER.md) without forcing a title
+# any longer than the label it's meant to be.
+DEFAULT_ISSUE_BODY = "\n## Acceptance criteria\n\n- [ ] \n"
+
+
 def cmd_new(args: argparse.Namespace) -> int:
     data_dir = resolve_data_dir(args)
     prefix = load_config(data_dir)["prefix"]
+    # POLY-56 (gate-1 ruling R3): warns, never refuses -- the issue is
+    # still created, exit 0. `>`, not `>=`: exactly TITLE_CHAR_CAP chars
+    # is the cap, not yet over it.
+    if len(args.title) > TITLE_CHAR_CAP:
+        print(
+            f"warning: title is {len(args.title)} chars (cap {TITLE_CHAR_CAP}) -- "
+            "short label in the title, substance in the body",
+            file=sys.stderr,
+        )
     fields = {
         "title": args.title,
         "status": args.status,
@@ -5808,7 +5950,16 @@ def cmd_new(args: argparse.Namespace) -> int:
     # can't reuse the `else []` shape labels/blocked_by use just above.
     if args.paths:
         fields["paths"] = _split_csv(args.paths)
-    path = allocate_and_create_issue(data_dir, fields)
+    # POLY-56 (gate-1 ruling R3): `-` reads stdin, the same convention
+    # `cairn comment --body -` already uses; an absent `--body` seeds the
+    # default skeleton rather than leaving the file bodyless.
+    if args.body == "-":
+        body = sys.stdin.read()
+    elif args.body is not None:
+        body = args.body
+    else:
+        body = DEFAULT_ISSUE_BODY
+    path = allocate_and_create_issue(data_dir, fields, body=body)
     frontmatter, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
     print(frontmatter["id"])
     return 0
@@ -5944,6 +6095,113 @@ def cmd_comment(args: argparse.Namespace) -> int:
               f"wait for it to be committed (or pass --allow-foreign if you are sweeping it in on purpose)", file=sys.stderr)
         return 1
     append_comment(path, args.author, body)
+    return 0
+
+
+def _line_byte_offsets(s: str) -> List[int]:
+    """The utf-8 byte offset, within `s`, of the start of each line of
+    `s.split("\\n")` -- POLY-56 (gate-1 ruling R2) `cmd_check_item`'s one
+    building block for turning a `checklist_items` `line` index into an
+    exact byte position, without re-deriving this arithmetic inline."""
+    offsets = []
+    pos = 0
+    for line in s.split("\n"):
+        offsets.append(pos)
+        pos += len(line.encode("utf-8")) + 1  # +1 for the '\n' this split ate
+    return offsets
+
+
+def _format_checklist_item_line(issue_id: str, item: Dict[str, Any]) -> str:
+    """`<ID> #<k> [x] <text>` -- POLY-56 (gate-1 ruling R2): what
+    `cmd_check_item` prints so the caller can see which line it hit (or
+    would have hit, on the already-in-state no-write path)."""
+    mark = "x" if item["checked"] else " "
+    return f"{issue_id} #{item['ordinal']} [{mark}] {item['text']}"
+
+
+def cmd_check_item(args: argparse.Namespace) -> int:
+    """`cairn check-item <ID> <ordinal> [--uncheck] [--text <exact>]`
+    (POLY-56 gate-1 ruling R2): flips exactly one byte -- the state
+    character inside `- [ ]`/`- [x]` -- for the ordinal-th checklist item
+    under `<ID>`'s `## Acceptance criteria` heading. `updated` is not
+    bumped and the frontmatter is not re-emitted; this is a body-only,
+    single-byte rewrite, deliberately NOT routed through `apply_patch`.
+
+    Line identity is text+ordinal over a FRESH read every invocation, never
+    an index cached across processes -- `--text <exact>` is the optional
+    anchor for a scripted caller that wants to refuse rather than tick the
+    wrong row if the file moved under it.
+    """
+    data_dir = resolve_data_dir(args)
+    path = find_issue_path(data_dir, args.id)
+    if path is None:
+        print(f"error: no such record: {args.id}", file=sys.stderr)
+        return 1
+    if is_archived_path(data_dir, path):
+        print(f"error: {args.id} is archived -- read-only", file=sys.stderr)
+        return 1
+    try:
+        st_before = path.stat()
+    except FileNotFoundError:
+        print(f"error: no such record: {args.id}", file=sys.stderr)
+        return 1
+    raw = path.read_bytes()
+    try:
+        text = raw.decode("utf-8")
+    except UnicodeDecodeError as e:
+        print(f"error: {path}: {e}", file=sys.stderr)
+        return 1
+    try:
+        _frontmatter, body = parse_frontmatter(text)
+    except CairnError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    description, _comments = split_comments(body)
+    items = checklist_items(description)
+    if not items:
+        print(f"error: {args.id} has no Acceptance criteria section", file=sys.stderr)
+        return 1
+    if not (1 <= args.ordinal <= len(items)):
+        print(f"error: {args.id} has {len(items)} checklist item(s); ordinal {args.ordinal} is out of range", file=sys.stderr)
+        return 1
+    item = items[args.ordinal - 1]
+    if args.text is not None and item["text"] != args.text:
+        print(
+            f"error: {args.id} #{item['ordinal']}: text {item['text']!r} does not match --text {args.text!r}",
+            file=sys.stderr,
+        )
+        return 1
+
+    want_checked = not args.uncheck
+    if item["checked"] == want_checked:
+        # Already in the requested state: no write, so the file's mtime
+        # (and every other byte) is untouched -- idempotent by construction,
+        # not by comparing-then-skipping a would-be-identical write.
+        print(_format_checklist_item_line(args.id, item))
+        return 0
+
+    # `body` is exactly the tail of `text` (parse_frontmatter's contract),
+    # so its start offset in `text` -- and, since encode/decode round-trips
+    # for valid utf-8, in `raw` too -- is `len(text) - len(body)`, no
+    # separate re-scan for the closing fence needed.
+    body_start_byte = len(text[:len(text) - len(body)].encode("utf-8"))
+    line_offset = _line_byte_offsets(body)[item["line"]]
+    target_offset = body_start_byte + line_offset + len("- [")
+    current = raw[target_offset:target_offset + 1]
+    if current not in (b" ", b"x", b"X"):
+        print(f"error: {args.id}: could not locate item #{item['ordinal']}'s checkbox byte", file=sys.stderr)
+        return 1
+
+    st_now = path.stat()
+    if st_now.st_mtime_ns != st_before.st_mtime_ns:
+        print(f"error: {args.id} changed on disk since it was read -- refusing to write (re-run to retry)", file=sys.stderr)
+        return 1
+
+    new_char = b"x" if want_checked else b" "
+    new_raw = raw[:target_offset] + new_char + raw[target_offset + 1:]
+    _atomic_write_bytes(path, new_raw)
+    item["checked"] = want_checked
+    print(_format_checklist_item_line(args.id, item))
     return 0
 
 
@@ -6419,6 +6677,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_new.add_argument("--labels", default=None, help="comma-separated")
     p_new.add_argument("--blocked-by", default=None, help="comma-separated issue ids")
     p_new.add_argument("--paths", default=None, help="comma-separated repo-relative glob patterns (POLY-2); omitted -> undeclared, not []")
+    p_new.add_argument("--body", default=None, help="issue body text, or '-' to read from stdin (POLY-56); omitted -> the default Acceptance-criteria skeleton")
     p_new.set_defaults(func=cmd_new)
 
     p_ls = sub.add_parser("ls", parents=[common], help="list issues")
@@ -6438,6 +6697,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     p_comment.add_argument("--body", required=True, help="comment text, or '-' to read from stdin")
     p_comment.add_argument("--allow-foreign", dest="allow_foreign", action="store_true", help="append even though another author's comment is uncommitted in the file (PT-94 E15)")
     p_comment.set_defaults(func=cmd_comment)
+
+    p_check_item = sub.add_parser("check-item", parents=[common], help="tick/untick one checklist item (POLY-56)")
+    p_check_item.add_argument("id")
+    p_check_item.add_argument("ordinal", type=int)
+    p_check_item.add_argument("--uncheck", action="store_true", help="untick instead of tick")
+    p_check_item.add_argument("--text", default=None, help="refuse (exit 1, no write) unless the item's text matches exactly")
+    p_check_item.set_defaults(func=cmd_check_item)
 
     p_show = sub.add_parser("show", parents=[common], help="print a single issue")
     p_show.add_argument("id")
@@ -6528,6 +6794,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
 COMMENT_LINE_CAP = 40          # B6: an issue comment over this warns
 ISSUE_SIZE_CAP_BYTES = 24 * 1024  # D14: an issue file over this warns
 DOC_PARAGRAPH_SENTENCE_CAP = 8    # D13: a TRACKER/WORKFLOW paragraph over this warns
+TITLE_CHAR_CAP = 70            # POLY-56 (gate-1 ruling R3): a title over this warns
 # D13: instruction-shaped phrases fail the check in the operative docs --
 # what to do belongs in the sentence, the persuasion in the ledger.
 DOC_PHRASES = ("say why", "state both", "not just", "worth noting", "worth stating",
@@ -6594,7 +6861,11 @@ def check_docs(data_dir: Path) -> List[str]:
 def check_budgets(data_dir: Path) -> List[str]:
     """Warnings, never errors: comments over COMMENT_LINE_CAP lines and
     issue files over ISSUE_SIZE_CAP_BYTES (issues/ only -- archived files
-    are frozen history), and doc paragraphs over the sentence cap."""
+    are frozen history), doc paragraphs over the sentence cap, and (POLY-56
+    gate-1 ruling R3) an over-cap title or an empty description on a live,
+    open (non-done/cancelled) issue with no `stage:` -- sub-issues carry
+    `stage:` and are exempt, the same scope `cairn new`'s own title warning
+    has no need to repeat since it only ever sees one new file at a time."""
     warnings: List[str] = []
     data_dir = Path(data_dir)
     for p in _dir_glob(data_dir / "issues"):
@@ -6623,11 +6894,27 @@ def check_budgets(data_dir: Path) -> List[str]:
         # Keying on tokens made every such close indistinguishable from a
         # `cairn set status=done` close it never was.
         try:
-            fm, _ = parse_frontmatter(text)
+            fm, body = parse_frontmatter(text)
         except CairnError:
-            fm = {}
+            fm, body = {}, ""
         if fm.get("status") == "done" and fm.get("stage") is not None and fm.get("actual.gate_cycles") is None:
             warnings.append(f"{p.name}: status done with stage {fm['stage']!r} but no actual.* -- closed via `cairn set` rather than `cairn close`")
+        # POLY-56 (gate-1 ruling R3): title/description lint, scoped to
+        # live issues that are still open and are not sub-issue stage
+        # records (M5: unscoped, this fires on 24/56 of the 71 issues on
+        # disk today; scoped, on 8/8).
+        if fm.get("status") not in ("done", "cancelled") and fm.get("stage") is None:
+            title = fm.get("title")
+            if title is not None and len(title) > TITLE_CHAR_CAP:
+                warnings.append(
+                    f"{p.name}: title is {len(title)} chars (cap {TITLE_CHAR_CAP}) -- "
+                    "short label in the title, substance in the body"
+                )
+            description, _comments = split_comments(body)
+            if _description_before_ac(description).strip() == "":
+                warnings.append(
+                    f"{p.name}: empty description -- a paragraph before '## Acceptance criteria' says what and why"
+                )
     for name in DOC_LINT_FILES:
         doc = _docs_dir(data_dir) / name
         if not doc.exists():

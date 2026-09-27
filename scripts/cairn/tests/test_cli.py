@@ -133,6 +133,86 @@ class NewCommandTests(unittest.TestCase):
         self.assertEqual(frontmatter["blocked_by"], [])
 
 
+class NewCommandBodySeedingTests(unittest.TestCase):
+    """POLY-56 gate-1 ruling § R3: `_claim_issue_file(..., body="")` rides
+    the same O_EXCL write dump_frontmatter already uses (M6) -- `cairn new
+    --body <text|->` seeds it verbatim; omitted, the default skeleton is
+    exactly '\\n## Acceptance criteria\\n\\n- [ ] \\n'."""
+
+    def _new_file(self, data_dir: Path) -> Path:
+        new_files = [
+            p for p in sorted((data_dir / "issues").glob("PT-*.md"))
+            if p.name not in ("PT-1.md", "PT-3.md", "PT-4.md")
+        ]
+        self.assertEqual(len(new_files), 1)
+        return new_files[0]
+
+    def test_body_dash_reads_stdin_and_seeds_it_verbatim(self):
+        # Mutation: drop the body from the O_EXCL write -- the seeded
+        # body must round-trip byte-for-byte, not just non-empty.
+        # `_claim_issue_file`'s own glue (M6: dump_frontmatter(...) + "\n"
+        # + body) always inserts the one blank-line separator every other
+        # issue file in this repo already has between the closing fence
+        # and its body -- hence the leading "\n" in every expectation
+        # below, not a bug in the given body text.
+        data_dir = helpers.make_tmp_data_dir(self)
+        body_text = "A paragraph.\n\n## Acceptance criteria\n\n- [ ] one\n- [ ] two\n"
+        result = run_cairn(
+            ["new", "Body via stdin", "--body", "-", "--data-dir", str(data_dir)],
+            input=body_text,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        path = self._new_file(data_dir)
+        _, body = cairn.parse_frontmatter(path.read_text(encoding="utf-8"))
+        self.assertEqual(body, "\n" + body_text)
+
+    def test_body_literal_argument_seeds_it_verbatim(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        result = run_cairn(
+            ["new", "Body via literal arg", "--body", "Just a paragraph.\n", "--data-dir", str(data_dir)]
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        path = self._new_file(data_dir)
+        _, body = cairn.parse_frontmatter(path.read_text(encoding="utf-8"))
+        self.assertEqual(body, "\nJust a paragraph.\n")
+
+    def test_omitted_body_seeds_the_default_skeleton(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        result = run_cairn(["new", "No body given", "--data-dir", str(data_dir)])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        path = self._new_file(data_dir)
+        _, body = cairn.parse_frontmatter(path.read_text(encoding="utf-8"))
+        self.assertEqual(body, "\n\n## Acceptance criteria\n\n- [ ] \n")
+
+
+class NewCommandTitleLintTests(unittest.TestCase):
+    """POLY-56 gate-1 ruling § R3: `cairn new` warns on stderr and still
+    creates the issue (exit 0) when the title exceeds TITLE_CHAR_CAP (70).
+    Mutation: `>=` instead of `>` -- exactly-70 must stay silent, 71 must warn."""
+
+    def test_title_at_the_cap_is_silent(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        title = "x" * cairn.TITLE_CHAR_CAP
+        result = run_cairn(["new", title, "--data-dir", str(data_dir)])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("warning:", result.stderr)
+
+    def test_title_one_over_the_cap_warns_but_still_creates_the_issue(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        title = "x" * (cairn.TITLE_CHAR_CAP + 1)
+        result = run_cairn(["new", title, "--data-dir", str(data_dir)])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("warning:", result.stderr)
+        self.assertIn(str(cairn.TITLE_CHAR_CAP), result.stderr)
+        new_files = [
+            p for p in sorted((data_dir / "issues").glob("PT-*.md"))
+            if p.name not in ("PT-1.md", "PT-3.md", "PT-4.md")
+        ]
+        self.assertEqual(len(new_files), 1, "the issue must still be created despite the warning")
+        frontmatter, _ = cairn.parse_frontmatter(new_files[0].read_text(encoding="utf-8"))
+        self.assertEqual(frontmatter["title"], title)
+
+
 class LsCommandTests(unittest.TestCase):
     def test_ls_lists_active_issues_one_line_each(self):
         data_dir = helpers.make_tmp_data_dir(self)
