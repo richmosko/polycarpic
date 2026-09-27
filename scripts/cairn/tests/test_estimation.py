@@ -1818,5 +1818,54 @@ class EstimateCostAxisTests(unittest.TestCase):
         self.assertRegex(line, r"\s-\s", line)
 
 
+class CloseCRLFByteExactTests(unittest.TestCase):
+    """POLY-60 review checklist row 6 ('close'): `cmd_close`'s only
+    issue-file write is `apply_patch(path, patch)` with a `status`/`ratio`
+    patch (`estimate.py:588`) -- the architect's own M4 measurement exercised
+    exactly this call directly rather than the full CLI, since the full
+    `cairn close` needs a real git repo + metrics mount that would swamp
+    what this seam actually needs to prove. Mutation that must turn this
+    red: `emit_frontmatter` ignoring `eol`.
+    """
+
+    def _write(self, path: Path) -> bytes:
+        frontmatter_text = (
+            "id: PT-9\r\ntitle: Thing\r\nstatus: in-progress\r\nmilestone: null\r\nparent: null\r\n"
+            "assignee: null\r\nlabels: []\r\npriority: null\r\npr: null\r\n"
+            "created: 2026-01-01\r\nupdated: 2026-01-01\r\n"
+        )
+        body = (
+            "Body line with trailing space.  \r\n"
+            "\r\n"
+            "## Acceptance criteria\r\n"
+            "\r\n"
+            "- [ ] a  \r\n"
+            "- [ ] b\t\r\n"
+        )
+        raw = ("---\r\n" + frontmatter_text + "---\r\n" + body).encode("utf-8")
+        path.write_bytes(raw)
+        return raw
+
+    def test_close_style_patch_leaves_the_body_byte_for_byte(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        path = tmp / "PT-9.md"
+        raw = self._write(path)
+        first = raw.index(b"---\r\n")
+        second = raw.index(b"---\r\n", first + len(b"---\r\n"))
+        before_tail = raw[second + len(b"---\r\n"):]
+
+        cairn.apply_patch(path, {"status": "done", "ratio": "1.00"})
+
+        after = path.read_bytes()
+        after_first = after.index(b"---\r\n")
+        after_second = after.index(b"---\r\n", after_first + len(b"---\r\n"))
+        after_tail = after[after_second + len(b"---\r\n"):]
+        self.assertEqual(before_tail, after_tail, "body bytes changed across close's status/ratio patch")
+
+        new_frontmatter, _ = cairn.parse_frontmatter(after.decode("utf-8"))
+        self.assertEqual(new_frontmatter["status"], "done")
+        self.assertEqual(new_frontmatter["ratio"], "1.00")
+
+
 if __name__ == "__main__":
     unittest.main()

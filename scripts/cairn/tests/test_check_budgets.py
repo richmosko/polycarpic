@@ -232,5 +232,37 @@ class DocsPhraseLintTests(unittest.TestCase):
         self.assertIn("worth noting", r.stderr.lower())
 
 
+class LiveTrackerTitleAndDescriptionLintTests(unittest.TestCase):
+    """POLY-60 review checklist row 12: `cairn check`'s title/description
+    lint (`TitleAndDescriptionLintTests` above already pins the mechanism
+    itself -- a `done` issue is exempt from both checks) must report ZERO
+    warnings against the real, live `process/cairn` tracker once the 8
+    old-style POLY-48/POLY-49 children (POLY-7, 8, 15, 25, 27, 33, 40, 47)
+    are flipped to `status: done` (POLY-60 ruling R3 -- POLY-9 already has
+    a body, so it was never linted in the first place). Read-only: this
+    never writes to process/cairn/, only reads it. Mutation that must turn
+    this red: leaving any one of those 9 children at `backlog`.
+    """
+
+    _CHILDREN = ("POLY-7", "POLY-8", "POLY-15", "POLY-25", "POLY-27", "POLY-33", "POLY-40", "POLY-47")
+
+    def _live_data_dir(self) -> Path:
+        # helpers.CAIRN_DIR is scripts/cairn/ -- .parent.parent is the repo
+        # root, the same derivation helpers.real_metrics_dir() already uses
+        # for the main checkout's process/cairn/ tree.
+        return helpers.CAIRN_DIR.parent.parent / "process" / "cairn"
+
+    def test_live_tracker_reports_zero_title_or_description_warnings(self):
+        data_dir = self._live_data_dir()
+        self.assertTrue(data_dir.is_dir(), f"test sanity: {data_dir} must exist")
+        warnings = cairn.check_budgets(data_dir)
+        offending = [w for w in warnings if any(child in w for child in self._CHILDREN)]
+        self.assertEqual(
+            offending, [],
+            "every POLY-48/POLY-49 child named in POLY-60 ruling R3 must be status: done "
+            "(exempting it from the title/description lint), not left at backlog",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

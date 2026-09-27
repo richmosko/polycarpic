@@ -31,6 +31,7 @@ import time
 import unittest
 import urllib.request
 from pathlib import Path
+from unittest import mock
 
 import helpers  # noqa: F401
 
@@ -222,6 +223,56 @@ class ServerEngineStatusTests(unittest.TestCase):
         # stale board.js/board.css is not a reachable state at all.
         resp = http_get(f"{self.base_url}/board/board.js")
         self.assertEqual(resp.headers.get("Cache-Control"), "no-store")
+
+
+class SharedDirStatHelperTests(unittest.TestCase):
+    """POLY-60 review checklist row 11: `compute_multi_etag`'s directory
+    branch and `engine_fingerprint`'s directory branch must both route
+    through the single `cairnlib.enginesrc.engine_source_stat` helper
+    (ruling R2), rather than each carrying its own inlined dir-stat loop
+    (POLY-58 verdict, 222f15a: `multiroot.py` copied ~10 lines of it
+    instead of sharing it with `watch.py`). Proven by mocking the helper
+    at its callers' own lookup (per tests/INTERFACE.md's patch-the-
+    call-site-module convention) and observing that a different return
+    value visibly changes each caller's output. Mutation that must turn
+    this red: dropping the helper call (reverting to an inlined loop that
+    never looks the mock up at all).
+    """
+
+    def _two_file_dir(self) -> Path:
+        tmp_dir = helpers.make_empty_tmp_dir(self)
+        (tmp_dir / "a.py").write_text("one\n", encoding="utf-8")
+        (tmp_dir / "b.py").write_text("two\n", encoding="utf-8")
+        return tmp_dir
+
+    def test_compute_multi_etag_directory_branch_calls_engine_source_stat(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        roots, _ = cairn.resolve_roots(data_dir, cairn.load_config(data_dir))
+        source_dir = self._two_file_dir()
+
+        with mock.patch("cairnlib.multiroot.engine_source_stat", return_value=(111, 222)):
+            etag_a = cairn.compute_multi_etag(roots, boot_sha="s", source_path=source_dir)
+        with mock.patch("cairnlib.multiroot.engine_source_stat", return_value=(333, 222)):
+            etag_b = cairn.compute_multi_etag(roots, boot_sha="s", source_path=source_dir)
+        self.assertNotEqual(
+            etag_a, etag_b,
+            "compute_multi_etag's directory branch must call cairnlib.enginesrc.engine_source_stat "
+            "(imported into cairnlib.multiroot), not an inlined loop that ignores the mock",
+        )
+
+    def test_engine_fingerprint_directory_branch_calls_engine_source_stat(self):
+        source_dir = self._two_file_dir()
+        with mock.patch("cairnlib.watch.engine_source_stat", return_value=(111, 222)):
+            fp_a = cairn.engine_fingerprint(source_dir)
+        with mock.patch("cairnlib.watch.engine_source_stat", return_value=(333, 222)):
+            fp_b = cairn.engine_fingerprint(source_dir)
+        self.assertEqual(fp_a["mtime_ns"], 111)
+        self.assertEqual(fp_b["mtime_ns"], 333)
+        self.assertEqual(
+            fp_a["size"], 222,
+            "engine_fingerprint's directory branch must take mtime/size from "
+            "cairnlib.enginesrc.engine_source_stat (imported into cairnlib.watch), not its own inlined loop",
+        )
 
 
 if __name__ == "__main__":

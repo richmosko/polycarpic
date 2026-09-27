@@ -446,5 +446,44 @@ class DoneBeforeSkipNonDoneMilestoneTests(unittest.TestCase):
         self.assertTrue((data_dir / "archive" / "issues" / "PT-5.md").exists())
 
 
+class ArchiveCRLFByteExactTests(unittest.TestCase):
+    """POLY-60 review checklist row 7 ('archive'): M5's measurement found
+    `cairn archive --done-before` byte-identical already (a pure
+    `_git_mv_or_rename`, no frontmatter rewrite at all) -- this test pins
+    that invariant explicitly against a CRLF + trailing-whitespace fixture,
+    so a future change that routes archive through `apply_patch` (e.g. to
+    stamp something on archive) is caught immediately. Mutation that must
+    turn this red: archive re-emitting the file through `apply_patch`.
+    """
+
+    def test_archived_issue_bytes_are_byte_identical_to_the_pre_archive_file(self):
+        data_dir = helpers.make_empty_tmp_dir(self) / "cairn"
+        (data_dir / "issues").mkdir(parents=True)
+        (data_dir / "config.yml").write_text("prefix: PT\nport: 8766\ndata_dir: process/cairn\n", encoding="utf-8")
+        path = data_dir / "issues" / "PT-1.md"
+        frontmatter_text = (
+            "id: PT-1\r\ntitle: Thing\r\nstatus: done\r\nmilestone: null\r\nparent: null\r\n"
+            "assignee: null\r\nlabels: []\r\npriority: null\r\npr: null\r\n"
+            "created: 2020-01-01\r\nupdated: 2020-01-01\r\n"
+        )
+        body = (
+            "Body line with trailing space.  \r\n"
+            "\r\n"
+            "## Acceptance criteria\r\n"
+            "\r\n"
+            "- [x] a  \r\n"
+            "- [x] b\t\r\n"
+        )
+        raw = ("---\r\n" + frontmatter_text + "---\r\n" + body).encode("utf-8")
+        path.write_bytes(raw)
+
+        result = run_cairn(["archive", "--done-before", "2026-01-01", "--data-dir", str(data_dir)])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        archived_path = data_dir / "archive" / "issues" / "PT-1.md"
+        self.assertTrue(archived_path.exists(), "the issue must have moved into archive/issues/")
+        self.assertEqual(archived_path.read_bytes(), raw, "archive must move the file without changing a single byte")
+
+
 if __name__ == "__main__":
     unittest.main()

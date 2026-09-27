@@ -274,5 +274,46 @@ class CheckItemCRLFByteRoundTripTests(unittest.TestCase):
         self.assertEqual(frontmatter["updated"], "2026-01-01")
 
 
+class CheckItemFullyCRLFFenceTests(unittest.TestCase):
+    """POLY-60 review checklist row 4: unlike `CheckItemCRLFByteRoundTripTests`
+    above (CRLF body, LF fences), THIS fixture's frontmatter fence lines
+    are themselves CRLF-terminated (`---\\r\\n`) -- the exact shape M3's
+    measurement found `check-item` refusing outright (`rc 1`, "file must
+    start with a '---' frontmatter delimiter", 0 bytes written), because
+    `parse_frontmatter` splits on bare `\\n` and sees the fence line as
+    `---\\r`, never `---`. Mutation that must turn this red: reverting the
+    fence rule to `== "---"` (no `---\\r` tolerance).
+    """
+
+    def test_fully_crlf_file_exits_zero_and_changes_exactly_one_byte(self):
+        data_dir = _tree(self)
+        path = data_dir / "issues" / "PT-1.md"
+        frontmatter_text = (
+            "id: PT-1\r\ntitle: Thing\r\nstatus: todo\r\nmilestone: null\r\nparent: null\r\n"
+            "assignee: null\r\nlabels: []\r\npriority: null\r\npr: null\r\n"
+            "created: 2026-01-01\r\nupdated: 2026-01-01\r\n"
+        )
+        body = (
+            "Para with trailing space.  \r\n"
+            "\r\n"
+            "## Acceptance criteria\r\n"
+            "\r\n"
+            "- [ ] first item \r\n"
+            "- [ ] second item\t\r\n"
+        )
+        path.write_bytes(("---\r\n" + frontmatter_text + "---\r\n" + "\r\n" + body).encode("utf-8"))
+        before = path.read_bytes()
+
+        result = run_cairn(["check-item", "PT-1", "1", "--data-dir", str(data_dir)])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        after = path.read_bytes()
+        self.assertEqual(len(before), len(after), "check-item must not change the file's length")
+        diffs = [i for i in range(len(before)) if before[i] != after[i]]
+        self.assertEqual(len(diffs), 1, f"exactly one byte must differ, got {diffs}")
+        self.assertEqual(before[diffs[0]:diffs[0] + 1], b" ")
+        self.assertEqual(after[diffs[0]:diffs[0] + 1], b"x")
+
+
 if __name__ == "__main__":
     unittest.main()
