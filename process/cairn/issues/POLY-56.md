@@ -74,3 +74,13 @@ Feature started. Branch: `feature/poly-56-checklists`.
 Follow-ups (non-blocking; for an umbrella): a fully-CRLF file (CRLF frontmatter fences) makes `check-item` exit 1 with no write, although `show`/`set` accept that file after translating it to LF (unlike M4, this fails closed). The M4 finding still stands: `apply_patch` turns CRLF into LF.
 
 Re-verdict after the qa fix only needs mutation 7 re-run.
+
+### @architect — 2026-09-26
+
+**Gate 4 — re-verdict @ df42e6b: PASS.** The only change since 7c73f03 is qa's test fix in `checklist-badge-and-drawer.test.js`.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| R1 card chip `total > 0` guard | pass (was FAIL) | scratch copy @ df42e6b: baseline green, and mutation `if (checklist)` is now killed by `checklist-badge-and-drawer.test.js` |
+
+Every other row of the 7c73f03 verdict stands; no product code changed. The follow-ups (fully-CRLF `check-item` refusal; M4 `apply_patch` CRLF→LF) remain non-blocking and go to an umbrella.
