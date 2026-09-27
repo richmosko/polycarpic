@@ -297,8 +297,7 @@ def make_milestone_git_repo(testcase, with_engine_copy: bool = False) -> Path:
     if with_engine_copy:
         engine_dir = tmp / "scripts" / "cairn"
         engine_dir.mkdir(parents=True)
-        for name in ("backfill_tokens.py", "cairn.py"):
-            (engine_dir / name).write_bytes((helpers.CAIRN_DIR / name).read_bytes())
+        helpers.copy_engine(engine_dir, ("backfill_tokens.py", "cairn.py"))
         (tmp / ".claude" / "agents").mkdir(parents=True)
     _commit_at(tmp, "initial", "2026-08-09 09:00:00 +0000")
     return tmp
