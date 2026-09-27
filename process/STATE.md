@@ -15,7 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. POLY-A open work: POLY-59 (telemetry umbrella, backlog) and a routine archive run for POLY-48/POLY-49 and their nine now-done children. Next session decides whether POLY-A closes as the Research→Plan transition._
+_None — between loops. POLY-A open work: POLY-59 (telemetry umbrella, backlog). `cairn archive` refuses issues whose milestone is still open, so archiving POLY-48/POLY-49 and their done children waits for the POLY-A close. Next session decides whether POLY-A closes as the Research→Plan transition (then `cairn archive --milestone POLY-A`)._
 
 ## Releases
 
