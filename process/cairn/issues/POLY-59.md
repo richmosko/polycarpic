@@ -28,10 +28,10 @@ Timing-sensitive; candidates for injected-clock fixes alongside POLY-49's AC2/AC
 
 ## Acceptance criteria
 
-- [ ] The PT-* window-collision lines are explained (which process, which root) and a test pins `--ingest` from a linked worktree computing `milestone_windows` against the main checkout's `process/cairn/` (amended at gate 1: the root was never wrong — ruling §1)
-- [ ] Both flaky receiver tests are deterministic (explicit trigger); 10 consecutive `run_tests.py -j 8` runs of the two modules green, plus mutations M2a/M2b (amended at gate 1 — ruling §2)
-- [ ] A test pins the `_otel_cutoff` one-second boundary with a named mutation
-- [ ] `_branch_at` reuses its lookup list across calls (or the ruling records why not) — ruling §4 records why not; no code change
+- [x] The PT-* window-collision lines are explained (which process, which root) and a test pins `--ingest` from a linked worktree computing `milestone_windows` against the main checkout's `process/cairn/` (amended at gate 1: the root was never wrong — ruling §1)
+- [x] Both flaky receiver tests are deterministic (explicit trigger); 10 consecutive `run_tests.py -j 8` runs of the two modules green, plus mutations M2a/M2b (amended at gate 1 — ruling §2)
+- [x] A test pins the `_otel_cutoff` one-second boundary with a named mutation
+- [x] `_branch_at` reuses its lookup list across calls (or the ruling records why not) — ruling §4 records why not; no code change
 
 ## Comments
 
