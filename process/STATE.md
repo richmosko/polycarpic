@@ -21,7 +21,8 @@ Milestone: POLY-A (archived; POLY-61 archives with it at close)
 Branch: `feature/poly-61-receiver-staleness-check`  
 Started: 2026-09-27  
 Goal: the receiver's `--status` reports a stale engine when its fingerprint differs from the checkout's, `/merge-pr` restarts the daemon when `cairnlib/` changed too, and the status test's SIGCONT cleanup tolerates an exited daemon.  
-Status: In Progress_
+PR: https://github.com/richmosko/polycarpic/pull/36  
+Status: In Review_
 
 ## Releases
 

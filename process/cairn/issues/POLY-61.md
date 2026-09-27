@@ -1,14 +1,14 @@
 ---
 id: POLY-61
 title: Receiver engine-staleness self-check, SIGCONT cleanup (grouped)
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, telemetry]
 priority: P3
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/36
 created: 2026-09-27
 updated: 2026-09-27
 ---
@@ -58,3 +58,7 @@ Gate 4 verdict — **PASS** (checklist from ruling.md @ 67a9021, run once on a s
 | G5 new module wall ≤ 45 s | 4.66 s | 8b8fb28 |
 
 Scratch setup needed `.claude/settings.json` and `.gitignore` copied beside `scripts/` for hardening/self_stop to run; this is harness scope, not a defect.
+
+### @team-lead — 2026-09-27
+
+PR opened: https://github.com/richmosko/polycarpic/pull/36. Awaiting Validate.
