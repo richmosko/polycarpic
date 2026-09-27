@@ -329,8 +329,19 @@ def compute_multi_etag(
             try:
                 p = Path(source_path)
                 if p.is_dir():
-                    fp = engine_fingerprint(p)
-                    hasher.update(f"engine_source:{fp['mtime_ns']}:{fp['size']}\n".encode("utf-8"))
+                    # POLY-58 §2: multiroot (this module) is a leaves-first
+                    # step BEFORE watch (engine_fingerprint's owner) --
+                    # inlined rather than calling engine_fingerprint, which
+                    # would be a back-edge. Only mtime_ns/size are needed
+                    # here (never the sha engine_fingerprint also computes).
+                    mtimes = []
+                    total_size = 0
+                    for f in sorted(p.glob("*.py")):
+                        fst = f.stat()
+                        mtimes.append(fst.st_mtime_ns)
+                        total_size += fst.st_size
+                    mtime_ns = max(mtimes) if mtimes else 0
+                    hasher.update(f"engine_source:{mtime_ns}:{total_size}\n".encode("utf-8"))
                 else:
                     st = p.stat()
                     hasher.update(f"engine_source:{st.st_mtime_ns}:{st.st_size}\n".encode("utf-8"))
