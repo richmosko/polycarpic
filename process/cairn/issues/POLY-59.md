@@ -1,7 +1,7 @@
 ---
 id: POLY-59
 title: Telemetry follow-ups: receiver root, CI flakes, backfill (grouped)
-status: backlog
+status: in-progress
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [cairn, telemetry]
 priority: P3
 pr: null
 created: 2026-09-26
-updated: 2026-09-26
+updated: 2026-09-27
 ---
 
 Grouped follow-ups from the POLY-50 loop (2026-09-26): architect bubble-ups at gate 1 (208f408) and gate 4 (b5ed00f), plus two CI flakes seen the same day. One PR closes every item.
@@ -32,3 +32,9 @@ Timing-sensitive; candidates for injected-clock fixes alongside POLY-49's AC2/AC
 - [ ] Both flaky receiver tests are deterministic (injected clock or explicit trigger); 10 consecutive 8-worker runs green
 - [ ] A test pins the `_otel_cutoff` one-second boundary with a named mutation
 - [ ] `_branch_at` reuses its lookup list across calls (or the ruling records why not)
+
+## Comments
+
+### @team-lead — 2026-09-27
+
+Feature started. Branch: `feature/poly-59-telemetry-follow-ups`. Promoted straight from backlog (user, 2026-09-27); user pre-cleared the merge once green.
