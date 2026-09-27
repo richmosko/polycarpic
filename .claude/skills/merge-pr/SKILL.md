@@ -74,13 +74,15 @@ git pull --ff-only
 git branch -d feature/<id>-<slug>
 ```
 
-**If the PR touched `scripts/cairn/otel_receiver.py`:** the running receiver still holds the pre-merge code (a Python daemon does not hot-reload). Restart it bare and confirm before reporting done:
+**If the PR touched the receiver's engine** — `scripts/cairn/otel_receiver.py` or anything under `scripts/cairn/cairnlib/` (also `backfill_tokens.py`, `cairn.py`, `worktree_root.py` in `scripts/cairn/`, which it imports) — the running receiver still holds the pre-merge code (a Python daemon does not hot-reload). Check with `gh pr diff <n> --name-only | grep -E '^scripts/cairn/(otel_receiver\.py|backfill_tokens\.py|cairn\.py|worktree_root\.py|cairnlib/)'` — any match means restart it bare and confirm before reporting done:
 
 ```bash
 python3 scripts/cairn/otel_receiver.py --stop
 python3 scripts/cairn/otel_receiver.py --ensure-running </dev/null   # bare: no --session-id, so a never-non-empty registry never arms the self-stop
 python3 scripts/cairn/otel_receiver.py --status
 ```
+
+`--status` must print `engine: current`. `engine: stale` (exit 3) at any later time means a merge skipped this step, so restart the same way.
 
 Also check the sync didn't stall on the receiver's live data file: it appends `otel` lines to `process/cairn/metrics/token-usage.jsonl` while you work. If `git pull --ff-only` refuses, preserve the lines not yet on `main` (`comm -13` of the sorted `otel` lines in `origin/main` vs the working tree), restore the file, pull, and re-append only those — never re-append a previously preserved set, which duplicates lines already committed.
 
