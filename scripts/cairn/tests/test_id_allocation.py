@@ -98,7 +98,11 @@ class SharedClaimAndWriteHelperTests(unittest.TestCase):
     signature of "one shared helper" vs. "two copies of the same loop"."""
 
     def test_the_o_excl_claim_call_appears_exactly_once_in_the_module(self):
-        source = inspect.getsource(cairn)
+        # POLY-58 step 6: the claim-and-write helper lives in
+        # cairnlib.store now, not in the cairn.py facade -- inspect the
+        # module that actually owns the O_CREAT|O_EXCL call site.
+        import cairnlib.store
+        source = inspect.getsource(cairnlib.store)
         occurrences = source.count("os.O_CREAT | os.O_EXCL | os.O_WRONLY")
         self.assertEqual(
             occurrences, 1,

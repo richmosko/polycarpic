@@ -111,8 +111,7 @@ def make_fake_engine_root(testcase, otel_port: Optional[int] = None) -> Path:
     root = helpers.make_empty_tmp_dir(testcase)
     engine_dir = root / "scripts" / "cairn"
     engine_dir.mkdir(parents=True)
-    for name in ENGINE_FILES:
-        shutil.copy2(helpers.CAIRN_DIR / name, engine_dir / name)
+    helpers.copy_engine(engine_dir, ENGINE_FILES)
     data_dir = root / "process" / "cairn"
     data_dir.mkdir(parents=True)
     lines = ["prefix: PT", "port: 8766"]

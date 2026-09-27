@@ -57,6 +57,8 @@ from pathlib import Path
 import helpers  # noqa: F401
 
 import cairn
+import cairnlib.attribution
+import cairnlib.payloads
 
 
 REPO_ROOT = helpers.CAIRN_DIR.parent.parent  # scripts/cairn -> scripts -> repo root
@@ -419,7 +421,15 @@ class BuildDashboardPayloadSingleGitTagsReadTests(unittest.TestCase):
         )
         _run_git(data_dir, "tag", "v1.0.0")
 
-        with unittest.mock.patch.object(cairn, "read_git_tags", wraps=cairn.read_git_tags) as spy:
+        # POLY-58 step 15: build_dashboard_payload/build_board_payload
+        # (cairnlib.payloads) and read_git_state (cairnlib.attribution)
+        # each bind their own `read_git_tags` name at import time -- a
+        # patch on the cairn facade no longer reaches either. One spy,
+        # patched into both modules' own namespaces (ruling §5), so the
+        # count is accurate regardless of which module's call site fires.
+        spy = unittest.mock.MagicMock(wraps=cairn.read_git_tags)
+        with unittest.mock.patch.object(cairnlib.payloads, "read_git_tags", spy), \
+                unittest.mock.patch.object(cairnlib.attribution, "read_git_tags", spy):
             cairn.build_dashboard_payload(data_dir)
 
         self.assertEqual(

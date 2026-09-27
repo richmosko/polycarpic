@@ -702,7 +702,11 @@ class ClosedAtReusesTheMemoizedFlowWrapperTests(unittest.TestCase):
             token_line("PT-1", "team-lead", "claude-sonnet-5", input=10),
         ])
 
-        with mock.patch("cairn._compute_flow_payload", wraps=cairn._compute_flow_payload) as spy:
+        # POLY-58 step 12: _compute_flow_payload/build_flow_payload both
+        # live in cairnlib.flow now -- the internal call inside
+        # build_flow_payload resolves through that module's own globals,
+        # not cairn's facade, so the patch target follows it there.
+        with mock.patch("cairnlib.flow._compute_flow_payload", wraps=cairn._compute_flow_payload) as spy:
             _call_build_tokens_payload(data_dir, prices=SONNET_PRICE)
             _call_build_tokens_payload(data_dir, prices=SONNET_PRICE)
         self.assertEqual(

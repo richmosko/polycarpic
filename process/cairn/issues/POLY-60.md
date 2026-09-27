@@ -21,9 +21,12 @@ Grouped follow-ups from the POLY-56 loop (2026-09-26): architect ruling measurem
 
 **Lint noise: 16 warnings on 8 open issues** (8 titles over 70 chars + 8 empty descriptions), all children of POLY-48 / POLY-49 with old-style titles and empty bodies. Expected until they are rewritten to the authoring convention (short title, description body, criteria as `- [ ]` rows) or archived with their umbrellas.
 
+**Duplicate dir-stat code in `cairnlib/multiroot.py`** (POLY-58 verdict, 222f15a): commit d0b06a9 unhooked `compute_multi_etag` from `watch` by copying about 10 lines of the directory-stat logic instead of sharing it. Fold back into one helper.
+
 ## Acceptance criteria
 
 - [ ] Every cairn read/write path preserves bytes outside the edited span; one test with a CRLF + trailing-whitespace fixture per write path (`set`, `comment`, `check-item`, `close`, `archive`)
 - [ ] `check-item` accepts a CRLF-frontmatter file and still changes exactly one byte
 - [ ] TRACKER.md's byte-for-byte sentence is true (written after the measurement lands)
 - [ ] `cairn check` on the live tracker reports 0 title/description warnings: the 8 POLY-48/POLY-49 children rewritten to the convention or archived
+- [ ] `compute_multi_etag` and the watcher share one dir-stat helper; no duplicated stat loop in `cairnlib/multiroot.py`

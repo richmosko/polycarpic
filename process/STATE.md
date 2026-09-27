@@ -15,7 +15,14 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. Next: POLY-58 (cairn.py split). Three unplaced `temp/` notes (receiver PT-* window collisions + CI flakes; POLY-50 verdict follow-ups; POLY-56 CRLF + lint-noise items) await `/sweep-temp` into batched issues._
+_Feature: Split cairn.py into modules  
+Issue: POLY-58 (cairn)  
+Milestone: POLY-A  
+Branch: `feature/poly-58-cairn-split`  
+Started: 2026-09-26  
+Goal: extract `scripts/cairn/cairn.py` (7,700 lines) into a `cairnlib/` package one module per commit in the ruled leaves-first order, suite green at every commit, `cairn.py` left as the CLI entry plus re-exports so `import cairn` is unchanged for every caller.  
+PR: https://github.com/richmosko/polycarpic/pull/28  
+Status: In Review_
 
 ## Releases
 

@@ -14,7 +14,7 @@ import tempfile
 import threading
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 TESTS_DIR = Path(__file__).resolve().parent
 CAIRN_DIR = TESTS_DIR.parent  # scripts/cairn/
@@ -25,6 +25,30 @@ CAIRN_PY = CAIRN_DIR / "cairn.py"
 
 if str(CAIRN_DIR) not in sys.path:
     sys.path.insert(0, str(CAIRN_DIR))
+
+
+def copy_engine(dst_dir: Path, names: Iterable[str]) -> None:
+    """Copy each of `names` (files under CAIRN_DIR, e.g. "cairn.py",
+    "otel_receiver.py") into `dst_dir`, plus the `cairnlib/` package
+    (POLY-58) if it exists -- `__pycache__` excluded.
+
+    POLY-58 ruling §5 (M7): `cairn.py` is a re-export facade over
+    `cairnlib/` from step 1 onward, so a fake-engine copy that carries
+    `cairn.py` without its `cairnlib/` package fails at import time. Every
+    "copy the engine into a throwaway root and run it" test must go
+    through this helper instead of copying `ENGINE_FILES` by hand.
+    """
+    dst_dir = Path(dst_dir)
+    for name in names:
+        shutil.copy2(CAIRN_DIR / name, dst_dir / name)
+    cairnlib_src = CAIRN_DIR / "cairnlib"
+    if cairnlib_src.is_dir():
+        shutil.copytree(
+            cairnlib_src,
+            dst_dir / "cairnlib",
+            ignore=shutil.ignore_patterns("__pycache__"),
+            dirs_exist_ok=True,
+        )
 
 
 def real_metrics_dir() -> Path:
