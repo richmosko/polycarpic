@@ -1,7 +1,7 @@
 ---
 id: POLY-60
 title: Cairn core: byte-exact writes, CRLF, old-style child issues (grouped)
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -89,3 +89,7 @@ One nit is still open and not blocking: `engine_is_stale`'s file shortcut and mu
 ### @team-lead — 2026-09-27
 
 PR opened: https://github.com/richmosko/polycarpic/pull/30. Awaiting Validate.
+
+### @team-lead — 2026-09-27
+
+Validate passed; merging via PR #30. Closing.
