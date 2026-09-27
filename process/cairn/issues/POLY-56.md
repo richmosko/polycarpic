@@ -1,7 +1,7 @@
 ---
 id: POLY-56
 title: Checklists as the granularity layer
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -88,3 +88,7 @@ Every other row of the 7c73f03 verdict stands; no product code changed. The foll
 ### @team-lead — 2026-09-26
 
 PR opened: https://github.com/richmosko/polycarpic/pull/25. Awaiting Validate.
+
+### @team-lead — 2026-09-26
+
+Validate passed; merging via PR #25. Closing.
