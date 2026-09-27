@@ -1,7 +1,7 @@
 ---
 id: POLY-58
 title: Split cairn.py into modules
-status: in-review
+status: done
 milestone: POLY-A
 parent: null
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [cairn, refactor]
 priority: P3
 pr: https://github.com/richmosko/polycarpic/pull/28
 created: 2026-09-25
-updated: 2026-09-26
+updated: 2026-09-27
 ---
 
 `scripts/cairn/cairn.py` is 7,400 lines and 167 top-level definitions in one file; parallel loops touching cairn collide in it, and no module tests alone. The architect's boundary sketch (13 modules under a `scripts/cairn/cairnlib/` package, leaves-first extraction order, test mapping) is in `process/reviews/POLY-57/ruling.md` §6. `cairn.py` stays the CLI entry and a re-export facade, so `import cairn` keeps working for tests and for `backfill_tokens.py`, `otel_receiver.py`, `loop_stats.py`.
@@ -94,3 +94,7 @@ measured 0.68 ms, so accepted.
 ### @team-lead — 2026-09-26
 
 PR opened: https://github.com/richmosko/polycarpic/pull/28. Awaiting Validate.
+
+### @team-lead — 2026-09-27
+
+Validate passed; merging via PR #28. Closing.
