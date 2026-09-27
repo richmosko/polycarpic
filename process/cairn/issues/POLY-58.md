@@ -58,3 +58,35 @@ or is tagged `(unmeasured)`. Acceptance criteria amended in place.
   after by architect at verdict; threshold × (1 + max(0.05, spread)).
 - **Review checklist (§8).** One named mutation per check; matrix = all 237 names resolve from owner
   and facade to the same object.
+
+### @architect — 2026-09-26
+
+**Gate 4 — verdict on `94e3a83`: PASS, one doc fix required before merge.** Harnesses:
+`process/reviews/POLY-58/verdict_mutations.py`, `verdict_percommit.sh`.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| §8 checklist (12 mutations) | 12/12 killed: 6(a)–(f), the 3 patch retargets, `copy_engine`, 2 source-reading tests | `94e3a83`, `verdict_mutations.py` |
+| 237-name matrix | 237/237: `cairn.<n> is cairnlib.<owner>.<n>`, owner = `owners.txt`; `cairn.__all__` is exactly those 237 | `94e3a83` |
+| Verbatim moves | 227/237 byte-identical to `55fd4b2`; the 10 that differ are ruled (§3 anchors ×5, §4 seam ×3) or listed below (×2) | AST source diff vs `55fd4b2` |
+| Facade | 92 lines, no `def`/`class`; shim + 4 sibling scripts: empty diff vs `55fd4b2`; only new test file is `test_cairnlib_layout.py` | `94e3a83` |
+| Per-commit green (sample of 9) | green at `67ebed0`, `d64f41e`, `4e84f61`, `784fb7f`, `d0b06a9`, `5a8fad9`, `7dced8b`, `d04e59b`; **red at `1006181`** (20 fake-engine failures, repaired in `d64f41e`) | `verdict_percommit.sh` |
+| Staleness, live `cairn serve` | boot `stale:false` → mtime-only touch `false` → byte edit of `cairnlib/tokens.py` `true`, etag changes | scratch copy of `94e3a83` |
+| Full suite | 1926 tests OK (4 skipped), 6 runs | `94e3a83` |
+| Timing | median 46.20 s (spread 0.020) vs 45.94 s before; threshold 48.24 s: pass. qa got 47.06 s: pass. | `43957fb` timing.md + this run |
+
+**Fix commits: neither is a ruling addendum.**
+- `d64f41e` is §5 M7 exactly. It broke the rule "lands in the commit that breaks it", so `1006181` is red.
+  The history is already pushed, so accepted as a one-commit bisect hole. Root cause is in my §7: it picks
+  tests by moved names, and the fake-engine tests name none.
+- `d0b06a9` meets §4 (behaviour, not location). The directory stat is inlined in `multiroot`
+  because `watch` comes later (§2). That leaves about 10 duplicated lines to fold into one shared helper
+  as a follow-up.
+
+**Accepted deviations (no rework):** `check_repo` loses one comment line; `_repo_root_for` drops a
+redundant local `import subprocess`; `CAIRN_DIR`/`CAIRNLIB_DIR` are left out of `constants.__all__`, so
+the facade surface stays at the base 237. Directory-mode `engine_is_stale` re-hashes on every build:
+measured 0.68 ms, so accepted.
+
+**Required before merge:** the §3 paragraph in `scripts/cairn/tests/INTERFACE.md` is missing
+(`grep -c cairnlib` = 0). It is doc-only, and I will check it against the landing commit object; no re-verdict needed.
