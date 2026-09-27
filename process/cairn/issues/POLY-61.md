@@ -34,3 +34,27 @@ Feature started. Branch: `feature/poly-61-receiver-staleness-check`. Filed under
 ### @architect — 2026-09-27
 
 Gate 1 ruling: `process/reviews/POLY-61/ruling.md`. R1 seam: `.engine-fingerprint` JSON marker in `.sessions/`, computed once at `serve()` entry over otel_receiver.py, backfill_tokens.py, cairn.py, worktree_root.py and cairnlib/ via `cairnlib.watch.engine_fingerprint`; rewritten unchanged on registry recreate. R2 `--status` line `engine: current|stale (<names>)|unknown (…)`, compared against the recorded paths. R3 exit 3 = running + engine stale (precedence 1>2>3>0). R4 `--ensure-running` warns on stderr and never restarts. R5 merge-pr text verbatim. R6 `_sigcont_if_alive`. Tests T1–T5, one named mutation each (M1–M5); guards G1–G5.
+
+### @architect — 2026-09-27
+
+Gate 4 verdict — **PASS** (checklist from ruling.md @ 67a9021, run once on a scratch copy of 8b8fb28).
+
+| Axis | Result | Evidence |
+|---|---|---|
+| R1 seam: marker once at serve() entry, recreate rewrites the held dict | pass | 8b8fb28 |
+| R2 status line after last-flush:, compares recorded paths | pass | 8b8fb28 |
+| R3 rc 3, precedence 1>2>3>0, unknown leaves rc unchanged | pass | 8b8fb28 |
+| R4 ensure-running warns on both already-live returns, no restart | pass | 8b8fb28 |
+| R5 merge-pr sentences verbatim | pass | 8b8fb28 |
+| R6 `_sigcont_if_alive`, swallows ProcessLookupError only | pass | 8b8fb28 |
+| G1 `grep -c 'hashlib\|st_mtime_ns' otel_receiver.py` = 0 | pass (0) | 8b8fb28 |
+| G2 six receiver modules via run_tests.py | pass: 115 tests OK, 46.2 s wall | 8b8fb28 |
+| G3 `scripts/cairn/cairnlib/` in merge-pr SKILL.md ≥ 1 | pass (1) | 8b8fb28 |
+| G4 M1 drops cairnlib source → T1 red | pass, note: T3 also red (T3 makes the engine stale by editing cairnlib, so the fixture overlaps with M1). Does not block | 8b8fb28 |
+| G4 M2 recompute at recreate → T2 red only | pass | 8b8fb28 |
+| G4 M3 drop R4 print → T3 red only | pass | 8b8fb28 |
+| G4 M4 missing marker = stale → T4 red only | pass | 8b8fb28 |
+| G4 M5 drop except → T5 errors with ProcessLookupError; restored → OK | pass | 8b8fb28 |
+| G5 new module wall ≤ 45 s | 4.66 s | 8b8fb28 |
+
+Scratch setup needed `.claude/settings.json` and `.gitignore` copied beside `scripts/` for hardening/self_stop to run; this is harness scope, not a defect.
