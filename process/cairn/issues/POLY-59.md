@@ -28,13 +28,17 @@ Timing-sensitive; candidates for injected-clock fixes alongside POLY-49's AC2/AC
 
 ## Acceptance criteria
 
-- [ ] The PT-* window-collision lines are explained (which process, which root) and the receiver anchors `milestone_windows` on the main checkout's `process/cairn/`, with a test
-- [ ] Both flaky receiver tests are deterministic (injected clock or explicit trigger); 10 consecutive 8-worker runs green
+- [ ] The PT-* window-collision lines are explained (which process, which root) and a test pins `--ingest` from a linked worktree computing `milestone_windows` against the main checkout's `process/cairn/` (amended at gate 1: the root was never wrong — ruling §1)
+- [ ] Both flaky receiver tests are deterministic (explicit trigger); 10 consecutive `run_tests.py -j 8` runs of the two modules green, plus mutations M2a/M2b (amended at gate 1 — ruling §2)
 - [ ] A test pins the `_otel_cutoff` one-second boundary with a named mutation
-- [ ] `_branch_at` reuses its lookup list across calls (or the ruling records why not)
+- [ ] `_branch_at` reuses its lookup list across calls (or the ruling records why not) — ruling §4 records why not; no code change
 
 ## Comments
 
 ### @team-lead — 2026-09-27
 
 Feature started. Branch: `feature/poly-59-telemetry-follow-ups`. Promoted straight from backlog (user, 2026-09-27); user pre-cleared the merge once green.
+
+### @architect — 2026-09-27
+
+Gate 1 ruling: `process/reviews/POLY-59/ruling.md`. AC1: the PT-* lines are this checkout's own pre-scrub tree (db906a0's 16 milestone ids, exact match), not a mis-anchor; qa pins the worktree→main-checkout windows root with a new test, implementation-lead corrects the `main()` `--repo-root` comment. AC2: status flake = heartbeat write after `utime` (fix: SIGSTOP the daemon + 1.5 s adversarial wait); grace flake = out-file read between `server_close` and the flush (fix: wait for pidfile gone). AC3: fractional-second straddle test. AC4: no change, measured (59 calls × 130 µs, bounded by the cutoff). ACs 1/2/4 amended in place. Checklist M1–M3b in ruling §5.
