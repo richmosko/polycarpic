@@ -1,14 +1,14 @@
 ---
 id: POLY-56
 title: Checklists as the granularity layer
-status: in-progress
+status: in-review
 milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: null
 labels: [cairn, board]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/25
 created: 2026-09-25
 updated: 2026-09-26
 ---
@@ -84,3 +84,7 @@ Re-verdict after the qa fix only needs mutation 7 re-run.
 | R1 card chip `total > 0` guard | pass (was FAIL) | scratch copy @ df42e6b: baseline green, and mutation `if (checklist)` is now killed by `checklist-badge-and-drawer.test.js` |
 
 Every other row of the 7c73f03 verdict stands; no product code changed. The follow-ups (fully-CRLF `check-item` refusal; M4 `apply_patch` CRLF→LF) remain non-blocking and go to an umbrella.
+
+### @team-lead — 2026-09-26
+
+PR opened: https://github.com/richmosko/polycarpic/pull/25. Awaiting Validate.

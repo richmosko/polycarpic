@@ -21,7 +21,8 @@ Milestone: POLY-A
 Branch: `feature/poly-56-checklists`  
 Started: 2026-09-26  
 Goal: make body `- [ ]` checklists the layer below sub-issues — card badge, drawer rows, `cairn new`/`cairn check` enforcing the short-title/body-criteria convention, and checkbox write-back built or explicitly re-deferred per the gate-1 ruling.  
-Status: In Progress_
+PR: https://github.com/richmosko/polycarpic/pull/25  
+Status: In Review_
 
 ## Releases
 
