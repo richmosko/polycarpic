@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from cairnlib.constants import DEFAULT_STATUS, ISSUE_FIELD_ORDER, RECORD_STATUSES, STATUSES
-from cairnlib.errors import CairnError
-from cairnlib.records import LIST_FIELDS, NULLABLE_FIELDS, _atomic_write_bytes, _split_csv, append_comment, apply_patch, checklist_items, parse_frontmatter, parse_issue, split_comments
+from cairnlib.errors import CairnError, ConflictError
+from cairnlib.records import LIST_FIELDS, NULLABLE_FIELDS, _split_csv, append_comment, apply_patch, checklist_items, parse_frontmatter, parse_issue, read_record, split_comments, write_record
 from cairnlib.config import load_config, resolve_data_dir
 from cairnlib.store import _dir_glob, _id_sort_key, _record_schema_for_path, _RECORD_FIELD_ORDER, allocate_and_create_issue, find_issue_path, find_record_path, is_archived_path
 from cairnlib.guards import TITLE_CHAR_CAP, check_budgets, cmd_gate, cmd_guard_commit, cmd_guard_push, uncommitted_comment_authors
@@ -318,6 +318,12 @@ def cmd_check_item(args: argparse.Namespace) -> int:
     an index cached across processes -- `--text <exact>` is the optional
     anchor for a scripted caller that wants to refuse rather than tick the
     wrong row if the file moved under it.
+
+    POLY-60 ruling R1: the read/offset/mtime-guard/write plumbing now
+    routes through `read_record`/`write_record` (the same seam
+    `apply_patch`/`append_comment` use) instead of its own inline
+    decode+stat -- also accepts a fully-CRLF file (CRLF frontmatter fences
+    included), which used to refuse outright (M3).
     """
     data_dir = resolve_data_dir(args)
     path = find_issue_path(data_dir, args.id)
@@ -328,21 +334,17 @@ def cmd_check_item(args: argparse.Namespace) -> int:
         print(f"error: {args.id} is archived -- read-only", file=sys.stderr)
         return 1
     try:
-        st_before = path.stat()
+        record = read_record(path)
     except FileNotFoundError:
         print(f"error: no such record: {args.id}", file=sys.stderr)
         return 1
-    raw = path.read_bytes()
-    try:
-        text = raw.decode("utf-8")
     except UnicodeDecodeError as e:
         print(f"error: {path}: {e}", file=sys.stderr)
         return 1
-    try:
-        _frontmatter, body = parse_frontmatter(text)
     except CairnError as e:
         print(f"error: {e}", file=sys.stderr)
         return 1
+    body = record.raw[record.body_start:].decode("utf-8")
     description, _comments = split_comments(body)
     items = checklist_items(description)
     if not items:
@@ -367,26 +369,20 @@ def cmd_check_item(args: argparse.Namespace) -> int:
         print(_format_checklist_item_line(args.id, item))
         return 0
 
-    # `body` is exactly the tail of `text` (parse_frontmatter's contract),
-    # so its start offset in `text` -- and, since encode/decode round-trips
-    # for valid utf-8, in `raw` too -- is `len(text) - len(body)`, no
-    # separate re-scan for the closing fence needed.
-    body_start_byte = len(text[:len(text) - len(body)].encode("utf-8"))
     line_offset = _line_byte_offsets(body)[item["line"]]
-    target_offset = body_start_byte + line_offset + len("- [")
-    current = raw[target_offset:target_offset + 1]
+    target_offset = record.body_start + line_offset + len("- [")
+    current = record.raw[target_offset:target_offset + 1]
     if current not in (b" ", b"x", b"X"):
         print(f"error: {args.id}: could not locate item #{item['ordinal']}'s checkbox byte", file=sys.stderr)
         return 1
 
-    st_now = path.stat()
-    if st_now.st_mtime_ns != st_before.st_mtime_ns:
+    new_char = b"x" if want_checked else b" "
+    new_raw = record.raw[:target_offset] + new_char + record.raw[target_offset + 1:]
+    try:
+        write_record(path, new_raw, expect_mtime_ns=record.mtime_ns)
+    except ConflictError:
         print(f"error: {args.id} changed on disk since it was read -- refusing to write (re-run to retry)", file=sys.stderr)
         return 1
-
-    new_char = b"x" if want_checked else b" "
-    new_raw = raw[:target_offset] + new_char + raw[target_offset + 1:]
-    _atomic_write_bytes(path, new_raw)
     item["checked"] = want_checked
     print(_format_checklist_item_line(args.id, item))
     return 0

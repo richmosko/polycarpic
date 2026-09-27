@@ -576,7 +576,7 @@ There is deliberately **no** dedicated status endpoint — a drag is just a patc
 
 ### Write-back and conflict handling
 
-Board edits **rewrite only the frontmatter block**, re-emitted in canonical key order; the body after the closing `---` is concatenated **byte-for-byte** from the original. Comment appends touch only the tail. Writes go to a temp file in the same directory followed by `os.replace` — atomic, so a crashed write can't truncate an issue.
+Writes are bytes in, bytes out. `set`, board edits and `close` rewrite only the frontmatter block, re-emitted in canonical key order with the file's own line ending (the opening fence's: CRLF or LF). Every byte after the closing `---` is kept exactly as read, CRLF and trailing whitespace included. A comment append also changes `updated` and adds bytes after the old end of file, in the file's line ending. `check-item` changes exactly one byte. `archive` moves the file without changing a byte. Writes go to a temp file in the same directory followed by `os.replace` — atomic, so a crashed write can't truncate an issue.
 
 **`seen` is `st_mtime_ns` as a string.** The browser receives it with every read and returns it with every write; the server compares against the file's current mtime and returns `409` on mismatch.
 

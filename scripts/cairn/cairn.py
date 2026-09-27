@@ -42,6 +42,7 @@ name binding (ruling §5).
 import sys
 
 import cairnlib
+from cairnlib.enginesrc import *  # noqa: F401,F403 (POLY-60 step 0: leaf, no cairnlib deps)
 from cairnlib.constants import *  # noqa: F401,F403 (POLY-58 step 1)
 from cairnlib.errors import *  # noqa: F401,F403 (POLY-58 step 2)
 from cairnlib.yamlsub import *  # noqa: F401,F403 (POLY-58 step 3)
@@ -65,7 +66,8 @@ from cairnlib.estimate import *  # noqa: F401,F403 (POLY-58 step 20)
 from cairnlib.cli import *  # noqa: F401,F403 (POLY-58 step 21)
 
 __all__ = (
-    cairnlib.constants.__all__
+    cairnlib.enginesrc.__all__
+    + cairnlib.constants.__all__
     + cairnlib.errors.__all__
     + cairnlib.yamlsub.__all__
     + cairnlib.records.__all__
