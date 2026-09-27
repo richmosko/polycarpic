@@ -14,6 +14,20 @@ just keep spec-compliance the north star, not this file's word choice.
 Everything lives in `scripts/cairn/cairn.py`, a single stdlib-only module, executable
 both as `python3 cairn.py ...` and via the bash shim `scripts/cairn/cairn`.
 
+**POLY-58:** the implementation actually lives in the `scripts/cairn/cairnlib/`
+package, one module per leaves-first extraction step (`process/reviews/POLY-58/ruling.md`
+§2) — `cairnlib.constants`, `cairnlib.errors`, `cairnlib.yamlsub`, `cairnlib.records`,
+`cairnlib.config`, `cairnlib.store`, `cairnlib.guards`, `cairnlib.lint`,
+`cairnlib.snapshot`, `cairnlib.roster`, `cairnlib.attribution`, `cairnlib.flow`,
+`cairnlib.tokens`, `cairnlib.actuals`, `cairnlib.payloads`, `cairnlib.multiroot`,
+`cairnlib.watch`, `cairnlib.server`, `cairnlib.archive`, `cairnlib.estimate`, and
+`cairnlib.cli`. `cairn.py` is a re-export facade only (`from cairnlib.<mod> import *`
+per module, plus `__all__` and the `__main__` guard) — every name below still
+resolves as `cairn.<name>`, so `import cairn` is unchanged for every caller. A test
+that patches a name reaches the CALLER's own lookup, not the defining module's: patch
+the module that owns the call site (ruling §5), e.g. `cairnlib.server.<name>` for a
+name `make_server` looks up internally, not `cairn.<name>`.
+
 ## Constants
 
 - `ISSUE_FIELD_ORDER` — `["id", "title", "status", "milestone", "parent", "assignee", "labels", "priority", "pr", "created", "updated"]`, the canonical key order `dump_frontmatter` must emit (matches the Frontmatter schema table in the spec).
