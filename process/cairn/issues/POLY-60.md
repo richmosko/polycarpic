@@ -25,14 +25,26 @@ Grouped follow-ups from the POLY-56 loop (2026-09-26): architect ruling measurem
 
 ## Acceptance criteria
 
-- [ ] Every cairn read/write path preserves bytes outside the edited span; one test with a CRLF + trailing-whitespace fixture per write path (`set`, `comment`, `check-item`, `close`, `archive`)
-- [ ] `check-item` accepts a CRLF-frontmatter file and still changes exactly one byte
-- [ ] TRACKER.md's byte-for-byte sentence is true (written after the measurement lands)
-- [ ] `cairn check` on the live tracker reports 0 title/description warnings: the 8 POLY-48/POLY-49 children rewritten to the convention or archived
-- [ ] `compute_multi_etag` and the watcher share one dir-stat helper; no duplicated stat loop in `cairnlib/multiroot.py`
+- [ ] Every write path goes through `read_record`/`write_record` (ruling R1); one test per path (`set`, `comment`, `check-item`, `close`, `archive`) on a CRLF + trailing-whitespace fixture asserts every byte outside that path's edited span is unchanged; the text-mode `_atomic_write` is gone
+- [ ] `parse_frontmatter` accepts `---\r` fences (frontmatter values carry no `\r`, body unchanged); `check-item` on a fully-CRLF file exits 0 and changes exactly one byte
+- [ ] TRACKER.md Write-back carries the R4 sentence verbatim; `tests/INTERFACE.md` lists the new seam and module
+- [ ] POLY-7, 8, 9, 15, 25, 27, 33, 40, 47 set `done`, each with a comment naming its R3 sha; POLY-49 criterion 1 ticked; `cairn check` on the live tracker reports 0 title/description warnings
+- [ ] `cairnlib/enginesrc.py` (`engine_source_files`, `engine_source_stat`) is the only dir-stat loop; `compute_multi_etag` and `watch.engine_fingerprint`/`engine_is_stale` call it
+- [ ] Every row of the review checklist in `process/reviews/POLY-60/ruling.md` has its test, and each test fails under its named mutation
 
 ## Comments
 
 ### @team-lead — 2026-09-27
 
 Feature started. Branch: `feature/poly-60-cairn-core-bytes`. Promoted straight from backlog (user, 2026-09-27).
+
+### @architect — 2026-09-27
+
+Gate-1 ruling: process/reviews/POLY-60/ruling.md (measured @ 989944f; acceptance criteria amended in place).
+
+- M: set/comment/close turn a CRLF file into LF throughout (frontmatter and body); check-item refuses a CRLF file (fence `---\r`); archive is byte-exact (rename). Trailing whitespace survives on every path.
+- R1 seam: `parse_frontmatter` accepts `---\r` fences (the one fence rule; read-only callers unchanged). New `read_record`/`write_record`/`emit_frontmatter` in records.py; every writer uses them; the text-mode `_atomic_write` is deleted. Re-emitted frontmatter takes the opening fence's EOL.
+- R2: new leaf `cairnlib/enginesrc.py` (`engine_source_files`, `engine_source_stat`), shared by `compute_multi_etag` and `watch`.
+- R3: all 8 children, plus POLY-9, already shipped (shas in the table) → set done with a sha comment, tick POLY-49 #1; no archive in this PR.
+- R4: the TRACKER.md Write-back sentence, verbatim in the ruling.
+- Review checklist: 12 tests, one named mutation each.
