@@ -25,12 +25,12 @@ User decision 2026-09-25 (POLY-51 loop): sub-issues nest one level only. Anythin
 
 Amended by the gate-1 ruling (`process/reviews/POLY-56/ruling.md`).
 
-- [ ] Card badge: a distinct `checklist` chip `☑ k/n` (shown only when n > 0), fed by a server-side `checklist {done,total}` on `/api/board` from one Python parser `checklist_items`; the drawer renders `checklist_items` from `/api/issue`, and the client-side item parse is removed. Read-only
-- [ ] Sub-issues as checkbox rows: the drawer's Children list renders a disabled checkbox per child, checked iff `status: done`, still linking to the child. Read-only
-- [ ] `cairn check-item <ID> <ordinal> [--uncheck] [--text <exact>]` built: exactly one byte changes, `updated` untouched, mtime-guarded, idempotent; board write-back re-deferred with the ruling recorded in TRACKER.md → Deferred work
-- [ ] Convention in TRACKER.md: short title, description body, criteria as body `- [ ]` items; qa's verdict ticks them with `cairn check-item`
-- [ ] `cairn new --body <text|->` seeds the body in the same `O_EXCL` write (default skeleton `## Acceptance criteria` + one empty item) and warns on a title over 70 chars; `cairn check` warns on a long title or an empty description for open, non-`stage:` issues
-- [ ] Tests: one per row of the ruling's review checklist, each catching its named mutation, including the check-item byte-for-byte round-trip on a CRLF + trailing-whitespace fixture
+- [x] Card badge: a distinct `checklist` chip `☑ k/n` (shown only when n > 0), fed by a server-side `checklist {done,total}` on `/api/board` from one Python parser `checklist_items`; the drawer renders `checklist_items` from `/api/issue`, and the client-side item parse is removed. Read-only
+- [x] Sub-issues as checkbox rows: the drawer's Children list renders a disabled checkbox per child, checked iff `status: done`, still linking to the child. Read-only
+- [x] `cairn check-item <ID> <ordinal> [--uncheck] [--text <exact>]` built: exactly one byte changes, `updated` untouched, mtime-guarded, idempotent; board write-back re-deferred with the ruling recorded in TRACKER.md → Deferred work
+- [x] Convention in TRACKER.md: short title, description body, criteria as body `- [ ]` items; qa's verdict ticks them with `cairn check-item`
+- [x] `cairn new --body <text|->` seeds the body in the same `O_EXCL` write (default skeleton `## Acceptance criteria` + one empty item) and warns on a title over 70 chars; `cairn check` warns on a long title or an empty description for open, non-`stage:` issues
+- [x] Tests: one per row of the ruling's review checklist, each catching its named mutation, including the check-item byte-for-byte round-trip on a CRLF + trailing-whitespace fixture
 
 ## Comments
 
