@@ -48,3 +48,27 @@ Gate-1 ruling: process/reviews/POLY-60/ruling.md (measured @ 989944f; acceptance
 - R3: all 8 children, plus POLY-9, already shipped (shas in the table) → set done with a sha comment, tick POLY-49 #1; no archive in this PR.
 - R4: the TRACKER.md Write-back sentence, verbatim in the ruling.
 - Review checklist: 12 tests, one named mutation each.
+
+### @architect — 2026-09-27
+
+Gate-4 verdict on 5a8c907 (build 3e2ec7b): **changes requested** (one item). The harness is scratch-only; each mutation ran against its pinned test module in a scratch copy (row 6 in place, then reverted).
+
+| Axis | Result | Evidence |
+|---|---|---|
+| Per-path bytes, CRLF + trailing-whitespace fixture (M-harness) | pass | set 308→308 B, CRLF 27→27, 2 bytes differ; comment old bytes kept + CRLF tail (CRLF 27→31); check-item rc 0, 1 byte; close seam CRLF kept (+1 CRLF for the `ratio` line); archive 0 bytes differ. The LF control is unchanged from 989944f |
+| Checklist rows 1, 2, 4, 5, 7–12 | pass | every mutation turns its test red |
+| Checklist row 6 (emit ignores eol) | pass | `CloseCRLFByteExactTests` goes red with an error (`ValueError: subsection not found`), not a failure; still red |
+| **Checklist row 3** (drop `endswith(eol)`) | **fail** | `test_missing_trailing_eol_gets_a_real_crlf_separator_not_glued_text` stays green: the mutated output `...eol\r\n### @b` still starts with `\r\n`. Fix: assert `appended.startswith(b"\r\n\r\n### @b")`, the exact separator the LF path has always produced (`eol` + blank line) |
+| R1 seam | pass | `read_record`/`write_record`/`emit_frontmatter` carry set, comment, check-item, and close via `apply_patch`; no `_atomic_write` left in the code (grep) |
+| R2 helper | pass | the one dir loop is `enginesrc.engine_source_stat`, called by `compute_multi_etag` and `engine_fingerprint` |
+| R3 children | pass | 9 set done, each with a sha comment; POLY-49 row 1 ticked; live `cairn check` → ok |
+| R4 sentence | pass | TRACKER.md Write-back contains the ruling's blockquote verbatim (exact line match) |
+| Facade | pass | all 6 new public names are in `cairn.__all__` and resolve; `_atomic_write` is gone from both; no duplicate names in `__all__` |
+| qa full run | pending | no qa commit after 5a8c907 on origin when this verdict was written |
+
+Non-blocking nits (fix with row 3 or drop):
+- the `engine_fingerprint` docstring says "exactly one glob per call", but `engine_source_stat` globs again (two)
+- R2 also named `engine_is_stale`'s file shortcut and multiroot's file branch for `engine_source_stat`; both still stat inline (not loops, so the AC holds)
+- stale `_atomic_write` mentions in test comments (`test_frontmatter_rewrite.py:470,475,510`)
+
+Re-verdict needs: row 3 red under its mutation, green without it, and qa's full run.
