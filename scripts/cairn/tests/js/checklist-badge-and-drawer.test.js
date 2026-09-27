@@ -85,16 +85,26 @@ test("cardEl's checklist chip reads issue.checklist (server-stamped), not a clie
 test("cardEl's checklist chip is guarded by total > 0", () => {
   // Mutation: drop the total > 0 guard -- a checklist chip must not
   // render for an issue with no acceptance-criteria section at all.
+  //
+  // Gate-4 verdict fix (architect, POLY-56.md @ 7c73f03): the previous
+  // regex matched the FIRST `if (...) {...chip("checklist"...}` shape
+  // anywhere in cardEl -- which is the pre-existing `subissues` chip's
+  // own `if (progress.total > 0)` guard (it too has `.total > 0` and,
+  // being earlier in the function, wins the match), not the checklist
+  // chip's guard at all. `if (checklist)` (dropping `.total > 0`
+  // entirely) therefore survived undetected. Sliced to start at `var
+  // checklist =` so the match is anchored on the checklist-specific
+  // code, never the subissues chip's unrelated guard.
   const body = extractFunctionBody(readSource(), "cardEl");
-  // Allows either a same-line guard (`if (...) chip(...)`) or a braced
-  // block (`if (...) { ... chip("checklist", ...) ... }`) -- both are
-  // legitimate "guarded by an if" shapes; only the condition matters here.
-  const chipMatch = body.match(/if\s*\([^)]*\)\s*\{?[^}]*?chip\(\s*"checklist"/);
+  const checklistVarIdx = body.search(/var\s+checklist\s*=/);
+  assert.ok(checklistVarIdx >= 0, "expected a `var checklist = ...` declaration inside cardEl");
+  const checklistScope = body.slice(checklistVarIdx);
+  const chipMatch = checklistScope.match(/if\s*\([^)]*\)\s*\{?[^}]*?chip\(\s*"checklist"/);
   assert.ok(chipMatch, "expected the checklist chip call to be guarded by an `if (...)` condition");
   assert.match(
     chipMatch[0],
-    /\.total\s*>\s*0/,
-    "expected the guard to check `.total > 0` (mirrors the existing subissues chip's own guard)"
+    /checklist\.total\s*>\s*0/,
+    "expected the guard to check `checklist.total > 0` (mirrors the existing subissues chip's own guard)"
   );
 });
 
