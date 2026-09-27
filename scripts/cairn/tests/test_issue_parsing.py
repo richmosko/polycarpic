@@ -89,6 +89,43 @@ class ParseFrontmatterTests(unittest.TestCase):
             cairn.parse_frontmatter("")
 
 
+class ParseFrontmatterCRLFTests(unittest.TestCase):
+    """POLY-60 review checklist row 8: `parse_frontmatter` must accept a
+    fence line that is `---\\r` (i.e. the file's fence lines are CRLF-
+    terminated, `text` decoded raw with no universal-newline translation).
+    Frontmatter VALUES must carry no stray `\\r` (a CRLF-authored `title:
+    Thing\\r` must parse to `"Thing"`, not `"Thing\\r"`), while `body` --
+    the untouched span -- keeps every `\\r` exactly as it was. Mutation
+    that must turn this red: stripping `\\r` from the body too (only the
+    frontmatter side may be `\\r`-stripped).
+    """
+
+    def _crlf_text(self) -> str:
+        frontmatter = (
+            "id: PT-1\r\ntitle: Thing\r\nstatus: todo\r\nmilestone: null\r\nparent: null\r\n"
+            "assignee: null\r\nlabels: []\r\npriority: null\r\npr: null\r\n"
+            "created: 2026-01-01\r\nupdated: 2026-01-01\r\n"
+        )
+        body = "Body line with trailing space.  \r\nAnother line.\r\n"
+        return "---\r\n" + frontmatter + "---\r\n" + body
+
+    def test_fence_line_ending_in_cr_is_accepted(self):
+        frontmatter, _body = cairn.parse_frontmatter(self._crlf_text())
+        self.assertEqual(frontmatter["id"], "PT-1")
+
+    def test_frontmatter_values_carry_no_stray_cr(self):
+        frontmatter, _body = cairn.parse_frontmatter(self._crlf_text())
+        self.assertEqual(frontmatter["title"], "Thing")
+        self.assertNotIn("\r", frontmatter["title"])
+        self.assertEqual(frontmatter["status"], "todo")
+
+    def test_body_keeps_every_cr_untouched(self):
+        text = self._crlf_text()
+        _frontmatter, body = cairn.parse_frontmatter(text)
+        expected_body = "Body line with trailing space.  \r\nAnother line.\r\n"
+        self.assertEqual(body, expected_body, "the untouched body span must keep its CRLF bytes exactly")
+
+
 class SplitCommentsTests(unittest.TestCase):
     def setUp(self):
         _, self.spec_body = cairn.parse_frontmatter(SPEC_EXAMPLE_ISSUE)

@@ -2,6 +2,12 @@
 frontmatter-only write-back (byte-preserving body).
 
 Extracted verbatim from cairn.py (POLY-58 ruling §2 step 4).
+
+POLY-60 ruling R1: every write path is bytes in, bytes out. `read_record`/
+`write_record`/`emit_frontmatter` are the one seam `apply_patch`,
+`append_comment`, and `cmd_check_item` all funnel through -- there is no
+text-mode writer left in this module (see `NoTextModeWriterInRecordsTests`,
+tests/test_frontmatter_rewrite.py).
 """
 
 import os
@@ -9,18 +15,18 @@ import re
 import stat
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
 from cairnlib.constants import AC_HEADING_RE, COMMENTS_HEADING_RE, COMMENT_DELIM_RE, ISSUE_FIELD_ORDER, _CHECKLIST_ITEM_RE, _today
-from cairnlib.errors import FrontmatterError
+from cairnlib.errors import ConflictError, FrontmatterError
 from cairnlib.yamlsub import parse_yaml_subset
 
 __all__ = [
     "LIST_FIELDS",
     "NULLABLE_FIELDS",
+    "RawRecord",
     "_BARE_RESERVED",
     "_NUMERIC_LOOKING_RE",
-    "_atomic_write",
     "_atomic_write_bytes",
     "_description_before_ac",
     "_dump_value",
@@ -32,33 +38,46 @@ __all__ = [
     "apply_patch",
     "checklist_items",
     "dump_frontmatter",
+    "emit_frontmatter",
     "get_seen",
     "parse_frontmatter",
     "parse_issue",
+    "read_record",
     "split_comments",
+    "write_record",
 ]
 
 
 def parse_frontmatter(text: str) -> Tuple[Dict[str, Any], str]:
     """Split a whole issue/milestone/major file into (frontmatter, body).
 
-    Requires the first line to be exactly '---' and a later line to be
-    exactly '---'. `body` is everything after the closing fence's newline,
-    byte-for-byte (well, char-for-char post-decode).
+    Requires the first line to be exactly '---' (or CRLF-terminated,
+    '---\\r') and a later line to be the same. `body` is everything after
+    the closing fence's newline, byte-for-byte (well, char-for-char
+    post-decode) -- untouched, `\\r` included.
+
+    POLY-60 ruling R1 (fence rule, one place): a line is a fence iff it is
+    `---` or `---\\r` once split on bare `\\n` -- so a CRLF-frontmatter file
+    (M3's measurement: `check-item` used to refuse it outright, `rc 1`) is
+    accepted like any other. Each frontmatter line has its own trailing
+    `\\r` stripped before `parse_yaml_subset` sees it (a CRLF-authored
+    `title: Thing\\r` must parse to `"Thing"`, not `"Thing\\r"`) -- `body`
+    is joined from the ORIGINAL lines, completely unstripped, since it is
+    the untouched span every write path must preserve exactly.
     """
     if not text.startswith("---"):
         raise FrontmatterError("file must start with a '---' frontmatter delimiter")
     lines = text.split("\n")
-    if lines[0] != "---":
+    if lines[0].rstrip("\r") != "---":
         raise FrontmatterError("file must start with a '---' frontmatter delimiter")
     end_idx = None
     for i in range(1, len(lines)):
-        if lines[i] == "---":
+        if lines[i].rstrip("\r") == "---":
             end_idx = i
             break
     if end_idx is None:
         raise FrontmatterError("no closing '---' frontmatter delimiter found")
-    fm_text = "\n".join(lines[1:end_idx])
+    fm_text = "\n".join(line.rstrip("\r") for line in lines[1:end_idx])
     body = "\n".join(lines[end_idx + 1:])
     frontmatter = parse_yaml_subset(fm_text)
     return frontmatter, body
@@ -250,42 +269,15 @@ def dump_frontmatter(fields: Dict[str, Any]) -> str:
     return "---\n" + "\n".join(lines) + "\n---\n"
 
 
-def _atomic_write(path: Path, text: str) -> None:
-    """Write `text` to `path` via a same-directory temp file + os.replace.
-
-    Preserves the original file's mode (PT-7): `os.replace` is a rename,
-    so the final file's permission bits come from the *source* -- without
-    an explicit chmod, mkstemp's 0600 default silently replaces whatever
-    mode the file had (e.g. 0644 -> 0600) on every frontmatter rewrite.
-    """
-    path = Path(path)
-    try:
-        original_mode = stat.S_IMODE(path.stat().st_mode)
-    except FileNotFoundError:
-        original_mode = None
-    fd, tmp_name = tempfile.mkstemp(dir=str(path.parent), prefix=f".{path.name}.", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(text)
-            f.flush()
-            os.fsync(f.fileno())
-        if original_mode is not None:
-            os.chmod(tmp_name, original_mode)
-        os.replace(tmp_name, str(path))
-    except BaseException:
-        try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
-
-
 def _atomic_write_bytes(path: Path, data: bytes) -> None:
-    """The binary sibling of `_atomic_write` (POLY-56 gate-1 ruling R2):
-    same same-directory temp file + `os.replace` + mode-preservation
-    discipline, but `wb` instead of text mode -- `cmd_check_item`'s one-byte
-    rewrite must never go through a newline-translating write, which is
-    exactly the mutation the CRLF round-trip test is pinned to catch.
+    """The ONLY writer left in this module (POLY-60 ruling R1: the prior
+    text-mode `_atomic_write` -- universal-newline read paired with an
+    `os.linesep`-translating write -- was the CRLF-corruption root cause,
+    and is deleted outright rather than kept as a second path anything
+    could drift back onto). Same same-directory temp file + `os.replace`
+    + mode-preservation discipline as before, `wb` throughout: no read or
+    write in this module ever goes through a newline-translating text
+    mode again.
     """
     path = Path(path)
     try:
@@ -352,14 +344,87 @@ def _split_csv(value: str) -> List[str]:
     return [v.strip() for v in value.split(",") if v.strip()]
 
 
+class RawRecord(NamedTuple):
+    """One `read_record` snapshot (POLY-60 ruling R1): the whole file's raw
+    bytes, its dominant line ending, where the body starts, the parsed
+    frontmatter, and the mtime it was read at -- everything a writer needs
+    to rewrite the frontmatter span and re-emit the body untouched,
+    without a second read.
+    """
+
+    raw: bytes
+    eol: bytes
+    body_start: int
+    frontmatter: Dict[str, Any]
+    mtime_ns: int
+
+
+def read_record(path: Path) -> RawRecord:
+    """Read `path` once: stat, `read_bytes()`, utf-8-decode with NO
+    newline translation (unlike `Path.read_text()`/text-mode `open()`,
+    which silently turn every CRLF into LF), then `parse_frontmatter`.
+
+    `body_start` is the byte offset where the body begins -- `len(raw) -
+    len(body.encode("utf-8"))`, valid because `body` is always `text`'s
+    own trailing slice and utf-8 round-trips exactly for the frontmatter
+    fence's byte position. `eol` is the OPENING fence line's own line
+    ending (`b"\\r\\n"` if that line ends `\\r`, else `b"\\n"`) -- a
+    mixed-EOL file (CRLF fences, LF body) re-emits its frontmatter in the
+    fence's own ending, never a body-majority vote (POLY-60 ruling R1).
+    """
+    path = Path(path)
+    mtime_ns = path.stat().st_mtime_ns
+    raw = path.read_bytes()
+    text = raw.decode("utf-8")
+    frontmatter, body = parse_frontmatter(text)
+    body_start = len(raw) - len(body.encode("utf-8"))
+    first_line = text.split("\n", 1)[0]
+    eol = b"\r\n" if first_line.endswith("\r") else b"\n"
+    return RawRecord(raw=raw, eol=eol, body_start=body_start, frontmatter=frontmatter, mtime_ns=mtime_ns)
+
+
+def write_record(path: Path, data: bytes, expect_mtime_ns: Optional[int] = None) -> None:
+    """Write `data` to `path` (the same-directory-temp-file + `os.replace`
+    + mode-preservation discipline `_atomic_write_bytes` already carries),
+    with an optional freshness guard (POLY-60 ruling R1): when
+    `expect_mtime_ns` is given, `path` is re-stat'd immediately before the
+    write, and a mismatch raises `ConflictError` with nothing written --
+    the caller changed on disk since it was read (`cmd_check_item`'s
+    mtime-guard, PT-56 R2, now expressed here instead of inline).
+    """
+    path = Path(path)
+    if expect_mtime_ns is not None:
+        current_mtime_ns = path.stat().st_mtime_ns
+        if current_mtime_ns != expect_mtime_ns:
+            raise ConflictError(f"{path}: changed on disk since it was read -- refusing to write")
+    _atomic_write_bytes(path, data)
+
+
+def emit_frontmatter(fields: Dict[str, Any], eol: bytes) -> bytes:
+    """`dump_frontmatter(fields)`, with every `\\n` converted to `eol`,
+    encoded as utf-8 bytes -- the re-emitted frontmatter block always
+    matches the ORIGINAL file's own line ending (POLY-60 ruling R1),
+    never a bare LF regardless of what line ending the file was authored
+    with.
+    """
+    text = dump_frontmatter(fields)
+    if eol != b"\n":
+        text = text.replace("\n", eol.decode("ascii"))
+    return text.encode("utf-8")
+
+
 def apply_patch(path: Path, patch: Dict[str, Any]) -> Dict[str, Any]:
     """Merge `patch` into `path`'s frontmatter and rewrite it in place.
 
     On issue-shaped files (has a `title` key), sets `updated` to today
     unless `patch` supplies it explicitly. `updated` belongs to the issue
     schema only — a milestone/major file never gets it injected (PT-13).
-    Body bytes after the closing fence are untouched. Returns the new
-    frontmatter dict.
+    Body bytes after the closing fence are untouched -- bytes, not just
+    text: read via `read_record` (no newline translation) and re-emitted
+    via `emit_frontmatter`/`write_record` (POLY-60 ruling R1), so a CRLF
+    body (and any trailing whitespace on its lines) survives a patch
+    byte-for-byte, and the re-emitted frontmatter itself keeps the
+    original file's own line ending. Returns the new frontmatter dict.
 
     Coerces `""` -> `None` for the five nullable fields (milestone,
     assignee, parent, priority, pr): clearing a field — via the CLI
@@ -370,18 +435,18 @@ def apply_patch(path: Path, patch: Dict[str, Any]) -> Dict[str, Any]:
     of caller.
     """
     path = Path(path)
-    text = path.read_text(encoding="utf-8")
-    frontmatter, body = parse_frontmatter(text)
+    record = read_record(path)
     coerced_patch = dict(patch)
     for field in NULLABLE_FIELDS:
         if field in coerced_patch and coerced_patch[field] == "":
             coerced_patch[field] = None
+    frontmatter = dict(record.frontmatter)
     is_issue = _is_issue_shaped(frontmatter)
     frontmatter.update(coerced_patch)
     if is_issue and "updated" not in patch:
         frontmatter["updated"] = _today()
-    new_text = dump_frontmatter(frontmatter) + body
-    _atomic_write(path, new_text)
+    new_data = emit_frontmatter(frontmatter, record.eol) + record.raw[record.body_start:]
+    write_record(path, new_data)
     return frontmatter
 
 
@@ -389,6 +454,13 @@ def append_comment(path: Path, author: str, body: str, comment_date: Optional[st
     """Append one comment to the tail of `path` (adding a '## Comments'
     heading first if absent), and bump `updated` to today -- issue-shaped
     files only. Returns the new frontmatter dict.
+
+    Byte-exact (POLY-60 ruling R1): every pre-existing byte survives as an
+    exact prefix (bar the re-emitted frontmatter block, which keeps its
+    own original line ending) -- the separator/heading/comment-block text
+    built here is `\\n`-authored, then converted to `record.eol` before
+    being appended, so a CRLF file's appended tail is CRLF too, never a
+    bare LF glued onto a CRLF body.
 
     PT-51 §4 prerequisite: gated on `_is_issue_shaped`, the same guard
     `apply_patch` already uses. Records (milestone/major) have no
@@ -398,24 +470,35 @@ def append_comment(path: Path, author: str, body: str, comment_date: Optional[st
     (and wrongly) emit forever after.
     """
     path = Path(path)
-    text = path.read_text(encoding="utf-8")
-    frontmatter, file_body = parse_frontmatter(text)
+    record = read_record(path)
+    eol = record.eol
+    old_body_bytes = record.raw[record.body_start:]
     date_str = comment_date or _today()
-    comment_block = f"### @{author} — {date_str}\n\n{body.strip()}\n"
+    comment_block_text = f"### @{author} — {date_str}\n\n{body.strip()}\n"
 
-    has_heading = any(COMMENTS_HEADING_RE.match(l) for l in file_body.split("\n"))
-    new_body = file_body
-    if not new_body.endswith("\n"):
-        new_body += "\n"
-    if not new_body.endswith("\n\n"):
-        new_body += "\n"
-    if has_heading:
-        new_body += comment_block
-    else:
-        new_body += "## Comments\n\n" + comment_block
+    has_heading = any(
+        COMMENTS_HEADING_RE.match(line) for line in old_body_bytes.decode("utf-8").split("\n")
+    )
+    if not has_heading:
+        comment_block_text = "## Comments\n\n" + comment_block_text
 
+    # Separator logic on the raw tail, in eol/eol*2 units -- not a literal
+    # "\n"/"\n\n" check, which would misjudge a CRLF file's own blank line
+    # (POLY-60 ruling R1).
+    separator = b""
+    tail = old_body_bytes
+    if not tail.endswith(eol):
+        separator += eol
+        tail = tail + eol
+    if not tail.endswith(eol * 2):
+        separator += eol
+
+    comment_block_bytes = comment_block_text.replace("\n", eol.decode("ascii")).encode("utf-8")
+    appended_bytes = separator + comment_block_bytes
+
+    frontmatter = dict(record.frontmatter)
     if _is_issue_shaped(frontmatter):
         frontmatter["updated"] = _today()
-    new_text = dump_frontmatter(frontmatter) + new_body
-    _atomic_write(path, new_text)
+    new_data = emit_frontmatter(frontmatter, eol) + old_body_bytes + appended_bytes
+    write_record(path, new_data)
     return frontmatter

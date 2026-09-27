@@ -1,7 +1,7 @@
 ---
 id: POLY-8
 title: finish-feature JS gate: token-chart-logic.test.js needs the dashboard's node_modules installed
-status: backlog
+status: done
 milestone: null
 parent: POLY-48
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [workflow, cairn, tests]
 priority: P3
 pr: null
 created: 2026-09-23
-updated: 2026-09-25
+updated: 2026-09-27
 ---
 
 
@@ -23,3 +23,7 @@ Found at POLY-4's finish gate (2026-09-23). `scripts/cairn/tests/js/token-chart-
 ## Acceptance criteria
 
 - [ ] `node --test scripts/cairn/tests/js/**/*.test.js` passes on a clone with no `dashboard/node_modules`, or the finish-feature gate installs it first
+
+### @implementation-lead — 2026-09-27
+
+Resolved by a428df5 (t.skip when dashboard/node_modules is absent, plus an independence test) -- POLY-60 ruling R3. Flipped to done.

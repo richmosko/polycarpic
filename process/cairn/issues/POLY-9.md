@@ -1,7 +1,7 @@
 ---
 id: POLY-9
 title: Unquoted leading-* paths: entry hits the YAML alias check before lint
-status: backlog
+status: done
 milestone: null
 parent: POLY-49
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [cairn, workflow]
 priority: P3
 pr: null
 created: 2026-09-23
-updated: 2026-09-25
+updated: 2026-09-27
 ---
 
 Found during POLY-2 (qa-engineer, architect re-review @ 8c41351). A hand-typed
@@ -28,3 +28,9 @@ YAML. Scope is a hint only.
 - [ ] The parser error for a `*`-leading unquoted scalar says to quote the entry (`"**/**"`)
 - [ ] `process/TRACKER.md` → Path ownership notes that `*`-leading globs must be quoted when hand-edited
 - [ ] A unit test covers the hint text
+
+## Comments
+
+### @implementation-lead — 2026-09-27
+
+Resolved by affd63d (exact ruled hint text for an unquoted leading-* paths entry) plus process/TRACKER.md -> Path ownership (:433) -- POLY-60 ruling R3. Flipped to done.

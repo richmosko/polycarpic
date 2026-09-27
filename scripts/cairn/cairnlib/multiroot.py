@@ -25,6 +25,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple
 
+from cairnlib.enginesrc import engine_source_stat
 from cairnlib.errors import CairnError
 from cairnlib.yamlsub import parse_yaml_subset
 from cairnlib.config import load_config, resolve_board_columns, resolve_board_swimlane
@@ -279,18 +280,12 @@ def compute_multi_etag(
             try:
                 p = Path(source_path)
                 if p.is_dir():
-                    # POLY-58 §2: multiroot (this module) is a leaves-first
-                    # step BEFORE watch (engine_fingerprint's owner) --
-                    # inlined rather than calling engine_fingerprint, which
-                    # would be a back-edge. Only mtime_ns/size are needed
-                    # here (never the sha engine_fingerprint also computes).
-                    mtimes = []
-                    total_size = 0
-                    for f in sorted(p.glob("*.py")):
-                        fst = f.stat()
-                        mtimes.append(fst.st_mtime_ns)
-                        total_size += fst.st_size
-                    mtime_ns = max(mtimes) if mtimes else 0
+                    # POLY-60 ruling R2: shared with watch.engine_fingerprint's
+                    # directory branch via cairnlib.enginesrc (a leaf module
+                    # below both) -- this used to be its own inlined
+                    # sorted(glob("*.py")) -> max mtime, sum size loop
+                    # (POLY-58 verdict, 222f15a), duplicating watch.py's.
+                    mtime_ns, total_size = engine_source_stat(p)
                     hasher.update(f"engine_source:{mtime_ns}:{total_size}\n".encode("utf-8"))
                 else:
                     st = p.stat()

@@ -31,6 +31,7 @@ import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List
 
+from cairnlib.enginesrc import engine_source_files, engine_source_stat
 from cairnlib.store import _dir_glob, archived_issue_paths
 from cairnlib.multiroot import Root
 
@@ -192,25 +193,25 @@ def engine_fingerprint(source_path: Path) -> Dict[str, Any]:
     `cairnlib/` package) -- `mtime_ns` is the max and `size` the sum over
     the directory's `*.py` files, `sha` is sha256 over the sorted
     `(name, NUL, bytes)` of the same files, first 12 hex. A file keeps
-    the original single-file behavior unchanged."""
+    the original single-file behavior unchanged.
+
+    POLY-60 ruling R2: `mtime_ns`/`size` come from `cairnlib.enginesrc.
+    engine_source_stat` (shared with `multiroot.compute_multi_etag`'s
+    directory branch) rather than this function's own inlined stat loop.
+    `engine_source_files` is called here for the sha AND again inside
+    `engine_source_stat` -- two globs per call, not one; neither is a
+    stat loop duplicated inline, which is the invariant R2 actually asks
+    for (architect's gate-4 verdict, POLY-60.md @ 7cd5b26).
+    """
     source_path = Path(source_path)
     if source_path.is_dir():
         hasher = hashlib.sha256()
-        mtimes = []
-        total_size = 0
-        for f in sorted(source_path.glob("*.py")):
-            data = f.read_bytes()
-            st = f.stat()
-            mtimes.append(st.st_mtime_ns)
-            total_size += st.st_size
+        for f in engine_source_files(source_path):
             hasher.update(f.name.encode("utf-8"))
             hasher.update(b"\x00")
-            hasher.update(data)
-        return {
-            "sha": hasher.hexdigest()[:12],
-            "mtime_ns": max(mtimes) if mtimes else 0,
-            "size": total_size,
-        }
+            hasher.update(f.read_bytes())
+        mtime_ns, total_size = engine_source_stat(source_path)
+        return {"sha": hasher.hexdigest()[:12], "mtime_ns": mtime_ns, "size": total_size}
     data = source_path.read_bytes()
     st = source_path.stat()
     return {"sha": hashlib.sha256(data).hexdigest()[:12], "mtime_ns": st.st_mtime_ns, "size": st.st_size}

@@ -42,6 +42,13 @@ CAIRNLIB_DIR = helpers.CAIRN_DIR / "cairnlib"
 # earlier step, and every intra-cairnlib import must point strictly
 # backward in this list.
 STEPS = [
+    # POLY-60 ruling R2: a new leaf module, "no cairnlib imports" (its own
+    # docstring's words) -- sits below multiroot (16) and watch (17), the
+    # two modules that call into it, so it must carry a step strictly
+    # earlier than both. Given step 0 (earlier than every extraction-order
+    # step below, which is fine -- this check only compares "strictly
+    # earlier", never contiguity or a specific starting index).
+    (0, "enginesrc", "engine_source_stat"),
     (1, "constants", "DEFAULT_PORT"),
     (2, "errors", "CairnError"),
     (3, "yamlsub", "parse_yaml_subset"),

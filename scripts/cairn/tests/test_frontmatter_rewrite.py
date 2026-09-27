@@ -8,6 +8,7 @@ bodies are all exercised explicitly).
 from __future__ import annotations
 
 import datetime
+import inspect
 import json
 import os
 import stat
@@ -44,6 +45,14 @@ def tail_bytes_after_second_fence(raw: bytes) -> bytes:
     first = raw.index(b"---\n")
     second = raw.index(b"---\n", first + len(b"---\n"))
     return raw[second + len(b"---\n"):]
+
+
+def _tail_after_second_fence(raw: bytes, fence: bytes = b"---\n") -> bytes:
+    """`tail_bytes_after_second_fence`, generalized to a caller-chosen fence
+    marker -- POLY-60's CRLF fixtures need `---\r\n`, not `---\n`."""
+    first = raw.index(fence)
+    second = raw.index(fence, first + len(fence))
+    return raw[second + len(fence):]
 
 
 
@@ -458,12 +467,13 @@ class AppendCommentTests(unittest.TestCase):
 
 class PT7FileModePreservationTests(unittest.TestCase):
     """PT-7: a frontmatter rewrite must preserve the original file's mode.
-    `_atomic_write` writes through `tempfile.mkstemp` (mode 0600 by
-    default) then `os.replace`s it over the target -- `os.replace` is a
-    rename, so the final file's permission bits come from the *source*
-    (the 0600 temp file), silently flipping any other starting mode to
-    0600. Exercised across three distinct starting modes, on both
-    apply_patch and append_comment (both funnel through _atomic_write)."""
+    `write_record` (POLY-60 R1: `_atomic_write_bytes` under the hood) writes
+    through `tempfile.mkstemp` (mode 0600 by default) then `os.replace`s it
+    over the target -- `os.replace` is a rename, so the final file's
+    permission bits come from the *source* (the 0600 temp file), silently
+    flipping any other starting mode to 0600. Exercised across three
+    distinct starting modes, on both apply_patch and append_comment (both
+    funnel through write_record)."""
 
     def setUp(self):
         self.tmp = helpers.make_empty_tmp_dir(self)
@@ -498,7 +508,7 @@ class PT7FileModePreservationTests(unittest.TestCase):
         self.assertEqual(self._mode(), 0o600)
 
     def test_mode_survives_append_comment_too(self):
-        # append_comment shares _atomic_write with apply_patch -- same bug,
+        # append_comment shares write_record with apply_patch -- same bug,
         # same fix should cover both call sites.
         os.chmod(self.path, 0o644)
         cairn.append_comment(self.path, "mosko", "A comment.")
@@ -574,6 +584,206 @@ class PT13MilestoneFieldOrderAndNoUpdatedInjectionTests(unittest.TestCase):
         self.assertEqual(keys, [f for f in cairn.ISSUE_FIELD_ORDER if f not in _undeclared_optional_fields(fixture_text)])
         frontmatter, _ = cairn.parse_frontmatter(raw)
         self.assertEqual(frontmatter["updated"], datetime.date.today().isoformat())
+
+
+class SetCRLFByteExactTests(unittest.TestCase):
+    """POLY-60 review checklist row 1 ('set'): apply_patch on a fully-CRLF
+    fixture (CRLF fences, CRLF body, trailing whitespace + a tab) must
+    leave every body byte after the frontmatter block untouched, and the
+    re-emitted frontmatter must still be CRLF. Mutation that must turn
+    this red: apply_patch reading via `read_text` again -- universal-
+    newline translation silently flattens the CRLF body to LF before
+    `write_record` puts it back.
+    """
+
+    def _write(self, path: Path) -> bytes:
+        frontmatter_text = (
+            "id: PT-1\r\ntitle: Thing\r\nstatus: todo\r\nmilestone: null\r\nparent: null\r\n"
+            "assignee: null\r\nlabels: []\r\npriority: null\r\npr: null\r\n"
+            "created: 2026-01-01\r\nupdated: 2026-01-01\r\n"
+        )
+        body = (
+            "Body line with trailing space.  \r\n"
+            "\r\n"
+            "## Acceptance criteria\r\n"
+            "\r\n"
+            "- [ ] a  \r\n"
+            "- [ ] b\t\r\n"
+        )
+        raw = ("---\r\n" + frontmatter_text + "---\r\n" + body).encode("utf-8")
+        path.write_bytes(raw)
+        return raw
+
+    def test_body_bytes_survive_a_set_style_patch_byte_for_byte(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        path = tmp / "PT-1.md"
+        raw = self._write(path)
+        before_tail = _tail_after_second_fence(raw, fence=b"---\r\n")
+
+        cairn.apply_patch(path, {"priority": "P2"})
+
+        after = path.read_bytes()
+        after_tail = _tail_after_second_fence(after, fence=b"---\r\n")
+        self.assertEqual(before_tail, after_tail, "body bytes changed across a CRLF frontmatter-only rewrite")
+
+        new_frontmatter, _ = cairn.parse_frontmatter(after.decode("utf-8"))
+        self.assertEqual(new_frontmatter["priority"], "P2")  # the patch itself still took effect
+
+    def test_reemitted_frontmatter_is_still_crlf(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        path = tmp / "PT-1.md"
+        self._write(path)
+
+        cairn.apply_patch(path, {"priority": "P2"})
+
+        after = path.read_bytes()
+        first = after.index(b"---\r\n")
+        second = after.index(b"---\r\n", first + len(b"---\r\n"))
+        frontmatter_block = after[first:second]
+        self.assertNotIn(
+            b"\n", frontmatter_block.replace(b"\r\n", b""),
+            "a bare LF leaked into the re-emitted CRLF frontmatter",
+        )
+
+
+class CommentCRLFByteExactTests(unittest.TestCase):
+    """POLY-60 review checklist row 2 ('comment'): the pre-existing body
+    bytes must be an exact prefix of the post-comment file, and the newly
+    appended comment block must itself be CRLF. Mutation that must turn
+    this red: building the comment block with a literal `\\n` (no `eol`
+    conversion).
+    """
+
+    def _write(self, path: Path) -> bytes:
+        frontmatter_text = (
+            "id: PT-1\r\ntitle: Thing\r\nstatus: todo\r\nmilestone: null\r\nparent: null\r\n"
+            "assignee: null\r\nlabels: []\r\npriority: null\r\npr: null\r\n"
+            "created: 2026-01-01\r\nupdated: 2026-01-01\r\n"
+        )
+        body = (
+            "Body line with trailing space.  \r\n"
+            "\r\n"
+            "## Comments\r\n"
+            "\r\n"
+            "### @a — 2026-01-01\r\n"
+            "\r\n"
+            "old  \r\n"
+        )
+        raw = ("---\r\n" + frontmatter_text + "---\r\n" + body).encode("utf-8")
+        path.write_bytes(raw)
+        return raw
+
+    def test_old_bytes_are_an_exact_prefix_and_the_new_block_is_crlf(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        path = tmp / "PT-1.md"
+        raw = self._write(path)
+        before_tail = _tail_after_second_fence(raw, fence=b"---\r\n")
+
+        cairn.append_comment(path, "b", "new comment", comment_date="2026-01-02")
+
+        after = path.read_bytes()
+        after_tail = _tail_after_second_fence(after, fence=b"---\r\n")
+        self.assertTrue(
+            after_tail.startswith(before_tail),
+            "pre-existing body bytes were not kept as an exact prefix",
+        )
+        appended = after_tail[len(before_tail):]
+        self.assertNotIn(b"\n", appended.replace(b"\r\n", b""), "a bare LF leaked into the appended CRLF block")
+        self.assertIn("### @b — 2026-01-02\r\n".encode("utf-8"), appended)
+
+    def test_missing_trailing_eol_gets_a_real_crlf_separator_not_glued_text(self):
+        # POLY-60 review checklist row 3: a file with NO final EOL at all
+        # must still get a real CRLF separator before the new content --
+        # never text glued directly onto the last existing byte. Mutation
+        # that must turn this red: dropping the `endswith(eol)` check.
+        tmp = helpers.make_empty_tmp_dir(self)
+        path = tmp / "PT-1.md"
+        frontmatter_text = (
+            "id: PT-1\r\ntitle: Thing\r\nstatus: todo\r\nmilestone: null\r\nparent: null\r\n"
+            "assignee: null\r\nlabels: []\r\npriority: null\r\npr: null\r\n"
+            "created: 2026-01-01\r\nupdated: 2026-01-01\r\n"
+        )
+        body_tail = (
+            "Para.\r\n\r\n## Comments\r\n\r\n### @a — 2026-01-01\r\n\r\nFirst comment, no trailing eol"
+        )
+        raw = ("---\r\n" + frontmatter_text + "---\r\n" + body_tail).encode("utf-8")
+        path.write_bytes(raw)
+        before_tail = _tail_after_second_fence(raw, fence=b"---\r\n")
+
+        cairn.append_comment(path, "b", "Second.", comment_date="2026-01-02")
+
+        after = path.read_bytes()
+        after_tail = _tail_after_second_fence(after, fence=b"---\r\n")
+        self.assertTrue(after_tail.startswith(before_tail), "pre-existing body bytes were altered")
+        appended = after_tail[len(before_tail):]
+        # Architect's gate-4 verdict (POLY-60.md @ 7cd5b26): the mutated
+        # output ("...eol\r\n### @b") still starts with a bare `\r\n`, so
+        # that alone doesn't catch dropping the `endswith(eol)` check --
+        # the exact separator the LF path has always produced is `eol`
+        # (finish the dangling last line) THEN a blank line (`eol` again)
+        # before the comment marker, i.e. `\r\n\r\n### @b`.
+        self.assertTrue(
+            appended.startswith(b"\r\n\r\n### @b"),
+            f"expected a CRLF end-of-line plus a CRLF blank-line separator before the new "
+            f"comment marker, got {appended[:12]!r}",
+        )
+        self.assertNotIn(b"\n", appended.replace(b"\r\n", b""), "a bare LF leaked into the appended tail")
+
+
+class MixedEOLTests(unittest.TestCase):
+    """POLY-60 review checklist row 9: a mixed-EOL file (CRLF fences, LF
+    body) must re-emit the frontmatter in the OPENING FENCE's line ending
+    and must never touch the (untouched-span) LF body. Built with far more
+    LF body lines than CRLF fence lines so a majority-vote-derived `eol`
+    and the fence-derived rule visibly disagree. Mutation that must turn
+    this red: deriving `eol` by majority/`os.linesep` instead of the
+    opening fence.
+    """
+
+    def test_eol_comes_from_the_opening_fence_not_a_body_majority_vote(self):
+        tmp = helpers.make_empty_tmp_dir(self)
+        path = tmp / "PT-1.md"
+        frontmatter_text = (
+            "id: PT-1\r\ntitle: Thing\r\nstatus: todo\r\nmilestone: null\r\nparent: null\r\n"
+            "assignee: null\r\nlabels: []\r\npriority: null\r\npr: null\r\n"
+            "created: 2026-01-01\r\nupdated: 2026-01-01\r\n"
+        )
+        body = "".join(f"Line {i}.\n" for i in range(20))  # 20 LF lines vs 2 CRLF fence lines
+        raw = ("---\r\n" + frontmatter_text + "---\r\n" + body).encode("utf-8")
+        path.write_bytes(raw)
+
+        cairn.apply_patch(path, {"priority": "P2"})
+
+        after_raw = path.read_bytes()
+        after_text = after_raw.decode("utf-8")
+        _, after_body = cairn.parse_frontmatter(after_text)
+        frontmatter_bytes = after_raw[:len(after_raw) - len(after_body.encode("utf-8"))]
+        self.assertNotIn(
+            b"\n", frontmatter_bytes.replace(b"\r\n", b""),
+            "the re-emitted frontmatter must use the opening fence's CRLF, not a majority "
+            "vote over the file's mostly-LF body",
+        )
+        self.assertEqual(after_body, body, "an LF body must never be rewritten just because the fence is CRLF")
+
+
+class NoTextModeWriterInRecordsTests(unittest.TestCase):
+    """POLY-60 review checklist row 10: `records.py`'s text-mode
+    `_atomic_write` (universal-newline read, `os.linesep` write) is the
+    CRLF-corruption root cause and must be deleted outright -- the only
+    writer left is the binary path (`_atomic_write_bytes`/`write_record`).
+    A static source check, not a behavioral one: a reintroduced text-mode
+    writer can silently regress this even if every behavioral test above
+    happens to keep passing for its own narrow fixture. Mutation that must
+    turn this red: reintroducing `_atomic_write`.
+    """
+
+    def test_records_module_defines_no_text_mode_atomic_write(self):
+        import cairnlib.records as records_mod
+        source = inspect.getsource(records_mod)
+        self.assertNotIn(
+            "def _atomic_write(", source,
+            "the text-mode _atomic_write must be deleted -- it is the CRLF-corruption root cause",
+        )
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 ---
 id: POLY-15
 title: prices.json lacks claude-opus-5-5; one unpriced model nulls an issue's whole cost
-status: backlog
+status: done
 milestone: POLY-A
 parent: POLY-48
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [cairn, telemetry]
 priority: P3
 pr: null
 created: 2026-09-23
-updated: 2026-09-25
+updated: 2026-09-27
 ---
 
 
@@ -25,3 +25,7 @@ Two non-blocking loop-stats notes from the same review, file with this or drop: 
 ### @team-lead — 2026-09-24
 
 AC1 landed on the POLY-3 branch: `claude-opus-5-5` row added to prices.json from the published table (input 4, cache_write_5m 5, cache_write_1h 8, cache_read 0.20, output 20; retrieved 2026-09-24). Reason it rode POLY-3: `test_prices_table` reads the real token log, which now carries opus-5-5, so the finish gate could not pass without the row. AC2 (partial cost + warning vs null) stays open here.
+
+### @implementation-lead — 2026-09-27
+
+Resolved by ba0a246 (AC1: claude-opus-5-5 rate added) and d5d90a1 plus the POLY-48 ruling (a) (AC2: null-cost posture stated; test_estimation.py:1642) -- POLY-60 ruling R3. Flipped to done.
