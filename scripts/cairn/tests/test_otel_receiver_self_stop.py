@@ -1057,6 +1057,19 @@ class GraceWindowFlushContentTests(unittest.TestCase):
             f"timeout (grace={grace}s), {stopped.stdout!r} {stopped.stderr!r}",
         )
 
+        # POLY-59 gate-1 ruling §2B: CI-only flake (run 36278579860) --
+        # `--status` reports not-running from httpd.server_close() onward,
+        # while the pidfile itself survives until _compare_and_delete_
+        # pidfile() runs, AFTER _do_flush() writes --out-file. Reading the
+        # file as soon as --status says not-running can land in that
+        # window, before the flush itself has completed. Waiting for the
+        # pidfile to be gone happens-after the flush returns, so it is the
+        # correct signal to read the file by, not --status alone.
+        self.assertTrue(
+            _wait_for_pidfile_gone(fake_root, timeout=5.0),
+            "pidfile must be removed once the self-stop flush has completed",
+        )
+
         out_path = _out_path(fake_root)
         self.assertTrue(out_path.is_file(), "the self-stop flush must have written --out-file")
         lines = read_jsonl(out_path)
