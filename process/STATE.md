@@ -15,14 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_Feature: Cairn core: byte-exact writes, CRLF, old-style child issues (grouped)  
-Issue: POLY-60 (cairn)  
-Milestone: POLY-A  
-Branch: `feature/poly-60-cairn-core-bytes`  
-Started: 2026-09-27  
-Goal: every cairn read/write path preserves bytes outside the edited span (CRLF and trailing whitespace included), `check-item` accepts CRLF frontmatter, the 8 old-style POLY-48/POLY-49 children stop tripping the lint, and the duplicated dir-stat loop from POLY-58 folds into one helper.  
-PR: https://github.com/richmosko/polycarpic/pull/30  
-Status: In Review_
+_None — between loops. POLY-A open work: POLY-59 (telemetry umbrella, backlog) and a routine archive run for POLY-48/POLY-49 and their nine now-done children. Next session decides whether POLY-A closes as the Research→Plan transition._
 
 ## Releases
 
