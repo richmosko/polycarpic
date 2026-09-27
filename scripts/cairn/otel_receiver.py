@@ -187,6 +187,7 @@ from urllib.parse import urlparse
 import cairn
 import backfill_tokens
 import worktree_root
+from cairnlib.watch import engine_fingerprint, engine_is_stale
 
 SOURCE_NAME = "otel"
 DEFAULT_OTEL_PORT = 4318
@@ -218,6 +219,13 @@ NUDGE_CAPABLE_MARKER_NAME = ".nudge-capable"
 # find the daemon's own resolved transcripts dir), even though `--status`
 # no longer reads it back for liveness labelling.
 TRANSCRIPTS_DIR_MARKER_NAME = ".transcripts-dir"
+# POLY-61 ruling R1: written once at daemon startup, inside `_sessions_dir`,
+# same pattern as NUDGE_CAPABLE_MARKER_NAME/TRANSCRIPTS_DIR_MARKER_NAME.
+# Content is JSON: `{"<resolved abs path>": {"sha", "mtime_ns", "size"}, ...}`,
+# in `_engine_sources()` order -- the boot fingerprint `--status` and
+# `ensure_running` compare the CURRENT on-disk files against, via
+# `cairnlib.watch.engine_is_stale`. See `_engine_sources`/`_engine_staleness`.
+ENGINE_FINGERPRINT_MARKER_NAME = ".engine-fingerprint"
 DEFAULT_GRACE_PERIOD_SECONDS = 10.0  # addendum §D: default 10s
 WATCHDOG_TICK_SECONDS = 0.2  # addendum §4: "ticks <= 0.25 s"
 # POLY-49 ruling §4: "Liveness = pid, every tick" -- `_tick` now reaps
@@ -1128,6 +1136,70 @@ def _sessions_dir(pidfile: Path) -> Path:
     return pidfile.parent / SESSIONS_DIRNAME
 
 
+# --------------------------------------------------------------------------
+# POLY-61: the receiver's own engine-staleness self-check. `serve()`
+# fingerprints `_engine_sources()` once at boot (R1) and every later
+# `--status`/`ensure_running` call compares the CURRENT files against that
+# recorded marker (R2/R4) via `cairnlib.watch.engine_is_stale` -- no hashing
+# or stat code of its own (ruling guard G1).
+# --------------------------------------------------------------------------
+
+def _engine_sources() -> List[Path]:
+    """R1: every module `otel_receiver.py` imports at process start,
+    fingerprinted for the staleness self-check -- covers more than the
+    issue's two named files (`cairnlib/enginesrc`), since a change to any
+    of these leaves the running daemon just as stale as the POLY-50
+    `cairnlib/` case does (ruling m1). Order matters: it's the order the
+    marker JSON and every `engine: stale (...)` name list is written in."""
+    here = Path(__file__).resolve().parent
+    return [
+        here / "otel_receiver.py",
+        here / "backfill_tokens.py",
+        here / "cairn.py",
+        here / "worktree_root.py",
+        here / "cairnlib",
+    ]
+
+
+def _engine_staleness(sessions_dir: Path) -> Tuple[str, List[str]]:
+    """Reads the `ENGINE_FINGERPRINT_MARKER_NAME` marker `serve()` wrote at
+    boot and compares each recorded path against its CURRENT on-disk state
+    via `engine_is_stale`. Returns `("current", [])`, `("stale", [names])`
+    (marker order, basenames only), or `("unknown", [])` -- marker absent
+    or unparseable (a pre-POLY-61 daemon, or `--status`/`ensure_running`
+    called before any daemon ever wrote one). Never raises."""
+    marker_path = sessions_dir / ENGINE_FINGERPRINT_MARKER_NAME
+    try:
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "unknown", []
+    if not isinstance(marker, dict):
+        return "unknown", []
+    stale_names: List[str] = []
+    for path_str, boot in marker.items():
+        if not isinstance(boot, dict):
+            continue
+        if engine_is_stale(Path(path_str), boot):
+            stale_names.append(Path(path_str).name)
+    return ("stale" if stale_names else "current"), stale_names
+
+
+def _warn_if_engine_stale(sessions_dir: Path) -> None:
+    """R4: `ensure_running`'s already-live paths report only -- they never
+    restart (the spawn argv is this CALLER's own `__file__`, so an
+    auto-restart from a worktree session would hand the one daemon to a
+    feature-branch engine; see the ruling for why this stays a merge-time
+    or operator action). One stderr line, nothing else changes (rc,
+    return value, pid)."""
+    state, stale_names = _engine_staleness(sessions_dir)
+    if state == "stale":
+        print(
+            f"otel_receiver: running receiver's engine is stale ({', '.join(stale_names)}); "
+            "restart it: --stop, then --ensure-running",
+            file=sys.stderr,
+        )
+
+
 def register_session(sessions_dir: Path, session_id: str, pid: Optional[int]) -> None:
     """Idempotent upsert -- a SessionStart hook firing twice for the same
     session id (shouldn't happen, but never fatal if it does) just
@@ -1480,10 +1552,12 @@ def ensure_running(
             # gotten there yet -- either way this is NOT a stranger
             # holding the port, so H2's "already held" alarm below would
             # be a false one. We're already registered; report success.
+            _warn_if_engine_stale(sessions_dir)
             return True
         already_running = False  # the old daemon is genuinely gone -- fall through to a fresh spawn
 
     if already_running:
+        _warn_if_engine_stale(sessions_dir)
         return True  # no-op -- already up, and (if given) now registered too
 
     # H3: otel_port (config.yml, the single source of truth -- `port`
@@ -1618,6 +1692,16 @@ def _status(
     this never re-reads `os.environ`/the user settings file a second
     time); `None` (a caller that hasn't resolved one) omits the line
     entirely rather than guessing.
+
+    POLY-61 ruling R2/R3: one new line, immediately after `last-flush:`
+    and before `sessions:` -- `engine: current`, `engine: stale
+    (<names>)` (marker order, basenames), `engine: unknown (no
+    fingerprint)` (marker absent/unparseable), or `engine: unknown (not
+    running)` (the marker isn't even read when `running` is False).
+    Exit-code precedence: `1` not running > `2` watchdog stale > `3`
+    running, watchdog not stale, engine stale > `0`. `unknown` never
+    changes the exit code, the same asymmetry `watchdog: absent` already
+    has.
     """
     pid = _read_pidfile(pidfile)
     running = pid is not None and _pid_is_alive(pid) and _port_is_listening(port)
@@ -1649,6 +1733,23 @@ def _status(
         print(f"last-flush: {parts[0]} ({parts[1]} lines)")
     else:
         print("last-flush: never")
+
+    # POLY-61 ruling R2: compares the marker `serve()` wrote at boot
+    # against the CURRENT on-disk files -- never read when `running` is
+    # False (a stopped daemon's marker says nothing about what would run
+    # next).
+    engine_stale = False
+    if not running:
+        print("engine: unknown (not running)")
+    else:
+        engine_state, engine_stale_names = _engine_staleness(sessions_dir)
+        if engine_state == "unknown":
+            print("engine: unknown (no fingerprint)")
+        elif engine_state == "stale":
+            print(f"engine: stale ({', '.join(engine_stale_names)})")
+            engine_stale = True
+        else:
+            print("engine: current")
 
     ids = live_session_ids(sessions_dir)
     print(f"sessions: {len(ids)}")
@@ -1684,6 +1785,8 @@ def _status(
         # nothing this ticket didn't already accept -- `stale` alone stays
         # the scriptable, unambiguous case.
         return 2
+    if engine_stale:
+        return 3
     return 0
 
 
@@ -1822,6 +1925,13 @@ def serve(
     state = ReceiverState()
     sessions_dir = sessions_dir if sessions_dir is not None else _sessions_dir(pidfile)
     my_pid = os.getpid()
+    # POLY-61 ruling R1: the "boot" engine fingerprint -- computed ONCE
+    # here, at entry, and held on this closure. Every later `--status`/
+    # `ensure_running` call (a separate CLI invocation) compares against
+    # what THIS process actually loaded, never against its own `__file__`
+    # (a worktree CLI on a feature branch would otherwise raise a false
+    # alarm -- ruling R2).
+    engine_boot = {str(p): engine_fingerprint(p) for p in _engine_sources()}
     # POLY-49 ruling §4: liveness = pid, every tick -- the old two-signal
     # (pid + transcript-staleness) probe is withdrawn from the reap
     # predicate entirely; `transcripts_dir` stays a `serve()` parameter
@@ -1850,6 +1960,7 @@ def serve(
     # resolved, not whatever that separate CLI call would resolve on its
     # own -- see TRANSCRIPTS_DIR_MARKER_NAME's own comment.
     (sessions_dir / TRANSCRIPTS_DIR_MARKER_NAME).write_text(str(transcripts_dir), encoding="utf-8")
+    (sessions_dir / ENGINE_FINGERPRINT_MARKER_NAME).write_text(json.dumps(engine_boot), encoding="utf-8")
 
     def _do_flush() -> int:
         """Returns the number of lines this flush wrote (PT-90) -- `0` on
@@ -2111,6 +2222,11 @@ def serve(
                     sessions_dir.mkdir(exist_ok=True)
                     (sessions_dir / NUDGE_CAPABLE_MARKER_NAME).write_text("", encoding="utf-8")
                     (sessions_dir / TRANSCRIPTS_DIR_MARKER_NAME).write_text(str(transcripts_dir), encoding="utf-8")
+                    # POLY-61 R1: rewritten from the SAME `engine_boot` dict
+                    # `serve()` computed once at entry -- never recomputed
+                    # here, which would launder a stale daemon's own
+                    # fingerprint back to "current" on every registry recreate.
+                    (sessions_dir / ENGINE_FINGERPRINT_MARKER_NAME).write_text(json.dumps(engine_boot), encoding="utf-8")
                     print(f"watchdog: registry dir absent {registry_absent_recreate_seconds}s, recreated {sessions_dir}", file=sys.stderr)
                     st["absent_since"] = None
                     return True

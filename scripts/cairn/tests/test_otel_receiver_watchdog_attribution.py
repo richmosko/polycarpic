@@ -77,6 +77,19 @@ REAL_SESSIONS_DIR = REAL_METRICS_DIR / ".sessions"
 # carry it too or the copy crashes at import time.
 ENGINE_FILES = ("otel_receiver.py", "backfill_tokens.py", "cairn.py", "worktree_root.py")
 
+
+def _sigcont_if_alive(pid: int) -> None:
+    """POLY-61 ruling R6: `self.addCleanup(os.kill, pid, signal.SIGCONT)`
+    raises `ProcessLookupError` if the daemon has already died by cleanup
+    time -- it must never surface as a cleanup error masking (or riding
+    alongside) a real test failure. Only `ProcessLookupError` is swallowed;
+    `PermissionError` still raises."""
+    try:
+        os.kill(pid, signal.SIGCONT)
+    except ProcessLookupError:
+        pass
+
+
 _REAL_STATE_SNAPSHOT = None
 
 
@@ -732,7 +745,7 @@ class StatusReportsWatchdogAndLastFlushTests(unittest.TestCase):
         # daemon must be resumed before --stop is ever sent to it.
         pid = int(_pidfile_path(fake_root).read_text(encoding="utf-8").strip())
         os.kill(pid, signal.SIGSTOP)
-        self.addCleanup(os.kill, pid, signal.SIGCONT)
+        self.addCleanup(_sigcont_if_alive, pid)
         old = time.time() - 10
         os.utime(heartbeat, (old, old))
         # Adversarial wait: strictly longer than the 1.0s write interval --
