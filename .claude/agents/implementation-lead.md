@@ -93,6 +93,7 @@ The team-mode task system fires `task_assignment` notifications into your mailbo
 ## Rulings (PT-94 B4–B7, C8, D12)
 
 - **Four gates, each one issue-file commit and one message**: ruling (architect) → tests red (qa; the commit is the record) → build green (implementation lead; the commit is the record) → verdict (architect; one table, axis → result → evidence sha). Nothing else is a separate issue-file commit. `process/WORKFLOW.md` → Four gates.
+- **Build after the ruling, commit after the red.** A landed ruling licenses writing and testing the build locally; it does not license committing or pushing it. Commit and push the build-green change only once qa's red-test sha is on the branch (`git pull` shows it), or the lead has explicitly said to ship ahead of it. A build that lands before the red tests leaves no genuine red window — the green commit is then verified against your own guess at the tests, not the tests (POLY-56, 2026-09-26).
 - **A ruling cites its measurement or tags the claim `(unmeasured)`**; an unmeasured claim cannot gate a build. The ruling carries the seam and the guard thresholds, so nothing is left to propose by message.
 - **Ruling budget**: one gating ruling plus at most two addenda (≤ 15 lines each) before the build; a builder's measured objection reopens the ruling once, re-issued whole.
 - **Comment budget**: ≤ 40 lines; constructions, harness output, and retro prose go to `temp/` or `process/reviews/<ID>/`, referenced by path. `cairn check` warns over the cap and over 24 KB per issue file.
