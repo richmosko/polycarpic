@@ -71,3 +71,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** one 8,000-line file made every cairn loop collide in the same file and let no module test alone. Keeping `import cairn` byte-for-byte compatible means the shim, the four sibling scripts and 54 test files needed no edits; the flat package (not nested sub-packages) keeps the import graph one level deep and the extraction one commit per module with the suite green at each.
 **Alternatives considered:** the earlier 13-module sketch (11 backward calls, could not be extracted in order); nested sub-packages such as `readers/` (a second level of `__init__` re-exports for no boundary gain); rewriting callers to import `cairnlib` directly (touches every test and script for no behaviour change).
 **Approved by:** richmosko (POLY-58 plan confirmed 2026-09-26)
+
+### 2026-09-27 — Cairn record writes are bytes in, bytes out
+**Decision:** every cairn command that rewrites an issue file goes through `cairnlib.records.read_record` / `write_record`: the file is read and written as bytes, the frontmatter is re-emitted with the file's own line ending, and nothing after the closing fence changes unless the command's edit is there. The text-mode writer is gone. `parse_frontmatter` accepts a `---\r` fence so CRLF files parse everywhere. Ruling: `process/reviews/POLY-60/ruling.md` R1.
+**Why:** `set`, `comment` and `close` silently rewrote whole CRLF files to LF on first touch, so the tracker's byte-for-byte guarantee was false for every path except POLY-56's `check-item`. One seam under one fixture test per path is cheaper to keep true than five separate promises.
+**Alternatives considered:** normalise every file to LF on read and declare LF canonical (breaks the guarantee by fiat and rewrites files nobody edited); fix only `check-item`'s refusal (leaves the three rewriting paths wrong).
+**Approved by:** richmosko (POLY-60 plan confirmed 2026-09-27)
