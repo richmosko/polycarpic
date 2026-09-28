@@ -8,15 +8,18 @@ it works' is the template's strongest property"). This follows the same preceden
 by an agent, re-vendor by hand when the upstream preset changes.
 
 `gen_variants.py` (same directory) is the authoring tool that turns `variants.json` into
-the three checked-in `variants.css` copies (`scripts/cairn/board/variants.css`,
-`scripts/cairn/dashboard/src/variants.css`, `docs/DESIGN/variants.css`). It is
+the two checked-in `variants.css` copies (`scripts/cairn/board/variants.css`,
+`scripts/cairn/dashboard/src/variants.css`). It is
 stdlib-only, zero network — regenerate with `python3 scripts/cairn/board/theme/gen_variants.py`
-after any edit to `variants.json`.
+after any edit to `variants.json`. (POLY-78: a third copy used to be written to
+`docs/DESIGN/variants.css`; the Principal's ruling that cairn must not write under `docs/`
+retired that target. Cairn's own frozen design reference now lives at
+`scripts/cairn/board/theme/design-system-spec.md`.)
 
 ## Source and method
 
 Every value in `variants.json` was extracted from the same generator the app's own
-`b6XadDxmQS` preset (`docs/DESIGN/design-system-spec.md`'s canonical source) comes from:
+`b6XadDxmQS` preset (`scripts/cairn/board/theme/design-system-spec.md`'s canonical source) comes from:
 shadcn-svelte's CLI preset system (`packages/cli/src/preset/preset.ts` in
 `huntabyte/shadcn-svelte`), decoded/re-encoded with each dimension's target value swapped
 (base color, theme, or chart color), then materialized via the CLI's own live data
@@ -45,9 +48,9 @@ dimension's delta.
   every fetched Base Color option (verified: same value for all 6 non-default bases) —
   i.e. this pair is genuinely base-invariant in the live system, not something the
   generator forgot to vary. `variants.json` reuses this app's own already-vendored
-  default value (`docs/DESIGN/design-system-spec.md`'s Foundations → Color table,
-  extracted 2026-08-26) for `--destructive-foreground` in every Base Color variant rather
-  than inventing one.
+  default value (`scripts/cairn/board/theme/design-system-spec.md`'s Foundations → Color
+  table, extracted 2026-08-26) for `--destructive-foreground` in every Base Color variant
+  rather than inventing one.
 - **Theme.** Expanded 2026-08-29 (Mosko's live-test finding #5) from a curated 7 to the
   **full 24-name `PRESET_THEME_KEYS` reference set** (Sky default + 23 alternates —
   Amber/Blue/Cyan/Emerald/Fuchsia/Green/Indigo/Lime/Mauve/Mist/Neutral/Olive/Orange/Pink/

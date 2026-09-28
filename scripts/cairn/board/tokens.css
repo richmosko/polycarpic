@@ -17,16 +17,20 @@
  * rendering depend on the dashboard's build artifact, the dependency
  * direction the spin-off constraint forbids.
  *
- * This is a THIRD copy of the same preset values (alongside
- * docs/DESIGN/tokens.css and scripts/cairn/dashboard/src/app.css) --
- * accepted per the ruling ("where a copy is unavoidable, make drift
- * loud"): scripts/cairn/tests/test_board_tokens_parity.py asserts every
- * variable this file shares with the other two agrees on value. Copies
- * are survivable; silent copies aren't.
+ * This is a SECOND copy of the same preset values (alongside
+ * scripts/cairn/dashboard/src/app.css) -- accepted per the ruling
+ * ("where a copy is unavoidable, make drift loud"):
+ * scripts/cairn/tests/test_board_tokens_parity.py asserts every variable
+ * this file shares with app.css agrees on value. Copies are survivable;
+ * silent copies aren't. (POLY-78: a third copy at docs/DESIGN/tokens.css
+ * used to be parity-tested here too; the Principal's ruling that cairn
+ * must not write or depend on anything under docs/ retired that leg --
+ * docs/DESIGN/ is the product's own design system now, owned by
+ * ux-designer, free to diverge.)
  *
  * PALETTE = shadcn-svelte "create" preset b6XadDxmQS -- same source as
- * the other two copies; see docs/DESIGN/design-system-spec.md for full
- * detail and usage rules.
+ * the other copy; see scripts/cairn/board/theme/design-system-spec.md
+ * for full detail and usage rules.
  *
  * Owned by the ux-designer agent for its color/radius values; the
  * board-specific font-delivery mechanism (self-hosted @font-face here,
@@ -83,8 +87,9 @@
 
   /* Radius scale -- same multiplicative formula as the live shadcn-svelte
      scaffold's generated @theme inline block (verified against real CLI
-     output, not derived on paper -- see docs/DESIGN/tokens.css's own
-     comment for the correction history). PT-57's ruling: pick per
+     output, not derived on paper -- see
+     scripts/cairn/board/theme/design-system-spec.md's own comment for
+     the correction history). PT-57's ruling: pick per
      component (badge/chip -> sm, button/input -> md, card/drawer -> lg),
      never a blanket swap of the old flat 6px --radius. */
   --radius-sm: calc(var(--radius) * 0.6);
@@ -96,7 +101,7 @@
      --font-sans carries the base/default UI (body, buttons, inputs,
      table cells, badges/chips) despite the "sans" name; --font-heading
      is headings/section-titles only; --font-mono is ids. Same strings as
-     docs/DESIGN/tokens.css and app.css -- parity-tested. */
+     app.css -- parity-tested. */
   --font-sans: 'Merriweather Variable', Georgia, 'Times New Roman', serif;
   --font-heading: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
