@@ -6,16 +6,16 @@
 
 ## Current Phase
 
-**Phase:** Research — milestone `POLY-B` (Research: PRD v1, user stories, product-milestone sketch). `POLY-A` (Bootstrap & Tooling) closed and archived 2026-09-27; the Plan milestone is `POLY-C`. Kickoff decisions are consolidated in [`docs/project_kickoff.md`](../docs/project_kickoff.md); next up is Pre-Discovery into the initial PRD (`/generate-prd`, product-manager drives).  
-**Started:** 2026-09-23  
-**Driver agent:** team-lead (product-manager drives once the PRD interview starts)  
+**Phase:** Plan — milestone `POLY-C` (ARCH + SECURITY + INFRA, design system in `docs/DESIGN/`, throwaway prototype at `prototype/`, GL build-vs-adopt and migration-tool research, product milestones `POLY-M1…` created and GA designated). Research gate approved 2026-09-27: PRD v1 at [`docs/PRD/index.html`](../docs/PRD/index.html); `POLY-B` closed and archived. Opening moves run in parallel: ux-designer builds the design system + wireframes with the Principal (`/generate-designdoc`), architect starts the layer model and GL research (`/generate-archdoc`); seceng and devops-engineer join once ARCH v1 exists. Hand-offs for the architect and seceng are in `temp/` (`prd-spillover-arch.md`, `seceng-research-notes.md`).  
+**Started:** 2026-09-27  
+**Driver agent:** architect (ux-designer drives the design-system track)  
 **Gate criteria:** _see [`WORKFLOW.md`](WORKFLOW.md)_
 
 ## Active Feature
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — between loops. `POLY-B` (Research) has no issues yet; the first Research move is the PRD interview (`/generate-prd`). Tooling follow-ups after the `POLY-A` close have no milestone home yet — file the next one under a new tooling milestone or let it ride unmilestoned._
+_None — Plan phase. The thirteen story-grain issues `POLY-62`–`POLY-73`, `POLY-75` sit in `backlog` with no milestone until the architect files them into `POLY-M1…`; `POLY-74` (CI filter) is an unmilestoned tooling follow-up._
 
 ## Releases
 

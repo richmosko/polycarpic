@@ -3,7 +3,7 @@ id: POLY-B
 name: Research
 kind: process
 major: POLY-V1
-status: in-progress
+status: done
 target_tag: null
 ga: false
 ---
