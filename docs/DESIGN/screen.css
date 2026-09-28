@@ -1,65 +1,310 @@
 /*
- * screen.css — Component & screen styles for TBD.
+ * screen.css — Component & screen styles for polycarpic.
  *
  * Built entirely on the primitives in tokens.css — never hardcode a color,
  * size, or radius here; reference a `--token`. Styled-screen mockups in
  * styled-screens/ link both files, so this doubles as the implementation
- * contract frontend-lead consumes during Implement.
+ * contract frontend-lead consumes during Implement (a plain-CSS reference;
+ * the real app wires the same values through shadcn-svelte's Tailwind
+ * components — see design-system-spec.md § Component inventory for the
+ * shadcn-svelte component each of these maps to).
  *
  * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
- * The rules below are scaffolding — replace with the project's components.
  */
 
 @import url("tokens.css");
 
-/* Base */
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+
 body {
+  margin: 0;
   font-family: var(--font-sans);
-  font-size: var(--text-base);
-  line-height: var(--leading-normal);
-  color: var(--color-text);
-  background: var(--color-surface);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--foreground);
+  background: var(--muted); /* canvas convention: cards-on-muted, not cards-on-background */
 }
 
-/* Button — document every state in design-system-spec.md */
+h1, h2, h3, .heading {
+  font-family: var(--font-heading);
+  margin: 0;
+}
+
+.eyebrow {
+  font-family: var(--font-heading);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+}
+
+/* ---------- Shell: sidebar + header + content ---------- */
+.shell {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: var(--sidebar);
+  color: var(--sidebar-foreground);
+  border-right: 1px solid var(--sidebar-border);
+  padding: 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--sidebar-foreground);
+  text-decoration: none;
+}
+
+.sidebar .nav-item.active,
+.sidebar .nav-item:hover {
+  background: var(--sidebar-accent);
+}
+
+.sidebar .entity-switcher {
+  margin-bottom: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+}
+
+.content {
+  padding: 28px; /* page margins, dashboard scale */
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+/* ---------- Card / KPI stat card ---------- */
+.card {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 6%);
+}
+
+.card + .card { margin-top: 24px; }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px; /* gap between cards, dashboard scale */
+}
+
+.card-title {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.stat-card .eyebrow { margin-bottom: 8px; display: block; }
+
+.stat-value {
+  font-family: var(--font-sans); /* stat values stay on the body face, bold — not the heading face */
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+.stat-delta.positive { color: var(--positive); }
+.stat-delta.negative { color: var(--destructive); }
+.stat-delta.neutral { color: var(--muted-foreground); }
+/* Delta color is never the only signal — the sign glyph in the mockup's
+   markup (+/−) or an icon is required alongside the color, per
+   design-system-spec.md § Financial semantics. */
+
+/* ---------- Badge ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badge-default { background: var(--primary); color: var(--primary-foreground); }
+.badge-secondary { background: var(--secondary); color: var(--secondary-foreground); }
+.badge-outline { background: transparent; color: var(--foreground); border-color: var(--border); }
+.badge-destructive { background: var(--destructive); color: var(--destructive-foreground); }
+.badge-positive { background: var(--positive); color: var(--positive-foreground); }
+.badge-warning { background: var(--warning); color: var(--warning-foreground); }
+.badge-archived { background: transparent; color: var(--muted-foreground); border-color: var(--border); font-style: italic; opacity: 0.8; }
+
+/* ---------- Button ---------- */
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
+  gap: 8px;
+  padding: 8px 16px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-weight: var(--weight-medium);
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard);
+  transition: filter 120ms ease;
 }
+
+.btn-default { background: var(--primary); color: var(--primary-foreground); }
+.btn-secondary { background: var(--secondary); color: var(--secondary-foreground); }
+.btn-outline { background: transparent; color: var(--foreground); border-color: var(--border); }
+.btn-destructive { background: var(--destructive); color: var(--destructive-foreground); }
 .btn:hover { filter: brightness(1.05); }
-.btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
-/* Input */
-.input {
+/* ---------- Input / Select ---------- */
+.input, .select {
   width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
+  padding: 8px 12px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 14px;
+  font-family: var(--font-sans);
 }
-.input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-.input[aria-invalid="true"] { border-color: var(--color-danger); }
+.input:focus-visible, .select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.input[aria-invalid="true"] { border-color: var(--destructive); }
 
-/* Card */
-.card {
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface-raised);
-  box-shadow: var(--shadow-sm);
+/* ---------- Table ---------- */
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+table.data-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+}
+
+table.data-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+table.data-table tbody tr:hover { background: var(--accent); }
+table.data-table td.amount { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+table.data-table td.amount.positive { color: var(--positive); }
+table.data-table td.amount.negative { color: var(--destructive); }
+
+/* ---------- Tabs (entity switcher, GL-vs-custodial, nominal-vs-real) ---------- */
+.tabs {
+  display: inline-flex;
+  padding: 4px;
+  background: var(--muted);
+  border-radius: var(--radius-md);
+  gap: 2px;
+}
+
+.tabs .tab {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.tabs .tab.active { background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px oklch(0 0 0 / 8%); }
+
+/* ---------- Sheet / drawer (transaction detail) ---------- */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 40%);
+}
+
+.sheet {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 420px;
+  max-width: 90vw;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  border-top-left-radius: var(--radius-xl);
+  border-bottom-left-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: -4px 0 24px oklch(0 0 0 / 12%);
+}
+
+/* ---------- Progress (import batch, safe-harbor paid-vs-required) ---------- */
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.progress-fill { height: 100%; background: var(--primary); }
+.progress-fill.warning { background: var(--warning); }
+.progress-fill.destructive { background: var(--destructive); }
+
+/* ---------- Skeleton ---------- */
+.skeleton {
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 30%), transparent);
+  animation: skeleton-sweep 1.6s infinite;
+}
+
+@keyframes skeleton-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
+  * { animation: none !important; transition: none !important; }
+  .skeleton::after { display: none; }
 }

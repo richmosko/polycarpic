@@ -1,41 +1,27 @@
 /*
- * tokens.css — Design tokens for the project dashboard.
+ * tokens.css — Design tokens for the polycarpic app (SvelteKit + shadcn-svelte,
+ * PRD §8 "Technical Considerations").
  *
- * The machine-readable reference copy of the design system's primitives.
- * The color/border/ring/chart/sidebar tokens below are shipped verbatim
- * (byte-identical) into the real consumer — scripts/cairn/dashboard/
- * src/app.css's `:root`/`.dark` blocks. The radius scale and font stacks
- * are value-identical to app.css but not block-identical: this file keeps
- * them flat inside `:root` for a single-file reference copy, while app.css
- * wires the same values through a separate `@theme inline` block per
- * shadcn-svelte's standard Tailwind v4 convention (verified against the
- * live scaffold's generated output 2026-08-26, after an earlier revision
- * of this file carried a subtractive radius formula that had only ever
- * been derived on paper, never checked against what the CLI actually
- * generates — see design-system-spec.md's Radius scale section for the
- * same correction). This file is the doc-side reference copy (PT-54 AC),
- * not itself built — `index.html` links it to live-preview the swatches.
+ * This is the product's own token source — frontend-lead consumes it verbatim
+ * into apps/web's `app.css` (`:root`/`.dark`, shadcn-svelte's standard
+ * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
+ * the swatches.
  *
- * PALETTE = shadcn-svelte "create" preset b6XadDxmQS — Style "Mira", Base
- * "Stone" (warm neutrals), Theme "Sky" (blue primary), Chart "Yellow",
- * Heading face Space Grotesk, Body face Merriweather, Icon library Lucide,
- * radius 0.625rem. Values pulled verbatim from the live preset
- * (https://www.shadcn-svelte.com/create/preview?preset=b6XadDxmQS),
- * extracted 2026-08-26 — full detail and usage rules in
- * docs/DESIGN/design-system-spec.md, which this file's values must match
- * exactly (re-extract and diff both if the preset ever changes upstream).
- *
- * Direction pivot (2026-08-26): supersedes the retired Atlassian-modeled
- * palette (preset b1FR0Us0w) this file previously carried. That legacy
- * palette lived on in scripts/cairn/board/board.css only until PT-57
- * (2026-08-27) migrated it too — board.css now consumes its own third
- * copy of these values (scripts/cairn/board/tokens.css, colors+radius
- * only; no font vars — see that file's own header for why a third copy
- * is unavoidable there and how drift across all three is caught). No
- * project-specific semantic aliases are added here: the pivot is
- * preset-pure by design (no invented hues) — see design-system-spec.md
- * § Project extensions for how the record-status/badge vocabulary is
- * expressed entirely as shadcn badge variants against these tokens.
+ * PROVENANCE — deliberately shared, not coincidental: the base palette below
+ * (colors, radius scale, font stacks) is inherited byte-for-byte from
+ * scripts/cairn/dashboard/src/app.css, the cairn tracker tool's own
+ * shadcn-svelte preset (`b6XadDxmQS` — Style "Mira", Base "Stone", Theme
+ * "Sky", Chart "Yellow", heading Space Grotesk, body Merriweather, icons
+ * Lucide, radius 0.625rem; extracted 2026-08-26, full derivation history and
+ * AA contrast fixes in design-system-spec.md's Foundations section). Both
+ * our internal tooling and the product itself are shadcn-svelte apps, so
+ * reusing an already-audited, AA-vetted preset is a deliberate consistency
+ * choice, not laziness — re-deriving a second palette from scratch would buy
+ * nothing. THIS FILE NOW DIVERGES from cairn-dashboard's app.css below the
+ * inherited-foundations line: the `--positive`/`--warning`/entity-type
+ * tokens are polycarpic-specific additions with no cairn-tool equivalent,
+ * and are NOT mirrored back into scripts/cairn/dashboard. If the upstream
+ * preset ever changes, re-extract and diff the foundations block only.
  *
  * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
  */
@@ -111,6 +97,17 @@
   --font-sans: 'Merriweather Variable', Georgia, 'Times New Roman', serif;
   --font-heading: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* --- polycarpic product additions below this line (no cairn-dashboard
+     equivalent) --- financial-semantic colors the base preset has no slot
+     for: gain/loss deltas and a caution tier distinct from --destructive's
+     danger. (unmeasured — target AA 4.5:1 text / 3:1 large+UI against
+     --card and --background; verify before lock, see design-system-spec.md
+     § Financial semantics.) */
+  --positive: oklch(0.52 0.15 150);
+  --positive-foreground: oklch(1 0 0);
+  --warning: oklch(0.75 0.15 85);
+  --warning-foreground: oklch(0.28 0.05 85);
 }
 
 .dark {
@@ -155,4 +152,10 @@
   --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.553 0.013 58.071);
+
+  /* polycarpic product additions, dark mode — see :root's comment above. */
+  --positive: oklch(0.62 0.15 150);
+  --positive-foreground: oklch(0.15 0.02 150);
+  --warning: oklch(0.70 0.15 85);
+  --warning-foreground: oklch(0.2 0.04 85);
 }
