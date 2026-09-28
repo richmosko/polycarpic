@@ -1,18 +1,20 @@
 ---
 id: POLY-74
-title: CI: exclude process/DECISIONS.md from the cairn job's change filter
-status: todo
+title: CI change filter over-triggers
+status: done
 milestone: null
 parent: null
 blocked_by: []
-assignee: null
-paths: [.github/workflows/ci.yml]
+assignee: devops-engineer
+paths: [.github/workflows/ci.yml, tests/workflow/test_cairn_test_boundary.py]
 labels: [ci, tooling]
-priority: null
-pr: null
+priority: P1
+pr: https://github.com/richmosko/polycarpic/pull/42
 created: 2026-09-27
-updated: 2026-09-27
+updated: 2026-09-28
 ---
+
+The required `cairn` CI job runs the full test suite for any change under `process/` or `docs/DESIGN/`, including files no test reads (the decision log, the state ledger, review records). Narrow the filter to the files tests actually read, keep it fail-closed, and drop `docs/DESIGN/` once POLY-78 lands.
 
 ## Context
 
@@ -28,3 +30,20 @@ updated: 2026-09-27
 ## Notes
 
 Future CI-filter follow-ups go here as sub-issues rather than new top-level issues (see the team-lead memory on batching tooling fixes).
+
+
+### @team-lead — 2026-09-28
+
+**Re-scoped and raised to P1 (Principal: "process/* ... definitely triggers a full CI! That's not acceptable").** `PATTERN` is `^process/` with only the four tracker-record dirs excluded, so `process/reviews/**`, `process/DECISIONS.md`, `process/STATE.md` and every doc-only PR under them run the ~1 min suite. `docs/DESIGN/` is in `PATTERN` too, solely because of the cairn parity test that POLY-78 removes.
+
+Acceptance criteria, superseding the original single-file one:
+- [ ] A change confined to `process/reviews/**`, `process/DECISIONS.md`, or `process/STATE.md` does not run the test suites. Keep the trigger for the files a test actually reads (`process/WORKFLOW.md`, `process/TRACKER.md`, `process/cairn/config.yml`, and any `process/reviews/` ruling file a `tests/workflow` blob check pins — enumerate them from the tests rather than guessing).
+- [ ] After POLY-78 lands, `docs/DESIGN/` leaves `PATTERN`.
+- [ ] The skip decision is still fail-closed (POLY-39): any error in the filter runs the suite.
+- [ ] Do this before POLY-78; it is a one-file change and unblocks every doc PR in the Plan phase.
+
+## Comments
+
+### @team-lead — 2026-09-28
+
+Merging via PR #42 (Principal: "merge 40, then 41 then 42"). The change filter's process/ leg now names exactly what a test reads; STATE.md, DECISIONS.md and review records no longer run the suite. docs/DESIGN/ leaves the pattern once POLY-78 is on main. Closing.

@@ -113,3 +113,21 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the milestone's definition of done (PRD v1 approved, stories enumerated, backlog seeded) is met on `main` at PR #38. The kickoff orders design before ARCH because the API shape depends on the screens, not because the architect's research does; running both saves a phase-length wait. The Principal wants to judge look-and-feel on running pages, which the prototype was already scoped to provide.
 **Alternatives considered:** holding Research open for the UX flows (the workflow template's "late Research" slot) — delays the gate for work the Plan milestone already owns; static wireframes only for high fidelity — the Principal asked for a running server.
 **Approved by:** richmosko (2026-09-27, "Gate approved")
+
+### 2026-09-28 — Cairn's theme assets and tests are localized to `scripts/cairn/`; cairn never writes under `docs/`
+**Decision:** the inherited PT-69 shape, in which cairn's theme generator writes `docs/DESIGN/variants.css` and cairn's CI-run tests pin `docs/DESIGN/tokens.css` to the board's tokens, is reversed for this repo. Cairn's own design reference moves under `scripts/cairn/`, no cairn test reads any file under `docs/`, and the product design system in `docs/DESIGN/` is free to diverge from the tracker's look. Tracked as POLY-78 (devops-engineer), which must merge before the design-system branch can pass CI.
+**Why:** `docs/DESIGN/` is the product's design directory and the Principal wants polycarpic's design to take its cues from Monarch Money and Origin, not from cairn. As inherited, any product palette change would fail the required `cairn` status check, so the coupling is a merge blocker, not a cosmetic one.
+**Alternatives considered:** keep cairn's palette as the product base to satisfy the parity test (locks the product to tooling aesthetics); exempt `docs/` from CI's change filter (leaves the generator writing into the product tree).
+**Approved by:** richmosko (2026-09-28, "ensure Cairn does not write or update anything in the docs directory")
+
+### 2026-09-28 — seceng runs on opus
+**Decision:** `.claude/agents/seceng.md` is retuned from the template default (`sonnet`, `effort: high`) to `opus`, `effort: high`. The sonnet instance spawned at Plan start was retired and respawned on opus before it produced deliverables.
+**Why:** the security design for this project (RLS under connection pooling, credential encryption, purge path, threat model over a ledger) is novel system design in the same class as the architect's work, not pattern-matching.
+**Alternatives considered:** sonnet with `effort: high` (the template's rationale; rejected by the Principal for this project).
+**Approved by:** richmosko (2026-09-28)
+
+### 2026-09-28 — Rulings live in the tracker record; `process/reviews/` is retired; a hand-off is never committed
+**Decision:** durable rulings that exceed an issue comment's budget live at `process/cairn/reviews/<ID>/ruling.md`, inside the tracker's own parent directory, where CI's tracker-record exclusion already applies. The template-inherited `process/reviews/<ID>/` location is retired and its nineteen files moved with history. Hand-off files (drafts for the lead, decision candidates, review logs not meant for the record) are never committed: they live in `temp/`, which for a worktree-bound teammate means `temp/` inside its own worktree, pointed to by absolute path. `cairn guard-push` enforces it by refusing new files under `process/` outside the tracker record and the named process docs. Tracked as POLY-80. The same self-containment applies to cairn's own design assets (POLY-78).
+**Why:** three principles from the Principal: cairn's records are self-contained under one parent; no unnecessary CI triggers; nothing that is a hand-off reaches GitHub. The inherited layout violated all three at once: a free-floating `process/` directory that the CI filter treats as test-relevant, with a hook and ten briefs telling agents to commit overflow there.
+**Alternatives considered:** keep `process/reviews/` and exempt it from CI (leaves the hand-off path open and the records split across two parents); issue comments only with the line cap removed (rulings with tables and code would bloat issue files past the 24 KB board limit).
+**Approved by:** richmosko (2026-09-28, "we should go with your rec on rulings")

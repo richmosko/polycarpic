@@ -3,7 +3,7 @@ f7869cd): the dashboard's z-tier ladder -- content `z-auto` (inside an
 `isolate` page-root child, PT-117) < sidebar container `z-10` < sidebar
 rail `z-20` < header `z-40` (PT-110) < portal'd floating overlays `z-50`
 (the `[data-bits-floating-content-wrapper]` floor, PT-110 verdict delta
-2) -- recorded in docs/DESIGN/design-system-spec.md, plus four
+2) -- recorded in scripts/cairn/board/theme/design-system-spec.md, plus four
 structural guards so the doc and the code cannot drift silently.
 
 The subtlety the spec (and this file's own comments) must carry: two
@@ -29,8 +29,7 @@ DASHBOARD_APP_SVELTE = DASHBOARD_SRC / "App.svelte"
 APP_CSS = DASHBOARD_SRC / "app.css"
 SIDEBAR_SVELTE = DASHBOARD_SRC / "lib" / "components" / "ui" / "sidebar" / "sidebar.svelte"
 SIDEBAR_RAIL_SVELTE = DASHBOARD_SRC / "lib" / "components" / "ui" / "sidebar" / "sidebar-rail.svelte"
-REPO_ROOT = helpers.CAIRN_DIR.parent.parent  # scripts/cairn -> scripts -> repo root
-DESIGN_SPEC = REPO_ROOT / "docs" / "DESIGN" / "design-system-spec.md"
+DESIGN_SPEC = helpers.CAIRN_DIR / "board" / "theme" / "design-system-spec.md"
 
 
 def _strip_html_comments(source: str) -> str:

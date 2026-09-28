@@ -60,10 +60,11 @@ import palette_check
 DASHBOARD_SRC = helpers.CAIRN_DIR / "dashboard" / "src"
 APP_CSS = DASHBOARD_SRC / "app.css"
 DASHBOARD_VARIANTS_CSS = DASHBOARD_SRC / "variants.css"
-REPO_ROOT = helpers.CAIRN_DIR.parent.parent
 BOARD_VARIANTS_CSS = helpers.CAIRN_DIR / "board" / "variants.css"
-DOCS_VARIANTS_CSS = REPO_ROOT / "docs" / "DESIGN" / "variants.css"
-ALL_THREE_COPIES = (BOARD_VARIANTS_CSS, DASHBOARD_VARIANTS_CSS, DOCS_VARIANTS_CSS)
+# POLY-78: this used to be three copies including docs/DESIGN/variants.css;
+# the Principal's ruling that cairn must not write under docs/ retired that
+# target (see gen_variants.py's own module docstring).
+ALL_GENERATED_COPIES = (BOARD_VARIANTS_CSS, DASHBOARD_VARIANTS_CSS)
 GEN_VARIANTS_PY = helpers.CAIRN_DIR / "board" / "theme" / "gen_variants.py"
 
 # Ruling's adopted mapping (ux-designer's design-2), verbatim.
@@ -238,7 +239,7 @@ class AliasSeamTests(unittest.TestCase):
         self.assertEqual(offenders, [], f"app.css must carry no literal oklch(...) for a family token: {offenders!r}")
 
     def test_no_generated_variants_css_declares_a_family_token_at_all(self):
-        for copy_path in ALL_THREE_COPIES:
+        for copy_path in ALL_GENERATED_COPIES:
             with self.subTest(copy=str(copy_path)):
                 self.assertTrue(copy_path.is_file(), f"{copy_path} does not exist")
                 source = copy_path.read_text(encoding="utf-8")

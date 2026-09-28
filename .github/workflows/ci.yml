@@ -48,7 +48,16 @@ jobs:
           # Fail closed: if the diff itself errors, `set -e` aborts this step and
           # the job goes red -- it must never fall through to a silent `run=false`.
           CHANGED="$(git diff --name-only "$BASE_SHA" HEAD)"
-          PATTERN='^(scripts/cairn/|\.claude/|process/|tests/workflow/|\.github/workflows/|\.githooks/|docs/DESIGN/)'
+          # POLY-74 (Principal: a bare `process/` prefix runs the full suite for
+          # process/reviews/**, process/DECISIONS.md and process/STATE.md, which no
+          # test reads -- supersedes POLY-39's "PATTERN stays byte-identical" pin).
+          # Only the process/ paths a test actually reads stay in PATTERN:
+          # WORKFLOW.md/TRACKER.md (test_ratified_text_scanners.py), process/cairn/
+          # (config.yml, metrics/ -- carved back down to non-tracker-record files by
+          # EXCLUDE below), and the five ruling.md files
+          # test_ruling_archive_records.py pins to a specific git blob sha.
+          # docs/DESIGN/ stays for now -- POLY-78 removes cairn's last read of it.
+          PATTERN='^(scripts/cairn/|\.claude/|process/WORKFLOW\.md$|process/TRACKER\.md$|process/cairn/|process/reviews/(POLY-6|POLY-10|POLY-26|POLY-48|POLY-51)/ruling\.md$|tests/workflow/|\.github/workflows/|\.githooks/|docs/DESIGN/)'
           EXCLUDE='^process/cairn/(issues|milestones|majors|archive)/'
 
           # Skip only when every change since the last successful run on this branch is tracker-only; any gh/API/git failure here falls through to the plain diff test below, never adding a skip on its own (POLY-39).
