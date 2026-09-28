@@ -101,7 +101,6 @@ class CiWorkflowShapeTests(unittest.TestCase):
         "tests/workflow/",
         ".github/workflows/",
         ".githooks/",
-        "docs/DESIGN/",
     )
 
     def setUp(self):
@@ -184,26 +183,33 @@ class CiWorkflowShapeTests(unittest.TestCase):
 class CiExcludePatternTests(unittest.TestCase):
     """POLY-39 (ruling scripts/cairn/docs/estimation.md @ e4c73bf, §0.7):
     the `changes` step gains an `EXCLUDE` regex that filters tracker-data
-    paths (`process/cairn/{issues,milestones,majors,archive}/**`) out
-    before `PATTERN` is applied via `grep -vE ... | grep -qE ...` semantics
-    (simulated here in Python `re`, never a subprocess -- ci.yml itself is
-    the only thing under test). The step never swallows a non-zero grep
-    exit status with a bare `|| true`.
+    paths (`process/cairn/{issues,milestones,majors,archive,reviews}/**`)
+    out before `PATTERN` is applied via `grep -vE ... | grep -qE ...`
+    semantics (simulated here in Python `re`, never a subprocess -- ci.yml
+    itself is the only thing under test). The step never swallows a
+    non-zero grep exit status with a bare `|| true`.
 
     POLY-74 (Principal, 2026-09-28) supersedes POLY-39's "PATTERN stays
     byte-identical" pin: a bare `process/` prefix ran the full suite for
     `process/reviews/**`, `process/DECISIONS.md` and `process/STATE.md`,
     none of which any test reads. `PATTERN`'s `process/` leg is narrowed to
     exactly what `test_ratified_text_scanners.py` (`process/WORKFLOW.md`,
-    `process/TRACKER.md`), `process/cairn/` (config.yml, metrics/ -- still
-    carved down to non-tracker-record files by EXCLUDE), and
-    `test_ruling_archive_records.py`'s five pinned `ruling.md` blobs
-    actually read."""
+    `process/TRACKER.md`) and `process/cairn/` (config.yml, metrics/ --
+    carved down to non-tracker-record files by EXCLUDE) actually read.
+
+    POLY-80 (Principal, 2026-09-28) folds in two more changes, coordinated
+    to land after POLY-74 so the two rulings' ci.yml edits don't conflict:
+    rulings move from `process/reviews/<ID>/` into the tracker record at
+    `process/cairn/reviews/<ID>/`, so EXCLUDE now carves that directory out
+    too -- the five `ruling.md` files `test_ruling_archive_records.py` used
+    to need a PATTERN exception for (their move doesn't change their blob
+    sha) are tracker records like any other now, no exception needed. And
+    POLY-78 removed cairn's last read of `docs/DESIGN/`, so that leaves
+    PATTERN as well."""
 
     PATTERN_LITERAL = (
         r'^(scripts/cairn/|\.claude/|process/WORKFLOW\.md$|process/TRACKER\.md$'
-        r'|process/cairn/|process/reviews/(POLY-6|POLY-10|POLY-26|POLY-48|POLY-51)/ruling\.md$'
-        r'|tests/workflow/|\.github/workflows/|\.githooks/|docs/DESIGN/)'
+        r'|process/cairn/|tests/workflow/|\.github/workflows/|\.githooks/)'
     )
 
     def setUp(self):
@@ -243,6 +249,7 @@ class CiExcludePatternTests(unittest.TestCase):
             "process/cairn/milestones/POLY-A.md",
             "process/cairn/majors/POLY-V1.md",
             "process/cairn/archive/POLY-0.md",
+            "process/cairn/reviews/POLY-6/ruling.md",
         ]:
             with self.subTest(path=p):
                 self.assertFalse(self._run([p]), f"{p} alone must not trigger the cairn job")
@@ -251,19 +258,19 @@ class CiExcludePatternTests(unittest.TestCase):
         for p in [
             "process/WORKFLOW.md", "process/TRACKER.md",
             "process/cairn/config.yml", "scripts/cairn/cairn.py",
-            "process/reviews/POLY-6/ruling.md", "process/reviews/POLY-10/ruling.md",
-            "process/reviews/POLY-26/ruling.md", "process/reviews/POLY-48/ruling.md",
-            "process/reviews/POLY-51/ruling.md",
         ]:
             with self.subTest(path=p):
                 self.assertTrue(self._run([p]), f"{p} must still trigger the cairn job")
 
     def test_no_longer_relevant_paths_give_run_false(self):
         # POLY-74: no test reads any of these -- a bare `process/` prefix
-        # used to run the full suite for all three.
+        # used to run the full suite for all three. POLY-80: rulings are
+        # tracker records now (process/cairn/reviews/), and docs/DESIGN/
+        # left PATTERN once POLY-78 removed cairn's last read of it.
         for p in [
             "process/STATE.md", "process/DECISIONS.md",
-            "process/reviews/POLY-57/ruling.md", "process/reviews/POLY-C/notes.md",
+            "process/cairn/reviews/POLY-57/ruling.md", "process/cairn/reviews/POLY-C/notes.md",
+            "docs/DESIGN/tokens.css", "docs/DESIGN/variants.css",
         ]:
             with self.subTest(path=p):
                 self.assertFalse(self._run([p]), f"{p} must no longer trigger the cairn job")
@@ -274,7 +281,7 @@ class CiExcludePatternTests(unittest.TestCase):
     def test_unrelated_doc_path_gives_run_false(self):
         self.assertFalse(self._run(["docs/PRD/index.html"]))
 
-    def test_pattern_literal_matches_the_poly_74_shape(self):
+    def test_pattern_literal_matches_the_poly_80_shape(self):
         _, pattern_re = self._exclude_and_pattern()
         self.assertEqual(pattern_re.pattern, self.PATTERN_LITERAL)
 
