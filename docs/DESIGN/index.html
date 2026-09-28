@@ -19,7 +19,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.3</span>
+    <span><strong>Version:</strong> 0.4</span>
     <span><strong>Last updated:</strong> 2026-09-28</span>
   </div>
 </header>
@@ -53,7 +53,7 @@
     <li><strong>No decorative loading states.</strong> Skeletons match the real layout; spinners are a last resort (see Component inventory).</li>
     <li><strong>Every number earns trust.</strong> This is a general ledger, not a budgeting toy — a balance, a delta, or a pending-liability figure must always be traceable to its source (the journal entry, the lot, the reconciliation). The UI never shows a number it can't explain if clicked.</li>
     <li><strong>Immutability is visible, not just enforced.</strong> A posted transaction reads as posted (badge, disabled edit affordance); a correction reads as a reversal + new entry, never as a silent edit (PRD §5).</li>
-    <li><strong>Diverge from polycarpic's own tooling, deliberately.</strong> The cairn tracker (our internal tool) and the product are not the same thing and shouldn't look like it — this system's identity is hand-authored, taking inspiration from Monarch Money and Origin instead (Principal direction, 2026-09-28) — see <a href="design-system-spec.md#inspiration-monarch--origin">Inspiration: Monarch &amp; Origin</a>.</li>
+    <li><strong>Diverge from polycarpic's own tooling, deliberately.</strong> The cairn tracker (our internal tool) and the product are not the same thing and shouldn't look like it — this system's identity is derived from <strong>measured</strong> screenshots and live style reads off Monarch Money and Origin (`useorigin.com`), not memory (Principal direction, 2026-09-28) — see <a href="design-system-spec.md#inspiration-monarch--origin">Inspiration: Monarch &amp; Origin</a>.</li>
   </ul>
 </section>
 
@@ -66,7 +66,7 @@
     <li><a href="tokens.css">tokens.css</a> — design tokens as CSS custom properties (hand-authored palette, not a vendored shadcn preset)</li>
     <li><a href="screen.css">screen.css</a> — component &amp; screen styles built on the tokens</li>
   </ul>
-  <p class="section-hint">Figma stays the high-fidelity design tool for anything shipping pixel-exact (via the <code>ux-designer</code>'s Figma skills); <code>docs/DESIGN/</code> is the in-repo, code-level home that ships with the project and is the contract for implementation. Note: <code>docs/DESIGN/variants.css</code> belongs to the <code>cairn</code> tracker tool's own theme-variant pipeline (generated, do not hand-edit) — it is not part of the product's design system and is being relocated out of this directory by POLY-78, see design-system-spec.md § Provenance.</p>
+  <p class="section-hint">Figma stays the high-fidelity design tool for anything shipping pixel-exact (via the <code>ux-designer</code>'s Figma skills); <code>docs/DESIGN/</code> is the in-repo, code-level home that ships with the project and is the contract for implementation.</p>
 </section>
 
 <section id="tokens" data-section="tokens">
@@ -121,7 +121,7 @@
     <div class="swatch"><span class="chip" style="background:var(--sidebar-accent)"></span><span class="name">--sidebar-accent</span></div>
   </div>
 
-  <p class="section-hint"><strong>Type:</strong> <code>--font-sans</code> Inter — one family for body and headings, hierarchy by weight (diverges from cairn's serif/sans split); <code>--font-heading</code> is an alias onto the same family; <code>--font-mono</code> is a system stack (no extra web-font request). <strong>Radius:</strong> hand-picked <code>--radius-sm|md|lg|xl</code> = 8/10/12/20px.</p>
+  <p class="section-hint"><strong>Type:</strong> <code>--font-sans</code> Inter — one grotesque sans for body and headings, hierarchy by weight, confirmed against both reference products' actual app UI (their serif accent is marketing-only, see Inspiration); <code>--font-mono</code> Roboto Mono — Origin's own measured choice, for uppercase eyebrow labels, account numbers, tickers, tabular figures. <strong>Radius:</strong> measured <code>--radius-sm|md|lg|xl</code> = 6/8/12/20px (cards 12px, buttons 8px — both products' actual app-level values, not either's marketing-only pill).</p>
 </section>
 
 <section id="components" data-section="components">
@@ -130,12 +130,14 @@
   <table>
     <thead><tr><th>Component</th><th>shadcn-svelte primitive</th><th>polycarpic usage</th></tr></thead>
     <tbody>
-      <tr><td>Stat/KPI card</td><td>Card</td><td>Per-entity dashboard balances, pending tax liability</td></tr>
+      <tr><td>Net-worth hero</td><td>Chart (LayerChart, Area)</td><td>Big figure + signed delta on the figure + single-line area chart — direct Monarch pattern</td></tr>
+      <tr><td>Grouped account list</td><td>Table / custom</td><td>Type-grouped rows with sparkline + freshness — direct Monarch pattern</td></tr>
+      <tr><td>Segmented bar + legend</td><td>Custom, tokens-driven</td><td>Assets/Liabilities, allocation actual-vs-target — direct Monarch pattern</td></tr>
       <tr><td>Badge</td><td>Badge</td><td>Entity/account/transaction status — see Financial semantics</td></tr>
       <tr><td>Transaction table</td><td>Table</td><td>Ledger, import staging, exceptions report</td></tr>
       <tr><td>Entity switcher</td><td>Tabs / Sidebar</td><td>Switch between Person/Trust/Business/Household</td></tr>
       <tr><td>Transaction detail</td><td>Sheet</td><td>Drill into a posted/draft entry, its journal lines, source doc</td></tr>
-      <tr><td>Charts</td><td>Chart (LayerChart)</td><td>Net worth over time, allocation actual-vs-target, safe-harbor gauge</td></tr>
+      <tr><td>Empty state</td><td>Card + plain text, no skeleton</td><td>Dashboard panels not yet shipped (tax at 1.0, allocation at M4) — see styled-screens/dashboard.html</td></tr>
     </tbody>
   </table>
 </section>
@@ -180,7 +182,7 @@
   <table>
     <thead><tr><th>Concern</th><th>Standard / approach</th></tr></thead>
     <tbody>
-      <tr><td>Color contrast</td><td>WCAG AA (4.5:1 text, 3:1 large/UI) — every token pair measured via the standard relative-luminance formula against this palette's actual hex values; no CVD simulation run yet (open item)</td></tr>
+      <tr><td>Color contrast</td><td>WCAG AA (4.5:1 text, 3:1 large/UI) — every token pair measured, both modes, against this palette's actual hex values (chart ramp re-tuned after a first pass failed the 3:1 floor at both extremes); no CVD simulation run yet (open item)</td></tr>
       <tr><td>Color-alone signaling</td><td>Never — every gain/loss/status pairs color with a sign/icon/label</td></tr>
       <tr><td>Keyboard</td><td>All interactive elements reachable &amp; operable (shadcn default)</td></tr>
       <tr><td>Screen readers</td><td>Semantic markup; labelled controls; delta sign readable from text content</td></tr>
@@ -193,9 +195,9 @@
   <h2>9. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
-    <li><strong>Resolved 2026-09-28:</strong> visual identity diverges from cairn's tooling palette — Principal direction, see Overview §1 and design-system-spec.md § Inspiration.</li>
+    <li><strong>Resolved 2026-09-28:</strong> visual identity diverges from cairn's tooling palette, and is now derived from measured Monarch/Origin references rather than general recall — see design-system-spec.md § Inspiration for the correction history (two prior passes rejected).</li>
     <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — recommended before lock (design-system-spec.md § Accessibility).</li>
-    <li>A live-browser visual QA pass against Monarch/Origin would confirm or correct the inspiration notes recorded this session (no screenshot tool available) — recommended before hi-fi styled-screens are treated as final.</li>
+    <li>The Accounts screen's full grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen this pass (the highest-traffic comparison point) — Accounts itself is still at wireframe fidelity; promote it the same way as a fast-follow if the gap matters before Implement.</li>
     <li>Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.</li>
     <li><code>prototype/</code> throwaway UX prototype (kickoff §2.9) not yet built — confirm ownership/timing with team-lead.</li>
   </ul>
@@ -214,8 +216,8 @@
     <dd>A: Hand-edit <code>docs/DESIGN/comments.md</code> with <code>## §&lt;section-id&gt;</code> blocks, or run <code>/serve-docs DESIGN</code> and use the inline <code>+ Comment</code> widget. Then run <code>/refine-doc DESIGN</code>. See <a href="../../process/WORKFLOW.md">process/WORKFLOW.md</a> → Doc review loop.</dd>
     <dt>Q: Why is the design system in <code>docs/DESIGN/</code> and not in the app's source?</dt>
     <dd>A: It's the design <em>deliverable</em> — the contract. During Implement, <code>frontend-lead</code> imports or derives the app's real stylesheets from <code>tokens.css</code>/<code>screen.css</code>.</dd>
-    <dt>Q: Why do <code>tokens.css</code> and <code>variants.css</code> in this same directory look unrelated?</dt>
-    <dd>A: <code>variants.css</code> is generated infrastructure for the <code>cairn</code> tracker tool's own theme switcher, not the product — POLY-78 relocates it out of this directory entirely. See design-system-spec.md § Provenance &amp; shared tooling.</dd>
+    <dt>Q: Where did <code>variants.css</code> go?</dt>
+    <dd>A: It was generated infrastructure for the <code>cairn</code> tracker tool's own theme switcher, never part of the product — removed from this directory (POLY-78 relocates its generator target the same way). See design-system-spec.md § Provenance &amp; shared tooling.</dd>
   </dl>
 </section>
 

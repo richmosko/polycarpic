@@ -7,25 +7,20 @@
  * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
  * the swatches.
  *
- * DIRECTION (Principal, 2026-09-28, temp/design-direction-2026-09-28.md):
- * inspiration from Monarch Money and Origin (originfinancial.com); diverge
- * from the palette/type/radius that polycarpic's own cairn tracker tool
- * uses (scripts/cairn/) — matching cairn was an earlier, now-rejected
- * assumption (see design-system-spec.md § Provenance for the full history
- * and § Inspiration: Monarch & Origin for what was taken from each and
- * why). This file therefore does NOT vendor a shadcn preset the way
- * cairn's own tokens do — these are a hand-authored palette, still wired
- * through shadcn-svelte's standard CSS-custom-property slot names so
- * shadcn-svelte components consume them unchanged.
+ * THIRD PASS (2026-09-28) — derived from MEASURED references, not memory.
+ * team-lead captured live getComputedStyle reads + screenshots off
+ * monarch.com and useorigin.com (temp/design-refs/README.md + 5 images —
+ * gitignored, not in this repo; figures reproduced in
+ * design-system-spec.md § Inspiration). The prior pass (695bcad) guessed
+ * at both products' identity and got the primary hue and Origin's own
+ * domain wrong. Every hex below traces to a specific measured value from
+ * that capture, adjusted only where the raw brand color misses WCAG AA
+ * (documented inline) — see design-system-spec.md § Inspiration and
+ * § Accessibility for the derivation and every contrast figure.
  *
- * Plain sRGB hex, not OKLCH — a deliberate simplification, not an
- * oversight: this system doesn't need cairn's multi-preset theme-variant
- * machinery (scripts/cairn/board/theme/gen_variants.py), so the extra
- * color-space precision that machinery justified doesn't pay for itself
- * here. Contrast figures in design-system-spec.md § Accessibility were
- * computed from these exact hex values via the standard WCAG relative-
- * luminance formula (not OKLCH deltas) — see that section for the script
- * and figures.
+ * Plain sRGB hex, not OKLCH — this system doesn't vendor a shadcn preset
+ * (unlike cairn's own tokens) and doesn't need OKLCH's multi-preset
+ * precision.
  *
  * CI note (POLY-78, in progress): scripts/cairn/tests/test_board_tokens_parity.py
  * currently asserts this file shares values with cairn's board tokens —
@@ -37,116 +32,143 @@
  */
 
 :root {
-  /* Surfaces & text — cool neutral grays, not cairn's warm stone */
+  /* Surfaces & text — warm off-white canvas + near-black warm ink, measured
+     off Monarch's actual app UI (not its cream marketing hero — the app
+     canvas is off-white with pure-white cards, per temp/design-refs). */
   --background: #FFFFFF;
-  --foreground: #111827;
+  --foreground: #2A2926; /* Monarch's measured ink */
   --card: #FFFFFF;
-  --card-foreground: #111827;
+  --card-foreground: #2A2926;
   --popover: #FFFFFF;
-  --popover-foreground: #111827;
+  --popover-foreground: #2A2926;
 
-  /* Brand — indigo/violet, Origin-inspired; deliberately not cairn's sky blue */
-  --primary: #6D5BD0;
+  /* Brand — blue, the one hue both reference products independently reach
+     for when they need a calm/informational signal rather than an urgent
+     one (Monarch's net-worth trend line is light blue; Origin's own
+     "info" semantic color is #195F97) — adopted as the primary brand
+     accent precisely because it's shared, restrained, and free of
+     financial-semantic meaning (unlike orange/red/green, all already
+     spoken for). Origin's own measured #195F97, used as-is (6.72:1 on
+     white, no adjustment needed). */
+  --primary: #195F97;
   --primary-foreground: #FFFFFF;
-  --secondary: #F1F0FB;
-  --secondary-foreground: #3730A3;
-  --muted: #F4F5F7;
-  --muted-foreground: #5B6472; /* darkened from a lighter first pass to clear 4.5:1 on --muted (5.48:1) and --card (5.98:1) */
-  --accent: #EDEBFB;
-  --accent-foreground: #3730A3;
+  --secondary: #E8F1FA; /* pale blue tint */
+  --secondary-foreground: #0B2942;
+  --muted: #F7F4EE; /* warm off-white canvas, echoing Monarch's warm palette */
+  --muted-foreground: #65625D; /* Monarch's measured secondary text (5.53:1 on --muted, 6.07:1 on --card) */
+  --accent: #EEF4FB;
+  --accent-foreground: #0B2942;
 
-  --destructive: #DC2626;
+  /* Destructive — Origin's measured #FC4A4A darkened to #E70404 (hue/
+     saturation preserved) to clear 4.5:1 text; the raw brand value only
+     clears 3.38:1. */
+  --destructive: #E70404;
   --destructive-foreground: #FFFFFF;
 
-  --border: #E5E7EB;
-  --input: #E5E7EB;
-  --ring: #6D5BD0;
+  --border: #E8E4DB;
+  --input: #E8E4DB;
+  --ring: #195F97;
 
-  /* Chart ramp — sequential, single-hue (brand indigo), for magnitude/
-     time-series charts (net worth over time, book-vs-market). Not a
-     categorical palette — see design-system-spec.md § Financial semantics
-     for why categories are label+icon, not hue. */
-  --chart-1: #C7BFF2;
-  --chart-2: #A69AEA;
-  --chart-3: #6D5BD0;
-  --chart-4: #4B3BA8;
-  --chart-5: #332C6E;
+  /* Chart ramp — sequential, single-hue (brand blue), for magnitude/
+     time-series charts (net worth over time — Monarch's own hero chart is
+     exactly this: single-line area chart, one hue, soft gradient fill).
+     Every step clears 3:1 against --card, measured. */
+  --chart-1: #3A95DE;
+  --chart-2: #217CC5;
+  --chart-3: #196099;
+  --chart-4: #12456D;
+  --chart-5: #0B2942;
 
-  --sidebar: #FAFAFB;
-  --sidebar-foreground: #111827;
-  --sidebar-accent: #EDEBFB;
-  --sidebar-accent-foreground: #3730A3;
-  --sidebar-border: #E5E7EB;
-  --sidebar-ring: #6D5BD0;
+  --sidebar: #F7F4EE;
+  --sidebar-foreground: #2A2926;
+  --sidebar-accent: #E8F1FA;
+  --sidebar-accent-foreground: #0B2942;
+  --sidebar-border: #E8E4DB;
+  --sidebar-ring: #195F97;
 
-  /* Financial semantics — Monarch-inspired growth green for gains,
-     a caution amber distinct from --destructive's danger red. Never the
-     only signal — see design-system-spec.md § Financial semantics. */
-  --positive: #15803D;
+  /* Financial semantics — Origin's measured positive/negative hues,
+     darkened only as far as needed to clear 4.5:1 text (both raw brand
+     values only clear ~3.4-3.6:1). Warning is Monarch's measured mustard
+     accent (#EFB921, used for illustrations/promos there), darkened the
+     same way, repurposed here as a caution tier — mustard/amber-for-
+     caution is a standard convention independent of either brand. Never
+     the only signal — see design-system-spec.md § Financial semantics. */
+  --positive: #00854D; /* darkened from Origin's measured #009C5A */
   --positive-foreground: #FFFFFF;
-  --warning: #B45309;
+  --warning: #8F6C0A; /* darkened from Monarch's measured #EFB921 */
   --warning-foreground: #FFFFFF;
 
-  /* Radius — hand-picked, not formula-derived from a shadcn preset (this
-     system isn't vendoring one, see file header). Softer/larger than
-     cairn's 10px base, matching the rounder card language common to both
-     inspiration products. */
-  --radius-sm: 8px;
-  --radius-md: 10px;
+  /* Radius — measured off Monarch's actual app screenshot: cards ~12px,
+     buttons/inputs ~8px (NOT the pill shape Monarch's marketing-page CTA
+     uses — that's a marketing-only device, confirmed by comparing the
+     app screenshot against the hero page; Origin's stated button radius
+     is also 8px, corroborating). radius-xl has no direct measurement —
+     a reasonable extrapolation for sheets/drawers, flag before lock. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 20px;
 
-  /* Typography — one sans family throughout (hierarchy by weight, not by
-     face) — both Monarch and Origin do this; diverges from cairn's
-     serif-body/sans-heading split. --font-heading kept as an alias, not a
-     second family, so existing usages don't need to change meaning.
-     Single web font (Inter) rather than cairn's three — also fixes a
-     standing pushback item from this doc's own prior revision (unneeded
-     network font cost). --font-mono is a system stack, no extra request. */
+  /* Typography — one grotesque sans throughout the APP (hierarchy by
+     weight, not face): both Monarch ("ABC Oracle") and Origin ("Suisse
+     Intl") do this in their actual product UI — the serif display accent
+     both use is a MARKETING-page-only device (confirmed: Monarch's app
+     screenshot title "Accounts" is bold sans, not serif; the serif only
+     appears on monarch.com's hero/tracking marketing pages), so it's
+     deliberately NOT adopted here — see design-system-spec.md §
+     Inspiration for the reasoning. --font-mono is Origin's own measured
+     choice ("Roboto Mono"), adopted for its uppercase-letterspaced
+     section-header signature (Origin's product cards: "HOLDINGS",
+     "UPCOMING TRANSACTIONS") — a genuine, evidenced typographic
+     signature for a ledger product, not decoration. */
   --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-heading: var(--font-sans);
-  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .dark {
-  --background: #0B0E14;
-  --foreground: #E5E7EB;
-  --card: #131722;
-  --card-foreground: #E5E7EB;
-  --popover: #131722;
-  --popover-foreground: #E5E7EB;
+  /* Origin's measured near-black base (#050505) + its own subtle
+     white-overlay surface convention (rgba(255,255,255,0.04–0.08)). */
+  --background: #050505;
+  --foreground: #F2F2F0;
+  --card: #141416;
+  --card-foreground: #F2F2F0;
+  --popover: #141416;
+  --popover-foreground: #F2F2F0;
 
-  --primary: #8B7CF0;
-  --primary-foreground: #14101F; /* dark text on the lighter dark-mode primary clears 5.55:1; white on it only clears 3.37:1 */
-  --secondary: #1E2233;
-  --secondary-foreground: #C7BFF2;
-  --muted: #1B2030;
-  --muted-foreground: #9CA3AF;
-  --accent: #23283C;
-  --accent-foreground: #C7BFF2;
+  --primary: #50A1E2;
+  --primary-foreground: #08202E; /* dark text clears 6.00:1; white on this lighter dark-mode blue only clears 2.79:1 */
+  --secondary: #16324A;
+  --secondary-foreground: #BDDCF4;
+  --muted: #1A1A1C;
+  --muted-foreground: #A6A6A3;
+  --accent: #1C3A54;
+  --accent-foreground: #BDDCF4;
 
-  --destructive: #EF4444;
-  --destructive-foreground: #2A0507; /* dark text clears 4.97:1; white on this lighter dark-mode red only clears 3.76:1 */
+  --destructive: #FC4F4F;
+  --destructive-foreground: #2A0507; /* dark text clears 5.67:1 */
 
   --border: rgba(255, 255, 255, 0.08);
   --input: rgba(255, 255, 255, 0.12);
-  --ring: #8B7CF0;
+  --ring: #50A1E2;
 
-  --chart-1: #DCD6FA;
-  --chart-2: #B7AEF0;
-  --chart-3: #8B7CF0;
-  --chart-4: #6D5BD0;
-  --chart-5: #4B3BA8;
+  /* Re-lightened for dark mode — needs to clear 3:1 against the near-black
+     dark --card, so it isn't a straight carry-over of the light ramp. */
+  --chart-1: #BDDCF4;
+  --chart-2: #84BDEB;
+  --chart-3: #50A1E2;
+  --chart-4: #248ADB;
+  --chart-5: #1E74B8;
 
-  --sidebar: #0F1320;
-  --sidebar-foreground: #E5E7EB;
-  --sidebar-accent: #23283C;
-  --sidebar-accent-foreground: #C7BFF2;
+  --sidebar: #0A0A0C;
+  --sidebar-foreground: #F2F2F0;
+  --sidebar-accent: #16324A;
+  --sidebar-accent-foreground: #BDDCF4;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #8B7CF0;
+  --sidebar-ring: #50A1E2;
 
-  --positive: #4ADE80;
+  --positive: #52E0A4; /* Origin's green hue, saturation eased from its raw 100% for a dark-mode fill that doesn't read neon */
   --positive-foreground: #052E13;
-  --warning: #FBBF24;
-  --warning-foreground: #451A03;
+  --warning: #F3CA59;
+  --warning-foreground: #33230A;
 }

@@ -32,11 +32,11 @@ h1, h2, h3, .heading {
 }
 
 .eyebrow {
-  font-family: var(--font-heading);
-  font-size: 12px;
-  font-weight: 600;
+  font-family: var(--font-mono); /* Origin pattern: uppercase letterspaced mono section labels */
+  font-size: 11px;
+  font-weight: 500;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--muted-foreground);
 }
 
@@ -282,6 +282,120 @@ table.data-table td.amount.negative { color: var(--destructive); }
 .progress-fill { height: 100%; background: var(--primary); }
 .progress-fill.warning { background: var(--warning); }
 .progress-fill.destructive { background: var(--destructive); }
+
+/* ---------- Net-worth hero (Monarch pattern: eyebrow + big figure + signed
+   delta on the figure itself + area chart with gradient fill) ---------- */
+.networth-hero .eyebrow { margin-bottom: 6px; }
+
+.networth-hero .value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.networth-hero .value {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+}
+
+.networth-hero .delta {
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.networth-hero .delta.positive { color: var(--positive); }
+.networth-hero .delta.negative { color: var(--destructive); }
+
+.networth-hero .chart-area {
+  margin-top: 16px;
+  height: 160px;
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--chart-1) 25%, transparent), transparent 80%);
+}
+
+/* ---------- Grouped account list (Monarch pattern) ---------- */
+.account-group + .account-group { margin-top: 8px; }
+
+.account-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-group-header .group-delta { font-weight: 500; font-size: 13px; margin-left: 8px; }
+.account-group-header .group-delta.positive { color: var(--positive); }
+.account-group-header .group-delta.negative { color: var(--destructive); }
+
+.account-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-row .logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--secondary);
+}
+
+.account-row .name { font-weight: 500; }
+.account-row .subtype,
+.account-row .freshness { font-size: 12px; color: var(--muted-foreground); }
+.account-row .sparkline { width: 80px; height: 24px; background: var(--muted); border-radius: var(--radius-sm); }
+.account-row .balance { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---------- Segmented bar + legend (Monarch Assets/Liabilities pattern) --- */
+.segmented-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.segmented-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.segmented-legend .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.segmented-legend .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.segmented-legend .label { flex: 1; color: var(--muted-foreground); }
+.segmented-legend .amount { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- Empty state (feature not yet shipped, not "loading") -------- */
+.empty-state {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  padding: 8px 0;
+}
 
 /* ---------- Skeleton ---------- */
 .skeleton {

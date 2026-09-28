@@ -25,36 +25,98 @@
       <button class="btn btn-outline">Refresh</button>
     </div>
 
-    <div class="card-grid" style="margin-bottom:24px;">
-      <div class="card stat-card">
-        <span class="eyebrow">Net worth</span>
-        <div class="stat-value">$412,884</div>
-        <div class="stat-delta positive">▲ +2.4% mo/mo</div>
-      </div>
-      <div class="card stat-card">
-        <span class="eyebrow">Cash flow (mtd)</span>
-        <div class="stat-value">−$1,240</div>
-        <div class="stat-delta negative">▼ vs. +$800 last month</div>
-      </div>
-      <div class="card stat-card">
-        <span class="eyebrow">Pending tax liability</span>
-        <div class="stat-value">$3,100</div>
-        <div class="stat-delta"><span class="badge badge-warning">Gap — due Sep 15</span></div>
-      </div>
-    </div>
-
-    <div class="card" style="margin-bottom:24px;">
-      <div class="header-row" style="margin-bottom:12px;">
-        <span class="card-title">Net worth over time</span>
+    <!-- Net-worth hero — Monarch pattern: eyebrow + big figure + signed delta
+         on the figure itself + single-line area chart with gradient fill.
+         Compare against temp/design-refs/monarch-app-accounts-zoom.png -->
+    <div class="card networth-hero" style="margin-bottom:24px;">
+      <div class="header-row" style="align-items:flex-start;">
+        <div>
+          <span class="eyebrow">Net worth</span>
+          <div class="value-row">
+            <span class="value">$412,884.21</span>
+            <span class="delta positive">▲ $9,684.02 (2.4%) 1 month change</span>
+          </div>
+        </div>
         <div class="tabs">
-          <button class="tab active">Nominal</button>
-          <button class="tab">Inflation-adjusted</button>
+          <button class="tab active">1 month</button>
+          <button class="tab">1 year</button>
         </div>
       </div>
-      <div style="height:180px; background:var(--muted); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; color:var(--muted-foreground); font-size:13px;">[LayerChart — sequential ramp, --chart-1..5]</div>
+      <div class="chart-area"></div>
     </div>
 
-    <div class="card-grid">
+    <div class="card-grid" style="grid-template-columns: 2fr 1fr; margin-bottom:24px; align-items:start;">
+      <!-- Grouped account list — Monarch pattern -->
+      <div class="card">
+        <div class="account-group">
+          <div class="account-group-header">
+            <span>Cash</span>
+            <span class="group-delta positive">▲ $1,826.10 (2.9%) 1mo</span>
+            <span style="margin-left:auto; font-family:var(--font-mono);">$65,342.30</span>
+          </div>
+          <div class="account-row">
+            <span class="logo"></span>
+            <div>
+              <div class="name">Primary Checking</div>
+              <div class="subtype">Checking · Bank Y</div>
+            </div>
+            <span class="sparkline"></span>
+            <div style="text-align:right;">
+              <div class="balance">$15,234.75</div>
+              <div class="freshness">16 hours ago</div>
+            </div>
+          </div>
+        </div>
+        <div class="account-group">
+          <div class="account-group-header">
+            <span>Investments</span>
+            <span class="group-delta positive">▲ $10,287.56 (1.9%) 1mo</span>
+            <span style="margin-left:auto; font-family:var(--font-mono);">$204,110.00</span>
+          </div>
+          <div class="account-row">
+            <span class="logo"></span>
+            <div>
+              <div class="name">Brokerage</div>
+              <div class="subtype">Investments · Custodian X</div>
+            </div>
+            <span class="sparkline"></span>
+            <div style="text-align:right;">
+              <div class="balance">$204,110.00</div>
+              <div class="freshness">EOD price</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary panel — Monarch pattern: segmented stacked bar + legend -->
+      <div class="card">
+        <span class="card-title">Summary</span>
+        <div style="margin-top:12px;">
+          <span class="eyebrow">Assets</span>
+          <div class="segmented-bar" style="margin-top:8px;">
+            <div style="width:50%; background:var(--chart-1);"></div>
+            <div style="width:32%; background:var(--chart-3);"></div>
+            <div style="width:18%; background:var(--positive);"></div>
+          </div>
+          <div class="segmented-legend">
+            <div class="row"><span class="dot" style="background:var(--chart-1);"></span><span class="label">Investments</span><span class="amount">$204,110</span></div>
+            <div class="row"><span class="dot" style="background:var(--chart-3);"></span><span class="label">Real estate</span><span class="amount">$130,000</span></div>
+            <div class="row"><span class="dot" style="background:var(--positive);"></span><span class="label">Cash</span><span class="amount">$65,342</span></div>
+          </div>
+        </div>
+        <div style="margin-top:20px;">
+          <span class="eyebrow">Liabilities</span>
+          <div class="segmented-bar" style="margin-top:8px;">
+            <div style="width:100%; background:var(--warning);"></div>
+          </div>
+          <div class="segmented-legend">
+            <div class="row"><span class="dot" style="background:var(--warning);"></span><span class="label">Credit cards</span><span class="amount">$1,204</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-grid" style="grid-template-columns: 1fr 1fr 1fr;">
       <div class="card">
         <span class="card-title">Recent activity</span>
         <table class="data-table">
@@ -65,9 +127,18 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Empty state — ships M3, tax feature lands 1.0 (ARCH §2.4). Keeps
+           the real card chrome so the layout doesn't shift when it ships. -->
       <div class="card">
-        <span class="card-title">Asset allocation — actual vs. target</span>
-        <div style="height:120px; background:var(--muted); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; color:var(--muted-foreground); font-size:13px;">[bar chart]</div>
+        <span class="eyebrow">Pending tax liability</span>
+        <p class="empty-state">Available in v1.0. This card will show your pending liability, safe-harbor gap, and next due date once tax tracking ships.</p>
+      </div>
+
+      <!-- Empty state — ships M3, allocation view lands M4 -->
+      <div class="card">
+        <span class="eyebrow">Asset allocation</span>
+        <p class="empty-state">Available at M4. This card will compare your actual allocation to your target once securities/lot tracking ships.</p>
       </div>
     </div>
   </main>
