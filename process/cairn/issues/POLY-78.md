@@ -1,7 +1,7 @@
 ---
 id: POLY-78
 title: Decouple cairn theme from docs/DESIGN
-status: in-review
+status: done
 milestone: null
 parent: null
 blocked_by: []
@@ -35,3 +35,9 @@ Principal's ruling (2026-09-28): cairn must not write or update anything under `
 - [ ] `docs/DESIGN/variants.css` is deleted from the product tree (ux-designer owns anything that replaces it).
 - [ ] `scripts/cairn/run_tests.py` and the JS suite pass locally with `docs/DESIGN/tokens.css` replaced by an arbitrary palette (prove the decoupling, e.g. temporarily blank the file).
 - [ ] DECISIONS.md entry drafted for the team-lead: PT-69 reversed for this repo; cairn theme assets are localized to `scripts/cairn/`.
+
+## Comments
+
+### @team-lead — 2026-09-28
+
+Merging via PR #41 (Principal: "merge 40, then 41 then 42"). Devops proved the decoupling by running the 67 tests that touched docs/DESIGN plus the JS suite with tokens.css blanked to an arbitrary palette. Closing.
