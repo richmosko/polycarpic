@@ -510,7 +510,41 @@ flowchart LR
     <li><strong>Postgres is never exposed publicly.</strong> It lives on the compose network only; the operator reaches it through <code>docker compose exec</code> or an SSH tunnel.</li>
     <li><strong>Environments:</strong> <em>dev</em> — local compose (Postgres + web + worker) with the <code>fake</code> provider; <em>CI</em> — fresh Postgres service per run; <em>staging</em> — same VPS, separate compose project and database, fake data only, auto-deploys every merge to <code>main</code>; <em>prod</em> — tagged releases only (kickoff §2.13). Staging on the same box is a cost trade-off (§10).</li>
     <li><strong>Secondary target:</strong> the same app built with <code>adapter-vercel</code> against Neon. The worker's jobs become Vercel Cron → internal route. CI builds it and runs the smoke suite against a Neon branch (or a local Postgres standing in for one); no Vercel-specific APIs anywhere.</li>
-    <li><strong>Sizing (unmeasured):</strong> a CX22/CX32-class VPS (2–4 vCPU, 4–8 GB RAM) is expected to carry prod + staging at single-household scale. DevOps confirms in INFRA.</li>
+    <li><strong>Sizing:</strong> CX32 (4 vCPU / 8 GB RAM) as the starting VPS — see §7.3.</li>
+  </ul>
+
+  <h3 id="environments">7.1 Environments</h3>
+  <table>
+    <thead><tr><th>Environment</th><th>Data</th><th>Deploy trigger</th><th>Access</th></tr></thead>
+    <tbody>
+      <tr><td>dev</td><td><code>fake</code> provider only</td><td>local compose, manual</td><td>developer machine only</td></tr>
+      <tr><td>CI</td><td>fresh Postgres service per run, torn down after</td><td>every PR</td><td>GitHub-hosted runner only</td></tr>
+      <tr><td>staging</td><td>fake data only (§10)</td><td>auto, every merge to <code>main</code></td><td>same VPS, separate compose project + DB; reachable behind Caddy basic auth / IP allowlist — not indexed, not linked from prod</td></tr>
+      <tr><td>prod</td><td>real data</td><td>tagged releases only, via <code>/merge-pr</code></td><td>public, TLS via Caddy</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="backup-dr">7.2 Backup &amp; Disaster Recovery</h3>
+  <p class="section-hint">Resolves OQ-9.</p>
+  <ul>
+    <li><strong>Staging co-location:</strong> staging stays on the prod VPS (confirms §10's trade-off). Staging holds fake data only, so its compromise has no ledger-confidentiality blast radius; splitting to a second box roughly doubles the fixed monthly cost for a single-household deployment with no compliance driver forcing separation. Revisit only if the app is offered to other self-hosters at meaningfully larger scale, or staging starts touching anything beyond fake data.</li>
+    <li><strong>Backup store:</strong> Hetzner Storage Box (same account, cheap, restic/rsync-compatible) as the default; an S3-compatible bucket is a documented, config-only drop-in alternative for self-hosters outside Hetzner — no code change, since the backup job is provider-agnostic behind a small config surface.</li>
+    <li><strong>Mechanism:</strong> <code>restic</code> for encrypted, deduplicated, incremental snapshots of a nightly <code>pg_dump --format=custom</code> logical backup, plus continuous WAL archiving to the same store for point-in-time recovery. The backup is encrypted client-side by restic <em>before</em> it leaves the box — independent of the VPS's own disk encryption, per SecEng's flag that a compromised or lost VPS invalidates disk-level encryption as a backup safeguard.</li>
+    <li><strong>Key custody:</strong> the restic repository password is generated once at bootstrap, held in the operator's password manager per the deploy runbook, and never stored on the VPS or in the repo; the runbook also has the novice self-hoster print an offline recovery copy. Rotation is a manual runbook step (re-encrypts existing snapshots) triggered only on suspected compromise, not on a schedule.</li>
+    <li><strong>RPO:</strong> ≤ 15 minutes via continuous WAL shipping; the nightly full dump is the tested fallback restore point (RPO 24h) if WAL replay is unavailable.</li>
+    <li><strong>RTO:</strong> ≤ 4 hours for total loss of the VPS — provision a replacement box from the same IaC, restore the latest dump, replay WAL, redeploy the last tagged release image. ≤ 30 minutes for a bad-migration rollback that doesn't need a box rebuild (§8.1).</li>
+    <li><strong>Restore drills:</strong> quarterly, scripted, run against a scratch compose project and checked against a fixture query (trial balance sums to zero); logged as a runbook checklist item, not assumed to work from the backup job succeeding alone.</li>
+  </ul>
+
+  <h3 id="sizing">7.3 Sizing</h3>
+  <p>CX32-class (4 vCPU / 8 GB RAM) rather than CX22 (2 vCPU / 4 GB): Postgres (prod + staging) + web + worker + Caddy fit comfortably inside 8 GB idle, and the extra headroom absorbs <code>restic</code> runs, migration bursts, and the staging Playwright smoke without contending with prod. <strong>Unmeasured</strong> — confirmed against real resource metrics after POLY-M1 lands; downgrading to CX22 is a one-line IaC change if it proves oversized.</p>
+
+  <h3 id="observability">7.4 Observability &amp; Operations</h3>
+  <ul>
+    <li><strong>Logs:</strong> web / worker emit structured JSON to stdout (one schema — <code>ts, level, req_id, entity_id?, event, …</code>; exact fields agreed with backend-lead before POLY-M1 ships anything that logs). Docker's <code>json-file</code> driver with <code>max-size</code> / <code>max-file</code> rotation captures them; <code>docker compose logs</code> / <code>journalctl</code> is the query surface at this scale. No log-aggregation service until a second box or third-party hosting is in play.</li>
+    <li><strong>Metrics:</strong> a <code>/api/v1/health</code> route reports DB connectivity, last successful migration, and last successful backup timestamp. Polled by a free external uptime monitor. Container resource metrics via <code>docker stats</code> on demand; no Prometheus/Grafana until scale or a second operator justifies the extra service.</li>
+    <li><strong>Alerts</strong> (all by email — no on-call rotation for a household of one): backup job failure or a backup older than 26h; <code>/health</code> failing for &gt;5 minutes; CI deploy-to-prod failure.</li>
+    <li><strong>Dashboard:</strong> <code>/health</code> plus <code>docker compose ps</code> is the v1 dashboard — the thing the team-lead can point to at launch. A Grafana-class dashboard is a documented future initiative once observability volume justifies the extra container.</li>
   </ul>
 </section>
 
@@ -529,10 +563,19 @@ flowchart LR
       <tr><td>Build</td><td><code>adapter-node</code> image; <code>adapter-vercel</code> build</td><td>Both must build</td></tr>
       <tr><td>Smoke (integration milestones)</td><td>Playwright: login, import a batch, confirm a draft, view a statement</td><td>Must pass</td></tr>
       <tr><td>Security scan</td><td>Dependency audit, secret scan</td><td>No high-severity findings</td></tr>
-      <tr><td>Deploy → staging</td><td>Push image, run migrate, restart (GitHub Actions → SSH, or a pull agent — DevOps decides)</td><td>Auto on merge to <code>main</code></td></tr>
+      <tr><td>Deploy → staging</td><td>GitHub Actions → SSH (§8.1)</td><td>Auto on merge to <code>main</code></td></tr>
       <tr><td>Deploy → prod</td><td>Same mechanism, triggered by a release tag cut by <code>/merge-pr</code></td><td>Tag only</td></tr>
     </tbody>
   </table>
+
+  <h3 id="deploy-mechanism">8.1 Deploy mechanism</h3>
+  <ul>
+    <li><strong>Decision: GitHub Actions → SSH push</strong>, not a pull agent. A deploy-only SSH key (not the operator's personal key) lives as a GitHub Actions encrypted secret; on the VPS its <code>authorized_keys</code> entry carries a <code>command=</code> restriction to the deploy script only — it cannot open an interactive shell. This avoids a second always-listening service on the box and keeps deploy auth inside GitHub's existing secret store instead of standing up a new one.</li>
+    <li><strong>Build once, promote:</strong> CI builds a single <code>adapter-node</code> image per commit, pushes it to GHCR tagged with the git sha; that same image is promoted from staging to prod on tag, never rebuilt. This rules out a staging/prod code-drift class of bug. <code>adapter-vercel</code> builds separately in CI as the secondary-target check (§7) but is not deployed by this pipeline.</li>
+    <li><strong>Deploy script</strong> (idempotent, same for staging/prod, environment passed as an argument): <code>docker compose pull</code> → one-off <code>migrate</code> → <code>docker compose up -d</code> → poll <code>/health</code> with retry → non-zero exit on failure without swapping traffic (Caddy keeps routing to the last healthy containers until the new ones pass health).</li>
+    <li><strong>Rollback (one button):</strong> re-run the deploy workflow via <code>workflow_dispatch</code> with the previous tag/sha as input. Migrations are additive / backward-compatible by convention (expand-contract — no destructive migration ships in the same release as the code that depends on the drop), so a code rollback never needs a schema rollback. A schema-level rollback is rare and falls back to the DR restore path (§7.2).</li>
+    <li><strong>Operator secrets</strong> on the box live in a root-only <code>.env</code> file per host (§9), placed once during VPS bootstrap and never touched by CI — CI only ever triggers the deploy, it never transmits secret values to the box.</li>
+  </ul>
 </section>
 
 <!-- ============================================================ -->
@@ -607,7 +650,7 @@ flowchart LR
       <tr><td>OQ-6</td><td>Cross-entity transfers (e.g. Person → Household joint account): what counterpart account does each side book — contribution / distribution, or a due-to / due-from pair?</td><td>Principal (via team-lead)</td><td>Start of POLY-M3</td></tr>
       <tr><td>OQ-7</td><td>Real-data path for GA: SimpleFIN adapter, CSV/OFX file adapter, or both? PRD goal 1 needs one. Tracked as POLY-77 in POLY-1.0; its scope waits on this answer.</td><td>Principal (via team-lead)</td><td>Before POLY-M2 closes</td></tr>
       <tr><td>OQ-8</td><td>Should intermediate milestones cut <code>0.x</code> releases so prod can run on real data before GA, or does everything before GA live on staging with fake data?</td><td>Principal (via team-lead)</td><td>Before POLY-M1 closes</td></tr>
-      <tr><td>OQ-9</td><td>Staging co-located on the prod VPS vs. a separate small box; backup store choice; RPO/RTO numbers.</td><td>devops-engineer</td><td>INFRA v1</td></tr>
+      <tr><td>OQ-9</td><td><strong>Resolved</strong> — see §7.2: staging co-located on the prod VPS; backup store is Hetzner Storage Box (S3-compatible as a config-only alternative); RPO ≤ 15 min (WAL) / 24h (nightly dump fallback), RTO ≤ 4h (full loss) / ≤ 30 min (bad-migration rollback).</td><td>devops-engineer</td><td>INFRA v1 — done 2026-09-28</td></tr>
       <tr><td>OQ-10</td><td>Drizzle spike outcome (§6.2), which confirms or flips the migration-tool decision.</td><td>architect + backend-lead</td><td>POLY-76, first issue of POLY-M1</td></tr>
       <tr><td>OQ-11</td><td><em>Resolved in outline (§2.4):</em> the six DESIGN screens are mapped to package DTOs. Field-level DTO shapes get pinned in each package's design file at the start of its milestone.</td><td>ux-designer + architect</td><td>Per milestone</td></tr>
       <tr><td>OQ-12</td><td>Prior-year filed tax per entity per jurisdiction (safe-harbor input): a manual entry per year, or derived from the ledger's settled filing entries?</td><td>architect + Principal</td><td>Start of POLY-1.0</td></tr>
