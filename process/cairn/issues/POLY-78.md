@@ -1,7 +1,7 @@
 ---
 id: POLY-78
 title: Decouple cairn theme from docs/DESIGN
-status: todo
+status: in-review
 milestone: null
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [scripts/cairn/**, docs/DESIGN/variants.css]
 labels: [tooling, ci, design]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/41
 created: 2026-09-28
 updated: 2026-09-28
 ---
