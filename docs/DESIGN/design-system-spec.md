@@ -210,6 +210,21 @@ shadcn ships `focus-visible:ring-ring` and `disabled:opacity-50 disabled:pointer
 
 ---
 
+## Screen data contract
+
+For architect's Screen DTO work (ARCH §2.3, OQ-11) — the data each of the six primary screens shows, driving the per-page DTO set. Model constraints noted by architect apply throughout: amounts are signed per line with Dr/Cr derived for display; drafts are separate from posted entries and posted entries are immutable; Cash-in-Transit open items get an exceptions view; access comes from membership only (no parent/child inheritance).
+
+| Screen | Data shown |
+|---|---|
+| Dashboard | Net worth; cash-flow by period; recent activity (posted + draft, signed amounts); pending tax liability + safe-harbor gap; allocation actual-vs-target; scoped to the switched entity |
+| Ledger | Draft transactions (editable category/tax-treatment tag); posted transactions (immutable); reversals; Cash-in-Transit exceptions aged past the configurable threshold; actor attribution per row |
+| Accounts | Balance sheet by GL account and by custodial account (toggle); NAV delta vs. prior book period; reconciliation status (clean/break) per custodial account |
+| Entities | Entity list (Person/Trust/Business/Household); memberships per entity (user, role); invite action |
+| Securities | Lot table (book value, market value, cost basis) per custodial account; allocation actual-vs-target; book-vs-market time series |
+| Import | Linked providers + connection state; batch progress; batch review (new/duplicate/needs-category counts) |
+
+---
+
 ## Provenance & shared tooling
 
 polycarpic's own `cairn` tracker (the board/dashboard at `localhost:8766`, under `scripts/cairn/`) is a separate shadcn-svelte app with its own design history, own reference copies (`scripts/cairn/dashboard/src/app.css`, `scripts/cairn/board/tokens.css`), and its own generated theme-variant pipeline (`scripts/cairn/board/theme/gen_variants.py` → `docs/DESIGN/variants.css`, one of three checked-in copies by architect ruling — **do not hand-edit `docs/DESIGN/variants.css`, and it does not describe the product**). This doc's Foundations section inherits that tool's already-audited base palette (see **What governs this system**); everything past Foundations is new, product-specific work.
