@@ -1,7 +1,7 @@
 ---
 id: POLY-74
 title: CI change filter over-triggers
-status: todo
+status: in-review
 milestone: null
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [.github/workflows/ci.yml, tests/workflow/test_cairn_test_boundary.py]
 labels: [ci, tooling]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/42
 created: 2026-09-27
 updated: 2026-09-27
 ---
