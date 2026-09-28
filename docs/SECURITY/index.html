@@ -184,6 +184,7 @@ flowchart TB
       <tr><td>T-34</td><td>Unlink deletes the local row but leaves the token live at the provider.</td><td>I</td><td>M</td><td>M</td><td>C-32</td></tr>
       <tr><td>T-35</td><td>A malicious CSV or OFX: XXE, billion-laughs, oversize input, spreadsheet-formula payloads.</td><td>T / D / I</td><td>M</td><td>M</td><td>C-40, C-41</td></tr>
       <tr><td>T-36</td><td>Full account numbers stored in raw payloads widen the blast radius of any read leak.</td><td>I</td><td>H</td><td>M</td><td>C-34; payload readable by manager+ only (§4.2.1)</td></tr>
+      <tr><td>T-37</td><td>A malicious attachment (a PDF/HTML polyglot, a forged content type, a header-injecting file name) runs in our origin, or attachments fill the disk.</td><td>T / E / D</td><td>M</td><td>M</td><td>C-46</td></tr>
     </tbody>
   </table>
 
@@ -582,6 +583,16 @@ flowchart TB
       <tr><td>C-43</td><td>Zod validates every route and form action. Unknown keys are stripped; a mismatch returns 400.</td><td>T-10, T-14</td><td><code>apps/web</code> wrapper</td><td>Unit tests on the wrapper.</td><td>POLY-M1</td></tr>
       <tr><td>C-44</td><td>Parameterized queries only. Lint bans <code>sql.raw()</code> and <code>sql.unsafe</code> with non-literal arguments. Raw SQL is allowed only in reviewed migrations. CodeQL <code>js/sql-injection</code> runs in CI.</td><td>T-18</td><td>ESLint; CI</td><td>Lint + CodeQL.</td><td>POLY-M1</td></tr>
       <tr><td>C-45</td><td>Reference-data anomaly flag: a price move over 50% day-over-day, or an out-of-bounds CPI revision, is stored but flagged.</td><td>T-43</td><td><code>packages/refdata</code></td><td>Unit.</td><td>POLY-M4</td></tr>
+      <tr><td>C-46</td><td>Attachments (ARCH §3.5 @ fcffe6c):
+        <ul>
+          <li>Stored as <code>bytea</code> under RLS. The bytes live in <code>attachment_blob</code>, separate from the metadata.</li>
+          <li>Size limit of 10 MB. Type is sniffed server-side against an allowlist; the client-declared type is never trusted.</li>
+          <li>Served only as a download: <code>Content-Disposition: attachment</code> with an RFC 6266 sanitized <code>filename*</code>, plus <code>nosniff</code> and a CSP of <code>default-src 'none'; sandbox</code>.</li>
+          <li>Composite entity FKs on attachments and their links.</li>
+          <li>Insert-only, and included in the purge.</li>
+          <li>Per-entity storage quota and upload rate limit.</li>
+          <li>File contents are never parsed.</li>
+        </ul></td><td>T-37</td><td><code>packages/attachments</code> (per ARCH)</td><td>Integration: a spoofed type is rejected; a file name containing CR/LF is sanitized; response header assertions; a cross-entity link is denied; purge leaves 0 attachment rows.</td><td>With the attachments feature</td></tr>
       <tr><td>C-50</td><td>Purge per §4.5: the <code>poly_purge</code> role, 8 guards checked in order, and a typed confirmation.</td><td>T-50, T-51, T-08</td><td><code>app.purge_entity</code>; tenancy route</td><td>pgTAP: a non-sole owner is denied; a stale export is denied; a write after the export is denied; <code>poly_app</code> with the GUC set is denied outside the function; a successful purge leaves 0 rows in every purgeable table plus 1 <code>audit_event</code>.</td><td>The purge feature (POLY-1.0 scope)</td></tr>
       <tr><td>C-51</td><td>Export is streamed, never persisted. If it has to run async, the file is encrypted in temp storage and expires after 24 h. Owner only, with step-up; audited with a SHA-256; rate-limited.</td><td>T-53</td><td>Export module</td><td>Integration: no file remains after download.</td><td>The export feature</td></tr>
       <tr><td>C-52</td><td>Account deletion: the user row becomes a tombstone; ledger rows are never UPDATEd. BetterAuth <code>deleteUser</code> is overridden. Sessions, accounts, MFA and passkeys are deleted. Linked credentials are revoked, and the user's connections go <code>principal_invalid</code>. Deletion is refused while the user is sole owner of any entity.</td><td>T-41, T-54</td><td><code>packages/auth</code> override; tenancy</td><td>Integration: entries remain and resolve to "deleted user"; a sole owner's deletion is refused.</td><td>POLY-1.0</td></tr>
