@@ -111,7 +111,7 @@ def _flush_receiver_and_wait(repo_root: Path, usage_path: Path, timeout: float =
 def _token_ceiling(
     usage_path: Path, at_sha: str, at_ts: str, max_gap_seconds: int,
 ) -> Tuple[str, Optional[str]]:
-    """POLY-48 item 4 (POLY-47, gate-1 ruling process/reviews/POLY-48/ruling.md
+    """POLY-48 item 4 (POLY-47, gate-1 ruling process/cairn/reviews/POLY-48/ruling.md
     §1(b)): the TOKEN-side ceiling for a `--at <sha>` close. `at_ts`
     (the commit's own author time) almost never lines up with a flush
     boundary -- the flush actually carrying this stage's last tokens can
@@ -277,7 +277,7 @@ def _append_calibration_record(data_dir: Path, record: Dict[str, Any]) -> None:
 
 def _linked_worktree_main_checkout(start: Path) -> Optional[Path]:
     """POLY-48 item 9 (`close` from a worktree, gate-1 ruling
-    process/reviews/POLY-48/ruling.md §1(d)): `git rev-parse --git-dir` vs
+    process/cairn/reviews/POLY-48/ruling.md §1(d)): `git rev-parse --git-dir` vs
     `--git-common-dir` is the one reliable test for "is `start` inside a
     LINKED git worktree" -- the two paths are identical in the main
     checkout and differ in a linked worktree, regardless of layout (never
@@ -425,7 +425,7 @@ def cmd_close(args: argparse.Namespace) -> int:
     # author time; the default ceiling is real wall-clock now(). Commits
     # and wall-clock (gate_cycle_actuals below) stay bounded by close_ts,
     # unchanged (POLY-48 item 4, gate-1 ruling
-    # process/reviews/POLY-48/ruling.md §1(b)) -- only the TOKEN ceiling differs.
+    # process/cairn/reviews/POLY-48/ruling.md §1(b)) -- only the TOKEN ceiling differs.
     close_ts = at_ts if at_sha is not None else datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # POLY-34 (ruling §0.2): prices loaded once here (not inside

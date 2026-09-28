@@ -2,7 +2,7 @@
 `.sessions` dir, `--status` health reporting, and teammate attribution via
 worktree-sibling transcripts.
 
-Pinned to the architect's ruling (`process/reviews/POLY-10/ruling.md`
+Pinned to the architect's ruling (`process/cairn/reviews/POLY-10/ruling.md`
 @ 3d83a20). Each `TestCase` class below is named after, and
 carries the number of, that ruling's `## (f) Tests qa writes` list item --
 1 through 8, in order. A later change to that list should track a change

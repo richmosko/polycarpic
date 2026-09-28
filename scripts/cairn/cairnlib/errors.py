@@ -56,7 +56,7 @@ class BadParentError(CairnError):
     where X doesn't resolve, or X is itself a sub-issue (suffixed or a
     legacy numbered one -- sub-issues nest one level only) (POLY-51 ruling
     §2 steps 2-3) -- AND, since POLY-48 item 7 (gate-1 ruling
-    process/reviews/POLY-48/ruling.md §1, "confirmed as filed"), a..z letter
+    process/cairn/reviews/POLY-48/ruling.md §1, "confirmed as filed"), a..z letter
     exhaustion under an otherwise-valid parent (both raise sites:
     `_next_sub_issue_letter` and `_allocate_sub_issue`'s retry loop). A
     client can fix any of these four cases by retrying with a different

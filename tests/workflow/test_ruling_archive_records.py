@@ -1,7 +1,7 @@
 """POLY-57 RED tests (repo-side): gate-1 rulings become audit records
-under `process/reviews/<ID>/ruling.md`, moved byte-for-byte out of
+under `process/cairn/reviews/<ID>/ruling.md`, moved byte-for-byte out of
 cairn's old design-notes directory. Gate-1 ruling
-(process/reviews/POLY-57/ruling.md @ ab8063b) §4: this check belongs in
+(process/cairn/reviews/POLY-57/ruling.md @ ab8063b) §4: this check belongs in
 `tests/workflow/`, not `scripts/cairn/tests/`, because its subject spans
 the whole repo (TRACKER.md, WORKFLOW.md, every issue file, cairn's own
 tree) -- the POLY-6 test boundary puts a repo-layout concern like that
@@ -16,13 +16,13 @@ avoid self-matching -- see GREP_PREDICATE_CMD below):
    byte-identical move, not a re-authored copy.
 2. The ruling's own "done" predicate: `git grep` for the moved rulings'
    old basenames (and the old design/ directory) anywhere in the repo,
-   excluding `process/reviews/` (the audit records themselves, which are
+   excluding `process/cairn/reviews/` (the audit records themselves, which are
    frozen and keep their own internal cross-references stale on purpose)
    and `process/cairn/{issues,archive/issues}/POLY-57*` (this feature's own issue files,
    which narrate the move using the old names as history) -- must return
    nothing.
 
-Nothing under test exists yet -- `process/reviews/<ID>/ruling.md` do not
+Nothing under test exists yet -- `process/cairn/reviews/<ID>/ruling.md` do not
 exist and the old references are still live everywhere, so every
 assertion below is expected to fail on an explicit path/content mismatch
 or a non-empty `git grep`, never an import error.
@@ -67,7 +67,7 @@ GREP_PREDICATE_CMD = [
     "-e", "sub-issue-letter-ids" + ".md",
     "-e", "estimation-engine-fixes" + ".md",
     "--",
-    ":!process/reviews",
+    ":!process/cairn/reviews",
     ":!process/cairn/issues/POLY-57*",
     ":!process/cairn/archive/issues/POLY-57*",
 ]
@@ -77,7 +77,7 @@ class RulingArchiveRecordsTests(unittest.TestCase):
     def test_each_ruling_exists_with_its_pinned_blob_sha(self):
         for issue_id, expected_blob in sorted(RULING_BLOBS.items()):
             with self.subTest(issue=issue_id):
-                dest = REPO_ROOT / "process" / "reviews" / issue_id / "ruling.md"
+                dest = REPO_ROOT / "process" / "cairn" / "reviews" / issue_id / "ruling.md"
                 self.assertTrue(
                     dest.is_file(),
                     f"{dest} missing -- {issue_id}'s ruling must move here unchanged",

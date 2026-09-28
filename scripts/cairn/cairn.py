@@ -33,7 +33,7 @@ Port override for `serve`: CAIRN_PORT=8899, or `--port`.
 
 POLY-58: this file is the CLI entry point and a re-export facade only —
 the implementation lives in the `cairnlib/` package, one module per
-leaves-first extraction step (see process/reviews/POLY-58/ruling.md).
+leaves-first extraction step (see process/cairn/reviews/POLY-58/ruling.md).
 `import cairn` stays unchanged for every caller; `cairnlib.<mod>` is the
 patch target for anything that needs to reach a specific module's own
 name binding (ruling §5).

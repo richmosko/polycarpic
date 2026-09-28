@@ -1078,7 +1078,7 @@ def _write_sibling_fixture_record(
 
 
 class BackfillWorktreeSiblingScanTests(unittest.TestCase):
-    """POLY-26 gate-1 ruling (`process/reviews/POLY-26/ruling.md`
+    """POLY-26 gate-1 ruling (`process/cairn/reviews/POLY-26/ruling.md`
     §4): `scan_transcripts` must walk the repo's own worktree-
     sibling transcript dirs (`<slug>--claude-worktrees-*`) alongside the
     main slug dir, using the SAME anchored-prefix resolver §1 moves into
@@ -1227,7 +1227,7 @@ class BackfillWorktreeSiblingScanTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------
-# POLY-50 gate-1 ruling (process/reviews/POLY-50/ruling.md §§1-2): a
+# POLY-50 gate-1 ruling (process/cairn/reviews/POLY-50/ruling.md §§1-2): a
 # worktree-*/HEAD record resolves through the lead's own main-checkout
 # branch timeline (§1, POLY-45), and a write excludes every record
 # at/after the earliest otel day (§2, POLY-46).

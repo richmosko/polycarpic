@@ -48,7 +48,7 @@ Feature started. Branch: `feature/poly-49-receiver-hardening`.
 
 ### @architect — 2026-09-25
 
-**Gate-1 ruling** — full text + measurements: `process/reviews/POLY-49/ruling.md`. Sub-issues: 49a plan, 49b red (qa), 49c build (impl-lead), 49d review.
+**Gate-1 ruling** — full text + measurements: `process/cairn/reviews/POLY-49/ruling.md`. Sub-issues: 49a plan, 49b red (qa), 49c build (impl-lead), 49d review.
 
 - **AC4 cause (measured, M1–M8):** Claude Code 2.1.282 ignores telemetry vars in project/local settings. Same env block: 2.1.280 → 3 exports, 2.1.282 → 0; 0 connections to :4318 in 150 s from 4 live 2.1.282 agents. The receiver parses 2.1.282 payloads fine (4 points/export, delta). Registration failed for the same reason: `CLAUDE_CODE_ENABLE_TELEMETRY` no longer reaches hook env, and H1 returns before `register_session`.
 - **User action (settings, user-only):** add the five telemetry keys (`CLAUDE_CODE_ENABLE_TELEMETRY`, `OTEL_METRICS_EXPORTER`, `OTEL_LOGS_EXPORTER`, `OTEL_EXPORTER_OTLP_PROTOCOL`, `OTEL_EXPORTER_OTLP_ENDPOINT`, values as today) to `~/.claude/settings.json` → `env`; remove them from `.claude/settings.json` → `env`. Verified: user-scope env initialises the 2.1.282 exporter and reaches hooks (flag only, no `OTEL_*`).
@@ -125,7 +125,7 @@ TRACKER.md findings:
 - **L108:** "now", "Root cause (measured 2026-09-24)", "used to read", "glob cost measured".
 - **L88:** closes with "exactly PT-79's real incident".
 
-**R3 (implementation-lead):** replace L80, L86, L96 and L108, plus L88's second sentence, verbatim with `process/reviews/POLY-49/tracker-r3.md` (`kind: deliverable`). A doc-only change needs no test run.
+**R3 (implementation-lead):** replace L80, L86, L96 and L108, plus L88's second sentence, verbatim with `process/cairn/reviews/POLY-49/tracker-r3.md` (`kind: deliverable`). A doc-only change needs no test run.
 
 Once R3 lands verbatim, the verdict is APPROVE. I verify with `git show <sha>:process/TRACKER.md` and need no further review round.
 

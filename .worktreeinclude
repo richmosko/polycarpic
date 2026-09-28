@@ -6,7 +6,7 @@
 # pattern does NOT reach inside it; the directory must be named explicitly.
 # Measured, not guessed — do not "simplify" this back to `**/node_modules/**`.
 scripts/cairn/dashboard/node_modules/**
-# Spike delta 1, then delta 3 (process/reviews/PT-82/spike.md @ 1d25274,
+# Spike delta 1, then delta 3 (process/cairn/reviews/PT-82/spike.md @ 1d25274,
 # 643dd89): `node_modules/.bin/` is a dot-directory of SYMLINKS -- naming
 # it explicitly here (as this comment used to) still did not deliver it
 # on a repeat, measured twice. The worktree-copy mechanism does not
