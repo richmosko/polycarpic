@@ -1,20 +1,27 @@
 """PT-57 (architect's token-delivery ruling, 2026-08-27): board/tokens.css
-is a THIRD copy of the preset token values (alongside docs/DESIGN/
-tokens.css and the dashboard's app.css) -- an accepted, unavoidable copy
-per the ruling's own framing: "where a copy is unavoidable, make drift
-loud." This is that loudness: parses the `:root`/`.dark` declarations out
-of all three files and asserts every variable board/tokens.css shares with
-the other two agrees on VALUE.
+is a SECOND copy of the preset token values (alongside the dashboard's
+app.css) -- an accepted, unavoidable copy per the ruling's own framing:
+"where a copy is unavoidable, make drift loud." This is that loudness:
+parses the `:root`/`.dark` declarations out of both files and asserts
+every variable board/tokens.css shares with app.css agrees on VALUE.
 
-Not a set-equality check -- the three files deliberately carry different
-key sets (docs/DESIGN/tokens.css and app.css carry font-family/typography
-vars and app.css's extra --radius-2xl/3xl/4xl steps that board/tokens.css
-explicitly omits, "colors and radius ONLY" per the ruling's own scope
-cut). The guard is: for every key board/tokens.css DOES define, if either
-other file also defines that key, the values must match. A key present in
-board/tokens.css but absent from a sibling is not a failure (that's the
-scope cut working as intended); a key present in more than one file with
-DIFFERENT values is exactly the silent-drift this test exists to catch.
+POLY-78: a third leg of this comparison used to read docs/DESIGN/
+tokens.css. The Principal's ruling (2026-09-28) that cairn must not read
+or write anything under docs/ retired that leg -- docs/DESIGN/ is the
+product's own design system now, owned by ux-designer, free to diverge
+from cairn's board palette. Cairn's own frozen reference copy of what
+docs/DESIGN/design-system-spec.md used to document lives at
+scripts/cairn/board/theme/design-system-spec.md.
+
+Not a set-equality check -- the two files deliberately carry different
+key sets (app.css carries font-family/typography vars and its own extra
+--radius-2xl/3xl/4xl steps that board/tokens.css explicitly omits,
+"colors and radius ONLY" per the ruling's own scope cut). The guard is:
+for every key board/tokens.css DOES define, if app.css also defines that
+key, the values must match. A key present in board/tokens.css but absent
+from app.css is not a failure (that's the scope cut working as intended);
+a key present in both with DIFFERENT values is exactly the silent-drift
+this test exists to catch.
 """
 from __future__ import annotations
 
@@ -24,7 +31,6 @@ import unittest
 import helpers  # noqa: F401
 
 REPO_ROOT = helpers.CAIRN_DIR.parent.parent
-DOCS_TOKENS_CSS = REPO_ROOT / "docs" / "DESIGN" / "tokens.css"
 APP_CSS = REPO_ROOT / "scripts" / "cairn" / "dashboard" / "src" / "app.css"
 BOARD_TOKENS_CSS = helpers.CAIRN_DIR / "board" / "tokens.css"
 BOARD_CSS = helpers.CAIRN_DIR / "board" / "board.css"
@@ -90,19 +96,14 @@ def _assert_shared_keys_agree(testcase, base_name, base_decls, other_name, other
 class BoardTokensRootParityTests(unittest.TestCase):
     def setUp(self):
         self.board_root = _extract_block(BOARD_TOKENS_CSS.read_text(encoding="utf-8"), ":root")
-        self.docs_root = _extract_block(DOCS_TOKENS_CSS.read_text(encoding="utf-8"), ":root")
         self.app_root = _extract_block(APP_CSS.read_text(encoding="utf-8"), ":root")
-
-    def test_board_tokens_root_agrees_with_docs_tokens_root(self):
-        _assert_shared_keys_agree(self, "board/tokens.css :root", self.board_root, "docs/DESIGN/tokens.css :root", self.docs_root)
 
     def test_board_tokens_root_agrees_with_app_css_root(self):
         _assert_shared_keys_agree(self, "board/tokens.css :root", self.board_root, "dashboard app.css :root", self.app_root)
 
-    def test_board_tokens_root_shares_a_real_non_trivial_key_set_with_each_sibling(self):
+    def test_board_tokens_root_shares_a_real_non_trivial_key_set_with_sibling(self):
         # Guards against the comparison being vacuously true because the
         # extractor found nothing / found empty blocks.
-        self.assertGreater(len(self.board_root.keys() & self.docs_root.keys()), 5)
         self.assertGreater(len(self.board_root.keys() & self.app_root.keys()), 5)
 
     def test_board_tokens_root_carries_font_vars_as_of_pt63(self):
@@ -121,11 +122,7 @@ class BoardTokensRootParityTests(unittest.TestCase):
 class BoardTokensDarkParityTests(unittest.TestCase):
     def setUp(self):
         self.board_dark = _extract_block(BOARD_TOKENS_CSS.read_text(encoding="utf-8"), ".dark")
-        self.docs_dark = _extract_block(DOCS_TOKENS_CSS.read_text(encoding="utf-8"), ".dark")
         self.app_dark = _extract_block(APP_CSS.read_text(encoding="utf-8"), ".dark")
-
-    def test_board_tokens_dark_agrees_with_docs_tokens_dark(self):
-        _assert_shared_keys_agree(self, "board/tokens.css .dark", self.board_dark, "docs/DESIGN/tokens.css .dark", self.docs_dark)
 
     def test_board_tokens_dark_agrees_with_app_css_dark(self):
         _assert_shared_keys_agree(self, "board/tokens.css .dark", self.board_dark, "dashboard app.css .dark", self.app_dark)
