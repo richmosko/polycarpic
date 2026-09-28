@@ -500,12 +500,12 @@ flowchart LR
   <table>
     <thead><tr><th>Milestone</th><th>Layers</th><th>Stories</th><th>Integration check at close</th></tr></thead>
     <tbody>
-      <tr><td>POLY-M1 — Foundations</td><td>L0, L1, L6 shell</td><td>POLY-62</td><td>A user signs in, creates an entity, grants a viewer; the RLS battery is green; migrate runs in CI and on staging</td></tr>
+      <tr><td>POLY-M1 — Foundations</td><td>L0, L1, L6 shell</td><td>POLY-76 (spike), POLY-62</td><td>A user signs in, creates an entity, grants a viewer; the RLS battery is green; migrate runs in CI and on staging</td></tr>
       <tr><td>POLY-M2 — Ledger &amp; Import</td><td>L2, L3, L4</td><td>POLY-64, POLY-65</td><td>The fake persona imports, drafts are confirmed into balanced immutable entries, and categories / tax tags apply</td></tr>
       <tr><td>POLY-M3 — Transfers, Reconciliation &amp; Dashboard</td><td>L4, L6</td><td>POLY-71, POLY-72, POLY-63</td><td>The couple persona's transfers net CIT to zero; the custodial reconciliation matches; the dashboard is under 2 s</td></tr>
       <tr><td>POLY-M4 — Securities &amp; Market Data</td><td>L2 refdata, L3 securities, L5 portfolio</td><td>POLY-67, POLY-69, POLY-75</td><td>Persona 3's lots, EOD valuation and allocation are correct; the real / nominal toggle works</td></tr>
       <tr><td>POLY-M5 — Statements</td><td>L5 reports</td><td>POLY-73, POLY-68</td><td>Seeded templates render; clones survive a template upgrade</td></tr>
-      <tr><td><strong>POLY-1.0 — Tax, Sharing &amp; Real Data (GA)</strong></td><td>L5 tax, L6, L2 real adapter</td><td>POLY-66, POLY-70</td><td>Tags <code>v1.0.0</code>: the Principal runs one entity end to end on real data (PRD goal 1)</td></tr>
+      <tr><td><strong>POLY-1.0 — Tax, Sharing &amp; Real Data (GA)</strong></td><td>L5 tax, L6, L2 real adapter</td><td>POLY-66, POLY-70, POLY-77 (real-data adapter)</td><td>Tags <code>v1.0.0</code>: the Principal runs one entity end to end on real data (PRD goal 1)</td></tr>
     </tbody>
   </table>
 </section>
@@ -523,10 +523,10 @@ flowchart LR
       <tr><td>OQ-4</td><td>Purge path coexistence with append-only triggers (§3.4 proposal vs. separate role vs. tombstoning) and how the purge is audited.</td><td>seceng</td><td>SECURITY v1</td></tr>
       <tr><td>OQ-5</td><td>Which EOD price provider (free tier, coverage of mutual funds / ETFs)? mosko-fintech used provider-implied prices plus FMP.</td><td>architect</td><td>Start of POLY-M4</td></tr>
       <tr><td>OQ-6</td><td>Cross-entity transfers (e.g. Person → Household joint account): what counterpart account does each side book — contribution / distribution, or a due-to / due-from pair?</td><td>Principal (via team-lead)</td><td>Start of POLY-M3</td></tr>
-      <tr><td>OQ-7</td><td>Real-data path for GA: SimpleFIN adapter, CSV/OFX file adapter, or both? PRD goal 1 needs one, but no backlog story covers it yet.</td><td>Principal (via team-lead)</td><td>Before POLY-M2 closes</td></tr>
+      <tr><td>OQ-7</td><td>Real-data path for GA: SimpleFIN adapter, CSV/OFX file adapter, or both? PRD goal 1 needs one. Tracked as POLY-77 in POLY-1.0; its scope waits on this answer.</td><td>Principal (via team-lead)</td><td>Before POLY-M2 closes</td></tr>
       <tr><td>OQ-8</td><td>Should intermediate milestones cut <code>0.x</code> releases so prod can run on real data before GA, or does everything before GA live on staging with fake data?</td><td>Principal (via team-lead)</td><td>Before POLY-M1 closes</td></tr>
       <tr><td>OQ-9</td><td>Staging co-located on the prod VPS vs. a separate small box; backup store choice; RPO/RTO numbers.</td><td>devops-engineer</td><td>INFRA v1</td></tr>
-      <tr><td>OQ-10</td><td>Drizzle spike outcome (§6.2), which confirms or flips the migration-tool decision.</td><td>architect + backend-lead</td><td>First issue of POLY-M1</td></tr>
+      <tr><td>OQ-10</td><td>Drizzle spike outcome (§6.2), which confirms or flips the migration-tool decision.</td><td>architect + backend-lead</td><td>POLY-76, first issue of POLY-M1</td></tr>
       <tr><td>OQ-11</td><td>Screen list and per-screen DTOs: which screens the prototype fixes for the first dashboard, and in what shape.</td><td>ux-designer + architect</td><td>DESIGN v1</td></tr>
       <tr><td>OQ-12</td><td>Prior-year filed tax per entity per jurisdiction (safe-harbor input): a manual entry per year, or derived from the ledger's settled filing entries?</td><td>architect + Principal</td><td>Start of POLY-1.0</td></tr>
     </tbody>
