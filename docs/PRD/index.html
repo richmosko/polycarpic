@@ -136,11 +136,11 @@
   <table>
     <thead><tr><th>Category</th><th>Requirement</th></tr></thead>
     <tbody>
-      <tr><td>Performance</td><td class="tbd">—</td></tr>
-      <tr><td>Availability</td><td class="tbd">—</td></tr>
-      <tr><td>Security / Regulatory</td><td class="tbd">—</td></tr>
-      <tr><td>Accessibility</td><td class="tbd">WCAG AA target unless stated otherwise</td></tr>
-      <tr><td>Browsers / devices</td><td class="tbd">—</td></tr>
+      <tr><td>Performance</td><td class="tbd">No formal target set. Proposed: dashboard pages render in &lt;2s on the VPS deployment at single-household data scale — needs Principal confirmation.</td></tr>
+      <tr><td>Availability</td><td class="tbd">No formal target set. Self-hosted on a single Hetzner VPS; proposed informal target ~99% (occasional downtime for patching accepted) — needs Principal confirmation.</td></tr>
+      <tr><td>Security / Regulatory</td><td class="tbd">RLS is mandatory (kickoff §2.4/§2.8). Handles bank/brokerage credentials, transaction data, and multi-entity ownership (trusts, businesses) for a closed household (no public signup). Regulatory scope (GDPR/PCI/SOC2 applicability) not yet assessed — routed to SecEng for a high-level read; see <a href="#open-questions">Open Questions</a>.</td></tr>
+      <tr><td>Accessibility</td><td>WCAG AA target (template default; not separately discussed with the Principal).</td></tr>
+      <tr><td>Browsers / devices</td><td>Modern evergreen browsers (Chrome/Safari/Firefox/Edge) via SvelteKit. Native iOS/macOS clients (Swift/SwiftUI, not a web view) are a later milestone (kickoff §2.10).</td></tr>
     </tbody>
   </table>
 </section>
@@ -160,8 +160,15 @@ flowchart LR
   <h2>8. Technical Considerations</h2>
   <p class="section-hint">Known integrations and constraints. Detail lives in <a href="../ARCH/">ARCH</a>.</p>
   <ul>
-    <li class="tbd">—</li>
+    <li>Database: PostgreSQL (latest) — the ledger and RLS live in our own Postgres; no external ledger service, plain-text ledger engine, or full ERP.</li>
+    <li>Auth: BetterAuth in our Postgres; OAuth day one via Google, Apple, GitHub; MFA available; transactional email via Resend.</li>
+    <li>Frontend: SvelteKit + shadcn-svelte (Tailwind, LayerChart for charts); design tokens come from <a href="../DESIGN/">DESIGN</a> once built.</li>
+    <li>Hosting: primary Hetzner VPS via Docker Compose (self-owned box); secondary Vercel + Neon kept working and CI-verified as a free-tier fallback.</li>
+    <li>Repository: pnpm workspace monorepo (<code>apps/web</code>, later <code>apps/ios</code>; one <code>packages/</code> per layer) with affected-only CI; OpenAPI generated from route schemas.</li>
+    <li>Import providers: provider-agnostic adapter interface; order is fake → SimpleFIN → Plaid → direct broker APIs (Schwab, IBKR).</li>
+    <li>Native clients: Swift/SwiftUI for iOS and macOS (not a wrapped web view), generated from the same OpenAPI spec — a later milestone.</li>
   </ul>
+  <p>Full rationale, layer boundaries, and API shape belong in <a href="../ARCH/">ARCH</a>, written next in the Plan phase. Implementation-level detail extracted during this import (GL, transaction-import mechanics, reports engine, infra topology, fake-data generator) is queued at <code>temp/prd-spillover-arch.md</code> for the architect.</p>
 </section>
 
 <section id="timeline" data-section="timeline">
@@ -169,15 +176,27 @@ flowchart LR
   <p class="section-hint">Coarse milestones (named by target version, e.g. <code>1.0</code>). Features are tracked in <a href="../../process/STATE.md">process/STATE.md</a> and Linear; Session Cycles are a session-planning heuristic.</p>
   <table>
     <thead><tr><th>Milestone</th><th>Target date</th><th>Definition of done</th></tr></thead>
-    <tbody><tr><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr></tbody>
+    <tbody>
+      <tr><td>POLY-A — Bootstrap &amp; Tooling</td><td>done (2026-09-27)</td><td>Repo scrubbed from template, tracker set up, per-agent git identity, path-ownership check, estimation loop in cairn.</td></tr>
+      <tr><td>POLY-B — Research</td><td class="tbd">in progress</td><td>This PRD (v1) approved; user stories seeded to the tracker backlog.</td></tr>
+      <tr><td>POLY-C — Plan</td><td class="tbd">TBD</td><td>Design system built, throwaway UX prototype at <code>prototype/</code>, ARCH doc (layers, GL build-vs-adopt decision, migration tool), SECURITY doc, INFRA doc — all as living artifacts.</td></tr>
+      <tr><td>POLY-V1 — First initiative build-out</td><td class="tbd">TBD</td><td>Entity/membership model, GL + journal entries, provider-agnostic import (fake source first) with draft→confirm, transfer matching, reconciliation, securities lot sub-ledger, seeded reports, and the per-entity dashboard all ship through Implement→Validate loops.</td></tr>
+    </tbody>
   </table>
+  <p>Dates are intentionally open — this is a self-paced personal project, not a dated commercial roadmap. See <a href="#open-questions">Open Questions</a>.</p>
 </section>
 
 <section id="open-questions" data-section="open-questions">
   <h2>10. Open Questions &amp; Risks</h2>
   <p class="section-hint">Every unresolved question. Every assumption that could be wrong. This drives the next conversation.</p>
   <ul>
-    <li class="tbd">—</li>
+    <li>What numeric targets belong in §2 Goals — tax-estimate variance tolerance, reconciliation window, dashboard load-time target, uptime target? Drafted as placeholders; need the Principal's confirmation.</li>
+    <li>Does this app ever have users beyond the Principal's own household (spouse, family), or could it ever be offered to others? Affects whether GDPR/PCI/SOC2-style regulatory scope applies — routed to SecEng (see §6).</li>
+    <li>General ledger: build a home-grown schema (borrowing from <a href="https://github.com/richmosko/mosko-fintech">mosko-fintech</a>) vs. adopt a library that manages tables inside our own Postgres — a Plan-phase research step owned by the architect (kickoff §2.5).</li>
+    <li>Database migration tool — Drizzle is the leading candidate; the architect confirms against the <code>mosko-fintech</code> incumbent (kickoff §2.13).</li>
+    <li>Bloat-signal thresholds (gate cycles over estimate, token ratio) are set only after the first milestone's baseline (kickoff §2.12) — no number yet.</li>
+    <li>Timeline dates: does the Principal want target dates on any milestone, or is fully self-paced sequencing (as drafted in §9) the intended mode for the whole project?</li>
+    <li>Which of the 8 user stories in §4 are the actual first slice for the next Implement→Validate loops, vs. sequenced later within <code>POLY-V1</code>? Drafted here at initiative grain; per-story sequencing happens when the architect and team-lead break <code>POLY-V1</code> into milestones/issues.</li>
   </ul>
 </section>
 
@@ -185,7 +204,9 @@ flowchart LR
   <h2>11. Appendix</h2>
   <p class="section-hint">Research notes, competitive analysis, supporting links.</p>
   <ul>
-    <li class="tbd">—</li>
+    <li>Source documents: <a href="../project_kickoff.md">docs/project_kickoff.md</a> (operative kickoff record) and <a href="../project_manifesto.md">docs/project_manifesto.md</a> (original brief, frozen as written) — both imported into this PRD via <code>/generate-prd</code>. Kept in place rather than moved to <code>docs/archive/</code>, per team-lead ruling: <code>CLAUDE.md</code> links both by their current paths and calls the kickoff record operative.</li>
+    <li>Reference project: <a href="https://github.com/richmosko/mosko-fintech">mosko-fintech</a> — prior related work, explicitly not the blueprint for this project.</li>
+    <li>Look-and-feel references: <a href="https://useorigin.com/">Origin</a>, <a href="https://www.monarch.com/">Monarch</a>; starting layout: <a href="https://www.shadcn-svelte.com/view/dashboard-01">shadcn-svelte dashboard-01</a>.</li>
   </ul>
 
   <h3 id="faqs">11.1 FAQs</h3>
@@ -193,8 +214,8 @@ flowchart LR
   <dl class="faqs">
     <dt>Q: How do I add review comments to this PRD?</dt>
     <dd>A: Two ways. Hand-edit <code>docs/PRD/comments.md</code> with <code>## §&lt;section-id&gt;</code> blocks pointing at the <code>id</code> attribute of the section you're commenting on. Or run <code>./scripts/serve-docs.sh</code> from the repo root and browse to <code>http://localhost:8765/PRD/</code> — an inline widget appears next to each section heading with a <code>+ Comment</code> button. Both methods write to the same <code>comments.md</code> file. When you're ready for Claude to act on the comments, run <code>/refine-doc PRD</code> — each comment is addressed in the matching section and removed from the sidecar. The sidecar is gitignored; the actual resolution lives in this doc and is committed via PR. See <a href="../../process/WORKFLOW.md">process/WORKFLOW.md</a> → Doc review loop for the full pattern.</dd>
-    <dt class="tbd">Q: —</dt>
-    <dd class="tbd">A: —</dd>
+    <dt>Q: Why aren't <code>project_kickoff.md</code> and <code>project_manifesto.md</code> archived now that the PRD exists?</dt>
+    <dd>A: The standard import flow moves a legacy source to <code>docs/archive/</code> once ported. Team-lead ruling keeps both in place instead, since <code>CLAUDE.md</code> links them by their current paths and calls the kickoff record operative; they'll be frozen as history once the PRD and ARCH doc fully absorb their content, per the kickoff file's own header.</dd>
   </dl>
 </section>
 
