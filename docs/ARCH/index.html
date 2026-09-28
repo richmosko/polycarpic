@@ -158,6 +158,21 @@ flowchart TB
     <li><strong>Job unit</strong> — <code>run(ctx, params): Promise&lt;Result&gt;</code>; must be idempotent, short (&lt; 60 s per invocation, chunked otherwise), and triggerable by either scheduler (§7).</li>
     <li><strong>Screen DTOs</strong> — each page's server <code>load</code> returns a DTO type exported by the owning package. The same types back <code>/api/v1</code>, so the web UI and native clients share one contract. The list of screens comes from DESIGN (ux-designer); DTOs get pinned per screen in each package's design file (kickoff §2.13).</li>
   </ul>
+
+  <h3 id="screen-dtos">2.4 Screen → DTO ownership</h3>
+  <p>Screens and their data come from <a href="../DESIGN/design-system-spec.md">DESIGN § Screen data contract</a>. A screen that spans packages gets a composite DTO assembled in <code>apps/web</code> from package DTOs. A panel whose package hasn't shipped yet renders an empty state, so the Dashboard ships in POLY-M3 and gains the tax and allocation panels as POLY-M4 and POLY-1.0 land.</p>
+  <table>
+    <thead><tr><th>Screen</th><th>DTO(s) → owning package</th><th>First milestone</th></tr></thead>
+    <tbody>
+      <tr><td>Dashboard</td><td><code>NetWorthSeries</code>, <code>CashFlowByPeriod</code>, <code>RecentActivity</code> → ledger / posting; <code>TaxPosition</code> → tax; <code>AllocationVsTarget</code> → portfolio</td><td>POLY-M3 (panels fill in by M4 and 1.0)</td></tr>
+      <tr><td>Ledger</td><td><code>DraftList</code>, <code>CitExceptions</code> → posting; <code>PostedEntryList</code> (with reversal links and actor) → ledger</td><td>POLY-M2 (CIT exceptions in M3)</td></tr>
+      <tr><td>Accounts</td><td><code>BalanceSheet</code> (GL / custodial) and <code>NavDelta</code> → reports; <code>ReconciliationStatus</code> → posting</td><td>POLY-M3 status, M5 statements</td></tr>
+      <tr><td>Entities</td><td><code>EntityList</code>, <code>MembershipList</code>, invite command → tenancy</td><td>POLY-M1</td></tr>
+      <tr><td>Securities</td><td><code>LotTable</code> → securities; <code>AllocationVsTarget</code>, <code>BookVsMarketSeries</code> → portfolio</td><td>POLY-M4</td></tr>
+      <tr><td>Import</td><td><code>ConnectionList</code>, <code>ImportBatch</code> (progress; new / duplicate / needs-category counts) → import + posting</td><td>POLY-M2</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Model consequence:</strong> batch review needs an <code>import_batch</code> row per ingest run, holding status and counts. Rows skipped by <code>ON CONFLICT DO NOTHING</code> are counted into the batch as duplicates instead of vanishing silently (§3.1).</p>
 </section>
 
 <!-- ============================================================ -->
@@ -200,7 +215,7 @@ erDiagram
       <tr><td><code>entity</code>, <code>membership</code>, <code>entity_type</code></td><td>entity id; types: <code>owner_user_id</code> or null (system)</td><td>mutable</td><td>Tax-classification attribute on <code>entity</code> (individual; trust grantor / non-grantor; business pass-through / C-corp). User-defined types readable by creator plus holders of any membership on an entity of that type — the narrow cross-tenant metadata exception SecEng flagged.</td></tr>
       <tr><td><code>account</code></td><td>entity id</td><td>mutable until first posting; then name/parent only</td><td>Number, name, parent, class (asset / liability / equity / income / expense), normal side, currency, <code>is_custodial</code> + custodian, default tax-treatment tag. Seeded per entity: Cash in Transit, Suspense, Opening Balance Equity, prepaid-tax assets per jurisdiction.</td></tr>
       <tr><td><code>journal_entry</code>, <code>journal_line</code></td><td>entity id (denormalized onto the line)</td><td><strong>append-only</strong> (trigger)</td><td>Entry: posting date (exactly one), description, <code>actor_kind</code> (user / rule / system) + <code>actor_id</code>, <code>reverses_entry_id</code>, <code>source_ref</code>. Line: account, <code>currency</code>, <code>native_amount</code>, <code>base_amount</code>, <code>fx_rate</code>, category, tax-treatment tag, memo. Amounts are <code>numeric</code>, signed (debit &gt; 0); never JS floats.</td></tr>
-      <tr><td><code>raw_transaction</code>, <code>reported_balance</code></td><td>entity id (via linked account, denormalized)</td><td>insert-only; <code>status</code> draft → posted (then frozen by trigger)</td><td>Unique de-dup hash. Full provider payload kept for audit.</td></tr>
+      <tr><td><code>import_batch</code>, <code>raw_transaction</code>, <code>reported_balance</code></td><td>entity id (via linked account, denormalized)</td><td>raw rows insert-only; <code>status</code> draft → posted (then frozen by trigger); batch mutable while running</td><td>Unique de-dup hash. Full provider payload kept for audit. Batch holds run status and new / duplicate / needs-category counts (§2.4).</td></tr>
       <tr><td><code>draft</code>, <code>rule</code>, <code>transfer_match</code></td><td>entity id</td><td>mutable until confirmed</td><td>Draft carries the proposed entry (lines as JSON) and an actor. Rule carries <code>auto_post</code> opt-in (default false).</td></tr>
       <tr><td><code>provider_connection</code></td><td>entity id + linking user</td><td>mutable</td><td>Sealed credential only (ciphertext + key id); never selected by the app role except through the <code>secrets</code> path. Revocation calls the provider before deleting.</td></tr>
       <tr><td><code>security</code>, <code>price_observation</code>, <code>cpi_observation</code>, <code>tax_table</code></td><td>global reference data</td><td>writable by system jobs / operator import only</td><td>Price: unique (security, date, source) + source priority (borrowed from mosko-fintech). Tax table: jurisdiction × filing year → due dates, cutoffs, multipliers, cumulative percentages — a new year is a data row.</td></tr>
@@ -527,7 +542,7 @@ flowchart LR
       <tr><td>OQ-8</td><td>Should intermediate milestones cut <code>0.x</code> releases so prod can run on real data before GA, or does everything before GA live on staging with fake data?</td><td>Principal (via team-lead)</td><td>Before POLY-M1 closes</td></tr>
       <tr><td>OQ-9</td><td>Staging co-located on the prod VPS vs. a separate small box; backup store choice; RPO/RTO numbers.</td><td>devops-engineer</td><td>INFRA v1</td></tr>
       <tr><td>OQ-10</td><td>Drizzle spike outcome (§6.2), which confirms or flips the migration-tool decision.</td><td>architect + backend-lead</td><td>POLY-76, first issue of POLY-M1</td></tr>
-      <tr><td>OQ-11</td><td>Screen list and per-screen DTOs: which screens the prototype fixes for the first dashboard, and in what shape.</td><td>ux-designer + architect</td><td>DESIGN v1</td></tr>
+      <tr><td>OQ-11</td><td><em>Resolved in outline (§2.4):</em> the six DESIGN screens are mapped to package DTOs. Field-level DTO shapes get pinned in each package's design file at the start of its milestone.</td><td>ux-designer + architect</td><td>Per milestone</td></tr>
       <tr><td>OQ-12</td><td>Prior-year filed tax per entity per jurisdiction (safe-harbor input): a manual entry per year, or derived from the ledger's settled filing entries?</td><td>architect + Principal</td><td>Start of POLY-1.0</td></tr>
     </tbody>
   </table>
