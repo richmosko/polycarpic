@@ -107,6 +107,7 @@
     <li>As the Principal, I want a balance sheet by GL account and a separate one by custodial (physical holding) account, so that I can reconcile what the ledger says against what my custodians report.</li>
     <li>As the Principal, I want an asset-allocation view with target adjustments, so that I can see how my actual holdings compare to where I want them.</li>
     <li>As a household member with a granted viewer role, I want to see the household's shared accounts and my own entity's finances, so that I have visibility into our joint financial picture without owning the underlying ledger.</li>
+    <li>As the Principal, I want time-series charts to show inflation-adjusted values alongside nominal ones, so that growth in net worth, spending and income reads in real terms.</li>
   </ol>
 </section>
 
@@ -137,6 +138,9 @@
     <li>The system shall let a user export or fully delete their own data on request; deletion closes the account and purges raw imports and unposted drafts, but does not rewrite or delete posted journal entries, which remain the audit record.</li>
     <li>The system shall record which actor (a user, an auto-post rule, or a system job) performed each draft or posted journal entry, as a first-class column, never inferred.</li>
     <li>The system shall enforce a tested owner/manager/viewer permission matrix per entity, and keep the RLS session context safe under connection pooling — no cross-tenant reads on a reused connection.</li>
+    <li>The system shall maintain a CPI-U reference series (BLS series CUUR0000SA0, monthly) fetched from the Bureau of Labor Statistics API v2 and stored as reference data, with the same ingestion pattern as security price series.</li>
+    <li>The system shall render any time-series chart in nominal or inflation-adjusted terms, with a user-selectable base period defaulting to the latest available month.</li>
+    <li>The system shall operate without a BLS key (v1 endpoint, lower limits) and accept manual CSV import of the series as a fallback.</li>
   </ul>
 </section>
 
@@ -191,6 +195,7 @@ flowchart LR
     <li>Import providers: provider-agnostic adapter interface; order is fake → SimpleFIN → Plaid → direct broker APIs (Schwab, IBKR).</li>
     <li>Native clients: Swift/SwiftUI for iOS and macOS (not a wrapped web view), generated from the same OpenAPI spec — a later milestone.</li>
     <li>Tax jurisdiction/rate tables (due dates, period cutoffs, annualization multipliers, cumulative required percentages) are per-jurisdiction, per-filing-year data rows, not code — a new tax year never requires a release; storage mechanism is an architect decision in Plan.</li>
+    <li>BLS API v2 requires a free per-operator registration key (500 queries/day); each self-hoster registers their own. The key is a low-tier secret — never logged, never in the repo.</li>
   </ul>
   <p>Full rationale, layer boundaries, and API shape belong in <a href="../ARCH/">ARCH</a>, written next in the Plan phase. Implementation-level detail extracted during this import (GL, transaction-import mechanics, reports engine, infra topology, fake-data generator) is queued at <code>temp/prd-spillover-arch.md</code> for the architect.</p>
 </section>
