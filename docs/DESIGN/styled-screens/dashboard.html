@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Dashboard</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="entity-switcher">Person — Mosko ▾</div>
+    <a class="nav-item active" href="#">Dashboard</a>
+    <a class="nav-item" href="#">Ledger</a>
+    <a class="nav-item" href="#">Accounts</a>
+    <a class="nav-item" href="#">Entities</a>
+    <a class="nav-item" href="#">Securities</a>
+    <a class="nav-item" href="#">Import</a>
+  </aside>
+
+  <main class="content">
+    <div class="header-row">
+      <h1 class="heading" style="font-size:24px;">Dashboard</h1>
+      <button class="btn btn-outline">Refresh</button>
+    </div>
+
+    <div class="card-grid" style="margin-bottom:24px;">
+      <div class="card stat-card">
+        <span class="eyebrow">Net worth</span>
+        <div class="stat-value">$412,884</div>
+        <div class="stat-delta positive">▲ +2.4% mo/mo</div>
+      </div>
+      <div class="card stat-card">
+        <span class="eyebrow">Cash flow (mtd)</span>
+        <div class="stat-value">−$1,240</div>
+        <div class="stat-delta negative">▼ vs. +$800 last month</div>
+      </div>
+      <div class="card stat-card">
+        <span class="eyebrow">Pending tax liability</span>
+        <div class="stat-value">$3,100</div>
+        <div class="stat-delta"><span class="badge badge-warning">Gap — due Sep 15</span></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:24px;">
+      <div class="header-row" style="margin-bottom:12px;">
+        <span class="card-title">Net worth over time</span>
+        <div class="tabs">
+          <button class="tab active">Nominal</button>
+          <button class="tab">Inflation-adjusted</button>
+        </div>
+      </div>
+      <div style="height:180px; background:var(--muted); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; color:var(--muted-foreground); font-size:13px;">[LayerChart — sequential ramp, --chart-1..5]</div>
+    </div>
+
+    <div class="card-grid">
+      <div class="card">
+        <span class="card-title">Recent activity</span>
+        <table class="data-table">
+          <tbody>
+            <tr><td>Grocery Co. — Groceries</td><td class="amount negative">−$84.20</td></tr>
+            <tr><td>Employer — Salary</td><td class="amount positive">+$2,400.00</td></tr>
+            <tr><td>Streaming Svc — Subscriptions</td><td class="amount negative">−$12.99</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <span class="card-title">Asset allocation — actual vs. target</span>
+        <div style="height:120px; background:var(--muted); border-radius:var(--radius-md); display:flex; align-items:center; justify-content:center; color:var(--muted-foreground); font-size:13px;">[bar chart]</div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
