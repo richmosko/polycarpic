@@ -90,6 +90,7 @@
     <li>User-authored report scripting — deferred until the declarative report definitions (§5) prove insufficient for a named report.</li>
     <li>Period locking of closed books — deferred; the posting-date check is designed so locking can be added later without a schema change.</li>
     <li>An MCP server exposing a user's data to their own assistant — feasible later as a thin client of the same API, authenticated with the user's own token; out of scope until the API exists.</li>
+    <li>A hosted, multi-user (non-self-hosted) offering — out of scope for v1; if ever pursued, it changes the regulatory picture materially (GLBA Safeguards Rule, state financial-privacy law, PCI DSS if card data is ever touched directly) per SecEng's read (<code>temp/seceng-research-notes.md</code>).</li>
   </ol>
 </section>
 
@@ -126,7 +127,9 @@
     <li>The system shall reconcile the GL balance of each custodial account against the custodian's reported balance.</li>
     <li>The system shall enforce that every journal entry's debits equal its credits, in the base currency.</li>
     <li>The system shall provide the seeded report templates: Balance Sheet, Income Statement, Statement of Cash Flows, custodial NAV, and NAV delta.</li>
-    <li>The system shall grant data access only through a user's membership on an entity (role: owner, manager, or viewer), never through a bare user identifier.</li>
+    <li>The system shall grant data access only through a user's membership on an entity (role: owner, manager, or viewer), never through a bare user identifier; a parent entity's structure (e.g. Household over Person) never implies transitive read access — only an explicit membership grant does.</li>
+    <li>The system shall store aggregator credentials (provider access tokens/URLs) encrypted at rest, exclude them from logs and API responses once stored, and provide a documented path to revoke a linked account's token at the provider, not just delete the local row.</li>
+    <li>The system shall let a user export or fully delete their own data on request; deletion closes the account and purges raw imports and unposted drafts, but does not rewrite or delete posted journal entries, which remain the audit record.</li>
   </ul>
 </section>
 
@@ -138,7 +141,16 @@
     <tbody>
       <tr><td>Performance</td><td class="tbd">No formal target set. Proposed: dashboard pages render in &lt;2s on the VPS deployment at single-household data scale — needs Principal confirmation.</td></tr>
       <tr><td>Availability</td><td class="tbd">No formal target set. Self-hosted on a single Hetzner VPS; proposed informal target ~99% (occasional downtime for patching accepted) — needs Principal confirmation.</td></tr>
-      <tr><td>Security / Regulatory</td><td class="tbd">RLS is mandatory (kickoff §2.4/§2.8). Handles bank/brokerage credentials, transaction data, and multi-entity ownership (trusts, businesses) for a closed household (no public signup). Regulatory scope (GDPR/PCI/SOC2 applicability) not yet assessed — routed to SecEng for a high-level read; see <a href="#open-questions">Open Questions</a>.</td></tr>
+      <tr><td>Security / Regulatory</td><td>
+        <ul>
+          <li>No SOC2/PCI-DSS/GLBA compliance program is required for v1 — a self-hosted personal tool operated by its own owner has no "customer" relationship (SecEng read). Revisit only if this ever becomes a hosted multi-user offering.</li>
+          <li>RLS keys on the membership join <code>(user, entity, role)</code>, never a bare <code>user_id</code> (kickoff §2.4) — hard requirement, must not regress in schema work.</li>
+          <li>Aggregator credentials (Plaid tokens, SimpleFIN URLs) and financial data (balances, transactions, holdings, memo PII) are both "sensitive personal financial data": encrypted at rest, never logged, never returned once stored.</li>
+          <li>Posted ledger rows are append-only, enforced by a database trigger — not app-logic-only, since a self-hoster may have direct DB access.</li>
+          <li>Self-hosted VPS deployment requires documented full-disk/volume encryption and an encrypted, tested backup with an explicit RPO/RTO (INFRA doc detail).</li>
+        </ul>
+        Full write-up: <code>temp/seceng-research-notes.md</code> (SecEng); detailed controls and threat model belong in SECURITY doc, written in Plan.
+      </td></tr>
       <tr><td>Accessibility</td><td>WCAG AA target (template default; not separately discussed with the Principal).</td></tr>
       <tr><td>Browsers / devices</td><td>Modern evergreen browsers (Chrome/Safari/Firefox/Edge) via SvelteKit. Native iOS/macOS clients (Swift/SwiftUI, not a web view) are a later milestone (kickoff §2.10).</td></tr>
     </tbody>
@@ -191,7 +203,8 @@ flowchart LR
   <p class="section-hint">Every unresolved question. Every assumption that could be wrong. This drives the next conversation.</p>
   <ul>
     <li>What numeric targets belong in §2 Goals — tax-estimate variance tolerance, reconciliation window, dashboard load-time target, uptime target? Drafted as placeholders; need the Principal's confirmation.</li>
-    <li>Does this app ever have users beyond the Principal's own household (spouse, family), or could it ever be offered to others? Affects whether GDPR/PCI/SOC2-style regulatory scope applies — routed to SecEng (see §6).</li>
+    <li>Resolved by SecEng: no SOC2/PCI/GLBA compliance program attaches to a self-hosted personal tool (§6). Still open: does the Principal want GDPR/CCPA-style export/delete (§5) scoped for v1 or deferred, given it's "good practice" rather than a legal trigger here?</li>
+    <li>Plan-phase design questions flagged by SecEng, not decided here: credential-encryption mechanism (envelope vs. pgcrypto vs. external secrets manager) and key rotation for a self-hoster with no KMS; how RLS session context is set safely under connection pooling; the owner/manager/viewer authorization test matrix; backup-encryption key custody. See <code>temp/seceng-research-notes.md</code> for the full list — feeds SECURITY doc.</li>
     <li>General ledger: build a home-grown schema (borrowing from <a href="https://github.com/richmosko/mosko-fintech">mosko-fintech</a>) vs. adopt a library that manages tables inside our own Postgres — a Plan-phase research step owned by the architect (kickoff §2.5).</li>
     <li>Database migration tool — Drizzle is the leading candidate; the architect confirms against the <code>mosko-fintech</code> incumbent (kickoff §2.13).</li>
     <li>Bloat-signal thresholds (gate cycles over estimate, token ratio) are set only after the first milestone's baseline (kickoff §2.12) — no number yet.</li>
