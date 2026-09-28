@@ -6,7 +6,7 @@ milestone: null
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [process/cairn/reviews/**, process/reviews/**, process/WORKFLOW.md, process/TRACKER.md, process/DECISIONS.md, .claude/roles/team-lead.md, .claude/agents/*.md, .claude/hooks/message_cap.py, scripts/cairn/**, tests/workflow/**, .github/workflows/ci.yml]
+paths: [process/cairn/reviews/**, process/reviews/**, process/WORKFLOW.md, process/TRACKER.md, process/DECISIONS.md, .claude/roles/team-lead.md, .claude/agents/*.md, .claude/hooks/message_cap.py, scripts/cairn/**, tests/workflow/**, .github/workflows/ci.yml, process/cairn/archive/**, .worktreeinclude, docs/project_kickoff.md, .claude/hooks/**, .claude/skills/**]
 labels: [tooling, ci, process]
 priority: P1
 pr: null
