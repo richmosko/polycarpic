@@ -17,8 +17,8 @@
   <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
-    <span><strong>Status:</strong> Draft v1 — pending DevOps fold (backup key custody, §6.6 / §9) and Principal review</span>
-    <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1 (Approved 2026-09-27)</a>, <a href="../ARCH/">ARCH v1</a>, <a href="../project_kickoff.md">kickoff record</a></span>
+    <span><strong>Status:</strong> Draft v1 (reviewed rewrite, supersedes 8963efb). Pending the architect's re-fold (§12.2) and the Principal's review (§11 approvals, §12.3).</span>
+    <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1</a> (Approved 2026-09-27), <a href="../ARCH/">ARCH v1 draft</a> (@ db8aa61)</span>
     <span><strong>Last updated:</strong> 2026-09-28</span>
   </div>
 </header>
@@ -41,653 +41,780 @@
   </ol>
 </nav>
 
-<!-- ============================================================ -->
 <section id="compliance" data-section="compliance">
   <h2>1. Compliance Posture</h2>
-  <p class="section-hint">Source of truth is <a href="../PRD/#nonfunctional">PRD §6 — Non-Functional Requirements → Security / Regulatory</a>, decided with the Principal 2026-09-27.</p>
-
-  <p><strong>The posture in one sentence:</strong> a self-hosted personal tool, operated by the person whose books it holds, has no <em>customer</em> and therefore no third-party compliance obligation — so no regime attaches, and the security work here is justified by the threat model, not by an auditor.</p>
-
+  <p class="section-hint">Source of truth is PRD §6 (Non-Functional Requirements) and the Principal's audience decision of 2026-09-27.</p>
+  <p>Polycarpic is software a person installs and runs for their own household. The Principal will never operate it as a service for others. That is a standing non-goal (PRD §3), not a v1 deferral. Nobody is anybody's "customer", so no formal compliance regime attaches.</p>
+  <p>That does not lower the bar. The Principal made the PRD §6 security items hard requirements, and this document treats them that way. Every control here answers a threat in §3, not an auditor. The yardstick is <strong>OWASP ASVS 4.0 Level 2</strong>, used as a checklist, not as a certification target.</p>
   <table>
     <thead><tr><th>Regime</th><th>In scope?</th><th>Why</th><th>Target evidence</th></tr></thead>
     <tbody>
-      <tr><td>HIPAA</td><td><strong>No</strong></td><td>No health data is collected or processed. Medical <em>payees</em> may appear in transaction memos, which is why memo text is classified Confidential (§5) — but a payee string is not PHI held by a covered entity.</td><td>Data classification table (§5); memo fields in the log-redaction list (§9).</td></tr>
-      <tr><td>PCI-DSS</td><td><strong>No</strong></td><td>The system never touches a PAN, CVV or cardholder data. Aggregators (SimpleFIN, Plaid) mediate every bank and card connection; the system holds a read-only bearer credential, never card data.</td><td><code>ImportAdapter</code> contract (<a href="../ARCH/#contracts">ARCH §2.3</a>): no card-data field exists in <code>RawTxn</code>.</td></tr>
-      <tr><td>GLBA (Safeguards Rule)</td><td><strong>No</strong> for v1</td><td>GLBA attaches to a financial institution holding <em>customer</em> information. A self-hosted instance whose owner is also its only data subject has no customer relationship. Standing Non-Goal: the Principal will never host this for others (<a href="../PRD/#non-goals">PRD §3 #10</a>).</td><td>PRD §3 Non-Goal #10 and §6 audience decision. Re-opens only on a deliberate reversal (§11 R-6).</td></tr>
-      <tr><td>SOC 2</td><td><strong>No</strong></td><td>SOC 2 is a report sold to enterprise buyers. There are no buyers and no service organization.</td><td>n/a.</td></tr>
-      <tr><td>GDPR / CCPA</td><td><strong>Adopted voluntarily</strong></td><td>Not legally triggered (no controller/processor relationship with a third party), but the data-subject rights are cheap here and worth having. Scoped to the immutable-ledger model: <em>export</em> is complete; <em>delete</em> means account closure with actor anonymization, plus whole-entity purge by the sole owner — never a retroactive ledger rewrite.</td><td><a href="../PRD/#functional">PRD §5</a>: export requirement, account-deletion requirement, whole-entity purge requirement. Controls C-21 (provider-side revocation) and C-35–C-37 (purge guards) in §7.</td></tr>
-      <tr><td>State financial-privacy law (e.g. CA FIPA), PCI DSS direct</td><td><strong>No</strong> — future trigger only</td><td>Would attach only if the standing Non-Goal is reversed and the Principal operates a hosted multi-user offering. Flagged so it is not a surprise later, not a v1 work item.</td><td>Accepted risk R-6 (§11).</td></tr>
+      <tr><td>GLBA Safeguards Rule</td><td>No</td><td>Applies to financial institutions that serve customers, and a self-hosted personal tool has none. It would likely attach if the hosting non-goal were reversed (R-6).</td><td>—</td></tr>
+      <tr><td>PCI-DSS</td><td>No</td><td>We never store, process or transmit card numbers. Aggregators expose transactions, not PANs. Adapters must not persist a PAN even if a provider payload carries one (C-34).</td><td>C-34 adapter fixture test</td></tr>
+      <tr><td>GDPR / CCPA</td><td>No (voluntary alignment)</td><td>Processing by a natural person in a purely personal or household activity falls under the GDPR Art. 2(2)(c) household exemption. CCPA thresholds are never met. We adopt the data-rights practices anyway (PRD §6): export, account deletion and entity purge, all scoped to the immutable ledger.</td><td>C-50, C-51, C-52</td></tr>
+      <tr><td>SOC 2</td><td>No</td><td>No service organization and no customers.</td><td>—</td></tr>
+      <tr><td>HIPAA</td><td>No</td><td>No health data by design. Payee strings can still reveal medical providers, which is one reason memo and payee text is Tier 3 (§5).</td><td>—</td></tr>
+      <tr><td>Aggregator terms (Plaid, SimpleFIN)</td><td>Yes, per operator</td><td>Each self-hoster obtains their own provider keys and accepts that provider's terms. Plaid production access comes with a security questionnaire. The controls here are written so an operator can answer it truthfully.</td><td>§6, C-30 to C-35</td></tr>
+      <tr><td>Tax record retention (IRS guidance, 3–7 years)</td><td>Advisory</td><td>Not a regime we enforce. The purge flow must warn the owner about it (PRD §5).</td><td>C-50 warning copy</td></tr>
     </tbody>
   </table>
-
-  <p><strong>What the absence of a regime does <em>not</em> buy us.</strong> The Principal has designated six items as hard requirements independent of any regime (PRD §6): credential encryption at rest with a provider-side revocation path; RLS on the membership join proven safe under pooling; a tested owner/manager/viewer permission matrix; DB-trigger-enforced append-only posted rows; a first-class actor column; and documented disk encryption plus tested encrypted backups with a stated RPO/RTO. Each of those is a control in §7 with a named test, not a policy sentence.</p>
 </section>
 
-<!-- ============================================================ -->
 <section id="boundaries" data-section="boundaries">
   <h2>2. Trust Boundaries</h2>
-  <p class="section-hint">Derived from <a href="../ARCH/#topology">ARCH §7</a> and the layer model (<a href="../ARCH/#layers">ARCH §2.1</a>). Every boundary below is a STRIDE entry in §3 — that mapping is the doc's spine.</p>
-
-  <pre class="mermaid">
-flowchart LR
-  attacker(("Internet / attacker"))
-  user(["Browser or native client"])
-  operator(["Self-host operator (Principal)"])
-
-  subgraph vps["Hetzner VPS"]
-    caddy["Caddy — TLS termination"]
-    subgraph appproc["Node process (web + worker)"]
-      app["SvelteKit app + /api/v1"]
-      sec["packages/secrets — seal / open"]
-      wrk["worker — job units"]
-    end
-    key[["Master key: root-only file / env"]]
-    pg[("Postgres — RLS enforced, poly_app / poly_worker")]
-  end
-
-  prov["Aggregators: SimpleFIN, Plaid, brokers"]
-  idp["OAuth IdPs: Google, Apple, GitHub"]
-  mail["Resend"]
-  backup[("Off-box backup store")]
-
-  attacker -.->|"TB-1 network"| caddy
-  user -->|"TB-2 session cookie / bearer"| caddy
-  caddy --> app
-  app -->|"TB-3 limited role + txn-local context"| pg
-  wrk -->|"TB-3"| pg
-  sec -->|"TB-4 key never leaves process"| key
-  wrk -->|"TB-5 sealed credential, egress only"| prov
-  app -->|"TB-6 OAuth redirect"| idp
-  app --> mail
-  pg -.->|"TB-7 client-side encrypted"| backup
-  operator -->|"TB-8 SSH, superuser — bypasses RLS"| vps
-  app -.->|"TB-9 SECURITY DEFINER purge path"| pg
-
-  classDef boundary stroke-dasharray: 5 5;
-  class attacker,prov,idp,mail,backup,operator boundary;
-  </pre>
-
+  <p class="section-hint">ARCH §7 cites TB-1 to TB-10, so those numbers stay stable. The OQ-1 revision (§6.3) redefines TB-4. TB-11 and TB-12 are new. Each boundary becomes a threat entry in §3.</p>
   <table>
-    <thead><tr><th>#</th><th>From</th><th>To</th><th>Boundary type</th><th>Control at the boundary</th></tr></thead>
+    <thead><tr><th>#</th><th>From</th><th>To</th><th>Boundary type</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td>TB-1</td><td>Public internet</td><td>Caddy</td><td>Network</td><td>Firewall (22 restricted by source, 80/443 open, Postgres never published); automatic TLS with HSTS; Postgres and the app ports exist only on the compose network.</td></tr>
-      <tr><td>TB-2</td><td>Browser / native / future MCP client</td><td>SvelteKit app</td><td>Network + Authn</td><td>TLS 1.2+; BetterAuth session cookie (<code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>) for web; revocable scoped bearer token for native and MCP clients; CSRF origin check on mutating routes.</td></tr>
-      <tr><td>TB-3</td><td>App / worker process</td><td>Postgres</td><td>Network + Authz</td><td><strong>The main boundary.</strong> Connects as <code>poly_app</code> / <code>poly_worker</code> (<code>NOBYPASSRLS</code>, not the table owner); tenant identity set transaction-locally; every tenant table <code>FORCE</code>s RLS; default-deny. §4.3.</td></tr>
-      <tr><td>TB-4</td><td><code>packages/secrets</code></td><td>Master key (file / env)</td><td>Process + Filesystem</td><td>Key readable only by the app process user (mode 0600, root-owned, outside the image and the repo); plaintext credentials exist only inside a <code>secrets.open()</code> call frame; never in Postgres, never in a log, never in a response. §6.</td></tr>
-      <tr><td>TB-5</td><td>Worker</td><td>Aggregators / brokers / price + BLS APIs</td><td>Network + Third-party trust</td><td>Egress only — no inbound webhook surface in v1; sealed credential opened per call; provider responses are untrusted input (schema-validated, stored as opaque payload, never rendered as HTML). §3.3.</td></tr>
-      <tr><td>TB-6</td><td>App</td><td>OAuth IdPs (Google / Apple / GitHub), Resend</td><td>Network + Delegated identity</td><td>OAuth 2.0 + PKCE via BetterAuth; per-operator client credentials held as operator secrets; email is a notification channel, never an authorization channel beyond BetterAuth's own verified flows.</td></tr>
-      <tr><td>TB-7</td><td>VPS</td><td>Off-box backup store</td><td>Network + Data egress</td><td>Backups encrypted <em>on the box before transmission</em>, with a key held independently of the box (§6.6, DevOps owns the mechanism in INFRA). The store credential is write-mostly.</td></tr>
-      <tr><td>TB-8</td><td>Operator (SSH)</td><td>VPS, Postgres superuser</td><td>Administrative</td><td>Key-only SSH, no password auth, source-restricted. <strong>Superuser bypasses RLS by definition</strong> — documented as accepted risk R-1 (§11), not a boundary RLS can defend.</td></tr>
-      <tr><td>TB-9</td><td><code>poly_app</code> ordinary write path</td><td>Privileged purge path</td><td>Privilege escalation, intentional</td><td>One <code>SECURITY DEFINER</code> function owned by <code>poly_owner</code>, guarded by sole-owner check, fresh-export check, and an <code>audit_event</code> written before any delete. §4.5.</td></tr>
-      <tr><td>TB-10</td><td>Prod compose project</td><td>Staging compose project (same VPS)</td><td>Host-level (shared kernel)</td><td>Separate compose project, separate database, separate credentials; staging holds fake data only. Accepted risk R-4 (§11).</td></tr>
+      <tr><td>TB-1</td><td>Internet</td><td>Caddy</td><td>Network, TLS</td><td>TLS 1.2+ with HSTS. Caddy is the only container that publishes ports (80 and 443).</td></tr>
+      <tr><td>TB-2</td><td>Browser, native and MCP clients</td><td>SvelteKit <code>web</code></td><td>Authentication</td><td>A session cookie or bearer token goes through <code>getSession()</code> and becomes a branded <code>SessionUserId</code>. Anything else is anonymous. CSRF and origin checks sit here.</td></tr>
+      <tr><td>TB-3</td><td><code>web</code> / <code>worker</code></td><td>Postgres</td><td>DB role + RLS</td><td>The primary authorization boundary. Apps connect as <code>poly_app</code> or <code>poly_worker</code>, never as the owner. Tenant context is transaction-local (§4.3).</td></tr>
+      <tr><td>TB-4</td><td><code>web</code></td><td><code>worker</code> (the credential-opening capability)</td><td>Process + key separation</td><td><code>web</code> can seal credentials but cannot open them; only <code>worker</code> holds the private key (§6.3). The two share only the database. <em>Revised:</em> 8963efb had a symmetric master key mounted into the app.</td></tr>
+      <tr><td>TB-5</td><td><code>worker</code></td><td>Aggregators, brokers, price and CPI providers</td><td>Egress, third-party trust</td><td>Outbound only. Credentials are opened just in time. Every response is untrusted input: payee and memo text can be written by anyone who sends the user money.</td></tr>
+      <tr><td>TB-6</td><td><code>web</code></td><td>OAuth IdPs, Resend</td><td>Third-party identity and email</td><td>The IdP asserts identity. Resend sees verification and magic-link URLs in transit.</td></tr>
+      <tr><td>TB-7</td><td>Box</td><td>Off-box backup store</td><td>Custody</td><td>Backups are encrypted before egress, with a key separate from the credential key (§6.6).</td></tr>
+      <tr><td>TB-8</td><td>Operator (SSH, <code>docker compose exec</code>)</td><td>Box, Postgres superuser</td><td>Administrative</td><td>Bypasses RLS and triggers by definition (R-1). C-24 is the compensating control.</td></tr>
+      <tr><td>TB-9</td><td>Ordinary write path</td><td>Purge path</td><td>Privilege (DB role)</td><td>The only path that deletes posted rows. It runs inside a function owned by the NOLOGIN <code>poly_purge</code> role (§4.5).</td></tr>
+      <tr><td>TB-10</td><td>Staging compose project</td><td>Prod compose project</td><td>Container isolation, shared kernel</td><td>Staging auto-deploys every merge to <code>main</code> and holds fake data only. It has separate networks, secrets and database, and no credential private key (R-4).</td></tr>
+      <tr><td>TB-11</td><td>User upload (CSV / OFX)</td><td><code>web</code> parser</td><td>Untrusted file</td><td>The credential-free import path, and a parser attack surface (C-40).</td></tr>
+      <tr><td>TB-12</td><td>GitHub (CI, Actions, Renovate, registry)</td><td>Release images, prod deploy</td><td>Supply chain</td><td>Whoever can publish an image that prod runs owns the box (§8).</td></tr>
     </tbody>
   </table>
+  <pre class="mermaid">
+flowchart TB
+  user(["Browser / native client"])
+  op(["Operator"])
+  ci["GitHub CI + release images"]
+  caddy["Caddy: TLS, only published ports"]
+  web["web: seal only"]
+  wrk["worker: seal + open"]
+  purge["app.purge_entity, owned by poly_purge"]
+  pg[("Postgres prod: poly_app / poly_worker, RLS")]
+  stg["staging web + worker + Postgres, fake data"]
+  ext["Aggregators, brokers, prices, BLS"]
+  idp["OAuth IdPs, Resend"]
+  bk[("Off-box backups, encrypted")]
+  user -->|TB-1 TLS| caddy
+  caddy -->|TB-2 session| web
+  caddy -->|TB-10 same kernel| stg
+  user -->|TB-11 upload| web
+  web -->|TB-3 RLS| pg
+  wrk -->|TB-3 RLS| pg
+  web -.->|TB-4 via DB only| wrk
+  web -->|TB-9 definer call| purge
+  purge --> pg
+  wrk -->|TB-5 egress| ext
+  web -->|TB-6| idp
+  pg -.->|TB-7 encrypted| bk
+  op -->|TB-8 superuser| pg
+  ci -->|TB-12 images| web
+  classDef boundary stroke-dasharray: 5 5;
+  class caddy,pg,bk,ci,stg,purge boundary;
+  </pre>
 </section>
 
-<!-- ============================================================ -->
 <section id="threats" data-section="threats">
   <h2>3. Threat Model (STRIDE)</h2>
-  <p class="section-hint">One subsection per trust boundary from §2, plus two data-integrity surfaces that matter more here than any network threat. Not exhaustive — only threats with non-trivial likelihood × impact. Controls are catalogued in §7; the <code>C-n</code> references point there.</p>
+  <p class="section-hint">One table per component group. Only threats with non-trivial likelihood × impact are listed. L = likelihood, I = impact (H/M/L). Control IDs refer to §7.</p>
+  <p><strong>Attacker model.</strong></p>
+  <ul>
+    <li>(a) An internet attacker who can reach Caddy.</li>
+    <li>(b) A curious or malicious household member with a legitimate viewer or manager grant.</li>
+    <li>(c) A counterparty who controls text that lands in our data. Anyone who sends the user money writes a payee or memo string.</li>
+    <li>(d) A compromised dependency or CI path.</li>
+    <li>(e) A thief with a backup or a disk.</li>
+    <li>(f) An attacker with code execution in <code>web</code>. This one is in scope, and the design limits what they get.</li>
+  </ul>
+  <p>The operator's own superuser is not modelled as an attacker (R-1).</p>
 
-  <p><strong>Adversary model.</strong> Three adversaries are in scope: (A) an unauthenticated internet attacker with no prior access; (B) an authenticated user of the instance who holds <em>some</em> membership and wants data or writes outside it — the household member with a viewer grant is the realistic case, and it is the adversary the whole tenancy design exists to stop; (C) a compromised or hostile upstream dependency (an aggregator returning malicious payloads, a poisoned npm package). Explicitly <strong>out of scope</strong>: the box's own root/superuser (R-1) and an attacker with physical access to a powered-on VPS.</p>
-
-  <h3 id="t-edge">3.1 TB-1 / TB-2 — Internet and client ↔ app</h3>
+  <h3>3.1 TB-1 / TB-2 — Edge &amp; web app (Caddy, SvelteKit, <code>packages/auth</code>)</h3>
   <table>
-    <thead><tr><th>Threat</th><th>STRIDE</th><th>Likelihood</th><th>Impact</th><th>Control(s)</th></tr></thead>
+    <thead><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>L</th><th>I</th><th>Control(s)</th></tr></thead>
     <tbody>
-      <tr><td>Credential stuffing / password spray against the login route</td><td>S</td><td>medium</td><td>high</td><td>C-1 (BetterAuth: hashed passwords, rate-limited login, MFA available), C-2 (OAuth preferred over password), C-20 (auth-outcome logging)</td></tr>
-      <tr><td>Session cookie stolen via XSS and replayed</td><td>S / E</td><td>low</td><td>high</td><td>C-3 (<code>HttpOnly</code> + <code>Secure</code> + <code>SameSite</code> cookie; Svelte escapes by default; CSP with no <code>unsafe-inline</code>), C-4 (session revocation on logout / password change / membership revocation)</td></tr>
-      <tr><td>Native/MCP bearer token leaked from a client device and replayed indefinitely</td><td>S</td><td>medium</td><td>high</td><td>C-5 (bearer tokens are named, listable and individually revocable by the user; stored hashed; scoped to the issuing user, never to an entity)</td></tr>
-      <tr><td>Cross-site request forgery on a mutating <code>/api/v1</code> route</td><td>T</td><td>low</td><td>medium</td><td>C-3 (<code>SameSite=Lax</code> + origin check on all non-GET routes; bearer routes are cookie-less by construction)</td></tr>
-      <tr><td>Unauthenticated request reads tenant data because a route forgot its auth check</td><td>I / E</td><td>medium</td><td><strong>critical</strong></td><td>C-6 (<strong>no route can leak: RLS default-deny means a query with no transaction context returns zero rows</strong>), C-7 (<code>withTenant()</code> is the only connection path; session-level <code>SET</code> banned by lint)</td></tr>
-      <tr><td>Request flood exhausts the single VPS</td><td>D</td><td>low</td><td>medium</td><td>Accepted: ~99% availability target (PRD §6). Caddy connection limits + fail2ban on SSH; no CDN/WAF in v1 (R-3).</td></tr>
+      <tr><td>T-01</td><td>A stranger signs up on a public instance and gets an account on someone's household box.</td><td>S / E</td><td>H</td><td>M</td><td>C-01</td></tr>
+      <tr><td>T-02</td><td>Credential stuffing, spraying or brute force against password login.</td><td>S</td><td>M</td><td>H</td><td>C-03, C-04</td></tr>
+      <tr><td>T-03</td><td>OAuth account takeover: an IdP identity with an unverified email auto-links to an existing user.</td><td>S</td><td>L</td><td>H</td><td>C-05</td></tr>
+      <tr><td>T-04</td><td>Session cookie theft through XSS, subdomain cookie injection or the network.</td><td>S</td><td>M</td><td>H</td><td>C-02, C-07, C-41</td></tr>
+      <tr><td>T-05</td><td>CSRF on state-changing form actions or <code>/api/v1</code>.</td><td>T / E</td><td>M</td><td>H</td><td>C-06</td></tr>
+      <tr><td>T-06</td><td>Stored XSS through provider payee or memo strings, or through entity or report names set by a co-member.</td><td>T / E</td><td>M</td><td>H</td><td>C-41, C-07</td></tr>
+      <tr><td>T-07</td><td>Account enumeration through login, reset or signup responses.</td><td>I</td><td>M</td><td>L</td><td>C-04</td></tr>
+      <tr><td>T-08</td><td>A stolen session is used for an irreversible or exfiltration-shaped action: purge, export, provider link, membership grant.</td><td>S / E</td><td>L</td><td>H</td><td>C-03 (step-up), C-50</td></tr>
+      <tr><td>T-09</td><td>Floods against expensive endpoints: reports, export, upload.</td><td>D</td><td>L</td><td>M</td><td>C-04, C-40, C-42</td></tr>
     </tbody>
   </table>
 
-  <h3 id="t-db">3.2 TB-3 — App ↔ Postgres (the tenancy boundary)</h3>
-  <p>This is adversary (B)'s whole playing field and the highest-value table in this document.</p>
+  <h3>3.2 TB-3 — Database &amp; tenancy (<code>packages/db</code>, <code>packages/tenancy</code>, RLS)</h3>
   <table>
-    <thead><tr><th>Threat</th><th>STRIDE</th><th>Likelihood</th><th>Impact</th><th>Control(s)</th></tr></thead>
+    <thead><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>L</th><th>I</th><th>Control(s)</th></tr></thead>
     <tbody>
-      <tr><td>Pooled connection carries the previous request's identity; user B reads user A's books</td><td>I</td><td>medium</td><td><strong>critical</strong></td><td>C-8 (<code>set_config('app.user_id', …, is_local =&gt; true)</code> inside the transaction — the setting dies at COMMIT/ROLLBACK; session <code>SET</code> forbidden), C-9 (pool-reuse test in the CI battery: A's transaction then B's on the same physical connection must show zero A rows)</td></tr>
-      <tr><td>A new table ships without an RLS policy — drafts, raw import rows, lots, <code>transfer_match</code>, staging are the easy misses</td><td>I</td><td><strong>high</strong></td><td><strong>critical</strong></td><td>C-10 (catalog-driven CI probe: any table with a tenant column and RLS not <code>ENABLE</code>d + <code>FORCE</code>d <em>fails the build</em> — coverage is derived, never a hand-maintained list), C-11 (inversion self-test: an unprotected canary table must leak, proving the probe has teeth)</td></tr>
-      <tr><td>App-layer <code>can()</code> check passes but the DB permits the write — authz enforced only in TypeScript</td><td>E</td><td>medium</td><td>high</td><td>C-12 (<strong>the database is the enforcement point</strong>; <code>can()</code> is UX-level early rejection only), C-9 (per-role write probes in pgTAP: a viewer's INSERT must be rejected by policy, not by the app)</td></tr>
-      <tr><td>Viewer on entity X reads entity Y through a parent/child link ("the Household lens leaks")</td><td>I</td><td>medium</td><td>high</td><td>C-13 (policies consult <code>membership</code> only; <code>parent_id</code> is never in a <code>USING</code> clause — structure grants nothing), C-9 (a probe asserts a child-entity grant yields no parent rows and vice versa)</td></tr>
-      <tr><td>RLS helper functions are <code>SECURITY DEFINER</code>; a mutable <code>search_path</code> lets a user shadow <code>membership</code> and widen visibility</td><td>E</td><td>low</td><td><strong>critical</strong></td><td>C-14 (every <code>SECURITY DEFINER</code> function pins <code>SET search_path = pg_catalog, app</code> and is <code>STABLE</code>; <code>EXECUTE</code> granted narrowly; <code>CREATE</code> on <code>public</code> revoked from <code>poly_app</code>)</td></tr>
-      <tr><td><code>poly_app</code> can read sealed credential ciphertext for entities it can see</td><td>I</td><td>medium</td><td>medium</td><td>Accepted by design — ciphertext without the master key is inert (§6). C-16 (column excluded from every DTO and OpenAPI response schema), C-17 (only <code>secrets.open()</code> may decrypt)</td></tr>
-      <tr><td>SQL injection via a payee string, report formula, or provider payload</td><td>T / I</td><td>low</td><td>high</td><td>C-18 (Drizzle parameterized queries only; raw SQL confined to <code>packages/db</code> migrations and reviewed), C-19 (report formula grammar is a parsed AST over an account allow-list, never interpolated SQL), plus C-6 — even a successful injection runs as <code>poly_app</code> under RLS with the caller's context</td></tr>
+      <tr><td>T-10</td><td>IDOR: a route accepts an <code>entityId</code> the caller has no membership on.</td><td>I / T</td><td>H</td><td>H</td><td>C-13, C-14, C-17</td></tr>
+      <tr><td>T-11</td><td>A pooled connection carries tenant A's context into tenant B's request.</td><td>I</td><td>M</td><td>H</td><td>C-11, C-12</td></tr>
+      <tr><td>T-12</td><td>A new table ships without RLS: staging, draft, lot or some future table.</td><td>I</td><td>H</td><td>H</td><td>C-13 (catalog-derived battery)</td></tr>
+      <tr><td>T-13</td><td>RLS is bypassed through ownership: a view runs as its owner, a materialized view has no RLS, or a SECURITY DEFINER function is not on the allowlist.</td><td>I / E</td><td>M</td><td>H</td><td>C-15, C-16</td></tr>
+      <tr><td>T-14</td><td>A write policy without <code>WITH CHECK</code>, or an updatable <code>entity_id</code>, lets a row be inserted into or moved to another entity.</td><td>T / E</td><td>M</td><td>H</td><td>C-14</td></tr>
+      <tr><td>T-15</td><td>A manager grants roles, or the last owner is removed.</td><td>E</td><td>M</td><td>H</td><td>C-20</td></tr>
+      <tr><td>T-16</td><td>A user attaches their entity under someone else's Household, injecting rows into the victim's roll-up reports.</td><td>T / S</td><td>L</td><td>M</td><td>C-19</td></tr>
+      <tr><td>T-17</td><td>Existence oracle: FK checks bypass RLS, so sequential IDs let an attacker probe for other tenants' rows.</td><td>I</td><td>M</td><td>L</td><td>C-18</td></tr>
+      <tr><td>T-18</td><td>SQL injection in <code>poly_app</code> sets <code>app.user_id</code> to anyone. The GUC is asserted by the app, not authenticated by the database.</td><td>S / I / E</td><td>L</td><td>H</td><td>C-44 prevents it; RLS does not (R-2)</td></tr>
+      <tr><td>T-19</td><td>Cross-tenant metadata read through user-defined entity types. This is by design (kickoff §2.4).</td><td>I</td><td>H</td><td>L</td><td>R-9; the C-14 view exposes the label only</td></tr>
+      <tr><td>T-20</td><td>Membership-table policies recurse through the authz functions, or FORCE RLS blinds those functions, so policies fail open or error.</td><td>E / D</td><td>M</td><td>H</td><td>C-15 (functions owned by <code>poly_authz</code>)</td></tr>
     </tbody>
   </table>
 
-  <h3 id="t-providers">3.3 TB-5 — Worker ↔ aggregators and reference-data providers</h3>
+  <h3>3.3 Ledger integrity — tampering &amp; repudiation (<code>ledger</code>, <code>securities</code>, <code>posting</code>)</h3>
   <table>
-    <thead><tr><th>Threat</th><th>STRIDE</th><th>Likelihood</th><th>Impact</th><th>Control(s)</th></tr></thead>
+    <thead><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>L</th><th>I</th><th>Control(s)</th></tr></thead>
     <tbody>
-      <tr><td>Aggregator credential exfiltrated (log line, error message, API response, crash dump) and used to read the user's real bank data</td><td>I</td><td>medium</td><td><strong>critical</strong></td><td>C-15 (envelope encryption at rest), C-16 (never in a response DTO or the OpenAPI spec), C-20 (pino redaction list covers credential, token, access-URL and account-number keys; a redaction unit test asserts a seeded secret never appears in serialized output), C-17 (single decrypt path)</td></tr>
-      <tr><td>Unlinking an account deletes the local row but leaves the token live at the provider — standing read access to a bank the user believes is disconnected</td><td>I</td><td><strong>high</strong></td><td>high</td><td>C-21 (<code>ImportAdapter.revoke(cred)</code> is called <em>before</em> the local delete; failure surfaces an actionable error and leaves the connection in a <code>revocation_failed</code> state rather than silently vanishing; the attempt is an <code>audit_event</code>)</td></tr>
-      <tr><td>Hostile or compromised provider returns a payload that poisons the ledger (absurd amounts, script in a payee field, oversized JSON)</td><td>T</td><td>low</td><td>medium</td><td>C-22 (adapter output Zod-validated into <code>RawTxn</code>: <code>numeric</code>-parseable amount, bounded string lengths, payload size cap; rejected rows quarantine, never post), C-23 (<strong>nothing posts without user confirmation unless the user explicitly opted a rule into auto-post</strong> — draft-by-default is a security control, not only a UX one)</td></tr>
-      <tr><td>Provider payload rendered into the UI executes script (stored XSS via payee/memo)</td><td>T / E</td><td>low</td><td>high</td><td>C-3 (Svelte auto-escaping; <code>{@html}</code> banned by lint outside a reviewed allow-list; CSP)</td></tr>
-      <tr><td>Provider outage or rate-limit stalls imports; stale data is mistaken for current</td><td>D</td><td>medium</td><td>low</td><td>C-24 (last-synced timestamp surfaced per connection; backoff with retry; hash de-dup means a replayed window loses nothing)</td></tr>
+      <tr><td>T-21</td><td>A posted entry is edited or deleted through the app role, an ad-hoc SQL session, or <code>TRUNCATE</code>. <code>TRUNCATE</code> fires no row triggers and ignores RLS.</td><td>T / R</td><td>M</td><td>H</td><td>C-21, C-10 (no TRUNCATE grant)</td></tr>
+      <tr><td>T-22</td><td>An unbalanced entry is committed.</td><td>T</td><td>L</td><td>H</td><td>C-22</td></tr>
+      <tr><td>T-23</td><td>Forged attribution: <code>actor_id</code> is set to another user.</td><td>R / S</td><td>M</td><td>M</td><td>C-23</td></tr>
+      <tr><td>T-24</td><td>The operator superuser disables triggers (<code>ALTER TABLE … DISABLE TRIGGER</code>, <code>session_replication_role = replica</code>) and edits history undetectably. The same applies to editing a restored backup.</td><td>T / R</td><td>L</td><td>H</td><td>C-24 (proposed), R-1</td></tr>
+      <tr><td>T-25</td><td>A manager's <code>auto_post</code> rule posts attacker-shaped entries without review.</td><td>T</td><td>L</td><td>M</td><td>C-17 (manager+), C-23 (<code>actor = rule:&lt;id&gt;</code>), C-53</td></tr>
     </tbody>
   </table>
 
-  <h3 id="t-secrets">3.4 TB-4 — The master-key boundary</h3>
+  <h3>3.4 TB-4 / TB-5 / TB-11 — Import, adapters &amp; credentials</h3>
   <table>
-    <thead><tr><th>Threat</th><th>STRIDE</th><th>Likelihood</th><th>Impact</th><th>Control(s)</th></tr></thead>
+    <thead><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>L</th><th>I</th><th>Control(s)</th></tr></thead>
     <tbody>
-      <tr><td>Database dump or stolen backup yields plaintext aggregator credentials</td><td>I</td><td>medium</td><td><strong>critical</strong></td><td>C-15 (<strong>the master key never lives in Postgres</strong> — a DB-only compromise yields ciphertext; this is the single reason app-layer sealing beats pgcrypto here, §6.5)</td></tr>
-      <tr><td>Master key committed to the repo, baked into a container layer, or printed at startup</td><td>I</td><td>medium</td><td><strong>critical</strong></td><td>C-25 (secret scanning in CI and as a pre-commit hook), C-26 (key supplied only as a mounted file or env var; app logs the key <em>id</em>, never the key; startup fails closed if absent outside dev)</td></tr>
-      <tr><td>Key compromise has no recovery path because everything is encrypted under one static key forever</td><td>I</td><td>low</td><td>high</td><td>C-27 (per-record DEK wrapped by the master key + <code>key_id</code> column ⇒ rotation is a rewrap job over small wrapped-DEK blobs, not a full re-encrypt; documented runbook, §6.4)</td></tr>
-      <tr><td>Dev/staging uses a weak or shared default key that reaches prod</td><td>S / I</td><td>medium</td><td>high</td><td>C-26 (no default key exists; dev uses an obviously-labelled ephemeral key generated per container and staging holds fake data only)</td></tr>
+      <tr><td>T-30</td><td>A DB dump or backup leaks aggregator tokens, which are standing bearer access to real bank data.</td><td>I</td><td>M</td><td>H</td><td>C-30, C-72, C-73</td></tr>
+      <tr><td>T-31</td><td>Code execution or SSRF in the internet-facing <code>web</code> process opens every stored credential.</td><td>I / E</td><td>L</td><td>H</td><td>C-30 (<code>web</code> holds the public key only), C-31</td></tr>
+      <tr><td>T-32</td><td>Sealed-blob swap: someone with DB write copies the victim's sealed token into their own connection row, and the victim's bank data flows into the attacker's entity.</td><td>T / I</td><td>L</td><td>H</td><td>C-30 (AAD binds the blob to connection, entity and provider)</td></tr>
+      <tr><td>T-33</td><td>A token or URL leaks into logs, errors, API responses or the stored payload.</td><td>I</td><td>H</td><td>H</td><td>C-31, C-33, C-34, C-75</td></tr>
+      <tr><td>T-34</td><td>Unlink deletes the local row but leaves the token live at the provider.</td><td>I</td><td>M</td><td>M</td><td>C-32</td></tr>
+      <tr><td>T-35</td><td>A malicious CSV or OFX: XXE, billion-laughs, oversize input, spreadsheet-formula payloads.</td><td>T / D / I</td><td>M</td><td>M</td><td>C-40, C-41</td></tr>
+      <tr><td>T-36</td><td>Full account numbers stored in raw payloads widen the blast radius of any read leak.</td><td>I</td><td>H</td><td>M</td><td>C-34; payload readable by manager+ only (§4.2.1)</td></tr>
     </tbody>
   </table>
 
-  <h3 id="t-ledger">3.5 Ledger integrity — the repudiation and tampering surface</h3>
-  <p>For a book of record, the interesting attacks are not reads. They are "this entry was never here", "this number changed", and "I did not do that".</p>
+  <h3>3.5 Worker &amp; jobs (<code>apps/worker</code>, <code>packages/refdata</code>)</h3>
   <table>
-    <thead><tr><th>Threat</th><th>STRIDE</th><th>Likelihood</th><th>Impact</th><th>Control(s)</th></tr></thead>
+    <thead><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>L</th><th>I</th><th>Control(s)</th></tr></thead>
     <tbody>
-      <tr><td>A posted entry is edited or deleted — silently rewriting history</td><td>T / R</td><td>medium</td><td><strong>critical</strong></td><td>C-28 (<code>BEFORE UPDATE OR DELETE</code> trigger raises unconditionally on <code>journal_entry</code>, <code>journal_line</code>, <code>lot</code>, <code>lot_match</code>, <code>tax_period_freeze</code> and posted <code>raw_transaction</code> rows — <strong>DB-enforced, so even an ad-hoc <code>psql</code> session by the owner hits it</strong>; corrections are reversal-only)</td></tr>
-      <tr><td>An unbalanced entry is written by a buggy or hostile code path</td><td>T</td><td>medium</td><td>high</td><td>C-29 (<code>DEFERRABLE INITIALLY DEFERRED</code> constraint trigger: Σ <code>base_amount</code> = 0 and ≥ 2 lines at COMMIT; property-based tests generate balanced/unbalanced entries)</td></tr>
-      <tr><td>A user denies having posted or confirmed an entry; or an auto-post rule's output is indistinguishable from a human's</td><td>R</td><td>medium</td><td>medium</td><td>C-30 (<code>actor_kind</code> ∈ {user, rule, system} + <code>actor_id</code>, <code>NOT NULL</code>, defaulted from the transaction context so no code path can omit them — never inferred)</td></tr>
-      <tr><td>A line is posted to another entity's account, crossing the books</td><td>T / E</td><td>low</td><td>high</td><td>C-31 (composite FK <code>(entity_id, account_id)</code> forces every leg into the entry's entity; cross-entity transfers are two entries)</td></tr>
-      <tr><td>A raw import row is marked posted with no entry, or an entry points at nothing — breaking the audit chain</td><td>R</td><td>low</td><td>medium</td><td>C-32 (two-way link written in one transaction; check constraint: a posted raw row has an entry id and the entry's <code>source_ref</code> points back)</td></tr>
+      <tr><td>T-40</td><td>A job with blanket cross-tenant write: one bug corrupts every tenant.</td><td>E / T</td><td>M</td><td>H</td><td>C-60 (every tenant write has a user principal)</td></tr>
+      <tr><td>T-41</td><td>A job keeps importing after the linking user loses their grant or deletes their account.</td><td>E / I</td><td>M</td><td>M</td><td>C-60 (<code>principal_invalid</code>), C-52</td></tr>
+      <tr><td>T-42</td><td>An unauthenticated caller triggers the Vercel Cron internal route.</td><td>E / D</td><td>M</td><td>M</td><td>C-61</td></tr>
+      <tr><td>T-43</td><td>Tampered or garbage reference data (prices, CPI) skews valuations.</td><td>T</td><td>L</td><td>M</td><td>TLS, source priority, C-45</td></tr>
     </tbody>
   </table>
 
-  <h3 id="t-purge">3.6 TB-9 — The privileged purge path</h3>
+  <h3>3.6 TB-9 — Export, account deletion, purge &amp; audit</h3>
   <table>
-    <thead><tr><th>Threat</th><th>STRIDE</th><th>Likelihood</th><th>Impact</th><th>Control(s)</th></tr></thead>
+    <thead><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>L</th><th>I</th><th>Control(s)</th></tr></thead>
     <tbody>
-      <tr><td>Purge is used as a general immutability bypass — an ordinary write path sets the purge GUC and edits history</td><td>T / E</td><td>low</td><td><strong>critical</strong></td><td>C-33 (the trigger honours <code>app.purge_entity</code> only when the current execution context is the <code>poly_owner</code>-owned definer function; <code>poly_app</code> setting the GUC directly achieves nothing), C-34 (a pgTAP test asserts exactly that: <code>poly_app</code> sets the GUC, the UPDATE still raises)</td></tr>
-      <tr><td>A co-owner or manager purges books out from under the others</td><td>T</td><td>low</td><td><strong>critical</strong></td><td>C-35 (<strong>sole-owner check inside the function</strong>: refuses if any other owner membership exists; manager and viewer cannot reach the path at all)</td></tr>
-      <tr><td>Purge destroys the evidence that the purge happened</td><td>R</td><td>medium</td><td>high</td><td>C-36 (<code>audit_event</code> is written <em>first</em>, sits outside the purge cascade, has a nullable <code>entity_id</code>, and is append-only — the record survives the thing it describes)</td></tr>
-      <tr><td>A user purges books they still owed themselves (or a tax authority) — irreversible data loss mistaken for a feature</td><td>—</td><td>medium</td><td>high</td><td>C-37 (mandatory completed export <strong>within the last 24 hours</strong>, verified by the function against an <code>audit_event</code> export record; re-authentication; explicit record-retention warning naming the user's own obligations)</td></tr>
+      <tr><td>T-50</td><td>Purge abuse: an owner who is not the sole owner, <code>poly_app</code> setting the purge GUC directly, a stale export, or writes made after the export.</td><td>T / E</td><td>L</td><td>H</td><td>C-50</td></tr>
+      <tr><td>T-51</td><td>The purge path deletes nothing and reports success. This happens under FORCE RLS with no DELETE policy.</td><td>T</td><td>H if built per 8963efb</td><td>H</td><td>C-50 (<code>poly_purge</code> role-targeted DELETE policies; a zero-rows-remain assertion)</td></tr>
+      <tr><td>T-52</td><td>The purge erases its own evidence.</td><td>R</td><td>L</td><td>M</td><td>C-53</td></tr>
+      <tr><td>T-53</td><td>Export files linger on disk or in temp storage.</td><td>I</td><td>M</td><td>H</td><td>C-51</td></tr>
+      <tr><td>T-54</td><td>PRD §5's "rewrite the actor attribution" on account deletion would mean an UPDATE on append-only rows.</td><td>T</td><td>H</td><td>M</td><td>C-52 (tombstone the user row, never the entries)</td></tr>
+      <tr><td>T-55</td><td>An exported CSV runs a spreadsheet formula planted in a payee string.</td><td>T / E</td><td>M</td><td>M</td><td>C-41</td></tr>
     </tbody>
   </table>
 
-  <h3 id="t-backup">3.7 TB-7 / TB-8 / TB-10 — Backups, operator access, co-located staging</h3>
+  <h3>3.7 TB-7 / TB-8 / TB-10 / TB-12 — Host, backups &amp; supply chain</h3>
   <table>
-    <thead><tr><th>Threat</th><th>STRIDE</th><th>Likelihood</th><th>Impact</th><th>Control(s)</th></tr></thead>
+    <thead><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>L</th><th>I</th><th>Control(s)</th></tr></thead>
     <tbody>
-      <tr><td>Backup store credential leaks; an attacker downloads the full books</td><td>I</td><td>medium</td><td><strong>critical</strong></td><td>C-38 (client-side encryption <em>before</em> egress — the store never holds plaintext; the store credential is not a data-disclosure credential)</td></tr>
-      <tr><td>Backup encryption key is stored only on the box it backs up — the box dies and the backups are unreadable</td><td>—</td><td><strong>high</strong></td><td><strong>critical</strong></td><td>C-39 (key custody is off-box and independent of the VPS; the restore drill proves recoverability from a clean machine — DevOps owns the mechanism, §6.6)</td></tr>
-      <tr><td>Backups exist but have never been restored; RPO/RTO are aspirational</td><td>—</td><td><strong>high</strong></td><td><strong>critical</strong></td><td>C-40 (a tested restore is a release-gate item, not a doc sentence; stated RPO/RTO numbers land in INFRA — ARCH OQ-9)</td></tr>
-      <tr><td>Operator's SSH key is compromised — full superuser, RLS bypassed, master key readable</td><td>E</td><td>low</td><td><strong>critical</strong></td><td>Partly accepted (R-1). C-41 (key-only SSH, no password auth, source-restricted port 22, fail2ban), C-42 (IR runbook §10 treats this as SEV-1: rotate master key, rewrap, revoke every provider token)</td></tr>
-      <tr><td>Staging compromise pivots to prod on the shared kernel</td><td>E</td><td>low</td><td>high</td><td>Accepted (R-4). C-43 (separate compose project, separate DB credentials, fake data only in staging — a staging compromise exposes no real books)</td></tr>
-    </tbody>
-  </table>
-
-  <h3 id="t-supply">3.8 Supply chain and CI/CD</h3>
-  <table>
-    <thead><tr><th>Threat</th><th>STRIDE</th><th>Likelihood</th><th>Impact</th><th>Control(s)</th></tr></thead>
-    <tbody>
-      <tr><td>A malicious or compromised npm transitive dependency reads the master key or exfiltrates ledger rows at runtime</td><td>I / E</td><td>medium</td><td><strong>critical</strong></td><td>C-44 (lockfile committed, <code>--frozen-lockfile</code> installs, Dependabot/Renovate + <code>pnpm audit</code> gate), C-45 (SBOM generated per release so a named CVE can be answered in minutes), C-26 (key is env/file-scoped, not a build artifact)</td></tr>
-      <tr><td>A secret is committed to the repo (public GitHub)</td><td>I</td><td>medium</td><td><strong>critical</strong></td><td>C-25 (secret scan in CI <em>and</em> pre-commit; GitHub push protection), C-46 (no <code>.env</code> committed; <code>.env.example</code> carries names only)</td></tr>
-      <tr><td>CI deploy credentials (SSH key / registry token) leak from GitHub Actions</td><td>E</td><td>low</td><td>high</td><td>C-47 (deploy secrets are repo-environment-scoped with required reviewers on the prod environment; the deploy key is separate from the operator's own key and independently revocable)</td></tr>
-      <tr><td>An unreviewed change reaches <code>main</code> and auto-deploys to staging</td><td>T</td><td>low</td><td>medium</td><td>C-48 (branch protection: PR required, admins included, no force-push, <code>cairn</code> status check strict — already enforced, see CLAUDE.md)</td></tr>
+      <tr><td>T-60</td><td>Postgres or <code>web</code> is exposed publicly, because Docker-published ports bypass <code>ufw</code>.</td><td>I / E</td><td>M</td><td>H</td><td>C-70, C-71</td></tr>
+      <tr><td>T-61</td><td>A stolen disk, snapshot or backup exposes everything.</td><td>I</td><td>L</td><td>H</td><td>C-72, C-73</td></tr>
+      <tr><td>T-62</td><td>A box compromise also deletes or encrypts the off-box backups.</td><td>D / T</td><td>L</td><td>H</td><td>C-73 (append-only credential, immutable snapshots)</td></tr>
+      <tr><td>T-63</td><td>A compromised npm release (worm or typosquat) runs install scripts in CI or in the image.</td><td>E / I</td><td>M</td><td>H</td><td>C-80, C-82</td></tr>
+      <tr><td>T-64</td><td>A GitHub or Actions compromise pushes to prod through a deploy key.</td><td>E</td><td>L</td><td>H</td><td>C-81, C-83</td></tr>
+      <tr><td>T-65</td><td>Code merged but not yet released runs on staging on the prod kernel, then escapes its container.</td><td>E</td><td>L</td><td>H</td><td>C-70, C-74, R-4</td></tr>
+      <tr><td>T-66</td><td>A secret is committed to the repo or baked into an image.</td><td>I</td><td>M</td><td>H</td><td>C-82, C-74</td></tr>
     </tbody>
   </table>
 </section>
 
-<!-- ============================================================ -->
 <section id="authnz" data-section="authnz">
   <h2>4. Authentication &amp; Authorization</h2>
-  <p class="section-hint">Resolves <a href="../ARCH/#open-questions">ARCH OQ-2</a> (RLS shape + permission matrix) and <a href="../ARCH/#open-questions">OQ-3</a> (system-job principal). §4.3–§4.5 are the SecEng rulings the architect asked for; the summary table is §12.</p>
+  <p class="section-hint">§4.3–§4.5 are the rulings on ARCH OQ-2, OQ-3 and OQ-4. OQ-1 is ruled in §6.3. §12 has the summary and the changes against 8963efb.</p>
 
-  <h3 id="authn">4.1 Authentication</h3>
+  <h3>4.1 Authentication</h3>
   <ul>
-    <li><strong>User authn.</strong> BetterAuth against our own Postgres (no external identity store). Email+password with a modern memory-hard hash (BetterAuth default, Argon2id/scrypt class — <em>not</em> a fast hash), OAuth 2.0 + PKCE via Google / Apple / GitHub, TOTP MFA available with single-use recovery codes. Email verification and recovery flows go through Resend.</li>
-    <li><strong>MFA policy.</strong> Available and encouraged, <strong>not</strong> mandatory in v1 — a self-hoster locking themselves out of their own books with no support desk is a worse outcome than the marginal risk, given the box is single-tenant and the login surface is rate-limited. Recovery codes are shown once and stored hashed. Re-evaluate if a household ever exceeds ~5 members (R-7).</li>
-    <li><strong>Session model (web).</strong> Server-side session record in Postgres, referenced by an <code>HttpOnly</code> / <code>Secure</code> / <code>SameSite=Lax</code> cookie. Server-side means revocation is real: logout, password change, and MFA reset invalidate sessions immediately.</li>
-    <li><strong>Token model (native / MCP).</strong> Named, listable, individually revocable bearer tokens stored hashed, scoped to a <em>user</em> — never to an entity, because entity access must stay a live membership lookup. A token grants exactly what its user can do at the moment of the request, not at the moment of issue.</li>
-    <li><strong>Service authn.</strong> There is no service mesh: one Node process pair (web, worker) and one database. The worker authenticates to Postgres as <code>poly_worker</code>; on the Vercel target, Vercel Cron calls an internal route authenticated by a dedicated shared-secret header compared in constant time — that route is otherwise indistinguishable from an unauthenticated public endpoint and must be treated as a first-class auth surface.</li>
+    <li><strong>Provider.</strong> BetterAuth in our own Postgres, via the Drizzle adapter. Sign-in methods:
+      <ul>
+        <li>Email + password, hashed with scrypt (the BetterAuth default).</li>
+        <li>OAuth 2.0 with PKCE and a verified <code>state</code>, via Google, Apple or GitHub.</li>
+        <li>Passkeys.</li>
+        <li>Optional magic links sent through Resend.</li>
+      </ul></li>
+    <li><strong>Invite-only registration (C-01).</strong> The first user on an empty instance is the bootstrap user. After that:
+      <ul>
+        <li>Self-signup is off. New users arrive only through a membership invitation from an entity owner.</li>
+        <li>OAuth sign-in for an unknown email with no pending invite is rejected.</li>
+        <li>An operator flag can re-open signup. It is off by default (Principal Q5).</li>
+      </ul></li>
+    <li><strong>MFA (C-03).</strong> TOTP and passkeys, with single-use backup codes stored hashed.
+      <ul>
+        <li><em>Proposed, pending Principal Q1:</em> MFA is required for any user holding owner or manager on any entity. OAuth-only users must enrol a passkey or TOTP to hold those roles, because we cannot verify the IdP's MFA.</li>
+        <li>8963efb recommended MFA-optional, fearing lockout with no support desk. The lockout risk has a cheaper answer: an operator-side CLI (<code>polycarpic user reset-mfa &lt;email&gt;</code>). It runs only on the box and writes an <code>audit_event</code>. The operator is already the trust root (R-1).</li>
+      </ul></li>
+    <li><strong>Step-up.</strong> These actions require a re-authentication within the last 5 minutes (password + MFA, or a passkey):
+      <ul>
+        <li>purge</li>
+        <li>entity export</li>
+        <li>granting a membership or changing a role</li>
+        <li>linking or unlinking a provider</li>
+        <li>disabling MFA</li>
+        <li>changing email</li>
+        <li>deleting the account</li>
+      </ul></li>
+    <li><strong>Web sessions (C-02).</strong> Server-side BetterAuth records.
+      <ul>
+        <li>The cookie is <code>__Host-</code>-prefixed, <code>HttpOnly</code>, <code>Secure</code> and <code>SameSite=Lax</code>.</li>
+        <li>Sessions expire after 7 days idle or 30 days absolute.</li>
+        <li>All sessions are revoked on password change, MFA reset or account deletion.</li>
+        <li>Membership changes need no session revocation, because visibility is recomputed from <code>membership</code> in every transaction.</li>
+      </ul></li>
+    <li><strong>Native and MCP tokens (later).</strong> Named, listable, individually revocable bearer tokens.
+      <ul>
+        <li>Stored hashed as Tier 1, and kept in the device Keychain.</li>
+        <li>Scoped to a <em>user</em>, never to an entity. A token grants what its user can do at the time of each request.</li>
+      </ul></li>
+    <li><strong>No in-app super-admin.</strong> No application role reads across tenants. The operator's superuser is the only such principal, and it sits outside the app (R-1).</li>
+    <li><strong>Service authentication.</strong>
+      <ul>
+        <li>Each service uses its own Postgres role and password, delivered as files (C-74): <code>web</code> uses <code>poly_app</code>, <code>worker</code> uses <code>poly_worker</code>, migrate uses <code>poly_migrator</code>.</li>
+        <li><code>web</code> and <code>worker</code> never talk over HTTP; they coordinate through pg-boss tables.</li>
+        <li>On Vercel, Cron calls an internal route authenticated by <code>Authorization: Bearer &lt;CRON_SECRET&gt;</code>, compared with <code>timingSafeEqual</code>. The route is compiled out of the <code>adapter-node</code> build (C-61).</li>
+      </ul></li>
   </ul>
 
-  <h3 id="authz-model">4.2 Authorization model</h3>
-  <p><strong>RBAC over the membership join, enforced in the database.</strong> A user's rights come from rows in <code>membership (user_id, entity_id, role)</code> — never from a <code>user_id</code> column on a data table, and never from entity structure. <em>Access is a grant; the hierarchy grants nothing.</em></p>
-  <p><strong>Enforcement point: Postgres RLS. Single source of truth.</strong> The <code>can(role, action)</code> helper in <code>packages/tenancy</code> exists to render a correct UI and to return a clean 403 early. It is <strong>not</strong> an enforcement point, and no control in §7 depends on it. The design test is blunt: if every <code>can()</code> call were deleted, the system would still be safe — slower and uglier, but safe. Any control that fails that test is app-layer-only authz and gets rejected at the security gate.</p>
+  <h3>4.2 Authorization model</h3>
+  <p><strong>RBAC over the membership join (<code>user</code>, <code>entity</code>, <code>role</code>), enforced by Postgres RLS.</strong> A user's rights come only from <code>membership</code> rows. They never come from a <code>user_id</code> column on a data table, and never from entity structure. Access is a grant; the hierarchy grants nothing.</p>
+  <p><code>can(role, action)</code> in <code>packages/tenancy</code> exists to render a correct UI and to return a clean 403 early. It is <em>not</em> an enforcement point.</p>
+  <p>The design test: delete every <code>can()</code> call, and the system must still be safe. Any control that fails this test is app-layer-only authorization, and the security gate rejects it.</p>
+  <p>There are two exceptions, and both are enforced in database functions rather than <code>can()</code>: step-up recency (checked by the route, and required as an argument by the purge function) and sole-owner status.</p>
 
-  <h3 id="matrix">4.2.1 Permission matrix (owner / manager / viewer)</h3>
-  <p>Roles are uniform across entity types — a Trust's manager and a Household's manager hold the same rights. Entity <em>type</em> affects tax routing and reporting, never authorization; adding a type must never require touching a policy. <strong>Every row below is a pgTAP assertion in the CI battery</strong> (C-9): allowed actions succeed, denied actions are rejected <em>by policy</em>, with the app layer bypassed.</p>
+  <h4 id="matrix">4.2.1 Permission matrix (owner / manager / viewer)</h4>
+  <p>Roles are the same for every entity type. The type drives tax routing and reporting, never authorization. The matrix is stored as data in <code>packages/tenancy</code>. Every row gets a pgTAP assertion that bypasses the app layer, plus an endpoint-level test (C-17).</p>
   <table>
-    <thead><tr><th>Action</th><th>Owner</th><th>Manager</th><th>Viewer</th><th>Enforced by</th></tr></thead>
+    <thead><tr><th>Action</th><th>viewer</th><th>manager</th><th>owner</th><th>Enforced by</th></tr></thead>
     <tbody>
-      <tr><td>Read dashboard, balances, reports, posted entries</td><td>✓</td><td>✓</td><td>✓</td><td>RLS <code>SELECT</code> policy: <code>entity_id = any (app.visible_entities())</code></td></tr>
-      <tr><td>Read full custodial account numbers</td><td>✓</td><td>✓</td><td><strong>✗ — masked to last-4</strong></td><td>Column-level: a masking view / DTO projection chosen by role. Viewers get enough to recognize an account, not enough to transact against it.</td></tr>
-      <tr><td>Read raw provider payloads (<code>raw_transaction.payload</code>)</td><td>✓</td><td>✓</td><td>✗</td><td>RLS policy requires <code>app.has_role(entity_id,'manager')</code>; the payload is the least-curated, most PII-dense field in the system.</td></tr>
-      <tr><td>Create / edit / delete a draft</td><td>✓</td><td>✓</td><td>✗</td><td>RLS <code>INSERT/UPDATE/DELETE</code> policy on <code>draft</code>: manager+</td></tr>
-      <tr><td>Confirm a draft → post a journal entry</td><td>✓</td><td>✓</td><td>✗</td><td>RLS <code>INSERT</code> policy on <code>journal_entry</code> / <code>journal_line</code>: manager+</td></tr>
-      <tr><td>Reverse a posted entry</td><td>✓</td><td>✓</td><td>✗</td><td>Same as posting — a reversal <em>is</em> a new entry; nothing is edited.</td></tr>
-      <tr><td>Create / edit accounts (chart of accounts)</td><td>✓</td><td>✓</td><td>✗</td><td>RLS on <code>account</code>: manager+</td></tr>
-      <tr><td>Create / edit rules, including setting <code>auto_post</code></td><td>✓</td><td>✓</td><td>✗</td><td>RLS on <code>rule</code>: manager+. Auto-post is a standing write grant — worth a second look if managers ever become less trusted than they are in a household.</td></tr>
-      <tr><td>Link a provider connection (store a credential)</td><td>✓</td><td>✓</td><td>✗</td><td>RLS on <code>provider_connection</code>: manager+. The linking user is recorded (§4.4).</td></tr>
-      <tr><td>Unlink a connection (provider-side revoke + delete)</td><td>✓</td><td>✓ — only connections they linked</td><td>✗</td><td>Policy + function check. A manager cannot revoke the owner's bank link; an owner can revoke anyone's.</td></tr>
-      <tr><td>Export the entity's complete books</td><td>✓</td><td>✓</td><td>✗</td><td>Privileged function, manager+; writes an <code>audit_event</code>. A full export is an exfiltration-shaped action and is logged like one.</td></tr>
-      <tr><td>Set entity metadata (name, tax classification, parent link)</td><td>✓</td><td>✗</td><td>✗</td><td>RLS on <code>entity</code>: owner only. Tax classification changes how filings route — it is an owner decision.</td></tr>
-      <tr><td>Grant / revoke / change a membership</td><td>✓</td><td>✗</td><td>✗</td><td>RLS on <code>membership</code>: owner only. <strong>Managers cannot grant access</strong> — otherwise manager silently equals owner.</td></tr>
-      <tr><td>Transfer or add an owner</td><td>✓</td><td>✗</td><td>✗</td><td>RLS on <code>membership</code>: owner only.</td></tr>
-      <tr><td>Purge the entity's books</td><td><strong>✓ sole owner only</strong></td><td>✗</td><td>✗</td><td><code>SECURITY DEFINER</code> function with a sole-owner check + fresh export (§4.5).</td></tr>
-      <tr><td>Read the entity's <code>audit_event</code> rows</td><td>✓</td><td>✗</td><td>✗</td><td>RLS on <code>audit_event</code>: owner only. It is the record of who did what to the books.</td></tr>
-      <tr><td>Delete own user account</td><td>self</td><td>self</td><td>self</td><td>Always self-service, independent of role — but refused while it would orphan any entity where the user is sole owner (PRD §5).</td></tr>
+      <tr><td>Read dashboard, balances, posted entries, lots, reports, drafts</td><td>✓</td><td>✓</td><td>✓</td><td>SELECT policy: <code>entity_id = any ((select app.visible_entities()))</code></td></tr>
+      <tr><td>Read linked-account name and last-4</td><td>✓</td><td>✓</td><td>✓</td><td>Full numbers are never stored (C-34), so there is nothing to mask per role.</td></tr>
+      <tr><td>Read the raw provider payload (<code>raw_transaction.payload</code>)</td><td>✗</td><td>✓</td><td>✓</td><td>Policy or column grant through a manager+ view. The payload is the least-curated, most PII-dense field we hold.</td></tr>
+      <tr><td>Read the entity's membership list</td><td>own row</td><td>✓</td><td>✓</td><td>SELECT policy on <code>membership</code></td></tr>
+      <tr><td>Create, edit or delete a draft; confirm a draft (post); reverse an entry</td><td>✗</td><td>✓</td><td>✓</td><td>Per-command policies with <code>WITH CHECK app.has_role(entity_id,'manager')</code></td></tr>
+      <tr><td>Edit the chart of accounts; create or edit rules, including <code>auto_post</code></td><td>✗</td><td>✓</td><td>✓</td><td>As above. <code>auto_post</code> creation writes an <code>audit_event</code>.</td></tr>
+      <tr><td>Upload CSV / OFX</td><td>✗</td><td>✓</td><td>✓</td><td>Insert policy on <code>import_batch</code> and <code>raw_transaction</code></td></tr>
+      <tr><td>Link a provider connection</td><td>✗</td><td>✓ step-up</td><td>✓ step-up</td><td>Insert policy on <code>provider_connection</code>. The linking user becomes <code>linked_by_user_id</code>.</td></tr>
+      <tr><td>Unlink a connection</td><td>✗</td><td>own links only</td><td>any, step-up</td><td>Policy compares <code>linked_by_user_id</code>. Revocation runs as a worker job (C-32).</td></tr>
+      <tr><td>Set entity metadata (name, tax classification)</td><td>✗</td><td>✗</td><td>✓</td><td>UPDATE policy on <code>entity</code>: owner</td></tr>
+      <tr><td>Set a parent link</td><td>✗</td><td>✗</td><td>✓ on child <em>and</em> parent</td><td>C-19</td></tr>
+      <tr><td>Grant, revoke or change a membership; add or transfer an owner</td><td>✗</td><td>✗</td><td>✓ step-up</td><td>Owner-only policies on <code>membership</code>, plus a last-owner trigger (C-20)</td></tr>
+      <tr><td>Export the entity's complete books</td><td>✗</td><td>✗</td><td>✓ step-up</td><td>PRD §5 grants this to the owner. It is exfiltration-shaped, so it is audited (C-51). <em>Revised:</em> 8963efb allowed manager+.</td></tr>
+      <tr><td>Purge the entity's books</td><td>✗</td><td>✗</td><td>sole owner, step-up</td><td>C-50 (§4.5)</td></tr>
+      <tr><td>Read the entity's <code>audit_event</code> rows</td><td>✗</td><td>✗</td><td>✓</td><td>SELECT policy: owner, or <code>actor_id = app.current_user_id()</code></td></tr>
+      <tr><td>Clone or edit own report definitions; export own personal data; delete own account</td><td>self</td><td>self</td><td>self</td><td>Owner-user policies. Account deletion is refused while the user is sole owner of any entity (C-52).</td></tr>
     </tbody>
   </table>
-  <p><strong>Revocation semantics.</strong> Revoking a membership takes effect on the next transaction — there is no cached authorization anywhere, because visibility is recomputed per transaction from <code>membership</code>. Two consequences must be handled explicitly: (a) the revoked user's active sessions and bearer tokens remain valid for <em>their own</em> entities and simply stop seeing the revoked one (correct, and free); (b) a native client's <strong>local cache</strong> is outside our control — the iOS/macOS milestone must purge cached entity data on a 403/empty-scope response, and SECURITY reviews that milestone specifically. Server-side we cannot un-see what was already read; the honest statement to the user is that revocation stops future access, not past knowledge.</p>
+  <p><strong>Revocation semantics.</strong> Revoking a membership takes effect on the next transaction; there is no cached authorization. The user's sessions stay valid for their other entities. Data a client has already fetched cannot be recalled (R-11). The native milestone must purge its cache on any 401, 403 or empty scope.</p>
 
-  <h3 id="rls">4.3 RLS mechanism — SecEng ruling on ARCH §3.3 (OQ-2)</h3>
-  <p><strong>Ruling: ARCH §3.3 is confirmed as specified, with four additions (a)–(d) below.</strong> Transaction-local GUC, <code>STABLE SECURITY DEFINER</code> visibility functions, <code>FORCE</code> RLS everywhere, default-deny. The pgbouncer/pooling risk I flagged in Research is answered by <code>set_config(..., is_local =&gt; true)</code>: the setting is scoped to the transaction and discarded at COMMIT or ROLLBACK, so it is safe under both the in-process <code>node-postgres</code> pool and a transaction-mode external pooler.</p>
-  <p><strong>Non-negotiable corollary:</strong> the whole guarantee rests on <em>transaction-mode</em> pooling. If an external pooler is ever introduced in <em>session</em> mode, or if any code opens a connection outside <code>withTenant()</code>/<code>withSystem()</code>, the guarantee is void. Hence: <code>SET</code> (session-level) is banned by lint; direct <code>pool.query()</code> outside <code>packages/db</code> is banned by lint; and a pooler-mode assertion belongs in the deploy checklist (DevOps, INFRA).</p>
-  <p><strong>Additions to the ARCH shape:</strong></p>
-  <ol>
-    <li><strong>(a) Coverage must be derived, not listed.</strong> The CI probe enumerates tables from <code>pg_catalog</code> and fails on any table carrying a tenant column without <code>ENABLE</code> + <code>FORCE</code> RLS and at least one policy. A hand-maintained list of "tables to check" will drift the first time someone adds a staging table in a hurry. Tables intentionally global (<code>price_observation</code>, <code>cpi_observation</code>, <code>tax_table</code>, system <code>report_definition</code>) sit on an explicit, commented allow-list — and adding to that list is a security-gate decision, not a build fix.</li>
-    <li><strong>(b) <code>poly_app</code> must not own tables and must not hold <code>CREATE</code> on <code>public</code>.</strong> ARCH says the first part; I am adding the second, because <code>CREATE</code> on a schema in the <code>search_path</code> is the standard way to defeat a <code>SECURITY DEFINER</code> function. Every definer function also pins its own <code>search_path</code> (C-14).</li>
-    <li><strong>(c) Write policies must be split per command.</strong> A single <code>FOR ALL</code> policy with a <code>USING</code> clause and no <code>WITH CHECK</code> lets a manager <em>insert</em> a row attributed to an entity they cannot see. Every tenant table gets separate <code>SELECT</code> / <code>INSERT</code> / <code>UPDATE</code> / <code>DELETE</code> policies, and every write policy carries an explicit <code>WITH CHECK</code>. A pgTAP test asserts the <code>WITH CHECK</code> path directly (insert with a forged <code>entity_id</code> must fail).</li>
-    <li><strong>(d) The probe needs a negative control.</strong> Keep ARCH's inversion self-test (an unprotected canary table must leak). A green RLS suite that would also be green against a database with RLS switched off is worthless, and that failure mode is common enough to be worth one canary table.</li>
-  </ol>
-  <p><strong>Default-deny check.</strong> <code>current_setting('app.user_id', true)</code> returns NULL when unset, and <code>entity_id = any (app.visible_entities())</code> with a NULL-derived empty array matches nothing. The battery asserts a context-free query returns zero rows on every tenant table — this is what makes "a route forgot its auth check" a bug rather than a breach (C-6).</p>
-
-  <h3 id="jobs">4.4 System jobs — SecEng ruling (OQ-3)</h3>
-  <p><strong>Ruling: adopt ARCH's proposal — a job's tenant writes run under the linking user's membership, with <code>actor_kind = 'system'</code> and <code>actor_id = &lt;job&gt;</code>. Reject a dedicated system policy clause.</strong></p>
-  <p><strong>Why.</strong> A "system may write anything" clause is a permanent RLS bypass sitting in every policy, reachable by any code path that can set the system flag, and it is exactly the kind of clause that gets copied into a new policy without thought. Binding the job to the linking user's membership means the job's write scope is bounded by construction — it can never write more than the human who created the connection could, and that bound is re-checked every transaction rather than at link time.</p>
-  <p><strong>Consequences that must be built, not assumed:</strong></p>
+  <h3>4.3 RLS mechanism — ruling on ARCH §3.3 (OQ-2)</h3>
+  <p><strong>Ruling: confirmed, with amendments.</strong> These stand as designed: transaction-local GUC, STABLE SECURITY DEFINER visibility functions, ENABLE + FORCE on every tenant table, and default-deny.</p>
+  <p>Additions (a)–(d) are already in ARCH (from 8963efb) and remain in force:</p>
   <ul>
-    <li><code>provider_connection.linked_by_user_id</code> is <code>NOT NULL</code> and is the principal for that connection's jobs. <code>withSystem(job, connection, fn)</code> sets <code>app.user_id</code> to that user and <code>app.actor = 'system:&lt;job&gt;'</code>. <strong>Actor and principal are deliberately different things</strong> — the entries say "the import job did this", while the permission check says "under Alice's grant".</li>
-    <li><strong>Fail closed on revocation.</strong> If the linking user's membership is revoked or their account is deleted, the job's writes stop returning rows to write — correct, and automatic. But silent failure is unacceptable: the connection must flip to <code>principal_invalid</code>, surface on the entity's dashboard, and an <code>audit_event</code> is written. Re-linking by a current manager is the remedy. <strong>This is a new requirement on the import milestone</strong> and needs a QA test.</li>
-    <li>Reference-data jobs (prices, CPI, tax tables) touch no tenant table and run as <code>poly_worker</code> with no user context — those policies grant <code>poly_worker</code> directly. That is the <em>only</em> place a role-based grant substitutes for a membership check, and it is safe precisely because those tables have no tenant column.</li>
-    <li>A job must never run with an <em>absent</em> context as a fallback. If no principal resolves, the job errors — it does not proceed context-free (which, given default-deny, would silently write nothing and look like success).</li>
+    <li>(a) The coverage probe is derived from the catalog.</li>
+    <li>(b) No CREATE on <code>public</code>.</li>
+    <li>(c) Per-command policies with <code>WITH CHECK</code> on every write; <code>FOR ALL</code> is banned.</li>
+    <li>(d) The inversion canary stays.</li>
+  </ul>
+  <p>Review found defects that (a)–(d) do not cover. Amendments (e)–(l) are new:</p>
+  <ol type="a" start="5">
+    <li><strong>FORCE RLS vs. the definer functions (latent defect, T-20).</strong>
+      <ul>
+        <li><em>The problem.</em> Under <code>FORCE</code>, the table <em>owner</em> is also subject to policies. ARCH has <code>visible_entities()</code> and <code>has_role()</code> owned by <code>poly_owner</code>, and they read <code>membership</code>, which is itself FORCEd.</li>
+        <li><em>Why it breaks.</em> Once <code>membership</code>'s own SELECT policy calls <code>has_role()</code> (so that managers can list members), the chain function → <code>membership</code> policy → function makes Postgres raise "infinite recursion detected in policy". If the policy does not call it, the functions silently see only the rows the policy allows.</li>
+        <li><em>Fix.</em> A <code>poly_authz</code> role (NOLOGIN, NOBYPASSRLS) with SELECT on <code>membership</code> and <code>entity_type</code> only, plus a role-targeted policy <code>CREATE POLICY authz_read ON membership FOR SELECT TO poly_authz USING (true)</code>. Both functions are owned by <code>poly_authz</code>. FORCE stays uniform and nothing gets BYPASSRLS. <code>poly_app</code> cannot use the policy, because it is not a member of <code>poly_authz</code>.</li>
+      </ul></li>
+    <li><strong>The empty-string GUC (defect).</strong>
+      <ul>
+        <li><em>The problem.</em> 8963efb and ARCH say <code>current_setting('app.user_id', true)</code> returns NULL when unset. That is only true until the GUC is first touched in a session. After any transaction-local set, the placeholder reads back as <code>''</code>, and <code>''::uuid</code> raises. That is fail-closed, but noisy and fragile.</li>
+        <li><em>Fix.</em> Every policy reads <code>app.current_user_id()</code>, which is <code>nullif(current_setting('app.user_id', true), '')::uuid</code>. The pool-reuse test runs its no-context probe on a connection that has already carried a context.</li>
+      </ul></li>
+    <li><strong><code>TRUNCATE</code> (defect).</strong> It ignores RLS and fires no row-level DELETE triggers. <em>Fix:</em> a statement-level <code>BEFORE TRUNCATE</code> trigger that raises on every append-only table, and no login role holds TRUNCATE.</li>
+    <li><strong>Pinned search_path.</strong>
+      <ul>
+        <li>Definer functions use <code>SET search_path = ''</code>, and every name is schema-qualified.</li>
+        <li>EXECUTE is revoked from PUBLIC and granted explicitly.</li>
+        <li>Policies call these functions as <code>(select app.fn())</code>, so each is evaluated once per statement as an initplan.</li>
+        <li>A catalog allowlist names every SECURITY DEFINER function, and any function not on it fails the battery.</li>
+      </ul></li>
+    <li><strong>Immutable tenancy columns.</strong> <code>entity_id</code>, <code>actor_kind</code> and <code>actor_id</code> are left out of <code>poly_app</code>'s column-level UPDATE grants, so no row can change tenant or author. UPDATE policies carry both <code>USING</code> and <code>WITH CHECK</code>.</li>
+    <li><strong>Views.</strong> Every view over tenant tables is created <code>WITH (security_invoker = true)</code>. Materialized views over tenant data are banned, because RLS cannot apply to them. The battery asserts both rules.</li>
+    <li><strong>Role hygiene.</strong> <code>poly_app</code> and <code>poly_worker</code> are NOSUPERUSER, NOBYPASSRLS and NOCREATEROLE. They have no TRUNCATE, REFERENCES or TRIGGER grants and are members of no other role. The battery checks this with <code>pg_has_role</code> and <code>has_table_privilege</code>.</li>
+    <li><strong>Non-enumerable identifiers.</strong> Primary keys for tenant-visible rows are UUIDs (v7 is acceptable). FK checks bypass RLS, so sequential IDs would make an existence oracle. ARCH §4.1's <code>/entities/42</code> becomes a UUID.</li>
+  </ol>
+  <p><strong>Pool safety.</strong> <code>set_config(…, true)</code> is safe under the in-process node-postgres pool and under transaction-mode pgbouncer, including Neon's pooler. The rules that keep it safe:</p>
+  <ul>
+    <li>Statement-mode pooling is banned, because it breaks transactions.</li>
+    <li>The deploy checklist asserts the pooler mode on both targets (DevOps).</li>
+    <li><code>withTenant()</code> refuses to nest (AsyncLocalStorage guard).</li>
+    <li><code>withTenant()</code> accepts only a branded <code>SessionUserId</code>, which only <code>packages/auth</code> can construct.</li>
+    <li>The raw pool is not exported, and the layer lint enforces that.</li>
+    <li>Session-level <code>SET</code> is banned by lint.</li>
+  </ul>
+  <p><strong>What RLS buys, and what it does not.</strong></p>
+  <ul>
+    <li><em>It buys:</em> authorization bugs become empty results instead of leaks. That covers a missing <code>WHERE</code>, an IDOR, a forgotten table.</li>
+    <li><em>It does not buy:</em> any defence against SQL injection or code execution inside <code>poly_app</code>. The GUC is app-asserted, so anyone who can run SQL as <code>poly_app</code> can set it to anyone (R-2).</li>
+    <li><em>For that case:</em> prevention is C-44. The blast radius is capped by C-30 (<code>web</code> cannot open credentials) and C-10 (no DDL, no TRUNCATE).</li>
   </ul>
 
-  <h3 id="purge">4.5 The purge path — SecEng ruling (OQ-4)</h3>
-  <p><strong>Ruling: adopt ARCH §3.4's <code>SECURITY DEFINER</code> function. Reject a separate purge role; reject tombstoning.</strong></p>
+  <h3>4.4 System jobs — ruling on OQ-3</h3>
+  <p><strong>Ruling: confirmed as folded into ARCH.</strong> A job's tenant writes run under the linking user's membership. No tenant policy has a system bypass clause. The requirements already on POLY-64 stand:</p>
   <ul>
-    <li><strong>Why not a separate role.</strong> A purge role needs a credential; a credential needs to live somewhere the app can reach; anything the app can reach is reachable by an attacker who has the app. It converts a narrow code path into a standing credential — strictly worse.</li>
-    <li><strong>Why not tombstoning.</strong> Tombstoning is soft-delete with better branding. PRD §5 promises the owner that the books are <em>gone</em>, after an explicit warning about their own retention obligations; leaving the rows in place and hiding them behind a flag makes that promise false, and adds a permanent "show tombstoned rows" bypass to every query. Deletion must actually delete.</li>
-    <li><strong>Why the definer function is acceptable.</strong> It is one auditable code path, owned by <code>poly_owner</code>, with its escalation bounded to a single <code>entity_id</code> for the duration of one transaction. The append-only triggers honour <code>app.purge_entity</code> <em>only</em> inside that definer context — so <code>poly_app</code> setting the same GUC is inert, and C-34 tests exactly that.</li>
+    <li><code>provider_connection.linked_by_user_id</code> is NOT NULL.</li>
+    <li><code>withSystem(job, connection, fn)</code> sets <code>app.user_id</code> to that user and <code>app.actor = system:&lt;job&gt;</code>. Authority and attribution stay separate.</li>
+    <li>If that user's membership drops below manager, or their account is deleted, the connection flips to <code>principal_invalid</code>. That state surfaces on the dashboard, writes an <code>audit_event</code> and notifies the owners. It never fails silently.</li>
+    <li>A job never falls back to running context-free. If no principal resolves, it errors.</li>
   </ul>
-  <p><strong>Required guards, in order, inside the function:</strong></p>
-  <ol>
-    <li>Re-authentication within the last 5 minutes (checked at the app layer and recorded; the function receives the assertion and requires it present).</li>
-    <li><strong>Sole-owner check</strong> — refuse if any other <code>owner</code> membership exists on the entity.</li>
-    <li><strong>Fresh-export check</strong> — an <code>audit_event</code> of kind <code>export.completed</code> for this entity, by this user, within the last 24 hours. Stale exports do not count; an export that failed mid-stream does not count. The window exists so the exported file actually reflects what is about to be destroyed.</li>
-    <li>Write the <code>audit_event</code> of kind <code>entity.purged</code> — actor, timestamp, entity name and id, the export event it relies on, and row counts per table. <strong>Written before the first delete</strong>, outside the purge cascade, with a nullable <code>entity_id</code> so the FK does not drag it down.</li>
-    <li>Set <code>app.purge_entity</code> transaction-locally, delete in dependency order, reset.</li>
-    <li>Revoke every provider credential for that entity at the provider before deleting the connection rows (a purge that leaves live bank tokens behind is the worst possible outcome).</li>
-  </ol>
-  <p><strong>Not permitted:</strong> purge by a background job, purge by API without an interactive confirmation, purge of a partial date range (that is an edit, and edits are reversals), and purge while any other owner exists.</p>
+  <p>Additions:</p>
+  <ul>
+    <li><strong>Entity-bound jobs with no connection</strong> (the tax-period freeze) run under a current owner of the entity, chosen deterministically as the earliest owner membership, with <code>actor = system:&lt;job&gt;</code>. Every tenant write therefore has a human principal.</li>
+    <li><strong>Scheduling</strong> needs a cross-tenant list of targets. That list comes from one allowlisted SECURITY DEFINER function, <code>app.job_targets(job)</code>, which returns only (<code>entity_id</code>, <code>principal_user_id</code>, <code>connection_id</code>). Only <code>poly_worker</code> can execute it.</li>
+    <li><strong>Reference-data writes</strong> (prices, CPI, tax tables) go through role-targeted policies (<code>TO poly_worker</code>). <code>poly_app</code> gets SELECT only. A role-targeted policy cannot be unlocked by any GUC that <code>poly_app</code> sets.</li>
+    <li><strong>Cash-in-Transit aging</strong> is computed on read by the exceptions report, not stored by a job. That removes a job that would need cross-tenant reads.</li>
+    <li><strong><code>poly_worker</code> tenant DML</strong> is limited to the import path:
+      <ul>
+        <li><code>import_batch</code>, <code>raw_transaction</code>, <code>reported_balance</code></li>
+        <li><code>draft</code>, <code>transfer_match</code></li>
+        <li>status columns of <code>provider_connection</code></li>
+        <li><code>journal_entry</code> / <code>journal_line</code>, for <code>auto_post</code> only</li>
+        <li><code>tax_period_freeze</code>, <code>audit_event</code></li>
+      </ul></li>
+  </ul>
+
+  <h3>4.5 The purge path — ruling on OQ-4 (revised)</h3>
+  <p><strong>Ruling: the purge function is owned by a dedicated NOLOGIN <code>poly_purge</code> role, with role-targeted DELETE policies.</strong> This reverses 8963efb, which had the function owned by <code>poly_owner</code> and rejected a separate role. The guard order ARCH folded in is kept, with two guards added.</p>
+  <ul>
+    <li><strong>Why 8963efb's shape fails (T-51).</strong>
+      <ul>
+        <li>A definer function owned by <code>poly_owner</code> runs as the table owner, and under <code>FORCE ROW LEVEL SECURITY</code> the owner is subject to policies.</li>
+        <li>Append-only tables deliberately have no DELETE policy. So the function would delete <em>zero rows and report success</em>.</li>
+        <li>Adding a <code>poly_owner</code> DELETE policy would instead hand the purge capability to the migration owner.</li>
+      </ul></li>
+    <li><strong>Why the separate-role objection does not hold.</strong> 8963efb said "a role needs a credential". A NOLOGIN role has no credential; it is only the owner identity for the definer function. The entry point is just as narrow: one function, with EXECUTE granted to <code>poly_app</code>. The only change is which role's privileges the function runs with.</li>
+    <li><strong>Shape.</strong>
+      <ul>
+        <li><code>poly_purge</code> is NOLOGIN and NOBYPASSRLS, with DELETE on the purgeable tables only.</li>
+        <li>Each purgeable table gets <code>CREATE POLICY purge ON &lt;t&gt; FOR DELETE TO poly_purge USING (entity_id = nullif(current_setting('app.purge_entity', true), '')::uuid)</code>.</li>
+        <li>The append-only triggers allow DELETE only when <code>current_user = 'poly_purge'</code> <em>and</em> <code>OLD.entity_id</code> matches the GUC. <code>poly_app</code> can set the GUC but can never become <code>poly_purge</code>.</li>
+        <li><code>app.purge_entity(entity_id, export_id, reauth_at)</code> is SECURITY DEFINER, owned by <code>poly_purge</code>, with <code>search_path = ''</code>.</li>
+      </ul></li>
+    <li><strong>Guards, in order, in one transaction:</strong>
+      <ol>
+        <li>Re-authentication within 5 minutes. The route checks it, and the function requires the timestamp as an argument.</li>
+        <li>Sole-owner check against <code>app.current_user_id()</code>.</li>
+        <li>An <code>export.completed</code> audit event for this entity, by this user, within 24 hours, carrying a SHA-256.</li>
+        <li><em>(New.)</em> No tenant write to the entity since the export's snapshot marker, so a manager's later postings cannot slip past the export. The entity row is locked <code>FOR UPDATE</code>.</li>
+        <li>An <code>entity.purged</code> <code>audit_event</code> is written before the first delete. It records the actor, entity id and name, the export event, per-table row counts and timestamps. <code>audit_event</code> has no FK to <code>entity</code> and no purge policy.</li>
+        <li>Every connection is revoked at the provider. The worker revoke job must have succeeded; a failed revocation blocks the purge and is never skipped.</li>
+        <li>Set <code>app.purge_entity</code> transaction-locally and delete in dependency order.</li>
+        <li><em>(New.)</em> Assert zero rows remain for the entity in every purgeable table before commit. This is the fail-loud guard against T-51.</li>
+      </ol></li>
+    <li><strong>Not permitted:</strong>
+      <ul>
+        <li>purge by a job;</li>
+        <li>purge through the API without interactive, typed confirmation of the entity name;</li>
+        <li>purge of a partial date range (that is an edit, and edits are reversals);</li>
+        <li>purge while a second owner exists.</li>
+      </ul></li>
+    <li><strong>Backups:</strong> purged data persists until the backup retention window rolls (R-5). The purge warning says so.</li>
+    <li><strong>Rejected alternatives:</strong>
+      <ul>
+        <li><code>ALTER TABLE … DISABLE TRIGGER</code> is DDL. It needs an ACCESS EXCLUSIVE lock and the table owner, and it affects every tenant.</li>
+        <li>Tombstoning is not a purge, so it breaks the PRD §5 promise.</li>
+        <li>BYPASSRLS is broader than needed.</li>
+      </ul></li>
+    <li><em>Pending Principal Q2:</em> an optional delayed execution (24 h, cancellable, email to every member) as protection against a hijacked session.</li>
+  </ul>
 </section>
 
-<!-- ============================================================ -->
 <section id="data" data-section="data">
   <h2>5. Data Classification &amp; Handling</h2>
-  <p class="section-hint">Three sensitive tiers plus one public tier. The tier drives the handling rule; the handling rule is testable. Tier assignment for a <em>new</em> field is a security-gate question, not an author's judgment call.</p>
-
+  <p>User data falls into three sensitive tiers (from the Research brief), plus two non-tenant classes. Tiers 2 and 3 together are "sensitive personal financial data". Memo and payee text routinely leaks medical, income and relationship details, so it is not "just transactions".</p>
+  <p>Everything sits on an encrypted volume (C-72) and travels only over TLS. The table covers handling beyond that baseline. Assigning a tier to a new field is a security-gate question.</p>
   <table>
-    <thead><tr><th>Tier</th><th>Data</th><th>Classification</th><th>At rest</th><th>In transit</th><th>Retention</th></tr></thead>
+    <thead><tr><th>Tier</th><th>Data</th><th>At rest (beyond volume encryption)</th><th>Exposure rules</th><th>Retention</th></tr></thead>
     <tbody>
-      <tr>
-        <td><strong>T1</strong></td>
-        <td><strong>Authentication secrets</strong> — password hashes, OAuth refresh tokens, TOTP seeds, MFA recovery codes, session records, native/MCP bearer tokens, the Vercel Cron shared secret.</td>
-        <td><strong>Restricted</strong></td>
-        <td>Passwords and bearer tokens: one-way hashed (never recoverable). TOTP seeds and OAuth refresh tokens: encrypted via BetterAuth's storage on an encrypted volume. Never in application logs.</td>
-        <td>TLS 1.2+ only. Never in a URL, query string, or redirect fragment we control.</td>
-        <td>Sessions: BetterAuth TTL, revoked immediately on logout / password change / MFA reset. Recovery codes: until used or regenerated. Password hash: life of the account.</td>
-      </tr>
-      <tr>
-        <td><strong>T2</strong></td>
-        <td><strong>Aggregator credentials</strong> — Plaid access tokens, SimpleFIN access URLs, broker OAuth tokens. <em>Bearer-equivalent to read access on the user's real bank accounts.</em></td>
-        <td><strong>Restricted</strong> — highest-value data in the system</td>
-        <td><strong>Envelope-encrypted by <code>packages/secrets</code> (§6)</strong>: AES-256-GCM under a per-record DEK, DEK wrapped by the master key, stored as ciphertext + nonce + wrapped DEK + <code>key_id</code>. The master key is never in Postgres.</td>
-        <td>TLS to the provider only. <strong>Never sent to a browser or native client, in any form, ever</strong> — not masked, not partial.</td>
-        <td>Until unlink. Unlink revokes at the provider <em>first</em>, then deletes the row (C-21). Purge revokes before deleting (§4.5).</td>
-      </tr>
-      <tr>
-        <td><strong>T3</strong></td>
-        <td><strong>Financial data and PII</strong> — balances, transactions, holdings, lots, journal lines, custodial account numbers, and <em>payee / memo free text</em>. Memos routinely carry merchant names, medical payees, employer and income details.</td>
-        <td><strong>Confidential</strong></td>
-        <td>Postgres on an encrypted volume (DevOps/INFRA). No field-level encryption — it would break the ledger's query model (sums, ranges, reports) for a threat already covered by volume encryption plus RLS. Custodial account numbers are masked to last-4 for viewers (§4.2.1).</td>
-        <td>TLS. <strong>Excluded from logs by the pino redaction list</strong> — memo and payee are treated as secrets for logging purposes even though they are not secrets for storage purposes (C-20).</td>
-        <td>Indefinite — the ledger <em>is</em> the record. Removal only via user-account deletion (actor anonymized, entries retained) or sole-owner whole-entity purge (§4.5).</td>
-      </tr>
-      <tr>
-        <td><strong>T4</strong></td>
-        <td><strong>Reference data</strong> — EOD prices, CPI-U series, per-jurisdiction tax tables, system report templates.</td>
-        <td>Public / Internal</td>
-        <td>Plain. No tenant column by design; global to the instance.</td>
-        <td>TLS (inbound fetch).</td>
-        <td>Indefinite; historical series are append-mostly.</td>
-      </tr>
+      <tr><td><strong>T1</strong> Authentication secrets — Restricted</td><td>Password hashes, TOTP seeds, backup codes, session records, native/MCP bearer tokens, verification and reset tokens, IdP OAuth tokens</td><td>Passwords use scrypt. Backup codes and bearer tokens are hashed. Session-token hashing and <code>encryptOAuthTokens</code> in BetterAuth are unmeasured; POLY-62 confirms them, and R-12 applies otherwise. We request no offline OAuth scopes, because we need identity only.</td><td>Never logged. Never returned after creation. Never in a URL, except single-use reset and magic links that expire after 15 minutes.</td><td>Sessions: 7 days idle, 30 days absolute. Tokens: until used or expired. All deleted on account deletion.</td></tr>
+      <tr><td><strong>T2</strong> Standing bank-access credentials — Restricted (highest value)</td><td>SimpleFIN access URLs, Plaid access tokens, broker refresh tokens</td><td>HPKE-sealed, with AAD binding (§6.3, C-30). <code>poly_app</code> has no column SELECT (C-31).</td><td>Never sent to any client in any form, not even masked or partial. Never in DTOs, logs or the raw payload. Opened only in <code>worker</code>.</td><td>Until unlink. Revoked at the provider on unlink, account deletion or purge (C-32).</td></tr>
+      <tr><td><strong>T3</strong> Financial data and PII — Confidential</td><td>Balances, transactions, payees, memos, holdings, lots, entries, tax figures, entity names and classification, account last-4, raw payloads (redacted), exports, <code>audit_event</code>, user name and email</td><td>RLS on the membership join. Full account numbers are never stored (C-34). No field-level encryption: it would break sums, ranges and reports, for a threat that volume encryption plus RLS already covers.</td><td>Members only, per §4.2.1. Payloads are manager+ only. Logs carry opaque IDs only (C-33). Exports are streamed and never persisted (C-51). Emails are visible only to co-members who are owner or manager.</td><td>Ledger: indefinite (append-only) until entity purge. Raw rows follow the ledger. <code>audit_event</code>: indefinite. On account deletion, the user row becomes a tombstone (C-52).</td></tr>
+      <tr><td><strong>Operator secrets</strong></td><td>Credential private keys, DB passwords, Plaid secret, Resend key, BLS key, OAuth client secrets, BetterAuth secret, backup key, <code>CRON_SECRET</code></td><td>Files under <code>/run/secrets</code>, mode 0400. Never in the repo, an image or the database (§6.2).</td><td>Never logged. Prod and staging values differ. The backup key and the credential key are never stored together.</td><td>§6.4</td></tr>
+      <tr><td><strong>T4</strong> Public reference</td><td>Prices, CPI-U, tax tables, system report templates</td><td>—</td><td>No tenant column.</td><td>Indefinite</td></tr>
     </tbody>
   </table>
-
-  <p><strong>The inference rule that makes T3 real:</strong> which securities someone holds, where they shop, who they pay, and what they earn is a complete personal profile. The system therefore holds no analytics, no telemetry containing tenant data, and makes no outbound call carrying user data except a provider call the user initiated or an owner-initiated export. <em>Nothing about a user's books leaves the box otherwise</em> — that sentence from ARCH §1 is a control, and any future feature that breaks it (crash reporting with payloads, hosted error tracking, an LLM call carrying transaction text) requires an explicit security review and a PRD-level decision, not a library import.</p>
-
-  <p><strong>A note on the log/store asymmetry.</strong> T3 is stored in the clear and redacted in logs. That is deliberate: the database is access-controlled, backed up encrypted, and RLS-filtered; log files are none of those things — they get tailed over SSH, pasted into bug reports, and shipped to whatever aggregator someone adds later. Logs are the most likely place for financial PII to escape, which is why the redaction list carries a unit test (C-20) rather than a convention.</p>
+  <p><strong>No outbound user data (a control).</strong> ARCH §1 says nothing about a user's books leaves the box, except through a provider call the user initiated or an owner-initiated export. Treat that sentence as a control. Any feature that would break it needs a security review and a PRD-level decision, not just a library import. Examples: crash reporting with payloads, hosted error tracking, telemetry that includes tenant data, or an LLM call that carries transaction text.</p>
+  <p><strong>Stored, but never logged.</strong> T3 is stored in the clear under RLS, but scrubbed from logs. Logs get tailed over SSH, pasted into bug reports and shipped to aggregators, which makes them the likeliest escape route. That is why scrubbing is enforced by a CI canary (C-33) and not left to convention.</p>
 </section>
 
-<!-- ============================================================ -->
 <section id="secrets" data-section="secrets">
   <h2>6. Secret Management</h2>
-  <p class="section-hint">Resolves <a href="../ARCH/#open-questions">ARCH OQ-1</a>. Two distinct populations: <strong>operator secrets</strong> (one set per instance, held by the person running the box) and <strong>user credentials</strong> (per connection, held in the database, sealed).</p>
+  <p class="section-hint">Two populations. Operator secrets: one set per instance, held by the person running the box. User credentials: one per connection, held sealed in the database. §6.3 resolves ARCH OQ-1.</p>
 
-  <h3 id="secret-inventory">6.1 Inventory</h3>
+  <h3>6.1 Inventory</h3>
   <table>
-    <thead><tr><th>Secret</th><th>Population</th><th>Lives in</th><th>Reachable by</th><th>Rotation</th></tr></thead>
+    <thead><tr><th>Secret</th><th>Lives in</th><th>Mounted into</th><th>Rotation</th></tr></thead>
     <tbody>
-      <tr><td>Credential master key (AES-256)</td><td>Operator</td><td>Root-owned file (0600) mounted into the app container, or an env var. Never in the image, repo, or database.</td><td>The app process only, via <code>packages/secrets</code></td><td>Operator-initiated rewrap; annually or on suspected compromise (§6.4)</td></tr>
-      <tr><td>Postgres role passwords (<code>poly_app</code>, <code>poly_worker</code>, <code>poly_migrator</code>)</td><td>Operator</td><td>Root-only env file on the VPS; Vercel/Neon env vars on the secondary target</td><td>Respective container only</td><td>On operator change or compromise</td></tr>
-      <tr><td>Provider client secrets (Plaid client id/secret, broker OAuth clients), price-provider API key, BLS key, Resend key, OAuth IdP client secrets</td><td>Operator</td><td>Same env file</td><td>App / worker</td><td>Per provider policy; on compromise</td></tr>
-      <tr><td>Backup-store credential + backup encryption key</td><td>Operator</td><td>Backup key held <strong>off-box</strong> (§6.6); store credential in the env file</td><td>Backup job</td><td>DevOps sets cadence in INFRA</td></tr>
-      <tr><td>Vercel Cron shared secret (secondary target only)</td><td>Operator</td><td>Vercel env var</td><td>The internal cron route</td><td>On compromise</td></tr>
-      <tr><td>CI deploy key / registry token</td><td>Operator</td><td>GitHub environment secrets, prod environment gated</td><td>Actions runner</td><td>On compromise; independently revocable from the operator's own SSH key</td></tr>
-      <tr><td><strong>Aggregator access tokens / URLs</strong></td><td><strong>User (per connection)</strong></td><td><strong>Postgres, sealed</strong> (§6.3)</td><td><code>secrets.open()</code> only</td><td>Provider-driven; rewrapped on master-key rotation</td></tr>
+      <tr><td>Credential keyring (X25519 private keys, by <code>key_id</code>)</td><td><code>/etc/polycarpic/secrets/credential_keyring</code>, plus an offline copy in the operator's password manager</td><td><code>worker</code> only. Public keys go to <code>web</code> as non-secret config.</td><td>§6.4</td></tr>
+      <tr><td>Postgres role passwords (<code>poly_app</code>, <code>poly_worker</code>, <code>poly_migrator</code>)</td><td>Host secrets directory</td><td>Only the container that uses that role</td><td>On compromise or a change of operator</td></tr>
+      <tr><td>BetterAuth secret</td><td>Host secrets directory</td><td><code>web</code></td><td>On compromise. Rotating it invalidates every session, which is the intended effect in an incident.</td></tr>
+      <tr><td>OAuth IdP client secrets, Resend key</td><td>Host secrets directory</td><td><code>web</code></td><td>At the provider, on suspicion</td></tr>
+      <tr><td>Plaid client secret, broker OAuth clients, price-provider key, BLS key</td><td>Host secrets directory</td><td><code>worker</code>, plus <code>web</code> for the Plaid token exchange</td><td>At the provider, on suspicion</td></tr>
+      <tr><td>Backup encryption key and store credential</td><td>The public half (recipient) on the box; the private half offline (§6.6)</td><td>Backup job</td><td>On a change of operator. Keep the old key until its last backup expires.</td></tr>
+      <tr><td><code>CRON_SECRET</code> (Vercel only)</td><td>Vercel env var</td><td>Internal cron route</td><td>On compromise</td></tr>
+      <tr><td>CI deploy credential or registry token</td><td>GitHub <em>environment</em> secret, with required reviewers</td><td>Actions runner</td><td>On compromise. Revocable independently of the operator's SSH key.</td></tr>
+      <tr><td>Aggregator tokens and URLs (T2)</td><td>Postgres, sealed (§6.3)</td><td>Opened only in <code>worker</code></td><td>Driven by the provider. Re-sealed on key rotation.</td></tr>
     </tbody>
   </table>
 
-  <h3 id="operator-secrets">6.2 Operator secret handling</h3>
+  <h3>6.2 Operator secret handling</h3>
   <ul>
-    <li>One root-only env file on the VPS (<code>0600</code>, outside the repo and outside any build context), referenced by compose. On the Vercel target, Vercel environment variables.</li>
-    <li><strong>No secret is ever baked into a container image</strong> — an image layer is effectively public once pushed to any registry.</li>
-    <li><code>.env.example</code> carries variable <em>names</em> and a comment each; never a value, never a placeholder that looks like a value.</li>
-    <li>The app <strong>fails to start</strong> when a required secret is missing outside development. A system that silently degrades to "no encryption" because a variable was unset is worse than one that refuses to boot (C-26).</li>
-    <li>Secrets are read once at startup into process memory; there is no runtime secret-fetch path and no admin endpoint that reveals configuration.</li>
+    <li><strong>Files, not environment variables.</strong>
+      <ul>
+        <li>Secrets live on the host in <code>/etc/polycarpic/secrets/</code> (root:root, files 0400, directory 0700).</li>
+        <li>They are mounted as compose <code>secrets:</code> at <code>/run/secrets/</code>, and apps read them through the <code>*_FILE</code> convention.</li>
+        <li>Why: environment variables leak through <code>docker inspect</code>, <code>/proc/&lt;pid&gt;/environ</code>, child processes and error reporters that dump <code>process.env</code>.</li>
+        <li><em>Revised:</em> 8963efb and ARCH §9 specify a root-only env file.</li>
+      </ul></li>
+    <li><strong>Per-container scoping.</strong> Each container gets only the secrets it needs. <code>web</code> never gets the credential private key or the backup key. Staging gets its own values and no credential private key, because it uses only the fake provider.</li>
+    <li><strong>Nothing in images.</strong> No secret is ever baked into an image or passed as a build arg. <code>.env.example</code> lists names with a comment each, never values.</li>
+    <li><strong>Fail closed at startup.</strong> Outside development, the app refuses to start if a required secret is missing, or if a secret-looking env var is set in production.</li>
+    <li><strong>Read once.</strong> Secrets are read at startup. There is no runtime secret-fetch path and no admin endpoint that reveals configuration.</li>
+    <li><strong>Vercel.</strong> The secondary target uses Vercel's encrypted env vars (R-3).</li>
   </ul>
 
-  <h3 id="sealing">6.3 Credential sealing — the ruling (OQ-1)</h3>
-  <p><strong>Ruling: application-layer envelope encryption in <code>packages/secrets</code>, AES-256-GCM, per-record DEK wrapped by an operator-held master key. Reject pgcrypto; reject an external secrets manager for v1.</strong></p>
-  <p><strong>Scheme.</strong> On <code>seal(plaintext)</code>: generate a random 256-bit DEK and a random 96-bit nonce; encrypt the credential with AES-256-GCM under the DEK, binding the record id and provider as additional authenticated data (so a ciphertext cannot be moved between connection rows); wrap the DEK with the current master key (also AES-256-GCM, its own nonce); store <code>{ciphertext, nonce, wrapped_dek, dek_nonce, key_id, alg}</code>. On <code>open(sealed)</code>: unwrap with the master key version named by <code>key_id</code>, decrypt, return the plaintext <em>inside the call frame only</em>. AEAD is required, not optional — it makes ciphertext substitution a decryption failure rather than a silent success.</p>
-  <table>
-    <thead><tr><th>Property</th><th>Rule</th></tr></thead>
-    <tbody>
-      <tr><td>Plaintext lifetime</td><td>Exists only within a <code>secrets.open()</code> caller frame, for the duration of one provider call. Never assigned to a module-level variable, never cached, never returned up more than one layer.</td></tr>
-      <tr><td>Logging</td><td>The sealed column and every known credential key name are in the pino redaction list. A unit test seals a known canary string and asserts it never appears in serialized log output (C-20).</td></tr>
-      <tr><td>API exposure</td><td>The column is absent from every DTO and from <code>openapi.json</code>. An OpenAPI-freshness diff in CI means adding it would show up in review as a visible spec change (C-16).</td></tr>
-      <tr><td>Errors</td><td>Provider errors are re-thrown with the credential stripped; a raw provider exception is never propagated to a response or a log line without passing through the scrubber.</td></tr>
-      <tr><td>Who can decrypt</td><td>Only <code>packages/secrets</code>. A lint boundary rule forbids any other package importing the low-level crypto module.</td></tr>
-    </tbody>
-  </table>
+  <h3 id="sealing">6.3 Credential sealing — ruling on OQ-1 (revised)</h3>
+  <p><strong>Ruling: app-layer <em>asymmetric</em> sealing in <code>packages/secrets</code>. <code>web</code> holds only public keys; the private keyring is mounted into <code>worker</code> only.</strong></p>
+  <p>This replaces 8963efb's symmetric envelope scheme, which ARCH §3.1 and TB-4 folded in: an AES-256-GCM DEK wrapped by a master key mounted into the app. The seam is unchanged: <code>seal()</code> / <code>open()</code> with a <code>key_id</code>. Rejecting pgcrypto and external KMS still stands (§6.5).</p>
+  <ul>
+    <li><strong>Why revise.</strong>
+      <ul>
+        <li>With a symmetric master key, whoever seals can also open. The sealing process is <code>web</code>, because it receives the SimpleFIN setup token or the Plaid public token.</li>
+        <li><code>web</code> is also the internet-facing process, and the most likely place for RCE or SSRF. So one <code>web</code> compromise would yield every bank token (T-31).</li>
+        <li>Asymmetric sealing removes that path at about the same implementation cost.</li>
+      </ul></li>
+    <li><strong>Algorithm.</strong> HPKE (RFC 9180) base mode: DHKEM(X25519, HKDF-SHA256), HKDF-SHA256, AES-256-GCM. The library (e.g. <code>@hpke/core</code>, or an equivalent over <code>node:crypto</code>) is pinned in the <code>packages/secrets</code> design file, with SecEng sign-off. No home-rolled construction.</li>
+    <li><strong>Binding.</strong> The HPKE <code>aad</code> is the canonical encoding of (<code>connection_id</code>, <code>entity_id</code>, <code>provider</code>, <code>key_id</code>, <code>alg_version</code>). A blob copied to another row fails to open (T-32).</li>
+    <li><strong>Stored columns.</strong> <code>enc</code> (the encapsulated key), <code>ciphertext</code>, <code>key_id</code>, <code>alg_version</code>. These replace ARCH §3.1's "ciphertext + nonce + wrapped DEK + key_id".</li>
+    <li><strong>Flows.</strong>
+      <ul>
+        <li><em>Link</em> (in <code>web</code>): receive the setup or public token, exchange it with the provider, <code>seal()</code> the result under the active public key, insert the row, drop the plaintext.</li>
+        <li><em>Poll</em> (in <code>worker</code>): <code>open()</code> inside one call frame, for one provider call. The plaintext is never cached and never held in a module-level variable.</li>
+        <li><em>Unlink</em>: <code>web</code> enqueues a revoke job. <code>worker</code> opens the credential, calls <code>adapter.revoke()</code>, then deletes (C-32).</li>
+      </ul></li>
+    <li><strong>Database enforcement.</strong> <code>poly_app</code> has column INSERT and UPDATE on the sealed columns, but no SELECT. <code>poly_worker</code> has SELECT. The columns never appear in DTOs or <code>openapi.json</code> (C-31).</li>
+    <li><strong>Errors.</strong> Provider errors are re-thrown with the credential stripped. A raw provider exception never reaches a response or a log without passing through the scrubber.</li>
+    <li><strong>Import boundary.</strong> A lint boundary rule forbids any package except <code>packages/secrets</code> from importing the crypto module. Only <code>apps/worker</code> may import <code>open()</code>.</li>
+  </ul>
 
-  <h3 id="rotation">6.4 Key rotation for an operator with no KMS</h3>
-  <p>Envelope encryption exists here for exactly one reason: <strong>rotation without re-encrypting the data</strong>. Rotating the master key rewraps a few dozen small DEK blobs rather than decrypting and re-encrypting every credential, which keeps the operation short, interruptible, and safe to retry.</p>
+  <h3>6.4 Key rotation for an operator with no KMS</h3>
   <ol>
-    <li>Operator generates a new master key and adds it as version <em>n+1</em>, keeping <em>n</em> present. Both are loaded; <em>n+1</em> becomes the write key.</li>
-    <li><code>pnpm secrets:rewrap</code> — for each sealed record with <code>key_id = n</code>: unwrap the DEK with <em>n</em>, rewrap with <em>n+1</em>, update <code>key_id</code>. Idempotent and resumable; the credential ciphertext itself is untouched.</li>
-    <li>The job asserts zero rows remain at <code>key_id = n</code>, then the operator removes key <em>n</em>. An <code>audit_event</code> records the rotation.</li>
-    <li><strong>Cadence:</strong> annually as hygiene; <strong>immediately</strong> on any suspicion that the box, the operator's SSH key, or a backup was compromised. In that case rotation alone is insufficient — see §10: assume the old key is known and revoke every provider credential.</li>
+    <li>Run <code>polycarpic secrets rotate</code> in <code>worker</code>. It generates key <em>n+1</em>, adds it to the keyring, and publishes its public key as the active sealing key.</li>
+    <li>It re-seals every row with <code>key_id = n</code>: open with <em>n</em>, seal with <em>n+1</em>. The step is idempotent and resumable.</li>
+    <li>It asserts that zero rows remain under key <em>n</em>, removes <em>n</em>, and writes an <code>audit_event</code>.</li>
+    <li>When to rotate: on any suspicion that the worker, the box, the operator's SSH key, or a backup together with the keyring was compromised, and whenever the operator changes. Annual rotation is optional hygiene. If the keyring <em>and</em> the database may both be exposed, rotation alone is not enough: revoke every token at the provider and relink (RB-1).</li>
   </ol>
-  <p><strong>Lost master key = unrecoverable credentials</strong>, by design. The remedy is re-linking each provider connection, which is inconvenient but not data loss — the ledger itself is not encrypted under this key. The runbook must say so plainly so a panicked operator does not go looking for a backdoor that must not exist.</p>
+  <p><strong>A lost keyring means relinking, not data loss.</strong> Every connection shows "relink required". The ledger is not encrypted under this key. The runbook says this plainly, so that nobody stores the key next to the backup "to be safe". The keyring is never part of the backup set.</p>
 
-  <h3 id="rejected">6.5 Why not pgcrypto, and why not a secrets manager</h3>
+  <h3>6.5 Why not pgcrypto, and why not a secrets manager</h3>
   <ul>
-    <li><strong>pgcrypto (rejected).</strong> To encrypt or decrypt in SQL, the key must be reachable by the Postgres process — passed as a query parameter (landing in <code>pg_stat_activity</code> and potentially the statement log) or held in a GUC/config file next to the data. That collapses the distinction between "database compromised" and "bank credentials compromised", which is the <em>entire</em> value of sealing. A stolen dump or a leaked backup must yield inert ciphertext; with pgcrypto and a co-located key, it does not.</li>
-    <li><strong>External secrets manager — Vault, AWS/GCP KMS (rejected for v1).</strong> The deploy audience is a competent stranger on one VPS (PRD §6). Requiring them to run or subscribe to a KMS contradicts the self-host goal and the near-zero-spend guardrail (PRD §2 goal 4), and it adds an availability dependency: a KMS outage would stop imports. The seam is preserved — <code>seal()</code>/<code>open()</code> with a <code>key_id</code> is exactly the interface a KMS-backed implementation would present, so swapping the implementation later touches one package. Revisit if the hosted-offering Non-Goal is ever reversed (R-6).</li>
-    <li><strong>The credential-free path stays the recommended default.</strong> CSV/OFX file import implements the same <code>ImportAdapter</code> interface with <em>no stored credential at all</em> (ARCH §2.3). An instance that never links an aggregator holds zero T2 data and removes this entire threat class. That should be the documented default for a cautious self-hoster, with aggregator linking presented as a convenience trade-off — stated in the operator runbook, not buried here.</li>
+    <li><strong>pgcrypto (rejected).</strong> The key and the plaintext would pass through SQL. That puts them in <code>pg_stat_activity</code>, potentially in statement logs, and in the same process as the data. A stolen dump must yield inert ciphertext. With the key co-located, it does not.</li>
+    <li><strong>Vault or a cloud KMS (rejected for v1).</strong> On a single VPS, a vault's unseal material sits on the same box. So it adds a service for a novice operator to run without adding real separation. It would also break the near-zero-spend guardrail and add an availability dependency. The <code>key_id</code> seam leaves room for a KMS-backed keyring later; revisit if R-6 ever triggers.</li>
+    <li><strong>The credential-free path stays the recommended default.</strong> The CSV/OFX adapter stores no credential. An instance that never links an aggregator holds zero T2 data. The operator runbook presents linking as a convenience trade-off.</li>
   </ul>
 
-  <h3 id="backup-keys">6.6 Backup key custody — open, DevOps owns</h3>
-  <p>Backups must be encrypted <strong>on the box before egress</strong> (C-38), so the off-box store never holds plaintext. The key custody question is the hard half and it is genuinely open: a key stored only on the VPS is useless in the exact scenario backups exist for. SecEng's requirement on DevOps (ARCH OQ-9, INFRA v1): <strong>the encryption key must be recoverable independently of the VPS</strong> — an asymmetric scheme where the box holds only a public key and the private key lives with the operator (age/gpg-style) satisfies this cleanly and is the recommended shape, since a write-only backup credential plus a public encryption key means a fully compromised box cannot read its own historical backups. A tested restore from a clean machine (C-40) is the acceptance criterion; RPO/RTO numbers are DevOps's to state.</p>
+  <h3>6.6 Backup key custody — owned by DevOps (ARCH OQ-9)</h3>
+  <p>Requirements on INFRA:</p>
+  <ul>
+    <li>Backups are encrypted on the box before they leave it.</li>
+    <li>The key can be recovered without the VPS.</li>
+    <li>The key is distinct from the credential keyring, and the two are never stored together.</li>
+  </ul>
+  <p>Recommended shape:</p>
+  <ul>
+    <li>An asymmetric recipient (age-style), so the box holds only the public half.</li>
+    <li>A write-only or append-only store credential, or immutable snapshots.</li>
+  </ul>
+  <p>With that shape, a fully compromised box can neither read nor delete its own historical backups. The acceptance test is a restore onto a clean machine. RPO and RTO numbers are DevOps's call.</p>
 </section>
 
-<!-- ============================================================ -->
 <section id="controls" data-section="controls">
   <h2>7. Controls Catalog</h2>
-  <p class="section-hint">Every control answers a specific threat in §3. Status is <em>planned</em> for all of them — no application code exists yet; this catalog is the checklist the Validate gate runs against, milestone by milestone. "Lives at" names the intended home from <a href="../ARCH/#components">ARCH §2.2</a>.</p>
+  <p class="section-hint">Each control maps to threats in §3. No application code exists yet, so Status names the milestone where the control must land. A feature that touches a control cannot pass the Validate security gate without it. Control IDs are new in this rewrite; 8963efb's C-numbers are retired.</p>
   <table>
-    <thead><tr><th>#</th><th>Control</th><th>Threat</th><th>Lives at</th><th>Tested by</th><th>Milestone</th></tr></thead>
+    <thead><tr><th>ID</th><th>Control</th><th>Threats</th><th>Lives at</th><th>Tested by</th><th>Status</th></tr></thead>
     <tbody>
-      <tr><td>C-1</td><td>Memory-hard password hashing; rate-limited login (per-account and per-IP); MFA (TOTP) available with hashed single-use recovery codes.</td><td>3.1 spray</td><td><code>packages/auth</code></td><td>Integration: N failed logins → lockout/backoff</td><td>M1</td></tr>
-      <tr><td>C-2</td><td>OAuth 2.0 + PKCE for Google / Apple / GitHub; no implicit flow; state parameter verified.</td><td>3.1</td><td><code>packages/auth</code></td><td>Playwright smoke (one provider)</td><td>M1</td></tr>
-      <tr><td>C-3</td><td><code>HttpOnly</code>+<code>Secure</code>+<code>SameSite=Lax</code> cookies; origin check on non-GET; CSP without <code>unsafe-inline</code>; <code>{@html}</code> lint-banned outside a reviewed allow-list.</td><td>3.1, 3.3</td><td><code>apps/web</code> hooks</td><td>Header assertion test; lint rule</td><td>M1</td></tr>
-      <tr><td>C-4</td><td>Server-side sessions, invalidated on logout, password change, and MFA reset.</td><td>3.1</td><td><code>packages/auth</code></td><td>Integration</td><td>M1</td></tr>
-      <tr><td>C-5</td><td>Bearer tokens: named, hashed at rest, listable and individually revocable, scoped to a user (never to an entity).</td><td>3.1</td><td><code>packages/auth</code></td><td>Integration: revoke → 401</td><td>M1 (issue), native milestone (use)</td></tr>
-      <tr><td>C-6</td><td><strong>Default-deny RLS</strong>: a query with no transaction context returns zero rows on every tenant table.</td><td>3.1, 3.2</td><td><code>packages/db</code> policies</td><td>pgTAP battery</td><td>M1</td></tr>
-      <tr><td>C-7</td><td><code>withTenant()</code>/<code>withSystem()</code> are the only connection paths; session-level <code>SET</code> and direct pool access outside <code>packages/db</code> are lint errors.</td><td>3.2</td><td><code>packages/db</code> + ESLint boundaries</td><td>Lint in CI</td><td>M1</td></tr>
-      <tr><td>C-8</td><td>Transaction-local identity via <code>set_config('app.user_id', …, true)</code>; discarded at COMMIT/ROLLBACK.</td><td>3.2 pooling</td><td><code>packages/db</code></td><td>pgTAP</td><td>M1</td></tr>
-      <tr><td>C-9</td><td><strong>RLS battery</strong>: pool-reuse test, cross-tenant probes, per-role write probes covering every row of the §4.2.1 matrix, <code>WITH CHECK</code> forgery test.</td><td>3.2 (all)</td><td><code>packages/db/tests</code> (pgTAP)</td><td>CI gate on any schema change</td><td>M1, extended per milestone</td></tr>
-      <tr><td>C-10</td><td>Catalog-driven coverage probe: any table with a tenant column lacking <code>ENABLE</code>+<code>FORCE</code> RLS and a policy <strong>fails the build</strong>; global tables on a commented allow-list.</td><td>3.2 missing policy</td><td><code>packages/db/tests</code></td><td>CI gate</td><td>M1</td></tr>
-      <tr><td>C-11</td><td>Inversion self-test: an unprotected canary table must leak, proving the probe has teeth.</td><td>3.2</td><td><code>packages/db/tests</code></td><td>CI gate</td><td>M1</td></tr>
-      <tr><td>C-12</td><td>Database is the authz enforcement point; <code>can()</code> is UX-only. Security review rejects any control whose safety depends on an app-layer check.</td><td>3.2 app-only authz</td><td><code>packages/tenancy</code> (advisory) + policies (binding)</td><td><code>/security-review</code> at each gate</td><td>ongoing</td></tr>
-      <tr><td>C-13</td><td>Policies consult <code>membership</code> only; <code>parent_id</code> never appears in a <code>USING</code>/<code>WITH CHECK</code> clause.</td><td>3.2 hierarchy leak</td><td><code>packages/db</code> policies</td><td>pgTAP: parent/child isolation</td><td>M1</td></tr>
-      <tr><td>C-14</td><td>Every <code>SECURITY DEFINER</code> function is <code>STABLE</code> with a pinned <code>search_path</code>; <code>CREATE</code> on <code>public</code> revoked from <code>poly_app</code>; <code>EXECUTE</code> granted narrowly.</td><td>3.2 definer hijack</td><td><code>packages/db</code> migrations</td><td>pgTAP catalog assertion over all definer functions</td><td>M1</td></tr>
-      <tr><td>C-15</td><td><strong>Envelope encryption</strong> of aggregator credentials (AES-256-GCM, per-record DEK, wrapped by operator master key, AAD-bound to the record).</td><td>3.3, 3.4</td><td><code>packages/secrets</code></td><td>Unit: round-trip, tamper-detection, cross-record substitution rejected</td><td>M2 (first real adapter)</td></tr>
-      <tr><td>C-16</td><td>Sealed columns excluded from every DTO and from <code>openapi.json</code>; the OpenAPI-freshness diff makes any exposure visible in review.</td><td>3.3</td><td><code>apps/web</code> routes</td><td>CI spec diff + a test asserting the field is absent from connection responses</td><td>M2</td></tr>
-      <tr><td>C-17</td><td>Single decrypt path: only <code>packages/secrets</code> may import the crypto module; plaintext never leaves the caller frame.</td><td>3.3, 3.4</td><td>ESLint boundaries</td><td>Lint in CI</td><td>M2</td></tr>
-      <tr><td>C-18</td><td>Parameterized queries only (Drizzle); raw SQL confined to reviewed migrations.</td><td>3.2 injection</td><td>all packages</td><td>Lint + review</td><td>M1</td></tr>
-      <tr><td>C-19</td><td>Report formula grammar is a parsed AST over an account allow-list — never string-interpolated SQL.</td><td>3.2 injection</td><td><code>packages/reports</code></td><td>Unit: malicious formula rejected</td><td>M5</td></tr>
-      <tr><td>C-20</td><td><strong>Log redaction list</strong> covering credentials, tokens, access URLs, account numbers, payee and memo text; a canary test asserts a seeded secret never reaches serialized output.</td><td>3.3, §5</td><td>logger config (<code>apps/*</code>)</td><td>Unit (canary)</td><td>M1</td></tr>
-      <tr><td>C-21</td><td>Unlink calls <code>ImportAdapter.revoke()</code> <em>before</em> the local delete; failure leaves <code>revocation_failed</code> visible to the user; the attempt is an <code>audit_event</code>.</td><td>3.3 stale token</td><td><code>packages/import</code></td><td>Integration with the fake adapter (revoke fails → state + audit row)</td><td>M2</td></tr>
-      <tr><td>C-22</td><td>Adapter output Zod-validated into <code>RawTxn</code>: numeric-parseable amounts, bounded string lengths, payload size cap; invalid rows quarantine.</td><td>3.3 poisoning</td><td><code>packages/import</code></td><td>Unit with hostile fixtures</td><td>M2</td></tr>
-      <tr><td>C-23</td><td>Draft-by-default: nothing posts without explicit user confirmation unless a rule is explicitly opted into auto-post.</td><td>3.3</td><td><code>packages/posting</code></td><td>Integration</td><td>M2</td></tr>
-      <tr><td>C-24</td><td>Per-connection last-synced timestamp surfaced in the UI; retry with backoff; hash de-dup makes replay lossless.</td><td>3.3 stale data</td><td><code>packages/import</code>, <code>apps/web</code></td><td>Integration</td><td>M2</td></tr>
-      <tr><td>C-25</td><td>Secret scanning in CI <em>and</em> as a pre-commit hook; GitHub push protection on.</td><td>3.4, 3.8</td><td><code>.github/workflows</code>, hooks</td><td>CI gate (seeded canary commit in a fixture)</td><td>M1</td></tr>
-      <tr><td>C-26</td><td>No default master key; app fails to start without one outside dev; the key id — never the key — is logged.</td><td>3.4</td><td><code>packages/secrets</code></td><td>Unit: startup refuses</td><td>M2</td></tr>
-      <tr><td>C-27</td><td>Per-record DEK + <code>key_id</code> ⇒ rewrap-based rotation; <code>secrets:rewrap</code> job, idempotent and resumable.</td><td>3.4</td><td><code>packages/secrets</code></td><td>Integration: rotate, assert zero rows at old key id, round-trip still works</td><td>M2</td></tr>
-      <tr><td>C-28</td><td><strong>Append-only triggers</strong> on posted ledger rows — raised in the database, so ad-hoc <code>psql</code> hits them too.</td><td>3.5 tampering</td><td><code>packages/db</code> migrations</td><td>pgTAP: UPDATE and DELETE both raise</td><td>M2</td></tr>
-      <tr><td>C-29</td><td>Deferred balance trigger: Σ <code>base_amount</code> = 0 and ≥ 2 lines at COMMIT.</td><td>3.5</td><td><code>packages/db</code></td><td>pgTAP + property-based tests</td><td>M2</td></tr>
-      <tr><td>C-30</td><td><code>actor_kind</code> + <code>actor_id</code> <code>NOT NULL</code> on entries and drafts, defaulted from transaction context.</td><td>3.5 repudiation</td><td><code>packages/db</code>, <code>packages/ledger</code></td><td>pgTAP: insert without context fails</td><td>M2</td></tr>
-      <tr><td>C-31</td><td>Composite FK <code>(entity_id, account_id)</code> forces every leg into the entry's entity.</td><td>3.5</td><td><code>packages/db</code></td><td>pgTAP</td><td>M2</td></tr>
-      <tr><td>C-32</td><td>Two-way raw↔entry link written in one transaction; check constraint enforces both directions.</td><td>3.5</td><td><code>packages/db</code>, <code>packages/posting</code></td><td>pgTAP + integration</td><td>M2</td></tr>
-      <tr><td>C-33</td><td>Purge GUC honoured only inside the <code>poly_owner</code> definer context.</td><td>3.6 bypass</td><td><code>packages/db</code> triggers</td><td>pgTAP (see C-34)</td><td>GA</td></tr>
-      <tr><td>C-34</td><td>Negative test: <code>poly_app</code> sets <code>app.purge_entity</code> itself → UPDATE/DELETE still raises.</td><td>3.6</td><td><code>packages/db/tests</code></td><td>pgTAP</td><td>GA</td></tr>
-      <tr><td>C-35</td><td>Sole-owner check inside the purge function; manager/viewer cannot reach the path.</td><td>3.6</td><td><code>packages/db</code> function</td><td>pgTAP: second owner → refused</td><td>GA</td></tr>
-      <tr><td>C-36</td><td><code>audit_event</code> append-only, nullable <code>entity_id</code>, outside the purge cascade, written before the first delete.</td><td>3.6 repudiation</td><td><code>packages/db</code></td><td>pgTAP: purge then assert the event survives</td><td>GA</td></tr>
-      <tr><td>C-37</td><td>Purge requires re-auth + a completed export within 24 h + an explicit retention warning.</td><td>3.6 mistake</td><td><code>packages/db</code> function, <code>apps/web</code></td><td>Integration: stale export → refused</td><td>GA</td></tr>
-      <tr><td>C-38</td><td>Backups client-side encrypted before egress; the store never holds plaintext.</td><td>3.7</td><td>backup job (INFRA)</td><td>DevOps restore drill</td><td>M1 (infra)</td></tr>
-      <tr><td>C-39</td><td>Backup key custody independent of the VPS (asymmetric recommended, §6.6).</td><td>3.7</td><td>INFRA</td><td>Restore from a clean machine</td><td>M1 (infra)</td></tr>
-      <tr><td>C-40</td><td><strong>Tested restore</strong> with stated RPO/RTO — a release-gate item, not a documented intention.</td><td>3.7</td><td>INFRA runbook</td><td>Drill, recorded</td><td>M1 (infra), repeated per release</td></tr>
-      <tr><td>C-41</td><td>Key-only SSH, no password auth, source-restricted port 22, fail2ban; Postgres never published.</td><td>3.7</td><td>INFRA</td><td>DevOps config review</td><td>M1 (infra)</td></tr>
-      <tr><td>C-42</td><td>IR runbook §10 with a named SEV-1 path for box/key compromise.</td><td>3.7</td><td>this doc + INFRA runbook</td><td>Tabletop at GA</td><td>GA</td></tr>
-      <tr><td>C-43</td><td>Staging isolated by compose project, database and credentials; fake data only.</td><td>3.7</td><td>INFRA</td><td>DevOps config review</td><td>M1 (infra)</td></tr>
-      <tr><td>C-44</td><td>Committed lockfile, <code>--frozen-lockfile</code> installs, Dependabot/Renovate, <code>pnpm audit</code> gate on high severity.</td><td>3.8</td><td><code>.github/workflows</code></td><td>CI gate</td><td>M1</td></tr>
-      <tr><td>C-45</td><td>SBOM (CycloneDX) generated per release build and stored as a release artifact.</td><td>3.8</td><td>CI</td><td>Artifact presence check</td><td>M1</td></tr>
-      <tr><td>C-46</td><td>No <code>.env</code> committed; <code>.env.example</code> holds names only.</td><td>3.8</td><td>repo</td><td>C-25 scan + review</td><td>done/ongoing</td></tr>
-      <tr><td>C-47</td><td>Deploy secrets scoped to a GitHub <em>environment</em> with required reviewers on prod; deploy key separate from the operator key.</td><td>3.8</td><td>GitHub settings</td><td>DevOps config review</td><td>M1 (infra)</td></tr>
-      <tr><td>C-48</td><td>Branch protection on <code>main</code>: PR required, admins included, no force-push, strict <code>cairn</code> check.</td><td>3.8</td><td>GitHub settings</td><td>Verified 2026-09-23 / 2026-09-25 (CLAUDE.md)</td><td><strong>implemented</strong></td></tr>
-      <tr><td>C-49</td><td>Container image scan (Trivy or equivalent) on the built <code>adapter-node</code> image; high-severity findings block deploy.</td><td>3.8</td><td>CI</td><td>CI gate</td><td>M1 (infra)</td></tr>
+      <tr><td>C-01</td><td>Invite-only registration after the bootstrap user. OAuth sign-in for an unknown email is rejected unless an invite is pending.</td><td>T-01</td><td><code>packages/auth</code> hooks</td><td>Integration: a 2nd signup is rejected; OAuth for an unknown email is rejected; an invite accept works.</td><td>POLY-M1</td></tr>
+      <tr><td>C-02</td><td>Session cookie is <code>__Host-</code>, <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>. 7 days idle, 30 days absolute. All sessions revoked on a password or MFA change.</td><td>T-04</td><td><code>packages/auth</code> config</td><td>Playwright <code>Set-Cookie</code> assertions; config unit test.</td><td>POLY-M1</td></tr>
+      <tr><td>C-03</td><td>MFA (TOTP, passkeys) per §4.1. Step-up re-auth within 5 minutes on the listed actions. Operator MFA-reset CLI, audited.</td><td>T-02, T-08</td><td><code>packages/auth</code>; the <code>requireRecentAuth()</code> guard; worker CLI</td><td>Integration: every step-up action returns 403 without a recent re-auth; the CLI writes an <code>audit_event</code>.</td><td>POLY-M1 (MFA), then with each gated feature</td></tr>
+      <tr><td>C-04</td><td>BetterAuth <code>rateLimit</code> with database storage (e.g. sign-in 5/min per IP and per email). Generic auth error messages. Body-size limits on every route.</td><td>T-02, T-07, T-09</td><td><code>packages/auth</code>; <code>hooks.server.ts</code></td><td>Integration: the 6th attempt returns 429; responses for known and unknown emails are identical.</td><td>POLY-M1</td></tr>
+      <tr><td>C-05</td><td>OAuth uses PKCE and <code>state</code>. Accounts link only when the IdP asserts a verified email <em>and</em> there is either an existing session or a matching pending invite.</td><td>T-03</td><td><code>packages/auth</code></td><td>Integration: a mocked IdP sending <code>email_verified=false</code> does not link.</td><td>POLY-M1</td></tr>
+      <tr><td>C-06</td><td><code>kit.csrf.checkOrigin = true</code>, never disabled. Mutating <code>/api/v1</code> routes accept JSON only. SameSite cookies.</td><td>T-05</td><td><code>svelte.config.js</code>; <code>/api/v1</code> wrapper</td><td>Integration: a cross-origin form POST is rejected; <code>text/plain</code> returns 415.</td><td>POLY-M1</td></tr>
+      <tr><td>C-07</td><td>CSP through <code>kit.csp</code>: nonce or hash, no <code>unsafe-inline</code> script, <code>frame-ancestors 'none'</code>, <code>object-src 'none'</code>. HSTS for 1 year at Caddy. <code>nosniff</code>. <code>Referrer-Policy: strict-origin-when-cross-origin</code>.</td><td>T-04, T-06</td><td><code>svelte.config.js</code>; Caddyfile</td><td>Header assertions in the Playwright smoke run.</td><td>POLY-M1</td></tr>
+      <tr><td>C-10</td><td>Role separation and hygiene per §4.3(k), including <code>poly_authz</code> and <code>poly_purge</code>. No TRUNCATE, REFERENCES or TRIGGER grants to login roles. No CREATE on <code>public</code>.</td><td>T-13, T-21</td><td><code>packages/db</code> role migrations</td><td>pgTAP catalog assertions.</td><td>POLY-M1</td></tr>
+      <tr><td>C-11</td><td><code>withTenant()</code>: <code>set_config('app.user_id', …, true)</code> as the first statement; branded <code>SessionUserId</code>; nesting guard; raw pool not exported; session-level <code>SET</code> banned by lint; pooler-mode assertion in the deploy checklist.</td><td>T-11</td><td><code>packages/db</code>; INFRA checklist</td><td>pgTAP pool-reuse test (tenant A, then tenant B on the same backend, sees 0 of A's rows); Vitest: a nested call throws.</td><td>POLY-M1</td></tr>
+      <tr><td>C-12</td><td>Fail-closed context: <code>app.current_user_id() = nullif(current_setting('app.user_id', true), '')::uuid</code>.</td><td>T-11</td><td><code>packages/db</code> SQL</td><td>pgTAP: on a backend that already carried a context, a query with no context returns 0 rows on every tenant table and raises no error.</td><td>POLY-M1</td></tr>
+      <tr><td>C-13</td><td>ENABLE + FORCE RLS and at least one policy on every table with a tenant column. The probe is catalog-derived, with an inversion canary. The global-table allowlist is a security-gate decision.</td><td>T-10, T-12</td><td><code>packages/db</code> battery</td><td>pgTAP in CI; the build fails if any table is uncovered.</td><td>POLY-M1</td></tr>
+      <tr><td>C-14</td><td>Per-command policies with <code>WITH CHECK</code>; no <code>FOR ALL</code>. Tenancy and actor columns are not updatable. No DELETE policies on append-only tables. The entity-type exception goes through a label-only <code>security_invoker</code> view.</td><td>T-10, T-14, T-19</td><td><code>packages/db</code> schema</td><td>pgTAP: a viewer INSERT is denied; an insert with a forged <code>entity_id</code> is denied; an <code>UPDATE</code> of <code>entity_id</code> gets permission denied.</td><td>POLY-M1</td></tr>
+      <tr><td>C-15</td><td>Authz functions are owned by <code>poly_authz</code>, with a role-targeted policy on <code>membership</code>. Every definer function sets <code>search_path = ''</code> and has EXECUTE revoked from PUBLIC. SECURITY DEFINER functions are allowlisted.</td><td>T-13, T-20</td><td><code>packages/db</code></td><td>pgTAP: the set of <code>prosecdef</code> functions equals the allowlist; <code>proconfig</code> pins <code>search_path</code>; a manager can list members without recursion.</td><td>POLY-M1</td></tr>
+      <tr><td>C-16</td><td>Views are <code>security_invoker = true</code>. No materialized views over tenant data.</td><td>T-13</td><td><code>packages/db</code></td><td>pgTAP catalog check on <code>reloptions</code> and <code>relkind</code>.</td><td>POLY-M1</td></tr>
+      <tr><td>C-17</td><td>The §4.2.1 matrix is stored as data. QA generates an endpoint × role test matrix, and a route with no matrix row fails CI.</td><td>T-10, T-25</td><td><code>packages/tenancy</code>; QA suite</td><td>Generated Vitest + pgTAP tests; coverage check.</td><td>POLY-M1, growing with each feature</td></tr>
+      <tr><td>C-18</td><td>Tenant-visible primary keys are UUIDs. No sequential IDs in URLs or the API.</td><td>T-17</td><td><code>packages/db</code> schema</td><td>Schema test: every tenant PK has type <code>uuid</code>.</td><td>POLY-M1</td></tr>
+      <tr><td>C-19</td><td>A parent link requires owner on both the child and the parent. Policies never consult the parent link.</td><td>T-16</td><td><code>packages/tenancy</code>; <code>entity</code> policy</td><td>pgTAP: owner of the child only is denied; a member of the parent sees no child rows.</td><td>POLY-M1</td></tr>
+      <tr><td>C-20</td><td>Only owners change membership. A trigger keeps at least one owner (except during purge). Every change writes an <code>audit_event</code>.</td><td>T-15</td><td><code>packages/tenancy</code>; trigger</td><td>pgTAP: a manager's grant is denied; removing the last owner raises.</td><td>POLY-M1</td></tr>
+      <tr><td>C-21</td><td>Append-only: row-level BEFORE UPDATE/DELETE triggers plus a statement-level BEFORE TRUNCATE trigger. The only exception is <code>current_user = 'poly_purge'</code> together with a matching <code>app.purge_entity</code>.</td><td>T-21, T-50</td><td><code>packages/db</code> SQL</td><td>pgTAP: UPDATE, DELETE and TRUNCATE all raise for <code>poly_app</code>, <code>poly_worker</code> and <code>poly_owner</code>; <code>poly_app</code> with the GUC set still raises.</td><td>POLY-M2</td></tr>
+      <tr><td>C-22</td><td>Deferred balance constraint trigger (ARCH §3.2).</td><td>T-22</td><td><code>packages/ledger</code> SQL</td><td>pgTAP + property-based tests.</td><td>POLY-M2</td></tr>
+      <tr><td>C-23</td><td>A BEFORE INSERT trigger <em>forces</em> the actor from the session context. <code>actor_kind = user</code> requires <code>actor_id = app.current_user_id()</code>.</td><td>T-23, T-25</td><td><code>packages/db</code> SQL</td><td>pgTAP: a forged <code>actor_id</code> is overwritten or rejected.</td><td>POLY-M2</td></tr>
+      <tr><td>C-24</td><td><em>Proposed:</em> a per-entity hash chain, <code>entry_hash = sha256(prev_hash ‖ canonical entry)</code>, written by the insert trigger. A verifier job checks the chain, and every export carries the chain head.</td><td>T-24</td><td><code>packages/ledger</code></td><td>pgTAP: an edit made as superuser is detected.</td><td>Post-GA, pending Principal Q4</td></tr>
+      <tr><td>C-30</td><td>HPKE sealing with AAD binding. <code>web</code> seals, <code>worker</code> opens; keys are held in a keyring by <code>key_id</code> (§6.3).</td><td>T-30, T-31, T-32</td><td><code>packages/secrets</code></td><td>Unit: round trip works; a swapped AAD, tampered ciphertext or unknown <code>key_id</code> all fail closed. Integration: the <code>web</code> container has no keyring file.</td><td>Seam in POLY-M2; first real use in POLY-1.0 (POLY-77)</td></tr>
+      <tr><td>C-31</td><td><code>poly_app</code> has no SELECT on the sealed columns. DTOs and the OpenAPI spec omit them.</td><td>T-31, T-33</td><td><code>packages/db</code>; DTOs</td><td>pgTAP: permission denied. OpenAPI freshness diff.</td><td>POLY-M2</td></tr>
+      <tr><td>C-32</td><td>Unlink enqueues a worker revoke job. The row stays <code>revoke_pending</code> until the provider confirms, with retries and backoff; a failure is surfaced to the user. Every step writes an <code>audit_event</code>.</td><td>T-34</td><td><code>packages/import</code>; worker</td><td>Integration: when the fake provider's revoke returns 500, the row is not deleted.</td><td>POLY-M2 (fake provider), POLY-1.0</td></tr>
+      <tr><td>C-33</td><td>Logs are safe by construction. Pino serializers log only declared fields, and <code>redact</code> covers known paths. Never logged: bodies, <code>Cookie</code>, <code>Authorization</code>, SQL parameters, memo, payee.</td><td>T-33</td><td>Shared logger package</td><td><strong>Canary test:</strong> the integration run seeds canary token, URL, account-number and memo values. CI captures every log line and fails if any canary appears.</td><td>POLY-M1 (harness), extended with each adapter</td></tr>
+      <tr><td>C-34</td><td>Adapters redact full account numbers, PANs and credential-bearing fields from stored payloads, keeping last-4 only. Payloads are readable by manager+ only.</td><td>T-33, T-36</td><td>Each <code>packages/import-*</code></td><td>Per-adapter fixture containing canary numbers; pgTAP: a viewer cannot read the payload.</td><td>POLY-M2, POLY-1.0</td></tr>
+      <tr><td>C-35</td><td><code>polycarpic secrets rotate</code> (§6.4).</td><td>T-30, T-31</td><td><code>packages/secrets</code> CLI</td><td>Integration: after rotation every row opens under the new key and none under the old.</td><td>POLY-1.0</td></tr>
+      <tr><td>C-40</td><td>Upload caps (e.g. 10 MB, 50k rows). OFX 2.x parsed with DTD and external entities disabled; OFX 1.x parsed with a non-XML parser. No eval.</td><td>T-35, T-09</td><td>File adapter</td><td>Unit: XXE and billion-laughs fixtures are rejected; an oversize file returns 413.</td><td>With the file adapter (POLY-77)</td></tr>
+      <tr><td>C-41</td><td>Svelte escaping. <code>{@html}</code> is lint-banned everywhere except one sanitizing component. CSV export neutralizes any cell starting with <code>= + - @</code>, tab or CR.</td><td>T-06, T-55</td><td><code>packages/ui</code> lint; export module</td><td>Unit: a <code>=HYPERLINK(…)</code> cell exports inert. Playwright: a <code>&lt;script&gt;</code> payee renders as text.</td><td>POLY-M1 (lint), then with the export feature</td></tr>
+      <tr><td>C-42</td><td>The report formula engine parses formulas to an AST over an account allowlist. <code>eval</code> and <code>new Function</code> are banned. Node-count, depth and time caps apply.</td><td>T-09</td><td><code>packages/reports</code></td><td>Unit: pathological and malicious formulas are rejected.</td><td>POLY-M5</td></tr>
+      <tr><td>C-43</td><td>Zod validates every route and form action. Unknown keys are stripped; a mismatch returns 400.</td><td>T-10, T-14</td><td><code>apps/web</code> wrapper</td><td>Unit tests on the wrapper.</td><td>POLY-M1</td></tr>
+      <tr><td>C-44</td><td>Parameterized queries only. Lint bans <code>sql.raw()</code> and <code>sql.unsafe</code> with non-literal arguments. Raw SQL is allowed only in reviewed migrations. CodeQL <code>js/sql-injection</code> runs in CI.</td><td>T-18</td><td>ESLint; CI</td><td>Lint + CodeQL.</td><td>POLY-M1</td></tr>
+      <tr><td>C-45</td><td>Reference-data anomaly flag: a price move over 50% day-over-day, or an out-of-bounds CPI revision, is stored but flagged.</td><td>T-43</td><td><code>packages/refdata</code></td><td>Unit.</td><td>POLY-M4</td></tr>
+      <tr><td>C-50</td><td>Purge per §4.5: the <code>poly_purge</code> role, 8 guards checked in order, and a typed confirmation.</td><td>T-50, T-51, T-08</td><td><code>app.purge_entity</code>; tenancy route</td><td>pgTAP: a non-sole owner is denied; a stale export is denied; a write after the export is denied; <code>poly_app</code> with the GUC set is denied outside the function; a successful purge leaves 0 rows in every purgeable table plus 1 <code>audit_event</code>.</td><td>The purge feature (POLY-1.0 scope)</td></tr>
+      <tr><td>C-51</td><td>Export is streamed, never persisted. If it has to run async, the file is encrypted in temp storage and expires after 24 h. Owner only, with step-up; audited with a SHA-256; rate-limited.</td><td>T-53</td><td>Export module</td><td>Integration: no file remains after download.</td><td>The export feature</td></tr>
+      <tr><td>C-52</td><td>Account deletion: the user row becomes a tombstone; ledger rows are never UPDATEd. BetterAuth <code>deleteUser</code> is overridden. Sessions, accounts, MFA and passkeys are deleted. Linked credentials are revoked, and the user's connections go <code>principal_invalid</code>. Deletion is refused while the user is sole owner of any entity.</td><td>T-41, T-54</td><td><code>packages/auth</code> override; tenancy</td><td>Integration: entries remain and resolve to "deleted user"; a sole owner's deletion is refused.</td><td>POLY-1.0</td></tr>
+      <tr><td>C-53</td><td><code>audit_event</code> is append-only, has no purge exception and no FK to <code>entity</code>. Readable by owners and by the acting user.</td><td>T-52, T-25</td><td><code>packages/db</code></td><td>pgTAP: the row survives a purge and cannot be updated.</td><td>POLY-M1 (the table), then events with each feature</td></tr>
+      <tr><td>C-60</td><td>Job principal per §4.4: <code>linked_by_user_id</code>, <code>principal_invalid</code>, no context-free fallback, <code>app.job_targets()</code>, role-targeted reference-data policies, restricted <code>poly_worker</code> grants.</td><td>T-40, T-41</td><td><code>packages/db</code>; <code>apps/worker</code></td><td>pgTAP: a job whose linker was revoked writes 0 rows and flips the connection's state; <code>poly_app</code> cannot write reference data.</td><td>POLY-M2 (POLY-64)</td></tr>
+      <tr><td>C-61</td><td>The Vercel cron route checks <code>CRON_SECRET</code> with <code>timingSafeEqual</code>, and the route is absent from the node build.</td><td>T-42</td><td><code>apps/web</code></td><td>Unit test; build test that the node build returns 404 for the route.</td><td>POLY-M1</td></tr>
+      <tr><td>C-70</td><td>Only Caddy publishes ports. Prod and staging use separate compose networks. No Docker socket mounts. Containers run non-root, <code>read_only</code>, with <code>cap_drop: [ALL]</code> and <code>no-new-privileges</code>.</td><td>T-60, T-65</td><td><code>compose.yml</code> (DevOps)</td><td>Compose policy lint in CI; a post-deploy external port scan shows only 22, 80 and 443.</td><td>POLY-M1 (INFRA)</td></tr>
+      <tr><td>C-71</td><td>SSH is key-only, with no root login. Unattended security upgrades. The firewall is the Hetzner Cloud Firewall, which sits outside the host, so Docker cannot bypass it.</td><td>T-60</td><td>INFRA provisioning</td><td>Provisioning check script.</td><td>POLY-M1 (INFRA)</td></tr>
+      <tr><td>C-72</td><td>The Postgres volume and local backup staging sit on an encrypted (LUKS) volume.</td><td>T-61</td><td>INFRA</td><td>Runbook verification.</td><td>INFRA v1</td></tr>
+      <tr><td>C-73</td><td>Backups per §6.6: asymmetric recipient, a key separate from the keyring, an append-only or immutable store, and a monthly restore drill.</td><td>T-61, T-62</td><td>INFRA</td><td>Restore drill; a test that the store credential cannot delete.</td><td>INFRA v1 (OQ-9)</td></tr>
+      <tr><td>C-74</td><td>Secrets are files, scoped per container (§6.2). Staging has its own distinct values. The app refuses to start if a secret is missing. No secrets in images.</td><td>T-66, T-31</td><td>INFRA; config loader</td><td>Trivy secret scan; config-loader unit test.</td><td>POLY-M1</td></tr>
+      <tr><td>C-75</td><td>Postgres logging: <code>log_parameter_max_length = 0</code>, <code>log_parameter_max_length_on_error = 0</code>, <code>log_statement = 'ddl'</code>.</td><td>T-33</td><td>Postgres config</td><td>Config assertion in the battery.</td><td>POLY-M1</td></tr>
+      <tr><td>C-80–83</td><td>Supply chain (§8).</td><td>T-63, T-64, T-66</td><td>CI</td><td>§8</td><td>POLY-M1</td></tr>
     </tbody>
   </table>
-  <p><strong>Gate rule.</strong> A feature touching auth, tenancy/RLS, credentials, provider integration, the purge path, or logging does not merge until <code>/security-review</code> has run on its diff and every control listed for that milestone is either green or explicitly deferred with an entry in §11. "Planned" is not a passing state at the milestone where the control is due.</p>
 </section>
 
-<!-- ============================================================ -->
 <section id="cicd-sec" data-section="cicd-sec">
   <h2>8. CI/CD Security</h2>
-  <p class="section-hint">Shape agreed with <code>devops-engineer</code>; INFRA holds the runner-level detail. Maps to <a href="../ARCH/#cicd">ARCH §8</a>'s "Security scan" stage, which this section expands.</p>
   <ul>
-    <li><strong>Branch protection (implemented).</strong> <code>main</code> requires a PR, includes admins, forbids force-push, and requires the strict <code>cairn</code> status check. No direct pushes — the workflow rule is enforced by GitHub, not by etiquette (C-48).</li>
-    <li><strong>Signed commits / tags.</strong> Commit signing is <em>not</em> required — the repo has one human author and per-agent worktree identities, so signature verification would prove little and break the agent workflow. <strong>Release tags cut by <code>/merge-pr</code> should be signed</strong>, since a tag is what triggers a prod deploy and is the one artifact worth binding to the operator. Recommended, not yet implemented — tracked as R-8.</li>
-    <li><strong>Secret scanning.</strong> Pre-commit hook plus a CI job (gitleaks-class), plus GitHub push protection. Pre-commit alone is insufficient (hooks are skippable); CI alone is too late (the secret is already pushed to a public repo) — both, deliberately (C-25).</li>
-    <li><strong>Dependency scanning.</strong> Committed lockfile, <code>--frozen-lockfile</code> installs, automated update PRs (Dependabot or Renovate), and a <code>pnpm audit</code> gate failing on high severity. Given adversary (C), the supply chain is the most probable route to the master key (C-44).</li>
-    <li><strong>Image scanning.</strong> The built <code>adapter-node</code> image is scanned before it is pushed or deployed; high-severity OS/library findings block the deploy (C-49).</li>
-    <li><strong>SAST.</strong> <code>tsc</code> strict, ESLint including the layer-boundary rules (which are themselves a security control — they are what keeps the crypto module and the connection path un-importable from elsewhere) and a security-rules plugin. No commercial SAST; it would not pay for itself at this size.</li>
-    <li><strong>DAST / penetration testing.</strong> None in v1 (R-3). The exposed surface is one Caddy-fronted app on one box, and the highest-value assertions — cross-tenant isolation, immutability, credential non-exposure — are covered far more precisely by the pgTAP battery than by a scanner.</li>
-    <li><strong>SBOM.</strong> CycloneDX generated at release build, stored with the release artifact, so "are we affected by CVE-X?" is answerable without reconstructing a historical dependency tree (C-45).</li>
-    <li><strong>The DB battery is a security gate.</strong> ARCH §8 lists it under correctness; it is also the primary tenancy control. When <code>packages/db</code> or any schema changes, the RLS + trigger battery must pass — a red battery blocks the merge regardless of what else is green.</li>
-    <li><strong>Deploy credentials.</strong> Scoped to a GitHub environment with required reviewers on prod; the deploy key is distinct from the operator's SSH key so it can be revoked without locking the operator out (C-47).</li>
+    <li><strong>C-80 Dependencies.</strong>
+      <ul>
+        <li>Installs use <code>pnpm install --frozen-lockfile</code>.</li>
+        <li>pnpm lifecycle scripts are blocked, with an explicit <code>onlyBuiltDependencies</code> allowlist.</li>
+        <li><code>minimumReleaseAge</code> is at least 3 days in both pnpm and Renovate, so a freshly compromised release has time to be yanked before we pick it up.</li>
+        <li>Renovate never auto-merges major versions.</li>
+        <li><code>pnpm audit --audit-level high</code> gates the build.</li>
+      </ul></li>
+    <li><strong>C-81 Workflow hardening.</strong>
+      <ul>
+        <li>Actions are pinned by commit SHA.</li>
+        <li>Workflows default to <code>permissions: contents: read</code>, and widen per job only.</li>
+        <li>No <code>pull_request_target</code> that runs untrusted code.</li>
+        <li>No secrets are exposed to fork PRs.</li>
+      </ul></li>
+    <li><strong>C-82 Scanning.</strong>
+      <ul>
+        <li>gitleaks runs in CI and as a pre-commit hook.</li>
+        <li>CodeQL (JS/TS) runs on PRs.</li>
+        <li>Trivy scans images and fails the build on fixable critical or high findings and on embedded secrets.</li>
+        <li>Each release carries a CycloneDX SBOM.</li>
+        <li>Each release image gets an <code>actions/attest-build-provenance</code> attestation.</li>
+        <li>No DAST in v1 (R-13).</li>
+      </ul></li>
+    <li><strong>C-83 Deploy path.</strong> Pull-based is preferred: the box pulls the tagged image by digest and verifies its attestation before migrating. That way GitHub holds no credential that reaches prod. If DevOps chooses push-over-SSH instead:
+      <ul>
+        <li>the key is prod-only;</li>
+        <li><code>authorized_keys</code> locks it to a <code>command=</code> forced script, with <code>no-pty</code> and <code>no-port-forwarding</code>;</li>
+        <li>the key lives in a GitHub environment with required reviewers;</li>
+        <li>staging uses a separate key.</li>
+      </ul></li>
+    <li><strong>Signing.</strong> <code>/merge-pr</code> signs release tags (SSH signing) before the first prod deploy, because a tag triggers deployment. Per-commit signing is not required (R-10).</li>
   </ul>
 </section>
 
-<!-- ============================================================ -->
 <section id="observability" data-section="observability">
   <h2>9. Logging, Monitoring &amp; Detection</h2>
-  <p class="section-hint">Detection capability here is deliberately modest — one operator, one box, no SIEM. What exists must therefore be high-signal and trustworthy.</p>
   <ul>
-    <li><strong>What is logged.</strong> Structured JSON (pino): request id, user id (or <code>system:&lt;job&gt;</code>), route, action, outcome, duration, and the entity id where relevant. Authentication outcomes (success, failure, MFA challenge, lockout) are logged at a dedicated level so they can be grepped without wading through request noise.</li>
-    <li><strong>What is never logged.</strong> T1 and T2 values, in any form. T3 free text — <strong>payee and memo strings are redacted in logs</strong> even though they are stored in the clear (§5). Full account numbers, provider payloads, request bodies on mutating routes. The redaction list is code with a canary unit test, not a convention (C-20).</li>
-    <li><strong>Storage and retention.</strong> Container stdout → host files, rotated (logrotate, size- and age-bounded). Local only; no log shipping in v1, which means no third party ever holds even redacted financial traffic. If log shipping is ever added, it is a §5-boundary change requiring security review.</li>
-    <li><strong>The audit log is the real detection surface.</strong> <code>audit_event</code> (append-only, owner-readable, outside the purge cascade) records: membership grant / revoke / role change, provider connection link / unlink / revocation attempt and outcome, full-entity export, entity purge, master-key rotation, and principal-invalidation of a connection. These are the actions that matter after the fact — the ones an attacker would need, and the ones a user would dispute. It lives in the database rather than in log files precisely because it must survive log rotation and be queryable years later.</li>
-    <li><strong>Alerts.</strong> v1 has uptime pinging only (DevOps). There is <em>no</em> automated alerting on authentication-failure spikes, authz denials, or anomalous egress — accepted as R-2, with the compensating control that the audit log makes after-the-fact reconstruction possible. The first alert worth adding, when one is added, is repeated auth failure followed by a success.</li>
-    <li><strong>Postgres logging.</strong> Slow-query log on. Statement logging stays <strong>off</strong> in prod: <code>log_statement = 'all'</code> would write payee and memo text — T3 data — into a plaintext file with different handling than the database it came from.</li>
+    <li><strong>Logged:</strong> request ID, user UUID, entity UUID, route, action, outcome, latency, job name and run ID.</li>
+    <li><strong>Never logged:</strong> T1 or T2 values, request or response bodies, memo or payee text, amounts, emails, cookies, <code>Authorization</code>, SQL parameters. The C-33 canary test enforces this.</li>
+    <li><strong>Storage and retention.</strong> JSON logs stay on the box, rotated, for 30 days. Postgres logging is set per C-75. An optional OTel export must pass through the same serializers.</li>
+    <li><strong>Operator alerts</strong>, sent by email through Resend:
+      <ul>
+        <li>more than 20 sign-in failures in 10 minutes;</li>
+        <li>MFA disabled, or a new passkey added;</li>
+        <li>a membership grant;</li>
+        <li>a provider link or unlink;</li>
+        <li>an export or a purge;</li>
+        <li>3 failures of a revoke job;</li>
+        <li>a connection going <code>principal_invalid</code>;</li>
+        <li>a backup failure, or no successful backup within the RPO;</li>
+        <li>an RLS battery failure on deploy (this also blocks the deploy);</li>
+        <li>more than 50 authz denials or empty scopes per user in 10 minutes.</li>
+      </ul>
+      The thresholds are provisional and unmeasured; tune them after POLY-M1. <em>Revised:</em> 8963efb accepted no alerting at all (its R-2). Email on these events costs almost nothing.</li>
+    <li><strong>User-facing notices.</strong> Users get an email for a sign-in from a new device, a password or MFA change, and being granted or removed from an entity.</li>
+    <li><strong>Audit.</strong> <code>audit_event</code> (C-53) survives purge. The journal actor columns (C-23) are the ledger's own audit trail. C-24 is the proposed tamper-evidence control.</li>
   </ul>
 </section>
 
-<!-- ============================================================ -->
 <section id="ir" data-section="ir">
   <h2>10. Incident Response</h2>
-  <p class="section-hint">Written for the realistic case: one person, their own data, no pager. The value here is a pre-written decision order for a moment when nobody thinks clearly.</p>
-
-  <h3 id="ir-roles">10.1 Roles and declaration</h3>
-  <p><strong>On call:</strong> the instance operator — for the primary instance, the Principal. There is no rotation and no escalation path; the runbook must therefore be executable by one person from a laptop. Any self-hoster inherits this role for their own instance, which is why the runbook ships with the app rather than living only here.</p>
-  <table>
-    <thead><tr><th>Severity</th><th>Criteria</th><th>First action</th></tr></thead>
-    <tbody>
-      <tr><td><strong>SEV-1</strong></td><td>Suspected disclosure of T1 or T2 data (master key, box compromise, leaked backup, credential in a public log); <em>or</em> a cross-tenant read/write (RLS bypass); <em>or</em> a ledger-integrity violation (a posted row changed, an unbalanced entry landed).</td><td>Contain first, diagnose second. §10.2.</td></tr>
-      <tr><td><strong>SEV-2</strong></td><td>Availability loss (box down, database down, TLS expired); backups failing; imports failing silently for more than a day.</td><td>Restore service; then root cause. No credential rotation needed unless SEV-1 is also suspected.</td></tr>
-      <tr><td><strong>SEV-3</strong></td><td>A single provider connection broken, a stale price series, a failed job with a clean retry, a low-severity dependency CVE.</td><td>Normal backlog issue in cairn.</td></tr>
-    </tbody>
-  </table>
-
-  <h3 id="ir-sev1">10.2 SEV-1 runbook — containment → eradication → recovery</h3>
-  <ol>
-    <li><strong>Contain.</strong> Take the app off the internet (stop the web container or drop 443 in the firewall) — the database keeps running so evidence and books survive. Do <em>not</em> rebuild or <code>docker compose down -v</code>: destroying state destroys the answer to "what happened".</li>
-    <li><strong>Preserve.</strong> Snapshot the volume and copy current logs off the box before any remediation. This is the step that is always skipped and always wanted later.</li>
-    <li><strong>Assess exposure.</strong> Which tier? T2 exposure (credential/master key/backup) is the gravest because it reaches the user's <em>actual bank accounts</em>, which are outside this system's control and cannot be restored by restoring a backup.</li>
-    <li><strong>Eradicate — credentials.</strong> On any suspicion that the box, an SSH key, or a backup was exposed: <strong>revoke every aggregator credential at the provider</strong> (Plaid <code>/item/remove</code>, SimpleFIN access revocation, broker token revoke) — do not merely delete local rows. Then rotate the master key (§6.4), every Postgres role password, every provider API key, the Resend key, OAuth client secrets, the backup-store credential, and the CI deploy key. Assume anything readable on the box is known to the attacker.</li>
-    <li><strong>Eradicate — sessions.</strong> Invalidate all sessions and bearer tokens; force re-authentication; reset MFA if T1 exposure is plausible.</li>
-    <li><strong>Eradicate — access.</strong> Rotate operator SSH keys; review <code>authorized_keys</code>, system users, cron, and the compose files for anything added.</li>
-    <li><strong>Recover.</strong> Rebuild the host from a known-good image and restore data from the last backup taken <em>before</em> the suspected compromise window; re-link provider connections by hand (the deliberate consequence of key rotation, §6.4). Verify integrity before reopening: RLS battery green, balance invariants green, <code>audit_event</code> reviewed for the window.</li>
-    <li><strong>Special case — RLS bypass or ledger-integrity violation.</strong> Do not reopen on a patch alone. Write the failing pgTAP test first, watch it fail, fix, watch it pass, and add it permanently to the battery (C-9). An integrity bug that leaves no regression test behind will return.</li>
-    <li><strong>Notify.</strong> No regulator requires notification (§1). Every person holding a membership on an affected entity is told what was exposed and what they should do (e.g. watch the linked accounts) — honestly, even when it is the operator's own fault, and especially when the operator is also the only user.</li>
-  </ol>
-
-  <h3 id="ir-post">10.3 Post-incident</h3>
   <ul>
-    <li>Blameless postmortem within 5 business days: timeline, what the threat model got wrong, which control was missing or mis-sized.</li>
-    <li>A decision entry in <a href="../../process/DECISIONS.md"><code>process/DECISIONS.md</code></a>; <strong>every SEV-1 also amends this document</strong> — a new §3 threat row and a new §7 control, or an explicit §11 acceptance. An incident that changes no artifact was not learned from.</li>
-    <li>File the regression test as a cairn issue if it cannot ship with the fix.</li>
+    <li><strong>On call:</strong> each instance's operator. For the Principal's instance, that is the Principal. Alerts arrive by email (§9).</li>
+    <li><strong>Severity:</strong>
+      <ul>
+        <li><strong>SEV1</strong>: suspected T1 or T2 exposure, or keyring exposure; a confirmed cross-tenant read or write; code execution on the box; ledger tampering detected.</li>
+        <li><strong>SEV2</strong>: T3 exposure limited to one user; no backup within the RPO; a revoke that cannot complete; a critical CVE with a known exploit in a deployed dependency.</li>
+        <li><strong>SEV3</strong>: a vulnerability with no evidence of exploitation; a threshold breach that turns out benign.</li>
+      </ul></li>
+    <li><strong>Runbooks.</strong> These cover the security content only; exact commands live in the INFRA runbook.
+      <ul>
+        <li><strong>RB-1: keyring or worker compromise (SEV1).</strong>
+          <ol>
+            <li>Stop <code>worker</code>.</li>
+            <li>Revoke every token at its provider: Plaid <code>/item/remove</code>, SimpleFIN bridge revocation, broker OAuth revoke. If the database and the keyring may both have been exposed, treat every token as burned.</li>
+            <li>Generate a new keyring.</li>
+            <li>Relink every connection.</li>
+            <li>Rotate the provider API secrets.</li>
+            <li>Review <code>audit_event</code> and the logs for credential opens that happened outside import runs.</li>
+          </ol></li>
+        <li><strong>RB-2: web or box compromise (SEV1).</strong>
+          <ol>
+            <li>Put Caddy into maintenance mode.</li>
+            <li>Snapshot the volume for forensics.</li>
+            <li>Rotate every operator secret, including the BetterAuth secret. This invalidates all sessions.</li>
+            <li>If the worker or the keyring was reachable, run RB-1.</li>
+            <li>Rebuild from a clean, attested image on a fresh host.</li>
+            <li>Restore the last backup taken before the compromise, and verify it against C-24 if that control exists.</li>
+          </ol></li>
+        <li><strong>RB-3: cross-tenant leak bug (SEV1).</strong>
+          <ol>
+            <li>Disable the affected route.</li>
+            <li>Add the failing case to the RLS battery or the authz matrix <em>before</em> fixing it.</li>
+            <li>Identify affected users from request logs, by route and user ID.</li>
+            <li>Notify the affected members.</li>
+          </ol></li>
+        <li><strong>RB-4: lost keyring (SEV3).</strong> Generate a new keyring. Every connection then shows "relink required". The ledger is unaffected.</li>
+        <li><strong>RB-5: backup failure or restore (SEV2).</strong> Follow INFRA. Restore to staging first, and run the balance and hash verifier before promoting.</li>
+        <li><strong>RB-6: compromised dependency (SEV1 or SEV2).</strong>
+          <ol>
+            <li>Pin to the last known-good version.</li>
+            <li>Rebuild and redeploy.</li>
+            <li>Diff the SBOMs to check whether the bad version shipped in a release image.</li>
+            <li>If it did, run RB-2.</li>
+          </ol></li>
+      </ul></li>
+    <li><strong>Post-incident:</strong> a blameless postmortem within 5 business days as a cairn issue comment or review file (location per <code>process/WORKFLOW.md</code>). Record decisions in <a href="../../process/DECISIONS.md">process/DECISIONS.md</a>. The regression test lands with the fix.</li>
   </ul>
 </section>
 
-<!-- ============================================================ -->
 <section id="risks" data-section="risks">
   <h2>11. Open Risks (Accepted)</h2>
-  <p class="section-hint">Risks we live with — for now. Each has a rationale, a compensating control, a re-evaluation date, and an approver. Entries marked <em>pending</em> have not yet been put to the Principal and are SecEng's recommendation until they are.</p>
+  <p class="section-hint">Each risk has a rationale, a compensating control, a re-evaluation date and an approver. "Pending" means a SecEng recommendation that the Principal has not yet ruled on. ARCH cites R-1 and R-4, and both keep their meaning; the other numbers are reassigned from 8963efb.</p>
   <table>
     <thead><tr><th>#</th><th>Risk</th><th>Why acceptable</th><th>Compensating control</th><th>Re-evaluate by</th><th>Approved by</th></tr></thead>
     <tbody>
-      <tr>
-        <td>R-1</td>
-        <td><strong>The operator's superuser bypasses RLS entirely.</strong> Anyone with root on the VPS or a Postgres superuser session reads and writes every entity's books regardless of membership, and can read the master key file.</td>
-        <td>Structural, not a defect: the person running the box owns the hardware, the volume and the keys. Pretending RLS defends against the box's own administrator would be theater. PRD §6 states it explicitly.</td>
-        <td>Append-only triggers still fire for a superuser — history cannot be silently rewritten from <code>psql</code> (C-28). SSH hardened (C-41). <code>audit_event</code> records privileged actions taken through the app.</td>
-        <td>Only on a decision to host for others (see R-6)</td>
-        <td>Rich Mosko (PRD §6, 2026-09-27)</td>
-      </tr>
-      <tr>
-        <td>R-2</td>
-        <td><strong>No automated security alerting.</strong> No detection of auth-failure spikes, authz-denial patterns, or anomalous egress; discovery of a live intrusion depends on the operator noticing.</td>
-        <td>One operator, one box, near-zero-spend guardrail (PRD §2 goal 4). A SIEM for a single-household instance costs more attention than it returns, and a noisy alert nobody reads is worse than none.</td>
-        <td><code>audit_event</code> gives after-the-fact reconstruction of every consequential action (§9); auth outcomes logged at a dedicated level; uptime ping.</td>
-        <td>At GA, or on the first real incident</td>
-        <td><em>pending</em> — SecEng recommendation</td>
-      </tr>
-      <tr>
-        <td>R-3</td>
-        <td><strong>No DAST, WAF, or penetration test.</strong> Web-layer flaws are found by review and by the type system, not by an attacker simulator.</td>
-        <td>Small, single-purpose surface behind Caddy; no compliance regime requires it (§1); the highest-value properties (tenant isolation, immutability, credential non-exposure) are asserted far more precisely by pgTAP than by any scanner.</td>
-        <td>RLS battery as default-deny backstop (C-6); SAST + dependency + secret + image scanning (§8); this threat model reviewed each milestone.</td>
-        <td>Before any hosted offering; otherwise at GA</td>
-        <td><em>pending</em> — SecEng recommendation</td>
-      </tr>
-      <tr>
-        <td>R-4</td>
-        <td><strong>Staging co-located with prod on one VPS</strong> — shared kernel, so a container escape from staging reaches prod.</td>
-        <td>Saves a second box (ARCH §10). Staging holds only fake data, so a staging compromise discloses no real books; the value at risk is the pivot, not the data.</td>
-        <td>Separate compose project, database and credentials (C-43); staging never holds real provider credentials; ARCH already flags a later split.</td>
-        <td>INFRA v1 (DevOps, ARCH OQ-9)</td>
-        <td><em>pending</em> — inherited from ARCH §10</td>
-      </tr>
-      <tr>
-        <td>R-5</td>
-        <td><strong>Master-key rotation is a manual operator runbook step</strong>, not automated or scheduled, and a lost key makes sealed credentials unrecoverable.</td>
-        <td>The target operator has no KMS (§6.5). Automation would require storing the new key somewhere the automation can reach — reintroducing the problem. Unrecoverability is the correct failure mode; the recovery is re-linking providers, not a backdoor.</td>
-        <td>Rewrap job is idempotent and resumable (C-27); the runbook states plainly that a lost key means re-linking; the ledger itself is not encrypted under this key.</td>
-        <td>Annually, with the rotation</td>
-        <td><em>pending</em> — SecEng recommendation</td>
-      </tr>
-      <tr>
-        <td>R-6</td>
-        <td><strong>Multi-tenant design leaves the hosted-offering door open.</strong> If the standing Non-Goal is ever reversed, GLBA Safeguards Rule, state financial-privacy law, and possibly PCI DSS attach — and R-1, R-2, R-3 all become unacceptable at once.</td>
-        <td>Hosting for others is a standing Non-Goal (PRD §3 #10), not a deferral. The architecture is tenant-safe by construction, so the reversal would be a compliance programme, not a rewrite.</td>
-        <td>This row exists so the reversal is a deliberate, costed decision. Any such decision re-opens §1 and invalidates R-1/R-2/R-3.</td>
-        <td>Only on a deliberate decision to host</td>
-        <td>Rich Mosko (PRD §3, 2026-09-27)</td>
-      </tr>
-      <tr>
-        <td>R-7</td>
-        <td><strong>MFA is optional, not mandatory.</strong> A password-only account with a granted membership is a viable path to another person's financial data.</td>
-        <td>Self-hosted with no support desk: a forced-MFA lockout has no recovery path and destroys access to the user's own books. Login is rate-limited and OAuth (which carries the IdP's own MFA) is the encouraged path.</td>
-        <td>C-1 rate limiting + lockout; OAuth-first onboarding; hashed single-use recovery codes when MFA is enabled; auth outcomes logged.</td>
-        <td>When a household exceeds ~5 members, or at GA</td>
-        <td><em>pending</em> — SecEng recommendation</td>
-      </tr>
-      <tr>
-        <td>R-8</td>
-        <td><strong>Commits and release tags are unsigned.</strong> A repo-write compromise could introduce a commit indistinguishable from an authored one.</td>
-        <td>One human author plus per-agent worktree identities; signature verification would prove little about agent commits and complicates the workflow. Branch protection already prevents unreviewed merges (C-48).</td>
-        <td>Branch protection with admins included, no force-push, strict status check. <strong>Signing release tags is recommended before the first prod deploy</strong>, since a tag triggers deployment.</td>
-        <td>Before the first prod deploy (M1 infra)</td>
-        <td><em>pending</em> — SecEng recommendation</td>
-      </tr>
-      <tr>
-        <td>R-9</td>
-        <td><strong>User-defined entity types are readable across tenants.</strong> A type created by one user is visible to anyone holding a membership on any entity of that type — a deliberate cross-tenant metadata read (kickoff §2.4).</td>
-        <td>Necessary: a viewer must read the type name to render the entity. The exposure is a type <em>label</em> and its owner id — no financial data, no membership list, no entity names.</td>
-        <td>An explicit, narrow RLS policy on <code>entity_type</code> rather than a blanket read grant; a pgTAP test asserts it exposes label-level fields only. Users are told a custom type name is visible to anyone sharing that type.</td>
-        <td>If entity types ever carry more than a label</td>
-        <td><em>pending</em> — inherited from kickoff §2.4</td>
-      </tr>
-      <tr>
-        <td>R-10</td>
-        <td><strong>Cross-root read access (PT-3, tooling):</strong> <code>cairn serve</code> reads directories named in a committed <code>roots:</code> config (or <code>--repos</code>), i.e. outside the repo. A malicious <code>roots:</code> entry in a PR could point a reviewer's local board at a sibling directory (e.g. <code>../../.ssh</code>).</td>
-        <td>Read-only and localhost-only — no write path to a secondary root, and the <code>/api/board</code> payload carries only parsed cairn frontmatter, so there is no exfiltration channel. A directory without a <code>config.yml</code> is skipped before anything is read. Whoever can commit a <code>roots:</code> entry already has a stronger vector (editing <code>cairn.py</code>/<code>board.js</code> directly), so a runtime path-jail would be theater against the real threat.</td>
-        <td>Startup stderr banner logs each resolved absolute root path when &gt;1 root loads (human tripwire against a stale/fat-fingered <code>roots:</code> silently serving the wrong tracker). Re-evaluate if cairn ever gains a write path to non-primary roots.</td>
-        <td>2027-02-21</td>
-        <td>Rich Mosko</td>
-      </tr>
+      <tr><td>R-1</td><td>The operator's superuser, and root on the box, bypass RLS. They can also disable the append-only triggers (<code>ALTER TABLE … DISABLE TRIGGER</code>, <code>session_replication_role</code>) and read the keyring.</td><td>The operator owns the box, the volume and the keys. No database control can bind them (PRD §6). <em>Corrected:</em> 8963efb said the triggers still stop the superuser. They do not.</td><td>C-24 hash chain (proposed): silent edits become detectable, and the chain head goes into every export. Superuser access only through <code>docker compose exec</code> or an SSH tunnel. C-71.</td><td>On any decision to host for others</td><td>Rich Mosko approved the principle (PRD §6, 2026-09-27); the corrected text is pending</td></tr>
+      <tr><td>R-2</td><td>RLS does not stop SQL injection or code execution in <code>poly_app</code>, because the app itself asserts the tenant GUC.</td><td>Binding the GUC to a DB-verified session token would gain little: <code>poly_app</code> has to read the session table for auth anyway.</td><td>C-44 (parameterized SQL, lint, CodeQL); C-30 (<code>web</code> cannot open credentials); C-10 (no DDL or TRUNCATE).</td><td>2027-03-31</td><td>pending</td></tr>
+      <tr><td>R-3</td><td>On Vercel, <code>web</code> and <code>worker</code> are one deployment. The TB-4 key split collapses, and the keyring becomes an env var.</td><td>Vercel is a fallback target, and CI verifies it against fake data only.</td><td>Vercel encrypted env vars. The runbook tells anyone with real credentials to use the VPS.</td><td>Before any real data runs on Vercel</td><td>pending</td></tr>
+      <tr><td>R-4</td><td>Staging shares the prod kernel and auto-deploys unreleased code from <code>main</code> (TB-10).</td><td>It saves a second box. Staging holds fake data only, so what is at risk is a pivot into prod, not staging's own data.</td><td>C-70 (separate networks, non-root containers, no Docker socket); C-74 (distinct secrets, no keyring on staging).</td><td>INFRA v1 (OQ-9)</td><td>pending</td></tr>
+      <tr><td>R-5</td><td>Purged entity data persists in backups until the retention window rolls.</td><td>Rewriting encrypted backups is disproportionate.</td><td>The purge warning says so. INFRA bounds retention.</td><td>INFRA v1</td><td>pending</td></tr>
+      <tr><td>R-6</td><td>The multi-tenant design leaves a hosted offering possible. Reversing the non-goal would bring in GLBA, state privacy law and possibly PCI, and would make R-1, R-2 and R-13 unacceptable.</td><td>Hosting for others is a standing non-goal (PRD §3).</td><td>This row makes any reversal a deliberate, costed decision that re-opens §1.</td><td>Only on a deliberate decision to host</td><td>Rich Mosko (PRD §3, 2026-09-27)</td></tr>
+      <tr><td>R-7</td><td>Viewers are not required to use MFA. Conditional on Q1: if the Principal makes MFA optional for all roles, this row widens to cover everyone.</td><td>Viewers cannot mutate data, link credentials or grant access.</td><td>C-04 rate limiting; onboarding leads with OAuth; new-device email (§9).</td><td>GA</td><td>pending (Q1)</td></tr>
+      <tr><td>R-8</td><td>Losing the keyring makes sealed credentials unrecoverable, and rotation is a manual operator step.</td><td>Automating rotation would mean storing the new key somewhere automation can reach. Unrecoverable is the right failure mode here, because recovery is simply relinking.</td><td>The rotate command is idempotent and resumable (C-35); the runbook states the failure mode plainly; the ledger is not encrypted under this key.</td><td>Annually</td><td>pending</td></tr>
+      <tr><td>R-9</td><td>User-defined entity types are readable across tenants, by anyone with a membership on an entity of that type (kickoff §2.4).</td><td>A viewer needs the type label to render the entity.</td><td>A narrow policy plus a <code>security_invoker</code> view expose the label and tax defaults only, never the creator ID (C-14). Users are told that custom type names are shared.</td><td>If types ever carry more than a label</td><td>pending</td></tr>
+      <tr><td>R-10</td><td>Commits are unsigned.</td><td>With per-agent worktree identities, commit signatures prove little. Branch protection already prevents unreviewed merges.</td><td>Branch protection (admins included, no force-push, required <code>cairn</code> check). Release tags are signed (§8).</td><td>First prod deploy</td><td>pending</td></tr>
+      <tr><td>R-11</td><td>Revoking a grant does not recall data a client already fetched: an open browser tab now, the native cache later.</td><td>This is inherent to any client. The next request is denied.</td><td>The native milestone must purge its cache on 401, 403 or an empty scope. SecEng reviews that milestone.</td><td>Native milestone</td><td>pending</td></tr>
+      <tr><td>R-12</td><td><em>Conditional, unmeasured.</em> If BetterAuth stores session tokens unhashed, anyone with DB read can hijack sessions.</td><td>This needs DB read access, which already exposes T3.</td><td>Short sessions (C-02); step-up for sensitive actions (C-03). POLY-62 measures this and closes or confirms the row.</td><td>POLY-62</td><td>pending</td></tr>
+      <tr><td>R-13</td><td>No DAST, WAF or penetration test.</td><td>The surface is small and sits behind Caddy, and no regime requires one. pgTAP asserts the high-value properties more precisely than a scanner would.</td><td>The RLS battery; SAST, dependency, secret and image scanning (§8); this threat model is reviewed at every milestone.</td><td>GA</td><td>pending</td></tr>
+      <tr><td>R-14</td><td>Cross-root read access (PT-3, tooling). <code>cairn serve</code> reads directories named in a committed <code>roots:</code> config (or <code>--repos</code>), which can be outside the repo. A malicious <code>roots:</code> entry in a PR could point a reviewer's local board at a sibling directory, e.g. <code>../../.ssh</code>.</td><td>The server is read-only and localhost-only, with no write path to a secondary root. The <code>/api/board</code> payload carries only parsed cairn frontmatter, so there is no exfiltration channel. A directory without a <code>config.yml</code> is skipped before anything is read. Anyone who can commit a <code>roots:</code> entry already has a stronger vector, editing <code>cairn.py</code> or <code>board.js</code> directly, so a runtime path-jail would be theater.</td><td>When more than one root loads, a startup stderr banner logs each resolved absolute root path. It is a human tripwire against a stale or mistyped <code>roots:</code> entry silently serving the wrong tracker. Re-evaluate if cairn ever gains a write path to non-primary roots.</td><td>2027-02-21</td><td>Rich Mosko</td></tr>
     </tbody>
   </table>
 </section>
 
-<!-- ============================================================ -->
 <section id="rulings" data-section="rulings">
   <h2>12. Rulings on ARCH Open Questions</h2>
-  <p class="section-hint">The four questions <a href="../ARCH/#open-questions">ARCH §12</a> assigns to <code>seceng</code>, answered. Each links to the section carrying the reasoning; the architect can close OQ-1–OQ-4 against this table.</p>
+
+  <h3>12.1 Final rulings</h3>
   <table>
-    <thead><tr><th>OQ</th><th>Question</th><th>Ruling</th><th>Detail</th></tr></thead>
+    <thead><tr><th>OQ</th><th>Ruling</th><th>vs. 8963efb (as folded in ARCH @ eaa825e)</th><th>Detail</th></tr></thead>
     <tbody>
-      <tr>
-        <td><strong>OQ-1</strong></td>
-        <td>Credential sealing mechanism and key rotation for a self-hoster with no KMS.</td>
-        <td><strong>App-layer envelope encryption</strong> in <code>packages/secrets</code>: AES-256-GCM, per-record DEK wrapped by an operator-held master key, AAD-bound to the record, stored as ciphertext + nonce + wrapped DEK + <code>key_id</code>. <strong>pgcrypto rejected</strong> (co-locates key with data, so a DB dump yields plaintext). <strong>External KMS rejected for v1</strong> (contradicts self-host + near-zero-spend; adds an availability dependency) — the <code>seal</code>/<code>open</code>/<code>key_id</code> seam ARCH already fixed is exactly what a KMS implementation would slot into. Rotation is an operator-run <strong>rewrap</strong> job over wrapped DEKs, annually or on compromise.</td>
-        <td><a href="#sealing">§6.3</a>, <a href="#rotation">§6.4</a>, <a href="#rejected">§6.5</a>; controls C-15, C-17, C-26, C-27</td>
-      </tr>
-      <tr>
-        <td><strong>OQ-2</strong></td>
-        <td>Confirm the RLS shape in ARCH §3.3, and the permission matrix per role × action × entity type.</td>
-        <td><strong>ARCH §3.3 confirmed</strong> (transaction-local GUC, <code>STABLE SECURITY DEFINER</code> visibility functions, <code>FORCE</code> RLS, default-deny) with four additions: <strong>(a)</strong> coverage probe derived from <code>pg_catalog</code>, not a hand-maintained list; <strong>(b)</strong> <code>poly_app</code> also loses <code>CREATE</code> on <code>public</code>; <strong>(c)</strong> per-command policies with an explicit <code>WITH CHECK</code> on every write — no <code>FOR ALL</code>; <strong>(d)</strong> keep the inversion canary. <strong>Matrix: roles are uniform across entity types</strong> — type affects tax routing and reporting, never authorization. Managers post, confirm, reverse, link and export; <strong>only owners manage memberships, entity metadata and audit reads</strong>; <strong>viewers are read-only and see account numbers masked to last-4, with no access to raw provider payloads</strong>; purge is sole-owner only.</td>
-        <td><a href="#matrix">§4.2.1</a> (matrix), <a href="#rls">§4.3</a> (mechanism); controls C-6 … C-14</td>
-      </tr>
-      <tr>
-        <td><strong>OQ-3</strong></td>
-        <td>System-job principal: the linking user's membership, or a dedicated system policy clause?</td>
-        <td><strong>Linking user's membership — ARCH's proposal adopted; a system policy clause is rejected</strong> as a permanent RLS bypass reachable by any path that can set the flag. <code>provider_connection.linked_by_user_id</code> is <code>NOT NULL</code> and is the principal; actor stays <code>system:&lt;job&gt;</code>, so attribution and authority are deliberately separate. <strong>New requirement on the import milestone:</strong> when that user's membership is revoked or their account deleted, the connection flips to <code>principal_invalid</code>, surfaces on the dashboard, and writes an <code>audit_event</code> — it must not fail silently. Reference-data jobs (no tenant column) are the only role-granted exception.</td>
-        <td><a href="#jobs">§4.4</a>; control C-30, audit entries §9</td>
-      </tr>
-      <tr>
-        <td><strong>OQ-4</strong></td>
-        <td>Purge path coexistence with the append-only triggers, and how the purge is audited.</td>
-        <td><strong>ARCH §3.4's <code>SECURITY DEFINER</code> function adopted. Separate purge role rejected</strong> (converts a code path into a standing credential); <strong>tombstoning rejected</strong> (makes PRD §5's promise false and adds a permanent query bypass). Required guards, in order: re-auth ≤ 5 min → <strong>sole-owner check</strong> → <strong>completed export within 24 h</strong> → <code>audit_event</code> written <em>before</em> the first delete (append-only, nullable <code>entity_id</code>, outside the cascade) → transaction-local <code>app.purge_entity</code> honoured <strong>only inside the definer context</strong> → <strong>provider-side credential revocation before deleting connection rows</strong>. No purge by job, by API without interactive confirmation, of a partial range, or while a second owner exists.</td>
-        <td><a href="#purge">§4.5</a>; controls C-33 … C-37</td>
-      </tr>
+      <tr><td>OQ-1</td><td>App-layer <strong>asymmetric</strong> sealing: HPKE with X25519, HKDF-SHA256 and AES-256-GCM. The AAD binds each credential to its connection, entity and provider. <code>web</code> seals; only <code>worker</code> holds the private keyring and can open. pgcrypto and KMS are rejected. Rotation is a re-seal job.</td><td><strong>Revised.</strong> Under the old design, the symmetric master key was reachable from <code>web</code>.</td><td>§6.3–§6.5; C-30, C-31, C-35</td></tr>
+      <tr><td>OQ-2</td><td>ARCH §3.3 is confirmed, and additions (a)–(d) stand. This review adds (e)–(l):
+        <ul>
+          <li>(e) authz functions owned by <code>poly_authz</code>;</li>
+          <li>(f) context read as <code>nullif(…,'')</code>;</li>
+          <li>(g) TRUNCATE triggers;</li>
+          <li>(h) <code>search_path = ''</code> plus a definer-function allowlist;</li>
+          <li>(i) tenancy columns not updatable;</li>
+          <li>(j) views are <code>security_invoker</code>, with no materialized views;</li>
+          <li>(k) role hygiene;</li>
+          <li>(l) UUID keys.</li>
+        </ul>
+        The permission matrix is the same for every entity type.</td><td><strong>Extended.</strong> Export becomes owner-only, per PRD §5. Payload access stays manager+.</td><td>§4.2.1, §4.3; C-10 to C-20</td></tr>
+      <tr><td>OQ-3</td><td>Confirmed: the linking user is the job principal, <code>principal_invalid</code> exists, and there is no system clause. Additions:
+        <ul>
+          <li>entity-bound jobs run as the earliest owner;</li>
+          <li>a new <code>app.job_targets()</code> function;</li>
+          <li>reference-data policies are role-targeted;</li>
+          <li>Cash-in-Transit aging is computed on read.</li>
+        </ul></td><td><strong>Extended.</strong> The POLY-64 scope comment stays valid.</td><td>§4.4; C-60</td></tr>
+      <tr><td>OQ-4</td><td>The purge function is SECURITY DEFINER, owned by a <strong>NOLOGIN <code>poly_purge</code></strong> role. It uses role-targeted DELETE policies, and the append-only trigger makes an exception only when <code>current_user = 'poly_purge'</code>. ARCH's guard order is kept, plus two new guards: no writes since the export, and an assertion that zero rows remain.</td><td><strong>Revised.</strong> A purge owned by <code>poly_owner</code> deletes zero rows under FORCE RLS (T-51).</td><td>§4.5; C-21, C-50</td></tr>
     </tbody>
   </table>
 
-  <h3 id="asks">12.1 Asks on other owners</h3>
+  <h3>12.2 ARCH changes to re-fold (architect)</h3>
+  <table>
+    <thead><tr><th>#</th><th>ARCH §</th><th>Change</th></tr></thead>
+    <tbody>
+      <tr><td>A-1</td><td>§3.3</td><td><code>visible_entities()</code> and <code>has_role()</code> are owned by <code>poly_authz</code>, with a role-targeted SELECT policy on <code>membership</code>. Add <code>poly_authz</code> and <code>poly_purge</code> to the role list.</td></tr>
+      <tr><td>A-2</td><td>§3.4</td><td>The purge function is owned by <code>poly_purge</code>. Add the role-targeted DELETE policies and key the trigger exception on <code>current_user</code>. Add guards 4 and 8. Replace the text "a separate purge role … rejected".</td></tr>
+      <tr><td>A-3</td><td>§3.3</td><td>Use the <code>nullif</code> form of <code>app.current_user_id()</code>. Correct the claim "unset returns NULL". The pool-reuse test must run on a backend that has already been used.</td></tr>
+      <tr><td>A-4</td><td>§3.2</td><td>Add BEFORE TRUNCATE statement triggers. No login role holds TRUNCATE.</td></tr>
+      <tr><td>A-5</td><td>§3.2</td><td>The actor is forced by trigger, not merely defaulted. <code>actor_kind = user</code> requires <code>actor_id = app.current_user_id()</code>.</td></tr>
+      <tr><td>A-6</td><td>§3.1, §4.1</td><td>Tenant-visible primary keys are UUIDs. Replace <code>/entities/42</code>.</td></tr>
+      <tr><td>A-7</td><td>§3.1 <code>provider_connection</code>; §2.2 <code>packages/secrets</code>; §7 TB-4; §9</td><td>The sealed columns become <code>enc</code>, <code>ciphertext</code>, <code>key_id</code> and <code>alg_version</code>. <code>seal()</code> lives in <code>web</code>; <code>open()</code> lives only in <code>worker</code>. TB-4 becomes the web ↔ worker boundary. Revocation on unlink runs as a worker job. Operator secrets are files, not an env file.</td></tr>
+      <tr><td>A-8</td><td>§3.1 user; PRD §5 wording</td><td>On account deletion, the <code>user</code> row becomes a tombstone and entries are never UPDATEd. <code>actor_id</code> FKs are <code>ON DELETE NO ACTION</code>. Override BetterAuth's <code>deleteUser</code>.</td></tr>
+      <tr><td>A-9</td><td>§2.3 RawTxn</td><td>Adapters redact full account numbers, PANs and credential fields from the stored payload.</td></tr>
+      <tr><td>A-10</td><td>§3.3</td><td>Views are <code>security_invoker</code>, with no materialized views over tenant data. Tenancy and actor columns are not updatable.</td></tr>
+      <tr><td>A-11</td><td>§3.1 entity</td><td>A parent link requires owner on both the child and the parent.</td></tr>
+      <tr><td>A-12</td><td>§3.3 system jobs</td><td>Entity-bound jobs run as the earliest owner. Add <code>app.job_targets()</code>. Cash-in-Transit aging is computed on read.</td></tr>
+      <tr><td>A-13</td><td>§6.2 / POLY-76</td><td>Add spike acceptance criterion (e): FORCE RLS, a role-targeted <code>pgPolicy</code> (<code>to:</code>), and a definer function owned by a non-owner NOLOGIN role must round-trip through <code>generate</code> and apply as <code>poly_migrator</code>.</td></tr>
+      <tr><td>A-14</td><td>§3.1, §5 (<em>gap</em>)</td><td>Attachments appear in PRD §5 export and purge but have no storage design. They need: a location; size and type limits; serving with <code>Content-Disposition: attachment</code> and <code>nosniff</code>; and inclusion in both purge and export.</td></tr>
+      <tr><td>A-15</td><td>§7 TB list</td><td>Add TB-11 (upload ↔ parser) and TB-12 (supply chain ↔ prod).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>12.3 Asks on other owners</h3>
   <ul>
-    <li><strong>architect:</strong> ARCH §3.3 gains additions (a)–(d) from §4.3; ARCH §3.4 gains the guard order from §4.5; <code>provider_connection</code> gains <code>linked_by_user_id NOT NULL</code> and a <code>principal_invalid</code> state (§4.4); <code>raw_transaction.payload</code> is manager+ only, and <code>audit_event</code> is owner-read-only (§4.2.1). Trust boundary TB-10 (staging ↔ prod on one host) and TB-4 (master key ↔ process) are not in ARCH §7's list and should be.</li>
-    <li><strong>devops-engineer:</strong> backup key custody must be recoverable independently of the VPS — asymmetric (box holds the public key only) is the recommended shape (§6.6); a restore from a clean machine is the acceptance test (C-39, C-40). Also: confirm the pooler runs in <em>transaction</em> mode on both targets (§4.3), and scope prod deploy secrets to a reviewed GitHub environment (C-47).</li>
-    <li><strong>qa-engineer:</strong> every row of the §4.2.1 matrix is a pgTAP assertion; the battery needs the pool-reuse test, the <code>WITH CHECK</code> forgery test, the catalog-coverage probe, the inversion canary, and the purge negative test (C-34). The log-redaction canary (C-20) is a unit test that must exist before the first real adapter ships.</li>
-    <li><strong>Principal (via team-lead):</strong> R-2, R-3, R-5, R-7, R-8 and R-9 are accepted risks awaiting your approval; R-1 and R-6 you already approved in PRD §6/§3. The one with a real trade-off is <strong>R-7 (MFA optional)</strong> — the alternative is mandatory MFA with no lockout recovery.</li>
+    <li><strong>devops-engineer:</strong>
+      <ul>
+        <li>§6.2: secrets as files, scoped per container; the keyring goes to <code>worker</code> only.</li>
+        <li>§6.6: an asymmetric backup key and an append-only backup store.</li>
+        <li>C-70/C-71: only Caddy publishes ports; the firewall lives in the cloud provider, not on the host.</li>
+        <li>C-75: Postgres logging settings.</li>
+        <li>C-83: a pull-based deploy is preferred.</li>
+        <li>Assert the connection-pooler mode on both targets.</li>
+      </ul></li>
+    <li><strong>qa-engineer:</strong>
+      <ul>
+        <li>Every row of §4.2.1 becomes a pgTAP assertion.</li>
+        <li>The battery adds: pool reuse on a dirty backend (C-12); WITH CHECK forgery; catalog coverage plus canary; the definer allowlist; <code>security_invoker</code>; TRUNCATE; purge negatives and the zero-rows-remain check (C-50).</li>
+        <li>The log canary (C-33) must land before the first real adapter.</li>
+      </ul></li>
+    <li><strong>Principal (via team-lead).</strong> Five questions, each with SecEng's recommendation:
+      <ul>
+        <li>Q1: Require MFA for the owner and manager roles? <em>Recommend yes.</em> The operator reset CLI covers lockout recovery.</li>
+        <li>Q2: Run a purge only after a cancellable 24 h delay, emailing every member? <em>Recommend yes.</em></li>
+        <li>Q3: Approve R-2 to R-5 and R-7 to R-13, and re-confirm R-1's corrected text? <em>Recommend approving all.</em></li>
+        <li>Q4: Build the ledger hash chain (C-24) in v1, or after GA? <em>Recommend after GA.</em></li>
+        <li>Q5: Make registration invite-only after the bootstrap user, with a reopen flag that is off by default? <em>Recommend yes.</em></li>
+      </ul></li>
   </ul>
 </section>
 
