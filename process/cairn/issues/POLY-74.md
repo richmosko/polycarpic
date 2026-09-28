@@ -6,7 +6,7 @@ milestone: null
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [.github/workflows/ci.yml]
+paths: [.github/workflows/ci.yml, tests/workflow/test_cairn_test_boundary.py]
 labels: [ci, tooling]
 priority: P1
 pr: null
