@@ -41,3 +41,54 @@ Today `process/reviews/<ID>/` holds 19 files across 12 issues (POLY-6 … POLY-6
 ### @team-lead — 2026-09-28
 
 Merging via PR #44 (Principal: "go with your rec on rulings"). Verified on the branch: process/reviews/ empty, 19 files moved with history, PINNED_RULINGS carve-out matches RULING_BLOBS exactly (POLY-6, 10, 26, 48, 51), full suites green. Closing.
+
+### @devops-engineer — 2026-09-28
+
+---
+kind: deliverable
+target: process/cairn/issues/POLY-80.md
+topic: POLY-80 completion comment (devops-engineer), for team-lead to paste
+---
+
+Done on branch feature/POLY-80 (final sha 67ef39d).
+
+- `git mv process/reviews -> process/cairn/reviews` (19 tracked files, 12 rulings, history
+  preserved -- confirmed with `git log --follow`). `grep -rn "process/reviews" .` returns
+  nothing outside `.git/` except `process/cairn/reviews/POLY-57/` and `POLY-58/ruling.md`'s
+  own internal prose -- frozen, matching `test_ruling_archive_records.py`'s established
+  precedent for that directory (a record's own cross-references stay as written; only its
+  path moves).
+- WORKFLOW.md, TRACKER.md, the team-lead role, all ten agent briefs (edited identically —
+  confirmed byte-identical before and after), and `message_cap.py`'s hook text now say: a
+  ruling is an issue comment or `process/cairn/reviews/<ID>/ruling.md` over budget; a
+  hand-off is never committed; a worktree-bound teammate uses its own worktree's `temp/` and
+  reports an absolute path.
+- `guard-push` principle-3 enforcement: a NEW file (not an edit) under `process/` that isn't
+  a tracker record or a named doc is refused, naming `temp/`. `PINNED_RULINGS`, a third
+  ci.yml variable checked against the unfiltered changed-file set, keeps the five
+  `RULING_BLOBS`-pinned ruling files triggering CI even though `process/cairn/reviews/` is
+  now in `EXCLUDE` (team-lead's gate-1 catch: `EXCLUDE` runs before `PATTERN`, so a plain
+  `PATTERN` allowlist would have been dead code). The pinned-id list is derived from
+  `test_ruling_archive_records.RULING_BLOBS` by import, not hand-typed twice.
+- `cairn show <ID>` lists `process/cairn/reviews/<ID>/`'s files, one line each, when the dir
+  exists.
+- ci.yml: `docs/DESIGN/` dropped from `PATTERN` (POLY-78 removed cairn's last read of it);
+  `reviews/` added to `EXCLUDE` alongside issues/milestones/majors/archive.
+- Optional bullet done: `ToolSearch` added to `ux-designer.md`'s `tools:` -- it's the
+  prerequisite for loading the deferred `mcp__claude-in-chrome__*` tools at all (no agent's
+  `tools:` line lists chrome tools directly; they're discovered via `ToolSearch`), which is
+  why the designer had no browser for two Plan-phase deliverables.
+
+**Upstream to project_template:** three changes here are template-generic, not
+polycarpic-specific, and should be pushed upstream so the template stops shipping the
+free-floating `process/reviews/` directory: (a) the `process/reviews/` ->
+`process/cairn/reviews/` location change itself, plus every doc/brief citation fix; (b) the
+`guard-push` principle-3 addition (`_is_allowed_process_path`, `_files_added_by_author`) and
+its `HandoffLeakTests`; (c) the `cairn show` review-files listing and its
+`ShowReviewFilesTests`. `PINNED_RULINGS` is NOT upstream material -- it exists only because
+this repo's own history had five ruling files blob-pinned by an earlier gate-1 ruling
+(POLY-57); a fresh template instance has no such pins to protect.
+
+**Verified:** full cairn suite green (`--gate green`: 1968 tests, 0 failures, 4 skipped);
+full JS suite green (494 tests, 492 pass / 2 skipped, 0 failures);
+`tests/workflow/test_cairn_test_boundary.py` 29/29. `cairn check` clean throughout.
