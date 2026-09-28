@@ -1,7 +1,7 @@
 ---
 id: POLY-80
 title: Retire process/reviews
-status: todo
+status: done
 milestone: null
 parent: null
 blocked_by: []
@@ -35,3 +35,9 @@ Today `process/reviews/<ID>/` holds 19 files across 12 issues (POLY-6 … POLY-6
 - [ ] `cairn show <ID>` lists the issue's review files if `process/cairn/reviews/<ID>/` exists (one line each); the board's detail drawer may follow later, not required here.
 - [ ] Optional, same brief-editing pass: add the `mcp__claude-in-chrome__*` tools to `.claude/agents/ux-designer.md` so the designer can do its own visual research (two Plan-phase deliverables needed a browser the teammate did not have).
 - [ ] Note in the issue comment what should be pushed upstream to project_template (the location change and the guard), so the template stops shipping the free-floating directory.
+
+## Comments
+
+### @team-lead — 2026-09-28
+
+Merging via PR #44 (Principal: "go with your rec on rulings"). Verified on the branch: process/reviews/ empty, 19 files moved with history, PINNED_RULINGS carve-out matches RULING_BLOBS exactly (POLY-6, 10, 26, 48, 51), full suites green. Closing.
