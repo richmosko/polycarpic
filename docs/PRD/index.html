@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Product Requirements — TBD</title>
+  <title>Product Requirements — Polycarpic</title>
   <link rel="stylesheet" href="../_assets/doc.css">
   <link rel="stylesheet" href="../_assets/comments.css">
   <script defer src="../_assets/mermaid-init.js"></script>
@@ -14,12 +14,12 @@
 
 <header class="doc-header">
   <h1>Product Requirements</h1>
-  <p class="doc-subtitle"><span class="tbd">Project name — TBD</span></p>
+  <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>product-manager</code> agent</span>
-    <span><strong>Status:</strong> <span class="tbd">Draft</span></span>
-    <span><strong>Version:</strong> <span class="tbd">0.1</span></span>
-    <span><strong>Last updated:</strong> <span class="tbd">—</span></span>
+    <span><strong>Status:</strong> Draft — v1, first initiative (<code>POLY-V1</code>)</span>
+    <span><strong>Version:</strong> 0.1</span>
+    <span><strong>Last updated:</strong> 2026-09-27</span>
   </div>
 </header>
 
@@ -51,19 +51,29 @@
 <section id="overview" data-section="overview">
   <h2>1. Overview &amp; Problem Statement</h2>
   <p class="section-hint">Why we're building this. The user problem, who feels it, and the desired business outcome.</p>
-  <div class="stub">Replace this block during the Research phase. Use <code>/generate-prd</code> to be interviewed.</div>
+  <div>
+    <p><strong>Problem.</strong> The Principal manages personal and family finances — budgeting, investment tracking, and quarterly tax estimation — across multiple legal entities (Person, Trust, Business, Household) using disconnected spreadsheets and per-provider dashboards. There is no single, continuously updated system of record that shows true financial health per entity, categorizes cash flows by tax treatment, tracks investment lots with accurate book and market value, or reliably estimates quarterly taxes.</p>
+    <p><strong>Who feels it.</strong> The Principal today, as owner/operator across several entities. The Principal's spouse and other household members feel it too, once shared-access (membership) features ship — they co-own jointly-titled accounts and need their own view into household finances without owning the underlying ledger.</p>
+    <p><strong>Status quo and its cost.</strong> Manual spreadsheets and per-provider dashboards (bank and brokerage sites) require hand re-entry and reconciliation — the reason the Principal wants this to grow into a virtual <strong>Single Family Office</strong> rather than continuing to patch spreadsheets together. A related prior project, <a href="https://github.com/richmosko/mosko-fintech">mosko-fintech</a>, explored some of this ground but is explicitly not the blueprint: this project starts from what the Principal wants and doesn't want (kickoff §3), not from that codebase's structure.</p>
+    <p><strong>Business outcome.</strong> A self-hosted system of record with a genuine double-entry general ledger, automated provider-agnostic transaction import, and per-entity dashboards — replacing manual reconciliation with always-current visibility into net worth, cash flow, and tax position across every entity the Principal controls.</p>
+  </div>
 
   <h3 id="approach">1.1 High-Level Approach</h3>
   <p class="section-hint">The rough shape of how we'll tackle the problem — a sentence or two so a reader can squint and see the same solution. Not a design or architecture; just the framing. (e.g. for "feature discoverability" → "an in-app notification center for relevant new features".)</p>
-  <div class="stub">One paragraph max. Detail belongs in <a href="../ARCH/">ARCH</a>.</div>
+  <div>
+    <p>A modular, layered SvelteKit application on a genuine double-entry general ledger in PostgreSQL under row-level security. Transactions arrive through provider-agnostic import adapters (a deterministic fake source first, then SimpleFIN, Plaid, and direct broker APIs), land as immutable posted journal entries once confirmed, and surface through Monarch/Origin-style per-entity dashboards. Delivered incrementally by initiative — this PRD scopes the first initiative (<code>POLY-V1</code>); later initiatives (stock research, Monte Carlo modelling, a consolidated household dashboard, multi-currency processing, etc.) are explicit Non-Goals for now (§3). Detail belongs in <a href="../ARCH/">ARCH</a>.</p>
+  </div>
 </section>
 
 <section id="goals" data-section="goals">
   <h2>2. Goals &amp; Success Metrics</h2>
   <p class="section-hint">What measurable outcomes prove the product succeeded? Mix measurable (metrics) and immeasurable (feelings). Include counter-metrics where relevant. Ideally in priority order.</p>
-  <div class="stub">Quantify success at 30 days and 90 days post-launch where possible.</div>
+  <div class="stub">None of the numeric targets below are locked — see <a href="#open-questions">§10 Open Questions</a>. They're drafted from the vision documents to give the Plan phase something concrete to react to, not confirmed commitments; no source document stated a metric.</div>
   <ol>
-    <li class="tbd">Goal — metric / target — counter-metric (if any)</li>
+    <li><strong>Replace spreadsheets as the system of record.</strong> Metric: <span class="tbd">by day 90 after POLY-V1 ships, 100% of the Principal's transactions for at least one entity flow through import → draft → confirm, with zero manual spreadsheet entries for that entity (target to confirm)</span>. Counter-metric: the manual-correction/reversal rate stays low enough that reconciling in-app isn't more work than the prior spreadsheet — numeric threshold TBD.</li>
+    <li><strong>Accurate quarterly estimated-tax calculation.</strong> Metric: the app's quarterly estimated-tax figure lands within <span class="tbd">an agreed variance — TBD</span> of the Principal's own manual calculation, for the first quarter after the securities/income sub-ledger ships.</li>
+    <li><strong>Reliable reconciliation.</strong> Metric: GL balance per custodial account matches the custodian's reported balance at each check (kickoff §2.6), with unmatched transfer legs clearing out of the <em>Cash in Transit</em> account within <span class="tbd">a target window — TBD</span>.</li>
+    <li><strong>Self-hosting cost stays low</strong> — a guardrail, not a growth goal. Counter-metric: monthly third-party spend stays near zero beyond the VPS and any data providers actually in use (Plaid trial items, Resend). No dollar figure set yet.</li>
   </ol>
 </section>
 
@@ -71,16 +81,31 @@
   <h2>3. Non-Goals</h2>
   <p class="section-hint">Explicitly out of scope — and <em>why</em>. Non-goals are as clarifying as goals: they shut down ambiguity, prevent scope creep, and make trade-offs visible.</p>
   <ol>
-    <li class="tbd">What we're <em>not</em> doing — and the reason (deferred / out of charter / different team / etc.)</li>
+    <li>Stock research and valuation engine for screening — deferred; not needed until the core ledger and dashboards exist.</li>
+    <li>Monte-Carlo portfolio survivability and efficient-frontier modelling — deferred; depends on real historical data already flowing through the ledger.</li>
+    <li>Capitalization table per entity — deferred; only relevant for entity types that issue units, none of which are in the first initiative.</li>
+    <li>Business-type features (literal inventory management, etc.) — deferred; the first initiative targets Person/Trust/Household budgeting and investing, not business operations.</li>
+    <li>Consolidated household dashboard (the roll-up view) — the underlying schema (parent link + membership) ships in the first initiative, but the view itself is a later milestone.</li>
+    <li>Multi-currency process (rate feed, period-end revaluation, FX reports) — schema-ready (every journal line already carries currency + native/base amounts) but the process is deferred until foreign currency is actually held again.</li>
+    <li>User-authored report scripting — deferred until the declarative report definitions (§5) prove insufficient for a named report.</li>
+    <li>Period locking of closed books — deferred; the posting-date check is designed so locking can be added later without a schema change.</li>
+    <li>An MCP server exposing a user's data to their own assistant — feasible later as a thin client of the same API, authenticated with the user's own token; out of scope until the API exists.</li>
   </ol>
 </section>
 
 <section id="stories" data-section="stories">
   <h2>4. User Stories &amp; Use Cases</h2>
   <p class="section-hint">"As a &lt;persona&gt;, I want to &lt;action&gt; so that &lt;outcome&gt;." Aim for 3–8 stories on v1.</p>
-  <div class="stub">Each story becomes a cairn issue when the backlog is seeded (see <code>/setup-tracker</code>).</div>
+  <div class="stub">Written at initiative grain — each becomes a cairn backlog issue (proposed list queued at <code>temp/prd-spillover-issues.md</code> pending confirmation) and is decomposed further when the architect breaks <code>POLY-V1</code> into milestones/issues.</div>
   <ol>
-    <li class="tbd">As a …, I want to …, so that …</li>
+    <li>As the Principal, I want a dashboard of financial health per entity (Person, Trust, Business, Household), so that I can tell at a glance how each entity is doing without opening separate spreadsheets or provider sites.</li>
+    <li>As the Principal, I want my bank and brokerage transactions imported automatically and staged as drafts, so that I can review and confirm them instead of hand-entering every transaction.</li>
+    <li>As the Principal, I want categorized expense and revenue cash flows tagged by tax treatment, so that I can distinguish tax-consequence expenses from owner draws/distributions when tax season comes.</li>
+    <li>As the Principal, I want a quarterly estimated-tax calculation, so that I don't have to build that estimate by hand every quarter.</li>
+    <li>As the Principal, I want lot-based tracking of my marketable securities with both GL book value and daily market value, so that I can see accurate cost basis alongside current net asset value.</li>
+    <li>As the Principal, I want a balance sheet by GL account and a separate one by custodial (physical holding) account, so that I can reconcile what the ledger says against what my custodians report.</li>
+    <li>As the Principal, I want an asset-allocation view with target adjustments, so that I can see how my actual holdings compare to where I want them.</li>
+    <li>As a household member with a granted viewer role, I want to see the household's shared accounts and my own entity's finances, so that I have visibility into our joint financial picture without owning the underlying ledger.</li>
   </ol>
 </section>
 
@@ -88,7 +113,20 @@
   <h2>5. Functional Requirements</h2>
   <p class="section-hint">What the system shall do. Implementation-agnostic.</p>
   <ul>
-    <li class="tbd">The system shall …</li>
+    <li>The system shall show a dashboard of balances, cash flow, and recent activity per entity, filtered to the entities the logged-in user holds a membership on.</li>
+    <li>The system shall import transactions from at least one provider adapter (a deterministic fake source first) behind a provider-agnostic interface, and stage them as drafts pending user confirmation.</li>
+    <li>The system shall post a draft transaction as a journal entry on user confirmation, at which point the source transaction becomes immutable (no further update or delete).</li>
+    <li>The system shall correct a posted transaction only via a reversing entry plus a new entry, never by editing the original.</li>
+    <li>The system shall categorize transactions by expense/revenue category and by tax-treatment tag.</li>
+    <li>The system shall calculate a quarterly estimated-tax figure from categorized, tax-tagged cash flows.</li>
+    <li>The system shall track marketable-security lots per custodial account, recording book value (with depreciation/amortization/return of capital) and daily end-of-day market value.</li>
+    <li>The system shall render a balance sheet by GL account and a separate balance sheet by custodial account, including the custodial NAV's delta from the prior book period.</li>
+    <li>The system shall render an asset-allocation view comparing actual holdings to a user-set target allocation.</li>
+    <li>The system shall match the two raw legs of an inter-account transfer into one multi-leg journal entry within a configurable date window, posting unmatched legs against a <em>Cash in Transit</em> clearing account.</li>
+    <li>The system shall reconcile the GL balance of each custodial account against the custodian's reported balance.</li>
+    <li>The system shall enforce that every journal entry's debits equal its credits, in the base currency.</li>
+    <li>The system shall provide the seeded report templates: Balance Sheet, Income Statement, Statement of Cash Flows, custodial NAV, and NAV delta.</li>
+    <li>The system shall grant data access only through a user's membership on an entity (role: owner, manager, or viewer), never through a bare user identifier.</li>
   </ul>
 </section>
 
