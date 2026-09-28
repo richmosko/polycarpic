@@ -1,14 +1,14 @@
 ---
 id: POLY-74
-title: CI: exclude process/DECISIONS.md from the cairn job's change filter
+title: CI: change filter runs the full suite for process/ and docs/ paths no test reads
 status: todo
 milestone: null
 parent: null
 blocked_by: []
-assignee: null
+assignee: devops-engineer
 paths: [.github/workflows/ci.yml]
 labels: [ci, tooling]
-priority: null
+priority: P1
 pr: null
 created: 2026-09-27
 updated: 2026-09-27
@@ -28,3 +28,14 @@ updated: 2026-09-27
 ## Notes
 
 Future CI-filter follow-ups go here as sub-issues rather than new top-level issues (see the team-lead memory on batching tooling fixes).
+
+
+### @team-lead — 2026-09-28
+
+**Re-scoped and raised to P1 (Principal: "process/* ... definitely triggers a full CI! That's not acceptable").** `PATTERN` is `^process/` with only the four tracker-record dirs excluded, so `process/reviews/**`, `process/DECISIONS.md`, `process/STATE.md` and every doc-only PR under them run the ~1 min suite. `docs/DESIGN/` is in `PATTERN` too, solely because of the cairn parity test that POLY-78 removes.
+
+Acceptance criteria, superseding the original single-file one:
+- [ ] A change confined to `process/reviews/**`, `process/DECISIONS.md`, or `process/STATE.md` does not run the test suites. Keep the trigger for the files a test actually reads (`process/WORKFLOW.md`, `process/TRACKER.md`, `process/cairn/config.yml`, and any `process/reviews/` ruling file a `tests/workflow` blob check pins — enumerate them from the tests rather than guessing).
+- [ ] After POLY-78 lands, `docs/DESIGN/` leaves `PATTERN`.
+- [ ] The skip decision is still fail-closed (POLY-39): any error in the filter runs the suite.
+- [ ] Do this before POLY-78; it is a one-file change and unblocks every doc PR in the Plan phase.
