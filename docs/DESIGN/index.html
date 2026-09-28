@@ -19,7 +19,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.2</span>
+    <span><strong>Version:</strong> 0.3</span>
     <span><strong>Last updated:</strong> 2026-09-28</span>
   </div>
 </header>
@@ -53,7 +53,7 @@
     <li><strong>No decorative loading states.</strong> Skeletons match the real layout; spinners are a last resort (see Component inventory).</li>
     <li><strong>Every number earns trust.</strong> This is a general ledger, not a budgeting toy — a balance, a delta, or a pending-liability figure must always be traceable to its source (the journal entry, the lot, the reconciliation). The UI never shows a number it can't explain if clicked.</li>
     <li><strong>Immutability is visible, not just enforced.</strong> A posted transaction reads as posted (badge, disabled edit affordance); a correction reads as a reversal + new entry, never as a silent edit (PRD §5).</li>
-    <li><strong>Reuse the tooling's own visual language deliberately.</strong> polycarpic's own cairn tracker is a shadcn-svelte app on an already AA-audited palette — the product inherits that base rather than re-deriving one, see <a href="design-system-spec.md#provenance-shared-tooling">Provenance &amp; shared tooling</a>.</li>
+    <li><strong>Diverge from polycarpic's own tooling, deliberately.</strong> The cairn tracker (our internal tool) and the product are not the same thing and shouldn't look like it — this system's identity is hand-authored, taking inspiration from Monarch Money and Origin instead (Principal direction, 2026-09-28) — see <a href="design-system-spec.md#inspiration-monarch--origin">Inspiration: Monarch &amp; Origin</a>.</li>
   </ul>
 </section>
 
@@ -61,11 +61,12 @@
   <h2>2. Design System</h2>
   <p class="section-hint">The single source of truth for the visual language. The written spec lives alongside this doc; the machine-readable system lives in the two CSS files that <code>frontend-lead</code> consumes directly.</p>
   <ul>
+    <li><a href="design-system-spec.md#inspiration-monarch--origin">design-system-spec.md § Inspiration</a> — what was taken from Monarch Money and Origin, and why</li>
     <li><a href="design-system-spec.md">design-system-spec.md</a> — the written spec (token rationale, financial semantics, component inventory, accessibility)</li>
-    <li><a href="tokens.css">tokens.css</a> — design tokens as CSS custom properties (shadcn-svelte base + polycarpic's financial-semantic additions)</li>
+    <li><a href="tokens.css">tokens.css</a> — design tokens as CSS custom properties (hand-authored palette, not a vendored shadcn preset)</li>
     <li><a href="screen.css">screen.css</a> — component &amp; screen styles built on the tokens</li>
   </ul>
-  <p class="section-hint">Figma stays the high-fidelity design tool for anything shipping pixel-exact (via the <code>ux-designer</code>'s Figma skills); <code>docs/DESIGN/</code> is the in-repo, code-level home that ships with the project and is the contract for implementation. Note: <code>docs/DESIGN/variants.css</code> belongs to the <code>cairn</code> tracker tool's own theme-variant pipeline (generated, do not hand-edit) — it is not part of the product's design system, see design-system-spec.md § Provenance.</p>
+  <p class="section-hint">Figma stays the high-fidelity design tool for anything shipping pixel-exact (via the <code>ux-designer</code>'s Figma skills); <code>docs/DESIGN/</code> is the in-repo, code-level home that ships with the project and is the contract for implementation. Note: <code>docs/DESIGN/variants.css</code> belongs to the <code>cairn</code> tracker tool's own theme-variant pipeline (generated, do not hand-edit) — it is not part of the product's design system and is being relocated out of this directory by POLY-78, see design-system-spec.md § Provenance.</p>
 </section>
 
 <section id="tokens" data-section="tokens">
@@ -120,7 +121,7 @@
     <div class="swatch"><span class="chip" style="background:var(--sidebar-accent)"></span><span class="name">--sidebar-accent</span></div>
   </div>
 
-  <p class="section-hint"><strong>Type:</strong> <code>--font-sans</code> Merriweather (body/UI, incl. stat values), <code>--font-heading</code> Space Grotesk (titles), <code>--font-mono</code> Geist Mono (IDs, tickers, tabular figures). <strong>Radius:</strong> <code>--radius</code> 0.625rem → <code>--radius-sm|md|lg|xl</code>.</p>
+  <p class="section-hint"><strong>Type:</strong> <code>--font-sans</code> Inter — one family for body and headings, hierarchy by weight (diverges from cairn's serif/sans split); <code>--font-heading</code> is an alias onto the same family; <code>--font-mono</code> is a system stack (no extra web-font request). <strong>Radius:</strong> hand-picked <code>--radius-sm|md|lg|xl</code> = 8/10/12/20px.</p>
 </section>
 
 <section id="components" data-section="components">
@@ -179,7 +180,7 @@
   <table>
     <thead><tr><th>Concern</th><th>Standard / approach</th></tr></thead>
     <tbody>
-      <tr><td>Color contrast</td><td>WCAG AA (4.5:1 text, 3:1 large/UI) — inherited foundations independently verified; new financial-semantic tokens not yet measured, open item</td></tr>
+      <tr><td>Color contrast</td><td>WCAG AA (4.5:1 text, 3:1 large/UI) — every token pair measured via the standard relative-luminance formula against this palette's actual hex values; no CVD simulation run yet (open item)</td></tr>
       <tr><td>Color-alone signaling</td><td>Never — every gain/loss/status pairs color with a sign/icon/label</td></tr>
       <tr><td>Keyboard</td><td>All interactive elements reachable &amp; operable (shadcn default)</td></tr>
       <tr><td>Screen readers</td><td>Semantic markup; labelled controls; delta sign readable from text content</td></tr>
@@ -192,8 +193,9 @@
   <h2>9. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
-    <li>Does the Principal want polycarpic's own visual identity distinct from the shared cairn-tooling palette, or is a shared look acceptable/desirable? Currently assumed acceptable.</li>
-    <li>Confirm the four new financial-semantic tokens (<code>--positive</code>/<code>--warning</code>) clear AA contrast once run through a real checker (open item, design-system-spec.md § Accessibility).</li>
+    <li><strong>Resolved 2026-09-28:</strong> visual identity diverges from cairn's tooling palette — Principal direction, see Overview §1 and design-system-spec.md § Inspiration.</li>
+    <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — recommended before lock (design-system-spec.md § Accessibility).</li>
+    <li>A live-browser visual QA pass against Monarch/Origin would confirm or correct the inspiration notes recorded this session (no screenshot tool available) — recommended before hi-fi styled-screens are treated as final.</li>
     <li>Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.</li>
     <li><code>prototype/</code> throwaway UX prototype (kickoff §2.9) not yet built — confirm ownership/timing with team-lead.</li>
   </ul>
@@ -213,7 +215,7 @@
     <dt>Q: Why is the design system in <code>docs/DESIGN/</code> and not in the app's source?</dt>
     <dd>A: It's the design <em>deliverable</em> — the contract. During Implement, <code>frontend-lead</code> imports or derives the app's real stylesheets from <code>tokens.css</code>/<code>screen.css</code>.</dd>
     <dt>Q: Why do <code>tokens.css</code> and <code>variants.css</code> in this same directory look unrelated?</dt>
-    <dd>A: <code>variants.css</code> is generated infrastructure for the <code>cairn</code> tracker tool's own theme switcher, not the product — see design-system-spec.md § Provenance &amp; shared tooling.</dd>
+    <dd>A: <code>variants.css</code> is generated infrastructure for the <code>cairn</code> tracker tool's own theme switcher, not the product — POLY-78 relocates it out of this directory entirely. See design-system-spec.md § Provenance &amp; shared tooling.</dd>
   </dl>
 </section>
 

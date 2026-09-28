@@ -7,155 +7,146 @@
  * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
  * the swatches.
  *
- * PROVENANCE — deliberately shared, not coincidental: the base palette below
- * (colors, radius scale, font stacks) is inherited byte-for-byte from
- * scripts/cairn/dashboard/src/app.css, the cairn tracker tool's own
- * shadcn-svelte preset (`b6XadDxmQS` — Style "Mira", Base "Stone", Theme
- * "Sky", Chart "Yellow", heading Space Grotesk, body Merriweather, icons
- * Lucide, radius 0.625rem; extracted 2026-08-26, full derivation history and
- * AA contrast fixes in design-system-spec.md's Foundations section). Both
- * our internal tooling and the product itself are shadcn-svelte apps, so
- * reusing an already-audited, AA-vetted preset is a deliberate consistency
- * choice, not laziness — re-deriving a second palette from scratch would buy
- * nothing. THIS FILE NOW DIVERGES from cairn-dashboard's app.css below the
- * inherited-foundations line: the `--positive`/`--warning`/entity-type
- * tokens are polycarpic-specific additions with no cairn-tool equivalent,
- * and are NOT mirrored back into scripts/cairn/dashboard. If the upstream
- * preset ever changes, re-extract and diff the foundations block only.
+ * DIRECTION (Principal, 2026-09-28, temp/design-direction-2026-09-28.md):
+ * inspiration from Monarch Money and Origin (originfinancial.com); diverge
+ * from the palette/type/radius that polycarpic's own cairn tracker tool
+ * uses (scripts/cairn/) — matching cairn was an earlier, now-rejected
+ * assumption (see design-system-spec.md § Provenance for the full history
+ * and § Inspiration: Monarch & Origin for what was taken from each and
+ * why). This file therefore does NOT vendor a shadcn preset the way
+ * cairn's own tokens do — these are a hand-authored palette, still wired
+ * through shadcn-svelte's standard CSS-custom-property slot names so
+ * shadcn-svelte components consume them unchanged.
+ *
+ * Plain sRGB hex, not OKLCH — a deliberate simplification, not an
+ * oversight: this system doesn't need cairn's multi-preset theme-variant
+ * machinery (scripts/cairn/board/theme/gen_variants.py), so the extra
+ * color-space precision that machinery justified doesn't pay for itself
+ * here. Contrast figures in design-system-spec.md § Accessibility were
+ * computed from these exact hex values via the standard WCAG relative-
+ * luminance formula (not OKLCH deltas) — see that section for the script
+ * and figures.
+ *
+ * CI note (POLY-78, in progress): scripts/cairn/tests/test_board_tokens_parity.py
+ * currently asserts this file shares values with cairn's board tokens —
+ * that assertion is the thing POLY-78 is removing. Expect this file to
+ * fail the `cairn` CI check until POLY-78 merges; do not re-add cairn's
+ * values to work around it.
  *
  * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
  */
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.147 0.004 49.25);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.147 0.004 49.25);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.147 0.004 49.25);
-  --primary: oklch(0.5 0.134 242.749);
-  --primary-foreground: oklch(0.977 0.013 236.62);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.97 0.001 106.424);
-  /* PT-69 (Mosko's ruling, 2026-08-29, "darken the ink"; re-derived under
-     the "two-model rule"): darkened from the preset's own oklch(0.553
-     0.013 58.071), which fails WCAG AA against --muted above (4.39:1 <
-     4.5:1 floor) -- clears the floor under BOTH the quantized-hex and
-     float contrast models (4.58:1 / 4.56:1). See app.css's own copy of
-     this comment and scripts/cairn/board/theme/gen_variants.py's
-     derive_muted_foreground() for the full rationale/method. */
-  --muted-foreground: oklch(0.5450 0.013 58.071);
-  --accent: oklch(0.97 0.001 106.424);
-  --accent-foreground: oklch(0.216 0.006 56.043);
-  --destructive: oklch(0.577 0.245 27.325);
-  /* PT-69 (ux-designer's ruling, 2026-08-29, on architect's f26dbad): see
-     app.css's own copy of this comment for the full rationale --
-     lightened (the direction-correct fix here) to pure white, the only
-     value with real headroom (4.35:1 -> 4.76:1); costs the preset's
-     slight warm-pink tint. See .dark's own copy for the opposite-
-     direction dark-mode fix. */
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.923 0.003 48.717);
-  --input: oklch(0.923 0.003 48.717);
-  --ring: oklch(0.709 0.01 56.259);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.001 106.423);
-  --sidebar-foreground: oklch(0.147 0.004 49.25);
-  --sidebar-primary: oklch(0.588 0.158 241.966);
-  --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
-  --sidebar-accent: oklch(0.97 0.001 106.424);
-  --sidebar-accent-foreground: oklch(0.216 0.006 56.043);
-  --sidebar-border: oklch(0.923 0.003 48.717);
-  --sidebar-ring: oklch(0.709 0.01 56.259);
+  /* Surfaces & text — cool neutral grays, not cairn's warm stone */
+  --background: #FFFFFF;
+  --foreground: #111827;
+  --card: #FFFFFF;
+  --card-foreground: #111827;
+  --popover: #FFFFFF;
+  --popover-foreground: #111827;
 
-  /* Radius scale — matches the live shadcn-svelte scaffold's generated
-     @theme inline block exactly (scripts/cairn/dashboard/src/app.css),
-     verified 2026-08-26 against the actual `shadcn-svelte init --preset
-     b6XadDxmQS` output -- multiplicative, not the subtractive formula an
-     earlier revision of this file (and of design-system-spec.md)
-     documented from derivation alone, never re-verified live. Same
-     computed px values at --radius: 0.625rem (6/8/10/14), but the two
-     formulas diverge the moment --radius is customized -- the scaffold
-     is ground truth. */
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Brand — indigo/violet, Origin-inspired; deliberately not cairn's sky blue */
+  --primary: #6D5BD0;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F1F0FB;
+  --secondary-foreground: #3730A3;
+  --muted: #F4F5F7;
+  --muted-foreground: #5B6472; /* darkened from a lighter first pass to clear 4.5:1 on --muted (5.48:1) and --card (5.98:1) */
+  --accent: #EDEBFB;
+  --accent-foreground: #3730A3;
 
-  /* Typography — face is by ROLE, not size (see design-system-spec.md
-     § Typography). --font-sans carries the base/default UI despite the
-     name; --font-heading is headings/titles only. */
-  --font-sans: 'Merriweather Variable', Georgia, 'Times New Roman', serif;
-  --font-heading: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
 
-  /* --- polycarpic product additions below this line (no cairn-dashboard
-     equivalent) --- financial-semantic colors the base preset has no slot
-     for: gain/loss deltas and a caution tier distinct from --destructive's
-     danger. (unmeasured — target AA 4.5:1 text / 3:1 large+UI against
-     --card and --background; verify before lock, see design-system-spec.md
-     § Financial semantics.) */
-  --positive: oklch(0.52 0.15 150);
-  --positive-foreground: oklch(1 0 0);
-  --warning: oklch(0.75 0.15 85);
-  --warning-foreground: oklch(0.28 0.05 85);
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --ring: #6D5BD0;
+
+  /* Chart ramp — sequential, single-hue (brand indigo), for magnitude/
+     time-series charts (net worth over time, book-vs-market). Not a
+     categorical palette — see design-system-spec.md § Financial semantics
+     for why categories are label+icon, not hue. */
+  --chart-1: #C7BFF2;
+  --chart-2: #A69AEA;
+  --chart-3: #6D5BD0;
+  --chart-4: #4B3BA8;
+  --chart-5: #332C6E;
+
+  --sidebar: #FAFAFB;
+  --sidebar-foreground: #111827;
+  --sidebar-accent: #EDEBFB;
+  --sidebar-accent-foreground: #3730A3;
+  --sidebar-border: #E5E7EB;
+  --sidebar-ring: #6D5BD0;
+
+  /* Financial semantics — Monarch-inspired growth green for gains,
+     a caution amber distinct from --destructive's danger red. Never the
+     only signal — see design-system-spec.md § Financial semantics. */
+  --positive: #15803D;
+  --positive-foreground: #FFFFFF;
+  --warning: #B45309;
+  --warning-foreground: #FFFFFF;
+
+  /* Radius — hand-picked, not formula-derived from a shadcn preset (this
+     system isn't vendoring one, see file header). Softer/larger than
+     cairn's 10px base, matching the rounder card language common to both
+     inspiration products. */
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+
+  /* Typography — one sans family throughout (hierarchy by weight, not by
+     face) — both Monarch and Origin do this; diverges from cairn's
+     serif-body/sans-heading split. --font-heading kept as an alias, not a
+     second family, so existing usages don't need to change meaning.
+     Single web font (Inter) rather than cairn's three — also fixes a
+     standing pushback item from this doc's own prior revision (unneeded
+     network font cost). --font-mono is a system stack, no extra request. */
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
 }
 
 .dark {
-  --background: oklch(0.147 0.004 49.25);
-  --foreground: oklch(0.985 0.001 106.423);
-  --card: oklch(0.216 0.006 56.043);
-  --card-foreground: oklch(0.985 0.001 106.423);
-  --popover: oklch(0.216 0.006 56.043);
-  --popover-foreground: oklch(0.985 0.001 106.423);
-  --primary: oklch(0.443 0.11 240.79);
-  --primary-foreground: oklch(0.977 0.013 236.62);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.268 0.007 34.298);
-  --muted-foreground: oklch(0.709 0.01 56.259);
-  --accent: oklch(0.268 0.007 34.298);
-  --accent-foreground: oklch(0.985 0.001 106.423);
-  --destructive: oklch(0.704 0.191 22.216);
-  /* PT-69 (architect's ruling, 2026-08-29, f26dbad): SPLIT from :root's
-     value above -- see app.css's own copy of this comment for the full
-     rationale (one shared ink can't clear both modes; dark's fill is
-     unusually lighter than light's own). Minimum darkening that clears
-     unusually lighter than light's own). Re-derived under the "two-model
-     rule" -- a bare-minimum single-model search first landed on
-     L=0.3145 (4.53:1 quantized, but only 4.4955:1 float, below floor);
-     L=0.31 clears both (4.60:1 quantized / 4.57:1 float). Also fixes
-     .engine-stale-banner (board.css), which pairs the same two tokens. */
-  --destructive-foreground: oklch(0.31 0.01 17.0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.553 0.013 58.071);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
-  --sidebar: oklch(0.216 0.006 56.043);
-  --sidebar-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-primary: oklch(0.685 0.169 237.323);
-  --sidebar-primary-foreground: oklch(0.293 0.066 243.157);
-  --sidebar-accent: oklch(0.268 0.007 34.298);
-  --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.553 0.013 58.071);
+  --background: #0B0E14;
+  --foreground: #E5E7EB;
+  --card: #131722;
+  --card-foreground: #E5E7EB;
+  --popover: #131722;
+  --popover-foreground: #E5E7EB;
 
-  /* polycarpic product additions, dark mode — see :root's comment above. */
-  --positive: oklch(0.62 0.15 150);
-  --positive-foreground: oklch(0.15 0.02 150);
-  --warning: oklch(0.70 0.15 85);
-  --warning-foreground: oklch(0.2 0.04 85);
+  --primary: #8B7CF0;
+  --primary-foreground: #14101F; /* dark text on the lighter dark-mode primary clears 5.55:1; white on it only clears 3.37:1 */
+  --secondary: #1E2233;
+  --secondary-foreground: #C7BFF2;
+  --muted: #1B2030;
+  --muted-foreground: #9CA3AF;
+  --accent: #23283C;
+  --accent-foreground: #C7BFF2;
+
+  --destructive: #EF4444;
+  --destructive-foreground: #2A0507; /* dark text clears 4.97:1; white on this lighter dark-mode red only clears 3.76:1 */
+
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #8B7CF0;
+
+  --chart-1: #DCD6FA;
+  --chart-2: #B7AEF0;
+  --chart-3: #8B7CF0;
+  --chart-4: #6D5BD0;
+  --chart-5: #4B3BA8;
+
+  --sidebar: #0F1320;
+  --sidebar-foreground: #E5E7EB;
+  --sidebar-accent: #23283C;
+  --sidebar-accent-foreground: #C7BFF2;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #8B7CF0;
+
+  --positive: #4ADE80;
+  --positive-foreground: #052E13;
+  --warning: #FBBF24;
+  --warning-foreground: #451A03;
 }
