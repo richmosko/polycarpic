@@ -224,7 +224,7 @@ erDiagram
       <tr><td><code>lot</code>, <code>lot_match</code>, <code>lot_adjustment</code></td><td>entity id</td><td>append-only</td><td>Lot-match is an append-only many-to-many junction with a <code>match_seq</code>; the latest batch is current (borrowed from mosko-fintech 032).</td></tr>
       <tr><td><code>tax_period_freeze</code></td><td>entity id</td><td>append-only</td><td>Annualized income, tax, cumulative required, paid — per jurisdiction per period; source of the 2210 / Schedule AI export.</td></tr>
       <tr><td><code>report_definition</code></td><td>owner user id (clones) / null (system templates)</td><td>system templates read-only; clones mutable</td><td>Upgrades replace system templates in place; clones are never touched.</td></tr>
-      <tr><td><code>attachment</code>, <code>entry_attachment</code></td><td>entity id</td><td>attachment insert-only; links deletable by manager+ (audited)</td><td>Supporting documents such as statements and receipts, stored as <code>bytea</code> in Postgres (see §3.5). They are RLS-covered, backed up, exported and purged along with everything else.</td></tr>
+      <tr><td><code>attachment</code>, <code>attachment_blob</code>, <code>entry_attachment</code></td><td>entity id</td><td>attachment insert-only; links deletable by manager+ (audited)</td><td>Supporting documents such as statements and receipts, stored as <code>bytea</code> in Postgres (see §3.5). They are RLS-covered, backed up, exported and purged along with everything else.</td></tr>
       <tr><td><code>audit_event</code></td><td>entity id (nullable after purge)</td><td>append-only, outside purge cascade</td><td>Records purges, exports, revocations, membership changes, and <code>principal_invalid</code> transitions; survives the purge it describes. Readable by owners only (SECURITY §4.2.1).</td></tr>
     </tbody>
   </table>
@@ -293,6 +293,14 @@ erDiagram
     <li><strong>Linking:</strong> <code>entry_attachment</code> links an attachment to a journal entry, draft or account. A link doesn't change the entry, so attaching to a posted entry is allowed. Unlinking is manager+ and writes an <code>audit_event</code>. Attachment bytes themselves are insert-only.</li>
     <li><strong>Boundary:</strong> uploads cross TB-11 (untrusted file ↔ parser). Attachments are stored, never parsed. CSV/OFX import files are parsed by the import adapter under TB-11's controls.</li>
   </ul>
+  <p><strong>SecEng conditions (approved on security, all binding):</strong></p>
+  <ol>
+    <li><em>Filename:</em> <code>Content-Disposition</code> uses the RFC 6266 <code>filename*=UTF-8''</code> form, with CR/LF and quotes stripped. The CSP is <code>default-src 'none'; sandbox</code>.</li>
+    <li><em>Entity binding:</em> <code>attachment</code> and <code>entry_attachment</code> both carry <code>entity_id</code>, with composite FKs, so a link can never cross entities. Viewers read; manager+ uploads.</li>
+    <li><em>Purge:</em> both tables get the <code>poly_purge</code> DELETE policy and the append-only trigger exception, and are included in the zero-rows-remain assertion (C-50).</li>
+    <li><em>Quota:</em> a per-entity storage quota and an upload rate limit protect the disk. The numbers are set in INFRA.</li>
+    <li><em>Isolation:</em> the bytes live in their own table (<code>attachment_blob</code>, 1:1 with <code>attachment</code>), so list and DTO queries never select <code>bytea</code>. Content is never parsed, and no AV scanning is an accepted consequence of that.</li>
+  </ol>
 </section>
 
 <!-- ============================================================ -->
