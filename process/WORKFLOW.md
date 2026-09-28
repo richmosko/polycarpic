@@ -527,6 +527,16 @@ docs/PRD/
 
 The `index.html` filename stays stable across the split, so external references (CLAUDE.md, README, skills) don't need updating.
 
+### Doc header: version, status, last updated
+
+Every top-level HTML doc (PRD, ARCH, SECURITY, DESIGN) carries three hand-maintained header fields. Nothing reads them and no skill bumps them, so the rule is the only thing keeping them honest (ruled 2026-09-27, PRD v1 interview):
+
+- **Version is the document's own number, unrelated to product releases or milestones.** `1.0` is the version the phase gate approves (the Research milestone's definition of done says "PRD v1 approved", and the header should say the same). Before the gate the doc is `1.0` with Status `Draft — pending <phase> gate`; the gate-approval doc update flips Status to `Approved <YYYY-MM-DD>` and changes nothing else, so the approval is a one-line diff.
+- **Each merged doc-update PR that changes substance bumps the minor** (`1.1`, `1.2`, …). Typo fixes, link repairs, and late-filled stubs (the Design section filling in after UX joins) do not bump. A rewrite driven by a new initiative or a re-planned architecture is a major bump (`2.0`).
+- **Last updated is the date of the last merged substantive edit**, set by whoever makes the edit, in the same commit. It is the field most likely to go stale; until `/finish-doc-update` checks it against the branch diff, the lead's read of the PR is the check.
+
+The same three fields mean the same thing on all four docs; a doc that has not reached its gate is `Draft`, whatever its version number.
+
 ## Doc review loop (`comments.md` sidecar)
 
 Each HTML doc (`PRD`, `ARCH`, `SECURITY`, `DESIGN`) supports an optional sidecar `docs/<DOC>/comments.md` for in-process review notes. It's a feedback loop with Claude: write per-section comments in the file, then run `/refine-doc` to have the lead address them.
