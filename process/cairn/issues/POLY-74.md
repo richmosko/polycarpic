@@ -1,7 +1,7 @@
 ---
 id: POLY-74
 title: CI change filter over-triggers
-status: in-review
+status: done
 milestone: null
 parent: null
 blocked_by: []
@@ -11,7 +11,7 @@ labels: [ci, tooling]
 priority: P1
 pr: https://github.com/richmosko/polycarpic/pull/42
 created: 2026-09-27
-updated: 2026-09-27
+updated: 2026-09-28
 ---
 
 The required `cairn` CI job runs the full test suite for any change under `process/` or `docs/DESIGN/`, including files no test reads (the decision log, the state ledger, review records). Narrow the filter to the files tests actually read, keep it fail-closed, and drop `docs/DESIGN/` once POLY-78 lands.
@@ -41,3 +41,9 @@ Acceptance criteria, superseding the original single-file one:
 - [ ] After POLY-78 lands, `docs/DESIGN/` leaves `PATTERN`.
 - [ ] The skip decision is still fail-closed (POLY-39): any error in the filter runs the suite.
 - [ ] Do this before POLY-78; it is a one-file change and unblocks every doc PR in the Plan phase.
+
+## Comments
+
+### @team-lead — 2026-09-28
+
+Merging via PR #42 (Principal: "merge 40, then 41 then 42"). The change filter's process/ leg now names exactly what a test reads; STATE.md, DECISIONS.md and review records no longer run the suite. docs/DESIGN/ leaves the pattern once POLY-78 is on main. Closing.
