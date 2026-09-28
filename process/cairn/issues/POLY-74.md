@@ -1,6 +1,6 @@
 ---
 id: POLY-74
-title: CI change filter runs the full suite for paths no test reads
+title: CI change filter over-triggers
 status: todo
 milestone: null
 parent: null
@@ -13,6 +13,8 @@ pr: null
 created: 2026-09-27
 updated: 2026-09-27
 ---
+
+The required `cairn` CI job runs the full test suite for any change under `process/` or `docs/DESIGN/`, including files no test reads (the decision log, the state ledger, review records). Narrow the filter to the files tests actually read, keep it fail-closed, and drop `docs/DESIGN/` once POLY-78 lands.
 
 ## Context
 

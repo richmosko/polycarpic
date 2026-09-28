@@ -1,6 +1,6 @@
 ---
 id: POLY-78
-title: Decouple cairn theme tooling and tests from docs/DESIGN
+title: Decouple cairn theme from docs/DESIGN
 status: todo
 milestone: null
 parent: null
@@ -13,6 +13,8 @@ pr: null
 created: 2026-09-28
 updated: 2026-09-28
 ---
+
+Cairn's theme generator writes `docs/DESIGN/variants.css` and its CI-run parity test pins `docs/DESIGN/tokens.css` to the board's tokens, so the product design system cannot change its palette without failing the merge gate. Localize cairn's theme assets, tests and design reference under `scripts/cairn/` and prove the decoupling.
 
 ## Context
 
