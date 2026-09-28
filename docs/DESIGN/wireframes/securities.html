@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Securities / Lots</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="wf-shell">
+  <div class="wf-sidebar">
+    <div class="wf-nav-item">[Entity switcher ▾]</div>
+    <div class="wf-nav-item">Dashboard</div>
+    <div class="wf-nav-item">Ledger</div>
+    <div class="wf-nav-item">Accounts</div>
+    <div class="wf-nav-item">Entities</div>
+    <div class="wf-nav-item">Securities (active)</div>
+    <div class="wf-nav-item">Import</div>
+  </div>
+  <div class="wf-content">
+    <h1>Securities &amp; Lots — [Entity name]</h1>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Lot table — Brokerage (Custodian X)</span>
+      <div class="wf-row"><span>AAPL — 50 sh, acquired [date]</span><span>book $6,200 / mkt $8,900</span></div>
+      <div class="wf-row"><span>AAPL — 25 sh, acquired [date]</span><span>book $2,900 / mkt $4,450</span></div>
+      <div class="wf-row"><span>VTI — 100 sh, acquired [date]</span><span>book $22,000 / mkt $24,100</span></div>
+    </div>
+
+    <div class="wf-grid cols-2">
+      <div class="wf-box">
+        <span class="wf-box-label">Asset allocation — actual vs. target</span>
+        <div style="height:120px; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999;">[bar chart, per asset class]</div>
+      </div>
+      <div class="wf-box">
+        <span class="wf-box-label">Book vs. market value over time</span>
+        <div style="height:120px; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999;">[line chart, sequential ramp]</div>
+      </div>
+    </div>
+
+    <p class="wf-note">Market value updates daily from the EOD price feed; book value carries depreciation/amortization/return-of-capital. Lot rows drill into individual buy/sell/dividend transactions in the ledger.</p>
+  </div>
+</div>
+</body>
+</html>

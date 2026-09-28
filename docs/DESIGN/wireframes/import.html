@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Import</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="wf-shell">
+  <div class="wf-sidebar">
+    <div class="wf-nav-item">[Entity switcher ▾]</div>
+    <div class="wf-nav-item">Dashboard</div>
+    <div class="wf-nav-item">Ledger</div>
+    <div class="wf-nav-item">Accounts</div>
+    <div class="wf-nav-item">Entities</div>
+    <div class="wf-nav-item">Securities</div>
+    <div class="wf-nav-item">Import (active)</div>
+  </div>
+  <div class="wf-content">
+    <h1>Import — [Entity name]</h1>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Linked providers</span>
+      <div class="wf-row"><span>Bank Y — checking, savings</span><span class="wf-chip">connected</span></div>
+      <div class="wf-row"><span>Custodian X — brokerage</span><span class="wf-chip">connected</span></div>
+      <div style="margin-top:8px;">[+ Link a provider — fake / SimpleFIN / Plaid]</div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Batch progress</span>
+      <div style="height:8px; background:#eee; border-radius:4px; overflow:hidden;"><div style="width:70%; height:100%; background:#999;"></div></div>
+      <div class="wf-placeholder-text w40" style="margin-top:8px;"></div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Batch review — 12 new, 2 duplicates skipped, 1 needs category</span>
+      <div class="wf-row"><span>[date] Payee</span><span>−$84.20</span></div>
+      <div class="wf-row"><span>[date] Payee — [needs category]</span><span>−$40.00</span></div>
+      <div style="text-align:right; margin-top:8px;">[Review in Ledger →]</div>
+    </div>
+
+    <p class="wf-note">Credential storage is never surfaced beyond "connected/needs re-auth" — tokens are encrypted at rest, never shown, with a documented revoke-at-provider path (PRD §6 Security). Import batches always land as drafts, never auto-posted, regardless of provider.</p>
+  </div>
+</div>
+</body>
+</html>

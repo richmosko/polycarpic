@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Dashboard</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="wf-shell">
+  <div class="wf-sidebar">
+    <div class="wf-nav-item">[Entity switcher ▾]</div>
+    <div class="wf-nav-item">Dashboard (active)</div>
+    <div class="wf-nav-item">Ledger</div>
+    <div class="wf-nav-item">Accounts</div>
+    <div class="wf-nav-item">Entities</div>
+    <div class="wf-nav-item">Securities</div>
+    <div class="wf-nav-item">Import</div>
+  </div>
+  <div class="wf-content">
+    <h1>Dashboard — [Entity name]</h1>
+
+    <div class="wf-grid cols-3">
+      <div class="wf-box">
+        <span class="wf-box-label">Net worth</span>
+        <div class="wf-placeholder-text w60" style="height:22px"></div>
+        <span class="wf-chip">+2.4% mo/mo</span>
+      </div>
+      <div class="wf-box">
+        <span class="wf-box-label">Cash flow (mtd)</span>
+        <div class="wf-placeholder-text w60" style="height:22px"></div>
+        <span class="wf-chip">−$1,240</span>
+      </div>
+      <div class="wf-box">
+        <span class="wf-box-label">Pending tax liability</span>
+        <div class="wf-placeholder-text w60" style="height:22px"></div>
+        <span class="wf-chip">gap: $3,100 due Sep 15</span>
+      </div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Net worth over time (nominal / inflation-adjusted toggle)</span>
+      <div style="height:160px; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999;">[chart]</div>
+    </div>
+
+    <div class="wf-grid cols-2">
+      <div class="wf-box">
+        <span class="wf-box-label">Recent activity</span>
+        <div class="wf-row"><span>Payee — category</span><span>−$84.20</span></div>
+        <div class="wf-row"><span>Payee — category</span><span>+$2,400.00</span></div>
+        <div class="wf-row"><span>Payee — category</span><span>−$12.99</span></div>
+      </div>
+      <div class="wf-box">
+        <span class="wf-box-label">Asset allocation — actual vs. target</span>
+        <div style="height:100px; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999;">[bar chart]</div>
+      </div>
+    </div>
+
+    <p class="wf-note">Every stat card links through to its source (ledger line / liability detail / lot). Viewer-role members see only entities they hold membership on — no transitive access via parent entity.</p>
+  </div>
+</div>
+</body>
+</html>

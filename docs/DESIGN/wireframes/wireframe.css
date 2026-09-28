@@ -1,0 +1,97 @@
+/*
+ * wireframe.css — low-fidelity structural styling shared by wireframes/*.html.
+ *
+ * Deliberately greyscale/box-only — structure before style. Do not reference
+ * tokens.css here; that's the point of a wireframe. Promote a screen to
+ * styled-screens/ (which does consume tokens.css + screen.css) once its
+ * layout is agreed.
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: #333;
+  background: #fafafa;
+}
+
+.wf-shell {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: 100vh;
+}
+
+.wf-sidebar {
+  border-right: 2px dashed #999;
+  padding: 16px;
+}
+
+.wf-content {
+  padding: 24px;
+}
+
+.wf-box {
+  border: 1.5px solid #999;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+.wf-box-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.wf-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.wf-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.wf-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+.wf-placeholder-text {
+  height: 8px;
+  background: #ddd;
+  border-radius: 2px;
+  margin: 4px 0;
+}
+.wf-placeholder-text.w60 { width: 60%; }
+.wf-placeholder-text.w40 { width: 40%; }
+.wf-placeholder-text.w80 { width: 80%; }
+
+.wf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed #ddd;
+}
+
+.wf-chip {
+  display: inline-block;
+  border: 1px dashed #999;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #666;
+}
+
+.wf-note {
+  font-size: 12px;
+  color: #b45309;
+  border: 1px dashed #b45309;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+h1, h2, h3 { font-weight: 600; margin: 0 0 12px; }
+.wf-nav-item { padding: 8px; border: 1px dashed #ccc; border-radius: 4px; margin-bottom: 6px; }
