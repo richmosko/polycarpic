@@ -55,7 +55,7 @@
     <p><strong>Problem.</strong> The Principal manages personal and family finances — budgeting, investment tracking, and quarterly tax estimation — across multiple legal entities (Person, Trust, Business, Household) using disconnected spreadsheets and per-provider dashboards. There is no single, continuously updated system of record that shows true financial health per entity, categorizes cash flows by tax treatment, tracks investment lots with accurate book and market value, or reliably estimates quarterly taxes.</p>
     <p><strong>Who feels it.</strong> The Principal today, as owner/operator across several entities. The Principal's spouse and other household members feel it too, once shared-access (membership) features ship — they co-own jointly-titled accounts and need their own view into household finances without owning the underlying ledger.</p>
     <p><strong>Status quo and its cost.</strong> Manual spreadsheets and per-provider dashboards (bank and brokerage sites) require hand re-entry and reconciliation — the reason the Principal wants this to grow into a virtual <strong>Single Family Office</strong> rather than continuing to patch spreadsheets together. A related prior project, <a href="https://github.com/richmosko/mosko-fintech">mosko-fintech</a>, explored some of this ground but is explicitly not the blueprint: this project starts from what the Principal wants and doesn't want (kickoff §3), not from that codebase's structure.</p>
-    <p><strong>Business outcome.</strong> A self-hosted system of record with a genuine double-entry general ledger, automated provider-agnostic transaction import, and per-entity dashboards — replacing manual reconciliation with always-current visibility into net worth, cash flow, and tax position across every entity the Principal controls.</p>
+    <p><strong>Business outcome.</strong> A self-hosted system of record with a genuine double-entry general ledger, automated provider-agnostic transaction import, and per-entity dashboards — replacing manual reconciliation with always-current visibility into net worth, cash flow, and tax position across every entity the Principal controls. Built so any self-hoster can run their own instance, though the Principal will never operate it as a hosted service for anyone else — a standing decision, not a v1-only deferral (§3).</p>
   </div>
 
   <h3 id="approach">1.1 High-Level Approach</h3>
@@ -68,11 +68,11 @@
 <section id="goals" data-section="goals">
   <h2>2. Goals &amp; Success Metrics</h2>
   <p class="section-hint">What measurable outcomes prove the product succeeded? Mix measurable (metrics) and immeasurable (feelings). Include counter-metrics where relevant. Ideally in priority order.</p>
-  <div class="stub">None of the numeric targets below are locked — see <a href="#open-questions">§10 Open Questions</a>. They're drafted from the vision documents to give the Plan phase something concrete to react to, not confirmed commitments; no source document stated a metric.</div>
+  <div class="stub">Confirmed with the Principal 2026-09-27 (see <a href="#open-questions">§10</a> for what's still Plan-phase). Dashboard-load and uptime targets live in <a href="#nonfunctional">§6 NFR</a> as provisional-accepted; the tax and reconciliation metrics below replace earlier drafts that measured the wrong thing.</div>
   <ol>
-    <li><strong>Replace spreadsheets as the system of record.</strong> Metric: <span class="tbd">by day 90 after POLY-V1 ships, 100% of the Principal's transactions for at least one entity flow through import → draft → confirm, with zero manual spreadsheet entries for that entity (target to confirm)</span>. Counter-metric: the manual-correction/reversal rate stays low enough that reconciling in-app isn't more work than the prior spreadsheet — numeric threshold TBD.</li>
-    <li><strong>Accurate quarterly estimated-tax calculation.</strong> Metric: the app's quarterly estimated-tax figure lands within <span class="tbd">an agreed variance — TBD</span> of the Principal's own manual calculation, for the first quarter after the securities/income sub-ledger ships.</li>
-    <li><strong>Reliable reconciliation.</strong> Metric: GL balance per custodial account matches the custodian's reported balance at each check (kickoff §2.6), with unmatched transfer legs clearing out of the <em>Cash in Transit</em> account within <span class="tbd">a target window — TBD</span>.</li>
+    <li><strong>Replace spreadsheets as the system of record.</strong> Metric: by day 90 after POLY-V1 ships, 100% of the Principal's transactions for at least one entity flow through import → draft → confirm, with zero manual spreadsheet entries for that entity — provisional. Counter-metric: the manual-correction/reversal rate stays low enough that reconciling in-app isn't more work than the prior spreadsheet — numeric threshold TBD.</li>
+    <li><strong>Quarterly estimated-tax payments land right.</strong> Metric: quarterly transfers into the prepaid-tax accounts (§5) match the app's guiding figure, and at filing there is no underpayment penalty. Refund/balance-due tolerance is set after the first full tax year from observed data. (Comparing to a manual calculation was dropped — filing stays in tax software, and the comparison measured nothing.)</li>
+    <li><strong>Cash in Transit stays fully explained.</strong> Metric: every open item in the <em>Cash in Transit</em> clearing account is a known in-flight transfer at each check, with zero items older than a configurable aging threshold (default 3 business days) — aged items surface on an exceptions report instead.</li>
     <li><strong>Self-hosting cost stays low</strong> — a guardrail, not a growth goal. Counter-metric: monthly third-party spend stays near zero beyond the VPS and any data providers actually in use (Plaid trial items, Resend). No dollar figure set yet.</li>
   </ol>
 </section>
@@ -90,7 +90,8 @@
     <li>User-authored report scripting — deferred until the declarative report definitions (§5) prove insufficient for a named report.</li>
     <li>Period locking of closed books — deferred; the posting-date check is designed so locking can be added later without a schema change.</li>
     <li>An MCP server exposing a user's data to their own assistant — feasible later as a thin client of the same API, authenticated with the user's own token; out of scope until the API exists.</li>
-    <li>A hosted, multi-user (non-self-hosted) offering — out of scope for v1; if ever pursued, it changes the regulatory picture materially (GLBA Safeguards Rule, state financial-privacy law, PCI DSS if card data is ever touched directly) per SecEng's read (<code>temp/seceng-research-notes.md</code>).</li>
+    <li>A hosted, multi-user offering run by the Principal — a <strong>standing</strong> non-goal, not a v1-only deferral: the app is built to be self-hostable by anyone, but the Principal will never operate it as a service for others. If that decision is ever deliberately reversed, GLBA Safeguards Rule, state financial-privacy law, and PCI DSS (if card data is ever touched directly) would likely apply (SecEng read, <code>temp/seceng-research-notes.md</code>).</li>
+    <li>Annualized-installment method for estimated taxes — only the prior-year safe-harbor and current-year-projection methods ship in v1 (§5); rate tables and the annualized-installment method itself are Plan-phase detail for the architect.</li>
   </ol>
 </section>
 
@@ -102,7 +103,7 @@
     <li>As the Principal, I want a dashboard of financial health per entity (Person, Trust, Business, Household), so that I can tell at a glance how each entity is doing without opening separate spreadsheets or provider sites.</li>
     <li>As the Principal, I want my bank and brokerage transactions imported automatically and staged as drafts, so that I can review and confirm them instead of hand-entering every transaction.</li>
     <li>As the Principal, I want categorized expense and revenue cash flows tagged by tax treatment, so that I can distinguish tax-consequence expenses from owner draws/distributions when tax season comes.</li>
-    <li>As the Principal, I want a quarterly estimated-tax calculation, so that I don't have to build that estimate by hand every quarter.</li>
+    <li>As the Principal, I want to see both the prior-year safe-harbor and current-year-projection estimated-tax figures per entity and jurisdiction (federal, state), with the penalty-safe minimum highlighted and a projected balance due at filing, so that I know how much to wire each quarter without doing the calculation by hand.</li>
     <li>As the Principal, I want lot-based tracking of my marketable securities with both GL book value and daily market value, so that I can see accurate cost basis alongside current net asset value.</li>
     <li>As the Principal, I want a balance sheet by GL account and a separate one by custodial (physical holding) account, so that I can reconcile what the ledger says against what my custodians report.</li>
     <li>As the Principal, I want an asset-allocation view with target adjustments, so that I can see how my actual holdings compare to where I want them.</li>
@@ -119,17 +120,21 @@
     <li>The system shall post a draft transaction as a journal entry on user confirmation, at which point the source transaction becomes immutable (no further update or delete).</li>
     <li>The system shall correct a posted transaction only via a reversing entry plus a new entry, never by editing the original.</li>
     <li>The system shall categorize transactions by expense/revenue category and by tax-treatment tag.</li>
-    <li>The system shall calculate a quarterly estimated-tax figure from categorized, tax-tagged cash flows.</li>
+    <li>The system shall calculate, per entity and jurisdiction (federal and state), both a prior-year safe-harbor estimate (last year's filed tax × 100%/110% by income level, split by quarter, from a manual per-entity/jurisdiction annual input) and a current-year projection (year-to-date income by tax treatment, annualized, through applicable rates), and shall highlight the penalty-safe minimum (the smaller of the two) alongside the projected balance due at filing if only the minimum is paid.</li>
+    <li>The system shall post each estimated-tax payment as a transfer from a bank account into a prepaid-tax asset account per jurisdiction (custodian = IRS or the relevant state); at filing, actual liability settles out of that prepaid asset, any shortfall is paid from cash, and any overpayment remains a receivable until refunded.</li>
+    <li>The system shall classify each entity by a tax-classification attribute (individual; trust — grantor or non-grantor; business — pass-through or C-corp) and use it to route the filing settlement as an income-tax expense (individual, non-grantor trust, C-corp) or a distribution/owner draw (grantor trust, pass-through).</li>
     <li>The system shall track marketable-security lots per custodial account, recording book value (with depreciation/amortization/return of capital) and daily end-of-day market value.</li>
     <li>The system shall render a balance sheet by GL account and a separate balance sheet by custodial account, including the custodial NAV's delta from the prior book period.</li>
     <li>The system shall render an asset-allocation view comparing actual holdings to a user-set target allocation.</li>
-    <li>The system shall match the two raw legs of an inter-account transfer into one multi-leg journal entry within a configurable date window, posting unmatched legs against a <em>Cash in Transit</em> clearing account.</li>
+    <li>The system shall recognize two raw transaction legs as one inter-account transfer at the import layer (matching within a configurable date window) and post them as one multi-leg journal entry when both legs share a posting date, or as two entries through a seeded <em>Cash in Transit</em> clearing account when dates differ (source-date entry debits Cash in Transit / credits the source account; destination-date entry debits the destination account / credits Cash in Transit) — a journal entry always has exactly one posting date. Unmatched legs post to Cash in Transit and remain open items; items older than a configurable threshold (default 3 business days) appear on an exceptions report.</li>
     <li>The system shall reconcile the GL balance of each custodial account against the custodian's reported balance.</li>
     <li>The system shall enforce that every journal entry's debits equal its credits, in the base currency.</li>
     <li>The system shall provide the seeded report templates: Balance Sheet, Income Statement, Statement of Cash Flows, custodial NAV, and NAV delta.</li>
     <li>The system shall grant data access only through a user's membership on an entity (role: owner, manager, or viewer), never through a bare user identifier; a parent entity's structure (e.g. Household over Person) never implies transitive read access — only an explicit membership grant does.</li>
     <li>The system shall store aggregator credentials (provider access tokens/URLs) encrypted at rest, exclude them from logs and API responses once stored, and provide a documented path to revoke a linked account's token at the provider, not just delete the local row.</li>
     <li>The system shall let a user export or fully delete their own data on request; deletion closes the account and purges raw imports and unposted drafts, but does not rewrite or delete posted journal entries, which remain the audit record.</li>
+    <li>The system shall record which actor (a user, an auto-post rule, or a system job) performed each draft or posted journal entry, as a first-class column, never inferred.</li>
+    <li>The system shall enforce a tested owner/manager/viewer permission matrix per entity, and keep the RLS session context safe under connection pooling — no cross-tenant reads on a reused connection.</li>
   </ul>
 </section>
 
@@ -139,16 +144,20 @@
   <table>
     <thead><tr><th>Category</th><th>Requirement</th></tr></thead>
     <tbody>
-      <tr><td>Performance</td><td class="tbd">No formal target set. Proposed: dashboard pages render in &lt;2s on the VPS deployment at single-household data scale — needs Principal confirmation.</td></tr>
-      <tr><td>Availability</td><td class="tbd">No formal target set. Self-hosted on a single Hetzner VPS; proposed informal target ~99% (occasional downtime for patching accepted) — needs Principal confirmation.</td></tr>
+      <tr><td>Performance</td><td>Provisional target, accepted by the Principal 2026-09-27: dashboard pages render in &lt;2s on the VPS deployment at single-household data scale.</td></tr>
+      <tr><td>Availability</td><td>Provisional target, accepted by the Principal 2026-09-27: ~99% on a single Hetzner VPS (occasional downtime for patching accepted).</td></tr>
       <tr><td>Security / Regulatory</td><td>
-        <p>No formal compliance regime attaches for v1: a self-hosted app serving a closed household (no public signup, no third-party customers) is not a GLBA/PCI/SOC2-covered entity. GDPR/CCPA-style data rights (export, delete) are adopted as good practice regardless of legal trigger, scoped to the immutable-ledger model (raw imports are purgeable; posted journal entries are the audit record, not deletable). If the app is ever offered to non-household users or hosted for others, GLBA Safeguards Rule and state financial-privacy law would likely apply, and PCI DSS if card data is ever handled directly (not expected — aggregators mediate) — tracked as a future-scope trigger, not a v1 requirement.</p>
+        <p><strong>Audience decision (Principal, 2026-09-27):</strong> the app is self-hostable by others, but the Principal will never host it as a service for anyone else — a standing Non-Goal (§3), not a v1-only deferral. No formal compliance regime attaches for v1: a self-hosted app with no "customer" relationship is not a GLBA/PCI/SOC2-covered entity. GDPR/CCPA-style data rights (export, delete) are adopted as good practice regardless of legal trigger, scoped to the immutable-ledger model. Re-open the regulatory question only on a deliberate later decision to host for others.</p>
+        <p>Despite no regime attaching, the Principal wants the following as <strong>hard requirements</strong>, not aspirational "good practice":</p>
         <ul>
-          <li>RLS keys on the membership join <code>(user, entity, role)</code>, never a bare <code>user_id</code> (kickoff §2.4) — hard requirement, must not regress in schema work.</li>
-          <li>Aggregator credentials (Plaid tokens, SimpleFIN URLs) and financial data (balances, transactions, holdings, memo PII) are both "sensitive personal financial data": encrypted at rest, never logged, never returned once stored.</li>
-          <li>Posted ledger rows are append-only, enforced by a database trigger — not app-logic-only, since a self-hoster may have direct DB access.</li>
-          <li>Self-hosted VPS deployment requires documented full-disk/volume encryption and an encrypted, tested backup with an explicit RPO/RTO (INFRA doc detail).</li>
+          <li>Aggregator credentials (Plaid tokens, SimpleFIN URLs) encrypted at rest, never logged, never returned in API responses once stored, with a documented provider-side revocation path.</li>
+          <li>RLS keyed on the membership join <code>(user, entity, role)</code>, never a bare <code>user_id</code> (kickoff §2.4); proven safe under connection pooling; policies cover every table including staging/draft rows and the securities lot sub-ledger, not just posted ledger tables.</li>
+          <li>A tested owner/manager/viewer permission matrix — which role can do what, per entity type.</li>
+          <li>Posted ledger rows are append-only, enforced by a database trigger, not app-logic-only; corrections are reversal-only, never edits.</li>
+          <li>An actor column (user / rule / system job) on every journal entry and draft row — who or what performed each action is never inferred.</li>
+          <li>Documented volume/full-disk encryption and encrypted, tested backups with a stated RPO/RTO, plus a novice-operator runbook — the self-host audience is a competent stranger, not a security expert.</li>
         </ul>
+        <p>Packaging consequence: install/upgrade docs and defaults must be operator-proof for a competent stranger running their own instance. Superuser/root Postgres access (which bypasses RLS by definition) is documented as an accepted risk with the instance owner as approver, not something RLS can protect against.</p>
         Full write-up: <code>temp/seceng-research-notes.md</code> (SecEng); detailed controls and threat model belong in SECURITY doc, written in Plan.
       </td></tr>
       <tr><td>Accessibility</td><td>WCAG AA target (template default; not separately discussed with the Principal).</td></tr>
@@ -192,24 +201,24 @@ flowchart LR
       <tr><td>POLY-A — Bootstrap &amp; Tooling</td><td>done (2026-09-27)</td><td>Repo scrubbed from template, tracker set up, per-agent git identity, path-ownership check, estimation loop in cairn.</td></tr>
       <tr><td>POLY-B — Research</td><td class="tbd">in progress</td><td>This PRD (v1) approved; user stories seeded to the tracker backlog.</td></tr>
       <tr><td>POLY-C — Plan</td><td class="tbd">TBD</td><td>Design system built, throwaway UX prototype at <code>prototype/</code>, ARCH doc (layers, GL build-vs-adopt decision, migration tool), SECURITY doc, INFRA doc — all as living artifacts.</td></tr>
-      <tr><td>POLY-V1 — First initiative build-out</td><td class="tbd">TBD</td><td>Entity/membership model, GL + journal entries, provider-agnostic import (fake source first) with draft→confirm, transfer matching, reconciliation, securities lot sub-ledger, seeded reports, and the per-entity dashboard all ship through Implement→Validate loops.</td></tr>
+      <tr><td>Development milestones <code>POLY-M1</code>, <code>POLY-M2</code>, … under the <code>POLY-V1</code> major</td><td>open by decision, not omission</td><td>Defined by the architect in Plan, ordered by scope not release order (entity/membership model, GL + journal entries, provider-agnostic import with draft→confirm, transfer matching, reconciliation, securities lot sub-ledger, seeded reports, per-entity dashboard). A milestone is renamed to a version (<code>POLY-0.x</code>/<code>POLY-1.0</code>) only when designated to cut a release, preserving the tracker's 1:1 milestone↔tag rule.</td></tr>
     </tbody>
   </table>
-  <p>Dates are intentionally open — this is a self-paced personal project, not a dated commercial roadmap. See <a href="#open-questions">Open Questions</a>.</p>
+  <p>Dates are open by deliberate decision, not omission: this is a self-paced personal project. Estimates come from the tracker's observed baseline after the first development milestone, not from a calendar commitment.</p>
 </section>
 
 <section id="open-questions" data-section="open-questions">
   <h2>10. Open Questions &amp; Risks</h2>
   <p class="section-hint">Every unresolved question. Every assumption that could be wrong. This drives the next conversation.</p>
   <ul>
-    <li>What numeric targets belong in §2 Goals — tax-estimate variance tolerance, reconciliation window, dashboard load-time target, uptime target? Drafted as placeholders; need the Principal's confirmation.</li>
-    <li>Resolved (SecEng, Research consult): no compliance regime applies for v1 given closed-household self-hosting — see §6. Re-open only if the Principal decides to offer this to non-household users or host it for others; that's a product call, not a security one.</li>
-    <li>Plan-phase design questions flagged by SecEng, not decided here: credential-encryption mechanism (envelope vs. pgcrypto vs. external secrets manager) and key rotation for a self-hoster with no KMS; how RLS session context is set safely under connection pooling; the owner/manager/viewer authorization test matrix; backup-encryption key custody. See <code>temp/seceng-research-notes.md</code> for the full list — feeds SECURITY doc.</li>
-    <li>General ledger: build a home-grown schema (borrowing from <a href="https://github.com/richmosko/mosko-fintech">mosko-fintech</a>) vs. adopt a library that manages tables inside our own Postgres — a Plan-phase research step owned by the architect (kickoff §2.5).</li>
-    <li>Database migration tool — Drizzle is the leading candidate; the architect confirms against the <code>mosko-fintech</code> incumbent (kickoff §2.13).</li>
-    <li>Bloat-signal thresholds (gate cycles over estimate, token ratio) are set only after the first milestone's baseline (kickoff §2.12) — no number yet.</li>
-    <li>Timeline dates: does the Principal want target dates on any milestone, or is fully self-paced sequencing (as drafted in §9) the intended mode for the whole project?</li>
-    <li>Which of the 8 user stories in §4 are the actual first slice for the next Implement→Validate loops, vs. sequenced later within <code>POLY-V1</code>? Drafted here at initiative grain; per-story sequencing happens when the architect and team-lead break <code>POLY-V1</code> into milestones/issues.</li>
+    <li>Resolved (Principal, 2026-09-27): the app is self-hostable by others but the Principal never hosts it as a service — a standing Non-Goal (§3), not a v1-only deferral. No compliance regime (GLBA/PCI/SOC2) applies for v1 as a result (SecEng, §6). Re-open only on a deliberate later decision to host for others.</li>
+    <li>Resolved (Principal, 2026-09-27): timeline is fully self-paced — milestones ordered by definition of done, no target dates. Estimates come from the tracker's observed baseline after the first development milestone (§9).</li>
+    <li>Plan-phase: credential-encryption mechanism (envelope vs. pgcrypto vs. external secrets manager) and key rotation for a self-hoster with no KMS; how RLS session context is set safely under connection pooling; the owner/manager/viewer authorization test matrix; backup-encryption key custody. See <code>temp/seceng-research-notes.md</code> — feeds SECURITY doc.</li>
+    <li>Plan-phase: general ledger — build a home-grown schema (borrowing from <a href="https://github.com/richmosko/mosko-fintech">mosko-fintech</a>) vs. adopt a library that manages tables inside our own Postgres (kickoff §2.5), owned by the architect.</li>
+    <li>Plan-phase: database migration tool — Drizzle is the leading candidate; the architect confirms against the <code>mosko-fintech</code> incumbent (kickoff §2.13).</li>
+    <li>Plan-phase: bloat-signal thresholds (gate cycles over estimate, token ratio) are set only after the first milestone's baseline (kickoff §2.12) — no number yet.</li>
+    <li>Plan-phase: which of the 8 user stories in §4 are the actual first slice for the next Implement→Validate loops, vs. sequenced later within <code>POLY-V1</code>. Drafted here at initiative grain; the architect and team-lead sequence it when breaking <code>POLY-V1</code> into milestones/issues.</li>
+    <li>Not an assumption — needs the Principal's CPA: confirm trust (grantor vs. non-grantor) and pass-through filing treatment for the Principal's actual entities before the tax-classification attribute (§5) is relied on.</li>
   </ul>
 </section>
 
