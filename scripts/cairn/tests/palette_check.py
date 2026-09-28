@@ -21,7 +21,7 @@ contrast figures reproduced exactly):
    make roles look ranked.
 
 Deliberately NOT covered: CVD/deuteranopia simulation. That stays a
-design-time check documented in `docs/DESIGN/design-system-spec.md` -- it
+design-time check documented in `scripts/cairn/board/theme/design-system-spec.md` -- it
 needs simulation matrices, and reimplementing them here would be a second
 unverified implementation checking a second unverified implementation.
 

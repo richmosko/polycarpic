@@ -248,7 +248,7 @@ export function formatCaption(
 // changes). The 8 hue values AND this membership list were an escalated
 // design-system decision (ux-designer's token proposal, commit fd6df5c;
 // mechanism amendment 962f3e9 unblocked applying it) -- see
-// docs/DESIGN/design-system-spec.md § Categorical role palette (PT-79)
+// scripts/cairn/board/theme/design-system-spec.md § Categorical role palette (PT-79)
 // for the full derivation/evidence. Order here matches app.css's
 // --chart-role-1..8 index exactly (position 0 -> --chart-role-1, etc.).
 // `frontend-lead`/`backend-lead` were considered and explicitly folded
