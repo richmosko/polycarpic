@@ -20,6 +20,13 @@ import re
 import unittest
 from pathlib import Path
 
+# POLY-80 (team-lead's gate-1 correction): the pinned-ruling-file list
+# below must be DERIVED from test_ruling_archive_records.py's own
+# RULING_BLOBS, not hand-typed a second time -- a sibling tests/workflow/
+# import, not scripts/cairn/ or helpers, so NoWorkflowTestTouchesCairnTests
+# below (which forbids exactly those two) does not apply to it.
+import test_ruling_archive_records
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CAIRN_TESTS_DIR = REPO_ROOT / "scripts" / "cairn" / "tests"
 WORKFLOW_TESTS_DIR = REPO_ROOT / "tests" / "workflow"
@@ -273,13 +280,11 @@ class CiExcludePatternTests(unittest.TestCase):
                 self.assertFalse(self._run([p]), f"{p} alone must not trigger the cairn job")
 
     def test_still_relevant_paths_give_run_true(self):
-        for p in [
-            "process/WORKFLOW.md", "process/TRACKER.md",
-            "process/cairn/config.yml", "scripts/cairn/cairn.py",
-            "process/cairn/reviews/POLY-6/ruling.md", "process/cairn/reviews/POLY-10/ruling.md",
-            "process/cairn/reviews/POLY-26/ruling.md", "process/cairn/reviews/POLY-48/ruling.md",
-            "process/cairn/reviews/POLY-51/ruling.md",
-        ]:
+        pinned_paths = [
+            f"process/cairn/reviews/{issue_id}/ruling.md"
+            for issue_id in sorted(test_ruling_archive_records.RULING_BLOBS)
+        ]
+        for p in ["process/WORKFLOW.md", "process/TRACKER.md", "process/cairn/config.yml", "scripts/cairn/cairn.py"] + pinned_paths:
             with self.subTest(path=p):
                 self.assertTrue(self._run([p]), f"{p} must still trigger the cairn job")
 
@@ -325,13 +330,15 @@ class PinnedRulingFilesSurviveExcludeTests(unittest.TestCase):
     pinned ruling file is ever excluded rather than folding that case
     into CiExcludePatternTests' general lists above.
 
-    PINNED_IDS below is a literal copy of
-    test_ruling_archive_records.RULING_BLOBS's keys (POLY-6/10/26/48/51)
-    -- not imported, matching this file's own established no-cross-file-
-    import convention (see NoWorkflowTestTouchesCairnTests) -- so keep the
-    two lists in sync by hand if RULING_BLOBS ever changes."""
+    PINNED_IDS is DERIVED from test_ruling_archive_records.RULING_BLOBS's
+    own keys (team-lead's gate-1 correction: not hand-typed a second time
+    -- a hand copy is exactly how ci.yml's own PINNED_RULINGS regex could
+    drift from RULING_BLOBS undetected). Add a ruling to RULING_BLOBS and
+    this class's tests automatically cover it; no second edit needed
+    here, only in ci.yml's own PINNED_RULINGS literal (which this class's
+    tests below fail loudly against if it isn't kept in sync)."""
 
-    PINNED_IDS = ("POLY-6", "POLY-10", "POLY-26", "POLY-48", "POLY-51")
+    PINNED_IDS = tuple(sorted(test_ruling_archive_records.RULING_BLOBS))
 
     def setUp(self):
         if not CI_WORKFLOW.is_file():
@@ -352,6 +359,28 @@ class PinnedRulingFilesSurviveExcludeTests(unittest.TestCase):
         self.assertIsNotNone(m_exclude, "the changes step has no EXCLUDE='...' literal")
         self.assertIsNotNone(m_pinned, "the changes step has no PINNED_RULINGS='...' literal")
         return re.compile(m_exclude.group(1)), re.compile(m_pinned.group(1))
+
+    def test_every_ruling_blobs_path_is_a_trigger(self):
+        # The end-to-end claim, not just "PINNED_RULINGS matches the
+        # path": runs the FULL PATTERN_HIT-or-PINNED_HIT decision (same
+        # shape as CiExcludePatternTests._run) for every path
+        # RULING_BLOBS names, straight off the live dict -- not PINNED_IDS,
+        # so this test alone would still catch a RULING_BLOBS entry this
+        # class's own derivation somehow missed.
+        m_pattern = re.search(r"PATTERN='([^']*)'", self.block)
+        self.assertIsNotNone(m_pattern, "the changes step has no PATTERN='...' literal")
+        pattern_re = re.compile(m_pattern.group(1))
+        exclude_re, pinned_re = self._regexes()
+        for issue_id in test_ruling_archive_records.RULING_BLOBS:
+            path = f"process/cairn/reviews/{issue_id}/ruling.md"
+            with self.subTest(path=path):
+                relevant = exclude_re.search(path) is None
+                pattern_hit = relevant and pattern_re.search(path) is not None
+                pinned_hit = pinned_re.search(path) is not None
+                self.assertTrue(
+                    pattern_hit or pinned_hit,
+                    f"{path} (from RULING_BLOBS) does not trigger the cairn job",
+                )
 
     def test_every_pinned_ruling_file_would_otherwise_be_excluded(self):
         # Sanity/control: proves this guard exercises a REAL carve-out,
