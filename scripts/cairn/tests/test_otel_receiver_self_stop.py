@@ -869,7 +869,7 @@ class LivenessReapTests(unittest.TestCase):
 
     def test_a_dead_pid_with_a_fresh_transcript_is_reaped_too(self):
         # INVERTED per POLY-49 gate-1 ruling §4 (architect,
-        # process/reviews/POLY-49/ruling.md): "Liveness = pid, every
+        # process/cairn/reviews/POLY-49/ruling.md): "Liveness = pid, every
         # tick... The transcript-staleness second signal (PT-86 addendum
         # C) is WITHDRAWN from the reap predicate -- AC7 requires drop
         # within one beat of pid exit." A dead pid, even with a

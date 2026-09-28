@@ -12,7 +12,7 @@ around the server's own serve loop with no interval set.
 
 Writer boundary (ruling): implementation-lead owns tests/helpers.py and
 the 14 call-site files; qa-engineer owns this file, test_run_tests.py's
-AC6 addition, and process/reviews/PT-96/mutations.md. Nothing here edits
+AC6 addition, and process/cairn/reviews/PT-96/mutations.md. Nothing here edits
 helpers.py or a call-site file.
 """
 from __future__ import annotations

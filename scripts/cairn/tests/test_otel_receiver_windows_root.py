@@ -1,4 +1,4 @@
-"""POLY-59 gate-1 ruling §1 (process/reviews/POLY-59/ruling.md @ d9a966c):
+"""POLY-59 gate-1 ruling §1 (process/cairn/reviews/POLY-59/ruling.md @ d9a966c):
 pins that `otel_receiver.py --ingest` computes `milestone_windows` against
 the MAIN CHECKOUT's `process/cairn/`, never a linked worktree's own
 (possibly divergent) copy -- a regression test, not a bug-fix test: the

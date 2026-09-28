@@ -2,7 +2,7 @@
 helpers with no dependency on any other cairnlib module.
 
 Extracted verbatim from cairn.py (POLY-58 ruling §2 step 1). See
-process/reviews/POLY-58/ruling.md for the split's design and cairn.py's
+process/cairn/reviews/POLY-58/ruling.md for the split's design and cairn.py's
 own module docstring for the project this belongs to.
 """
 

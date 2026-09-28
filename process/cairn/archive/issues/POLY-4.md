@@ -24,8 +24,8 @@ prints `OK`; `FORCE_COLOR=0 NO_COLOR=1` is the current workaround. A gate that
 lies about its result is worse than one that fails.
 
 **2. Six pre-existing failing files left by the template scrub** (kickoff
-§ 2.2): `test_test_run_hooks.py` (missing `process/reviews/PT-97` fixture,
-deleted with `process/reviews/`), `test_backfill_tokens.py`,
+§ 2.2): `test_test_run_hooks.py` (missing `process/cairn/reviews/PT-97` fixture,
+deleted with `process/cairn/reviews/`), `test_backfill_tokens.py`,
 `test_otel_receiver.py` (cwd / prefix resolution), `test_state_releases_bound.py`
 (STATE.md Releases row format), `test_agent_setting_role.py` (backfill role
 matrix keyed on scrubbed `PT-301`–`PT-306` fixtures; resolves everything to

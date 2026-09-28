@@ -13,7 +13,7 @@ created: 2026-09-25
 updated: 2026-09-25
 ---
 
-`scripts/cairn/design/` mixes three things: one living design note (`estimation.md`), five loop-scoped gate-1 rulings (POLY-6, POLY-10, POLY-26, POLY-48, POLY-51), and vendored board theme data from the template (`variants.json`, `gen_variants.py`, `NOTICE.md`, `bootstrap.snippet.html`). The rulings landed there by precedent, not by rule: WORKFLOW.md says a ruling is an issue comment within the 40-line budget, with overflow in `process/reviews/<ID>/`.
+`scripts/cairn/design/` mixes three things: one living design note (`estimation.md`), five loop-scoped gate-1 rulings (POLY-6, POLY-10, POLY-26, POLY-48, POLY-51), and vendored board theme data from the template (`variants.json`, `gen_variants.py`, `NOTICE.md`, `bootstrap.snippet.html`). The rulings landed there by precedent, not by rule: WORKFLOW.md says a ruling is an issue comment within the 40-line budget, with overflow in `process/cairn/reviews/<ID>/`.
 
 **User decisions (2026-09-25):**
 - Cairn's docs stay inside `scripts/cairn/` (they travel with a spin-off) but the directory is `docs/`, not `design/`.
@@ -26,9 +26,9 @@ updated: 2026-09-25
 
 - [ ] `scripts/cairn/design/` is gone; `scripts/cairn/docs/` holds `estimation.md` and a README of at most ten lines saying what belongs there (living docs only)
 - [ ] Vendored theme data moves under the board directory that consumes it; `gen_variants.py` and every reference still resolve
-- [ ] The five ruling files move to `process/reviews/<ID>/ruling.md` unchanged; every path reference in TRACKER.md, WORKFLOW.md, and issue files points at the new location
+- [ ] The five ruling files move to `process/cairn/reviews/<ID>/ruling.md` unchanged; every path reference in TRACKER.md, WORKFLOW.md, and issue files points at the new location
 - [ ] Living docs corrected in place only where a ruling changed a stated behaviour, one sentence each; diff of TRACKER.md and estimation.md reviewed line by line against that rule
-- [ ] WORKFLOW.md and the architect agent file gain one line each: a ruling is an issue comment within budget, or `process/reviews/<ID>/ruling.md`; never a file under `scripts/cairn/docs/`
+- [ ] WORKFLOW.md and the architect agent file gain one line each: a ruling is an issue comment within budget, or `process/cairn/reviews/<ID>/ruling.md`; never a file under `scripts/cairn/docs/`
 - [ ] Tests, `cairn check`, and the docs links all pass after the moves
 - [ ] `scripts/cairn/docs/estimation.md` is pruned to current behaviour (user decision 2026-09-25, in this loop): history, rationale, loop narratives, and superseded rules go; every statement that remains is true now, and no behaviour statement is lost
 
@@ -40,15 +40,15 @@ Feature started. Branch: `feature/poly-57-cairn-docs-cleanup`.
 
 ### @architect — 2026-09-25
 
-**Gate-1 ruling (POLY-57a), base `f686787`.** Reference list, tests, and thresholds: `process/reviews/POLY-57/ruling.md`.
+**Gate-1 ruling (POLY-57a), base `f686787`.** Reference list, tests, and thresholds: `process/cairn/reviews/POLY-57/ruling.md`.
 
-1. **Split.** Living: `estimation.md` → `scripts/cairn/docs/`. Rulings, moved unchanged (`git mv`, blob shas pinned in ruling.md §1): test-boundary-ci → `process/reviews/POLY-6/ruling.md`, telemetry-attribution → POLY-10, backfill-sibling-scan → POLY-26, estimation-engine-fixes → POLY-48, sub-issue-letter-ids → POLY-51. Theme data (`variants.json`, `gen_variants.py`, `NOTICE.md`, `bootstrap.snippet.html`) → `scripts/cairn/board/theme/`; `gen_variants.py` resolves `cairn_dir = SCRIPT_DIR.parents[1]`, and its three emitted headers are regenerated. `dist/index.html` L14–16 is edited by hand alongside `dashboard/index.html` (no `node_modules`, measured). Done means the ruling.md §2 `git grep` predicate returns nothing.
+1. **Split.** Living: `estimation.md` → `scripts/cairn/docs/`. Rulings, moved unchanged (`git mv`, blob shas pinned in ruling.md §1): test-boundary-ci → `process/cairn/reviews/POLY-6/ruling.md`, telemetry-attribution → POLY-10, backfill-sibling-scan → POLY-26, estimation-engine-fixes → POLY-48, sub-issue-letter-ids → POLY-51. Theme data (`variants.json`, `gen_variants.py`, `NOTICE.md`, `bootstrap.snippet.html`) → `scripts/cairn/board/theme/`; `gen_variants.py` resolves `cairn_dir = SCRIPT_DIR.parents[1]`, and its three emitted headers are regenerated. `dist/index.html` L14–16 is edited by hand alongside `dashboard/index.html` (no `node_modules`, measured). Done means the ruling.md §2 `git grep` predicate returns nothing.
 2. **Stale statements.** POLY-6, POLY-10, POLY-26, POLY-51: none (measured: their TRACKER text already landed). POLY-48: two.
    - `estimation.md` §2 Tokens: `from_ts < generated <= close_ts` → `from_ts < generated <= to_ts   (to_ts = close_ts; with --at, the first otel flush within 1800 s after it)`.
    - `TRACKER.md` L419: "An issue's `paths:` list declares" → "An issue's `paths:`, unioned with the `paths:` of every other issue sharing its `parent` and `assignee`, declares" (the rest of the sentence is unchanged).
 3. **One line each.** Both `process/WORKFLOW.md` (after the "Rulings live in the file" bullet, L242) and `.claude/agents/architect.md` (after the "Comment budget" bullet in → Rulings) get this line:
    ```
-   - **A ruling is an issue comment within budget, or `process/reviews/<ID>/ruling.md`**; never a file under `scripts/cairn/docs/`.
+   - **A ruling is an issue comment within budget, or `process/cairn/reviews/<ID>/ruling.md`**; never a file under `scripts/cairn/docs/`.
    ```
 4. **`scripts/cairn/docs/README.md`**, verbatim:
    ```
@@ -58,7 +58,7 @@ Feature started. Branch: `feature/poly-57-cairn-docs-cleanup`.
    When a statement stops being true, correct it in place.
 
    Not here:
-   - Gate rulings: an issue comment, or `process/reviews/<ID>/ruling.md`.
+   - Gate rulings: an issue comment, or `process/cairn/reviews/<ID>/ruling.md`.
    - History, rationale, agent prose: the issue file and the git log.
    - Vendored theme data: `../board/theme/`.
    ```
@@ -91,7 +91,7 @@ AC amended in place (user decision 2026-09-25): `estimation.md` is pruned to cur
 | WORKFLOW.md / architect.md | one ruled line each (after L242 / after Comment budget) + 1 WORKFLOW link edit | same diff |
 | docs/README.md | 9 lines, verbatim from the ruling | `367be73` |
 | docs/estimation.md | 770 → 275; ruled formula + path kept; prune accepted by lead at 367be73 | POLY-57e |
-| Ruling blobs | POLY-6/10/26/48/51 blobs = ruling.md §1 pins | `git ls-tree -r 367be73 process/reviews` |
+| Ruling blobs | POLY-6/10/26/48/51 blobs = ruling.md §1 pins | `git ls-tree -r 367be73 process/cairn/reviews` |
 | §2 predicate (addendum 2) | no hits | `git grep` at 367be73 |
 | design/ gone; theme under board/theme/ | yes | `git ls-tree` |
 | Generator | runs, tree clean after | `gen_variants.py`; `git status` |

@@ -1,5 +1,5 @@
 """POLY-6 gate-red (qa-engineer), pinned to the architect's gate-1 ruling
-(process/reviews/POLY-6/ruling.md @ 615b94e). This file lives
+(process/cairn/reviews/POLY-6/ruling.md @ 615b94e). This file lives
 under `tests/workflow/` itself, so it is subject to its own guard
 (NoWorkflowTestTouchesCairnTests below) -- it must never import `cairn`,
 `helpers`, or put `scripts/cairn` on `sys.path`.

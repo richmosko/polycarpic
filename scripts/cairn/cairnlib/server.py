@@ -532,7 +532,7 @@ def make_server(
                 "pr": None,
             }
             # PT-52 §3 / POLY-51 ruling §2 / POLY-48 item 7 (gate-1 ruling
-            # process/reviews/POLY-48/ruling.md §1, "confirmed as filed"):
+            # process/cairn/reviews/POLY-48/ruling.md §1, "confirmed as filed"):
             # allocate_and_create_issue raises one of three named errors,
             # each caught before the plain-`CairnError` fallback (both
             # subclass it) so they map to distinct, truthful HTTP codes:

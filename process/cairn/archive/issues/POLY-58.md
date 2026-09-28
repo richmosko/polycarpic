@@ -13,7 +13,7 @@ created: 2026-09-25
 updated: 2026-09-27
 ---
 
-`scripts/cairn/cairn.py` is 7,400 lines and 167 top-level definitions in one file; parallel loops touching cairn collide in it, and no module tests alone. The architect's boundary sketch (13 modules under a `scripts/cairn/cairnlib/` package, leaves-first extraction order, test mapping) is in `process/reviews/POLY-57/ruling.md` §6. `cairn.py` stays the CLI entry and a re-export facade, so `import cairn` keeps working for tests and for `backfill_tokens.py`, `otel_receiver.py`, `loop_stats.py`.
+`scripts/cairn/cairn.py` is 7,400 lines and 167 top-level definitions in one file; parallel loops touching cairn collide in it, and no module tests alone. The architect's boundary sketch (13 modules under a `scripts/cairn/cairnlib/` package, leaves-first extraction order, test mapping) is in `process/cairn/reviews/POLY-57/ruling.md` §6. `cairn.py` stays the CLI entry and a re-export facade, so `import cairn` keeps working for tests and for `backfill_tokens.py`, `otel_receiver.py`, `loop_stats.py`.
 
 ## Acceptance criteria
 
@@ -32,7 +32,7 @@ Feature started. Branch: `feature/poly-58-cairn-split`.
 
 ### @architect — 2026-09-26
 
-**Gate 1 — ruling.** Full text: `process/reviews/POLY-58/ruling.md`; measurement script `graph.py`
+**Gate 1 — ruling.** Full text: `process/cairn/reviews/POLY-58/ruling.md`; measurement script `graph.py`
 and the derived name→module list `owners.txt` beside it. Every claim there cites its command (M1–M13)
 or is tagged `(unmeasured)`. Acceptance criteria amended in place.
 
@@ -62,7 +62,7 @@ or is tagged `(unmeasured)`. Acceptance criteria amended in place.
 ### @architect — 2026-09-26
 
 **Gate 4 — verdict on `94e3a83`: PASS, one doc fix required before merge.** Harnesses:
-`process/reviews/POLY-58/verdict_mutations.py`, `verdict_percommit.sh`.
+`process/cairn/reviews/POLY-58/verdict_mutations.py`, `verdict_percommit.sh`.
 
 | Axis | Result | Evidence |
 |---|---|---|

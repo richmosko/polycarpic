@@ -2,7 +2,7 @@
 """
 run_tests.py — PT-93: file-level parallel runner for the cairn Python suite.
 
-Measured (process/reviews/PT-93/timings.md, sha 5fd6db1, 10 logical cores):
+Measured (process/cairn/reviews/PT-93/timings.md, sha 5fd6db1, 10 logical cores):
 serial `unittest discover` is 171 s wall against 79 s of CPU (spawn/sleep-
 bound, not CPU-bound), because ~30 of 82 files spawn real servers/daemons
 or build fresh git-repo fixtures. `unittest` itself has no file-level
@@ -94,7 +94,7 @@ from worktree_root import _resolve_worktree_main_checkout  # noqa: F401 -- POLY-
 SCRIPT_DIR = Path(__file__).resolve().parent
 TESTS_DIR = SCRIPT_DIR / "tests"
 
-# POLY-6 gate-1 ruling (process/reviews/POLY-6/ruling.md @ 615b94e,
+# POLY-6 gate-1 ruling (process/cairn/reviews/POLY-6/ruling.md @ 615b94e,
 # section (a) Mechanics): "a second root in run_tests.py, not a separate
 # entry point" -- one command keeps one gate, one ledger row, and leaves
 # test_run_guard/test_run_record, the settings prefilter, and both skills'

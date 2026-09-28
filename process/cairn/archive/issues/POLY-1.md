@@ -69,7 +69,7 @@ Author: implementation-lead <implementation-lead@agents.polycarpic.local> (git l
 
 Targeted files pass: test_agent_git_identity.py, test_agent_worktree_protocol_block.py (both green).
 
-Full-suite --gate green run (98 files, 1671 tests): 5 pre-existing failures unrelated to POLY-1 -- test_test_run_hooks.py (missing process/reviews/PT-97 fixture, deleted by the template scrub per kickoff Section 2.2), test_backfill_tokens.py, test_otel_receiver.py (cwd/prefix resolution), test_state_releases_bound.py (STATE.md Releases row format). None touch git identity, the worktree-protocol block, or settings.json.
+Full-suite --gate green run (98 files, 1671 tests): 5 pre-existing failures unrelated to POLY-1 -- test_test_run_hooks.py (missing process/cairn/reviews/PT-97 fixture, deleted by the template scrub per kickoff Section 2.2), test_backfill_tokens.py, test_otel_receiver.py (cwd/prefix resolution), test_state_releases_bound.py (STATE.md Releases row format). None touch git identity, the worktree-protocol block, or settings.json.
 
 Infra note: run_tests.py's stderr summary regex does not tolerate ANSI-colorized unittest output; FORCE_COLOR=3 leaking from this tmux shell made every file appear to error until the run was forced with FORCE_COLOR=0 NO_COLOR=1. Not fixed here (out of POLY-1 scope) -- flagging for whoever owns run_tests.py.
 

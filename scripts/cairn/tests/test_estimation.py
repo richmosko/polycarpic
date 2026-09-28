@@ -588,7 +588,7 @@ class CloseRefusesFromWorktreeTests(CloseCommandTestBase):
         before_raw = issue_path.read_bytes()
 
         r = cairn_cmd(self.worktree_root, self.worktree_data_dir, "close", "PT-9", "--no-flush")
-        # Ruling (process/reviews/POLY-48/ruling.md §1(d)): exit 2, exactly.
+        # Ruling (process/cairn/reviews/POLY-48/ruling.md §1(d)): exit 2, exactly.
         self.assertEqual(r.returncode, 2, r.stdout + r.stderr)
         self.assertIn(str(self.root), r.stdout + r.stderr)
 
@@ -1380,7 +1380,7 @@ class AtCeilingValidationTests(StageWindowTestBase):
 
 
 class AtCeilingAdmitsTrailingFlushTests(StageWindowTestBase):
-    """POLY-47 (gate-1 ruling §1(b), process/reviews/POLY-48/ruling.md):
+    """POLY-47 (gate-1 ruling §1(b), process/cairn/reviews/POLY-48/ruling.md):
     `--at <sha>`'s token ceiling admits the first flush
     `generated` after the commit's own author time, provided it lands
     within 1800s (the receiver's own DEFAULT_FLUSH_INTERVAL_SECONDS) --
@@ -1413,7 +1413,7 @@ class AtCeilingAdmitsTrailingFlushTests(StageWindowTestBase):
 
     def test_a_transcript_backfill_line_does_not_count_as_the_flush(self):
         # Addendum 1 (architect's review of d1f2e08,
-        # process/reviews/POLY-48/ruling.md): a
+        # process/cairn/reviews/POLY-48/ruling.md): a
         # transcript-backfill line's `generated` is the backfill RUN
         # time, not a flush -- the candidate set for the ceiling is
         # `source == "otel"` lines only. Measured on d1f2e08: a backfill

@@ -59,7 +59,7 @@ Each item below was proposed by the team-lead and confirmed by the Principal. Ra
 
 The repo is a straight copy of `project_template` **v0.12.2** and carries the template's own history. Scrub:
 
-1. Delete `process/cairn/archive/` (120 template issues, 16 milestones), `process/cairn/metrics/*` (template telemetry), `process/reviews/`, `process/TEMPLATE_DECISIONS.md`, `docs/starting-prompt.md`.
+1. Delete `process/cairn/archive/` (120 template issues, 16 milestones), `process/cairn/metrics/*` (template telemetry), `process/cairn/reviews/`, `process/TEMPLATE_DECISIONS.md`, `docs/starting-prompt.md`.
 2. Run `/setup-tracker`: prefix `POLY`, replace the template's founding major with this project's, set `stop-at-merge`.
 3. Record template version **v0.12.2** in `process/STATE.md` → Releases and in `process/DECISIONS.md` → "Bootstrapped from", so future template updates can be diffed against a known base. (The manifesto's "STATUS.md" means `process/STATE.md`.)
 4. **Keep** the `PT-nn` citations in `scripts/cairn/`, `.claude/agents/*.md`, and `process/WORKFLOW.md` — they are pointers into the template repo, not stale state, and they help when porting template updates.
