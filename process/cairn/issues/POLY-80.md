@@ -1,6 +1,6 @@
 ---
 id: POLY-80
-title: Retire process/reviews: rulings live in the tracker record; hand-offs never committed
+title: Retire process/reviews; rulings in the tracker record
 status: todo
 milestone: null
 parent: null

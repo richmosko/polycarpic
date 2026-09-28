@@ -1,6 +1,6 @@
 ---
 id: POLY-74
-title: CI: change filter runs the full suite for process/ and docs/ paths no test reads
+title: CI change filter runs the full suite for paths no test reads
 status: todo
 milestone: null
 parent: null
