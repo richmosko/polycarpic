@@ -50,34 +50,18 @@
 
   <pre class="mermaid">
 flowchart LR
-  principal(["Principal (entity owner)"])
-  member(["Household member (viewer / manager)"])
-  native(["iOS / macOS client (later)"])
-  mcp(["User-scoped MCP server (future)"])
-  operator(["Self-host operator"])
-
-  subgraph box["Polycarpic instance (one VPS, or Vercel + Neon)"]
-    app["SvelteKit app: web UI + /api/v1"]
-    worker["Worker: scheduled idempotent jobs"]
-    db[("PostgreSQL: GL + RLS")]
+  users(["Users"]) -->|HTTPS| app
+  clients(["Native, MCP<br/>(later)"]) -->|token| app
+  subgraph inst["Polycarpic instance"]
+    app["Web app<br/>+ API"]
+    worker["Worker"]
+    db[("PostgreSQL")]
   end
-
-  principal -->|HTTPS, session cookie| app
-  member -->|HTTPS, session cookie| app
-  native -->|HTTPS, bearer token| app
-  mcp -->|HTTPS, user bearer token| app
-  operator -->|SSH, compose, runbook| box
-
-  app --- db
-  worker --- db
-
-  worker -->|pull transactions| agg["Aggregators: fake, SimpleFIN, Plaid"]
-  worker -->|pull positions / trades| brokers["Broker APIs: Schwab, IBKR (later)"]
-  worker -->|EOD prices| prices["EOD price provider (TBD)"]
-  worker -->|CPI-U series| bls["BLS API v2"]
-  app -->|OAuth 2.0| idp["Google, Apple, GitHub"]
-  app -->|transactional email| resend["Resend"]
-  box -->|encrypted backups| backup[("Off-box backup store")]
+  app --> idp["Login IdPs,<br/>Resend"]
+  app --> db
+  worker --> db
+  db -.-> backup[("Off-box<br/>backup")]
+  worker --> ext["Banks, brokers,<br/>prices, BLS"]
   </pre>
 </section>
 
@@ -90,40 +74,15 @@ flowchart LR
   <p>Kickoff §3 asks for layers defined before details, depending only downward, with narrow interfaces. The model below is the contract. <strong>Rule:</strong> a package may import only packages in a strictly lower layer or in its own layer's shared <code>contracts</code>; <code>packages/*</code> never import SvelteKit; only <code>packages/db</code> opens connections, and only through <code>withTenant()</code> / <code>withSystem()</code> (see <a href="#rls">§3.3</a>). Enforced by <code>eslint-plugin-boundaries</code> (or <code>dependency-cruiser</code>) in CI.</p>
 
   <pre class="mermaid">
-flowchart TB
-  subgraph L6["L6 Delivery"]
-    web["apps/web: SvelteKit UI + /api/v1 + OpenAPI"]
-    wrk["apps/worker: job scheduler"]
-    ui["packages/ui: shadcn-svelte + DESIGN tokens"]
-  end
-  subgraph L5["L5 Insight"]
-    reports["packages/reports: declarative report engine"]
-    tax["packages/tax: estimated-tax accrual"]
-    portfolio["packages/portfolio: NAV, allocation, real-vs-nominal"]
-  end
-  subgraph L4["L4 Posting"]
-    posting["packages/posting: draft to confirm, rules, transfer matching, reconciliation"]
-  end
-  subgraph L3["L3 Books"]
-    ledger["packages/ledger: CoA, journal entries, reversal"]
-    securities["packages/securities: lots, lot matching, holdings"]
-  end
-  subgraph L2["L2 Sources"]
-    importer["packages/import: adapter interface, raw rows, hash de-dup"]
-    adapters["packages/import-fake, -simplefin, -plaid ..."]
-    refdata["packages/refdata: prices, CPI, tax tables"]
-  end
-  subgraph L1["L1 Identity and tenancy"]
-    auth["packages/auth: BetterAuth config"]
-    tenancy["packages/tenancy: entity, type, membership, permission matrix"]
-    secrets["packages/secrets: credential sealing"]
-  end
-  subgraph L0["L0 Platform"]
-    dbp["packages/db: Drizzle schema, migrations, roles, withTenant"]
-    pg[("PostgreSQL")]
-  end
-
-  L6 --> L5 --> L4 --> L3 --> L2 --> L1 --> L0
+block-beta
+  columns 4
+  L6["L6 Delivery"] web["Web + API"] wrk["Worker"] ui["UI kit"]
+  L5["L5 Insight"] rep["Reports"] tax["Tax"] pf["Portfolio"]
+  L4["L4 Posting"] post["Drafts, rules, matching, reconciliation"]:3
+  L3["L3 Books"] led["Ledger"] sec["Securities"]:2
+  L2["L2 Sources"] imp["Import + adapters"] ref["Reference data"]:2
+  L1["L1 Identity"] auth["Auth"] ten["Tenancy"] secr["Secrets"]
+  L0["L0 Platform"] dbp["DB access, migrations, PostgreSQL"]:3
   </pre>
 
   <p><strong>Why import sits below the books.</strong> Kickoff §2.6 calls import "the lowest non-infrastructure layer". That holds for the <em>raw</em> side — adapters, the raw-transaction store and de-dup depend on nothing domain-level, so they sit at L2. Confirmation, rules and transfer matching need both raw rows and the ledger, so they are split into <code>posting</code> (L4). This keeps "raw data arrives first" true while dependencies stay strictly downward. The ledger never imports the importer: a journal entry carries an opaque <code>source_ref</code>; the two-way link and the posted-status flip happen inside one database transaction owned by <code>posting</code>.</p>
@@ -184,29 +143,21 @@ flowchart TB
   <pre class="mermaid">
 erDiagram
   USER ||--o{ MEMBERSHIP : holds
-  ENTITY ||--o{ MEMBERSHIP : "grants access via"
-  ENTITY_TYPE ||--o{ ENTITY : classifies
-  ENTITY |o--o{ ENTITY : "parent of (reporting lens only)"
-  ENTITY ||--o{ ACCOUNT : "chart of accounts"
-  ACCOUNT |o--o{ ACCOUNT : "parent (category / account / sub-account)"
+  ENTITY ||--o{ MEMBERSHIP : grants
+  ENTITY ||--o{ ACCOUNT : owns
   ENTITY ||--o{ JOURNAL_ENTRY : books
-  JOURNAL_ENTRY ||--|{ JOURNAL_LINE : "2..n legs"
+  JOURNAL_ENTRY ||--|{ JOURNAL_LINE : "2+ legs"
   ACCOUNT ||--o{ JOURNAL_LINE : posts
-  JOURNAL_ENTRY |o--o| JOURNAL_ENTRY : reverses
-  PROVIDER_CONNECTION ||--o{ LINKED_ACCOUNT : exposes
-  LINKED_ACCOUNT }o--|| ACCOUNT : "maps to custodial"
-  LINKED_ACCOUNT ||--o{ RAW_TRANSACTION : imports
-  LINKED_ACCOUNT ||--o{ REPORTED_BALANCE : reports
-  RAW_TRANSACTION ||--o| DRAFT : "proposes"
-  DRAFT |o--o| JOURNAL_ENTRY : "confirmed as"
-  RULE ||--o{ DRAFT : "proposed by"
+  </pre>
+  <p class="section-hint">Tenancy and the ledger, above. Import and securities, below. The table that follows lists every table group.</p>
+  <pre class="mermaid">
+erDiagram
+  LINKED_ACCT ||--o{ RAW_TXN : imports
+  RAW_TXN ||--o| DRAFT : proposes
+  DRAFT |o--o| JOURNAL_ENTRY : becomes
+  ACCOUNT ||--o{ LOT : holds
   SECURITY ||--o{ LOT : "held as"
-  ACCOUNT ||--o{ LOT : "custodial holding"
-  LOT ||--o{ LOT_MATCH : "closed by"
-  SECURITY ||--o{ PRICE_OBSERVATION : "priced by"
-  ENTITY ||--o{ TAX_PERIOD_FREEZE : "frozen at cutoff"
-  TAX_TABLE ||--o{ TAX_PERIOD_FREEZE : "rules from"
-  USER ||--o{ REPORT_DEFINITION : "owns clones"
+  SECURITY ||--o{ PRICE : "priced by"
   </pre>
 
   <p><strong>Keys:</strong> every tenant-visible primary key is a UUID, never a sequential integer, so ids leak neither counts nor ordering across tenants (SECURITY A-6). Tenancy columns (<code>entity_id</code>) and actor columns are not updatable.</p>
@@ -310,83 +261,76 @@ erDiagram
 
   <h3 id="flow-request">4.1 Any authenticated read (PRD Story 1, 8)</h3>
   <pre class="mermaid">
+%%{init: {"sequence": {"width": 110, "actorMargin": 30, "mirrorActors": false}}}%%
 sequenceDiagram
-  participant B as Browser / native client
-  participant K as SvelteKit (hooks + load / route)
-  participant A as packages/auth
-  participant P as domain package
-  participant D as packages/db
-  participant PG as Postgres (poly_app)
-  B->>K: GET /entities/{entityUuid}/dashboard (cookie or bearer)
-  K->>A: getSession(request)
-  A-->>K: userId (or 401)
-  K->>P: dashboard(entityUuid) inside withTenant(userId)
-  P->>D: withTenant(userId, fn)
-  D->>PG: BEGIN; set_config('app.user_id', userId, true)
-  P->>PG: SELECT ... (RLS filters to visible entities)
-  PG-->>P: rows (empty if no membership)
-  D->>PG: COMMIT (context discarded)
+  participant B as Client
+  participant K as SvelteKit
+  participant P as Package
+  participant PG as Postgres
+  B->>K: GET dashboard
+  K->>K: session gives userId
+  K->>P: dashboard, withTenant
+  P->>PG: BEGIN, set user locally
+  P->>PG: SELECT, RLS filters
+  PG-->>P: only granted rows
+  P->>PG: COMMIT, context gone
   P-->>K: DashboardDTO
-  K-->>B: HTML / JSON
+  K-->>B: HTML or JSON
   </pre>
 
   <h3 id="flow-import">4.2 Import → draft → confirm (PRD Story 2, 3)</h3>
   <pre class="mermaid">
+%%{init: {"sequence": {"width": 110, "actorMargin": 30, "mirrorActors": false}}}%%
 sequenceDiagram
-  participant W as Worker (import-poll job)
-  participant I as packages/import
-  participant X as Adapter (fake / SimpleFIN / CSV)
-  participant S as packages/secrets
-  participant Po as packages/posting
-  participant L as packages/ledger
+  participant W as Worker
+  participant I as Import
+  participant Po as Posting
+  participant L as Ledger
   participant U as User
-  W->>I: ingest(connectionId, since)
-  I->>S: open(sealed credential)
-  I->>X: fetchTransactions(cred, account, range)
-  X-->>I: RawTxn[]
-  I->>I: hash + INSERT ... ON CONFLICT (hash) DO NOTHING
+  W->>I: ingest
+  I->>I: fetch, hash, keep new
   I->>Po: new raw rows
-  Po->>Po: rules propose category + entry, transfer matcher pairs legs
-  alt rule has auto_post = true
-    Po->>L: postEntry(lines, actor = rule)
+  Po->>Po: propose, match
+  alt rule auto-posts
+    Po->>L: post, actor rule
   else default
-    Po->>Po: store draft (actor = system import)
-    U->>Po: review, edit, confirm(draftId)
-    Po->>L: postEntry(lines, actor = user)
+    U->>Po: confirm draft
+    Po->>L: post, actor user
   end
-  L->>L: INSERT entry + lines (deferred balance check at COMMIT)
-  Po->>I: mark raw row posted + entry id (same transaction)
-  Note over L,I: From here, triggers reject UPDATE / DELETE on both sides
+  L->>L: balance check
+  Po->>I: mark row posted
+  Note over I,L: Both sides now immutable
   </pre>
 
   <h3 id="flow-transfer">4.3 Transfer matching and Cash in Transit (PRD §5)</h3>
   <pre class="mermaid">
 flowchart TD
-  a["Raw leg arrives"] --> m{"Counter-leg within date window? (same entity, opposite sign, equal amount)"}
-  m -- "yes, same posting date" --> one["One entry: Dr destination / Cr source"]
-  m -- "yes, dates differ" --> two["Two entries: source date Dr CIT / Cr source; destination date Dr destination / Cr CIT"]
-  m -- "not yet" --> open["Post source leg against CIT; open item"]
-  open --> age{"Older than threshold (default 3 business days)?"}
-  age -- yes --> exc["Exceptions report"]
-  age -- "no, counter-leg lands" --> close["Post destination leg against CIT; CIT nets to zero"]
+  a["Raw leg arrives"] --> m{"Counter-leg<br/>in window?"}
+  m -->|same date| one["One entry"]
+  m -->|dates differ| two["Two entries<br/>via CIT"]
+  m -->|not yet| open["Leg to CIT,<br/>open item"]
+  open --> age{"Past<br/>threshold?"}
+  age -->|yes| exc["Exceptions<br/>report"]
+  age -->|leg lands| close["CIT clears<br/>to zero"]
   </pre>
   <p>Matching lives in <code>posting</code> (the import side of posting), never inside <code>ledger.postEntry()</code>. Cash-in-Transit aging is computed on read by the exceptions report, not by a job (SECURITY §4.4).</p>
 
   <h3 id="flow-prices">4.4 Reference data: EOD prices and CPI-U (PRD Stories 5, 9)</h3>
   <pre class="mermaid">
+%%{init: {"sequence": {"width": 110, "actorMargin": 30, "mirrorActors": false}}}%%
 sequenceDiagram
-  participant W as Worker (daily)
-  participant R as packages/refdata
-  participant Pv as PriceProvider / BLS
-  participant PG as Postgres (poly_worker)
-  W->>R: refresh(prices, for securities held by any lot)
-  R->>Pv: fetch(symbols, missing dates)
-  Pv-->>R: observations (source, priority)
-  R->>PG: upsert price_observation (unique security, date, source)
-  W->>R: refresh(CPI-U CUUR0000SA0)
-  R->>Pv: BLS v2 (key) or v1 (no key) or manual CSV
-  R->>PG: upsert cpi_observation
-  Note over R,PG: Global reference data: no tenant column, no user data leaves the box
+  participant W as Worker
+  participant R as Refdata
+  participant Pv as API
+  participant PG as Postgres
+  W->>R: refresh prices
+  R->>Pv: fetch missing
+  Pv-->>R: observations
+  R->>PG: upsert prices
+  W->>R: refresh CPI-U
+  R->>Pv: BLS or CSV
+  R->>PG: upsert CPI
+  Note over R,PG: No tenant data leaves
   </pre>
 
   <h3 id="flow-tax">4.5 Estimated-tax accrual (PRD Story 4)</h3>
@@ -460,34 +404,20 @@ sequenceDiagram
   <p class="section-hint">Environments, network paths, trust boundaries. DevOps owns the INFRA-level detail; cross-reference <a href="../SECURITY/#boundaries">SECURITY</a>.</p>
 
   <pre class="mermaid">
-flowchart LR
-  internet(("Internet"))
-  subgraph vps["Hetzner VPS (firewall: 22 restricted, 80/443 open)"]
-    caddy["Caddy: TLS, reverse proxy"]
-    subgraph prod["compose project: prod (tagged releases)"]
-      webp["web (adapter-node)"]
-      wrkp["worker"]
-      migp["migrate (one-off, before web starts)"]
-      pgp[("Postgres prod, encrypted volume")]
+flowchart TB
+  net(("Internet")) --> caddy
+  subgraph vps["Hetzner VPS"]
+    caddy["Caddy, TLS"]
+    subgraph prod["prod: tagged releases"]
+      webp["web, worker,<br/>migrate"] --> pgp[("Postgres")]
     end
-    subgraph stg["compose project: staging (every merge to main, fake data only)"]
-      webs["web"]
-      wrks["worker"]
-      pgs[("Postgres staging")]
+    subgraph stg["staging: fake data"]
+      webs["web, worker"] --> pgs[("Postgres")]
     end
+    caddy --> webp
+    caddy --> webs
   end
-  backup[("Off-box backup store: client-side encrypted")]
-  vercel["Vercel + Neon (secondary target, CI-verified)"]
-
-  internet --> caddy
-  caddy --> webp
-  caddy --> webs
-  webp --> pgp
-  wrkp --> pgp
-  migp --> pgp
-  webs --> pgs
-  wrks --> pgs
-  pgp -.->|nightly dump + WAL, encrypted| backup
+  pgp -.->|encrypted| backup[("Off-box backup")]
   </pre>
 
   <ul>
