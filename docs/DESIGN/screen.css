@@ -474,92 +474,176 @@ table.data-table td.amount.negative { color: var(--destructive); }
   padding: 8px 0;
 }
 
-/* ---------- Entity card grid (Home screen, pass 4) ---------- */
-.entity-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+/* ---------- Public landing page (Home, pass 4 — corrected 2026-09-30:
+   this is the PRE-AUTH marketing page, not a signed-in screen. The hero
+   band is a fixed dark/brand backdrop (same posture as the login visual
+   pane — a deliberate "dark surface" context for --brand at full
+   strength); the feature/footer sections below it are theme-aware like
+   any other page. ---------- */
+.landing-hero {
+  background: #070907;
+  color: #EFF1EF;
+  text-align: center;
+  padding: 96px 48px 80px;
 }
 
-.entity-card {
-  padding: 20px;
+.landing-hero .brand-mark {
+  color: #2CFF05;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 32px;
+}
+
+.landing-hero h1 {
+  font-size: 40px;
+  font-weight: 700;
+  max-width: 20ch;
+  margin: 0 auto 16px;
+}
+
+.landing-hero .landing-subhead {
+  font-size: 18px;
+  color: #A1AD9F;
+  max-width: 46ch;
+  margin: 0 auto 32px;
+}
+
+.landing-hero .cta-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.landing-hero .cta-row .btn-default { background: #2CFF05; color: #070907; }
+.landing-hero .cta-row .btn-outline { border-color: rgba(255,255,255,0.24); color: #EFF1EF; }
+
+.landing-features {
+  padding: 56px 48px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  background: var(--background);
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.landing-feature {
+  padding: 24px;
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--card);
-  cursor: pointer;
-  transition: box-shadow 120ms ease;
-}
-.entity-card:hover { box-shadow: 0 2px 8px oklch(0 0 0 / 10%); }
-
-.entity-card .entity-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--secondary);
-  margin-bottom: 12px;
 }
 
-.entity-card .entity-name { font-weight: 600; margin-bottom: 4px; }
-.entity-card .entity-teaser { font-family: var(--font-mono); font-size: 13px; color: var(--muted-foreground); }
+.landing-feature .feature-title { font-weight: 600; margin-bottom: 8px; }
+.landing-feature .feature-body { font-size: 13px; color: var(--muted-foreground); }
 
-/* ---------- Two-pane login (pass 4) — full-bleed, dark regardless of the
-   user's stored preference (no "user's canvas" to theme before sign-in) */
+.landing-footer {
+  padding: 24px 48px;
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  text-align: center;
+  background: var(--background);
+}
+
+/* ---------- Split screen login page (pass 4, corrected 2026-09-30 to the
+   Principal's exact pattern + captured reference,
+   temp/design-refs/split-login-example.png). Form pane is theme-aware
+   (follows the user's stored preference like any other page); the visual
+   pane always carries the brand identity regardless of theme — the one
+   deliberate exception, same posture as the landing hero above. ---------- */
 .auth-shell {
   min-height: 100vh;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #070907;
-  color: #EFF1EF;
-}
-
-.auth-brand-pane {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 64px;
-}
-
-.auth-brand-pane .brand-mark {
-  color: #2CFF05;
-  font-family: var(--font-heading);
-  font-size: 40px;
-  font-weight: 700;
-  margin-bottom: 16px;
-}
-
-.auth-brand-pane .brand-statement {
-  font-size: 18px;
-  color: #A1AD9F;
-  max-width: 32ch;
+  background: var(--background);
+  color: var(--foreground);
 }
 
 .auth-form-pane {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 48px;
+  flex-direction: column;
+  padding: 48px 64px;
 }
 
-.auth-form-card {
-  width: 100%;
+.auth-form-pane .auth-logo {
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 18px;
+  margin-bottom: 64px;
+}
+
+.auth-form-inner {
   max-width: 360px;
-  background: #0D100C;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--radius-lg);
-  padding: 32px;
+  width: 100%;
+  margin: auto 0;
 }
 
-.auth-form-card .auth-title { font-family: var(--font-heading); font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #EFF1EF; }
-.auth-form-card .input { background: #161F14; border-color: rgba(255,255,255,0.12); color: #EFF1EF; margin-bottom: 12px; }
-.auth-form-card .btn-default { width: 100%; background: #2CFF05; color: #070907; margin-bottom: 16px; }
-.auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: #A1AD9F; font-size: 12px; }
-.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,0.12); }
-.auth-oauth-row { display: flex; flex-direction: column; gap: 8px; }
-.auth-oauth-row .btn-outline { width: 100%; justify-content: center; border-color: rgba(255,255,255,0.16); color: #EFF1EF; }
+.auth-form-inner .auth-title { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+.auth-form-inner .auth-subtitle { color: var(--muted-foreground); margin-bottom: 24px; font-size: 14px; }
+
+.auth-oauth-row { margin-bottom: 20px; }
+.auth-oauth-row .btn-outline { width: 100%; justify-content: center; }
+
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; color: var(--muted-foreground); font-size: 12px; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.auth-field { margin-bottom: 16px; }
+.auth-field .field-label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.auth-field label { font-size: 13px; font-weight: 500; }
+.auth-field .forgot-link { font-size: 12px; color: var(--primary); text-decoration: none; }
+.auth-field .input-with-icon { position: relative; }
+.auth-field .input-with-icon .input { padding-right: 40px; }
+.auth-field .reveal-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.auth-submit { width: 100%; justify-content: center; margin-top: 4px; }
+
+.auth-signup-line { text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted-foreground); }
+.auth-signup-line a { color: var(--primary); text-decoration: none; }
+
+.auth-legal-footer {
+  margin-top: 48px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.auth-legal-footer a { color: inherit; text-decoration: underline; }
+
+/* Visual pane — always dark/branded, inset with rounded corners and a
+   margin (matching the captured reference's proportions), not flush to
+   the viewport edge. No photo asset exists yet, so a brand gradient
+   stands in — see design-system-spec.md § New screens for the reasoning. */
+.auth-visual-pane {
+  margin: 24px 24px 24px 0;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: linear-gradient(160deg, #2CFF05 0%, #0D2E07 45%, #070907 85%);
+  display: flex;
+  align-items: flex-end;
+  padding: 40px;
+}
+
+.auth-visual-pane .visual-caption {
+  color: #EFF1EF;
+  font-size: 14px;
+  max-width: 28ch;
+  opacity: 0.85;
+}
 
 @media (max-width: 760px) {
   .auth-shell { grid-template-columns: 1fr; }
-  .auth-brand-pane { padding: 32px 24px 0; text-align: center; align-items: center; }
+  .auth-visual-pane { display: none; }
+  .landing-features { grid-template-columns: 1fr; }
 }
 
 /* ---------- Skeleton ---------- */

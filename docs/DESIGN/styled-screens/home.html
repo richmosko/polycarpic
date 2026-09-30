@@ -3,50 +3,43 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Styled screen — Home (entity picker)</title>
+<title>Styled screen — Home (public landing page)</title>
 <link rel="stylesheet" href="../tokens.css">
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<div class="shell">
-  <header class="topbar">
-    <span class="topbar-title" style="font-size:20px;">polycarpic</span>
-    <div class="topbar-actions">
-      <button class="btn btn-outline">Sign out</button>
-    </div>
-  </header>
+<!-- Public landing page (corrected 2026-09-30): the page a VISITOR sees
+     before signing in — not a signed-in dashboard. Hero band is a fixed
+     dark/brand backdrop (same posture as the login visual pane); the
+     feature and footer sections below follow the user's theme like any
+     other page. -->
+<section class="landing-hero">
+  <div class="brand-mark">polycarpic</div>
+  <h1>A virtual Single Family Office, self-hosted</h1>
+  <p class="landing-subhead">A genuine double-entry ledger for every entity you're responsible for — Person, Trust, Business, Household — in one place, on your own server.</p>
+  <div class="cta-row">
+    <button class="btn btn-default">Get started</button>
+    <button class="btn btn-outline">Sign in</button>
+  </div>
+</section>
 
-  <main class="content" style="padding:32px;">
-    <h1 class="heading" style="font-size:24px; margin-bottom:4px;">Your entities</h1>
-    <p style="color:var(--muted-foreground); margin:0 0 24px;">A single-entity user skips this screen and lands directly on their Dashboard — see design-system-spec.md § New screens: Home &amp; Login.</p>
+<section class="landing-features">
+  <div class="landing-feature">
+    <div class="feature-title">A genuine ledger</div>
+    <div class="feature-body">Double-entry, append-only, under row-level security — not a budgeting spreadsheet wearing a UI.</div>
+  </div>
+  <div class="landing-feature">
+    <div class="feature-title">Every entity, one view</div>
+    <div class="feature-body">Person, Trust, Business, Household — each with its own books, memberships, and permissions.</div>
+  </div>
+  <div class="landing-feature">
+    <div class="feature-title">Self-hosted</div>
+    <div class="feature-body">Your data stays on your own server. No aggregator sees your full picture but you.</div>
+  </div>
+</section>
 
-    <div class="entity-grid">
-      <div class="entity-card">
-        <div class="entity-icon"></div>
-        <div class="entity-name">Mosko (Person)</div>
-        <span class="badge badge-default" style="margin-bottom:8px;">Owner</span>
-        <div class="entity-teaser">$412,884.21</div>
-      </div>
-      <div class="entity-card">
-        <div class="entity-icon"></div>
-        <div class="entity-name">The Moskos (Household)</div>
-        <span class="badge badge-default" style="margin-bottom:8px;">Owner</span>
-        <div class="entity-teaser">$589,201.40</div>
-      </div>
-      <div class="entity-card">
-        <div class="entity-icon"></div>
-        <div class="entity-name">Family Trust</div>
-        <span class="badge badge-secondary" style="margin-bottom:8px;">Manager</span>
-        <div class="entity-teaser">$1,204,558.00</div>
-      </div>
-      <div class="entity-card">
-        <div class="entity-icon"></div>
-        <div class="entity-name">LLC (Business)</div>
-        <span class="badge badge-default" style="margin-bottom:8px;">Owner</span>
-        <div class="entity-teaser">$88,410.12</div>
-      </div>
-    </div>
-  </main>
-</div>
+<footer class="landing-footer">
+  polycarpic — self-hosted, source-available. <a href="#" style="color:inherit;">Terms</a> · <a href="#" style="color:inherit;">Privacy</a>
+</footer>
 </body>
 </html>

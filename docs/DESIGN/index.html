@@ -143,8 +143,8 @@
       <tr><td>Transaction detail</td><td>Sheet</td><td>Drill into a posted/draft entry, its journal lines, source doc</td></tr>
       <tr><td>Empty state</td><td>Card + plain text, no skeleton</td><td>Dashboard panels not yet shipped (tax at 1.0, allocation at M4) — see styled-screens/dashboard.html</td></tr>
       <tr><td>Header <em>(pass 4)</em></td><td>—, custom full-width bar</td><td>Full page width, entity switcher + page title + actions; sidebar sits below it — see design-system-spec.md § Layout &amp; shell</td></tr>
-      <tr><td>Entity card grid <em>(pass 4)</em></td><td>Card grid</td><td>Home screen's entity picker</td></tr>
-      <tr><td>Two-pane auth split <em>(pass 4)</em></td><td>—, custom</td><td>Login — brand pane + form-card pane, full-bleed dark</td></tr>
+      <tr><td>Public hero <em>(pass 4, corrected)</em></td><td>—, custom</td><td>Home — pre-auth landing page, product statement + CTAs, not a signed-in screen</td></tr>
+      <tr><td>Split screen login <em>(pass 4)</em></td><td>—, custom</td><td>Login — full field list (OAuth, email, password+reveal, sign-in, sign-up, legal footer) + always-branded visual pane</td></tr>
     </tbody>
   </table>
 </section>
@@ -208,7 +208,7 @@
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
     <li><strong>Sidebar expand/collapse cue (pass 4):</strong> three options proposed (design-system-spec.md § Sidebar, wireframes/sidebar-cues.html) — chevron / hover-reveal / keyboard+remembered-state — a recommendation is stated but the Principal has not picked one.</li>
-    <li><strong>Login's exact visual (pass 4):</strong> <code>useorigin.com</code>'s own login page was behind a splash loader under automation and could not be captured — this pass's two-pane proposal is built from a relayed description, not a screenshot.</li>
+    <li><strong>Login's visual pane (pass 4):</strong> built as a brand gradient, not a photo — no photography asset exists for this product. A real photo/illustration asset (in the style of the captured `dribbble` reference) would likely read stronger; flagging as a design-asset gap, not a layout question.</li>
     <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — now higher priority given how central the brand hue is (recommended before lock, design-system-spec.md § Accessibility).</li>
     <li>The Accounts screen's full grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen (the highest-traffic comparison point) — Accounts itself is still at wireframe fidelity; promote it the same way as a fast-follow if the gap matters before Implement.</li>
     <li>Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.</li>

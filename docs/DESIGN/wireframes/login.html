@@ -2,26 +2,33 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Wireframe — Login</title>
+<title>Wireframe — Login (split screen login page)</title>
 <link rel="stylesheet" href="wireframe.css">
 </head>
 <body>
-<div style="display:grid; grid-template-columns:1fr 1fr; min-height:100vh; background:#1a1a1a; color:#eee;">
-  <div style="display:flex; flex-direction:column; justify-content:center; padding:48px;">
-    <div class="wf-box-label" style="color:#8f8;">[brand mark]</div>
-    <div class="wf-placeholder-text w80" style="background:#444;"></div>
-    <div class="wf-placeholder-text w60" style="background:#444;"></div>
-  </div>
-  <div style="display:flex; align-items:center; justify-content:center;">
-    <div class="wf-box" style="background:#222; border-color:#555; width:320px; color:#eee;">
-      <span class="wf-box-label" style="color:#aaa;">Sign in</span>
-      <div class="wf-placeholder-text" style="background:#444;"></div>
-      <span class="wf-chip" style="border-color:#8f8; color:#8f8;">Continue</span>
-      <div style="margin:12px 0; color:#666; font-size:11px;">— or —</div>
-      <div class="wf-row" style="border:none;"><span class="wf-chip">Google</span></div>
-      <div class="wf-row" style="border:none;"><span class="wf-chip">Apple</span></div>
-      <div class="wf-row" style="border:none;"><span class="wf-chip">GitHub</span></div>
+<p class="wf-note" style="margin:16px;">Corrected 2026-09-30: full field list per the Principal's "split screen login page" direction — logo, heading, OAuth, divider, email, password (+forgot+reveal), submit, sign-up line, legal footer. Reference: temp/design-refs/split-login-example.png.</p>
+<div style="display:grid; grid-template-columns:1fr 1fr; min-height:70vh;">
+  <div style="padding:32px 48px; display:flex; flex-direction:column;">
+    <div class="wf-box-label">[logo]</div>
+    <div style="max-width:320px; margin:auto 0;">
+      <h2>Welcome back</h2>
+      <p style="color:#888; font-size:13px;">Sign in to your account</p>
+      <div class="wf-box" style="text-align:center; margin-bottom:12px;">Continue with Google</div>
+      <div style="text-align:center; color:#999; font-size:11px; margin-bottom:12px;">— or —</div>
+      <div class="wf-box-label">Email</div>
+      <div class="wf-placeholder-text w80" style="height:28px; background:#eee; border:1px solid #ccc;"></div>
+      <div style="display:flex; justify-content:space-between; margin-top:8px;">
+        <span class="wf-box-label">Password</span>
+        <span class="wf-chip">Forgot password?</span>
+      </div>
+      <div class="wf-placeholder-text w80" style="height:28px; background:#eee; border:1px solid #ccc;"></div>
+      <div class="wf-box" style="text-align:center; margin-top:16px; background:#333; color:#fff;">Sign in</div>
+      <p style="text-align:center; font-size:12px; color:#888;">Don't have an account? <span class="wf-chip">Sign up</span></p>
+      <p style="font-size:11px; color:#aaa; margin-top:24px;">By signing in you agree to our Terms of Service and Privacy Policy.</p>
     </div>
+  </div>
+  <div style="margin:16px 16px 16px 0; border-radius:12px; background:linear-gradient(160deg,#8f8,#222); display:flex; align-items:flex-end; padding:24px;">
+    <span style="color:#fff; font-size:12px;">[brand visual pane — always dark/branded regardless of theme]</span>
   </div>
 </div>
 </body>

@@ -252,8 +252,8 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Sonner (toast)** | Import batch complete, draft confirmed/posted, reconciliation break |
 | **Progress** | Import batch progress, safe-harbor paid-vs-required |
 | **Header** *(pass 4)* | Full-width top bar — entity switcher, page title, global actions; sidebar sits below it, not beside it (see Layout & shell) |
-| **Entity card grid** *(pass 4, new)* | Home screen's entity picker — one card per entity, net-worth teaser, role badge |
-| **Two-pane split** *(pass 4, new)* | Login — brand pane + form-card pane, full-bleed dark |
+| **Public hero + feature call-outs** *(pass 4, corrected)* | Home — pre-auth landing page, product statement + brand identity + CTAs |
+| **Split screen login** *(pass 4)* | Login — theme-aware form pane (full field list: OAuth, email, password + reveal + forgot-password, sign-in, sign-up link, legal footer) + always-branded visual pane, stacks on phone width |
 
 **Top bar pattern (Monarch):** page title (left) + a secondary outline action + a primary filled CTA (right) — e.g. Dashboard: "Refresh" (outline) + nothing else; Ledger: "Confirm all" (filled, primary action for that screen). **Pass 4:** this pattern now lives in the full-width Header, with the entity switcher added to its left edge.
 
@@ -263,27 +263,32 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 
 ---
 
-## New screens: Home & Login (pass 4)
+## New screens: Home & Login (pass 4, corrected same day)
 
-### Home
+**Correction, 2026-09-30 (same day as the original ask):** the first version of this section proposed "Home" as a signed-in entity-picker. The Principal's clarification: **Home is the public landing page a visitor sees before authentication, not a signed-in screen at all.** The entity-picker concept is dropped as a named screen — for a multi-entity user, entity selection is handled by the header's entity switcher (Layout & shell), already sufficient; no dedicated interstitial page is needed. Login also gained real specificity: it's the **"split screen login page"** pattern by name, with a fully specified form-pane content list, not just "email + continue + OAuth."
 
-**Principal direction:** "what does a signed-in user land on" — net worth hero vs. entity switcher vs. recent activity, proposed here.
+### Home — public landing page
 
-**Proposal:** Home is the **entity-scoped landing surface**, not a third thing competing with Dashboard:
-- A user with **one** entity lands directly on that entity's **Dashboard** — Home is skipped entirely, not an extra click for the common case.
-- A user with **multiple** entities (a household, or an owner/manager/viewer across several) lands on **Home**: a grid of entity cards (Person/Trust/Business/Household, per Financial semantics badges), each showing a one-line net-worth teaser and role badge, sorted by last-viewed. Selecting a card goes to that entity's Dashboard; the header's entity switcher (see Layout) is the fast path back to Home or to any other entity without a full navigation round-trip.
+**What it is:** the marketing/landing page a visitor sees before signing in — not a Dashboard, not authenticated, no ledger data. One screen, hero-led:
+- **Hero:** product statement + the neon-green brand identity front and center (this is a prime "dark or brand surface" context, so `--brand` at full strength is appropriate here, unlike anywhere in the authenticated app).
+- **What it does, in one screen:** a genuine double-entry ledger, multi-entity (Person/Trust/Business/Household), self-hosted — three short feature call-outs, not an exhaustive feature list.
+- **Calls to action:** "Sign in" and "Get started" (routes to Login).
+- **Footer:** minimal — links, no dense content.
 
-This resolves the "net worth hero vs. entity switcher vs. recent activity" question directly: Home carries **only** the entity-picker role (net-worth teaser per card is a preview, not a full hero); the real net-worth hero and recent activity belong on the per-entity Dashboard, already designed — Home doesn't duplicate them.
+Both themes apply here like any other doc page (unlike Login's visual pane, a landing page's whole canvas is content, not brand chrome, so it follows the user's stored preference same as the rest of the app). See `wireframes/home.html` and `styled-screens/home.html`.
 
-### Login / authentication
+### Login — split screen login page
 
-**Principal direction:** two-pane, modeled on `useorigin.com`'s login (page was behind a splash loader under automation and couldn't be captured directly; known shape relayed by team-lead: full-bleed dark page, two side-by-side panes — left brand/marketing statement, right a card with email + continue + OAuth buttons).
+**Principal's exact pattern, named:** "split screen login page." Two references: `useorigin.com`'s own login (dark, brand pane + form card — behind a splash loader under automation, no direct capture) and a captured example (`temp/design-refs/split-login-example.png`, form pane left including a labeled email/password pair with a "Forgot password?" link and a reveal-eye icon, OAuth button, divider, primary button, sign-up link, legal footer at the very bottom; a full-bleed moody photo right, inset with rounded corners and a margin rather than flush to the viewport edge).
 
-**Proposal:** a two-pane split, full-bleed, dark by default regardless of the user's stored theme preference (a login page has no "user's canvas" yet to theme) —
-- **Left pane:** the brand pane — `--background` dark, the neon `--brand` green used generously here (a large wordmark/mark, a short one-line statement), since this is exactly the "dark surface" context where the raw brand hex is meant to be used at full strength.
-- **Right pane:** a `--card` panel (still on the dark page, so it reads as a lifted surface) holding the actual form — email input, "Continue" primary button, a divider, then OAuth buttons (Google / Apple / GitHub per PRD §8) stacked below.
+**Form pane content, in order** (per the Principal's explicit list): logo (top-left), "Welcome back" heading + one-line subtext, an OAuth button, a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, a "Don't have an account? Sign up" line, and a legal footer ("By signing in you agree to...") pinned at the bottom.
 
-See `wireframes/login.html` and `styled-screens/login.html` for the built version.
+**Ours, adapted:**
+- **Form pane:** sits on the theme-aware tinted neutral (`--card`/`--background`) — follows the user's stored light/dark preference like the rest of the app, unlike the visual pane.
+- **Visual pane:** full-bleed, always carries the neon-green brand identity regardless of the user's theme preference (a brand graphic, not a stock photo — we have no photography asset, and a brand-forward abstract better serves "what should this product feel like" than a generic lifestyle photo) — inset with rounded corners and a margin, matching the captured reference's proportions rather than flush edges.
+- **Responsive:** collapses to a single stacked pane (form only, visual pane hidden) below the phone-width breakpoint — a login form doesn't need to fight a hero image for a 375px-wide screen.
+
+See `wireframes/login.html` and `styled-screens/login.html`.
 
 ---
 
@@ -299,8 +304,8 @@ For architect's Screen DTO work (ARCH §2.4, OQ-11 resolved in outline). Model c
 | Entities | Entity list; memberships; invite action | |
 | Securities | Lot table; allocation actual-vs-target; book-vs-market time series | |
 | Import | Linked providers; batch progress; `import_batch` new/duplicate/needs-category counts | |
-| Home *(pass 4, new)* | Entity list scoped to the user's memberships, each with a one-line net-worth teaser and role badge; skipped entirely for single-entity users (straight to Dashboard) | Not milestone-pinned yet — depends on `tenancy`'s membership list, no new package |
-| Login *(pass 4, new)* | Unauthenticated — email, OAuth provider list (Google/Apple/GitHub, PRD §8); no ledger data | `packages/auth` |
+| Home *(pass 4, corrected)* | **No DTO** — public landing page, static marketing content, unauthenticated, no membership/ledger data at all | Not a package concern |
+| Login *(pass 4)* | Unauthenticated — email/password, OAuth provider list (Google/Apple/GitHub, PRD §8); no ledger data | `packages/auth` |
 
 ---
 
@@ -315,6 +320,8 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 ## Accessibility
 
 **Target: WCAG AA.** Every pair below re-run for pass 4's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check.py`).
+
+**Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` hardcode the same hex already verified in the dark-mode table below (`#070907` background, `#EFF1EF` foreground, `#2CFF05` brand, `#A1AD9F` muted-foreground) rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme. No separate re-verification needed — same numbers, different (fixed) context.
 
 **Light mode — text pairs (floor 4.5:1), all PASS:**
 
@@ -392,5 +399,5 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 - Categorical (3+ hue) chart palette for transaction-category breakdowns — deferred until a concrete chart spec exists.
 - Compare `styled-screens/dashboard.html` against `temp/design-refs/monarch-app-accounts-zoom.png` component-by-component once frontend-lead builds the real screen — this pass matched structure and the net-worth hero closely but did not build the full grouped-account-list + segmented-bar right column (time-boxed to the highest-traffic pattern); flag as a fast-follow if the gap matters before Implement.
 - **Sidebar expand/collapse cue (pass 4):** three options proposed (chevron / hover-reveal / keyboard+remembered-state), a recommendation stated, not decided — needs the Principal's pick before frontend-lead builds it.
-- **Login page's exact visual (pass 4):** `useorigin.com`'s own login was behind a splash loader under automation and could not be captured directly — this pass's two-pane proposal is built from a relayed description (team-lead), not a screenshot. Worth a direct look before treating the styled screen as final.
+- **Login's visual pane (pass 4):** built as a brand gradient, since no photography/illustration asset exists for this product — the captured `dribbble` reference and `useorigin.com`'s own (relayed, uncaptured) login both use a real photo there. A real asset would likely read stronger; this is a design-asset gap to fill before final, not a layout uncertainty.
 - **CVD check on the brand hue (pass 4):** flagged in Accessibility — the yellow-green brand hue is a plausible deuteranopia risk given how central it now is; not yet simulated.
