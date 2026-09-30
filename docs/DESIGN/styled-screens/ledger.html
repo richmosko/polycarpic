@@ -9,17 +9,19 @@
 </head>
 <body>
 <div class="shell">
+  <!-- Header (pass 5): brand lockup left, entity selector right. Household
+     entity shown here (vs. dashboard.html's Person) to demonstrate the
+     avatar cluster with more than one member — see design-system-spec.md
+     § Header for the max-shown + overflow rule. -->
   <header class="topbar">
-    <div class="entity-switcher">Person — Mosko ▾</div>
-    <span class="topbar-title">Ledger</span>
-    <div class="topbar-actions">
-      <div class="tabs">
-        <button class="tab active">All</button>
-        <button class="tab">Drafts</button>
-        <button class="tab">Posted</button>
-        <button class="tab">Exceptions</button>
-      </div>
-    </div>
+    <div class="brand-lockup"><span class="brand-icon"></span>Polycarpic</div>
+    <button class="entity-selector">
+      <span class="entity-selector-name">The Moskos (Household)</span>
+      <span class="avatar-cluster">
+        <span class="avatar">M</span>
+        <span class="avatar">S</span>
+      </span>
+    </button>
   </header>
 
   <div class="shell-body">
@@ -34,6 +36,16 @@
     </aside>
 
   <main class="content">
+    <div class="header-row">
+      <h1 class="heading" style="font-size:24px;">Ledger</h1>
+      <div class="tabs">
+        <button class="tab active">All</button>
+        <button class="tab">Drafts</button>
+        <button class="tab">Posted</button>
+        <button class="tab">Exceptions</button>
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:24px;">
       <div class="header-row" style="margin-bottom:12px;">
         <span class="card-title">Staged batch — 2 drafts pending review</span>

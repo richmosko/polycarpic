@@ -9,20 +9,25 @@
 </head>
 <body>
 <div class="shell">
-  <!-- Header (pass 4): full page width, entity switcher moved here from the
-       sidebar — see design-system-spec.md § Layout & shell. -->
+  <!-- Header (pass 5, Principal review 2): global chrome only — brand
+       lockup left, entity selector (name + avatar cluster) right. Page
+       title + page-specific actions moved into .content's own
+       .header-row (below) — see design-system-spec.md § Layout & shell. -->
   <header class="topbar">
-    <div class="entity-switcher">Person — Mosko ▾</div>
-    <span class="topbar-title">Dashboard</span>
-    <div class="topbar-actions">
-      <button class="btn btn-outline">Refresh</button>
-    </div>
+    <div class="brand-lockup"><span class="brand-icon"></span>Polycarpic</div>
+    <button class="entity-selector">
+      <span class="entity-selector-name">Mosko (Person)</span>
+      <span class="avatar-cluster">
+        <span class="avatar">M</span>
+      </span>
+    </button>
   </header>
 
   <div class="shell-body">
-    <!-- Sidebar (pass 4): inverted, rounded card, collapsible to an icon
-         rail. Cue shown here is Option A (chevron) — see
-         wireframes/sidebar-cues.html for all three proposed. -->
+    <!-- Sidebar (pass 4/5): inverted, rounded card, stretches to fill the
+         viewport height under the header (Principal review 2, option A
+         chosen), collapse icon pinned at the very bottom of the full-
+         height card — see wireframes/sidebar-cues.html for B/C, rejected. -->
     <aside class="sidebar">
       <a class="nav-item active" href="#"><span class="nav-icon"></span><span class="nav-label">Dashboard</span></a>
       <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Ledger</span></a>
@@ -34,6 +39,11 @@
     </aside>
 
   <main class="content">
+    <div class="header-row">
+      <h1 class="heading" style="font-size:24px;">Dashboard</h1>
+      <button class="btn btn-outline">Refresh</button>
+    </div>
+
     <!-- Net-worth hero — Monarch pattern: eyebrow + big figure + signed delta
          on the figure itself + single-line area chart with gradient fill.
          Compare against temp/design-refs/monarch-app-accounts-zoom.png -->

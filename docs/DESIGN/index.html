@@ -19,7 +19,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.5</span>
+    <span><strong>Version:</strong> 0.6</span>
     <span><strong>Last updated:</strong> 2026-09-30</span>
   </div>
 </header>
@@ -142,9 +142,10 @@
       <tr><td>Entity switcher</td><td>Tabs / Sidebar</td><td>Switch between Person/Trust/Business/Household</td></tr>
       <tr><td>Transaction detail</td><td>Sheet</td><td>Drill into a posted/draft entry, its journal lines, source doc</td></tr>
       <tr><td>Empty state</td><td>Card + plain text, no skeleton</td><td>Dashboard panels not yet shipped (tax at 1.0, allocation at M4) — see styled-screens/dashboard.html</td></tr>
-      <tr><td>Header <em>(pass 4)</em></td><td>—, custom full-width bar</td><td>Full page width, entity switcher + page title + actions; sidebar sits below it — see design-system-spec.md § Layout &amp; shell</td></tr>
+      <tr><td>Header <em>(pass 5)</em></td><td>—, custom full-width bar</td><td>Brand lockup left, entity selector right; page title/actions moved to the content column — see design-system-spec.md § Header</td></tr>
+      <tr><td>Avatar cluster <em>(pass 5, new)</em></td><td>—, custom</td><td>Overlapping initials in the entity selector, max 3 + overflow</td></tr>
       <tr><td>Public hero <em>(pass 4, corrected)</em></td><td>—, custom</td><td>Home — pre-auth landing page, product statement + CTAs, not a signed-in screen</td></tr>
-      <tr><td>Split screen login <em>(pass 4)</em></td><td>—, custom</td><td>Login — full field list (OAuth, email, password+reveal, sign-in, sign-up, legal footer) + always-branded visual pane</td></tr>
+      <tr><td>Split screen login <em>(pass 4, refined pass 5)</em></td><td>—, custom</td><td>Login — full field list, centered form column, always-branded visual pane</td></tr>
     </tbody>
   </table>
 </section>
@@ -173,7 +174,7 @@
     <li><a href="wireframes/import.html">Import</a> — provider link + batch review</li>
     <li><a href="wireframes/home.html">Home</a> <em>(pass 4, new)</em> — entity picker, skipped for single-entity users</li>
     <li><a href="wireframes/login.html">Login</a> <em>(pass 4, new)</em> — two-pane, Origin-inspired</li>
-    <li><a href="wireframes/sidebar-cues.html">Sidebar expand/collapse cues</a> <em>(pass 4, new)</em> — three options sketched, not yet decided</li>
+    <li><a href="wireframes/sidebar-cues.html">Sidebar expand/collapse cues</a> <em>(pass 4, decided pass 5)</em> — option A (chevron) chosen, B/C kept for the record</li>
   </ul>
 </section>
 
@@ -207,7 +208,8 @@
   <h2>9. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
-    <li><strong>Sidebar expand/collapse cue (pass 4):</strong> three options proposed (design-system-spec.md § Sidebar, wireframes/sidebar-cues.html) — chevron / hover-reveal / keyboard+remembered-state — a recommendation is stated but the Principal has not picked one.</li>
+    <li><strong>Resolved 2026-09-30 (pass 5):</strong> sidebar expand/collapse cue — option A (chevron) chosen; sidebar now full-height; header restructured to brand lockup + entity selector with an avatar cluster; login form pane centered — design-system-spec.md § Header, § Sidebar, § Login.</li>
+    <li><strong>Avatar cluster overflow (pass 5):</strong> the "+N" fold for 4th+ members is specified but not yet shown live in either reference screen (both currently have ≤2 members) — worth a quick visual check once a real multi-member entity exists.</li>
     <li><strong>Login's visual pane (pass 4):</strong> built as a brand gradient, not a photo — no photography asset exists for this product. A real photo/illustration asset (in the style of the captured `dribbble` reference) would likely read stronger; flagging as a design-asset gap, not a layout question.</li>
     <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — now higher priority given how central the brand hue is (recommended before lock, design-system-spec.md § Accessibility).</li>
     <li>The Accounts screen's full grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen (the highest-traffic comparison point) — Accounts itself is still at wireframe fidelity; promote it the same way as a fast-follow if the gap matters before Implement.</li>

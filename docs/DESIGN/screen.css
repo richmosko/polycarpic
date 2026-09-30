@@ -54,31 +54,76 @@ h1, h2, h3, .heading {
 .topbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 20px;
   padding: 12px 24px;
   background: var(--card);
   border-bottom: 1px solid var(--border);
 }
 
-.topbar .entity-switcher {
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  font-size: 13px;
-  background: var(--muted);
-}
-
-.topbar .topbar-title {
-  font-family: var(--font-heading);
-  font-size: 17px;
-  font-weight: 600;
-}
-
-.topbar .topbar-actions {
-  margin-left: auto;
+/* Left: product icon + wordmark (pass 5 / Principal review 2). The page
+   title and any page-specific actions (Refresh, tabs, Confirm all, ...)
+   that lived in the header through pass 4 move into the content area as
+   a `.content .header-row` at the top of each screen instead — the
+   header is global chrome now (brand + entity), not per-page chrome. */
+.brand-lockup {
   display: flex;
+  align-items: center;
   gap: 8px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 16px;
 }
+
+.brand-lockup .brand-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+/* Right: entity selector — entity name + avatar cluster, opens the
+   switcher on click. Replaces pass 4's plain-text "Person — Mosko ▾". */
+.entity-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+.entity-selector:hover { background: var(--muted); }
+.entity-selector .entity-selector-name { font-size: 14px; font-weight: 500; color: var(--foreground); }
+
+/* Avatar cluster — overlapping circles representing the entity's
+   membership. Max 3 shown + a "+N" overflow chip in the same slot,
+   continuing the overlap. Fallback is always initials (no avatar-image
+   asset exists) on a --secondary fill. Border color matches whatever
+   surface the cluster sits on (--card in the header) to cut a visible
+   ring between overlapping circles — pass a different border color via
+   an inline style if reused on a non-card surface. */
+.avatar-cluster { display: flex; align-items: center; }
+
+.avatar-cluster .avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--card);
+  margin-left: -8px;
+  flex-shrink: 0;
+}
+.avatar-cluster .avatar:first-child { margin-left: 0; }
+.avatar-cluster .avatar.overflow { background: var(--muted); color: var(--muted-foreground); }
 
 .shell-body {
   flex: 1;
@@ -86,10 +131,21 @@ h1, h2, h3, .heading {
   grid-template-columns: 240px 1fr;
   gap: 20px;
   padding: 20px 24px;
-  align-items: start;
+  /* align-items intentionally left at its grid default (stretch) — see
+     .sidebar below: this is what makes the sidebar reach full height. */
 }
 
-/* ---------- Sidebar (pass 4): inverted, a rounded card, collapsible ----- */
+/* ---------- Sidebar (pass 4/5): inverted, a rounded card, collapsible,
+   and (pass 5 — Principal review 2, option A chosen) stretches to fill
+   the viewport height under the header. `.shell` is a min-height:100vh
+   flex column with the header as an auto-height row and `.shell-body` as
+   `flex:1` — that alone gives `.shell-body` a definite height equal to
+   the remaining viewport (or the content's own height if content is
+   taller and the page scrolls). Leaving both `.shell-body`'s
+   `align-items` and `.sidebar`'s `align-self` at their grid/flex default
+   (stretch, i.e. NOT overridden to `start` the way pass 4 had it) is
+   what makes the sidebar track that height automatically in both cases,
+   without a hardcoded viewport-minus-header magic number. */
 .sidebar {
   background: var(--sidebar);
   color: var(--sidebar-foreground);
@@ -99,7 +155,8 @@ h1, h2, h3, .heading {
   flex-direction: column;
   gap: 4px;
   box-shadow: 0 1px 3px oklch(0 0 0 / 12%);
-  align-self: start;
+  position: sticky;
+  top: 20px; /* matches .shell-body's own padding, so it reads as one continuous card while the page scrolls */
   width: 240px;
   transition: width 150ms ease;
 }
@@ -561,23 +618,36 @@ table.data-table td.amount.negative { color: var(--destructive); }
   color: var(--foreground);
 }
 
+/* Pass 5 (Principal review 2): heading/copy/fields centered both
+   vertically AND horizontally as a fixed-max-width column — logo is the
+   one element that stays pinned top-left, via align-self overriding the
+   pane's own centering. */
 .auth-form-pane {
   display: flex;
   flex-direction: column;
+  align-items: center;
   padding: 48px 64px;
 }
 
 .auth-form-pane .auth-logo {
+  align-self: flex-start;
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 18px;
-  margin-bottom: 64px;
 }
 
 .auth-form-inner {
-  max-width: 360px;
+  max-width: 380px;
   width: 100%;
-  margin: auto 0;
+  margin: auto 0; /* vertical centering within the pane's remaining flex space */
+  text-align: center;
+}
+
+.auth-form-inner .auth-field,
+.auth-form-inner .auth-oauth-row,
+.auth-form-inner .auth-signup-line,
+.auth-form-inner .auth-legal-footer {
+  text-align: left; /* fields/links stay left-aligned within the centered column — only the heading/copy are centered text */
 }
 
 .auth-form-inner .auth-title { font-size: 26px; font-weight: 700; margin-bottom: 4px; }

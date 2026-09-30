@@ -170,33 +170,48 @@ Kept from the prior pass on its own merits (generic spacing rhythm), not re-meas
 
 No custom `--shadow-*` overrides — inherits shadcn-svelte's default scale.
 
-### Layout & shell (pass 4)
+### Layout & shell (pass 4, header contents corrected pass 5)
 
-**Principal direction:** "Can we have the top header bar span the full width, and have the side-bar under the header?" — a shell restructure from pass 3's side-by-side sidebar+content grid.
+**Principal direction (pass 4):** "Can we have the top header bar span the full width, and have the side-bar under the header?" — a shell restructure from pass 3's side-by-side sidebar+content grid.
 
 New shell, top to bottom:
-1. **Header** — full page width, top row. Entity switcher (left), page title, global actions (right: theme toggle, notifications later). Persistent across every screen.
-2. **Body** — below the header, a two-column region: sidebar (left) + content (right). The sidebar no longer spans full page height; it starts below the header, same as the content column.
+1. **Header** — full page width, top row, global chrome only (see Header, below, for exactly what lives here — corrected in pass 5).
+2. **Body** — below the header, a two-column region: sidebar (left, now full-height as of pass 5, see Sidebar) + content (right). Each screen's own page title and page-specific actions (Refresh, tabs, "Confirm all", ...) live at the top of the content column, not in the header.
 
-This is a genuine restructure, not a cosmetic tweak — the entity switcher moves from "top of sidebar" (pass 3) to the header, since the header is now the one element guaranteed full-width real estate on every screen including when the sidebar collapses to a rail (below). See `wireframes/` and `styled-screens/dashboard.html` for the built version.
+This is a genuine restructure, not a cosmetic tweak. See `wireframes/` and both styled screens for the built version.
 
-### Sidebar (pass 4 — inverted, card, collapsible)
+### Header (pass 5 — Principal review 2)
 
-**Principal direction:** "Maybe we can play with an inverted background color for the sidebar. And while we are at it: Make it a card with the same rounded edges. I also want the ability to compact the sidebar to just icons."
+**Principal direction:** "Can we have the entity selector on the right of the header? Ideally it would be the entity name + a cluster of avatars representing the membership. And at the [left] of the header would be the Product Icon with name to the right (Polycarpic)."
+
+- **Left: brand lockup** — a product icon (`.brand-icon`, currently a plain `--primary`-filled square placeholder pending a real mark) + the wordmark "Polycarpic," `--font-heading` 700.
+- **Right: entity selector** — the current entity's name + an **avatar cluster** (below), opening the entity switcher on click. Replaces pass 4's plain-text "Person — Mosko ▾."
+- **What moved out of the header (pass 4 → pass 5):** the page title (e.g. "Dashboard," "Ledger") and any page-specific actions (Refresh, tabs, "Confirm all") that pass 4 put in the header move into the **content column's own `.header-row`**, at the top of each screen — the header is global chrome (brand + entity) now, not per-page chrome. Every wireframe and both styled screens were updated to this shape.
+
+**Avatar cluster — new component (pass 5).** Overlapping circles representing the entity's membership:
+- 24px diameter, `-8px` overlap (each circle's `margin-left`), a 2px border in whatever surface color it sits on (`--card` in the header) to cut a visible ring between overlapping circles.
+- **Fallback is always initials** on a `--secondary` fill — no avatar-image asset exists for this product yet, so this isn't a "fallback for the rare case," it's the only case today.
+- **Max 3 shown**, a 4th+ member folds into a "+N" chip in the same slot and style, continuing the overlap (not yet built in the two reference screens — both shown entities have ≤2 members; the overflow rule is stated here for frontend-lead to implement against a real membership count).
+
+### Sidebar (pass 4 — inverted, card, collapsible; pass 5 — option A chosen, full height)
+
+**Principal direction (pass 4):** "Maybe we can play with an inverted background color for the sidebar. And while we are at it: Make it a card with the same rounded edges. I also want the ability to compact the sidebar to just icons."
 
 - **Inverted:** in light mode the sidebar is a dark surface (`--sidebar` = `#20291F`) floating on the light page; in dark mode it's a light surface (`--sidebar` = `#F5F7F5`, the light mode's own canvas tone reused directly) floating on the dark page. A user should never see two dark (or two light) surfaces stacked with no separation across a mode switch — "inverted" means relative to the page, in both directions.
-- **Card:** `border-radius: var(--radius-lg)` (12px, same as any other card), with its own `padding` and a visible edge against the page canvas (a subtle shadow or border, not flush) — it now reads as a floating panel rather than a flush structural rail.
-- **Collapsible to an icon rail:** a compact state (~64px wide) showing only nav icons, no labels, no entity-switcher (that moved to the header, see Layout above) — expand restores the full ~240px width with labels.
+- **Card:** `border-radius: var(--radius-lg)` (12px, same as any other card), with its own `padding` and a visible edge against the page canvas (a subtle shadow, not flush) — it reads as a floating panel rather than a flush structural rail.
+- **Collapsible to an icon rail:** a compact state (~64px wide) showing only nav icons, no labels — expand restores the full ~240px width with labels.
 
-**Expand/collapse cue — three options, not yet chosen (Principal to pick):**
+**Expand/collapse cue — Option A chosen (Principal review 2, 2026-09-30).** Three options were sketched; the Principal picked **A: a chevron pinned at the sidebar's bottom edge, always visible, click to toggle.** B (hover-reveal) and C (keyboard + remembered state) are kept below as rejected alternatives, for the record — not implemented.
 
-| Option | Mechanism | Trade-off |
+| Option | Mechanism | Status |
 |---|---|---|
-| **A. Chevron at the rail's bottom edge** | A small chevron/arrow button pinned at the bottom of the sidebar, always visible, click to toggle | Most discoverable (a permanent, labeled affordance); costs a small amount of vertical space at the bottom of every sidebar state |
-| **B. Hover-reveal** | Collapsed rail shows icons only; hovering the rail temporarily flies out full labels (like a dock), with a small pin icon to make the expansion persist | Zero permanent chrome cost; less discoverable on first use, and awkward on touch (no hover) — would need a tap-to-expand fallback for mobile |
-| **C. Keyboard shortcut + remembered state** | `Cmd/Ctrl+B` toggles; the last state persists (`localStorage`, same pattern as `doc-theme` in `toc.js`); a one-time tooltip on first sidebar interaction teaches the shortcut | Cheapest UI cost (no permanent control needed at all) but the least discoverable without the tooltip; best power-user ergonomics |
+| **A. Chevron at the rail's bottom edge** | A small chevron/arrow button, always visible, click to toggle | **Chosen** |
+| B. Hover-reveal | Collapsed rail shows icons only; hovering flies out full labels, pin to persist | Rejected |
+| C. Keyboard shortcut + remembered state | `Cmd/Ctrl+B` toggles; state persists in `localStorage` | Rejected |
 
-**Recommendation, not a decision:** A (chevron) as the primary, always-visible affordance, **plus** C's remembered state and keyboard shortcut as an accelerator on top of it — B (hover-reveal) is the one I'd drop, since its touch-device gap needs a fallback control anyway, which erodes its "zero chrome" advantage. See `wireframes/sidebar-cues.html` for a rough side-by-side sketch of all three.
+See `wireframes/sidebar-cues.html`, updated to mark A chosen.
+
+**Full height (pass 5).** "Can we have the sidebar elongate down to fill the screen? Put the [collapse] icon at the very bottom." The sidebar card now stretches to the full height of `.shell-body` — which itself is a `flex:1` row inside `.shell`'s `min-height:100vh` flex column, so it's exactly "the remaining viewport below the header" when content is short, and grows to match content's own height when content is taller (the page scrolls, the sidebar — `position:sticky` — tracks near the top of view the whole way down). No hardcoded "100vh minus header px" number: this falls out of leaving `.shell-body`'s `align-items` and `.sidebar`'s `align-self` at their CSS Grid default (`stretch`), which pass 4 had overridden to `start` — removing that override is the entire fix. The collapse chevron, already pinned via `margin-top: auto` inside the sidebar's own flex column, now sits at the bottom of this full-height card rather than just below the last nav item.
 
 ---
 
@@ -251,7 +266,8 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Skeleton** | Every async fetch boundary |
 | **Sonner (toast)** | Import batch complete, draft confirmed/posted, reconciliation break |
 | **Progress** | Import batch progress, safe-harbor paid-vs-required |
-| **Header** *(pass 4)* | Full-width top bar — entity switcher, page title, global actions; sidebar sits below it, not beside it (see Layout & shell) |
+| **Header** *(pass 4, contents corrected pass 5)* | Full-width top bar — brand lockup left, entity selector right; page title/actions moved to the content column (see Layout & shell, Header) |
+| **Avatar cluster** *(pass 5, new)* | Overlapping initials-on-`--secondary` circles in the entity selector — membership at a glance, max 3 + overflow (see Header) |
 | **Public hero + feature call-outs** *(pass 4, corrected)* | Home — pre-auth landing page, product statement + brand identity + CTAs |
 | **Split screen login** *(pass 4)* | Login — theme-aware form pane (full field list: OAuth, email, password + reveal + forgot-password, sign-in, sign-up link, legal footer) + always-branded visual pane, stacks on phone width |
 
@@ -277,15 +293,15 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 
 Both themes apply here like any other doc page (unlike Login's visual pane, a landing page's whole canvas is content, not brand chrome, so it follows the user's stored preference same as the rest of the app). See `wireframes/home.html` and `styled-screens/home.html`.
 
-### Login — split screen login page
+### Login — split screen login page (pass 4, refined pass 5)
 
 **Principal's exact pattern, named:** "split screen login page." Two references: `useorigin.com`'s own login (dark, brand pane + form card — behind a splash loader under automation, no direct capture) and a captured example (`temp/design-refs/split-login-example.png`, form pane left including a labeled email/password pair with a "Forgot password?" link and a reveal-eye icon, OAuth button, divider, primary button, sign-up link, legal footer at the very bottom; a full-bleed moody photo right, inset with rounded corners and a margin rather than flush to the viewport edge).
 
 **Form pane content, in order** (per the Principal's explicit list): logo (top-left), "Welcome back" heading + one-line subtext, an OAuth button, a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, a "Don't have an account? Sign up" line, and a legal footer ("By signing in you agree to...") pinned at the bottom.
 
 **Ours, adapted:**
-- **Form pane:** sits on the theme-aware tinted neutral (`--card`/`--background`) — follows the user's stored light/dark preference like the rest of the app, unlike the visual pane.
-- **Visual pane:** full-bleed, always carries the neon-green brand identity regardless of the user's theme preference (a brand graphic, not a stock photo — we have no photography asset, and a brand-forward abstract better serves "what should this product feel like" than a generic lifestyle photo) — inset with rounded corners and a margin, matching the captured reference's proportions rather than flush edges.
+- **Form pane:** sits on the theme-aware tinted neutral (`--card`/`--background`) — follows the user's stored light/dark preference like the rest of the app, unlike the visual pane. **Pass 5:** the heading, subtext, and fields are centered both vertically and horizontally as a fixed-max-width (380px) column within the pane — the logo is the one element that stays pinned top-left, overriding the pane's own centering. Field labels, inputs, and links stay left-aligned *within* that centered column (only the heading/subtext text itself is center-aligned) — a defensible reading of "centred," stated explicitly since the alternative (centering every line of text, including form labels) would read oddly for a form.
+- **Visual pane:** full-bleed, always carries the neon-green brand identity regardless of the user's theme preference — inset with rounded corners and a margin, matching the captured reference's proportions rather than flush edges. **Pass 5:** currently a brand gradient placeholder (`linear-gradient`, `--brand` → dark) — the Principal will supply a real photo; the slot is `.auth-visual-pane`'s `background`, sized to fill its container (`background-size: cover` when a real image replaces the gradient), portrait-to-square aspect (the pane itself is roughly 1:1.3 at desktop widths, narrowing as the viewport does) is the target once an asset lands.
 - **Responsive:** collapses to a single stacked pane (form only, visual pane hidden) below the phone-width breakpoint — a login form doesn't need to fight a hero image for a 375px-wide screen.
 
 See `wireframes/login.html` and `styled-screens/login.html`.
@@ -322,6 +338,8 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 **Target: WCAG AA.** Every pair below re-run for pass 4's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check.py`).
 
 **Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` hardcode the same hex already verified in the dark-mode table below (`#070907` background, `#EFF1EF` foreground, `#2CFF05` brand, `#A1AD9F` muted-foreground) rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme. No separate re-verification needed — same numbers, different (fixed) context.
+
+**Pass 5 (header, sidebar, login centering) introduces no new token values** — the avatar cluster (`--secondary`/`--secondary-foreground` fill, `--muted`/`--muted-foreground` overflow chip), the entity selector and brand lockup (plain `--foreground` text, `--primary` icon fill), and the login form's centering are all either already-verified token pairs in a new layout position, or layout-only changes with no color at all. Nothing to re-run.
 
 **Light mode — text pairs (floor 4.5:1), all PASS:**
 
