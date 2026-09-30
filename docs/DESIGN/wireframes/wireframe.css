@@ -17,16 +17,38 @@ body {
   background: #fafafa;
 }
 
+/* Shell (pass 4): full-width header on top, sidebar + content below it —
+   see design-system-spec.md § Layout & shell. */
 .wf-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.wf-topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 2px dashed #999;
+}
+
+.wf-shell-body {
+  flex: 1;
   display: grid;
   grid-template-columns: 200px 1fr;
-  min-height: 100vh;
 }
 
 .wf-sidebar {
-  border-right: 2px dashed #999;
+  border: 2px dashed #999;
+  border-radius: 8px;
+  margin: 16px;
   padding: 16px;
+  background: #2a2a2a;
+  color: #eee;
 }
+
+.wf-sidebar .wf-nav-item { border-color: #555; color: #eee; }
 
 .wf-content {
   padding: 24px;

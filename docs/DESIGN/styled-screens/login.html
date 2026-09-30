@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Login</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<!-- Two-pane, modeled on useorigin.com's login (relayed description, not a
+     direct screenshot — see design-system-spec.md § New screens: Home &
+     Login, and the Open Questions item flagging this for a follow-up
+     look). Full-bleed dark regardless of the user's stored theme
+     preference: there's no "user's canvas" yet to theme before sign-in. -->
+<div class="auth-shell">
+  <div class="auth-brand-pane">
+    <div class="brand-mark">polycarpic</div>
+    <p class="brand-statement">A virtual Single Family Office — one ledger for every entity, every account, every dollar you're responsible for.</p>
+  </div>
+  <div class="auth-form-pane">
+    <div class="auth-form-card">
+      <div class="auth-title">Sign in</div>
+      <input class="input" type="email" placeholder="Email address">
+      <button class="btn-default btn" style="justify-content:center;">Continue</button>
+      <div class="auth-divider">or</div>
+      <div class="auth-oauth-row">
+        <button class="btn btn-outline">Continue with Google</button>
+        <button class="btn btn-outline">Continue with Apple</button>
+        <button class="btn btn-outline">Continue with GitHub</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

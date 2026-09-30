@@ -19,8 +19,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.4</span>
-    <span><strong>Last updated:</strong> 2026-09-28</span>
+    <span><strong>Version:</strong> 0.5</span>
+    <span><strong>Last updated:</strong> 2026-09-30</span>
   </div>
 </header>
 
@@ -54,6 +54,7 @@
     <li><strong>Every number earns trust.</strong> This is a general ledger, not a budgeting toy — a balance, a delta, or a pending-liability figure must always be traceable to its source (the journal entry, the lot, the reconciliation). The UI never shows a number it can't explain if clicked.</li>
     <li><strong>Immutability is visible, not just enforced.</strong> A posted transaction reads as posted (badge, disabled edit affordance); a correction reads as a reversal + new entry, never as a silent edit (PRD §5).</li>
     <li><strong>Diverge from polycarpic's own tooling, deliberately.</strong> The cairn tracker (our internal tool) and the product are not the same thing and shouldn't look like it — this system's identity is derived from <strong>measured</strong> screenshots and live style reads off Monarch Money and Origin (`useorigin.com`), not memory (Principal direction, 2026-09-28) — see <a href="design-system-spec.md#inspiration-monarch--origin">Inspiration: Monarch &amp; Origin</a>.</li>
+    <li><strong>One brand hue, used honestly.</strong> The Principal's neon-green brand color (<code>#2CFF05</code>, 2026-09-30 — "the project name relates to fruiting plants") measures 1.36:1 against white, far below AA — kept as the literal <code>--brand</code> value everywhere it clears AA (dark surfaces), with a darkened same-hue green for light-mode <code>--primary</code>, stated plainly rather than silently swapped for a different hue — see <a href="design-system-spec.md#foundations">Foundations</a>.</li>
   </ul>
 </section>
 
@@ -86,6 +87,7 @@
   <h3 id="tokens-actions">3.2 Actions &amp; States</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--primary)"></span><span class="name">--primary</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--brand)"></span><span class="name">--brand (dark surfaces only — see Foundations)</span></div>
     <div class="swatch"><span class="chip" style="background:var(--secondary)"></span><span class="name">--secondary</span></div>
     <div class="swatch"><span class="chip" style="background:var(--accent)"></span><span class="name">--accent</span></div>
     <div class="swatch"><span class="chip" style="background:var(--destructive)"></span><span class="name">--destructive</span></div>
@@ -115,11 +117,13 @@
     <div class="swatch"><span class="chip" style="background:var(--chart-5)"></span><span class="name">--chart-5</span></div>
   </div>
 
-  <h3 id="tokens-sidebar">3.6 Sidebar</h3>
+  <h3 id="tokens-sidebar">3.6 Sidebar (inverted, pass 4)</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--sidebar)"></span><span class="name">--sidebar</span></div>
     <div class="swatch"><span class="chip" style="background:var(--sidebar-accent)"></span><span class="name">--sidebar-accent</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--sidebar-ring)"></span><span class="name">--sidebar-ring</span></div>
   </div>
+  <p class="section-hint">Dark-on-light in light mode, light-on-dark in dark mode — see <a href="design-system-spec.md">design-system-spec.md § Sidebar</a> for the collapse-to-rail behavior and three proposed expand/collapse cues.</p>
 
   <p class="section-hint"><strong>Type:</strong> <code>--font-sans</code> Inter — one grotesque sans for body and headings, hierarchy by weight, confirmed against both reference products' actual app UI (their serif accent is marketing-only, see Inspiration); <code>--font-mono</code> Roboto Mono — Origin's own measured choice, for uppercase eyebrow labels, account numbers, tickers, tabular figures. <strong>Radius:</strong> measured <code>--radius-sm|md|lg|xl</code> = 6/8/12/20px (cards 12px, buttons 8px — both products' actual app-level values, not either's marketing-only pill).</p>
 </section>
@@ -138,6 +142,9 @@
       <tr><td>Entity switcher</td><td>Tabs / Sidebar</td><td>Switch between Person/Trust/Business/Household</td></tr>
       <tr><td>Transaction detail</td><td>Sheet</td><td>Drill into a posted/draft entry, its journal lines, source doc</td></tr>
       <tr><td>Empty state</td><td>Card + plain text, no skeleton</td><td>Dashboard panels not yet shipped (tax at 1.0, allocation at M4) — see styled-screens/dashboard.html</td></tr>
+      <tr><td>Header <em>(pass 4)</em></td><td>—, custom full-width bar</td><td>Full page width, entity switcher + page title + actions; sidebar sits below it — see design-system-spec.md § Layout &amp; shell</td></tr>
+      <tr><td>Entity card grid <em>(pass 4)</em></td><td>Card grid</td><td>Home screen's entity picker</td></tr>
+      <tr><td>Two-pane auth split <em>(pass 4)</em></td><td>—, custom</td><td>Login — brand pane + form-card pane, full-bleed dark</td></tr>
     </tbody>
   </table>
 </section>
@@ -164,6 +171,9 @@
     <li><a href="wireframes/entities.html">Entities / Memberships</a></li>
     <li><a href="wireframes/securities.html">Securities / Lots</a> — lot table + allocation view</li>
     <li><a href="wireframes/import.html">Import</a> — provider link + batch review</li>
+    <li><a href="wireframes/home.html">Home</a> <em>(pass 4, new)</em> — entity picker, skipped for single-entity users</li>
+    <li><a href="wireframes/login.html">Login</a> <em>(pass 4, new)</em> — two-pane, Origin-inspired</li>
+    <li><a href="wireframes/sidebar-cues.html">Sidebar expand/collapse cues</a> <em>(pass 4, new)</em> — three options sketched, not yet decided</li>
   </ul>
 </section>
 
@@ -173,6 +183,8 @@
   <ul>
     <li><a href="styled-screens/dashboard.html">Dashboard</a></li>
     <li><a href="styled-screens/ledger.html">Ledger / Transactions</a></li>
+    <li><a href="styled-screens/home.html">Home</a> <em>(pass 4, new)</em></li>
+    <li><a href="styled-screens/login.html">Login</a> <em>(pass 4, new)</em></li>
   </ul>
 </section>
 
@@ -182,7 +194,7 @@
   <table>
     <thead><tr><th>Concern</th><th>Standard / approach</th></tr></thead>
     <tbody>
-      <tr><td>Color contrast</td><td>WCAG AA (4.5:1 text, 3:1 large/UI) — every token pair measured, both modes, against this palette's actual hex values (chart ramp re-tuned after a first pass failed the 3:1 floor at both extremes); no CVD simulation run yet (open item)</td></tr>
+      <tr><td>Color contrast</td><td>WCAG AA (4.5:1 text, 3:1 large/UI) — every token pair re-measured for the pass-4 neon-green rebrand, both modes; <code>--brand</code> deliberately fails against light surfaces (1.36:1, by design — never used there, see Foundations); no CVD simulation run yet (open item, now higher-priority given how central the brand hue is)</td></tr>
       <tr><td>Color-alone signaling</td><td>Never — every gain/loss/status pairs color with a sign/icon/label</td></tr>
       <tr><td>Keyboard</td><td>All interactive elements reachable &amp; operable (shadcn default)</td></tr>
       <tr><td>Screen readers</td><td>Semantic markup; labelled controls; delta sign readable from text content</td></tr>
@@ -195,9 +207,10 @@
   <h2>9. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
-    <li><strong>Resolved 2026-09-28:</strong> visual identity diverges from cairn's tooling palette, and is now derived from measured Monarch/Origin references rather than general recall — see design-system-spec.md § Inspiration for the correction history (two prior passes rejected).</li>
-    <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — recommended before lock (design-system-spec.md § Accessibility).</li>
-    <li>The Accounts screen's full grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen this pass (the highest-traffic comparison point) — Accounts itself is still at wireframe fidelity; promote it the same way as a fast-follow if the gap matters before Implement.</li>
+    <li><strong>Sidebar expand/collapse cue (pass 4):</strong> three options proposed (design-system-spec.md § Sidebar, wireframes/sidebar-cues.html) — chevron / hover-reveal / keyboard+remembered-state — a recommendation is stated but the Principal has not picked one.</li>
+    <li><strong>Login's exact visual (pass 4):</strong> <code>useorigin.com</code>'s own login page was behind a splash loader under automation and could not be captured — this pass's two-pane proposal is built from a relayed description, not a screenshot.</li>
+    <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — now higher priority given how central the brand hue is (recommended before lock, design-system-spec.md § Accessibility).</li>
+    <li>The Accounts screen's full grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen (the highest-traffic comparison point) — Accounts itself is still at wireframe fidelity; promote it the same way as a fast-follow if the gap matters before Implement.</li>
     <li>Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.</li>
     <li><code>prototype/</code> throwaway UX prototype (kickoff §2.9) not yet built — confirm ownership/timing with team-lead.</li>
   </ul>

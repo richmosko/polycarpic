@@ -2,7 +2,7 @@
 
 > The written companion to `tokens.css` + `screen.css`. The CSS files are the machine-readable source of truth; this doc explains the *why* and the usage rules. Owned by the `ux-designer` agent. Generate/refine with `/generate-designdoc`.
 
-**Revision history (all 2026-09-28):** Pass 1 replaced an earlier revision that documented the cairn tracker's own board/dashboard UI, but inherited that tool's palette — rejected by the Principal same day (diverging from cairn is the goal). Pass 2 hand-authored an indigo/violet identity "inspired by" Monarch Money and Origin, but from general/training knowledge rather than an actual look — rejected: the guessed primary hue matched neither product, and "Origin" was misidentified (`originfinancial.com` is an unrelated Hawaii advisory firm; the product is **Origin, `useorigin.com`**). **This revision (pass 3) is derived from measurements**, not memory — team-lead captured live `getComputedStyle` reads and product screenshots off both actual sites (`temp/design-refs/README.md` + 5 images, gitignored, not in this repo — figures reproduced below). Every color/type/radius decision below traces to a specific measured value.
+**Revision history:** Pass 1 (2026-09-28) inherited the cairn tracker's own palette — rejected, diverging from cairn is the goal. Pass 2 (2026-09-28) hand-authored an indigo/violet identity "inspired by" Monarch Money and Origin from general/training knowledge — rejected: the guessed hue matched neither product, and "Origin" was misidentified. Pass 3 (2026-09-28) derived a blue-primary, warm-neutral palette from team-lead's measured screenshots of the actual products (`temp/design-refs/`) — accepted as the base, most of **Inspiration** and **Typography** below is still that pass's work and still current. **Pass 4 (2026-09-30, this revision)** is the Principal's first review of the pass-3 result (`temp/2026-09-30-design-review-1.md`): the brand hue becomes neon green (`#2CFF05`, chosen because the project name relates to fruiting plants and it's likely the logo's dominant color), the warm/brown neutral scale is replaced with a faint tint of that hue, the sidebar inverts, the shell layout changes (full-width header, sidebar below it), and two new screens (Home, Login) are added. See **Foundations** for the updated palette and every contrast figure, and **Layout & shell** / **Sidebar** / **New screens: Home & Login** for the rest.
 
 ## What governs this system
 
@@ -46,65 +46,76 @@ This project's UI direction is **SvelteKit + shadcn-svelte** (Tailwind, headless
 
 ### Color
 
-Every value below traces to a specific measured hex from **Inspiration**, above, adjusted only where noted for WCAG AA. Contrast figures were computed via the standard WCAG relative-luminance formula against these exact hex values (script in `temp/`, full pair-by-pair results in **Accessibility**).
+**Pass 4 (2026-09-30): brand hue is neon green.** The Principal's own choice: `#2CFF05`, "since the project name relates to fruiting plants... likely a dominant color in the logo." Measured: hue 110.6°, full saturation, L 0.51, **relative luminance 0.72 — only 1.36:1 against white**. That's not close to AA (needs 4.5:1 as text, 3:1 as a non-text UI element) — using it directly as light-mode `--primary` would have shipped an inaccessible button/link color. Resolution stated plainly, not silently substituted: **`#2CFF05` is kept as the literal `--brand` value** (logo references, dark-mode `--primary`, focus rings and chart accents against dark surfaces — everywhere it measures well) **and a darkened value at the exact same hue (110.6°, full saturation, L 0.26 → `#158500`) serves as light-mode `--primary`** instead. One number, `#158500`, does both jobs light mode needs — a fill with white text on it, and a plain text/link color directly on `--card` — both clear 4.79:1, checked against both roles rather than tuning one and assuming the other.
 
-**Dashboard canvas convention: cards-on-muted, not cards-on-background.** Confirmed directly from Monarch's app screenshot: warm off-white canvas (`--muted`), pure-white cards (`--card`) on top.
+**Neutrals are a faint tint of the brand hue, not warm/brown.** The Principal's words: the pass-3 Monarch-derived beige/warm-brown scale read as "90s corporate beige... depressing." Every neutral below (`--background`, `--muted`, `--border`, `--foreground`, and their dark-mode counterparts) is now built at hue 110.6° and a very low saturation (6–14%, barely perceptible as a hue at all) rather than carried over from Monarch's measured warm palette. `--card` stays at true white/near-black — a tinted card would fight with genuinely white content (statements, exports) — so the tint lives in the canvas (`--muted`) and hairlines (`--border`) around it, same "cards-on-tinted-canvas" convention as pass 3, just re-tinted.
 
-#### Light (`:root`) — primary/default mode, modeled on Monarch's app UI
+Contrast figures were computed via the standard WCAG relative-luminance formula against these exact hex values (script in `temp/`, full pair-by-pair results in **Accessibility**).
+
+#### Light (`:root`) — primary/default mode
 
 | Token | Value | Role |
 |---|---|---|
-| `--background` | `#FFFFFF` | Page background |
-| `--foreground` | `#2A2926` | Default body text — Monarch's measured ink |
+| `--background` | `#FEFEFE` | Page background |
+| `--foreground` | `#1F241E` | Default body text — near-black, faint cool-green cast, not brown |
 | `--card` | `#FFFFFF` | Card surface |
 | `--popover` | `#FFFFFF` | Popover/dropdown surface |
-| `--primary` | `#195F97` | Primary action fill — Origin's measured "info" blue, used as-is (5.18:1→ see Accessibility for exact figure) |
+| `--primary` | `#158500` | Primary action fill — darkened brand green, same hue as `--brand`, see above |
 | `--primary-foreground` | `#FFFFFF` | Text on primary fill |
-| `--secondary` | `#E8F1FA` | Secondary button/surface — pale blue tint |
-| `--secondary-foreground` | `#0B2942` | Text on secondary |
-| `--muted` | `#F7F4EE` | Muted background — warm off-white canvas |
-| `--muted-foreground` | `#65625D` | Muted/meta text — Monarch's measured secondary text |
-| `--accent` | `#EEF4FB` | Hover/active surface accent |
-| `--accent-foreground` | `#0B2942` | Text on accent |
-| `--destructive` | `#E70404` | Destructive fill — darkened from Origin's measured `#FC4A4A` (hue/sat preserved) to clear 4.5:1; the raw value only clears 3.38:1 |
+| `--secondary` | `#E9F3E8` | Secondary button/surface — pale green tint |
+| `--secondary-foreground` | `#235719` | Text on secondary |
+| `--muted` | `#F5F7F5` | Muted background — the "faint hint of the primary hue" canvas tint |
+| `--muted-foreground` | `#606F5D` | Muted/meta text |
+| `--accent` | `#F0F6EE` | Hover/active surface accent |
+| `--accent-foreground` | `#235719` | Text on accent |
+| `--brand` | `#2CFF05` | **New.** Literal, undarkened neon accent — logo, decorative highlights, dark-surface call-outs only; never text or a light-surface fill |
+| `--destructive` | `#E70404` | Destructive fill — unchanged from pass 3, re-verified against the new near-white surfaces |
 | `--destructive-foreground` | `#FFFFFF` | Text on destructive fill |
-| `--border` | `#E8E4DB` | Default hairline border — warm-toned |
-| `--input` | `#E8E4DB` | Input border |
-| `--ring` | `#195F97` | Focus ring |
-| `--chart-1`…`--chart-5` | `#3A95DE` → `#0B2942` | Sequential/magnitude ramp (brand blue) — net-worth-over-time, book-vs-market |
-| `--sidebar` | `#F7F4EE` | Sidebar background |
-| `--sidebar-accent` | `#E8F1FA` | Sidebar hover/accent (active nav item) |
-| `--positive` | `#00854D` | Gain / income / surplus — darkened from Origin's measured `#009C5A`; raw value only clears 3.56:1 |
+| `--border` | `#E5E9E4` | Default hairline border — green-tinted, not warm |
+| `--input` | `#E5E9E4` | Input border |
+| `--ring` | `#158500` | Focus ring |
+| `--chart-1`…`--chart-5` | `#1D9108` → `#061D02` | Sequential/magnitude ramp — moved from pass 3's blue to the brand's own green hue |
+| `--sidebar` | `#20291F` | **Inverted** — a dark surface floating on the light page (see Sidebar) |
+| `--sidebar-foreground` | `#EFF1EF` | |
+| `--sidebar-accent` | `#32412F` | |
+| `--sidebar-accent-foreground` | `#EFF1EF` | |
+| `--sidebar-ring` | `#2CFF05` | Raw brand green — pops cleanly against the dark sidebar even in light mode |
+| `--positive` | `#15803D` | Gain / income / surplus — unchanged from pass 3 |
 | `--positive-foreground` | `#FFFFFF` | Text on positive fill |
-| `--warning` | `#8F6C0A` | Caution tier — darkened from Monarch's measured mustard `#EFB921` (used there for illustrations/promos; repurposed here as caution, a standard convention); raw value only clears 1.81:1 |
+| `--warning` | `#B45309` | Caution tier — unchanged from pass 3 |
 | `--warning-foreground` | `#FFFFFF` | Text on warning fill |
 
-#### Dark (`.dark`) — secondary mode, modeled on Origin's measured base
+#### Dark (`.dark`) — secondary mode
 
 | Token | Value | Role |
 |---|---|---|
-| `--background` | `#050505` | Page background — Origin's measured base, used as-is |
-| `--foreground` | `#F2F2F0` | Default body text |
-| `--card` | `#141416` | Card surface — a lifted plane, echoing Origin's `rgba(255,255,255,0.04–0.08)` overlay convention |
-| `--primary` | `#50A1E2` | Primary action fill, lightened for dark bg |
-| `--primary-foreground` | `#08202E` | Dark text — clears 6.00:1; white on this fill only clears 2.79:1 |
-| `--secondary` | `#16324A` | |
-| `--secondary-foreground` | `#BDDCF4` | |
-| `--muted` | `#1A1A1C` | |
-| `--muted-foreground` | `#A6A6A3` | |
-| `--accent` | `#1C3A54` | |
-| `--accent-foreground` | `#BDDCF4` | |
-| `--destructive` | `#FC4F4F` | Origin's own hue at a lighter step for dark-bg legibility |
-| `--destructive-foreground` | `#2A0507` | Dark text — clears 5.67:1 |
-| `--border` | `rgba(255,255,255,0.08)` | Origin's measured overlay convention |
-| `--chart-1`…`--chart-5` | `#BDDCF4` → `#1E74B8` | Ramp re-lightened for dark mode |
-| `--sidebar` | `#0A0A0C` | |
-| `--positive` | `#52E0A4` | Origin's green hue, saturation eased from its raw 100% so the dark-mode fill doesn't read neon |
+| `--background` | `#070907` | Page background — same brand-hue tint applied to a near-black base |
+| `--foreground` | `#EFF1EF` | Default body text |
+| `--card` | `#0D100C` | Card surface |
+| `--primary` | `#2CFF05` | **The raw brand green itself** — this is the one surface where "the brand color" and "the primary token" are the same value; it clears AA beautifully here where light mode's white base couldn't use it at all |
+| `--primary-foreground` | `#070907` | Dark ink — clears 14.7:1; white on this bright fill only clears 1.4:1 |
+| `--secondary` | `#161F14` | |
+| `--secondary-foreground` | `#61CB4D` | |
+| `--muted` | `#0F130E` | |
+| `--muted-foreground` | `#A1AD9F` | |
+| `--accent` | `#182216` | |
+| `--accent-foreground` | `#61CB4D` | |
+| `--brand` | `#2CFF05` | Same literal value both modes — a fixed brand reference, not themed |
+| `--destructive` | `#FC4F4F` | Unchanged from pass 3 |
+| `--destructive-foreground` | `#2A0507` | |
+| `--border` | `rgba(255,255,255,0.08)` | |
+| `--chart-1`…`--chart-5` | `#C1FBB6` → `#29CB0B` | Ramp re-lightened for dark mode, same brand hue |
+| `--sidebar` | `#F5F7F5` | **Inverted the other way** — a light card floating on the dark page, reusing the light mode canvas tone directly (see Sidebar) |
+| `--sidebar-foreground` | `#1F241E` | |
+| `--sidebar-accent` | `#E9F3E8` | |
+| `--sidebar-accent-foreground` | `#235719` | |
+| `--sidebar-ring` | `#158500` | The darker primary, not the raw brand green — against this light sidebar the raw brand green would sit too close to its own hue family for a focus indicator to read distinctly |
+| `--positive` | `#52E0A4` | Unchanged from pass 3 |
 | `--positive-foreground` | `#052E13` | |
-| `--warning` | `#F3CA59` | Monarch's mustard hue, lightened for dark-bg legibility |
+| `--warning` | `#F3CA59` | Unchanged from pass 3 |
 | `--warning-foreground` | `#33230A` | |
 
-**Character read:** a warm, near-black-on-off-white light mode and a true-near-black dark mode (not a cool navy-grey shift on either), a single restrained blue accent shared by both reference products in a calm role, and financial-semantic hues (green/red/mustard) sourced from measured brand values rather than invented. Both light and dark are real, designed modes — light is primary/default (see Inspiration), dark is not an afterthought.
+**Character read:** a near-white-on-near-black-green-tinted light mode and a true-near-black-green-tinted dark mode — the same "barely a hue" neutral treatment in both directions, replacing pass 3's warm/brown Monarch-derived scale. One brand hue (neon green, 110.6°) carries the whole system: literal where it clears AA (dark surfaces), darkened at the same hue where it doesn't (light-mode primary). `--positive` (green, hue ≈150°) and the brand/primary green (hue ≈110.6°) are a deliberate ≈40° apart — checked, not assumed, that a chartreuse brand accent and a more blue-toned "gain" green don't read as the same color next to each other.
 
 ### Typography
 
@@ -159,9 +170,33 @@ Kept from the prior pass on its own merits (generic spacing rhythm), not re-meas
 
 No custom `--shadow-*` overrides — inherits shadcn-svelte's default scale.
 
-### Sidebar tokens
+### Layout & shell (pass 4)
 
-Persistent left sidebar — confirmed as the correct pattern by both references' actual app/product structure (Monarch's own sidebar: Dashboard, Accounts, Transactions, Cash Flow, Reports, Budget, Recurring, Goals, Investments, Advice — validates our own sidebar-nav wireframes).
+**Principal direction:** "Can we have the top header bar span the full width, and have the side-bar under the header?" — a shell restructure from pass 3's side-by-side sidebar+content grid.
+
+New shell, top to bottom:
+1. **Header** — full page width, top row. Entity switcher (left), page title, global actions (right: theme toggle, notifications later). Persistent across every screen.
+2. **Body** — below the header, a two-column region: sidebar (left) + content (right). The sidebar no longer spans full page height; it starts below the header, same as the content column.
+
+This is a genuine restructure, not a cosmetic tweak — the entity switcher moves from "top of sidebar" (pass 3) to the header, since the header is now the one element guaranteed full-width real estate on every screen including when the sidebar collapses to a rail (below). See `wireframes/` and `styled-screens/dashboard.html` for the built version.
+
+### Sidebar (pass 4 — inverted, card, collapsible)
+
+**Principal direction:** "Maybe we can play with an inverted background color for the sidebar. And while we are at it: Make it a card with the same rounded edges. I also want the ability to compact the sidebar to just icons."
+
+- **Inverted:** in light mode the sidebar is a dark surface (`--sidebar` = `#20291F`) floating on the light page; in dark mode it's a light surface (`--sidebar` = `#F5F7F5`, the light mode's own canvas tone reused directly) floating on the dark page. A user should never see two dark (or two light) surfaces stacked with no separation across a mode switch — "inverted" means relative to the page, in both directions.
+- **Card:** `border-radius: var(--radius-lg)` (12px, same as any other card), with its own `padding` and a visible edge against the page canvas (a subtle shadow or border, not flush) — it now reads as a floating panel rather than a flush structural rail.
+- **Collapsible to an icon rail:** a compact state (~64px wide) showing only nav icons, no labels, no entity-switcher (that moved to the header, see Layout above) — expand restores the full ~240px width with labels.
+
+**Expand/collapse cue — three options, not yet chosen (Principal to pick):**
+
+| Option | Mechanism | Trade-off |
+|---|---|---|
+| **A. Chevron at the rail's bottom edge** | A small chevron/arrow button pinned at the bottom of the sidebar, always visible, click to toggle | Most discoverable (a permanent, labeled affordance); costs a small amount of vertical space at the bottom of every sidebar state |
+| **B. Hover-reveal** | Collapsed rail shows icons only; hovering the rail temporarily flies out full labels (like a dock), with a small pin icon to make the expansion persist | Zero permanent chrome cost; less discoverable on first use, and awkward on touch (no hover) — would need a tap-to-expand fallback for mobile |
+| **C. Keyboard shortcut + remembered state** | `Cmd/Ctrl+B` toggles; the last state persists (`localStorage`, same pattern as `doc-theme` in `toc.js`); a one-time tooltip on first sidebar interaction teaches the shortcut | Cheapest UI cost (no permanent control needed at all) but the least discoverable without the tooltip; best power-user ergonomics |
+
+**Recommendation, not a decision:** A (chevron) as the primary, always-visible affordance, **plus** C's remembered state and keyboard shortcut as an accelerator on top of it — B (hover-reveal) is the one I'd drop, since its touch-device gap needs a fallback control anyway, which erodes its "zero chrome" advantage. See `wireframes/sidebar-cues.html` for a rough side-by-side sketch of all three.
 
 ---
 
@@ -212,16 +247,43 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Tabs** | Entity switcher, GL-vs-custodial toggle, nominal-vs-inflation-adjusted toggle, Totals/Percent toggle (Monarch pattern) |
 | **Sheet / Dialog** | Transaction detail drawer; confirm-draft dialog; new-entity/membership dialog |
 | **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers |
-| **Sidebar** | Primary nav — validated against both references' own app structure |
+| **Sidebar** | Primary nav — now inverted, a rounded card, collapsible to an icon rail (pass 4, see Sidebar) |
 | **Skeleton** | Every async fetch boundary |
 | **Sonner (toast)** | Import batch complete, draft confirmed/posted, reconciliation break |
 | **Progress** | Import batch progress, safe-harbor paid-vs-required |
+| **Header** *(pass 4)* | Full-width top bar — entity switcher, page title, global actions; sidebar sits below it, not beside it (see Layout & shell) |
+| **Entity card grid** *(pass 4, new)* | Home screen's entity picker — one card per entity, net-worth teaser, role badge |
+| **Two-pane split** *(pass 4, new)* | Login — brand pane + form-card pane, full-bleed dark |
 
-**Top bar pattern (Monarch):** page title (left) + a secondary outline action + a primary filled CTA (right) — e.g. Dashboard: "Refresh" (outline) + nothing else; Ledger: "Confirm all" (filled, primary action for that screen).
+**Top bar pattern (Monarch):** page title (left) + a secondary outline action + a primary filled CTA (right) — e.g. Dashboard: "Refresh" (outline) + nothing else; Ledger: "Confirm all" (filled, primary action for that screen). **Pass 4:** this pattern now lives in the full-width Header, with the entity switcher added to its left edge.
 
 **Empty-state pattern (ARCH §2.4 — Dashboard ships in M3 with the tax panel empty until 1.0, allocation panel empty until M4):** an empty panel keeps its real card chrome (eyebrow label, card shape, dashboard-scale padding) and states plainly that the feature isn't set up yet, in `--muted-foreground` body text — no illustration, no skeleton (a skeleton implies "loading," not "not built yet" — conflating the two is misleading). **Copy never names an internal milestone or version id** (architect's nit, 2026-09-28) — "Not set up yet," not "Available in v1.0"/"Available at M4": these panels are staging-only today, but neutral copy survives either way OQ-8 (0.x releases) resolves, without leaking internal roadmap language to a user. Example: the tax-liability card shows the eyebrow "PENDING TAX LIABILITY" and "Not set up yet" — same card shape as the live version will have, so the dashboard's layout doesn't visibly shift when the feature ships. See `styled-screens/dashboard.html` for the built example.
 
 **Still ours to set:** reduced-motion policy; loading-state discipline (per-feature).
+
+---
+
+## New screens: Home & Login (pass 4)
+
+### Home
+
+**Principal direction:** "what does a signed-in user land on" — net worth hero vs. entity switcher vs. recent activity, proposed here.
+
+**Proposal:** Home is the **entity-scoped landing surface**, not a third thing competing with Dashboard:
+- A user with **one** entity lands directly on that entity's **Dashboard** — Home is skipped entirely, not an extra click for the common case.
+- A user with **multiple** entities (a household, or an owner/manager/viewer across several) lands on **Home**: a grid of entity cards (Person/Trust/Business/Household, per Financial semantics badges), each showing a one-line net-worth teaser and role badge, sorted by last-viewed. Selecting a card goes to that entity's Dashboard; the header's entity switcher (see Layout) is the fast path back to Home or to any other entity without a full navigation round-trip.
+
+This resolves the "net worth hero vs. entity switcher vs. recent activity" question directly: Home carries **only** the entity-picker role (net-worth teaser per card is a preview, not a full hero); the real net-worth hero and recent activity belong on the per-entity Dashboard, already designed — Home doesn't duplicate them.
+
+### Login / authentication
+
+**Principal direction:** two-pane, modeled on `useorigin.com`'s login (page was behind a splash loader under automation and couldn't be captured directly; known shape relayed by team-lead: full-bleed dark page, two side-by-side panes — left brand/marketing statement, right a card with email + continue + OAuth buttons).
+
+**Proposal:** a two-pane split, full-bleed, dark by default regardless of the user's stored theme preference (a login page has no "user's canvas" yet to theme) —
+- **Left pane:** the brand pane — `--background` dark, the neon `--brand` green used generously here (a large wordmark/mark, a short one-line statement), since this is exactly the "dark surface" context where the raw brand hex is meant to be used at full strength.
+- **Right pane:** a `--card` panel (still on the dark page, so it reads as a lifted surface) holding the actual form — email input, "Continue" primary button, a divider, then OAuth buttons (Google / Apple / GitHub per PRD §8) stacked below.
+
+See `wireframes/login.html` and `styled-screens/login.html` for the built version.
 
 ---
 
@@ -237,6 +299,8 @@ For architect's Screen DTO work (ARCH §2.4, OQ-11 resolved in outline). Model c
 | Entities | Entity list; memberships; invite action | |
 | Securities | Lot table; allocation actual-vs-target; book-vs-market time series | |
 | Import | Linked providers; batch progress; `import_batch` new/duplicate/needs-category counts | |
+| Home *(pass 4, new)* | Entity list scoped to the user's memberships, each with a one-line net-worth teaser and role badge; skipped entirely for single-entity users (straight to Dashboard) | Not milestone-pinned yet — depends on `tenancy`'s membership list, no new package |
+| Login *(pass 4, new)* | Unauthenticated — email, OAuth provider list (Google/Apple/GitHub, PRD §8); no ledger data | `packages/auth` |
 
 ---
 
@@ -250,43 +314,60 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 ## Accessibility
 
-**Target: WCAG AA.** Every pair below computed via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`).
+**Target: WCAG AA.** Every pair below re-run for pass 4's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check.py`).
 
 **Light mode — text pairs (floor 4.5:1), all PASS:**
 
 | Pair | Contrast |
 |---|---|
-| `--foreground` / `--background` | 14.55:1 |
-| `--primary-foreground` / `--primary` | 6.72:1 |
-| `--muted-foreground` / `--muted` | 5.53:1 |
-| `--muted-foreground` / `--card` | 6.07:1 |
+| `--foreground` / `--background` | 15.66:1 |
+| `--primary-foreground` / `--primary` (fill) | 4.79:1 |
+| `--primary` / `--card` (text-only, e.g. links) | 4.79:1 |
+| `--secondary-foreground` / `--secondary` | 7.53:1 |
+| `--muted-foreground` / `--muted` | 4.96:1 |
+| `--muted-foreground` / `--card` | 5.34:1 |
+| `--accent-foreground` / `--accent` | 7.81:1 |
 | `--destructive-foreground` / `--destructive` | 4.75:1 |
-| `--positive-foreground` / `--positive` (fill) | 4.71:1 |
-| `--warning-foreground` / `--warning` (fill) | 4.86:1 |
+| `--sidebar-foreground` / `--sidebar` | 13.23:1 |
+| `--sidebar-accent-foreground` / `--sidebar-accent` | 9.57:1 |
+| `--positive-foreground` / `--positive` (fill) | 5.02:1 |
+| `--warning-foreground` / `--warning` (fill) | 5.02:1 |
 
 **Light mode — non-text pairs (floor 3:1):**
 
 | Pair | Contrast | Result |
 |---|---|---|
-| `--chart-1`…`--chart-5` / `--card` | 3.21:1 → 14.89:1 | PASS all 5 |
-| `--border` / `--card` | 1.27:1 | Below floor — decorative hairline, accepted (see Open items) |
+| `--ring` / `--card` | 4.79:1 | PASS |
+| `--sidebar-ring` / `--sidebar` | 11.02:1 | PASS |
+| `--chart-1`…`--chart-5` / `--card` | 4.11:1 → 17.73:1 | PASS all 5 |
+| `--border` / `--card` | 1.23:1 | Below floor — decorative hairline, accepted (unchanged posture from pass 3) |
+| `--brand` / `--background` | 1.35:1 | **Expected fail** — confirms `--brand` must never be used as a light-surface fill or text color (see Foundations); this row exists to catch a future regression, not to be fixed |
 
 **Dark mode — text pairs (floor 4.5:1), all PASS:**
 
 | Pair | Contrast |
 |---|---|
-| `--foreground` / `--background` | 18.18:1 |
-| `--primary-foreground` / `--primary` | 6.00:1 (dark text — white on this fill only clears 2.79:1) |
-| `--muted-foreground` / `--card` | 7.54:1 |
+| `--foreground` / `--background` | 17.60:1 |
+| `--primary-foreground` / `--primary` (fill) | 14.66:1 |
+| `--primary` / `--card` (text-only) | 14.06:1 |
+| `--secondary-foreground` / `--secondary` | 8.19:1 |
+| `--muted-foreground` / `--muted` | 8.03:1 |
+| `--muted-foreground` / `--card` | 8.20:1 |
+| `--accent-foreground` / `--accent` | 7.94:1 |
 | `--destructive-foreground` / `--destructive` | 5.67:1 |
+| `--sidebar-foreground` / `--sidebar` | 14.67:1 |
+| `--sidebar-accent-foreground` / `--sidebar-accent` | 7.53:1 |
 | `--positive-foreground` / `--positive` (fill) | 8.93:1 |
-| `--warning-foreground` / `--warning` (fill) | 9.56:1 |
+| `--warning-foreground` / `--warning` (fill) | 9.67:1 |
 
 **Dark mode — non-text pairs (floor 3:1):**
 
 | Pair | Contrast | Result |
 |---|---|---|
-| `--chart-1`…`--chart-5` / `--card` | 3.72:1 → 12.89:1 | PASS all 5 |
+| `--ring` / `--card` | 14.06:1 | PASS |
+| `--sidebar-ring` / `--sidebar` | 4.45:1 | PASS — the darker `--primary`, not raw `--brand`, is used here (see Foundations) |
+| `--chart-1`…`--chart-5` / `--card` | 8.79:1 → 16.18:1 | PASS all 5 |
+| `--brand` / `--background` | 14.66:1 | PASS — this is the surface `--brand` is meant for |
 
 | Concern | Standard / approach |
 |---|---|
@@ -297,10 +378,11 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | Motion | Respect `prefers-reduced-motion` (open item) |
 
 **Open items:**
-- No CVD simulation run on the new palette yet.
-- `--border`/`--card` is a low-contrast hairline by design (1.27:1) — decorative, consistent with common practice.
+- No CVD simulation run on the new palette yet — the brand hue (110.6°, yellow-green) sits near the deuteranopia confusion band; worth a real check before lock given how central it now is to the brand identity, more so than pass 3's blue.
+- `--border`/`--card` is a low-contrast hairline by design (1.23:1) — decorative, consistent with common practice.
 - Reduced-motion policy not yet written.
-- Radius-xl (sheets) not measured against either reference — extrapolated.
+- Radius-xl (sheets) not measured against either reference — extrapolated (unchanged from pass 3).
+- Sidebar expand/collapse cue (three options proposed, see Sidebar) — Principal to pick before frontend-lead builds it.
 
 ---
 
@@ -309,3 +391,6 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 - Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.
 - Categorical (3+ hue) chart palette for transaction-category breakdowns — deferred until a concrete chart spec exists.
 - Compare `styled-screens/dashboard.html` against `temp/design-refs/monarch-app-accounts-zoom.png` component-by-component once frontend-lead builds the real screen — this pass matched structure and the net-worth hero closely but did not build the full grouped-account-list + segmented-bar right column (time-boxed to the highest-traffic pattern); flag as a fast-follow if the gap matters before Implement.
+- **Sidebar expand/collapse cue (pass 4):** three options proposed (chevron / hover-reveal / keyboard+remembered-state), a recommendation stated, not decided — needs the Principal's pick before frontend-lead builds it.
+- **Login page's exact visual (pass 4):** `useorigin.com`'s own login was behind a splash loader under automation and could not be captured directly — this pass's two-pane proposal is built from a relayed description (team-lead), not a screenshot. Worth a direct look before treating the styled screen as final.
+- **CVD check on the brand hue (pass 4):** flagged in Accessibility — the yellow-green brand hue is a plausible deuteranopia risk given how central it now is; not yet simulated.

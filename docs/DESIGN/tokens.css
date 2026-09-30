@@ -7,167 +7,186 @@
  * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
  * the swatches.
  *
- * THIRD PASS (2026-09-28) — derived from MEASURED references, not memory.
- * team-lead captured live getComputedStyle reads + screenshots off
- * monarch.com and useorigin.com (temp/design-refs/README.md + 5 images —
- * gitignored, not in this repo; figures reproduced in
- * design-system-spec.md § Inspiration). The prior pass (695bcad) guessed
- * at both products' identity and got the primary hue and Origin's own
- * domain wrong. Every hex below traces to a specific measured value from
- * that capture, adjusted only where the raw brand color misses WCAG AA
- * (documented inline) — see design-system-spec.md § Inspiration and
- * § Accessibility for the derivation and every contrast figure.
+ * FOURTH PASS (2026-09-30) — Principal review pass 1 on the third-pass
+ * Monarch/Origin palette (temp/2026-09-30-design-review-1.md): brand hue
+ * becomes neon green #2CFF05 ("the project name relates to fruiting
+ * plants... likely a dominant color in the logo"); the beige/warm-brown
+ * neutral scale (inherited from Monarch's measured palette) is replaced
+ * with a faint tint of the brand hue; the sidebar inverts (dark-on-light /
+ * light-on-dark). See design-system-spec.md § Foundations for full
+ * derivation and every contrast figure — every value below that isn't the
+ * literal brand hex was DERIVED (same hue, adjusted lightness/chroma for
+ * AA), not picked freehand.
+ *
+ * #2CFF05 itself measures ~1.36:1 against white — nowhere near AA as text
+ * or a light-mode fill. Kept as the literal brand/accent value (--brand,
+ * dark-mode --primary, both a --ring value, chart accents) everywhere it
+ * clears AA against a dark surface; a darkened same-hue green (#158500,
+ * hue held at 110.6°) serves as light-mode --primary instead, stated
+ * plainly rather than silently substituting a different hue.
  *
  * Plain sRGB hex, not OKLCH — this system doesn't vendor a shadcn preset
- * (unlike cairn's own tokens) and doesn't need OKLCH's multi-preset
- * precision.
+ * and doesn't need OKLCH's multi-preset precision.
  *
- * CI note (POLY-78, in progress): scripts/cairn/tests/test_board_tokens_parity.py
- * currently asserts this file shares values with cairn's board tokens —
- * that assertion is the thing POLY-78 is removing. Expect this file to
- * fail the `cairn` CI check until POLY-78 merges; do not re-add cairn's
- * values to work around it.
+ * CI note (POLY-78): scripts/cairn/tests/test_board_tokens_parity.py
+ * asserted this file shares values with cairn's board tokens; POLY-78
+ * removed that assertion. If it somehow reappears, do not re-add cairn's
+ * values to satisfy it.
  *
  * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
  */
 
 :root {
-  /* Surfaces & text — warm off-white canvas + near-black warm ink, measured
-     off Monarch's actual app UI (not its cream marketing hero — the app
-     canvas is off-white with pure-white cards, per temp/design-refs). */
-  --background: #FFFFFF;
-  --foreground: #2A2926; /* Monarch's measured ink */
+  /* Surfaces & text — a faint tint of the brand hue (110.6°) replacing the
+     Monarch-derived warm/brown neutral scale the Principal called "90s
+     corporate beige". Cards stay near-pure white (a tinted white would
+     fight with genuinely-white content like receipts/exports); the canvas
+     (--muted) and hairlines (--border) carry the visible tint. */
+  --background: #FEFEFE;
+  --foreground: #1F241E; /* near-black, faint cool-green cast — not brown */
   --card: #FFFFFF;
-  --card-foreground: #2A2926;
+  --card-foreground: #1F241E;
   --popover: #FFFFFF;
-  --popover-foreground: #2A2926;
+  --popover-foreground: #1F241E;
 
-  /* Brand — blue, the one hue both reference products independently reach
-     for when they need a calm/informational signal rather than an urgent
-     one (Monarch's net-worth trend line is light blue; Origin's own
-     "info" semantic color is #195F97) — adopted as the primary brand
-     accent precisely because it's shared, restrained, and free of
-     financial-semantic meaning (unlike orange/red/green, all already
-     spoken for). Origin's own measured #195F97, used as-is (6.72:1 on
-     white, no adjustment needed). */
-  --primary: #195F97;
+  /* Brand — neon green, the Principal's own choice (project name relates
+     to fruiting plants; likely the logo's dominant color). #2CFF05 itself
+     measures 1.36:1 against white — far below AA — so it is NOT used as
+     light-mode --primary. Light-mode --primary is a darkened value at the
+     SAME hue (110.6°, full saturation, L 0.26 vs the brand's L 0.51): one
+     value clears AA as both a fill (white text on it, 4.79:1) and as
+     plain text/link color directly on --card (4.79:1) — a single number
+     doing both jobs, not two separately-tuned values. */
+  --primary: #158500;
   --primary-foreground: #FFFFFF;
-  --secondary: #E8F1FA; /* pale blue tint */
-  --secondary-foreground: #0B2942;
-  --muted: #F7F4EE; /* warm off-white canvas, echoing Monarch's warm palette */
-  --muted-foreground: #65625D; /* Monarch's measured secondary text (5.53:1 on --muted, 6.07:1 on --card) */
-  --accent: #EEF4FB;
-  --accent-foreground: #0B2942;
+  --secondary: #E9F3E8; /* pale green tint */
+  --secondary-foreground: #235719;
+  --muted: #F5F7F5; /* the "faint hint of the primary hue" canvas tint */
+  --muted-foreground: #606F5D; /* 4.96:1 on --muted, 5.34:1 on --card */
+  --accent: #F0F6EE;
+  --accent-foreground: #235719;
 
-  /* Destructive — Origin's measured #FC4A4A darkened to #E70404 (hue/
-     saturation preserved) to clear 4.5:1 text; the raw brand value only
-     clears 3.38:1. */
+  /* --brand: the literal, undarkened neon accent — logo references, chart
+     accent call-outs, decorative highlights, anywhere a dark surface sits
+     underneath. Do not use for text or a light-surface fill; use --primary
+     for that. */
+  --brand: #2CFF05;
+
+  /* Destructive — unchanged from the Origin-measured derivation (pass 3);
+     re-verified against the new near-white surfaces, no meaningful drift
+     (4.75:1, was 4.83:1 against the old pure #FFFFFF). */
   --destructive: #E70404;
   --destructive-foreground: #FFFFFF;
 
-  --border: #E8E4DB;
-  --input: #E8E4DB;
-  --ring: #195F97;
+  --border: #E5E9E4;
+  --input: #E5E9E4;
+  --ring: #158500;
 
-  /* Chart ramp — sequential, single-hue (brand blue), for magnitude/
-     time-series charts (net worth over time — Monarch's own hero chart is
-     exactly this: single-line area chart, one hue, soft gradient fill).
-     Every step clears 3:1 against --card, measured. */
-  --chart-1: #3A95DE;
-  --chart-2: #217CC5;
-  --chart-3: #196099;
-  --chart-4: #12456D;
-  --chart-5: #0B2942;
+  /* Chart ramp — moved from pass 3's blue (Origin-inspired) to the brand's
+     own green hue, so the one sequential/magnitude accent in the system
+     reads as "the same green," not a leftover blue from a superseded
+     pass. Deliberately a different green from --positive (hue 150° vs
+     this ramp's 110.6°, see Financial semantics) — checked, not assumed,
+     that the two don't read as the same hue. Every step clears 3:1
+     against --card, measured; chart-1 (the lightest usable step) is
+     already fairly saturated-dark, same shape as pass 3's blue ramp. */
+  --chart-1: #1D9108;
+  --chart-2: #177406;
+  --chart-3: #115705;
+  --chart-4: #0C3A03;
+  --chart-5: #061D02;
 
-  --sidebar: #F7F4EE;
-  --sidebar-foreground: #2A2926;
-  --sidebar-accent: #E8F1FA;
-  --sidebar-accent-foreground: #0B2942;
-  --sidebar-border: #E8E4DB;
-  --sidebar-ring: #195F97;
+  /* Sidebar — INVERTED per Principal direction: a dark surface floating on
+     the light page, styled as a rounded card (radius-lg) rather than a
+     flush panel. --sidebar-foreground/--sidebar-accent-foreground reuse
+     the dark-mode foreground/positive-accent inks directly (13.2:1,
+     9.6:1) since this surface IS effectively a dark-mode island inside a
+     light page. */
+  --sidebar: #20291F;
+  --sidebar-foreground: #EFF1EF;
+  --sidebar-accent: #32412F;
+  --sidebar-accent-foreground: #EFF1EF;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #2CFF05; /* the raw brand green pops cleanly against this dark surface, 11.0:1 */
 
-  /* Financial semantics — Origin's measured positive/negative hues,
-     darkened only as far as needed to clear 4.5:1 text (both raw brand
-     values only clear ~3.4-3.6:1). Warning is Monarch's measured mustard
-     accent (#EFB921, used for illustrations/promos there), darkened the
-     same way, repurposed here as a caution tier — mustard/amber-for-
-     caution is a standard convention independent of either brand. Never
-     the only signal — see design-system-spec.md § Financial semantics. */
-  --positive: #00854D; /* darkened from Origin's measured #009C5A */
+  /* Financial semantics — unchanged hues from pass 3 (Origin-measured
+     green/red, Monarch-measured mustard), re-verified against the new
+     near-white surfaces (see design-system-spec.md § Accessibility for
+     the full re-run). */
+  --positive: #15803D;
   --positive-foreground: #FFFFFF;
-  --warning: #8F6C0A; /* darkened from Monarch's measured #EFB921 */
+  --warning: #B45309;
   --warning-foreground: #FFFFFF;
 
-  /* Radius — measured off Monarch's actual app screenshot: cards ~12px,
-     buttons/inputs ~8px (NOT the pill shape Monarch's marketing-page CTA
-     uses — that's a marketing-only device, confirmed by comparing the
-     app screenshot against the hero page; Origin's stated button radius
-     is also 8px, corroborating). radius-xl has no direct measurement —
-     a reasonable extrapolation for sheets/drawers, flag before lock. */
+  /* Radius — unchanged from pass 3 (measured off Monarch/Origin's app-level
+     values). The inverted sidebar card uses --radius-lg like any other
+     card. */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 20px;
 
-  /* Typography — one grotesque sans throughout the APP (hierarchy by
-     weight, not face): both Monarch ("ABC Oracle") and Origin ("Suisse
-     Intl") do this in their actual product UI — the serif display accent
-     both use is a MARKETING-page-only device (confirmed: Monarch's app
-     screenshot title "Accounts" is bold sans, not serif; the serif only
-     appears on monarch.com's hero/tracking marketing pages), so it's
-     deliberately NOT adopted here — see design-system-spec.md §
-     Inspiration for the reasoning. --font-mono is Origin's own measured
-     choice ("Roboto Mono"), adopted for its uppercase-letterspaced
-     section-header signature (Origin's product cards: "HOLDINGS",
-     "UPCOMING TRANSACTIONS") — a genuine, evidenced typographic
-     signature for a ledger product, not decoration. */
+  /* Typography — unchanged from pass 3 (Inter body/headings, Roboto Mono
+     for uppercase eyebrow labels — see design-system-spec.md § Typography
+     for the full Monarch/Origin app-UI evidence; not re-litigated here). */
   --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-heading: var(--font-sans);
   --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .dark {
-  /* Origin's measured near-black base (#050505) + its own subtle
-     white-overlay surface convention (rgba(255,255,255,0.04–0.08)). */
-  --background: #050505;
-  --foreground: #F2F2F0;
-  --card: #141416;
-  --card-foreground: #F2F2F0;
-  --popover: #141416;
-  --popover-foreground: #F2F2F0;
+  /* Same brand-hue tint applied to a near-black base (was Origin's flat
+     #050505/#141416) — "go through the other color tokens... less
+     browns" read as a whole-system instruction, not light-mode-only. */
+  --background: #070907;
+  --foreground: #EFF1EF;
+  --card: #0D100C;
+  --card-foreground: #EFF1EF;
+  --popover: #0D100C;
+  --popover-foreground: #EFF1EF;
 
-  --primary: #50A1E2;
-  --primary-foreground: #08202E; /* dark text clears 6.00:1; white on this lighter dark-mode blue only clears 2.79:1 */
-  --secondary: #16324A;
-  --secondary-foreground: #BDDCF4;
-  --muted: #1A1A1C;
-  --muted-foreground: #A6A6A3;
-  --accent: #1C3A54;
-  --accent-foreground: #BDDCF4;
+  /* Dark-mode --primary IS the raw brand green — it clears AA beautifully
+     here (14.7:1 with dark ink) where light mode's white base couldn't
+     use it at all. This is the one surface where "the brand color" and
+     "the primary token" are the same value. */
+  --primary: #2CFF05;
+  --primary-foreground: #070907; /* dark ink clears 14.7:1; white on this bright fill only clears 1.4:1 */
+  --secondary: #161F14;
+  --secondary-foreground: #61CB4D;
+  --muted: #0F130E;
+  --muted-foreground: #A1AD9F; /* 8.0:1 on --muted, 8.2:1 on --card */
+  --accent: #182216;
+  --accent-foreground: #61CB4D;
+
+  --brand: #2CFF05; /* same literal value both modes — it's a fixed brand reference, not a themed token */
 
   --destructive: #FC4F4F;
-  --destructive-foreground: #2A0507; /* dark text clears 5.67:1 */
+  --destructive-foreground: #2A0507;
 
   --border: rgba(255, 255, 255, 0.08);
   --input: rgba(255, 255, 255, 0.12);
-  --ring: #50A1E2;
+  --ring: #2CFF05;
 
-  /* Re-lightened for dark mode — needs to clear 3:1 against the near-black
-     dark --card, so it isn't a straight carry-over of the light ramp. */
-  --chart-1: #BDDCF4;
-  --chart-2: #84BDEB;
-  --chart-3: #50A1E2;
-  --chart-4: #248ADB;
-  --chart-5: #1E74B8;
+  /* Re-lightened for dark mode, same brand hue — clears 3:1 against the
+     near-black --card at every step, measured. */
+  --chart-1: #C1FBB6;
+  --chart-2: #8BF877;
+  --chart-3: #5AF53D;
+  --chart-4: #31F20D;
+  --chart-5: #29CB0B;
 
-  --sidebar: #0A0A0C;
-  --sidebar-foreground: #F2F2F0;
-  --sidebar-accent: #16324A;
-  --sidebar-accent-foreground: #BDDCF4;
-  --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #50A1E2;
+  /* Sidebar — INVERTED the other way in dark mode: a LIGHT card floating
+     on the dark page (the same light-mode canvas tone, reused directly).
+     A user should never see two dark sidebars back to back across a mode
+     switch — inversion means "opposite of the page," in both directions. */
+  --sidebar: #F5F7F5;
+  --sidebar-foreground: #1F241E;
+  --sidebar-accent: #E9F3E8;
+  --sidebar-accent-foreground: #235719;
+  --sidebar-border: #E5E9E4;
+  --sidebar-ring: #158500; /* the darker primary reads against this light sidebar; raw brand green would be too close to its own fill hue for a focus ring here */
 
-  --positive: #52E0A4; /* Origin's green hue, saturation eased from its raw 100% for a dark-mode fill that doesn't read neon */
+  --positive: #52E0A4;
   --positive-foreground: #052E13;
   --warning: #F3CA59;
   --warning-foreground: #33230A;

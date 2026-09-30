@@ -9,22 +9,31 @@
 </head>
 <body>
 <div class="shell">
-  <aside class="sidebar">
+  <!-- Header (pass 4): full page width, entity switcher moved here from the
+       sidebar — see design-system-spec.md § Layout & shell. -->
+  <header class="topbar">
     <div class="entity-switcher">Person — Mosko ▾</div>
-    <a class="nav-item active" href="#">Dashboard</a>
-    <a class="nav-item" href="#">Ledger</a>
-    <a class="nav-item" href="#">Accounts</a>
-    <a class="nav-item" href="#">Entities</a>
-    <a class="nav-item" href="#">Securities</a>
-    <a class="nav-item" href="#">Import</a>
-  </aside>
-
-  <main class="content">
-    <div class="header-row">
-      <h1 class="heading" style="font-size:24px;">Dashboard</h1>
+    <span class="topbar-title">Dashboard</span>
+    <div class="topbar-actions">
       <button class="btn btn-outline">Refresh</button>
     </div>
+  </header>
 
+  <div class="shell-body">
+    <!-- Sidebar (pass 4): inverted, rounded card, collapsible to an icon
+         rail. Cue shown here is Option A (chevron) — see
+         wireframes/sidebar-cues.html for all three proposed. -->
+    <aside class="sidebar">
+      <a class="nav-item active" href="#"><span class="nav-icon"></span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Ledger</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Accounts</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Entities</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Securities</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Import</span></a>
+      <button class="sidebar-toggle">‹ Collapse</button>
+    </aside>
+
+  <main class="content">
     <!-- Net-worth hero — Monarch pattern: eyebrow + big figure + signed delta
          on the figure itself + single-line area chart with gradient fill.
          Compare against temp/design-refs/monarch-app-accounts-zoom.png -->
@@ -142,6 +151,7 @@
       </div>
     </div>
   </main>
+  </div>
 </div>
 </body>
 </html>

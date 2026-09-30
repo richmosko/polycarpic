@@ -40,49 +40,126 @@ h1, h2, h3, .heading {
   color: var(--muted-foreground);
 }
 
-/* ---------- Shell: sidebar + header + content ---------- */
+/* ---------- Shell (pass 4): full-width header on top, sidebar + content
+   below it — replaces the pass-3 side-by-side sidebar+content-only grid.
+   The entity switcher lives in the header now, not the sidebar, since the
+   header is the one element guaranteed full width on every screen
+   including when the sidebar is collapsed to a rail. ---------- */
 .shell {
-  display: grid;
-  grid-template-columns: 240px 1fr;
   min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 12px 24px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar .entity-switcher {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  background: var(--muted);
+}
+
+.topbar .topbar-title {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.topbar .topbar-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.shell-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 20px;
+  padding: 20px 24px;
+  align-items: start;
+}
+
+/* ---------- Sidebar (pass 4): inverted, a rounded card, collapsible ----- */
 .sidebar {
   background: var(--sidebar);
   color: var(--sidebar-foreground);
-  border-right: 1px solid var(--sidebar-border);
+  border-radius: var(--radius-lg);
   padding: 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  box-shadow: 0 1px 3px oklch(0 0 0 / 12%);
+  align-self: start;
+  width: 240px;
+  transition: width 150ms ease;
+}
+
+.sidebar.collapsed {
+  width: 64px;
+  padding: 16px 10px;
 }
 
 .sidebar .nav-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-radius: var(--radius-md);
   font-size: 14px;
   color: var(--sidebar-foreground);
   text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
 }
+
+.sidebar .nav-item .nav-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.sidebar.collapsed .nav-item .nav-label { display: none; }
+.sidebar.collapsed .nav-item { justify-content: center; }
 
 .sidebar .nav-item.active,
 .sidebar .nav-item:hover {
   background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
 }
 
-.sidebar .entity-switcher {
-  margin-bottom: 16px;
-  padding: 8px 12px;
-  border: 1px solid var(--sidebar-border);
+/* Cue option A (recommended primary): chevron pinned at the rail's bottom.
+   See design-system-spec.md § Sidebar for options B/C. */
+.sidebar-toggle {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px;
   border-radius: var(--radius-md);
-  font-size: 13px;
+  color: var(--sidebar-foreground);
+  background: transparent;
+  border: 1px solid var(--sidebar-border);
+  cursor: pointer;
+  font-size: 12px;
 }
+.sidebar-toggle:hover { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); }
 
 .content {
-  padding: 28px; /* page margins, dashboard scale */
+  padding: 4px 0 28px; /* shell-body already carries the page margin */
 }
 
 .header-row {
@@ -395,6 +472,94 @@ table.data-table td.amount.negative { color: var(--destructive); }
   color: var(--muted-foreground);
   font-size: 13px;
   padding: 8px 0;
+}
+
+/* ---------- Entity card grid (Home screen, pass 4) ---------- */
+.entity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.entity-card {
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  cursor: pointer;
+  transition: box-shadow 120ms ease;
+}
+.entity-card:hover { box-shadow: 0 2px 8px oklch(0 0 0 / 10%); }
+
+.entity-card .entity-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--secondary);
+  margin-bottom: 12px;
+}
+
+.entity-card .entity-name { font-weight: 600; margin-bottom: 4px; }
+.entity-card .entity-teaser { font-family: var(--font-mono); font-size: 13px; color: var(--muted-foreground); }
+
+/* ---------- Two-pane login (pass 4) — full-bleed, dark regardless of the
+   user's stored preference (no "user's canvas" to theme before sign-in) */
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #070907;
+  color: #EFF1EF;
+}
+
+.auth-brand-pane {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px;
+}
+
+.auth-brand-pane .brand-mark {
+  color: #2CFF05;
+  font-family: var(--font-heading);
+  font-size: 40px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.auth-brand-pane .brand-statement {
+  font-size: 18px;
+  color: #A1AD9F;
+  max-width: 32ch;
+}
+
+.auth-form-pane {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+}
+
+.auth-form-card {
+  width: 100%;
+  max-width: 360px;
+  background: #0D100C;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+}
+
+.auth-form-card .auth-title { font-family: var(--font-heading); font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #EFF1EF; }
+.auth-form-card .input { background: #161F14; border-color: rgba(255,255,255,0.12); color: #EFF1EF; margin-bottom: 12px; }
+.auth-form-card .btn-default { width: 100%; background: #2CFF05; color: #070907; margin-bottom: 16px; }
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: #A1AD9F; font-size: 12px; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,0.12); }
+.auth-oauth-row { display: flex; flex-direction: column; gap: 8px; }
+.auth-oauth-row .btn-outline { width: 100%; justify-content: center; border-color: rgba(255,255,255,0.16); color: #EFF1EF; }
+
+@media (max-width: 760px) {
+  .auth-shell { grid-template-columns: 1fr; }
+  .auth-brand-pane { padding: 32px 24px 0; text-align: center; align-items: center; }
 }
 
 /* ---------- Skeleton ---------- */
