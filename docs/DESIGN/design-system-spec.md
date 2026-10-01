@@ -46,9 +46,11 @@ This project's UI direction is **SvelteKit + shadcn-svelte** (Tailwind, headless
 
 ### Color
 
-**Pass 4 (2026-09-30): brand hue is neon green.** The Principal's own choice: `#2CFF05`, "since the project name relates to fruiting plants... likely a dominant color in the logo." Measured: hue 110.6°, full saturation, L 0.51, **relative luminance 0.72 — only 1.36:1 against white**. That's not close to AA (needs 4.5:1 as text, 3:1 as a non-text UI element) — using it directly as light-mode `--primary` would have shipped an inaccessible button/link color. Resolution stated plainly, not silently substituted: **`#2CFF05` is kept as the literal `--brand` value** (logo references, dark-mode `--primary`, focus rings and chart accents against dark surfaces — everywhere it measures well) **and a darkened value at the exact same hue (110.6°, full saturation, L 0.26 → `#158500`) serves as light-mode `--primary`** instead. One number, `#158500`, does both jobs light mode needs — a fill with white text on it, and a plain text/link color directly on `--card` — both clear 4.79:1, checked against both roles rather than tuning one and assuming the other.
+**Pass 4 (2026-09-30): brand hue is neon green.** The Principal's own choice: `#2CFF05`, "since the project name relates to fruiting plants... likely a dominant color in the logo." Measured: hue 110.6°, full saturation, L 0.51, **relative luminance 0.72 — only 1.36:1 against white**. Kept as the literal `--brand` value everywhere it measures well (dark surfaces, dark-mode `--primary`), with a darkened same-hue value (`#158500`, L 0.26) serving light-mode `--primary` — one number doing both the fill-with-white-text job and the plain-text-on-card job, both clearing 4.79:1.
 
-**Neutrals are a faint tint of the brand hue, not warm/brown.** The Principal's words: the pass-3 Monarch-derived beige/warm-brown scale read as "90s corporate beige... depressing." Every neutral below (`--background`, `--muted`, `--border`, `--foreground`, and their dark-mode counterparts) is now built at hue 110.6° and a very low saturation (6–14%, barely perceptible as a hue at all) rather than carried over from Monarch's measured warm palette. `--card` stays at true white/near-black — a tinted card would fight with genuinely white content (statements, exports) — so the tint lives in the canvas (`--muted`) and hairlines (`--border`) around it, same "cards-on-tinted-canvas" convention as pass 3, just re-tinted.
+**Pass 5 (2026-09-30): a second brand hue, sky blue.** The Principal: "Can we explore adding a secondary brand color? something in a desaturated blue would complement well like `#05A9FF`." Measured: hue 200.6°, full saturation, L 0.51 — **2.56:1 against the light background, same "fails as a light-surface fill/text" shape as the green brand.** Same resolution pattern: **`#05A9FF` is kept as the literal `--brand-2` value** (dark-surface/decorative use — the sidebar's focus ring, and the dark-mode half of the chart series-2 job, see **Secondary accent** below); **a darkened same-hue value (`#0078B8`, L 0.36) does the light-mode job** (`--secondary-foreground`, 4.72:1 on `--secondary`/5.48:1 on `--card`) instead of a separately-invented color.
+
+**Neutrals re-tinted from green to blue, lighter (pass 5).** Pass 4 tinted every neutral (`--background`/`--muted`/`--border`/`--foreground`) at the green brand's hue, 6–14% saturation. The Principal: "the background: can we use the secondary blue shade above in the same style? A slight hint of the secondary color but much lighter" — and separately flagged the inverted sidebar as reading green-biased. **Both re-tinted to the new blue hue (200.6°) at a lower saturation than pass 4's green** (3–9%, vs. pass 4's 6–14%) — "much lighter" read as *less saturated*, not *higher lightness* (the lightness levels were already near-white/near-black; what the Principal was reacting to was how strongly the tint read as a hue at all). `--card` still stays true white/near-black, same "cards-on-tinted-canvas" convention as every prior pass.
 
 Contrast figures were computed via the standard WCAG relative-luminance formula against these exact hex values (script in `temp/`, full pair-by-pair results in **Accessibility**).
 
@@ -57,65 +59,77 @@ Contrast figures were computed via the standard WCAG relative-luminance formula 
 | Token | Value | Role |
 |---|---|---|
 | `--background` | `#FEFEFE` | Page background |
-| `--foreground` | `#1F241E` | Default body text — near-black, faint cool-green cast, not brown |
+| `--foreground` | `#1D1F20` | Default body text — near-black, barely blue, flatter than pass 4's green-cast ink |
 | `--card` | `#FFFFFF` | Card surface |
 | `--popover` | `#FFFFFF` | Popover/dropdown surface |
-| `--primary` | `#158500` | Primary action fill — darkened brand green, same hue as `--brand`, see above |
+| `--primary` | `#158500` | Primary action fill — darkened brand green, same hue as `--brand`, unchanged from pass 4 |
 | `--primary-foreground` | `#FFFFFF` | Text on primary fill |
-| `--secondary` | `#E9F3E8` | Secondary button/surface — pale green tint |
-| `--secondary-foreground` | `#235719` | Text on secondary |
-| `--muted` | `#F5F7F5` | Muted background — the "faint hint of the primary hue" canvas tint |
-| `--muted-foreground` | `#606F5D` | Muted/meta text |
-| `--accent` | `#F0F6EE` | Hover/active surface accent |
-| `--accent-foreground` | `#235719` | Text on accent |
-| `--brand` | `#2CFF05` | **New.** Literal, undarkened neon accent — logo, decorative highlights, dark-surface call-outs only; never text or a light-surface fill |
-| `--destructive` | `#E70404` | Destructive fill — unchanged from pass 3, re-verified against the new near-white surfaces |
+| `--secondary` | `#E3F0F7` | **Pass 5, re-hued.** Secondary button/surface — pale *blue* tint (was pale green in pass 4) |
+| `--secondary-foreground` | `#096FA5` | Darkened `--brand-2`, same hue — see Secondary accent |
+| `--muted` | `#F7F8F8` | Muted background — the "faint hint of the secondary color... much lighter" canvas tint |
+| `--muted-foreground` | `#60686C` | Muted/meta text |
+| `--accent` | `#EBF4F9` | Hover/active surface accent — same blue family as `--secondary` |
+| `--accent-foreground` | `#096FA5` | |
+| `--brand` | `#2CFF05` | Literal, undarkened neon green — logo, decorative highlights, dark-surface call-outs only; never text or a light-surface fill |
+| `--brand-2` | `#05A9FF` | **Pass 5, new.** Literal, undarkened sky blue — same dark-surface-only rule as `--brand`; see Secondary accent for its job |
+| `--destructive` | `#E70404` | Destructive fill — unchanged |
 | `--destructive-foreground` | `#FFFFFF` | Text on destructive fill |
-| `--border` | `#E5E9E4` | Default hairline border — green-tinted, not warm |
-| `--input` | `#E5E9E4` | Input border |
-| `--ring` | `#158500` | Focus ring |
-| `--chart-1`…`--chart-5` | `#1D9108` → `#061D02` | Sequential/magnitude ramp — moved from pass 3's blue to the brand's own green hue |
-| `--sidebar` | `#20291F` | **Inverted** — a dark surface floating on the light page (see Sidebar) |
-| `--sidebar-foreground` | `#EFF1EF` | |
-| `--sidebar-accent` | `#32412F` | |
-| `--sidebar-accent-foreground` | `#EFF1EF` | |
-| `--sidebar-ring` | `#2CFF05` | Raw brand green — pops cleanly against the dark sidebar even in light mode |
-| `--positive` | `#15803D` | Gain / income / surplus — unchanged from pass 3 |
+| `--border` | `#E7E8E9` | Default hairline border — blue-tinted (was green in pass 4) |
+| `--input` | `#E7E8E9` | Input border |
+| `--ring` | `#158500` | Focus ring — unchanged (primary green) |
+| `--chart-1`…`--chart-5` | `#1D9108` → `#061D02` | Sequential/magnitude ramp — unchanged, brand green |
+| `--sidebar` | `#1F2528` | **Re-hued pass 5** (was green `#20291F`) — inverted, a dark blue-tinted surface floating on the light page (see Sidebar) |
+| `--sidebar-foreground` | `#F2F2F3` | |
+| `--sidebar-accent` | `#303B40` | |
+| `--sidebar-accent-foreground` | `#F2F2F3` | |
+| `--sidebar-ring` | `#05A9FF` | **Re-hued pass 5** (was raw `--brand` green) — the raw secondary blue, to fully remove the green cast from this component |
+| `--positive` | `#15803D` | Gain / income / surplus — unchanged |
 | `--positive-foreground` | `#FFFFFF` | Text on positive fill |
-| `--warning` | `#B45309` | Caution tier — unchanged from pass 3 |
+| `--warning` | `#B45309` | Caution tier — unchanged |
 | `--warning-foreground` | `#FFFFFF` | Text on warning fill |
 
 #### Dark (`.dark`) — secondary mode
 
 | Token | Value | Role |
 |---|---|---|
-| `--background` | `#070907` | Page background — same brand-hue tint applied to a near-black base |
-| `--foreground` | `#EFF1EF` | Default body text |
-| `--card` | `#0D100C` | Card surface |
-| `--primary` | `#2CFF05` | **The raw brand green itself** — this is the one surface where "the brand color" and "the primary token" are the same value; it clears AA beautifully here where light mode's white base couldn't use it at all |
-| `--primary-foreground` | `#070907` | Dark ink — clears 14.7:1; white on this bright fill only clears 1.4:1 |
-| `--secondary` | `#161F14` | |
-| `--secondary-foreground` | `#61CB4D` | |
-| `--muted` | `#0F130E` | |
-| `--muted-foreground` | `#A1AD9F` | |
-| `--accent` | `#182216` | |
-| `--accent-foreground` | `#61CB4D` | |
-| `--brand` | `#2CFF05` | Same literal value both modes — a fixed brand reference, not themed |
-| `--destructive` | `#FC4F4F` | Unchanged from pass 3 |
+| `--background` | `#070808` | Page background — pass 5, blue-tinted (was green `#070907`) |
+| `--foreground` | `#F2F2F3` | Default body text |
+| `--card` | `#0D0E0F` | Card surface |
+| `--primary` | `#2CFF05` | The raw brand green itself — unchanged from pass 4 |
+| `--primary-foreground` | `#070808` | Dark ink — clears 14.7:1; white on this bright fill only clears 1.4:1 |
+| `--secondary` | `#173C4F` | **Pass 5, re-hued** (was pale green `#161F14`) |
+| `--secondary-foreground` | `#68C3F3` | |
+| `--muted` | `#0F1112` | |
+| `--muted-foreground` | `#A0A7AB` | |
+| `--accent` | `#194257` | |
+| `--accent-foreground` | `#68C3F3` | |
+| `--brand` | `#2CFF05` | Same literal value both modes |
+| `--brand-2` | `#05A9FF` | Same literal value both modes |
+| `--destructive` | `#FC4F4F` | Unchanged |
 | `--destructive-foreground` | `#2A0507` | |
 | `--border` | `rgba(255,255,255,0.08)` | |
-| `--chart-1`…`--chart-5` | `#C1FBB6` → `#29CB0B` | Ramp re-lightened for dark mode, same brand hue |
-| `--sidebar` | `#F5F7F5` | **Inverted the other way** — a light card floating on the dark page, reusing the light mode canvas tone directly (see Sidebar) |
-| `--sidebar-foreground` | `#1F241E` | |
-| `--sidebar-accent` | `#E9F3E8` | |
-| `--sidebar-accent-foreground` | `#235719` | |
-| `--sidebar-ring` | `#158500` | The darker primary, not the raw brand green — against this light sidebar the raw brand green would sit too close to its own hue family for a focus indicator to read distinctly |
-| `--positive` | `#52E0A4` | Unchanged from pass 3 |
+| `--chart-1`…`--chart-5` | `#C1FBB6` → `#29CB0B` | Unchanged, brand green |
+| `--sidebar` | `#F7F8F8` | Inverted the other way — a light card floating on the dark page, reusing the light-mode canvas tone directly (now blue-tinted, so this stays consistent automatically) |
+| `--sidebar-foreground` | `#1D1F20` | |
+| `--sidebar-accent` | `#E3F0F7` | |
+| `--sidebar-accent-foreground` | `#096FA5` | |
+| `--sidebar-ring` | `#0078B8` | **Re-hued pass 5** (was `--primary` green) — the light-mode derived blue ink, since the raw `--brand-2` reads too close to this light sidebar's own near-white surface |
+| `--positive` | `#52E0A4` | Unchanged |
 | `--positive-foreground` | `#052E13` | |
-| `--warning` | `#F3CA59` | Unchanged from pass 3 |
+| `--warning` | `#F3CA59` | Unchanged |
 | `--warning-foreground` | `#33230A` | |
 
-**Character read:** a near-white-on-near-black-green-tinted light mode and a true-near-black-green-tinted dark mode — the same "barely a hue" neutral treatment in both directions, replacing pass 3's warm/brown Monarch-derived scale. One brand hue (neon green, 110.6°) carries the whole system: literal where it clears AA (dark surfaces), darkened at the same hue where it doesn't (light-mode primary). `--positive` (green, hue ≈150°) and the brand/primary green (hue ≈110.6°) are a deliberate ≈40° apart — checked, not assumed, that a chartreuse brand accent and a more blue-toned "gain" green don't read as the same color next to each other.
+**Character read:** two brand hues now, each following the same rule — literal where it clears AA (dark surfaces), darkened at the same hue where it doesn't (light-mode surfaces): neon green (`--brand`/`--primary`, 110.6°) for the main/primary identity, sky blue (`--brand-2`/secondary family, 200.6°) for secondary surfaces, info-weight badges, and anywhere the system needs a calm non-primary affordance. The neutral scale and the sidebar both carry the blue tint now, not the green one — the Principal's read of the sidebar as "green-biased" generalizes to "the whole neutral scale was green-biased," and pass 5 fixes both the same way. `--positive` (gain green, hue ≈150°) stays a third, deliberately distinct green — checked against both `--brand` (110.6°) and against itself being mistaken for either brand hue.
+
+### Secondary accent — job definition (pass 5)
+
+A second brand hue needs an explicit job or it fights the first one for meaning. `--brand-2` / the blue `--secondary` family is used for:
+- **Secondary buttons and surfaces** — anywhere `--secondary`/`--accent` already applied (unchanged role, just a new hue).
+- **Info-weight badges and callouts** — a step above `--muted-foreground` neutral, a step below `--warning`'s caution — e.g. "new feature," "beta," informational tooltips. Not a Financial-semantics status tier (those stay `--positive`/`--warning`/`--destructive`, see Financial semantics) — this is for product-chrome informational messaging, a different axis.
+- **Selected / non-primary-active states** — e.g. a selected row in a list that isn't *the* primary action of the screen, distinct from `--primary`'s "main CTA" meaning.
+- **Chart series 2** in genuine two-series comparison charts (nominal vs. inflation-adjusted, actual vs. target): series 1 uses `--chart-3` (mid-ramp green); series 2 uses `--brand-2` on dark surfaces or `--secondary-foreground` on light surfaces — not a new 5-step ramp, just one representative accent value per mode, since a full categorical/sequential blue ramp isn't needed for a 2-series case.
+
+**Not used for:** anything `--primary` already owns (main CTAs, the brand's "default interactive" meaning) or anything a Financial-semantics tier already owns (gain/loss/caution/danger) — the whole point of giving it a job is so it doesn't become a second, redundant way to say what green or the semantic tiers already say.
 
 ### Typography
 
@@ -193,11 +207,12 @@ This is a genuine restructure, not a cosmetic tweak. See `wireframes/` and both 
 - **Fallback is always initials** on a `--secondary` fill — no avatar-image asset exists for this product yet, so this isn't a "fallback for the rare case," it's the only case today.
 - **Max 3 shown**, a 4th+ member folds into a "+N" chip in the same slot and style, continuing the overlap (not yet built in the two reference screens — both shown entities have ≤2 members; the overflow rule is stated here for frontend-lead to implement against a real membership count).
 
-### Sidebar (pass 4 — inverted, card, collapsible; pass 5 — option A chosen, full height)
+### Sidebar (pass 4 — inverted, card, collapsible; pass 5 — option A chosen, full height, re-hued blue)
 
 **Principal direction (pass 4):** "Maybe we can play with an inverted background color for the sidebar. And while we are at it: Make it a card with the same rounded edges. I also want the ability to compact the sidebar to just icons."
 
-- **Inverted:** in light mode the sidebar is a dark surface (`--sidebar` = `#20291F`) floating on the light page; in dark mode it's a light surface (`--sidebar` = `#F5F7F5`, the light mode's own canvas tone reused directly) floating on the dark page. A user should never see two dark (or two light) surfaces stacked with no separation across a mode switch — "inverted" means relative to the page, in both directions.
+- **Inverted:** in light mode the sidebar is a dark surface (`--sidebar` = `#1F2528`, blue-tinted as of pass 5, was `#20291F` green) floating on the light page; in dark mode it's a light surface (`--sidebar` = `#F7F8F8`, the light mode's own canvas tone reused directly) floating on the dark page. A user should never see two dark (or two light) surfaces stacked with no separation across a mode switch — "inverted" means relative to the page, in both directions.
+- **Re-hued blue (pass 5).** The Principal, reviewing the pass-4 result: "check the background on the side-bar. Is that green biased? I want it more flat or blue-biased." It was — same hue family as the pass-4 primary green, just dark. Moved to the same blue hue (200.6°) as the pass-5 re-tinted neutral scale, rather than a true neutral grey, so the whole system (page canvas + sidebar) carries one consistent "barely blue" cast instead of introducing a third hue family. The sidebar's own focus ring moved too (`--brand-2` instead of the green `--brand`) so no green survives anywhere in this component.
 - **Card:** `border-radius: var(--radius-lg)` (12px, same as any other card), with its own `padding` and a visible edge against the page canvas (a subtle shadow, not flush) — it reads as a floating panel rather than a flush structural rail.
 - **Collapsible to an icon rail:** a compact state (~64px wide) showing only nav icons, no labels — expand restores the full ~240px width with labels.
 
@@ -335,26 +350,27 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 ## Accessibility
 
-**Target: WCAG AA.** Every pair below re-run for pass 4's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check.py`).
+**Target: WCAG AA.** Every pair below re-run for pass 5's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check-pass3.py`).
 
-**Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` hardcode the same hex already verified in the dark-mode table below (`#070907` background, `#EFF1EF` foreground, `#2CFF05` brand, `#A1AD9F` muted-foreground) rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme. No separate re-verification needed — same numbers, different (fixed) context.
+**Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` hardcode the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
 
-**Pass 5 (header, sidebar, login centering) introduces no new token values** — the avatar cluster (`--secondary`/`--secondary-foreground` fill, `--muted`/`--muted-foreground` overflow chip), the entity selector and brand lockup (plain `--foreground` text, `--primary` icon fill), and the login form's centering are all either already-verified token pairs in a new layout position, or layout-only changes with no color at all. Nothing to re-run.
+**Pass 5 header/sidebar/login-centering changes (review 2) introduced no new token values** — unchanged from the prior revision's note.
 
 **Light mode — text pairs (floor 4.5:1), all PASS:**
 
 | Pair | Contrast |
 |---|---|
-| `--foreground` / `--background` | 15.66:1 |
+| `--foreground` / `--background` | 16.41:1 |
 | `--primary-foreground` / `--primary` (fill) | 4.79:1 |
 | `--primary` / `--card` (text-only, e.g. links) | 4.79:1 |
-| `--secondary-foreground` / `--secondary` | 7.53:1 |
-| `--muted-foreground` / `--muted` | 4.96:1 |
-| `--muted-foreground` / `--card` | 5.34:1 |
-| `--accent-foreground` / `--accent` | 7.81:1 |
+| `--secondary-foreground` / `--secondary` (fill, NEW blue) | 4.72:1 |
+| `--secondary-foreground` / `--card` (text-only, NEW blue) | 5.48:1 |
+| `--muted-foreground` / `--muted` | 5.34:1 |
+| `--muted-foreground` / `--card` | 5.68:1 |
+| `--accent-foreground` / `--accent` | 4.92:1 |
 | `--destructive-foreground` / `--destructive` | 4.75:1 |
-| `--sidebar-foreground` / `--sidebar` | 13.23:1 |
-| `--sidebar-accent-foreground` / `--sidebar-accent` | 9.57:1 |
+| `--sidebar-foreground` / `--sidebar` (NEW blue-tinted sidebar) | 13.87:1 |
+| `--sidebar-accent-foreground` / `--sidebar-accent` | 10.28:1 |
 | `--positive-foreground` / `--positive` (fill) | 5.02:1 |
 | `--warning-foreground` / `--warning` (fill) | 5.02:1 |
 
@@ -363,25 +379,27 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | Pair | Contrast | Result |
 |---|---|---|
 | `--ring` / `--card` | 4.79:1 | PASS |
-| `--sidebar-ring` / `--sidebar` | 11.02:1 | PASS |
+| `--sidebar-ring` / `--sidebar` (NEW `--brand-2`) | 6.00:1 | PASS |
 | `--chart-1`…`--chart-5` / `--card` | 4.11:1 → 17.73:1 | PASS all 5 |
-| `--border` / `--card` | 1.23:1 | Below floor — decorative hairline, accepted (unchanged posture from pass 3) |
-| `--brand` / `--background` | 1.35:1 | **Expected fail** — confirms `--brand` must never be used as a light-surface fill or text color (see Foundations); this row exists to catch a future regression, not to be fixed |
+| `--border` / `--card` | 1.23:1 | Below floor — decorative hairline, accepted (unchanged posture since pass 3) |
+| `--brand` / `--background` | 1.35:1 | **Expected fail** — `--brand` (green) must never be a light-surface fill/text; regression tripwire, not a bug |
+| `--brand-2` / `--background` | 2.56:1 | **Expected fail** — same rule, new hue: `--brand-2` (blue) must never be a light-surface fill/text either |
 
 **Dark mode — text pairs (floor 4.5:1), all PASS:**
 
 | Pair | Contrast |
 |---|---|
-| `--foreground` / `--background` | 17.60:1 |
-| `--primary-foreground` / `--primary` (fill) | 14.66:1 |
-| `--primary` / `--card` (text-only) | 14.06:1 |
-| `--secondary-foreground` / `--secondary` | 8.19:1 |
-| `--muted-foreground` / `--muted` | 8.03:1 |
-| `--muted-foreground` / `--card` | 8.20:1 |
-| `--accent-foreground` / `--accent` | 7.94:1 |
+| `--foreground` / `--background` | 17.92:1 |
+| `--primary-foreground` / `--primary` (fill) | 14.72:1 |
+| `--primary` / `--card` (text-only) | 14.18:1 |
+| `--secondary-foreground` / `--secondary` (fill, NEW blue) | 5.95:1 |
+| `--secondary-foreground` / `--card` (text-only, NEW blue) | 9.83:1 |
+| `--muted-foreground` / `--muted` | 7.76:1 |
+| `--muted-foreground` / `--card` | 7.92:1 |
+| `--accent-foreground` / `--accent` | 5.46:1 |
 | `--destructive-foreground` / `--destructive` | 5.67:1 |
-| `--sidebar-foreground` / `--sidebar` | 14.67:1 |
-| `--sidebar-accent-foreground` / `--sidebar-accent` | 7.53:1 |
+| `--sidebar-foreground` / `--sidebar` | 15.55:1 |
+| `--sidebar-accent-foreground` / `--sidebar-accent` | 4.72:1 |
 | `--positive-foreground` / `--positive` (fill) | 8.93:1 |
 | `--warning-foreground` / `--warning` (fill) | 9.67:1 |
 
@@ -389,10 +407,10 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 | Pair | Contrast | Result |
 |---|---|---|
-| `--ring` / `--card` | 14.06:1 | PASS |
-| `--sidebar-ring` / `--sidebar` | 4.45:1 | PASS — the darker `--primary`, not raw `--brand`, is used here (see Foundations) |
-| `--chart-1`…`--chart-5` / `--card` | 8.79:1 → 16.18:1 | PASS all 5 |
-| `--brand` / `--background` | 14.66:1 | PASS — this is the surface `--brand` is meant for |
+| `--ring` / `--card` | 14.18:1 | PASS |
+| `--sidebar-ring` / `--sidebar` (NEW, derived light-mode blue ink) | 4.51:1 | PASS |
+| `--brand-2` / `--background` | 7.76:1 | PASS — this dark surface is exactly what `--brand-2` is for |
+| `--chart-1`…`--chart-5` / `--card` | 8.87:1 → 16.32:1 | PASS all 5 |
 
 | Concern | Standard / approach |
 |---|---|
@@ -403,11 +421,11 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | Motion | Respect `prefers-reduced-motion` (open item) |
 
 **Open items:**
-- No CVD simulation run on the new palette yet — the brand hue (110.6°, yellow-green) sits near the deuteranopia confusion band; worth a real check before lock given how central it now is to the brand identity, more so than pass 3's blue.
+- No CVD simulation run on the new palette yet — now TWO brand hues (green 110.6°, blue 200.6°) to check, not just one; higher priority with each pass that adds more meaning-bearing color.
 - `--border`/`--card` is a low-contrast hairline by design (1.23:1) — decorative, consistent with common practice.
 - Reduced-motion policy not yet written.
-- Radius-xl (sheets) not measured against either reference — extrapolated (unchanged from pass 3).
-- Sidebar expand/collapse cue (three options proposed, see Sidebar) — Principal to pick before frontend-lead builds it.
+- Radius-xl (sheets) not measured against either reference — extrapolated.
+- Sidebar expand/collapse cue is decided (option A) — no longer an open item as of pass 5.
 
 ---
 
@@ -416,6 +434,6 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 - Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.
 - Categorical (3+ hue) chart palette for transaction-category breakdowns — deferred until a concrete chart spec exists.
 - Compare `styled-screens/dashboard.html` against `temp/design-refs/monarch-app-accounts-zoom.png` component-by-component once frontend-lead builds the real screen — this pass matched structure and the net-worth hero closely but did not build the full grouped-account-list + segmented-bar right column (time-boxed to the highest-traffic pattern); flag as a fast-follow if the gap matters before Implement.
-- **Sidebar expand/collapse cue (pass 4):** three options proposed (chevron / hover-reveal / keyboard+remembered-state), a recommendation stated, not decided — needs the Principal's pick before frontend-lead builds it.
 - **Login's visual pane (pass 4):** built as a brand gradient, since no photography/illustration asset exists for this product — the captured `dribbble` reference and `useorigin.com`'s own (relayed, uncaptured) login both use a real photo there. A real asset would likely read stronger; this is a design-asset gap to fill before final, not a layout uncertainty.
-- **CVD check on the brand hue (pass 4):** flagged in Accessibility — the yellow-green brand hue is a plausible deuteranopia risk given how central it now is; not yet simulated.
+- **CVD check on the brand hues (pass 4/5):** flagged in Accessibility — two brand hues now (green, blue) to check, not yet simulated.
+- **Resolved pass 5:** flows weren't rendering — `index.html` §flows linked to raw `flows/*.md`, which the browser serves as plain text, so the fenced `mermaid` blocks never reached the page's own loader. All five are now embedded inline under their own `<h3>`; the `.md` files stay as the diffable source. Fixing this also surfaced a real, previously-untested syntax error in the dashboard-glance flow (an unescaped quote inside a node label) — fixed in both the embedded copy and the source. All five confirmed ≤782px (the content-column width) via the architect's render.py measurement method plus a live browser check; four of five exceed the raw 720px mmdc threshold intrinsically (954/886/896/1200px) but fit the real container through the same CSS scale-down already proven for ARCH's diagrams.

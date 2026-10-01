@@ -7,23 +7,21 @@
  * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
  * the swatches.
  *
- * FOURTH PASS (2026-09-30) — Principal review pass 1 on the third-pass
- * Monarch/Origin palette (temp/2026-09-30-design-review-1.md): brand hue
- * becomes neon green #2CFF05 ("the project name relates to fruiting
- * plants... likely a dominant color in the logo"); the beige/warm-brown
- * neutral scale (inherited from Monarch's measured palette) is replaced
- * with a faint tint of the brand hue; the sidebar inverts (dark-on-light /
- * light-on-dark). See design-system-spec.md § Foundations for full
- * derivation and every contrast figure — every value below that isn't the
- * literal brand hex was DERIVED (same hue, adjusted lightness/chroma for
- * AA), not picked freehand.
+ * FIFTH PASS (2026-09-30) — Principal review pass 3
+ * (temp/2026-09-30-design-review-3.md): a secondary brand hue, sky blue
+ * #05A9FF, is added alongside the neon-green --brand from pass 4 (same
+ * "literal on dark surfaces, darkened-same-hue on light surfaces" pattern,
+ * see --brand-2 below); the neutral scale (--background/--muted/--border)
+ * re-tints from the green hue to this new blue hue, at a lower chroma than
+ * pass 4's green tint ("much lighter"); the inverted sidebar, read by the
+ * Principal as green-biased, moves to the same blue tint instead. See
+ * design-system-spec.md § Foundations for the full derivation and every
+ * contrast figure.
  *
- * #2CFF05 itself measures ~1.36:1 against white — nowhere near AA as text
- * or a light-mode fill. Kept as the literal brand/accent value (--brand,
- * dark-mode --primary, both a --ring value, chart accents) everywhere it
- * clears AA against a dark surface; a darkened same-hue green (#158500,
- * hue held at 110.6°) serves as light-mode --primary instead, stated
- * plainly rather than silently substituting a different hue.
+ * Earlier passes' header comments (pass 4: neon green, warm/brown neutral
+ * replacement; pass 3: Monarch/Origin measured references) are not
+ * reproduced here — see design-system-spec.md's revision history for the
+ * full chain. This header documents only what pass 5 changed.
  *
  * Plain sRGB hex, not OKLCH — this system doesn't vendor a shadcn preset
  * and doesn't need OKLCH's multi-preset precision.
@@ -37,128 +35,135 @@
  */
 
 :root {
-  /* Surfaces & text — a faint tint of the brand hue (110.6°) replacing the
-     Monarch-derived warm/brown neutral scale the Principal called "90s
-     corporate beige". Cards stay near-pure white (a tinted white would
-     fight with genuinely-white content like receipts/exports); the canvas
-     (--muted) and hairlines (--border) carry the visible tint. */
+  /* Surfaces & text — pass 5: re-tinted from the green brand hue (110.6°)
+     to the new secondary blue hue (200.6°, from --brand-2 below), at a
+     lower chroma than pass 4's green tint ("much lighter" per direction).
+     Cards stay near-pure white (a tinted white would fight genuinely-
+     white content like receipts/exports); the canvas (--muted) and
+     hairlines (--border) carry the visible tint. */
   --background: #FEFEFE;
-  --foreground: #1F241E; /* near-black, faint cool-green cast — not brown */
+  --foreground: #1D1F20; /* near-black, barely blue, flatter than pass 4's green-cast ink */
   --card: #FFFFFF;
-  --card-foreground: #1F241E;
+  --card-foreground: #1D1F20;
   --popover: #FFFFFF;
-  --popover-foreground: #1F241E;
+  --popover-foreground: #1D1F20;
 
-  /* Brand — neon green, the Principal's own choice (project name relates
-     to fruiting plants; likely the logo's dominant color). #2CFF05 itself
-     measures 1.36:1 against white — far below AA — so it is NOT used as
-     light-mode --primary. Light-mode --primary is a darkened value at the
-     SAME hue (110.6°, full saturation, L 0.26 vs the brand's L 0.51): one
-     value clears AA as both a fill (white text on it, 4.79:1) and as
-     plain text/link color directly on --card (4.79:1) — a single number
-     doing both jobs, not two separately-tuned values. */
+  /* Primary — unchanged from pass 4: a darkened neon green (hue 110.6°,
+     same hue as --brand, L 0.26 vs the brand's L 0.51) — see --brand
+     below for why the raw brand hex can't be primary on a light surface. */
   --primary: #158500;
   --primary-foreground: #FFFFFF;
-  --secondary: #E9F3E8; /* pale green tint */
-  --secondary-foreground: #235719;
-  --muted: #F5F7F5; /* the "faint hint of the primary hue" canvas tint */
-  --muted-foreground: #606F5D; /* 4.96:1 on --muted, 5.34:1 on --card */
-  --accent: #F0F6EE;
-  --accent-foreground: #235719;
 
-  /* --brand: the literal, undarkened neon accent — logo references, chart
+  /* Secondary/accent — pass 5: moved from pass 4's pale GREEN tint to the
+     new secondary BLUE hue (200.6°), giving the blue brand a real surface
+     job (secondary buttons, info-weight badges, selected/non-primary
+     states) distinct from primary's green "main action" role — see
+     design-system-spec.md § Secondary accent for the full job
+     definition. One derived ink (#096FA5) serves both the fill-with-text
+     role (4.72:1 on --secondary) and the plain-text-on-card role (5.48:1). */
+  --secondary: #E3F0F7;
+  --secondary-foreground: #096FA5;
+  --muted: #F7F8F8; /* the "faint hint of the secondary color... much lighter" canvas tint */
+  --muted-foreground: #60686C;
+  --accent: #EBF4F9;
+  --accent-foreground: #096FA5;
+
+  /* --brand: the literal, undarkened neon green — logo references, chart
      accent call-outs, decorative highlights, anywhere a dark surface sits
-     underneath. Do not use for text or a light-surface fill; use --primary
-     for that. */
+     underneath. Do not use for text or a light-surface fill; use
+     --primary for that.
+     --brand-2 (pass 5, new): the literal, undarkened secondary sky blue
+     (#05A9FF, the Principal's own choice) — same rule: dark-surface/
+     decorative use only (2.56:1 against this light --background — far
+     below AA, same posture as --brand). Used for: the sidebar focus ring
+     (reads against the sidebar's own dark-in-light-mode surface), and as
+     the series-2 color in two-series comparison charts (nominal vs.
+     inflation-adjusted, actual vs. target) paired against the green
+     --chart-3 as series 1, on dark surfaces — on light surfaces, that
+     same chart-series-2 job uses the derived --secondary-foreground
+     ink (#096FA5) instead, the same "literal-on-dark, derived-on-light"
+     split every brand hue in this system follows. */
   --brand: #2CFF05;
+  --brand-2: #05A9FF;
 
-  /* Destructive — unchanged from the Origin-measured derivation (pass 3);
-     re-verified against the new near-white surfaces, no meaningful drift
-     (4.75:1, was 4.83:1 against the old pure #FFFFFF). */
+  /* Destructive — unchanged from pass 3/4. */
   --destructive: #E70404;
   --destructive-foreground: #FFFFFF;
 
-  --border: #E5E9E4;
-  --input: #E5E9E4;
+  --border: #E7E8E9;
+  --input: #E7E8E9;
   --ring: #158500;
 
-  /* Chart ramp — moved from pass 3's blue (Origin-inspired) to the brand's
-     own green hue, so the one sequential/magnitude accent in the system
-     reads as "the same green," not a leftover blue from a superseded
-     pass. Deliberately a different green from --positive (hue 150° vs
-     this ramp's 110.6°, see Financial semantics) — checked, not assumed,
-     that the two don't read as the same hue. Every step clears 3:1
-     against --card, measured; chart-1 (the lightest usable step) is
-     already fairly saturated-dark, same shape as pass 3's blue ramp. */
+  /* Chart ramp — unchanged from pass 4 (brand green, sequential/
+     magnitude). See --brand-2 above for the new series-2 blue accent
+     used alongside this ramp in two-series comparison charts. */
   --chart-1: #1D9108;
   --chart-2: #177406;
   --chart-3: #115705;
   --chart-4: #0C3A03;
   --chart-5: #061D02;
 
-  /* Sidebar — INVERTED per Principal direction: a dark surface floating on
-     the light page, styled as a rounded card (radius-lg) rather than a
-     flush panel. --sidebar-foreground/--sidebar-accent-foreground reuse
-     the dark-mode foreground/positive-accent inks directly (13.2:1,
-     9.6:1) since this surface IS effectively a dark-mode island inside a
-     light page. */
-  --sidebar: #20291F;
-  --sidebar-foreground: #EFF1EF;
-  --sidebar-accent: #32412F;
-  --sidebar-accent-foreground: #EFF1EF;
+  /* Sidebar — pass 5: re-tinted blue (was green in pass 4 — the Principal
+     read the green cast as a bias, not a deliberate choice, and asked
+     for flat or blue-biased; blue was chosen to stay consistent with the
+     rest of the re-tinted neutral scale above rather than introducing a
+     third, truly-neutral grey). Still inverted (dark-on-light / light-
+     on-dark) and still a rounded, collapsible card — see
+     design-system-spec.md § Sidebar, unchanged from pass 4. Focus ring
+     also moved to --brand-2 (was the green --brand) to fully remove the
+     green cast from this component. */
+  --sidebar: #1F2528;
+  --sidebar-foreground: #F2F2F3;
+  --sidebar-accent: #303B40;
+  --sidebar-accent-foreground: #F2F2F3;
   --sidebar-border: rgba(255, 255, 255, 0.08);
-  --sidebar-ring: #2CFF05; /* the raw brand green pops cleanly against this dark surface, 11.0:1 */
+  --sidebar-ring: #05A9FF;
 
-  /* Financial semantics — unchanged hues from pass 3 (Origin-measured
-     green/red, Monarch-measured mustard), re-verified against the new
-     near-white surfaces (see design-system-spec.md § Accessibility for
-     the full re-run). */
+  /* Financial semantics — unchanged from pass 3/4, re-verified against
+     the new (barely different) near-white surfaces. */
   --positive: #15803D;
   --positive-foreground: #FFFFFF;
   --warning: #B45309;
   --warning-foreground: #FFFFFF;
 
-  /* Radius — unchanged from pass 3 (measured off Monarch/Origin's app-level
-     values). The inverted sidebar card uses --radius-lg like any other
-     card. */
+  /* Radius — unchanged from pass 3/4. */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 20px;
 
-  /* Typography — unchanged from pass 3 (Inter body/headings, Roboto Mono
-     for uppercase eyebrow labels — see design-system-spec.md § Typography
-     for the full Monarch/Origin app-UI evidence; not re-litigated here). */
+  /* Typography — unchanged from pass 3/4. */
   --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-heading: var(--font-sans);
   --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .dark {
-  /* Same brand-hue tint applied to a near-black base (was Origin's flat
-     #050505/#141416) — "go through the other color tokens... less
-     browns" read as a whole-system instruction, not light-mode-only. */
-  --background: #070907;
-  --foreground: #EFF1EF;
-  --card: #0D100C;
-  --card-foreground: #EFF1EF;
-  --popover: #0D100C;
-  --popover-foreground: #EFF1EF;
+  /* Same blue-hue tint applied to a near-black base (pass 5 — was the
+     green-tinted #070907/#0D100C of pass 4). */
+  --background: #070808;
+  --foreground: #F2F2F3;
+  --card: #0D0E0F;
+  --card-foreground: #F2F2F3;
+  --popover: #0D0E0F;
+  --popover-foreground: #F2F2F3;
 
-  /* Dark-mode --primary IS the raw brand green — it clears AA beautifully
-     here (14.7:1 with dark ink) where light mode's white base couldn't
-     use it at all. This is the one surface where "the brand color" and
-     "the primary token" are the same value. */
+  /* Dark-mode --primary IS the raw brand green (unchanged from pass 4) —
+     it clears AA beautifully here where light mode's white base
+     couldn't use it at all. */
   --primary: #2CFF05;
-  --primary-foreground: #070907; /* dark ink clears 14.7:1; white on this bright fill only clears 1.4:1 */
-  --secondary: #161F14;
-  --secondary-foreground: #61CB4D;
-  --muted: #0F130E;
-  --muted-foreground: #A1AD9F; /* 8.0:1 on --muted, 8.2:1 on --card */
-  --accent: #182216;
-  --accent-foreground: #61CB4D;
+  --primary-foreground: #070808;
 
-  --brand: #2CFF05; /* same literal value both modes — it's a fixed brand reference, not a themed token */
+  /* Secondary/accent — pass 5, new blue (was pale green in pass 4). */
+  --secondary: #173C4F;
+  --secondary-foreground: #68C3F3;
+  --muted: #0F1112;
+  --muted-foreground: #A0A7AB;
+  --accent: #194257;
+  --accent-foreground: #68C3F3;
+
+  --brand: #2CFF05; /* same literal value both modes — a fixed brand reference, not themed */
+  --brand-2: #05A9FF; /* same literal value both modes */
 
   --destructive: #FC4F4F;
   --destructive-foreground: #2A0507;
@@ -167,24 +172,26 @@
   --input: rgba(255, 255, 255, 0.12);
   --ring: #2CFF05;
 
-  /* Re-lightened for dark mode, same brand hue — clears 3:1 against the
-     near-black --card at every step, measured. */
+  /* Unchanged from pass 4 — brand green ramp, re-lightened for dark mode. */
   --chart-1: #C1FBB6;
   --chart-2: #8BF877;
   --chart-3: #5AF53D;
   --chart-4: #31F20D;
   --chart-5: #29CB0B;
 
-  /* Sidebar — INVERTED the other way in dark mode: a LIGHT card floating
-     on the dark page (the same light-mode canvas tone, reused directly).
-     A user should never see two dark sidebars back to back across a mode
-     switch — inversion means "opposite of the page," in both directions. */
-  --sidebar: #F5F7F5;
-  --sidebar-foreground: #1F241E;
-  --sidebar-accent: #E9F3E8;
-  --sidebar-accent-foreground: #235719;
-  --sidebar-border: #E5E9E4;
-  --sidebar-ring: #158500; /* the darker primary reads against this light sidebar; raw brand green would be too close to its own fill hue for a focus ring here */
+  /* Sidebar — pass 5: still inverted the other way in dark mode (a LIGHT
+     card floating on the dark page, reusing the light mode canvas tone
+     directly) — now that canvas tone is blue-tinted too, so this stays
+     visually consistent automatically. Ring uses the light-mode derived
+     blue ink (#0078B8, NOT the raw --brand-2) since the raw brand blue
+     reads too close to this light sidebar's own near-white surface to
+     register as a distinct focus indicator. */
+  --sidebar: #F7F8F8;
+  --sidebar-foreground: #1D1F20;
+  --sidebar-accent: #E3F0F7;
+  --sidebar-accent-foreground: #096FA5;
+  --sidebar-border: #E7E8E9;
+  --sidebar-ring: #0078B8;
 
   --positive: #52E0A4;
   --positive-foreground: #052E13;

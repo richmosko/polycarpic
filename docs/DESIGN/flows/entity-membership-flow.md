@@ -7,7 +7,7 @@ flowchart TD
   login([User logs in]) --> memberships[Load user's memberships:\nentity, role]
   memberships --> list{More than one\nentity?}
   list -- no --> single[Land directly on the\none entity, no switcher shown]
-  list -- yes --> switcher[Entity switcher in sidebar:\nlist entities by membership]
+  list -- yes --> switcher[Entity switcher in header:\nlist entities by membership]
   switcher --> select[User selects an entity]
   select --> roleCheck{Role on\nselected entity}
   roleCheck -- owner --> ownerView[Full read/write:\npost, edit memberships, purge]

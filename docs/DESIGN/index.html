@@ -88,6 +88,7 @@
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--primary)"></span><span class="name">--primary</span></div>
     <div class="swatch"><span class="chip" style="background:var(--brand)"></span><span class="name">--brand (dark surfaces only — see Foundations)</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--brand-2)"></span><span class="name">--brand-2 (pass 5, same rule — see Secondary accent)</span></div>
     <div class="swatch"><span class="chip" style="background:var(--secondary)"></span><span class="name">--secondary</span></div>
     <div class="swatch"><span class="chip" style="background:var(--accent)"></span><span class="name">--accent</span></div>
     <div class="swatch"><span class="chip" style="background:var(--destructive)"></span><span class="name">--destructive</span></div>
@@ -117,7 +118,7 @@
     <div class="swatch"><span class="chip" style="background:var(--chart-5)"></span><span class="name">--chart-5</span></div>
   </div>
 
-  <h3 id="tokens-sidebar">3.6 Sidebar (inverted, pass 4)</h3>
+  <h3 id="tokens-sidebar">3.6 Sidebar (inverted, pass 4; re-hued blue, pass 5)</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--sidebar)"></span><span class="name">--sidebar</span></div>
     <div class="swatch"><span class="chip" style="background:var(--sidebar-accent)"></span><span class="name">--sidebar-accent</span></div>
@@ -152,13 +153,140 @@
 
 <section id="flows" data-section="flows">
   <h2>5. User Flows</h2>
-  <p class="section-hint">How users move through the product to accomplish the highest-traffic stories (PRD §4). Source diagrams in <a href="flows/">flows/</a>.</p>
+  <p class="section-hint">How users move through the product to accomplish the highest-traffic stories (PRD §4). <strong>Pass 5 fix (2026-09-30):</strong> these previously linked to <code>flows/*.md</code>, which the browser serves as raw Markdown — the fenced <code>mermaid</code> blocks never ran through the page's own Mermaid loader, so nothing rendered (not a syntax error, as first suspected). Each flow is now embedded inline below; the <code>.md</code> files stay as the diffable source of truth in <a href="flows/">flows/</a>.</p>
+
+  <h3 id="flow-dashboard-glance">5.1 Dashboard glance</h3>
+  <p class="section-hint"><strong>Story (PRD §4.1):</strong> per-entity financial health at a glance. Source: <a href="flows/dashboard-glance-flow.md">flows/dashboard-glance-flow.md</a>.</p>
+  <pre class="mermaid">
+flowchart TD
+  start([User logs in]) --> membership{Holds membership\non 1+ entity?}
+  membership -- no --> empty[Empty state:\nNo entities yet, invite/create CTA]
+  membership -- yes --> default[Land on default entity\nlast-viewed or first by role]
+  default --> render[Render dashboard:\nbalances, cash flow, recent activity,\npending tax liability, allocation snapshot]
+  render --> loading{Data cached?}
+  loading -- no --> skeleton[Skeleton matches real layout\nno spinner]
+  skeleton --> render
+  render --> switch{Switch entity?}
+  switch -- yes --> picker[Entity switcher\nPerson / Trust / Business / Household]
+  picker --> filtered[Re-render scoped to\nuser's membership on that entity]
+  filtered --> render
+  switch -- no --> drill{Drill into a number?}
+  drill -- yes --> source[Navigate to source:\nledger line, lot, or liability detail]
+  drill -- no --> idle([Glance complete])
+  </pre>
   <ul>
-    <li><a href="flows/dashboard-glance-flow.md">Dashboard glance</a> — per-entity financial health at a glance</li>
-    <li><a href="flows/import-confirm-flow.md">Import &amp; confirm transactions</a> — staged drafts → reviewed → posted</li>
-    <li><a href="flows/tax-liability-flow.md">Tax liability &amp; safe-harbor</a> — pending liability, required payment, gap, pay</li>
-    <li><a href="flows/securities-lots-flow.md">Securities lots &amp; balance sheet</a> — GL vs. custodial reconciliation</li>
-    <li><a href="flows/entity-membership-flow.md">Entity switch &amp; membership access</a> — owner/manager/viewer boundary</li>
+    <li>Every number on this screen must be clickable through to its source (Overview principle: "every number earns trust").</li>
+    <li>Filtered strictly by membership (owner/manager/viewer) — no transitive access via parent entity (PRD §5 permission model).</li>
+  </ul>
+
+  <h3 id="flow-import-confirm">5.2 Import &amp; confirm transactions</h3>
+  <p class="section-hint"><strong>Story (PRD §4.2):</strong> staged drafts → reviewed → posted. Source: <a href="flows/import-confirm-flow.md">flows/import-confirm-flow.md</a>.</p>
+  <pre class="mermaid">
+flowchart TD
+  poll([Provider adapter polls\nor fake source generates batch]) --> stage[Stage as draft transactions\nunposted, editable]
+  stage --> transfer{Two legs match\nwithin date window?}
+  transfer -- same posting date --> oneEntry[One multi-leg journal entry]
+  transfer -- different dates --> citEntry[Two entries via\nCash in Transit clearing account]
+  transfer -- unmatched --> openItem[Remains open item in\nCash in Transit]
+  openItem --> aging{Older than\nexceptions threshold\ndefault 3 business days?}
+  aging -- yes --> exceptions[Surface on\nExceptions report]
+  aging -- no --> stage
+  oneEntry --> review[User reviews staged batch:\ncategory, tax-treatment tag,\ncounterparty]
+  citEntry --> review
+  review --> edit{Needs correction\nbefore posting?}
+  edit -- yes --> editDraft[Edit draft fields\nstill mutable]
+  editDraft --> review
+  edit -- no --> confirm[User confirms]
+  confirm --> post[Post as journal entry\nsource becomes immutable]
+  post --> toast[Toast: batch posted]
+  post --> ledger([Appears in ledger,\nposted badge])
+  exceptions --> resolve{Resolved manually?}
+  resolve -- yes --> post
+  resolve -- no --> exceptions
+  </pre>
+  <ul>
+    <li>Once posted, a transaction is immutable — the UI never offers an "edit" affordance on a posted row, only "reverse".</li>
+    <li>Actor attribution (user / auto-post rule / system job) is shown on every draft and posted row, never inferred (PRD §5).</li>
+  </ul>
+
+  <h3 id="flow-tax-liability">5.3 Tax liability &amp; safe-harbor</h3>
+  <p class="section-hint"><strong>Story (PRD §4.4):</strong> pending liability, required payment, gap, pay. Source: <a href="flows/tax-liability-flow.md">flows/tax-liability-flow.md</a>.</p>
+  <pre class="mermaid">
+flowchart TD
+  view([Open Tax Liability view\nfor entity + jurisdiction]) --> accrual[Running accrual annualizes\nincome to date by tax treatment]
+  accrual --> pending[Pending liability =\n100% annualized minus prepaid balance]
+  accrual --> safeharbor[Two safe-harbor bases computed:\nprior-year and current-year]
+  safeharbor --> required[Required payment =\nlesser of the two minus prepaid balance]
+  pending --> gap[Gap = required minus pending]
+  required --> gap
+  gap --> tier{Gap status}
+  tier -- "gap &lt;= 0" --> onTrack[Tier: Normal / on track\npositive token]
+  tier -- "gap &gt; 0, due date &gt; 14d out" --> caution[Tier: Caution\nwarning token]
+  tier -- "gap &gt; 0, due date passed" --> danger[Tier: Danger / overdue\ndestructive token]
+  onTrack --> display[Display gauge + figures]
+  caution --> display
+  danger --> display
+  display --> pay{User initiates payment?}
+  pay -- yes --> post[Post estimated-tax payment:\ntransfer bank to prepaid-tax asset\nper jurisdiction]
+  post --> display
+  pay -- no --> wait([Wait for next period cutoff])
+  wait --> freeze[Period cutoff freezes\nannualized figure for due date]
+  freeze --> accrual
+  </pre>
+  <ul>
+    <li>The three-tier status (normal/caution/danger) reuses the product-wide status vocabulary — see <a href="design-system-spec.md">design-system-spec.md § Financial semantics</a>.</li>
+    <li>Jurisdiction due dates, multipliers, and cumulative percentages are data-driven, so this view must render correctly for an arbitrary number of jurisdictions (PRD §5).</li>
+  </ul>
+
+  <h3 id="flow-securities-lots">5.4 Securities lots &amp; balance sheet reconciliation</h3>
+  <p class="section-hint"><strong>Stories (PRD §4.5–4.7):</strong> GL vs. custodial reconciliation, allocation vs. target. Source: <a href="flows/securities-lots-flow.md">flows/securities-lots-flow.md</a>.</p>
+  <pre class="mermaid">
+flowchart TD
+  view([Open Securities view\nfor entity]) --> lots[Lot table per custodial account:\nbook value, market value, cost basis]
+  lots --> priceFeed[Daily EOD price feed\nupdates market value]
+  priceFeed --> lots
+  lots --> toggle{Balance sheet basis}
+  toggle -- GL --> glSheet[Balance sheet by GL account]
+  toggle -- Custodial --> custSheet[Balance sheet by custodial account\nplus NAV delta from prior book period]
+  glSheet --> reconcile[Reconcile GL balance\nagainst custodian-reported balance]
+  custSheet --> reconcile
+  reconcile --> match{Balances match\nwithin tolerance?}
+  match -- yes --> clean[Reconciliation: clean\npositive tier]
+  match -- no --> break[Reconciliation: break\ndanger tier, flagged]
+  clean --> allocation[Asset-allocation view:\nactual vs. target]
+  break --> allocation
+  allocation --> adjust{User adjusts target?}
+  adjust -- yes --> saveTarget[Save new target allocation]
+  saveTarget --> allocation
+  adjust -- no --> done([View complete])
+  </pre>
+  <ul>
+    <li>GL-vs-custodial is a <code>Tabs</code> toggle on one screen, not two separate pages.</li>
+    <li>A reconciliation break uses the danger tier (<code>--destructive</code>) and must surface on the Dashboard glance too.</li>
+  </ul>
+
+  <h3 id="flow-entity-membership">5.5 Entity switch &amp; membership access</h3>
+  <p class="section-hint"><strong>Story (PRD §4.8):</strong> owner/manager/viewer boundary. Source: <a href="flows/entity-membership-flow.md">flows/entity-membership-flow.md</a>.</p>
+  <pre class="mermaid">
+flowchart TD
+  login([User logs in]) --> memberships[Load user's memberships:\nentity, role]
+  memberships --> list{More than one\nentity?}
+  list -- no --> single[Land directly on the\none entity, no switcher shown]
+  list -- yes --> switcher[Entity switcher in header:\nlist entities by membership]
+  switcher --> select[User selects an entity]
+  select --> roleCheck{Role on\nselected entity}
+  roleCheck -- owner --> ownerView[Full read/write:\npost, edit memberships, purge]
+  roleCheck -- manager --> managerView[Read/write ledger,\nno membership/purge rights]
+  roleCheck -- viewer --> viewerView[Read-only:\nbalances, activity, statements]
+  ownerView --> guard{Parent-entity\nstructure implies access?}
+  managerView --> guard
+  viewerView --> guard
+  guard -- "no (always)" --> explicit[Only explicit membership\ngrants access, never inherited]
+  explicit --> render([Render scoped dashboard])
+  </pre>
+  <ul>
+    <li>A Household's membership never transitively grants access to a member Person entity, or vice versa (PRD §5, hard requirement).</li>
+    <li>A viewer never sees a write affordance rendered-then-disabled — write controls are omitted entirely, not shown-and-greyed.</li>
   </ul>
 </section>
 

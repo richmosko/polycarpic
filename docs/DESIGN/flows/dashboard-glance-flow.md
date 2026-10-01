@@ -5,7 +5,7 @@
 ```mermaid
 flowchart TD
   start([User logs in]) --> membership{Holds membership\non 1+ entity?}
-  membership -- no --> empty[Empty state:\n"No entities yet" + invite/create CTA]
+  membership -- no --> empty[Empty state:\nNo entities yet, invite/create CTA]
   membership -- yes --> default[Land on default entity\nlast-viewed or first by role]
   default --> render[Render dashboard:\nbalances, cash flow, recent activity,\npending tax liability, allocation snapshot]
   render --> loading{Data cached?}
