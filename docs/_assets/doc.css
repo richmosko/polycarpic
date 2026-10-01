@@ -229,6 +229,19 @@ th, td {
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--doc-border);
   vertical-align: top;
+  /* seceng finding (PR #48): no overflow-wrap meant a single long unbroken
+     identifier (a package path, a column of code-wrapped values) pushed
+     the whole table past the content column in every doc — SECURITY's
+     controls table measured 969px in a 782px column before seceng-2
+     patched it with a doc-local <style>. Fixed here globally instead, so
+     every doc's tables get it for free. */
+  overflow-wrap: anywhere;
+}
+
+td code, th code {
+  /* `code` defaults to no-wrap-friendly inline text; without this, the
+     overflow-wrap above can't break a long inline code span inside a cell. */
+  white-space: normal;
 }
 
 th {
