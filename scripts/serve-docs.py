@@ -98,12 +98,26 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stderr.write(f"  {self.command} {self.path} → {args[1] if len(args) > 1 else '-'}\n")
 
+    def end_headers(self):  # noqa: N802
+        """Every response -- static files via SimpleHTTPRequestHandler's own
+        send_head() (which calls this before returning the file object to
+        copy), and the JSON API via _send_json below -- must tell the
+        browser never to use a cached copy. SimpleHTTPRequestHandler only
+        ever sends Last-Modified, which several browsers treat as a
+        heuristic-caching green light; the Principal has twice hit a stale
+        index.html or docs/_assets/*.js during review (black Mermaid boxes,
+        a flow that wouldn't render) as a result. Cache-Control: no-store
+        is the directive that actually stops that; Pragma: no-cache is
+        belt-and-suspenders for any HTTP/1.0-era cache still in the path."""
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Pragma", "no-cache")
+        super().end_headers()
+
     def _send_json(self, status: int, payload: dict) -> None:
         body = json.dumps(payload).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
