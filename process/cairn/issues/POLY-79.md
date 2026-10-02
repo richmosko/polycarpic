@@ -6,7 +6,7 @@ milestone: null
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [scripts/cairn/**, .claude/hooks/**]
+paths: [scripts/cairn/**, .claude/hooks/**, scripts/serve-docs.py, scripts/serve-docs.sh]
 labels: [tooling]
 priority: null
 pr: null
