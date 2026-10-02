@@ -6,27 +6,40 @@
 <link rel="stylesheet" href="wireframe.css">
 </head>
 <body>
-<p class="wf-note" style="margin:16px;">Pass 7 (2026-10-02) — rebuilt from the custodial half of the old "Accounts" screen's GL-vs-custodial toggle, absorbing "Securities" (lots become a sub-card) and "Import" (provider setup becomes the [+ New] modal here). Principal, verbatim: "Sub-card in the Custodial view... pull downs of each security to show lots... book vs market should be implicit in the custodial view, shown as whether the lots show the short/long/total current gains/losses."</p>
-<div class="wf-shell">
-  <div class="wf-topbar">
-    <strong>&#9670; Polycarpic</strong>
-    <span style="display:flex; align-items:center; gap:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
-  </div>
-  <div class="wf-shell-body">
-  <div class="wf-sidebar">
-    <div class="wf-nav-item">Dashboard</div>
-    <div class="wf-nav-item">Transactions</div>
-    <div class="wf-nav-item">General Ledger</div>
-    <div class="wf-nav-item">Custodial Accounts (active)</div>
-    <div class="wf-nav-item">Allocation</div>
-    <div class="wf-nav-item">Reports</div>
-    <div class="wf-nav-item">Entities</div>
-    <div class="wf-nav-item">Settings</div>
-    <div class="wf-sidebar-toggle">&#8249; Collapse</div>
-  </div>
-  <div class="wf-content">
+<div class="wf-app-shell">
+  <aside class="wf-app-sidebar">
+    <div class="wf-sidebar-top">&#9670; Polycarpic</div>
+    <nav class="wf-sidebar-nav">
+      <div class="wf-nav-item">Dashboard</div>
+      <div class="wf-nav-item">Transactions</div>
+      <div class="wf-nav-item">General Ledger</div>
+      <div class="wf-nav-item">Custodial Accounts (active)</div>
+      <div class="wf-nav-item">Allocation</div>
+      <div class="wf-nav-item">Reports</div>
+      <div class="wf-nav-item">Entities</div>
+    </nav>
+    <div class="wf-sidebar-bottom">
+      <div class="wf-sidebar-avatar-trigger"><span class="wf-avatar">M</span><span class="wf-sidebar-user-name">Mosko &#9662;</span></div>
+    </div>
+  </aside>
+  <div class="wf-main">
+    <p class="wf-note" style="margin:16px;">Pass 7, app shell updated pass 8 (2026-10-02) — rebuilt from the custodial half of the old "Accounts" screen's GL-vs-custodial toggle, absorbing "Securities" (lots become a sub-card) and "Import" (provider setup becomes the [+ New] modal here). Principal, verbatim: "Sub-card in the Custodial view... pull downs of each security to show lots... book vs market should be implicit in the custodial view, shown as whether the lots show the short/long/total current gains/losses." Header/sidebar reworked per review 5 (see wireframes/dashboard.html for the full note).</p>
+    <div class="wf-app-topbar">
+      <div class="wf-topbar-left">
+        <span class="wf-icon-btn">&#9776;</span>
+        <span class="wf-breadcrumbs">Custodial Accounts</span>
+      </div>
+      <div class="wf-topbar-right">
+        <span style="display:flex; align-items:center; gap:8px; margin-right:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+        <span class="wf-icon-btn disabled" title="AI/Agent — greyed in v1">&#10024;</span>
+        <span class="wf-icon-btn" title="Search">&#128269;</span>
+        <span class="wf-icon-btn" title="Notifications">&#128276;</span>
+        <span class="wf-icon-btn" title="Settings">&#9881;</span>
+      </div>
+    </div>
+    <div class="wf-app-content">
     <div class="wf-row" style="border:none; align-items:flex-start;">
-      <h1>Custodial Accounts — [Entity name]</h1>
+      <span></span>
       <span>[Sync] [+ New]</span>
     </div>
 
@@ -105,7 +118,7 @@
     </div>
 
     <p class="wf-note">Sync on this screen pulls balances AND positions (lots), not just transactions. Link-health (expired token / lost access / stale) shows as a badge here and as a banner on Transactions. Viewers see no [Sync] / [+ New] / token-refresh / unlink actions.</p>
-  </div>
+    </div>
   </div>
 </div>
 </body>

@@ -17,17 +17,18 @@ body {
   background: #fafafa;
 }
 
-/* Shell (pass 4): full-width header on top, sidebar + content below it —
-   see design-system-spec.md § Layout & shell. */
+/* Shell (pass 4; scope narrowed pass 8 — see .wf-app-shell below): a
+   simple topbar-over-content stack. As of pass 8 this is used only by
+   the two screens that have no sidebar at all (membership-setup.html,
+   admin.html) — every sidebar-bearing screen uses .wf-app-shell instead. */
 .wf-shell {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* Header (pass 5): brand lockup left, entity selector (name + avatar
-   cluster) right — see design-system-spec.md § Header. Page title moved
-   into .wf-content as its own row, same as the real screens. */
+/* Header (pass 5; superseded pass 8 for sidebar screens, see
+   .wf-app-topbar below) — brand lockup left, entity selector right. */
 .wf-topbar {
   display: flex;
   align-items: center;
@@ -53,22 +54,77 @@ body {
   align-items: stretch; /* pass 5: sidebar stretches full height, option A */
 }
 
-.wf-sidebar {
-  border: 2px dashed #999;
-  border-radius: 8px;
-  margin: 16px;
-  padding: 16px;
+/* .wf-sidebar / .wf-sidebar-toggle (pass 4/5, the floating-card sidebar
+   with a bottom chevron) are superseded by .wf-app-shell's
+   .wf-app-sidebar below (pass 8) for every screen that has a sidebar.
+   `.wf-shell` / `.wf-shell-body` above stay as-is — still used by the
+   two shell-less pages (membership-setup.html, admin.html) that keep a
+   simple topbar-over-content stack with no sidebar at all. */
+
+/* ---------- App shell with sidebar (pass 8, 2026-10-02 — Principal
+   review 5, shadcn Sidebar pattern): the sidebar fills the entire
+   viewport height and sits flush left; the topbar starts to its right,
+   not above it. See screen.css for the styled/token equivalent and
+   design-system-spec.md § Layout & shell for the full rationale. ---------- */
+.wf-app-shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.wf-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wf-app-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 2px dashed #999;
+  background: #fff;
+}
+.wf-topbar-left { display: flex; align-items: center; gap: 12px; }
+.wf-topbar-right { display: flex; align-items: center; gap: 4px; }
+.wf-icon-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: 1px dashed #999; border-radius: 4px; font-size: 13px; }
+.wf-icon-btn.disabled { opacity: 0.4; }
+.wf-icon-btn.active { background: #eee; border-color: #333; } /* e.g. the gear on Settings itself — no sidebar nav item to mark active instead */
+.wf-breadcrumbs { font-size: 14px; font-weight: 600; }
+.wf-breadcrumbs .wf-crumb { color: #888; font-weight: 400; }
+
+.wf-app-sidebar {
+  width: 200px;
+  flex-shrink: 0;
   background: #2a2a2a;
   color: #eee;
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 16px;
+  position: fixed; /* not sticky — a wireframe's own note-banner above the
+    shell would otherwise offset a sticky sidebar below y=0, same fix as
+    screen.css's .sidebar; fixed pins it to the viewport itself */
+  top: 0;
+  left: 0;
+  height: 100vh;
+  padding: 12px;
+  border-radius: 0 8px 8px 0;
 }
 
-.wf-sidebar-toggle { margin-top: auto; text-align: center; padding-top: 12px; font-size: 11px; color: #aaa; }
+.wf-main { margin-left: 200px; }
+.wf-app-sidebar .wf-nav-item { border-color: #555; color: #eee; }
 
-.wf-sidebar .wf-nav-item { border-color: #555; color: #eee; }
+.wf-sidebar-top { padding: 4px 4px 12px; border-bottom: 1px dashed #555; margin-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.wf-sidebar-nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.wf-sidebar-bottom { margin-top: auto; border-top: 1px dashed #555; padding-top: 8px; position: relative; }
+.wf-sidebar-avatar-trigger { display: flex; align-items: center; gap: 8px; padding: 6px 4px; cursor: pointer; }
+.wf-sidebar-user-name { font-size: 12px; }
+.wf-avatar-popover { position: absolute; bottom: calc(100% + 6px); left: 0; width: 180px; background: #fff; color: #333; border: 1px solid #999; border-radius: 6px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.wf-avatar-popover div { padding: 6px 8px; font-size: 12px; border-bottom: 1px dashed #eee; }
+.wf-avatar-popover div:last-child { border-bottom: none; color: #c33; }
+
+.wf-app-content { padding: 20px 24px; }
 
 .wf-content {
   padding: 24px;

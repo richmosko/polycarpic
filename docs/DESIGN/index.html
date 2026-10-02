@@ -19,7 +19,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.9</span>
+    <span><strong>Version:</strong> 0.10</span>
     <span><strong>Last updated:</strong> 2026-10-02</span>
   </div>
 </header>
@@ -67,6 +67,7 @@
   <p class="section-hint">The single source of truth for the visual language. The written spec lives alongside this doc; the machine-readable system lives in the two CSS files that <code>frontend-lead</code> consumes directly.</p>
   <ul>
     <li><a href="design-system-spec.md#inspiration-monarch--origin">design-system-spec.md § Inspiration</a> — what was taken from Monarch Money and Origin, and why</li>
+    <li><a href="design-system-spec.md#shadcn-svelte-reuse-map-pass-8-2026-10-02">design-system-spec.md § shadcn-svelte reuse map</a> <em>(pass 8, new)</em> — every component/region mapped to its shadcn-svelte component, block, or a stated "custom" reason</li>
     <li><a href="design-system-spec.md">design-system-spec.md</a> — the written spec (token rationale, financial semantics, component inventory, accessibility)</li>
     <li><a href="tokens.css">tokens.css</a> — design tokens as CSS custom properties (hand-authored palette, not a vendored shadcn preset)</li>
     <li><a href="tokens.html">tokens.html</a> <em>(pass 6, new)</em> — every token decoded: name, value in both modes, swatch, one-line "used for"</li>
@@ -150,8 +151,10 @@
       <tr><td>Entity switcher</td><td>Tabs / Sidebar</td><td>Switch between Person/Trust/Business/Household</td></tr>
       <tr><td>Transaction detail</td><td>Sheet</td><td>Drill into a posted/draft entry, its journal lines, source doc</td></tr>
       <tr><td>Empty state</td><td>Card + plain text, no skeleton</td><td>Dashboard panels not yet shipped (tax at 1.0, allocation at M4) — see styled-screens/dashboard.html</td></tr>
-      <tr><td>Header <em>(pass 5)</em></td><td>—, custom full-width bar</td><td>Brand lockup left, entity selector right; page title/actions moved to the content column — see design-system-spec.md § Header</td></tr>
+      <tr><td>Header <em>(pass 8, rebuilt)</em></td><td>—, starts right of the sidebar</td><td>Expand/contract icon + breadcrumb left; entity selector, AI icon (greyed v1), search, notifications, settings gear right — see design-system-spec.md § Header</td></tr>
+      <tr><td>Sidebar <em>(pass 8, rebuilt)</em></td><td>Sidebar (shadcn-svelte)</td><td>Viewport-fixed full height, seven nav items, brand top item, avatar-popover bottom item (Settings moved to the header gear) — see design-system-spec.md § Sidebar</td></tr>
       <tr><td>Avatar cluster <em>(pass 5, new)</em></td><td>—, custom</td><td>Overlapping initials in the entity selector, max 3 + overflow</td></tr>
+      <tr><td>Avatar popover <em>(pass 8, new)</em></td><td>Popover / DropdownMenu</td><td>User menu at the sidebar's bottom — profile, preferences, theme, keyboard shortcuts, Log out last</td></tr>
       <tr><td>Public hero <em>(pass 4, corrected)</em></td><td>—, custom</td><td>Home — pre-auth landing page, product statement + CTAs, not a signed-in screen</td></tr>
       <tr><td>Split screen login <em>(pass 4, refined pass 5)</em></td><td>—, custom</td><td>Login — full field list, centered form column, always-branded visual pane</td></tr>
     </tbody>
@@ -376,6 +379,7 @@ flowchart TD
   <h2>9. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
+    <li><strong>Resolved 2026-10-02 (pass 8):</strong> app shell rebuilt on the shadcn Sidebar component's own pattern (Principal review 5) — sidebar now fills the viewport height (<code>position: fixed</code>, not <code>sticky</code>, fixing a real bug where a wireframe's own explanatory note pushed the sidebar below the visible viewport), brand moved to the sidebar's top item, an avatar-popover user menu (profile/preferences/theme/shortcuts/Log out) replaces the old bottom chevron, and Settings left the sidebar for a header gear icon (seven nav items remain). Header now starts right of the sidebar: expand/contract icon + breadcrumb left, entity selector/AI-icon/search/notifications/gear right — screens no longer repeat their title as an on-page heading. New <a href="design-system-spec.md#shadcn-svelte-reuse-map-pass-8-2026-10-02">§ shadcn-svelte reuse map</a> answers the Principal's reuse question directly. Applied to screen.css, wireframe.css, both styled screens, and all nine sidebar-bearing wireframes.</li>
     <li><strong>Resolved 2026-10-02 (pass 7, all 5 stages):</strong> sidebar reworked to eight items per the Principal's interview (<code>temp/2026-10-02-sidebar-interview.md</code>) — Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, Reports, Entities, Settings. "Securities" and "Import" are gone. Transactions rebuilt around the Plaid review/match workflow (expansion, Split, Group, a shared journal-entry modal); General Ledger opens to a chart-of-accounts tree with a per-account register page; Custodial Accounts gained a lots sub-card and a provider-item modal; Allocation, Reports (empty until POLY-M5), and Settings are new. See design-system-spec.md § Sidebar information architecture onward. <strong>Judgment call:</strong> only Dashboard and Transactions got styled-screen fidelity, matching the existing traffic-priority rule — flag if General Ledger, Custodial Accounts, or Allocation need a styled build sooner.</li>
     <li><strong>Resolved 2026-10-01 (pass 6):</strong> <code>--warning</code> re-hued to a true orange with a dark ink (was brown-reading); light-mode chart ramp brightened; <a href="tokens.html">tokens.html</a> added; Login wireframe corrected to match the centered styled screen; dashboard first-run/empty-state wireframe added (<a href="wireframes/membership-setup.html">membership-setup.html</a>); skeleton-vs-spinner explained in plain words; flow 5.2 reframed around the user-facing "Correct entry" action; flow 5.3 redrawn to remove the app-initiates-payment step.</li>
     <li><strong>Resolved 2026-09-30 (pass 5):</strong> sidebar expand/collapse cue — option A (chevron) chosen; sidebar now full-height; header restructured to brand lockup + entity selector with an avatar cluster; login form pane centered — design-system-spec.md § Header, § Sidebar, § Login.</li>

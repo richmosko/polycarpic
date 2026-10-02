@@ -2,7 +2,7 @@
 
 > The written companion to `tokens.css` + `screen.css`. The CSS files are the machine-readable source of truth; this doc explains the *why* and the usage rules. Owned by the `ux-designer` agent. Generate/refine with `/generate-designdoc`.
 
-**Revision history:** Pass 1 (2026-09-28) inherited the cairn tracker's own palette — rejected, diverging from cairn is the goal. Pass 2 (2026-09-28) hand-authored an indigo/violet identity "inspired by" Monarch Money and Origin from general/training knowledge — rejected: the guessed hue matched neither product, and "Origin" was misidentified. Pass 3 (2026-09-28) derived a blue-primary, warm-neutral palette from team-lead's measured screenshots of the actual products (`temp/design-refs/`) — accepted as the base, most of **Inspiration** and **Typography** below is still that pass's work and still current. Pass 4 (2026-09-30) is the Principal's first review of the pass-3 result: the brand hue becomes neon green (`#2CFF05`), the neutral scale replaces warm/brown with a faint tint of that hue, the sidebar inverts, the shell layout changes (full-width header, sidebar below it), and two new screens (Home, Login) are added. Pass 5 (2026-09-30) adds a secondary blue brand hue (`#05A9FF`), re-tints the neutral scale and sidebar from green to that blue (less saturated), and fixes the flows section not rendering. **Pass 6 (2026-10-01, this revision)**, Principal review 4: `--warning` becomes a genuinely orange hue paired with dark ink (not a white-text-forcing darkened brown); the light-mode chart ramp brightens across all 5 steps (the old tail read as "almost black"); a new `tokens.html` example page decodes every token with swatches in both modes and a "used for" line; the Login wireframe is corrected to match the centered styled screen; a dashboard first-run/empty-state wireframe (the membership-setup page) is added and linked from flow 5.1; the skeleton-vs-spinner bullet is answered in plain words; flow 5.2 is reframed around what the user experiences (a "Correct entry" action with a badge and a struck/shaded reversal on click-through, the underlying reversal-only mechanism unchanged); flow 5.3 is redrawn so the app never initiates a payment — the user pays their bank, the payment lands as an imported transaction with no counterparty, and they post it against the custodial tax-authority account, which is what the gap is measured against. See **Foundations**, **Financial semantics**, the flow sections, and `tokens.html` for the detail. **Pass 7 (2026-10-02, this revision)** reworks the sidebar's information architecture end to end, per an interview with the Principal (`temp/2026-10-02-sidebar-interview.md`): "Ledger" becomes **Transactions** (three urgency-ordered accordion cards — Exceptions, Pending, Posted — the Pending card rebuilt around the Principal's Plaid bank-feed review/match workflow); "Accounts" splits into **General Ledger** (a chart-of-accounts tree + per-account register page) and **Custodial Accounts** (physical accounts, reconciliation, and a new lots sub-card absorbing "Securities"); **Allocation** and **Reports** become their own items; **Settings** is new; "Securities" and "Import" are gone as nav items. See **Sidebar information architecture**, above, and the updated **Screen data contract** below; the Pending-inbox workflow mechanics (expansion panel, split grid, bulk-group modal) land as their own pass alongside the rebuilt Transactions screen.
+**Revision history:** Pass 1 (2026-09-28) inherited the cairn tracker's own palette — rejected, diverging from cairn is the goal. Pass 2 (2026-09-28) hand-authored an indigo/violet identity "inspired by" Monarch Money and Origin from general/training knowledge — rejected: the guessed hue matched neither product, and "Origin" was misidentified. Pass 3 (2026-09-28) derived a blue-primary, warm-neutral palette from team-lead's measured screenshots of the actual products (`temp/design-refs/`) — accepted as the base, most of **Inspiration** and **Typography** below is still that pass's work and still current. Pass 4 (2026-09-30) is the Principal's first review of the pass-3 result: the brand hue becomes neon green (`#2CFF05`), the neutral scale replaces warm/brown with a faint tint of that hue, the sidebar inverts, the shell layout changes (full-width header, sidebar below it), and two new screens (Home, Login) are added. Pass 5 (2026-09-30) adds a secondary blue brand hue (`#05A9FF`), re-tints the neutral scale and sidebar from green to that blue (less saturated), and fixes the flows section not rendering. **Pass 6 (2026-10-01)**, Principal review 4: `--warning` becomes a genuinely orange hue paired with dark ink (not a white-text-forcing darkened brown); the light-mode chart ramp brightens across all 5 steps (the old tail read as "almost black"); a new `tokens.html` example page decodes every token with swatches in both modes and a "used for" line; the Login wireframe is corrected to match the centered styled screen; a dashboard first-run/empty-state wireframe (the membership-setup page) is added and linked from flow 5.1; the skeleton-vs-spinner bullet is answered in plain words; flow 5.2 is reframed around what the user experiences (a "Correct entry" action with a badge and a struck/shaded reversal on click-through, the underlying reversal-only mechanism unchanged); flow 5.3 is redrawn so the app never initiates a payment — the user pays their bank, the payment lands as an imported transaction with no counterparty, and they post it against the custodial tax-authority account, which is what the gap is measured against. See **Foundations**, **Financial semantics**, the flow sections, and `tokens.html` for the detail. **Pass 7 (2026-10-02)** reworks the sidebar's information architecture end to end, per an interview with the Principal (`temp/2026-10-02-sidebar-interview.md`): "Ledger" becomes **Transactions** (three urgency-ordered accordion cards — Exceptions, Pending, Posted — the Pending card rebuilt around the Principal's Plaid bank-feed review/match workflow); "Accounts" splits into **General Ledger** (a chart-of-accounts tree + per-account register page) and **Custodial Accounts** (physical accounts, reconciliation, and a new lots sub-card absorbing "Securities"); **Allocation** and **Reports** become their own items; **Settings** is new; "Securities" and "Import" are gone as nav items. See **Sidebar information architecture**, and the **Screen data contract**; the Pending-inbox workflow mechanics (expansion panel, split grid, bulk-group modal) land as their own pass alongside the rebuilt Transactions screen. **Pass 8 (2026-10-02, this revision)**, Principal review 5: the app shell rebuilds on the shadcn Sidebar component's own pattern — the sidebar fills the viewport height (`position: fixed`, not `sticky`), carries the brand as its top item and an avatar-popover user menu as its bottom item, and drops to seven nav items as **Settings** moves to a header gear icon. The header now starts right of the sidebar: an expand/contract icon + breadcrumb on the left, entity selector/AI-icon/search/notifications/gear on the right. A new **shadcn-svelte reuse map** (below) answers which shadcn-svelte component or block backs every piece of this system. See **Layout & shell**, **Header**, **Sidebar**, and **shadcn-svelte reuse map**.
 
 ## What governs this system
 
@@ -188,55 +188,75 @@ Kept from the prior pass on its own merits (generic spacing rhythm), not re-meas
 
 No custom `--shadow-*` overrides — inherits shadcn-svelte's default scale.
 
-### Layout & shell (pass 4, header contents corrected pass 5)
+### Layout & shell (pass 4; superseded pass 8, 2026-10-02 — Principal review 5)
 
-**Principal direction (pass 4):** "Can we have the top header bar span the full width, and have the side-bar under the header?" — a shell restructure from pass 3's side-by-side sidebar+content grid.
+**Pass 4 history (superseded, kept for the record):** "Can we have the top header bar span the full width, and have the side-bar under the header?" — pass 4's shell had a full-width header on top, with the sidebar + content as a two-column body below it.
 
-New shell, top to bottom:
-1. **Header** — full page width, top row, global chrome only (see Header, below, for exactly what lives here — corrected in pass 5).
-2. **Body** — below the header, a two-column region: sidebar (left, now full-height as of pass 5, see Sidebar) + content (right). Each screen's own page title and page-specific actions (Refresh, tabs, "Confirm all", ...) live at the top of the content column, not in the header.
+**Pass 8, current shell** — rebuilt on the shadcn Sidebar component's own pattern (https://ui.shadcn.com/docs/components/base/sidebar, `temp/design-refs/shadcn-sidebar.png`), per the Principal: "we should have the sidebar take up the entire vertical *screen* space. Not the vertical *page* space... The header row would start at the right of the expanded or contracted sidebar." The header no longer spans the full width — it starts to the right of the sidebar instead:
 
-This is a genuine restructure, not a cosmetic tweak. See `wireframes/` and both styled screens for the built version.
+1. **Sidebar** — a fixed column, flush to the left edge, filling the full viewport height (`position: fixed; height: 100vh`, not `sticky` against the page — see § Sidebar for why `sticky` wasn't enough). Composition top to bottom: brand (logo + wordmark, moved here from the header) → nav (seven items) → avatar trigger (opens the user-menu popover).
+2. **Shell main** (everything to the right of the sidebar) — a header row, then the content column below it. Each screen's own page-specific actions (Refresh, tabs, "Confirm all", Sync/+New entry, ...) still live at the top of the content column; the page **title** itself no longer does — it moved into the header's breadcrumb (see Header, below).
 
-### Header (pass 5 — Principal review 2)
+This is a genuine restructure, not a cosmetic tweak — see `wireframes/` and both styled screens for the built version. `.shell-main` carries a `margin-left` matching the sidebar's width, since a `position: fixed` sidebar is out of normal document flow.
 
-**Principal direction:** "Can we have the entity selector on the right of the header? Ideally it would be the entity name + a cluster of avatars representing the membership. And at the [left] of the header would be the Product Icon with name to the right (Polycarpic)."
+### Header (pass 5 — Principal review 2; rebuilt pass 8 — Principal review 5)
 
-- **Left: brand lockup** — a product icon (`.brand-icon`, currently a plain `--primary`-filled square placeholder pending a real mark) + the wordmark "Polycarpic," `--font-heading` 700.
-- **Right: entity selector** — the current entity's name + an **avatar cluster** (below), opening the entity switcher on click. Replaces pass 4's plain-text "Person — Mosko ▾."
-- **What moved out of the header (pass 4 → pass 5):** the page title (e.g. "Dashboard," "Ledger") and any page-specific actions (Refresh, tabs, "Confirm all") that pass 4 put in the header move into the **content column's own `.header-row`**, at the top of each screen — the header is global chrome (brand + entity) now, not per-page chrome. Every wireframe and both styled screens were updated to this shape.
+**Pass 5 history (superseded, kept for the record):** brand lockup moved to the header's left, entity selector to the right, page title/actions moved out into the content column. The brand lockup has since moved again (pass 8, into the sidebar's own top item) — everything else pass 5 established about *what leaves the header* (page title, page-specific actions) still holds.
 
-**Avatar cluster — new component (pass 5).** Overlapping circles representing the entity's membership:
+**Pass 8, current header — the Principal's spec, restated exactly:**
+
+| Side | Items, in order |
+|---|---|
+| **Left** | Expand/contract icon (`.sidebar-toggle-header`, toggles the sidebar between full and icon-rail width) → page title **>** breadcrumbs (`.breadcrumbs`) |
+| **Right** | Entity selector (name + avatar cluster) → AI/Agent icon (greyed, non-interactive in v1) → Search icon (keyword / account name / report view) → Notification centre icon → Gear icon → Settings |
+
+- **Breadcrumbs are now the only place a page's title renders.** Most screens are a single crumb (e.g. "Transactions"); a drill-down page shows its full path — the account register is the canonical example: "General Ledger **>** Primary Checking." Screens no longer repeat their own title as an `<h1>` in the content column (pass 5 through pass 7 did this; removed in pass 8 to avoid saying the same thing twice two different ways).
+- **The AI/Agent icon is deliberately inert in v1** — greyed out, `disabled`, present only to reserve its slot in the row for when agent features ship. Not a dead placeholder forever; a known future surface being designed for now.
+- **Search** is one icon for three search domains (keyword, account name, report view) — a single entry point, not three separate controls; the exact command-palette behavior is architect/frontend-lead's to define against a real search index, this spec only fixes its header position and icon.
+- **Settings left the sidebar** (see § Sidebar information architecture) — the gear is its only entry point now. On the Settings screen itself, no sidebar nav item is active (there isn't one to mark); the gear shows an `active` state instead (`.icon-btn.active`).
+- **Entity selector / avatar cluster are unchanged from pass 5** — same component, same position (now the first item in the header's right-justified icon row rather than the header's only right-side item).
+
+**Avatar cluster (pass 5, unchanged in pass 8).** Overlapping circles representing the entity's membership:
 - 24px diameter, `-8px` overlap (each circle's `margin-left`), a 2px border in whatever surface color it sits on (`--card` in the header) to cut a visible ring between overlapping circles.
 - **Fallback is always initials** on a `--secondary` fill — no avatar-image asset exists for this product yet, so this isn't a "fallback for the rare case," it's the only case today.
 - **Max 3 shown**, a 4th+ member folds into a "+N" chip in the same slot and style, continuing the overlap (not yet built in the two reference screens — both shown entities have ≤2 members; the overflow rule is stated here for frontend-lead to implement against a real membership count).
 
-### Sidebar (pass 4 — inverted, card, collapsible; pass 5 — option A chosen, full height, re-hued blue)
+### Sidebar (pass 4 — inverted, card, collapsible; pass 5 — option A chosen, full height, re-hued blue; pass 8 — shadcn pattern, viewport-fixed, avatar popover)
 
 **Principal direction (pass 4):** "Maybe we can play with an inverted background color for the sidebar. And while we are at it: Make it a card with the same rounded edges. I also want the ability to compact the sidebar to just icons."
 
 - **Inverted:** in light mode the sidebar is a dark surface (`--sidebar` = `#1F2528`, blue-tinted as of pass 5, was `#20291F` green) floating on the light page; in dark mode it's a light surface (`--sidebar` = `#F7F8F8`, the light mode's own canvas tone reused directly) floating on the dark page. A user should never see two dark (or two light) surfaces stacked with no separation across a mode switch — "inverted" means relative to the page, in both directions.
 - **Re-hued blue (pass 5).** The Principal, reviewing the pass-4 result: "check the background on the side-bar. Is that green biased? I want it more flat or blue-biased." It was — same hue family as the pass-4 primary green, just dark. Moved to the same blue hue (200.6°) as the pass-5 re-tinted neutral scale, rather than a true neutral grey, so the whole system (page canvas + sidebar) carries one consistent "barely blue" cast instead of introducing a third hue family. The sidebar's own focus ring moved too (`--brand-2` instead of the green `--brand`) so no green survives anywhere in this component.
-- **Card:** `border-radius: var(--radius-lg)` (12px, same as any other card), with its own `padding` and a visible edge against the page canvas (a subtle shadow, not flush) — it reads as a floating panel rather than a flush structural rail.
+- **Card, pass-8 shape:** `border-radius` moved from all four corners (pass 4/5, a floating card with margin on every side) to **just the inner edge** (`0 var(--radius-lg) var(--radius-lg) 0`) — pass 8's sidebar is flush to the viewport's left and bottom edges (see "Full height," below), so only the edge touching the content column still reads as a rounded card seam.
 - **Collapsible to an icon rail:** a compact state (~64px wide) showing only nav icons, no labels — expand restores the full ~240px width with labels.
 
-**Expand/collapse cue — Option A chosen (Principal review 2, 2026-09-30).** Three options were sketched; the Principal picked **A: a chevron pinned at the sidebar's bottom edge, always visible, click to toggle.** B (hover-reveal) and C (keyboard + remembered state) are kept below as rejected alternatives, for the record — not implemented.
+**Composition, pass 8, top to bottom:**
+1. **Brand item** (`.sidebar-top`) — logo + "Polycarpic" wordmark, moved here from the header (see § Header). Collapses to the logo mark alone in the icon rail.
+2. **Nav** (`.sidebar-nav`) — seven items (was eight through pass 7; Settings left for the header's gear, see § Sidebar information architecture).
+3. **Avatar trigger** (`.sidebar-bottom`) — opens a user-menu popover (profile, preferences, theme, keyboard shortcuts, … **Log out last**). Collapses to the avatar circle alone in the icon rail.
 
-| Option | Mechanism | Status |
-|---|---|---|
-| **A. Chevron at the rail's bottom edge** | A small chevron/arrow button, always visible, click to toggle | **Chosen** |
-| B. Hover-reveal | Collapsed rail shows icons only; hovering flies out full labels, pin to persist | Rejected |
-| C. Keyboard shortcut + remembered state | `Cmd/Ctrl+B` toggles; state persists in `localStorage` | Rejected |
+**Expand/collapse cue — Option A superseded (pass 8, Principal review 5).** Pass 5 chose "a chevron pinned at the sidebar's bottom edge." The Principal's pass-8 header spec gives that bottom slot to the avatar trigger instead and moves the expand/contract control into the header (`.sidebar-toggle-header`, left of the breadcrumb) — proposed by team-lead during the review, not objected to. **B (hover-reveal) and C (keyboard + remembered state) are still rejected**, for the same reasons as pass 5; A's own mechanism is superseded, not rejected — it just no longer lives on the sidebar. See `wireframes/sidebar-cues.html`, updated to record this.
 
-See `wireframes/sidebar-cues.html`, updated to mark A chosen.
+**Full height (pass 5; mechanism fixed pass 8).** "Can we have the sidebar elongate down to fill the screen? ... the entire vertical *screen* space. Not the vertical *page* space." Pass 5 used `position: sticky` against `.shell-body`'s own flex row — this tracked the **page's** scroll position, not the **viewport**, and broke outright once a wireframe convention put an explanatory note above the shell: the sticky sidebar's natural document-flow offset pushed its bottom edge below the actual viewport. **Pass 8 fix:** `position: fixed; top: 0; left: 0; height: 100vh` — pinned to the viewport itself, independent of where the shell sits in the document and independent of scroll position. `.shell-main` carries a `margin-left` equal to the sidebar's width to avoid being covered, since a fixed element is out of normal flow.
 
-**Full height (pass 5).** "Can we have the sidebar elongate down to fill the screen? Put the [collapse] icon at the very bottom." The sidebar card now stretches to the full height of `.shell-body` — which itself is a `flex:1` row inside `.shell`'s `min-height:100vh` flex column, so it's exactly "the remaining viewport below the header" when content is short, and grows to match content's own height when content is taller (the page scrolls, the sidebar — `position:sticky` — tracks near the top of view the whole way down). No hardcoded "100vh minus header px" number: this falls out of leaving `.shell-body`'s `align-items` and `.sidebar`'s `align-self` at their CSS Grid default (`stretch`), which pass 4 had overridden to `start` — removing that override is the entire fix. The collapse chevron, already pinned via `margin-top: auto` inside the sidebar's own flex column, now sits at the bottom of this full-height card rather than just below the last nav item.
+**Avatar popover (pass 8, new component).** The sidebar's bottom item (`.sidebar-avatar-trigger`) opens a popover anchored above it (the trigger sits at the screen's bottom edge, so the popover always opens upward):
+
+| Order | Item |
+|---|---|
+| 1 | Profile |
+| 2 | Preferences |
+| 3 | Theme |
+| 4 | Keyboard shortcuts |
+| — | divider |
+| 5 | **Log out** (last, `--destructive`-styled) |
+
+Shown "open" as the built reference on `styled-screens/dashboard.html` and `wireframes/dashboard.html`; every other screen shows the trigger closed. This is a Popover, not a Sheet or Dialog — it doesn't block the rest of the screen and dismisses on outside click (see § shadcn-svelte reuse map, below, for the exact primitive).
 
 ### Sidebar information architecture (pass 7, 2026-10-02)
 
 **The Principal, pass 4 review:** "I kind of feel like the transactions, Ledger entries, General Ledger, Custodial Accounts, and security views are mixed together. Needs some conceptual clean up." Resolved via an interview (team-lead ran it; full transcript in `temp/2026-10-02-sidebar-interview.md`, held past this pass). The underlying issue was a **flow-vs-state conflation**: three pipeline stages (imported transaction → draft → posted journal entry) were stacked on one "Ledger" screen, and two different concept layers (the GL abstraction vs. a physical custodial account) shared one screen behind a silent toggle.
 
-**Final sidebar, eight flat items, no nesting** (the existing icon-collapsible mechanism above is unchanged — flat items are what it was designed for):
+**Final sidebar, pass 7: eight flat items, no nesting. Amended pass 8: seven sidebar items + one header surface** (Settings moved to the header's gear icon, Principal review 5 — see § Header). The table below is pass 7's, with Settings' row marked to reflect where it actually lives now; everything else is unchanged, and the icon-collapsible mechanism is still flat-items-only.
 
 | # | Nav item | Replaces / absorbs | What it is |
 |---|---|---|---|
@@ -247,9 +267,9 @@ See `wireframes/sidebar-cues.html`, updated to mark A chosen.
 | 5 | **Allocation** | the allocation-vs-target half of old "Securities" | A dedicated actual-vs-target page — promoted out of Securities now that Securities itself is gone as a nav item. |
 | 6 | **Reports** | new | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (Component inventory, above) until POLY-M5 ships statements. Wireframe fidelity only for now. |
 | 7 | **Entities** | unchanged | Entity list, memberships, invite. Never implicated in the "mixed together" complaint — intentionally left alone. |
-| 8 | **Settings** | new; absorbs scheduling from old "Import" | Batch-import schedule and options, plus other app-level settings. |
+| — *(pass 8: header gear, not a sidebar item)* | **Settings** | new; absorbs scheduling from old "Import" | Batch-import schedule and options, plus other app-level settings. Reached via the header's gear icon (§ Header) — no sidebar nav item is active on this screen; the gear itself shows the `active` state instead. |
 
-**What's explicitly gone:** "Securities" (folded into Custodial Accounts' lots sub-card + the new Allocation page) and "Import" (its setup is now a Custodial Accounts action; its stats live on Transactions; its scheduling lives in Settings). **What's unaffected:** the sidebar's own visual mechanism — inversion, card shape, icon-rail collapse, the chosen chevron cue — none of that changed, only the item list and what each item means.
+**What's explicitly gone:** "Securities" (folded into Custodial Accounts' lots sub-card + the new Allocation page) and "Import" (its setup is now a Custodial Accounts action; its stats live on Transactions; its scheduling lives in Settings). **Pass 8 addition:** Settings itself also leaves the sidebar, for the header's gear icon. **What's unaffected:** the sidebar's own visual mechanism — inversion, card shape, icon-rail collapse — none of that changed; the expand/collapse *cue* did move (§ Sidebar, "Expand/collapse cue — Option A superseded").
 
 ---
 
@@ -398,20 +418,67 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Sheet / Dialog** | Transaction detail drawer; new-entity/membership dialog; provider-item modal (Custodial Accounts) |
 | **Dialog, near-full-screen** *(pass 7, new)* | The journal-entry modal (header + legs) — manual "+ New entry", "Correct entry", Split, and Group & Summarize all reuse this one modal |
 | **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers; the suggested-offset-leg inline search dropdown (Pending inbox); per-card "show N" limit selector |
-| **Sidebar** | Primary nav, eight flat items — inverted, a rounded card, collapsible to an icon rail (pass 4, item list pass 7, see Sidebar information architecture) |
+| **Sidebar** | Primary nav, seven flat items as of pass 8 (Settings moved to the header gear) — inverted, viewport-fixed full height, collapsible to an icon rail, brand item on top + avatar-popover trigger on bottom (pass 4/5/7/8, see Sidebar information architecture) |
 | **Skeleton** | Every async fetch boundary |
 | **Sonner (toast)** | Import batch complete, entry posted, reconciliation break |
 | **Progress** | Import batch progress, safe-harbor paid-vs-required |
-| **Header** *(pass 4, contents corrected pass 5)* | Full-width top bar — brand lockup left, entity selector right; page title/actions moved to the content column (see Layout & shell, Header) |
+| **Header** *(pass 4/5, rebuilt pass 8)* | Starts right of the sidebar, not full-width: expand/contract icon + breadcrumb (left); entity selector, AI icon (greyed v1), search, notifications, settings gear (right) — see Layout & shell, Header |
+| **Popover / DropdownMenu** *(pass 8, new)* | Avatar popover at the sidebar's bottom — profile, preferences, theme, keyboard shortcuts, Log out last (see Sidebar) |
+| **Breadcrumb** *(pass 8, new)* | The header's "page title > breadcrumbs" — single crumb on most screens, multi-crumb on drill-downs (the account register) |
 | **Avatar cluster** *(pass 5, new)* | Overlapping initials-on-`--secondary` circles in the entity selector — membership at a glance, max 3 + overflow (see Header) |
 | **Public hero + feature call-outs** *(pass 4, corrected)* | Home — pre-auth landing page, product statement + brand identity + CTAs |
 | **Split screen login** *(pass 4)* | Login — theme-aware form pane (full field list: OAuth, email, password + reveal + forgot-password, sign-in, sign-up link, legal footer) + always-branded visual pane, stacks on phone width |
 
-**Top bar pattern (Monarch):** page title (left) + a secondary outline action + a primary filled CTA (right) — e.g. Dashboard: "Refresh" (outline) + nothing else; Transactions: `[Sync Transactions]` (outline) + `[+ New entry]` (filled) *(pass 7, was Ledger's "Confirm all," since posting now happens per-item in the Pending inbox, not as a single batch action)*. **Pass 4:** this pattern now lives in the full-width Header, with the entity switcher added to its left edge.
+**Top bar pattern (Monarch):** page title (left) + a secondary outline action + a primary filled CTA (right) — e.g. Dashboard: "Refresh" (outline) + nothing else; Transactions: `[Sync Transactions]` (outline) + `[+ New entry]` (filled) *(pass 7, was Ledger's "Confirm all," since posting now happens per-item in the Pending inbox, not as a single batch action)*. **Pass 8:** the page title itself moved into the header's breadcrumb (§ Header); this row now carries only the page-specific action button(s), right-aligned in the content column — not the header, which is global chrome (sidebar-adjacent, not full-width, as of pass 8).
 
 **Empty-state pattern (ARCH §2.4 — Dashboard ships in M3 with the tax panel empty until 1.0, allocation panel empty until M4):** an empty panel keeps its real card chrome (eyebrow label, card shape, dashboard-scale padding) and states plainly that the feature isn't set up yet, in `--muted-foreground` body text — no illustration, no skeleton (a skeleton implies "loading," not "not built yet" — conflating the two is misleading). **Copy never names an internal milestone or version id** (architect's nit, 2026-09-28) — "Not set up yet," not "Available in v1.0"/"Available at M4": these panels are staging-only today, but neutral copy survives either way OQ-8 (0.x releases) resolves, without leaking internal roadmap language to a user. Example: the tax-liability card shows the eyebrow "PENDING TAX LIABILITY" and "Not set up yet" — same card shape as the live version will have, so the dashboard's layout doesn't visibly shift when the feature ships. See `styled-screens/dashboard.html` for the built example.
 
 **Still ours to set:** reduced-motion policy; loading-state discipline (per-feature).
+
+---
+
+## shadcn-svelte reuse map (pass 8, 2026-10-02)
+
+**The Principal's question:** "How much of shadcn-svelte's components and blocks are we reusing? Ideally we would stick to the already designed stuff as much as possible for stability." Answered here, directly: every component and screen region in this system, mapped to the shadcn-svelte component or official block it's built from, or `custom` with one line why. The bias throughout is toward an existing component/block over a bespoke build — `custom` rows are the exception, not the default, and each states what shadcn-svelte doesn't already cover.
+
+**Registry, version, and vendoring (the Principal also asked how blocks get in):** shadcn-svelte (https://shadcn-svelte.com, the Svelte port of shadcn/ui) follows shadcn's own distribution model — components are **copied into the repo** via `bunx shadcn-svelte@latest add <name>` (already stated in Component inventory, above), not installed as a versioned npm dependency. That means there is no single "shadcn-svelte version" pin the way there is for a normal package — each component is vendored source, owned and modified in-repo once added. **What is pinned:** the `shadcn-svelte` CLI/registry version used *at the moment each `add` command runs*, recorded as a decision in `process/DECISIONS.md` by frontend-lead at Implement kickoff (not a design-time decision — this spec fixes *which* components/blocks to use, not which CLI version generates them). Official **blocks** (pre-assembled multi-component screens — sidebar, dashboard, login blocks) are vendored the same way and are the preferred starting point wherever one exists close to our own screen shape, per the Principal's "stick to the already designed stuff" direction.
+
+| Component / region | shadcn-svelte component or block | Notes |
+|---|---|---|
+| App shell (sidebar + header) | **Sidebar** (`https://ui.shadcn.com/docs/components/base/sidebar`) — official component, used close to its own documented composition (`SidebarProvider`, `Sidebar`, `SidebarHeader`, `SidebarContent`, `SidebarFooter`, `SidebarMenu`) | Direct reuse, per the Principal's own reference screenshot (`temp/design-refs/shadcn-sidebar.png`) — our brand item ≈ its `SidebarHeader`, nav ≈ `SidebarMenu`, avatar trigger ≈ its `SidebarFooter` pattern |
+| Avatar popover (user menu) | **Popover** + **DropdownMenu** (the popover is the container; its items are a DropdownMenu's item list) | Matches shadcn's own sidebar-footer example (avatar + name, opens a menu) almost exactly |
+| Breadcrumbs | **Breadcrumb** | Direct reuse — single-crumb pages just render a one-item Breadcrumb |
+| Search icon / command entry point | **Command** (the `⌘K`-style command palette primitive) | The icon opens a Command dialog; the keyword/account/report-view search domains are three command groups within it, not three components |
+| Notification centre | `custom` | No official shadcn-svelte notification-center block exists; built from **Popover** (container) + **Badge** (unread count) + plain list markup — closest primitives, not a named block |
+| AI/Agent icon (v1) | **Button**, `disabled` | Just a disabled icon button reserving its slot — no agent UI exists yet to back it with anything more |
+| Gear → Settings | **Button** (icon variant) | A plain nav affordance, not a menu — it's a page link, not a dropdown |
+| Entity selector | `custom` | shadcn-svelte has no "entity switcher" block; closest primitive is **DropdownMenu**, but the avatar-cluster trigger is bespoke (no shadcn component composes avatars this way) |
+| Avatar cluster | `custom` | Overlapping-avatars-with-overflow-chip is a known pattern (Origin, Monarch, GitHub) but not a shadcn-svelte component; built from **Avatar** primitives, manually overlapped |
+| KPI / stat cards | **Card** | Direct reuse everywhere |
+| Net-worth hero chart | **Chart** (LayerChart-backed `Chart` component, Area variant) | Direct reuse |
+| Grouped account list | **Table**, `custom` grouping | Table primitive; the type-group header + sparkline + freshness row composition is ours |
+| Segmented bar + legend | `custom` | No shadcn equivalent; tokens-driven custom component |
+| Badge (status, role, link-health) | **Badge** | Direct reuse, variants only |
+| Accordion (Transactions' 3 cards) | **Accordion** | Direct reuse |
+| Pending row expansion | **Accordion** (nested item), **Select** (suggested-offset inline search) | The two-leg preview itself is custom content inside an Accordion item |
+| Split grid | `custom` | A dynamic multi-row form grid with live-sum validation; no shadcn block matches |
+| Bulk action bar | `custom` | A "floating selection toolbar" pattern (seen in many apps) but not a shadcn-svelte component |
+| Journal-entry modal | **Dialog**, sized near-full-screen | Direct reuse — just a non-default Dialog size, not a different primitive |
+| Transaction/account-register tables | **Table** | Direct reuse |
+| Chart-of-accounts tree | `custom` | No shadcn tree component; built from nested disclosure rows (could adopt a community tree primitive later if one matures) |
+| Lots sub-card pull-down | **Collapsible** | Direct reuse — a simpler primitive than Accordion for a single expand/collapse row |
+| Provider-item modal | **Dialog**, **Tabs** (source-type picker), **Select** (account mapping) | Composed from three existing primitives, no custom chrome |
+| Tabs (entity switcher pre-pass-8, nominal/real toggle, Totals/Percent) | **Tabs** | Direct reuse |
+| Transaction detail drawer | **Sheet** | Direct reuse |
+| Select / Combobox (category, tax-treatment, jurisdiction) | **Select**, **Combobox** | Direct reuse |
+| Toasts (import complete, entry posted, reconciliation break) | **Sonner** | Direct reuse |
+| Progress (import batch, safe-harbor paid-vs-required) | **Progress** | Direct reuse |
+| Skeleton | **Skeleton** | Direct reuse |
+| Tooltip (icon-button titles, truncated text) | **Tooltip** | Direct reuse — used wherever an icon-only control needs a text label on hover |
+| Public hero (Home) | `custom` | Marketing/landing content; no shadcn block fits a bespoke brand hero |
+| Split-screen login | shadcn-svelte's own **login block** (`https://shadcn-svelte.com/blocks/login`, the two-pane pattern) as a starting point, customized | The Principal's own reference screenshot (`temp/design-refs/split-login-example.png`) is close to this official block's shape; adopted as the base rather than built from scratch, then customized for our exact field list (§ New screens: Home & Login) |
+
+**What's deliberately `custom` and why that's still "sticking to the designed stuff":** every `custom` row above is custom because shadcn-svelte genuinely has no matching primitive or block — not because an existing one was skipped. Each is built *from* shadcn-svelte primitives (Avatar, Popover, Card, Button) rather than from scratch, so the stability the Principal is asking for — consistent tokens, consistent interaction patterns, one accessibility baseline — still holds even where the composition itself is ours.
 
 ---
 

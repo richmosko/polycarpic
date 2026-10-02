@@ -6,25 +6,38 @@
 <link rel="stylesheet" href="wireframe.css">
 </head>
 <body>
-<div class="wf-shell">
-  <div class="wf-topbar">
-    <strong>&#9670; Polycarpic</strong>
-    <span style="display:flex; align-items:center; gap:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
-  </div>
-  <div class="wf-shell-body">
-  <div class="wf-sidebar">
-    <div class="wf-nav-item">Dashboard</div>
-    <div class="wf-nav-item">Transactions</div>
-    <div class="wf-nav-item">General Ledger</div>
-    <div class="wf-nav-item">Custodial Accounts</div>
-    <div class="wf-nav-item">Allocation</div>
-    <div class="wf-nav-item">Reports</div>
-    <div class="wf-nav-item">Entities (active)</div>
-    <div class="wf-nav-item">Settings</div>
-    <div class="wf-sidebar-toggle">&#8249; Collapse</div>
-  </div>
-  <div class="wf-content">
-    <h1>Entities &amp; Memberships</h1>
+<div class="wf-app-shell">
+  <aside class="wf-app-sidebar">
+    <div class="wf-sidebar-top">&#9670; Polycarpic</div>
+    <nav class="wf-sidebar-nav">
+      <div class="wf-nav-item">Dashboard</div>
+      <div class="wf-nav-item">Transactions</div>
+      <div class="wf-nav-item">General Ledger</div>
+      <div class="wf-nav-item">Custodial Accounts</div>
+      <div class="wf-nav-item">Allocation</div>
+      <div class="wf-nav-item">Reports</div>
+      <div class="wf-nav-item">Entities (active)</div>
+    </nav>
+    <div class="wf-sidebar-bottom">
+      <div class="wf-sidebar-avatar-trigger"><span class="wf-avatar">M</span><span class="wf-sidebar-user-name">Mosko &#9662;</span></div>
+    </div>
+  </aside>
+  <div class="wf-main">
+    <p class="wf-note" style="margin:16px;">Pass 8 (2026-10-02) — new app shell (see wireframes/dashboard.html for the full header/sidebar-rework note). Settings is reached via the header's gear icon now, not this sidebar.</p>
+    <div class="wf-app-topbar">
+      <div class="wf-topbar-left">
+        <span class="wf-icon-btn">&#9776;</span>
+        <span class="wf-breadcrumbs">Entities</span>
+      </div>
+      <div class="wf-topbar-right">
+        <span style="display:flex; align-items:center; gap:8px; margin-right:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+        <span class="wf-icon-btn disabled" title="AI/Agent — greyed in v1">&#10024;</span>
+        <span class="wf-icon-btn" title="Search">&#128269;</span>
+        <span class="wf-icon-btn" title="Notifications">&#128276;</span>
+        <span class="wf-icon-btn" title="Settings">&#9881;</span>
+      </div>
+    </div>
+    <div class="wf-app-content">
 
     <div class="wf-grid cols-2">
       <div class="wf-box">
@@ -54,7 +67,7 @@
     </div>
 
     <p class="wf-note">A Household's own membership never implies access to a member Person's finances, or vice versa — every grant is an explicit row here. Role badges use decreasing weight: Owner (filled) / Manager (secondary) / Viewer (outline).</p>
-  </div>
+    </div>
   </div>
 </div>
 </body>

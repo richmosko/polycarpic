@@ -9,23 +9,15 @@
 </head>
 <body>
 <div class="shell">
-  <!-- Header (pass 5): brand lockup left, entity selector right. Household
-     entity shown here (vs. dashboard.html's Person) to demonstrate the
-     avatar cluster with more than one member — see design-system-spec.md
-     § Header for the max-shown + overflow rule. -->
-  <header class="topbar">
-    <div class="brand-lockup"><span class="brand-icon"></span>Polycarpic</div>
-    <button class="entity-selector">
-      <span class="entity-selector-name">The Moskos (Household)</span>
-      <span class="avatar-cluster">
-        <span class="avatar">M</span>
-        <span class="avatar">S</span>
-      </span>
-    </button>
-  </header>
-
-  <div class="shell-body">
-    <aside class="sidebar">
+  <!-- Sidebar (pass 8 — see styled-screens/dashboard.html for the full
+       rebuild note): fixed, full viewport height, brand top item, seven
+       nav items (no Settings), avatar trigger at the bottom (closed here
+       — dashboard.html shows the popover "open" as the built reference). -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand-lockup"><span class="brand-icon"></span><span class="sidebar-brand-label">Polycarpic</span></div>
+    </div>
+    <nav class="sidebar-nav">
       <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Dashboard</span></a>
       <a class="nav-item active" href="#"><span class="nav-icon"></span><span class="nav-label">Transactions</span></a>
       <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">General Ledger</span></a>
@@ -33,13 +25,44 @@
       <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Allocation</span></a>
       <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Reports</span></a>
       <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Entities</span></a>
-      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Settings</span></a>
-      <button class="sidebar-toggle">‹ Collapse</button>
-    </aside>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="sidebar-avatar-trigger">
+        <span class="avatar">M</span>
+        <span class="sidebar-user-name">Mosko</span>
+        <span class="sidebar-user-chevron">▾</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="shell-main">
+    <!-- Header (pass 8): starts right of the sidebar. Household entity
+         shown here (vs. dashboard.html's Person) to demonstrate the
+         avatar cluster with more than one member — see
+         design-system-spec.md § Header for the max-shown + overflow rule. -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle-header" aria-label="Collapse sidebar">☰</button>
+        <div class="breadcrumbs"><span class="crumb">Transactions</span></div>
+      </div>
+      <div class="topbar-right">
+        <button class="entity-selector">
+          <span class="entity-selector-name">The Moskos (Household)</span>
+          <span class="avatar-cluster">
+            <span class="avatar">M</span>
+            <span class="avatar">S</span>
+          </span>
+        </button>
+        <button class="icon-btn" disabled title="AI/Agent — greyed in v1">✨</button>
+        <button class="icon-btn" title="Search">🔍</button>
+        <button class="icon-btn" title="Notifications">🔔</button>
+        <button class="icon-btn" title="Settings">⚙</button>
+      </div>
+    </header>
 
   <main class="content">
     <div class="header-row">
-      <h1 class="heading" style="font-size:24px;">Transactions</h1>
+      <span></span>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-outline">Sync Transactions</button>
         <button class="btn btn-default">+ New entry</button>

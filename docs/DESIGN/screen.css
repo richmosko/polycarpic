@@ -40,15 +40,26 @@ h1, h2, h3, .heading {
   color: var(--muted-foreground);
 }
 
-/* ---------- Shell (pass 4): full-width header on top, sidebar + content
-   below it — replaces the pass-3 side-by-side sidebar+content-only grid.
-   The entity switcher lives in the header now, not the sidebar, since the
-   header is the one element guaranteed full width on every screen
-   including when the sidebar is collapsed to a rail. ---------- */
+/* ---------- Shell (pass 8, 2026-10-02 — Principal review 5): rebuilt on
+   the shadcn Sidebar component's own pattern
+   (https://ui.shadcn.com/docs/components/base/sidebar,
+   temp/design-refs/shadcn-sidebar.png). Supersedes pass 4's "full-width
+   header on top, sidebar below it" — the header no longer spans the full
+   width; it starts to the right of the sidebar, which now fills the
+   entire viewport height (not the page height) as its own fixed column.
+   `.shell` is a row: `.sidebar` | `.shell-main` (header + content
+   stacked). See design-system-spec.md § Layout & shell for the full
+   rationale and what pass 4/5 this replaces. */
 .shell {
   min-height: 100vh;
   display: flex;
+}
+
+.shell-main {
+  flex: 1;
+  display: flex;
   flex-direction: column;
+  min-width: 0; /* lets long breadcrumb/page-title text truncate instead of overflowing the row */
 }
 
 .topbar {
@@ -59,13 +70,85 @@ h1, h2, h3, .heading {
   padding: 12px 24px;
   background: var(--card);
   border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
-/* Left: product icon + wordmark (pass 5 / Principal review 2). The page
-   title and any page-specific actions (Refresh, tabs, Confirm all, ...)
-   that lived in the header through pass 4 move into the content area as
-   a `.content .header-row` at the top of each screen instead — the
-   header is global chrome now (brand + entity), not per-page chrome. */
+.topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.topbar-right { display: flex; align-items: center; gap: 2px; }
+
+/* Expand/contract control (pass 8) — moved from the sidebar's own bottom
+   chevron (pass 5) into the header, per the Principal's spec. */
+.sidebar-toggle-header {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: none;
+  border: none;
+  color: var(--foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sidebar-toggle-header:hover { background: var(--muted); }
+
+/* Page title > breadcrumbs (pass 8) — most screens are a single crumb
+   (e.g. "Transactions"); a drill-down page (the account register) shows
+   its full path (e.g. "General Ledger > Primary Checking"). This is now
+   the ONLY place the page title renders — screens no longer repeat it as
+   an <h1> in the content column (design-system-spec.md § Header). */
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.breadcrumbs .crumb { color: var(--muted-foreground); font-weight: 500; }
+.breadcrumbs .crumb:last-child { color: var(--foreground); font-weight: 600; }
+.breadcrumbs .crumb-sep { color: var(--muted-foreground); }
+
+/* Right-justified header icon row (pass 8): entity selector, AI/agent
+   (greyed, v1), search, notifications, settings gear. Settings is a
+   header surface now, not a sidebar nav item — see § Sidebar
+   information architecture pass-8 update. */
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: none;
+  border: none;
+  color: var(--foreground);
+  cursor: pointer;
+  position: relative;
+  font-size: 15px;
+}
+.icon-btn:hover { background: var(--muted); }
+.icon-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.icon-btn[disabled]:hover { background: none; }
+.icon-btn.active { background: var(--muted); color: var(--primary); } /* the gear, when the current screen is Settings — no sidebar nav item to mark active instead */
+.icon-btn .notif-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--destructive);
+}
+
+/* Product icon + wordmark — pass 8: moved from the header into the
+   sidebar's own top item (was .brand-lockup in the header, pass 5). Class
+   name kept the same; only its container moved — see .sidebar-top below. */
 .brand-lockup {
   display: flex;
   align-items: center;
@@ -83,8 +166,9 @@ h1, h2, h3, .heading {
   flex-shrink: 0;
 }
 
-/* Right: entity selector — entity name + avatar cluster, opens the
-   switcher on click. Replaces pass 4's plain-text "Person — Mosko ▾". */
+/* Entity selector — entity name + avatar cluster, opens the switcher on
+   click. Stays in the header's right-justified icon row (pass 8,
+   unchanged position from pass 5's "Right: entity selector"). */
 .entity-selector {
   display: flex;
   align-items: center;
@@ -125,45 +209,70 @@ h1, h2, h3, .heading {
 .avatar-cluster .avatar:first-child { margin-left: 0; }
 .avatar-cluster .avatar.overflow { background: var(--muted); color: var(--muted-foreground); }
 
-.shell-body {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: 20px;
-  padding: 20px 24px;
-  /* align-items intentionally left at its grid default (stretch) — see
-     .sidebar below: this is what makes the sidebar reach full height. */
-}
-
-/* ---------- Sidebar (pass 4/5): inverted, a rounded card, collapsible,
-   and (pass 5 — Principal review 2, option A chosen) stretches to fill
-   the viewport height under the header. `.shell` is a min-height:100vh
-   flex column with the header as an auto-height row and `.shell-body` as
-   `flex:1` — that alone gives `.shell-body` a definite height equal to
-   the remaining viewport (or the content's own height if content is
-   taller and the page scrolls). Leaving both `.shell-body`'s
-   `align-items` and `.sidebar`'s `align-self` at their grid/flex default
-   (stretch, i.e. NOT overridden to `start` the way pass 4 had it) is
-   what makes the sidebar track that height automatically in both cases,
-   without a hardcoded viewport-minus-header magic number. */
+/* ---------- Sidebar (pass 8, 2026-10-02 — Principal review 5, shadcn
+   Sidebar pattern): fills the entire viewport HEIGHT, not the page
+   height — `position: fixed; top: 0; height: 100vh`, so its bottom edge
+   (the avatar trigger) is always visible regardless of how long the page
+   scrolls OR how much content sits above the shell in the DOM (`position:
+   sticky` against `.shell`'s flex row, tried first, still inherits the
+   shell's own document-flow offset — `fixed` pins it to the viewport
+   itself, not the document). Superseding pass 5's "stretch to
+   .shell-body's height" approach (which tracked the PAGE, not the
+   screen). `.shell-main` carries a matching `margin-left` since the
+   sidebar is out of normal flow now. No longer a floating card with
+   margin on all sides — it's a flush full-height rail, rounded only on
+   the inner (right) edge where it meets the content. Composition, top to
+   bottom: brand item (logo + wordmark) → nav (seven items, Settings
+   removed, see design-system-spec.md § Sidebar information architecture)
+   → avatar trigger (opens the user-menu popover). */
 .sidebar {
   background: var(--sidebar);
   color: var(--sidebar-foreground);
-  border-radius: var(--radius-lg);
-  padding: 16px 12px;
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  box-shadow: 0 1px 3px oklch(0 0 0 / 12%);
-  position: sticky;
-  top: 20px; /* matches .shell-body's own padding, so it reads as one continuous card while the page scrolls */
+  box-shadow: 1px 0 3px oklch(0 0 0 / 12%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
   width: 240px;
+  flex-shrink: 0;
   transition: width 150ms ease;
 }
 
 .sidebar.collapsed {
   width: 64px;
-  padding: 16px 10px;
+  padding: 12px 10px;
+}
+
+.shell-main { margin-left: 240px; }
+/* :has() is a mockup convenience only — the real app drives this margin
+   from component state (the sidebar's own collapsed/expanded store), not
+   a CSS relational selector. */
+.shell:has(.sidebar.collapsed) .shell-main { margin-left: 64px; }
+
+/* Top item — brand (pass 8: moved here from the header, see
+   .brand-lockup above). Reuses .brand-lockup's own styles; sidebar-ink
+   aware since it sits on the sidebar's own (inverted) surface. */
+.sidebar-top {
+  padding: 8px 10px 16px;
+  color: var(--sidebar-foreground);
+  border-bottom: 1px solid var(--sidebar-border);
+  margin-bottom: 8px;
+}
+.sidebar-top .brand-lockup { color: var(--sidebar-foreground); }
+.sidebar.collapsed .sidebar-top .brand-lockup .sidebar-brand-label { display: none; }
+.sidebar.collapsed .sidebar-top { display: flex; justify-content: center; padding: 8px 0 16px; }
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  overflow-y: auto;
 }
 
 .sidebar .nav-item {
@@ -197,26 +306,93 @@ h1, h2, h3, .heading {
   color: var(--sidebar-accent-foreground);
 }
 
-/* Cue option A (recommended primary): chevron pinned at the rail's bottom.
-   See design-system-spec.md § Sidebar for options B/C. */
-.sidebar-toggle {
+/* Bottom item — avatar trigger + popover (pass 8, new). Opens the user
+   menu (profile, preferences, theme, keyboard shortcuts, ... Log out
+   last) — design-system-spec.md § Sidebar. Replaces pass 5's chevron
+   (the expand/contract control itself moved to the header, above). */
+.sidebar-bottom {
   margin-top: auto;
+  border-top: 1px solid var(--sidebar-border);
+  padding-top: 8px;
+  position: relative;
+}
+
+.sidebar-avatar-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: none;
+  border: none;
+  color: var(--sidebar-foreground);
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-avatar-trigger:hover { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); }
+
+.sidebar-avatar-trigger .avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-size: 12px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 8px;
-  border-radius: var(--radius-md);
-  color: var(--sidebar-foreground);
-  background: transparent;
-  border: 1px solid var(--sidebar-border);
-  cursor: pointer;
-  font-size: 12px;
+  flex-shrink: 0;
 }
-.sidebar-toggle:hover { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); }
+
+.sidebar-avatar-trigger .sidebar-user-name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar.collapsed .sidebar-avatar-trigger .sidebar-user-name,
+.sidebar.collapsed .sidebar-avatar-trigger .sidebar-user-chevron { display: none; }
+.sidebar.collapsed .sidebar-avatar-trigger { justify-content: center; }
+
+.sidebar-user-chevron { margin-left: auto; opacity: 0.7; font-size: 12px; }
+
+/* The popover itself — shown "open" as a static reference on one screen
+   (same convention as .correction-trail / .bulk-bar / .je-modal), not a
+   real toggle. Anchored above the trigger since the trigger sits at the
+   screen's bottom edge. */
+.avatar-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: 220px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 20%);
+  padding: 6px;
+  z-index: 10;
+}
+.avatar-popover .popover-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: none;
+  border: none;
+  color: var(--popover-foreground);
+  cursor: pointer;
+}
+.avatar-popover .popover-item:hover { background: var(--muted); }
+.avatar-popover .popover-item.destructive { color: var(--destructive); }
+.avatar-popover .popover-divider { height: 1px; background: var(--border); margin: 4px 0; }
 
 .content {
-  padding: 4px 0 28px; /* shell-body already carries the page margin */
+  padding: 24px 28px;
 }
 
 .header-row {
