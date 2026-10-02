@@ -119,7 +119,13 @@ block-beta
   </ul>
 
   <h3 id="screen-dtos">2.4 Screen → DTO ownership</h3>
-  <p>The sidebar has eight items (Principal, 2026-10-02): <strong>Dashboard</strong>, <strong>Transactions</strong>, <strong>General Ledger</strong>, <strong>Custodial Accounts</strong>, <strong>Allocation</strong>, <strong>Reports</strong>, <strong>Entities</strong>, <strong>Settings</strong>. The earlier Securities and Import screens are gone: lots now live inside Custodial Accounts, and import setup lives on the provider item. Screen layouts are in DESIGN.</p>
+  <p>The sidebar has seven items (Principal, DESIGN pass 5): <strong>Dashboard</strong>, <strong>Transactions</strong>, <strong>General Ledger</strong>, <strong>Custodial Accounts</strong>, <strong>Allocation</strong>, <strong>Reports</strong>, <strong>Entities</strong>.</p>
+  <ul>
+    <li><strong>Header:</strong> the entity selector, Search, the notification centre, a Settings gear, and a greyed-out AI/agent icon.</li>
+    <li><strong>Sidebar foot:</strong> the avatar opens the user menu (profile, MFA, Log out).</li>
+    <li><strong>Gone:</strong> the earlier Securities and Import screens. Lots now live inside Custodial Accounts, and import setup lives on the provider item.</li>
+  </ul>
+  <p>Screen layouts are in DESIGN.</p>
   <p>A screen that spans packages gets a composite DTO assembled in <code>apps/web</code> from package DTOs. A panel whose package hasn't shipped yet renders the empty-state pattern.</p>
   <table>
     <thead><tr><th>Screen / surface</th><th>DTO(s) → owning package</th><th>First milestone</th></tr></thead>
@@ -135,7 +141,11 @@ block-beta
       <tr><td>Allocation</td><td><code>AllocationVsTarget</code>, target editor → portfolio</td><td>M4</td></tr>
       <tr><td>Reports</td><td><code>ReportTable</code> (Balance Sheet, Income Statement, Cash Flow; NAV and NAV delta) → reports; empty state until then</td><td>M5</td></tr>
       <tr><td>Entities</td><td><code>EntityList</code>, <code>MembershipList</code>, invite command → tenancy</td><td>M1</td></tr>
-      <tr><td>Settings</td><td><code>ImportSchedule</code> (per-entity batch schedule and options) → import; app preferences → tenancy</td><td>M2</td></tr>
+      <tr><td>Settings (header gear)</td><td><code>ImportSchedule</code> (per-entity batch schedule and options) → import; app preferences and notification preferences → tenancy</td><td>M2</td></tr>
+      <tr><td>Entity selector (header)</td><td><code>EntityList</code> (the user's memberships only) → tenancy. The selected entity scopes every screen's DTO request, and RLS still decides what returns.</td><td>M1</td></tr>
+      <tr><td>Search (header, cross-cutting)</td><td><code>SearchResults</code> grouped by kind: accounts (name and number), payees and memos on posted entries and pending drafts, and report views → a <code>search</code> query service in <code>apps/web</code> over ledger, posting and reports. It runs inside <code>withTenant</code> over Postgres full-text indexes (<code>tsvector</code> on payee, memo and account name), so results are RLS-filtered with no separate index to secure. Viewers see results without masked numbers or raw payloads.</td><td>M3 (accounts and entries); report views at M5</td></tr>
+      <tr><td>Notification centre (header, cross-cutting)</td><td><code>NotificationList</code> plus an unread count → a <code>notification</code> table (entity-scoped, per recipient, RLS-covered). Rows are written by the producers of the alerting events in SECURITY: link health (<code>token_expired</code>, <code>principal_invalid</code>, <code>stale</code>), aged Cash-in-Transit items, an auto-post rule switched off, membership changes, a purge pending, failed import batches, and tax due dates. Delivery is in-app; email via Resend follows the user's preferences.</td><td>M2 (import and link health); others as their producers land</td></tr>
+      <tr><td>AI / agent icon (header)</td><td>None in v1. It is a greyed-out placeholder for the future user-scoped MCP / agent surface (PRD §3 non-goal), which would be a client of <code>/api/v1</code>.</td><td>v2 placeholder</td></tr>
     </tbody>
   </table>
   <p><strong>Model consequence:</strong> import status on Transactions comes from an <code>import_batch</code> row per ingest run, holding status and counts. Rows skipped by <code>ON CONFLICT DO NOTHING</code> are counted into the batch as duplicates instead of vanishing silently (§3.1).</p>
@@ -198,6 +208,7 @@ erDiagram
       <tr><td><code>tax_period_freeze</code></td><td>entity id</td><td>append-only</td><td>Annualized income, tax, cumulative required, paid — per jurisdiction per period; source of the 2210 / Schedule AI export.</td></tr>
       <tr><td><code>report_definition</code></td><td>owner user id (clones) / null (system templates)</td><td>system templates read-only; clones mutable</td><td>Upgrades replace system templates in place; clones are never touched.</td></tr>
       <tr><td><code>attachment</code>, <code>attachment_blob</code>, <code>entry_attachment</code></td><td>entity id</td><td>attachment insert-only; links deletable by manager+ (audited)</td><td>Supporting documents such as statements and receipts, stored as <code>bytea</code> in Postgres (see §3.5). They are RLS-covered, backed up, exported and purged along with everything else.</td></tr>
+      <tr><td><code>notification</code></td><td>entity id + recipient user id</td><td>insert-only, except <code>read_at</code></td><td>One row per recipient per alert event (§2.4). Producers write it in the same transaction as the event. Purged with the entity, and deleted with the recipient's account.</td></tr>
       <tr><td><code>audit_event</code></td><td>entity id (nullable after purge)</td><td>append-only, outside purge cascade</td><td>Records purges, exports, revocations, membership changes, and <code>principal_invalid</code> transitions; survives the purge it describes. Readable by owners only (SECURITY §4.2.1).</td></tr>
     </tbody>
   </table>
