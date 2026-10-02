@@ -329,6 +329,18 @@ Any gate failure keeps the item in Pending — there is no partial post and no s
 
 ---
 
+## General Ledger: tree & register (pass 7, 2026-10-02)
+
+**Team-lead ruling during the sidebar interview (the Principal did not object):** General Ledger opens to a **chart-of-accounts tree** — category → account → sub-account, each row showing its balance. Clicking an account opens that account's **register** as its own page, breadcrumbed back to the tree.
+
+- **The custodial marker.** A tree row for a GL account that mirrors a physical custodial account (e.g. "Primary Checking") carries a small `custodial: <institution>` tag — a cross-reference only, not a second data source; the figure shown is always the GL's own balance. Not every account has one (Owner's Equity, Cash in Transit never do).
+- **The register is account-scoped and running-balance-shaped:** every line that hit this one account, in date order, with a running balance, each linking to its full journal entry (every leg, not just the one that hit this account) — the same "every number earns trust" principle as the Dashboard.
+- **Distinct from Transactions, deliberately.** Transactions (§ Transactions workflow, above) is entry-scoped and time-ordered across every account in the entity — the journal. The register is the opposite cut: one account, every entry that ever touched it. Neither view replaces the other.
+
+See `wireframes/general-ledger.html` and `wireframes/account-register.html` — wireframe fidelity only, consistent with the traffic-priority rule (Open Questions, index.html).
+
+---
+
 ## Component inventory
 
 Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@latest add <name>`.
