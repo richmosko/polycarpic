@@ -224,16 +224,16 @@ flowchart TD
   <pre class="mermaid">
 flowchart TD
   view([Open Tax Liability view\nfor entity + jurisdiction]) --> accrual[Running accrual annualizes\nincome to date by tax treatment]
-  accrual --> pending[Pending liability =\n100% annualized minus balance of the\ntax-authority custodial account]
+  accrual --> pending[Pending liability =\nannualized tax to date minus\ncustodial prepaid balance]
   accrual --> safeharbor[Two safe-harbor bases computed:\nprior-year and current-year]
-  safeharbor --> required[Required payment =\nlesser of the two minus balance of the\ntax-authority custodial account]
-  pending --> gap[Gap = required minus pending\nmeasured against that account's balance]
-  required --> gap
+  safeharbor --> required[Required payment to date =\nlesser of the two safe-harbor bases]
+  required --> gap[Gap = required payments to date\nminus custodial balance,\nare you current with the authority]
+  pending --> display[Display gauge + figures]
   gap --> tier{Gap status}
   tier -- "gap &lt;= 0" --> onTrack[Tier: Normal / on track\npositive token]
   tier -- "gap &gt; 0, due date &gt; 14d out" --> caution[Tier: Caution\nwarning token]
   tier -- "gap &gt; 0, due date passed" --> danger[Tier: Danger / overdue\ndestructive token]
-  onTrack --> display[Display gauge + figures]
+  onTrack --> display
   caution --> display
   danger --> display
   display --> extPay[User pays the tax authority\nat their own bank, the app\nnever initiates a payment]
@@ -247,7 +247,8 @@ flowchart TD
   <ul>
     <li>The three-tier status (normal/caution/danger) reuses the product-wide status vocabulary — see <a href="design-system-spec.md">design-system-spec.md § Financial semantics</a>.</li>
     <li>Jurisdiction due dates, multipliers, and cumulative percentages are data-driven, so this view must render correctly for an arbitrary number of jurisdictions (PRD §5).</li>
-    <li><strong>Redrawn pass 6:</strong> v1 never moves money — there is no "User initiates payment?" button. The user pays at their own bank; it lands as an imported transaction with no counterparty; the user posts the GL entry, debiting the custodial tax-authority account. <strong>The gap is measured against that account's balance</strong>, not a separate "amount paid" figure. Dashboard/tax-panel copy says "post your payment," never "pay" or "transfer."</li>
+    <li><strong>Redrawn pass 6:</strong> v1 never moves money — there is no "User initiates payment?" button. The user pays at their own bank; it lands as an imported transaction with no counterparty; the user posts the GL entry, debiting the custodial tax-authority account. Dashboard/tax-panel copy says "post your payment," never "pay" or "transfer."</li>
+    <li><strong>Addendum, pass 6:</strong> two figures, both measured against the custodial account's balance but not against each other — <strong>Pending liability = annualized tax to date − custodial prepaid balance</strong> (what you'd owe net of prepayments, if filed today); <strong>Gap = required payments to date (safe-harbor) − custodial balance</strong> ("are you current with the authority"). Gap is never <code>required − pending</code>.</li>
   </ul>
 
   <h3 id="flow-securities-lots">5.4 Securities lots &amp; balance sheet reconciliation</h3>

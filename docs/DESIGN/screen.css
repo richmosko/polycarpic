@@ -305,6 +305,19 @@ h1, h2, h3, .heading {
 .badge-corrected { background: transparent; color: var(--foreground); border-color: var(--border); }
 .badge-corrected .badge-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--brand-2); display: inline-block; }
 
+/* ---------- Row meta (e.g. "posted by rule <name>" attribution) ----------
+   Addendum, pass 6: an auto-posted row carries a small actor-attribution
+   line under its status badge and gets the exact same "Correct entry"
+   action as any other posted row — there is no separate edit affordance
+   for rule-posted rows (design-system-spec.md § Correcting a posted
+   entry). Also used for user/system-job attribution generally
+   (PRD §5 — actor attribution is never inferred). */
+.row-meta {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+}
+
 /* ---------- Row action (e.g. "Correct entry" on a posted row) ---------- */
 .row-action {
   background: none;
