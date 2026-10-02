@@ -503,6 +503,7 @@ flowchart TB
         <li>TB-10: prod ↔ staging compose projects on one host (shared kernel; accepted risk R-4).</li>
         <li>TB-11: user upload (CSV / OFX, attachments) ↔ web parser.</li>
         <li>TB-12: supply chain (GitHub CI / Actions / Renovate / registry) ↔ prod images. Whoever can publish an image that prod runs owns the box.</li>
+        <li>TB-13: operator SSH tunnel ↔ loopback-bound Admin listener, never routed by Caddy. Placeholder, defined under POLY-81 (OQ-15).</li>
       </ul>
     </li>
     <li><strong>Postgres is never exposed publicly.</strong> It lives on the compose network only; the operator reaches it through <code>docker compose exec</code> or an SSH tunnel.</li>
