@@ -310,6 +310,13 @@ flowchart TB
       <tr><td>Upload CSV / OFX</td><td>✗</td><td>✓</td><td>✓</td><td>Insert policy on <code>import_batch</code> and <code>raw_transaction</code></td></tr>
       <tr><td>Link a provider connection</td><td>✗</td><td>✓ step-up</td><td>✓ step-up</td><td>Insert policy on <code>provider_connection</code>. The linking user becomes <code>linked_by_user_id</code>.</td></tr>
       <tr><td>Unlink a connection</td><td>✗</td><td>own links only</td><td>any, step-up</td><td>Policy compares <code>linked_by_user_id</code>. Revocation runs as a worker job (C-32).</td></tr>
+      <tr><td colspan="5"><em>Sidebar-IA actions (ARCH §2.4 @ 884748c). G6 in ARCH §3.2a relies on these rows.</em></td></tr>
+      <tr><td>Refresh a provider token (relink)</td><td>✗</td><td>✓ step-up, own links</td><td>✓ step-up</td><td>A relink stores a new sealed credential, so it is treated like a link (C-30). The policy compares <code>linked_by_user_id</code> for managers. Writes an <code>audit_event</code>.</td></tr>
+      <tr><td>Map a linked account to a custodial GL account</td><td>✗</td><td>✓</td><td>✓</td><td>UPDATE policy on <code>linked_account</code>: manager+. The target account must belong to the same entity (composite FK). A mapping change writes an <code>audit_event</code>, because it redirects where bank data posts.</td></tr>
+      <tr><td>Sync now</td><td>✗</td><td>✓</td><td>✓</td><td>Enqueues a worker job and never opens the credential in <code>web</code> (TB-4). Rate-limited per connection (minimum interval set in INFRA) against provider quota and cost.</td></tr>
+      <tr><td>Post, Split, Group, + New entry, Correct entry</td><td>✗</td><td>✓</td><td>✓</td><td>G6: <code>WITH CHECK app.has_role(entity_id,'manager')</code> on <code>journal_entry</code>/<code>journal_line</code>, with the actor forced by trigger (C-23). Correct entry is a reversal plus a new entry and never an edit (C-21). G1, G2, G4 and G5 are re-checked by the database at commit.</td></tr>
+      <tr><td>Rule auto-post opt-in (opting in counts as confirmation)</td><td>✗</td><td>✓</td><td>✓</td><td>The opting-in user is recorded on the rule (<code>auto_post_by_user_id</code>) and is the principal for every auto-post, as in OQ-3. If that user drops below manager or is deleted, <code>auto_post</code> flips off and an <code>audit_event</code> is written, mirroring <code>principal_invalid</code>. Auto-posts pass G1–G6 like any post. Opt-in writes an <code>audit_event</code> and emails the owners.</td></tr>
+      <tr><td>Per-entity import schedule</td><td>✗</td><td>✓</td><td>✓</td><td>UPDATE policy on the entity's import settings: manager+. The interval is bounded below by the same INFRA minimum as Sync now.</td></tr>
       <tr><td>Set entity metadata (name, tax classification)</td><td>✗</td><td>✗</td><td>✓</td><td>UPDATE policy on <code>entity</code>: owner</td></tr>
       <tr><td>Set a parent link</td><td>✗</td><td>✗</td><td>✓ on child <em>and</em> parent</td><td>C-19</td></tr>
       <tr><td>Grant, revoke or change a membership; add or transfer an owner</td><td>✗</td><td>✗</td><td>✓ step-up</td><td>Owner-only policies on <code>membership</code>, plus a last-owner trigger (C-20)</td></tr>
@@ -319,6 +326,15 @@ flowchart TB
       <tr><td>Clone or edit own report definitions; export own personal data; delete own account</td><td>self</td><td>self</td><td>self</td><td>Owner-user policies. Account deletion is refused while the user is sole owner of any entity (C-52).</td></tr>
     </tbody>
   </table>
+  <p><strong>pgTAP for the sidebar-IA rows (qa-engineer, C-17).</strong> Each row gets an allow test and a deny test, run as <code>poly_app</code> with the app layer bypassed:</p>
+  <ul>
+    <li>A viewer cannot run any of the actions: every INSERT or UPDATE is rejected by policy.</li>
+    <li>A manager cannot relink or unlink another user's connection.</li>
+    <li>A mapping to another entity's account fails the composite FK.</li>
+    <li>An auto-post whose opting-in user has been demoted to viewer writes 0 rows, and its rule ends with <code>auto_post = false</code>.</li>
+    <li>A "Correct entry" never UPDATEs the original; it leaves one reversal plus one new entry.</li>
+    <li>Sync and schedule below the minimum interval are rejected.</li>
+  </ul>
   <p><strong>Revocation semantics.</strong> Revoking a membership takes effect on the next transaction; there is no cached authorization. The user's sessions stay valid for their other entities. Data a client has already fetched cannot be recalled (R-11). The native milestone must purge its cache on any 401, 403 or empty scope.</p>
 
   <h3>4.3 RLS mechanism — ruling on ARCH §3.3 (OQ-2)</h3>
