@@ -368,6 +368,20 @@ See `wireframes/custodial-accounts.html` — wireframe fidelity only, same traff
 
 ---
 
+## Allocation, Reports & Settings (pass 7, 2026-10-02)
+
+The remaining three new sidebar items — all wireframe fidelity, all new as of this pass.
+
+**Allocation.** A dedicated actual-vs-target page, promoted out of the old Securities screen per the Principal's own direction (§ Custodial Accounts, above). Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.9) is orthogonal and applies here like any time-series view. Includes a target editor (must sum to 100%).
+
+**Reports.** A nav item **from day one**, per the Principal: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the Component inventory's empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
+
+**Settings.** Absorbs the scheduling half of the old Import screen ("the undefined Settings View... all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window — a Household's schedule doesn't touch a Person entity) and **per-user** (theme, default entity on login, reduced motion). Viewers can view this page but the Manager/Owner-only actions (schedule, import options) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
+
+See `wireframes/allocation.html`, `wireframes/reports.html`, `wireframes/settings.html`.
+
+---
+
 ## Component inventory
 
 Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@latest add <name>`.

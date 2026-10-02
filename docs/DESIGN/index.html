@@ -19,7 +19,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.8</span>
+    <span><strong>Version:</strong> 0.9</span>
     <span><strong>Last updated:</strong> 2026-10-02</span>
   </div>
 </header>
@@ -324,10 +324,10 @@ flowchart TD
     <li><a href="wireframes/transactions.html">Transactions</a> <em>(stage 2, done)</em> — three urgency-ordered accordion cards (Exceptions/Pending/Posted), Pending inbox built around the Plaid review/match workflow.</li>
     <li><a href="wireframes/general-ledger.html">General Ledger</a> <em>(stage 3, done)</em> — chart-of-accounts tree; each account opens its own <a href="wireframes/account-register.html">register page</a>.</li>
     <li><a href="wireframes/custodial-accounts.html">Custodial Accounts</a> <em>(stage 4, done)</em> — per-account cards, a lots sub-card (pull-down per security, short/long/total gains), and the <code>[+ New]</code> provider-item modal (aggregator/manual/file, discovered-account mapping, token refresh, unlink).</li>
-    <li>Allocation <em>(stage 5, pending)</em> — actual-vs-target, promoted out of the old Securities screen.</li>
-    <li>Reports <em>(stage 5, pending)</em> — Balance Sheet / Income Statement / Cash Flow, low fidelity; empty state until POLY-M5.</li>
+    <li><a href="wireframes/allocation.html">Allocation</a> <em>(stage 5, done)</em> — actual-vs-target, promoted out of the old Securities screen.</li>
+    <li><a href="wireframes/reports.html">Reports</a> <em>(stage 5, done)</em> — Balance Sheet / Income Statement / Cash Flow, low fidelity; empty state until POLY-M5.</li>
     <li><a href="wireframes/entities.html">Entities</a> — unaffected by the sidebar rework</li>
-    <li>Settings <em>(stage 5, pending)</em> — batch-import schedule/options + app preferences.</li>
+    <li><a href="wireframes/settings.html">Settings</a> <em>(stage 5, done)</em> — batch-import schedule/options + app preferences.</li>
     <li><a href="wireframes/home.html">Home</a> <em>(pass 4, corrected)</em> — public pre-auth landing page</li>
     <li><a href="wireframes/login.html">Login</a> <em>(pass 4, new; corrected pass 6)</em> — split screen, centered form pane</li>
     <li><a href="wireframes/membership-setup.html">Membership setup</a> <em>(pass 6, new)</em> — dashboard first-run / no-membership empty state, linked from flow 5.1</li>
@@ -366,7 +366,7 @@ flowchart TD
   <h2>9. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
-    <li><strong>In progress, pass 7 (2026-10-02):</strong> sidebar reworked to eight items per the Principal's interview (<code>temp/2026-10-02-sidebar-interview.md</code>) — Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, Reports, Entities, Settings. Rolling out across 5 stages on this same branch; stage 1 (this revision) covers the sidebar item list, the Screen data contract, and flow updates. See design-system-spec.md § Sidebar information architecture. <strong>Judgment call:</strong> only Dashboard and Transactions are planned for styled-screen fidelity, matching the existing traffic-priority rule — flag if General Ledger, Custodial Accounts, or Allocation need a styled build sooner.</li>
+    <li><strong>Resolved 2026-10-02 (pass 7, all 5 stages):</strong> sidebar reworked to eight items per the Principal's interview (<code>temp/2026-10-02-sidebar-interview.md</code>) — Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, Reports, Entities, Settings. "Securities" and "Import" are gone. Transactions rebuilt around the Plaid review/match workflow (expansion, Split, Group, a shared journal-entry modal); General Ledger opens to a chart-of-accounts tree with a per-account register page; Custodial Accounts gained a lots sub-card and a provider-item modal; Allocation, Reports (empty until POLY-M5), and Settings are new. See design-system-spec.md § Sidebar information architecture onward. <strong>Judgment call:</strong> only Dashboard and Transactions got styled-screen fidelity, matching the existing traffic-priority rule — flag if General Ledger, Custodial Accounts, or Allocation need a styled build sooner.</li>
     <li><strong>Resolved 2026-10-01 (pass 6):</strong> <code>--warning</code> re-hued to a true orange with a dark ink (was brown-reading); light-mode chart ramp brightened; <a href="tokens.html">tokens.html</a> added; Login wireframe corrected to match the centered styled screen; dashboard first-run/empty-state wireframe added (<a href="wireframes/membership-setup.html">membership-setup.html</a>); skeleton-vs-spinner explained in plain words; flow 5.2 reframed around the user-facing "Correct entry" action; flow 5.3 redrawn to remove the app-initiates-payment step.</li>
     <li><strong>Resolved 2026-09-30 (pass 5):</strong> sidebar expand/collapse cue — option A (chevron) chosen; sidebar now full-height; header restructured to brand lockup + entity selector with an avatar cluster; login form pane centered — design-system-spec.md § Header, § Sidebar, § Login.</li>
     <li><strong>Avatar cluster overflow (pass 5):</strong> the "+N" fold for 4th+ members is specified but not yet shown live in either reference screen (both currently have ≤2 members) — worth a quick visual check once a real multi-member entity exists.</li>

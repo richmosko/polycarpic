@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Settings</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<p class="wf-note" style="margin:16px;">Pass 7 (2026-10-02) — new. Absorbs the scheduling half of the old "Import" screen, per the Principal: "In the undefined Settings View, we should have all the option selections for batch scheduled imports." Plus general app preferences.</p>
+<div class="wf-shell">
+  <div class="wf-topbar">
+    <strong>&#9670; Polycarpic</strong>
+    <span style="display:flex; align-items:center; gap:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+  </div>
+  <div class="wf-shell-body">
+  <div class="wf-sidebar">
+    <div class="wf-nav-item">Dashboard</div>
+    <div class="wf-nav-item">Transactions</div>
+    <div class="wf-nav-item">General Ledger</div>
+    <div class="wf-nav-item">Custodial Accounts</div>
+    <div class="wf-nav-item">Allocation</div>
+    <div class="wf-nav-item">Reports</div>
+    <div class="wf-nav-item">Entities</div>
+    <div class="wf-nav-item">Settings (active)</div>
+    <div class="wf-sidebar-toggle">&#8249; Collapse</div>
+  </div>
+  <div class="wf-content">
+    <h1>Settings — [Entity name]</h1>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Batch import schedule</span>
+      <div class="wf-row"><span>Primary Checking — Bank Y</span><span>[Daily, 6am ▾]</span></div>
+      <div class="wf-row"><span>Brokerage — Custodian X</span><span>[Daily, 6am ▾]</span></div>
+      <div class="wf-row"><span>Crypto Wallet — Coinbase</span><span>[Manual only ▾]</span></div>
+      <div class="wf-row"><span>Auto-post matched recurring transactions</span><span>[On ▾] — see Transactions' "posted by rule" badge</span></div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Import options</span>
+      <div class="wf-row"><span>Cash-in-Transit exceptions threshold</span><span>[3 business days]</span></div>
+      <div class="wf-row"><span>Duplicate detection window</span><span>[±1 day]</span></div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">App preferences</span>
+      <div class="wf-row"><span>Theme</span><span>[Light | Dark | Auto]</span></div>
+      <div class="wf-row"><span>Default entity on login</span><span>[Last-viewed ▾]</span></div>
+      <div class="wf-row"><span>Reduced motion</span><span>[Off ▾]</span></div>
+    </div>
+
+    <p class="wf-note">Per-entity scope: schedule and import options are set per entity (a Household's schedule doesn't affect a Person entity). App preferences (theme, reduced motion) are per-user, not per-entity. Viewers can view this page but not change schedule/import options (Manager/Owner only) — see ARCH §2.4 permissions table.</p>
+  </div>
+  </div>
+</div>
+</body>
+</html>

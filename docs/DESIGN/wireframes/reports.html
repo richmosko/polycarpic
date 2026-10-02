@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Reports</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<p class="wf-note" style="margin:16px;">Pass 7 (2026-10-02) — new nav item from day one, per the Principal: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Low fidelity — this is the full planned shape for when M5 ships, not just the empty state.</p>
+<div class="wf-shell">
+  <div class="wf-topbar">
+    <strong>&#9670; Polycarpic</strong>
+    <span style="display:flex; align-items:center; gap:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+  </div>
+  <div class="wf-shell-body">
+  <div class="wf-sidebar">
+    <div class="wf-nav-item">Dashboard</div>
+    <div class="wf-nav-item">Transactions</div>
+    <div class="wf-nav-item">General Ledger</div>
+    <div class="wf-nav-item">Custodial Accounts</div>
+    <div class="wf-nav-item">Allocation</div>
+    <div class="wf-nav-item">Reports (active)</div>
+    <div class="wf-nav-item">Entities</div>
+    <div class="wf-nav-item">Settings</div>
+    <div class="wf-sidebar-toggle">&#8249; Collapse</div>
+  </div>
+  <div class="wf-content">
+    <h1>Reports — [Entity name]</h1>
+    <span class="wf-chip">Tabs: Balance Sheet | Income Statement | Cash Flow</span>
+
+    <!-- Today (until POLY-M5): empty state, same pattern as Dashboard's
+         not-yet-shipped panels. -->
+    <div class="wf-box" style="margin-top:16px;">
+      <span class="wf-box-label">Balance Sheet</span>
+      <p style="color:#999; font-size:13px;">Not set up yet. This report will show assets, liabilities, and equity as of a chosen date, sourced from the General Ledger.</p>
+    </div>
+
+    <!-- Planned shape once M5 ships statements — shown for reference. -->
+    <div class="wf-box" style="opacity:0.6;">
+      <span class="wf-box-label">(M5 shape) Income Statement — period: [Sep 2026 ▾]</span>
+      <div class="wf-row"><span>Revenue</span><span>$2,400.00</span></div>
+      <div class="wf-row"><span>Expenses</span><span>−$1,538.00</span></div>
+      <div class="wf-row"><strong>Net income</strong><strong>$862.00</strong></div>
+    </div>
+
+    <div class="wf-box" style="opacity:0.6;">
+      <span class="wf-box-label">(M5 shape) Cash Flow — period: [Sep 2026 ▾]</span>
+      <div class="wf-row"><span>Operating</span><span>$862.00</span></div>
+      <div class="wf-row"><span>Investing</span><span>−$4,250.00</span></div>
+      <div class="wf-row"><span>Financing</span><span>$0.00</span></div>
+    </div>
+
+    <p class="wf-note">Copy never names an internal milestone ("Not set up yet," not "Available at M5") — same rule as the Dashboard's empty-state panels (design-system-spec.md § Component inventory). NAV and NAV delta (ARCH §2.4) surface alongside the Balance Sheet once it ships.</p>
+  </div>
+  </div>
+</div>
+</body>
+</html>
