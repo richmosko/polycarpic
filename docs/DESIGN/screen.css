@@ -297,6 +297,49 @@ h1, h2, h3, .heading {
 .badge-positive { background: var(--positive); color: var(--positive-foreground); }
 .badge-warning { background: var(--warning); color: var(--warning-foreground); }
 .badge-archived { background: transparent; color: var(--muted-foreground); border-color: var(--border); font-style: italic; opacity: 0.8; }
+/* Corrected — pass 6 (design-system-spec.md § Correcting a posted entry):
+   an `outline` badge plus a small --brand-2-tinted dot, distinct from a
+   plain Posted or a standalone Reversed row — the user-facing signal that
+   a reversal + replacement pair sits behind this row, without the row
+   itself using the word "reverse". */
+.badge-corrected { background: transparent; color: var(--foreground); border-color: var(--border); }
+.badge-corrected .badge-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--brand-2); display: inline-block; }
+
+/* ---------- Row action (e.g. "Correct entry" on a posted row) ---------- */
+.row-action {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+.row-action:hover { text-decoration: underline; }
+
+/* ---------- Correction trail (click-through on a Corrected row) ----------
+   Pass 6: the full double-entry pair revealed on click-through — the
+   original entry's lines shaded/struck, then the reversal, then the new
+   corrected entry — so the correction stays auditable without "reverse"
+   ever being the row's primary affordance. */
+.correction-trail {
+  margin-top: 10px;
+  padding: 12px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--muted);
+}
+.correction-trail .trail-label {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  margin: 10px 0 4px;
+}
+.correction-trail .trail-label:first-child { margin-top: 0; }
+.correction-trail .trail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+.correction-trail .trail-row.struck { text-decoration: line-through; color: var(--muted-foreground); opacity: 0.75; }
 
 /* ---------- Button ---------- */
 .btn {

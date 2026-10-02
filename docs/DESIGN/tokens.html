@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Design Tokens (decoded) — polycarpic</title>
+  <link rel="stylesheet" href="../_assets/doc.css">
+  <link rel="stylesheet" href="../_assets/comments.css">
+  <script defer src="../_assets/comments.js"></script>
+  <script defer src="../_assets/toc.js"></script>
+  <style>
+    /* Page-local only — this page shows BOTH modes' literal values at once
+       (not a live light/dark toggle), so swatches are hardcoded hex, not
+       var(--token). Reuses doc.css's .tokens-grid/.swatch/.chip look for
+       the single-value cases below; this table-row pair pattern is new. */
+    table.token-table { width: 100%; }
+    table.token-table th:first-child, table.token-table td:first-child { white-space: nowrap; }
+    table.token-table th:last-child { white-space: nowrap; }
+    .pair { display: flex; gap: 0.75rem; align-items: center; }
+    .pair .mode { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; min-width: 4.5rem; }
+    .pair .mode-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--doc-muted); }
+    .pair .chip { display: block; width: 2.75rem; height: 1.75rem; border-radius: var(--doc-radius-md); border: 1px solid var(--doc-border); }
+    .pair .hex { font-family: var(--font-mono, monospace); font-size: 0.68rem; color: var(--doc-muted); }
+    .type-sample { font-size: 1.1rem; }
+    .mono-sample { font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.75rem; }
+    .radius-demo { width: 3rem; height: 3rem; background: #1D9108; display: inline-block; vertical-align: middle; }
+    .group-note { margin: 0.25rem 0 1rem; }
+  </style>
+</head>
+<body>
+
+<header class="doc-header">
+  <h1>Design Tokens — decoded</h1>
+  <p class="doc-subtitle">Every token in <a href="tokens.css">tokens.css</a>, both modes, with a rendered swatch and a one-line "used for" — the page to read when a token name is obscure. Full rationale in <a href="design-system-spec.md">design-system-spec.md</a>.</p>
+  <div class="doc-meta">
+    <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
+    <span><strong>Added:</strong> pass 6, 2026-10-01 (Principal review 4: "the names are obscure to me")</span>
+    <span><strong>Source of truth:</strong> <a href="tokens.css">tokens.css</a> — if this page and that file ever disagree, the CSS file wins</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#how-to-read">How to read this page</a></li>
+    <li><a href="#brand">Brand &amp; Primary</a></li>
+    <li><a href="#surfaces">Surfaces &amp; Text</a></li>
+    <li><a href="#secondary">Secondary &amp; Accent</a></li>
+    <li><a href="#semantic">Semantic (financial status)</a></li>
+    <li><a href="#borders">Borders &amp; Focus</a></li>
+    <li><a href="#charts">Charts</a></li>
+    <li><a href="#sidebar">Sidebar</a></li>
+    <li><a href="#type">Typography</a></li>
+    <li><a href="#radius">Radius &amp; Spacing</a></li>
+  </ol>
+</nav>
+
+<section id="how-to-read" data-section="how-to-read">
+  <h2>How to read this page</h2>
+  <p class="section-hint">Each row is one CSS custom property from <code>tokens.css</code>. The two swatches show its <strong>literal</strong> value in Light (<code>:root</code>) and Dark (<code>.dark</code>) mode side by side — not a toggle, so you can compare both at once. "Used for" is deliberately short; follow the link in <a href="design-system-spec.md">design-system-spec.md</a> for the full derivation, contrast figures, and the job definition for tokens (like <code>--brand</code>/<code>--brand-2</code>) that are only safe to use in specific places.</p>
+</section>
+
+<section id="brand" data-section="brand">
+  <h2>1. Brand &amp; Primary</h2>
+  <p class="section-hint group-note">The system's two literal brand hues, and the darkened/lightened values that do the day-to-day "primary action" job on a surface where the literal hue would fail contrast.</p>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><code>--brand</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#2CFF05"></span><span class="hex">#2CFF05</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#2CFF05"></span><span class="hex">#2CFF05</span></div></td>
+        <td>The literal neon-green brand mark — logo references, decorative highlights, anywhere a <strong>dark surface</strong> sits underneath (1.35:1 against the light background — never a light-surface fill or text; use <code>--primary</code> there). Same value both modes, a fixed brand reference.</td>
+      </tr>
+      <tr>
+        <td><code>--primary</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#158500"></span><span class="hex">#158500</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#2CFF05"></span><span class="hex">#2CFF05</span></div></td>
+        <td>The main-action fill — buttons, links, focus accents. Light mode darkens <code>--brand</code>'s hue to clear AA with white text; dark mode uses the raw brand green directly, since it already clears AA against a dark fill-with-dark-text pairing.</td>
+      </tr>
+      <tr>
+        <td><code>--primary-foreground</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#070808"></span><span class="hex">#070808</span></div></td>
+        <td>Text/icon color on top of <code>--primary</code>. White in light mode (4.79:1); near-black ink in dark mode (14.72:1) — white text on the raw bright green would only clear 1.4:1.</td>
+      </tr>
+      <tr>
+        <td><code>--brand-2</code> <em>(pass 5)</em></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#05A9FF"></span><span class="hex">#05A9FF</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#05A9FF"></span><span class="hex">#05A9FF</span></div></td>
+        <td>The literal secondary sky-blue hue. Same "dark-surface/decorative only" rule as <code>--brand</code> (2.56:1 against the light background). Used for: the sidebar focus ring, and dark-surface chart series-2. See design-system-spec.md § Secondary accent.</td>
+      </tr>
+      <tr>
+        <td><code>--ring</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#158500"></span><span class="hex">#158500</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#2CFF05"></span><span class="hex">#2CFF05</span></div></td>
+        <td>Default keyboard-focus ring, everywhere except the sidebar (which has its own <code>--sidebar-ring</code>, below).</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="surfaces" data-section="surfaces">
+  <h2>2. Surfaces &amp; Text</h2>
+  <p class="section-hint group-note">The neutral scale — page canvas, cards, and body text. Carries a faint blue tint (pass 5) rather than true grey, at a hue matching <code>--brand-2</code>.</p>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--background</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#FEFEFE"></span><span class="hex">#FEFEFE</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#070808"></span><span class="hex">#070808</span></div></td>
+        <td>Page canvas, behind every card.</td></tr>
+      <tr><td><code>--foreground</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#1D1F20"></span><span class="hex">#1D1F20</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#F2F2F3"></span><span class="hex">#F2F2F3</span></div></td>
+        <td>Default body text (16.41:1 / 17.92:1 against <code>--background</code>).</td></tr>
+      <tr><td><code>--card</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#0D0E0F"></span><span class="hex">#0D0E0F</span></div></td>
+        <td>Card/panel surface — stays true white/near-black so it doesn't fight genuinely-white content like receipts/exports.</td></tr>
+      <tr><td><code>--popover</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#0D0E0F"></span><span class="hex">#0D0E0F</span></div></td>
+        <td>Dropdown/popover surface — same as <code>--card</code>.</td></tr>
+      <tr><td><code>--muted</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#F7F8F8"></span><span class="hex">#F7F8F8</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#0F1112"></span><span class="hex">#0F1112</span></div></td>
+        <td>A faint-tint canvas, one step off <code>--background</code> — the "much lighter hint of the secondary color" the Principal asked for (pass 5).</td></tr>
+      <tr><td><code>--muted-foreground</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#60686C"></span><span class="hex">#60686C</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#A0A7AB"></span><span class="hex">#A0A7AB</span></div></td>
+        <td>Secondary/meta text — timestamps, helper copy, table meta.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="secondary" data-section="secondary">
+  <h2>3. Secondary &amp; Accent</h2>
+  <p class="section-hint group-note">The <code>--brand-2</code> blue family's light/dark-surface jobs: secondary buttons, info-weight badges, selected/non-primary states. Never used for a main CTA (that's <code>--primary</code>) or a financial-status tier (that's positive/warning/destructive, below).</p>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--secondary</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#E3F0F7"></span><span class="hex">#E3F0F7</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#173C4F"></span><span class="hex">#173C4F</span></div></td>
+        <td>Secondary button/surface fill — a pale/dim blue tint.</td></tr>
+      <tr><td><code>--secondary-foreground</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#096FA5"></span><span class="hex">#096FA5</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#68C3F3"></span><span class="hex">#68C3F3</span></div></td>
+        <td>Text on <code>--secondary</code> (4.72:1 / 5.95:1) — also doubles as the light-mode chart series-2 ink and plain-text links in the blue family.</td></tr>
+      <tr><td><code>--accent</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#EBF4F9"></span><span class="hex">#EBF4F9</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#194257"></span><span class="hex">#194257</span></div></td>
+        <td>Hover/active-state surface — same blue family as <code>--secondary</code>, one step lighter/darker.</td></tr>
+      <tr><td><code>--accent-foreground</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#096FA5"></span><span class="hex">#096FA5</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#68C3F3"></span><span class="hex">#68C3F3</span></div></td>
+        <td>Text on <code>--accent</code>.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="semantic" data-section="semantic">
+  <h2>4. Semantic (financial status)</h2>
+  <p class="section-hint group-note">The three-tier status vocabulary (design-system-spec.md § Financial semantics) plus gain/loss. Never the only signal — always paired with a sign, icon, or label.</p>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--positive</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#15803D"></span><span class="hex">#15803D</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#52E0A4"></span><span class="hex">#52E0A4</span></div></td>
+        <td>Gain / income / surplus; "normal, on track" status tier (safe-harbor gap ≤0, clean reconciliation, fully-matched import).</td></tr>
+      <tr><td><code>--positive-foreground</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#052E13"></span><span class="hex">#052E13</span></div></td>
+        <td>Text on a <code>--positive</code> fill.</td></tr>
+      <tr><td><code>--warning</code> <em>(pass 6, re-hued)</em></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#EA6A0A"></span><span class="hex">#EA6A0A</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#FF9452"></span><span class="hex">#FF9452</span></div></td>
+        <td><strong>Caution tier</strong> — the Principal asked what this is for: an aged Cash-in-Transit exceptions-window item, a stale provider link, or a safe-harbor due date &gt;14 days out. Was a darkened brown-reading amber; now a true orange, matching Monarch's own measured orange hue.</td></tr>
+      <tr><td><code>--warning-foreground</code> <em>(pass 6)</em></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#2A1200"></span><span class="hex">#2A1200</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#2A1200"></span><span class="hex">#2A1200</span></div></td>
+        <td>Dark orange-black ink on <code>--warning</code> (5.54:1 / 8.11:1) — same value both modes, since orange can't pair with white text AA-safely at a saturation that still reads as orange.</td></tr>
+      <tr><td><code>--destructive</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#E70404"></span><span class="hex">#E70404</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#FC4F4F"></span><span class="hex">#FC4F4F</span></div></td>
+        <td>Loss / negative delta; "danger, overdue" status tier (safe-harbor payment overdue, exceptions-threshold breach, reconciliation break); destructive actions (delete, purge).</td></tr>
+      <tr><td><code>--destructive-foreground</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#2A0507"></span><span class="hex">#2A0507</span></div></td>
+        <td>Text on a <code>--destructive</code> fill.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="borders" data-section="borders">
+  <h2>5. Borders &amp; Focus</h2>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--border</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#E7E8E9; border-color:#C9CACB;"></span><span class="hex">#E7E8E9</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#202122;"></span><span class="hex">white 8% on --card</span></div></td>
+        <td>Default hairline border — card edges, table rules, dividers. Deliberately low-contrast (1.23:1), a decorative hairline, not a content-bearing element. (Dark swatch approximates <code>rgba(255,255,255,.08)</code> composited over <code>--card</code>, <code>#0D0E0F</code> — the token itself is translucent.)</td></tr>
+      <tr><td><code>--input</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#E7E8E9; border-color:#C9CACB;"></span><span class="hex">#E7E8E9</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#2A2B2C;"></span><span class="hex">white 12% on --card</span></div></td>
+        <td>Form input border — same hue as <code>--border</code>, dark mode slightly stronger for legibility against form fields. (Dark swatch approximates <code>rgba(255,255,255,.12)</code> composited over <code>--card</code>.)</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="charts" data-section="charts">
+  <h2>6. Charts (sequential ramp — magnitude, not category)</h2>
+  <p class="section-hint group-note"><strong>Pass 6:</strong> the light-mode ramp brightened across all 5 steps — the prior tail (down to L=0.061) read as "almost rendered as black." Dark mode was already bright and is unchanged. Not for 3+ categorical series — see design-system-spec.md § Financial semantics open item.</p>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--chart-1</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#21A509"></span><span class="hex">#21A509 (3.26:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#C1FBB6"></span><span class="hex">#C1FBB6 (16.32:1)</span></div></td>
+        <td>Brightest step — e.g. the current period / largest share.</td></tr>
+      <tr><td><code>--chart-2</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#1D9108"></span><span class="hex">#1D9108 (4.11:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#8BF877"></span><span class="hex">#8BF877 (14.53:1)</span></div></td>
+        <td>Second step in the magnitude ramp.</td></tr>
+      <tr><td><code>--chart-3</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#197E07"></span><span class="hex">#197E07 (5.21:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#5AF53D"></span><span class="hex">#5AF53D (13.40:1)</span></div></td>
+        <td>Midpoint — also series-1 in a two-series comparison chart (nominal vs. inflation-adjusted, actual vs. target), paired with <code>--brand-2</code>/<code>--secondary-foreground</code> as series 2.</td></tr>
+      <tr><td><code>--chart-4</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#156B06"></span><span class="hex">#156B06 (6.69:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#31F20D"></span><span class="hex">#31F20D (12.73:1)</span></div></td>
+        <td>Fourth step.</td></tr>
+      <tr><td><code>--chart-5</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#125705"></span><span class="hex">#125705 (8.78:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#29CB0B"></span><span class="hex">#29CB0B (8.87:1)</span></div></td>
+        <td>Darkest/smallest step — pass 6 brought this up from a near-black 17.73:1 to a legible, still-green 8.78:1.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="sidebar" data-section="sidebar">
+  <h2>7. Sidebar</h2>
+  <p class="section-hint group-note">Inverted relative to the page (dark-on-light / light-on-dark), re-hued blue in pass 5 to remove a green cast the Principal flagged.</p>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--sidebar</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#1F2528"></span><span class="hex">#1F2528</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#F7F8F8"></span><span class="hex">#F7F8F8</span></div></td>
+        <td>The sidebar's own card surface — dark in light mode, light in dark mode, always the opposite of the page canvas.</td></tr>
+      <tr><td><code>--sidebar-foreground</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#F2F2F3"></span><span class="hex">#F2F2F3</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#1D1F20"></span><span class="hex">#1D1F20</span></div></td>
+        <td>Nav label/icon text.</td></tr>
+      <tr><td><code>--sidebar-accent</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#303B40"></span><span class="hex">#303B40</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#E3F0F7"></span><span class="hex">#E3F0F7</span></div></td>
+        <td>Active/hover nav-item fill.</td></tr>
+      <tr><td><code>--sidebar-ring</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#05A9FF"></span><span class="hex">#05A9FF</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#0078B8"></span><span class="hex">#0078B8</span></div></td>
+        <td>Focus ring inside the sidebar — the raw <code>--brand-2</code> in light mode (reads against the dark sidebar); a derived darker blue in dark mode (the raw blue reads too close to this light sidebar's own near-white surface).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="type" data-section="type">
+  <h2>8. Typography</h2>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Sample</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--font-sans</code></td>
+        <td class="type-sample" style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">Aa — $12,480.55</td>
+        <td>Everywhere — body, buttons, inputs, table cells, headings, stat values. One grotesque sans for the whole app, confirmed against both reference products' actual app UI (their serif is marketing-only).</td></tr>
+      <tr><td><code>--font-heading</code></td>
+        <td class="type-sample" style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight:700;">Aa — Dashboard</td>
+        <td>Alias onto <code>--font-sans</code> — hierarchy by weight/size, not a second typeface.</td></tr>
+      <tr><td><code>--font-mono</code></td>
+        <td class="mono-sample">NET WORTH · AAPL · #10294</td>
+        <td>Origin's own measured pattern — uppercase, letterspaced eyebrow labels, account numbers, ticker symbols, tabular figures. Never body copy.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="radius" data-section="radius">
+  <h2>9. Radius &amp; Spacing</h2>
+  <p class="section-hint group-note">Radius values are real tokens in <code>tokens.css</code>. The spacing figures below (page margins, card gaps/padding) are a fixed reference scale used consistently throughout <code>screen.css</code>, not yet promoted to their own CSS custom properties — flagged as an open item if that promotion becomes worth doing.</p>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Sample</th><th>Value</th><th>Used for</th></tr></thead>
+    <tbody>
+      <tr><td><code>--radius-sm</code></td>
+        <td><span class="radius-demo" style="border-radius:6px;"></span></td>
+        <td>6px</td>
+        <td>Badge, checkbox.</td></tr>
+      <tr><td><code>--radius-md</code></td>
+        <td><span class="radius-demo" style="border-radius:8px;"></span></td>
+        <td>8px</td>
+        <td>Button, input, select — both products' measured app-level radius.</td></tr>
+      <tr><td><code>--radius-lg</code></td>
+        <td><span class="radius-demo" style="border-radius:12px;"></span></td>
+        <td>12px</td>
+        <td>Card, dialog, popover, the sidebar's own card shape.</td></tr>
+      <tr><td><code>--radius-xl</code></td>
+        <td><span class="radius-demo" style="border-radius:20px;"></span></td>
+        <td>20px</td>
+        <td>Sheet/drawer — extrapolated, not directly measured; flag before lock.</td></tr>
+    </tbody>
+  </table>
+  <table class="token-table" style="margin-top:1.5rem;">
+    <thead><tr><th>Spacing reference</th><th>Value</th></tr></thead>
+    <tbody>
+      <tr><td>Page margins</td><td>28px</td></tr>
+      <tr><td>Gap between cards</td><td>24px</td></tr>
+      <tr><td>Card padding</td><td>24px</td></tr>
+      <tr><td>Table row padding</td><td>16px (cell), 13px text</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer class="doc-footer">
+  Generated by the <code>ux-designer</code> agent. Values here are literal copies of <code>tokens.css</code> for readability — <code>tokens.css</code> is the source of truth if the two ever disagree. See <a href="index.html">index.html</a> and <a href="design-system-spec.md">design-system-spec.md</a> for the rest of the design system.
+</footer>
+
+</body>
+</html>

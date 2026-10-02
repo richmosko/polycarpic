@@ -2,7 +2,7 @@
 
 > The written companion to `tokens.css` + `screen.css`. The CSS files are the machine-readable source of truth; this doc explains the *why* and the usage rules. Owned by the `ux-designer` agent. Generate/refine with `/generate-designdoc`.
 
-**Revision history:** Pass 1 (2026-09-28) inherited the cairn tracker's own palette — rejected, diverging from cairn is the goal. Pass 2 (2026-09-28) hand-authored an indigo/violet identity "inspired by" Monarch Money and Origin from general/training knowledge — rejected: the guessed hue matched neither product, and "Origin" was misidentified. Pass 3 (2026-09-28) derived a blue-primary, warm-neutral palette from team-lead's measured screenshots of the actual products (`temp/design-refs/`) — accepted as the base, most of **Inspiration** and **Typography** below is still that pass's work and still current. **Pass 4 (2026-09-30, this revision)** is the Principal's first review of the pass-3 result (`temp/2026-09-30-design-review-1.md`): the brand hue becomes neon green (`#2CFF05`, chosen because the project name relates to fruiting plants and it's likely the logo's dominant color), the warm/brown neutral scale is replaced with a faint tint of that hue, the sidebar inverts, the shell layout changes (full-width header, sidebar below it), and two new screens (Home, Login) are added. See **Foundations** for the updated palette and every contrast figure, and **Layout & shell** / **Sidebar** / **New screens: Home & Login** for the rest.
+**Revision history:** Pass 1 (2026-09-28) inherited the cairn tracker's own palette — rejected, diverging from cairn is the goal. Pass 2 (2026-09-28) hand-authored an indigo/violet identity "inspired by" Monarch Money and Origin from general/training knowledge — rejected: the guessed hue matched neither product, and "Origin" was misidentified. Pass 3 (2026-09-28) derived a blue-primary, warm-neutral palette from team-lead's measured screenshots of the actual products (`temp/design-refs/`) — accepted as the base, most of **Inspiration** and **Typography** below is still that pass's work and still current. Pass 4 (2026-09-30) is the Principal's first review of the pass-3 result: the brand hue becomes neon green (`#2CFF05`), the neutral scale replaces warm/brown with a faint tint of that hue, the sidebar inverts, the shell layout changes (full-width header, sidebar below it), and two new screens (Home, Login) are added. Pass 5 (2026-09-30) adds a secondary blue brand hue (`#05A9FF`), re-tints the neutral scale and sidebar from green to that blue (less saturated), and fixes the flows section not rendering. **Pass 6 (2026-10-01, this revision)**, Principal review 4: `--warning` becomes a genuinely orange hue paired with dark ink (not a white-text-forcing darkened brown); the light-mode chart ramp brightens across all 5 steps (the old tail read as "almost black"); a new `tokens.html` example page decodes every token with swatches in both modes and a "used for" line; the Login wireframe is corrected to match the centered styled screen; a dashboard first-run/empty-state wireframe (the membership-setup page) is added and linked from flow 5.1; the skeleton-vs-spinner bullet is answered in plain words; flow 5.2 is reframed around what the user experiences (a "Correct entry" action with a badge and a struck/shaded reversal on click-through, the underlying reversal-only mechanism unchanged); flow 5.3 is redrawn so the app never initiates a payment — the user pays their bank, the payment lands as an imported transaction with no counterparty, and they post it against the custodial tax-authority account, which is what the gap is measured against. See **Foundations**, **Financial semantics**, the flow sections, and `tokens.html` for the detail.
 
 ## What governs this system
 
@@ -52,6 +52,10 @@ This project's UI direction is **SvelteKit + shadcn-svelte** (Tailwind, headless
 
 **Neutrals re-tinted from green to blue, lighter (pass 5).** Pass 4 tinted every neutral (`--background`/`--muted`/`--border`/`--foreground`) at the green brand's hue, 6–14% saturation. The Principal: "the background: can we use the secondary blue shade above in the same style? A slight hint of the secondary color but much lighter" — and separately flagged the inverted sidebar as reading green-biased. **Both re-tinted to the new blue hue (200.6°) at a lower saturation than pass 4's green** (3–9%, vs. pass 4's 6–14%) — "much lighter" read as *less saturated*, not *higher lightness* (the lightness levels were already near-white/near-black; what the Principal was reacting to was how strongly the tint read as a hue at all). `--card` still stays true white/near-black, same "cards-on-tinted-canvas" convention as every prior pass.
 
+**`--warning` becomes genuinely orange, paired with dark ink (pass 6).** The Principal's review: "Can we make this something that is more definitively Orange rather than brown? Please remind me what this token would be used for?" The prior value (`#B45309`, hue 26°) is in the orange hue range by number, but at L=0.371 with white text forcing it dark enough to clear 4.5:1, it reads as brown — the same trap destructive/positive avoid only because red and green stay legible when darkened; orange does not. **Fix: a true vivid orange (`#EA6A0A`, hue 25.7°, matching Monarch's own measured orange hue of 22° — see Inspiration) paired with a dark orange-black ink (`#2A1200`) instead of white.** One literal value does both jobs this system normally splits across two: 5.54:1 for fill-with-text, and (unlike `--brand`/`--brand-2`) 3.20:1 against `--card` too, so it also clears the non-text floor used directly as a border/icon color. Dark mode gets the same treatment, lightened for a dark surface (`#FF9452`, hue ≈23°) with the same dark ink (`#2A1200`) — not a white/dark flip like `--destructive`, because orange never pairs with white text AA-safely at a saturation that still reads as orange, in either mode. **Used for:** the caution status tier — an aged Cash-in-Transit exceptions-window item, a stale provider link, or a safe-harbor due date more than 14 days out (see Financial semantics § Status tiers).
+
+**Chart ramp brightened (pass 6).** The Principal: "Can we make the chart sequencing brighter? it is really dark, with the final few colors almost rendered as black." The light-mode ramp (hue 110.6°, S≈0.90) spanned L 0.300→0.061 — `--chart-5` at L=0.061 is genuinely close to black (17.73:1 against `--card`). Re-derived at L 0.34→0.18, same hue/saturation: `--chart-1` is now brighter than the old `--chart-1` (3.26:1 vs white, was 4.11:1) and `--chart-5` is far lighter than the old tail (8.78:1, was 17.73:1) — every step still clears the 3:1 non-text floor, with margin at both ends. Dark mode's ramp (`#C1FBB6`→`#29CB0B`, 8.87:1→16.32:1 against `--card`) was already bright — the "almost black" complaint was a light-mode-only symptom, left unchanged.
+
 Contrast figures were computed via the standard WCAG relative-luminance formula against these exact hex values (script in `temp/`, full pair-by-pair results in **Accessibility**).
 
 #### Light (`:root`) — primary/default mode
@@ -77,7 +81,7 @@ Contrast figures were computed via the standard WCAG relative-luminance formula 
 | `--border` | `#E7E8E9` | Default hairline border — blue-tinted (was green in pass 4) |
 | `--input` | `#E7E8E9` | Input border |
 | `--ring` | `#158500` | Focus ring — unchanged (primary green) |
-| `--chart-1`…`--chart-5` | `#1D9108` → `#061D02` | Sequential/magnitude ramp — unchanged, brand green |
+| `--chart-1`…`--chart-5` | `#21A509` → `#125705` | **Brightened pass 6** (was `#1D9108`→`#061D02`, tail read "almost black") — sequential/magnitude ramp, brand green |
 | `--sidebar` | `#1F2528` | **Re-hued pass 5** (was green `#20291F`) — inverted, a dark blue-tinted surface floating on the light page (see Sidebar) |
 | `--sidebar-foreground` | `#F2F2F3` | |
 | `--sidebar-accent` | `#303B40` | |
@@ -85,8 +89,8 @@ Contrast figures were computed via the standard WCAG relative-luminance formula 
 | `--sidebar-ring` | `#05A9FF` | **Re-hued pass 5** (was raw `--brand` green) — the raw secondary blue, to fully remove the green cast from this component |
 | `--positive` | `#15803D` | Gain / income / surplus — unchanged |
 | `--positive-foreground` | `#FFFFFF` | Text on positive fill |
-| `--warning` | `#B45309` | Caution tier — unchanged |
-| `--warning-foreground` | `#FFFFFF` | Text on warning fill |
+| `--warning` | `#EA6A0A` | **Pass 6, re-hued true orange** (was brown-reading `#B45309`) — caution tier: aged CIT exceptions, stale provider link, safe-harbor due date >14 days out |
+| `--warning-foreground` | `#2A1200` | **Pass 6, now dark ink** (was white — orange can't clear 4.5:1 with white without reading brown) |
 
 #### Dark (`.dark`) — secondary mode
 
@@ -108,7 +112,7 @@ Contrast figures were computed via the standard WCAG relative-luminance formula 
 | `--destructive` | `#FC4F4F` | Unchanged |
 | `--destructive-foreground` | `#2A0507` | |
 | `--border` | `rgba(255,255,255,0.08)` | |
-| `--chart-1`…`--chart-5` | `#C1FBB6` → `#29CB0B` | Unchanged, brand green |
+| `--chart-1`…`--chart-5` | `#C1FBB6` → `#29CB0B` | Unchanged, brand green — already bright, pass 6's "almost black" complaint was light-mode-only |
 | `--sidebar` | `#F7F8F8` | Inverted the other way — a light card floating on the dark page, reusing the light-mode canvas tone directly (now blue-tinted, so this stays consistent automatically) |
 | `--sidebar-foreground` | `#1D1F20` | |
 | `--sidebar-accent` | `#E3F0F7` | |
@@ -116,8 +120,8 @@ Contrast figures were computed via the standard WCAG relative-luminance formula 
 | `--sidebar-ring` | `#0078B8` | **Re-hued pass 5** (was `--primary` green) — the light-mode derived blue ink, since the raw `--brand-2` reads too close to this light sidebar's own near-white surface |
 | `--positive` | `#52E0A4` | Unchanged |
 | `--positive-foreground` | `#052E13` | |
-| `--warning` | `#F3CA59` | Unchanged |
-| `--warning-foreground` | `#33230A` | |
+| `--warning` | `#FF9452` | **Pass 6, re-hued true orange** (was mustard-reading `#F3CA59`, H=44°) — same hue family as light mode (≈23°), lightened for a dark surface |
+| `--warning-foreground` | `#2A1200` | **Pass 6** — same dark ink as light mode (not a white/dark flip like `--destructive`; orange never pairs with white text AA-safely at a legible saturation, in either mode) |
 
 **Character read:** two brand hues now, each following the same rule — literal where it clears AA (dark surfaces), darkened at the same hue where it doesn't (light-mode surfaces): neon green (`--brand`/`--primary`, 110.6°) for the main/primary identity, sky blue (`--brand-2`/secondary family, 200.6°) for secondary surfaces, info-weight badges, and anywhere the system needs a calm non-primary affordance. The neutral scale and the sidebar both carry the blue tint now, not the green one — the Principal's read of the sidebar as "green-biased" generalizes to "the whole neutral scale was green-biased," and pass 5 fixes both the same way. `--positive` (gain green, hue ≈150°) stays a third, deliberately distinct green — checked against both `--brand` (110.6°) and against itself being mistaken for either brand hue.
 
@@ -245,7 +249,7 @@ See `wireframes/sidebar-cues.html`, updated to mark A chosen.
 | Tier | Token | Product examples |
 |---|---|---|
 | Normal / on track | `--positive` or plain `--foreground` | Safe-harbor gap ≤ 0; reconciliation clean; import fully matched |
-| Caution | `--warning` | Safe-harbor gap open, due date >14 days out; unmatched transfer leg inside the exceptions window |
+| Caution | `--warning` | **(pass 6, the Principal asked what this is for)** Safe-harbor gap open, due date >14 days out; an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
 | Danger / overdue | `--destructive` | Safe-harbor payment overdue; exceptions-threshold breach; reconciliation break |
 
 ### Entity, account, and category badges — label + icon, not per-category hue
@@ -256,10 +260,22 @@ Unchanged principle from prior passes: meaning by label/icon/variant weight, not
 |---|---|---|
 | Entity type — Person / Trust / Business / Household | `secondary` | `User` / `Landmark` / `Building2` / `Home` |
 | Account — GL / Custodial | `outline` | `BookText` / `Landmark` |
-| Transaction — Draft / Posted / Reversed | `secondary` / `outline` / `outline` italic | `Clock` / `Check` / `RotateCcw` |
+| Transaction — Draft / Posted / Reversed / **Corrected** *(pass 6)* | `secondary` / `outline` / `outline` italic / **`outline` + `brand-2`-tinted dot** | `Clock` / `Check` / `RotateCcw` / `Pencil` |
 | Role — Owner / Manager / Viewer | `default` / `secondary` / `outline` | — |
 
 **Open item:** a genuine 3+-hue categorical chart need isn't solved by this doc yet — decide against a concrete spec when one arises.
+
+### Correcting a posted entry — "Correct entry," not "edit" or "reverse" (pass 6)
+
+**The Principal's framing (review 4):** the user-facing action and the underlying mechanism are two different claims, and the prior wording of flow 5.2 (design-system-spec.md / flow 5.2's own bullet) conflated them — "the UI never offers an edit affordance on a posted row, only reverse" describes the *mechanism* correctly but is not what the user should be told to click.
+
+- **Import is the immutable baseline.** An imported bank transaction is never altered after import — this hasn't changed, and the user never corrects an import row directly.
+- **Nothing reaches the GL without a confirmation step.** Between import and posting, a draft is fully editable — category, tax-treatment tag, counterparty, amount allocation — exactly as today's flow 5.2 already describes. This is where a user fixes a mistake *before* it is load-bearing.
+- **After posting, the user-facing action is "Correct entry," not "edit."** Clicking it does not mutate the posted row — under the hood it posts a full reversal of the original entry plus a new corrected entry (unchanged mechanism, reversal-only, PRD §5) — but the user is never shown "reverse" as a verb for this, and never asked to manually construct the reversing entry themselves.
+- **A corrected row carries a badge** (see table above) distinguishing it from a plain Posted or a standalone Reversed (e.g. a reversal with no replacement) row.
+- **Click-through reveals the mechanism.** Opening a corrected entry's detail view shows the full underlying pair — the original entry's lines rendered shaded/struck-through, the reversal lines, and the new corrected entry — so the double-entry trail stays fully auditable (Overview principle: "every number earns trust") without the top-level row ever using the word "reverse" as the primary affordance.
+
+See flow 5.2 (§ User Flows) for the updated decision diagram and `styled-screens/ledger.html` for the built row action, badge, and click-through state.
 
 ---
 
@@ -350,7 +366,7 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 ## Accessibility
 
-**Target: WCAG AA.** Every pair below re-run for pass 5's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check-pass3.py`).
+**Target: WCAG AA.** Every pair below re-run for pass 6's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check-pass3.py`; pass 6's warning/chart figures computed via a successor script in the same `temp/` directory). See `tokens.html` for every token's value in both modes with a rendered swatch, alongside this written derivation.
 
 **Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` hardcode the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
 
@@ -372,7 +388,7 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | `--sidebar-foreground` / `--sidebar` (NEW blue-tinted sidebar) | 13.87:1 |
 | `--sidebar-accent-foreground` / `--sidebar-accent` | 10.28:1 |
 | `--positive-foreground` / `--positive` (fill) | 5.02:1 |
-| `--warning-foreground` / `--warning` (fill) | 5.02:1 |
+| `--warning-foreground` / `--warning` (fill, **pass 6, re-hued true orange + dark ink**) | 5.54:1 |
 
 **Light mode — non-text pairs (floor 3:1):**
 
@@ -380,7 +396,8 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 |---|---|---|
 | `--ring` / `--card` | 4.79:1 | PASS |
 | `--sidebar-ring` / `--sidebar` (NEW `--brand-2`) | 6.00:1 | PASS |
-| `--chart-1`…`--chart-5` / `--card` | 4.11:1 → 17.73:1 | PASS all 5 |
+| `--chart-1`…`--chart-5` / `--card` (**pass 6, brightened**) | 3.26:1 → 8.78:1 | PASS all 5 — narrower band than pass 5 (was 4.11:1→17.73:1), both ends now closer to the 3:1 floor by design, fixing the "almost black" tail |
+| `--warning` / `--card` (**pass 6, new** — this token, unlike `--brand`/`--brand-2`, is also used directly as a border/icon color) | 3.20:1 | PASS |
 | `--border` / `--card` | 1.23:1 | Below floor — decorative hairline, accepted (unchanged posture since pass 3) |
 | `--brand` / `--background` | 1.35:1 | **Expected fail** — `--brand` (green) must never be a light-surface fill/text; regression tripwire, not a bug |
 | `--brand-2` / `--background` | 2.56:1 | **Expected fail** — same rule, new hue: `--brand-2` (blue) must never be a light-surface fill/text either |
@@ -401,7 +418,7 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | `--sidebar-foreground` / `--sidebar` | 15.55:1 |
 | `--sidebar-accent-foreground` / `--sidebar-accent` | 4.72:1 |
 | `--positive-foreground` / `--positive` (fill) | 8.93:1 |
-| `--warning-foreground` / `--warning` (fill) | 9.67:1 |
+| `--warning-foreground` / `--warning` (fill, **pass 6, re-hued true orange, same dark ink as light mode**) | 8.11:1 |
 
 **Dark mode — non-text pairs (floor 3:1):**
 
@@ -410,7 +427,8 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | `--ring` / `--card` | 14.18:1 | PASS |
 | `--sidebar-ring` / `--sidebar` (NEW, derived light-mode blue ink) | 4.51:1 | PASS |
 | `--brand-2` / `--background` | 7.76:1 | PASS — this dark surface is exactly what `--brand-2` is for |
-| `--chart-1`…`--chart-5` / `--card` | 8.87:1 → 16.32:1 | PASS all 5 |
+| `--chart-1`…`--chart-5` / `--card` | 8.87:1 → 16.32:1 | PASS all 5 (unchanged, pass 6 only touched the light-mode ramp) |
+| `--warning` / `--card` (**pass 6, new**) | 8.84:1 | PASS |
 
 | Concern | Standard / approach |
 |---|---|
@@ -436,4 +454,5 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 - Compare `styled-screens/dashboard.html` against `temp/design-refs/monarch-app-accounts-zoom.png` component-by-component once frontend-lead builds the real screen — this pass matched structure and the net-worth hero closely but did not build the full grouped-account-list + segmented-bar right column (time-boxed to the highest-traffic pattern); flag as a fast-follow if the gap matters before Implement.
 - **Login's visual pane (pass 4):** built as a brand gradient, since no photography/illustration asset exists for this product — the captured `dribbble` reference and `useorigin.com`'s own (relayed, uncaptured) login both use a real photo there. A real asset would likely read stronger; this is a design-asset gap to fill before final, not a layout uncertainty.
 - **CVD check on the brand hues (pass 4/5):** flagged in Accessibility — two brand hues now (green, blue) to check, not yet simulated.
+- **Resolved pass 6:** `--warning` re-hued to a true orange with a dark ink (was brown-reading); light-mode chart ramp brightened (old tail read "almost black"); a `tokens.html` example page added; Login wireframe corrected to match the centered styled screen; a dashboard first-run/empty-state wireframe (membership setup) added and linked from flow 5.1; the skeleton-vs-spinner bullet answered in plain words; flow 5.2 reframed around the user-facing "Correct entry" action; flow 5.3 redrawn to remove the app-initiates-payment step.
 - **Resolved pass 5:** flows weren't rendering — `index.html` §flows linked to raw `flows/*.md`, which the browser serves as plain text, so the fenced `mermaid` blocks never reached the page's own loader. All five are now embedded inline under their own `<h3>`; the `.md` files stay as the diffable source. Fixing this also surfaced a real, previously-untested syntax error in the dashboard-glance flow (an unescaped quote inside a node label) — fixed in both the embedded copy and the source. All five confirmed ≤782px (the content-column width) via the architect's render.py measurement method plus a live browser check; four of five exceed the raw 720px mmdc threshold intrinsically (954/886/896/1200px) but fit the real container through the same CSS scale-down already proven for ARCH's diagrams.

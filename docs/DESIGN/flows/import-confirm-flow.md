@@ -24,9 +24,16 @@ flowchart TD
   exceptions --> resolve{Resolved manually?}
   resolve -- yes --> post
   resolve -- no --> exceptions
+  ledger --> correctQ{User clicks\nCorrect entry?}
+  correctQ -- yes --> doCorrect[System posts the reversal\n+ the new corrected entry\nuser never sees reverse as the verb]
+  doCorrect --> correctedBadge[Row now shows\nCorrected badge]
+  correctedBadge --> clickThrough[Click-through: original lines\nshaded/struck + reversal + new entry]
+  correctQ -- no --> complete([Flow complete])
+  clickThrough --> complete
 ```
 
 **Notes**
-- Once posted, a transaction is immutable — the UI never offers an "edit" affordance on a posted row, only "reverse" (Overview principle: immutability is visible).
-- Draft rows carry the `Draft (staged)` badge (`--secondary`, clock icon); posted rows carry `Posted` (`--outline`, check icon) — see design-system-spec.md § Financial semantics.
+- **Reframed pass 6 (the Principal, review 4):** what the user is told is distinct from how it works underneath. Import is the immutable baseline and never changes after import; a draft is fully editable before posting (the "edit" the user actually wants happens here); after posting, the user-facing action is **"Correct entry"**, never "edit" and never "reverse" as a verb — even though the mechanism underneath is still a reversal-only pair (PRD §5, architecture unchanged). See design-system-spec.md § Correcting a posted entry.
+- Draft rows carry the `Draft (staged)` badge (`--secondary`, clock icon); posted rows carry `Posted` (`--outline`, check icon); a corrected row carries `Corrected` (`--outline` + `--brand-2`-tinted dot, pencil icon) — see design-system-spec.md § Financial semantics.
+- Click-through on a corrected row shows the full double-entry trail — original lines shaded/struck-through, the reversal, and the new corrected entry — so the correction stays fully auditable without the row itself ever using the word "reverse" as its primary affordance.
 - Actor attribution (user / auto-post rule / system job) is shown on every draft and posted row, never inferred (PRD §5).

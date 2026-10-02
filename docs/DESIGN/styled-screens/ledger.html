@@ -79,9 +79,42 @@
     <div class="card" style="margin-bottom:24px;">
       <span class="card-title">Posted transactions</span>
       <table class="data-table">
+        <thead>
+          <tr><th>Date</th><th>Payee</th><th>Category</th><th></th><th>Status</th><th style="text-align:right;">Amount</th><th></th></tr>
+        </thead>
         <tbody>
-          <tr><td>Sep 10</td><td>Streaming Svc</td><td>Subscriptions</td><td></td><td><span class="badge badge-outline">Posted</span></td><td class="amount negative">−$12.99</td></tr>
-          <tr><td>Sep 8</td><td>Refund — Sep 1 charge</td><td>Reversal</td><td></td><td><span class="badge badge-archived">Reversed</span></td><td class="amount">$0.00</td></tr>
+          <tr>
+            <td>Sep 10</td><td>Streaming Svc</td><td>Subscriptions</td><td></td>
+            <td><span class="badge badge-outline">Posted</span></td>
+            <td class="amount negative">−$12.99</td>
+            <td><button class="row-action">Correct entry</button></td>
+          </tr>
+          <tr>
+            <td>Sep 9</td><td>Office Supply Co.</td><td>Office expense</td><td></td>
+            <td><span class="badge badge-corrected"><span class="badge-dot"></span>Corrected</span></td>
+            <td class="amount negative">−$68.50</td>
+            <td><button class="row-action">View correction ⌄</button></td>
+          </tr>
+        </tbody>
+      </table>
+      <!-- Click-through state (pass 6) — the Corrected row above, expanded.
+           A real build toggles this on click; shown open here as the
+           reference for what the disclosure reveals. -->
+      <div class="correction-trail">
+        <div class="trail-label">Original entry (Sep 8) — reversed</div>
+        <div class="trail-row struck"><span>Dr Office expense</span><span>$84.20</span></div>
+        <div class="trail-row struck"><span>Cr Checking</span><span>−$84.20</span></div>
+        <div class="trail-label">Reversal (Sep 9)</div>
+        <div class="trail-row"><span>Cr Office expense</span><span>−$84.20</span></div>
+        <div class="trail-row"><span>Dr Checking</span><span>$84.20</span></div>
+        <div class="trail-label">Corrected entry (Sep 9)</div>
+        <div class="trail-row"><span>Dr Office expense</span><span>$68.50</span></div>
+        <div class="trail-row"><span>Cr Checking</span><span>−$68.50</span></div>
+      </div>
+      <div class="card-footnote" style="margin-top:8px; font-size:12px; color:var(--muted-foreground);">A posted row is never edited directly — "Correct entry" posts the reversal + a new entry underneath; the badge and this trail are the only user-visible trace. See design-system-spec.md § Correcting a posted entry.</div>
+      <table class="data-table" style="margin-top:16px;">
+        <tbody>
+          <tr><td>Sep 8</td><td>Refund — Sep 1 charge</td><td>Reversal</td><td></td><td><span class="badge badge-archived">Reversed</span></td><td class="amount">$0.00</td><td></td></tr>
         </tbody>
       </table>
     </div>

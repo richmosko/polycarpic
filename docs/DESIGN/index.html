@@ -19,8 +19,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.6</span>
-    <span><strong>Last updated:</strong> 2026-09-30</span>
+    <span><strong>Version:</strong> 0.7</span>
+    <span><strong>Last updated:</strong> 2026-10-01</span>
   </div>
 </header>
 
@@ -65,6 +65,7 @@
     <li><a href="design-system-spec.md#inspiration-monarch--origin">design-system-spec.md § Inspiration</a> — what was taken from Monarch Money and Origin, and why</li>
     <li><a href="design-system-spec.md">design-system-spec.md</a> — the written spec (token rationale, financial semantics, component inventory, accessibility)</li>
     <li><a href="tokens.css">tokens.css</a> — design tokens as CSS custom properties (hand-authored palette, not a vendored shadcn preset)</li>
+    <li><a href="tokens.html">tokens.html</a> <em>(pass 6, new)</em> — every token decoded: name, value in both modes, swatch, one-line "used for"</li>
     <li><a href="screen.css">screen.css</a> — component &amp; screen styles built on the tokens</li>
   </ul>
   <p class="section-hint">Figma stays the high-fidelity design tool for anything shipping pixel-exact (via the <code>ux-designer</code>'s Figma skills); <code>docs/DESIGN/</code> is the in-repo, code-level home that ships with the project and is the contract for implementation.</p>
@@ -72,7 +73,7 @@
 
 <section id="tokens" data-section="tokens">
   <h2>3. Design Tokens</h2>
-  <p class="section-hint">Color, typography, spacing, radius, and shadow primitives — SvelteKit + shadcn-svelte (PRD §8). Edit values in <a href="tokens.css">tokens.css</a>; the swatches below preview the live variables. Full rationale in <a href="design-system-spec.md">design-system-spec.md</a>.</p>
+  <p class="section-hint">Color, typography, spacing, radius, and shadow primitives — SvelteKit + shadcn-svelte (PRD §8). Edit values in <a href="tokens.css">tokens.css</a>; the swatches below preview the live variables. Full rationale in <a href="design-system-spec.md">design-system-spec.md</a> — or see <a href="tokens.html">tokens.html</a> for every token decoded with both-mode values and a "used for" line.</p>
 
   <h3 id="tokens-surfaces">3.1 Surfaces &amp; Text</h3>
   <div class="tokens-grid">
@@ -160,7 +161,7 @@
   <pre class="mermaid">
 flowchart TD
   start([User logs in]) --> membership{Holds membership\non 1+ entity?}
-  membership -- no --> empty[Empty state:\nNo entities yet, invite/create CTA]
+  membership -- no --> empty[Membership-setup page:\nno entities yet, create or accept invite]
   membership -- yes --> default[Land on default entity\nlast-viewed or first by role]
   default --> render[Render dashboard:\nbalances, cash flow, recent activity,\npending tax liability, allocation snapshot]
   render --> loading{Data cached?}
@@ -177,9 +178,11 @@ flowchart TD
   <ul>
     <li>Every number on this screen must be clickable through to its source (Overview principle: "every number earns trust").</li>
     <li>Filtered strictly by membership (owner/manager/viewer) — no transitive access via parent entity (PRD §5 permission model).</li>
+    <li><strong>No-membership state (pass 6):</strong> see <a href="wireframes/membership-setup.html">wireframes/membership-setup.html</a> — the Principal confirmed the dashboard's empty state can simply be the membership-setup page itself, not a separate illustrated empty-state screen.</li>
+    <li><strong>"Skeleton matches real layout, no spinner" (pass 6):</strong> while dashboard data is loading, the screen shows placeholder blocks already shaped like the real cards (same card chrome, same approximate text-line widths) instead of a spinner — so nothing visually jumps or re-flows once the real numbers arrive, they just fade in where the placeholders already were.</li>
   </ul>
 
-  <h3 id="flow-import-confirm">5.2 Import &amp; confirm transactions</h3>
+  <h3 id="flow-import-confirm">5.2 Import, confirm &amp; correct transactions</h3>
   <p class="section-hint"><strong>Story (PRD §4.2):</strong> staged drafts → reviewed → posted. Source: <a href="flows/import-confirm-flow.md">flows/import-confirm-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
@@ -203,9 +206,16 @@ flowchart TD
   exceptions --> resolve{Resolved manually?}
   resolve -- yes --> post
   resolve -- no --> exceptions
+  ledger --> correctQ{User clicks\nCorrect entry?}
+  correctQ -- yes --> doCorrect[System posts the reversal\n+ the new corrected entry\nuser never sees reverse as the verb]
+  doCorrect --> correctedBadge[Row now shows\nCorrected badge]
+  correctedBadge --> clickThrough[Click-through: original lines\nshaded/struck + reversal + new entry]
+  correctQ -- no --> complete([Flow complete])
+  clickThrough --> complete
   </pre>
   <ul>
-    <li>Once posted, a transaction is immutable — the UI never offers an "edit" affordance on a posted row, only "reverse".</li>
+    <li><strong>Reframed pass 6:</strong> import is the immutable baseline; a draft is fully editable before posting; after posting, the user-facing action is "Correct entry", never "edit" and never "reverse" as a verb — the mechanism underneath is still a reversal-only pair (PRD §5, unchanged), only the UX changed. See design-system-spec.md § Correcting a posted entry.</li>
+    <li>A corrected row carries the <code>Corrected</code> badge (<code>--outline</code> + <code>--brand-2</code>-tinted dot, pencil icon); click-through reveals the full double-entry trail — original lines shaded/struck, the reversal, and the new entry.</li>
     <li>Actor attribution (user / auto-post rule / system job) is shown on every draft and posted row, never inferred (PRD §5).</li>
   </ul>
 
@@ -214,10 +224,10 @@ flowchart TD
   <pre class="mermaid">
 flowchart TD
   view([Open Tax Liability view\nfor entity + jurisdiction]) --> accrual[Running accrual annualizes\nincome to date by tax treatment]
-  accrual --> pending[Pending liability =\n100% annualized minus prepaid balance]
+  accrual --> pending[Pending liability =\n100% annualized minus balance of the\ntax-authority custodial account]
   accrual --> safeharbor[Two safe-harbor bases computed:\nprior-year and current-year]
-  safeharbor --> required[Required payment =\nlesser of the two minus prepaid balance]
-  pending --> gap[Gap = required minus pending]
+  safeharbor --> required[Required payment =\nlesser of the two minus balance of the\ntax-authority custodial account]
+  pending --> gap[Gap = required minus pending\nmeasured against that account's balance]
   required --> gap
   gap --> tier{Gap status}
   tier -- "gap &lt;= 0" --> onTrack[Tier: Normal / on track\npositive token]
@@ -226,16 +236,18 @@ flowchart TD
   onTrack --> display[Display gauge + figures]
   caution --> display
   danger --> display
-  display --> pay{User initiates payment?}
-  pay -- yes --> post[Post estimated-tax payment:\ntransfer bank to prepaid-tax asset\nper jurisdiction]
-  post --> display
-  pay -- no --> wait([Wait for next period cutoff])
-  wait --> freeze[Period cutoff freezes\nannualized figure for due date]
+  display --> extPay[User pays the tax authority\nat their own bank, the app\nnever initiates a payment]
+  extPay --> imported[Payment appears as an imported\nbank transaction, no counterparty]
+  imported --> postEntry[User posts the GL entry:\ndebit the tax-authority custodial\naccount, pending liability itself\ndoes not change, not filed yet]
+  postEntry --> accrual
+  display --> waitNode([Wait for next period cutoff])
+  waitNode --> freeze[Period cutoff freezes\nannualized figure for due date]
   freeze --> accrual
   </pre>
   <ul>
     <li>The three-tier status (normal/caution/danger) reuses the product-wide status vocabulary — see <a href="design-system-spec.md">design-system-spec.md § Financial semantics</a>.</li>
     <li>Jurisdiction due dates, multipliers, and cumulative percentages are data-driven, so this view must render correctly for an arbitrary number of jurisdictions (PRD §5).</li>
+    <li><strong>Redrawn pass 6:</strong> v1 never moves money — there is no "User initiates payment?" button. The user pays at their own bank; it lands as an imported transaction with no counterparty; the user posts the GL entry, debiting the custodial tax-authority account. <strong>The gap is measured against that account's balance</strong>, not a separate "amount paid" figure. Dashboard/tax-panel copy says "post your payment," never "pay" or "transfer."</li>
   </ul>
 
   <h3 id="flow-securities-lots">5.4 Securities lots &amp; balance sheet reconciliation</h3>
@@ -300,8 +312,9 @@ flowchart TD
     <li><a href="wireframes/entities.html">Entities / Memberships</a></li>
     <li><a href="wireframes/securities.html">Securities / Lots</a> — lot table + allocation view</li>
     <li><a href="wireframes/import.html">Import</a> — provider link + batch review</li>
-    <li><a href="wireframes/home.html">Home</a> <em>(pass 4, new)</em> — entity picker, skipped for single-entity users</li>
-    <li><a href="wireframes/login.html">Login</a> <em>(pass 4, new)</em> — two-pane, Origin-inspired</li>
+    <li><a href="wireframes/home.html">Home</a> <em>(pass 4, corrected)</em> — public pre-auth landing page</li>
+    <li><a href="wireframes/login.html">Login</a> <em>(pass 4, new; corrected pass 6)</em> — split screen, centered form pane</li>
+    <li><a href="wireframes/membership-setup.html">Membership setup</a> <em>(pass 6, new)</em> — dashboard first-run / no-membership empty state, linked from flow 5.1</li>
     <li><a href="wireframes/sidebar-cues.html">Sidebar expand/collapse cues</a> <em>(pass 4, decided pass 5)</em> — option A (chevron) chosen, B/C kept for the record</li>
   </ul>
 </section>
@@ -336,6 +349,7 @@ flowchart TD
   <h2>9. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
+    <li><strong>Resolved 2026-10-01 (pass 6):</strong> <code>--warning</code> re-hued to a true orange with a dark ink (was brown-reading); light-mode chart ramp brightened; <a href="tokens.html">tokens.html</a> added; Login wireframe corrected to match the centered styled screen; dashboard first-run/empty-state wireframe added (<a href="wireframes/membership-setup.html">membership-setup.html</a>); skeleton-vs-spinner explained in plain words; flow 5.2 reframed around the user-facing "Correct entry" action; flow 5.3 redrawn to remove the app-initiates-payment step.</li>
     <li><strong>Resolved 2026-09-30 (pass 5):</strong> sidebar expand/collapse cue — option A (chevron) chosen; sidebar now full-height; header restructured to brand lockup + entity selector with an avatar cluster; login form pane centered — design-system-spec.md § Header, § Sidebar, § Login.</li>
     <li><strong>Avatar cluster overflow (pass 5):</strong> the "+N" fold for 4th+ members is specified but not yet shown live in either reference screen (both currently have ≤2 members) — worth a quick visual check once a real multi-member entity exists.</li>
     <li><strong>Login's visual pane (pass 4):</strong> built as a brand gradient, not a photo — no photography asset exists for this product. A real photo/illustration asset (in the style of the captured `dribbble` reference) would likely read stronger; flagging as a design-asset gap, not a layout question.</li>

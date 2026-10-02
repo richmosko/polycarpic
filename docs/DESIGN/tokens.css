@@ -7,6 +7,18 @@
  * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
  * the swatches.
  *
+ * SIXTH PASS (2026-10-01) — Principal review pass 4
+ * (temp/2026-10-01-design-review-4.md): --warning moves from a darkened
+ * brown-reading amber (H=26°) to a genuinely orange hue the Principal could
+ * recognize as orange, paired with a dark ink instead of white (orange
+ * cannot clear 4.5:1 with white text without going dark enough to read
+ * brown — same problem destructive/positive solved by darkening, orange
+ * can't); the light-mode chart ramp brightens across all 5 steps (the old
+ * tail, L down to 0.061, read as "almost black" — compressed to L 0.18-0.34,
+ * still clearing the 3:1 non-text floor against --card). See
+ * design-system-spec.md § Foundations and § Financial semantics for the
+ * full derivation and every contrast figure.
+ *
  * FIFTH PASS (2026-09-30) — Principal review pass 3
  * (temp/2026-09-30-design-review-3.md): a secondary brand hue, sky blue
  * #05A9FF, is added alongside the neon-green --brand from pass 4 (same
@@ -94,14 +106,21 @@
   --input: #E7E8E9;
   --ring: #158500;
 
-  /* Chart ramp — unchanged from pass 4 (brand green, sequential/
-     magnitude). See --brand-2 above for the new series-2 blue accent
-     used alongside this ramp in two-series comparison charts. */
-  --chart-1: #1D9108;
-  --chart-2: #177406;
-  --chart-3: #115705;
-  --chart-4: #0C3A03;
-  --chart-5: #061D02;
+  /* Chart ramp — pass 6: brightened. Same hue/saturation (110.6°, S≈0.90)
+     as every pass, but the lightness band compresses from pass 4/5's
+     L 0.300→0.061 (the tail read as "almost rendered as black" — the
+     Principal, pass 4) to L 0.34→0.18: the brightest step (chart-1) is
+     now brighter than the old chart-1 (3.26:1 vs white, was 4.11:1) and
+     the darkest (chart-5) is far lighter than the old near-black tail
+     (8.78:1 vs white, was 17.73:1) — still clears the 3:1 non-text floor
+     at every step, see Accessibility. See --brand-2 above for the
+     separate series-2 blue accent used alongside this ramp in two-series
+     comparison charts. */
+  --chart-1: #21A509;
+  --chart-2: #1D9108;
+  --chart-3: #197E07;
+  --chart-4: #156B06;
+  --chart-5: #125705;
 
   /* Sidebar — pass 5: re-tinted blue (was green in pass 4 — the Principal
      read the green cast as a bias, not a deliberate choice, and asked
@@ -119,12 +138,23 @@
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #05A9FF;
 
-  /* Financial semantics — unchanged from pass 3/4, re-verified against
-     the new (barely different) near-white surfaces. */
+  /* Financial semantics — --positive unchanged from pass 3/4, re-verified
+     against the new (barely different) near-white surfaces.
+     --warning — pass 6: was #B45309 (H=26°, L=0.371 — reads brown, not
+     orange, to the Principal). A true vivid orange (H=25.7°, matching
+     Monarch's own measured orange hue of 22° — see Inspiration) can't
+     clear 4.5:1 with WHITE text without darkening past the point it still
+     reads as orange (destructive/positive solved this by darkening; orange
+     can't take that route and keep its hue legible). Paired with a dark
+     orange-black ink instead — one literal value doing both jobs: 5.54:1
+     for fill-with-text, 3.20:1 against --card for border/icon use
+     (used for: aged Cash-in-Transit exceptions, a stale provider link,
+     or a safe-harbor due date >14 days out — see Financial semantics §
+     Status tiers). */
   --positive: #15803D;
   --positive-foreground: #FFFFFF;
-  --warning: #B45309;
-  --warning-foreground: #FFFFFF;
+  --warning: #EA6A0A;
+  --warning-foreground: #2A1200;
 
   /* Radius — unchanged from pass 3/4. */
   --radius-sm: 6px;
@@ -172,7 +202,9 @@
   --input: rgba(255, 255, 255, 0.12);
   --ring: #2CFF05;
 
-  /* Unchanged from pass 4 — brand green ramp, re-lightened for dark mode. */
+  /* Unchanged from pass 4 — brand green ramp, re-lightened for dark mode.
+     Already bright (8.87:1 → 16.32:1 against --card) — pass 6's "almost
+     black tail" complaint was a light-mode-only problem, see :root above. */
   --chart-1: #C1FBB6;
   --chart-2: #8BF877;
   --chart-3: #5AF53D;
@@ -195,6 +227,13 @@
 
   --positive: #52E0A4;
   --positive-foreground: #052E13;
-  --warning: #F3CA59;
-  --warning-foreground: #33230A;
+  /* --warning — pass 6: was #F3CA59, H=44° — a mustard/gold, not orange
+     (the dark-mode symptom of the same light-mode problem: a warm hue
+     pulled toward yellow to stay bright and legible). Same hue as the
+     light-mode fix (H≈23–26°), lightened for a dark surface; pairs with
+     the same dark orange-black ink as light mode (not a white/dark flip
+     like --destructive — orange never pairs with white text AA-safely at
+     a saturation that still reads as orange, in either mode). */
+  --warning: #FF9452;
+  --warning-foreground: #2A1200;
 }
