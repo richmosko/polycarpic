@@ -354,6 +354,104 @@ h1, h2, h3, .heading {
 .correction-trail .trail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
 .correction-trail .trail-row.struck { text-decoration: line-through; color: var(--muted-foreground); opacity: 0.75; }
 
+/* ---------- Accordion (pass 7 — Transactions' three urgency-ordered
+   cards: Exceptions, Pending, Posted, design-system-spec.md § Transactions
+   workflow) ---------- */
+.accordion-card + .accordion-card { margin-top: 16px; }
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+}
+.accordion-header .accordion-title { font-size: 15px; font-weight: 600; }
+.accordion-header .accordion-count { color: var(--muted-foreground); font-weight: 400; font-size: 13px; margin-left: 6px; }
+.accordion-body { padding: 0 20px 20px; }
+.show-n-select { font-size: 12px; }
+
+/* ---------- Pending row expansion (the "Auto-Suggest Match" view) ----------
+   Locked leg = verified bank reality (design-system-spec.md § Transactions
+   workflow) — never editable; the suggested leg is an inline-search select,
+   pre-filled, user can override. */
+.pending-row { border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 8px; overflow: hidden; }
+.pending-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.pending-summary .pending-checkbox { margin-right: 10px; }
+.pending-expand { background: var(--muted); border-top: 1px solid var(--border); padding: 16px; }
+.leg-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 13px; font-family: var(--font-mono); }
+.leg-row .leg-label { font-family: var(--font-sans); }
+.leg-locked { color: var(--muted-foreground); }
+.leg-locked .lock-icon { margin-right: 4px; }
+.pending-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.pending-actions .secondary-actions { display: flex; gap: 8px; }
+
+/* ---------- Split grid (Flow A — splitting a single transaction) ---------- */
+.split-grid { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; background: var(--card); margin-top: 8px; }
+.split-row { display: grid; grid-template-columns: 90px 90px 1fr 110px; gap: 8px; align-items: center; padding: 4px 0; font-size: 13px; }
+/* Journal-entry modal's own leg rows: Dr/Cr select, account select (gets
+   the room), amount — a different shape from the locked-leg split rows
+   above (those reserve a column for the lock icon/label). */
+.split-row.je-leg { grid-template-columns: 100px 1fr 120px; }
+.split-total { text-align: right; font-size: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.split-total.balanced { color: var(--positive); }
+.split-total.unbalanced { color: var(--destructive); }
+
+/* ---------- Bulk action bar (Flow B — grouping multiple transactions) ----------
+   Floats at the bottom of the viewport in the real build; shown inline
+   here as a static reference, same "shown open" convention as the
+   correction trail above. */
+.bulk-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--foreground);
+  color: var(--background);
+  border-radius: 999px;
+  padding: 10px 20px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.bulk-bar .btn { padding: 6px 14px; font-size: 12px; }
+/* .btn-outline assumes a light surface (dark border/text) by default —
+   on the bulk bar's dark fill that would be invisible, so flip it light. */
+.bulk-bar .btn-outline { border-color: var(--background); color: var(--background); }
+
+/* ---------- Near-full-screen journal-entry modal (pass 7, new) ----------
+   Reused for manual "+ New entry", "Correct entry", Split, and Group &
+   Summarize — one component, different pre-fill per entry point
+   (design-system-spec.md § Transactions workflow). A real build renders
+   this as a Dialog over a scrim; shown here as a large static card, same
+   "shown open" convention as .correction-trail / .bulk-bar above. */
+.je-modal-scrim { background: var(--muted); border-radius: var(--radius-xl); padding: 32px; }
+.je-modal { background: var(--card); border-radius: var(--radius-lg); padding: 28px; max-width: 720px; margin: 0 auto; box-shadow: 0 8px 32px oklch(0 0 0 / 16%); }
+.je-modal .je-modal-title { font-size: 18px; font-weight: 600; }
+.je-modal .je-modal-subtitle { font-size: 13px; color: var(--muted-foreground); margin-bottom: 20px; }
+.je-modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* ---------- Link health badge (pass 7, Custodial Accounts + Transactions) ---------- */
+.link-health-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  margin-bottom: 16px;
+}
+/* Text uses --warning-foreground (the dark ink), not --warning itself —
+   the literal --warning fill only clears AA text contrast against --card
+   at 3.20:1, below the 4.5:1 text floor (see tokens.css § warning). */
+.link-health-banner.warning { background: color-mix(in srgb, var(--warning) 14%, var(--card)); color: var(--warning-foreground); }
+
 /* ---------- Button ---------- */
 .btn {
   display: inline-flex;

@@ -137,3 +137,45 @@ body {
 
 h1, h2, h3 { font-weight: 600; margin: 0 0 12px; }
 .wf-nav-item { padding: 8px; border: 1px dashed #ccc; border-radius: 4px; margin-bottom: 6px; }
+
+/* ---------- Accordion (pass 7 — Transactions' three urgency-ordered
+   cards: Exceptions, Pending, Posted) ---------- */
+.wf-accordion-card { border: 1.5px solid #999; border-radius: 4px; margin-bottom: 16px; background: #fff; overflow: hidden; }
+.wf-accordion-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px; font-weight: 600; background: #f0f0f0; border-bottom: 1.5px solid #999;
+}
+.wf-accordion-header .wf-count { font-weight: 400; color: #888; font-size: 12px; }
+.wf-accordion-body { padding: 12px; }
+.wf-show-n { font-size: 11px; color: #888; border: 1px dashed #999; border-radius: 999px; padding: 2px 8px; }
+
+/* ---------- Pending row expansion (two-leg preview) ---------- */
+.wf-pending-row { border: 1px dashed #ccc; border-radius: 4px; margin-bottom: 8px; }
+.wf-pending-summary { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; cursor: pointer; }
+.wf-expand-panel { border-top: 1px dashed #ccc; padding: 12px; background: #fafafa; }
+.wf-leg-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; }
+.wf-leg-locked { color: #888; }
+.wf-leg-suggested { }
+.wf-expand-actions { display: flex; justify-content: space-between; margin-top: 10px; }
+
+/* ---------- Split grid (Flow A) ---------- */
+.wf-split-grid { border: 1px dashed #999; border-radius: 4px; padding: 10px; margin-top: 8px; }
+.wf-split-row { display: flex; gap: 8px; padding: 4px 0; font-size: 12px; align-items: center; }
+.wf-split-total { font-size: 11px; color: #888; text-align: right; margin-top: 6px; }
+
+/* ---------- Bulk action bar (Flow B) ---------- */
+.wf-bulk-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  border: 1.5px dashed #333; border-radius: 999px; padding: 8px 16px;
+  background: #222; color: #fff; margin: 8px 0 16px;
+}
+
+/* ---------- Modal overlay (JE modal, provider-item modal) ----------
+   Wireframes are static, so a "modal" renders as an inset bordered panel
+   representing the overlay state, not a real toggle. */
+.wf-modal-overlay {
+  border: 2px solid #333; border-radius: 8px; padding: 20px;
+  background: #fff; margin: 16px 40px; box-shadow: 0 0 0 4000px rgba(0,0,0,0.15);
+}
+.wf-modal-title { font-weight: 600; font-size: 16px; margin-bottom: 4px; }
+.wf-modal-subtitle { font-size: 12px; color: #888; margin-bottom: 16px; }

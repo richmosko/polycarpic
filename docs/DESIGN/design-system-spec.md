@@ -293,9 +293,39 @@ Unchanged principle from prior passes: meaning by label/icon/variant weight, not
 - **After posting, the user-facing action is "Correct entry," not "edit."** Clicking it does not mutate the posted row — under the hood it posts a full reversal of the original entry plus a new corrected entry (unchanged mechanism, reversal-only, PRD §5) — but the user is never shown "reverse" as a verb for this, and never asked to manually construct the reversing entry themselves.
 - **A corrected row carries a badge** (see table above) distinguishing it from a plain Posted or a standalone Reversed (e.g. a reversal with no replacement) row.
 - **Click-through reveals the mechanism.** Opening a corrected entry's detail view shows the full underlying pair — the original entry's lines rendered shaded/struck-through, the reversal lines, and the new corrected entry — so the double-entry trail stays fully auditable (Overview principle: "every number earns trust") without the top-level row ever using the word "reverse" as the primary affordance.
-- **Auto-posted rows get the identical treatment (addendum, pass 6).** A row posted by a recurring rule rather than a manual confirm shows the same `Posted` badge plus a small `posted by rule — <rule name>` attribution line underneath it, and offers the exact same **Correct entry** action as any other posted row. There is no separate "edit" affordance for a rule-posted row, and no different correction mechanism — actor attribution (user / auto-post rule / system job, PRD §5) changes who gets credited, never how a mistake gets fixed. See `styled-screens/ledger.html` for the built example.
+- **Auto-posted rows get the identical treatment (addendum, pass 6).** A row posted by a recurring rule rather than a manual confirm shows the same `Posted` badge plus a small `posted by rule — <rule name>` attribution line underneath it, and offers the exact same **Correct entry** action as any other posted row. There is no separate "edit" affordance for a rule-posted row, and no different correction mechanism — actor attribution (user / auto-post rule / system job, PRD §5) changes who gets credited, never how a mistake gets fixed. See `styled-screens/transactions.html` for the built example.
 
-See flow 5.2 (§ User Flows) for the updated decision diagram and `styled-screens/ledger.html` for the built row action, badge, and click-through state.
+See flow 5.2 (§ User Flows) for the updated decision diagram and `styled-screens/transactions.html` for the built row action, badge, and click-through state.
+
+---
+
+## Transactions workflow (pass 7, 2026-10-02)
+
+The Principal's own product specification for the Plaid bank-feed → journal-entry pipeline (`temp/2026-10-02-sidebar-interview.md`, kept as the starting point, refined here). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.2 for the full decision diagram.
+
+**Layout:** a high-density table/list of unposted raw rows. Clicking a row expands it vertically (Accordion/Expansion pattern) — the matching workspace opens inline, no navigation away from the feed.
+
+**The two-line preview (every expanded row starts here):**
+- **Line 1, the locked leg.** Always the custodial cash side — debited or credited per the Plaid transaction type. Locked because it represents verified bank reality; never editable, here or in Split/Group.
+- **Line 2, the suggested offset leg.** The system scans historical rules and the Plaid category to pre-fill an educated guess (e.g. Accounts Receivable, Software Expense, Custodial Clearing). Shown as an inline search dropdown the user can override in place — never a blank field.
+
+**Flow A — Split (one raw row → one multi-leg entry).** For a transaction that represents multiple contexts (e.g. a $1,200 payout that nets a $20 platform fee). The expanded row morphs into a multi-column grid; the user adds unlimited offsetting rows. A live validation loop disables "Approve & Post" until the split rows' total exactly matches the raw transaction's absolute total — never a partial or over/under split.
+
+**Flow B — Group (many raw rows → one entry).** For compressing many micro-transactions into one summary entry (prevents GL bloat). The user checkbox-selects rows in the primary table; a floating bulk-action bar appears; "Group & Summarize" opens the **same journal-entry modal** used everywhere else, pre-filled with one aggregated primary line and the user's chosen balancing distributions. **This is the system's one many-to-one draft→entry relationship** — every other posting path (manual entry, simple match, Split) is one draft (or one manual action) to one entry.
+
+**The journal-entry modal, one component reused everywhere.** Header (date, memo) + legs (account, Dr/Cr, amount) — a near-full-screen `Dialog`, not a drawer, because the Principal wants it to take up most of the screen. The exact same modal serves: manual **"+ New entry"**, **"Correct entry"** (§ Correcting a posted entry, above), **Split**, and **Group & Summarize** — only the pre-fill differs per entry point.
+
+**Posting gate, stated explicitly (team-lead ruling, 2026-10-02):** a transaction cannot leave the Pending card unless **all** of the following hold —
+1. Σ debits = Σ credits (balanced).
+2. The accounting equation holds, per entity (Assets = Liabilities + Equity).
+3. The entry date matches the bank date — or, for a date mismatch, the Cash-in-Transit clearing rule applies (2026-09-27 decision).
+4. The posted draft links to exactly one journal entry (except Group, which links many drafts to the one entry it produced).
+
+Any gate failure keeps the item in Pending — there is no partial post and no silent failure. **"Approve & Post"** collapses the expanded panel with a fade-out and removes the item from the unposted inbox once the gate passes.
+
+**"show N" selector:** each of the three accordion cards (Exceptions, Pending, Posted) has its own limit selector — a user with a large Posted history isn't forced to render all of it; Posted is paged, Exceptions/Pending show their full (usually small) count by default.
+
+**Permissions:** New entry, Sync, Split, Group, Approve & Post, and the rule auto-post opt-in are Manager/Owner actions — a Viewer sees none of these affordances anywhere on this screen (SECURITY §4.2.1 matrix, ARCH §2.4 permissions table).
 
 ---
 

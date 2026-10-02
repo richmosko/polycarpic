@@ -184,31 +184,40 @@ flowchart TD
     <li><strong>"Skeleton matches real layout, no spinner" (pass 6):</strong> while dashboard data is loading, the screen shows placeholder blocks already shaped like the real cards (same card chrome, same approximate text-line widths) instead of a spinner — so nothing visually jumps or re-flows once the real numbers arrive, they just fade in where the placeholders already were.</li>
   </ul>
 
-  <h3 id="flow-import-confirm">5.2 Import, confirm &amp; correct transactions</h3>
-  <p class="section-hint"><strong>Story (PRD §4.2):</strong> staged drafts → reviewed → posted. Source: <a href="flows/import-confirm-flow.md">flows/import-confirm-flow.md</a>. <strong>Pass 7:</strong> this screen is now <strong>Transactions</strong> ("Ledger"/"Import" renamed/retired, see § Sidebar information architecture) — the shape below is still accurate at a high level; the Plaid bank-feed review mechanics (expansion, split, group) land with the rebuilt screen.</p>
+  <h3 id="flow-import-confirm">5.2 Transactions — review, match &amp; correct</h3>
+  <p class="section-hint"><strong>Story (PRD §4.2):</strong> staged for review → matched/split/grouped → posted → correctable. Source: <a href="flows/import-confirm-flow.md">flows/import-confirm-flow.md</a>. <strong>Pass 7 full rewrite:</strong> this screen is now <strong>Transactions</strong> ("Ledger"/"Import" renamed/retired) — the review mechanics below are the Principal's own Plaid bank-feed workflow spec.</p>
   <pre class="mermaid">
 flowchart TD
-  poll([Provider adapter polls\nor fake source generates batch]) --> stage[Stage as draft transactions\nunposted, editable]
+  poll([Plaid adapter polls\nor fake source generates batch]) --> stage[Raw transaction lands\nin the Pending card]
   stage --> transfer{Two legs match\nwithin date window?}
-  transfer -- same posting date --> oneEntry[One multi-leg journal entry]
+  transfer -- same posting date --> autoEntry[Locked debit leg +\nsuggested offset leg\ntwo-line preview]
   transfer -- different dates --> citEntry[Two entries via\nCash in Transit clearing account]
-  transfer -- unmatched --> openItem[Remains open item in\nCash in Transit]
+  transfer -- unmatched --> openItem[Remains a single-leg\nPending row]
   openItem --> aging{Older than\nexceptions threshold\ndefault 3 business days?}
-  aging -- yes --> exceptions[Surface on\nExceptions report]
+  aging -- yes --> exceptions[Surface on\nExceptions card]
   aging -- no --> stage
-  oneEntry --> review[User reviews staged batch:\ncategory, tax-treatment tag,\ncounterparty]
-  citEntry --> review
-  review --> edit{Needs correction\nbefore posting?}
-  edit -- yes --> editDraft[Edit draft fields\nstill mutable]
-  editDraft --> review
-  edit -- no --> confirm[User confirms]
-  confirm --> post[Post as journal entry\nsource becomes immutable]
-  post --> toast[Toast: batch posted]
-  post --> ledger([Appears on Transactions,\nposted badge])
+  citEntry --> autoEntry
+  autoEntry --> expand[User expands the row:\nAuto-Suggest Match view]
+  expand --> action{User action}
+  action -- edit offset --> editLeg[Inline search dropdown:\noverride the suggested account]
+  editLeg --> action
+  action -- split --> splitGrid[Split grid:\nadd offsetting rows]
+  splitGrid --> liveCheck{Split sum equals\nthe Plaid total?}
+  liveCheck -- no --> splitGrid
+  liveCheck -- yes --> post
+  action -- group --> bulkSelect[Checkbox-select rows,\nbulk action bar appears]
+  bulkSelect --> groupModal[Group and Summarize modal:\npre-filled entry, one aggregate\nline + balancing distributions]
+  groupModal --> post
+  action -- approve --> post[User hits Approve and Post]
+  post --> gate{Posting gate:\nbalanced, accounting equation,\ndate match, one entry per draft}
+  gate -- fail --> stage
+  gate -- pass --> commit[Row fades out of Pending;\nbalanced entry commits to the GL]
+  commit --> toast[Toast: entry posted]
+  commit --> posted([Appears on Posted,\npaged])
   exceptions --> resolve{Resolved manually?}
   resolve -- yes --> post
   resolve -- no --> exceptions
-  ledger --> correctQ{User clicks\nCorrect entry?}
+  posted --> correctQ{User clicks\nCorrect entry?}
   correctQ -- yes --> doCorrect[System posts the reversal\n+ the new corrected entry\nuser never sees reverse as the verb]
   doCorrect --> correctedBadge[Row now shows\nCorrected badge]
   correctedBadge --> clickThrough[Click-through: original lines\nshaded/struck + reversal + new entry]
@@ -216,8 +225,11 @@ flowchart TD
   clickThrough --> complete
   </pre>
   <ul>
-    <li><strong>Reframed pass 6:</strong> import is the immutable baseline; a draft is fully editable before posting; after posting, the user-facing action is "Correct entry", never "edit" and never "reverse" as a verb — the mechanism underneath is still a reversal-only pair (PRD §5, unchanged), only the UX changed. See design-system-spec.md § Correcting a posted entry.</li>
-    <li>A corrected row carries the <code>Corrected</code> badge (<code>--outline</code> + <code>--brand-2</code>-tinted dot, pencil icon); click-through reveals the full double-entry trail — original lines shaded/struck, the reversal, and the new entry.</li>
+    <li><strong>The locked leg</strong> is always the custodial cash side (verified bank reality) — never editable, in the preview, Split grid, or Group modal. <strong>The suggested offset leg</strong> is pre-filled from historical rules + Plaid category, overridden in place via an inline search dropdown.</li>
+    <li><strong>Split</strong> is one draft → one multi-leg entry, live-validated to the Plaid total before it's submittable. <strong>Group</strong> is many drafts → one entry (the one many-to-one case, ARCH §3) via the shared journal-entry modal, pre-filled with an aggregate line + balancing distributions.</li>
+    <li><strong>Posting gate:</strong> Σ debits = Σ credits; accounting equation per entity; entry date matches bank date (or the CIT rule); every posted draft linked to exactly one entry — any failure keeps the item in Pending.</li>
+    <li><strong>Reframed pass 6, unchanged:</strong> a posted row's user-facing action is "Correct entry", never "edit"/"reverse" — reversal-only underneath (PRD §5). See design-system-spec.md § Correcting a posted entry.</li>
+    <li>A corrected row carries the <code>Corrected</code> badge (<code>--outline</code> + <code>--brand-2</code>-tinted dot, pencil icon); click-through reveals the full double-entry trail — original lines shaded/struck, the reversal, and the new entry. An auto-posted row carries the same badge/action plus a <code>posted by rule — &lt;name&gt;</code> line (addendum, pass 6).</li>
     <li>Actor attribution (user / auto-post rule / system job) is shown on every draft and posted row, never inferred (PRD §5).</li>
   </ul>
 
@@ -309,7 +321,7 @@ flowchart TD
   <p class="section-hint">Low-fidelity layout of each key screen — structure before style. Assets in <a href="wireframes/">wireframes/</a>. <strong>Pass 7 (2026-10-02):</strong> reorganized for the eight-item sidebar (design-system-spec.md § Sidebar information architecture) — rolling out across stages 2–5 of the same pass; items not yet rebuilt are marked pending rather than linked to a stale file.</p>
   <ul>
     <li><a href="wireframes/dashboard.html">Dashboard</a> — per-entity financial health</li>
-    <li>Transactions <em>(stage 2, pending)</em> — three urgency-ordered accordion cards (Exceptions/Pending/Posted), Pending inbox rebuilt around the Plaid review/match workflow. Today's interim link: <a href="wireframes/ledger.html">wireframes/ledger.html</a> (pre-pass-7 shape, to be renamed <code>transactions.html</code>).</li>
+    <li><a href="wireframes/transactions.html">Transactions</a> <em>(stage 2, done)</em> — three urgency-ordered accordion cards (Exceptions/Pending/Posted), Pending inbox built around the Plaid review/match workflow.</li>
     <li>General Ledger <em>(stage 3, pending)</em> — chart-of-accounts tree + per-account register page.</li>
     <li>Custodial Accounts <em>(stage 4, pending)</em> — absorbs the old Accounts' custodial half + Securities' lots. Today's interim link: <a href="wireframes/accounts.html">wireframes/accounts.html</a> (pre-pass-7 shape, to be renamed <code>custodial-accounts.html</code>).</li>
     <li>Allocation <em>(stage 5, pending)</em> — actual-vs-target, promoted out of the old Securities screen.</li>
@@ -329,7 +341,7 @@ flowchart TD
   <p class="section-hint">High-fidelity screens that apply the design system to the wireframes, consuming <code>tokens.css</code> + <code>screen.css</code> — a visual regression reference and a head-start for <code>frontend-lead</code>. Prioritized by traffic (PRD §4 stories 1 &amp; 2); remaining screens promote from wireframe fidelity as the design system stabilizes. <strong>Pass 7:</strong> only Dashboard and Transactions get styled-screen fidelity for now, same traffic-priority rule as before — General Ledger, Custodial Accounts, Allocation, Reports, and Settings stay at wireframe fidelity until there's evidence a styled build is needed before Implement (judgment call, flagged in Open Questions).</p>
   <ul>
     <li><a href="styled-screens/dashboard.html">Dashboard</a></li>
-    <li>Transactions <em>(stage 2, pending)</em> — today's interim link: <a href="styled-screens/ledger.html">styled-screens/ledger.html</a> (pre-pass-7 shape, to be renamed <code>transactions.html</code>).</li>
+    <li><a href="styled-screens/transactions.html">Transactions</a> <em>(stage 2, done)</em></li>
     <li><a href="styled-screens/home.html">Home</a> <em>(pass 4, new)</em></li>
     <li><a href="styled-screens/login.html">Login</a> <em>(pass 4, new)</em></li>
   </ul>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Transactions</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<p class="wf-note" style="margin:16px;">Pass 7 (2026-10-02) — rebuilt from "Ledger" per the sidebar interview + the Principal's Plaid bank-feed workflow spec (temp/2026-10-02-sidebar-interview.md). Three accordion cards in urgency order: Exceptions → Pending → Posted, each with a "show N" limit. The Pending card is the review/match inbox. Import stats/status live here; Sync + New entry at top.</p>
+<div class="wf-shell">
+  <div class="wf-topbar">
+    <strong>&#9670; Polycarpic</strong>
+    <span style="display:flex; align-items:center; gap:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+  </div>
+  <div class="wf-shell-body">
+  <div class="wf-sidebar">
+    <div class="wf-nav-item">Dashboard</div>
+    <div class="wf-nav-item">Transactions (active)</div>
+    <div class="wf-nav-item">General Ledger</div>
+    <div class="wf-nav-item">Custodial Accounts</div>
+    <div class="wf-nav-item">Allocation</div>
+    <div class="wf-nav-item">Reports</div>
+    <div class="wf-nav-item">Entities</div>
+    <div class="wf-nav-item">Settings</div>
+    <div class="wf-sidebar-toggle">&#8249; Collapse</div>
+  </div>
+  <div class="wf-content">
+    <div class="wf-row" style="border:none; align-items:flex-start;">
+      <h1>Transactions — [Entity name]</h1>
+      <span>[Sync Transactions] [+ New entry]</span>
+    </div>
+    <span class="wf-chip">Import status: Fidelity — synced 14 min ago · Coinbase — token expired, needs re-auth</span>
+
+    <!-- ============ Exceptions (most urgent) ============ -->
+    <div class="wf-accordion-card">
+      <div class="wf-accordion-header">
+        <span>Exceptions <span class="wf-count">— unmatched transfer legs &gt; 3 business days (1)</span></span>
+        <span class="wf-show-n">Show: 10 ▾</span>
+      </div>
+      <div class="wf-accordion-body">
+        <div class="wf-row"><span>Sep 5 · Cash in Transit — source leg only</span><span>−$500.00 <span class="wf-chip">overdue</span></span></div>
+      </div>
+    </div>
+
+    <!-- ============ Pending (the review/match inbox) ============ -->
+    <div class="wf-accordion-card">
+      <div class="wf-accordion-header">
+        <span>Pending <span class="wf-count">— unposted, needs review (3)</span></span>
+        <span class="wf-show-n">Show: 25 ▾</span>
+      </div>
+      <div class="wf-accordion-body">
+        <div class="wf-bulk-bar">
+          <span>2 selected</span>
+          <span>[Group &amp; Summarize] [Clear selection]</span>
+        </div>
+
+        <!-- Collapsed pending row -->
+        <div class="wf-pending-row">
+          <div class="wf-pending-summary">
+            <span>&#9744; Sep 12 · Stripe Payout</span>
+            <span>+$1,500.00 ▾</span>
+          </div>
+        </div>
+
+        <!-- Expanded pending row — the "Auto-Suggest Match" view -->
+        <div class="wf-pending-row">
+          <div class="wf-pending-summary">
+            <span>&#9744; Sep 12 · Office Supply Co.</span>
+            <span>−$84.20 ▴</span>
+          </div>
+          <div class="wf-expand-panel">
+            <div class="wf-box-label">Account suggestions (double-entry preview)</div>
+            <div class="wf-leg-row wf-leg-locked"><span>Line 1 — Debit: Plaid Custodial Cash Account (locked)</span><span>$84.20</span></div>
+            <div class="wf-leg-row wf-leg-suggested"><span>Line 2 — Credit: [Office Expense ▾] &#9998; Edit account</span><span>$84.20</span></div>
+            <div class="wf-expand-actions">
+              <span>[Group with others] [Split transaction]</span>
+              <span>[Approve &amp; Post]</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expanded + split -->
+        <div class="wf-pending-row">
+          <div class="wf-pending-summary">
+            <span>&#9745; Sep 11 · Custodial Payout — Fidelity</span>
+            <span>−$1,200.00 ▴</span>
+          </div>
+          <div class="wf-expand-panel">
+            <div class="wf-box-label">Split transaction — multi-column grid</div>
+            <div class="wf-split-grid">
+              <div class="wf-split-row"><span>Line 1 (locked)</span><span>Debit</span><span>Plaid Custodial Cash Account</span><span>$1,200.00</span></div>
+              <div class="wf-split-row"><span>Line 2</span><span>Credit</span><span>[Platform Fee Expense ▾]</span><span>$20.00</span></div>
+              <div class="wf-split-row"><span>Line 3</span><span>Credit</span><span>[Custodial Clearing ▾]</span><span>$1,180.00</span></div>
+              <div class="wf-split-row">[+ Add row]</div>
+              <div class="wf-split-total">Split total $1,200.00 = Plaid total $1,200.00 — balanced, submit enabled</div>
+            </div>
+            <div class="wf-expand-actions">
+              <span>[Cancel split]</span>
+              <span>[Approve &amp; Post]</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ Posted (paged, least urgent) ============ -->
+    <div class="wf-accordion-card">
+      <div class="wf-accordion-header">
+        <span>Posted <span class="wf-count">— 214 entries</span></span>
+        <span class="wf-show-n">Show: 25 ▾</span>
+      </div>
+      <div class="wf-accordion-body">
+        <div class="wf-row"><span>Sep 10 · Streaming Svc</span><span>−$12.99 <span class="wf-chip">posted</span> [Correct entry]</span></div>
+        <div class="wf-row"><span>Sep 9 · Office Supply Co.</span><span>−$68.50 <span class="wf-chip">corrected</span> [View correction ▾]</span></div>
+        <div class="wf-row"><span>Sep 9 · Property Mgmt Co. — posted by rule: Recurring rent</span><span>−$2,200.00 <span class="wf-chip">posted</span> [Correct entry]</span></div>
+        <div style="text-align:center; margin-top:8px;">[&lt; Prev]  Page 1 of 9  [Next &gt;]</div>
+      </div>
+    </div>
+
+    <!-- ============ Journal-entry modal — reused for manual entry, Correct entry, Split, Group ============ -->
+    <div class="wf-modal-overlay">
+      <div class="wf-modal-title">New journal entry</div>
+      <div class="wf-modal-subtitle">Header + legs — the same modal used for Correct entry, Split, and Group &amp; Summarize, pre-filled differently per entry point.</div>
+      <div class="wf-row"><span>Date</span><span>[Sep 12 ▾]</span></div>
+      <div class="wf-row"><span>Memo</span><span>[________________]</span></div>
+      <div class="wf-box-label" style="margin-top:12px;">Legs</div>
+      <div class="wf-split-grid">
+        <div class="wf-split-row"><span>Line 1</span><span>[Debit ▾]</span><span>[Account ▾]</span><span>[$0.00]</span></div>
+        <div class="wf-split-row"><span>Line 2</span><span>[Credit ▾]</span><span>[Account ▾]</span><span>[$0.00]</span></div>
+        <div class="wf-split-row">[+ Add leg]</div>
+        <div class="wf-split-total">Σ Debits = Σ Credits required to post — gate fails otherwise, entry stays in Pending</div>
+      </div>
+      <div class="wf-expand-actions">
+        <span>[Cancel]</span>
+        <span>[Post]</span>
+      </div>
+    </div>
+
+    <p class="wf-note">Posting gates (team-lead ruling, 2026-10-02): Σ debits = Σ credits; accounting equation holds per entity; entry date matches bank date (or the CIT rule for mismatched dates); every posted draft links to exactly one entry. Fails any gate → stays in Pending, never silently posts. The locked leg is always the custodial cash side — never editable. Viewers see no Sync / New entry / Post actions anywhere on this page.</p>
+  </div>
+  </div>
+</div>
+</body>
+</html>
