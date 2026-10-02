@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Dashboard</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="wf-app-shell">
+  <aside class="wf-app-sidebar">
+    <div class="wf-sidebar-top">&#9670; Polycarpic</div>
+    <nav class="wf-sidebar-nav">
+      <div class="wf-nav-item">Dashboard (active)</div>
+      <div class="wf-nav-item">Transactions</div>
+      <div class="wf-nav-item">General Ledger</div>
+      <div class="wf-nav-item">Custodial Accounts</div>
+      <div class="wf-nav-item">Allocation</div>
+      <div class="wf-nav-item">Reports</div>
+      <div class="wf-nav-item">Entities</div>
+    </nav>
+    <div class="wf-sidebar-bottom">
+      <div class="wf-avatar-popover">
+        <div>Profile</div>
+        <div>Preferences</div>
+        <div>Theme</div>
+        <div>Keyboard shortcuts</div>
+        <div>Log out</div>
+      </div>
+      <div class="wf-sidebar-avatar-trigger"><span class="wf-avatar">M</span><span class="wf-sidebar-user-name">Mosko &#9662;</span></div>
+    </div>
+  </aside>
+  <div class="wf-main">
+    <p class="wf-note" style="margin:16px;">Pass 8 (2026-10-02) — new app shell per the Principal (shadcn Sidebar pattern, temp/design-refs/shadcn-sidebar.png): sidebar fills the viewport height, logo moved to its top item, Settings left the sidebar for the header's gear icon (seven items remain), avatar + popover at the sidebar's screen-bottom. Header now starts right of the sidebar: expand/contract icon + breadcrumb on the left, entity selector/AI/search/notifications/gear on the right. Popover shown "open" here as the built reference.</p>
+    <div class="wf-app-topbar">
+      <div class="wf-topbar-left">
+        <span class="wf-icon-btn">&#9776;</span>
+        <span class="wf-breadcrumbs">Dashboard</span>
+      </div>
+      <div class="wf-topbar-right">
+        <span style="display:flex; align-items:center; gap:8px; margin-right:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+        <span class="wf-icon-btn disabled" title="AI/Agent — greyed in v1">&#10024;</span>
+        <span class="wf-icon-btn" title="Search">&#128269;</span>
+        <span class="wf-icon-btn" title="Notifications">&#128276;</span>
+        <span class="wf-icon-btn" title="Settings">&#9881;</span>
+      </div>
+    </div>
+    <div class="wf-app-content">
+
+    <div class="wf-grid cols-3">
+      <div class="wf-box">
+        <span class="wf-box-label">Net worth</span>
+        <div class="wf-placeholder-text w60" style="height:22px"></div>
+        <span class="wf-chip">+2.4% mo/mo</span>
+      </div>
+      <div class="wf-box">
+        <span class="wf-box-label">Cash flow (mtd)</span>
+        <div class="wf-placeholder-text w60" style="height:22px"></div>
+        <span class="wf-chip">−$1,240</span>
+      </div>
+      <div class="wf-box">
+        <span class="wf-box-label">Pending tax liability</span>
+        <div class="wf-placeholder-text w60" style="height:22px"></div>
+        <span class="wf-chip">gap: $3,100 due Sep 15</span>
+      </div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Net worth over time (nominal / inflation-adjusted toggle)</span>
+      <div style="height:160px; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999;">[chart]</div>
+    </div>
+
+    <div class="wf-grid cols-2">
+      <div class="wf-box">
+        <span class="wf-box-label">Recent activity</span>
+        <div class="wf-row"><span>Payee — category</span><span>−$84.20</span></div>
+        <div class="wf-row"><span>Payee — category</span><span>+$2,400.00</span></div>
+        <div class="wf-row"><span>Payee — category</span><span>−$12.99</span></div>
+      </div>
+      <div class="wf-box">
+        <span class="wf-box-label">Asset allocation — actual vs. target</span>
+        <div style="height:100px; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999;">[bar chart]</div>
+      </div>
+    </div>
+
+    <p class="wf-note">Every stat card links through to its source (ledger line / liability detail / lot). Viewer-role members see only entities they hold membership on — no transitive access via parent entity. No-membership first run: see <a href="membership-setup.html">membership-setup.html</a> (flow 5.1).</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

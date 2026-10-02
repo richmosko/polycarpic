@@ -1,65 +1,1073 @@
 /*
- * screen.css — Component & screen styles for TBD.
+ * screen.css — Component & screen styles for polycarpic.
  *
  * Built entirely on the primitives in tokens.css — never hardcode a color,
  * size, or radius here; reference a `--token`. Styled-screen mockups in
  * styled-screens/ link both files, so this doubles as the implementation
- * contract frontend-lead consumes during Implement.
+ * contract frontend-lead consumes during Implement (a plain-CSS reference;
+ * the real app wires the same values through shadcn-svelte's Tailwind
+ * components — see design-system-spec.md § Component inventory for the
+ * shadcn-svelte component each of these maps to).
  *
  * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
- * The rules below are scaffolding — replace with the project's components.
  */
 
 @import url("tokens.css");
 
-/* Base */
+/* ---------- Base ---------- */
+* { box-sizing: border-box; }
+
 body {
+  margin: 0;
   font-family: var(--font-sans);
-  font-size: var(--text-base);
-  line-height: var(--leading-normal);
-  color: var(--color-text);
-  background: var(--color-surface);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--foreground);
+  background: var(--muted); /* canvas convention: cards-on-muted, not cards-on-background */
 }
 
-/* Button — document every state in design-system-spec.md */
+h1, h2, h3, .heading {
+  font-family: var(--font-heading);
+  margin: 0;
+}
+
+.eyebrow {
+  font-family: var(--font-mono); /* Origin pattern: uppercase letterspaced mono section labels */
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+}
+
+/* ---------- Shell (pass 8, 2026-10-02 — Principal review 5): rebuilt on
+   the shadcn Sidebar component's own pattern
+   (https://ui.shadcn.com/docs/components/base/sidebar,
+   temp/design-refs/shadcn-sidebar.png). Supersedes pass 4's "full-width
+   header on top, sidebar below it" — the header no longer spans the full
+   width; it starts to the right of the sidebar, which now fills the
+   entire viewport height (not the page height) as its own fixed column.
+   `.shell` is a row: `.sidebar` | `.shell-main` (header + content
+   stacked). See design-system-spec.md § Layout & shell for the full
+   rationale and what pass 4/5 this replaces. */
+.shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.shell-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0; /* lets long breadcrumb/page-title text truncate instead of overflowing the row */
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 24px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.topbar-right { display: flex; align-items: center; gap: 2px; }
+
+/* Expand/contract control (pass 8) — moved from the sidebar's own bottom
+   chevron (pass 5) into the header, per the Principal's spec. */
+.sidebar-toggle-header {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: none;
+  border: none;
+  color: var(--foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.sidebar-toggle-header:hover { background: var(--muted); }
+
+/* Page title > breadcrumbs (pass 8) — most screens are a single crumb
+   (e.g. "Transactions"); a drill-down page (the account register) shows
+   its full path (e.g. "General Ledger > Primary Checking"). This is now
+   the ONLY place the page title renders — screens no longer repeat it as
+   an <h1> in the content column (design-system-spec.md § Header). */
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+  overflow: hidden;
+  white-space: nowrap;
+}
+.breadcrumbs .crumb { color: var(--muted-foreground); font-weight: 500; }
+.breadcrumbs .crumb:last-child { color: var(--foreground); font-weight: 600; }
+.breadcrumbs .crumb-sep { color: var(--muted-foreground); }
+
+/* Right-justified header icon row (pass 8): entity selector, AI/agent
+   (greyed, v1), search, notifications, settings gear. Settings is a
+   header surface now, not a sidebar nav item — see § Sidebar
+   information architecture pass-8 update. */
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: none;
+  border: none;
+  color: var(--foreground);
+  cursor: pointer;
+  position: relative;
+  font-size: 15px;
+}
+.icon-btn:hover { background: var(--muted); }
+.icon-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+.icon-btn[disabled]:hover { background: none; }
+.icon-btn.active { background: var(--muted); color: var(--primary); } /* the gear, when the current screen is Settings — no sidebar nav item to mark active instead */
+.icon-btn .notif-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--destructive);
+}
+
+/* Product icon + wordmark — pass 8: moved from the header into the
+   sidebar's own top item (was .brand-lockup in the header, pass 5). Class
+   name kept the same; only its container moved — see .sidebar-top below. */
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.brand-lockup .brand-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+/* Entity selector — entity name + avatar cluster, opens the switcher on
+   click. Stays in the header's right-justified icon row (pass 8,
+   unchanged position from pass 5's "Right: entity selector"). */
+.entity-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+.entity-selector:hover { background: var(--muted); }
+.entity-selector .entity-selector-name { font-size: 14px; font-weight: 500; color: var(--foreground); }
+
+/* Avatar cluster — overlapping circles representing the entity's
+   membership. Max 3 shown + a "+N" overflow chip in the same slot,
+   continuing the overlap. Fallback is always initials (no avatar-image
+   asset exists) on a --secondary fill. Border color matches whatever
+   surface the cluster sits on (--card in the header) to cut a visible
+   ring between overlapping circles — pass a different border color via
+   an inline style if reused on a non-card surface. */
+.avatar-cluster { display: flex; align-items: center; }
+
+.avatar-cluster .avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--card);
+  margin-left: -8px;
+  flex-shrink: 0;
+}
+.avatar-cluster .avatar:first-child { margin-left: 0; }
+.avatar-cluster .avatar.overflow { background: var(--muted); color: var(--muted-foreground); }
+
+/* ---------- Sidebar (pass 8, 2026-10-02 — Principal review 5, shadcn
+   Sidebar pattern): fills the entire viewport HEIGHT, not the page
+   height — `position: fixed; top: 0; height: 100vh`, so its bottom edge
+   (the avatar trigger) is always visible regardless of how long the page
+   scrolls OR how much content sits above the shell in the DOM (`position:
+   sticky` against `.shell`'s flex row, tried first, still inherits the
+   shell's own document-flow offset — `fixed` pins it to the viewport
+   itself, not the document). Superseding pass 5's "stretch to
+   .shell-body's height" approach (which tracked the PAGE, not the
+   screen). `.shell-main` carries a matching `margin-left` since the
+   sidebar is out of normal flow now. No longer a floating card with
+   margin on all sides — it's a flush full-height rail, rounded only on
+   the inner (right) edge where it meets the content. Composition, top to
+   bottom: brand item (logo + wordmark) → nav (seven items, Settings
+   removed, see design-system-spec.md § Sidebar information architecture)
+   → avatar trigger (opens the user-menu popover). */
+.sidebar {
+  background: var(--sidebar);
+  color: var(--sidebar-foreground);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: 1px 0 3px oklch(0 0 0 / 12%);
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 240px;
+  flex-shrink: 0;
+  transition: width 150ms ease;
+}
+
+.sidebar.collapsed {
+  width: 64px;
+  padding: 12px 10px;
+}
+
+.shell-main { margin-left: 240px; }
+/* :has() is a mockup convenience only — the real app drives this margin
+   from component state (the sidebar's own collapsed/expanded store), not
+   a CSS relational selector. */
+.shell:has(.sidebar.collapsed) .shell-main { margin-left: 64px; }
+
+/* Top item — brand (pass 8: moved here from the header, see
+   .brand-lockup above). Reuses .brand-lockup's own styles; sidebar-ink
+   aware since it sits on the sidebar's own (inverted) surface. */
+.sidebar-top {
+  padding: 8px 10px 16px;
+  color: var(--sidebar-foreground);
+  border-bottom: 1px solid var(--sidebar-border);
+  margin-bottom: 8px;
+}
+.sidebar-top .brand-lockup { color: var(--sidebar-foreground); }
+.sidebar.collapsed .sidebar-top .brand-lockup .sidebar-brand-label { display: none; }
+.sidebar.collapsed .sidebar-top { display: flex; justify-content: center; padding: 8px 0 16px; }
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sidebar .nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  color: var(--sidebar-foreground);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar .nav-item .nav-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  background: currentColor;
+  opacity: 0.85;
+}
+
+.sidebar.collapsed .nav-item .nav-label { display: none; }
+.sidebar.collapsed .nav-item { justify-content: center; }
+
+.sidebar .nav-item.active,
+.sidebar .nav-item:hover {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+
+/* Bottom item — avatar trigger + popover (pass 8, new). Opens the user
+   menu (profile, preferences, theme, keyboard shortcuts, ... Log out
+   last) — design-system-spec.md § Sidebar. Replaces pass 5's chevron
+   (the expand/contract control itself moved to the header, above). */
+.sidebar-bottom {
+  margin-top: auto;
+  border-top: 1px solid var(--sidebar-border);
+  padding-top: 8px;
+  position: relative;
+}
+
+.sidebar-avatar-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  background: none;
+  border: none;
+  color: var(--sidebar-foreground);
+  cursor: pointer;
+  text-align: left;
+}
+.sidebar-avatar-trigger:hover { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); }
+
+.sidebar-avatar-trigger .avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-avatar-trigger .sidebar-user-name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sidebar.collapsed .sidebar-avatar-trigger .sidebar-user-name,
+.sidebar.collapsed .sidebar-avatar-trigger .sidebar-user-chevron { display: none; }
+.sidebar.collapsed .sidebar-avatar-trigger { justify-content: center; }
+
+.sidebar-user-chevron { margin-left: auto; opacity: 0.7; font-size: 12px; }
+
+/* The popover itself — shown "open" as a static reference on one screen
+   (same convention as .correction-trail / .bulk-bar / .je-modal), not a
+   real toggle. Anchored above the trigger since the trigger sits at the
+   screen's bottom edge. */
+.avatar-popover {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  width: 220px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 20%);
+  padding: 6px;
+  z-index: 10;
+}
+.avatar-popover .popover-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  background: none;
+  border: none;
+  color: var(--popover-foreground);
+  cursor: pointer;
+}
+.avatar-popover .popover-item:hover { background: var(--muted); }
+.avatar-popover .popover-item.destructive { color: var(--destructive); }
+.avatar-popover .popover-divider { height: 1px; background: var(--border); margin: 4px 0; }
+
+.content {
+  padding: 24px 28px;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+/* ---------- Card / KPI stat card ---------- */
+.card {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+  color: var(--card-foreground);
+  box-shadow: 0 1px 2px oklch(0 0 0 / 6%);
+}
+
+.card + .card { margin-top: 24px; }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px; /* gap between cards, dashboard scale */
+}
+
+.card-title {
+  font-family: var(--font-heading);
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.stat-card .eyebrow { margin-bottom: 8px; display: block; }
+
+.stat-value {
+  font-family: var(--font-sans); /* stat values stay on the body face, bold — not the heading face */
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 6px;
+}
+
+.stat-delta.positive { color: var(--positive); }
+.stat-delta.negative { color: var(--destructive); }
+.stat-delta.neutral { color: var(--muted-foreground); }
+/* Delta color is never the only signal — the sign glyph in the mockup's
+   markup (+/−) or an icon is required alongside the color, per
+   design-system-spec.md § Financial semantics. */
+
+/* ---------- Badge ---------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badge-default { background: var(--primary); color: var(--primary-foreground); }
+.badge-secondary { background: var(--secondary); color: var(--secondary-foreground); }
+.badge-outline { background: transparent; color: var(--foreground); border-color: var(--border); }
+.badge-destructive { background: var(--destructive); color: var(--destructive-foreground); }
+.badge-positive { background: var(--positive); color: var(--positive-foreground); }
+.badge-warning { background: var(--warning); color: var(--warning-foreground); }
+.badge-archived { background: transparent; color: var(--muted-foreground); border-color: var(--border); font-style: italic; opacity: 0.8; }
+/* Corrected — pass 6 (design-system-spec.md § Correcting a posted entry):
+   an `outline` badge plus a small --brand-2-tinted dot, distinct from a
+   plain Posted or a standalone Reversed row — the user-facing signal that
+   a reversal + replacement pair sits behind this row, without the row
+   itself using the word "reverse". */
+.badge-corrected { background: transparent; color: var(--foreground); border-color: var(--border); }
+.badge-corrected .badge-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--brand-2); display: inline-block; }
+
+/* ---------- Row meta (e.g. "posted by rule <name>" attribution) ----------
+   Addendum, pass 6: an auto-posted row carries a small actor-attribution
+   line under its status badge and gets the exact same "Correct entry"
+   action as any other posted row — there is no separate edit affordance
+   for rule-posted rows (design-system-spec.md § Correcting a posted
+   entry). Also used for user/system-job attribution generally
+   (PRD §5 — actor attribution is never inferred). */
+.row-meta {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+}
+
+/* ---------- Row action (e.g. "Correct entry" on a posted row) ---------- */
+.row-action {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+.row-action:hover { text-decoration: underline; }
+
+/* ---------- Correction trail (click-through on a Corrected row) ----------
+   Pass 6: the full double-entry pair revealed on click-through — the
+   original entry's lines shaded/struck, then the reversal, then the new
+   corrected entry — so the correction stays auditable without "reverse"
+   ever being the row's primary affordance. */
+.correction-trail {
+  margin-top: 10px;
+  padding: 12px 16px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--muted);
+}
+.correction-trail .trail-label {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--muted-foreground);
+  margin: 10px 0 4px;
+}
+.correction-trail .trail-label:first-child { margin-top: 0; }
+.correction-trail .trail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+.correction-trail .trail-row.struck { text-decoration: line-through; color: var(--muted-foreground); opacity: 0.75; }
+
+/* ---------- Accordion (pass 7 — Transactions' three urgency-ordered
+   cards: Exceptions, Pending, Posted, design-system-spec.md § Transactions
+   workflow) ---------- */
+.accordion-card + .accordion-card { margin-top: 16px; }
+.accordion-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  cursor: pointer;
+}
+.accordion-header .accordion-title { font-size: 15px; font-weight: 600; }
+.accordion-header .accordion-count { color: var(--muted-foreground); font-weight: 400; font-size: 13px; margin-left: 6px; }
+.accordion-body { padding: 0 20px 20px; }
+.show-n-select { font-size: 12px; }
+
+/* ---------- Pending row expansion (the "Auto-Suggest Match" view) ----------
+   Locked leg = verified bank reality (design-system-spec.md § Transactions
+   workflow) — never editable; the suggested leg is an inline-search select,
+   pre-filled, user can override. */
+.pending-row { border: 1px solid var(--border); border-radius: var(--radius-md); margin-bottom: 8px; overflow: hidden; }
+.pending-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.pending-summary .pending-checkbox { margin-right: 10px; }
+.pending-expand { background: var(--muted); border-top: 1px solid var(--border); padding: 16px; }
+.leg-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 13px; font-family: var(--font-mono); }
+.leg-row .leg-label { font-family: var(--font-sans); }
+.leg-locked { color: var(--muted-foreground); }
+.leg-locked .lock-icon { margin-right: 4px; }
+.pending-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.pending-actions .secondary-actions { display: flex; gap: 8px; }
+
+/* ---------- Split grid (Flow A — splitting a single transaction) ---------- */
+.split-grid { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; background: var(--card); margin-top: 8px; }
+.split-row { display: grid; grid-template-columns: 90px 90px 1fr 110px; gap: 8px; align-items: center; padding: 4px 0; font-size: 13px; }
+/* Journal-entry modal's own leg rows: Dr/Cr select, account select (gets
+   the room), amount — a different shape from the locked-leg split rows
+   above (those reserve a column for the lock icon/label). */
+.split-row.je-leg { grid-template-columns: 100px 1fr 120px; }
+.split-total { text-align: right; font-size: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
+.split-total.balanced { color: var(--positive); }
+.split-total.unbalanced { color: var(--destructive); }
+
+/* ---------- Bulk action bar (Flow B — grouping multiple transactions) ----------
+   Floats at the bottom of the viewport in the real build; shown inline
+   here as a static reference, same "shown open" convention as the
+   correction trail above. */
+.bulk-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--foreground);
+  color: var(--background);
+  border-radius: 999px;
+  padding: 10px 20px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.bulk-bar .btn { padding: 6px 14px; font-size: 12px; }
+/* .btn-outline assumes a light surface (dark border/text) by default —
+   on the bulk bar's dark fill that would be invisible, so flip it light. */
+.bulk-bar .btn-outline { border-color: var(--background); color: var(--background); }
+
+/* ---------- Near-full-screen journal-entry modal (pass 7, new) ----------
+   Reused for manual "+ New entry", "Correct entry", Split, and Group &
+   Summarize — one component, different pre-fill per entry point
+   (design-system-spec.md § Transactions workflow). A real build renders
+   this as a Dialog over a scrim; shown here as a large static card, same
+   "shown open" convention as .correction-trail / .bulk-bar above. */
+.je-modal-scrim { background: var(--muted); border-radius: var(--radius-xl); padding: 32px; }
+.je-modal { background: var(--card); border-radius: var(--radius-lg); padding: 28px; max-width: 720px; margin: 0 auto; box-shadow: 0 8px 32px oklch(0 0 0 / 16%); }
+.je-modal .je-modal-title { font-size: 18px; font-weight: 600; }
+.je-modal .je-modal-subtitle { font-size: 13px; color: var(--muted-foreground); margin-bottom: 20px; }
+.je-modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+/* ---------- Link health badge (pass 7, Custodial Accounts + Transactions) ---------- */
+.link-health-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  background: var(--secondary);
+  color: var(--secondary-foreground);
+  margin-bottom: 16px;
+}
+/* Text uses --warning-foreground (the dark ink), not --warning itself —
+   the literal --warning fill only clears AA text contrast against --card
+   at 3.20:1, below the 4.5:1 text floor (see tokens.css § warning). */
+.link-health-banner.warning { background: color-mix(in srgb, var(--warning) 14%, var(--card)); color: var(--warning-foreground); }
+
+/* ---------- Button ---------- */
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-4);
+  gap: 8px;
+  padding: 8px 16px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  font-weight: var(--weight-medium);
+  font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background var(--duration-fast) var(--ease-standard);
+  transition: filter 120ms ease;
 }
+
+.btn-default { background: var(--primary); color: var(--primary-foreground); }
+.btn-secondary { background: var(--secondary); color: var(--secondary-foreground); }
+.btn-outline { background: transparent; color: var(--foreground); border-color: var(--border); }
+.btn-destructive { background: var(--destructive); color: var(--destructive-foreground); }
 .btn:hover { filter: brightness(1.05); }
-.btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
-.btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.btn[disabled] { opacity: 0.5; cursor: not-allowed; pointer-events: none; }
 
-/* Input */
-.input {
+/* ---------- Input / Select ---------- */
+.input, .select {
   width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-raised);
-  color: var(--color-text);
+  padding: 8px 12px;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  background: var(--card);
+  color: var(--foreground);
+  font-size: 14px;
+  font-family: var(--font-sans);
 }
-.input:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 1px; }
-.input[aria-invalid="true"] { border-color: var(--color-danger); }
+.input:focus-visible, .select:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.input[aria-invalid="true"] { border-color: var(--destructive); }
 
-/* Card */
-.card {
-  padding: var(--space-6);
-  border: 1px solid var(--color-border);
+/* ---------- Table ---------- */
+table.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+table.data-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
+}
+
+table.data-table td {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+table.data-table tbody tr:hover { background: var(--accent); }
+table.data-table td.amount { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
+table.data-table td.amount.positive { color: var(--positive); }
+table.data-table td.amount.negative { color: var(--destructive); }
+
+/* ---------- Tabs (entity switcher, GL-vs-custodial, nominal-vs-real) ---------- */
+.tabs {
+  display: inline-flex;
+  padding: 4px;
+  background: var(--muted);
+  border-radius: var(--radius-md);
+  gap: 2px;
+}
+
+.tabs .tab {
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+}
+
+.tabs .tab.active { background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px oklch(0 0 0 / 8%); }
+
+/* ---------- Sheet / drawer (transaction detail) ---------- */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: oklch(0 0 0 / 40%);
+}
+
+.sheet {
+  position: fixed;
+  top: 0; right: 0; bottom: 0;
+  width: 420px;
+  max-width: 90vw;
+  background: var(--card);
+  border-left: 1px solid var(--border);
+  border-top-left-radius: var(--radius-xl);
+  border-bottom-left-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: -4px 0 24px oklch(0 0 0 / 12%);
+}
+
+/* ---------- Progress (import batch, safe-harbor paid-vs-required) ---------- */
+.progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--muted);
+  overflow: hidden;
+}
+
+.progress-fill { height: 100%; background: var(--primary); }
+.progress-fill.warning { background: var(--warning); }
+.progress-fill.destructive { background: var(--destructive); }
+
+/* ---------- Net-worth hero (Monarch pattern: eyebrow + big figure + signed
+   delta on the figure itself + area chart with gradient fill) ---------- */
+.networth-hero .eyebrow { margin-bottom: 6px; }
+
+.networth-hero .value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.networth-hero .value {
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 32px;
+  font-variant-numeric: tabular-nums;
+}
+
+.networth-hero .delta {
+  font-size: 14px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.networth-hero .delta.positive { color: var(--positive); }
+.networth-hero .delta.negative { color: var(--destructive); }
+
+.networth-hero .chart-area {
+  margin-top: 16px;
+  height: 160px;
+  border-radius: var(--radius-md);
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--chart-1) 25%, transparent), transparent 80%);
+}
+
+/* ---------- Grouped account list (Monarch pattern) ---------- */
+.account-group + .account-group { margin-top: 8px; }
+
+.account-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-group-header .group-delta { font-weight: 500; font-size: 13px; margin-left: 8px; }
+.account-group-header .group-delta.positive { color: var(--positive); }
+.account-group-header .group-delta.negative { color: var(--destructive); }
+
+.account-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.account-row .logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--secondary);
+}
+
+.account-row .name { font-weight: 500; }
+.account-row .subtype,
+.account-row .freshness { font-size: 12px; color: var(--muted-foreground); }
+.account-row .sparkline { width: 80px; height: 24px; background: var(--muted); border-radius: var(--radius-sm); }
+.account-row .balance { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+
+/* ---------- Segmented bar + legend (Monarch Assets/Liabilities pattern) --- */
+.segmented-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.segmented-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.segmented-legend .row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.segmented-legend .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.segmented-legend .label { flex: 1; color: var(--muted-foreground); }
+.segmented-legend .amount { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ---------- Empty state (feature not yet shipped, not "loading") -------- */
+.empty-state {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  padding: 8px 0;
+}
+
+/* ---------- Public landing page (Home, pass 4 — corrected 2026-09-30:
+   this is the PRE-AUTH marketing page, not a signed-in screen. The hero
+   band is a fixed dark/brand backdrop (same posture as the login visual
+   pane — a deliberate "dark surface" context for --brand at full
+   strength); the feature/footer sections below it are theme-aware like
+   any other page. ---------- */
+.landing-hero {
+  background: #070907;
+  color: #EFF1EF;
+  text-align: center;
+  padding: 96px 48px 80px;
+}
+
+.landing-hero .brand-mark {
+  color: #2CFF05;
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 32px;
+}
+
+.landing-hero h1 {
+  font-size: 40px;
+  font-weight: 700;
+  max-width: 20ch;
+  margin: 0 auto 16px;
+}
+
+.landing-hero .landing-subhead {
+  font-size: 18px;
+  color: #A1AD9F;
+  max-width: 46ch;
+  margin: 0 auto 32px;
+}
+
+.landing-hero .cta-row {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.landing-hero .cta-row .btn-default { background: #2CFF05; color: #070907; }
+.landing-hero .cta-row .btn-outline { border-color: rgba(255,255,255,0.24); color: #EFF1EF; }
+
+.landing-features {
+  padding: 56px 48px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  background: var(--background);
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.landing-feature {
+  padding: 24px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  background: var(--color-surface-raised);
-  box-shadow: var(--shadow-sm);
+  background: var(--card);
+}
+
+.landing-feature .feature-title { font-weight: 600; margin-bottom: 8px; }
+.landing-feature .feature-body { font-size: 13px; color: var(--muted-foreground); }
+
+.landing-footer {
+  padding: 24px 48px;
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  text-align: center;
+  background: var(--background);
+}
+
+/* ---------- Split screen login page (pass 4, corrected 2026-09-30 to the
+   Principal's exact pattern + captured reference,
+   temp/design-refs/split-login-example.png). Form pane is theme-aware
+   (follows the user's stored preference like any other page); the visual
+   pane always carries the brand identity regardless of theme — the one
+   deliberate exception, same posture as the landing hero above. ---------- */
+.auth-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* Pass 5 (Principal review 2): heading/copy/fields centered both
+   vertically AND horizontally as a fixed-max-width column — logo is the
+   one element that stays pinned top-left, via align-self overriding the
+   pane's own centering. */
+.auth-form-pane {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 64px;
+}
+
+.auth-form-pane .auth-logo {
+  align-self: flex-start;
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.auth-form-inner {
+  max-width: 380px;
+  width: 100%;
+  margin: auto 0; /* vertical centering within the pane's remaining flex space */
+  text-align: center;
+}
+
+.auth-form-inner .auth-field,
+.auth-form-inner .auth-oauth-row,
+.auth-form-inner .auth-signup-line,
+.auth-form-inner .auth-legal-footer {
+  text-align: left; /* fields/links stay left-aligned within the centered column — only the heading/copy are centered text */
+}
+
+.auth-form-inner .auth-title { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
+.auth-form-inner .auth-subtitle { color: var(--muted-foreground); margin-bottom: 24px; font-size: 14px; }
+
+.auth-oauth-row { margin-bottom: 20px; }
+.auth-oauth-row .btn-outline { width: 100%; justify-content: center; }
+
+.auth-divider { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; color: var(--muted-foreground); font-size: 12px; }
+.auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+
+.auth-field { margin-bottom: 16px; }
+.auth-field .field-label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+.auth-field label { font-size: 13px; font-weight: 500; }
+.auth-field .forgot-link { font-size: 12px; color: var(--primary); text-decoration: none; }
+.auth-field .input-with-icon { position: relative; }
+.auth-field .input-with-icon .input { padding-right: 40px; }
+.auth-field .reveal-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  cursor: pointer;
+  background: none;
+  border: none;
+}
+
+.auth-submit { width: 100%; justify-content: center; margin-top: 4px; }
+
+.auth-signup-line { text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted-foreground); }
+.auth-signup-line a { color: var(--primary); text-decoration: none; }
+
+.auth-legal-footer {
+  margin-top: 48px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.auth-legal-footer a { color: inherit; text-decoration: underline; }
+
+/* Visual pane — always dark/branded, inset with rounded corners and a
+   margin (matching the captured reference's proportions), not flush to
+   the viewport edge. No photo asset exists yet, so a brand gradient
+   stands in — see design-system-spec.md § New screens for the reasoning. */
+.auth-visual-pane {
+  margin: 24px 24px 24px 0;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: linear-gradient(160deg, #2CFF05 0%, #0D2E07 45%, #070907 85%);
+  display: flex;
+  align-items: flex-end;
+  padding: 40px;
+}
+
+.auth-visual-pane .visual-caption {
+  color: #EFF1EF;
+  font-size: 14px;
+  max-width: 28ch;
+  opacity: 0.85;
+}
+
+@media (max-width: 760px) {
+  .auth-shell { grid-template-columns: 1fr; }
+  .auth-visual-pane { display: none; }
+  .landing-features { grid-template-columns: 1fr; }
+}
+
+/* ---------- Skeleton ---------- */
+.skeleton {
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, oklch(1 0 0 / 30%), transparent);
+  animation: skeleton-sweep 1.6s infinite;
+}
+
+@keyframes skeleton-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
+  * { animation: none !important; transition: none !important; }
+  .skeleton::after { display: none; }
 }

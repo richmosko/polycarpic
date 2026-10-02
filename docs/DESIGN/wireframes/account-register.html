@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Account register</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="wf-app-shell">
+  <aside class="wf-app-sidebar">
+    <div class="wf-sidebar-top">&#9670; Polycarpic</div>
+    <nav class="wf-sidebar-nav">
+      <div class="wf-nav-item">Dashboard</div>
+      <div class="wf-nav-item">Transactions</div>
+      <div class="wf-nav-item">General Ledger (active)</div>
+      <div class="wf-nav-item">Custodial Accounts</div>
+      <div class="wf-nav-item">Allocation</div>
+      <div class="wf-nav-item">Reports</div>
+      <div class="wf-nav-item">Entities</div>
+    </nav>
+    <div class="wf-sidebar-bottom">
+      <div class="wf-sidebar-avatar-trigger"><span class="wf-avatar">M</span><span class="wf-sidebar-user-name">Mosko &#9662;</span></div>
+    </div>
+  </aside>
+  <div class="wf-main">
+    <p class="wf-note" style="margin:16px;">Pass 7, app shell updated pass 8 (2026-10-02) — new. Opened by clicking an account in the <a href="general-ledger.html">General Ledger tree</a>. Account-scoped and running-balance-shaped — every line that hit this one account, in date order — distinct from Transactions, which is entry-scoped and time-ordered across every account (design-system-spec.md § Sidebar information architecture). The breadcrumb (header, pass 8) is this screen's canonical "page title > breadcrumbs" example — a multi-crumb path, unlike every other screen's single crumb.</p>
+    <div class="wf-app-topbar">
+      <div class="wf-topbar-left">
+        <span class="wf-icon-btn">&#9776;</span>
+        <span class="wf-breadcrumbs"><a class="wf-crumb" href="general-ledger.html">General Ledger</a> &gt; Primary Checking <span class="wf-custodial-marker">custodial: Bank Y</span></span>
+      </div>
+      <div class="wf-topbar-right">
+        <span style="display:flex; align-items:center; gap:8px; margin-right:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+        <span class="wf-icon-btn disabled" title="AI/Agent — greyed in v1">&#10024;</span>
+        <span class="wf-icon-btn" title="Search">&#128269;</span>
+        <span class="wf-icon-btn" title="Notifications">&#128276;</span>
+        <span class="wf-icon-btn" title="Settings">&#9881;</span>
+      </div>
+    </div>
+    <div class="wf-app-content">
+
+    <div class="wf-box">
+      <div class="wf-row" style="font-weight:600; border-bottom:2px solid #999;">
+        <span>Date — Description</span>
+        <span>Debit — Credit — Running balance</span>
+      </div>
+      <div class="wf-row"><span>Sep 12 · Client Payment <span class="wf-chip">posted</span></span><span>+$2,400.00 — — $17,634.75</span></div>
+      <div class="wf-row"><span>Sep 10 · Streaming Svc <span class="wf-chip">posted</span></span><span>— −$12.99 — $15,234.75</span></div>
+      <div class="wf-row"><span>Sep 9 · Office Supply Co. <span class="wf-chip">corrected</span></span><span>— −$68.50 — $15,247.74</span></div>
+      <div class="wf-row"><span>Sep 9 · Property Mgmt Co. — posted by rule <span class="wf-chip">posted</span></span><span>— −$2,200.00 — $15,316.24</span></div>
+      <div class="wf-row"><span>Sep 1 · Opening balance</span><span>+$17,516.24 — — $17,516.24</span></div>
+    </div>
+
+    <p class="wf-note">Each row links to its full journal entry (header + every leg, not just the leg hitting this account) — same "every number earns trust" principle as the Dashboard. Running balance reads top-to-bottom most-recent-first, consistent with Transactions' own ordering.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

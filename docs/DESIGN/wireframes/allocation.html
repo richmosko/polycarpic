@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Allocation</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="wf-app-shell">
+  <aside class="wf-app-sidebar">
+    <div class="wf-sidebar-top">&#9670; Polycarpic</div>
+    <nav class="wf-sidebar-nav">
+      <div class="wf-nav-item">Dashboard</div>
+      <div class="wf-nav-item">Transactions</div>
+      <div class="wf-nav-item">General Ledger</div>
+      <div class="wf-nav-item">Custodial Accounts</div>
+      <div class="wf-nav-item">Allocation (active)</div>
+      <div class="wf-nav-item">Reports</div>
+      <div class="wf-nav-item">Entities</div>
+    </nav>
+    <div class="wf-sidebar-bottom">
+      <div class="wf-sidebar-avatar-trigger"><span class="wf-avatar">M</span><span class="wf-sidebar-user-name">Mosko &#9662;</span></div>
+    </div>
+  </aside>
+  <div class="wf-main">
+    <p class="wf-note" style="margin:16px;">Pass 7, app shell updated pass 8 (2026-10-02) — new, promoted out of the old "Securities" screen per the Principal: "For the Allocation vs target to be a dedicated page." Book-vs-market itself now lives on Custodial Accounts' lots sub-card, not here — this page is actual-vs-target only. Header/sidebar reworked per review 5 (see wireframes/dashboard.html for the full note).</p>
+    <div class="wf-app-topbar">
+      <div class="wf-topbar-left">
+        <span class="wf-icon-btn">&#9776;</span>
+        <span class="wf-breadcrumbs">Allocation</span>
+      </div>
+      <div class="wf-topbar-right">
+        <span style="display:flex; align-items:center; gap:8px; margin-right:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+        <span class="wf-icon-btn disabled" title="AI/Agent — greyed in v1">&#10024;</span>
+        <span class="wf-icon-btn" title="Search">&#128269;</span>
+        <span class="wf-icon-btn" title="Notifications">&#128276;</span>
+        <span class="wf-icon-btn" title="Settings">&#9881;</span>
+      </div>
+    </div>
+    <div class="wf-app-content">
+    <span class="wf-chip">Nominal | Inflation-adjusted (CPI-U)</span>
+
+    <div class="wf-box" style="margin-top:16px;">
+      <span class="wf-box-label">Actual vs. target, by asset class</span>
+      <div style="height:140px; border:1px dashed #ccc; display:flex; align-items:center; justify-content:center; color:#999;">[segmented bar per asset class — actual vs. target, colored-dot legend]</div>
+      <div class="wf-row"><span>US Equity — actual 42% / target 40%</span><span class="wf-chip">+2pt over</span></div>
+      <div class="wf-row"><span>Intl Equity — actual 18% / target 20%</span><span class="wf-chip">−2pt under</span></div>
+      <div class="wf-row"><span>Fixed Income — actual 25% / target 25%</span><span class="wf-chip">on target</span></div>
+      <div class="wf-row"><span>Cash — actual 15% / target 15%</span><span class="wf-chip">on target</span></div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Edit target allocation</span>
+      <div class="wf-row"><span>US Equity</span><span>[40%]</span></div>
+      <div class="wf-row"><span>Intl Equity</span><span>[20%]</span></div>
+      <div class="wf-row"><span>Fixed Income</span><span>[25%]</span></div>
+      <div class="wf-row"><span>Cash</span><span>[15%]</span></div>
+      <div style="text-align:right; margin-top:8px;">Total must equal 100% — [Save target]</div>
+    </div>
+
+    <p class="wf-note">Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for this entity. The nominal/inflation-adjusted toggle (CPI-U, PRD §4.9) is orthogonal to actual-vs-target and applies to any time-series view on this page.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

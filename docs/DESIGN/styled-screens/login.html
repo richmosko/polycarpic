@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Login (split screen login page)</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<!-- Split screen login page — the Principal's named pattern. Form-pane
+     content list is exact per direction: logo, "Welcome back" + subtext,
+     OAuth button, divider, email, password (+ forgot-password + reveal),
+     primary button, sign-up line, legal footer. References:
+     useorigin.com/authentication/login (no capture, splash loader) and
+     temp/design-refs/split-login-example.png (captured). Form pane is
+     theme-aware (this is the light-mode render); visual pane always
+     carries the brand identity regardless of theme. -->
+<div class="auth-shell">
+  <div class="auth-form-pane">
+    <div class="auth-logo">polycarpic</div>
+    <div class="auth-form-inner">
+      <div class="auth-title">Welcome back</div>
+      <p class="auth-subtitle">Sign in to your account</p>
+
+      <div class="auth-oauth-row">
+        <button class="btn btn-outline">Continue with Google</button>
+      </div>
+      <div class="auth-divider">or</div>
+
+      <div class="auth-field">
+        <label>Email</label>
+        <input class="input" type="email" placeholder="you@example.com">
+      </div>
+      <div class="auth-field">
+        <div class="field-label-row">
+          <label>Password</label>
+          <a class="forgot-link" href="#">Forgot password?</a>
+        </div>
+        <div class="input-with-icon">
+          <input class="input" type="password" value="••••••••••••">
+          <button class="reveal-icon" aria-label="Show password">👁</button>
+        </div>
+      </div>
+
+      <button class="btn btn-default auth-submit">Sign in</button>
+
+      <p class="auth-signup-line">Don't have an account? <a href="#">Sign up</a></p>
+
+      <p class="auth-legal-footer">By signing in you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
+    </div>
+  </div>
+
+  <div class="auth-visual-pane">
+    <div class="visual-caption">One ledger. Every entity. Self-hosted.</div>
+  </div>
+</div>
+</body>
+</html>

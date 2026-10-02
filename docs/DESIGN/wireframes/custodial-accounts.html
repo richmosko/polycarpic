@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Custodial Accounts</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="wf-app-shell">
+  <aside class="wf-app-sidebar">
+    <div class="wf-sidebar-top">&#9670; Polycarpic</div>
+    <nav class="wf-sidebar-nav">
+      <div class="wf-nav-item">Dashboard</div>
+      <div class="wf-nav-item">Transactions</div>
+      <div class="wf-nav-item">General Ledger</div>
+      <div class="wf-nav-item">Custodial Accounts (active)</div>
+      <div class="wf-nav-item">Allocation</div>
+      <div class="wf-nav-item">Reports</div>
+      <div class="wf-nav-item">Entities</div>
+    </nav>
+    <div class="wf-sidebar-bottom">
+      <div class="wf-sidebar-avatar-trigger"><span class="wf-avatar">M</span><span class="wf-sidebar-user-name">Mosko &#9662;</span></div>
+    </div>
+  </aside>
+  <div class="wf-main">
+    <p class="wf-note" style="margin:16px;">Pass 7, app shell updated pass 8 (2026-10-02) — rebuilt from the custodial half of the old "Accounts" screen's GL-vs-custodial toggle, absorbing "Securities" (lots become a sub-card) and "Import" (provider setup becomes the [+ New] modal here). Principal, verbatim: "Sub-card in the Custodial view... pull downs of each security to show lots... book vs market should be implicit in the custodial view, shown as whether the lots show the short/long/total current gains/losses." Header/sidebar reworked per review 5 (see wireframes/dashboard.html for the full note).</p>
+    <div class="wf-app-topbar">
+      <div class="wf-topbar-left">
+        <span class="wf-icon-btn">&#9776;</span>
+        <span class="wf-breadcrumbs">Custodial Accounts</span>
+      </div>
+      <div class="wf-topbar-right">
+        <span style="display:flex; align-items:center; gap:8px; margin-right:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+        <span class="wf-icon-btn disabled" title="AI/Agent — greyed in v1">&#10024;</span>
+        <span class="wf-icon-btn" title="Search">&#128269;</span>
+        <span class="wf-icon-btn" title="Notifications">&#128276;</span>
+        <span class="wf-icon-btn" title="Settings">&#9881;</span>
+      </div>
+    </div>
+    <div class="wf-app-content">
+    <div class="wf-row" style="border:none; align-items:flex-start;">
+      <span></span>
+      <span>[Sync] [+ New]</span>
+    </div>
+
+    <!-- ============ Custodial account card — bank, no lots ============ -->
+    <div class="wf-custodial-card">
+      <div class="wf-custodial-header">
+        <span><strong>Primary Checking</strong> <span class="wf-institution">Bank Y</span></span>
+        <span>$15,234.75 &nbsp; <span class="wf-link-health ok">synced 14 min ago</span></span>
+      </div>
+      <div class="wf-accordion-body" style="padding:12px;">
+        <div class="wf-row"><span>Reconciliation vs. GL</span><span class="wf-chip">clean — match</span></div>
+      </div>
+    </div>
+
+    <!-- ============ Custodial account card — needs re-auth ============ -->
+    <div class="wf-custodial-card">
+      <div class="wf-custodial-header">
+        <span><strong>Crypto Wallet</strong> <span class="wf-institution">Coinbase</span></span>
+        <span>$8,420.10 &nbsp; <span class="wf-link-health warning">token expired — re-auth needed</span></span>
+      </div>
+      <div class="wf-accordion-body" style="padding:12px;">
+        <div class="wf-row"><span>Reconciliation vs. GL</span><span class="wf-chip">stale — last synced 6 days ago</span></div>
+      </div>
+    </div>
+
+    <!-- ============ Custodial account card — brokerage with lots sub-card ============ -->
+    <div class="wf-custodial-card">
+      <div class="wf-custodial-header">
+        <span><strong>Brokerage</strong> <span class="wf-institution">Custodian X</span></span>
+        <span>$204,110.00 &nbsp; <span class="wf-link-health ok">synced 14 min ago</span></span>
+      </div>
+      <div class="wf-accordion-body" style="padding:12px;">
+        <div class="wf-row"><span>Reconciliation vs. GL</span><span class="wf-chip">clean — match</span></div>
+
+        <div class="wf-lots-subcard">
+          <div class="wf-box-label">Lots — pull down a security to see its lots</div>
+
+          <div class="wf-lots-security-row">
+            <span>▾ AAPL — 75 sh total</span>
+            <span>book $9,100 / mkt $13,350 <span class="wf-gain-positive">+$4,250</span></span>
+          </div>
+          <div class="wf-lots-detail">50 sh, acquired [date] — long-term — book $6,200 / mkt $8,900 <span class="wf-gain-positive">+$2,700</span></div>
+          <div class="wf-lots-detail">25 sh, acquired [date] — short-term — book $2,900 / mkt $4,450 <span class="wf-gain-positive">+$1,550</span></div>
+
+          <div class="wf-lots-security-row">
+            <span>▸ VTI — 100 sh total</span>
+            <span>book $22,000 / mkt $24,100 <span class="wf-gain-positive">+$2,100</span></span>
+          </div>
+
+          <div class="wf-row" style="border-top:1.5px solid #999; font-weight:600;">
+            <span>Account total, short/long/total</span>
+            <span>short +$1,550 · long +$2,700 · <span class="wf-gain-positive">total +$6,350 unrealized</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ [+ New] provider-item modal ============ -->
+    <div class="wf-modal-overlay">
+      <div class="wf-modal-title">Add a custodial account</div>
+      <div class="wf-modal-subtitle">Source type, then discovered accounts, then map each one to a custodial account.</div>
+      <div class="wf-source-type-row">
+        <span class="selected">Aggregator (Plaid)</span>
+        <span>Manual account</span>
+        <span>Import file (CSV/OFX)</span>
+      </div>
+      <div class="wf-box-label">Discovered accounts (aggregator connected)</div>
+      <div class="wf-mapping-row"><span>Bank Y — •••1234 (checking)</span><span>Map to: [Primary Checking ▾]</span></div>
+      <div class="wf-mapping-row"><span>Bank Y — •••5678 (savings)</span><span>Map to: [+ Create new ▾]</span></div>
+      <div class="wf-mapping-row" style="margin-top:10px; border-top:1px dashed #ccc; padding-top:10px;"><span>Token refresh</span><span>[Refresh token]</span></div>
+      <div class="wf-mapping-row"><span>Unlink this provider item</span><span>[Unlink] — access may persist up to 24h after unlinking (Vercel target)</span></div>
+      <div class="wf-expand-actions">
+        <span>[Cancel]</span>
+        <span>[Save mapping]</span>
+      </div>
+    </div>
+
+    <p class="wf-note">Sync on this screen pulls balances AND positions (lots), not just transactions. Link-health (expired token / lost access / stale) shows as a badge here and as a banner on Transactions. Viewers see no [Sync] / [+ New] / token-refresh / unlink actions.</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

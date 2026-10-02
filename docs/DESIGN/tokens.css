@@ -1,158 +1,239 @@
 /*
- * tokens.css — Design tokens for the project dashboard.
+ * tokens.css — Design tokens for the polycarpic app (SvelteKit + shadcn-svelte,
+ * PRD §8 "Technical Considerations").
  *
- * The machine-readable reference copy of the design system's primitives.
- * The color/border/ring/chart/sidebar tokens below are shipped verbatim
- * (byte-identical) into the real consumer — scripts/cairn/dashboard/
- * src/app.css's `:root`/`.dark` blocks. The radius scale and font stacks
- * are value-identical to app.css but not block-identical: this file keeps
- * them flat inside `:root` for a single-file reference copy, while app.css
- * wires the same values through a separate `@theme inline` block per
- * shadcn-svelte's standard Tailwind v4 convention (verified against the
- * live scaffold's generated output 2026-08-26, after an earlier revision
- * of this file carried a subtractive radius formula that had only ever
- * been derived on paper, never checked against what the CLI actually
- * generates — see design-system-spec.md's Radius scale section for the
- * same correction). This file is the doc-side reference copy (PT-54 AC),
- * not itself built — `index.html` links it to live-preview the swatches.
+ * This is the product's own token source — frontend-lead consumes it verbatim
+ * into apps/web's `app.css` (`:root`/`.dark`, shadcn-svelte's standard
+ * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
+ * the swatches.
  *
- * PALETTE = shadcn-svelte "create" preset b6XadDxmQS — Style "Mira", Base
- * "Stone" (warm neutrals), Theme "Sky" (blue primary), Chart "Yellow",
- * Heading face Space Grotesk, Body face Merriweather, Icon library Lucide,
- * radius 0.625rem. Values pulled verbatim from the live preset
- * (https://www.shadcn-svelte.com/create/preview?preset=b6XadDxmQS),
- * extracted 2026-08-26 — full detail and usage rules in
- * docs/DESIGN/design-system-spec.md, which this file's values must match
- * exactly (re-extract and diff both if the preset ever changes upstream).
+ * SIXTH PASS (2026-10-01) — Principal review pass 4
+ * (temp/2026-10-01-design-review-4.md): --warning moves from a darkened
+ * brown-reading amber (H=26°) to a genuinely orange hue the Principal could
+ * recognize as orange, paired with a dark ink instead of white (orange
+ * cannot clear 4.5:1 with white text without going dark enough to read
+ * brown — same problem destructive/positive solved by darkening, orange
+ * can't); the light-mode chart ramp brightens across all 5 steps (the old
+ * tail, L down to 0.061, read as "almost black" — compressed to L 0.18-0.34,
+ * still clearing the 3:1 non-text floor against --card). See
+ * design-system-spec.md § Foundations and § Financial semantics for the
+ * full derivation and every contrast figure.
  *
- * Direction pivot (2026-08-26): supersedes the retired Atlassian-modeled
- * palette (preset b1FR0Us0w) this file previously carried. That legacy
- * palette lived on in scripts/cairn/board/board.css only until PT-57
- * (2026-08-27) migrated it too — board.css now consumes its own third
- * copy of these values (scripts/cairn/board/tokens.css, colors+radius
- * only; no font vars — see that file's own header for why a third copy
- * is unavoidable there and how drift across all three is caught). No
- * project-specific semantic aliases are added here: the pivot is
- * preset-pure by design (no invented hues) — see design-system-spec.md
- * § Project extensions for how the record-status/badge vocabulary is
- * expressed entirely as shadcn badge variants against these tokens.
+ * FIFTH PASS (2026-09-30) — Principal review pass 3
+ * (temp/2026-09-30-design-review-3.md): a secondary brand hue, sky blue
+ * #05A9FF, is added alongside the neon-green --brand from pass 4 (same
+ * "literal on dark surfaces, darkened-same-hue on light surfaces" pattern,
+ * see --brand-2 below); the neutral scale (--background/--muted/--border)
+ * re-tints from the green hue to this new blue hue, at a lower chroma than
+ * pass 4's green tint ("much lighter"); the inverted sidebar, read by the
+ * Principal as green-biased, moves to the same blue tint instead. See
+ * design-system-spec.md § Foundations for the full derivation and every
+ * contrast figure.
+ *
+ * Earlier passes' header comments (pass 4: neon green, warm/brown neutral
+ * replacement; pass 3: Monarch/Origin measured references) are not
+ * reproduced here — see design-system-spec.md's revision history for the
+ * full chain. This header documents only what pass 5 changed.
+ *
+ * Plain sRGB hex, not OKLCH — this system doesn't vendor a shadcn preset
+ * and doesn't need OKLCH's multi-preset precision.
+ *
+ * CI note (POLY-78): scripts/cairn/tests/test_board_tokens_parity.py
+ * asserted this file shares values with cairn's board tokens; POLY-78
+ * removed that assertion. If it somehow reappears, do not re-add cairn's
+ * values to satisfy it.
  *
  * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
  */
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.147 0.004 49.25);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.147 0.004 49.25);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.147 0.004 49.25);
-  --primary: oklch(0.5 0.134 242.749);
-  --primary-foreground: oklch(0.977 0.013 236.62);
-  --secondary: oklch(0.967 0.001 286.375);
-  --secondary-foreground: oklch(0.21 0.006 285.885);
-  --muted: oklch(0.97 0.001 106.424);
-  /* PT-69 (Mosko's ruling, 2026-08-29, "darken the ink"; re-derived under
-     the "two-model rule"): darkened from the preset's own oklch(0.553
-     0.013 58.071), which fails WCAG AA against --muted above (4.39:1 <
-     4.5:1 floor) -- clears the floor under BOTH the quantized-hex and
-     float contrast models (4.58:1 / 4.56:1). See app.css's own copy of
-     this comment and scripts/cairn/board/theme/gen_variants.py's
-     derive_muted_foreground() for the full rationale/method. */
-  --muted-foreground: oklch(0.5450 0.013 58.071);
-  --accent: oklch(0.97 0.001 106.424);
-  --accent-foreground: oklch(0.216 0.006 56.043);
-  --destructive: oklch(0.577 0.245 27.325);
-  /* PT-69 (ux-designer's ruling, 2026-08-29, on architect's f26dbad): see
-     app.css's own copy of this comment for the full rationale --
-     lightened (the direction-correct fix here) to pure white, the only
-     value with real headroom (4.35:1 -> 4.76:1); costs the preset's
-     slight warm-pink tint. See .dark's own copy for the opposite-
-     direction dark-mode fix. */
-  --destructive-foreground: oklch(1 0 0);
-  --border: oklch(0.923 0.003 48.717);
-  --input: oklch(0.923 0.003 48.717);
-  --ring: oklch(0.709 0.01 56.259);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0.001 106.423);
-  --sidebar-foreground: oklch(0.147 0.004 49.25);
-  --sidebar-primary: oklch(0.588 0.158 241.966);
-  --sidebar-primary-foreground: oklch(0.977 0.013 236.62);
-  --sidebar-accent: oklch(0.97 0.001 106.424);
-  --sidebar-accent-foreground: oklch(0.216 0.006 56.043);
-  --sidebar-border: oklch(0.923 0.003 48.717);
-  --sidebar-ring: oklch(0.709 0.01 56.259);
+  /* Surfaces & text — pass 5: re-tinted from the green brand hue (110.6°)
+     to the new secondary blue hue (200.6°, from --brand-2 below), at a
+     lower chroma than pass 4's green tint ("much lighter" per direction).
+     Cards stay near-pure white (a tinted white would fight genuinely-
+     white content like receipts/exports); the canvas (--muted) and
+     hairlines (--border) carry the visible tint. */
+  --background: #FEFEFE;
+  --foreground: #1D1F20; /* near-black, barely blue, flatter than pass 4's green-cast ink */
+  --card: #FFFFFF;
+  --card-foreground: #1D1F20;
+  --popover: #FFFFFF;
+  --popover-foreground: #1D1F20;
 
-  /* Radius scale — matches the live shadcn-svelte scaffold's generated
-     @theme inline block exactly (scripts/cairn/dashboard/src/app.css),
-     verified 2026-08-26 against the actual `shadcn-svelte init --preset
-     b6XadDxmQS` output -- multiplicative, not the subtractive formula an
-     earlier revision of this file (and of design-system-spec.md)
-     documented from derivation alone, never re-verified live. Same
-     computed px values at --radius: 0.625rem (6/8/10/14), but the two
-     formulas diverge the moment --radius is customized -- the scaffold
-     is ground truth. */
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+  /* Primary — unchanged from pass 4: a darkened neon green (hue 110.6°,
+     same hue as --brand, L 0.26 vs the brand's L 0.51) — see --brand
+     below for why the raw brand hex can't be primary on a light surface. */
+  --primary: #158500;
+  --primary-foreground: #FFFFFF;
 
-  /* Typography — face is by ROLE, not size (see design-system-spec.md
-     § Typography). --font-sans carries the base/default UI despite the
-     name; --font-heading is headings/titles only. */
-  --font-sans: 'Merriweather Variable', Georgia, 'Times New Roman', serif;
-  --font-heading: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'Geist Mono Variable', ui-monospace, SFMono-Regular, Menlo, monospace;
+  /* Secondary/accent — pass 5: moved from pass 4's pale GREEN tint to the
+     new secondary BLUE hue (200.6°), giving the blue brand a real surface
+     job (secondary buttons, info-weight badges, selected/non-primary
+     states) distinct from primary's green "main action" role — see
+     design-system-spec.md § Secondary accent for the full job
+     definition. One derived ink (#096FA5) serves both the fill-with-text
+     role (4.72:1 on --secondary) and the plain-text-on-card role (5.48:1). */
+  --secondary: #E3F0F7;
+  --secondary-foreground: #096FA5;
+  --muted: #F7F8F8; /* the "faint hint of the secondary color... much lighter" canvas tint */
+  --muted-foreground: #60686C;
+  --accent: #EBF4F9;
+  --accent-foreground: #096FA5;
+
+  /* --brand: the literal, undarkened neon green — logo references, chart
+     accent call-outs, decorative highlights, anywhere a dark surface sits
+     underneath. Do not use for text or a light-surface fill; use
+     --primary for that.
+     --brand-2 (pass 5, new): the literal, undarkened secondary sky blue
+     (#05A9FF, the Principal's own choice) — same rule: dark-surface/
+     decorative use only (2.56:1 against this light --background — far
+     below AA, same posture as --brand). Used for: the sidebar focus ring
+     (reads against the sidebar's own dark-in-light-mode surface), and as
+     the series-2 color in two-series comparison charts (nominal vs.
+     inflation-adjusted, actual vs. target) paired against the green
+     --chart-3 as series 1, on dark surfaces — on light surfaces, that
+     same chart-series-2 job uses the derived --secondary-foreground
+     ink (#096FA5) instead, the same "literal-on-dark, derived-on-light"
+     split every brand hue in this system follows. */
+  --brand: #2CFF05;
+  --brand-2: #05A9FF;
+
+  /* Destructive — unchanged from pass 3/4. */
+  --destructive: #E70404;
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E7E8E9;
+  --input: #E7E8E9;
+  --ring: #158500;
+
+  /* Chart ramp — pass 6: brightened. Same hue/saturation (110.6°, S≈0.90)
+     as every pass, but the lightness band compresses from pass 4/5's
+     L 0.300→0.061 (the tail read as "almost rendered as black" — the
+     Principal, pass 4) to L 0.34→0.18: the brightest step (chart-1) is
+     now brighter than the old chart-1 (3.26:1 vs white, was 4.11:1) and
+     the darkest (chart-5) is far lighter than the old near-black tail
+     (8.78:1 vs white, was 17.73:1) — still clears the 3:1 non-text floor
+     at every step, see Accessibility. See --brand-2 above for the
+     separate series-2 blue accent used alongside this ramp in two-series
+     comparison charts. */
+  --chart-1: #21A509;
+  --chart-2: #1D9108;
+  --chart-3: #197E07;
+  --chart-4: #156B06;
+  --chart-5: #125705;
+
+  /* Sidebar — pass 5: re-tinted blue (was green in pass 4 — the Principal
+     read the green cast as a bias, not a deliberate choice, and asked
+     for flat or blue-biased; blue was chosen to stay consistent with the
+     rest of the re-tinted neutral scale above rather than introducing a
+     third, truly-neutral grey). Still inverted (dark-on-light / light-
+     on-dark) and still a rounded, collapsible card — see
+     design-system-spec.md § Sidebar, unchanged from pass 4. Focus ring
+     also moved to --brand-2 (was the green --brand) to fully remove the
+     green cast from this component. */
+  --sidebar: #1F2528;
+  --sidebar-foreground: #F2F2F3;
+  --sidebar-accent: #303B40;
+  --sidebar-accent-foreground: #F2F2F3;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #05A9FF;
+
+  /* Financial semantics — --positive unchanged from pass 3/4, re-verified
+     against the new (barely different) near-white surfaces.
+     --warning — pass 6: was #B45309 (H=26°, L=0.371 — reads brown, not
+     orange, to the Principal). A true vivid orange (H=25.7°, matching
+     Monarch's own measured orange hue of 22° — see Inspiration) can't
+     clear 4.5:1 with WHITE text without darkening past the point it still
+     reads as orange (destructive/positive solved this by darkening; orange
+     can't take that route and keep its hue legible). Paired with a dark
+     orange-black ink instead — one literal value doing both jobs: 5.54:1
+     for fill-with-text, 3.20:1 against --card for border/icon use
+     (used for: aged Cash-in-Transit exceptions, a stale provider link,
+     or a safe-harbor due date >14 days out — see Financial semantics §
+     Status tiers). */
+  --positive: #15803D;
+  --positive-foreground: #FFFFFF;
+  --warning: #EA6A0A;
+  --warning-foreground: #2A1200;
+
+  /* Radius — unchanged from pass 3/4. */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+
+  /* Typography — unchanged from pass 3/4. */
+  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .dark {
-  --background: oklch(0.147 0.004 49.25);
-  --foreground: oklch(0.985 0.001 106.423);
-  --card: oklch(0.216 0.006 56.043);
-  --card-foreground: oklch(0.985 0.001 106.423);
-  --popover: oklch(0.216 0.006 56.043);
-  --popover-foreground: oklch(0.985 0.001 106.423);
-  --primary: oklch(0.443 0.11 240.79);
-  --primary-foreground: oklch(0.977 0.013 236.62);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.268 0.007 34.298);
-  --muted-foreground: oklch(0.709 0.01 56.259);
-  --accent: oklch(0.268 0.007 34.298);
-  --accent-foreground: oklch(0.985 0.001 106.423);
-  --destructive: oklch(0.704 0.191 22.216);
-  /* PT-69 (architect's ruling, 2026-08-29, f26dbad): SPLIT from :root's
-     value above -- see app.css's own copy of this comment for the full
-     rationale (one shared ink can't clear both modes; dark's fill is
-     unusually lighter than light's own). Minimum darkening that clears
-     unusually lighter than light's own). Re-derived under the "two-model
-     rule" -- a bare-minimum single-model search first landed on
-     L=0.3145 (4.53:1 quantized, but only 4.4955:1 float, below floor);
-     L=0.31 clears both (4.60:1 quantized / 4.57:1 float). Also fixes
-     .engine-stale-banner (board.css), which pairs the same two tokens. */
-  --destructive-foreground: oklch(0.31 0.01 17.0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.553 0.013 58.071);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
-  --sidebar: oklch(0.216 0.006 56.043);
-  --sidebar-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-primary: oklch(0.685 0.169 237.323);
-  --sidebar-primary-foreground: oklch(0.293 0.066 243.157);
-  --sidebar-accent: oklch(0.268 0.007 34.298);
-  --sidebar-accent-foreground: oklch(0.985 0.001 106.423);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.553 0.013 58.071);
+  /* Same blue-hue tint applied to a near-black base (pass 5 — was the
+     green-tinted #070907/#0D100C of pass 4). */
+  --background: #070808;
+  --foreground: #F2F2F3;
+  --card: #0D0E0F;
+  --card-foreground: #F2F2F3;
+  --popover: #0D0E0F;
+  --popover-foreground: #F2F2F3;
+
+  /* Dark-mode --primary IS the raw brand green (unchanged from pass 4) —
+     it clears AA beautifully here where light mode's white base
+     couldn't use it at all. */
+  --primary: #2CFF05;
+  --primary-foreground: #070808;
+
+  /* Secondary/accent — pass 5, new blue (was pale green in pass 4). */
+  --secondary: #173C4F;
+  --secondary-foreground: #68C3F3;
+  --muted: #0F1112;
+  --muted-foreground: #A0A7AB;
+  --accent: #194257;
+  --accent-foreground: #68C3F3;
+
+  --brand: #2CFF05; /* same literal value both modes — a fixed brand reference, not themed */
+  --brand-2: #05A9FF; /* same literal value both modes */
+
+  --destructive: #FC4F4F;
+  --destructive-foreground: #2A0507;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #2CFF05;
+
+  /* Unchanged from pass 4 — brand green ramp, re-lightened for dark mode.
+     Already bright (8.87:1 → 16.32:1 against --card) — pass 6's "almost
+     black tail" complaint was a light-mode-only problem, see :root above. */
+  --chart-1: #C1FBB6;
+  --chart-2: #8BF877;
+  --chart-3: #5AF53D;
+  --chart-4: #31F20D;
+  --chart-5: #29CB0B;
+
+  /* Sidebar — pass 5: still inverted the other way in dark mode (a LIGHT
+     card floating on the dark page, reusing the light mode canvas tone
+     directly) — now that canvas tone is blue-tinted too, so this stays
+     visually consistent automatically. Ring uses the light-mode derived
+     blue ink (#0078B8, NOT the raw --brand-2) since the raw brand blue
+     reads too close to this light sidebar's own near-white surface to
+     register as a distinct focus indicator. */
+  --sidebar: #F7F8F8;
+  --sidebar-foreground: #1D1F20;
+  --sidebar-accent: #E3F0F7;
+  --sidebar-accent-foreground: #096FA5;
+  --sidebar-border: #E7E8E9;
+  --sidebar-ring: #0078B8;
+
+  --positive: #52E0A4;
+  --positive-foreground: #052E13;
+  /* --warning — pass 6: was #F3CA59, H=44° — a mustard/gold, not orange
+     (the dark-mode symptom of the same light-mode problem: a warm hue
+     pulled toward yellow to stay bright and legible). Same hue as the
+     light-mode fix (H≈23–26°), lightened for a dark surface; pairs with
+     the same dark orange-black ink as light mode (not a white/dark flip
+     like --destructive — orange never pairs with white text AA-safely at
+     a saturation that still reads as orange, in either mode). */
+  --warning: #FF9452;
+  --warning-foreground: #2A1200;
 }

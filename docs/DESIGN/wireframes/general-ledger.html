@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — General Ledger (chart-of-accounts tree)</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<div class="wf-app-shell">
+  <aside class="wf-app-sidebar">
+    <div class="wf-sidebar-top">&#9670; Polycarpic</div>
+    <nav class="wf-sidebar-nav">
+      <div class="wf-nav-item">Dashboard</div>
+      <div class="wf-nav-item">Transactions</div>
+      <div class="wf-nav-item">General Ledger (active)</div>
+      <div class="wf-nav-item">Custodial Accounts</div>
+      <div class="wf-nav-item">Allocation</div>
+      <div class="wf-nav-item">Reports</div>
+      <div class="wf-nav-item">Entities</div>
+    </nav>
+    <div class="wf-sidebar-bottom">
+      <div class="wf-sidebar-avatar-trigger"><span class="wf-avatar">M</span><span class="wf-sidebar-user-name">Mosko &#9662;</span></div>
+    </div>
+  </aside>
+  <div class="wf-main">
+    <p class="wf-note" style="margin:16px;">Pass 7, app shell updated pass 8 (2026-10-02) — new. Replaces half of the old "Accounts" screen's GL-vs-custodial toggle with its own nav item. Opens to a chart-of-accounts tree (category → account → sub-account, with balances); clicking any account opens its register as its own page — see <a href="account-register.html">account-register.html</a>. Header/sidebar reworked per review 5 (see wireframes/dashboard.html for the full note).</p>
+    <div class="wf-app-topbar">
+      <div class="wf-topbar-left">
+        <span class="wf-icon-btn">&#9776;</span>
+        <span class="wf-breadcrumbs">General Ledger</span>
+      </div>
+      <div class="wf-topbar-right">
+        <span style="display:flex; align-items:center; gap:8px; margin-right:8px;">[Entity name] <span class="wf-avatar-cluster"><span class="wf-avatar">M</span></span></span>
+        <span class="wf-icon-btn disabled" title="AI/Agent — greyed in v1">&#10024;</span>
+        <span class="wf-icon-btn" title="Search">&#128269;</span>
+        <span class="wf-icon-btn" title="Notifications">&#128276;</span>
+        <span class="wf-icon-btn" title="Settings">&#9881;</span>
+      </div>
+    </div>
+    <div class="wf-app-content">
+
+    <div class="wf-box">
+      <div class="wf-tree-row depth-0"><span>Assets</span><span>$412,884.21</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Cash</a></span><span>$65,342.30</span></div>
+      <div class="wf-tree-row depth-2"><span><a href="account-register.html">Primary Checking <span class="wf-custodial-marker">custodial: Bank Y</span></a></span><span>$15,234.75</span></div>
+      <div class="wf-tree-row depth-2"><span><a href="account-register.html">Savings <span class="wf-custodial-marker">custodial: Bank Y</span></a></span><span>$50,107.55</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Investments</a></span><span>$204,110.00</span></div>
+      <div class="wf-tree-row depth-2"><span><a href="account-register.html">Brokerage <span class="wf-custodial-marker">custodial: Custodian X</span></a></span><span>$204,110.00</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Prepaid Tax — Federal <span class="wf-custodial-marker">custodial: IRS escrow</span></a></span><span>$3,100.00</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Real Estate</a></span><span>$130,000.00</span></div>
+
+      <div class="wf-tree-row depth-0"><span>Liabilities</span><span>$1,204.00</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Credit Cards</a></span><span>$1,204.00</span></div>
+      <div class="wf-tree-row depth-2"><span><a href="account-register.html">Visa — Bank Y <span class="wf-custodial-marker">custodial: Bank Y</span></a></span><span>$1,204.00</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Cash in Transit (clearing)</a></span><span>$500.00</span></div>
+
+      <div class="wf-tree-row depth-0"><span>Equity</span><span>$411,180.21</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Owner's Equity</a></span><span>$411,180.21</span></div>
+
+      <div class="wf-tree-row depth-0"><span>Income (mtd)</span><span>$2,400.00</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Revenue</a></span><span>$2,400.00</span></div>
+
+      <div class="wf-tree-row depth-0"><span>Expenses (mtd)</span><span>$1,538.00</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Office Expense</a></span><span>$68.50</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Rent</a></span><span>$2,200.00</span></div>
+      <div class="wf-tree-row depth-1"><span><a href="account-register.html">Subscriptions</a></span><span>$12.99</span></div>
+    </div>
+
+    <p class="wf-note">The <span class="wf-custodial-marker">custodial: …</span> marker appears only on GL accounts that mirror a physical custodial account — it's a cross-reference, not a different data source; the balance shown here is always the GL's own figure. Click any account to open its register (this is the accounting abstraction; the physical-account view with reconciliation lives on Custodial Accounts). Not every GL account has a custodial counterpart (Owner's Equity, Cash in Transit).</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

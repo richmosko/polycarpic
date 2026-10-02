@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Design — TBD</title>
+  <title>Design — polycarpic</title>
   <link rel="stylesheet" href="../_assets/doc.css">
   <link rel="stylesheet" href="../_assets/comments.css">
   <link rel="stylesheet" href="tokens.css">
@@ -15,12 +15,12 @@
 
 <header class="doc-header">
   <h1>Design System &amp; UX</h1>
-  <p class="doc-subtitle"><span class="tbd">Project name — TBD</span></p>
+  <p class="doc-subtitle">polycarpic — personal budgeting &amp; wealth management (virtual Single Family Office)</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
-    <span><strong>Status:</strong> <span class="tbd">Draft</span></span>
-    <span><strong>Version:</strong> <span class="tbd">0.1</span></span>
-    <span><strong>Last updated:</strong> <span class="tbd">—</span></span>
+    <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
+    <span><strong>Version:</strong> 0.10</span>
+    <span><strong>Last updated:</strong> 2026-10-02</span>
   </div>
 </header>
 
@@ -32,7 +32,11 @@
     <li><a href="#tokens">Design Tokens</a></li>
     <li><a href="#components">Components &amp; Screen Styles</a></li>
     <li><a href="#flows">User Flows</a></li>
-    <li><a href="#wireframes">Wireframes</a></li>
+    <li><a href="#wireframes">Wireframes</a>
+      <ol>
+        <li><a href="#operator-surfaces">Operator surfaces</a></li>
+      </ol>
+    </li>
     <li><a href="#styled-screens">Styled Screens</a></li>
     <li><a href="#accessibility">Accessibility</a></li>
     <li><a href="#open-questions">Open Questions</a></li>
@@ -46,12 +50,15 @@
 
 <section id="overview" data-section="overview">
   <h2>1. Overview &amp; Design Principles</h2>
-  <p class="section-hint">What this product should feel like to use, and the principles that resolve design disputes. Owned by <code>ux-designer</code>; spans late-Research (flows, wireframes) through Plan/Implement (the design system matures as screens get built).</p>
-  <div class="stub">Replace during the Research/Plan phases. Use <code>/generate-designdoc</code> to be interviewed.</div>
+  <p class="section-hint">What this product should feel like to use, and the principles that resolve design disputes.</p>
   <ul>
-    <li class="tbd">Principle — e.g. "mobile-first; design up, not down"</li>
-    <li class="tbd">Principle — e.g. "accessible by default (WCAG AA)"</li>
-    <li class="tbd">Principle — e.g. "no decorative loading states"</li>
+    <li><strong>Mobile-first when in doubt.</strong> The primary v1 target is a self-hosted web dashboard used on desktop for deep review (statements, lot tables) and on mobile for quick checks (dashboard glance, confirming a draft transaction) — design the dense screens up from a mobile layout, not down from desktop.</li>
+    <li><strong>Accessible by default (WCAG AA).</strong> Non-negotiable per PRD §6. Financial gain/loss and status signals never rely on color alone — see <a href="design-system-spec.md#financial-semantics">Financial semantics</a>.</li>
+    <li><strong>No decorative loading states.</strong> Skeletons match the real layout; spinners are a last resort (see Component inventory).</li>
+    <li><strong>Every number earns trust.</strong> This is a general ledger, not a budgeting toy — a balance, a delta, or a pending-liability figure must always be traceable to its source (the journal entry, the lot, the reconciliation). The UI never shows a number it can't explain if clicked.</li>
+    <li><strong>Immutability is visible, not just enforced.</strong> A posted transaction reads as posted (badge, disabled edit affordance); a correction reads as a reversal + new entry, never as a silent edit (PRD §5).</li>
+    <li><strong>Diverge from polycarpic's own tooling, deliberately.</strong> The cairn tracker (our internal tool) and the product are not the same thing and shouldn't look like it — this system's identity is derived from <strong>measured</strong> screenshots and live style reads off Monarch Money and Origin (`useorigin.com`), not memory (Principal direction, 2026-09-28) — see <a href="design-system-spec.md#inspiration-monarch--origin">Inspiration: Monarch &amp; Origin</a>.</li>
+    <li><strong>One brand hue, used honestly.</strong> The Principal's neon-green brand color (<code>#2CFF05</code>, 2026-09-30 — "the project name relates to fruiting plants") measures 1.36:1 against white, far below AA — kept as the literal <code>--brand</code> value everywhere it clears AA (dark surfaces), with a darkened same-hue green for light-mode <code>--primary</code>, stated plainly rather than silently swapped for a different hue — see <a href="design-system-spec.md#foundations">Foundations</a>.</li>
   </ul>
 </section>
 
@@ -59,32 +66,26 @@
   <h2>2. Design System</h2>
   <p class="section-hint">The single source of truth for the visual language. The written spec lives alongside this doc; the machine-readable system lives in the two CSS files that <code>frontend-lead</code> consumes directly.</p>
   <ul>
-    <li><a href="design-system-spec.md">design-system-spec.md</a> — the written spec (token rationale, component inventory, usage rules)</li>
-    <li><a href="tokens.css">tokens.css</a> — design tokens as CSS custom properties</li>
+    <li><a href="design-system-spec.md#inspiration-monarch--origin">design-system-spec.md § Inspiration</a> — what was taken from Monarch Money and Origin, and why</li>
+    <li><a href="design-system-spec.md#shadcn-svelte-reuse-map-pass-8-2026-10-02">design-system-spec.md § shadcn-svelte reuse map</a> <em>(pass 8, new)</em> — every component/region mapped to its shadcn-svelte component, block, or a stated "custom" reason</li>
+    <li><a href="design-system-spec.md">design-system-spec.md</a> — the written spec (token rationale, financial semantics, component inventory, accessibility)</li>
+    <li><a href="tokens.css">tokens.css</a> — design tokens as CSS custom properties (hand-authored palette, not a vendored shadcn preset)</li>
+    <li><a href="tokens.html">tokens.html</a> <em>(pass 6, new)</em> — every token decoded: name, value in both modes, swatch, one-line "used for"</li>
     <li><a href="screen.css">screen.css</a> — component &amp; screen styles built on the tokens</li>
   </ul>
-  <p class="section-hint">Figma stays the high-fidelity design tool (via the <code>ux-designer</code>'s Figma skills); <code>docs/DESIGN/</code> is the in-repo, code-level home that ships with the project and is the contract for implementation.</p>
+  <p class="section-hint">Figma stays the high-fidelity design tool for anything shipping pixel-exact (via the <code>ux-designer</code>'s Figma skills); <code>docs/DESIGN/</code> is the in-repo, code-level home that ships with the project and is the contract for implementation.</p>
 </section>
 
 <section id="tokens" data-section="tokens">
   <h2>3. Design Tokens</h2>
-  <p class="section-hint">Color, typography, spacing, radius, shadow, and motion primitives. Edit values in <a href="tokens.css">tokens.css</a>; the swatches below preview the live variables.</p>
-  <blockquote>
-    <p>This palette is based on the shadcn/ui theme preset <strong>Stone · Lime · Amber</strong> —
-    <a href="https://ui.shadcn.com/create?preset=b1FR0Us0w&amp;item=preview">ui.shadcn.com/create?preset=b1FR0Us0w</a>.
-    Tokens use shadcn's own names (so shadcn components drop in unchanged); the
-    <code>--color-*</code> aliases in §3.6 are the project-facing names. Both light and
-    dark themes ship — re-theme by swapping values in <a href="tokens.css">tokens.css</a>.</p>
-  </blockquote>
+  <p class="section-hint">Color, typography, spacing, radius, and shadow primitives — SvelteKit + shadcn-svelte (PRD §8). Edit values in <a href="tokens.css">tokens.css</a>; the swatches below preview the live variables. Full rationale in <a href="design-system-spec.md">design-system-spec.md</a> — or see <a href="tokens.html">tokens.html</a> for every token decoded with both-mode values and a "used for" line.</p>
 
   <h3 id="tokens-surfaces">3.1 Surfaces &amp; Text</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--background)"></span><span class="name">--background</span></div>
     <div class="swatch"><span class="chip" style="background:var(--foreground)"></span><span class="name">--foreground</span></div>
     <div class="swatch"><span class="chip" style="background:var(--card)"></span><span class="name">--card</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--card-foreground)"></span><span class="name">--card-foreground</span></div>
     <div class="swatch"><span class="chip" style="background:var(--popover)"></span><span class="name">--popover</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--popover-foreground)"></span><span class="name">--popover-foreground</span></div>
     <div class="swatch"><span class="chip" style="background:var(--muted)"></span><span class="name">--muted</span></div>
     <div class="swatch"><span class="chip" style="background:var(--muted-foreground)"></span><span class="name">--muted-foreground</span></div>
   </div>
@@ -92,23 +93,29 @@
   <h3 id="tokens-actions">3.2 Actions &amp; States</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--primary)"></span><span class="name">--primary</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--primary-foreground)"></span><span class="name">--primary-foreground</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--brand)"></span><span class="name">--brand (dark surfaces only — see Foundations)</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--brand-2)"></span><span class="name">--brand-2 (pass 5, same rule — see Secondary accent)</span></div>
     <div class="swatch"><span class="chip" style="background:var(--secondary)"></span><span class="name">--secondary</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--secondary-foreground)"></span><span class="name">--secondary-foreground</span></div>
     <div class="swatch"><span class="chip" style="background:var(--accent)"></span><span class="name">--accent</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--accent-foreground)"></span><span class="name">--accent-foreground</span></div>
     <div class="swatch"><span class="chip" style="background:var(--destructive)"></span><span class="name">--destructive</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--destructive-foreground)"></span><span class="name">--destructive-foreground</span></div>
   </div>
 
-  <h3 id="tokens-lines">3.3 Borders &amp; Focus</h3>
+  <h3 id="tokens-financial">3.3 Financial semantics (new — polycarpic-specific)</h3>
+  <div class="tokens-grid">
+    <div class="swatch"><span class="chip" style="background:var(--positive)"></span><span class="name">--positive</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--warning)"></span><span class="name">--warning</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--destructive)"></span><span class="name">--destructive (reused for negative/danger)</span></div>
+  </div>
+  <p class="section-hint">See <a href="design-system-spec.md">design-system-spec.md § Financial semantics</a> — gain/loss, safe-harbor status tiers, and the "never color alone" rule.</p>
+
+  <h3 id="tokens-lines">3.4 Borders &amp; Focus</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--border)"></span><span class="name">--border</span></div>
     <div class="swatch"><span class="chip" style="background:var(--input)"></span><span class="name">--input</span></div>
     <div class="swatch"><span class="chip" style="background:var(--ring)"></span><span class="name">--ring</span></div>
   </div>
 
-  <h3 id="tokens-charts">3.4 Charts</h3>
+  <h3 id="tokens-charts">3.5 Charts (sequential ramp — magnitude, not category)</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--chart-1)"></span><span class="name">--chart-1</span></div>
     <div class="swatch"><span class="chip" style="background:var(--chart-2)"></span><span class="name">--chart-2</span></div>
@@ -117,115 +124,289 @@
     <div class="swatch"><span class="chip" style="background:var(--chart-5)"></span><span class="name">--chart-5</span></div>
   </div>
 
-  <h3 id="tokens-sidebar">3.5 Sidebar</h3>
+  <h3 id="tokens-sidebar">3.6 Sidebar (inverted, pass 4; re-hued blue, pass 5)</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--sidebar)"></span><span class="name">--sidebar</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--sidebar-foreground)"></span><span class="name">--sidebar-foreground</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--sidebar-primary)"></span><span class="name">--sidebar-primary</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--sidebar-primary-foreground)"></span><span class="name">--sidebar-primary-foreground</span></div>
     <div class="swatch"><span class="chip" style="background:var(--sidebar-accent)"></span><span class="name">--sidebar-accent</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--sidebar-accent-foreground)"></span><span class="name">--sidebar-accent-foreground</span></div>
-    <div class="swatch"><span class="chip" style="background:var(--sidebar-border)"></span><span class="name">--sidebar-border</span></div>
     <div class="swatch"><span class="chip" style="background:var(--sidebar-ring)"></span><span class="name">--sidebar-ring</span></div>
   </div>
+  <p class="section-hint">Dark-on-light in light mode, light-on-dark in dark mode — see <a href="design-system-spec.md">design-system-spec.md § Sidebar</a> for the collapse-to-rail behavior and three proposed expand/collapse cues.</p>
 
-  <h3 id="tokens-aliases">3.6 Project aliases &amp; scales</h3>
-  <p class="section-hint">The rest of the repo uses these semantic names, mapped onto the shadcn base above.</p>
-  <table>
-    <thead><tr><th>Project alias</th><th>shadcn base</th><th>Role</th></tr></thead>
-    <tbody>
-      <tr><td><code>--color-primary</code> / <code>--color-on-primary</code></td><td><code>--primary</code> / <code>--primary-foreground</code></td><td>Primary actions (buttons, active nav) + text on them</td></tr>
-      <tr><td><code>--color-secondary</code> / <code>--color-on-secondary</code></td><td><code>--secondary</code> / <code>--secondary-foreground</code></td><td>Secondary buttons / chips</td></tr>
-      <tr><td><code>--color-surface</code></td><td><code>--background</code></td><td>Page background / canvas base</td></tr>
-      <tr><td><code>--color-surface-raised</code></td><td><code>--card</code></td><td>Cards, sheets, the doc content card</td></tr>
-      <tr><td><code>--color-surface-muted</code></td><td><code>--muted</code></td><td>Subtle fills — code, table hover</td></tr>
-      <tr><td><code>--color-text</code> / <code>--color-text-muted</code></td><td><code>--foreground</code> / <code>--muted-foreground</code></td><td>Body text / secondary text</td></tr>
-      <tr><td><code>--color-border</code> / <code>--color-input</code> / <code>--color-ring</code></td><td><code>--border</code> / <code>--input</code> / <code>--ring</code></td><td>Hairlines, field borders, focus rings</td></tr>
-      <tr><td><code>--color-danger</code> / <code>--color-on-danger</code></td><td><code>--destructive</code> / <code>--destructive-foreground</code></td><td>Errors, destructive actions</td></tr>
-      <tr><td><code>--color-success</code> / <code>--color-warning</code> <span class="tbd">(+ on-)</span></td><td><em>not in shadcn base</em></td><td>Status states — kept as project roles</td></tr>
-    </tbody>
-  </table>
-  <p class="section-hint"><strong>Radius:</strong> <code>--radius</code> 0.625rem → <code>--radius-sm|md|lg|xl|full</code>. &nbsp;<strong>Type:</strong> <code>--font-sans</code> Inter, <code>--font-mono</code> Geist Mono (self-hosted). &nbsp;Plus <code>--text-*</code>, <code>--space-*</code>, <code>--shadow-*</code>, <code>--duration-*</code> scales.</p>
+  <p class="section-hint"><strong>Type:</strong> <code>--font-sans</code> Inter — one grotesque sans for body and headings, hierarchy by weight, confirmed against both reference products' actual app UI (their serif accent is marketing-only, see Inspiration); <code>--font-mono</code> Roboto Mono — Origin's own measured choice, for uppercase eyebrow labels, account numbers, tickers, tabular figures. <strong>Radius:</strong> measured <code>--radius-sm|md|lg|xl</code> = 6/8/12/20px (cards 12px, buttons 8px — both products' actual app-level values, not either's marketing-only pill).</p>
 </section>
 
 <section id="components" data-section="components">
   <h2>4. Components &amp; Screen Styles</h2>
-  <p class="section-hint">The component inventory and the styles that realize it, built on the tokens. Styles live in <a href="screen.css">screen.css</a>; document each component's states (default, hover, focus, disabled, loading, error) and link to its styled-screen example.</p>
+  <p class="section-hint">The component inventory and the styles that realize it, built on the tokens. Styles live in <a href="screen.css">screen.css</a>; full states-per-component table lives in <a href="design-system-spec.md">design-system-spec.md § Component inventory</a>.</p>
   <table>
-    <thead><tr><th>Component</th><th>States documented</th><th>Example</th></tr></thead>
+    <thead><tr><th>Component</th><th>shadcn-svelte primitive</th><th>polycarpic usage</th></tr></thead>
     <tbody>
-      <tr><td class="tbd">Button</td><td class="tbd">—</td><td class="tbd">—</td></tr>
-      <tr><td class="tbd">Input</td><td class="tbd">—</td><td class="tbd">—</td></tr>
-      <tr><td class="tbd">Card</td><td class="tbd">—</td><td class="tbd">—</td></tr>
+      <tr><td>Net-worth hero</td><td>Chart (LayerChart, Area)</td><td>Big figure + signed delta on the figure + single-line area chart — direct Monarch pattern</td></tr>
+      <tr><td>Grouped account list</td><td>Table / custom</td><td>Type-grouped rows with sparkline + freshness — direct Monarch pattern</td></tr>
+      <tr><td>Segmented bar + legend</td><td>Custom, tokens-driven</td><td>Assets/Liabilities, allocation actual-vs-target — direct Monarch pattern</td></tr>
+      <tr><td>Badge</td><td>Badge</td><td>Entity/account/transaction status, link-health — see Financial semantics</td></tr>
+      <tr><td>Transaction table</td><td>Table</td><td>Account register, exceptions report, lots</td></tr>
+      <tr><td>Accordion <em>(pass 7, new)</em></td><td>Accordion</td><td>Transactions' three urgency-ordered cards (Exceptions/Pending/Posted); Pending row expansion</td></tr>
+      <tr><td>Near-full-screen modal <em>(pass 7, new)</em></td><td>Dialog</td><td>Journal-entry modal (header + legs) — manual entry, Correct entry, Split, Group &amp; Summarize</td></tr>
+      <tr><td>Entity switcher</td><td>Tabs / Sidebar</td><td>Switch between Person/Trust/Business/Household</td></tr>
+      <tr><td>Transaction detail</td><td>Sheet</td><td>Drill into a posted/draft entry, its journal lines, source doc</td></tr>
+      <tr><td>Empty state</td><td>Card + plain text, no skeleton</td><td>Dashboard panels not yet shipped (tax at 1.0, allocation at M4) — see styled-screens/dashboard.html</td></tr>
+      <tr><td>Header <em>(pass 8, rebuilt)</em></td><td>—, starts right of the sidebar</td><td>Expand/contract icon + breadcrumb left; entity selector, AI icon (greyed v1), search, notifications, settings gear right — see design-system-spec.md § Header</td></tr>
+      <tr><td>Sidebar <em>(pass 8, rebuilt)</em></td><td>Sidebar (shadcn-svelte)</td><td>Viewport-fixed full height, seven nav items, brand top item, avatar-popover bottom item (Settings moved to the header gear) — see design-system-spec.md § Sidebar</td></tr>
+      <tr><td>Avatar cluster <em>(pass 5, new)</em></td><td>—, custom</td><td>Overlapping initials in the entity selector, max 3 + overflow</td></tr>
+      <tr><td>Avatar popover <em>(pass 8, new)</em></td><td>Popover / DropdownMenu</td><td>User menu at the sidebar's bottom — profile, preferences, theme, keyboard shortcuts, Log out last</td></tr>
+      <tr><td>Public hero <em>(pass 4, corrected)</em></td><td>—, custom</td><td>Home — pre-auth landing page, product statement + CTAs, not a signed-in screen</td></tr>
+      <tr><td>Split screen login <em>(pass 4, refined pass 5)</em></td><td>—, custom</td><td>Login — full field list, centered form column, always-branded visual pane</td></tr>
     </tbody>
   </table>
 </section>
 
 <section id="flows" data-section="flows">
   <h2>5. User Flows</h2>
-  <p class="section-hint">How users move through the product to accomplish the highest-traffic stories. Mermaid <code>flowchart</code> is fine for first-pass; source diagrams live in <a href="flows/">flows/</a>.</p>
-  <div class="stub">Sketch the top 3–8 stories from the PRD. One flow per major task.</div>
+  <p class="section-hint">How users move through the product to accomplish the highest-traffic stories (PRD §4). <strong>Pass 5 fix (2026-09-30):</strong> these previously linked to <code>flows/*.md</code>, which the browser serves as raw Markdown — the fenced <code>mermaid</code> blocks never ran through the page's own Mermaid loader, so nothing rendered (not a syntax error, as first suspected). Each flow is now embedded inline below; the <code>.md</code> files stay as the diffable source of truth in <a href="flows/">flows/</a>.</p>
+
+  <h3 id="flow-dashboard-glance">5.1 Dashboard glance</h3>
+  <p class="section-hint"><strong>Story (PRD §4.1):</strong> per-entity financial health at a glance. Source: <a href="flows/dashboard-glance-flow.md">flows/dashboard-glance-flow.md</a>.</p>
   <pre class="mermaid">
-flowchart LR
-  start([User opens app]) --> action[Primary action — TBD]
-  action --> outcome([Outcome — TBD])
+flowchart TD
+  start([User logs in]) --> membership{Holds membership\non 1+ entity?}
+  membership -- no --> empty[Membership-setup page:\nno entities yet, create or accept invite]
+  membership -- yes --> default[Land on default entity\nlast-viewed or first by role]
+  default --> render[Render dashboard:\nbalances, cash flow, recent activity,\npending tax liability, allocation snapshot]
+  render --> loading{Data cached?}
+  loading -- no --> skeleton[Skeleton matches real layout\nno spinner]
+  skeleton --> render
+  render --> switch{Switch entity?}
+  switch -- yes --> picker[Entity switcher\nPerson / Trust / Business / Household]
+  picker --> filtered[Re-render scoped to\nuser's membership on that entity]
+  filtered --> render
+  switch -- no --> drill{Drill into a number?}
+  drill -- yes --> source[Navigate to source:\nledger line, lot, or liability detail]
+  drill -- no --> idle([Glance complete])
   </pre>
+  <ul>
+    <li>Every number on this screen must be clickable through to its source (Overview principle: "every number earns trust").</li>
+    <li>Filtered strictly by membership (owner/manager/viewer) — no transitive access via parent entity (PRD §5 permission model).</li>
+    <li><strong>No-membership state (pass 6):</strong> see <a href="wireframes/membership-setup.html">wireframes/membership-setup.html</a> — the Principal confirmed the dashboard's empty state can simply be the membership-setup page itself, not a separate illustrated empty-state screen.</li>
+    <li><strong>"Skeleton matches real layout, no spinner" (pass 6):</strong> while dashboard data is loading, the screen shows placeholder blocks already shaped like the real cards (same card chrome, same approximate text-line widths) instead of a spinner — so nothing visually jumps or re-flows once the real numbers arrive, they just fade in where the placeholders already were.</li>
+  </ul>
+
+  <h3 id="flow-import-confirm">5.2 Transactions — review, match &amp; correct</h3>
+  <p class="section-hint"><strong>Story (PRD §4.2):</strong> staged for review → matched/split/grouped → posted → correctable. Source: <a href="flows/import-confirm-flow.md">flows/import-confirm-flow.md</a>. <strong>Pass 7 full rewrite:</strong> this screen is now <strong>Transactions</strong> ("Ledger"/"Import" renamed/retired) — the review mechanics below are the Principal's own Plaid bank-feed workflow spec.</p>
+  <pre class="mermaid">
+flowchart TD
+  poll([Plaid adapter polls\nor fake source generates batch]) --> stage[Raw transaction lands\nin the Pending card]
+  stage --> transfer{Two legs match\nwithin date window?}
+  transfer -- same posting date --> autoEntry[Locked debit leg +\nsuggested offset leg\ntwo-line preview]
+  transfer -- different dates --> citEntry[Two entries via\nCash in Transit clearing account]
+  transfer -- unmatched --> openItem[Remains a single-leg\nPending row]
+  openItem --> aging{Older than\nexceptions threshold\ndefault 3 business days?}
+  aging -- yes --> exceptions[Surface on\nExceptions card]
+  aging -- no --> stage
+  citEntry --> autoEntry
+  autoEntry --> expand[User expands the row:\nAuto-Suggest Match view]
+  expand --> action{User action}
+  action -- edit offset --> editLeg[Inline search dropdown:\noverride the suggested account]
+  editLeg --> action
+  action -- split --> splitGrid[Split grid:\nadd offsetting rows]
+  splitGrid --> liveCheck{Split sum equals\nthe Plaid total?}
+  liveCheck -- no --> splitGrid
+  liveCheck -- yes --> post
+  action -- group --> bulkSelect[Checkbox-select rows,\nbulk action bar appears]
+  bulkSelect --> groupModal[Group and Summarize modal:\npre-filled entry, one aggregate\nline + balancing distributions]
+  groupModal --> post
+  action -- approve --> post[User hits Approve and Post]
+  post --> gate{Posting gate:\nbalanced, accounting equation,\ndate match, one entry per draft}
+  gate -- fail --> stage
+  gate -- pass --> commit[Row fades out of Pending;\nbalanced entry commits to the GL]
+  commit --> toast[Toast: entry posted]
+  commit --> posted([Appears on Posted,\npaged])
+  exceptions --> resolve{Resolved manually?}
+  resolve -- yes --> post
+  resolve -- no --> exceptions
+  posted --> correctQ{User clicks\nCorrect entry?}
+  correctQ -- yes --> doCorrect[System posts the reversal\n+ the new corrected entry\nuser never sees reverse as the verb]
+  doCorrect --> correctedBadge[Row now shows\nCorrected badge]
+  correctedBadge --> clickThrough[Click-through: original lines\nshaded/struck + reversal + new entry]
+  correctQ -- no --> complete([Flow complete])
+  clickThrough --> complete
+  </pre>
+  <ul>
+    <li><strong>The locked leg</strong> is always the custodial cash side (verified bank reality) — never editable, in the preview, Split grid, or Group modal. <strong>The suggested offset leg</strong> is pre-filled from historical rules + Plaid category, overridden in place via an inline search dropdown.</li>
+    <li><strong>Split</strong> is one draft → one multi-leg entry, live-validated to the Plaid total before it's submittable. <strong>Group</strong> is many drafts → one entry (the one many-to-one case, ARCH §3) via the shared journal-entry modal, pre-filled with an aggregate line + balancing distributions.</li>
+    <li><strong>Posting gate:</strong> Σ debits = Σ credits; accounting equation per entity; entry date matches bank date (or the CIT rule); every posted draft linked to exactly one entry — any failure keeps the item in Pending.</li>
+    <li><strong>Reframed pass 6, unchanged:</strong> a posted row's user-facing action is "Correct entry", never "edit"/"reverse" — reversal-only underneath (PRD §5). See design-system-spec.md § Correcting a posted entry.</li>
+    <li>A corrected row carries the <code>Corrected</code> badge (<code>--outline</code> + <code>--brand-2</code>-tinted dot, pencil icon); click-through reveals the full double-entry trail — original lines shaded/struck, the reversal, and the new entry. An auto-posted row carries the same badge/action plus a <code>posted by rule — &lt;name&gt;</code> line (addendum, pass 6).</li>
+    <li>Actor attribution (user / auto-post rule / system job) is shown on every draft and posted row, never inferred (PRD §5).</li>
+  </ul>
+
+  <h3 id="flow-tax-liability">5.3 Tax liability &amp; safe-harbor</h3>
+  <p class="section-hint"><strong>Story (PRD §4.4):</strong> pending liability, required payment, gap, pay. Source: <a href="flows/tax-liability-flow.md">flows/tax-liability-flow.md</a>.</p>
+  <pre class="mermaid">
+flowchart TD
+  view([Open Tax Liability view\nfor entity + jurisdiction]) --> accrual[Running accrual annualizes\nincome to date by tax treatment]
+  accrual --> pending[Pending liability =\nannualized tax to date minus\ncustodial prepaid balance]
+  accrual --> safeharbor[Two safe-harbor bases computed:\nprior-year and current-year]
+  safeharbor --> required[Required payment to date =\nlesser of the two safe-harbor bases]
+  required --> gap[Gap = required payments to date\nminus custodial balance,\nare you current with the authority]
+  pending --> display[Display gauge + figures]
+  gap --> tier{Gap status}
+  tier -- "gap &lt;= 0" --> onTrack[Tier: Normal / on track\npositive token]
+  tier -- "gap &gt; 0, due date &gt; 14d out" --> caution[Tier: Caution\nwarning token]
+  tier -- "gap &gt; 0, due date passed" --> danger[Tier: Danger / overdue\ndestructive token]
+  onTrack --> display
+  caution --> display
+  danger --> display
+  display --> extPay[User pays the tax authority\nat their own bank, the app\nnever initiates a payment]
+  extPay --> imported[Payment appears as an imported\nbank transaction, no counterparty]
+  imported --> postEntry[User posts the GL entry:\ndebit the tax-authority custodial\naccount, pending liability itself\ndoes not change, not filed yet]
+  postEntry --> accrual
+  display --> waitNode([Wait for next period cutoff])
+  waitNode --> freeze[Period cutoff freezes\nannualized figure for due date]
+  freeze --> accrual
+  </pre>
+  <ul>
+    <li>The three-tier status (normal/caution/danger) reuses the product-wide status vocabulary — see <a href="design-system-spec.md">design-system-spec.md § Financial semantics</a>.</li>
+    <li>Jurisdiction due dates, multipliers, and cumulative percentages are data-driven, so this view must render correctly for an arbitrary number of jurisdictions (PRD §5).</li>
+    <li><strong>Redrawn pass 6:</strong> v1 never moves money — there is no "User initiates payment?" button. The user pays at their own bank; it lands as an imported transaction with no counterparty; the user posts the GL entry, debiting the custodial tax-authority account. Dashboard/tax-panel copy says "post your payment," never "pay" or "transfer."</li>
+    <li><strong>Addendum, pass 6:</strong> two figures, both measured against the custodial account's balance but not against each other — <strong>Pending liability = annualized tax to date − custodial prepaid balance</strong> (what you'd owe net of prepayments, if filed today); <strong>Gap = required payments to date (safe-harbor) − custodial balance</strong> ("are you current with the authority"). Gap is never <code>required − pending</code>.</li>
+  </ul>
+
+  <h3 id="flow-securities-lots">5.4 Custodial reconciliation, lots &amp; allocation</h3>
+  <p class="section-hint"><strong>Stories (PRD §4.5–4.7):</strong> GL vs. custodial reconciliation, allocation vs. target. Source: <a href="flows/securities-lots-flow.md">flows/securities-lots-flow.md</a>. <strong>Pass 7:</strong> "Securities" is gone as a nav item — lots are now a Custodial Accounts sub-card, GL vs. custodial is two nav items not a toggle, Allocation is its own page.</p>
+  <pre class="mermaid">
+flowchart TD
+  view([Open Custodial Accounts\nfor entity]) --> accounts[Per-account cards:\nreported balance, link-health badge]
+  accounts --> lotsCard[Lots sub-card per security:\npull-down shows lots,\nshort/long/total gain per lot + summed]
+  lotsCard --> priceFeed[Daily EOD price feed\nupdates market value]
+  priceFeed --> lotsCard
+  accounts --> reconcile[Reconcile GL balance\nagainst custodian-reported balance]
+  reconcile --> match{Balances match\nwithin tolerance?}
+  match -- yes --> clean[Reconciliation: clean\npositive tier]
+  match -- no --> break[Reconciliation: break\ndanger tier, flagged]
+  clean --> glLink[General Ledger account register\nshows the same balance, GL side]
+  break --> glLink
+  glLink --> allocLink([Allocation: actual vs. target,\nits own nav item])
+  allocLink --> adjust{User adjusts target?}
+  adjust -- yes --> saveTarget[Save new target allocation]
+  saveTarget --> allocLink
+  adjust -- no --> done([View complete])
+  </pre>
+  <ul>
+    <li><strong>No toggle (pass 7):</strong> General Ledger and Custodial Accounts are two separate nav items, not one screen behind a <code>Tabs</code> switch.</li>
+    <li>Book-vs-market is implicit on the lots sub-card's own gain/loss figures, not a separate chart.</li>
+    <li>A reconciliation break uses the danger tier (<code>--destructive</code>) and must surface on the Dashboard glance too.</li>
+  </ul>
+
+  <h3 id="flow-entity-membership">5.5 Entity switch &amp; membership access</h3>
+  <p class="section-hint"><strong>Story (PRD §4.8):</strong> owner/manager/viewer boundary. Source: <a href="flows/entity-membership-flow.md">flows/entity-membership-flow.md</a>.</p>
+  <pre class="mermaid">
+flowchart TD
+  login([User logs in]) --> memberships[Load user's memberships:\nentity, role]
+  memberships --> list{More than one\nentity?}
+  list -- no --> single[Land directly on the\none entity, no switcher shown]
+  list -- yes --> switcher[Entity switcher in header:\nlist entities by membership]
+  switcher --> select[User selects an entity]
+  select --> roleCheck{Role on\nselected entity}
+  roleCheck -- owner --> ownerView[Full read/write:\npost, edit memberships, purge]
+  roleCheck -- manager --> managerView[Read/write ledger,\nno membership/purge rights]
+  roleCheck -- viewer --> viewerView[Read-only:\nbalances, activity, statements]
+  ownerView --> guard{Parent-entity\nstructure implies access?}
+  managerView --> guard
+  viewerView --> guard
+  guard -- "no (always)" --> explicit[Only explicit membership\ngrants access, never inherited]
+  explicit --> render([Render scoped dashboard])
+  </pre>
+  <ul>
+    <li>A Household's membership never transitively grants access to a member Person entity, or vice versa (PRD §5, hard requirement).</li>
+    <li>A viewer never sees a write affordance rendered-then-disabled — write controls are omitted entirely, not shown-and-greyed.</li>
+  </ul>
 </section>
 
 <section id="wireframes" data-section="wireframes">
   <h2>6. Wireframes</h2>
-  <p class="section-hint">Low-fidelity layout of each key screen — structure before style. Assets live in <a href="wireframes/">wireframes/</a> (images or HTML); promote to Figma for anything that will ship.</p>
-  <div class="stub">Reference wireframe assets with relative paths, e.g. <code>&lt;img src="wireframes/onboarding-01.png"&gt;</code>.</div>
+  <p class="section-hint">Low-fidelity layout of each key screen — structure before style. Assets in <a href="wireframes/">wireframes/</a>. <strong>Pass 7 (2026-10-02):</strong> reorganized for the eight-item sidebar (design-system-spec.md § Sidebar information architecture) — rolling out across stages 2–5 of the same pass; items not yet rebuilt are marked pending rather than linked to a stale file.</p>
   <ul>
-    <li class="tbd">Screen — wireframe link</li>
+    <li><a href="wireframes/dashboard.html">Dashboard</a> — per-entity financial health</li>
+    <li><a href="wireframes/transactions.html">Transactions</a> <em>(stage 2, done)</em> — three urgency-ordered accordion cards (Exceptions/Pending/Posted), Pending inbox built around the Plaid review/match workflow.</li>
+    <li><a href="wireframes/general-ledger.html">General Ledger</a> <em>(stage 3, done)</em> — chart-of-accounts tree; each account opens its own <a href="wireframes/account-register.html">register page</a>.</li>
+    <li><a href="wireframes/custodial-accounts.html">Custodial Accounts</a> <em>(stage 4, done)</em> — per-account cards, a lots sub-card (pull-down per security, short/long/total gains), and the <code>[+ New]</code> provider-item modal (aggregator/manual/file, discovered-account mapping, token refresh, unlink).</li>
+    <li><a href="wireframes/allocation.html">Allocation</a> <em>(stage 5, done)</em> — actual-vs-target, promoted out of the old Securities screen.</li>
+    <li><a href="wireframes/reports.html">Reports</a> <em>(stage 5, done)</em> — Balance Sheet / Income Statement / Cash Flow, low fidelity; empty state until POLY-M5.</li>
+    <li><a href="wireframes/entities.html">Entities</a> — unaffected by the sidebar rework</li>
+    <li><a href="wireframes/settings.html">Settings</a> <em>(stage 5, done)</em> — batch-import schedule/options + app preferences.</li>
+    <li><a href="wireframes/home.html">Home</a> <em>(pass 4, corrected)</em> — public pre-auth landing page</li>
+    <li><a href="wireframes/login.html">Login</a> <em>(pass 4, new; corrected pass 6)</em> — split screen, centered form pane</li>
+    <li><a href="wireframes/membership-setup.html">Membership setup</a> <em>(pass 6, new)</em> — dashboard first-run / no-membership empty state, linked from flow 5.1</li>
+    <li><a href="wireframes/sidebar-cues.html">Sidebar expand/collapse cues</a> <em>(pass 4, decided pass 5)</em> — option A (chevron) chosen, B/C kept for the record; unaffected by the pass-7 item-list change</li>
   </ul>
+
+  <h3 id="operator-surfaces">6.1 Operator surfaces</h3>
+  <p class="section-hint">Not reachable from any in-app nav, not part of the eight-screen IA — operator-only, reached by SSH tunnel to the host.</p>
+  <ul>
+    <li><a href="wireframes/admin.html">Admin</a> <em>(pass 7 addendum, 2026-10-02)</em> — <strong>placeholder, pending PRD/ARCH/SECURITY definition (POLY-81).</strong> A plain status page (services, versions, DB/backup status, last sync, telemetry receiver state) + an "Administrative actions (TBD)" link list.</li>
+  </ul>
+  <p class="section-hint"><strong>Gone as of pass 7 (stage 4):</strong> <code>wireframes/securities.html</code> and <code>wireframes/import.html</code> are retired — their content is absorbed into Custodial Accounts (lots sub-card, provider-item modal) above.</p>
 </section>
 
 <section id="styled-screens" data-section="styled-screens">
   <h2>7. Styled Screens</h2>
-  <p class="section-hint">High-fidelity screens that apply the design system to the wireframes. HTML mockups in <a href="styled-screens/">styled-screens/</a> consume <code>tokens.css</code> + <code>screen.css</code>, so they double as a visual regression reference and a head-start for <code>frontend-lead</code>.</p>
+  <p class="section-hint">High-fidelity screens that apply the design system to the wireframes, consuming <code>tokens.css</code> + <code>screen.css</code> — a visual regression reference and a head-start for <code>frontend-lead</code>. Prioritized by traffic (PRD §4 stories 1 &amp; 2); remaining screens promote from wireframe fidelity as the design system stabilizes. <strong>Pass 7:</strong> only Dashboard and Transactions get styled-screen fidelity for now, same traffic-priority rule as before — General Ledger, Custodial Accounts, Allocation, Reports, and Settings stay at wireframe fidelity until there's evidence a styled build is needed before Implement (judgment call, flagged in Open Questions).</p>
   <ul>
-    <li class="tbd">Screen — styled-screen link</li>
+    <li><a href="styled-screens/dashboard.html">Dashboard</a></li>
+    <li><a href="styled-screens/transactions.html">Transactions</a> <em>(stage 2, done)</em></li>
+    <li><a href="styled-screens/home.html">Home</a> <em>(pass 4, new)</em></li>
+    <li><a href="styled-screens/login.html">Login</a> <em>(pass 4, new)</em></li>
   </ul>
 </section>
 
 <section id="accessibility" data-section="accessibility">
   <h2>8. Accessibility</h2>
-  <p class="section-hint">Accessibility is a design responsibility, not a QA afterthought. Document the target and any deliberate exceptions.</p>
+  <p class="section-hint">Accessibility is a design responsibility, not a QA afterthought. Full table in <a href="design-system-spec.md">design-system-spec.md § Accessibility</a>.</p>
   <table>
     <thead><tr><th>Concern</th><th>Standard / approach</th></tr></thead>
     <tbody>
-      <tr><td>Color contrast</td><td class="tbd">WCAG AA (4.5:1 text, 3:1 large/UI)</td></tr>
-      <tr><td>Keyboard</td><td class="tbd">All interactive elements reachable &amp; operable</td></tr>
-      <tr><td>Screen readers</td><td class="tbd">Semantic markup; labelled controls</td></tr>
-      <tr><td>Motion</td><td class="tbd">Respect <code>prefers-reduced-motion</code></td></tr>
+      <tr><td>Color contrast</td><td>WCAG AA (4.5:1 text, 3:1 large/UI) — every token pair re-measured for the pass-4 neon-green rebrand, both modes; <code>--brand</code> deliberately fails against light surfaces (1.36:1, by design — never used there, see Foundations); no CVD simulation run yet (open item, now higher-priority given how central the brand hue is)</td></tr>
+      <tr><td>Color-alone signaling</td><td>Never — every gain/loss/status pairs color with a sign/icon/label</td></tr>
+      <tr><td>Keyboard</td><td>All interactive elements reachable &amp; operable (shadcn default)</td></tr>
+      <tr><td>Screen readers</td><td>Semantic markup; labelled controls; delta sign readable from text content</td></tr>
+      <tr><td>Motion</td><td>Respect <code>prefers-reduced-motion</code> (policy not yet written)</td></tr>
     </tbody>
   </table>
 </section>
 
 <section id="open-questions" data-section="open-questions">
   <h2>9. Open Questions</h2>
-  <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Drives the next design conversation.</p>
+  <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
-    <li class="tbd">—</li>
+    <li><strong>Resolved 2026-10-02 (pass 8):</strong> app shell rebuilt on the shadcn Sidebar component's own pattern (Principal review 5) — sidebar now fills the viewport height (<code>position: fixed</code>, not <code>sticky</code>, fixing a real bug where a wireframe's own explanatory note pushed the sidebar below the visible viewport), brand moved to the sidebar's top item, an avatar-popover user menu (profile/preferences/theme/shortcuts/Log out) replaces the old bottom chevron, and Settings left the sidebar for a header gear icon (seven nav items remain). Header now starts right of the sidebar: expand/contract icon + breadcrumb left, entity selector/AI-icon/search/notifications/gear right — screens no longer repeat their title as an on-page heading. New <a href="design-system-spec.md#shadcn-svelte-reuse-map-pass-8-2026-10-02">§ shadcn-svelte reuse map</a> answers the Principal's reuse question directly. Applied to screen.css, wireframe.css, both styled screens, and all nine sidebar-bearing wireframes.</li>
+    <li><strong>Resolved 2026-10-02 (pass 7, all 5 stages):</strong> sidebar reworked to eight items per the Principal's interview (<code>temp/2026-10-02-sidebar-interview.md</code>) — Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, Reports, Entities, Settings. "Securities" and "Import" are gone. Transactions rebuilt around the Plaid review/match workflow (expansion, Split, Group, a shared journal-entry modal); General Ledger opens to a chart-of-accounts tree with a per-account register page; Custodial Accounts gained a lots sub-card and a provider-item modal; Allocation, Reports (empty until POLY-M5), and Settings are new. See design-system-spec.md § Sidebar information architecture onward. <strong>Judgment call:</strong> only Dashboard and Transactions got styled-screen fidelity, matching the existing traffic-priority rule — flag if General Ledger, Custodial Accounts, or Allocation need a styled build sooner.</li>
+    <li><strong>Resolved 2026-10-01 (pass 6):</strong> <code>--warning</code> re-hued to a true orange with a dark ink (was brown-reading); light-mode chart ramp brightened; <a href="tokens.html">tokens.html</a> added; Login wireframe corrected to match the centered styled screen; dashboard first-run/empty-state wireframe added (<a href="wireframes/membership-setup.html">membership-setup.html</a>); skeleton-vs-spinner explained in plain words; flow 5.2 reframed around the user-facing "Correct entry" action; flow 5.3 redrawn to remove the app-initiates-payment step.</li>
+    <li><strong>Resolved 2026-09-30 (pass 5):</strong> sidebar expand/collapse cue — option A (chevron) chosen; sidebar now full-height; header restructured to brand lockup + entity selector with an avatar cluster; login form pane centered — design-system-spec.md § Header, § Sidebar, § Login.</li>
+    <li><strong>Avatar cluster overflow (pass 5):</strong> the "+N" fold for 4th+ members is specified but not yet shown live in either reference screen (both currently have ≤2 members) — worth a quick visual check once a real multi-member entity exists.</li>
+    <li><strong>Login's visual pane (pass 4):</strong> built as a brand gradient, not a photo — no photography asset exists for this product. A real photo/illustration asset (in the style of the captured `dribbble` reference) would likely read stronger; flagging as a design-asset gap, not a layout question.</li>
+    <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — now higher priority given how central the brand hue is (recommended before lock, design-system-spec.md § Accessibility).</li>
+    <li><strong>Superseded by pass 7:</strong> the former Accounts screen's grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen — Accounts itself is now split into General Ledger and Custodial Accounts (both wireframe fidelity, stages 3–4); promote either the same way as a fast-follow if the gap matters before Implement.</li>
+    <li>Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.</li>
+    <li><code>prototype/</code> throwaway UX prototype (kickoff §2.9) not yet built — confirm ownership/timing with team-lead.</li>
   </ul>
 </section>
 
 <section id="appendix" data-section="appendix">
   <h2>10. Appendix</h2>
-  <p class="section-hint">Inspiration, references, prior art, links to Figma files.</p>
   <ul>
-    <li class="tbd">—</li>
+    <li>PRD user stories &amp; functional requirements: <a href="../PRD/index.html">docs/PRD/index.html</a> §4–5</li>
+    <li>Kickoff record, frontend/design system decisions: <a href="../project_kickoff.md">docs/project_kickoff.md</a> §2.9</li>
   </ul>
 
   <h3 id="faqs">10.1 FAQs</h3>
   <dl class="faqs">
     <dt>Q: How do I add review comments to this design doc?</dt>
-    <dd>A: Same as the other docs. Hand-edit <code>docs/DESIGN/comments.md</code> with <code>## §&lt;section-id&gt;</code> blocks pointing at a section's <code>id</code> (e.g. <code>tokens</code>, <code>flows</code>), or run <code>/serve-docs DESIGN</code> and use the inline <code>+ Comment</code> widget. Then run <code>/refine-doc DESIGN</code> to have the changes applied and the addressed comments removed. The sidecar is gitignored; resolutions land via PR. See <a href="../../process/WORKFLOW.md">process/WORKFLOW.md</a> → Doc review loop.</dd>
+    <dd>A: Hand-edit <code>docs/DESIGN/comments.md</code> with <code>## §&lt;section-id&gt;</code> blocks, or run <code>/serve-docs DESIGN</code> and use the inline <code>+ Comment</code> widget. Then run <code>/refine-doc DESIGN</code>. See <a href="../../process/WORKFLOW.md">process/WORKFLOW.md</a> → Doc review loop.</dd>
     <dt>Q: Why is the design system in <code>docs/DESIGN/</code> and not in the app's source?</dt>
-    <dd>A: It's the design <em>deliverable</em> — the contract. During Implement, <code>frontend-lead</code> imports or derives the app's real stylesheets from <code>tokens.css</code> / <code>screen.css</code>. Keeping the canonical system here keeps it reviewable as a doc and decoupled from any one app's build layout.</dd>
-    <dt class="tbd">Q: —</dt>
-    <dd class="tbd">A: —</dd>
+    <dd>A: It's the design <em>deliverable</em> — the contract. During Implement, <code>frontend-lead</code> imports or derives the app's real stylesheets from <code>tokens.css</code>/<code>screen.css</code>.</dd>
+    <dt>Q: Where did <code>variants.css</code> go?</dt>
+    <dd>A: It was generated infrastructure for the <code>cairn</code> tracker tool's own theme switcher, never part of the product — removed from this directory (POLY-78 relocates its generator target the same way). See design-system-spec.md § Provenance &amp; shared tooling.</dd>
   </dl>
 </section>
 

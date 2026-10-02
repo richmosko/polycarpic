@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Login (split screen login page)</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<p class="wf-note" style="margin:16px;">Corrected 2026-10-01 (pass 6 — the prior version of this wireframe wasn't centered like the styled screen): logo pinned top-left, heading/subtext/fields centered as a fixed-max-width column within the pane (fields/links stay left-aligned inside that column) — matches <code>styled-screens/login.html</code> / <code>screen.css</code> <code>.auth-form-pane</code> exactly. Reference: temp/design-refs/split-login-example.png.</p>
+<div style="display:grid; grid-template-columns:1fr 1fr; min-height:70vh;">
+  <div style="padding:32px 48px; display:flex; flex-direction:column; align-items:center;">
+    <div class="wf-box-label" style="align-self:flex-start;">[logo]</div>
+    <div style="max-width:320px; width:100%; margin:auto 0; text-align:center;">
+      <h2>Welcome back</h2>
+      <p style="color:#888; font-size:13px;">Sign in to your account</p>
+      <div class="wf-box" style="text-align:center; margin-bottom:12px;">Continue with Google</div>
+      <div style="text-align:center; color:#999; font-size:11px; margin-bottom:12px;">— or —</div>
+      <div style="text-align:left;">
+        <div class="wf-box-label">Email</div>
+        <div class="wf-placeholder-text w80" style="height:28px; background:#eee; border:1px solid #ccc;"></div>
+        <div style="display:flex; justify-content:space-between; margin-top:8px;">
+          <span class="wf-box-label">Password</span>
+          <span class="wf-chip">Forgot password?</span>
+        </div>
+        <div class="wf-placeholder-text w80" style="height:28px; background:#eee; border:1px solid #ccc;"></div>
+      </div>
+      <div class="wf-box" style="text-align:center; margin-top:16px; background:#333; color:#fff;">Sign in</div>
+      <p style="text-align:center; font-size:12px; color:#888;">Don't have an account? <span class="wf-chip">Sign up</span></p>
+      <p style="text-align:left; font-size:11px; color:#aaa; margin-top:24px;">By signing in you agree to our Terms of Service and Privacy Policy.</p>
+    </div>
+  </div>
+  <div style="margin:16px 16px 16px 0; border-radius:12px; background:linear-gradient(160deg,#8f8,#222); display:flex; align-items:flex-end; padding:24px;">
+    <span style="color:#fff; font-size:12px;">[brand visual pane — always dark/branded regardless of theme]</span>
+  </div>
+</div>
+</body>
+</html>

@@ -1,8 +1,16 @@
 /* Shared styling for PRD / ARCH / SECURITY / DESIGN docs. Print-friendly.
 
-   Palette + light/dark themes come from the design system (docs/DESIGN/tokens.css,
-   a shadcn preset). This file maps those tokens onto doc roles and lays the page
-   out as a content CARD floating on a tinted CANVAS (the shadcn dashboard look).
+   Palette + light/dark themes come from the design system (docs/DESIGN/tokens.css).
+   This file maps those tokens onto doc roles and lays the page out as a content
+   CARD floating on a tinted CANVAS.
+
+   2026-09-29: the --color-* alias names this file used to read (--color-surface,
+   --color-text, etc.) were the OLD generic template naming — tokens.css moved to
+   shadcn-native names (--background, --foreground, --card, --muted, ...) during
+   the Monarch/Origin design passes and this file was never updated, so every var()
+   below silently fell through to its hardcoded fallback regardless of theme (root
+   cause of the Mermaid dark/light contrast defects, see docs/DESIGN/design-system-
+   spec.md § Accessibility history). Fixed by pointing at the real token names.
 
    Fonts: Inter + Geist Mono are SELF-HOSTED below (variable woff2 in
    _assets/fonts/, from Fontsource) — no external dependency, works offline and
@@ -29,23 +37,21 @@
      Prefixed --doc-* where the bare name would collide with a shadcn base token
      (--border / --muted / --accent), so those base tokens flow through the docs
      untouched. Fallbacks keep the docs styled if tokens.css is ever absent. */
-  --bg: var(--color-surface, #ffffff);
-  --fg: var(--color-text, #1f1d1a);
-  --doc-muted: var(--color-text-muted, #6b6a66);
-  /* Link/accent TEXT color. The lime --primary is a bright FILL — too light for
-     text on white — so derive a darkened lime (same hue + chroma, lower
-     lightness) for legible links in light mode. Dark mode overrides this with
-     --primary directly (already light-on-dark). First line is a plain fallback
-     for browsers without relative-color syntax. */
-  --doc-accent: oklch(0.52 0.15 131);
-  --doc-accent: oklch(from var(--color-primary) 0.52 c h);
-  --doc-border: var(--color-border, #e6e4df);
-  --doc-accent-bg: var(--color-surface-muted, #f1f1f0);   /* subtle fill: TOC, blockquote */
-  --code-bg: var(--color-surface-muted, #f5f3ee);          /* code, table header */
+  --bg: var(--background, #ffffff);
+  --fg: var(--foreground, #1f1d1a);
+  --doc-muted: var(--muted-foreground, #6b6a66);
+  /* Link/accent TEXT color. --primary is already a legible fill/text color at its
+     own lightness (verified per-mode in design-system-spec.md § Accessibility),
+     so unlike the old lime-based derivation this needs no relative-color
+     adjustment — use it directly in both modes. */
+  --doc-accent: var(--primary, #195f97);
+  --doc-border: var(--border, #e6e4df);
+  --doc-accent-bg: var(--muted, #f1f1f0);   /* subtle fill: TOC, blockquote */
+  --code-bg: var(--muted, #f5f3ee);          /* code, table header */
 
-  /* Page canvas + content card (shadcn dashboard look: white card on a canvas). */
-  --doc-canvas: var(--color-surface-muted, #f1f1f0);  /* light: subtle slate/gray behind the card */
-  --doc-card: var(--color-surface-raised, #ffffff);   /* the content card itself */
+  /* Page canvas + content card (dashboard look: white card on a tinted canvas). */
+  --doc-canvas: var(--muted, #f1f1f0);  /* light: subtle gray behind the card */
+  --doc-card: var(--card, #ffffff);   /* the content card itself */
 
   /* Radii — reuse the token scale when present. */
   --doc-radius-sm: var(--radius-sm, 4px);
@@ -60,13 +66,11 @@
    own dark values. Applied on OS-dark and on an explicit `.dark` class. */
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --doc-accent: var(--color-primary);
     --doc-canvas: var(--background);   /* darkest surface, so the raised card stands out */
   }
 }
 
 :root.dark {
-  --doc-accent: var(--color-primary);
   --doc-canvas: var(--background);
 }
 
@@ -225,18 +229,31 @@ th, td {
   padding: 0.5rem 0.75rem;
   border-bottom: 1px solid var(--doc-border);
   vertical-align: top;
+  /* seceng finding (PR #48): no overflow-wrap meant a single long unbroken
+     identifier (a package path, a column of code-wrapped values) pushed
+     the whole table past the content column in every doc — SECURITY's
+     controls table measured 969px in a 782px column before seceng-2
+     patched it with a doc-local <style>. Fixed here globally instead, so
+     every doc's tables get it for free. */
+  overflow-wrap: anywhere;
+}
+
+td code, th code {
+  /* `code` defaults to no-wrap-friendly inline text; without this, the
+     overflow-wrap above can't break a long inline code span inside a cell. */
+  white-space: normal;
 }
 
 th {
   font-weight: 600;
-  /* Primary (lime) header — the button pairing: lime fill + dark-green
-     on-primary text, with a matching on-primary underline. */
-  color: var(--color-on-primary);
-  background: var(--color-primary);
-  border-bottom: 2px solid var(--color-on-primary);
+  /* Primary (blue) header — the button pairing: primary fill + its own
+     foreground text, with a matching underline. */
+  color: var(--primary-foreground);
+  background: var(--primary);
+  border-bottom: 2px solid var(--primary-foreground);
 }
 
-tbody tr:hover { background: color-mix(in srgb, var(--color-primary) 12%, transparent); }
+tbody tr:hover { background: color-mix(in srgb, var(--primary) 12%, transparent); }
 
 ul, ol { padding-left: 1.5rem; }
 li { margin: 0.25rem 0; }
@@ -300,8 +317,15 @@ blockquote {
   padding: 1rem;
   margin: 0 0 1.5rem;
   text-align: center;
-  overflow-x: auto;
+  overflow-x: auto; /* fallback if a diagram still exceeds the container below */
 }
+
+/* mermaid-init.js renders with useMaxWidth:false (an explicit width/height
+   attribute on the <svg>, required so Chrome paints it when printing — see that
+   file's comment) rather than mermaid's own responsive mode. This scales the
+   rendered SVG down to fit its container on screen AND on the printed page
+   without touching that JS setting, so both stay fixed at once. */
+.mermaid svg { max-width: 100%; height: auto; }
 
 footer.doc-footer {
   margin-top: 4rem;

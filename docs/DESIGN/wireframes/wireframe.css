@@ -1,0 +1,273 @@
+/*
+ * wireframe.css — low-fidelity structural styling shared by wireframes/*.html.
+ *
+ * Deliberately greyscale/box-only — structure before style. Do not reference
+ * tokens.css here; that's the point of a wireframe. Promote a screen to
+ * styled-screens/ (which does consume tokens.css + screen.css) once its
+ * layout is agreed.
+ */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  color: #333;
+  background: #fafafa;
+}
+
+/* Shell (pass 4; scope narrowed pass 8 — see .wf-app-shell below): a
+   simple topbar-over-content stack. As of pass 8 this is used only by
+   the two screens that have no sidebar at all (membership-setup.html,
+   admin.html) — every sidebar-bearing screen uses .wf-app-shell instead. */
+.wf-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header (pass 5; superseded pass 8 for sidebar screens, see
+   .wf-app-topbar below) — brand lockup left, entity selector right. */
+.wf-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 2px dashed #999;
+}
+
+.wf-avatar-cluster { display: flex; }
+.wf-avatar-cluster .wf-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #ccc; border: 2px solid #fafafa;
+  margin-left: -8px; display: flex; align-items: center; justify-content: center;
+  font-size: 10px; color: #555;
+}
+.wf-avatar-cluster .wf-avatar:first-child { margin-left: 0; }
+
+.wf-shell-body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  align-items: stretch; /* pass 5: sidebar stretches full height, option A */
+}
+
+/* .wf-sidebar / .wf-sidebar-toggle (pass 4/5, the floating-card sidebar
+   with a bottom chevron) are superseded by .wf-app-shell's
+   .wf-app-sidebar below (pass 8) for every screen that has a sidebar.
+   `.wf-shell` / `.wf-shell-body` above stay as-is — still used by the
+   two shell-less pages (membership-setup.html, admin.html) that keep a
+   simple topbar-over-content stack with no sidebar at all. */
+
+/* ---------- App shell with sidebar (pass 8, 2026-10-02 — Principal
+   review 5, shadcn Sidebar pattern): the sidebar fills the entire
+   viewport height and sits flush left; the topbar starts to its right,
+   not above it. See screen.css for the styled/token equivalent and
+   design-system-spec.md § Layout & shell for the full rationale. ---------- */
+.wf-app-shell {
+  min-height: 100vh;
+  display: flex;
+}
+
+.wf-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.wf-app-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: 2px dashed #999;
+  background: #fff;
+}
+.wf-topbar-left { display: flex; align-items: center; gap: 12px; }
+.wf-topbar-right { display: flex; align-items: center; gap: 4px; }
+.wf-icon-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: 1px dashed #999; border-radius: 4px; font-size: 13px; }
+.wf-icon-btn.disabled { opacity: 0.4; }
+.wf-icon-btn.active { background: #eee; border-color: #333; } /* e.g. the gear on Settings itself — no sidebar nav item to mark active instead */
+.wf-breadcrumbs { font-size: 14px; font-weight: 600; }
+.wf-breadcrumbs .wf-crumb { color: #888; font-weight: 400; }
+
+.wf-app-sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: #2a2a2a;
+  color: #eee;
+  display: flex;
+  flex-direction: column;
+  position: fixed; /* not sticky — a wireframe's own note-banner above the
+    shell would otherwise offset a sticky sidebar below y=0, same fix as
+    screen.css's .sidebar; fixed pins it to the viewport itself */
+  top: 0;
+  left: 0;
+  height: 100vh;
+  padding: 12px;
+  border-radius: 0 8px 8px 0;
+}
+
+.wf-main { margin-left: 200px; }
+.wf-app-sidebar .wf-nav-item { border-color: #555; color: #eee; }
+
+.wf-sidebar-top { padding: 4px 4px 12px; border-bottom: 1px dashed #555; margin-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.wf-sidebar-nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
+.wf-sidebar-bottom { margin-top: auto; border-top: 1px dashed #555; padding-top: 8px; position: relative; }
+.wf-sidebar-avatar-trigger { display: flex; align-items: center; gap: 8px; padding: 6px 4px; cursor: pointer; }
+.wf-sidebar-user-name { font-size: 12px; }
+.wf-avatar-popover { position: absolute; bottom: calc(100% + 6px); left: 0; width: 180px; background: #fff; color: #333; border: 1px solid #999; border-radius: 6px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+.wf-avatar-popover div { padding: 6px 8px; font-size: 12px; border-bottom: 1px dashed #eee; }
+.wf-avatar-popover div:last-child { border-bottom: none; color: #c33; }
+
+.wf-app-content { padding: 20px 24px; }
+
+.wf-content {
+  padding: 24px;
+}
+
+.wf-box {
+  border: 1.5px solid #999;
+  border-radius: 4px;
+  padding: 12px;
+  margin-bottom: 16px;
+  background: #fff;
+}
+
+.wf-box-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #888;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.wf-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.wf-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.wf-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+
+.wf-placeholder-text {
+  height: 8px;
+  background: #ddd;
+  border-radius: 2px;
+  margin: 4px 0;
+}
+.wf-placeholder-text.w60 { width: 60%; }
+.wf-placeholder-text.w40 { width: 40%; }
+.wf-placeholder-text.w80 { width: 80%; }
+
+.wf-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px dashed #ddd;
+}
+
+.wf-chip {
+  display: inline-block;
+  border: 1px dashed #999;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  color: #666;
+}
+
+.wf-note {
+  font-size: 12px;
+  color: #b45309;
+  border: 1px dashed #b45309;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+h1, h2, h3 { font-weight: 600; margin: 0 0 12px; }
+.wf-nav-item { padding: 8px; border: 1px dashed #ccc; border-radius: 4px; margin-bottom: 6px; }
+
+/* ---------- Accordion (pass 7 — Transactions' three urgency-ordered
+   cards: Exceptions, Pending, Posted) ---------- */
+.wf-accordion-card { border: 1.5px solid #999; border-radius: 4px; margin-bottom: 16px; background: #fff; overflow: hidden; }
+.wf-accordion-header {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 12px; font-weight: 600; background: #f0f0f0; border-bottom: 1.5px solid #999;
+}
+.wf-accordion-header .wf-count { font-weight: 400; color: #888; font-size: 12px; }
+.wf-accordion-body { padding: 12px; }
+.wf-show-n { font-size: 11px; color: #888; border: 1px dashed #999; border-radius: 999px; padding: 2px 8px; }
+
+/* ---------- Pending row expansion (two-leg preview) ---------- */
+.wf-pending-row { border: 1px dashed #ccc; border-radius: 4px; margin-bottom: 8px; }
+.wf-pending-summary { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; cursor: pointer; }
+.wf-expand-panel { border-top: 1px dashed #ccc; padding: 12px; background: #fafafa; }
+.wf-leg-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 12px; }
+.wf-leg-locked { color: #888; }
+.wf-leg-suggested { }
+.wf-expand-actions { display: flex; justify-content: space-between; margin-top: 10px; }
+
+/* ---------- Split grid (Flow A) ---------- */
+.wf-split-grid { border: 1px dashed #999; border-radius: 4px; padding: 10px; margin-top: 8px; }
+.wf-split-row { display: flex; gap: 8px; padding: 4px 0; font-size: 12px; align-items: center; }
+.wf-split-total { font-size: 11px; color: #888; text-align: right; margin-top: 6px; }
+
+/* ---------- Bulk action bar (Flow B) ---------- */
+.wf-bulk-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  border: 1.5px dashed #333; border-radius: 999px; padding: 8px 16px;
+  background: #222; color: #fff; margin: 8px 0 16px;
+}
+
+/* ---------- Modal overlay (JE modal, provider-item modal) ----------
+   Wireframes are static, so a "modal" renders as an inset bordered panel
+   representing the overlay state, not a real toggle. */
+.wf-modal-overlay {
+  border: 2px solid #333; border-radius: 8px; padding: 20px;
+  background: #fff; margin: 16px 40px; box-shadow: 0 0 0 4000px rgba(0,0,0,0.15);
+}
+.wf-modal-title { font-weight: 600; font-size: 16px; margin-bottom: 4px; }
+.wf-modal-subtitle { font-size: 12px; color: #888; margin-bottom: 16px; }
+
+/* ---------- Chart-of-accounts tree (pass 7 — General Ledger) ---------- */
+.wf-tree-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 6px 0; border-bottom: 1px dashed #eee; font-size: 13px;
+}
+.wf-tree-row.depth-0 { font-weight: 700; padding-top: 12px; }
+.wf-tree-row.depth-1 { padding-left: 20px; font-weight: 600; }
+.wf-tree-row.depth-2 { padding-left: 40px; color: #555; }
+.wf-tree-row a { color: #333; text-decoration: none; border-bottom: 1px dotted #999; }
+.wf-custodial-marker { font-size: 10px; border: 1px dashed #999; border-radius: 999px; padding: 1px 6px; margin-left: 6px; color: #888; }
+
+/* ---------- Account register breadcrumb ---------- */
+.wf-breadcrumb { font-size: 12px; color: #888; margin-bottom: 8px; }
+.wf-breadcrumb a { color: #666; }
+
+/* ---------- Custodial account card + lots sub-card (pass 7) ---------- */
+.wf-custodial-card { border: 1.5px solid #999; border-radius: 4px; margin-bottom: 16px; background: #fff; }
+.wf-custodial-header { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1.5px solid #999; }
+.wf-custodial-header .wf-institution { font-size: 12px; color: #888; }
+.wf-lots-subcard { margin: 12px; border: 1px dashed #999; border-radius: 4px; padding: 10px; }
+.wf-lots-security-row { display: flex; justify-content: space-between; padding: 6px 0; cursor: pointer; font-weight: 600; }
+.wf-lots-detail { padding: 4px 0 4px 16px; font-size: 12px; border-top: 1px dashed #eee; }
+.wf-gain-positive { color: #2a7; }
+.wf-gain-negative { color: #c33; }
+
+/* ---------- Link health badge ---------- */
+.wf-link-health { font-size: 11px; border: 1px dashed #999; border-radius: 999px; padding: 2px 8px; }
+.wf-link-health.ok { color: #2a7; }
+.wf-link-health.warning { color: #b45309; border-color: #b45309; }
+
+/* ---------- Provider-item modal (source-type picker, mapping step) ---------- */
+.wf-source-type-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.wf-source-type-row span { border: 1px dashed #999; border-radius: 4px; padding: 6px 12px; font-size: 12px; }
+.wf-source-type-row span.selected { border: 2px solid #333; font-weight: 600; }
+.wf-mapping-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }

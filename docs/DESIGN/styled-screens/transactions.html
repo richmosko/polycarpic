@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Transactions</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<div class="shell">
+  <!-- Sidebar (pass 8 — see styled-screens/dashboard.html for the full
+       rebuild note): fixed, full viewport height, brand top item, seven
+       nav items (no Settings), avatar trigger at the bottom (closed here
+       — dashboard.html shows the popover "open" as the built reference). -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand-lockup"><span class="brand-icon"></span><span class="sidebar-brand-label">Polycarpic</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item active" href="#"><span class="nav-icon"></span><span class="nav-label">Transactions</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">General Ledger</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Custodial Accounts</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Allocation</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Reports</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"></span><span class="nav-label">Entities</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="sidebar-avatar-trigger">
+        <span class="avatar">M</span>
+        <span class="sidebar-user-name">Mosko</span>
+        <span class="sidebar-user-chevron">▾</span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="shell-main">
+    <!-- Header (pass 8): starts right of the sidebar. Household entity
+         shown here (vs. dashboard.html's Person) to demonstrate the
+         avatar cluster with more than one member — see
+         design-system-spec.md § Header for the max-shown + overflow rule. -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle-header" aria-label="Collapse sidebar">☰</button>
+        <div class="breadcrumbs"><span class="crumb">Transactions</span></div>
+      </div>
+      <div class="topbar-right">
+        <button class="entity-selector">
+          <span class="entity-selector-name">The Moskos (Household)</span>
+          <span class="avatar-cluster">
+            <span class="avatar">M</span>
+            <span class="avatar">S</span>
+          </span>
+        </button>
+        <button class="icon-btn" disabled title="AI/Agent — greyed in v1">✨</button>
+        <button class="icon-btn" title="Search">🔍</button>
+        <button class="icon-btn" title="Notifications">🔔</button>
+        <button class="icon-btn" title="Settings">⚙</button>
+      </div>
+    </header>
+
+  <main class="content">
+    <div class="header-row">
+      <span></span>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-outline">Sync Transactions</button>
+        <button class="btn btn-default">+ New entry</button>
+      </div>
+    </div>
+
+    <div class="link-health-banner warning">
+      <span>⚠</span>
+      <span><strong>Coinbase</strong> — token expired, needs re-auth. <strong>Fidelity</strong> synced 14 min ago.</span>
+    </div>
+
+    <!-- ============ Exceptions — most urgent ============ -->
+    <div class="card accordion-card" style="padding:0;">
+      <div class="accordion-header">
+        <span class="accordion-title">Exceptions <span class="accordion-count">— unmatched transfer legs &gt; 3 business days (1)</span></span>
+        <select class="select show-n-select"><option>Show 10</option></select>
+      </div>
+      <div class="accordion-body">
+        <table class="data-table">
+          <tbody>
+            <tr><td>Sep 5</td><td>Cash in Transit — source leg only</td><td>Transfer</td><td><span class="badge badge-destructive">Overdue</span></td><td class="amount negative">−$500.00</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ============ Pending — the review/match inbox ============ -->
+    <div class="card accordion-card" style="padding:0;">
+      <div class="accordion-header">
+        <span class="accordion-title">Pending <span class="accordion-count">— unposted, needs review (3)</span></span>
+        <select class="select show-n-select"><option>Show 25</option></select>
+      </div>
+      <div class="accordion-body">
+        <div class="bulk-bar">
+          <span>2 selected</span>
+          <span style="display:flex; gap:8px;">
+            <button class="btn btn-secondary">Group &amp; Summarize</button>
+            <button class="btn btn-outline">Clear</button>
+          </span>
+        </div>
+
+        <!-- Collapsed row -->
+        <div class="pending-row">
+          <div class="pending-summary">
+            <span><input type="checkbox" class="pending-checkbox">Sep 12 · Stripe Payout</span>
+            <span class="amount positive">+$1,500.00 ▾</span>
+          </div>
+        </div>
+
+        <!-- Expanded row — "Auto-Suggest Match" -->
+        <div class="pending-row">
+          <div class="pending-summary">
+            <span><input type="checkbox" class="pending-checkbox">Sep 12 · Office Supply Co.</span>
+            <span class="amount negative">−$84.20 ▴</span>
+          </div>
+          <div class="pending-expand">
+            <div class="eyebrow" style="margin-bottom:10px;">Account suggestions — double-entry preview</div>
+            <div class="leg-row leg-locked"><span class="leg-label">🔒 Line 1 — Debit: Plaid Custodial Cash Account</span><span>$84.20</span></div>
+            <div class="leg-row"><span class="leg-label">Line 2 — Credit: <select class="select" style="display:inline-block; width:auto;"><option>Office Expense</option></select></span><span>$84.20</span></div>
+            <div class="pending-actions">
+              <span class="secondary-actions">
+                <button class="btn btn-outline">Group with others</button>
+                <button class="btn btn-outline">Split transaction</button>
+              </span>
+              <button class="btn btn-default">Approve &amp; Post</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expanded + split (Flow A) -->
+        <div class="pending-row">
+          <div class="pending-summary">
+            <span><input type="checkbox" class="pending-checkbox" checked>Sep 11 · Custodial Payout — Fidelity</span>
+            <span class="amount negative">−$1,200.00 ▴</span>
+          </div>
+          <div class="pending-expand">
+            <div class="eyebrow" style="margin-bottom:10px;">Split transaction — multi-column grid</div>
+            <div class="split-grid">
+              <div class="split-row"><span>Line 1 🔒</span><span>Debit</span><span>Plaid Custodial Cash Account</span><span class="amount">$1,200.00</span></div>
+              <div class="split-row"><span>Line 2</span><span>Credit</span><select class="select"><option>Platform Fee Expense</option></select><span class="amount">$20.00</span></div>
+              <div class="split-row"><span>Line 3</span><span>Credit</span><select class="select"><option>Custodial Clearing</option></select><span class="amount">$1,180.00</span></div>
+              <div class="split-row"><button class="btn btn-outline" style="font-size:12px; padding:4px 10px;">+ Add row</button></div>
+              <div class="split-total balanced">Split total $1,200.00 = Plaid total $1,200.00 — balanced</div>
+            </div>
+            <div class="pending-actions">
+              <button class="btn btn-outline">Cancel split</button>
+              <button class="btn btn-default">Approve &amp; Post</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ Posted — paged, least urgent ============ -->
+    <div class="card accordion-card" style="padding:0;">
+      <div class="accordion-header">
+        <span class="accordion-title">Posted <span class="accordion-count">— 214 entries</span></span>
+        <select class="select show-n-select"><option>Show 25</option></select>
+      </div>
+      <div class="accordion-body">
+        <table class="data-table">
+          <thead>
+            <tr><th>Date</th><th>Payee</th><th>Category</th><th></th><th>Status</th><th style="text-align:right;">Amount</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Sep 10</td><td>Streaming Svc</td><td>Subscriptions</td><td></td>
+              <td><span class="badge badge-outline">Posted</span></td>
+              <td class="amount negative">−$12.99</td>
+              <td><button class="row-action">Correct entry</button></td>
+            </tr>
+            <tr>
+              <td>Sep 9</td><td>Office Supply Co.</td><td>Office expense</td><td></td>
+              <td><span class="badge badge-corrected"><span class="badge-dot"></span>Corrected</span></td>
+              <td class="amount negative">−$68.50</td>
+              <td><button class="row-action">View correction ⌄</button></td>
+            </tr>
+            <tr>
+              <td>Sep 9</td><td>Property Mgmt Co.</td><td>Rent</td><td></td>
+              <td>
+                <span class="badge badge-outline">Posted</span>
+                <div class="row-meta">posted by rule — Recurring rent</div>
+              </td>
+              <td class="amount negative">−$2,200.00</td>
+              <td><button class="row-action">Correct entry</button></td>
+            </tr>
+          </tbody>
+        </table>
+        <!-- Click-through state (pass 6) — the Corrected row above, expanded. -->
+        <div class="correction-trail">
+          <div class="trail-label">Original entry (Sep 8) — reversed</div>
+          <div class="trail-row struck"><span>Dr Office expense</span><span>$84.20</span></div>
+          <div class="trail-row struck"><span>Cr Checking</span><span>−$84.20</span></div>
+          <div class="trail-label">Reversal (Sep 9)</div>
+          <div class="trail-row"><span>Cr Office expense</span><span>−$84.20</span></div>
+          <div class="trail-row"><span>Dr Checking</span><span>$84.20</span></div>
+          <div class="trail-label">Corrected entry (Sep 9)</div>
+          <div class="trail-row"><span>Dr Office expense</span><span>$68.50</span></div>
+          <div class="trail-row"><span>Cr Checking</span><span>−$68.50</span></div>
+        </div>
+        <div style="text-align:center; margin-top:16px; font-size:13px; color:var(--muted-foreground);">‹ Prev · Page 1 of 9 · Next ›</div>
+      </div>
+    </div>
+
+    <!-- ============ Journal-entry modal (pass 7, new) ============
+         Reused for manual "+ New entry", Correct entry, Split, and Group &
+         Summarize. Shown "open" here as the built reference, same
+         convention as .correction-trail above. -->
+    <div class="je-modal-scrim">
+      <div class="je-modal">
+        <div class="je-modal-title">New journal entry</div>
+        <div class="je-modal-subtitle">Header + legs — the same modal reused for Correct entry, Split, and Group &amp; Summarize, pre-filled differently per entry point.</div>
+        <div style="display:flex; gap:16px; margin-bottom:16px;">
+          <div style="flex:1;"><label style="font-size:13px; font-weight:500;">Date</label><input class="input" style="width:100%; margin-top:4px;" value="Sep 12, 2026"></div>
+          <div style="flex:2;"><label style="font-size:13px; font-weight:500;">Memo</label><input class="input" style="width:100%; margin-top:4px;" placeholder="Optional memo"></div>
+        </div>
+        <div class="eyebrow" style="margin-bottom:8px;">Legs</div>
+        <div class="split-grid">
+          <div class="split-row je-leg"><select class="select"><option>Debit</option></select><select class="select"><option>Account…</option></select><input class="input" placeholder="$0.00"></div>
+          <div class="split-row je-leg"><select class="select"><option>Credit</option></select><select class="select"><option>Account…</option></select><input class="input" placeholder="$0.00"></div>
+          <div class="split-row"><button class="btn btn-outline" style="font-size:12px; padding:4px 10px;">+ Add leg</button></div>
+          <div class="split-total unbalanced">Σ Debits must equal Σ Credits to post — gate fails otherwise, stays in Pending</div>
+        </div>
+        <div class="je-modal-footer">
+          <button class="btn btn-outline">Cancel</button>
+          <button class="btn btn-default" disabled>Post</button>
+        </div>
+      </div>
+    </div>
+
+    <p style="font-size:12px; color:var(--muted-foreground); margin-top:16px;">Posting gates: Σ debits = Σ credits; accounting equation holds per entity; entry date matches bank date (or the Cash-in-Transit rule for mismatched dates); every posted draft links to exactly one entry. The locked leg is always the custodial cash side. Viewers see no Sync / New entry / Post actions on this page.</p>
+  </main>
+  </div>
+</div>
+</body>
+</html>
