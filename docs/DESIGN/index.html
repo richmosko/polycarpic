@@ -19,8 +19,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.7</span>
-    <span><strong>Last updated:</strong> 2026-10-01</span>
+    <span><strong>Version:</strong> 0.8</span>
+    <span><strong>Last updated:</strong> 2026-10-02</span>
   </div>
 </header>
 
@@ -139,8 +139,10 @@
       <tr><td>Net-worth hero</td><td>Chart (LayerChart, Area)</td><td>Big figure + signed delta on the figure + single-line area chart — direct Monarch pattern</td></tr>
       <tr><td>Grouped account list</td><td>Table / custom</td><td>Type-grouped rows with sparkline + freshness — direct Monarch pattern</td></tr>
       <tr><td>Segmented bar + legend</td><td>Custom, tokens-driven</td><td>Assets/Liabilities, allocation actual-vs-target — direct Monarch pattern</td></tr>
-      <tr><td>Badge</td><td>Badge</td><td>Entity/account/transaction status — see Financial semantics</td></tr>
-      <tr><td>Transaction table</td><td>Table</td><td>Ledger, import staging, exceptions report</td></tr>
+      <tr><td>Badge</td><td>Badge</td><td>Entity/account/transaction status, link-health — see Financial semantics</td></tr>
+      <tr><td>Transaction table</td><td>Table</td><td>Account register, exceptions report, lots</td></tr>
+      <tr><td>Accordion <em>(pass 7, new)</em></td><td>Accordion</td><td>Transactions' three urgency-ordered cards (Exceptions/Pending/Posted); Pending row expansion</td></tr>
+      <tr><td>Near-full-screen modal <em>(pass 7, new)</em></td><td>Dialog</td><td>Journal-entry modal (header + legs) — manual entry, Correct entry, Split, Group &amp; Summarize</td></tr>
       <tr><td>Entity switcher</td><td>Tabs / Sidebar</td><td>Switch between Person/Trust/Business/Household</td></tr>
       <tr><td>Transaction detail</td><td>Sheet</td><td>Drill into a posted/draft entry, its journal lines, source doc</td></tr>
       <tr><td>Empty state</td><td>Card + plain text, no skeleton</td><td>Dashboard panels not yet shipped (tax at 1.0, allocation at M4) — see styled-screens/dashboard.html</td></tr>
@@ -183,7 +185,7 @@ flowchart TD
   </ul>
 
   <h3 id="flow-import-confirm">5.2 Import, confirm &amp; correct transactions</h3>
-  <p class="section-hint"><strong>Story (PRD §4.2):</strong> staged drafts → reviewed → posted. Source: <a href="flows/import-confirm-flow.md">flows/import-confirm-flow.md</a>.</p>
+  <p class="section-hint"><strong>Story (PRD §4.2):</strong> staged drafts → reviewed → posted. Source: <a href="flows/import-confirm-flow.md">flows/import-confirm-flow.md</a>. <strong>Pass 7:</strong> this screen is now <strong>Transactions</strong> ("Ledger"/"Import" renamed/retired, see § Sidebar information architecture) — the shape below is still accurate at a high level; the Plaid bank-feed review mechanics (expansion, split, group) land with the rebuilt screen.</p>
   <pre class="mermaid">
 flowchart TD
   poll([Provider adapter polls\nor fake source generates batch]) --> stage[Stage as draft transactions\nunposted, editable]
@@ -202,7 +204,7 @@ flowchart TD
   edit -- no --> confirm[User confirms]
   confirm --> post[Post as journal entry\nsource becomes immutable]
   post --> toast[Toast: batch posted]
-  post --> ledger([Appears in ledger,\nposted badge])
+  post --> ledger([Appears on Transactions,\nposted badge])
   exceptions --> resolve{Resolved manually?}
   resolve -- yes --> post
   resolve -- no --> exceptions
@@ -251,30 +253,29 @@ flowchart TD
     <li><strong>Addendum, pass 6:</strong> two figures, both measured against the custodial account's balance but not against each other — <strong>Pending liability = annualized tax to date − custodial prepaid balance</strong> (what you'd owe net of prepayments, if filed today); <strong>Gap = required payments to date (safe-harbor) − custodial balance</strong> ("are you current with the authority"). Gap is never <code>required − pending</code>.</li>
   </ul>
 
-  <h3 id="flow-securities-lots">5.4 Securities lots &amp; balance sheet reconciliation</h3>
-  <p class="section-hint"><strong>Stories (PRD §4.5–4.7):</strong> GL vs. custodial reconciliation, allocation vs. target. Source: <a href="flows/securities-lots-flow.md">flows/securities-lots-flow.md</a>.</p>
+  <h3 id="flow-securities-lots">5.4 Custodial reconciliation, lots &amp; allocation</h3>
+  <p class="section-hint"><strong>Stories (PRD §4.5–4.7):</strong> GL vs. custodial reconciliation, allocation vs. target. Source: <a href="flows/securities-lots-flow.md">flows/securities-lots-flow.md</a>. <strong>Pass 7:</strong> "Securities" is gone as a nav item — lots are now a Custodial Accounts sub-card, GL vs. custodial is two nav items not a toggle, Allocation is its own page.</p>
   <pre class="mermaid">
 flowchart TD
-  view([Open Securities view\nfor entity]) --> lots[Lot table per custodial account:\nbook value, market value, cost basis]
-  lots --> priceFeed[Daily EOD price feed\nupdates market value]
-  priceFeed --> lots
-  lots --> toggle{Balance sheet basis}
-  toggle -- GL --> glSheet[Balance sheet by GL account]
-  toggle -- Custodial --> custSheet[Balance sheet by custodial account\nplus NAV delta from prior book period]
-  glSheet --> reconcile[Reconcile GL balance\nagainst custodian-reported balance]
-  custSheet --> reconcile
+  view([Open Custodial Accounts\nfor entity]) --> accounts[Per-account cards:\nreported balance, link-health badge]
+  accounts --> lotsCard[Lots sub-card per security:\npull-down shows lots,\nshort/long/total gain per lot + summed]
+  lotsCard --> priceFeed[Daily EOD price feed\nupdates market value]
+  priceFeed --> lotsCard
+  accounts --> reconcile[Reconcile GL balance\nagainst custodian-reported balance]
   reconcile --> match{Balances match\nwithin tolerance?}
   match -- yes --> clean[Reconciliation: clean\npositive tier]
   match -- no --> break[Reconciliation: break\ndanger tier, flagged]
-  clean --> allocation[Asset-allocation view:\nactual vs. target]
-  break --> allocation
-  allocation --> adjust{User adjusts target?}
+  clean --> glLink[General Ledger account register\nshows the same balance, GL side]
+  break --> glLink
+  glLink --> allocLink([Allocation: actual vs. target,\nits own nav item])
+  allocLink --> adjust{User adjusts target?}
   adjust -- yes --> saveTarget[Save new target allocation]
-  saveTarget --> allocation
+  saveTarget --> allocLink
   adjust -- no --> done([View complete])
   </pre>
   <ul>
-    <li>GL-vs-custodial is a <code>Tabs</code> toggle on one screen, not two separate pages.</li>
+    <li><strong>No toggle (pass 7):</strong> General Ledger and Custodial Accounts are two separate nav items, not one screen behind a <code>Tabs</code> switch.</li>
+    <li>Book-vs-market is implicit on the lots sub-card's own gain/loss figures, not a separate chart.</li>
     <li>A reconciliation break uses the danger tier (<code>--destructive</code>) and must surface on the Dashboard glance too.</li>
   </ul>
 
@@ -305,27 +306,30 @@ flowchart TD
 
 <section id="wireframes" data-section="wireframes">
   <h2>6. Wireframes</h2>
-  <p class="section-hint">Low-fidelity layout of each key screen — structure before style. Assets in <a href="wireframes/">wireframes/</a>.</p>
+  <p class="section-hint">Low-fidelity layout of each key screen — structure before style. Assets in <a href="wireframes/">wireframes/</a>. <strong>Pass 7 (2026-10-02):</strong> reorganized for the eight-item sidebar (design-system-spec.md § Sidebar information architecture) — rolling out across stages 2–5 of the same pass; items not yet rebuilt are marked pending rather than linked to a stale file.</p>
   <ul>
     <li><a href="wireframes/dashboard.html">Dashboard</a> — per-entity financial health</li>
-    <li><a href="wireframes/ledger.html">Ledger / Transactions</a> — import staging + confirm</li>
-    <li><a href="wireframes/accounts.html">Accounts</a> — GL vs. custodial balance sheet</li>
-    <li><a href="wireframes/entities.html">Entities / Memberships</a></li>
-    <li><a href="wireframes/securities.html">Securities / Lots</a> — lot table + allocation view</li>
-    <li><a href="wireframes/import.html">Import</a> — provider link + batch review</li>
+    <li>Transactions <em>(stage 2, pending)</em> — three urgency-ordered accordion cards (Exceptions/Pending/Posted), Pending inbox rebuilt around the Plaid review/match workflow. Today's interim link: <a href="wireframes/ledger.html">wireframes/ledger.html</a> (pre-pass-7 shape, to be renamed <code>transactions.html</code>).</li>
+    <li>General Ledger <em>(stage 3, pending)</em> — chart-of-accounts tree + per-account register page.</li>
+    <li>Custodial Accounts <em>(stage 4, pending)</em> — absorbs the old Accounts' custodial half + Securities' lots. Today's interim link: <a href="wireframes/accounts.html">wireframes/accounts.html</a> (pre-pass-7 shape, to be renamed <code>custodial-accounts.html</code>).</li>
+    <li>Allocation <em>(stage 5, pending)</em> — actual-vs-target, promoted out of the old Securities screen.</li>
+    <li>Reports <em>(stage 5, pending)</em> — Balance Sheet / Income Statement / Cash Flow, low fidelity; empty state until POLY-M5.</li>
+    <li><a href="wireframes/entities.html">Entities</a> — unaffected by the sidebar rework</li>
+    <li>Settings <em>(stage 5, pending)</em> — batch-import schedule/options + app preferences.</li>
     <li><a href="wireframes/home.html">Home</a> <em>(pass 4, corrected)</em> — public pre-auth landing page</li>
     <li><a href="wireframes/login.html">Login</a> <em>(pass 4, new; corrected pass 6)</em> — split screen, centered form pane</li>
     <li><a href="wireframes/membership-setup.html">Membership setup</a> <em>(pass 6, new)</em> — dashboard first-run / no-membership empty state, linked from flow 5.1</li>
-    <li><a href="wireframes/sidebar-cues.html">Sidebar expand/collapse cues</a> <em>(pass 4, decided pass 5)</em> — option A (chevron) chosen, B/C kept for the record</li>
+    <li><a href="wireframes/sidebar-cues.html">Sidebar expand/collapse cues</a> <em>(pass 4, decided pass 5)</em> — option A (chevron) chosen, B/C kept for the record; unaffected by the pass-7 item-list change</li>
   </ul>
+  <p class="section-hint"><strong>Gone as of pass 7:</strong> <code>wireframes/securities.html</code> and <code>wireframes/import.html</code> are retired once stages 4–5 land (content absorbed above) — not deleted yet, to avoid breaking in-flight links mid-rollout.</p>
 </section>
 
 <section id="styled-screens" data-section="styled-screens">
   <h2>7. Styled Screens</h2>
-  <p class="section-hint">High-fidelity screens that apply the design system to the wireframes, consuming <code>tokens.css</code> + <code>screen.css</code> — a visual regression reference and a head-start for <code>frontend-lead</code>. Prioritized by traffic (PRD §4 stories 1 &amp; 2); remaining screens promote from wireframe fidelity as the design system stabilizes.</p>
+  <p class="section-hint">High-fidelity screens that apply the design system to the wireframes, consuming <code>tokens.css</code> + <code>screen.css</code> — a visual regression reference and a head-start for <code>frontend-lead</code>. Prioritized by traffic (PRD §4 stories 1 &amp; 2); remaining screens promote from wireframe fidelity as the design system stabilizes. <strong>Pass 7:</strong> only Dashboard and Transactions get styled-screen fidelity for now, same traffic-priority rule as before — General Ledger, Custodial Accounts, Allocation, Reports, and Settings stay at wireframe fidelity until there's evidence a styled build is needed before Implement (judgment call, flagged in Open Questions).</p>
   <ul>
     <li><a href="styled-screens/dashboard.html">Dashboard</a></li>
-    <li><a href="styled-screens/ledger.html">Ledger / Transactions</a></li>
+    <li>Transactions <em>(stage 2, pending)</em> — today's interim link: <a href="styled-screens/ledger.html">styled-screens/ledger.html</a> (pre-pass-7 shape, to be renamed <code>transactions.html</code>).</li>
     <li><a href="styled-screens/home.html">Home</a> <em>(pass 4, new)</em></li>
     <li><a href="styled-screens/login.html">Login</a> <em>(pass 4, new)</em></li>
   </ul>
@@ -350,12 +354,13 @@ flowchart TD
   <h2>9. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
+    <li><strong>In progress, pass 7 (2026-10-02):</strong> sidebar reworked to eight items per the Principal's interview (<code>temp/2026-10-02-sidebar-interview.md</code>) — Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, Reports, Entities, Settings. Rolling out across 5 stages on this same branch; stage 1 (this revision) covers the sidebar item list, the Screen data contract, and flow updates. See design-system-spec.md § Sidebar information architecture. <strong>Judgment call:</strong> only Dashboard and Transactions are planned for styled-screen fidelity, matching the existing traffic-priority rule — flag if General Ledger, Custodial Accounts, or Allocation need a styled build sooner.</li>
     <li><strong>Resolved 2026-10-01 (pass 6):</strong> <code>--warning</code> re-hued to a true orange with a dark ink (was brown-reading); light-mode chart ramp brightened; <a href="tokens.html">tokens.html</a> added; Login wireframe corrected to match the centered styled screen; dashboard first-run/empty-state wireframe added (<a href="wireframes/membership-setup.html">membership-setup.html</a>); skeleton-vs-spinner explained in plain words; flow 5.2 reframed around the user-facing "Correct entry" action; flow 5.3 redrawn to remove the app-initiates-payment step.</li>
     <li><strong>Resolved 2026-09-30 (pass 5):</strong> sidebar expand/collapse cue — option A (chevron) chosen; sidebar now full-height; header restructured to brand lockup + entity selector with an avatar cluster; login form pane centered — design-system-spec.md § Header, § Sidebar, § Login.</li>
     <li><strong>Avatar cluster overflow (pass 5):</strong> the "+N" fold for 4th+ members is specified but not yet shown live in either reference screen (both currently have ≤2 members) — worth a quick visual check once a real multi-member entity exists.</li>
     <li><strong>Login's visual pane (pass 4):</strong> built as a brand gradient, not a photo — no photography asset exists for this product. A real photo/illustration asset (in the style of the captured `dribbble` reference) would likely read stronger; flagging as a design-asset gap, not a layout question.</li>
     <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — now higher priority given how central the brand hue is (recommended before lock, design-system-spec.md § Accessibility).</li>
-    <li>The Accounts screen's full grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen (the highest-traffic comparison point) — Accounts itself is still at wireframe fidelity; promote it the same way as a fast-follow if the gap matters before Implement.</li>
+    <li><strong>Superseded by pass 7:</strong> the former Accounts screen's grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen — Accounts itself is now split into General Ledger and Custodial Accounts (both wireframe fidelity, stages 3–4); promote either the same way as a fast-follow if the gap matters before Implement.</li>
     <li>Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.</li>
     <li><code>prototype/</code> throwaway UX prototype (kickoff §2.9) not yet built — confirm ownership/timing with team-lead.</li>
   </ul>

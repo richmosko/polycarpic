@@ -2,6 +2,8 @@
 
 **Story (PRD §4.2):** As the Principal, I want my bank and brokerage transactions imported automatically and staged as drafts, so that I can review and confirm them instead of hand-entering every transaction.
 
+**Pass 7 note (2026-10-02):** the screen this flow describes is now **Transactions** (renamed from "Ledger"; "Import" is gone as a separate nav item — see design-system-spec.md § Sidebar information architecture). This diagram's shape (stage → review → confirm → post → correct) is still accurate at a high level, but the review step is being rebuilt around the Principal's Plaid bank-feed workflow (per-row expansion with a locked debit leg + suggested-offset dropdown, Split grid, bulk Group & Summarize modal) — that mechanical detail lands in the same pass as the rebuilt Transactions screen, not here.
+
 ```mermaid
 flowchart TD
   poll([Provider adapter polls\nor fake source generates batch]) --> stage[Stage as draft transactions\nunposted, editable]
@@ -20,7 +22,7 @@ flowchart TD
   edit -- no --> confirm[User confirms]
   confirm --> post[Post as journal entry\nsource becomes immutable]
   post --> toast[Toast: batch posted]
-  post --> ledger([Appears in ledger,\nposted badge])
+  post --> ledger([Appears on Transactions,\nposted badge])
   exceptions --> resolve{Resolved manually?}
   resolve -- yes --> post
   resolve -- no --> exceptions
