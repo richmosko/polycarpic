@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Architecture &amp; Infrastructure — TBD</title>
+  <title>Architecture &amp; Infrastructure — Polycarpic</title>
   <link rel="stylesheet" href="../_assets/doc.css">
   <link rel="stylesheet" href="../_assets/comments.css">
   <script defer src="../_assets/mermaid-init.js"></script>
@@ -14,12 +14,12 @@
 
 <header class="doc-header">
   <h1>Architecture &amp; Infrastructure</h1>
-  <p class="doc-subtitle"><span class="tbd">Project name — TBD</span></p>
+  <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>architect</code> agent</span>
-    <span><strong>Status:</strong> <span class="tbd">Draft</span></span>
-    <span><strong>Traces to:</strong> <a href="../PRD/">PRD</a></span>
-    <span><strong>Last updated:</strong> <span class="tbd">—</span></span>
+    <span><strong>Status:</strong> Draft v1 — pending SecEng / DevOps / QA folds and Principal review</span>
+    <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1 (Approved 2026-09-27)</a>, <a href="../project_kickoff.md">kickoff record</a></span>
+    <span><strong>Last updated:</strong> 2026-09-27</span>
   </div>
 </header>
 
@@ -27,142 +27,692 @@
   <h2>Contents</h2>
   <ol>
     <li><a href="#context">System Context</a></li>
-    <li><a href="#components">Components</a></li>
+    <li><a href="#components">Components &amp; Layer Model</a></li>
+    <li><a href="#datamodel">Data Model &amp; Database Invariants</a></li>
     <li><a href="#dataflow">Data Flow</a></li>
     <li><a href="#stack">Tech Stack &amp; Rationale</a></li>
+    <li><a href="#research">Plan-phase Research: GL Build-vs-Adopt, Migration Tool</a></li>
     <li><a href="#topology">Deployment Topology</a></li>
     <li><a href="#cicd">CI/CD Pipeline</a></li>
     <li><a href="#integrations">Integration Points</a></li>
     <li><a href="#tradeoffs">Trade-offs &amp; Alternatives</a></li>
+    <li><a href="#roadmap">Milestone Map</a></li>
     <li><a href="#open-questions">Open Questions</a></li>
   </ol>
 </nav>
 
+<!-- ============================================================ -->
 <section id="context" data-section="context">
   <h2>1. System Context</h2>
   <p class="section-hint">The system and the actors around it. C4 context level.</p>
-  <div class="stub">Replace the placeholder diagram. Add a one-paragraph narrative above it.</div>
+
+  <p>Polycarpic is a single self-hosted web application backed by one PostgreSQL database. Users (the Principal, household members holding a membership grant, later native iOS/macOS clients and a user-scoped MCP server) reach it over HTTPS. Inside, a genuine double-entry general ledger lives in Postgres under row-level security keyed on the <em>membership</em> join. Outbound, the system pulls transactions from bank/brokerage aggregators through a provider-agnostic adapter interface (a deterministic fake first, then SimpleFIN, Plaid, and direct broker APIs), end-of-day prices and the CPI-U series as reference data, and sends transactional email through Resend. Identity is local (BetterAuth in our own Postgres) with Google / Apple / GitHub as OAuth identity providers. Nothing about a user's books leaves the box except through a provider call the user initiated or an owner-initiated export.</p>
+
   <pre class="mermaid">
 flowchart LR
-  user(End User) --> system[Our System]
-  system --> dep1(Third-party API — TBD)
-  system --> db[(Data Store — TBD)]
+  users(["Users"]) -->|HTTPS| app
+  clients(["Native, MCP<br/>(later)"]) -->|token| app
+  subgraph inst["Polycarpic instance"]
+    app["Web app<br/>+ API"]
+    worker["Worker"]
+    db[("PostgreSQL")]
+  end
+  app --> idp["Login IdPs,<br/>Resend"]
+  app --> db
+  worker --> db
+  db -.-> backup[("Off-box<br/>backup")]
+  worker --> ext["Banks, brokers,<br/>prices, BLS"]
   </pre>
 </section>
 
+<!-- ============================================================ -->
 <section id="components" data-section="components">
-  <h2>2. Components</h2>
-  <p class="section-hint">3–7 components. Each has a single responsibility, an owner, and clear interfaces.</p>
+  <h2>2. Components &amp; Layer Model</h2>
+  <p class="section-hint">Layers depend only downward. Each layer is one or more workspace packages with its own tests; the boundary is enforced by lint, not convention.</p>
+
+  <h3 id="layers">2.1 Layer model</h3>
+  <p>Kickoff §3 asks for layers defined before details, depending only downward, with narrow interfaces. The model below is the contract. <strong>Rule:</strong> a package may import only packages in a strictly lower layer or in its own layer's shared <code>contracts</code>; <code>packages/*</code> never import SvelteKit; only <code>packages/db</code> opens connections, and only through <code>withTenant()</code> / <code>withSystem()</code> (see <a href="#rls">§3.3</a>). Enforced by <code>eslint-plugin-boundaries</code> (or <code>dependency-cruiser</code>) in CI.</p>
+
+  <pre class="mermaid">
+block-beta
+  columns 4
+  L6["L6 Delivery"] web["Web + API"] wrk["Worker"] ui["UI kit"]
+  L5["L5 Insight"] rep["Reports"] tax["Tax"] pf["Portfolio"]
+  L4["L4 Posting"] post["Drafts, rules, matching, reconciliation"]:3
+  L3["L3 Books"] led["Ledger"] sec["Securities"]:2
+  L2["L2 Sources"] imp["Import + adapters"] ref["Reference data"]:2
+  L1["L1 Identity"] auth["Auth"] ten["Tenancy"] secr["Secrets"]
+  L0["L0 Platform"] dbp["DB access, migrations, PostgreSQL"]:3
+  </pre>
+
+  <p><strong>Why import sits below the books.</strong> Kickoff §2.6 calls import "the lowest non-infrastructure layer". That holds for the <em>raw</em> side — adapters, the raw-transaction store and de-dup depend on nothing domain-level, so they sit at L2. Confirmation, rules and transfer matching need both raw rows and the ledger, so they are split into <code>posting</code> (L4). This keeps "raw data arrives first" true while dependencies stay strictly downward. The ledger never imports the importer: a journal entry carries an opaque <code>source_ref</code>; the two-way link and the posted-status flip happen inside one database transaction owned by <code>posting</code>.</p>
+
+  <h3 id="component-table">2.2 Components</h3>
   <table>
     <thead><tr><th>Component</th><th>Responsibility</th><th>Owner agent</th><th>Exposes</th><th>Consumes</th></tr></thead>
-    <tbody><tr><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr></tbody>
+    <tbody>
+      <tr><td><code>packages/db</code></td><td>Owns the schema, migrations, Postgres roles, and the only path to a connection — a tenant- or system-scoped transaction.</td><td>backend-lead</td><td><code>withTenant(userId, fn)</code>, <code>withSystem(job, fn)</code>, Drizzle table objects, migration runner</td><td>PostgreSQL</td></tr>
+      <tr><td><code>packages/auth</code></td><td>Configures BetterAuth (sessions, OAuth, MFA, bearer tokens) against our Postgres; maps a request to a user id.</td><td>backend-lead</td><td><code>getSession(request)</code>, auth route handler</td><td>db, Resend, OAuth IdPs</td></tr>
+      <tr><td><code>packages/tenancy</code></td><td>Entities, entity types, parent links, memberships, and the owner/manager/viewer permission matrix as data.</td><td>backend-lead</td><td>entity/membership service, <code>can(role, action)</code></td><td>db</td></tr>
+      <tr><td><code>packages/secrets</code></td><td>Seals and opens aggregator credentials with HPKE (X25519 / HKDF-SHA256 / AES-256-GCM; SECURITY §6.3). <code>web</code> only seals, under the public key; only <code>worker</code> holds the private keyring and can open.</td><td>backend-lead (SecEng sign-off)</td><td><code>seal(plain, aad) → {enc, ciphertext, key_id, alg_version}</code> (web); <code>open(sealed, aad)</code> (worker only, enforced by lint)</td><td>public keys (web); keyring file (worker)</td></tr>
+      <tr><td><code>packages/import</code> + adapters</td><td>Provider-agnostic adapter interface; fetches, normalizes, hashes and stores raw transactions and reported balances.</td><td>backend-lead</td><td><code>ImportAdapter</code> interface, <code>ingest(connectionId, range)</code></td><td>db, secrets, provider APIs</td></tr>
+      <tr><td><code>packages/refdata</code></td><td>Global reference series — EOD prices, CPI-U, per-jurisdiction per-year tax tables — behind provider interfaces.</td><td>backend-lead</td><td><code>PriceProvider</code>, <code>SeriesProvider</code>, lookups</td><td>db, BLS, price provider</td></tr>
+      <tr><td><code>packages/ledger</code></td><td>Chart of accounts and journal entries; posting and reversal; balances as of a date. DB enforces balance and immutability.</td><td>backend-lead</td><td><code>postEntry()</code>, <code>correctEntry()</code>, <code>balances(asOf)</code></td><td>db, tenancy</td></tr>
+      <tr><td><code>packages/securities</code></td><td>Lots, lot matching, quantities, book value adjustments (return of capital, amortization), holdings as of a date.</td><td>backend-lead</td><td>lot service, <code>holdings(asOf)</code></td><td>db, ledger, refdata</td></tr>
+      <tr><td><code>packages/posting</code></td><td>Turns raw rows into drafts, applies rules, matches transfers, confirms drafts into entries, reconciles custodial balances.</td><td>backend-lead</td><td>draft queue, <code>confirm(draftId)</code>, rule engine, matcher, reconciliation</td><td>import, ledger, securities</td></tr>
+      <tr><td><code>packages/reports</code></td><td>Evaluates declarative report definitions (rows by account range / tag / type, formula lines, period or entity columns).</td><td>backend-lead</td><td><code>run(definition, params) → ReportTable</code></td><td>ledger, securities, portfolio</td></tr>
+      <tr><td><code>packages/tax</code></td><td>Running annualized accrual, safe-harbor derivation, period-cutoff freezes, Form 2210 / Schedule AI export.</td><td>backend-lead</td><td><code>estimate(entity, jurisdiction, asOf)</code>, <code>freeze(period)</code></td><td>ledger, refdata, tenancy</td></tr>
+      <tr><td><code>packages/portfolio</code></td><td>NAV, allocation vs. target, inflation adjustment of any time series.</td><td>backend-lead</td><td><code>nav()</code>, <code>allocation()</code>, <code>deflate(series, base)</code></td><td>securities, refdata</td></tr>
+      <tr><td><code>packages/ui</code></td><td>Owned shadcn-svelte components, LayerChart wrappers, design tokens imported from <code>docs/DESIGN/</code>.</td><td>frontend-lead</td><td>Svelte components, token CSS (and a Swift token export later)</td><td>DESIGN tokens</td></tr>
+      <tr><td><code>apps/web</code></td><td>SvelteKit pages (server <code>load</code> calls packages directly) and <code>/api/v1</code> thin route wrappers with Zod schemas → OpenAPI.</td><td>frontend-lead (pages) / backend-lead (routes)</td><td>HTML, <code>/api/v1</code>, <code>openapi.json</code></td><td>every L1–L5 package, ui</td></tr>
+      <tr><td><code>apps/worker</code></td><td>Schedules the idempotent job units (import poll, EOD prices, CPI fetch, tax period freeze; Cash-in-Transit aging is computed on read, not a job).</td><td>backend-lead / devops-engineer</td><td>none (outbound only)</td><td>job units in L2–L5</td></tr>
+    </tbody>
   </table>
-  <pre class="mermaid">
-flowchart TB
-  ui[UI — frontend-lead] --> api[API — backend-lead]
-  api --> svc[Service layer — backend-lead]
-  svc --> db[(DB)]
-  svc --> queue[[Queue]]
-  </pre>
+
+  <h3 id="contracts">2.3 Interface contracts worth pinning now</h3>
+  <ul>
+    <li><strong><code>ImportAdapter</code></strong> — <code>id</code>; <code>capabilities</code> (transactions, balances, holdings, trades); <code>connect(input) → sealedCredential</code>; <code>listAccounts(cred)</code>; <code>fetchTransactions(cred, account, range) → RawTxn[]</code>; <code>fetchBalances(cred, account) → ReportedBalance[]</code>; <code>revoke(cred)</code> (provider-side revocation, PRD §5). The fake source implements exactly this and is registered as <code>fake</code>; switching an instance to SimpleFIN is configuration. A CSV/OFX file adapter implements the same interface with no stored credential (SecEng's preferred credential-free path).</li>
+    <li><strong><code>RawTxn</code></strong> — provider id, provider account id, posted date, amount (decimal string), currency, payee/memo, provider transaction id (nullable), provider payload (JSON). Before storing the payload, the adapter redacts full account numbers, PANs and any credential fields (SECURITY A-9). The de-dup hash is computed by <code>import</code>, never by the adapter: <code>sha256(provider, provider_account_id, provider_txn_id ?? (date, amount, normalized payee, per-day ordinal))</code>, enforced by a unique index.</li>
+    <li><strong><code>PriceProvider</code> / <code>SeriesProvider</code></strong> — <code>fetch(symbolOrSeries, range) → Observation[]</code> with a <code>source</code> and a priority; CPI-U reuses the price-series pattern (PRD §5). Fake EOD provider: seeded random walk per ticker.</li>
+    <li><strong>Job unit</strong> — <code>run(ctx, params): Promise&lt;Result&gt;</code>; must be idempotent, short (&lt; 60 s per invocation, chunked otherwise), and triggerable by either scheduler (§7).</li>
+    <li><strong>Screen DTOs</strong> — each page's server <code>load</code> returns a DTO type exported by the owning package. The same types back <code>/api/v1</code>, so the web UI and native clients share one contract. The list of screens comes from DESIGN (ux-designer); DTOs get pinned per screen in each package's design file (kickoff §2.13).</li>
+  </ul>
+
+  <h3 id="screen-dtos">2.4 Screen → DTO ownership</h3>
+  <p>The sidebar has seven items (Principal, DESIGN pass 5): <strong>Dashboard</strong>, <strong>Transactions</strong>, <strong>General Ledger</strong>, <strong>Custodial Accounts</strong>, <strong>Allocation</strong>, <strong>Reports</strong>, <strong>Entities</strong>.</p>
+  <ul>
+    <li><strong>Header:</strong> the entity selector, Search, the notification centre, a Settings gear, and a greyed-out AI/agent icon.</li>
+    <li><strong>Sidebar foot:</strong> the avatar opens the user menu (profile, MFA, Log out).</li>
+    <li><strong>Gone:</strong> the earlier Securities and Import screens. Lots now live inside Custodial Accounts, and import setup lives on the provider item.</li>
+  </ul>
+  <p>Screen layouts are in DESIGN.</p>
+  <p>A screen that spans packages gets a composite DTO assembled in <code>apps/web</code> from package DTOs. A panel whose package hasn't shipped yet renders the empty-state pattern.</p>
+  <table>
+    <thead><tr><th>Screen / surface</th><th>DTO(s) → owning package</th><th>First milestone</th></tr></thead>
+    <tbody>
+      <tr><td>Dashboard</td><td><code>NetWorthSeries</code>, <code>CashFlowByPeriod</code>, <code>RecentActivity</code> → ledger; <code>TaxPosition</code> → tax; <code>AllocationVsTarget</code> → portfolio</td><td>M3 (panels fill in at M4 and 1.0)</td></tr>
+      <tr><td>Transactions: three accordion cards (Exceptions, Pending, Posted), each with a "show N" limit</td><td><code>ExceptionList</code> (aged CIT, link-health banners) → posting + import; <code>PendingInbox</code> (draft with locked custodial leg + suggested offset) and <code>ImportStatus</code> → posting + import; <code>PostedJournal</code> (paged whole entries, correction badges) → ledger</td><td>M2 (CIT exceptions in M3)</td></tr>
+      <tr><td>Journal-entry modal (header + legs), used for split, group, manual "+ New entry" and "Correct entry"</td><td><code>EntryDraft</code> in, <code>GateResult</code> out → posting (§3.2a)</td><td>M2</td></tr>
+      <tr><td>General Ledger: chart-of-accounts tree</td><td><code>ChartTree</code> (category → account → sub-account, balances, custodial marker) → ledger</td><td>M2</td></tr>
+      <tr><td>General Ledger: account register page</td><td><code>AccountRegister</code> (lines on one account, date order, running balance, link to entry) → ledger</td><td>M2</td></tr>
+      <tr><td>Custodial Accounts</td><td><code>CustodialAccountList</code> (balance, <code>ReconciliationStatus</code>, link-health badge) → posting + import; <code>LotsCard</code> (per security: lots, short / long / total unrealized gain, per lot and summed) → securities</td><td>M3 (lots card at M4)</td></tr>
+      <tr><td>Provider-item modal ("+ New" on Custodial Accounts)</td><td><code>ProviderItem</code>: source type (aggregator / broker API / file / manual), discovered accounts with a mapping to custodial accounts, token refresh, unlink with the revocation-lag note → import</td><td>M2 (fake + file); real aggregators at 1.0</td></tr>
+      <tr><td>Sync commands (Transactions, Custodial Accounts) and "Import file"</td><td><code>SyncRequest</code> → a job in import; on Custodial Accounts it also pulls balances and positions</td><td>M2</td></tr>
+      <tr><td>Allocation</td><td><code>AllocationVsTarget</code>, target editor → portfolio</td><td>M4</td></tr>
+      <tr><td>Reports</td><td><code>ReportTable</code> (Balance Sheet, Income Statement, Cash Flow; NAV and NAV delta) → reports; empty state until then</td><td>M5</td></tr>
+      <tr><td>Entities</td><td><code>EntityList</code>, <code>MembershipList</code>, invite command → tenancy</td><td>M1</td></tr>
+      <tr><td>Settings (header gear)</td><td><code>ImportSchedule</code> (per-entity batch schedule and options) → import; app preferences and notification preferences → tenancy</td><td>M2</td></tr>
+      <tr><td>Entity selector (header)</td><td><code>EntityList</code> (the user's memberships only) → tenancy. The selected entity scopes every screen's DTO request, and RLS still decides what returns.</td><td>M1</td></tr>
+      <tr><td>Search (header, cross-cutting)</td><td><code>SearchResults</code> grouped by kind: accounts (name and number), payees and memos on posted entries and pending drafts, and report views → a <code>search</code> query service in <code>apps/web</code> over ledger, posting and reports. It runs inside <code>withTenant</code> over Postgres full-text indexes (<code>tsvector</code> on payee, memo and account name), so results are RLS-filtered with no separate index to secure. Viewers see results without masked numbers or raw payloads.</td><td>M3 (accounts and entries); report views at M5</td></tr>
+      <tr><td>Notification centre (header, cross-cutting)</td><td><code>NotificationList</code> plus an unread count → a <code>notification</code> table (entity-scoped, per recipient, RLS-covered). Rows are written by the producers of the alerting events in SECURITY: link health (<code>token_expired</code>, <code>principal_invalid</code>, <code>stale</code>), aged Cash-in-Transit items, an auto-post rule switched off, membership changes, a purge pending, failed import batches, and tax due dates. Delivery is in-app; email via Resend follows the user's preferences.</td><td>M2 (import and link health); others as their producers land</td></tr>
+      <tr><td>AI / agent icon (header)</td><td>None in v1. It is a greyed-out placeholder for the future user-scoped MCP / agent surface (PRD §3 non-goal), which would be a client of <code>/api/v1</code>.</td><td>v2 placeholder</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Model consequence:</strong> import status on Transactions comes from an <code>import_batch</code> row per ingest run, holding status and counts. Rows skipped by <code>ON CONFLICT DO NOTHING</code> are counted into the batch as duplicates instead of vanishing silently (§3.1).</p>
+  <p><strong>Permissions</strong> (mirrors the SECURITY §4.2.1 matrix @ 6fb5385):</p>
+  <table>
+    <thead><tr><th>Action</th><th>Viewer</th><th>Manager</th><th>Owner</th></tr></thead>
+    <tbody>
+      <tr><td>New provider item, map accounts, refresh token, unlink. Managers act on their own links only, with step-up re-auth; a mapping change writes an <code>audit_event</code>.</td><td>—</td><td>✓</td><td>✓</td></tr>
+      <tr><td>Sync, Import file. Sync enqueues a worker job, and the credential is never opened in web. Rate-limited to the INFRA minimum interval.</td><td>—</td><td>✓</td><td>✓</td></tr>
+      <tr><td>Post, Split, Group, + New entry, Correct entry</td><td>—</td><td>✓</td><td>✓</td></tr>
+      <tr><td>Rule auto-post opt-in. <code>rule.auto_post_by_user_id</code> is the principal.</td><td>—</td><td>✓</td><td>✓</td></tr>
+      <tr><td>Settings: per-entity import schedule, floored at the INFRA minimum interval</td><td>—</td><td>✓</td><td>✓</td></tr>
+      <tr><td>Read every screen above (account numbers masked to last 4; no raw payloads)</td><td>✓</td><td>✓</td><td>✓</td></tr>
+    </tbody>
+  </table>
+  <p>Viewers see none of the action buttons. The server enforces every row regardless of what the UI shows.</p>
 </section>
 
+<!-- ============================================================ -->
+<section id="datamodel" data-section="datamodel">
+  <h2>3. Data Model &amp; Database Invariants</h2>
+  <p class="section-hint">Logical model at ARCH grain; column-level design lives in each package's design file.</p>
+
+  <h3 id="erd">3.1 Core entities</h3>
+  <pre class="mermaid">
+erDiagram
+  USER ||--o{ MEMBERSHIP : holds
+  ENTITY ||--o{ MEMBERSHIP : grants
+  ENTITY ||--o{ ACCOUNT : owns
+  ENTITY ||--o{ JOURNAL_ENTRY : books
+  JOURNAL_ENTRY ||--|{ JOURNAL_LINE : "2+ legs"
+  ACCOUNT ||--o{ JOURNAL_LINE : posts
+  </pre>
+  <p class="section-hint">Tenancy and the ledger, above. Import and securities, below. The table that follows lists every table group.</p>
+  <pre class="mermaid">
+erDiagram
+  PROVIDER_ITEM ||--o{ PROVIDER_ACCT : discovers
+  PROVIDER_ACCT ||--o{ RAW_TXN : imports
+  RAW_TXN ||--|| DRAFT : proposes
+  DRAFT }o--o| JOURNAL_ENTRY : "posts into"
+  ACCOUNT ||--o{ LOT : holds
+  SECURITY ||--o{ LOT : "held as"
+  SECURITY ||--o{ PRICE : "priced by"
+  </pre>
+
+  <p><strong>Keys:</strong> every tenant-visible primary key is a UUID, never a sequential integer, so ids leak neither counts nor ordering across tenants (SECURITY A-6). Tenancy columns (<code>entity_id</code>) and actor columns are not updatable.</p>
+  <table>
+    <thead><tr><th>Table group</th><th>Tenant key</th><th>Mutability</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>user</code> (BetterAuth)</td><td>self</td><td>mutable; deletion tombstones</td><td>Account deletion turns the user row into a tombstone ("deleted user") and removes credentials, sessions and memberships. The row itself is never deleted, and entries are never UPDATEd. <code>actor_id</code> FKs are <code>ON DELETE NO ACTION</code>, and BetterAuth's <code>deleteUser</code> is overridden (SECURITY A-8).</td></tr>
+      <tr><td><code>entity</code>, <code>membership</code>, <code>entity_type</code></td><td>entity id; types: <code>owner_user_id</code> or null (system)</td><td>mutable; tenancy columns not updatable</td><td>Setting a parent link requires owner on both the child and the parent (SECURITY A-11). Tax-classification attribute on <code>entity</code> (individual; trust grantor / non-grantor; business pass-through / C-corp). User-defined types readable by creator plus holders of any membership on an entity of that type — the narrow cross-tenant metadata exception SecEng flagged.</td></tr>
+      <tr><td><code>account</code></td><td>entity id</td><td>mutable until first posting; then name/parent only</td><td>Number, name, parent, class (asset / liability / equity / income / expense), normal side, currency, <code>is_custodial</code> + custodian, default tax-treatment tag. Seeded per entity: Cash in Transit, Suspense, Opening Balance Equity, and the per-jurisdiction tax accounts listed in §4.5. Prepaid-tax accounts are custodial, with the tax authority (IRS, the state) as custodian.</td></tr>
+      <tr><td><code>journal_entry</code>, <code>journal_line</code></td><td>entity id (denormalized onto the line)</td><td><strong>append-only</strong> (trigger)</td><td>Entry: posting date (exactly one), description, <code>actor_kind</code> (user / rule / system) + <code>actor_id</code>, <code>reverses_entry_id</code>, <code>replaces_entry_id</code>, <code>source_ref</code>. Line: account, <code>currency</code>, <code>native_amount</code>, <code>base_amount</code>, <code>fx_rate</code>, category, tax-treatment tag, memo. Amounts are <code>numeric</code>, signed (debit &gt; 0); never JS floats.</td></tr>
+      <tr><td><code>import_batch</code>, <code>raw_transaction</code>, <code>reported_balance</code>, <code>reported_position</code></td><td>entity id (via linked account, denormalized)</td><td>raw rows insert-only; <code>status</code> draft → posted (then frozen by trigger); batch mutable while running</td><td>Unique de-dup hash. Full provider payload kept for audit; <code>payload</code> is readable by manager+ only, never by viewers (SECURITY §4.2.1). Batch holds run status and new / duplicate / needs-category counts (§2.4).</td></tr>
+      <tr><td><code>draft</code>, <code>rule</code>, <code>transfer_match</code></td><td>entity id</td><td>mutable until confirmed</td><td>One draft per raw row. Several drafts post into one entry when the user groups them (Flow B), so draft → entry is many-to-one. A split (Flow A) is one draft posting into one multi-leg entry. A posted draft carries exactly one <code>entry_id</code>. The draft carries the proposed lines (JSON), with the custodial cash leg locked (§3.2a), and an actor. Rule carries <code>auto_post</code> opt-in (default false). Opting in counts as the user's confirmation (Principal, 2026-09-30). <code>auto_post_by_user_id NOT NULL</code> records who opted in. If that user drops below manager, <code>auto_post</code> flips off and an <code>audit_event</code> is written (SECURITY §4.2.1). An auto-posted row is immutable like any other, and "Correct entry" applies to it.</td></tr>
+      <tr><td><code>provider_account</code></td><td>entity id</td><td>mutable</td><td>One account discovered on a provider item (a Fidelity brokerage, a Schwab checking account). It carries a <code>tracked</code> flag and a nullable mapping to a custodial <code>account</code>, set in the modal's mapping step. Raw transactions, reported balances and reported positions hang off it.</td></tr>
+      <tr><td><code>provider_connection</code> (the UI's "provider item")</td><td>entity id + linking user</td><td>mutable</td><td>The first-class record for one provider login. It owns the discovered <code>provider_account</code> rows. Source type: <code>aggregator</code> | <code>broker_api</code> | <code>file</code> | <code>manual</code>. File and manual items hold no credential. Link health is <code>ok</code> | <code>token_expired</code> | <code>principal_invalid</code> | <code>stale</code>. Sealed credential only: <code>enc</code>, <code>ciphertext</code>, <code>key_id</code>, <code>alg_version</code>, with AAD = (connection, entity, provider, key_id, alg_version) (SECURITY §6.3). <code>poly_app</code> may INSERT and UPDATE those columns but never SELECT them; only <code>poly_worker</code> reads them. <code>linked_by_user_id NOT NULL</code> is the principal that job writes run under. A <code>principal_invalid</code> state is set when that user's membership is revoked or their account is deleted; it surfaces on the dashboard and writes an <code>audit_event</code>, so it never fails silently (SECURITY §4.4). On unlink, <code>web</code> enqueues a revoke job; <code>worker</code> opens the credential, revokes at the provider, then deletes the row.</td></tr>
+      <tr><td><code>security</code>, <code>price_observation</code>, <code>cpi_observation</code>, <code>tax_table</code></td><td>global reference data</td><td>writable by system jobs / operator import only</td><td>Price: unique (security, date, source) + source priority (borrowed from mosko-fintech). Tax table: jurisdiction × filing year → due dates, cutoffs, multipliers, cumulative percentages — a new year is a data row.</td></tr>
+      <tr><td><code>lot</code>, <code>lot_match</code>, <code>lot_adjustment</code></td><td>entity id</td><td>append-only</td><td>Lot-match is an append-only many-to-many junction with a <code>match_seq</code>; the latest batch is current (borrowed from mosko-fintech 032).</td></tr>
+      <tr><td><code>tax_period_freeze</code></td><td>entity id</td><td>append-only</td><td>Annualized income, tax, cumulative required, paid — per jurisdiction per period; source of the 2210 / Schedule AI export.</td></tr>
+      <tr><td><code>report_definition</code></td><td>owner user id (clones) / null (system templates)</td><td>system templates read-only; clones mutable</td><td>Upgrades replace system templates in place; clones are never touched.</td></tr>
+      <tr><td><code>attachment</code>, <code>attachment_blob</code>, <code>entry_attachment</code></td><td>entity id</td><td>attachment insert-only; links deletable by manager+ (audited)</td><td>Supporting documents such as statements and receipts, stored as <code>bytea</code> in Postgres (see §3.5). They are RLS-covered, backed up, exported and purged along with everything else.</td></tr>
+      <tr><td><code>notification</code></td><td>entity id + recipient user id</td><td>insert-only, except <code>read_at</code></td><td>One row per recipient per alert event (§2.4). Producers write it in the same transaction as the event. Purged with the entity, and deleted with the recipient's account.</td></tr>
+      <tr><td><code>audit_event</code></td><td>entity id (nullable after purge)</td><td>append-only, outside purge cascade</td><td>Records purges, exports, revocations, membership changes, and <code>principal_invalid</code> transitions; survives the purge it describes. Readable by owners only (SECURITY §4.2.1).</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="invariants">3.2 Invariants the database enforces (not the app)</h3>
+  <ol>
+    <li><strong>Balanced entries.</strong> A <code>DEFERRABLE INITIALLY DEFERRED</code> constraint trigger on <code>journal_line</code> checks <code>Σ base_amount = 0</code> per entry at commit, and at least two lines. The app computes balance too, for good error messages; the trigger is the backstop.</li>
+    <li><strong>Append-only posted rows.</strong> <code>BEFORE UPDATE OR DELETE</code> triggers on <code>journal_entry</code>, <code>journal_line</code>, <code>lot</code>, <code>lot_match</code>, <code>tax_period_freeze</code> and on <code>raw_transaction</code> where <code>status = 'posted'</code> raise, and so do <code>BEFORE TRUNCATE</code> statement triggers on the same tables. No login role holds <code>TRUNCATE</code>. The one exception is DELETE by <code>current_user = 'poly_purge'</code> for the entity named in <code>app.purge_entity</code> (§3.4). Corrections go through <code>correctEntry(original, newLines)</code>. In one transaction it writes a reversal (a mirror entry with <code>reverses_entry_id</code> set) and a replacement entry with <code>replaces_entry_id</code> set. The UI calls this action "Correct entry". The UI never offers "edit" or "reverse" on a posted row; it badges the replacement and shows the struck-through reversal on click-through (DESIGN). <code>reverseEntry()</code> on its own stays internal, for a correction whose replacement is empty.</li>
+    <li><strong>Two-way link.</strong> Confirming one or more drafts inserts the entry and, in the same transaction, sets each draft's <code>entry_id</code> and flips each raw row to <code>posted</code>. The link is held on the draft side (many drafts → one entry). The entry's <code>source_ref</code> only marks it as import-sourced; it doesn't point back to a single row. A check ensures a posted raw row always has an entry (gate G4, §3.2a).</li>
+    <li><strong>Single posting date.</strong> One date column per entry; a <code>posting_date_allowed(entity, date)</code> function hook (always true in v1) is the seam where period locking plugs in later without a schema change.</li>
+    <li><strong>Same-entity legs.</strong> Every line's account belongs to the entry's entity (composite FK <code>(entity_id, account_id)</code>). Cross-entity transfers are two entries, one per entity's books (see OQ-6).</li>
+    <li><strong>Actor recorded.</strong> <code>actor_kind</code> + <code>actor_id</code> are NOT NULL on entries and drafts, and are <em>forced</em> by a BEFORE INSERT trigger from the transaction's context rather than merely defaulted. <code>actor_kind = 'user'</code> requires <code>actor_id = app.current_user_id()</code>, so a caller cannot attribute an entry to someone else (SECURITY A-5).</li>
+  </ol>
+
+  <h3 id="posting-gates">3.2a Posting gates</h3>
+  <p>A draft or group of drafts leaves Pending only by passing every gate below. The Principal's rule (2026-10-02): an item whose entry is not correct stays in the Pending queue. <code>posting.confirm()</code> evaluates the gates and returns a <code>GateResult</code> that the modal shows live; the Post button stays disabled until all gates pass. The database re-checks gates G1, G2, G4 and G5 at commit, so a bug in the app cannot bypass them.</p>
+  <table>
+    <thead><tr><th>#</th><th>Gate</th><th>Enforced by</th></tr></thead>
+    <tbody>
+      <tr><td>G1</td><td><strong>Balanced:</strong> Σ base_amount = 0 over the entry's lines, with at least two lines.</td><td>App (live) + deferred constraint trigger (§3.2.1)</td></tr>
+      <tr><td>G2</td><td><strong>Accounting equation per entity:</strong> every line's account belongs to the entry's entity. With G1, every entity's books then keep Assets = Liabilities + Equity (+ Income − Expense) after every posting. No separate entity-wide sum runs per posting; a property-based test asserts the trial balance is zero after random postings.</td><td>Composite FK (§3.2.5) + G1; test</td></tr>
+      <tr><td>G3</td><td><strong>Dates:</strong> an entry has exactly one posting date, equal to the bank date of every raw row it consumes. Legs with different dates never share an entry: a transfer whose legs land on different dates posts as two entries through Cash in Transit (PRD §5, the 2026-09-27 decision). A group (Flow B) may only combine drafts with the same bank date, so a daily summary is allowed (OQ-14 covers weekly).</td><td>App + a check in <code>confirm()</code></td></tr>
+      <tr><td>G4</td><td><strong>Linked:</strong> every draft being posted gets exactly one <code>entry_id</code>, and its raw row flips to <code>posted</code> in the same transaction. A posted draft without an entry, or an entry claiming a draft that is still pending, is rejected.</td><td>Check constraint + trigger (§3.2.3)</td></tr>
+      <tr><td>G5</td><td><strong>Custodial leg locked:</strong> for each custodial account touched by the consumed raw rows, the entry carries lines on that account summing exactly to those rows' amounts. The user edits only the offsetting legs; the bank's reality is never editable. A split keeps one locked leg and divides the offset; a group aggregates the locked legs into one line per custodial account.</td><td>App (the locked leg is not editable in the modal) + trigger comparing against the raw rows</td></tr>
+      <tr><td>G6</td><td><strong>Allowed:</strong> the actor holds manager+ on the entity, or the post comes from a rule whose <code>auto_post_by_user_id</code> still holds manager+ on the entity. <code>posting_date_allowed()</code> passes; it always does in v1, and is the hook for period locking later.</td><td>RLS + trigger (§3.2.6)</td></tr>
+    </tbody>
+  </table>
+  <p>A manual entry ("+ New entry") consumes no raw rows, so G3–G5 do not apply to it; G1, G2 and G6 do. A "Correct entry" replacement runs G1, G2 and G6, and must keep the original's custodial lines unless the user explicitly re-links the raw rows.</p>
+
+  <h3 id="rls">3.3 RLS mechanism and connection-pooling safety</h3>
+  <p><em>Confirmed by SecEng in <a href="../SECURITY/">SECURITY</a> §4.3 / §12 (OQ-2), with the four additions listed last. The permission matrix is SECURITY §4.2.1: roles are uniform across entity types.</em></p>
+  <ul>
+    <li><strong>Roles.</strong> <code>poly_owner</code> (NOLOGIN; owns every object); <code>poly_migrator</code> (LOGIN; used only by the migrate step; runs migrations as <code>set role poly_owner … reset role</code>, which mosko-fintech measured as the working shape); <code>poly_app</code> (LOGIN; DML grants only; <code>NOBYPASSRLS</code>; not the table owner, so RLS applies); <code>poly_worker</code> (LOGIN; <code>NOBYPASSRLS</code>; reference-data writes plus tenant DML limited to the import path, SECURITY §4.4); <code>poly_authz</code> (NOLOGIN; owns the authorization functions and nothing else); <code>poly_purge</code> (NOLOGIN; <code>NOBYPASSRLS</code>; owns the purge function; DELETE on purgeable tables only). Role hygiene follows SECURITY §4.3(k). The operator's superuser bypasses RLS by definition — documented as an accepted risk (PRD §6).</li>
+    <li><strong>Context per transaction, never per session.</strong> <code>withTenant(userId, fn)</code> opens a transaction and runs <code>select set_config('app.user_id', $1, true)</code> (<code>is_local = true</code>) before any query. The setting dies at COMMIT/ROLLBACK, so a pooled connection cannot carry a previous request's identity. This works with the in-process <code>node-postgres</code> pool on the VPS and with Neon's transaction-mode pooler. Session-level <code>SET</code> is banned by lint.</li>
+    <li><strong>Default deny.</strong> Policies read context only through <code>app.current_user_id()</code> = <code>nullif(current_setting('app.user_id', true), '')::uuid</code>. The <code>nullif</code> matters: once a backend has set the GUC and the transaction has ended, <code>current_setting</code> returns <code>''</code>, not NULL. Without <code>nullif</code>, a reused backend would compare against an empty string instead of denying cleanly (SECURITY A-3). Every tenant table has RLS <code>ENABLE</code>d and <code>FORCE</code>d, including drafts, raw rows, lots and staging tables.</li>
+    <li><strong>Policy shape.</strong> <code>using (entity_id = any (app.visible_entities()))</code> for reads; writes add <code>app.has_role(entity_id, 'manager')</code> or <code>'owner'</code> per the permission matrix. Both functions are <code>STABLE SECURITY DEFINER</code>, owned by <code>poly_authz</code> (not <code>poly_owner</code>, because under FORCE RLS the owner is itself subject to policies). They read <code>membership</code> through a role-targeted <code>SELECT … TO poly_authz</code> policy, with <code>search_path = ''</code>. Every definer function is on a CI-checked allowlist (SECURITY A-1, §4.3(h)). Parent/child structure is never consulted — structure grants nothing.</li>
+    <li><strong>System jobs.</strong> <code>withSystem(job, target, fn)</code> sets <code>app.user_id</code> to the target's principal and <code>app.actor = system:&lt;job&gt;</code>. It never runs context-free; if no principal resolves, the job errors. Targets come from one allowlisted definer function, <code>app.job_targets(job)</code>, which returns <code>(entity_id, principal_user_id, connection_id)</code> and is executable only by <code>poly_worker</code>. Entity-bound jobs with no connection (the tax-period freeze) run as the entity's earliest owner membership. Reference-data policies are role-targeted (<code>TO poly_worker</code>), and <code>poly_app</code> gets SELECT only. Cash-in-Transit aging is computed on read by the exceptions report, not stored by a job (SECURITY A-12). Tenant writes by a job (import polling) run under the linking user's membership (<code>provider_connection.linked_by_user_id</code>) with actor = <code>system:&lt;job&gt;</code>, so authority and attribution stay separate. There is no system bypass clause in tenant policies (SECURITY §4.4, OQ-3).</li>
+    <li><strong>SecEng additions (OQ-2).</strong> (a) The RLS coverage probe is derived from <code>pg_catalog</code>, never from a hand-maintained list. (b) <code>poly_app</code> also loses <code>CREATE</code> on <code>public</code>. (c) Policies are per-command with an explicit <code>WITH CHECK</code> on every write; <code>FOR ALL</code> is banned. (d) The inversion canary stays in the battery. The review added (e) to (l) (SECURITY §4.3):
+      <ul>
+        <li>(e) Authorization functions are owned by <code>poly_authz</code>.</li>
+        <li>(f) Context is read in the <code>nullif</code> form.</li>
+        <li>(g) TRUNCATE triggers.</li>
+        <li>(h) <code>search_path = ''</code>, plus a definer allowlist.</li>
+        <li>(i) Tenancy columns are not updatable.</li>
+        <li>(j) Views are <code>security_invoker = true</code>, and there are no materialized views over tenant data (a matview has no RLS). A report needing a cache materializes into a tenant table under RLS.</li>
+        <li>(k) Role hygiene.</li>
+        <li>(l) UUID keys.</li>
+      </ul></li>
+    <li><strong>Proof.</strong> Every migration run in CI executes an RLS battery: an <em>inversion self-test</em> (an unprotected canary table must leak, proving the probe has teeth — borrowed from mosko-fintech), a per-table cross-tenant probe generated from the catalog (a table with RLS disabled fails the build), and a pool-reuse test. That test must run on a backend that has <em>already</em> served a request: tenant A's transaction, then tenant B on the same physical connection sees zero A rows, and a context-free query on that dirty backend sees zero rows. The full battery list is SECURITY §12.3 (qa-engineer).</li>
+  </ul>
+
+  <h3 id="purge">3.4 The privileged purge path</h3>
+  <p>A sole owner's whole-entity purge (PRD §5) runs through one <code>SECURITY DEFINER</code> function, <code>app.purge_entity(entity_id, export_id, reauth_at)</code>. The function is owned by the dedicated NOLOGIN, NOBYPASSRLS role <code>poly_purge</code>, with <code>search_path = ''</code>, and <code>EXECUTE</code> is granted to <code>poly_app</code> (SECURITY §4.5, OQ-4).</p>
+  <p><strong>Why not <code>poly_owner</code>:</strong> under FORCE RLS the owner is itself subject to policies. Append-only tables have no DELETE policy, so an owner-run purge would delete zero rows and still report success (T-51).</p>
+  <p><strong>How the deletes are allowed:</strong> each purgeable table carries <code>CREATE POLICY purge … FOR DELETE TO poly_purge USING (entity_id = nullif(current_setting('app.purge_entity', true), '')::uuid)</code>. The append-only triggers allow DELETE only when <code>current_user = 'poly_purge'</code> and the row's entity matches. <code>poly_app</code> can set the GUC but can never become <code>poly_purge</code>.</p>
+  <p>The guards run in this order, in one transaction:</p>
+  <ol>
+    <li>Re-authentication within 5 minutes. The route checks it, and the function requires the timestamp as an argument.</li>
+    <li>Sole-owner check against <code>app.current_user_id()</code>.</li>
+    <li>An <code>export.completed</code> audit event for this entity, by this user, within 24 hours, carrying a SHA-256.</li>
+    <li>No tenant write to the entity since the export's snapshot marker. The entity row is locked <code>FOR UPDATE</code>.</li>
+    <li>An <code>entity.purged</code> <code>audit_event</code> is written before the first delete. <code>audit_event</code> has no FK to <code>entity</code> and no purge policy.</li>
+    <li>Every connection has been revoked at the provider by the worker revoke job. A failed revocation blocks the purge.</li>
+    <li>Set <code>app.purge_entity</code> transaction-locally and delete in dependency order, attachments included.</li>
+    <li>Assert zero rows remain for the entity in every purgeable table before commit (fail loud).</li>
+  </ol>
+  <p><strong>Not permitted:</strong> purge by a job; purge through the API without typed confirmation of the entity name; purge of a partial range; purge while a second owner exists. <strong>Rejected:</strong> <code>DISABLE TRIGGER</code> (DDL, affects every tenant), tombstoning (breaks PRD §5), <code>BYPASSRLS</code> (broader than needed). An optional cancellable 24-hour delay is pending the Principal (SECURITY §12.3 Q2).</p>
+
+  <h3 id="attachments">3.5 Attachments</h3>
+  <p>PRD §5 includes attachments (statements, receipts, closing documents) in export and purge, but v1 had no storage design (SECURITY A-14). The design:</p>
+  <ul>
+    <li><strong>Location:</strong> Postgres <code>bytea</code> in an entity-scoped <code>attachment</code> table. It is RLS-covered like every other tenant table, and it automatically falls inside backup, export and purge. It works unchanged on the secondary Vercel + Neon target.
+      <ul>
+        <li><em>Rejected for v1:</em> a filesystem or S3-compatible object store. That would be a second access-control system to keep in lockstep with RLS, and a second thing to back up, export and purge.</li>
+        <li><em>Cost:</em> database size. At household scale, a few hundred MB per year is expected (unmeasured).</li>
+        <li><em>Revisit</em> if the attachment table exceeds a size set in INFRA.</li>
+      </ul>
+    </li>
+    <li><strong>Limits:</strong> 10 MB per file. Type allowlist: PDF, PNG, JPEG, and CSV/OFX (kept as import evidence). The type is sniffed server-side, and the client-declared type is never trusted. A SHA-256 is stored for de-dup and for the export manifest.</li>
+    <li><strong>Serving:</strong> only through an app route inside <code>withTenant</code>, with <code>Content-Disposition: attachment</code>, <code>X-Content-Type-Options: nosniff</code>, the sniffed <code>Content-Type</code>, and a restrictive CSP. Nothing is rendered inline.</li>
+    <li><strong>Linking:</strong> <code>entry_attachment</code> links an attachment to a journal entry, draft or account. A link doesn't change the entry, so attaching to a posted entry is allowed. Unlinking is manager+ and writes an <code>audit_event</code>. Attachment bytes themselves are insert-only.</li>
+    <li><strong>Boundary:</strong> uploads cross TB-11 (untrusted file ↔ parser). Attachments are stored, never parsed. CSV/OFX import files are parsed by the import adapter under TB-11's controls.</li>
+  </ul>
+  <p><strong>SecEng conditions (approved on security, all binding):</strong></p>
+  <ol>
+    <li><em>Filename:</em> <code>Content-Disposition</code> uses the RFC 6266 <code>filename*=UTF-8''</code> form, with CR/LF and quotes stripped. The CSP is <code>default-src 'none'; sandbox</code>.</li>
+    <li><em>Entity binding:</em> <code>attachment</code> and <code>entry_attachment</code> both carry <code>entity_id</code>, with composite FKs, so a link can never cross entities. Viewers read; manager+ uploads.</li>
+    <li><em>Purge:</em> both tables get the <code>poly_purge</code> DELETE policy and the append-only trigger exception, and are included in the zero-rows-remain assertion (C-50).</li>
+    <li><em>Quota:</em> a per-entity storage quota and an upload rate limit protect the disk. The numbers are set in INFRA.</li>
+    <li><em>Isolation:</em> the bytes live in their own table (<code>attachment_blob</code>, 1:1 with <code>attachment</code>), so list and DTO queries never select <code>bytea</code>. Content is never parsed, and no AV scanning is an accepted consequence of that.</li>
+  </ol>
+</section>
+
+<!-- ============================================================ -->
 <section id="dataflow" data-section="dataflow">
-  <h2>3. Data Flow</h2>
-  <p class="section-hint">One sequence diagram per primary user story. Only diagram flows with non-trivial design choices.</p>
-  <div class="stub">Add a <code>&lt;pre class="mermaid"&gt;sequenceDiagram…&lt;/pre&gt;</code> block per major flow.</div>
+  <h2>4. Data Flow</h2>
+  <p class="section-hint">Only flows that surface a non-trivial design choice.</p>
+
+  <h3 id="flow-request">4.1 Any authenticated read (PRD Story 1, 8)</h3>
   <pre class="mermaid">
+%%{init: {"sequence": {"width": 110, "actorMargin": 30, "mirrorActors": false}}}%%
 sequenceDiagram
-  participant U as User
-  participant F as Frontend
-  participant A as API
-  participant D as DB
-  U->>F: Action — TBD
-  F->>A: Request — TBD
-  A->>D: Query — TBD
-  D-->>A: Result
-  A-->>F: Response
-  F-->>U: UI update
+  participant B as Client
+  participant K as SvelteKit
+  participant P as Package
+  participant PG as Postgres
+  B->>K: GET dashboard
+  K->>K: session gives userId
+  K->>P: dashboard, withTenant
+  P->>PG: BEGIN, set user locally
+  P->>PG: SELECT, RLS filters
+  PG-->>P: only granted rows
+  P->>PG: COMMIT, context gone
+  P-->>K: DashboardDTO
+  K-->>B: HTML or JSON
   </pre>
+
+  <h3 id="flow-import">4.2 Import → draft → confirm (PRD Story 2, 3)</h3>
+  <pre class="mermaid">
+%%{init: {"sequence": {"width": 110, "actorMargin": 30, "mirrorActors": false}}}%%
+sequenceDiagram
+  participant W as Worker
+  participant I as Import
+  participant Po as Posting
+  participant L as Ledger
+  participant U as User
+  W->>I: ingest
+  I->>I: fetch, hash, keep new
+  I->>Po: new raw rows
+  Po->>Po: propose, match
+  alt rule auto-posts
+    Po->>L: post, actor rule
+  else default
+    U->>Po: confirm draft
+    Po->>L: post, actor user
+  end
+  L->>L: balance check
+  Po->>I: mark row posted
+  Note over I,L: Both sides now immutable
+  </pre>
+
+  <h3 id="flow-transfer">4.3 Transfer matching and Cash in Transit (PRD §5)</h3>
+  <pre class="mermaid">
+flowchart TD
+  a["Raw leg arrives"] --> m{"Counter-leg<br/>in window?"}
+  m -->|same date| one["One entry"]
+  m -->|dates differ| two["Two entries<br/>via CIT"]
+  m -->|not yet| open["Leg to CIT,<br/>open item"]
+  open --> age{"Past<br/>threshold?"}
+  age -->|yes| exc["Exceptions<br/>report"]
+  age -->|leg lands| close["CIT clears<br/>to zero"]
+  </pre>
+  <p>Only legs between two of the entity's own linked accounts are transfer candidates. A payment to an outside party has no counter-leg and never enters matching or Cash in Transit. That includes an estimated-tax payment made at the bank: it is categorized and posted like any other draft (§4.5). Matching lives in <code>posting</code> (the import side of posting), never inside <code>ledger.postEntry()</code>. Cash-in-Transit aging is computed on read by the exceptions report, not by a job (SECURITY §4.4).</p>
+
+  <h3 id="flow-prices">4.4 Reference data: EOD prices and CPI-U (PRD Stories 5, 9)</h3>
+  <pre class="mermaid">
+%%{init: {"sequence": {"width": 110, "actorMargin": 30, "mirrorActors": false}}}%%
+sequenceDiagram
+  participant W as Worker
+  participant R as Refdata
+  participant Pv as API
+  participant PG as Postgres
+  W->>R: refresh prices
+  R->>Pv: fetch missing
+  Pv-->>R: observations
+  R->>PG: upsert prices
+  W->>R: refresh CPI-U
+  R->>Pv: BLS or CSV
+  R->>PG: upsert CPI
+  Note over R,PG: No tenant data leaves
+  </pre>
+
+  <h3 id="flow-tax">4.5 Estimated-tax accrual (PRD Story 4)</h3>
+  <p>No sequence diagram. <code>tax.estimate(entity, jurisdiction, asOf)</code> is a pure function over (a) year-to-date income by tax-treatment tag from the ledger, (b) the tax table row for that jurisdiction and filing year, (c) prior-year filed tax (an entity attribute per year), and (d) the balance of the custodial prepaid-tax sub-account for that jurisdiction and filing year, written <em>P</em> below. It returns:</p>
+  <ul>
+    <li><strong>Pending liability</strong> = annualized tax to date − <em>P</em>.</li>
+    <li><strong>Both safe-harbor values</strong> and the <strong>required payment to date</strong> (the lesser of the two cumulative safe-harbor amounts).</li>
+    <li><strong>Gap</strong> = required payment to date − <em>P</em>, which is what is still owed by the next due date.</li>
+  </ul>
+  <p>(Principal ruling, 2026-09-30.) A job unit calls <code>freeze()</code> the day after each period cutoff and appends a <code>tax_period_freeze</code> row. The estimate is recomputed on read and never stored, except the frozen period figures.</p>
+
+  <p><strong>The app never pays tax.</strong> v1 initiates no payment. The user pays the tax authority at their bank, and the payment arrives as an ordinary imported transaction with no counterparty leg. Nothing is accrued during the year: the pending liability is a computed figure, and the tax liability account is touched only at filing.</p>
+
+  <p><strong>Accounts</strong>, seeded per entity for each jurisdiction <em>J</em>:</p>
+  <ul>
+    <li><em>Prepaid tax — J</em>: an asset, custodial, with the authority as custodian. It has one sub-account per filing year <em>Y</em>.</li>
+    <li><em>Income tax payable — J</em>: a liability.</li>
+    <li><em>Tax refund receivable — J</em>: an asset, custodial.</li>
+    <li><em>Income tax expense — J</em>: an expense.</li>
+  </ul>
+  <p>Grantor trusts and pass-throughs use the entity's existing <em>Distributions / owner draws</em> equity account in place of the expense account (PRD §5 tax-classification routing).</p>
+
+  <p><strong>Why a sub-account per filing year:</strong> a January Q4 payment belongs to the prior year. When a payment draft is created, the rule proposes the filing year from the due-date table (the year whose next unpaid due date the payment falls on or before), and the user can change it before confirming.</p>
+
+  <table>
+    <thead><tr><th>Event</th><th>Source</th><th>Journal entry</th></tr></thead>
+    <tbody>
+      <tr><td>During the year</td><td>none</td><td>No accrual entry. The pending liability is computed on read.</td></tr>
+      <tr><td>Estimated payment</td><td>Imported bank debit, confirmed by the user (or a rule the user opted in)</td><td>Dr Prepaid tax — J — Y / Cr Bank</td></tr>
+      <tr><td>Filing (actual tax <em>T</em> for year Y, prepaid balance <em>P</em>)</td><td>Entered by the user from the filed return; one multi-leg entry dated the filing date</td><td>Dr Income tax expense — J (or Dr Distributions) <em>T</em>.<br/>Cr Prepaid tax — J — Y min(<em>T</em>, <em>P</em>).<br/>If <em>T</em> &gt; <em>P</em>: Cr Income tax payable — J (<em>T</em> − <em>P</em>).<br/>If <em>P</em> &gt; <em>T</em> and the user elects a refund: Dr Tax refund receivable — J (<em>P</em> − <em>T</em>) / Cr Prepaid tax — J — Y (<em>P</em> − <em>T</em>).<br/>If <em>P</em> &gt; <em>T</em> and the user elects to apply it to next year: Dr Prepaid tax — J — Y+1 / Cr Prepaid tax — J — Y (<em>P</em> − <em>T</em>).<br/>Penalty or interest, if any: Dr Tax penalties expense / Cr Income tax payable.</td></tr>
+      <tr><td>Balance due paid</td><td>Imported bank debit, confirmed</td><td>Dr Income tax payable — J / Cr Bank</td></tr>
+      <tr><td>Refund received</td><td>Imported bank credit, confirmed</td><td>Dr Bank / Cr Tax refund receivable — J</td></tr>
+    </tbody>
+  </table>
+  <p>After filing and settlement, Prepaid tax — J — Y and Income tax payable — J both read zero. The filing entry needs no separate liability recognition: the liability exists only for the unpaid remainder, and it is credited and debited inside filing-time entries alone. Custodial reconciliation (POLY-72) can compare the prepaid sub-account against the authority's account transcript. A filing entry made in error is fixed with "Correct entry", like any other entry.</p>
 </section>
 
+<!-- ============================================================ -->
 <section id="stack" data-section="stack">
-  <h2>4. Tech Stack &amp; Rationale</h2>
+  <h2>5. Tech Stack &amp; Rationale</h2>
   <p class="section-hint">Justify every row. "We know it" is a valid reason — write it down.</p>
   <table>
     <thead><tr><th>Layer</th><th>Choice</th><th>Why</th><th>Alternatives considered</th></tr></thead>
     <tbody>
-      <tr><td>Frontend framework</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr>
-      <tr><td>Backend language / framework</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr>
-      <tr><td>Data store</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr>
-      <tr><td>Auth</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr>
-      <tr><td>Hosting / runtime</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr>
-      <tr><td>Observability</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr>
+      <tr><td>Language</td><td>TypeScript (strict) end to end, Node LTS</td><td>One language across UI, API, jobs and schema; the Principal's prior project (mosko-fintech) is TS/SvelteKit.</td><td>Go / Python backend (a second language for no gain at this scale)</td></tr>
+      <tr><td>Frontend framework</td><td>SvelteKit + shadcn-svelte + Tailwind; LayerChart</td><td>Kickoff §2.9: owned component source, headless primitives; shadcn-svelte charts are LayerChart. Monarch/Origin feel from dashboard-01.</td><td>Flowbite Svelte (rejected: fixed look, ApexCharts)</td></tr>
+      <tr><td>API</td><td>SvelteKit <code>/api/v1</code> routes, Zod schemas, OpenAPI generated and committed (CI fails if stale)</td><td>Thin wrappers over packages; one contract for native clients and a future MCP server.</td><td>Separate API server (tRPC / Fastify): a second deployable for no gain</td></tr>
+      <tr><td>Data store</td><td>PostgreSQL, latest GA major (18 at Plan time; bump deliberately)</td><td>RLS, deferred constraint triggers, <code>numeric</code>, SECURITY DEFINER — the whole integrity story lives here.</td><td>SQLite (no RLS), external ledger services (excluded by kickoff §2.5)</td></tr>
+      <tr><td>ORM / query layer</td><td>Drizzle ORM</td><td>TS schema as the single source; RLS policies and roles declared in schema; BetterAuth ships a Drizzle adapter, so auth tables share one migration chain. See §6.2.</td><td>Kysely + generated types; Prisma (weak RLS / raw-SQL story, heavy engine)</td></tr>
+      <tr><td>Migrations</td><td>drizzle-kit <code>generate</code> (SQL files, committed) + hand-written custom SQL migrations for triggers / functions / roles, applied by a one-off migrate container</td><td>Plain SQL in the repo, a tracking table, never hand-run (kickoff §2.13). Conditional on the M1 spike — see §6.2.</td><td>dbmate (runner-up), Atlas, graphile-migrate, Supabase CLI (mosko-fintech incumbent)</td></tr>
+      <tr><td>General ledger</td><td>Home-grown schema in our Postgres (build)</td><td>See §6.1.</td><td>pgledger (adopt), mosko-fintech's journal model</td></tr>
+      <tr><td>Money arithmetic</td><td>Postgres <code>numeric</code>; decimal strings on the wire; a decimal library (e.g. <code>big.js</code>) in TS</td><td>No binary floats anywhere near money.</td><td>Integer minor units (awkward for share quantities and FX rates)</td></tr>
+      <tr><td>Auth</td><td>BetterAuth (Drizzle adapter), OAuth: Google / Apple / GitHub; MFA; bearer plugin; email via Resend</td><td>Kickoff §2.8: identity in our DB, no leased tier.</td><td>Clerk (rejected: external identity store), Lucia (maintenance mode)</td></tr>
+      <tr><td>Jobs</td><td>Plain idempotent job units; VPS: <code>apps/worker</code> with a Postgres-backed scheduler (pg-boss); Vercel: Vercel Cron → an authenticated internal route that runs the same unit</td><td>No Redis, no extra service; Postgres is already the system of record. Dual-target rule (kickoff §2.8).</td><td>BullMQ + Redis (extra service), system cron in the container (no retries or visibility)</td></tr>
+      <tr><td>Monorepo</td><td>pnpm workspaces + Turborepo (affected-only)</td><td>Kickoff §2.10; per-package tests and versions.</td><td>Nx (heavier), plain pnpm filters (no caching)</td></tr>
+      <tr><td>Tests</td><td>Vitest per package; Postgres via a disposable container (Testcontainers or CI service); pgTAP for the RLS / trigger battery; Playwright smoke suite (login, import a batch, confirm a draft, view a statement)</td><td>Kickoff §2.13. DB invariants are tested in SQL where they live.</td><td>Jest (slower ESM story)</td></tr>
+      <tr><td>Hosting / runtime</td><td>Primary: Hetzner VPS, Docker Compose (Caddy, web, worker, Postgres). Secondary: Vercel + Neon, CI-verified</td><td>Kickoff §2.8: owns the box; adapter-only difference.</td><td>Fly.io, Railway (leased), Kubernetes (overkill)</td></tr>
+      <tr><td>Reverse proxy / TLS</td><td>Caddy</td><td>Automatic HTTPS in one short config file, which suits the novice-operator runbook.</td><td>Traefik, nginx + certbot</td></tr>
+      <tr><td>Observability</td><td>Structured JSON logs (pino) with a redaction list (credentials, tokens, account numbers); Postgres slow-query log; uptime ping. OTel export is optional</td><td>Cheap stack. Logs must be safe by construction because PII lives in memos.</td><td>Hosted APM (subscription)</td></tr>
     </tbody>
   </table>
 </section>
 
-<section id="topology" data-section="topology">
-  <h2>5. Deployment Topology</h2>
-  <p class="section-hint">Environments, network paths, trust boundaries. Cross-reference <a href="../SECURITY/#boundaries">SECURITY</a>.</p>
-  <pre class="mermaid">
-flowchart LR
-  subgraph prod[Production]
-    p_edge[Edge / CDN] --> p_api[API service]
-    p_api --> p_db[(DB)]
-  end
-  subgraph stg[Staging]
-    s_edge --> s_api --> s_db[(DB)]
-  end
-  subgraph dev[Dev]
-    d[Local stack]
-  end
-  </pre>
-</section>
+<!-- ============================================================ -->
+<section id="research" data-section="research">
+  <h2>6. Plan-phase Research</h2>
+  <p class="section-hint">The two research items the PRD (§10) assigns to the architect. Each ends in a decision candidate for <code>process/DECISIONS.md</code>.</p>
 
-<section id="cicd" data-section="cicd">
-  <h2>6. CI/CD Pipeline</h2>
-  <p class="section-hint">Owned by <code>devops-engineer</code>. Stages, gates, deploy triggers.</p>
+  <h3 id="gl-research">6.1 General ledger: build vs. adopt</h3>
+  <p><strong>Scope (kickoff §2.5):</strong> the ledger lives in our Postgres under our RLS. External services (Formance, TigerBeetle, Blnk), plain-text engines and ERPs are already out. The question is only: a home-grown schema, or a library that manages tables inside our own Postgres.</p>
   <table>
-    <thead><tr><th>Stage</th><th>Tool</th><th>Gate</th></tr></thead>
+    <thead><tr><th>Candidate</th><th>What it is</th><th>Fit against our requirements</th></tr></thead>
     <tbody>
-      <tr><td>Lint</td><td class="tbd">—</td><td>Must pass</td></tr>
-      <tr><td>Test</td><td class="tbd">—</td><td>Must pass</td></tr>
-      <tr><td>Build</td><td class="tbd">—</td><td>Must pass</td></tr>
-      <tr><td>Security scan</td><td class="tbd">—</td><td>No high-severity findings</td></tr>
-      <tr><td>Deploy → staging</td><td class="tbd">—</td><td>Auto on merge to main</td></tr>
-      <tr><td>Deploy → prod</td><td class="tbd">—</td><td>Manual promote</td></tr>
+      <tr><td><strong>pgledger</strong> (pgr0ss, MIT)</td><td>A single SQL file of tables, functions and views: accounts with denormalized balance + version, two-legged transfers, entries carrying previous/current balance.</td><td>✗ No tenant column, no RLS. ✗ The primitive is a two-legged transfer; our entries are multi-leg with one posting date. Batched transfers approximate this, but reports would have to re-group them. ✗ Single currency per account and no <code>native / base / fx_rate</code> per line. ✗ No hierarchical CoA, normal side, custodial flag, or reversal link. ✗ No versioned migrations yet (its own TODO). Upgrades would mean diffing a vendored file.</td></tr>
+      <tr><td><strong>TS/Node double-entry libraries</strong> (e.g. Medici)</td><td>App-level ledger libraries.</td><td>✗ Medici is MongoDB. We found no mature TS library that manages Postgres tables under host-app RLS (web survey, 2026-09-27).</td></tr>
+      <tr><td><strong>mosko-fintech journal model</strong></td><td>Single-entry <code>account_trans</code> legs grouped post-hoc by <code>journal</code>; GL derived by an imputation function (<code>fn_gl_entries</code>); <code>users_id</code> as sole tenant anchor.</td><td>✗ Not a stored double-entry GL, and direct-owner tenancy contradicts our membership model. Its <em>patterns</em> port well, though (below).</td></tr>
+      <tr><td><strong>Home-grown</strong></td><td>~6 tables (§3.1) + 2 triggers + a posting service.</td><td>✓ Fits every requirement directly. Cost: we own correctness. We mitigate that with DB-enforced invariants (§3.2), property-based tests (random balanced / unbalanced entries), and the RLS battery.</td></tr>
     </tbody>
   </table>
-</section>
+  <p><strong>Recommendation: build.</strong> A GL core is small. The hard parts here are membership tenancy under RLS, multi-leg / multi-currency-ready lines, the securities sub-ledger, and declarative reports, and no candidate library provides any of them. Adopting pgledger would mean forking it to add all of them, which is building with extra steps.</p>
+  <p><strong>Borrow from pgledger:</strong> append-only entries as the source of truth; optional per-line running balance (deferred until a measured need — at household scale, <code>SUM</code> over an indexed <code>(entity_id, account_id, posting_date)</code> is expected to be fast (unmeasured; the dashboard &lt;2 s NFR is the guard)).<br>
+  <strong>Borrow from mosko-fintech:</strong> the immutability-trigger fence (004), the append-only lot-match junction with <code>match_seq</code> (032), price observations with source priority (019), structural de-dup by unique index + <code>ON CONFLICT DO NOTHING</code> (021), the RLS inversion self-test (tests/00), account-number masking (002), and the NOLOGIN-owner / <code>set role … reset role</code> migration ownership pattern. <strong>Leave behind:</strong> direct-owner <code>users_id</code> tenancy, post-hoc journal grouping, and Supabase-specific <code>auth.uid()</code> / JWT policy clauses.</p>
 
-<section id="integrations" data-section="integrations">
-  <h2>7. Integration Points</h2>
-  <p class="section-hint">For each third-party service: what it does, how we authenticate, rate limits, failure mode.</p>
+  <h3 id="migration-research">6.2 Migration tool</h3>
+  <p><strong>Constraints (kickoff §2.13):</strong> migrations are files committed with the code and never hand-run; CI applies them to a fresh Postgres on every run; the VPS runs a one-off migrate step before the app starts; Vercel runs it as a build step against Neon. On top of that, our schema is heavy on triggers, SECURITY DEFINER functions, roles and RLS policies.</p>
+  <p><strong>Incumbent check (mosko-fintech):</strong> 120 hand-written plain-SQL files applied with <code>supabase db push</code>, tracked in <code>supabase_migrations.schema_migrations</code>. Lessons worth keeping: a tracking table is non-negotiable (a bare <code>psql -f</code> loop was ruled out there); migrations must be tested <em>through the real apply path</em>, not psql (their <code>set local role</code> was a measured no-op under <code>db push</code>); objects need a NOLOGIN owner distinct from the applying login. The tool itself doesn't carry over: Supabase CLI assumes a Supabase stack we don't run.</p>
   <table>
-    <thead><tr><th>Service</th><th>Purpose</th><th>Auth</th><th>Limits</th><th>Failure mode</th></tr></thead>
-    <tbody><tr><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr></tbody>
+    <thead><tr><th>Tool</th><th>For</th><th>Against</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Drizzle Kit</strong> (recommended)</td><td>TS schema → generated SQL; <code>pgPolicy</code> / <code>pgRole</code> / <code>enableRLS</code> in schema; custom SQL migrations in the same chain for triggers and functions; BetterAuth's Drizzle adapter keeps auth tables in one chain; the query layer and the migration tool share one schema, so types never drift.</td><td>Triggers and functions aren't modelled, so they live in hand-written files. Policy diffing maturity is unmeasured — hence the spike.</td></tr>
+      <tr><td>dbmate</td><td>Plain SQL, tiny, language-agnostic, boring; tracking table; trivially run in a container.</td><td>No schema-as-code. Types would come from a codegen step (Kysely), and BetterAuth tables go through its own CLI generator.</td></tr>
+      <tr><td>Atlas</td><td>Declarative diffing, strong linting.</td><td>Some Postgres object types sit in the paid tier (unmeasured); a second schema language (HCL) alongside TS.</td></tr>
+      <tr><td>graphile-migrate</td><td>Excellent SQL-first dev loop (<code>current.sql</code>).</td><td>Postgres-only SQL workflow with no TS schema; smaller community.</td></tr>
+    </tbody>
   </table>
+  <p><strong>Recommendation: Drizzle Kit, gated by an M1 spike.</strong> Spike acceptance: (a) a <code>pgPolicy</code> round-trips through <code>generate</code> twice with no spurious diff; (b) BetterAuth's generated Drizzle schema migrates cleanly; (c) a custom SQL migration containing a trigger and a SECURITY DEFINER function applies through the real runner as <code>poly_migrator</code> with objects owned by <code>poly_owner</code>, and the tracking row is written; (d) the same runner works against Neon from a Vercel build step; (e) FORCE RLS, a role-targeted <code>pgPolicy</code> (<code>to:</code>), and a definer function owned by a non-owner NOLOGIN role (<code>poly_authz</code> / <code>poly_purge</code>) all round-trip through <code>generate</code> and apply as <code>poly_migrator</code> (SECURITY A-13). If (a), (c) or (e) fails, fall back to <strong>dbmate + Kysely codegen</strong>. That fallback changes only <code>packages/db</code>, since every other package consumes <code>withTenant()</code> and typed table objects.</p>
 </section>
 
-<section id="tradeoffs" data-section="tradeoffs">
-  <h2>8. Trade-offs &amp; Alternatives</h2>
-  <p class="section-hint">"Why X, not Y?" — answered for each major decision. Future-self memory.</p>
+<!-- ============================================================ -->
+<section id="topology" data-section="topology">
+  <h2>7. Deployment Topology</h2>
+  <p class="section-hint">Environments, network paths, trust boundaries. DevOps owns the INFRA-level detail; cross-reference <a href="../SECURITY/#boundaries">SECURITY</a>.</p>
+
+  <pre class="mermaid">
+flowchart TB
+  net(("Internet")) --> caddy
+  subgraph vps["Hetzner VPS"]
+    caddy["Caddy, TLS"]
+    subgraph prod["prod: tagged releases"]
+      webp["web, worker,<br/>migrate"] --> pgp[("Postgres")]
+    end
+    subgraph stg["staging: fake data"]
+      webs["web, worker"] --> pgs[("Postgres")]
+    end
+    caddy --> webp
+    caddy --> webs
+  end
+  pgp -.->|encrypted| backup[("Off-box backup")]
+  </pre>
+
   <ul>
-    <li class="tbd">Chose …, rejected …, because …</li>
+    <li><strong>Trust boundaries</strong> (numbering and controls from SECURITY §3):
+      <ul>
+        <li>TB-1: internet ↔ Caddy.</li>
+        <li>TB-2: clients ↔ app.</li>
+        <li>TB-3: app / worker ↔ Postgres (limited roles, RLS).</li>
+        <li>TB-4: <code>web</code> (seals with public keys only) ↔ <code>worker</code> (holds the private keyring, mounted into worker only; plaintext exists only inside one <code>open()</code> call frame). Redefined by SECURITY §6.3.</li>
+        <li>TB-5: worker ↔ providers (egress only).</li>
+        <li>TB-6: app ↔ OAuth IdPs and Resend.</li>
+        <li>TB-7: box ↔ backup store (encrypted before it leaves the box).</li>
+        <li>TB-8: operator SSH ↔ box (superuser; accepted risk R-1).</li>
+        <li>TB-9: ordinary write path ↔ purge path.</li>
+        <li>TB-10: prod ↔ staging compose projects on one host (shared kernel; accepted risk R-4).</li>
+        <li>TB-11: user upload (CSV / OFX, attachments) ↔ web parser.</li>
+        <li>TB-12: supply chain (GitHub CI / Actions / Renovate / registry) ↔ prod images. Whoever can publish an image that prod runs owns the box.</li>
+        <li>TB-13: operator SSH tunnel ↔ loopback-bound Admin listener, never routed by Caddy. Placeholder, defined under POLY-81 (OQ-15).</li>
+      </ul>
+    </li>
+    <li><strong>Postgres is never exposed publicly.</strong> It lives on the compose network only; the operator reaches it through <code>docker compose exec</code> or an SSH tunnel.</li>
+    <li><strong>Only Caddy publishes ports</strong> (SECURITY C-70): every other service (<code>web</code>, <code>worker</code>, Postgres, migrate) has no <code>ports:</code> mapping at all, reachable only over the compose network. Prod and staging run as separate compose projects on separate compose networks — no shared network, so a staging container can't reach a prod one by DNS name even if TB-10's shared kernel is compromised. No Docker socket is ever mounted into a container. Every container runs non-root, <code>read_only</code>, with <code>cap_drop: [ALL]</code> and <code>no-new-privileges</code>; a compose-policy lint enforces this in CI (C-70).</li>
+    <li><strong>The firewall is the Hetzner Cloud Firewall</strong>, not host <code>ufw</code> (SECURITY C-71): it sits outside the host, so a Docker-published port can't bypass it the way it bypasses <code>ufw</code>. Only 22 (SSH, key-only, no root login), 80 and 443 are open. Unattended security upgrades are enabled on the box.</li>
+    <li><strong>Environments:</strong> <em>dev</em> — local compose (Postgres + web + worker) with the <code>fake</code> provider; <em>CI</em> — fresh Postgres service per run; <em>staging</em> — same VPS, separate compose project and database, fake data only, auto-deploys every merge to <code>main</code>; <em>prod</em> — tagged releases only (kickoff §2.13). Staging on the same box is a cost trade-off (§10).</li>
+    <li><strong>Secondary target:</strong> the same app built with <code>adapter-vercel</code> against Neon, as <strong>two Vercel projects from the same repo</strong> (resolves OQ-13; SECURITY C-61 — see §7.6). CI builds it and runs the smoke suite against a Neon branch (or a local Postgres standing in for one); no Vercel-specific APIs anywhere.</li>
+    <li><strong>Sizing:</strong> CX32 (4 vCPU / 8 GB RAM) as the starting VPS — see §7.3.</li>
+  </ul>
+
+  <h3 id="environments">7.1 Environments</h3>
+  <table>
+    <thead><tr><th>Environment</th><th>Data</th><th>Deploy trigger</th><th>Access</th></tr></thead>
+    <tbody>
+      <tr><td>dev</td><td><code>fake</code> provider only</td><td>local compose, manual</td><td>developer machine only</td></tr>
+      <tr><td>CI</td><td>fresh Postgres service per run, torn down after</td><td>every PR</td><td>GitHub-hosted runner only</td></tr>
+      <tr><td>staging</td><td>fake data only (§10)</td><td>auto, every merge to <code>main</code></td><td>same VPS, separate compose project + DB; reachable behind Caddy basic auth / IP allowlist — not indexed, not linked from prod</td></tr>
+      <tr><td>prod</td><td>real data</td><td>tagged releases only, via <code>/merge-pr</code></td><td>public, TLS via Caddy</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="backup-dr">7.2 Backup &amp; Disaster Recovery</h3>
+  <p class="section-hint">Resolves OQ-9.</p>
+  <ul>
+    <li><strong>Staging co-location:</strong> staging stays on the prod VPS (confirms §10's trade-off). Staging holds fake data only, so its compromise has no ledger-confidentiality blast radius; splitting to a second box roughly doubles the fixed monthly cost for a single-household deployment with no compliance driver forcing separation. Revisit only if the app is offered to other self-hosters at meaningfully larger scale, or staging starts touching anything beyond fake data.</li>
+    <li><strong>Backup store:</strong> Hetzner Storage Box (same account, cheap) as the default, configured for <strong>append-only</strong> access (a restricted SSH/SFTP subaccount with no delete/overwrite permission on existing objects — Hetzner Storage Box's "no substitution" / read-append mode <strong>(unmeasured)</strong> until the C-73 cannot-delete test in the restore drill below actually passes against it); an S3-compatible bucket with Object Lock in compliance mode is the documented drop-in alternative for self-hosters outside Hetzner. Either way the store credential itself cannot delete or overwrite history (SECURITY C-73's own test: "a test that the store credential cannot delete").</li>
+    <li><strong>Mechanism, revised per SECURITY §6.6 (asymmetric recipient, not restic's symmetric repository password):</strong> a nightly <code>pg_dump --format=custom</code> logical backup and continuously-shipped WAL segments are each encrypted with <a href="https://age-encryption.org/"><code>age</code></a> (X25519, the same primitive family as the credential keyring's HPKE scheme) to a <strong>recipient public key</strong>, then uploaded. The box holds only the age <em>public</em> key — sufficient to encrypt, useless to decrypt. This is a deliberate change from an earlier <code>restic</code>-based draft: restic's repository password is symmetric, so a box holding it to <em>write</em> backups could also <em>read</em> them, which fails SECURITY §6.6's "box holds only the public half" requirement outright. Dedup/incremental snapshotting is given up for this; at single-household data volumes the cost is negligible.</li>
+    <li><strong>Key custody:</strong> the age keypair is generated once at bootstrap, off the box. The public half is placed on the VPS (non-secret — it can only encrypt). The private half lives in the operator's password manager and a printed offline recovery copy per the runbook; it is <strong>never</strong> on the VPS, and is a wholly separate key from the credential keyring (§6.1/§6.4) — the two are never stored together, so a single compromised secret can't unwrap both live credentials and backup history. Rotation (new keypair) is a manual runbook step on suspected compromise; old backups stay readable under the old private key, which the runbook says to retain until its last covered backup expires.</li>
+    <li><strong>RPO:</strong> ≤ 15 minutes via continuous, individually-encrypted WAL segment shipping; the nightly full dump is the tested fallback restore point (RPO 24h) if WAL replay is unavailable.</li>
+    <li><strong>RTO:</strong> ≤ 4 hours for total loss of the VPS — provision a replacement box from the same IaC, decrypt the latest dump and WAL with the offline private key, restore, replay, redeploy the last tagged release image. ≤ 30 minutes for a bad-migration rollback that doesn't need a box rebuild (§8.1).</li>
+    <li><strong>Restore drills:</strong> monthly (SECURITY C-73, tightened from this section's earlier quarterly draft), scripted, and run <strong>off the prod VPS</strong> — the operator's own machine, or a throwaway scratch VPS spun up and destroyed for the drill — never a scratch compose project on the box itself: that would put the age private key on the VPS for the drill, which this section's own key-custody rule (§7.2 above) forbids outright, drill or not. Checked against a fixture query (trial balance sums to zero); logged as a runbook checklist item, not assumed to work from the backup job succeeding alone. The drill script also asserts the store credential cannot delete an existing object (C-73's second test, and the measurement the append-only bullet above is waiting on).</li>
+  </ul>
+
+  <h3 id="sizing">7.3 Sizing</h3>
+  <p>CX32-class (4 vCPU / 8 GB RAM) rather than CX22 (2 vCPU / 4 GB): Postgres (prod + staging) + web + worker + Caddy fit comfortably inside 8 GB idle, and the extra headroom absorbs backup/WAL-shipping runs, migration bursts, and the staging Playwright smoke without contending with prod. <strong>Unmeasured</strong> — confirmed against real resource metrics after POLY-M1 lands; downgrading to CX22 is a one-line IaC change if it proves oversized.</p>
+
+  <h3 id="observability">7.4 Observability &amp; Operations</h3>
+  <ul>
+    <li><strong>Logs:</strong> web / worker emit structured JSON to stdout (one schema — <code>ts, level, req_id, entity_id?, event, …</code>; exact fields agreed with backend-lead before POLY-M1 ships anything that logs). Docker's <code>json-file</code> driver with <code>max-size</code> / <code>max-file</code> rotation captures them; <code>docker compose logs</code> / <code>journalctl</code> is the query surface at this scale. No log-aggregation service until a second box or third-party hosting is in play.</li>
+    <li><strong>Metrics:</strong> a <code>/api/v1/health</code> route reports DB connectivity, last successful migration, and last successful backup timestamp. Polled by a free external uptime monitor. Container resource metrics via <code>docker stats</code> on demand; no Prometheus/Grafana until scale or a second operator justifies the extra service.</li>
+    <li><strong>Alerts</strong> (all by email — no on-call rotation for a household of one): backup job failure or a backup older than 26h; <code>/health</code> failing for &gt;5 minutes; CI deploy-to-prod failure.</li>
+    <li><strong>Dashboard:</strong> <code>/health</code> plus <code>docker compose ps</code> is the v1 dashboard — the thing the team-lead can point to at launch. A Grafana-class dashboard is a documented future initiative once observability volume justifies the extra container.</li>
+  </ul>
+
+  <h3 id="secrets-hardening">7.5 Secrets Delivery &amp; Postgres Config</h3>
+  <p class="section-hint">DevOps's INFRA-level implementation of SECURITY §6.2 and §12.3's remaining asks.</p>
+  <ul>
+    <li><strong>Secrets as files, not env vars (SECURITY §6.2, C-74):</strong> every operator secret lives under <code>/etc/polycarpic/secrets/</code> on the host (root:root, files <code>0400</code>, directory <code>0700</code>), mounted into containers as Docker Compose <code>secrets:</code> at <code>/run/secrets/&lt;name&gt;</code>. Apps read them through a <code>*_FILE</code> convention (e.g. <code>DATABASE_PASSWORD_FILE=/run/secrets/db_password</code>), never a bare env var — <code>docker inspect</code>, <code>/proc/&lt;pid&gt;/environ</code> and an error reporter dumping <code>process.env</code> all leak plain env vars, never a file only the right container can read. Per-container scoping: <code>web</code> never gets the credential private keyring or the backup private key; only <code>worker</code> mounts the keyring secret. Staging gets its own distinct secret values and no keyring at all, since it only ever runs the <code>fake</code> provider. No secret is ever baked into an image or passed as a build arg; the app refuses to start outside development if a required secret file is missing.</li>
+    <li><strong>Postgres logging (SECURITY C-75):</strong> <code>log_parameter_max_length = 0</code> and <code>log_parameter_max_length_on_error = 0</code> (bound parameter VALUES never reach the log, even on error — a sealed credential's ciphertext is one thing, but a query parameter carrying a raw token before it's sealed is exactly what this guards), <code>log_statement = 'ddl'</code> (schema changes only, never row data). Set in the Postgres compose service's config, asserted by a config-check in the DB battery (§8's DB battery row).</li>
+    <li><strong>Connection-pooler mode, asserted on both targets:</strong> the VPS's Postgres and Neon (the secondary target) must both run in a pooler mode where <code>set_config(..., true)</code> (the transaction-local RLS GUC, ARCH §3.3) is safe under connection reuse — transaction-mode pooling, not session-mode, on any pooler in front of either target (PgBouncer on the VPS if one is added later; Neon's own built-in pooler). A CI assertion connects through each target's pooler and confirms the GUC resets between transactions on a reused connection (the same pool-reuse property qa-engineer's pgTAP battery checks at the RLS layer, asserted here at the pooler-config layer instead).</li>
+  </ul>
+
+  <h3 id="vercel-split">7.6 Vercel Secondary Target: Two-Project Split (OQ-13)</h3>
+  <p class="section-hint">Resolves OQ-13; SECURITY C-61/R-3 @ 3c66ce1 (phase/plan-security). DevOps builds the CI check; the split itself is a SecEng ruling.</p>
+  <ul>
+    <li><strong>Topology:</strong> the Vercel target is two Vercel projects deployed from the same repo, not one. <code>web</code> exposes only user-facing routes, holds only public keys and the <code>poly_app</code> DB credentials. <code>jobs</code> exposes only cron routes (each checking <code>CRON_SECRET</code> with <code>timingSafeEqual</code>), holds the credential keyring and the <code>poly_worker</code> credentials. This is the same TB-4 (<code>web</code> seals / <code>worker</code> opens) split the VPS target already has via separate compose services — Vercel just can't isolate them inside one deployment, so it takes two deployments instead.</li>
+    <li><strong>CI check, three legs (SECURITY C-61's own "build tests"):</strong>
+      <ul>
+        <li><em>Route manifest vs. allowlist.</em> Each project's build output (SvelteKit's route manifest under <code>.vercel/output/functions/</code>) is diffed against a checked-in allowlist per project — an exact-set match, not a subset check, so a route silently added to the wrong project's allowlist is caught too, not just one silently missing. <code>jobs</code>'s allowlist is exactly the cron routes; <code>web</code>'s is everything else.</li>
+        <li><em>No keyring reference in the <code>web</code> build.</em> A bundle-scan (grep the built output for the keyring module's resolved import path, same mechanism the existing <code>packages/secrets</code> import-boundary lint uses source-side) asserts <code>open()</code> and the keyring module never got bundled into <code>web</code>'s build artifact — catches a route misclassified into <code>web</code>'s allowlist that would otherwise pass the manifest check by having the right PATH but the wrong CODE behind it.</li>
+        <li><em>Node build 404s job routes.</em> The VPS's <code>adapter-node</code> build (one image, <code>web</code>/<code>worker</code>/<code>migrate</code> entrypoints, §8.1) is hit on its <code>web</code> entrypoint at each cron route path and must 404 — job routes exist only behind the <code>worker</code> entrypoint there, and this is the cross-check that the VPS and Vercel targets enforce the identical TB-4 boundary by two different mechanisms (separate compose service vs. separate Vercel project) without drifting apart.</li>
+      </ul>
+    </li>
+    <li><strong>Env check in CI (C-61):</strong> a Vercel API call lists each project's configured env var <em>names</em> (never values) and asserts the keyring variable name is present in <code>jobs</code> and absent from <code>web</code> — catches an operator (or a future IaC change) setting it on the wrong project directly in the Vercel dashboard, which the build-time checks above can't see.</li>
+    <li><strong>Cron frequency — measured:</strong> Vercel's Hobby plan caps cron jobs at once per day, with timing guaranteed only within the hour (Pro lifts this to per-minute). Since Hobby is already the ceiling this self-hoster fallback target targets, daily is not a choice DevOps is making for cost reasons — it is the only cadence Hobby allows at all. Import polling, EOD prices and period-end jobs on the Vercel target therefore run once daily, a real (accepted) data-freshness gap against the VPS target's more frequent worker loop; SecEng's framing ("daily polling is acceptable for this fallback target") holds given Vercel is explicitly the secondary, not the primary, deploy target (kickoff §2.8).</li>
+    <li><strong>Cost:</strong> two Hobby-tier Vercel projects, same as one — Hobby is free per project, so the split costs nothing beyond the CI check's own build time (one extra <code>adapter-vercel</code> build, ~same cost as the existing one). If POLY-77 ever needs Pro-tier cron frequency, that's a per-project upgrade, not a re-architecture.</li>
+  </ul>
+
+  <h3 id="sync-floors">7.7 Sync Rate Floors</h3>
+  <p class="section-hint">The INFRA minimum interval SECURITY §4.2.1 and §3.1 defer to, for "Sync now" and the per-entity import schedule. Rejected below the floor (SECURITY §4.2.1).</p>
+  <ul>
+    <li><strong>Aggregators (SimpleFIN, Plaid) — floor 2 hours, default 6 hours.</strong> Measured (provider docs, 2026-09-28): SimpleFIN Bridge caps a connection at 24 requests/day, with warnings then access-token disablement beyond that — the binding constraint, since it has no per-call cost at all. Plaid's own <code>/transactions/sync</code> limit (50 req/min/Item in production) is far looser, and Transactions is billed per active Item monthly, not per call, so Plaid imposes no comparable floor of its own. One shared floor governs both providers rather than branching per-provider in the schedule UI: <strong>2 hours</strong> (≤ 12 scheduled requests/day) leaves ≥ 12/day of SimpleFIN's budget as headroom for manual "Sync now" clicks and backoff retries without risking disablement, even if every connection runs at the floor. The out-of-the-box <strong>default is looser than the floor, 6 hours</strong> (4 syncs/day) — ample freshness for a personal dashboard that isn't real-time trading, and it leaves most of the SimpleFIN budget unused for the common case.</li>
+    <li><strong>Broker APIs (Schwab, IBKR) — floor 1 hour, default 24 hours (EOD), both provisional (unmeasured against a registered app).</strong> Schwab's Trader API publishes generous, per-app-configurable limits (on the order of 120 req/min for market data) with no stated per-call cost; IBKR's are comparably loose for read-only position/lot queries. Neither is the binding constraint for a buy-and-hold personal-investor persona — product reasoning is: lots and positions settle end-of-day, so there is little value polling a brokerage intraday the way a checking account's pending transactions reward polling. Floor is set looser than the aggregator floor (1 hour) because the provider headroom is real, not because the data changes faster; default matches the existing EOD price-provider cadence (§4.4) at once daily. Reopen when POLY-67/69 registers a real developer app and its actual configured limits are known — "provisional" here means the number, not the reasoning, may move.</li>
+    <li><strong>Enforcement:</strong> both floors are a single config value each (<code>SYNC_FLOOR_AGGREGATOR_SECONDS</code>, <code>SYNC_FLOOR_BROKER_SECONDS</code>), read by the same validation SECURITY §4.2.1 already specifies for "Sync now" and the per-entity schedule UPDATE policy — one seam, not a per-provider branch in application code. A provider added later slots into whichever floor its own rate limit and pricing most resembles; a provider that doesn't fit either (a hard per-call cost, for instance) gets its own floor then, not before.</li>
   </ul>
 </section>
 
-<section id="open-questions" data-section="open-questions">
-  <h2>9. Open Questions</h2>
-  <p class="section-hint">Each has an owner and a target resolution date.</p>
+<!-- ============================================================ -->
+<section id="cicd" data-section="cicd">
+  <h2>8. CI/CD Pipeline</h2>
+  <p class="section-hint">Owned by <code>devops-engineer</code>; this is the shape, INFRA holds the detail.</p>
   <table>
-    <thead><tr><th>Question</th><th>Owner agent</th><th>Resolve by</th></tr></thead>
-    <tbody><tr><td class="tbd">—</td><td class="tbd">—</td><td class="tbd">—</td></tr></tbody>
+    <thead><tr><th>Stage</th><th>Tool</th><th>Gate</th></tr></thead>
+    <tbody>
+      <tr><td>Change detection</td><td>Turborepo affected graph; docs-only changes skip test jobs</td><td>—</td></tr>
+      <tr><td>Lint + types</td><td>ESLint (incl. layer-boundary rules), <code>svelte-check</code>, <code>tsc</code></td><td>Must pass</td></tr>
+      <tr><td>Unit / package tests</td><td>Vitest, affected packages only</td><td>Must pass</td></tr>
+      <tr><td>DB battery</td><td>Apply all migrations to a fresh Postgres as <code>poly_migrator</code>; pgTAP RLS + trigger battery (incl. inversion self-test, pool-reuse test)</td><td>Must pass when <code>packages/db</code> or any schema changes</td></tr>
+      <tr><td>OpenAPI freshness</td><td>Regenerate and diff against the committed spec</td><td>No diff</td></tr>
+      <tr><td>Build</td><td><code>adapter-node</code> image; <code>adapter-vercel</code> build (both Vercel projects, §7.6)</td><td>Both must build</td></tr>
+      <tr><td>Vercel topology check</td><td>Route manifest vs. allowlist per project; no keyring reference in the <code>web</code> build; node build 404s job routes; env-name check via Vercel API (§7.6)</td><td>Must pass when <code>apps/web</code> routes or Vercel project config change</td></tr>
+      <tr><td>Smoke (integration milestones)</td><td>Playwright: login, import a batch, confirm a draft, view a statement</td><td>Must pass</td></tr>
+      <tr><td>Security scan</td><td>Dependency audit, secret scan</td><td>No high-severity findings</td></tr>
+      <tr><td>Deploy → staging</td><td>Pull-based: the box polls and verifies attestation (§8.1)</td><td>Auto on merge to <code>main</code></td></tr>
+      <tr><td>Deploy → prod</td><td>Same mechanism, triggered by a release tag cut by <code>/merge-pr</code></td><td>Tag only</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="deploy-mechanism">8.1 Deploy mechanism</h3>
+  <ul>
+    <li><strong>Decision, revised per SECURITY C-83: pull-based, not push-over-SSH.</strong> An earlier draft of this section chose GitHub Actions → SSH push; SecEng's explicit preference is pull-based specifically because it means <strong>no GitHub-held credential can ever reach prod</strong> — the box, not a GitHub Actions runner, decides when and what to deploy. A <code>systemd</code> timer on the box (every 5 minutes) runs a small poll script: query the GitHub Releases API for the newest <code>v*</code> tag (prod) or the registry for the newest <code>main</code>-branch image digest (staging); if it differs from what's running, pull the image <strong>by digest</strong> (never a mutable tag), then verify. A failed check at either verification step aborts the poll cycle and alerts (§7.4) — the box never runs an unverified image.</li>
+    <li><strong>Attestation verification, pinned per SecEng's delta (SECURITY C-73/C-83 @ 61b4d2a):</strong> <code>gh attestation verify &lt;digest&gt; --repo richmosko/polycarpic --signer-workflow &lt;path-to-the-release-workflow&gt;</code> — pinning the repo and the exact signer workflow, not just "an attestation exists" (an unpinned check would accept a provenance attestation from any workflow in any repo the same GitHub identity can sign for). <strong>Prod adds a second, independent check:</strong> the <code>v*</code> tag itself must carry an SSH signature verifiable against a checked-in <code>allowed_signers</code> file (the same signing <code>/merge-pr</code> already does before cutting a release tag, SECURITY §8 "Signing") — so a compromised registry or attestation service alone still can't move prod without also forging a tag signature staging never checks.</li>
+    <li><strong>The box's GitHub credential:</strong> a fine-grained PAT, scoped to this one repo only, <code>contents:read</code> + <code>packages:read</code>, with an expiry (rotated per the runbook, same cadence discipline as §6.4's other operator secrets) — never a classic PAT, never org-wide. If the GHCR package and the repo are ever made public, the PAT is dropped entirely: an unauthenticated <code>gh api</code> / registry pull needs no credential on the box at all, which is strictly less attack surface than a scoped-but-present one.</li>
+    <li><strong>Build once, promote:</strong> CI builds a single <code>adapter-node</code> image per commit, pushes it to GHCR tagged with the git sha, with an SBOM (CycloneDX) and a provenance attestation attached (SECURITY §8); that same image digest is promoted from staging to prod on tag, never rebuilt. This rules out a staging/prod code-drift class of bug. <code>adapter-vercel</code> builds separately in CI as the secondary-target check (§7) but is not deployed by this pipeline. The one image serves three compose services through different entrypoints: <code>web</code>, <code>worker</code> and <code>migrate</code>. Each gets only its own secrets; the credential keyring is mounted into <code>worker</code> alone (TB-4), and lint keeps <code>open()</code> out of the web bundle.</li>
+    <li><strong>Deploy script</strong> (idempotent, same for staging/prod, invoked by the poll timer once it has a verified digest to move to): <code>docker compose pull</code> (by digest) → one-off <code>migrate</code> → <code>docker compose up -d</code> → poll <code>/health</code> with retry → non-zero exit on failure without swapping traffic (Caddy keeps routing to the last healthy containers until the new ones pass health).</li>
+    <li><strong>Rollback (one button):</strong> a runbook command points the poll script's "desired digest" file at the previous release's digest and re-runs the deploy script directly (no need to wait for the next timer tick, and no dependency on GitHub's Releases API being reachable at rollback time — the operator already knows the prior digest from the deploy log). Migrations are additive / backward-compatible by convention (expand-contract — no destructive migration ships in the same release as the code that depends on the drop), so a code rollback never needs a schema rollback. A schema-level rollback is rare and falls back to the DR restore path (§7.2).</li>
+    <li><strong>Operator secrets</strong> on the box live as files under <code>/run/secrets/</code>, one per container that needs it (§7.5) — placed once during VPS bootstrap and never touched by CI or the poll script, which only ever reads a public digest and a public attestation. Neither transmits a secret value onto, or reads one off, the box.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section id="integrations" data-section="integrations">
+  <h2>9. Integration Points</h2>
+  <p class="section-hint">Limits marked (unmeasured) are to be verified against provider docs before each adapter's milestone.</p>
+  <table>
+    <thead><tr><th>Service</th><th>Purpose</th><th>Auth</th><th>Limits</th><th>Failure mode</th></tr></thead>
+    <tbody>
+      <tr><td>Fake source</td><td>Deterministic transactions for three personas; fake EOD walk</td><td>none</td><td>none</td><td>n/a — used in dev, CI and staging</td></tr>
+      <tr><td>CSV / OFX file import</td><td>Credential-free import path (SecEng's preferred default for self-hosters)</td><td>none (user upload)</td><td>upload size cap</td><td>Parse errors surface per row; nothing is posted without confirmation</td></tr>
+      <tr><td>SimpleFIN Bridge</td><td>First real aggregator</td><td>Setup token → access URL (bearer-equivalent; sealed)</td><td>24 requests/day/connection, measured (§7.7) — binding constraint on the shared aggregator sync floor</td><td>Job retries with backoff; the dashboard shows "last synced"; no data loss because de-dup is by hash</td></tr>
+      <tr><td>Plaid</td><td>Second aggregator</td><td>client id + secret (operator secret) + per-item access token (sealed)</td><td>Per-item monthly pricing; 50 req/min/Item on <code>/transactions/sync</code>, measured (§7.7) — looser than SimpleFIN's, not the binding constraint</td><td>As above; item-login-required surfaces a relink prompt; <code>/item/remove</code> on unlink</td></tr>
+      <tr><td>Schwab / IBKR APIs</td><td>Positions, trades, lots (later)</td><td>OAuth 2.0 / broker-specific</td><td>Provisional floor set (§7.7); exact per-app limits unmeasured until POLY-67/69 registers a real developer app</td><td>As above</td></tr>
+      <tr><td>EOD price provider</td><td>Daily closes for held securities</td><td>API key (operator secret)</td><td>Provider-dependent (OQ-5)</td><td>Fall back to the last observation, flagged stale; source priority lets a better source replace it later</td></tr>
+      <tr><td>BLS API v2</td><td>CPI-U (CUUR0000SA0), monthly</td><td>Free per-operator key (low-tier secret); v1 without a key</td><td>500 queries/day with a key (PRD §8)</td><td>Use the latest stored month; manual CSV import fallback</td></tr>
+      <tr><td>Resend</td><td>Transactional email (verification, magic link, MFA recovery)</td><td>API key (operator secret)</td><td>Free-tier volume cap (unmeasured)</td><td>Auth email fails loudly; OAuth login still works</td></tr>
+      <tr><td>Google / Apple / GitHub</td><td>OAuth identity providers</td><td>OAuth 2.0 client credentials per operator</td><td>n/a at this scale</td><td>That login method is unavailable; others still work</td></tr>
+      <tr><td>Off-box backup store</td><td>Encrypted backups (Hetzner Storage Box or S3-compatible)</td><td>Store credential (operator secret)</td><td>Storage quota</td><td>Backup job alerts; the RPO clock starts</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Operator secrets</strong> (provider client secrets, API keys, the credential keyring, the DB passwords) live as files on the VPS, each mounted only into the container that needs it (the keyring into <code>worker</code> only; SECURITY §6.2). On the secondary target they are Vercel env vars. They never live in the repo or the database. <strong>User credentials</strong> (access URLs, access tokens) live sealed in the database (§3.1, SECURITY).</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="tradeoffs" data-section="tradeoffs">
+  <h2>10. Trade-offs &amp; Alternatives</h2>
+  <ul>
+    <li><strong>Home-grown GL over pgledger.</strong> We own correctness, and in exchange we get a model that fits (multi-leg, tenancy, multi-currency-ready lines). §6.1.</li>
+    <li><strong>Drizzle over dbmate.</strong> One TS schema for queries and migrations, plus BetterAuth in the same chain, at the cost of hand-written files for triggers and functions and an unproven policy differ. The spike gates the choice. §6.2.</li>
+    <li><strong>Transaction-local RLS context over per-user DB roles or session <code>SET</code>.</strong> Per-user roles don't scale with memberships and complicate pooling; session <code>SET</code> leaks across pooled connections. <code>set_config(…, true)</code> is pool-safe on both targets.</li>
+    <li><strong>Import split into raw (L2) and posting (L4).</strong> This honours "import is the lowest layer" for raw data while keeping dependencies strictly downward. It costs one extra package.</li>
+    <li><strong>One entry per entity for cross-entity transfers.</strong> Each entity's books balance on their own; there are no cross-entity entries. The cost is that matching must pair across entities and post twice (OQ-6).</li>
+    <li><strong>Signed single amount per line over debit/credit columns.</strong> The balance check becomes a single <code>SUM = 0</code>; presentation derives Dr/Cr from sign and the account's normal side.</li>
+    <li><strong>Balances computed, not stored.</strong> No running-balance column until a measured need. That removes a whole class of lock contention and drift bugs, at the cost of a query that grows with history (indexed).</li>
+    <li><strong>pg-boss (Postgres) over Redis for jobs.</strong> No extra service. The cost is job throughput we will never need.</li>
+    <li><strong>Web pages call packages directly, not through <code>/api/v1</code>.</strong> This skips a serialization hop and keeps SSR fast. The two paths share DTO types, so they can't drift; the cost is that the web UI doesn't dogfood the HTTP API (the Playwright smoke and the native client will).</li>
+    <li><strong>Staging on the prod VPS.</strong> Saves a second box. Staging holds fake data only, so a staging compromise exposes no real books, but the two share a kernel. INFRA may split them later.</li>
+    <li><strong>Pull-based deploy over push-over-SSH (SECURITY C-83).</strong> No credential GitHub holds can ever reach prod directly, at the cost of a systemd timer on the box and up to a five-minute delay between a tag landing and the box noticing it (acceptable for a single-operator deployment with no SLA).</li>
+    <li><strong>Age-recipient backup encryption over restic's symmetric password (SECURITY §6.6).</strong> A compromised box can encrypt new backups but never decrypt any backup, past or future — the cost is giving up restic's deduplication, negligible at this data volume.</li>
+    <li><strong>Reports as data (declarative) over code.</strong> Users can clone and edit, and upgrades don't clobber clones. The cost is building a small formula grammar. Scripting stays deferred (PRD §3).</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section id="roadmap" data-section="roadmap">
+  <h2>11. Milestone Map</h2>
+  <p class="section-hint">Development milestones under <code>POLY-V1</code>, ordered by the layer model. The files in <code>process/cairn/milestones/</code> are authoritative; this is the rationale.</p>
+  <table>
+    <thead><tr><th>Milestone</th><th>Layers</th><th>Stories</th><th>Integration check at close</th></tr></thead>
+    <tbody>
+      <tr><td>POLY-M1 — Foundations</td><td>L0, L1, L6 shell</td><td>POLY-76 (spike), POLY-62</td><td>A user signs in, creates an entity, grants a viewer; the RLS battery is green; migrate runs in CI and on staging</td></tr>
+      <tr><td>POLY-M2 — Ledger &amp; Import</td><td>L2, L3, L4</td><td>POLY-64, POLY-65</td><td>The fake persona imports, drafts are confirmed into balanced immutable entries, and categories / tax tags apply</td></tr>
+      <tr><td>POLY-M3 — Transfers, Reconciliation &amp; Dashboard</td><td>L4, L6</td><td>POLY-71, POLY-72, POLY-63</td><td>The couple persona's transfers net CIT to zero; the custodial reconciliation matches; the dashboard is under 2 s</td></tr>
+      <tr><td>POLY-M4 — Securities &amp; Market Data</td><td>L2 refdata, L3 securities, L5 portfolio</td><td>POLY-67, POLY-69, POLY-75</td><td>Persona 3's lots, EOD valuation and allocation are correct; the real / nominal toggle works</td></tr>
+      <tr><td>POLY-M5 — Statements</td><td>L5 reports</td><td>POLY-73, POLY-68</td><td>Seeded templates render; clones survive a template upgrade</td></tr>
+      <tr><td><strong>POLY-1.0 — Tax, Sharing &amp; Real Data (GA)</strong></td><td>L5 tax, L6, L2 real adapter</td><td>POLY-66, POLY-70, POLY-77 (real-data adapter)</td><td>Tags <code>v1.0.0</code>: the Principal runs one entity end to end on real data (PRD goal 1)</td></tr>
+    </tbody>
   </table>
 </section>
 
+<!-- ============================================================ -->
+<section id="open-questions" data-section="open-questions">
+  <h2>12. Open Questions</h2>
+  <p class="section-hint">Each has an owner and a target resolution point.</p>
+  <table>
+    <thead><tr><th>#</th><th>Question</th><th>Owner</th><th>Resolve by</th></tr></thead>
+    <tbody>
+      <tr><td>OQ-1</td><td><em>Resolved, revised by SecEng review 70c9d05 (SECURITY §6.3–§6.5):</em> HPKE (X25519 / HKDF-SHA256 / AES-256-GCM). <code>web</code> seals; only <code>worker</code> holds the keyring and opens. Stored as <code>enc</code>, <code>ciphertext</code>, <code>key_id</code>, <code>alg_version</code>. pgcrypto and KMS are rejected. Rotation is a re-seal job.</td><td>seceng</td><td>Closed 2026-09-28</td></tr>
+      <tr><td>OQ-2</td><td><em>Resolved (SECURITY §12, §4.2.1, §4.3):</em> the §3.3 shape is confirmed, with additions (a)–(l) folded in. Roles are uniform across entity types.</td><td>seceng + qa-engineer</td><td>Closed 2026-09-28</td></tr>
+      <tr><td>OQ-3</td><td><em>Resolved (SECURITY §4.4):</em> jobs run under the linking user's membership (<code>linked_by_user_id NOT NULL</code>), with a <code>principal_invalid</code> state that fails loudly. The system policy clause was rejected.</td><td>seceng</td><td>Closed 2026-09-28</td></tr>
+      <tr><td>OQ-4</td><td><em>Resolved, revised by 70c9d05 (SECURITY §4.5):</em> the purge function is owned by the NOLOGIN <code>poly_purge</code> role, with role-targeted DELETE policies. Eight guards, including export freshness and a zero-rows-remain assert. See §3.4.</td><td>seceng</td><td>Closed 2026-09-28</td></tr>
+      <tr><td>OQ-5</td><td>Which EOD price provider (free tier, coverage of mutual funds / ETFs)? mosko-fintech used provider-implied prices plus FMP.</td><td>architect</td><td>Start of POLY-M4</td></tr>
+      <tr><td>OQ-6</td><td>Cross-entity transfers (e.g. Person → Household joint account): what counterpart account does each side book — contribution / distribution, or a due-to / due-from pair?</td><td>Principal (via team-lead)</td><td>Start of POLY-M3</td></tr>
+      <tr><td>OQ-7</td><td>Real-data path for GA: SimpleFIN adapter, CSV/OFX file adapter, or both? PRD goal 1 needs one. Tracked as POLY-77 in POLY-1.0; its scope waits on this answer. <em>Note (2026-10-02):</em> whichever the answer, file import is a source type in the same provider-item modal ("Import file" alongside Sync), so CSV/OFX costs no extra screen.</td><td>Principal (via team-lead)</td><td>Before POLY-M2 closes</td></tr>
+      <tr><td>OQ-14</td><td>Grouping (Flow B) across dates: gate G3 allows only same-bank-date groups, i.e. daily summaries. Does the Principal need weekly summaries? If so, the choice is between posting on the last date (cash balances wrong between the dates) and one entry per day inside the group (no real saving). Proposed: daily only.</td><td>Principal (via team-lead)</td><td>Start of POLY-M2</td></tr>
+      <tr><td>OQ-15</td><td>Operator-only Admin view (POLY-81, Principal direction 2026-10-02). It shows basic box and stack status (container health, last migration, backup age, disk, link-health counts) plus admin links still to be defined, and is reachable only through an SSH tunnel to a loopback-bound listener, never through Caddy. Topology options: (a) a route group inside the web process on a second listener bound to <code>127.0.0.1</code>, which is cheap but shares the web process and its attack surface; (b) a separate <code>admin</code> compose service bound to loopback with its own minimal DB role (read-only status views, no tenant data), which costs one service but isolates it. What it reads, and whether it may act (trigger a backup, rotate keys), is open. Leaning (b), pending SecEng.</td><td>architect + seceng + devops-engineer</td><td>Under POLY-81</td></tr>
+      <tr><td>OQ-8</td><td>Should intermediate milestones cut <code>0.x</code> releases so prod can run on real data before GA, or does everything before GA live on staging with fake data?</td><td>Principal (via team-lead)</td><td>Before POLY-M1 closes</td></tr>
+      <tr><td>OQ-9</td><td><strong>Resolved</strong> — see §7.2: staging co-located on the prod VPS; backup store is Hetzner Storage Box (S3-compatible as a config-only alternative); RPO ≤ 15 min (WAL) / 24h (nightly dump fallback), RTO ≤ 4h (full loss) / ≤ 30 min (bad-migration rollback).</td><td>devops-engineer</td><td>INFRA v1 — done 2026-09-28</td></tr>
+      <tr><td>OQ-10</td><td>Drizzle spike outcome (§6.2), which confirms or flips the migration-tool decision.</td><td>architect + backend-lead</td><td>POLY-76, first issue of POLY-M1</td></tr>
+      <tr><td>OQ-11</td><td><em>Resolved in outline (§2.4):</em> the six DESIGN screens are mapped to package DTOs. Field-level DTO shapes get pinned in each package's design file at the start of its milestone.</td><td>ux-designer + architect</td><td>Per milestone</td></tr>
+      <tr><td>OQ-12</td><td>Prior-year filed tax per entity per jurisdiction (safe-harbor input): a manual entry per year, or derived from the ledger's settled filing entries?</td><td>architect + Principal</td><td>Start of POLY-1.0</td></tr>
+      <tr><td>OQ-13</td><td><strong>Resolved</strong> — see §7.6: the Vercel target is two projects from one repo (SECURITY C-61), <code>web</code> holding public keys + <code>poly_app</code> only, <code>jobs</code> holding the keyring + <code>poly_worker</code>. CI enforces the split (route manifest, bundle scan, node-build 404, env-name check). Hobby-plan cron is capped at once daily — measured, accepted as this fallback target's data-freshness trade-off.</td><td>seceng + devops-engineer</td><td>Before POLY-77 — done 2026-09-28</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Source hand-offs folded in:</strong> PRD-import spillover (kickoff §2.4–§2.11 architecture detail) and SecEng's Research-phase notes. Their [Plan] items surface here as OQ-1 through OQ-4, and in §3.3 / §3.4.</p>
+</section>
+
 <footer class="doc-footer">
-  Generated by the <code>architect</code> agent via <code>/generate-archdoc</code>. Update when ARCH decisions change; log decisions in <a href="../../process/STATE.md">process/STATE.md</a>.
+  Generated by the <code>architect</code> agent via <code>/generate-archdoc</code>. Update when ARCH decisions change; log decisions in <a href="../../process/DECISIONS.md">process/DECISIONS.md</a>.
 </footer>
 
 </body>
