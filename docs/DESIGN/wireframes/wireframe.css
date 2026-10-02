@@ -194,3 +194,24 @@ h1, h2, h3 { font-weight: 600; margin: 0 0 12px; }
 /* ---------- Account register breadcrumb ---------- */
 .wf-breadcrumb { font-size: 12px; color: #888; margin-bottom: 8px; }
 .wf-breadcrumb a { color: #666; }
+
+/* ---------- Custodial account card + lots sub-card (pass 7) ---------- */
+.wf-custodial-card { border: 1.5px solid #999; border-radius: 4px; margin-bottom: 16px; background: #fff; }
+.wf-custodial-header { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1.5px solid #999; }
+.wf-custodial-header .wf-institution { font-size: 12px; color: #888; }
+.wf-lots-subcard { margin: 12px; border: 1px dashed #999; border-radius: 4px; padding: 10px; }
+.wf-lots-security-row { display: flex; justify-content: space-between; padding: 6px 0; cursor: pointer; font-weight: 600; }
+.wf-lots-detail { padding: 4px 0 4px 16px; font-size: 12px; border-top: 1px dashed #eee; }
+.wf-gain-positive { color: #2a7; }
+.wf-gain-negative { color: #c33; }
+
+/* ---------- Link health badge ---------- */
+.wf-link-health { font-size: 11px; border: 1px dashed #999; border-radius: 999px; padding: 2px 8px; }
+.wf-link-health.ok { color: #2a7; }
+.wf-link-health.warning { color: #b45309; border-color: #b45309; }
+
+/* ---------- Provider-item modal (source-type picker, mapping step) ---------- */
+.wf-source-type-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.wf-source-type-row span { border: 1px dashed #999; border-radius: 4px; padding: 6px 12px; font-size: 12px; }
+.wf-source-type-row span.selected { border: 2px solid #333; font-weight: 600; }
+.wf-mapping-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }

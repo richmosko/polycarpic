@@ -341,6 +341,33 @@ See `wireframes/general-ledger.html` and `wireframes/account-register.html` — 
 
 ---
 
+## Custodial Accounts: lots & provider setup (pass 7, 2026-10-02)
+
+**The Principal, verbatim (sidebar interview):** "Sub-card in the Custodial view... pull downs of each security to show lots. And for the Allocation vs target to be a dedicated page. The book vs market should be implicit in the custodial view, shown as whether the lots (and sum of lots) show the short/long/total current gains/losses." This absorbs both halves of what the old "Securities" nav item did — lots live here now; allocation-vs-target gets its own item (§ below is Custodial Accounts only; see the Allocation screen for that half).
+
+**Per-account card:** institution name, reported balance, link-health badge, and a reconciliation line against the GL (same clean/break tiers as before — danger tier surfaces on Dashboard too, per flow 5.4).
+
+**The lots sub-card (only on accounts that hold securities):**
+- One row per security, collapsed by default — a pull-down (disclosure triangle) reveals its individual lots.
+- Each lot shows book value, market value, and its own short-term or long-term unrealized gain/loss.
+- The security's own row shows its summed book/market/gain across all its lots.
+- The account's lots sub-card totals short, long, and total unrealized gain/loss across every security — this **is** the book-vs-market comparison; there is no separate chart for it (the Principal's correction to the pre-pass-7 design, which had book-vs-market as its own line chart on the old Securities screen — that chart is retired).
+
+**The `[+ New]` provider-item modal** (absorbs the old "Import" screen's linking step):
+- **Source type**, chosen first: aggregator (Plaid/SimpleFIN/fake), a manual account (no live link), or an imported file (CSV/OFX).
+- **Discovered-account mapping** (aggregator path only): a provider item can surface several accounts at once (e.g. a bank's checking + savings); each discovered account maps to an existing or new custodial account — a provider item is a first-class record that owns its discovered accounts (ARCH §3 data-model note), not folded directly into one custodial account.
+- **Token refresh** and **unlink** live in the same modal. Unlink states the revocation-lag note explicitly on the Vercel deployment target: access may persist up to 24h after unlinking.
+- **`[Sync]`** (top of Custodial Accounts, and a `[Sync Transactions]` counterpart on Transactions) pulls **both** balances and positions here — not transactions-only, which is what Sync means on Transactions.
+- **`[Import file]`** is the manual/file-source counterpart to Sync — same place, different action, for an account with no live aggregator link.
+
+**Link health** (expired token, lost access, stale) is a badge on the custodial-account row here, and a banner at the top of Transactions — one state, shown in both places a user would reasonably look for it.
+
+**Permissions:** `[+ New]`, token refresh, unlink, and `[Sync]`/`[Import file]` are Manager/Owner actions — a Viewer sees none of them (same posture as Transactions' posting actions, ARCH §2.4 permissions table).
+
+See `wireframes/custodial-accounts.html` — wireframe fidelity only, same traffic-priority rule as General Ledger.
+
+---
+
 ## Component inventory
 
 Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@latest add <name>`.

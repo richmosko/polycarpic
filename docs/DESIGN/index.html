@@ -323,7 +323,7 @@ flowchart TD
     <li><a href="wireframes/dashboard.html">Dashboard</a> — per-entity financial health</li>
     <li><a href="wireframes/transactions.html">Transactions</a> <em>(stage 2, done)</em> — three urgency-ordered accordion cards (Exceptions/Pending/Posted), Pending inbox built around the Plaid review/match workflow.</li>
     <li><a href="wireframes/general-ledger.html">General Ledger</a> <em>(stage 3, done)</em> — chart-of-accounts tree; each account opens its own <a href="wireframes/account-register.html">register page</a>.</li>
-    <li>Custodial Accounts <em>(stage 4, pending)</em> — absorbs the old Accounts' custodial half + Securities' lots. Today's interim link: <a href="wireframes/accounts.html">wireframes/accounts.html</a> (pre-pass-7 shape, to be renamed <code>custodial-accounts.html</code>).</li>
+    <li><a href="wireframes/custodial-accounts.html">Custodial Accounts</a> <em>(stage 4, done)</em> — per-account cards, a lots sub-card (pull-down per security, short/long/total gains), and the <code>[+ New]</code> provider-item modal (aggregator/manual/file, discovered-account mapping, token refresh, unlink).</li>
     <li>Allocation <em>(stage 5, pending)</em> — actual-vs-target, promoted out of the old Securities screen.</li>
     <li>Reports <em>(stage 5, pending)</em> — Balance Sheet / Income Statement / Cash Flow, low fidelity; empty state until POLY-M5.</li>
     <li><a href="wireframes/entities.html">Entities</a> — unaffected by the sidebar rework</li>
@@ -333,7 +333,7 @@ flowchart TD
     <li><a href="wireframes/membership-setup.html">Membership setup</a> <em>(pass 6, new)</em> — dashboard first-run / no-membership empty state, linked from flow 5.1</li>
     <li><a href="wireframes/sidebar-cues.html">Sidebar expand/collapse cues</a> <em>(pass 4, decided pass 5)</em> — option A (chevron) chosen, B/C kept for the record; unaffected by the pass-7 item-list change</li>
   </ul>
-  <p class="section-hint"><strong>Gone as of pass 7:</strong> <code>wireframes/securities.html</code> and <code>wireframes/import.html</code> are retired once stages 4–5 land (content absorbed above) — not deleted yet, to avoid breaking in-flight links mid-rollout.</p>
+  <p class="section-hint"><strong>Gone as of pass 7 (stage 4):</strong> <code>wireframes/securities.html</code> and <code>wireframes/import.html</code> are retired — their content is absorbed into Custodial Accounts (lots sub-card, provider-item modal) above.</p>
 </section>
 
 <section id="styled-screens" data-section="styled-screens">
