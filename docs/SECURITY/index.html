@@ -86,6 +86,7 @@
       <tr><td>TB-10</td><td>Staging compose project</td><td>Prod compose project</td><td>Container isolation, shared kernel</td><td>Staging auto-deploys every merge to <code>main</code> and holds fake data only. It has separate networks, secrets and database, and no credential private key (R-4).</td></tr>
       <tr><td>TB-11</td><td>User upload (CSV / OFX)</td><td><code>web</code> parser</td><td>Untrusted file</td><td>The credential-free import path, and a parser attack surface (C-40).</td></tr>
       <tr><td>TB-12</td><td>GitHub (CI, Actions, Renovate, registry)</td><td>Release images, prod deploy</td><td>Supply chain</td><td>Whoever can publish an image that prod runs owns the box (§8).</td></tr>
+      <tr><td>TB-13</td><td>Operator (SSH tunnel)</td><td>Admin view listener, bound to loopback and never routed by Caddy</td><td>Administrative, out-of-band</td><td><em>Placeholder; defined under POLY-81.</em> The design options are ARCH OQ-15: (a) a loopback route group inside <code>web</code>, or (b) a separate admin service with a read-only status DB role. The threats and controls are written when POLY-81 is ruled.</td></tr>
     </tbody>
   </table>
   <pre class="mermaid">
