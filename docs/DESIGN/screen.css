@@ -102,6 +102,25 @@ h1, h2, h3, .heading {
 }
 .sidebar-toggle-header:hover { background: var(--muted); }
 
+/* Bug fix (pass 9 addendum, Principal review): .sidebar-toggle-header and
+   .sidebar-user-chevron previously also carried the generic .icon class
+   directly on their own element (copy-paste from the wrapped-icon
+   pattern). .icon's 16x16 sizing is meant for a *wrapper span*, not a
+   32px tap target, so on these two elements it was the later rule in the
+   cascade and silently shrunk the whole button/span to 16x16 -- the
+   bare SVG inside then scaled to fill that, reading as "a few pixels" /
+   a tiny box. Markup no longer carries the stray .icon class (see
+   styled-screens); this is the one shared rule sizing the bare glyph
+   inside both containers to match wireframes/transactions.html's own
+   .wf-icon-btn > .wf-icon sizing. */
+.sidebar-toggle-header svg,
+.sidebar-user-chevron svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}
+
 /* Page title > breadcrumbs (pass 8) — most screens are a single crumb
    (e.g. "Transactions"); a drill-down page (the account register) shows
    its full path (e.g. "General Ledger > Primary Checking"). This is now
