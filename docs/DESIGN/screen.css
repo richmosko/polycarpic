@@ -40,19 +40,23 @@ h1, h2, h3, .heading {
   color: var(--muted-foreground);
 }
 
-/* ---------- Shell (pass 8, 2026-10-02 — Principal review 5): rebuilt on
-   the shadcn Sidebar component's own pattern
-   (https://ui.shadcn.com/docs/components/base/sidebar,
-   temp/design-refs/shadcn-sidebar.png). Supersedes pass 4's "full-width
-   header on top, sidebar below it" — the header no longer spans the full
-   width; it starts to the right of the sidebar, which now fills the
-   entire viewport height (not the page height) as its own fixed column.
-   `.shell` is a row: `.sidebar` | `.shell-main` (header + content
-   stacked). See design-system-spec.md § Layout & shell for the full
-   rationale and what pass 4/5 this replaces. */
+/* ---------- Shell (pass 9, 2026-10-10 — Principal review 6): refined
+   again on the shadcn Sidebar pattern, this time matching its sidebar-07
+   block specifically (https://ui.shadcn.com/view/new-york-v4/sidebar-07,
+   temp/design-refs/shadcn-sidebar-07*.png). Three changes from pass 8:
+   (1) the sidebar is now a true floating card — rounded on all four
+   corners, with a gutter on every side, not just flush-left with a
+   rounded inner edge; (2) the top row is no longer a persistent/sticky
+   header — it scrolls with the page and shares the main area's own
+   background token, no distinct surface, no border; (3) the top row's
+   contents are reduced to navigation chrome only (expand/collapse,
+   breadcrumb, entity selector, a contextual "more" menu) — AI/search/
+   notifications/gear are dropped (see § Header, "Top row"). */
 .shell {
+  --shell-gutter: 16px;
   min-height: 100vh;
   display: flex;
+  background: var(--background);
 }
 
 .shell-main {
@@ -62,24 +66,27 @@ h1, h2, h3, .heading {
   min-width: 0; /* lets long breadcrumb/page-title text truncate instead of overflowing the row */
 }
 
+/* Top row (pass 9, renamed from "Header" — it's no longer a header
+   surface at all). Same background token as the content below it
+   (`--background`), not `--card`; not sticky/fixed; no border. Scrolls
+   away with the rest of the page. */
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 12px 24px;
-  background: var(--card);
-  border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
-  z-index: 5;
+  gap: 10px;
+  padding: 16px 24px;
+  background: var(--background);
 }
 
-.topbar-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
-.topbar-right { display: flex; align-items: center; gap: 2px; }
+.topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.topbar-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 
-/* Expand/contract control (pass 8) — moved from the sidebar's own bottom
-   chevron (pass 5) into the header, per the Principal's spec. */
+/* Vertical separator (pass 9, new) — one left-justified (after the
+   expand/collapse icon), one right-justified (before the "more" menu). */
+.topbar-separator { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
+
+/* Expand/contract control (pass 8, icon corrected pass 9 — Lucide
+   `panel-left`, NOT a hamburger `menu` icon). */
 .sidebar-toggle-header {
   width: 32px;
   height: 32px;
@@ -112,12 +119,14 @@ h1, h2, h3, .heading {
 }
 .breadcrumbs .crumb { color: var(--muted-foreground); font-weight: 500; }
 .breadcrumbs .crumb:last-child { color: var(--foreground); font-weight: 600; }
-.breadcrumbs .crumb-sep { color: var(--muted-foreground); }
+.breadcrumbs .crumb-sep { color: var(--muted-foreground); display: flex; }
 
-/* Right-justified header icon row (pass 8): entity selector, AI/agent
-   (greyed, v1), search, notifications, settings gear. Settings is a
-   header surface now, not a sidebar nav item — see § Sidebar
-   information architecture pass-8 update. */
+/* "More" menu (pass 9, new) — the top row's only remaining right-side
+   icon besides the entity selector. Contextual per page view: its
+   contents are that page's global actions (Sync, New entry, export,
+   ...), defined per screen in design-system-spec.md § Header. AI/
+   search/notifications/settings are NOT here — see § Header for where
+   those are proposed instead (avatar popover, keyboard shortcut). */
 .icon-btn {
   width: 32px;
   height: 32px;
@@ -130,20 +139,25 @@ h1, h2, h3, .heading {
   color: var(--foreground);
   cursor: pointer;
   position: relative;
-  font-size: 15px;
 }
 .icon-btn:hover { background: var(--muted); }
 .icon-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
 .icon-btn[disabled]:hover { background: none; }
-.icon-btn.active { background: var(--muted); color: var(--primary); } /* the gear, when the current screen is Settings — no sidebar nav item to mark active instead */
-.icon-btn .notif-dot {
+.icon-btn.active { background: var(--muted); color: var(--primary); }
+
+.more-menu-wrap { position: relative; }
+.more-menu {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--destructive);
+  top: calc(100% + 6px);
+  right: 0;
+  width: 220px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 20%);
+  padding: 6px;
+  z-index: 10;
 }
 
 /* Product icon + wordmark — pass 8: moved from the header into the
@@ -209,35 +223,40 @@ h1, h2, h3, .heading {
 .avatar-cluster .avatar:first-child { margin-left: 0; }
 .avatar-cluster .avatar.overflow { background: var(--muted); color: var(--muted-foreground); }
 
-/* ---------- Sidebar (pass 8, 2026-10-02 — Principal review 5, shadcn
-   Sidebar pattern): fills the entire viewport HEIGHT, not the page
-   height — `position: fixed; top: 0; height: 100vh`, so its bottom edge
-   (the avatar trigger) is always visible regardless of how long the page
-   scrolls OR how much content sits above the shell in the DOM (`position:
-   sticky` against `.shell`'s flex row, tried first, still inherits the
-   shell's own document-flow offset — `fixed` pins it to the viewport
-   itself, not the document). Superseding pass 5's "stretch to
-   .shell-body's height" approach (which tracked the PAGE, not the
-   screen). `.shell-main` carries a matching `margin-left` since the
-   sidebar is out of normal flow now. No longer a floating card with
-   margin on all sides — it's a flush full-height rail, rounded only on
-   the inner (right) edge where it meets the content. Composition, top to
-   bottom: brand item (logo + wordmark) → nav (seven items, Settings
-   removed, see design-system-spec.md § Sidebar information architecture)
-   → avatar trigger (opens the user-menu popover). */
+/* ---------- Sidebar (pass 8; floating card w/ gutter pass 9, 2026-10-10
+   — Principal review 6, matching shadcn's sidebar-07 block exactly):
+   fills the entire viewport HEIGHT, not the page height — `position:
+   fixed`, so its bottom edge (the avatar trigger) is always visible
+   regardless of how long the page scrolls OR how much content sits above
+   the shell in the DOM (`position: sticky` against `.shell`'s flex row,
+   tried pass 8, still inherits the shell's own document-flow offset —
+   `fixed` pins it to the viewport itself, not the document).
+   **Pass 9: a true floating card, not a flush rail.** Pass 8 rounded
+   only the inner edge and ran flush to three of four sides; the
+   Principal: "the rounded corners on the sidebar should be on all 4
+   corners... with the appropriate border spacing." `top`/`left`/`bottom`
+   are now all inset by `--shell-gutter` instead of `height: 100vh` at
+   `top:0; left:0` — the card's height is implicit (the inset top/bottom
+   pair), not a fixed `100vh`. `.shell-main` carries a matching
+   `margin-left` (gutter + sidebar width + a matching gutter before the
+   content starts) since the sidebar is out of normal flow. Composition,
+   top to bottom: brand item (logo + wordmark) → nav (seven items,
+   Settings removed, see design-system-spec.md § Sidebar information
+   architecture) → avatar trigger (opens the user-menu popover, now to
+   its RIGHT — see .avatar-popover below). */
 .sidebar {
   background: var(--sidebar);
   color: var(--sidebar-foreground);
-  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  border-radius: var(--radius-lg);
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  box-shadow: 1px 0 3px oklch(0 0 0 / 12%);
+  box-shadow: 0 1px 3px oklch(0 0 0 / 12%);
   position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
+  top: var(--shell-gutter, 16px);
+  left: var(--shell-gutter, 16px);
+  bottom: var(--shell-gutter, 16px);
   width: 240px;
   flex-shrink: 0;
   transition: width 150ms ease;
@@ -248,11 +267,11 @@ h1, h2, h3, .heading {
   padding: 12px 10px;
 }
 
-.shell-main { margin-left: 240px; }
+.shell-main { margin-left: calc(240px + 2 * var(--shell-gutter, 16px)); }
 /* :has() is a mockup convenience only — the real app drives this margin
    from component state (the sidebar's own collapsed/expanded store), not
    a CSS relational selector. */
-.shell:has(.sidebar.collapsed) .shell-main { margin-left: 64px; }
+.shell:has(.sidebar.collapsed) .shell-main { margin-left: calc(64px + 2 * var(--shell-gutter, 16px)); }
 
 /* Top item — brand (pass 8: moved here from the header, see
    .brand-lockup above). Reuses .brand-lockup's own styles; sidebar-ink
@@ -288,14 +307,16 @@ h1, h2, h3, .heading {
   overflow: hidden;
 }
 
+/* Pass 9: a real Lucide icon (inline SVG, stroke: currentColor), not a
+   solid placeholder block — see design-system-spec.md § Component
+   inventory for the icon name per nav item. */
 .sidebar .nav-item .nav-icon {
   width: 18px;
   height: 18px;
   flex-shrink: 0;
-  border-radius: 4px;
-  background: currentColor;
-  opacity: 0.85;
+  opacity: 0.9;
 }
+.sidebar .nav-item .nav-icon svg { display: block; width: 100%; height: 100%; }
 
 .sidebar.collapsed .nav-item .nav-label { display: none; }
 .sidebar.collapsed .nav-item { justify-content: center; }
@@ -360,12 +381,15 @@ h1, h2, h3, .heading {
 
 /* The popover itself — shown "open" as a static reference on one screen
    (same convention as .correction-trail / .bulk-bar / .je-modal), not a
-   real toggle. Anchored above the trigger since the trigger sits at the
-   screen's bottom edge. */
+   real toggle. Pass 9: opens to the RIGHT of the trigger, bottom-aligned
+   with it — matching shadcn's sidebar-07 block exactly (the Principal's
+   own reference, temp/design-refs/shadcn-sidebar-07-user-popover.png),
+   not above it (pass 8). Unchanged in the collapsed rail — the popover
+   still opens to the right of the icon-only trigger. */
 .avatar-popover {
   position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
+  left: calc(100% + 8px);
+  bottom: 0;
   width: 220px;
   background: var(--popover);
   color: var(--popover-foreground);
@@ -375,8 +399,12 @@ h1, h2, h3, .heading {
   padding: 6px;
   z-index: 10;
 }
-.avatar-popover .popover-item {
-  display: block;
+/* .popover-item is shared between the avatar popover and the top row's
+   "more" menu (.more-menu) — same visual language, one class. */
+.popover-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   width: 100%;
   text-align: left;
   padding: 8px 10px;
@@ -387,9 +415,32 @@ h1, h2, h3, .heading {
   color: var(--popover-foreground);
   cursor: pointer;
 }
-.avatar-popover .popover-item:hover { background: var(--muted); }
-.avatar-popover .popover-item.destructive { color: var(--destructive); }
-.avatar-popover .popover-divider { height: 1px; background: var(--border); margin: 4px 0; }
+.popover-item .icon { flex-shrink: 0; color: var(--muted-foreground); }
+.popover-item:hover { background: var(--muted); }
+.popover-item.destructive { color: var(--destructive); }
+.popover-item.destructive .icon { color: var(--destructive); }
+.popover-divider { height: 1px; background: var(--border); margin: 4px 0; }
+/* Pass 9: Settings/Notifications entry points under the avatar popover
+   are PROPOSED, not decided — the Principal has not ruled on where
+   these land (design-system-spec.md § Header). */
+.popover-item .proposed-tag {
+  margin-left: auto;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+/* Generic inline-icon sizing (Lucide SVGs, stroke: currentColor) — used
+   standalone wherever an icon isn't inside .nav-icon/.popover-item/
+   .icon-btn's own sizing context (e.g. the breadcrumb separator chevron,
+   a locked-leg indicator). */
+.icon { width: 16px; height: 16px; flex-shrink: 0; display: inline-block; vertical-align: middle; }
+.icon svg { display: block; width: 100%; height: 100%; }
+.icon-sm { width: 14px; height: 14px; }
 
 .content {
   padding: 24px 28px;

@@ -61,14 +61,18 @@ body {
    two shell-less pages (membership-setup.html, admin.html) that keep a
    simple topbar-over-content stack with no sidebar at all. */
 
-/* ---------- App shell with sidebar (pass 8, 2026-10-02 — Principal
-   review 5, shadcn Sidebar pattern): the sidebar fills the entire
-   viewport height and sits flush left; the topbar starts to its right,
-   not above it. See screen.css for the styled/token equivalent and
-   design-system-spec.md § Layout & shell for the full rationale. ---------- */
+/* ---------- App shell with sidebar (pass 8; floating card w/ gutter +
+   no persistent header pass 9, 2026-10-10 — Principal review 6, shadcn
+   sidebar-07 block): the sidebar fills the viewport height minus a
+   gutter on every side (a true floating card, all 4 corners rounded,
+   not flush); the top row starts to its right, is NOT sticky/bordered,
+   and shares the main area's own background. See screen.css for the
+   styled/token equivalent and design-system-spec.md § Layout & shell. ---------- */
 .wf-app-shell {
+  --wf-gutter: 16px;
   min-height: 100vh;
   display: flex;
+  background: #fafafa;
 }
 
 .wf-main {
@@ -78,23 +82,29 @@ body {
   min-width: 0;
 }
 
+/* Top row (pass 9, renamed from "topbar" conceptually — no longer a
+   header surface). Same background as the page; not sticky; no border. */
 .wf-app-topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 20px;
-  border-bottom: 2px dashed #999;
-  background: #fff;
+  gap: 10px;
+  padding: 16px 20px;
+  background: #fafafa;
 }
-.wf-topbar-left { display: flex; align-items: center; gap: 12px; }
-.wf-topbar-right { display: flex; align-items: center; gap: 4px; }
-.wf-icon-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: 1px dashed #999; border-radius: 4px; font-size: 13px; }
+.wf-topbar-left { display: flex; align-items: center; gap: 10px; }
+.wf-topbar-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.wf-topbar-separator { width: 1px; height: 18px; background: #ccc; }
+.wf-icon-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; border: 1px dashed #999; border-radius: 4px; }
 .wf-icon-btn.disabled { opacity: 0.4; }
 .wf-icon-btn.active { background: #eee; border-color: #333; } /* e.g. the gear on Settings itself — no sidebar nav item to mark active instead */
-.wf-breadcrumbs { font-size: 14px; font-weight: 600; }
+.wf-breadcrumbs { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 4px; }
 .wf-breadcrumbs .wf-crumb { color: #888; font-weight: 400; }
+.wf-more-menu-wrap { position: relative; }
+.wf-more-menu { position: absolute; top: calc(100% + 6px); right: 0; width: 200px; background: #fff; color: #333; border: 1px solid #999; border-radius: 6px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10; }
+.wf-more-menu div { padding: 6px 8px; font-size: 12px; display: flex; align-items: center; gap: 8px; }
 
+/* Sidebar: a floating card, gutter on every side (pass 9) — was flush to
+   three of four edges (pass 8). */
 .wf-app-sidebar {
   width: 200px;
   flex-shrink: 0;
@@ -105,24 +115,32 @@ body {
   position: fixed; /* not sticky — a wireframe's own note-banner above the
     shell would otherwise offset a sticky sidebar below y=0, same fix as
     screen.css's .sidebar; fixed pins it to the viewport itself */
-  top: 0;
-  left: 0;
-  height: 100vh;
+  top: var(--wf-gutter, 16px);
+  left: var(--wf-gutter, 16px);
+  bottom: var(--wf-gutter, 16px);
   padding: 12px;
-  border-radius: 0 8px 8px 0;
+  border-radius: 8px;
 }
 
-.wf-main { margin-left: 200px; }
-.wf-app-sidebar .wf-nav-item { border-color: #555; color: #eee; }
+.wf-main { margin-left: calc(200px + 2 * var(--wf-gutter, 16px)); }
+.wf-app-sidebar .wf-nav-item { border-color: #555; color: #eee; display: flex; align-items: center; gap: 8px; }
 
 .wf-sidebar-top { padding: 4px 4px 12px; border-bottom: 1px dashed #555; margin-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
 .wf-sidebar-nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .wf-sidebar-bottom { margin-top: auto; border-top: 1px dashed #555; padding-top: 8px; position: relative; }
 .wf-sidebar-avatar-trigger { display: flex; align-items: center; gap: 8px; padding: 6px 4px; cursor: pointer; }
 .wf-sidebar-user-name { font-size: 12px; }
-.wf-avatar-popover { position: absolute; bottom: calc(100% + 6px); left: 0; width: 180px; background: #fff; color: #333; border: 1px solid #999; border-radius: 6px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
-.wf-avatar-popover div { padding: 6px 8px; font-size: 12px; border-bottom: 1px dashed #eee; }
-.wf-avatar-popover div:last-child { border-bottom: none; color: #c33; }
+/* Popover opens to the RIGHT of the trigger (pass 9 — shadcn sidebar-07's
+   own pattern), bottom-aligned, not above it (pass 8). */
+.wf-avatar-popover { position: absolute; left: calc(100% + 8px); bottom: 0; width: 180px; background: #fff; color: #333; border: 1px solid #999; border-radius: 6px; padding: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); z-index: 10; }
+.wf-avatar-popover div { padding: 6px 8px; font-size: 12px; display: flex; align-items: center; gap: 8px; }
+.wf-avatar-popover div.wf-logout { color: #c33; }
+.wf-proposed-tag { margin-left: auto; font-size: 9px; text-transform: uppercase; border: 1px dashed #999; border-radius: 999px; padding: 1px 5px; color: #888; }
+
+/* Lucide-icon sizing (inline SVG, stroke: currentColor) — shared by nav
+   items, top-row icons, and popover items. */
+.wf-icon { width: 15px; height: 15px; flex-shrink: 0; display: inline-flex; }
+.wf-icon svg { display: block; width: 100%; height: 100%; }
 
 .wf-app-content { padding: 20px 24px; }
 
