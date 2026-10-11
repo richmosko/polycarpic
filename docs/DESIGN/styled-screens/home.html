@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Home (public landing page)</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<!-- Public landing page (corrected 2026-09-30): the page a VISITOR sees
+     before signing in — not a signed-in dashboard. Hero band is a fixed
+     dark/brand backdrop (same posture as the login visual pane); the
+     feature and footer sections below follow the user's theme like any
+     other page. -->
+<section class="landing-hero">
+  <div class="brand-mark">polycarpic</div>
+  <h1>A virtual Single Family Office, self-hosted</h1>
+  <p class="landing-subhead">A genuine double-entry ledger for every entity you're responsible for — Person, Trust, Business, Household — in one place, on your own server.</p>
+  <div class="cta-row">
+    <button class="btn btn-default">Get started</button>
+    <button class="btn btn-outline">Sign in</button>
+  </div>
+</section>
+
+<section class="landing-features">
+  <div class="landing-feature">
+    <div class="feature-title">A genuine ledger</div>
+    <div class="feature-body">Double-entry, append-only, under row-level security — not a budgeting spreadsheet wearing a UI.</div>
+  </div>
+  <div class="landing-feature">
+    <div class="feature-title">Every entity, one view</div>
+    <div class="feature-body">Person, Trust, Business, Household — each with its own books, memberships, and permissions.</div>
+  </div>
+  <div class="landing-feature">
+    <div class="feature-title">Self-hosted</div>
+    <div class="feature-body">Your data stays on your own server. No aggregator sees your full picture but you.</div>
+  </div>
+</section>
+
+<footer class="landing-footer">
+  polycarpic — self-hosted, source-available. <a href="#" style="color:inherit;">Terms</a> · <a href="#" style="color:inherit;">Privacy</a>
+</footer>
+</body>
+</html>

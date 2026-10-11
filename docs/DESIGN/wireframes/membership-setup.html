@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Membership setup (dashboard first-run / empty state)</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<p class="wf-note" style="margin:16px;">Pass 6 — new (review 4, §flows 5.1a): the dashboard's "no entities yet" empty state from flow 5.1. Per the Principal, this can simply be the membership-setup page rather than a distinct illustrated empty state. No sidebar and no entity selector are shown — both require an entity to exist, which is exactly what's missing here.</p>
+<div class="wf-shell">
+  <div class="wf-topbar">
+    <strong>&#9670; Polycarpic</strong>
+    <span style="color:#999; font-size:12px;">[no entity yet — selector hidden]</span>
+  </div>
+  <div class="wf-shell-body" style="display:block;">
+  <div class="wf-content" style="max-width:520px; margin:48px auto;">
+    <h1 style="text-align:center;">Set up your first entity</h1>
+    <p style="text-align:center; color:#999; font-size:13px;">You're signed in, but you don't hold membership on any entity yet. Create one, or accept an invite someone sent you.</p>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Create a new entity</span>
+      <div class="wf-box-label">Entity name</div>
+      <div class="wf-placeholder-text w60" style="height:28px; background:#eee; border:1px solid #ccc;"></div>
+      <div style="margin-top:12px;">Type: [Person | Trust | Business | Household &#9660;]</div>
+      <div class="wf-box" style="text-align:center; margin-top:16px; background:#333; color:#fff;">Create entity</div>
+    </div>
+
+    <div style="text-align:center; color:#999; font-size:11px; margin:16px 0;">— or —</div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Have an invite?</span>
+      <div class="wf-box-label">Invite code</div>
+      <div class="wf-placeholder-text w60" style="height:28px; background:#eee; border:1px solid #ccc;"></div>
+      <div class="wf-box" style="text-align:center; margin-top:16px;">Accept invite</div>
+    </div>
+
+    <p class="wf-note">Creating an entity here makes the user its Owner (full read/write, membership management, purge). Accepting an invite lands them on whatever role the inviting owner granted (Owner/Manager/Viewer) — see design-system-spec.md § Financial semantics for the role-badge weights. Once at least one membership exists, this page is never shown again — the flow lands directly on the dashboard (flow 5.1).</p>
+  </div>
+  </div>
+</div>
+</body>
+</html>

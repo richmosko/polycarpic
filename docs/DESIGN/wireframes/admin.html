@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wireframe — Admin (placeholder, POLY-81)</title>
+<link rel="stylesheet" href="wireframe.css">
+</head>
+<body>
+<p class="wf-note" style="margin:16px;">Placeholder — pending PRD/ARCH/SECURITY definition (POLY-81). Addendum to the sidebar IA rework (2026-10-02): this is an operator-only Admin view, reached only through an SSH tunnel to the box — it is <strong>not</strong> a sidebar item and not part of the eight-screen IA (design-system-spec.md § Sidebar information architecture). No sidebar in this layout; the app shell's topbar only, since there's no entity context here.</p>
+<div class="wf-shell">
+  <div class="wf-topbar">
+    <strong>&#9670; Polycarpic</strong>
+    <span style="color:#999; font-size:12px;">[operator session — SSH tunnel only, no entity context]</span>
+  </div>
+  <div class="wf-shell-body" style="display:block;">
+  <div class="wf-content" style="max-width:720px; margin:32px auto;">
+    <h1>Admin</h1>
+    <p style="color:#999; font-size:13px;">Placeholder status page — content and actions below are indicative, not final (POLY-81).</p>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Services</span>
+      <div class="wf-row"><span>Web app</span><span class="wf-chip">up</span></div>
+      <div class="wf-row"><span>API</span><span class="wf-chip">up</span></div>
+      <div class="wf-row"><span>Background job runner</span><span class="wf-chip">up</span></div>
+      <div class="wf-row"><span>Telemetry receiver</span><span class="wf-chip">up — port 4318</span></div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Versions</span>
+      <div class="wf-row"><span>App version</span><span>[v0.x.x — git sha]</span></div>
+      <div class="wf-row"><span>Database schema</span><span>[migrations current]</span></div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Database &amp; backups</span>
+      <div class="wf-row"><span>Database connection</span><span class="wf-chip">connected</span></div>
+      <div class="wf-row"><span>Last backup</span><span>[timestamp] <span class="wf-chip">success</span></span></div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Sync</span>
+      <div class="wf-row"><span>Last sync, all entities</span><span>[timestamp]</span></div>
+    </div>
+
+    <div class="wf-box">
+      <span class="wf-box-label">Administrative actions (TBD)</span>
+      <div class="wf-row"><span>[Force resync] (TBD)</span><span></span></div>
+      <div class="wf-row"><span>[Restart job queue] (TBD)</span><span></span></div>
+      <div class="wf-row"><span>[View raw logs] (TBD)</span><span></span></div>
+    </div>
+
+    <p class="wf-note">Not reachable from any in-app nav — operator access only, via SSH tunnel to the host. Scope, authentication model, and the real action list are undefined pending PRD/ARCH/SECURITY (POLY-81); this wireframe exists only so the shape isn't invented from scratch later.</p>
+  </div>
+  </div>
+</div>
+</body>
+</html>
