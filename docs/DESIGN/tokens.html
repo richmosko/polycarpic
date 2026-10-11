@@ -23,7 +23,7 @@
     .pair .hex { font-family: var(--font-mono, monospace); font-size: 0.68rem; color: var(--doc-muted); }
     .type-sample { font-size: 1.1rem; }
     .mono-sample { font-family: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.75rem; }
-    .radius-demo { width: 3rem; height: 3rem; background: #1D9108; display: inline-block; vertical-align: middle; }
+    .radius-demo { width: 3rem; height: 3rem; background: #0B89CB; display: inline-block; vertical-align: middle; }
     .group-note { margin: 0.25rem 0 1rem; }
   </style>
 </head>
@@ -88,7 +88,7 @@
         <td><code>--brand-2</code> <em>(pass 5)</em></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#05A9FF"></span><span class="hex">#05A9FF</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#05A9FF"></span><span class="hex">#05A9FF</span></div></td>
-        <td>The literal secondary sky-blue hue. Same "dark-surface/decorative only" rule as <code>--brand</code> (2.56:1 against the light background). Used for: the sidebar focus ring, and dark-surface chart series-2. See design-system-spec.md § Secondary accent.</td>
+        <td>The literal secondary sky-blue hue. Same "dark-surface/decorative only" rule as <code>--brand</code> (2.56:1 against the light background). Used for: the sidebar focus ring, and (pass 10) the sequential chart ramp's own hue, <code>--chart-1</code>…<code>--chart-5</code> below. No longer the chart series-2 accent — that job moved to the green <code>--brand</code>/<code>--primary</code> pair once the ramp itself became blue, see design-system-spec.md § Secondary accent.</td>
       </tr>
       <tr>
         <td><code>--ring</code></td>
@@ -147,7 +147,7 @@
       <tr><td><code>--secondary-foreground</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#096FA5"></span><span class="hex">#096FA5</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#68C3F3"></span><span class="hex">#68C3F3</span></div></td>
-        <td>Text on <code>--secondary</code> (4.72:1 / 5.95:1) — also doubles as the light-mode chart series-2 ink and plain-text links in the blue family.</td></tr>
+        <td>Text on <code>--secondary</code> (4.72:1 / 5.95:1) — plain-text links in the blue family. No longer the chart series-2 ink (pass 10: that job moved to green <code>--primary</code>, since the ramp itself is now this same blue hue).</td></tr>
       <tr><td><code>--accent</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#EBF4F9"></span><span class="hex">#EBF4F9</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#194257"></span><span class="hex">#194257</span></div></td>
@@ -213,30 +213,30 @@
 
 <section id="charts" data-section="charts">
   <h2>6. Charts (sequential ramp — magnitude, not category)</h2>
-  <p class="section-hint group-note"><strong>Pass 6:</strong> the light-mode ramp brightened across all 5 steps — the prior tail (down to L=0.061) read as "almost rendered as black." Dark mode was already bright and is unchanged. Not for 3+ categorical series — see design-system-spec.md § Financial semantics open item.</p>
+  <p class="section-hint group-note"><strong>Pass 10:</strong> re-hued from the green <code>--primary</code> to a gradient of <code>--brand-2</code>, the secondary sky blue (200.6°) — Principal direction. Ordered light→dark, same direction as the superseded green ramp. Every step clears 3:1 against both <code>--background</code> and <code>--card</code> in its own mode (figures below are vs. <code>--card</code>). Not for 3+ categorical series — see design-system-spec.md § Financial semantics open item.</p>
   <table class="token-table">
     <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
     <tbody>
       <tr><td><code>--chart-1</code></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#21A509"></span><span class="hex">#21A509 (3.26:1)</span></div></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#C1FBB6"></span><span class="hex">#C1FBB6 (16.32:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#0C96DF"></span><span class="hex">#0C96DF (3.25:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#C5E9FC"></span><span class="hex">#C5E9FC (15.12:1)</span></div></td>
         <td>Brightest step — e.g. the current period / largest share.</td></tr>
       <tr><td><code>--chart-2</code></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#1D9108"></span><span class="hex">#1D9108 (4.11:1)</span></div></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#8BF877"></span><span class="hex">#8BF877 (14.53:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#0B89CB"></span><span class="hex">#0B89CB (3.83:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#8BD3F9"></span><span class="hex">#8BD3F9 (11.76:1)</span></div></td>
         <td>Second step in the magnitude ramp.</td></tr>
       <tr><td><code>--chart-3</code></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#197E07"></span><span class="hex">#197E07 (5.21:1)</span></div></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#5AF53D"></span><span class="hex">#5AF53D (13.40:1)</span></div></td>
-        <td>Midpoint — also series-1 in a two-series comparison chart (nominal vs. inflation-adjusted, actual vs. target), paired with <code>--brand-2</code>/<code>--secondary-foreground</code> as series 2.</td></tr>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#0A7CB8"></span><span class="hex">#0A7CB8 (4.57:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#51BDF6"></span><span class="hex">#51BDF6 (9.17:1)</span></div></td>
+        <td>Midpoint — also series-1 in a two-series comparison chart (nominal vs. inflation-adjusted, actual vs. target); series 2 is <code>--brand</code> (dark surfaces) or <code>--primary</code> (light surfaces) — roles reversed pass 10, now that this ramp is the blue hue.</td></tr>
       <tr><td><code>--chart-4</code></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#156B06"></span><span class="hex">#156B06 (6.69:1)</span></div></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#31F20D"></span><span class="hex">#31F20D (12.73:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#096FA5"></span><span class="hex">#096FA5 (5.48:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#16A7F3"></span><span class="hex">#16A7F3 (7.23:1)</span></div></td>
         <td>Fourth step.</td></tr>
       <tr><td><code>--chart-5</code></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#125705"></span><span class="hex">#125705 (8.78:1)</span></div></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#29CB0B"></span><span class="hex">#29CB0B (8.87:1)</span></div></td>
-        <td>Darkest/smallest step — pass 6 brought this up from a near-black 17.73:1 to a legible, still-green 8.78:1.</td></tr>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#086291"></span><span class="hex">#086291 (6.62:1)</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#0B89CB"></span><span class="hex">#0B89CB (5.04:1)</span></div></td>
+        <td>Darkest/smallest step — pass 10's hue swap: same L cadence as the superseded green ramp, now sampling <code>--brand-2</code>'s hue instead.</td></tr>
     </tbody>
   </table>
 </section>

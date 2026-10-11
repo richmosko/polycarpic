@@ -106,21 +106,28 @@
   --input: #E7E8E9;
   --ring: #158500;
 
-  /* Chart ramp — pass 6: brightened. Same hue/saturation (110.6°, S≈0.90)
-     as every pass, but the lightness band compresses from pass 4/5's
-     L 0.300→0.061 (the tail read as "almost rendered as black" — the
-     Principal, pass 4) to L 0.34→0.18: the brightest step (chart-1) is
-     now brighter than the old chart-1 (3.26:1 vs white, was 4.11:1) and
-     the darkest (chart-5) is far lighter than the old near-black tail
-     (8.78:1 vs white, was 17.73:1) — still clears the 3:1 non-text floor
-     at every step, see Accessibility. See --brand-2 above for the
-     separate series-2 blue accent used alongside this ramp in two-series
-     comparison charts. */
-  --chart-1: #21A509;
-  --chart-2: #1D9108;
-  --chart-3: #197E07;
-  --chart-4: #156B06;
-  --chart-5: #125705;
+  /* Chart ramp — pass 10: re-hued from the green --primary (110.6°) to a
+     gradient of --brand-2, the secondary sky blue (200.6°, S=0.90, same
+     saturation the green ramp used) — Principal direction: "I'd like the
+     chart tokens to be gradients of --brand-2 (instead of --primary)."
+     Ordered light→dark, chart-1 brightest/chart-5 darkest — kept the same
+     direction as every prior pass's ramp (both modes) so no chart-N
+     meaning flips for frontend-lead. L steps 0.46→0.30 (step -0.04,
+     same cadence as pass 6's green ramp). Every step clears the 3:1
+     non-text floor against BOTH --background and --card (chart-1, the
+     tightest: 3.22:1 vs --background #FEFEFE, 3.25:1 vs --card #FFFFFF);
+     pairwise-adjacent steps sit ~1.18-1.21:1 apart, the same modest-but-
+     perceptible separation the superseded green ramp used at an
+     identical L cadence. Semantic --positive/--destructive/--warning are
+     untouched — this hue swap is chart-only. See --brand-2 above for the
+     literal undarkened blue (dark-surface/decorative use only, not part
+     of this ramp) and design-system-spec.md § Chart ramp for the full
+     derivation and all ten contrast figures. */
+  --chart-1: #0C96DF;
+  --chart-2: #0B89CB;
+  --chart-3: #0A7CB8;
+  --chart-4: #096FA5;
+  --chart-5: #086291;
 
   /* Sidebar — pass 5: re-tinted blue (was green in pass 4 — the Principal
      read the green cast as a bias, not a deliberate choice, and asked
@@ -202,14 +209,19 @@
   --input: rgba(255, 255, 255, 0.12);
   --ring: #2CFF05;
 
-  /* Unchanged from pass 4 — brand green ramp, re-lightened for dark mode.
-     Already bright (8.87:1 → 16.32:1 against --card) — pass 6's "almost
-     black tail" complaint was a light-mode-only problem, see :root above. */
-  --chart-1: #C1FBB6;
-  --chart-2: #8BF877;
-  --chart-3: #5AF53D;
-  --chart-4: #31F20D;
-  --chart-5: #29CB0B;
+  /* Chart ramp — pass 10: same --brand-2 hue (200.6°, S=0.90) as :root,
+     re-lightened for the dark surface. L steps 0.88→0.42 (step -0.12);
+     chart-5's floor (#0B89CB) is the same hex as light mode's chart-2 —
+     coincidental, both ramps sample the same hue/saturation function, not
+     a themed link between the two modes. Every step clears 3:1 by a wide
+     margin (chart-5, the tightest: 5.23:1 vs --background, 5.04:1 vs
+     --card) — dark mode was never the tight constraint, see :root above
+     for the ramp that actually sets the floor. */
+  --chart-1: #C5E9FC;
+  --chart-2: #8BD3F9;
+  --chart-3: #51BDF6;
+  --chart-4: #16A7F3;
+  --chart-5: #0B89CB;
 
   /* Sidebar — pass 5: still inverted the other way in dark mode (a LIGHT
      card floating on the dark page, reusing the light mode canvas tone
