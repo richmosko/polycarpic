@@ -29,8 +29,11 @@ def main() -> int:
         return 0
     sys.stderr.write(
         f"SendMessage blocked: {lines} lines / {len(msg)} chars; the cap is {MAX_LINES} lines and {MAX_CHARS} chars (PT-94 A1/A2). "
-        "A message carries a pointer, sha-first: put the ruling, verdict table, or construction in the issue file "
-        "(cairn comment) or a review-log file, commit it, and send \"read <file> @ <sha>\" plus at most a few lines of what changed.\n")
+        "A message carries a pointer, sha-first: put a ruling or verdict table in the issue file (cairn comment), "
+        "or process/cairn/reviews/<ID>/ruling.md when it exceeds the comment budget, commit it, and send "
+        "\"read <file> @ <sha>\" plus at most a few lines of what changed. Constructions and harness output go to "
+        "temp/ instead -- hand-offs are never committed, so send an absolute path (worktree-bound teammates use "
+        "their own worktree's temp/).\n")
     return 2
 
 

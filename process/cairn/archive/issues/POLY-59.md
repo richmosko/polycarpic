@@ -41,7 +41,7 @@ Feature started. Branch: `feature/poly-59-telemetry-follow-ups`. Promoted straig
 
 ### @architect — 2026-09-27
 
-Gate 1 ruling: `process/reviews/POLY-59/ruling.md`. AC1: the PT-* lines are this checkout's own pre-scrub tree (db906a0's 16 milestone ids, exact match), not a mis-anchor; qa pins the worktree→main-checkout windows root with a new test, implementation-lead corrects the `main()` `--repo-root` comment. AC2: status flake = heartbeat write after `utime` (fix: SIGSTOP the daemon + 1.5 s adversarial wait); grace flake = out-file read between `server_close` and the flush (fix: wait for pidfile gone). AC3: fractional-second straddle test. AC4: no change, measured (59 calls × 130 µs, bounded by the cutoff). ACs 1/2/4 amended in place. Checklist M1–M3b in ruling §5.
+Gate 1 ruling: `process/cairn/reviews/POLY-59/ruling.md`. AC1: the PT-* lines are this checkout's own pre-scrub tree (db906a0's 16 milestone ids, exact match), not a mis-anchor; qa pins the worktree→main-checkout windows root with a new test, implementation-lead corrects the `main()` `--repo-root` comment. AC2: status flake = heartbeat write after `utime` (fix: SIGSTOP the daemon + 1.5 s adversarial wait); grace flake = out-file read between `server_close` and the flush (fix: wait for pidfile gone). AC3: fractional-second straddle test. AC4: no change, measured (59 calls × 130 µs, bounded by the cutoff). ACs 1/2/4 amended in place. Checklist M1–M3b in ruling §5.
 
 ### @architect — 2026-09-27
 

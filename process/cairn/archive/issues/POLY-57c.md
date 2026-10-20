@@ -6,7 +6,7 @@ milestone: POLY-A
 parent: POLY-57
 blocked_by: []
 assignee: implementation-lead
-paths: [scripts/cairn/design/**, scripts/cairn/docs/**, scripts/cairn/board/**, scripts/cairn/dashboard/**, scripts/cairn/*.py, process/reviews/**, process/TRACKER.md, process/WORKFLOW.md, .claude/agents/architect.md, docs/DESIGN/**, .github/workflows/ci.yml, process/cairn/issues/**]
+paths: [scripts/cairn/design/**, scripts/cairn/docs/**, scripts/cairn/board/**, scripts/cairn/dashboard/**, scripts/cairn/*.py, process/cairn/reviews/**, process/TRACKER.md, process/WORKFLOW.md, .claude/agents/architect.md, docs/DESIGN/**, .github/workflows/ci.yml, process/cairn/issues/**]
 stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2

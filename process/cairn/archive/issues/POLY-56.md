@@ -23,7 +23,7 @@ User decision 2026-09-25 (POLY-51 loop): sub-issues nest one level only. Anythin
 
 ## Acceptance criteria
 
-Amended by the gate-1 ruling (`process/reviews/POLY-56/ruling.md`).
+Amended by the gate-1 ruling (`process/cairn/reviews/POLY-56/ruling.md`).
 
 - [x] Card badge: a distinct `checklist` chip `☑ k/n` (shown only when n > 0), fed by a server-side `checklist {done,total}` on `/api/board` from one Python parser `checklist_items`; the drawer renders `checklist_items` from `/api/issue`, and the client-side item parse is removed. Read-only
 - [x] Sub-issues as checkbox rows: the drawer's Children list renders a disabled checkbox per child, checked iff `status: done`, still linking to the child. Read-only
@@ -44,7 +44,7 @@ Feature started. Branch: `feature/poly-56-checklists`.
 
 ### @architect — 2026-09-26
 
-**Gate 1 — ruling:** `process/reviews/POLY-56/ruling.md`. The acceptance criteria above were amended in place to match it.
+**Gate 1 — ruling:** `process/cairn/reviews/POLY-56/ruling.md`. The acceptance criteria above were amended in place to match it.
 
 - Badge: a distinct `checklist` chip. One Python parser feeds both the card and the drawer.
 - Write-back: the CLI `cairn check-item` is built (a one-byte rewrite, mtime-guarded). Board write-back is re-deferred.

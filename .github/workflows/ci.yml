@@ -1,6 +1,6 @@
 name: ci
 
-# POLY-6 / POLY-31, ruling process/reviews/POLY-6/ruling.md @ 615b94e section (c).
+# POLY-6 / POLY-31, ruling process/cairn/reviews/POLY-6/ruling.md @ 615b94e section (c).
 # One job, id+name `cairn` -- that is the required-check name registered on `main`.
 # No workflow-level `on.*.paths:` filter: a required check whose workflow never
 # triggers stays "Expected" and blocks the merge forever. The filter lives in the
@@ -52,13 +52,23 @@ jobs:
           # process/reviews/**, process/DECISIONS.md and process/STATE.md, which no
           # test reads -- supersedes POLY-39's "PATTERN stays byte-identical" pin).
           # Only the process/ paths a test actually reads stay in PATTERN:
-          # WORKFLOW.md/TRACKER.md (test_ratified_text_scanners.py), process/cairn/
+          # WORKFLOW.md/TRACKER.md (test_ratified_text_scanners.py) and process/cairn/
           # (config.yml, metrics/ -- carved back down to non-tracker-record files by
-          # EXCLUDE below), and the five ruling.md files
-          # test_ruling_archive_records.py pins to a specific git blob sha.
-          # docs/DESIGN/ stays for now -- POLY-78 removes cairn's last read of it.
-          PATTERN='^(scripts/cairn/|\.claude/|process/WORKFLOW\.md$|process/TRACKER\.md$|process/cairn/|process/reviews/(POLY-6|POLY-10|POLY-26|POLY-48|POLY-51)/ruling\.md$|tests/workflow/|\.github/workflows/|\.githooks/|docs/DESIGN/)'
-          EXCLUDE='^process/cairn/(issues|milestones|majors|archive)/'
+          # EXCLUDE below, which now also covers reviews/, POLY-80's new tracker-
+          # record home for a ruling once it outgrows the comment budget). POLY-78
+          # removed cairn's last read of docs/DESIGN/, so it leaves PATTERN too.
+          PATTERN='^(scripts/cairn/|\.claude/|process/WORKFLOW\.md$|process/TRACKER\.md$|process/cairn/|tests/workflow/|\.github/workflows/|\.githooks/)'
+          EXCLUDE='^process/cairn/(issues|milestones|majors|archive|reviews)/'
+          # PINNED_RULINGS is a carve-out from EXCLUDE, not from PATTERN: EXCLUDE
+          # runs first (`grep -vE "$EXCLUDE"`), so a ruling.md under the now-excluded
+          # process/cairn/reviews/ never reaches the PATTERN check at all -- putting
+          # these five paths in PATTERN instead of here would be dead code. Checked
+          # against the FULL, unfiltered $CHANGED (never $RELEVANT) below. Exactly
+          # the five ruling.md files test_ruling_archive_records.py's RULING_BLOBS
+          # pins by git blob sha (POLY-6/10/26/48/51) -- keep this list and that
+          # dict's keys in sync; test_cairn_test_boundary.py's
+          # PinnedRulingFilesSurviveExcludeTests fails if they drift.
+          PINNED_RULINGS='^process/cairn/reviews/(POLY-6|POLY-10|POLY-26|POLY-48|POLY-51)/ruling\.md$'
 
           # Skip only when every change since the last successful run on this branch is tracker-only; any gh/API/git failure here falls through to the plain diff test below, never adding a skip on its own (POLY-39).
           rc=0; ANCHOR="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=pull_request&status=success&branch=$HEAD_REF&per_page=1" --jq '.workflow_runs[0].head_sha // empty')" || rc=$?
@@ -76,7 +86,10 @@ jobs:
           if [ "$ANCESTRY_OK" = "true" ]; then
             if ANCHOR_DIFF="$(git diff --name-only "$ANCHOR" "$PR_HEAD")"; then
               rc=0; ANCHOR_RELEVANT="$(grep -vE "$EXCLUDE" <<<"$ANCHOR_DIFF")" || rc=$?
-              if [ "$rc" -le 1 ] && [ -z "$ANCHOR_RELEVANT" ]; then
+              if [ "$rc" -gt 1 ]; then exit "$rc"; fi   # 1 = every line excluded; >1 = grep error
+              rc=0; grep -qE "$PINNED_RULINGS" <<<"$ANCHOR_DIFF" || rc=$?
+              if [ "$rc" -gt 1 ]; then exit "$rc"; fi   # 1 = no match; >1 = grep error
+              if [ -z "$ANCHOR_RELEVANT" ] && [ "$rc" -eq 1 ]; then
                 SKIP=true
               fi
             fi
@@ -87,7 +100,15 @@ jobs:
           else
             rc=0; RELEVANT="$(grep -vE "$EXCLUDE" <<<"$CHANGED")" || rc=$?
             if [ "$rc" -gt 1 ]; then exit "$rc"; fi   # 1 = every line excluded; >1 = grep error
-            if grep -qE "$PATTERN" <<<"$RELEVANT"; then
+            PATTERN_HIT=false
+            rc=0; grep -qE "$PATTERN" <<<"$RELEVANT" || rc=$?
+            if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+            if [ "$rc" -eq 0 ]; then PATTERN_HIT=true; fi
+            PINNED_HIT=false
+            rc=0; grep -qE "$PINNED_RULINGS" <<<"$CHANGED" || rc=$?
+            if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+            if [ "$rc" -eq 0 ]; then PINNED_HIT=true; fi
+            if [ "$PATTERN_HIT" = "true" ] || [ "$PINNED_HIT" = "true" ]; then
               echo "run=true" >> "$GITHUB_OUTPUT"
             else
               echo "run=false" >> "$GITHUB_OUTPUT"

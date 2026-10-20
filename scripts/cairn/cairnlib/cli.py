@@ -474,6 +474,20 @@ def cmd_show(args: argparse.Namespace) -> int:
         "Blocks", _scan_issues(data_dir, path, lambda fm: args.id in (fm.get("blocked_by") or []))
     )
 
+    # POLY-80: an issue's ruling(s)/constructions live at
+    # process/cairn/reviews/<ID>/ once they outgrow the comment budget (B6,
+    # D14) -- listed here, one line each, sorted, so a reader doesn't have
+    # to know that convention exists to find them. No section at all when
+    # the directory doesn't exist, same posture as Children/Blocked
+    # by/Blocks above.
+    reviews_dir = data_dir / "reviews" / args.id
+    if reviews_dir.is_dir():
+        review_files = sorted(p for p in reviews_dir.rglob("*") if p.is_file())
+        if review_files:
+            print("\nReview files:")
+            for p in review_files:
+                print(f"  {p.relative_to(reviews_dir.parent)}")
+
     return 0
 
 

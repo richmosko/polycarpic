@@ -18,7 +18,7 @@ git rev-parse --abbrev-ref HEAD | grep -q '^feature/' || echo "ERROR: not on a f
 # 2. Tests are green — HARD GATE (PT-24: the old npm/yarn/pytest||echo chain never
 #    ran the suite and never blocked). The cairn Python suite runs through the
 #    PT-93 parallel runner (file-level, default 8 workers, same pass/skip counts
-#    as `--serial` — process/reviews/PT-93/timings.md); the
+#    as `--serial` — process/cairn/reviews/PT-93/timings.md); the
 #    board.js JS suite (PT-22) chains when Node is present. Do NOT reintroduce an
 #    `npm test`-first chain — a stray package.json would silently become THE gate
 #    and skip Python. This is the finish-feature gate, so it is a FULL run

@@ -6,7 +6,7 @@ milestone: POLY-A
 parent: POLY-57
 blocked_by: []
 assignee: architect
-paths: [process/cairn/issues/POLY-57*.md, process/reviews/POLY-57/**]
+paths: [process/cairn/issues/POLY-57*.md, process/cairn/reviews/POLY-57/**]
 stage: review
 estimate.cost_usd: "2.00"
 estimate.gate_cycles: 1

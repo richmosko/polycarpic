@@ -1,5 +1,5 @@
 """POLY-6 gate-red (qa-engineer), pinned to the architect's gate-1 ruling
-(process/reviews/POLY-6/ruling.md @ 615b94e). This file lives
+(process/cairn/reviews/POLY-6/ruling.md @ 615b94e). This file lives
 under `tests/workflow/` itself, so it is subject to its own guard
 (NoWorkflowTestTouchesCairnTests below) -- it must never import `cairn`,
 `helpers`, or put `scripts/cairn` on `sys.path`.
@@ -19,6 +19,13 @@ from __future__ import annotations
 import re
 import unittest
 from pathlib import Path
+
+# POLY-80 (team-lead's gate-1 correction): the pinned-ruling-file list
+# below must be DERIVED from test_ruling_archive_records.py's own
+# RULING_BLOBS, not hand-typed a second time -- a sibling tests/workflow/
+# import, not scripts/cairn/ or helpers, so NoWorkflowTestTouchesCairnTests
+# below (which forbids exactly those two) does not apply to it.
+import test_ruling_archive_records
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CAIRN_TESTS_DIR = REPO_ROOT / "scripts" / "cairn" / "tests"
@@ -101,7 +108,6 @@ class CiWorkflowShapeTests(unittest.TestCase):
         "tests/workflow/",
         ".github/workflows/",
         ".githooks/",
-        "docs/DESIGN/",
     )
 
     def setUp(self):
@@ -184,26 +190,43 @@ class CiWorkflowShapeTests(unittest.TestCase):
 class CiExcludePatternTests(unittest.TestCase):
     """POLY-39 (ruling scripts/cairn/docs/estimation.md @ e4c73bf, §0.7):
     the `changes` step gains an `EXCLUDE` regex that filters tracker-data
-    paths (`process/cairn/{issues,milestones,majors,archive}/**`) out
-    before `PATTERN` is applied via `grep -vE ... | grep -qE ...` semantics
-    (simulated here in Python `re`, never a subprocess -- ci.yml itself is
-    the only thing under test). The step never swallows a non-zero grep
-    exit status with a bare `|| true`.
+    paths (`process/cairn/{issues,milestones,majors,archive,reviews}/**`)
+    out before `PATTERN` is applied via `grep -vE ... | grep -qE ...`
+    semantics (simulated here in Python `re`, never a subprocess -- ci.yml
+    itself is the only thing under test). The step never swallows a
+    non-zero grep exit status with a bare `|| true`.
 
     POLY-74 (Principal, 2026-09-28) supersedes POLY-39's "PATTERN stays
     byte-identical" pin: a bare `process/` prefix ran the full suite for
     `process/reviews/**`, `process/DECISIONS.md` and `process/STATE.md`,
     none of which any test reads. `PATTERN`'s `process/` leg is narrowed to
     exactly what `test_ratified_text_scanners.py` (`process/WORKFLOW.md`,
-    `process/TRACKER.md`), `process/cairn/` (config.yml, metrics/ -- still
-    carved down to non-tracker-record files by EXCLUDE), and
-    `test_ruling_archive_records.py`'s five pinned `ruling.md` blobs
-    actually read."""
+    `process/TRACKER.md`) and `process/cairn/` (config.yml, metrics/ --
+    carved down to non-tracker-record files by EXCLUDE) actually read.
+
+    POLY-80 (Principal, 2026-09-28) folds in two more changes, coordinated
+    to land after POLY-74 so the two rulings' ci.yml edits don't conflict:
+    rulings move from `process/reviews/<ID>/` into the tracker record at
+    `process/cairn/reviews/<ID>/`, so EXCLUDE now carves that directory out
+    too. POLY-78 removed cairn's last read of `docs/DESIGN/`, so that
+    leaves PATTERN as well.
+
+    Team-lead's gate-1 correction (2026-09-28): EXCLUDE runs BEFORE
+    PATTERN (`grep -vE "$EXCLUDE" | grep -qE "$PATTERN"`), so a file
+    stripped by EXCLUDE never reaches PATTERN at all -- putting the five
+    `test_ruling_archive_records.py`-pinned `ruling.md` paths back into
+    PATTERN (as POLY-74 originally had them) would be dead code once
+    EXCLUDE also covers `reviews/`. A change to one of those five files'
+    content, undetected, would go red on some LATER unrelated PR's full
+    run instead of the PR that broke it. `PINNED_RULINGS` is therefore a
+    THIRD variable, checked against the un-filtered `$CHANGED` (never
+    `$RELEVANT`), ORed into both the anchor-skip decision and the main
+    run decision -- see `PinnedRulingFilesSurviveExcludeTests` below for
+    the carve-out's own coverage."""
 
     PATTERN_LITERAL = (
         r'^(scripts/cairn/|\.claude/|process/WORKFLOW\.md$|process/TRACKER\.md$'
-        r'|process/cairn/|process/reviews/(POLY-6|POLY-10|POLY-26|POLY-48|POLY-51)/ruling\.md$'
-        r'|tests/workflow/|\.github/workflows/|\.githooks/|docs/DESIGN/)'
+        r'|process/cairn/|tests/workflow/|\.github/workflows/|\.githooks/)'
     )
 
     def setUp(self):
@@ -229,13 +252,21 @@ class CiExcludePatternTests(unittest.TestCase):
         self.assertIsNotNone(m_pattern, "the changes step has no PATTERN='...' literal")
         return re.compile(m_exclude.group(1)), re.compile(m_pattern.group(1))
 
+    def _pinned_rulings(self):
+        m = re.search(r"PINNED_RULINGS='([^']*)'", self.block)
+        self.assertIsNotNone(m, "the changes step has no PINNED_RULINGS='...' literal")
+        return re.compile(m.group(1))
+
     def _run(self, changed_paths: list) -> bool:
-        """Mirrors `grep -vE "$EXCLUDE" <<<"$CHANGED" | grep -qE "$PATTERN"`:
-        filter changed paths through EXCLUDE first, then test the survivors
-        against PATTERN."""
+        """Mirrors the full shell decision: PATTERN_HIT (EXCLUDE-filtered
+        survivors against PATTERN) OR PINNED_HIT (PINNED_RULINGS against
+        the UN-filtered changed set)."""
         exclude_re, pattern_re = self._exclude_and_pattern()
+        pinned_re = self._pinned_rulings()
         relevant = [p for p in changed_paths if not exclude_re.search(p)]
-        return any(pattern_re.search(p) for p in relevant)
+        pattern_hit = any(pattern_re.search(p) for p in relevant)
+        pinned_hit = any(pinned_re.search(p) for p in changed_paths)
+        return pattern_hit or pinned_hit
 
     def test_tracker_only_paths_give_run_false(self):
         for p in [
@@ -243,27 +274,30 @@ class CiExcludePatternTests(unittest.TestCase):
             "process/cairn/milestones/POLY-A.md",
             "process/cairn/majors/POLY-V1.md",
             "process/cairn/archive/POLY-0.md",
+            "process/cairn/reviews/POLY-57/ruling.md",  # excluded, not pinned
         ]:
             with self.subTest(path=p):
                 self.assertFalse(self._run([p]), f"{p} alone must not trigger the cairn job")
 
     def test_still_relevant_paths_give_run_true(self):
-        for p in [
-            "process/WORKFLOW.md", "process/TRACKER.md",
-            "process/cairn/config.yml", "scripts/cairn/cairn.py",
-            "process/reviews/POLY-6/ruling.md", "process/reviews/POLY-10/ruling.md",
-            "process/reviews/POLY-26/ruling.md", "process/reviews/POLY-48/ruling.md",
-            "process/reviews/POLY-51/ruling.md",
-        ]:
+        pinned_paths = [
+            f"process/cairn/reviews/{issue_id}/ruling.md"
+            for issue_id in sorted(test_ruling_archive_records.RULING_BLOBS)
+        ]
+        for p in ["process/WORKFLOW.md", "process/TRACKER.md", "process/cairn/config.yml", "scripts/cairn/cairn.py"] + pinned_paths:
             with self.subTest(path=p):
                 self.assertTrue(self._run([p]), f"{p} must still trigger the cairn job")
 
     def test_no_longer_relevant_paths_give_run_false(self):
         # POLY-74: no test reads any of these -- a bare `process/` prefix
-        # used to run the full suite for all three.
+        # used to run the full suite for all three. POLY-80: an unpinned
+        # ruling (POLY-57, covered above) or a made-up one are tracker
+        # records now (process/cairn/reviews/), and docs/DESIGN/ left
+        # PATTERN once POLY-78 removed cairn's last read of it.
         for p in [
             "process/STATE.md", "process/DECISIONS.md",
-            "process/reviews/POLY-57/ruling.md", "process/reviews/POLY-C/notes.md",
+            "process/cairn/reviews/POLY-C/notes.md",
+            "docs/DESIGN/tokens.css", "docs/DESIGN/variants.css",
         ]:
             with self.subTest(path=p):
                 self.assertFalse(self._run([p]), f"{p} must no longer trigger the cairn job")
@@ -274,7 +308,7 @@ class CiExcludePatternTests(unittest.TestCase):
     def test_unrelated_doc_path_gives_run_false(self):
         self.assertFalse(self._run(["docs/PRD/index.html"]))
 
-    def test_pattern_literal_matches_the_poly_74_shape(self):
+    def test_pattern_literal_matches_the_poly_80_shape(self):
         _, pattern_re = self._exclude_and_pattern()
         self.assertEqual(pattern_re.pattern, self.PATTERN_LITERAL)
 
@@ -284,6 +318,103 @@ class CiExcludePatternTests(unittest.TestCase):
             "the changes step must not swallow a non-zero grep exit status with "
             "`|| true` (ruling section 0.7 fail-closed exclusion)",
         )
+
+
+class PinnedRulingFilesSurviveExcludeTests(unittest.TestCase):
+    """Team-lead's gate-1 correction (2026-09-28): EXCLUDE strips
+    `process/cairn/reviews/` before PATTERN is ever checked, so a change
+    to a ruling.md `test_ruling_archive_records.py` pins by git blob sha
+    would silently stop triggering the cairn job -- the red would land on
+    some later, unrelated PR instead of the one that broke the pin. This
+    is the dedicated failure-mode guard: it fails loudly, by name, if a
+    pinned ruling file is ever excluded rather than folding that case
+    into CiExcludePatternTests' general lists above.
+
+    PINNED_IDS is DERIVED from test_ruling_archive_records.RULING_BLOBS's
+    own keys (team-lead's gate-1 correction: not hand-typed a second time
+    -- a hand copy is exactly how ci.yml's own PINNED_RULINGS regex could
+    drift from RULING_BLOBS undetected). Add a ruling to RULING_BLOBS and
+    this class's tests automatically cover it; no second edit needed
+    here, only in ci.yml's own PINNED_RULINGS literal (which this class's
+    tests below fail loudly against if it isn't kept in sync)."""
+
+    PINNED_IDS = tuple(sorted(test_ruling_archive_records.RULING_BLOBS))
+
+    def setUp(self):
+        if not CI_WORKFLOW.is_file():
+            self.fail(f"{CI_WORKFLOW} does not exist yet")
+        self.text = CI_WORKFLOW.read_text(encoding="utf-8")
+        self.block = self._step_block("changes")
+
+    def _step_block(self, step_id: str) -> str:
+        idx = self.text.find(f"id: {step_id}")
+        self.assertNotEqual(idx, -1, f"no step with id: {step_id} found")
+        rest = self.text[idx:]
+        next_step = re.search(r"\n\s*- name:", rest)
+        return rest[: next_step.start()] if next_step else rest
+
+    def _regexes(self):
+        m_exclude = re.search(r"EXCLUDE='([^']*)'", self.block)
+        m_pinned = re.search(r"PINNED_RULINGS='([^']*)'", self.block)
+        self.assertIsNotNone(m_exclude, "the changes step has no EXCLUDE='...' literal")
+        self.assertIsNotNone(m_pinned, "the changes step has no PINNED_RULINGS='...' literal")
+        return re.compile(m_exclude.group(1)), re.compile(m_pinned.group(1))
+
+    def test_every_ruling_blobs_path_is_a_trigger(self):
+        # The end-to-end claim, not just "PINNED_RULINGS matches the
+        # path": runs the FULL PATTERN_HIT-or-PINNED_HIT decision (same
+        # shape as CiExcludePatternTests._run) for every path
+        # RULING_BLOBS names, straight off the live dict -- not PINNED_IDS,
+        # so this test alone would still catch a RULING_BLOBS entry this
+        # class's own derivation somehow missed.
+        m_pattern = re.search(r"PATTERN='([^']*)'", self.block)
+        self.assertIsNotNone(m_pattern, "the changes step has no PATTERN='...' literal")
+        pattern_re = re.compile(m_pattern.group(1))
+        exclude_re, pinned_re = self._regexes()
+        for issue_id in test_ruling_archive_records.RULING_BLOBS:
+            path = f"process/cairn/reviews/{issue_id}/ruling.md"
+            with self.subTest(path=path):
+                relevant = exclude_re.search(path) is None
+                pattern_hit = relevant and pattern_re.search(path) is not None
+                pinned_hit = pinned_re.search(path) is not None
+                self.assertTrue(
+                    pattern_hit or pinned_hit,
+                    f"{path} (from RULING_BLOBS) does not trigger the cairn job",
+                )
+
+    def test_every_pinned_ruling_file_would_otherwise_be_excluded(self):
+        # Sanity/control: proves this guard exercises a REAL carve-out,
+        # not a vacuous one -- if EXCLUDE stopped matching reviews/ paths
+        # at all, PINNED_RULINGS would have nothing left to carve out of.
+        exclude_re, _ = self._regexes()
+        for issue_id in self.PINNED_IDS:
+            path = f"process/cairn/reviews/{issue_id}/ruling.md"
+            with self.subTest(path=path):
+                self.assertIsNotNone(
+                    exclude_re.search(path),
+                    f"{path} is not matched by EXCLUDE -- the carve-out this guard checks "
+                    f"isn't needed for this path (or EXCLUDE regressed)",
+                )
+
+    def test_every_pinned_ruling_file_matches_pinned_rulings(self):
+        _, pinned_re = self._regexes()
+        for issue_id in self.PINNED_IDS:
+            path = f"process/cairn/reviews/{issue_id}/ruling.md"
+            with self.subTest(path=path):
+                self.assertIsNotNone(
+                    pinned_re.search(path),
+                    f"{path} is excluded from CI's change filter and NOT carved back out by "
+                    f"PINNED_RULINGS -- a change to this blob-pinned file would go undetected "
+                    f"by the PR that made it",
+                )
+
+    def test_an_unpinned_ruling_file_does_not_match_pinned_rulings(self):
+        # Negative control: the extractor mechanism itself must be able to
+        # fail -- PINNED_RULINGS must not be a blanket `reviews/.*` that
+        # would silently re-widen EXCLUDE back to "nothing is ever excluded".
+        _, pinned_re = self._regexes()
+        self.assertIsNone(pinned_re.search("process/cairn/reviews/POLY-57/ruling.md"))
+        self.assertIsNone(pinned_re.search("process/cairn/reviews/POLY-C/notes.md"))
 
 
 class CiAnchoredSkipTests(unittest.TestCase):
@@ -335,6 +466,29 @@ class CiAnchoredSkipTests(unittest.TestCase):
         self.assertNotRegex(
             self.block, r"\|\|\s*true",
             "the anchor path may only ever add a false -- never a swallowed exit status",
+        )
+
+    def test_anchor_skip_decision_also_checks_pinned_rulings(self):
+        # POLY-80: the anchor-skip path filters ANCHOR_DIFF through EXCLUDE
+        # same as the main §0.7 path -- it must also consult PINNED_RULINGS
+        # against the unfiltered ANCHOR_DIFF, or a PR touching only a
+        # blob-pinned ruling file could get skipped via this shortcut
+        # before ever reaching the PATTERN_HIT/PINNED_HIT check below it.
+        # Scoped to the span between computing ANCHOR_RELEVANT and deciding
+        # SKIP=true -- PINNED_RULINGS also appears earlier, in its own
+        # variable definition, which doesn't prove the anchor path uses it.
+        anchor_idx = self.block.index("ANCHOR_RELEVANT")
+        skip_true_idx = self.block.index("SKIP=true")
+        self.assertLess(anchor_idx, skip_true_idx, "expected ANCHOR_RELEVANT before SKIP=true in source order")
+        anchor_span = self.block[anchor_idx:skip_true_idx]
+        self.assertIn(
+            "PINNED_RULINGS", anchor_span,
+            "the anchor-skip decision must consult PINNED_RULINGS between computing "
+            "ANCHOR_RELEVANT and deciding SKIP=true, not just EXCLUDE",
+        )
+        self.assertIn(
+            "ANCHOR_DIFF", anchor_span[anchor_span.index("PINNED_RULINGS"):],
+            "PINNED_RULINGS must be checked against the unfiltered ANCHOR_DIFF",
         )
 
 

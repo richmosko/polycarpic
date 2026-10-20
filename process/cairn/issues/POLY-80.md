@@ -1,12 +1,12 @@
 ---
 id: POLY-80
 title: Retire process/reviews
-status: todo
+status: done
 milestone: null
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [process/cairn/reviews/**, process/reviews/**, process/WORKFLOW.md, process/TRACKER.md, process/DECISIONS.md, .claude/roles/team-lead.md, .claude/agents/*.md, .claude/hooks/message_cap.py, scripts/cairn/**, tests/workflow/**, .github/workflows/ci.yml]
+paths: [process/cairn/reviews/**, process/reviews/**, process/WORKFLOW.md, process/TRACKER.md, process/DECISIONS.md, .claude/roles/team-lead.md, .claude/agents/*.md, .claude/hooks/message_cap.py, scripts/cairn/**, tests/workflow/**, .github/workflows/ci.yml, process/cairn/archive/**, .worktreeinclude, docs/project_kickoff.md, .claude/hooks/**, .claude/skills/**]
 labels: [tooling, ci, process]
 priority: P1
 pr: null
@@ -35,3 +35,22 @@ Today `process/reviews/<ID>/` holds 19 files across 12 issues (POLY-6 … POLY-6
 - [ ] `cairn show <ID>` lists the issue's review files if `process/cairn/reviews/<ID>/` exists (one line each); the board's detail drawer may follow later, not required here.
 - [ ] Optional, same brief-editing pass: add the `mcp__claude-in-chrome__*` tools to `.claude/agents/ux-designer.md` so the designer can do its own visual research (two Plan-phase deliverables needed a browser the teammate did not have).
 - [ ] Note in the issue comment what should be pushed upstream to project_template (the location change and the guard), so the template stops shipping the free-floating directory.
+
+## Comments
+
+### @team-lead — 2026-09-28
+
+Merging via PR #44 (Principal: "go with your rec on rulings"). Verified on the branch: process/reviews/ empty, 19 files moved with history, PINNED_RULINGS carve-out matches RULING_BLOBS exactly (POLY-6, 10, 26, 48, 51), full suites green. Closing.
+
+### @devops-engineer — 2026-09-28
+
+Done on feature/POLY-80 (final sha 67ef39d).
+
+- `git mv process/reviews → process/cairn/reviews`: 19 files, 12 rulings, history preserved. No `process/reviews` citation remains outside `.git/`, except the two blob-pinned rulings' own internal prose (POLY-57, POLY-58), frozen by `test_ruling_archive_records.py`.
+- WORKFLOW.md, TRACKER.md, the team-lead role, all ten briefs and `message_cap.py` now say: a ruling is an issue comment or `process/cairn/reviews/<ID>/ruling.md`; a hand-off is never committed; worktree-bound teammates use their own `temp/` and report an absolute path.
+- `guard-push` refuses a NEW file under `process/` outside the tracker record and the named docs (`HandoffLeakTests`). `PINNED_RULINGS` in ci.yml keeps the five `RULING_BLOBS`-pinned rulings triggering CI although `reviews/` is in `EXCLUDE` (EXCLUDE runs before PATTERN); the id list is derived from `test_ruling_archive_records.RULING_BLOBS`, not hand-typed.
+- `cairn show <ID>` lists `process/cairn/reviews/<ID>/` files. ci.yml drops `docs/DESIGN/` from PATTERN and adds `reviews/` to EXCLUDE. `ToolSearch` added to `ux-designer.md` so the designer can load the browser tools.
+
+**Upstream to project_template:** (a) the `process/cairn/reviews/` location and citation fixes; (b) the guard-push principle-3 check and its tests; (c) the `cairn show` review-files listing. Not `PINNED_RULINGS`, which only exists because this repo blob-pinned five rulings under POLY-57.
+
+**Verified:** cairn suite `--gate green` 1968 tests; JS 494; `tests/workflow/test_cairn_test_boundary.py` 29/29; `cairn check` clean.
