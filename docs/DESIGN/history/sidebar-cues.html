@@ -2,11 +2,26 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Wireframe — Sidebar expand/collapse cue (brand-row toggle, decided pass 12)</title>
-<link rel="stylesheet" href="wireframe.css">
+<title>Design history — Sidebar expand/collapse cue (brand-row toggle, decided pass 12)</title>
+<!-- Design-history sketch (pass 13). wireframes/ and wireframe.css were
+     retired in pass 13, when every page became a styled screen. This page
+     is kept as a record of how the cue was decided, so it carries the few
+     sketch styles it needs inline. The built cue lives in screen.css and
+     every styled screen. -->
+<style>
+* { box-sizing: border-box; }
+body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; color: #333; background: #fafafa; }
+h1, h2, h3 { font-weight: 600; margin: 0 0 12px; }
+.wf-content { padding: 24px; }
+.wf-box-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #888; margin-bottom: 6px; display: block; }
+.wf-grid { display: grid; gap: 16px; }
+.wf-grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.wf-note { font-size: 12px; color: #b45309; border: 1px dashed #b45309; padding: 8px 12px; border-radius: 4px; margin-bottom: 16px; }
+</style>
 </head>
 <body>
 <div class="wf-content" style="padding:32px;">
+  <p class="wf-note" style="border-color:#555; color:#555;"><strong>Design history sketch, not a screen.</strong> The decided cue is built in every <a href="../styled-screens/dashboard.html">styled screen</a>. This page records the options and the decision trail.</p>
   <h1>Sidebar expand/collapse cue</h1>
   <p class="wf-note" style="border-color:#158500; color:#158500;"><strong>Decided, pass 12 (2026-10-19, Principal direction — the gemini.google.com sidebar pattern). Supersedes the pass-8/9 top-row <code>panel-left</code> icon.</strong> The control lives in the sidebar's own brand row. <strong>Expanded:</strong> logo + "Polycarpic" left, Lucide <code>panel-left-close</code> right-aligned in the same row. <strong>Collapsed:</strong> the row reduces to the logo mark alone, and the logo mark is itself the expand button — on hover <em>or keyboard focus</em> it swaps to Lucide <code>panel-left-open</code> and an "Expand sidebar" tooltip opens to the right. The main area's top row loses the icon and its left separator; it now starts with the breadcrumb. Built in <code>screen.css</code> (<code>.sidebar-collapse</code>, <code>.sidebar-expand</code>, <code>.sidebar-tooltip</code>) and both styled screens (click the icons to toggle).</p>
   <div class="wf-grid cols-3" style="margin-bottom:32px;">

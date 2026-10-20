@@ -10,6 +10,15 @@
   <script defer src="../_assets/mermaid-init.js"></script>
   <script defer src="../_assets/comments.js"></script>
   <script defer src="../_assets/toc.js"></script>
+  <style>
+    /* Screens gallery (pass 13): thumbnail cards, two to three per row. */
+    .screen-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin: 12px 0 28px; }
+    .screen-card { margin: 0; border: 1px solid var(--border, #ddd); border-radius: 10px; overflow: hidden; background: var(--card, #fff); break-inside: avoid; }
+    .screen-card img { display: block; width: 100%; height: auto; border-bottom: 1px solid var(--border, #ddd); }
+    .screen-card figcaption { padding: 10px 12px 12px; font-size: 13px; line-height: 1.4; }
+    .screen-card figcaption > a { display: block; font-weight: 600; margin-bottom: 2px; }
+    .screen-card figcaption span { color: var(--muted-foreground, #666); }
+  </style>
 </head>
 <body>
 
@@ -19,8 +28,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.12</span>
-    <span><strong>Last updated:</strong> 2026-10-11</span>
+    <span><strong>Version:</strong> 0.13</span>
+    <span><strong>Last updated:</strong> 2026-10-20</span>
   </div>
 </header>
 
@@ -32,12 +41,12 @@
     <li><a href="#tokens">Design Tokens</a></li>
     <li><a href="#components">Components &amp; Screen Styles</a></li>
     <li><a href="#flows">User Flows</a></li>
-    <li><a href="#wireframes">Wireframes</a>
+    <li><a href="#screens">Screens</a>
       <ol>
         <li><a href="#operator-surfaces">Operator surfaces</a></li>
+        <li><a href="#design-history">Design history</a></li>
       </ol>
     </li>
-    <li><a href="#styled-screens">Styled Screens</a></li>
     <li><a href="#accessibility">Accessibility</a></li>
     <li><a href="#open-questions">Open Questions</a></li>
     <li><a href="#appendix">Appendix</a>
@@ -157,6 +166,9 @@
       <tr><td>Avatar cluster <em>(pass 5, new)</em></td><td>—, custom</td><td>Overlapping initials in the entity selector, max 3 + overflow</td></tr>
       <tr><td>Avatar popover <em>(pass 8, new; opens right + proposed items pass 9)</em></td><td>Popover / DropdownMenu</td><td>User menu at the sidebar's bottom, opens to the right — profile, Settings (proposed), Notifications (proposed), preferences, theme, keyboard shortcuts, Log out last</td></tr>
       <tr><td>Public hero <em>(pass 4, corrected)</em></td><td>—, custom</td><td>Home — pre-auth landing page, product statement + CTAs, not a signed-in screen</td></tr>
+      <tr><td>Switch <em>(pass 13, new)</em></td><td>Switch</td><td>Settings on/off preferences (auto-post matched recurring transactions, reduced motion)</td></tr>
+      <tr><td>Chart-of-accounts tree <em>(pass 13, styled)</em></td><td>—, custom (nested disclosure rows)</td><td>General Ledger: group rows with chevrons, account rows link to the register, custodial cross-reference badge</td></tr>
+      <tr><td>Brand app bar <em>(pass 13, new)</em></td><td>—, custom</td><td>Shell-less pages only (membership setup, Admin): brand lockup + one trailing item, no sidebar</td></tr>
       <tr><td>Split screen login <em>(pass 4, refined pass 5)</em></td><td>—, custom</td><td>Login — full field list, centered form column, always-branded visual pane</td></tr>
     </tbody>
   </table>
@@ -188,7 +200,7 @@ flowchart TD
   <ul>
     <li>Every number on this screen must be clickable through to its source (Overview principle: "every number earns trust").</li>
     <li>Filtered strictly by membership (owner/manager/viewer) — no transitive access via parent entity (PRD §5 permission model).</li>
-    <li><strong>No-membership state (pass 6):</strong> see <a href="wireframes/membership-setup.html">wireframes/membership-setup.html</a> — the Principal confirmed the dashboard's empty state can simply be the membership-setup page itself, not a separate illustrated empty-state screen.</li>
+    <li><strong>No-membership state (pass 6):</strong> see <a href="styled-screens/membership-setup.html">styled-screens/membership-setup.html</a> — the Principal confirmed the dashboard's empty state can simply be the membership-setup page itself, not a separate illustrated empty-state screen.</li>
     <li><strong>"Skeleton matches real layout, no spinner" (pass 6):</strong> while dashboard data is loading, the screen shows placeholder blocks already shaped like the real cards (same card chrome, same approximate text-line widths) instead of a spinner — so nothing visually jumps or re-flows once the real numbers arrive, they just fade in where the placeholders already were.</li>
   </ul>
 
@@ -324,45 +336,44 @@ flowchart TD
   </ul>
 </section>
 
-<section id="wireframes" data-section="wireframes">
-  <h2>6. Wireframes</h2>
-  <p class="section-hint">Low-fidelity layout of each key screen — structure before style. Assets in <a href="wireframes/">wireframes/</a>. <strong>Pass 7 (2026-10-02):</strong> reorganized for the eight-item sidebar (design-system-spec.md § Sidebar information architecture) — rolling out across stages 2–5 of the same pass; items not yet rebuilt are marked pending rather than linked to a stale file.</p>
-  <ul>
-    <li><a href="wireframes/dashboard.html">Dashboard</a> — per-entity financial health</li>
-    <li><a href="wireframes/transactions.html">Transactions</a> <em>(stage 2, done)</em> — three urgency-ordered accordion cards (Exceptions/Pending/Posted), Pending inbox built around the Plaid review/match workflow.</li>
-    <li><a href="wireframes/general-ledger.html">General Ledger</a> <em>(stage 3, done)</em> — chart-of-accounts tree; each account opens its own <a href="wireframes/account-register.html">register page</a>.</li>
-    <li><a href="wireframes/custodial-accounts.html">Custodial Accounts</a> <em>(stage 4, done)</em> — per-account cards, a lots sub-card (pull-down per security, short/long/total gains), and the <code>[+ New]</code> provider-item modal (aggregator/manual/file, discovered-account mapping, token refresh, unlink).</li>
-    <li><a href="wireframes/allocation.html">Allocation</a> <em>(stage 5, done)</em> — actual-vs-target, promoted out of the old Securities screen.</li>
-    <li><a href="wireframes/reports.html">Reports</a> <em>(stage 5, done)</em> — Balance Sheet / Income Statement / Cash Flow, low fidelity; empty state until POLY-M5.</li>
-    <li><a href="wireframes/entities.html">Entities</a> — unaffected by the sidebar rework</li>
-    <li><a href="wireframes/settings.html">Settings</a> <em>(stage 5, done)</em> — batch-import schedule/options + app preferences.</li>
-    <li><a href="wireframes/home.html">Home</a> <em>(pass 4, corrected)</em> — public pre-auth landing page</li>
-    <li><a href="wireframes/login.html">Login</a> <em>(pass 4, new; corrected pass 6)</em> — split screen, centered form pane</li>
-    <li><a href="wireframes/membership-setup.html">Membership setup</a> <em>(pass 6, new)</em> — dashboard first-run / no-membership empty state, linked from flow 5.1</li>
-    <li><a href="wireframes/sidebar-cues.html">Sidebar expand/collapse cues</a> <em>(pass 4, decided pass 5)</em> — option A (chevron) chosen, B/C kept for the record; unaffected by the pass-7 item-list change</li>
-  </ul>
+<section id="screens" data-section="screens">
+  <h2>6. Screens</h2>
+  <p class="section-hint">Every page, rendered with the real design system: <code>tokens.css</code> + <code>screen.css</code>, the sidebar-07 shell, and Lucide icons. These are the visual-regression reference and the head start for <code>frontend-lead</code>. <strong>Pass 13 (2026-10-20):</strong> the Principal asked "Any reason why we have wireframes when we can fully render styled screens?" There wasn't one. All wireframes were promoted and <code>wireframes/</code> is retired. Each screen supports light and dark (<code>.dark</code> on <code>&lt;html&gt;</code>) and is checked at 960px and 1280px. Click a screen to open it; the sidebar nav links between them.</p>
+  <h3>App screens</h3>
+  <div class="screen-gallery">
+    <figure class="screen-card"><a href="styled-screens/dashboard.html"><img src="styled-screens/thumbs/dashboard.png" alt="Dashboard screen"></a><figcaption><a href="styled-screens/dashboard.html">Dashboard</a><span>Per-entity financial health: net worth, accounts, summary, empty tax/allocation cards.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/transactions.html"><img src="styled-screens/thumbs/transactions.png" alt="Transactions screen"></a><figcaption><a href="styled-screens/transactions.html">Transactions</a><span>Exceptions / Pending / Posted accordions; the Plaid review-and-match inbox, split grid, bulk bar, journal-entry modal.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/general-ledger.html"><img src="styled-screens/thumbs/general-ledger.png" alt="General Ledger screen"></a><figcaption><a href="styled-screens/general-ledger.html">General Ledger</a><span>Chart-of-accounts tree with custodial cross-reference badges; each account opens its register.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/account-register.html"><img src="styled-screens/thumbs/account-register.png" alt="Account register screen"></a><figcaption><a href="styled-screens/account-register.html">Account register</a><span>Drill-down from the GL: multi-crumb breadcrumb, Dr/Cr/running-balance table, Corrected and rule-posted rows.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/custodial-accounts.html"><img src="styled-screens/thumbs/custodial-accounts.png" alt="Custodial Accounts screen"></a><figcaption><a href="styled-screens/custodial-accounts.html">Custodial Accounts</a><span>Per-account cards with link health and reconciliation, a lots sub-card, and the provider-item dialog shown open.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers; target editor; nominal / CPI-U toggle.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/reports.html"><img src="styled-screens/thumbs/reports.png" alt="Reports screen"></a><figcaption><a href="styled-screens/reports.html">Reports</a><span>Balance Sheet empty state plus dimmed previews of the Income Statement and Cash Flow shapes.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/entities.html"><img src="styled-screens/thumbs/entities.png" alt="Entities screen"></a><figcaption><a href="styled-screens/entities.html">Entities</a><span>Membership cards with entity-type and role badges, invite, and create.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/settings.html"><img src="styled-screens/thumbs/settings.png" alt="Settings screen"></a><figcaption><a href="styled-screens/settings.html">Settings</a><span>Per-entity import schedule and options, per-user preferences; avatar popover open with Settings current (proposed entry point).</span></figcaption></figure>
+  </div>
+  <h3>Public &amp; onboarding</h3>
+  <div class="screen-gallery">
+    <figure class="screen-card"><a href="styled-screens/home.html"><img src="styled-screens/thumbs/home.png" alt="Home screen"></a><figcaption><a href="styled-screens/home.html">Home</a><span>Public pre-auth landing page.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/login.html"><img src="styled-screens/thumbs/login.png" alt="Login screen"></a><figcaption><a href="styled-screens/login.html">Login</a><span>Split screen: centered form pane, always-branded visual pane.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/membership-setup.html"><img src="styled-screens/thumbs/membership-setup.png" alt="Membership setup screen"></a><figcaption><a href="styled-screens/membership-setup.html">Membership setup</a><span>First run with no membership: create an entity or accept an invite. No sidebar.</span></figcaption></figure>
+  </div>
 
   <h3 id="operator-surfaces">6.1 Operator surfaces</h3>
-  <p class="section-hint">Not reachable from any in-app nav, not part of the eight-screen IA — operator-only, reached by SSH tunnel to the host.</p>
-  <ul>
-    <li><a href="wireframes/admin.html">Admin</a> <em>(pass 7 addendum, 2026-10-02)</em> — <strong>placeholder, pending PRD/ARCH/SECURITY definition (POLY-81).</strong> A plain status page (services, versions, DB/backup status, last sync, telemetry receiver state) + an "Administrative actions (TBD)" link list.</li>
-  </ul>
-  <p class="section-hint"><strong>Gone as of pass 7 (stage 4):</strong> <code>wireframes/securities.html</code> and <code>wireframes/import.html</code> are retired — their content is absorbed into Custodial Accounts (lots sub-card, provider-item modal) above.</p>
-</section>
+  <p class="section-hint">Not reachable from any in-app nav and not part of the seven-item IA. Operator-only, reached by SSH tunnel to the host.</p>
+  <div class="screen-gallery">
+    <figure class="screen-card"><a href="styled-screens/admin.html"><img src="styled-screens/thumbs/admin.png" alt="Admin screen"></a><figcaption><a href="styled-screens/admin.html">Admin</a><span><strong>Placeholder, pending PRD/ARCH/SECURITY definition (POLY-81).</strong> Services, versions, database and backups, last sync; administrative actions shown disabled until defined.</span></figcaption></figure>
+  </div>
 
-<section id="styled-screens" data-section="styled-screens">
-  <h2>7. Styled Screens</h2>
-  <p class="section-hint">High-fidelity screens that apply the design system to the wireframes, consuming <code>tokens.css</code> + <code>screen.css</code> — a visual regression reference and a head-start for <code>frontend-lead</code>. Prioritized by traffic (PRD §4 stories 1 &amp; 2); remaining screens promote from wireframe fidelity as the design system stabilizes. <strong>Pass 7:</strong> only Dashboard and Transactions get styled-screen fidelity for now, same traffic-priority rule as before — General Ledger, Custodial Accounts, Allocation, Reports, and Settings stay at wireframe fidelity until there's evidence a styled build is needed before Implement (judgment call, flagged in Open Questions).</p>
+  <h3 id="design-history">6.2 Design history</h3>
+  <p class="section-hint">Sketches kept as a record of how a decision was reached, not as screens.</p>
   <ul>
-    <li><a href="styled-screens/dashboard.html">Dashboard</a></li>
-    <li><a href="styled-screens/transactions.html">Transactions</a> <em>(stage 2, done)</em></li>
-    <li><a href="styled-screens/home.html">Home</a> <em>(pass 4, new)</em></li>
-    <li><a href="styled-screens/login.html">Login</a> <em>(pass 4, new)</em></li>
+    <li><a href="history/sidebar-cues.html">Sidebar expand/collapse cue</a>: the decided brand-row toggle (pass 12) and the options it superseded (bottom chevron, top-row icon, hover-reveal, keyboard-only).</li>
   </ul>
+  <p class="section-hint"><strong>Retired:</strong> <code>wireframes/</code> and <code>wireframe.css</code> (pass 13, every page is now a styled screen); <code>securities</code> and <code>import</code> (pass 7, absorbed into Custodial Accounts).</p>
 </section>
 
 <section id="accessibility" data-section="accessibility">
-  <h2>8. Accessibility</h2>
+  <h2>7. Accessibility</h2>
   <p class="section-hint">Accessibility is a design responsibility, not a QA afterthought. Full table in <a href="design-system-spec.md">design-system-spec.md § Accessibility</a>.</p>
   <table>
     <thead><tr><th>Concern</th><th>Standard / approach</th></tr></thead>
@@ -377,27 +388,28 @@ flowchart TD
 </section>
 
 <section id="open-questions" data-section="open-questions">
-  <h2>9. Open Questions</h2>
+  <h2>8. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
-    <li><strong>Resolved 2026-10-19 (pass 12):</strong> sidebar expand/collapse moves into the sidebar's brand row, the gemini.google.com pattern (Principal direction) — expanded: <code>panel-left-close</code> right-aligned beside logo + wordmark; collapsed: the logo mark is the expand button and swaps to <code>panel-left-open</code> with an "Expand sidebar" tooltip on hover or keyboard focus. The top row now starts with the breadcrumb. See <a href="wireframes/sidebar-cues.html">wireframes/sidebar-cues.html</a>.</li>
+    <li><strong>Resolved 2026-10-20 (pass 13):</strong> every page is a styled screen (Principal: "Any reason why we have wireframes when we can fully render styled screens? I'd like for all the pages to be presented as styled screens"). Nine screens promoted: membership setup, General Ledger, account register, Custodial Accounts, Allocation, Reports, Settings, Entities, Admin. <code>wireframes/</code> and <code>wireframe.css</code> are retired, and the traffic-priority fidelity rule is gone. Two layout bugs fixed along the way: grid cards no longer sit 24px low, and Show-N selects no longer stretch. One new component, <strong>Switch</strong> (Settings). See <a href="#screens">§ 6 Screens</a>.</li>
+    <li><strong>Resolved 2026-10-19 (pass 12):</strong> sidebar expand/collapse moves into the sidebar's brand row, the gemini.google.com pattern (Principal direction) — expanded: <code>panel-left-close</code> right-aligned beside logo + wordmark; collapsed: the logo mark is the expand button and swaps to <code>panel-left-open</code> with an "Expand sidebar" tooltip on hover or keyboard focus. The top row now starts with the breadcrumb. See <a href="history/sidebar-cues.html">history/sidebar-cues.html</a>.</li>
     <li><strong>Resolved 2026-10-11 (pass 10):</strong> chart ramp re-hued from the green <code>--primary</code> to a gradient of <code>--brand-2</code>'s sky blue (Principal: "I'd like the chart tokens to be gradients of --brand-2 instead of --primary") — same light→dark ordering and L cadence as the superseded green ramp, every step still ≥3:1 against both <code>--background</code> and <code>--card</code> in its own mode (light floor 3.22:1 at <code>--chart-1</code>; dark floor 5.23:1 at <code>--chart-5</code>). The two-series comparison chart's series-2 accent flips to green <code>--brand</code>/<code>--primary</code> (was blue) so the two series stay distinguishable now that the ramp itself is blue. See <a href="design-system-spec.md">design-system-spec.md § Foundations</a> and <a href="tokens.html">tokens.html § 6 Charts</a> for all ten hex values and contrast figures.</li>
     <li><strong>Resolved 2026-10-10 (pass 9):</strong> refined again on the specific shadcn <strong>sidebar-07</strong> block (Principal review 6, "I'm still not happy with the sidebar...") — the sidebar is now a true floating card, rounded all 4 corners with a gutter on every side (<code>position: fixed</code> with inset <code>top</code>/<code>left</code>/<code>bottom</code>, not a hardcoded <code>height: 100vh</code>); the avatar popover opens to the RIGHT of the trigger, not above; the persistent/sticky header is gone entirely — renamed "Top row," it scrolls with the page and shares the content's own background token; the top row drops to panel-left icon + separator + breadcrumb (left) and entity selector + separator + a contextual "more" menu (right) — AI/search/notifications/settings-gear are removed, with Settings and Notifications proposed (not decided) as new avatar-popover items; every icon in the system is now Lucide, named per control in design-system-spec.md § Icon inventory. Applied to screen.css, wireframe.css, both styled screens, all nine sidebar-bearing wireframes, and sidebar-cues.html.</li>
     <li><strong>Resolved 2026-10-02 (pass 8):</strong> app shell rebuilt on the shadcn Sidebar component's own pattern (Principal review 5) — sidebar now fills the viewport height (<code>position: fixed</code>, not <code>sticky</code>, fixing a real bug where a wireframe's own explanatory note pushed the sidebar below the visible viewport), brand moved to the sidebar's top item, an avatar-popover user menu (profile/preferences/theme/shortcuts/Log out) replaces the old bottom chevron, and Settings left the sidebar for a header gear icon (seven nav items remain). Header now starts right of the sidebar: expand/contract icon + breadcrumb left, entity selector/AI-icon/search/notifications/gear right — screens no longer repeat their title as an on-page heading. New <a href="design-system-spec.md#shadcn-svelte-reuse-map-pass-8-2026-10-02">§ shadcn-svelte reuse map</a> answers the Principal's reuse question directly. Applied to screen.css, wireframe.css, both styled screens, and all nine sidebar-bearing wireframes.</li>
-    <li><strong>Resolved 2026-10-02 (pass 7, all 5 stages):</strong> sidebar reworked to eight items per the Principal's interview (<code>temp/2026-10-02-sidebar-interview.md</code>) — Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, Reports, Entities, Settings. "Securities" and "Import" are gone. Transactions rebuilt around the Plaid review/match workflow (expansion, Split, Group, a shared journal-entry modal); General Ledger opens to a chart-of-accounts tree with a per-account register page; Custodial Accounts gained a lots sub-card and a provider-item modal; Allocation, Reports (empty until POLY-M5), and Settings are new. See design-system-spec.md § Sidebar information architecture onward. <strong>Judgment call:</strong> only Dashboard and Transactions got styled-screen fidelity, matching the existing traffic-priority rule — flag if General Ledger, Custodial Accounts, or Allocation need a styled build sooner.</li>
-    <li><strong>Resolved 2026-10-01 (pass 6):</strong> <code>--warning</code> re-hued to a true orange with a dark ink (was brown-reading); light-mode chart ramp brightened; <a href="tokens.html">tokens.html</a> added; Login wireframe corrected to match the centered styled screen; dashboard first-run/empty-state wireframe added (<a href="wireframes/membership-setup.html">membership-setup.html</a>); skeleton-vs-spinner explained in plain words; flow 5.2 reframed around the user-facing "Correct entry" action; flow 5.3 redrawn to remove the app-initiates-payment step.</li>
+    <li><strong>Resolved 2026-10-02 (pass 7, all 5 stages):</strong> sidebar reworked to eight items per the Principal's interview (<code>temp/2026-10-02-sidebar-interview.md</code>) — Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, Reports, Entities, Settings. "Securities" and "Import" are gone. Transactions rebuilt around the Plaid review/match workflow (expansion, Split, Group, a shared journal-entry modal); General Ledger opens to a chart-of-accounts tree with a per-account register page; Custodial Accounts gained a lots sub-card and a provider-item modal; Allocation, Reports (empty until POLY-M5), and Settings are new. See design-system-spec.md § Sidebar information architecture onward. <strong>Judgment call (superseded by pass 13):</strong> only Dashboard and Transactions got styled-screen fidelity at the time; every page is styled as of pass 13.</li>
+    <li><strong>Resolved 2026-10-01 (pass 6):</strong> <code>--warning</code> re-hued to a true orange with a dark ink (was brown-reading); light-mode chart ramp brightened; <a href="tokens.html">tokens.html</a> added; Login wireframe corrected to match the centered styled screen; dashboard first-run/empty-state wireframe added (now <a href="styled-screens/membership-setup.html">styled-screens/membership-setup.html</a>); skeleton-vs-spinner explained in plain words; flow 5.2 reframed around the user-facing "Correct entry" action; flow 5.3 redrawn to remove the app-initiates-payment step.</li>
     <li><strong>Resolved 2026-09-30 (pass 5):</strong> sidebar expand/collapse cue — option A (chevron) chosen; sidebar now full-height; header restructured to brand lockup + entity selector with an avatar cluster; login form pane centered — design-system-spec.md § Header, § Sidebar, § Login.</li>
     <li><strong>Avatar cluster overflow (pass 5):</strong> the "+N" fold for 4th+ members is specified but not yet shown live in either reference screen (both currently have ≤2 members) — worth a quick visual check once a real multi-member entity exists.</li>
     <li><strong>Login's visual pane (pass 4):</strong> built as a brand gradient, not a photo — no photography asset exists for this product. A real photo/illustration asset (in the style of the captured `dribbble` reference) would likely read stronger; flagging as a design-asset gap, not a layout question.</li>
     <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — now higher priority given how central the brand hue is (recommended before lock, design-system-spec.md § Accessibility).</li>
-    <li><strong>Superseded by pass 7:</strong> the former Accounts screen's grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen — Accounts itself is now split into General Ledger and Custodial Accounts (both wireframe fidelity, stages 3–4); promote either the same way as a fast-follow if the gap matters before Implement.</li>
+    <li><strong>Superseded by pass 7, closed by pass 13:</strong> the former Accounts screen's grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen — Accounts itself is now split into General Ledger and Custodial Accounts (both wireframe fidelity, stages 3–4); promote either the same way as a fast-follow if the gap matters before Implement.</li>
     <li>Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.</li>
     <li><code>prototype/</code> throwaway UX prototype (kickoff §2.9) not yet built — confirm ownership/timing with team-lead.</li>
   </ul>
 </section>
 
 <section id="appendix" data-section="appendix">
-  <h2>10. Appendix</h2>
+  <h2>9. Appendix</h2>
   <ul>
     <li>PRD user stories &amp; functional requirements: <a href="../PRD/index.html">docs/PRD/index.html</a> §4–5</li>
     <li>Kickoff record, frontend/design system decisions: <a href="../project_kickoff.md">docs/project_kickoff.md</a> §2.9</li>
