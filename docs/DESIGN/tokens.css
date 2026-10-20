@@ -8,7 +8,7 @@
  * the swatches.
  *
  * ELEVENTH PASS (2026-10-19) — Principal: light --background off white
- * to a warm grey "close to EFEEEE" (#EFEDEB); the light neutral scale,
+ * to a light grey, #EFEEEE (pass 11b: #EFEDEB read too dark); the light neutral scale,
  * --primary/--ring/--destructive/--positive inks, and the light chart ramp
  * re-derived so every pair stays AA on the greyer canvas. Dark mode
  * unchanged. See the Surfaces & text comment below.
@@ -56,18 +56,19 @@
   /* Surfaces & text — pass 11 (2026-10-19): the page canvas moves off
      white to a warm light grey with a hint of brown — Principal: "can we
      set --background to some subtle shade of grey with a hint of brown?
-     something close to EFEEEE". #EFEDEB = hue 30°, S 0.11, L 0.93 (the
-     asked-for #EFEEEE nudged ~2 units toward brown so the hint reads).
+     something close to EFEEEE". Pass 11b: exactly #EFEEEE (L 0.935,
+     near-neutral) after #EFEDEB read too dark; the brown hint lives in
+     --muted/--muted-foreground/--border/--input (hue 30-33°), not here.
      Why pass 5 ended at white: it read "much lighter" as LESS SATURATED
      and dropped the tint to ~3% at L 0.996 — a value indistinguishable
      from white — and pass 9 then made the shell's own background
      --background (sidebar-07 inset), not --muted, so that near-white
      became the whole page. The scale now hangs off the canvas: --card/
-     --popover stay pure white and float on it (1.17:1 step + hairline);
+     --popover stay pure white and float on it (1.16:1 step + hairline);
      --muted sits between the two (#F7F5F3) so in-card wells and hovers
      keep the same white-vs-muted step they had; --border/--input darken
      to stay visible on the greyer page. Same warm hue (30°) throughout. */
-  --background: #EFEDEB;
+  --background: #EFEEEE;
   --foreground: #1D1F20; /* near-black, barely blue, flatter than pass 4's green-cast ink */
   --card: #FFFFFF;
   --card-foreground: #1D1F20;
@@ -77,7 +78,7 @@
   /* Primary — unchanged from pass 4: a darkened neon green (hue 110.6°,
      same hue as --brand, L 0.26 vs the brand's L 0.51) — see --brand
      below for why the raw brand hex can't be primary on a light surface. */
-  --primary: #147C00; /* pass 11: L 0.26→0.243, same hue — 4.60:1 as text on the greyer --background */
+  --primary: #147C00; /* pass 11: L 0.26→0.243, same hue — 4.63:1 as text on the greyer --background */
   --primary-foreground: #FFFFFF;
 
   /* Secondary/accent — pass 5: moved from pass 4's pale GREEN tint to the
@@ -90,7 +91,7 @@
   --secondary: #E3F0F7;
   --secondary-foreground: #096FA5;
   --muted: #F7F5F3; /* pass 11: between --card and --background, warm 30° — in-card wells, hovers */
-  --muted-foreground: #5E5A55; /* pass 11: warm 33°, 5.86:1 on --background */
+  --muted-foreground: #5E5A55; /* pass 11: warm 33°, 5.91:1 on --background */
   --accent: #EBF4F9;
   --accent-foreground: #096FA5;
 
@@ -100,7 +101,7 @@
      --primary for that.
      --brand-2 (pass 5, new): the literal, undarkened secondary sky blue
      (#05A9FF, the Principal's own choice) — same rule: dark-surface/
-     decorative use only (2.21:1 against this light --background — far
+     decorative use only (2.23:1 against this light --background — far
      below AA, same posture as --brand). Used for: the sidebar focus ring
      (reads against the sidebar's own dark-in-light-mode surface), and as
      the series-2 color in two-series comparison charts (nominal vs.
@@ -113,10 +114,10 @@
   --brand-2: #05A9FF;
 
   /* Destructive — unchanged from pass 3/4. */
-  --destructive: #D70404; /* pass 11: L ×0.93, same hue — 4.60:1 on --background */
+  --destructive: #D70404; /* pass 11: L ×0.93, same hue — 4.64:1 on --background */
   --destructive-foreground: #FFFFFF;
 
-  --border: #DCD8D4; /* pass 11: warm, 1.21:1 on --background, 1.42:1 on --card */
+  --border: #DCD8D4; /* pass 11: warm, 1.22:1 on --background, 1.42:1 on --card */
   --input: #D3CEC9; /* pass 11: one step stronger than --border, 1.56:1 on --card */
   --ring: #147C00;
 
@@ -138,8 +139,8 @@
      of this ramp) and design-system-spec.md § Chart ramp for the full
      derivation and all ten contrast figures. */
   /* Pass 11: shifted one L step darker (L 0.42→0.26, same -0.04
-     cadence, same hue/S) — the old chart-1 (#0C96DF) fell to 2.79:1 on
-     the new --background. Floor is now chart-1 at 3.30:1 vs --background,
+     cadence, same hue/S) — the old chart-1 (#0C96DF) fell to 2.81:1 on
+     the new --background. Floor is now chart-1 at 3.32:1 vs --background,
      3.85:1 vs --card; adjacent steps still ~1.19-1.21:1 apart. */
   --chart-1: #0B89CB;
   --chart-2: #0A7CB8;
@@ -176,7 +177,7 @@
      (used for: aged Cash-in-Transit exceptions, a stale provider link,
      or a safe-harbor due date >14 days out — see Financial semantics §
      Status tiers). */
-  --positive: #147739; /* pass 11: L ×0.93, same hue — 4.82:1 on --background */
+  --positive: #147739; /* pass 11: L ×0.93, same hue — 4.87:1 on --background */
   --positive-foreground: #FFFFFF;
   --warning: #EA6A0A;
   --warning-foreground: #2A1200;

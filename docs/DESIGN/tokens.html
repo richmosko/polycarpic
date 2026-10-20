@@ -70,13 +70,13 @@
         <td><code>--brand</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#2CFF05"></span><span class="hex">#2CFF05</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#2CFF05"></span><span class="hex">#2CFF05</span></div></td>
-        <td>The literal neon-green brand mark — logo references, decorative highlights, anywhere a <strong>dark surface</strong> sits underneath (1.17:1 against the light background — never a light-surface fill or text; use <code>--primary</code> there). Same value both modes, a fixed brand reference.</td>
+        <td>The literal neon-green brand mark — logo references, decorative highlights, anywhere a <strong>dark surface</strong> sits underneath (1.18:1 against the light background — never a light-surface fill or text; use <code>--primary</code> there). Same value both modes, a fixed brand reference.</td>
       </tr>
       <tr>
         <td><code>--primary</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#147C00"></span><span class="hex">#147C00</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#2CFF05"></span><span class="hex">#2CFF05</span></div></td>
-        <td>The main-action fill — buttons, links, focus accents. Light mode darkens <code>--brand</code>'s hue to clear AA with white text; pass 11 took it one notch darker (<code>#158500</code>→<code>#147C00</code>, same hue) so it also clears 4.60:1 as text on the grey canvas; dark mode uses the raw brand green directly, since it already clears AA against a dark fill-with-dark-text pairing.</td>
+        <td>The main-action fill — buttons, links, focus accents. Light mode darkens <code>--brand</code>'s hue to clear AA with white text; pass 11 took it one notch darker (<code>#158500</code>→<code>#147C00</code>, same hue) so it also clears 4.63:1 as text on the grey canvas; dark mode uses the raw brand green directly, since it already clears AA against a dark fill-with-dark-text pairing.</td>
       </tr>
       <tr>
         <td><code>--primary-foreground</code></td>
@@ -88,7 +88,7 @@
         <td><code>--brand-2</code> <em>(pass 5)</em></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#05A9FF"></span><span class="hex">#05A9FF</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#05A9FF"></span><span class="hex">#05A9FF</span></div></td>
-        <td>The literal secondary sky-blue hue. Same "dark-surface/decorative only" rule as <code>--brand</code> (2.21:1 against the light background). Used for: the sidebar focus ring, and (pass 10) the sequential chart ramp's own hue, <code>--chart-1</code>…<code>--chart-5</code> below. No longer the chart series-2 accent — that job moved to the green <code>--brand</code>/<code>--primary</code> pair once the ramp itself became blue, see design-system-spec.md § Secondary accent.</td>
+        <td>The literal secondary sky-blue hue. Same "dark-surface/decorative only" rule as <code>--brand</code> (2.23:1 against the light background). Used for: the sidebar focus ring, and (pass 10) the sequential chart ramp's own hue, <code>--chart-1</code>…<code>--chart-5</code> below. No longer the chart series-2 accent — that job moved to the green <code>--brand</code>/<code>--primary</code> pair once the ramp itself became blue, see design-system-spec.md § Secondary accent.</td>
       </tr>
       <tr>
         <td><code>--ring</code></td>
@@ -102,22 +102,22 @@
 
 <section id="surfaces" data-section="surfaces">
   <h2>2. Surfaces &amp; Text</h2>
-  <p class="section-hint group-note">The neutral scale — page canvas, cards, and body text. <strong>Pass 11:</strong> the light canvas is a warm grey with a hint of brown (<code>#EFEDEB</code>, hue 30°), white cards floating on it; the light neutrals (<code>--muted</code>, <code>--muted-foreground</code>, <code>--border</code>, <code>--input</code>) follow the same warm hue. Dark mode keeps its pass-5 faint blue tint.</p>
+  <p class="section-hint group-note">The neutral scale — page canvas, cards, and body text. <strong>Pass 11:</strong> the light canvas is a light grey (<code>#EFEEEE</code>), white cards floating on it; the brown hint lives in the light neutrals (<code>--muted</code>, <code>--muted-foreground</code>, <code>--border</code>, <code>--input</code>) (warm hue 30–33°). Dark mode keeps its pass-5 faint blue tint.</p>
   <table class="token-table">
     <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
     <tbody>
       <tr><td><code>--background</code></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#EFEDEB"></span><span class="hex">#EFEDEB</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#EFEEEE"></span><span class="hex">#EFEEEE</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#070808"></span><span class="hex">#070808</span></div></td>
-        <td>Page canvas, behind every card. <em>Pass 11:</em> a warm light grey with a hint of brown (hue 30°), per the Principal — "close to EFEEEE". Was near-white <code>#FEFEFE</code>.</td></tr>
+        <td>Page canvas, behind every card. <em>Pass 11:</em> a light grey, exactly <code>#EFEEEE</code> per the Principal (a first try at warm <code>#EFEDEB</code> read too dark); the brown hint is carried by <code>--muted</code>/<code>--border</code>/<code>--input</code>. Was near-white <code>#FEFEFE</code>.</td></tr>
       <tr><td><code>--foreground</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#1D1F20"></span><span class="hex">#1D1F20</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#F2F2F3"></span><span class="hex">#F2F2F3</span></div></td>
-        <td>Default body text (14.17:1 / 17.92:1 against <code>--background</code>; 16.55:1 on light <code>--card</code>).</td></tr>
+        <td>Default body text (14.29:1 / 17.92:1 against <code>--background</code>; 16.55:1 on light <code>--card</code>).</td></tr>
       <tr><td><code>--card</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#0D0E0F"></span><span class="hex">#0D0E0F</span></div></td>
-        <td>Card/panel surface — stays true white/near-black so it doesn't fight genuinely-white content like receipts/exports. In light mode it now visibly floats on the grey canvas (1.17:1 step plus the <code>--border</code> hairline).</td></tr>
+        <td>Card/panel surface — stays true white/near-black so it doesn't fight genuinely-white content like receipts/exports. In light mode it now visibly floats on the grey canvas (1.16:1 step plus the <code>--border</code> hairline).</td></tr>
       <tr><td><code>--popover</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#0D0E0F"></span><span class="hex">#0D0E0F</span></div></td>
@@ -129,7 +129,7 @@
       <tr><td><code>--muted-foreground</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#5E5A55"></span><span class="hex">#5E5A55</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#A0A7AB"></span><span class="hex">#A0A7AB</span></div></td>
-        <td>Secondary/meta text — timestamps, helper copy, table meta. Pass 11: warmed to match the canvas; 5.86:1 on <code>--background</code>, 6.84:1 on <code>--card</code>.</td></tr>
+        <td>Secondary/meta text — timestamps, helper copy, table meta. Pass 11: warmed to match the canvas; 5.91:1 on <code>--background</code>, 6.84:1 on <code>--card</code>.</td></tr>
     </tbody>
   </table>
 </section>
@@ -173,7 +173,7 @@
       <tr><td><code>--positive-foreground</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#052E13"></span><span class="hex">#052E13</span></div></td>
-        <td>Text on a <code>--positive</code> fill (5.63:1). Pass 11: <code>--positive</code> darkened one notch (<code>#15803D</code>→<code>#147739</code>, same hue) to clear 4.82:1 as text on the grey canvas.</td></tr>
+        <td>Text on a <code>--positive</code> fill (5.63:1). Pass 11: <code>--positive</code> darkened one notch (<code>#15803D</code>→<code>#147739</code>, same hue) to clear 4.87:1 as text on the grey canvas.</td></tr>
       <tr><td><code>--warning</code> <em>(pass 6, re-hued)</em></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#EA6A0A"></span><span class="hex">#EA6A0A</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#FF9452"></span><span class="hex">#FF9452</span></div></td>
@@ -189,7 +189,7 @@
       <tr><td><code>--destructive-foreground</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#2A0507"></span><span class="hex">#2A0507</span></div></td>
-        <td>Text on a <code>--destructive</code> fill (5.37:1). Pass 11: <code>--destructive</code> darkened one notch (<code>#E70404</code>→<code>#D70404</code>, same hue) to clear 4.60:1 as text on the grey canvas.</td></tr>
+        <td>Text on a <code>--destructive</code> fill (5.37:1). Pass 11: <code>--destructive</code> darkened one notch (<code>#E70404</code>→<code>#D70404</code>, same hue) to clear 4.64:1 as text on the grey canvas.</td></tr>
     </tbody>
   </table>
 </section>
@@ -202,7 +202,7 @@
       <tr><td><code>--border</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#DCD8D4; border-color:#BDB7B0;"></span><span class="hex">#DCD8D4</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#202122;"></span><span class="hex">white 8% on --card</span></div></td>
-        <td>Default hairline border — card edges, table rules, dividers. Deliberately low-contrast (1.42:1 on <code>--card</code>, 1.21:1 on <code>--background</code>; pass 11 warmed and darkened it to stay visible on the grey canvas), a decorative hairline, not a content-bearing element. (Dark swatch approximates <code>rgba(255,255,255,.08)</code> composited over <code>--card</code>, <code>#0D0E0F</code> — the token itself is translucent.)</td></tr>
+        <td>Default hairline border — card edges, table rules, dividers. Deliberately low-contrast (1.42:1 on <code>--card</code>, 1.22:1 on <code>--background</code>; pass 11 warmed and darkened it to stay visible on the grey canvas), a decorative hairline, not a content-bearing element. (Dark swatch approximates <code>rgba(255,255,255,.08)</code> composited over <code>--card</code>, <code>#0D0E0F</code> — the token itself is translucent.)</td></tr>
       <tr><td><code>--input</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#D3CEC9; border-color:#BDB7B0;"></span><span class="hex">#D3CEC9</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#2A2B2C;"></span><span class="hex">white 12% on --card</span></div></td>
@@ -213,7 +213,7 @@
 
 <section id="charts" data-section="charts">
   <h2>6. Charts (sequential ramp — magnitude, not category)</h2>
-  <p class="section-hint group-note"><strong>Pass 10:</strong> re-hued from the green <code>--primary</code> to a gradient of <code>--brand-2</code>, the secondary sky blue (200.6°) — Principal direction. Ordered light→dark, same direction as the superseded green ramp. Every step clears 3:1 against both <code>--background</code> and <code>--card</code> in its own mode (figures below are vs. <code>--card</code>). <strong>Pass 11:</strong> the light ramp shifts one step darker (old <code>--chart-1</code> fell to 2.79:1 on the grey canvas); floor is now <code>--chart-1</code> at 3.30:1 vs <code>--background</code>. Not for 3+ categorical series — see design-system-spec.md § Financial semantics open item.</p>
+  <p class="section-hint group-note"><strong>Pass 10:</strong> re-hued from the green <code>--primary</code> to a gradient of <code>--brand-2</code>, the secondary sky blue (200.6°) — Principal direction. Ordered light→dark, same direction as the superseded green ramp. Every step clears 3:1 against both <code>--background</code> and <code>--card</code> in its own mode (figures below are vs. <code>--card</code>). <strong>Pass 11:</strong> the light ramp shifts one step darker (old <code>--chart-1</code> fell to 2.81:1 on the grey canvas); floor is now <code>--chart-1</code> at 3.32:1 vs <code>--background</code>. Not for 3+ categorical series — see design-system-spec.md § Financial semantics open item.</p>
   <table class="token-table">
     <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
     <tbody>
