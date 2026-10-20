@@ -126,6 +126,11 @@ body {
 .wf-app-sidebar .wf-nav-item { border-color: #555; color: #eee; display: flex; align-items: center; gap: 8px; }
 
 .wf-sidebar-top { padding: 4px 4px 12px; border-bottom: 1px dashed #555; margin-bottom: 8px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+/* Pass 12 (2026-10-19, Gemini pattern): the collapse control sits
+   right-aligned in the brand row (Lucide panel-left-close); the collapsed
+   rail's logo-swaps-to-panel-left-open state is drawn in sidebar-cues.html. */
+.wf-sidebar-brand { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+.wf-app-sidebar .wf-sidebar-collapse { border-color: #555; color: #eee; font-weight: 400; }
 .wf-sidebar-nav { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; }
 .wf-sidebar-bottom { margin-top: auto; border-top: 1px dashed #555; padding-top: 8px; position: relative; }
 .wf-sidebar-avatar-trigger { display: flex; align-items: center; gap: 8px; padding: 6px 4px; cursor: pointer; }

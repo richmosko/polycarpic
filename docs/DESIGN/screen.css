@@ -49,8 +49,9 @@ h1, h2, h3, .heading {
    rounded inner edge; (2) the top row is no longer a persistent/sticky
    header — it scrolls with the page and shares the main area's own
    background token, no distinct surface, no border; (3) the top row's
-   contents are reduced to navigation chrome only (expand/collapse,
-   breadcrumb, entity selector, a contextual "more" menu) — AI/search/
+   contents are reduced to navigation chrome only (breadcrumb, entity
+   selector, a contextual "more" menu; expand/collapse moved into the
+   sidebar's brand row, pass 12) — AI/search/
    notifications/gear are dropped (see § Header, "Top row"). */
 .shell {
   --shell-gutter: 16px;
@@ -81,39 +82,18 @@ h1, h2, h3, .heading {
 .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .topbar-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 
-/* Vertical separator (pass 9, new) — one left-justified (after the
-   expand/collapse icon), one right-justified (before the "more" menu). */
+/* Vertical separator (pass 9; pass 12 leaves one) — right-justified,
+   between the entity selector and the "more" menu. The left-hand one
+   left with the expand/collapse icon (pass 12, see .sidebar-top). */
 .topbar-separator { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
 
-/* Expand/contract control (pass 8, icon corrected pass 9 — Lucide
-   `panel-left`, NOT a hamburger `menu` icon). */
-.sidebar-toggle-header {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-md);
-  background: none;
-  border: none;
-  color: var(--foreground);
-  cursor: pointer;
-  flex-shrink: 0;
-}
-.sidebar-toggle-header:hover { background: var(--accent); color: var(--accent-foreground); } /* pass 11f: hovers on --accent, not --muted (--muted = page by ruling) */
+/* The sidebar's expand/collapse control lives in the sidebar's own brand
+   row as of pass 12 (2026-10-19) — see .sidebar-collapse / .sidebar-expand
+   below. Pass 8/9's top-row .sidebar-toggle-header is retired. */
 
-/* Bug fix (pass 9 addendum, Principal review): .sidebar-toggle-header and
-   .sidebar-user-chevron previously also carried the generic .icon class
-   directly on their own element (copy-paste from the wrapped-icon
-   pattern). .icon's 16x16 sizing is meant for a *wrapper span*, not a
-   32px tap target, so on these two elements it was the later rule in the
-   cascade and silently shrunk the whole button/span to 16x16 -- the
-   bare SVG inside then scaled to fill that, reading as "a few pixels" /
-   a tiny box. Markup no longer carries the stray .icon class (see
-   styled-screens); this is the one shared rule sizing the bare glyph
-   inside both containers to match wireframes/transactions.html's own
-   .wf-icon-btn > .wf-icon sizing. */
-.sidebar-toggle-header svg,
+/* Bare-glyph sizing inside the avatar trigger's chevron (pass 9 addendum
+   bug fix: never put the generic 16px .icon class on the container
+   itself — it shrinks the whole span). */
 .sidebar-user-chevron svg {
   width: 18px;
   height: 18px;
@@ -292,18 +272,93 @@ h1, h2, h3, .heading {
    a CSS relational selector. */
 .shell:has(.sidebar.collapsed) .shell-main { margin-left: calc(64px + 2 * var(--shell-gutter, 16px)); }
 
-/* Top item — brand (pass 8: moved here from the header, see
-   .brand-lockup above). Reuses .brand-lockup's own styles; sidebar-ink
-   aware since it sits on the sidebar's own (inverted) surface. */
+/* Top item — brand row (pass 8: moved here from the header; pass 12,
+   2026-10-19: carries the expand/collapse control — Gemini's pattern,
+   Principal direction). Expanded: logo + wordmark left, a Lucide
+   `panel-left-close` icon button right-aligned in the same row.
+   Collapsed rail: the row reduces to the logo mark alone, and the logo
+   mark IS the expand button — on :hover or :focus-visible the logo swaps
+   to a Lucide `panel-left-open` glyph and an "Expand sidebar" tooltip
+   opens to the right. Two buttons in the mockup, shown/hidden by
+   .collapsed; the real app renders one or the other from the sidebar's
+   collapsed store. */
 .sidebar-top {
-  padding: 8px 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0 12px 10px;
   color: var(--sidebar-foreground);
   border-bottom: 1px solid var(--sidebar-border);
   margin-bottom: 8px;
 }
-.sidebar-top .brand-lockup { color: var(--sidebar-foreground); }
-.sidebar.collapsed .sidebar-top .brand-lockup .sidebar-brand-label { display: none; }
-.sidebar.collapsed .sidebar-top { display: flex; justify-content: center; padding: 8px 0 16px; }
+.sidebar-top .brand-lockup { color: var(--sidebar-foreground); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; }
+.sidebar.collapsed .sidebar-top { justify-content: center; padding: 4px 0 12px; }
+
+.sidebar-collapse,
+.sidebar-expand {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: none;
+  border: none;
+  color: var(--sidebar-foreground);
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+}
+.sidebar-collapse:hover,
+.sidebar-expand:hover,
+.sidebar-expand:focus-visible {
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+.sidebar-collapse:focus-visible,
+.sidebar-expand:focus-visible { outline: 2px solid var(--sidebar-ring); outline-offset: 2px; }
+.sidebar-collapse svg,
+.sidebar-expand-icon svg { width: 18px; height: 18px; display: block; stroke: currentColor; }
+
+/* Expanded: only the collapse button. Collapsed: only the logo-as-expand
+   button (the lockup and the collapse button are both hidden). */
+.sidebar-expand { display: none; position: relative; }
+.sidebar.collapsed .sidebar-top .brand-lockup,
+.sidebar.collapsed .sidebar-collapse { display: none; }
+.sidebar.collapsed .sidebar-expand { display: flex; }
+
+/* The swap: logo mark at rest, panel-left-open on hover / keyboard focus. */
+.sidebar-expand .sidebar-expand-icon { display: none; }
+.sidebar-expand:hover .brand-icon,
+.sidebar-expand:focus-visible .brand-icon { display: none; }
+.sidebar-expand:hover .sidebar-expand-icon,
+.sidebar-expand:focus-visible .sidebar-expand-icon { display: flex; }
+.sidebar-expand .brand-icon { width: 24px; height: 24px; border-radius: 6px; background: var(--primary); flex-shrink: 0; }
+
+/* Tooltip — shadcn Tooltip's own look (inverted: --foreground fill,
+   --background ink), opening right of the rail, vertically centred on
+   the trigger. Shown on hover AND keyboard focus. */
+.sidebar-tooltip {
+  position: absolute;
+  left: calc(100% + 24px); /* button edge → rail edge is 16px (10px padding + 6px centring); +8px clears the card */
+  top: 50%;
+  transform: translateY(-50%);
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 100ms ease;
+  z-index: 20;
+}
+.sidebar-expand:hover .sidebar-tooltip,
+.sidebar-expand:focus-visible .sidebar-tooltip { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .sidebar-tooltip { transition: none; } }
 
 .sidebar-nav {
   display: flex;
@@ -349,7 +404,8 @@ h1, h2, h3, .heading {
 /* Bottom item — avatar trigger + popover (pass 8, new). Opens the user
    menu (profile, preferences, theme, keyboard shortcuts, ... Log out
    last) — design-system-spec.md § Sidebar. Replaces pass 5's chevron
-   (the expand/contract control itself moved to the header, above). */
+   (the expand/contract control moved to the header in pass 8, then into
+   the sidebar's own brand row in pass 12 — see .sidebar-top). */
 .sidebar-bottom {
   margin-top: auto;
   border-top: 1px solid var(--sidebar-border);
