@@ -25,8 +25,11 @@
 
 /* Design tokens -- shadcn-svelte preset b6XadDxmQS (Style "Mira", Base
    "Stone", Theme "Sky", Chart "Yellow"), extracted 2026-08-26. Verbatim
-   per docs/DESIGN/design-system-spec.md -- these :root/.dark blocks ARE
-   docs/DESIGN/tokens.css (PT-54 AC: same blocks ship in both places). */
+   per scripts/cairn/board/theme/design-system-spec.md -- these
+   :root/.dark blocks ARE board/tokens.css's own copy (PT-54 AC: same
+   blocks ship in both places; test_board_tokens_parity.py holds them to
+   it). POLY-78: this no longer also ships docs/DESIGN/tokens.css --
+   that's the product's own design system now, owned by ux-designer. */
 :root {
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.147 0.004 49.25);

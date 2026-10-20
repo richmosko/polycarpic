@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
 """gen_variants.py -- PT-69 (architect's theme-variant ruling, §1/§2):
-emits the three generated `variants.css` copies from the single vendored
+emits the two generated `variants.css` copies from the single vendored
 source of truth, `variants.json`, sitting next to this script.
+
+POLY-78: a third copy used to be written to `docs/DESIGN/variants.css`.
+The Principal's ruling (2026-09-28) is that cairn must not write or
+update anything under `docs/` -- that directory is the product's own
+design system, owned by `ux-designer`, and deliberately diverges from
+cairn's board look. This generator's output is confined to
+`scripts/cairn/` now; cairn's own frozen design reference lives at
+`scripts/cairn/board/theme/design-system-spec.md`.
 
 Authoring tool, not a runtime dependency: stdlib-only, zero deps, zero
 network. Run by an agent to (re)generate the checked-in files, never on
@@ -9,11 +17,10 @@ the clone path (the board is zero-build; nothing in `cairn serve` invokes
 this).
 
 Usage:
-    python3 gen_variants.py                  # writes the three real,
+    python3 gen_variants.py                  # writes the two real,
                                                # checked-in locations
     python3 gen_variants.py --out-dir DIR     # writes DIR/board/variants.css,
-                                               # DIR/dashboard/src/variants.css,
-                                               # DIR/docs/DESIGN/variants.css
+                                               # DIR/dashboard/src/variants.css
                                                # -- for verification only,
                                                # never the authoring path.
 
@@ -333,30 +340,12 @@ _DASHBOARD_HEADER = """\
 
 """
 
-_DOCS_HEADER = """\
-/*
- * variants.css -- GENERATED FILE, do not hand-edit.
- *
- * PT-69 (architect's theme-variant ruling): docs-side reference copy of
- * the theme-variant blocks, alongside docs/DESIGN/tokens.css's own
- * default-preset reference copy. Sourced from
- * scripts/cairn/board/theme/variants.json, emitted by
- * scripts/cairn/board/theme/gen_variants.py -- regenerate with
- * `python3 scripts/cairn/board/theme/gen_variants.py`, never edit this file by
- * hand. See docs/DESIGN/design-system-spec.md's "Theme & color variants"
- * section for the full spec, and scripts/cairn/board/theme/NOTICE.md for
- * provenance.
- */
-
-"""
-
 # (relative path used for the --out-dir verification layout -- always
 # flattened under one root there, per the CLI contract
 # test_theme_variants_generator.py pins), indent style, header.
 _TARGETS = (
     ("board/variants.css", "  ", _BOARD_HEADER),
     ("dashboard/src/variants.css", "\t", _DASHBOARD_HEADER),
-    ("docs/DESIGN/variants.css", "  ", _DOCS_HEADER),
 )
 
 
@@ -495,26 +484,22 @@ def _render_bootstrap(data: dict) -> str:
 
 
 def _target_paths(out_dir: Path | None) -> list:
-    """Absolute path for each of the three generated files.
+    """Absolute path for each of the two generated files, both under
+    `scripts/cairn/`.
 
-    With `out_dir` given (the --out-dir verification path), all three sit
+    With `out_dir` given (the --out-dir verification path), both sit
     flattened under one root -- `out_dir/board/variants.css`, etc. -- per
     the CLI contract test_theme_variants_generator.py pins. With no
-    `out_dir` (the real authoring invocation), the three files' actual
-    homes do NOT share a common relative-path prefix: board/ and
-    dashboard/src/ live under scripts/cairn/, but docs/DESIGN/ lives at
-    the repo root directly, not under scripts/cairn/docs/DESIGN -- so the
-    real paths are resolved explicitly rather than by reusing the
-    flattened --out-dir layout.
+    `out_dir` (the real authoring invocation), the real paths are
+    resolved explicitly rather than by reusing the flattened --out-dir
+    layout.
     """
     if out_dir is not None:
         return [out_dir / rel_path for rel_path, _, _ in _TARGETS]
     cairn_dir = SCRIPT_DIR.parents[1]  # scripts/cairn/board/theme -> scripts/cairn
-    repo_root = cairn_dir.parents[1]  # scripts/cairn -> repo root
     return [
         cairn_dir / "board" / "variants.css",
         cairn_dir / "dashboard" / "src" / "variants.css",
-        repo_root / "docs" / "DESIGN" / "variants.css",
     ]
 
 
@@ -542,7 +527,7 @@ def main(argv=None) -> int:
         "--out-dir",
         type=Path,
         default=None,
-        help="write board/, dashboard/src/, docs/DESIGN/ flattened under this directory instead "
+        help="write board/, dashboard/src/ flattened under this directory instead "
         "of the real checked-in locations (verification only -- the authoring invocation takes "
         "no arguments and writes the real files).",
     )

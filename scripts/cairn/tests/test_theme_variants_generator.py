@@ -17,15 +17,18 @@ same role QA's red guards played for PT-61's derived-token naming):
 
     python3 gen_variants.py --out-dir DIR
 
-writes DIR/board/variants.css, DIR/dashboard/src/variants.css, and
-DIR/docs/DESIGN/variants.css -- mirroring the three real repo-relative homes
-exactly, so the byte-compare below is a straight per-path diff with no path
-translation. Called with no arguments, it writes directly to the real
-checked-in locations (the authoring invocation, run by an agent, never
-tested here since it's destructive against the working tree). Output must
-be deterministic (architect's own requirement: "sorted keys, fixed block
-order") -- verified by running --out-dir TWICE into independent temp dirs
-and diffing them against EACH OTHER, which can go green before the checked-
+writes DIR/board/variants.css and DIR/dashboard/src/variants.css --
+mirroring the two real repo-relative homes exactly, so the byte-compare
+below is a straight per-path diff with no path translation. (POLY-78: a
+third target, DIR/docs/DESIGN/variants.css, used to be part of this
+contract; the Principal's ruling that cairn must not write under docs/
+retired it -- see gen_variants.py's own module docstring.) Called with no
+arguments, it writes directly to the real checked-in locations (the
+authoring invocation, run by an agent, never tested here since it's
+destructive against the working tree). Output must be deterministic
+(architect's own requirement: "sorted keys, fixed block order") --
+verified by running --out-dir TWICE into independent temp dirs and
+diffing them against EACH OTHER, which can go green before the checked-
 in files even exist.
 
 Partition-invariant tests below parse `board/variants.css` directly (plain
@@ -59,7 +62,6 @@ NOTICE_MD = THEME_DIR / "NOTICE.md"
 
 BOARD_VARIANTS_CSS = helpers.CAIRN_DIR / "board" / "variants.css"
 DASHBOARD_VARIANTS_CSS = helpers.CAIRN_DIR / "dashboard" / "src" / "variants.css"
-DOCS_VARIANTS_CSS = REPO_ROOT / "docs" / "DESIGN" / "variants.css"
 
 # Ruled option sets.
 #
@@ -269,7 +271,6 @@ class GeneratorDeterminismTests(unittest.TestCase):
         rel_paths = [
             Path("board") / "variants.css",
             Path("dashboard") / "src" / "variants.css",
-            Path("docs") / "DESIGN" / "variants.css",
         ]
         with tempfile.TemporaryDirectory(prefix="cairn-gen-a-") as a, \
              tempfile.TemporaryDirectory(prefix="cairn-gen-b-") as b:
@@ -294,7 +295,6 @@ class GeneratorByteIdenticalToCheckedInTests(unittest.TestCase):
     CHECKED_IN = {
         Path("board") / "variants.css": BOARD_VARIANTS_CSS,
         Path("dashboard") / "src" / "variants.css": DASHBOARD_VARIANTS_CSS,
-        Path("docs") / "DESIGN" / "variants.css": DOCS_VARIANTS_CSS,
     }
 
     def test_regenerated_output_is_byte_identical_to_checked_in_files(self):

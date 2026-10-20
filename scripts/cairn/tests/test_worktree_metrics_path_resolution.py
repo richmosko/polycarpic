@@ -173,7 +173,7 @@ class TrivialPassingTests(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------
-# Spike delta (team-lead, process/reviews/PT-82/spike.md @ 3b10267,
+# Spike delta (team-lead, process/cairn/reviews/PT-82/spike.md @ 3b10267,
 # "step 9 corrected"): a REAL full `--gate red` run from a REAL worktree
 # still wrote the stray `who: null` line into the worktree's own tracked
 # copy -- the test above (which explicitly sets `CLAUDE_PROJECT_DIR` in

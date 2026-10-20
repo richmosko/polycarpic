@@ -1,6 +1,6 @@
 "use strict";
 
-// POLY-56 gate-1 ruling (process/reviews/POLY-56/ruling.md § R1):
+// POLY-56 gate-1 ruling (process/cairn/reviews/POLY-56/ruling.md § R1):
 // splitAcceptanceCriteria moves from board.js into board-logic.js (was
 // un-testable there -- no jsdom in this suite) and loses its item-parsing
 // half entirely: checklist counts/items now come from the server (one

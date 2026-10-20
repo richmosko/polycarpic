@@ -10,7 +10,7 @@ own commands, since there is no `.claude/agents/team-lead.md` for
 `agent_type` to match.
 
 Registered behind a shell `case` glob prefilter in `.claude/settings.json`
-(measured ~6 ms on a miss vs. 29 ms unconditional -- process/reviews/
+(measured ~6 ms on a miss vs. 29 ms unconditional -- process/cairn/reviews/
 PT-97/measurements.md) matched against `TEST_CMD_TOKENS`; the two must
 never drift apart.
 

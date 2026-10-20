@@ -275,7 +275,7 @@ class ParseIssueTests(unittest.TestCase):
 
 
 class ChecklistItemsTests(unittest.TestCase):
-    """POLY-56 gate-1 ruling (process/reviews/POLY-56/ruling.md § R1): the
+    """POLY-56 gate-1 ruling (process/cairn/reviews/POLY-56/ruling.md § R1): the
     ONE parser, cairn.checklist_items(description) -> [{ordinal, text,
     checked, line}]. Scope is every line after the first `^##\\s*Acceptance
     criteria\\s*$` heading in the pre-`## Comments` description; item regex

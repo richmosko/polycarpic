@@ -1,6 +1,6 @@
 "use strict";
 
-// POLY-56 gate-1 ruling (process/reviews/POLY-56/ruling.md § R1/R4):
+// POLY-56 gate-1 ruling (process/cairn/reviews/POLY-56/ruling.md § R1/R4):
 // - cardEl: a DISTINCT `checklist` chip (`chip("checklist", "☑ " + done +
 //   "/" + total)`), shown only when total > 0, fed by the server-stamped
 //   `issue.checklist`. Never unified with the existing `subissues` chip

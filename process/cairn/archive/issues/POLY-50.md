@@ -40,7 +40,7 @@ Feature started. Branch: `feature/poly-50-backfill-attribution`.
 
 ### @architect — 2026-09-26
 
-Gate-1 ruling: `process/reviews/POLY-50/ruling.md` (measurements N1–N9, seams, 19-test mutation matrix = review checklist, verdict guard thresholds).
+Gate-1 ruling: `process/cairn/reviews/POLY-50/ruling.md` (measurements N1–N9, seams, 19-test mutation matrix = review checklist, verdict guard thresholds).
 
 - POLY-45: `_lead_branch_timeline(transcript_dir)` + `_branch_at(ts, timeline)`; `worktree-*`/`HEAD` records take the lead's main-checkout branch at their timestamp; between loops → milestone. Measured 5187/5242 resolve to an issue.
 - POLY-46: `_otel_cutoff(out_path)` = earliest otel `window_start` day start; records at/after excluded (dry run too); `generated` stamped to the cutoff; locked re-check refuses on a race. Reader precedence rejected (buckets straddle the cutoff). Delta temporality assumed (unmeasured).
@@ -49,7 +49,7 @@ Gate-1 ruling: `process/reviews/POLY-50/ruling.md` (measurements N1–N9, seams,
 
 ### @architect — 2026-09-26
 
-Gate-4 verdict — **pass** @ 0566102 (build c5cfc8b + kwarg rename). Checklist: `process/reviews/POLY-50/ruling.md` §5.
+Gate-4 verdict — **pass** @ 0566102 (build c5cfc8b + kwarg rename). Checklist: `process/cairn/reviews/POLY-50/ruling.md` §5.
 
 | Axis | Result | Evidence |
 |---|---|---|

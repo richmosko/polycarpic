@@ -82,8 +82,8 @@
 		output: 'var(--chart-counter-output)',
 	};
 	// The real, designed categorical role palette (ux-designer's proposal,
-	// commit fd6df5c, docs/DESIGN/design-system-spec.md § Categorical role
-	// palette (PT-79); unblocked by architect's mechanism amendment,
+	// commit fd6df5c, scripts/cairn/board/theme/design-system-spec.md §
+	// Categorical role palette (PT-79); unblocked by architect's mechanism amendment,
 	// 962f3e9). 8 role hues, index-matched to ROLE_TOKEN_ORDER exactly
 	// (position 0 -> --chart-role-1, etc.), PLUS three separate neutral
 	// fold/guard tokens -- never one shared grey -- so `auxiliary`

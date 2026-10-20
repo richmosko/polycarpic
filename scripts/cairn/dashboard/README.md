@@ -12,7 +12,7 @@ decision below.
 - Svelte 5 + TypeScript, plain Vite (no SvelteKit)
 - Tailwind CSS v4 (`@tailwindcss/vite`)
 - shadcn-svelte (Style **Mira**, Base **Stone**, preset `b6XadDxmQS` — see
-  `docs/DESIGN/design-system-spec.md`)
+  `scripts/cairn/board/theme/design-system-spec.md`)
 - Fonts: self-hosted via `@fontsource-variable/*` (Merriweather, Space
   Grotesk, Geist Mono) — no CDN, ever. Imported as JS side-effect imports
   in `src/main.ts`, not a CSS `@import` (keeps `@import "tailwindcss";`

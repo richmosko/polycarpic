@@ -98,7 +98,7 @@ How far a `/drive`-aimed [goal-driven loop](#goal-driven-loop-drive) runs before
   four gates only, by that gate's owner (qa at tests-red and build-green, the lead at finish):
   `python3 scripts/cairn/run_tests.py --gate <red|green|verdict|finish>` — a file-level
   parallel runner, default 8 workers, ≤ 45 s on the reference machine
-  (`process/reviews/PT-93/timings.md`); `--gate` is what the PreToolUse guard requires of
+  (`process/cairn/reviews/PT-93/timings.md`); `--gate` is what the PreToolUse guard requires of
   a teammate and what records the run. The verdict's counts-agreement leg is
   `python3 scripts/cairn/run_tests.py --serial --gate verdict` — the same files one at a
   time, a doubt-the-parallel-path control. A bare unittest discover run is no longer a
@@ -231,7 +231,7 @@ Async messaging guarantees crossings: idle notifications, acks, and status repor
 - **The lead never enters a worktree.** Isolation blocks any Bash command whose working directory resolves to the main checkout — `git -C`, `--git-dir`, `GIT_DIR`, a `cd`-then-git redirect — and this cannot be disabled. A lead inside a worktree could not merge, verify against the main checkout, or run `git -C`. The lead's tree stays on the feature branch and pulls; it verifies teammates' work against `origin/<feature-branch>` (via `git show`, never `git -C <main> show` into a worktree's commit) exactly as any other reviewer does.
 - **Fail closed (POLY-5).** A teammate calls `EnterWorktree` unconditionally, even from inside `.claude/worktrees/`, and if the call errors, is refused, or its permission prompt is denied it sets no identity, writes and commits nothing, and reports to team-lead instead of working in place — while `scripts/cairn/check_lead_not_in_worktree.py` (`/start-feature` step 0) exits non-zero when the lead's own cwd is a linked worktree.
 - **The invariant is enforced, not advised.** A teammate's local scaffolding branch (`worktree-<name>`, created by `EnterWorktree`) is never pushed and never gets a PR — `/finish-feature` and `/merge-pr` both run `scripts/cairn/check_feature_branch_invariant.py`, which fails loudly unless origin holds exactly one `feature/<id>-*` branch, zero `worktree-*` branches, and exactly one open PR for the issue. A pushed `worktree-*` branch is the failure that matters: it is what would produce a second PR.
-- **`temp/` is per-worktree.** Each worktree's `temp/` is its own gitignored scratch area — cross-teammate hand-offs go through commits or `SendMessage`, never a `temp/` file path (a worktree's `temp/` is invisible to anyone else's tree).
+- **`temp/` is per-worktree, and a hand-off is never committed.** Each worktree's `temp/` is its own gitignored scratch area — cross-teammate hand-offs go through commits or `SendMessage`, never a bare `temp/` file path (a worktree's `temp/` is invisible to anyone else's tree). A worktree-bound teammate handing something to the lead writes it under its own worktree's `temp/` and sends the absolute path — the lead reads any worktree's files directly and does not need the file committed to see it.
 - **Verification runs stay isolated too.** Red-test or scratch verification that checks out, mutates, or reverts files concurrently with a writer runs in its own worktree, never the writer's (rule from the 0.6 shared-tree incident, where a QA scratch-verification reverted the implementation lead's in-flight files; first-use validation recorded on PT-26) — worktree isolation now makes this the default shape rather than an opt-in.
 - **A teammate's gate run is recorded in the main checkout, not the worktree's own copy.** `run_tests.py` self-records to a path derived from its own file location (a worktree's copy, if run from one) and `.claude/hooks/test_run_record.py` patches `$CLAUDE_PROJECT_DIR`'s copy (the main checkout) — different files, in a worktree. `CAIRN_TEST_RUNS_FILE` (an existing override) wins if set; otherwise the runner prefers `$CLAUDE_PROJECT_DIR` for the records path, but **only when `--gate` is present** — a fake-engine-root test copy never passes `--gate`, so an un-gated run still self-records to its own tree, never the real file (PT-82). A detached worktree's own record still names `branch: "HEAD"` — a worktree's `HEAD` is never checked out onto a named branch — so anything reading that field for the feature name must get it from elsewhere (the record's own `sha`, or the issue file).
 
@@ -240,7 +240,7 @@ Async messaging guarantees crossings: idle notifications, acks, and status repor
 Eight rules, each paid for once. They apply to every Implement→Validate loop.
 
 - **Rulings live in the file before they are messaged.** A gating ruling, and any ruling that changes an earlier one, is committed to the issue file first; the message that follows says "read the file", never restates the ruling. Restated rulings and their reversals race through mailboxes and get acted on out of order (four crossings in one loop).
-- **A ruling is an issue comment within budget, or `process/reviews/<ID>/ruling.md`**; never a file under `scripts/cairn/docs/`.
+- **A ruling is an issue comment within budget, or `process/cairn/reviews/<ID>/ruling.md`**; never a file under `scripts/cairn/docs/`.
 - **A seam agreement waits on an in-flight ruling.** When the TDD pair knows a gating ruling is coming, they do not agree function names or flags by message first; the ruling names the seam and the pair writes against it.
 - **Operative text carries what to do; the ledger carries why.** Acceptance criteria are amended in place when a ruling changes them — a correction that lives only in a comment a hundred lines down is read by nobody who builds from the criteria. Reviewer instructions ("say why", "state both halves") never ship inside documentation; a ruling that dictates doc text supplies the sentences.
 - **Doc text about a measurement is written after the measurement lands**, never ahead of it. Two TRACKER sentences went false in opposite directions in one loop by being written first.
@@ -251,7 +251,7 @@ Eight rules, each paid for once. They apply to every Implement→Validate loop.
 
 #### Four gates and the loop caps (PT-94, 2026-09-05)
 
-Measured on PT-85 and PT-84 (`process/reviews/PT-94/README.md`): a third of gate traffic was confirmations and records, the verdict fragmented in proportion to the builder's commit count, 13 of 16 full-suite runs were a module run's job, and 33 of the lead's 64 inbound messages were idle notifications. The loop is therefore **four gates, each one issue-file commit and one message**:
+Measured on PT-85 and PT-84 (`process/cairn/reviews/PT-94/README.md`): a third of gate traffic was confirmations and records, the verdict fragmented in proportion to the builder's commit count, 13 of 16 full-suite runs were a module run's job, and 33 of the lead's 64 inbound messages were idle notifications. The loop is therefore **four gates, each one issue-file commit and one message**:
 
 | Gate | Owner | The commit contains | The one message says |
 |---|---|---|---|
@@ -271,7 +271,7 @@ Measured on PT-85 and PT-84 (`process/reviews/PT-94/README.md`): a third of gate
 | A3 | No confirmation round trips — "proceeding on X unless the file says otherwise"; the lead answers only when the file disagrees | agent definitions |
 | B4 | A ruling cites its measurement (command and output) or tags the claim `(unmeasured)`; an unmeasured claim cannot gate a build | architect definition → Rulings |
 | B5 | One gating ruling plus at most two addenda (≤ 15 lines each) before the build; a third addendum reopens the ruling | architect definition |
-| B6 | Issue comments ≤ 40 lines; verdicts as a table; constructions, harness output, and retro prose go to `temp/` or `process/reviews/<ID>/`, referenced by path | `cairn check` warns over the cap |
+| B6 | Issue comments ≤ 40 lines; verdicts as a table; constructions, harness output, and retro prose go to `temp/` or `process/cairn/reviews/<ID>/`, referenced by path | `cairn check` warns over the cap |
 | B7 | The review checklist is pre-registered before the build and run once; deltas in one batch | architect definition |
 | C8 | Four gates, fixed; the head-match is `cairn gate --head <verified sha>` (PASS = docs/tracker only since the sha) | `/finish-feature`; `cairn gate` |
 | C9 | One full-suite run per gate by the gate owner (qa at 2 and 3, the lead at finish); everyone else runs the touched module; a doc-only edit needs no run | agent definitions; mechanical half in PT-93 |

@@ -143,7 +143,7 @@ class RecorderTests(unittest.TestCase):
 
     POLY-4: guard threshold 7's own test (matching the ruling's real
     captured payload) is deleted, not recreated -- it read its fixture
-    from `process/reviews/PT-97/hook-payloads.json`, and `process/reviews/`
+    from `process/cairn/reviews/PT-97/hook-payloads.json`, and `process/cairn/reviews/`
     was removed wholesale by the template scrub (kickoff § 2.2). That
     payload was a hand-capture of one real PreToolUse/PostToolUse pair;
     there is nothing left in this repo to re-diff a replacement against

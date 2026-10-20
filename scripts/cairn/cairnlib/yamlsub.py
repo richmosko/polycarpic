@@ -108,7 +108,7 @@ def _parse_scalar(raw: str, ctx: str) -> Any:
         raise YamlError(f"{ctx}: flow mappings are not supported: {raw!r}")
     if raw[0] in "&*":
         if raw[0] == "*":
-            # POLY-9 (ruling, process/reviews/POLY-49/ruling.md §7):
+            # POLY-9 (ruling, process/cairn/reviews/POLY-49/ruling.md §7):
             # ruled (architect) -- no parser exception; an unquoted `*x`
             # really IS an alias in YAML, so the reject stays. But the
             # overwhelmingly likely intent of a hand-typed `paths:` entry

@@ -475,6 +475,42 @@ class ShowChildrenTests(unittest.TestCase):
         self.assertLess(positions["PT-9"], positions["PT-10"])
 
 
+class ShowReviewFilesTests(unittest.TestCase):
+    """POLY-80: `cairn show <id>` lists an issue's review files (one line
+    each) when `process/cairn/reviews/<id>/` exists -- the AC's own
+    "detail drawer may follow later, not required here" scope, CLI only."""
+
+    def test_show_lists_review_files_when_the_directory_exists(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        reviews_dir = data_dir / "reviews" / "PT-1"
+        reviews_dir.mkdir(parents=True)
+        (reviews_dir / "ruling.md").write_text("# Ruling\n", encoding="utf-8")
+        (reviews_dir / "timing.md").write_text("# Timing\n", encoding="utf-8")
+        result = run_cairn(["show", "PT-1", "--data-dir", str(data_dir)])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Review files", result.stdout)
+        self.assertIn("PT-1/ruling.md", result.stdout)
+        self.assertIn("PT-1/timing.md", result.stdout)
+
+    def test_show_has_no_review_files_section_when_the_directory_is_absent(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        result = run_cairn(["show", "PT-1", "--data-dir", str(data_dir)])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("Review files", result.stdout)
+
+    def test_show_review_files_are_sorted(self):
+        data_dir = helpers.make_tmp_data_dir(self)
+        reviews_dir = data_dir / "reviews" / "PT-1"
+        reviews_dir.mkdir(parents=True)
+        for name in ("zeta.md", "alpha.md", "mid.py"):
+            (reviews_dir / name).write_text("x\n", encoding="utf-8")
+        result = run_cairn(["show", "PT-1", "--data-dir", str(data_dir)])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        out = result.stdout
+        self.assertLess(out.index("alpha.md"), out.index("mid.py"))
+        self.assertLess(out.index("mid.py"), out.index("zeta.md"))
+
+
 class ShowBlockersTests(unittest.TestCase):
     """PT-26: `cairn show <id>` displays blocked_by (blockers) and the
     reverse "blocks" links, both directions sorted by _id_sort_key
