@@ -40,16 +40,20 @@ import helpers  # noqa: F401
 REPO_ROOT = helpers.CAIRN_DIR.parent.parent
 BOARD_CSS = helpers.CAIRN_DIR / "board" / "board.css"
 BOARD_TOKENS_CSS = helpers.CAIRN_DIR / "board" / "tokens.css"
-DOCS_TOKENS_CSS = REPO_ROOT / "docs" / "DESIGN" / "tokens.css"
 DASHBOARD_DIST_INDEX_CSS = REPO_ROOT / "scripts" / "cairn" / "dashboard" / "dist" / "assets" / "index.css"
 
 # PT-69 (architect's theme-variant ruling, §2): "All three go into
 # test_css_parse_sanity.py's file list -- a generated stylesheet is exactly
 # as capable of shipping dead as a hand-written one, and a 0 cssRules
 # variants.css would fail silently as 'theme just doesn't change.'"
+# POLY-78 (Principal's ruling, 2026-09-28): cairn must not read or write
+# anything under docs/ -- docs/DESIGN/ is the product's own design system
+# now, owned by ux-designer. The third copy this ruling used to check,
+# docs/DESIGN/variants.css, is deleted; only the two real cairn copies
+# remain here (and DocsTokensCssParseSanityTests, which read
+# docs/DESIGN/tokens.css, is removed below for the same reason).
 BOARD_VARIANTS_CSS = helpers.CAIRN_DIR / "board" / "variants.css"
 DASHBOARD_VARIANTS_CSS = helpers.CAIRN_DIR / "dashboard" / "src" / "variants.css"
-DOCS_VARIANTS_CSS = REPO_ROOT / "docs" / "DESIGN" / "variants.css"
 
 
 class CssStructuralScan(NamedTuple):
@@ -189,11 +193,6 @@ class BoardTokensCssParseSanityTests(unittest.TestCase):
         _assert_structurally_sound(self, BOARD_TOKENS_CSS, min_rules=2)  # :root, .dark
 
 
-class DocsTokensCssParseSanityTests(unittest.TestCase):
-    def test_docs_tokens_css_is_one_structurally_coherent_stylesheet(self):
-        _assert_structurally_sound(self, DOCS_TOKENS_CSS, min_rules=2)  # :root, .dark
-
-
 class DashboardBuiltCssParseSanityTests(unittest.TestCase):
     def test_dashboard_dist_index_css_is_one_structurally_coherent_stylesheet(self):
         # team-lead's own "arguably" -- included since a bundled/minified
@@ -213,7 +212,8 @@ class ThemeVariantsCssParseSanityTests(unittest.TestCase):
     output that might legitimately not exist yet pre-build -- so a missing
     file here is a hard failure, not a skip. See test_theme_variants_
     generator.py for the generator/regeneration contract these files come
-    from."""
+    from. POLY-78: a third file here, docs/DESIGN/variants.css, is gone --
+    see the module-level comment by BOARD_VARIANTS_CSS above."""
 
     def test_board_variants_css_is_one_structurally_coherent_stylesheet(self):
         self.assertTrue(BOARD_VARIANTS_CSS.is_file(), f"{BOARD_VARIANTS_CSS} does not exist")
@@ -224,11 +224,6 @@ class ThemeVariantsCssParseSanityTests(unittest.TestCase):
         self.assertTrue(DASHBOARD_VARIANTS_CSS.is_file(), f"{DASHBOARD_VARIANTS_CSS} does not exist")
         if DASHBOARD_VARIANTS_CSS.is_file():
             _assert_structurally_sound(self, DASHBOARD_VARIANTS_CSS, min_rules=10)
-
-    def test_docs_variants_css_is_one_structurally_coherent_stylesheet(self):
-        self.assertTrue(DOCS_VARIANTS_CSS.is_file(), f"{DOCS_VARIANTS_CSS} does not exist")
-        if DOCS_VARIANTS_CSS.is_file():
-            _assert_structurally_sound(self, DOCS_VARIANTS_CSS, min_rules=10)
 
 
 class ScanCssStructureSelfTests(unittest.TestCase):

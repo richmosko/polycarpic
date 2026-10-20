@@ -762,7 +762,7 @@ class RunnerRefusesAnIndirectUntieredFullRunTests(unittest.TestCase):
 
 class MultiRootDiscoveryTests(unittest.TestCase):
     """POLY-6 gate-red (qa-engineer), pinned to the architect's gate-1
-    ruling (process/reviews/POLY-6/ruling.md @ 615b94e, section
+    ruling (process/cairn/reviews/POLY-6/ruling.md @ 615b94e, section
     (a) Mechanics -- "a second root in run_tests.py, not a separate entry
     point"). `WORKFLOW_TESTS_DIR = SCRIPT_DIR.parent.parent / "tests" /
     "workflow"` per the ruling: for a fake engine root at `tmp`

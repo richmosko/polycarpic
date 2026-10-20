@@ -1,5 +1,5 @@
 """POLY-58 gate-2 red test: pins the architect's gate-1 ruling
-(`process/reviews/POLY-58/ruling.md` @ b156d14) §2 module/step order and
+(`process/cairn/reviews/POLY-58/ruling.md` @ b156d14) §2 module/step order and
 §3 facade contract, §4 engine-staleness dir mode, and §6(a)-(f) checks.
 
 Nothing under test exists yet at the base commit: `scripts/cairn/cairnlib/`
@@ -12,7 +12,7 @@ module is created; (d) only once step 21 leaves `cairn.py` a pure facade;
 over whatever `cairnlib` modules exist, so they are vacuously green at
 the base (no modules exist yet) -- the ruling calls this out explicitly.
 
-This file does not pin the full 237-name list (`process/reviews/POLY-58/
+This file does not pin the full 237-name list (`process/cairn/reviews/POLY-58/
 owners.txt`); the verdict gate's matrix check does that once, against the
 finished tree. This file pins only: the step order, each module's §2
 anchor name, and the four structural invariants that must hold once

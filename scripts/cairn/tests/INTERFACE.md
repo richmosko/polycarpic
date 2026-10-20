@@ -15,7 +15,7 @@ Everything lives in `scripts/cairn/cairn.py`, a single stdlib-only module, execu
 both as `python3 cairn.py ...` and via the bash shim `scripts/cairn/cairn`.
 
 **POLY-58:** the implementation actually lives in the `scripts/cairn/cairnlib/`
-package, one module per leaves-first extraction step (`process/reviews/POLY-58/ruling.md`
+package, one module per leaves-first extraction step (`process/cairn/reviews/POLY-58/ruling.md`
 §2) — `cairnlib.constants`, `cairnlib.errors`, `cairnlib.yamlsub`, `cairnlib.records`,
 `cairnlib.config`, `cairnlib.store`, `cairnlib.guards`, `cairnlib.lint`,
 `cairnlib.snapshot`, `cairnlib.roster`, `cairnlib.attribution`, `cairnlib.flow`,

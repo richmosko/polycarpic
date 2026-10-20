@@ -1,6 +1,6 @@
 """POLY-57 RED tests (cairn-side): cairn's old design-notes directory
 mixed a living design note, five loop-scoped gate-1 rulings, and vendored
-board theme data. Gate-1 ruling (process/reviews/POLY-57/ruling.md @
+board theme data. Gate-1 ruling (process/cairn/reviews/POLY-57/ruling.md @
 ab8063b) §4: this file pins design/'s removal, docs/'s living-docs-only
 contents, and the theme files' new home under board/theme/ -- everything
 whose subject is data under scripts/cairn/ itself. The sibling repo-wide

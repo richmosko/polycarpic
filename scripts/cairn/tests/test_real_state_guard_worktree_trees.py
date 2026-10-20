@@ -141,7 +141,7 @@ class BothTreesGuardWatchesTheWorktreeCopyByteExact(unittest.TestCase):
     main checkout (PT-82's records-path discriminator). A guard that
     reuses PT-100's tolerant `diagnose_real_state` unmodified for the
     worktree tree too would silently accept a backed-issue addition
-    there -- exactly the stray write the spike caught (process/reviews/
+    there -- exactly the stray write the spike caught (process/cairn/reviews/
     PT-82/spike.md, step 9) -- so that mutation must go red here."""
 
     def test_any_addition_to_the_worktree_copy_is_a_finding_even_with_a_backed_issue(self):

@@ -4,7 +4,7 @@ warning without restarting, and the recreated-registry marker keeping its
 BOOT fingerprint rather than laundering itself against edited files on
 disk).
 
-Pinned to the architect's ruling (`process/reviews/POLY-61/ruling.md`
+Pinned to the architect's ruling (`process/cairn/reviews/POLY-61/ruling.md`
 @ 67a9021). Each `TestCase` class below is named after, and carries the
 name of, that ruling's "Tests (qa) and pre-registered checklist" table --
 T1 through T4, in order. T5 (the SIGCONT cleanup helper) lives in

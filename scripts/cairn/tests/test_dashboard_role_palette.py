@@ -28,7 +28,7 @@ Two checks, both parsed from `app.css` under test, never hardcoded:
    monotone-lightness check, meaningless for unordered categories).
 
 ux-designer has already proposed concrete values (commit fd6df5c,
-`docs/DESIGN/design-system-spec.md`) but they are NOT YET pasted into
+`scripts/cairn/board/theme/design-system-spec.md`) but they are NOT YET pasted into
 `app.css` -- amendment ad940d3 explicitly blocks implementation-lead from
 touching `app.css` until the mechanism amendment (962f3e9) landed, which
 it now has. This file's `RolePaletteTokenContractTests` class is

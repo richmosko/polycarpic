@@ -92,9 +92,9 @@ test("PT-57: board.css no longer hardcodes any of design-system-spec.md's seven 
   const found = findLegacyHexes(readBoardCss());
   assert.deepEqual(
     found, [],
-    `board.css still hardcodes legacy hex value(s) ${JSON.stringify(found)} -- per docs/DESIGN/` +
-      `design-system-spec.md's Legacy/migration table, these must be replaced by the corresponding ` +
-      `preset token (see that table for the old-hex -> new-token mapping)`
+    `board.css still hardcodes legacy hex value(s) ${JSON.stringify(found)} -- per ` +
+      `scripts/cairn/board/theme/design-system-spec.md's Legacy/migration table, these must be ` +
+      `replaced by the corresponding preset token (see that table for the old-hex -> new-token mapping)`
   );
 });
 

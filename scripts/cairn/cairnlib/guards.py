@@ -24,7 +24,9 @@ __all__ = [
     "DOC_PARAGRAPH_SENTENCE_CAP",
     "DOC_PHRASES",
     "ISSUE_SIZE_CAP_BYTES",
+    "NAMED_PROCESS_DOCS",
     "TITLE_CHAR_CAP",
+    "TRACKER_RECORD_DIRS",
     "_COMMENT_HEADER_RE",
     "_DIFF_COMMENT_HEADER_RE",
     "_DOCS_PREFIXES",
@@ -33,8 +35,10 @@ __all__ = [
     "_cached_name_status",
     "_doc_paragraphs",
     "_docs_dir",
+    "_files_added_by_author",
     "_files_touched_by_author",
     "_git_toplevel",
+    "_is_allowed_process_path",
     "_resolve_push_base_ref",
     "_sibling_guard_paths",
     "check_budgets",
@@ -127,7 +131,7 @@ def check_budgets(data_dir: Path) -> List[str]:
         text = p.read_text(encoding="utf-8")
         size = len(text.encode("utf-8"))
         if size > ISSUE_SIZE_CAP_BYTES:
-            warnings.append(f"{p.name} is {size / 1024:.1f} KB (cap {ISSUE_SIZE_CAP_BYTES // 1024} KB) -- move review logs to process/reviews/ or a linked file at the next gate")
+            warnings.append(f"{p.name} is {size / 1024:.1f} KB (cap {ISSUE_SIZE_CAP_BYTES // 1024} KB) -- move review logs to process/cairn/reviews/ or a linked file at the next gate")
         lines = text.split("\n")
         headers = [(i, m) for i, l in enumerate(lines) if (m := _COMMENT_HEADER_RE.match(l))]
         for idx, (i, m) in enumerate(headers):
@@ -403,9 +407,68 @@ def _files_touched_by_author(root: Path, base: str, assignee: str) -> Set[str]:
     return files
 
 
+# POLY-80 (Principal's ruling, 2026-09-28, principle 3): "a hand-off is never
+# committed" -- a genuinely NEW file under process/ that is neither a tracker
+# record nor one of the named process docs is exactly a hand-off (a
+# construction, harness output, retro prose) that leaked onto the shared
+# branch instead of staying in the sender's own gitignored temp/. Tracker
+# records: process/cairn/{issues,milestones,majors,archive,reviews}/ -- the
+# same five subdirectories `cairn`'s own store code reads/writes, plus
+# `reviews` (this ruling's own new one). Named docs: the fixed set every
+# process/ file that ISN'T a tracker record is allowed to be.
+TRACKER_RECORD_DIRS = ("issues", "milestones", "majors", "archive", "reviews")
+NAMED_PROCESS_DOCS = frozenset({
+    "process/WORKFLOW.md",
+    "process/TRACKER.md",
+    "process/STATE.md",
+    "process/DECISIONS.md",
+    "process/cairn/config.yml",
+})
+
+
+def _is_allowed_process_path(path: str) -> bool:
+    """True if `path` is not under `process/` at all, or is one of the
+    tracker-record subdirectories / named docs POLY-80 allow-lists. False
+    is the "this looks like a leaked hand-off" verdict."""
+    if not path.startswith("process/"):
+        return True
+    if path in NAMED_PROCESS_DOCS:
+        return True
+    prefix = "process/cairn/"
+    if path.startswith(prefix):
+        rest = path[len(prefix):]
+        return any(rest == d or rest.startswith(d + "/") for d in TRACKER_RECORD_DIRS)
+    return False
+
+
+def _files_added_by_author(root: Path, base: str, assignee: str) -> Set[str]:
+    """Like `_files_touched_by_author`, but only files a commit authored by
+    `assignee` ADDED (git `--name-status` filter `A`) in `base..HEAD` --
+    POLY-80's principle-3 guard cares about a new file appearing, not an
+    existing allowed one being edited. `--no-merges --no-renames`, same
+    rationale as the sibling function; the same `\\x01`-prefixed-author
+    format sidesteps the same empty-commit-body ambiguity."""
+    result = subprocess.run(
+        ["git", "log", "--no-merges", "--no-renames", "--format=%x01%an", "--name-status", f"{base}..HEAD"],
+        cwd=root, capture_output=True, text=True, check=True,
+    )
+    files: Set[str] = set()
+    for block in result.stdout.split("\x01"):
+        if not block:
+            continue
+        lines = block.split("\n")
+        author = lines[0]
+        if author != assignee:
+            continue
+        for line in lines[2:]:
+            if line.startswith("A\t"):
+                files.add(line[2:])
+    return files
+
+
 def _sibling_guard_paths(data_dir: Path, issue_id: str, parent: str, assignee: str) -> List[str]:
     """POLY-48 item 6 (guard-push same-assignee scope, gate-1 ruling
-    process/reviews/POLY-48/ruling.md §1(c)): the `paths:` globs of every OTHER
+    process/cairn/reviews/POLY-48/ruling.md §1(c)): the `paths:` globs of every OTHER
     live issue sharing this one's `parent` and `assignee` (any stage, any
     status) -- unioned into the caller's own allowed set, so the second
     same-assignee sub-issue under one parent doesn't trip on the first
@@ -513,14 +576,32 @@ def cmd_guard_push(args: argparse.Namespace) -> int:
         return 2
     base = merge_base.stdout.strip()
 
-    touched = _files_touched_by_author(root, base, assignee)
-    if not touched:
-        return 0
+    # POLY-80 principle 3, unconditional (not scoped to this issue's own
+    # `paths:`): a NEW file this assignee added under process/ that is
+    # neither a tracker record nor a named process doc is a hand-off that
+    # leaked onto the shared branch -- refused regardless of whether it
+    # happens to fall inside the issue's declared paths, since a `paths:`
+    # glob like `process/cairn/**` was never meant to license an arbitrary
+    # new file the moment it's a prefix match.
+    added = _files_added_by_author(root, base, assignee)
+    leaked = sorted(f for f in added if not _is_allowed_process_path(f))
+    failed = False
+    for f in leaked:
+        print(
+            f"guard-push: {f} is a new file under process/ that is not a tracker record "
+            f"(process/cairn/{{issues,milestones,majors,archive,reviews}}/) or a named process doc "
+            f"(WORKFLOW.md, TRACKER.md, STATE.md, DECISIONS.md, cairn/config.yml) -- hand-offs go in "
+            f"temp/, never committed",
+            file=sys.stderr,
+        )
+        failed = True
 
-    matchers = [_glob_to_regex(p) for p in allowed_globs]
-    stray = sorted(f for f in touched if not any(m.match(f) for m in matchers))
-    if not stray:
-        return 0
-    for f in stray:
-        print(f, file=sys.stderr)
-    return 1
+    touched = _files_touched_by_author(root, base, assignee)
+    if touched:
+        matchers = [_glob_to_regex(p) for p in allowed_globs]
+        stray = sorted(f for f in touched if not any(m.match(f) for m in matchers) and f not in leaked)
+        for f in stray:
+            print(f, file=sys.stderr)
+            failed = True
+
+    return 1 if failed else 0

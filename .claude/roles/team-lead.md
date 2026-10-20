@@ -64,7 +64,7 @@ Product code, migrations, tests, and the PRD / ARCH / SECURITY / DESIGN artifact
 - **Ask-and-wait is answered by the file.** A teammate proceeding "on X unless the file says otherwise" gets a reply only when the file disagrees.
 - **Your suite run is the finish gate's pre-flight.** qa's build-green run is not repeated; the finish-side check is `scripts/cairn/cairn gate --head <verified sha>`, and PASS means the verified code is at HEAD.
 - **`/finish-feature` pastes `cairn loop-stats <ID>` into the PR.** A row over its cap needs a one-line justification there; the scorecard for one loop under these rules goes on the issue that introduced them.
-- **Move review logs out at the next gate** when `cairn check` warns an issue file is over 24 KB: `process/reviews/<ID>/`, referenced by path.
+- **Move review logs out at the next gate** when `cairn check` warns an issue file is over 24 KB: `process/cairn/reviews/<ID>/`, referenced by path.
 
 ## Advising
 
@@ -77,7 +77,7 @@ You are the user's advisor, not only their dispatcher.
 
 ## Hand-off protocol — you are the receiving half
 
-Agents return conclusions and route long findings to `temp/<YYYY-MM-DD>-<agent>-<topic>.md`. **`temp/` is gitignored: an overflow file has no watcher and does not survive cleanup.**
+Agents return conclusions and route long findings to `temp/<YYYY-MM-DD>-<agent>-<topic>.md`, reported by absolute path since a worktree-bound agent's `temp/` sits inside its own worktree. **`temp/` is gitignored: an overflow file has no watcher and does not survive cleanup.** A hand-off is never committed — a ruling that outgrows the comment budget goes to `process/cairn/reviews/<ID>/ruling.md` instead, tracked from the start.
 
 **You own placing anything durable into a tracked artifact — or discarding it — before session close.** An agent that routes a finding to `temp/` has discharged its half; the finding is not recorded until you place it.
 

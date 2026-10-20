@@ -345,7 +345,7 @@ class SameAssigneeSiblingSubIssueScopeTests(GuardPushTestBase):
         self.assertNotIn("src/auth/a.py", r.stdout + r.stderr)
 
     def test_a_different_assignees_sibling_paths_are_not_admitted(self):
-        """Ruling (process/reviews/POLY-48/ruling.md §1(c)): the union is
+        """Ruling (process/cairn/reviews/POLY-48/ruling.md §1(c)): the union is
         scoped to siblings with the SAME assignee -- a same-parent sibling
         held by someone else must not widen this assignee's allowed
         globs."""
@@ -398,6 +398,60 @@ class BranchBaseTests(GuardPushTestBase):
         r = guard_push(self.root, self.data_dir, "PT-1")
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         self.assertNotIn("legacy/old.py", r.stdout + r.stderr)
+
+
+class HandoffLeakTests(GuardPushTestBase):
+    """POLY-80 principle 3 ("a hand-off is never committed"): a genuinely
+    NEW file under `process/` that is neither a tracker record
+    (`process/cairn/{issues,milestones,majors,archive,reviews}/`) nor a
+    named process doc is refused -- even when the issue's own declared
+    `paths:` is broad enough that the ORIGINAL stray-file check alone
+    would have let it through. `paths=("process/cairn/**",)` throughout,
+    so every case here isolates principle 3 from the pre-existing check."""
+
+    def test_new_non_tracker_file_under_process_cairn_is_refused(self):
+        self.seed_issue_and_branch(paths=("process/cairn/**",))
+        write_file(self.root, "process/cairn/scratch-notes.md")
+        commit_as(self.root, "backend-lead", "a hand-off that leaked onto the branch")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        out = r.stdout + r.stderr
+        self.assertIn("process/cairn/scratch-notes.md", out)
+        self.assertIn("temp/", out, "the refusal must name temp/ as where a hand-off belongs")
+
+    def test_new_tracker_record_file_passes(self):
+        self.seed_issue_and_branch(paths=("process/cairn/**",))
+        write_file(self.root, "process/cairn/reviews/PT-1/ruling.md")
+        commit_as(self.root, "backend-lead", "a real ruling record")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_new_named_process_doc_passes(self):
+        self.seed_issue_and_branch(paths=("process/cairn/**", "process/DECISIONS.md"))
+        write_file(self.root, "process/DECISIONS.md", "## An entry\n")
+        commit_as(self.root, "backend-lead", "a decisions entry")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_editing_an_existing_disallowed_process_file_is_not_a_leak(self):
+        # Principle 3 is about a file ARRIVING, not about editing one that
+        # was already there before this branch -- the pre-existing
+        # stray-file check (declared paths:) still governs edits.
+        self.seed_issue_and_branch(
+            paths=("process/cairn/**", "process/cairn/scratch-notes.md"),
+            extra_main_files={"process/cairn/scratch-notes.md": "old\n"},
+        )
+        write_file(self.root, "process/cairn/scratch-notes.md", "new content\n")
+        commit_as(self.root, "backend-lead", "edit, not add")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+
+    def test_non_process_new_file_is_unaffected_by_principle_3(self):
+        self.seed_issue_and_branch(paths=("process/cairn/**", "src/auth/**"))
+        write_file(self.root, "src/auth/new.py")
+        commit_as(self.root, "backend-lead", "ordinary in-bounds code")
+        r = guard_push(self.root, self.data_dir, "PT-1")
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
 
 
 if __name__ == "__main__":
