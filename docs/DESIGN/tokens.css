@@ -8,10 +8,11 @@
  * the swatches.
  *
  * ELEVENTH PASS (2026-10-19) — Principal: light --background off white
- * to a light grey, #EFEEEE (pass 11b: #EFEDEB read too dark); the light neutral scale,
- * --primary/--ring/--destructive/--positive inks, and the light chart ramp
- * re-derived so every pair stays AA on the greyer canvas. Dark mode
- * unchanged. See the Surfaces & text comment below.
+ * to a warm off-white, #F7F5F3 (11c; #EFEDEB and #EFEEEE both read too
+ * dark). Light neutrals re-derived off it; --primary/--ring and
+ * --destructive one small notch darker, --positive back to its pass-10
+ * value, light chart ramp one step darker. Dark mode unchanged. See the
+ * Surfaces & text comment below.
  *
  * SIXTH PASS (2026-10-01) — Principal review pass 4
  * (temp/2026-10-01-design-review-4.md): --warning moves from a darkened
@@ -54,21 +55,20 @@
 
 :root {
   /* Surfaces & text — pass 11 (2026-10-19): the page canvas moves off
-     white to a warm light grey with a hint of brown — Principal: "can we
-     set --background to some subtle shade of grey with a hint of brown?
-     something close to EFEEEE". Pass 11b: exactly #EFEEEE (L 0.935,
-     near-neutral) after #EFEDEB read too dark; the brown hint lives in
-     --muted/--muted-foreground/--border/--input (hue 30-33°), not here.
+     white to a warm off-white — Principal: "can we set --background to
+     some subtle shade of grey with a hint of brown?" Tried #EFEDEB, then
+     #EFEEEE; both read too dark. Settled (11c) on the Principal's own
+     value: #EFEDEB + #080808 = #F7F5F3 (hue 30°, S 0.20, L 0.96).
      Why pass 5 ended at white: it read "much lighter" as LESS SATURATED
      and dropped the tint to ~3% at L 0.996 — a value indistinguishable
      from white — and pass 9 then made the shell's own background
      --background (sidebar-07 inset), not --muted, so that near-white
-     became the whole page. The scale now hangs off the canvas: --card/
-     --popover stay pure white and float on it (1.16:1 step + hairline);
-     --muted sits between the two (#F7F5F3) so in-card wells and hovers
-     keep the same white-vs-muted step they had; --border/--input darken
-     to stay visible on the greyer page. Same warm hue (30°) throughout. */
-  --background: #EFEEEE;
+     became the whole page. The scale hangs off the canvas, all at the
+     same warm hue (30°): --card/--popover stay pure white and float on
+     it (1.09:1 step + hairline); --muted #FBFAF9 sits halfway between
+     card and page (in-card wells, hovers); --border/--input sit darker
+     than the page so hairlines read on both page and card. */
+  --background: #F7F5F3;
   --foreground: #1D1F20; /* near-black, barely blue, flatter than pass 4's green-cast ink */
   --card: #FFFFFF;
   --card-foreground: #1D1F20;
@@ -78,7 +78,7 @@
   /* Primary — unchanged from pass 4: a darkened neon green (hue 110.6°,
      same hue as --brand, L 0.26 vs the brand's L 0.51) — see --brand
      below for why the raw brand hex can't be primary on a light surface. */
-  --primary: #147C00; /* pass 11: L 0.26→0.243, same hue — 4.63:1 as text on the greyer --background */
+  --primary: #148100; /* pass 11: L 0.26→0.253, same hue — #158500 is 4.40:1 on the page, this is 4.63:1 */
   --primary-foreground: #FFFFFF;
 
   /* Secondary/accent — pass 5: moved from pass 4's pale GREEN tint to the
@@ -90,8 +90,8 @@
      role (4.72:1 on --secondary) and the plain-text-on-card role (5.48:1). */
   --secondary: #E3F0F7;
   --secondary-foreground: #096FA5;
-  --muted: #F7F5F3; /* pass 11: between --card and --background, warm 30° — in-card wells, hovers */
-  --muted-foreground: #5E5A55; /* pass 11: warm 33°, 5.91:1 on --background */
+  --muted: #FBFAF9; /* pass 11: halfway between --card and --background, warm 30° — in-card wells, hovers */
+  --muted-foreground: #5E5A55; /* pass 11: warm 33°, 6.29:1 on --background */
   --accent: #EBF4F9;
   --accent-foreground: #096FA5;
 
@@ -101,7 +101,7 @@
      --primary for that.
      --brand-2 (pass 5, new): the literal, undarkened secondary sky blue
      (#05A9FF, the Principal's own choice) — same rule: dark-surface/
-     decorative use only (2.23:1 against this light --background — far
+     decorative use only (2.38:1 against this light --background — far
      below AA, same posture as --brand). Used for: the sidebar focus ring
      (reads against the sidebar's own dark-in-light-mode surface), and as
      the series-2 color in two-series comparison charts (nominal vs.
@@ -114,12 +114,12 @@
   --brand-2: #05A9FF;
 
   /* Destructive — unchanged from pass 3/4. */
-  --destructive: #D70404; /* pass 11: L ×0.93, same hue — 4.64:1 on --background */
+  --destructive: #E00404; /* pass 11: L ×0.97, same hue — #E70404 is 4.37:1 on the page, this is 4.61:1 */
   --destructive-foreground: #FFFFFF;
 
-  --border: #DCD8D4; /* pass 11: warm, 1.22:1 on --background, 1.42:1 on --card */
-  --input: #D3CEC9; /* pass 11: one step stronger than --border, 1.56:1 on --card */
-  --ring: #147C00;
+  --border: #E6E2DE; /* pass 11: one step darker than the page — 1.19:1 on --background, 1.29:1 on --card */
+  --input: #DCD8D4; /* pass 11: one step stronger than --border, 1.42:1 on --card */
+  --ring: #148100;
 
   /* Chart ramp — pass 10: re-hued from the green --primary (110.6°) to a
      gradient of --brand-2, the secondary sky blue (200.6°, S=0.90, same
@@ -139,9 +139,10 @@
      of this ramp) and design-system-spec.md § Chart ramp for the full
      derivation and all ten contrast figures. */
   /* Pass 11: shifted one L step darker (L 0.42→0.26, same -0.04
-     cadence, same hue/S) — the old chart-1 (#0C96DF) fell to 2.81:1 on
-     the new --background. Floor is now chart-1 at 3.32:1 vs --background,
-     3.85:1 vs --card; adjacent steps still ~1.19-1.21:1 apart. */
+     cadence, same hue/S) — the pass-10 chart-1 (#0C96DF) is 2.997:1 on
+     the new --background, just under the 3:1 floor. Floor is now chart-1
+     at 3.54:1 vs --background, 3.85:1 vs --card; adjacent steps still
+     ~1.19-1.21:1 apart. */
   --chart-1: #0B89CB;
   --chart-2: #0A7CB8;
   --chart-3: #096FA5;
@@ -177,7 +178,7 @@
      (used for: aged Cash-in-Transit exceptions, a stale provider link,
      or a safe-harbor due date >14 days out — see Financial semantics §
      Status tiers). */
-  --positive: #147739; /* pass 11: L ×0.93, same hue — 4.87:1 on --background */
+  --positive: #15803D; /* pass 10 value restored in 11c — 4.61:1 on --background */
   --positive-foreground: #FFFFFF;
   --warning: #EA6A0A;
   --warning-foreground: #2A1200;
