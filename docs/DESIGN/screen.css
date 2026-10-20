@@ -765,6 +765,13 @@ table.data-table td {
 }
 
 table.data-table tbody tr:hover { background: var(--accent); }
+/* Dark row hover (pass 11g, Principal ruling) — same pattern as the dark
+   "Log out" hover: a tinted fill instead of dark --accent (#194257), where
+   --destructive amounts were 3.25:1 and --muted-foreground 4.40:1. A faint
+   sky tint (40% --accent over --card = #12232C, 1.20:1 vs --card): body
+   text 14.41:1, --destructive 4.89, --muted-foreground 6.61, --positive
+   9.64, --primary 11.83. Not red — rows aren't destructive. */
+.dark table.data-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 40%, var(--card)); }
 table.data-table td.amount { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
 table.data-table td.amount.positive { color: var(--positive); }
 table.data-table td.amount.negative { color: var(--destructive); }

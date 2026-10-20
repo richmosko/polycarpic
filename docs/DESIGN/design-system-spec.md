@@ -69,13 +69,13 @@ Dark: `--chart-1` `#C5E9FC` · `--chart-2` `#8BD3F9` · `--chart-3` `#51BDF6` ·
 
 - `--card`/`--popover` stay pure `#FFFFFF` — they float on the canvas (1.06:1 step plus the hairline), the Monarch "white cards on an off-white canvas" convention from pass 3 restored.
 - **`--muted` = `--background` (`#F9F8F8`), by Principal ruling.** Tried as "halfway to card" (`#FCFBFA`, nearly invisible) and as a fixed darker step (`#F5F3F1`); the ruling makes it the page value. Its job narrows to **in-card** wells, tab/progress tracks, skeletons and placeholder blocks, where it reads at **1.06:1 against white**. On the page itself it is invisible by design.
-- **Hovers move to `--accent`, by Principal ruling.** `--muted` was also the hover/active fill on page-level controls, where it would now vanish. Every hover/active fill in `screen.css` is now `--accent` `#EBF4F9` (shadcn's own hover token) with `--accent-foreground` for text and icons. That covers the sidebar header toggle, icon buttons (hover and active), the entity selector, and popover/menu items; table rows already hovered on it. `--accent` reads on both surfaces: 1.05:1 against the page, 1.12:1 against a card. **One exception:** in dark mode a destructive menu item ("Log out") hovers on a 20% destructive tint, shadcn's `bg-destructive/20`. Red on dark `--accent` is only 3.25:1; on the tint it is 4.64:1.
+- **Hovers move to `--accent`, by Principal ruling.** `--muted` was also the hover/active fill on page-level controls, where it would now vanish. Every hover/active fill in `screen.css` is now `--accent` `#EBF4F9` (shadcn's own hover token) with `--accent-foreground` for text and icons. That covers the sidebar header toggle, icon buttons (hover and active), the entity selector, and popover/menu items; table rows already hovered on it. `--accent` reads on both surfaces: 1.05:1 against the page, 1.12:1 against a card. **One exception:** in dark mode a destructive menu item ("Log out") hovers on a 20% destructive tint, shadcn's `bg-destructive/20`. Red on dark `--accent` is only 3.25:1; on the tint it is 4.64:1. **Dark table-row hover, same pattern (Principal ruling, pass 11g):** a faint sky tint, 40% `--accent` over `--card` (`#12232C`, 1.20:1 vs `--card`), not dark `--accent`. On dark `--accent`, red amounts were 3.25:1 and meta text 4.40:1. On the tint: body text 14.41:1, `--destructive` 4.89:1, `--muted-foreground` 6.61:1, `--positive` 9.64:1, `--primary` 11.83:1. The tint is not red because rows are not destructive.
 - `--muted-foreground` `#5E5A55` (warm 33°, was blue-grey `#60686C`) — 6.45:1 on the page/`--muted`, 6.14:1 on `--accent`.
 - `--border` `#E6E2DE` a step darker than the page (1.29:1 on `--card`, 1.22:1 on the page); `--input` `#DCD8D4` one step stronger (1.42:1 on `--card`).
 - **Inks re-checked on page, card and `--accent`.** `--accent` is now the binding surface, because amounts and menu items sit on it when hovered. Every ink moves a notch darker at the same hue:
   - `--primary`/`--ring` `#158500`→`#148100`: the pass-10 value is 4.52:1 on the page but 4.30:1 on `--accent`. New value: 4.75 page / 4.52 accent / 5.04 white-on-fill.
   - `--destructive` `#E70404`→`#DE0404`: pass-10 is 4.49 page / 4.27 accent. New: 4.80 / 4.57 / 5.09 white-on-fill.
-  - `--positive` `#15803D`→`#147F3C`: pass-10 is 4.73 page but **4.4999** on `--accent`, a hair under AA. New: 4.80 / 4.56 / 5.08.
+  - `--positive` `#15803D`→`#147F3C`: pass-10 is 4.73 page but **4.4999** on `--accent`, a hair under AA. New: 4.80 / 4.56 / 5.08. Resolved: strictly a fail, so the value moved one hex step; no visible change.
   - `--secondary-foreground` `#096FA5` is unchanged (5.17 page / 4.92 accent).
 - **Chart ramp (light)** — pass-10 values kept: `--chart-1` `#0C96DF` is 3.07:1 on the page and in a muted well, 3.26:1 on `--card`. It is 2.92:1 on `--accent`, so no chart sits inside a hover fill.
 - Unchanged: `--foreground`, `--secondary`, `--accent`, `--warning`, the light-mode (dark) sidebar, and all of dark mode. Dark mode's light sidebar keeps `#F7F8F8` — it no longer mirrors the light canvas literally (see its row below).
@@ -697,6 +697,16 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | `--positive-foreground` / `--positive` (fill) | 8.93:1 |
 | `--warning-foreground` / `--warning` (fill, **pass 6, re-hued true orange, same dark ink as light mode**) | 8.11:1 |
 
+**Dark mode — hover fills (pass 11g), text pairs, all PASS:**
+
+| Pair | On the row-hover tint `#12232C` | On the "Log out" tint (20% `--destructive` over `--popover`) |
+|---|---|---|
+| `--foreground` | 14.41:1 | — |
+| `--destructive` | 4.89:1 | 4.64:1 |
+| `--muted-foreground` | 6.61:1 | — |
+| `--positive` | 9.64:1 | — |
+| `--primary` | 11.83:1 | — |
+
 **Dark mode — non-text pairs (floor 3:1):**
 
 | Pair | Contrast | Result |
@@ -720,7 +730,6 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 - No CVD simulation run on the new palette yet — now TWO brand hues (green 110.6°, blue 200.6°) to check, not just one; higher priority with each pass that adds more meaning-bearing color.
 - `--border`/`--card` is a low-contrast hairline by design (1.29:1 as of pass 11) — decorative, consistent with common practice.
 - `--warning` and `--chart-1` fall under 3:1 only on an `--accent` hover fill (2.87:1 / 2.92:1, pass 11) — no chart inside a hover; a bare warning icon on a hovered row keeps its label.
-- **Dark mode, pre-existing (not changed in pass 11):** on a hovered table row (dark `--accent` `#194257`), dark `--destructive` `#FC4F4F` is 3.25:1 and `--muted-foreground` `#A0A7AB` is 4.40:1 — both under 4.5:1. Pass 11 fixed only the destructive menu item (destructive-tint hover); the row-hover pair needs its own decision.
 - Reduced-motion policy not yet written.
 - Radius-xl (sheets) not measured against either reference — extrapolated.
 - Sidebar expand/collapse cue is decided (option A) — no longer an open item as of pass 5.
