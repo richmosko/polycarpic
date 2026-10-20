@@ -2,7 +2,7 @@
 
 > The written companion to `tokens.css` + `screen.css`. The CSS files are the machine-readable source of truth; this doc explains the *why* and the usage rules. Owned by the `ux-designer` agent. Generate/refine with `/generate-designdoc`.
 
-**Revision history:** Pass 1 (2026-09-28) inherited the cairn tracker's own palette — rejected, diverging from cairn is the goal. Pass 2 (2026-09-28) hand-authored an indigo/violet identity "inspired by" Monarch Money and Origin from general/training knowledge — rejected: the guessed hue matched neither product, and "Origin" was misidentified. Pass 3 (2026-09-28) derived a blue-primary, warm-neutral palette from team-lead's measured screenshots of the actual products (`temp/design-refs/`) — accepted as the base, most of **Inspiration** and **Typography** below is still that pass's work and still current. Pass 4 (2026-09-30) is the Principal's first review of the pass-3 result: the brand hue becomes neon green (`#2CFF05`), the neutral scale replaces warm/brown with a faint tint of that hue, the sidebar inverts, the shell layout changes (full-width header, sidebar below it), and two new screens (Home, Login) are added. Pass 5 (2026-09-30) adds a secondary blue brand hue (`#05A9FF`), re-tints the neutral scale and sidebar from green to that blue (less saturated), and fixes the flows section not rendering. **Pass 6 (2026-10-01)**, Principal review 4: `--warning` becomes a genuinely orange hue paired with dark ink (not a white-text-forcing darkened brown); the light-mode chart ramp brightens across all 5 steps (the old tail read as "almost black"); a new `tokens.html` example page decodes every token with swatches in both modes and a "used for" line; the Login wireframe is corrected to match the centered styled screen; a dashboard first-run/empty-state wireframe (the membership-setup page) is added and linked from flow 5.1; the skeleton-vs-spinner bullet is answered in plain words; flow 5.2 is reframed around what the user experiences (a "Correct entry" action with a badge and a struck/shaded reversal on click-through, the underlying reversal-only mechanism unchanged); flow 5.3 is redrawn so the app never initiates a payment — the user pays their bank, the payment lands as an imported transaction with no counterparty, and they post it against the custodial tax-authority account, which is what the gap is measured against. See **Foundations**, **Financial semantics**, the flow sections, and `tokens.html` for the detail. **Pass 7 (2026-10-02)** reworks the sidebar's information architecture end to end, per an interview with the Principal (`temp/2026-10-02-sidebar-interview.md`): "Ledger" becomes **Transactions** (three urgency-ordered accordion cards — Exceptions, Pending, Posted — the Pending card rebuilt around the Principal's Plaid bank-feed review/match workflow); "Accounts" splits into **General Ledger** (a chart-of-accounts tree + per-account register page) and **Custodial Accounts** (physical accounts, reconciliation, and a new lots sub-card absorbing "Securities"); **Allocation** and **Reports** become their own items; **Settings** is new; "Securities" and "Import" are gone as nav items. See **Sidebar information architecture**, and the **Screen data contract**; the Pending-inbox workflow mechanics (expansion panel, split grid, bulk-group modal) land as their own pass alongside the rebuilt Transactions screen. **Pass 8 (2026-10-02)**, Principal review 5: the app shell rebuilds on the shadcn Sidebar component's own pattern — the sidebar fills the viewport height (`position: fixed`, not `sticky`), carries the brand as its top item and an avatar-popover user menu as its bottom item, and drops to seven nav items as **Settings** moves to a header gear icon. The header now starts right of the sidebar: an expand/contract icon + breadcrumb on the left, entity selector/AI-icon/search/notifications/gear on the right. A new **shadcn-svelte reuse map** (below) answers which shadcn-svelte component or block backs every piece of this system. See **Layout & shell**, **Header**, **Sidebar**, and **shadcn-svelte reuse map**. **Pass 9 (2026-10-10)**, Principal review 6: the sidebar becomes a true floating card — rounded on all four corners, a gutter on every side, matching the specific shadcn block the Principal pointed to (sidebar-07) rather than the generic Sidebar component page pass 8 used; the user-menu popover opens to the RIGHT of the avatar trigger (sidebar-07's own pattern), not above it; the persistent/sticky header is removed entirely — renamed "Top row," it scrolls with the page and shares the main area's own background token; the top row's right side drops to just the entity selector + a contextual "more" menu (ellipsis-vertical, per-page global actions) — AI/search/notifications/settings-gear are gone from it, with Settings and Notifications proposed (not decided) as new avatar-popover items instead; every icon in the system becomes Lucide (lucide-svelte), named per control in § Component inventory. See **Layout & shell**, **Header → "Top row"**, **Sidebar**, and **Component inventory**. **Pass 10 (2026-10-11)**: the chart ramp re-hues from the green `--primary` to a gradient of `--brand-2`'s sky blue, Principal direction — same L cadence/direction each mode used before (`--chart-1` brightest → `--chart-5` darkest), every step still clears 3:1 against both `--background` and `--card`; the two-series comparison chart's series-2 job flips to the green `--brand`/`--primary` pair (was blue) now that the ramp itself is blue, to keep the two series two different hues. See **Foundations** § Chart ramp and **Secondary accent**. **Pass 11 (2026-10-19, this revision)**: the light-mode page canvas moves off near-white to a warm off-white, `#F7F5F3` — the Principal's own value (`#EFEDEB` + `#080808`) after two darker tries (`#EFEDEB`, `#EFEEEE`) both read too dark. The light neutrals re-derive off it; `--primary`/`--ring` and `--destructive` step one small notch darker at the same hue, `--positive` keeps its pass-10 value, and the light chart ramp shifts one step darker, so every pair stays AA. Dark mode unchanged. See **Foundations** § Color ("Warm off-white canvas") and **Accessibility**.
+**Revision history:** Pass 1 (2026-09-28) inherited the cairn tracker's own palette — rejected, diverging from cairn is the goal. Pass 2 (2026-09-28) hand-authored an indigo/violet identity "inspired by" Monarch Money and Origin from general/training knowledge — rejected: the guessed hue matched neither product, and "Origin" was misidentified. Pass 3 (2026-09-28) derived a blue-primary, warm-neutral palette from team-lead's measured screenshots of the actual products (`temp/design-refs/`) — accepted as the base, most of **Inspiration** and **Typography** below is still that pass's work and still current. Pass 4 (2026-09-30) is the Principal's first review of the pass-3 result: the brand hue becomes neon green (`#2CFF05`), the neutral scale replaces warm/brown with a faint tint of that hue, the sidebar inverts, the shell layout changes (full-width header, sidebar below it), and two new screens (Home, Login) are added. Pass 5 (2026-09-30) adds a secondary blue brand hue (`#05A9FF`), re-tints the neutral scale and sidebar from green to that blue (less saturated), and fixes the flows section not rendering. **Pass 6 (2026-10-01)**, Principal review 4: `--warning` becomes a genuinely orange hue paired with dark ink (not a white-text-forcing darkened brown); the light-mode chart ramp brightens across all 5 steps (the old tail read as "almost black"); a new `tokens.html` example page decodes every token with swatches in both modes and a "used for" line; the Login wireframe is corrected to match the centered styled screen; a dashboard first-run/empty-state wireframe (the membership-setup page) is added and linked from flow 5.1; the skeleton-vs-spinner bullet is answered in plain words; flow 5.2 is reframed around what the user experiences (a "Correct entry" action with a badge and a struck/shaded reversal on click-through, the underlying reversal-only mechanism unchanged); flow 5.3 is redrawn so the app never initiates a payment — the user pays their bank, the payment lands as an imported transaction with no counterparty, and they post it against the custodial tax-authority account, which is what the gap is measured against. See **Foundations**, **Financial semantics**, the flow sections, and `tokens.html` for the detail. **Pass 7 (2026-10-02)** reworks the sidebar's information architecture end to end, per an interview with the Principal (`temp/2026-10-02-sidebar-interview.md`): "Ledger" becomes **Transactions** (three urgency-ordered accordion cards — Exceptions, Pending, Posted — the Pending card rebuilt around the Principal's Plaid bank-feed review/match workflow); "Accounts" splits into **General Ledger** (a chart-of-accounts tree + per-account register page) and **Custodial Accounts** (physical accounts, reconciliation, and a new lots sub-card absorbing "Securities"); **Allocation** and **Reports** become their own items; **Settings** is new; "Securities" and "Import" are gone as nav items. See **Sidebar information architecture**, and the **Screen data contract**; the Pending-inbox workflow mechanics (expansion panel, split grid, bulk-group modal) land as their own pass alongside the rebuilt Transactions screen. **Pass 8 (2026-10-02)**, Principal review 5: the app shell rebuilds on the shadcn Sidebar component's own pattern — the sidebar fills the viewport height (`position: fixed`, not `sticky`), carries the brand as its top item and an avatar-popover user menu as its bottom item, and drops to seven nav items as **Settings** moves to a header gear icon. The header now starts right of the sidebar: an expand/contract icon + breadcrumb on the left, entity selector/AI-icon/search/notifications/gear on the right. A new **shadcn-svelte reuse map** (below) answers which shadcn-svelte component or block backs every piece of this system. See **Layout & shell**, **Header**, **Sidebar**, and **shadcn-svelte reuse map**. **Pass 9 (2026-10-10)**, Principal review 6: the sidebar becomes a true floating card — rounded on all four corners, a gutter on every side, matching the specific shadcn block the Principal pointed to (sidebar-07) rather than the generic Sidebar component page pass 8 used; the user-menu popover opens to the RIGHT of the avatar trigger (sidebar-07's own pattern), not above it; the persistent/sticky header is removed entirely — renamed "Top row," it scrolls with the page and shares the main area's own background token; the top row's right side drops to just the entity selector + a contextual "more" menu (ellipsis-vertical, per-page global actions) — AI/search/notifications/settings-gear are gone from it, with Settings and Notifications proposed (not decided) as new avatar-popover items instead; every icon in the system becomes Lucide (lucide-svelte), named per control in § Component inventory. See **Layout & shell**, **Header → "Top row"**, **Sidebar**, and **Component inventory**. **Pass 10 (2026-10-11)**: the chart ramp re-hues from the green `--primary` to a gradient of `--brand-2`'s sky blue, Principal direction — same L cadence/direction each mode used before (`--chart-1` brightest → `--chart-5` darkest), every step still clears 3:1 against both `--background` and `--card`; the two-series comparison chart's series-2 job flips to the green `--brand`/`--primary` pair (was blue) now that the ramp itself is blue, to keep the two series two different hues. See **Foundations** § Chart ramp and **Secondary accent**. **Pass 11 (2026-10-19, this revision)**: the light-mode page canvas moves off near-white to a warm off-white, `#F9F7F5` — the Principal's own value, iterated by eye (`#EFEDEB`, `#EFEEEE`, `#F7F5F3` each read too dark). The light neutrals re-derive off it; `--primary`/`--ring` and `--destructive` step one small notch darker at the same hue; `--positive` and the light chart ramp keep their pass-10 values, so every pair stays AA. Dark mode unchanged. See **Foundations** § Color ("Warm off-white canvas") and **Accessibility**.
 
 ## What governs this system
 
@@ -58,24 +58,22 @@ This project's UI direction is **SvelteKit + shadcn-svelte** (Tailwind, headless
 
 **Chart ramp re-hued to `--brand-2` (pass 10).** Principal direction: "I'd like the chart tokens to be gradients of --brand-2 (instead of --primary)." Re-derived at `--brand-2`'s own hue (200.6°, S=0.90 — kept the green ramp's own saturation), same L cadence each mode used before (light: step −0.04 starting at L=0.46; dark: step −0.12 starting at L=0.88) so the brightness *shape* of the ramp (and which end reads as "current period/largest share" vs. "darkest/smallest") doesn't change, only the hue. **Ordered light→dark, `--chart-1` brightest → `--chart-5` darkest, in both modes** — the same direction every prior pass used, so no `chart-N` meaning flips for frontend-lead. Checked against **both** backgrounds per direction (not just `--card`): light mode's floor is `--chart-1` at 3.22:1 against `--background` (`#FEFEFE`) / 3.25:1 against `--card` (`#FFFFFF`) — the tightest pair in the whole ramp, still clearing 3:1 with margin. Dark mode was never the tight constraint (floor 5.04:1→5.23:1 at `--chart-5`). Adjacent steps sit ~1.18–1.21:1 apart in light mode (~1.27–1.44:1 in dark) — the same modest-but-perceptible pairwise separation the superseded green ramp produced at an identical L cadence, i.e. not a regression in distinguishability, just a hue swap. `--positive`/`--warning`/`--destructive` are untouched — this re-hue is the sequential/magnitude chart ramp only.
 
-Light (pass 10, superseded by pass 11 below): `--chart-1` `#0C96DF` · `--chart-2` `#0B89CB` · `--chart-3` `#0A7CB8` · `--chart-4` `#096FA5` · `--chart-5` `#086291`.
+Light (pass 10, re-checked and kept in pass 11): `--chart-1` `#0C96DF` · `--chart-2` `#0B89CB` · `--chart-3` `#0A7CB8` · `--chart-4` `#096FA5` · `--chart-5` `#086291`.
 Dark: `--chart-1` `#C5E9FC` · `--chart-2` `#8BD3F9` · `--chart-3` `#51BDF6` · `--chart-4` `#16A7F3` · `--chart-5` `#0B89CB`.
 
-**Series-2 hue collision, resolved.** Pre-pass-10, the two-series comparison job (nominal vs. inflation-adjusted, actual vs. target) paired green `--chart-3` (series 1) against blue `--brand-2` (series 2) — two different hues, easy to tell apart. Now that the sequential ramp itself samples `--brand-2`'s hue, that pairing would put both series in the same blue family. **Fix: series 2 flips to the green identity instead** — literal `--brand` on dark surfaces, `--primary` (the derived green ink, `#148100` as of pass 11) on light surfaces — the same "literal-on-dark/derived-on-light" split every brand hue in this system follows, just with the two hues' roles reversed from pre-pass-10. See **Secondary accent** below for the updated job definition.
+**Series-2 hue collision, resolved.** Pre-pass-10, the two-series comparison job (nominal vs. inflation-adjusted, actual vs. target) paired green `--chart-3` (series 1) against blue `--brand-2` (series 2) — two different hues, easy to tell apart. Now that the sequential ramp itself samples `--brand-2`'s hue, that pairing would put both series in the same blue family. **Fix: series 2 flips to the green identity instead** — literal `--brand` on dark surfaces, `--primary` (the derived green ink, `#158300` as of pass 11) on light surfaces — the same "literal-on-dark/derived-on-light" split every brand hue in this system follows, just with the two hues' roles reversed from pre-pass-10. See **Secondary accent** below for the updated job definition.
 
 **Warm off-white canvas (pass 11, 2026-10-19).** The Principal: "somehow the background color got set to pure white. can we set --background to some subtle shade of grey with a hint of brown? something close to EFEEEE". **Why it ended at white:** pass 5 read "much lighter" as *less saturated* and cut the canvas tint to ~3% saturation at L 0.996 (`#FEFEFE`) — at that lightness no tint survives, so it was white in all but name. That was tolerable while `body` painted `--muted` as the canvas, but pass 9's sidebar-07 shell paints the inset/main area with `--background` itself, so the near-white became the whole page and cards stopped floating.
 
-**Three tries, one value.** `#EFEDEB` (hue 30°, L 0.93) and then `#EFEEEE` exactly (L 0.935) were both read as "too dark". The Principal then specified `#EFEDEB` + `#080808` = **`#F7F5F3`** (hue 30°, S 0.20, L 0.96) — warm, and light enough that white cards float on it without the page reading as grey. Every light neutral hangs off that one warm hue (30°), not off `--brand-2`'s blue:
+**Iterated by eye, one value.** `#EFEDEB` (hue 30°, L 0.93), `#EFEEEE` (L 0.935) and `#F7F5F3` (L 0.96) were each read as "too dark". The Principal then specified `#F7F5F3` + `#020202` = **`#F9F7F5`** (hue 30°, L 0.97) — warm, and light enough that the page doesn't read as grey while white cards still float on it. Every light neutral hangs off that one warm hue (30°), not off `--brand-2`'s blue:
 
-- `--card`/`--popover` stay pure `#FFFFFF` — they float on the canvas (1.09:1 step plus the hairline), the Monarch "white cards on an off-white canvas" convention from pass 3 restored.
-- `--muted` `#FBFAF9` sits halfway between card and page (1.04:1 each way) — in-card wells and popover/icon-button hovers.
-- `--muted-foreground` `#5E5A55` (warm 33°, was blue-grey `#60686C`) — 6.29:1 on the canvas.
-- `--border` `#E6E2DE` one step darker than the page (1.19:1 on it, 1.29:1 on `--card`); `--input` `#DCD8D4` one step stronger (1.42:1 on `--card`).
-- **Inks re-checked as text on the canvas, pass-10 values restored wherever they clear:** `--positive` `#15803D` clears at 4.61:1 — kept. `--primary`/`--ring` `#158500` is 4.40:1 → `#148100` (same hue, L 0.26→0.253; 4.63:1 on canvas, 5.04:1 white-on-fill). `--destructive` `#E70404` is 4.37:1 → `#E00404` (same hue; 4.61:1). `--secondary-foreground` `#096FA5` clears at 5.04:1, unchanged.
-- **Chart ramp (light)** shifts one L step darker (L 0.42→0.26, same −0.04 cadence and hue): the pass-10 `--chart-1` `#0C96DF` is 2.997:1 on the canvas, just under the 3:1 floor. Floor is now `--chart-1` `#0B89CB` at 3.54:1.
+- `--card`/`--popover` stay pure `#FFFFFF` — they float on the canvas (1.07:1 step plus the hairline), the Monarch "white cards on an off-white canvas" convention from pass 3 restored.
+- `--muted` `#FCFBFA` sits halfway between card and page (1.03:1 each way) — in-card wells and popover/icon-button hovers.
+- `--muted-foreground` `#5E5A55` (warm 33°, was blue-grey `#60686C`) — 6.40:1 on the canvas.
+- `--border` `#E8E4E0` one step darker than the page (1.18:1 on it, 1.27:1 on `--card`); `--input` `#DEDAD6` one step stronger (1.39:1 on `--card`).
+- **Inks re-checked as text on the canvas, pass-10 values kept wherever they clear:** `--positive` `#15803D` 4.69:1 — kept. `--secondary-foreground` `#096FA5` 5.13:1 — kept. `--primary`/`--ring` `#158500` is 4.48:1 → `#158300` (same hue, L 0.26→0.257; 4.59:1 on canvas, 4.91:1 white-on-fill). `--destructive` `#E70404` is 4.45:1 → `#E30404` (same hue; 4.59:1 on canvas, 4.90:1 white-on-fill).
+- **Chart ramp (light)** — pass-10 values kept: `--chart-1` `#0C96DF` is 3.05:1 on the canvas, still over the 3:1 floor.
 - Unchanged: `--foreground`, `--secondary`, `--accent`, `--warning`, the light-mode (dark) sidebar, and all of dark mode. Dark mode's light sidebar keeps `#F7F8F8` — it no longer mirrors the light canvas literally (see its row below).
-
-Light ramp is now: `--chart-1` `#0B89CB` · `--chart-2` `#0A7CB8` · `--chart-3` `#096FA5` · `--chart-4` `#086291` · `--chart-5` `#07557E` (supersedes the pass-10 light line above; dark unchanged).
 
 Contrast figures were computed via the standard WCAG relative-luminance formula against these exact hex values (script in `temp/`, full pair-by-pair results in **Accessibility**).
 
@@ -83,32 +81,32 @@ Contrast figures were computed via the standard WCAG relative-luminance formula 
 
 | Token | Value | Role |
 |---|---|---|
-| `--background` | `#F7F5F3` | **Pass 11.** Page canvas — warm off-white, hue 30° (was near-white `#FEFEFE`; `#EFEDEB`/`#EFEEEE` read too dark) |
+| `--background` | `#F9F7F5` | **Pass 11.** Page canvas — warm off-white, hue 30° (was near-white `#FEFEFE`; `#EFEDEB`/`#EFEEEE`/`#F7F5F3` read too dark) |
 | `--foreground` | `#1D1F20` | Default body text — near-black, barely blue, flatter than pass 4's green-cast ink |
 | `--card` | `#FFFFFF` | Card surface |
 | `--popover` | `#FFFFFF` | Popover/dropdown surface |
-| `--primary` | `#148100` | Primary action fill — darkened brand green, same hue as `--brand`; pass 11 one small notch darker (was `#158500`, 4.40:1 on the new canvas) |
+| `--primary` | `#158300` | Primary action fill — darkened brand green, same hue as `--brand`; pass 11 one small notch darker (was `#158500`, 4.48:1 on the new canvas) |
 | `--primary-foreground` | `#FFFFFF` | Text on primary fill |
 | `--secondary` | `#E3F0F7` | **Pass 5, re-hued.** Secondary button/surface — pale *blue* tint (was pale green in pass 4) |
 | `--secondary-foreground` | `#096FA5` | Darkened `--brand-2`, same hue — see Secondary accent |
-| `--muted` | `#FBFAF9` | **Pass 11.** Subtle well/hover surface, halfway between `--card` and `--background`, warm (was blue `#F7F8F8`) |
+| `--muted` | `#FCFBFA` | **Pass 11.** Subtle well/hover surface, halfway between `--card` and `--background`, warm (was blue `#F7F8F8`) |
 | `--muted-foreground` | `#5E5A55` | Muted/meta text — pass 11 warm (was `#60686C`) |
 | `--accent` | `#EBF4F9` | Hover/active surface accent — same blue family as `--secondary` |
 | `--accent-foreground` | `#096FA5` | |
 | `--brand` | `#2CFF05` | Literal, undarkened neon green — logo, decorative highlights, dark-surface call-outs only; never text or a light-surface fill |
 | `--brand-2` | `#05A9FF` | **Pass 5, new.** Literal, undarkened sky blue — same dark-surface-only rule as `--brand`; see Secondary accent for its job |
-| `--destructive` | `#E00404` | Destructive fill — pass 11 one small notch darker (was `#E70404`, 4.37:1 on the new canvas) |
+| `--destructive` | `#E30404` | Destructive fill — pass 11 a hair darker (was `#E70404`, 4.45:1 on the new canvas) |
 | `--destructive-foreground` | `#FFFFFF` | Text on destructive fill |
-| `--border` | `#E6E2DE` | Default hairline border — pass 11 warm, one step darker than the page (was blue `#E7E8E9`) |
-| `--input` | `#DCD8D4` | Input border — pass 11, one step stronger than `--border` |
-| `--ring` | `#148100` | Focus ring — follows `--primary` |
-| `--chart-1`…`--chart-5` | `#0B89CB` → `#07557E` | **Pass 11: one L step darker** (pass 10 was `#0C96DF`→`#086291`). **Re-hued pass 10** (was green `#21A509`→`#125705`, pass 6) — sequential/magnitude ramp, now `--brand-2`'s blue hue |
+| `--border` | `#E8E4E0` | Default hairline border — pass 11 warm, one step darker than the page (was blue `#E7E8E9`) |
+| `--input` | `#DEDAD6` | Input border — pass 11, one step stronger than `--border` |
+| `--ring` | `#158300` | Focus ring — follows `--primary` |
+| `--chart-1`…`--chart-5` | `#0C96DF` → `#086291` | **Re-hued pass 10** (was green `#21A509`→`#125705`, pass 6) — sequential/magnitude ramp, `--brand-2`'s blue hue; re-checked and kept in pass 11 |
 | `--sidebar` | `#1F2528` | **Re-hued pass 5** (was green `#20291F`) — inverted, a dark blue-tinted surface floating on the light page (see Sidebar) |
 | `--sidebar-foreground` | `#F2F2F3` | |
 | `--sidebar-accent` | `#303B40` | |
 | `--sidebar-accent-foreground` | `#F2F2F3` | |
 | `--sidebar-ring` | `#05A9FF` | **Re-hued pass 5** (was raw `--brand` green) — the raw secondary blue, to fully remove the green cast from this component |
-| `--positive` | `#15803D` | Gain / income / surplus — unchanged (clears 4.61:1 on the pass-11 canvas) |
+| `--positive` | `#15803D` | Gain / income / surplus — unchanged (clears 4.69:1 on the pass-11 canvas) |
 | `--positive-foreground` | `#FFFFFF` | Text on positive fill |
 | `--warning` | `#EA6A0A` | **Pass 6, re-hued true orange** (was brown-reading `#B45309`) — caution tier: aged CIT exceptions, stale provider link, safe-harbor due date >14 days out |
 | `--warning-foreground` | `#2A1200` | **Pass 6, now dark ink** (was white — orange can't clear 4.5:1 with white without reading brown) |
@@ -152,7 +150,7 @@ A second brand hue needs an explicit job or it fights the first one for meaning.
 - **Secondary buttons and surfaces** — anywhere `--secondary`/`--accent` already applied (unchanged role, just a new hue).
 - **Info-weight badges and callouts** — a step above `--muted-foreground` neutral, a step below `--warning`'s caution — e.g. "new feature," "beta," informational tooltips. Not a Financial-semantics status tier (those stay `--positive`/`--warning`/`--destructive`, see Financial semantics) — this is for product-chrome informational messaging, a different axis.
 - **Selected / non-primary-active states** — e.g. a selected row in a list that isn't *the* primary action of the screen, distinct from `--primary`'s "main CTA" meaning.
-- **Chart series 2** in genuine two-series comparison charts (nominal vs. inflation-adjusted, actual vs. target) — **roles reversed, pass 10:** series 1 uses `--chart-3` (mid-ramp, now `--brand-2`'s blue hue); series 2 uses literal `--brand` (green) on dark surfaces or `--primary` (the derived green ink, `#148100` as of pass 11) on light surfaces — not a new 5-step ramp, just one representative green accent value per mode, since a full categorical/sequential green ramp isn't needed for a 2-series case. (Pre-pass-10 this job was inverted — green series 1 / blue series 2 — swapped so the two series stay two different hues now that the sequential ramp itself is blue.)
+- **Chart series 2** in genuine two-series comparison charts (nominal vs. inflation-adjusted, actual vs. target) — **roles reversed, pass 10:** series 1 uses `--chart-3` (mid-ramp, now `--brand-2`'s blue hue); series 2 uses literal `--brand` (green) on dark surfaces or `--primary` (the derived green ink, `#158300` as of pass 11) on light surfaces — not a new 5-step ramp, just one representative green accent value per mode, since a full categorical/sequential green ramp isn't needed for a 2-series case. (Pre-pass-10 this job was inverted — green series 1 / blue series 2 — swapped so the two series stay two different hues now that the sequential ramp itself is blue.)
 
 **Not used for:** anything `--primary` already owns (main CTAs, the brand's "default interactive" meaning) or anything a Financial-semantics tier already owns (gain/loss/caution/danger) — the whole point of giving it a job is so it doesn't become a second, redundant way to say what green or the semantic tiers already say.
 
@@ -630,29 +628,29 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 ## Accessibility
 
-**Target: WCAG AA.** Light-mode pairs re-run for pass 11's warm off-white canvas, `#F7F5F3` (2026-10-19); dark-mode pairs unchanged since pass 10. Earlier: every pair re-run for pass 6's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check-pass3.py`; pass 6's warning/chart figures computed via a successor script in the same `temp/` directory). See `tokens.html` for every token's value in both modes with a rendered swatch, alongside this written derivation.
+**Target: WCAG AA.** Light-mode pairs re-run for pass 11's warm off-white canvas, `#F9F7F5` (2026-10-19); dark-mode pairs unchanged since pass 10. Earlier: every pair re-run for pass 6's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check-pass3.py`; pass 6's warning/chart figures computed via a successor script in the same `temp/` directory). See `tokens.html` for every token's value in both modes with a rendered swatch, alongside this written derivation.
 
 **Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` hardcode the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
 
 **Pass 5 header/sidebar/login-centering changes (review 2) introduced no new token values** — unchanged from the prior revision's note.
 
-**Light mode — text pairs (floor 4.5:1), all PASS (pass 11, canvas `#F7F5F3`):**
+**Light mode — text pairs (floor 4.5:1), all PASS (pass 11, canvas `#F9F7F5`):**
 
 | Pair | Contrast |
 |---|---|
-| `--foreground` / `--background` · `--card` · `--muted` | 15.22:1 · 16.55:1 · 15.87:1 (was 16.41:1 on `#FEFEFE`) |
-| `--primary-foreground` / `--primary` (fill) | 5.04:1 |
-| `--primary` / `--background` (text on canvas) | 4.63:1 — the binding pair that set `#148100` (pass-10 `#158500` is 4.40:1) |
-| `--primary` / `--card` · / `--muted` (text-only, e.g. links) | 5.04:1 · 4.83:1 |
+| `--foreground` / `--background` · `--card` · `--muted` | 15.48:1 · 16.55:1 · 16.01:1 (was 16.41:1 on `#FEFEFE`) |
+| `--primary-foreground` / `--primary` (fill) | 4.91:1 |
+| `--primary` / `--background` (text on canvas) | 4.59:1 — the binding pair that set `#158300` (pass-10 `#158500` is 4.48:1) |
+| `--primary` / `--card` · / `--muted` (text-only, e.g. links) | 4.91:1 · 4.75:1 |
 | `--secondary-foreground` / `--secondary` (fill) | 4.72:1 |
-| `--secondary-foreground` / `--background` · `--card` · `--muted` | 5.04:1 · 5.48:1 · 5.26:1 |
-| `--muted-foreground` / `--background` · `--card` · `--muted` | 6.29:1 · 6.84:1 · 6.56:1 |
+| `--secondary-foreground` / `--background` · `--card` · `--muted` | 5.13:1 · 5.48:1 · 5.31:1 |
+| `--muted-foreground` / `--background` · `--card` · `--muted` | 6.40:1 · 6.84:1 · 6.62:1 |
 | `--muted-foreground` / `--secondary` | 5.89:1 |
 | `--accent-foreground` / `--accent` | 4.92:1 |
-| `--destructive-foreground` / `--destructive` | 5.01:1 |
-| `--destructive` / `--background` · `--card` · `--muted` (text) | 4.61:1 · 5.01:1 · 4.81:1 (pass-10 `#E70404` is 4.37:1 on the canvas) |
+| `--destructive-foreground` / `--destructive` | 4.90:1 |
+| `--destructive` / `--background` · `--card` · `--muted` (text) | 4.59:1 · 4.90:1 · 4.74:1 (pass-10 `#E70404` is 4.45:1 on the canvas) |
 | `--positive-foreground` / `--positive` (fill) | 5.02:1 |
-| `--positive` / `--background` · `--card` · `--muted` (text) | 4.61:1 · 5.02:1 · 4.81:1 — pass-10 value, unchanged |
+| `--positive` / `--background` · `--card` · `--muted` (text) | 4.69:1 · 5.02:1 · 4.85:1 — pass-10 value, unchanged |
 | `--sidebar-foreground` / `--sidebar` | 13.87:1 (unchanged) |
 | `--sidebar-accent-foreground` / `--sidebar-accent` | 10.28:1 (unchanged) |
 | `--warning-foreground` / `--warning` (fill) | 5.54:1 (unchanged) |
@@ -661,18 +659,18 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 | Pair | Contrast | Result |
 |---|---|---|
-| `--ring` / `--background` · `--card` | 4.63:1 · 5.04:1 | PASS |
+| `--ring` / `--background` · `--card` | 4.59:1 · 4.91:1 | PASS |
 | `--sidebar-ring` / `--sidebar` | 6.00:1 | PASS (unchanged) |
-| `--chart-1`…`--chart-5` / `--card` | 3.85:1 → 8.05:1 | PASS all 5 |
-| `--chart-1`…`--chart-5` / `--background` | 3.54:1 → 7.40:1 | PASS all 5 — the pass-10 `#0C96DF` would be 2.997:1 here, just under the floor, which is why the ramp moved |
-| `--warning` / `--card` · `--muted` (border/icon use) | 3.20:1 · 3.07:1 | PASS |
-| `--warning` / `--background` | 2.94:1 | **Below floor:** use `--warning` as a border/icon only on `--card`/`--popover`/`--muted`, never bare on the canvas; banners already tint against `--card` |
-| `--card` / `--background` | 1.09:1 | Surface step, not a content pair — cards also carry the `--border` hairline |
-| `--muted` / `--background` · `--card` | 1.04:1 · 1.04:1 | Surface step — halfway between |
-| `--border` / `--card` · `--background` | 1.29:1 · 1.19:1 | Below floor — decorative hairline, accepted |
-| `--input` / `--card` | 1.42:1 | Below floor — same posture as `--border` (the field's label and placeholder carry identification) |
-| `--brand` / `--background` | 1.25:1 | **Expected fail** — never a light-surface fill/text |
-| `--brand-2` / `--background` | 2.38:1 | **Expected fail** — same rule |
+| `--chart-1`…`--chart-5` / `--card` | 3.26:1 → 6.63:1 | PASS all 5 — pass-10 ramp, unchanged |
+| `--chart-1`…`--chart-5` / `--background` | 3.05:1 → 6.21:1 | PASS all 5 — `--chart-1` at 3.05:1 is the ramp's floor; a darker canvas than `#F9F7F5` would push it under 3:1 (it was 2.997:1 on `#F7F5F3`) |
+| `--warning` / `--card` · `--muted` (border/icon use) | 3.20:1 · 3.10:1 | PASS |
+| `--warning` / `--background` | 2.99:1 | **Below floor (just):** use `--warning` as a border/icon only on `--card`/`--popover`/`--muted`, never bare on the canvas; banners already tint against `--card` |
+| `--card` / `--background` | 1.07:1 | Surface step, not a content pair — cards also carry the `--border` hairline |
+| `--muted` / `--background` · `--card` | 1.03:1 · 1.03:1 | Surface step — halfway between |
+| `--border` / `--card` · `--background` | 1.27:1 · 1.18:1 | Below floor — decorative hairline, accepted |
+| `--input` / `--card` | 1.39:1 | Below floor — same posture as `--border` (the field's label and placeholder carry identification) |
+| `--brand` / `--background` | 1.28:1 | **Expected fail** — never a light-surface fill/text |
+| `--brand-2` / `--background` | 2.42:1 | **Expected fail** — same rule |
 
 **Dark mode — text pairs (floor 4.5:1), all PASS:**
 
@@ -713,8 +711,8 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 **Open items:**
 - No CVD simulation run on the new palette yet — now TWO brand hues (green 110.6°, blue 200.6°) to check, not just one; higher priority with each pass that adds more meaning-bearing color.
-- `--border`/`--card` is a low-contrast hairline by design (1.29:1 as of pass 11) — decorative, consistent with common practice.
-- `--warning` as a bare border/icon on the light canvas is 2.94:1 (pass 11) — restricted to card/popover surfaces; revisit if a design puts it on the canvas.
+- `--border`/`--card` is a low-contrast hairline by design (1.27:1 as of pass 11) — decorative, consistent with common practice.
+- `--warning` as a bare border/icon on the light canvas is 2.99:1 (pass 11) — restricted to card/popover surfaces; revisit if a design puts it on the canvas.
 - Reduced-motion policy not yet written.
 - Radius-xl (sheets) not measured against either reference — extrapolated.
 - Sidebar expand/collapse cue is decided (option A) — no longer an open item as of pass 5.
