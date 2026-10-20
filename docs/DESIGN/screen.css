@@ -100,7 +100,7 @@ h1, h2, h3, .heading {
   cursor: pointer;
   flex-shrink: 0;
 }
-.sidebar-toggle-header:hover { background: var(--muted); }
+.sidebar-toggle-header:hover { background: var(--accent); color: var(--accent-foreground); } /* pass 11f: hovers on --accent, not --muted (--muted = page by ruling) */
 
 /* Bug fix (pass 9 addendum, Principal review): .sidebar-toggle-header and
    .sidebar-user-chevron previously also carried the generic .icon class
@@ -159,10 +159,10 @@ h1, h2, h3, .heading {
   cursor: pointer;
   position: relative;
 }
-.icon-btn:hover { background: var(--muted); }
+.icon-btn:hover { background: var(--accent); color: var(--accent-foreground); } /* pass 11f: hovers on --accent, not --muted (--muted = page by ruling) */
 .icon-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
 .icon-btn[disabled]:hover { background: none; }
-.icon-btn.active { background: var(--muted); color: var(--primary); }
+.icon-btn.active { background: var(--accent); color: var(--primary); } /* pass 11f: active fill on --accent; --primary icon 4.52:1 on it */
 
 .more-menu-wrap { position: relative; }
 .more-menu {
@@ -212,7 +212,7 @@ h1, h2, h3, .heading {
   background: none;
   border: none;
 }
-.entity-selector:hover { background: var(--muted); }
+.entity-selector:hover { background: var(--accent); } /* pass 11f: was --muted; name keeps --foreground (14.85:1 on --accent) */
 .entity-selector .entity-selector-name { font-size: 14px; font-weight: 500; color: var(--foreground); }
 
 /* Avatar cluster — overlapping circles representing the entity's
@@ -435,9 +435,15 @@ h1, h2, h3, .heading {
   cursor: pointer;
 }
 .popover-item .icon { flex-shrink: 0; color: var(--muted-foreground); }
-.popover-item:hover { background: var(--muted); }
+.popover-item:hover { background: var(--accent); color: var(--accent-foreground); } /* pass 11f: hovers on --accent, not --muted (--muted = page by ruling) */
+.popover-item:hover .icon { color: var(--accent-foreground); }
 .popover-item.destructive { color: var(--destructive); }
 .popover-item.destructive .icon { color: var(--destructive); }
+/* Destructive item hover — light: --accent like every item (--destructive
+   4.57:1 on it). Dark: --destructive on dark --accent is only 3.25:1, so
+   the item takes shadcn's own destructive-menu-item treatment instead
+   (bg-destructive/20): 4.64:1. */
+.dark .popover-item.destructive:hover { background: color-mix(in srgb, var(--destructive) 20%, var(--popover)); }
 .popover-divider { height: 1px; background: var(--border); margin: 4px 0; }
 /* Pass 9: Settings/Notifications entry points under the avatar popover
    are PROPOSED, not decided — the Principal has not ruled on where

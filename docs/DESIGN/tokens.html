@@ -76,7 +76,7 @@
         <td><code>--primary</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#148100"></span><span class="hex">#148100</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#2CFF05"></span><span class="hex">#2CFF05</span></div></td>
-        <td>The main-action fill — buttons, links, focus accents. Light mode darkens <code>--brand</code>'s hue to clear AA with white text; pass 11 took it one notch darker (<code>#158500</code>→<code>#148100</code>, same hue — the old value is 4.52:1 on the page but 4.33:1 on <code>--muted</code>) so it clears 4.55:1 as text on <code>--muted</code>, 4.75:1 on the page; dark mode uses the raw brand green directly, since it already clears AA against a dark fill-with-dark-text pairing.</td>
+        <td>The main-action fill — buttons, links, focus accents. Light mode darkens <code>--brand</code>'s hue to clear AA with white text; pass 11 took it one notch darker (<code>#158500</code>→<code>#148100</code>, same hue — the old value is 4.52:1 on the page and 4.30:1 on <code>--accent</code>) so it clears 4.52:1 as text on a hovered <code>--accent</code> row, 4.75:1 on the page; dark mode uses the raw brand green directly, since it already clears AA against a dark fill-with-dark-text pairing.</td>
       </tr>
       <tr>
         <td><code>--primary-foreground</code></td>
@@ -102,7 +102,7 @@
 
 <section id="surfaces" data-section="surfaces">
   <h2>2. Surfaces &amp; Text</h2>
-  <p class="section-hint group-note">The neutral scale — page canvas, cards, and body text. <strong>Pass 11:</strong> the light canvas is a near-neutral off-white (<code>#F9F8F8</code>, a touch of warmth), white cards floating on it; <code>--muted</code> is a fixed visible step darker than both (Principal ruling), and the other light neutrals (<code>--muted</code>, <code>--muted-foreground</code>, <code>--border</code>, <code>--input</code>) carry the warm hue (30–33°). Dark mode keeps its pass-5 faint blue tint.</p>
+  <p class="section-hint group-note">The neutral scale — page canvas, cards, and body text. <strong>Pass 11:</strong> the light canvas is a near-neutral off-white (<code>#F9F8F8</code>, a touch of warmth), white cards floating on it; <code>--muted</code> equals the page (Principal ruling) and every hover/active fill is <code>--accent</code>; the other light neutrals (<code>--muted</code>, <code>--muted-foreground</code>, <code>--border</code>, <code>--input</code>) carry the warm hue (30–33°). Dark mode keeps its pass-5 faint blue tint.</p>
   <table class="token-table">
     <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
     <tbody>
@@ -123,13 +123,13 @@
         <td class="pair"><div class="mode"><span class="chip" style="background:#0D0E0F"></span><span class="hex">#0D0E0F</span></div></td>
         <td>Dropdown/popover surface — same as <code>--card</code>.</td></tr>
       <tr><td><code>--muted</code></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#F5F3F1"></span><span class="hex">#F5F3F1</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#F9F8F8"></span><span class="hex">#F9F8F8</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#0F1112"></span><span class="hex">#0F1112</span></div></td>
-        <td>Wells, hovers, tab/progress tracks, placeholder blocks. <em>Pass 11, Principal ruling:</em> a <strong>fixed visible step</strong> darker than both <code>--card</code> (1.11:1) and <code>--background</code> (1.04:1) — no longer "halfway to card", which made these nearly invisible.</td></tr>
+        <td>In-card wells, tab/progress tracks, placeholder blocks. <em>Pass 11, Principal ruling:</em> light <code>--muted</code> = <code>--background</code> (<code>#F9F8F8</code>) — reads at 1.06:1 against a white card. <strong>Not a hover fill</strong>: hovers and active states use <code>--accent</code>.</td></tr>
       <tr><td><code>--muted-foreground</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#5E5A55"></span><span class="hex">#5E5A55</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#A0A7AB"></span><span class="hex">#A0A7AB</span></div></td>
-        <td>Secondary/meta text — timestamps, helper copy, table meta. Pass 11: warmed to match the canvas; 6.45:1 on <code>--background</code>, 6.18:1 on <code>--muted</code>, 6.84:1 on <code>--card</code>.</td></tr>
+        <td>Secondary/meta text — timestamps, helper copy, table meta. Pass 11: warmed to match the canvas; 6.45:1 on <code>--background</code>/<code>--muted</code>, 6.14:1 on <code>--accent</code>, 6.84:1 on <code>--card</code>.</td></tr>
     </tbody>
   </table>
 </section>
@@ -151,11 +151,11 @@
       <tr><td><code>--accent</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#EBF4F9"></span><span class="hex">#EBF4F9</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#194257"></span><span class="hex">#194257</span></div></td>
-        <td>Hover/active-state surface — same blue family as <code>--secondary</code>, one step lighter/darker.</td></tr>
+        <td><strong>The hover/active fill</strong> (pass 11f, Principal ruling) — menu items, icon buttons, the sidebar header toggle, entity selector, table rows. Same blue family as <code>--secondary</code>. Light: 1.05:1 vs page, 1.12:1 vs card, so it shows on both. One exception: a destructive menu item in dark mode hovers on a destructive tint instead (see <code>--destructive</code>).</td></tr>
       <tr><td><code>--accent-foreground</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#096FA5"></span><span class="hex">#096FA5</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#68C3F3"></span><span class="hex">#68C3F3</span></div></td>
-        <td>Text on <code>--accent</code>.</td></tr>
+        <td>Text/icon on a hovered <code>--accent</code> fill (4.92:1 / 5.46:1).</td></tr>
     </tbody>
   </table>
 </section>
@@ -167,13 +167,13 @@
     <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
     <tbody>
       <tr><td><code>--positive</code></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#15803D"></span><span class="hex">#15803D</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#147F3C"></span><span class="hex">#147F3C</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#52E0A4"></span><span class="hex">#52E0A4</span></div></td>
         <td>Gain / income / surplus; "normal, on track" status tier (safe-harbor gap ≤0, clean reconciliation, fully-matched import).</td></tr>
       <tr><td><code>--positive-foreground</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#052E13"></span><span class="hex">#052E13</span></div></td>
-        <td>Text on a <code>--positive</code> fill (5.02:1). <code>--positive</code> clears 4.73:1 on the page and 4.53:1 on <code>--muted</code> at its pass-10 value — no change needed.</td></tr>
+        <td>Text on a <code>--positive</code> fill (5.08:1). Pass 11f: <code>--positive</code> a hair darker (<code>#15803D</code>→<code>#147F3C</code>, same hue) — the old value is 4.4999:1 on a hovered <code>--accent</code> table row, just under AA; this is 4.56:1 there, 4.80:1 on the page.</td></tr>
       <tr><td><code>--warning</code> <em>(pass 6, re-hued)</em></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#EA6A0A"></span><span class="hex">#EA6A0A</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#FF9452"></span><span class="hex">#FF9452</span></div></td>
@@ -183,13 +183,13 @@
         <td class="pair"><div class="mode"><span class="chip" style="background:#2A1200"></span><span class="hex">#2A1200</span></div></td>
         <td>Dark orange-black ink on <code>--warning</code> (5.54:1 / 8.11:1) — same value both modes, since orange can't pair with white text AA-safely at a saturation that still reads as orange.</td></tr>
       <tr><td><code>--destructive</code></td>
-        <td class="pair"><div class="mode"><span class="chip" style="background:#E00404"></span><span class="hex">#E00404</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#DE0404"></span><span class="hex">#DE0404</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#FC4F4F"></span><span class="hex">#FC4F4F</span></div></td>
         <td>Loss / negative delta; "danger, overdue" status tier (safe-harbor payment overdue, exceptions-threshold breach, reconciliation break); destructive actions (delete, purge).</td></tr>
       <tr><td><code>--destructive-foreground</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#2A0507"></span><span class="hex">#2A0507</span></div></td>
-        <td>Text on a <code>--destructive</code> fill (5.01:1). Pass 11: <code>--destructive</code> a notch darker (<code>#E70404</code>→<code>#E00404</code>, same hue — the old value is 4.49:1 on the page, 4.30:1 on <code>--muted</code>) to clear 4.53:1 as text on <code>--muted</code>, e.g. a hovered "Log out" menu item.</td></tr>
+        <td>Text on a <code>--destructive</code> fill (5.09:1). Pass 11: <code>--destructive</code> a notch darker (<code>#E70404</code>→<code>#DE0404</code>, same hue — the old value is 4.49:1 on the page, 4.27:1 on <code>--accent</code>) to clear 4.57:1 on a hovered <code>--accent</code> row or menu item. Dark mode: a hovered destructive menu item uses a 20% destructive tint, not <code>--accent</code> (3.25:1 there), giving 4.64:1.</td></tr>
     </tbody>
   </table>
 </section>
@@ -202,7 +202,7 @@
       <tr><td><code>--border</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#E6E2DE; border-color:#BDB7B0;"></span><span class="hex">#E6E2DE</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#202122;"></span><span class="hex">white 8% on --card</span></div></td>
-        <td>Default hairline border — card edges, table rules, dividers. Deliberately low-contrast (1.29:1 on <code>--card</code>, 1.22:1 on <code>--background</code>, 1.16:1 on <code>--muted</code>; pass 11 warmed it and set it one step beyond <code>--muted</code>), a decorative hairline, not a content-bearing element. (Dark swatch approximates <code>rgba(255,255,255,.08)</code> composited over <code>--card</code>, <code>#0D0E0F</code> — the token itself is translucent.)</td></tr>
+        <td>Default hairline border — card edges, table rules, dividers. Deliberately low-contrast (1.29:1 on <code>--card</code>, 1.22:1 on <code>--background</code>/<code>--muted</code>; pass 11 warmed it, a step darker than the page), a decorative hairline, not a content-bearing element. (Dark swatch approximates <code>rgba(255,255,255,.08)</code> composited over <code>--card</code>, <code>#0D0E0F</code> — the token itself is translucent.)</td></tr>
       <tr><td><code>--input</code></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#DCD8D4; border-color:#BDB7B0;"></span><span class="hex">#DCD8D4</span></div></td>
         <td class="pair"><div class="mode"><span class="chip" style="background:#2A2B2C;"></span><span class="hex">white 12% on --card</span></div></td>
@@ -213,7 +213,7 @@
 
 <section id="charts" data-section="charts">
   <h2>6. Charts (sequential ramp — magnitude, not category)</h2>
-  <p class="section-hint group-note"><strong>Pass 10:</strong> re-hued from the green <code>--primary</code> to a gradient of <code>--brand-2</code>, the secondary sky blue (200.6°) — Principal direction. Ordered light→dark, same direction as the superseded green ramp. Every step clears 3:1 against both <code>--background</code> and <code>--card</code> in its own mode (figures below are vs. <code>--card</code>). <strong>Pass 11:</strong> re-checked on the off-white canvas — the pass-10 ramp still clears 3:1 (<code>--chart-1</code> 3.07:1 vs <code>--background</code>), unchanged. Plot on <code>--card</code> or the page, not inside a <code>--muted</code> well (<code>--chart-1</code> 2.94:1 there).</p>
+  <p class="section-hint group-note"><strong>Pass 10:</strong> re-hued from the green <code>--primary</code> to a gradient of <code>--brand-2</code>, the secondary sky blue (200.6°) — Principal direction. Ordered light→dark, same direction as the superseded green ramp. Every step clears 3:1 against both <code>--background</code> and <code>--card</code> in its own mode (figures below are vs. <code>--card</code>). <strong>Pass 11:</strong> re-checked on the off-white canvas — the pass-10 ramp still clears 3:1 (<code>--chart-1</code> 3.07:1 vs <code>--background</code>), unchanged. Not inside an <code>--accent</code> hover fill (<code>--chart-1</code> 2.92:1 there).</p>
   <table class="token-table">
     <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
     <tbody>

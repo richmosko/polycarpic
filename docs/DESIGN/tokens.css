@@ -8,13 +8,13 @@
  * the swatches.
  *
  * ELEVENTH PASS (2026-10-19) — Principal: light --background off white
- * to #F9F8F8, near-neutral with a touch of warmth (11e; iterated by eye
- * through #EFEDEB, #EFEEEE, #F7F5F3, #F9F7F5). --muted is a fixed,
- * visible step darker than the page (#F5F3F1) by Principal ruling;
- * --border/--input one step beyond it. --primary/--ring and
- * --destructive one small notch darker (to clear AA on --muted);
- * --positive and the light chart ramp keep their pass-10 values. Dark
- * mode unchanged. See the Surfaces & text comment below.
+ * to #F9F8F8, near-neutral with a touch of warmth (iterated by eye
+ * through #EFEDEB, #EFEEEE, #F7F5F3, #F9F7F5). By Principal ruling (11f)
+ * --muted = --background, and every hover/active fill moves to --accent
+ * (screen.css). --border/--input warm, a step darker than the page.
+ * --primary/--ring, --destructive and --positive each a notch darker at
+ * the same hue so they clear AA on --accent (hovered rows/menu items);
+ * the light chart ramp keeps its pass-10 values. Dark tokens unchanged.
  *
  * SIXTH PASS (2026-10-01) — Principal review pass 4
  * (temp/2026-10-01-design-review-4.md): --warning moves from a darkened
@@ -67,11 +67,12 @@
      --background (sidebar-07 inset), not --muted, so that near-white
      became the whole page.
      Scale: --card/--popover stay pure white and float on the page
-     (1.06:1 step + hairline). --muted is a FIXED STEP, Principal ruling
-     (11e) — no longer "halfway to card", which made wells, hovers,
-     tab/progress tracks and placeholder blocks nearly invisible: #F5F3F1
-     (warm 30°), 1.11:1 against --card, 1.04:1 against the page, darker
-     than both. --border/--input sit one step beyond --muted. */
+     (1.06:1 step + hairline). --muted = --background, Principal ruling
+     (11f): it serves in-card wells, tab/progress tracks and placeholder
+     blocks, where it reads at 1.06:1 against white; it is no longer a
+     hover fill — every hover/active fill is --accent (screen.css), which
+     stays visible on both page (1.05:1) and card (1.12:1).
+     --border/--input are warm (30°), a step darker than the page. */
   --background: #F9F8F8;
   --foreground: #1D1F20; /* near-black, barely blue, flatter than pass 4's green-cast ink */
   --card: #FFFFFF;
@@ -82,7 +83,7 @@
   /* Primary — unchanged from pass 4: a darkened neon green (hue 110.6°,
      same hue as --brand, L 0.26 vs the brand's L 0.51) — see --brand
      below for why the raw brand hex can't be primary on a light surface. */
-  --primary: #148100; /* pass 11: L 0.26→0.253, same hue — #158500 is 4.52:1 on the page but 4.33:1 on --muted; this is 4.55:1 on --muted */
+  --primary: #148100; /* pass 11: L 0.26→0.253, same hue — #158500 is 4.30:1 on --accent (hovered rows); this is 4.52:1 */
   --primary-foreground: #FFFFFF;
 
   /* Secondary/accent — pass 5: moved from pass 4's pale GREEN tint to the
@@ -94,9 +95,9 @@
      role (4.72:1 on --secondary) and the plain-text-on-card role (5.48:1). */
   --secondary: #E3F0F7;
   --secondary-foreground: #096FA5;
-  --muted: #F5F3F1; /* pass 11e, Principal ruling: a fixed visible step — 1.11:1 vs --card, 1.04:1 vs --background, darker than both */
-  --muted-foreground: #5E5A55; /* pass 11: warm 33°, 6.45:1 on --background, 6.18:1 on --muted */
-  --accent: #EBF4F9;
+  --muted: #F9F8F8; /* pass 11f, Principal ruling: = --background. Wells/tracks/placeholders on cards (1.06:1 vs white); NOT a hover fill — hovers use --accent */
+  --muted-foreground: #5E5A55; /* pass 11: warm 33°, 6.45:1 on --background/--muted, 6.14:1 on --accent */
+  --accent: #EBF4F9; /* pass 11f: THE hover/active fill (Principal ruling) — 1.05:1 vs page, 1.12:1 vs card */
   --accent-foreground: #096FA5;
 
   /* --brand: the literal, undarkened neon green — logo references, chart
@@ -118,10 +119,10 @@
   --brand-2: #05A9FF;
 
   /* Destructive — unchanged from pass 3/4. */
-  --destructive: #E00404; /* pass 11: same hue, a notch darker — #E70404 is 4.49:1 on the page, 4.30:1 on --muted; this is 4.53:1 on --muted */
+  --destructive: #DE0404; /* pass 11: same hue, a notch darker — #E70404 is 4.49:1 on the page, 4.27:1 on --accent; this is 4.57:1 on --accent */
   --destructive-foreground: #FFFFFF;
 
-  --border: #E6E2DE; /* pass 11: one step beyond --muted — 1.29:1 on --card, 1.22:1 on --background, 1.16:1 on --muted */
+  --border: #E6E2DE; /* pass 11: warm, a step darker than the page — 1.29:1 on --card, 1.22:1 on --background */
   --input: #DCD8D4; /* pass 11: one step stronger than --border, 1.42:1 on --card */
   --ring: #148100;
 
@@ -144,8 +145,9 @@
      derivation and all ten contrast figures. */
   /* Pass 11: re-checked on the #F9F8F8 canvas — the pass-10 ramp still
      clears 3:1 (chart-1 3.07:1 vs --background, 3.26:1 vs --card), so it
-     is kept unchanged. Not on --muted: chart-1 is 2.94:1 there — plot
-     charts on --card or the page, never inside a muted well. */
+     is kept unchanged. --muted now equals the page, so the same 3.07:1
+     holds in a muted well; not on --accent (2.92:1) — no chart inside a
+     hover fill. */
   --chart-1: #0C96DF;
   --chart-2: #0B89CB;
   --chart-3: #0A7CB8;
@@ -181,7 +183,7 @@
      (used for: aged Cash-in-Transit exceptions, a stale provider link,
      or a safe-harbor due date >14 days out — see Financial semantics §
      Status tiers). */
-  --positive: #15803D; /* pass-10 value, re-checked pass 11 — 4.73:1 on --background, 4.53:1 on --muted */
+  --positive: #147F3C; /* pass 11f: a hair darker — #15803D is 4.4999:1 on --accent (hovered table rows), this is 4.56:1 */
   --positive-foreground: #FFFFFF;
   --warning: #EA6A0A;
   --warning-foreground: #2A1200;
