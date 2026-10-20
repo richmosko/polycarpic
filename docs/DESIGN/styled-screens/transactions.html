@@ -14,9 +14,15 @@
        height. Brand top item, seven nav items (no Settings), avatar
        trigger at the bottom (closed here — dashboard.html shows the
        popover "open" as the built reference). -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="app-sidebar">
+    <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
+         panel-left-close right-aligned; collapsed = logo mark only, which
+         is itself the expand button — swaps to panel-left-open with an
+         "Expand sidebar" tooltip on hover / keyboard focus. -->
     <div class="sidebar-top">
       <div class="brand-lockup"><span class="brand-icon"></span><span class="sidebar-brand-label">Polycarpic</span></div>
+      <button class="sidebar-collapse" type="button" aria-label="Collapse sidebar" title="Collapse sidebar" aria-expanded="true" aria-controls="app-sidebar" onclick="document.getElementById('app-sidebar').classList.add('collapsed')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg></button>
+      <button class="sidebar-expand" type="button" aria-label="Expand sidebar" aria-expanded="false" aria-controls="app-sidebar" onclick="document.getElementById('app-sidebar').classList.remove('collapsed')"><span class="brand-icon"></span><span class="sidebar-expand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg></span><span class="sidebar-tooltip" role="tooltip">Expand sidebar</span></button>
     </div>
     <nav class="sidebar-nav">
       <a class="nav-item" href="#"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></span><span class="nav-label">Dashboard</span></a>
@@ -44,8 +50,6 @@
          New entry) — shown "open" here as this screen's reference. -->
     <div class="topbar">
       <div class="topbar-left">
-        <button class="sidebar-toggle-header" aria-label="Collapse sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
-        <span class="topbar-separator"></span>
         <div class="breadcrumbs"><span class="crumb">Transactions</span></div>
       </div>
       <div class="topbar-right">
