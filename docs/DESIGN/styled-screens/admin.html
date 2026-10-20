@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Admin</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<!-- Admin, the operator surface (pass 7 addendum; styled pass 13). Placeholder pending PRD/ARCH/SECURITY definition (POLY-81). Reached only through an SSH tunnel to the host: not a sidebar item, not part of the seven-item IA, no entity context, so no sidebar and no entity selector. Exists so the shape is not invented from scratch later. -->
+<header class="app-bar">
+  <div class="brand-lockup"><span class="brand-icon"></span><span>Polycarpic</span></div>
+  <span class="badge badge-outline"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg></span>Operator session · SSH tunnel</span>
+</header>
+<main class="page-medium">
+  <h1 class="page-title">Admin</h1>
+  <p class="page-lede">Instance status for the operator. Placeholder: the content and actions below are indicative, not final.</p>
+  <div class="card">
+    <div class="card-title">Services</div>
+    <div class="kv-row"><span>Web app</span><span class="badge badge-positive-soft"><span class="status-dot"></span>Up</span></div>
+    <div class="kv-row"><span>API</span><span class="badge badge-positive-soft"><span class="status-dot"></span>Up</span></div>
+    <div class="kv-row"><span>Background job runner</span><span class="badge badge-positive-soft"><span class="status-dot"></span>Up</span></div>
+    <div class="kv-row"><span class="kv-label">Telemetry receiver<span class="kv-help mono">port 4318</span></span><span class="badge badge-positive-soft"><span class="status-dot"></span>Up</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Versions</div>
+    <div class="kv-row"><span>App version</span><span class="mono">v0.4.2 · 8ff5af9</span></div>
+    <div class="kv-row"><span>Database schema</span><span class="badge badge-positive-soft"><span class="status-dot"></span>Migrations current</span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Database &amp; backups</div>
+    <div class="kv-row"><span>Database connection</span><span class="badge badge-positive-soft"><span class="status-dot"></span>Connected</span></div>
+    <div class="kv-row"><span>Last backup</span><span class="kv-value"><span class="mono">2026-10-19 03:00 UTC</span><span class="badge badge-positive-soft">Succeeded</span></span></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Sync</div>
+    <div class="kv-row"><span>Last sync, all entities</span><span class="mono">2026-10-19 06:00 UTC</span></div>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Administrative actions</span><span class="badge badge-outline">To be defined</span></div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="btn btn-outline" disabled>Force resync</button>
+      <button class="btn btn-outline" disabled>Restart job queue</button>
+      <button class="btn btn-outline" disabled>View raw logs</button>
+    </div>
+  </div>
+</main>
+</body>
+</html>

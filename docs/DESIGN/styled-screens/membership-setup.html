@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Membership setup</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<!-- Membership setup (pass 6; styled pass 13). The dashboard's no-membership empty state from flow 5.1: the Principal ruled it can simply be this page. No sidebar and no entity selector: both need an entity, which is exactly what is missing. Once one membership exists this page is never shown again; the flow lands on the dashboard. -->
+<header class="app-bar">
+  <div class="brand-lockup"><span class="brand-icon"></span><span>Polycarpic</span></div>
+  <span class="avatar-cluster" title="Signed in as Mosko"><span class="avatar" style="border-color:var(--background);">M</span></span>
+</header>
+<main class="page-narrow">
+  <h1 class="page-title center">Set up your first entity</h1>
+  <p class="page-lede center">You're signed in, but you don't belong to any entity yet. Create one, or accept an invite someone sent you.</p>
+
+  <div class="card">
+    <div class="card-title">Create a new entity</div>
+    <div class="field">
+      <label for="entity-name">Entity name</label>
+      <input id="entity-name" class="input" type="text" placeholder="e.g. Mosko, Family Trust">
+    </div>
+    <div class="field">
+      <label for="entity-type">Type</label>
+      <select id="entity-type" class="select"><option>Person</option><option>Trust</option><option>Business</option><option>Household</option></select>
+      <p class="field-help">You become its Owner: full read/write, membership management, purge.</p>
+    </div>
+    <button class="btn btn-default auth-submit">Create entity</button>
+  </div>
+
+  <div class="auth-divider" style="margin:20px 0;">or</div>
+
+  <div class="card">
+    <div class="card-title">Have an invite?</div>
+    <div class="field">
+      <label for="invite-code">Invite code</label>
+      <input id="invite-code" class="input mono" type="text" placeholder="XXXX-XXXX-XXXX">
+      <p class="field-help">You'll join with whatever role the inviting owner granted (Owner, Manager or Viewer).</p>
+    </div>
+    <button class="btn btn-outline auth-submit">Accept invite</button>
+  </div>
+</main>
+</body>
+</html>

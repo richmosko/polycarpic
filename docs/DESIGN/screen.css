@@ -1210,3 +1210,165 @@ table.data-table td.amount.negative { color: var(--destructive); }
   * { animation: none !important; transition: none !important; }
   .skeleton::after { display: none; }
 }
+
+/* =====================================================================
+   Pass 13 (2026-10-19): every page is a styled screen. The Principal
+   asked: "Any reason why we have wireframes when we can fully render
+   styled screens?" The wireframes are retired. The classes below cover
+   the nine screens promoted from them. They use the existing tokens
+   only, and each block names the shadcn-svelte component it stands in
+   for.
+   ===================================================================== */
+
+/* Stacked-card spacing applies to a vertical stack only. Inside a grid,
+   the gap does the spacing. Bug fix: the second and third cards of every
+   .card-grid row sat 24px low, including on the dashboard. */
+.card-grid > .card + .card { margin-top: 0; }
+
+/* Show-N select in an accordion header must never stretch. Bug fix: it
+   inherited .select's width:100% and squeezed the header title. */
+.select.show-n-select { width: auto; flex-shrink: 0; }
+
+/* Breadcrumb links (multi-crumb pages, e.g. the account register). */
+.breadcrumbs a.crumb { text-decoration: none; }
+.breadcrumbs a.crumb:hover { color: var(--foreground); text-decoration: underline; }
+.breadcrumbs .crumb-sep .icon { width: 14px; height: 14px; }
+
+/* The current page's entry in a menu (e.g. Settings in the avatar
+   popover while on Settings). */
+.popover-item[aria-current="page"] { background: var(--accent); color: var(--accent-foreground); font-weight: 500; }
+
+/* Small badge for inline cross-reference chips, e.g. "Custodial · Bank Y". */
+.badge-sm { padding: 1px 8px; font-size: 11px; gap: 4px; }
+.badge-sm .icon { width: 12px; height: 12px; }
+
+/* Card header row: title on the left, meta and actions on the right. */
+.card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.card-head .card-title { margin-bottom: 0; }
+.card-sub { font-size: 13px; color: var(--muted-foreground); }
+
+/* Key/value settings and status rows (shadcn: plain markup + Separator). */
+.kv-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.kv-row:last-child { border-bottom: none; }
+.kv-row .kv-label { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kv-row .kv-help { font-size: 12px; color: var(--muted-foreground); }
+.kv-row .kv-value { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.select.select-inline, .input.input-inline { width: auto; min-width: 140px; }
+.input.input-pct { width: 88px; text-align: right; font-family: var(--font-mono); }
+
+/* Generic form field, with the label above the control. */
+.field { margin-bottom: 16px; }
+.field label, .field .field-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+.field .field-help { font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
+
+/* Switch (shadcn Switch): a role="switch" button. */
+.switch { width: 36px; height: 20px; border-radius: 999px; border: none; background: var(--input); position: relative; cursor: pointer; flex-shrink: 0; padding: 0; transition: background 120ms ease; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--card); box-shadow: 0 1px 2px oklch(0 0 0 / 20%); transition: transform 120ms ease; }
+.switch[aria-checked="true"] { background: var(--primary); }
+.switch[aria-checked="true"]::after { transform: translateX(16px); background: var(--primary-foreground); }
+.switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.switch[disabled] { opacity: 0.5; cursor: not-allowed; }
+
+/* Shell-less pages (membership setup, admin) get a brand bar instead of
+   the sidebar. On the setup page no entity exists yet; on the operator
+   page no entity applies. */
+.app-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; }
+.page-narrow { max-width: 520px; margin: 32px auto 64px; padding: 0 24px; }
+.page-medium { max-width: 760px; margin: 16px auto 64px; padding: 0 24px; }
+.page-title { font-family: var(--font-heading); font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+.page-lede { color: var(--muted-foreground); font-size: 14px; margin-bottom: 24px; }
+.center { text-align: center; }
+
+/* ---------- General Ledger: chart-of-accounts tree. Custom: shadcn has
+   no tree component, so these are nested disclosure rows. ---------- */
+.gl-tree { padding: 8px 0; }
+.tree-row { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 10px 24px; font-size: 14px; }
+.tree-row .tree-name { display: flex; align-items: center; gap: 8px; min-width: 0; flex-wrap: wrap; }
+.tree-row .tree-balance { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.tree-row.depth-0 { font-weight: 600; border-top: 1px solid var(--border); margin-top: 4px; padding-top: 14px; }
+.tree-row.depth-0:first-child { border-top: none; margin-top: 0; padding-top: 10px; }
+.tree-row.depth-0 .tree-name { font-family: var(--font-heading); }
+.tree-row.depth-1 { padding-left: 48px; }
+.tree-row.depth-2 { padding-left: 72px; }
+.tree-row a { color: var(--foreground); text-decoration: none; }
+.tree-row:has(a):hover { background: var(--accent); }
+.tree-row:has(a):hover a { color: var(--accent-foreground); }
+.dark .tree-row:has(a):hover { background: color-mix(in srgb, var(--accent) 40%, var(--card)); }
+.dark .tree-row:has(a):hover a { color: var(--foreground); }
+.tree-row .tree-chevron { color: var(--muted-foreground); display: inline-flex; }
+
+/* ---------- Account register table (shadcn Table). shadcn wraps every
+   Table in an overflow-x container. Ours does the same, so a wide
+   register scrolls inside its card instead of spilling past it. ---------- */
+.table-wrap { width: 100%; overflow-x: auto; }
+table.data-table td.amount, table.data-table td.nowrap { white-space: nowrap; }
+table.data-table td.muted { color: var(--muted-foreground); }
+table.data-table th.num { text-align: right; }
+table.data-table tr.opening td { color: var(--muted-foreground); font-style: italic; }
+
+/* ---------- Custodial Accounts: a card per account, a lots sub-card
+   (Collapsible), and the provider-item Dialog. ---------- */
+.custodial-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.custodial-head .custodial-name { font-size: 16px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
+.custodial-head .institution { font-size: 13px; font-weight: 400; color: var(--muted-foreground); }
+.custodial-head .custodial-balance { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; }
+.custodial-meta { display: flex; align-items: center; gap: 10px; }
+.badge-warning-soft { background: color-mix(in srgb, var(--warning) 18%, var(--card)); color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 45%, var(--card)); }
+.dark .badge-warning-soft { color: var(--warning); }
+.badge-positive-soft { background: color-mix(in srgb, var(--positive) 12%, var(--card)); color: var(--positive); border-color: color-mix(in srgb, var(--positive) 35%, var(--card)); }
+.badge .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+.custodial-recon { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border); }
+.lots { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); overflow: hidden; }
+.lots-head { padding: 12px 16px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 12px; }
+.lot-security { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 13px; background: var(--card); cursor: pointer; }
+.lot-security .lot-name { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.lot-detail { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 8px 16px 8px 44px; font-size: 12px; background: var(--card); color: var(--muted-foreground); border-top: 1px dashed var(--border); }
+.lot-figs { font-family: var(--font-mono); font-variant-numeric: tabular-nums; text-align: right; }
+.gain-positive { color: var(--positive); }
+.gain-negative { color: var(--destructive); }
+.lots-total { display: grid; grid-template-columns: 1fr auto; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--border); font-size: 13px; font-weight: 600; }
+.mapping-row { display: grid; grid-template-columns: 1fr 220px; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.modal-section-label { margin: 20px 0 6px; display: block; }
+
+/* ---------- Allocation: actual-vs-target rows. Each asset class gets a
+   progress track with a target marker (custom, built on shadcn
+   Progress). ---------- */
+.alloc-row { display: grid; grid-template-columns: 160px 1fr 150px 110px; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.alloc-row:last-child { border-bottom: none; }
+.alloc-row .alloc-name { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.alloc-row .alloc-figs { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted-foreground); text-align: right; }
+.alloc-row .badge { justify-self: end; }
+.alloc-track { position: relative; height: 10px; border-radius: 999px; background: var(--muted); }
+.alloc-track .alloc-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; }
+.alloc-track .alloc-target { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--foreground); border-radius: 1px; }
+.alloc-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted-foreground); }
+.alloc-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.alloc-total { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 16px; font-size: 13px; }
+
+/* ---------- Reports: the planned shape of a statement that has not
+   shipped yet. ---------- */
+.card.planned { opacity: 0.6; }
+.statement-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.statement-row.total { font-weight: 600; border-bottom: none; border-top: 2px solid var(--border); }
+
+/* ---------- Entities: membership cards. ---------- */
+.entity-card .entity-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+.entity-card .entity-name { font-size: 16px; font-weight: 600; }
+.member-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.member-row .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.member-row .member-name { flex: 1; min-width: 0; }
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+.btn-ghost { background: transparent; color: var(--foreground); }
+.btn-ghost:hover { background: var(--accent); color: var(--accent-foreground); filter: none; }
+.btn .icon { width: 16px; height: 16px; }
+.form-row { display: grid; grid-template-columns: 1fr 200px auto; gap: 12px; align-items: end; }
+.form-row .field { margin-bottom: 0; }
+
+/* ---------- Narrow viewports. 960px is the floor the review checks;
+   these rules keep the multi-column rows from overflowing. ---------- */
+@media (max-width: 1100px) {
+  table.data-table th, table.data-table td { padding-left: 12px; padding-right: 12px; }
+  .alloc-row { grid-template-columns: 120px 1fr 120px 96px; gap: 12px; }
+  .form-row { grid-template-columns: 1fr 160px auto; }
+}
