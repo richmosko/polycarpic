@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Dashboard</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<div class="shell">
+  <!-- Sidebar (pass 8; floating card w/ gutter pass 9 — Principal review 6,
+       matching shadcn's sidebar-07 block). Fixed, fills the viewport height
+       minus the gutter on every side. Top item: brand. Seven nav items —
+       Settings left the sidebar for the top row's "more" menu / avatar
+       popover (proposed). Bottom: avatar trigger opening the user-menu
+       popover to its RIGHT (shown "open" here as the built reference,
+       matching temp/design-refs/shadcn-sidebar-07-user-popover.png).
+       See design-system-spec.md § Sidebar information architecture. -->
+  <aside class="sidebar">
+    <div class="sidebar-top">
+      <div class="brand-lockup"><span class="brand-icon"></span><span class="sidebar-brand-label">Polycarpic</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item active" href="#"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg></span><span class="nav-label">Transactions</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h6"/><path d="M8 11h8"/></svg></span><span class="nav-label">General Ledger</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="nav-label">Custodial Accounts</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span><span class="nav-label">Allocation</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span><span class="nav-label">Reports</span></a>
+      <a class="nav-item" href="#"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="nav-label">Entities</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <div class="avatar-popover">
+        <button class="popover-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>Profile</button>
+        <button class="popover-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg></span>Settings <span class="proposed-tag">proposed</span></button>
+        <button class="popover-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></span>Notifications <span class="proposed-tag">proposed</span></button>
+        <button class="popover-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/></svg></span>Preferences</button>
+        <button class="popover-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg></span>Theme</button>
+        <button class="popover-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8h.01"/><path d="M10 8h.01"/><path d="M14 8h.01"/><path d="M18 8h.01"/><path d="M8 12h.01"/><path d="M12 12h.01"/><path d="M16 12h.01"/><path d="M7 16h10"/></svg></span>Keyboard shortcuts</button>
+        <div class="popover-divider"></div>
+        <button class="popover-item destructive"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg></span>Log out</button>
+      </div>
+      <button class="sidebar-avatar-trigger">
+        <span class="avatar">M</span>
+        <span class="sidebar-user-name">Mosko</span>
+        <span class="sidebar-user-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="shell-main">
+    <!-- Top row (pass 9): no longer a persistent header — not sticky, same
+         background token as the content below it, no border. Left:
+         expand/collapse (Lucide panel-left) + separator + breadcrumb.
+         Right: entity selector + separator + "more" menu (contextual
+         per-page actions — shown "open" here as the built reference; see
+         design-system-spec.md § Header, "Top row"). AI/search/
+         notifications/gear are gone from here — proposed under the avatar
+         popover (above) or a keyboard shortcut instead. -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle-header" aria-label="Collapse sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+        <span class="topbar-separator"></span>
+        <div class="breadcrumbs"><span class="crumb">Dashboard</span></div>
+      </div>
+      <div class="topbar-right">
+        <button class="entity-selector">
+          <span class="entity-selector-name">Mosko (Person)</span>
+          <span class="avatar-cluster">
+            <span class="avatar">M</span>
+          </span>
+        </button>
+        <span class="topbar-separator"></span>
+        <div class="more-menu-wrap">
+          <button class="icon-btn" title="More"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></span></button>
+          <div class="more-menu">
+            <button class="popover-item"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></svg></span>Refresh</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  <main class="content" style="padding-top:8px;">
+    <!-- Pass 9: page-specific global actions (was a .header-row button
+         here) moved into the top row's "more" menu, above — no
+         duplicate action button in the content column now. -->
+
+    <!-- Net-worth hero — Monarch pattern: eyebrow + big figure + signed delta
+         on the figure itself + single-line area chart with gradient fill.
+         Compare against temp/design-refs/monarch-app-accounts-zoom.png -->
+    <div class="card networth-hero" style="margin-bottom:24px;">
+      <div class="header-row" style="align-items:flex-start;">
+        <div>
+          <span class="eyebrow">Net worth</span>
+          <div class="value-row">
+            <span class="value">$412,884.21</span>
+            <span class="delta positive">▲ $9,684.02 (2.4%) 1 month change</span>
+          </div>
+        </div>
+        <div class="tabs">
+          <button class="tab active">1 month</button>
+          <button class="tab">1 year</button>
+        </div>
+      </div>
+      <div class="chart-area"></div>
+    </div>
+
+    <div class="card-grid" style="grid-template-columns: 2fr 1fr; margin-bottom:24px; align-items:start;">
+      <!-- Grouped account list — Monarch pattern -->
+      <div class="card">
+        <div class="account-group">
+          <div class="account-group-header">
+            <span>Cash</span>
+            <span class="group-delta positive">▲ $1,826.10 (2.9%) 1mo</span>
+            <span style="margin-left:auto; font-family:var(--font-mono);">$65,342.30</span>
+          </div>
+          <div class="account-row">
+            <span class="logo"></span>
+            <div>
+              <div class="name">Primary Checking</div>
+              <div class="subtype">Checking · Bank Y</div>
+            </div>
+            <span class="sparkline"></span>
+            <div style="text-align:right;">
+              <div class="balance">$15,234.75</div>
+              <div class="freshness">16 hours ago</div>
+            </div>
+          </div>
+        </div>
+        <div class="account-group">
+          <div class="account-group-header">
+            <span>Investments</span>
+            <span class="group-delta positive">▲ $10,287.56 (1.9%) 1mo</span>
+            <span style="margin-left:auto; font-family:var(--font-mono);">$204,110.00</span>
+          </div>
+          <div class="account-row">
+            <span class="logo"></span>
+            <div>
+              <div class="name">Brokerage</div>
+              <div class="subtype">Investments · Custodian X</div>
+            </div>
+            <span class="sparkline"></span>
+            <div style="text-align:right;">
+              <div class="balance">$204,110.00</div>
+              <div class="freshness">EOD price</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Summary panel — Monarch pattern: segmented stacked bar + legend -->
+      <div class="card">
+        <span class="card-title">Summary</span>
+        <div style="margin-top:12px;">
+          <span class="eyebrow">Assets</span>
+          <div class="segmented-bar" style="margin-top:8px;">
+            <div style="width:50%; background:var(--chart-1);"></div>
+            <div style="width:32%; background:var(--chart-3);"></div>
+            <div style="width:18%; background:var(--positive);"></div>
+          </div>
+          <div class="segmented-legend">
+            <div class="row"><span class="dot" style="background:var(--chart-1);"></span><span class="label">Investments</span><span class="amount">$204,110</span></div>
+            <div class="row"><span class="dot" style="background:var(--chart-3);"></span><span class="label">Real estate</span><span class="amount">$130,000</span></div>
+            <div class="row"><span class="dot" style="background:var(--positive);"></span><span class="label">Cash</span><span class="amount">$65,342</span></div>
+          </div>
+        </div>
+        <div style="margin-top:20px;">
+          <span class="eyebrow">Liabilities</span>
+          <div class="segmented-bar" style="margin-top:8px;">
+            <div style="width:100%; background:var(--warning);"></div>
+          </div>
+          <div class="segmented-legend">
+            <div class="row"><span class="dot" style="background:var(--warning);"></span><span class="label">Credit cards</span><span class="amount">$1,204</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-grid" style="grid-template-columns: 1fr 1fr 1fr;">
+      <div class="card">
+        <span class="card-title">Recent activity</span>
+        <table class="data-table">
+          <tbody>
+            <tr><td>Grocery Co. — Groceries</td><td class="amount negative">−$84.20</td></tr>
+            <tr><td>Employer — Salary</td><td class="amount positive">+$2,400.00</td></tr>
+            <tr><td>Streaming Svc — Subscriptions</td><td class="amount negative">−$12.99</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty state — ships M3, tax feature lands 1.0 (ARCH §2.4). Keeps
+           the real card chrome so the layout doesn't shift when it ships. -->
+      <div class="card">
+        <span class="eyebrow">Pending tax liability</span>
+        <p class="empty-state">Not set up yet. This card will show your pending liability, safe-harbor gap, and next due date once tax tracking ships.</p>
+      </div>
+
+      <!-- Empty state — ships M3, allocation view lands M4 -->
+      <div class="card">
+        <span class="eyebrow">Asset allocation</span>
+        <p class="empty-state">Not set up yet. This card will compare your actual allocation to your target once securities/lot tracking ships.</p>
+      </div>
+    </div>
+  </main>
+  </div>
+</div>
+</body>
+</html>
