@@ -1220,6 +1220,11 @@ table.data-table td.amount.negative { color: var(--destructive); }
    for.
    ===================================================================== */
 
+/* Stacked-card spacing applies to a vertical stack only. Inside a grid,
+   the gap does the spacing. Bug fix: the second and third cards of every
+   .card-grid row sat 24px low, including on the dashboard. */
+.card-grid > .card + .card { margin-top: 0; }
+
 /* Show-N select in an accordion header must never stretch. Bug fix: it
    inherited .select's width:100% and squeezed the header title. */
 .select.show-n-select { width: auto; flex-shrink: 0; }
