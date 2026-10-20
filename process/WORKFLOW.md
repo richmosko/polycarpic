@@ -59,9 +59,9 @@ How far a `/drive`-aimed [goal-driven loop](#goal-driven-loop-drive) runs before
 - **Activities:**
   - PM interviews the user via the `/generate-prd` skill (chatprd.ai-grounded template)
   - PM drafts user stories, success metrics, non-goals
-  - UX produces flows + wireframes in `docs/DESIGN/` via `/generate-designdoc` (late-phase, after stories stabilize) — the design system (`tokens.css`/`screen.css`) matures later, through Plan and Implement
+  - UX produces flows + the first styled screens in `docs/DESIGN/` via `/generate-designdoc` (late-phase, after stories stabilize; one fidelity tier, no separate wireframe pass) — the design system (`tokens.css`/`screen.css`) matures later, through Plan and Implement
   - SecEng surfaces regulatory and high-level security considerations (e.g. "this handles PHI" → flag for SECURITY.md later)
-- **Artifact:** `docs/PRD/index.html` (+ `docs/DESIGN/` flows & wireframes, late-phase)
+- **Artifact:** `docs/PRD/index.html` (+ `docs/DESIGN/` flows & styled screens, late-phase)
 - **Gate:** User approves PRD v1.
 
 ### Plan
@@ -486,7 +486,7 @@ To tear down: _"Clean up the team."_
 │   │   ├── design-system-spec.md  written spec
 │   │   ├── tokens.css             design tokens
 │   │   ├── screen.css             component/screen styles
-│   │   ├── wireframes/  flows/  styled-screens/
+│   │   ├── flows/  styled-screens/  history/
 │   └── _assets/                 shared CSS + mermaid loader
 ├── process/cairn/               the tracker's data — majors, milestones, issues, archive
 │                                (config.yml committed; see TRACKER.md)

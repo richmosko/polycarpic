@@ -48,7 +48,7 @@ The intent is to **preserve hard-won signal from the legacy artifact** while bri
 
 ## Collaboration
 
-- **UX Designer:** invite via `SendMessage` once user stories are stable. UX produces wireframes/sketches and feeds them back as Design Considerations in the PRD.
+- **UX Designer:** invite via `SendMessage` once user stories are stable. UX produces flows and styled screens and feeds them back as Design Considerations in the PRD.
 - **SecEng:** invite once at the end of Research to flag any high-level compliance/regulatory issues (e.g. "this handles PHI", "GDPR scope"). Don't write detailed controls — that's SECURITY.md's job during Plan.
 - **Architect:** at the Research→Plan gate, hand off the approved PRD. The architect will translate it to ARCH.
 

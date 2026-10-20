@@ -11,7 +11,7 @@ labels: [tooling]
 priority: null
 pr: null
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-10-20
 ---
 
 Umbrella for tooling gaps found while running the Plan team in parallel worktrees on 2026-09-28: issue-ID collisions, the hand-off location rule, priority validation at creation, and guard-push counting add-then-remove as a touch. Add further items here rather than filing one issue each.
@@ -27,3 +27,9 @@ Umbrella for tooling gaps surfaced 2026-09-28 while running the Plan team in par
 - [ ] **`cairn guard-push` counts a path added and removed within the range as touched.** A feature branch that briefly committed an out-of-scope file and then removed it is blocked even though the net diff against `main` is clean (POLY-78, 2026-09-28; fixed by rewriting unpushed commits). Decide whether the guard should judge the net diff, the per-commit touches, or both, and document it in TRACKER.md.
 - [ ] **Lead commits made from a teammate's worktree carry the teammate's git identity.** The lead's POLY-80 tracker done-flip (a771961) was authored as devops-engineer because it was committed inside that worktree, and guard-push attributes by author name, so it tripped the same check a real leak would. Either set the lead's identity explicitly (`git -c user.name=... commit`) in the merge flow, or have guard-push exempt the tracker done-flip commit shape. Document in the merge-pr skill.
 - [ ] **`cairn new` accepted `--priority high` and only failed at `cairn check`.** Validate the P0–P3 vocabulary at creation time.
+
+## Comments
+
+### @team-lead — 2026-10-20
+
+Tooling gap (2026-10-20): `test_prices_table` fails locally whenever the metrics worktree is present — `scripts/cairn/board/prices.json` has no rates for `claude-haiku-5-5` and `claude-sonnet-5-5`, which appear in `process/cairn/metrics/token-usage.jsonl`. CI passes only because the metrics file is absent there, so a local `--gate green` cannot go clean until the two rows are added. Owner: devops-engineer.

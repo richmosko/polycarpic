@@ -1,11 +1,11 @@
 ---
 name: generate-designdoc
-description: Generates or refines `docs/DESIGN/index.html` — the Design System & UX document — plus its deliverables (`tokens.css`, `screen.css`, `design-system-spec.md`, flows, wireframes, styled-screens). Use from late Research (flows + wireframes, once user stories stabilize) through Plan/Implement (the design system matures as screens get built), or whenever the user asks for the design system, UX flows, wireframes, or tokens. Driven by the `ux-designer` agent. Interview-driven; pairs with Figma for high-fidelity work.
+description: Generates or refines `docs/DESIGN/index.html` — the Design System & UX document — plus its deliverables (`tokens.css`, `screen.css`, `design-system-spec.md`, flows, styled-screens). Use from late Research (flows + the first styled screens, once user stories stabilize) through Plan/Implement (the design system matures as screens get built), or whenever the user asks for the design system, UX flows, screens, or tokens. Driven by the `ux-designer` agent. Interview-driven; pairs with Figma for high-fidelity work.
 ---
 
 # generate-designdoc
 
-You are populating `docs/DESIGN/` — the in-repo, code-level home for the design system and UX deliverables. Owned by the `ux-designer` agent. This is **cross-phase**: wireframes and flows start in late Research (after user stories stabilize); the design system (`tokens.css` / `screen.css`) matures through Plan and Implement.
+You are populating `docs/DESIGN/` — the in-repo, code-level home for the design system and UX deliverables. Owned by the `ux-designer` agent. This is **cross-phase**: flows and the first styled screens start in late Research (after user stories stabilize); the design system (`tokens.css` / `screen.css`) matures through Plan and Implement.
 
 Figma stays the high-fidelity design tool (via the `ux-designer`'s `figma:*` skills). `docs/DESIGN/` is the in-repo contract that ships with the project and that `frontend-lead` consumes directly — keep the two in sync (export tokens/specs here; pull frames via Code Connect there).
 
@@ -27,10 +27,9 @@ Work section by section. Use `AskUserQuestion` for converged decisions (palette 
 3. **Design Tokens** (`#tokens`) — write real values into `tokens.css`: color (semantic roles + contrast pairings), typography (families/scale/weights/leading), spacing scale, radius, shadow, motion, layout/breakpoints. The swatch preview in `index.html` reads these live.
 4. **Components & Screen Styles** (`#components`) — the component inventory; for each, document **all states** (default/hover/focus-visible/active/disabled/loading/error) in `design-system-spec.md` and implement token-backed styles in `screen.css`. Never hardcode a value — reference a `--token`.
 5. **User Flows** (`#flows`) — Mermaid `flowchart` for the top 3–8 PRD stories. First-pass inline in `index.html`; promote complex flows to files in `flows/`.
-6. **Wireframes** (`#wireframes`) — low-fi layout per key screen; assets in `wireframes/`. Promote to Figma for anything shipping.
-7. **Styled Screens** (`#styled-screens`) — hi-fi HTML mockups in `styled-screens/` that link `tokens.css` + `screen.css`. These double as a visual-regression reference and a head-start for `frontend-lead`.
-8. **Accessibility** (`#accessibility`) — target standard (default WCAG AA) + deliberate exceptions with rationale. Mirror into `design-system-spec.md`.
-9. **Open Questions** (`#open-questions`) — unresolved design decisions; drives the next conversation.
+6. **Screens** (`#screens`) — one fidelity tier: every page is a hi-fi HTML mockup in `styled-screens/` that links `tokens.css` + `screen.css`, with a thumbnail gallery in `index.html`. No separate low-fi wireframe pass (DECISIONS 2026-10-20); superseded sketches go to `history/`. The screens double as a visual-regression reference and a head-start for `frontend-lead`.
+7. **Accessibility** (`#accessibility`) — target standard (default WCAG AA) + deliberate exceptions with rationale. Mirror into `design-system-spec.md`.
+8. **Open Questions** (`#open-questions`) — unresolved design decisions; drives the next conversation.
 
 ## Writing to the files
 
@@ -44,4 +43,4 @@ Work section by section. Use `AskUserQuestion` for converged decisions (palette 
 1. Update the PRD's **Design Considerations** (`#design`) section with a link to `docs/DESIGN/` and a one-line rationale for each major interaction choice — `SendMessage` the `product-manager` if they own that edit.
 2. `SendMessage` to `frontend-lead`: "Design system v1 in `docs/DESIGN/` — `tokens.css` + `screen.css` are the contract; flag anything missing for the screens you're about to build."
 3. `/open-doc docs/DESIGN/index.html` for user review (or `/serve-docs DESIGN` to review with the inline comment widget, then `/refine-doc DESIGN`).
-4. Promote shipping wireframes/screens to Figma via the `figma:*` skills; keep the exported stills + token specs in `docs/DESIGN/` as the in-repo record.
+4. Promote shipping screens to Figma via the `figma:*` skills; keep the exported stills + token specs in `docs/DESIGN/` as the in-repo record.
