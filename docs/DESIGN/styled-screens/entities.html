@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Entities</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<!-- Entities (pass 5; styled pass 13). One card per entity the user belongs to. A Household's membership never implies access to a member Person's finances, or vice versa: every grant is an explicit row here. Role badges use decreasing weight: Owner (default) / Manager (secondary) / Viewer (outline). Invite shows only where the user is an Owner of a multi-member entity in this mock. -->
+<div class="shell">
+  <aside class="sidebar" id="app-sidebar">
+    <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
+         panel-left-close right-aligned; collapsed = logo mark only, which
+         is itself the expand button — swaps to panel-left-open with an
+         "Expand sidebar" tooltip on hover / keyboard focus. -->
+    <div class="sidebar-top">
+      <div class="brand-lockup"><span class="brand-icon"></span><span class="sidebar-brand-label">Polycarpic</span></div>
+      <button class="sidebar-collapse" type="button" aria-label="Collapse sidebar" title="Collapse sidebar" aria-expanded="true" aria-controls="app-sidebar" onclick="document.getElementById('app-sidebar').classList.add('collapsed')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg></button>
+      <button class="sidebar-expand" type="button" aria-label="Expand sidebar" aria-expanded="false" aria-controls="app-sidebar" onclick="document.getElementById('app-sidebar').classList.remove('collapsed')"><span class="brand-icon"></span><span class="sidebar-expand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg></span><span class="sidebar-tooltip" role="tooltip">Expand sidebar</span></button>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="dashboard.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="transactions.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg></span><span class="nav-label">Transactions</span></a>
+      <a class="nav-item" href="general-ledger.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h6"/><path d="M8 11h8"/></svg></span><span class="nav-label">General Ledger</span></a>
+      <a class="nav-item" href="custodial-accounts.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="nav-label">Custodial Accounts</span></a>
+      <a class="nav-item" href="allocation.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span><span class="nav-label">Allocation</span></a>
+      <a class="nav-item" href="reports.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span><span class="nav-label">Reports</span></a>
+      <a class="nav-item active" href="entities.html" aria-current="page"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="nav-label">Entities</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="sidebar-avatar-trigger">
+        <span class="avatar">M</span>
+        <span class="sidebar-user-name">Mosko</span>
+        <span class="sidebar-user-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="shell-main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <nav class="breadcrumbs" aria-label="Breadcrumb"><span class="crumb">Entities</span></nav>
+      </div>
+      <div class="topbar-right">
+        <button class="entity-selector">
+          <span class="entity-selector-name">Mosko (Person)</span>
+          <span class="avatar-cluster"><span class="avatar">M</span></span>
+        </button>
+        <span class="topbar-separator"></span>
+        <div class="more-menu-wrap">
+          <button class="icon-btn" title="More" aria-label="More actions" aria-haspopup="menu"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></span></button>
+        </div>
+      </div>
+    </div>
+
+  <main class="content" style="padding-top:8px;">
+    <div class="card-grid" style="grid-template-columns:repeat(2, 1fr);">
+      <div class="card entity-card">
+        <div class="entity-head"><span class="entity-name">Mosko</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>Person</span></div>
+        <div class="member-row"><span class="avatar">M</span><span class="member-name">You</span><span class="badge badge-default">Owner</span></div>
+      </div>
+      <div class="card entity-card">
+        <div class="entity-head"><span class="entity-name">The Moskos</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Household</span></div>
+        <div class="member-row"><span class="avatar">M</span><span class="member-name">You</span><span class="badge badge-default">Owner</span></div>
+        <div class="member-row"><span class="avatar">S</span><span class="member-name">Sam Mosko</span><span class="badge badge-outline">Viewer</span></div>
+        <div style="padding-top:12px; border-top:1px solid var(--border);"><button class="btn btn-outline btn-sm"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></span>Invite member</button></div>
+      </div>
+      <div class="card entity-card">
+        <div class="entity-head"><span class="entity-name">Family Trust</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Trust</span></div>
+        <div class="member-row"><span class="avatar">M</span><span class="member-name">You</span><span class="badge badge-secondary">Manager</span></div>
+      </div>
+      <div class="card entity-card">
+        <div class="entity-head"><span class="entity-name">Mosko Consulting LLC</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></span>Business</span></div>
+        <div class="member-row"><span class="avatar">M</span><span class="member-name">You</span><span class="badge badge-default">Owner</span></div>
+      </div>
+    </div>
+    <div class="card" style="margin-top:24px;">
+      <div class="card-title">Create a new entity</div>
+      <div class="form-row">
+        <div class="field"><label for="new-entity">Entity name</label><input id="new-entity" class="input" type="text" placeholder="e.g. Family Trust"></div>
+        <div class="field"><label for="new-type">Type</label><select id="new-type" class="select"><option>Person</option><option>Trust</option><option>Business</option><option>Household</option></select></div>
+        <button class="btn btn-default"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>Create entity</button>
+      </div>
+    </div>
+  </main>
+  </div>
+</div>
+</body>
+</html>
