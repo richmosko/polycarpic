@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Phase:** Plan — milestone `POLY-C` (ARCH + SECURITY + INFRA, design system in `docs/DESIGN/`, throwaway prototype at `prototype/`, GL build-vs-adopt and migration-tool research, product milestones `POLY-M1…` created and GA designated). Research gate approved 2026-09-27: PRD v1 at [`docs/PRD/index.html`](../docs/PRD/index.html); `POLY-B` closed and archived. Opening moves run in parallel: ux-designer builds the design system + wireframes with the Principal (`/generate-designdoc`), architect starts the layer model and GL research (`/generate-archdoc`); seceng and devops-engineer join once ARCH v1 exists. Hand-offs for the architect and seceng are in `temp/` (`prd-spillover-arch.md`, `seceng-research-notes.md`).  
+**Phase:** Plan — milestone `POLY-C` (ARCH + SECURITY + INFRA, design system in `docs/DESIGN/`, throwaway prototype at `prototype/`, GL build-vs-adopt and migration-tool research, product milestones `POLY-M1…` created and GA designated). Research gate approved 2026-09-27: PRD v1 at [`docs/PRD/index.html`](../docs/PRD/index.html); `POLY-B` closed and archived. Opening moves run in parallel: ux-designer builds the design system + styled screens with the Principal (`/generate-designdoc`), architect starts the layer model and GL research (`/generate-archdoc`); seceng and devops-engineer join once ARCH v1 exists. Hand-offs for the architect and seceng are in `temp/` (`prd-spillover-arch.md`, `seceng-research-notes.md`).  
 **Started:** 2026-09-27  
 **Driver agent:** architect (ux-designer drives the design-system track)  
 **Gate criteria:** _see [`WORKFLOW.md`](WORKFLOW.md)_
