@@ -234,7 +234,7 @@ Both clear the 3:1 non-text floor, and the dark-mode value clears 4.5:1 too. Off
 | Sidebar brand row, expanded | 24px, left of the wordmark | `--sidebar-brand` | see above |
 | Sidebar rail, collapsed | 24px, the expand button's resting face; swaps to `panel-left-open` on hover or keyboard focus | `--sidebar-brand` | see above |
 | Shell-less app bar (membership setup, Admin) | 24px | `--primary` | 4.75:1 light, 14.72:1 dark |
-| Home hero (`.landing-brand`) | Full, 32px, left of the "Polycarpic" wordmark | Literal `--brand` on the fixed dark hero | 14.72:1 |
+| Home top bar (`.landing-brand`) | Full, 32px, left of the "Polycarpic" wordmark, left-justified in the fixed black bar | Literal `--brand` on the bar (`#070907`) | 14.72:1 |
 | Login form pane (`.auth-logo`) | 24px, left of the wordmark, top-left | `--primary` | 4.75:1 light, 14.72:1 dark |
 
 `.brand-mark` is the SVG's own class; Home's lockup container is `.landing-brand`.
@@ -502,7 +502,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Popover / DropdownMenu** | Avatar popover at the sidebar's bottom — profile, **Settings (proposed)**, **Notifications (proposed)**, preferences, theme, keyboard shortcuts, Log out last (see Sidebar); the same primitive backs the top row's "more" menu |
 | **Breadcrumb** | The top row's "page title > breadcrumbs" — single crumb on most screens, multi-crumb on drill-downs (the account register) |
 | **Avatar cluster** | Overlapping initials-on-`--secondary` circles in the entity selector — membership at a glance, max 3 + overflow (see Header) |
-| **Public hero + feature call-outs** | Home — pre-auth landing page, product statement + brand identity + CTAs |
+| **Landing top bar + illustration + feature call-outs** | Home — pre-auth landing page: fixed black top bar (lockup, CTAs) with a fade over the mountains illustration, then headline, subhead and three feature cards |
 | **Split screen login** | Login — theme-aware form pane (full field list: OAuth, email, password + reveal + forgot-password, sign-in, sign-up link, legal footer) + always-branded visual pane, stacks on phone width |
 
 **Page actions live in the "more" menu.** Monarch puts a page's actions in its top bar as visible buttons (page title + an outline action + a filled CTA). Here, a page's global actions (Dashboard's Refresh; Transactions' Sync Transactions and New entry) live in the top row's contextual "more" menu instead (§ Header), and posting happens per item in the Pending inbox, never as a single batch "confirm all".
@@ -605,7 +605,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Progress (import batch, safe-harbor paid-vs-required) | **Progress** | Direct reuse |
 | Skeleton | **Skeleton** | Direct reuse |
 | Tooltip (icon-button titles, truncated text, the rail's "Expand sidebar") | **Tooltip** | Direct reuse — used wherever an icon-only control needs a text label on hover |
-| Public hero (Home) | `custom` | Marketing/landing content; no shadcn block fits a bespoke brand hero |
+| Landing top bar + illustration (Home) | `custom`, with **Button** for the CTAs | Marketing/landing content; no shadcn block fits a fixed brand bar with a fade over a full-bleed illustration |
 | Split-screen login | shadcn-svelte's own **login block** (`https://shadcn-svelte.com/blocks/login`, the two-pane pattern) as a starting point, customized | The reference screenshot (`temp/design-refs/split-login-example.png`) is close to this official block's shape; adopted as the base rather than built from scratch, then customized for our exact field list (§ Public screens: Home & Login) |
 
 **What's deliberately `custom` and why that's still "sticking to the designed stuff":** every `custom` row above is custom because shadcn-svelte genuinely has no matching primitive or block — not because an existing one was skipped. Each is built *from* shadcn-svelte primitives (Avatar, Popover, Card, Button) rather than from scratch, so the stability this is after — consistent tokens, consistent interaction patterns, one accessibility baseline — still holds even where the composition itself is ours.
@@ -638,13 +638,24 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 
 ### Home — public landing page
 
-**What it is:** the marketing/landing page a visitor sees before signing in — not a Dashboard, not authenticated, no ledger data. One screen, hero-led:
-- **Hero:** the seedling mark + "Polycarpic" wordmark, a product statement, and the neon-green brand identity front and center (a prime "dark or brand surface" context, so `--brand` at full strength is appropriate here, unlike anywhere in the authenticated app).
-- **What it does, in one screen:** a genuine double-entry ledger, multi-entity (Person/Trust/Business/Household), self-hosted — three short feature call-outs, not an exhaustive feature list.
-- **Calls to action:** "Sign in" and "Get started" (routes to Login).
-- **Footer:** minimal — links, no dense content.
+**What it is:** the marketing/landing page a visitor sees before signing in — not a Dashboard, not authenticated, no ledger data. Top to bottom:
 
-The hero band is fixed dark; the feature and footer sections follow the user's stored theme preference like the rest of the app (a landing page's canvas below the hero is content, not brand chrome). See `styled-screens/home.html`.
+- **Fixed top bar** (`.landing-topbar`, 72px; 64px below 760px). Near-black `#070907`, the brand's dark surface, the same in both themes.
+  - Left: the lockup, left-justified (full seedling mark + "Polycarpic" in the literal `--brand`, 14.72:1). It is a link to the top of Home.
+  - Right: **Get started** (neon fill, near-black ink) and **Sign in** (outline).
+  - Under the bar hangs a fixed fade (88px, near-black → transparent). The page scrolls under the black and emerges through the gradient, so the black-and-neon identity stays on screen at every scroll position. The fade never takes clicks.
+- **The mountains illustration** (`.landing-art`), full width, 560px tall (360px below 760px), starting directly under the bar. At rest, the bar's fade lies over the image's top edge and the sky shows through it. Neon and near-white text sit only on the bar's solid black, never on the sky.
+- **Headline and subhead** (`.landing-intro`), then the **three feature call-outs** and a minimal **footer**. These follow the user's stored theme like the rest of the app.
+
+**Clearance and order:**
+- The image starts at the bar's height (`margin-top: var(--topbar-h)`), so nothing renders under the bar at rest.
+- `scroll-padding-top` keeps in-page anchors and focus scrolling clear of the bar.
+- Keyboard order follows the DOM: lockup, Get started, Sign in, then the page.
+- The page paints `--background` edge to edge; the global body canvas is `--muted`, which differs in dark mode.
+
+**Image:** `brand/polycarpic-bg-mountains.jpeg` (1600w, 242 KB) and `polycarpic-bg-mountains-3200.jpeg` (3200w, 607 KB), served by `srcset` with `sizes="100vw"`. Both are derived from a 4096px Real-ESRGAN (Upscayl, digital-art) upscale; no smaller original exists, and the PNG is not committed. Decorative: empty alt, hidden from assistive tech.
+
+See `styled-screens/home.html`.
 
 ### Login — split screen login page
 
@@ -696,7 +707,7 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 **Target: WCAG AA.** Every pair below is computed via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (scripts in `temp/`). See `tokens.html` for every token's value in both modes with a rendered swatch, alongside this written derivation.
 
-**Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` use the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
+**Home's top bar and Login's visual-pane colors are not new values** — `.landing-topbar`/`.auth-visual-pane` use the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
 
 **Light mode — text pairs (floor 4.5:1), all PASS (canvas = `--muted` = `#F9F8F8`, hover fill `--accent` `#EBF4F9`):**
 
