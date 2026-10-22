@@ -52,7 +52,19 @@
   </div>
 
   <div class="auth-visual-pane">
-    <img class="visual-art" src="../brand/polycarpic-bg-forest.jpeg" alt="" aria-hidden="true">
+    <!-- The art covers a tall pane, so the image's rendered side is the
+         larger of the pane's height (100vh - 48px) and width (50vw - 24px);
+         width wins only on viewports wider than ~2:1. `sizes` states that
+         side and the browser picks from srcset by it times the device pixel
+         ratio: a 1x desktop fetches the 1024px file, 2x the 2048, large
+         retina the 3072. -->
+    <img class="visual-art"
+         src="../brand/polycarpic-bg-forest.jpeg"
+         srcset="../brand/polycarpic-bg-forest.jpeg 1024w,
+                 ../brand/polycarpic-bg-forest-2048.jpeg 2048w,
+                 ../brand/polycarpic-bg-forest-3072.jpeg 3072w"
+         sizes="(min-aspect-ratio: 2/1) calc(50vw - 24px), calc(100vh - 48px)"
+         alt="" aria-hidden="true">
     <div class="visual-caption">One ledger. Every entity. Self-hosted.</div>
   </div>
 </div>
