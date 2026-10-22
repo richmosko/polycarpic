@@ -49,18 +49,19 @@
   </div>
 
   <div class="auth-visual-pane">
-    <!-- The art covers a tall pane, so the image's rendered side is the
-         larger of the pane's height (100vh - 48px) and width (50vw - 24px);
-         width wins only on viewports wider than ~2:1. `sizes` states that
-         side and the browser picks from srcset by it times the device pixel
-         ratio: a 1x desktop fetches the 1024px file, 2x the 2048, large
-         retina the 3072. -->
-    <img class="visual-art"
-         src="../brand/polycarpic-bg-forest.jpeg"
-         srcset="../brand/polycarpic-bg-forest.jpeg 1024w,
-                 ../brand/polycarpic-bg-forest-2048.jpeg 2048w,
-                 ../brand/polycarpic-bg-forest-3072.jpeg 3072w"
-         sizes="(min-aspect-ratio: 2/1) calc(50vw - 24px), calc(100vh - 48px)"
+    <!-- Sign up's own art: the sunrise over the peaks (portrait, 3:4), so
+         joining an instance reads differently from returning to it. Cover
+         crops the sides; the image's rendered width is the pane height
+         x 0.75, or the pane width on viewports wider than about 3:2, and
+         `sizes` states that width so the browser fetches only what it
+         needs: a 1x desktop gets the 1024px file, 2x the 2048, large retina
+         the 3072. -->
+    <img class="visual-art visual-art--sunrise"
+         src="../brand/polycarpic-bg-sunrise-tall.jpeg"
+         srcset="../brand/polycarpic-bg-sunrise-tall.jpeg 1024w,
+                 ../brand/polycarpic-bg-sunrise-tall-2048.jpeg 2048w,
+                 ../brand/polycarpic-bg-sunrise-tall-3072.jpeg 3072w"
+         sizes="(min-aspect-ratio: 3/2) calc(50vw - 24px), calc((100vh - 48px) * 0.75)"
          alt="" aria-hidden="true">
   </div>
 </div>

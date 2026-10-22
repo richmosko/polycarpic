@@ -1278,6 +1278,10 @@ a.btn { text-decoration: none; }
   object-fit: cover;
   object-position: 78% 70%;
 }
+/* Sign up's sunrise (portrait 3:4): the sun and the lit peaks sit on the
+   vertical centre line, so the crop stays centred horizontally; vertically
+   it favours the sunrise and the near ridges over the top of the sky. */
+.auth-visual-pane .visual-art--sunrise { object-position: 50% 62%; }
 
 @media (max-width: 760px) {
   .auth-shell { grid-template-columns: 1fr; }

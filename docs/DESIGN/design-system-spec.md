@@ -685,7 +685,7 @@ There is no public sign-up: every instance is self-hosted, and accounts on it co
   - "I'm setting up my own instance", which scrolls to the walkthrough (`dark` button).
 
   The walkthrough sits directly below as four numbered steps: requirements, deploy, first operator sign-in, invite members. It is an outline that grows as the deployment docs are written.
-- **Sign up** (`sign-up.html`, Login's split layout and forest pane), invite-gated:
+- **Sign up** (`sign-up.html`, Login's split layout with its own visual pane, the sunrise; see **Visual-pane image sources**), invite-gated:
   - Fields, in order: the invite code, then the account (the `dark` Google button, or email + password).
   - From an invite link, the code arrives pre-filled and validated, with a line naming who invited the visitor and to which entity. An invalid or used code shows an inline error under the field.
   - "Create account" hands off to Membership setup, where the invited entity is waiting.
@@ -714,6 +714,16 @@ Two references: `useorigin.com`'s own login (dark, brand pane + form card — be
 | `polycarpic-bg-forest-3072.jpeg` | 3072 | 575 KB | 2× at 1440×1440 (needs 2784px); 3× screens |
 
 The 2048/3072 files come from a 3× Real-ESRGAN upscale of the 1024px original (Upscayl, digital-art model), encoded as progressive JPEG (quality 95 and 89, chosen to land in a 400–700 KB budget). The upscale is faithful in structure. Compared with the original it carries a slight teal/saturation lift: hue +3–5°, saturation up to +7% in the glow plants and stream, lightness unchanged; mean difference 2–4/255 per channel. It also has cleaner, slightly simplified leaf edges, a faint light rim around the glow plants, and a few isolated single specks in the canopy. None of these reads at panel size. A native high-resolution export from the source artwork would remove them, if one is ever produced. The lossless 3072px PNG upscale is not committed.
+
+**Sign up's pane** shows the sunrise over the peaks (`visual-art--sunrise`), so joining an instance reads differently from returning to it. The art is portrait (3:4), so `cover` crops the sides; `object-position: 50% 62%` keeps the sun and the lit peaks centred at 960 and 1280. Because the image is not square, its `sizes` differs from Login's: the rendered width is the pane height × 0.75, or the pane width on viewports wider than about 3:2 (`sizes="(min-aspect-ratio: 3/2) calc(50vw - 24px), calc((100vh - 48px) * 0.75)"`). With the square formula, a 3× screen would fetch the 3072 file where the 2048 covers it.
+
+| File | Pixels | Size | Picked when (measured in headless Chrome) |
+|---|---|---|---|
+| `polycarpic-bg-sunrise-tall.jpeg` | 1024×1371 | 290 KB | 1× desktops (960×900, 1280×900: needs ~640px) |
+| `polycarpic-bg-sunrise-tall-2048.jpeg` | 2048×2743 | 690 KB | 2× at 1280×900 (needs ~1280px); 3× at 1280×900 (~1920px); 1× ultra-wide 2560×1000 (pane 1256px wide) |
+| `polycarpic-bg-sunrise-tall-3072.jpeg` | 3072×4114 | 917 KB | 2× at 1440×1440 (needs ~2090px) |
+
+The 1024 file is encoded from the 1792×2400 original; the 2048/3072 files from its 2× Real-ESRGAN upscale (Upscayl, digital-art model). All are progressive JPEGs under 1 MB. Neither source file is committed.
 
 See `styled-screens/login.html`.
 
