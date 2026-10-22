@@ -40,19 +40,15 @@ h1, h2, h3, .heading {
   color: var(--muted-foreground);
 }
 
-/* ---------- Shell (pass 9, 2026-10-10 — Principal review 6): refined
-   again on the shadcn Sidebar pattern, this time matching its sidebar-07
-   block specifically (https://ui.shadcn.com/view/new-york-v4/sidebar-07,
-   temp/design-refs/shadcn-sidebar-07*.png). Three changes from pass 8:
-   (1) the sidebar is now a true floating card — rounded on all four
-   corners, with a gutter on every side, not just flush-left with a
-   rounded inner edge; (2) the top row is no longer a persistent/sticky
-   header — it scrolls with the page and shares the main area's own
-   background token, no distinct surface, no border; (3) the top row's
-   contents are reduced to navigation chrome only (breadcrumb, entity
-   selector, a contextual "more" menu; expand/collapse moved into the
-   sidebar's brand row, pass 12) — AI/search/
-   notifications/gear are dropped (see § Header, "Top row"). */
+/* ---------- Shell: shadcn's sidebar-07 block
+   (https://ui.shadcn.com/view/new-york-v4/sidebar-07). (1) The sidebar is
+   a floating card, rounded on all four corners with a gutter on every
+   side. (2) There is no persistent header: the top row scrolls with the
+   page and shares the main area's background token, with no distinct
+   surface and no border. (3) The top row holds navigation chrome only
+   (breadcrumb, entity selector, a contextual "more" menu); expand/collapse
+   lives in the sidebar's brand row. AI/search/notifications/gear are not
+   in it (see § Header, "Top row"). */
 .shell {
   --shell-gutter: 16px;
   min-height: 100vh;
@@ -67,10 +63,9 @@ h1, h2, h3, .heading {
   min-width: 0; /* lets long breadcrumb/page-title text truncate instead of overflowing the row */
 }
 
-/* Top row (pass 9, renamed from "Header" — it's no longer a header
-   surface at all). Same background token as the content below it
-   (`--background`), not `--card`; not sticky/fixed; no border. Scrolls
-   away with the rest of the page. */
+/* Top row: not a header surface. Same background token as the content
+   below it (`--background`), not `--card`; not sticky/fixed; no border.
+   Scrolls away with the rest of the page. */
 .topbar {
   display: flex;
   align-items: center;
@@ -82,18 +77,16 @@ h1, h2, h3, .heading {
 .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .topbar-right { display: flex; align-items: center; gap: 10px; margin-left: auto; }
 
-/* Vertical separator (pass 9; pass 12 leaves one) — right-justified,
-   between the entity selector and the "more" menu. The left-hand one
-   left with the expand/collapse icon (pass 12, see .sidebar-top). */
+/* Vertical separator, right-justified, between the entity selector and
+   the "more" menu. */
 .topbar-separator { width: 1px; height: 20px; background: var(--border); flex-shrink: 0; }
 
 /* The sidebar's expand/collapse control lives in the sidebar's own brand
-   row as of pass 12 (2026-10-19) — see .sidebar-collapse / .sidebar-expand
-   below. Pass 8/9's top-row .sidebar-toggle-header is retired. */
+   row, not the top row: see .sidebar-collapse / .sidebar-expand below. */
 
-/* Bare-glyph sizing inside the avatar trigger's chevron (pass 9 addendum
-   bug fix: never put the generic 16px .icon class on the container
-   itself — it shrinks the whole span). */
+/* Bare-glyph sizing inside the avatar trigger's chevron. Never put the
+   generic 16px .icon class on the container itself: it shrinks the whole
+   span. */
 .sidebar-user-chevron svg {
   width: 18px;
   height: 18px;
@@ -101,11 +94,11 @@ h1, h2, h3, .heading {
   stroke: currentColor;
 }
 
-/* Page title > breadcrumbs (pass 8) — most screens are a single crumb
-   (e.g. "Transactions"); a drill-down page (the account register) shows
-   its full path (e.g. "General Ledger > Primary Checking"). This is now
-   the ONLY place the page title renders — screens no longer repeat it as
-   an <h1> in the content column (design-system-spec.md § Header). */
+/* Page title > breadcrumbs. Most screens are a single crumb (e.g.
+   "Transactions"); a drill-down page (the account register) shows its full
+   path (e.g. "General Ledger > Primary Checking"). This is the ONLY place
+   the page title renders; screens do not repeat it as an <h1> in the
+   content column (design-system-spec.md § Header). */
 .breadcrumbs {
   display: flex;
   align-items: center;
@@ -120,12 +113,12 @@ h1, h2, h3, .heading {
 .breadcrumbs .crumb:last-child { color: var(--foreground); font-weight: 600; }
 .breadcrumbs .crumb-sep { color: var(--muted-foreground); display: flex; }
 
-/* "More" menu (pass 9, new) — the top row's only remaining right-side
-   icon besides the entity selector. Contextual per page view: its
-   contents are that page's global actions (Sync, New entry, export,
-   ...), defined per screen in design-system-spec.md § Header. AI/
-   search/notifications/settings are NOT here — see § Header for where
-   those are proposed instead (avatar popover, keyboard shortcut). */
+/* "More" menu: the top row's only right-side icon besides the entity
+   selector. Contextual per page view: its contents are that page's global
+   actions (Sync, New entry, export, ...), defined per screen in
+   design-system-spec.md § Header. AI/search/notifications/settings are
+   NOT here; see § Header for their proposed entry points (avatar popover,
+   keyboard shortcut). */
 .icon-btn {
   width: 32px;
   height: 32px;
@@ -139,10 +132,10 @@ h1, h2, h3, .heading {
   cursor: pointer;
   position: relative;
 }
-.icon-btn:hover { background: var(--accent); color: var(--accent-foreground); } /* pass 11f: hovers on --accent, not --muted (--muted = page by ruling) */
+.icon-btn:hover { background: var(--accent); color: var(--accent-foreground); } /* hovers on --accent, never --muted (--muted = the page) */
 .icon-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
 .icon-btn[disabled]:hover { background: none; }
-.icon-btn.active { background: var(--accent); color: var(--primary); } /* pass 11f: active fill on --accent; --primary icon 4.52:1 on it */
+.icon-btn.active { background: var(--accent); color: var(--primary); } /* active fill on --accent; --primary icon 4.52:1 on it */
 
 .more-menu-wrap { position: relative; }
 .more-menu {
@@ -159,9 +152,8 @@ h1, h2, h3, .heading {
   z-index: 10;
 }
 
-/* Product icon + wordmark — pass 8: moved from the header into the
-   sidebar's own top item (was .brand-lockup in the header, pass 5). Class
-   name kept the same; only its container moved — see .sidebar-top below. */
+/* Product mark + wordmark: the sidebar's top item (see .sidebar-top
+   below). */
 .brand-lockup {
   display: flex;
   align-items: center;
@@ -171,13 +163,12 @@ h1, h2, h3, .heading {
   font-size: 16px;
 }
 
-/* Brand mark (pass 14): the Principal's seedling, traced from
-   brand/logo.jpeg to an inline SVG stroked in currentColor. No tile behind
-   it: the line art sits directly on the surface, as it does on the
-   source's slate. Off the sidebar (shell-less app bar) it takes --primary;
-   in the sidebar it takes --sidebar-brand (below). 24px uses the
-   simplified mark (no midribs, 1.5 stroke). See design-system-spec.md
-   § Brand mark. */
+/* Brand mark: the seedling, traced from brand/logo.jpeg to an inline SVG
+   stroked in currentColor. No tile behind it: the line art sits directly
+   on the surface, as it does on the source's slate. Off the sidebar
+   (shell-less app bar) it takes --primary; in the sidebar it takes
+   --sidebar-brand (below). 24px uses the simplified mark (no midribs,
+   1.5 stroke). See design-system-spec.md § Brand mark. */
 .brand-icon {
   width: 24px;
   height: 24px;
@@ -188,9 +179,8 @@ h1, h2, h3, .heading {
 .brand-icon .brand-mark { display: block; width: 100%; height: 100%; }
 .sidebar .brand-icon { color: var(--sidebar-brand); }
 
-/* Entity selector — entity name + avatar cluster, opens the switcher on
-   click. Stays in the header's right-justified icon row (pass 8,
-   unchanged position from pass 5's "Right: entity selector"). */
+/* Entity selector: entity name + avatar cluster, opens the switcher on
+   click. First item in the top row's right-justified group. */
 .entity-selector {
   display: flex;
   align-items: center;
@@ -201,7 +191,7 @@ h1, h2, h3, .heading {
   background: none;
   border: none;
 }
-.entity-selector:hover { background: var(--accent); } /* pass 11f: was --muted; name keeps --foreground (14.85:1 on --accent) */
+.entity-selector:hover { background: var(--accent); } /* name keeps --foreground (14.85:1 on --accent) */
 .entity-selector .entity-selector-name { font-size: 14px; font-weight: 500; color: var(--foreground); }
 
 /* Avatar cluster — overlapping circles representing the entity's
@@ -231,27 +221,21 @@ h1, h2, h3, .heading {
 .avatar-cluster .avatar:first-child { margin-left: 0; }
 .avatar-cluster .avatar.overflow { background: var(--muted); color: var(--muted-foreground); }
 
-/* ---------- Sidebar (pass 8; floating card w/ gutter pass 9, 2026-10-10
-   — Principal review 6, matching shadcn's sidebar-07 block exactly):
-   fills the entire viewport HEIGHT, not the page height — `position:
-   fixed`, so its bottom edge (the avatar trigger) is always visible
-   regardless of how long the page scrolls OR how much content sits above
-   the shell in the DOM (`position: sticky` against `.shell`'s flex row,
-   tried pass 8, still inherits the shell's own document-flow offset —
-   `fixed` pins it to the viewport itself, not the document).
-   **Pass 9: a true floating card, not a flush rail.** Pass 8 rounded
-   only the inner edge and ran flush to three of four sides; the
-   Principal: "the rounded corners on the sidebar should be on all 4
-   corners... with the appropriate border spacing." `top`/`left`/`bottom`
-   are now all inset by `--shell-gutter` instead of `height: 100vh` at
-   `top:0; left:0` — the card's height is implicit (the inset top/bottom
-   pair), not a fixed `100vh`. `.shell-main` carries a matching
-   `margin-left` (gutter + sidebar width + a matching gutter before the
-   content starts) since the sidebar is out of normal flow. Composition,
-   top to bottom: brand item (logo + wordmark) → nav (seven items,
-   Settings removed, see design-system-spec.md § Sidebar information
-   architecture) → avatar trigger (opens the user-menu popover, now to
-   its RIGHT — see .avatar-popover below). */
+/* ---------- Sidebar: a floating card (shadcn sidebar-07). It fills the
+   viewport HEIGHT, not the page height: `position: fixed`, so its bottom
+   edge (the avatar trigger) is always visible however long the page
+   scrolls or however much content sits above the shell in the DOM.
+   (`position: sticky` against `.shell`'s flex row inherits the shell's
+   document-flow offset; `fixed` pins it to the viewport itself.)
+   `top`/`left`/`bottom` are all inset by `--shell-gutter`, so the card's
+   height is implicit (the inset pair), not a literal `100vh`, which is
+   what gives it a gutter on every side. `.shell-main` carries a matching
+   `margin-left` (gutter + sidebar width + gutter) because the sidebar is
+   out of normal flow. Composition, top to bottom: brand row (mark +
+   wordmark + collapse control) → nav (seven items, see
+   design-system-spec.md § Sidebar information architecture) → avatar
+   trigger (opens the user-menu popover to its RIGHT, see .avatar-popover
+   below). */
 .sidebar {
   background: var(--sidebar);
   color: var(--sidebar-foreground);
@@ -281,16 +265,14 @@ h1, h2, h3, .heading {
    a CSS relational selector. */
 .shell:has(.sidebar.collapsed) .shell-main { margin-left: calc(64px + 2 * var(--shell-gutter, 16px)); }
 
-/* Top item — brand row (pass 8: moved here from the header; pass 12,
-   2026-10-19: carries the expand/collapse control — Gemini's pattern,
-   Principal direction). Expanded: logo + wordmark left, a Lucide
-   `panel-left-close` icon button right-aligned in the same row.
-   Collapsed rail: the row reduces to the logo mark alone, and the logo
-   mark IS the expand button — on :hover or :focus-visible the logo swaps
-   to a Lucide `panel-left-open` glyph and an "Expand sidebar" tooltip
-   opens to the right. Two buttons in the mockup, shown/hidden by
-   .collapsed; the real app renders one or the other from the sidebar's
-   collapsed store. */
+/* Top item: the brand row, which also carries the expand/collapse
+   control (the gemini.google.com pattern). Expanded: mark + wordmark
+   left, a Lucide `panel-left-close` icon button right-aligned in the same
+   row. Collapsed rail: the row reduces to the mark alone, and the mark IS
+   the expand button; on :hover or :focus-visible it swaps to a Lucide
+   `panel-left-open` glyph and an "Expand sidebar" tooltip opens to the
+   right. Two buttons in the mockup, shown/hidden by .collapsed; the real
+   app renders one or the other from the sidebar's collapsed store. */
 .sidebar-top {
   display: flex;
   align-items: center;
@@ -391,9 +373,9 @@ h1, h2, h3, .heading {
   overflow: hidden;
 }
 
-/* Pass 9: a real Lucide icon (inline SVG, stroke: currentColor), not a
-   solid placeholder block — see design-system-spec.md § Component
-   inventory for the icon name per nav item. */
+/* A real Lucide icon (inline SVG, stroke: currentColor), not a solid
+   placeholder block; see design-system-spec.md § Icon inventory for the
+   icon name per nav item. */
 .sidebar .nav-item .nav-icon {
   width: 18px;
   height: 18px;
@@ -411,11 +393,9 @@ h1, h2, h3, .heading {
   color: var(--sidebar-accent-foreground);
 }
 
-/* Bottom item — avatar trigger + popover (pass 8, new). Opens the user
-   menu (profile, preferences, theme, keyboard shortcuts, ... Log out
-   last) — design-system-spec.md § Sidebar. Replaces pass 5's chevron
-   (the expand/contract control moved to the header in pass 8, then into
-   the sidebar's own brand row in pass 12 — see .sidebar-top). */
+/* Bottom item: avatar trigger + popover. Opens the user menu (profile,
+   preferences, theme, keyboard shortcuts, ... Log out last);
+   design-system-spec.md § Sidebar. */
 .sidebar-bottom {
   margin-top: auto;
   border-top: 1px solid var(--sidebar-border);
@@ -464,13 +444,10 @@ h1, h2, h3, .heading {
 
 .sidebar-user-chevron { margin-left: auto; opacity: 0.7; font-size: 12px; }
 
-/* The popover itself — shown "open" as a static reference on one screen
+/* The popover itself: shown "open" as a static reference on one screen
    (same convention as .correction-trail / .bulk-bar / .je-modal), not a
-   real toggle. Pass 9: opens to the RIGHT of the trigger, bottom-aligned
-   with it — matching shadcn's sidebar-07 block exactly (the Principal's
-   own reference, temp/design-refs/shadcn-sidebar-07-user-popover.png),
-   not above it (pass 8). Unchanged in the collapsed rail — the popover
-   still opens to the right of the icon-only trigger. */
+   real toggle. It opens to the RIGHT of the trigger, bottom-aligned with
+   it, as in shadcn's sidebar-07 block; the same in the collapsed rail. */
 .avatar-popover {
   position: absolute;
   left: calc(100% + 8px);
@@ -501,7 +478,7 @@ h1, h2, h3, .heading {
   cursor: pointer;
 }
 .popover-item .icon { flex-shrink: 0; color: var(--muted-foreground); }
-.popover-item:hover { background: var(--accent); color: var(--accent-foreground); } /* pass 11f: hovers on --accent, not --muted (--muted = page by ruling) */
+.popover-item:hover { background: var(--accent); color: var(--accent-foreground); } /* hovers on --accent, never --muted (--muted = the page) */
 .popover-item:hover .icon { color: var(--accent-foreground); }
 .popover-item.destructive { color: var(--destructive); }
 .popover-item.destructive .icon { color: var(--destructive); }
@@ -511,9 +488,8 @@ h1, h2, h3, .heading {
    (bg-destructive/20): 4.64:1. */
 .dark .popover-item.destructive:hover { background: color-mix(in srgb, var(--destructive) 20%, var(--popover)); }
 .popover-divider { height: 1px; background: var(--border); margin: 4px 0; }
-/* Pass 9: Settings/Notifications entry points under the avatar popover
-   are PROPOSED, not decided — the Principal has not ruled on where
-   these land (design-system-spec.md § Header). */
+/* Settings/Notifications entry points under the avatar popover are
+   PROPOSED, not decided (design-system-spec.md § Header). */
 .popover-item .proposed-tag {
   margin-left: auto;
   font-size: 10px;
@@ -615,21 +591,21 @@ h1, h2, h3, .heading {
 .badge-positive { background: var(--positive); color: var(--positive-foreground); }
 .badge-warning { background: var(--warning); color: var(--warning-foreground); }
 .badge-archived { background: transparent; color: var(--muted-foreground); border-color: var(--border); font-style: italic; opacity: 0.8; }
-/* Corrected — pass 6 (design-system-spec.md § Correcting a posted entry):
-   an `outline` badge plus a small --brand-2-tinted dot, distinct from a
-   plain Posted or a standalone Reversed row — the user-facing signal that
-   a reversal + replacement pair sits behind this row, without the row
-   itself using the word "reverse". */
+/* Corrected (design-system-spec.md § Correcting a posted entry): an
+   `outline` badge plus a small --brand-2-tinted dot, distinct from a plain
+   Posted or a standalone Reversed row. It signals that a reversal +
+   replacement pair sits behind this row, without the row itself using
+   the word "reverse". */
 .badge-corrected { background: transparent; color: var(--foreground); border-color: var(--border); }
 .badge-corrected .badge-dot { width: 6px; height: 6px; border-radius: 999px; background: var(--brand-2); display: inline-block; }
 
 /* ---------- Row meta (e.g. "posted by rule <name>" attribution) ----------
-   Addendum, pass 6: an auto-posted row carries a small actor-attribution
-   line under its status badge and gets the exact same "Correct entry"
-   action as any other posted row — there is no separate edit affordance
-   for rule-posted rows (design-system-spec.md § Correcting a posted
-   entry). Also used for user/system-job attribution generally
-   (PRD §5 — actor attribution is never inferred). */
+   An auto-posted row carries a small actor-attribution line under its
+   status badge and gets the exact same "Correct entry" action as any
+   other posted row; there is no separate edit affordance for rule-posted
+   rows (design-system-spec.md § Correcting a posted entry). Also used for
+   user/system-job attribution generally (PRD §5: actor attribution is
+   never inferred). */
 .row-meta {
   font-size: 11px;
   color: var(--muted-foreground);
@@ -649,10 +625,10 @@ h1, h2, h3, .heading {
 .row-action:hover { text-decoration: underline; }
 
 /* ---------- Correction trail (click-through on a Corrected row) ----------
-   Pass 6: the full double-entry pair revealed on click-through — the
-   original entry's lines shaded/struck, then the reversal, then the new
-   corrected entry — so the correction stays auditable without "reverse"
-   ever being the row's primary affordance. */
+   The full double-entry pair revealed on click-through: the original
+   entry's lines shaded/struck, then the reversal, then the new corrected
+   entry, so the correction stays auditable without "reverse" ever being
+   the row's primary affordance. */
 .correction-trail {
   margin-top: 10px;
   padding: 12px 16px;
@@ -672,8 +648,8 @@ h1, h2, h3, .heading {
 .correction-trail .trail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
 .correction-trail .trail-row.struck { text-decoration: line-through; color: var(--muted-foreground); opacity: 0.75; }
 
-/* ---------- Accordion (pass 7 — Transactions' three urgency-ordered
-   cards: Exceptions, Pending, Posted, design-system-spec.md § Transactions
+/* ---------- Accordion: Transactions' three urgency-ordered cards
+   (Exceptions, Pending, Posted; design-system-spec.md § Transactions
    workflow) ---------- */
 .accordion-card + .accordion-card { margin-top: 16px; }
 .accordion-header {
@@ -741,9 +717,9 @@ h1, h2, h3, .heading {
    on the bulk bar's dark fill that would be invisible, so flip it light. */
 .bulk-bar .btn-outline { border-color: var(--background); color: var(--background); }
 
-/* ---------- Near-full-screen journal-entry modal (pass 7, new) ----------
+/* ---------- Near-full-screen journal-entry modal ----------
    Reused for manual "+ New entry", "Correct entry", Split, and Group &
-   Summarize — one component, different pre-fill per entry point
+   Summarize: one component, different pre-fill per entry point
    (design-system-spec.md § Transactions workflow). A real build renders
    this as a Dialog over a scrim; shown here as a large static card, same
    "shown open" convention as .correction-trail / .bulk-bar above. */
@@ -753,7 +729,7 @@ h1, h2, h3, .heading {
 .je-modal .je-modal-subtitle { font-size: 13px; color: var(--muted-foreground); margin-bottom: 20px; }
 .je-modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 
-/* ---------- Link health badge (pass 7, Custodial Accounts + Transactions) ---------- */
+/* ---------- Link health banner (Custodial Accounts + Transactions) ---------- */
 .link-health-banner {
   display: flex;
   align-items: center;
@@ -831,12 +807,12 @@ table.data-table td {
 }
 
 table.data-table tbody tr:hover { background: var(--accent); }
-/* Dark row hover (pass 11g, Principal ruling) — same pattern as the dark
-   "Log out" hover: a tinted fill instead of dark --accent (#194257), where
-   --destructive amounts were 3.25:1 and --muted-foreground 4.40:1. A faint
-   sky tint (40% --accent over --card = #12232C, 1.20:1 vs --card): body
-   text 14.41:1, --destructive 4.89, --muted-foreground 6.61, --positive
-   9.64, --primary 11.83. Not red — rows aren't destructive. */
+/* Dark row hover: a tinted fill instead of dark --accent (#194257), the
+   same pattern as the dark "Log out" hover. On #194257, --destructive
+   amounts are 3.25:1 and --muted-foreground 4.40:1. A faint sky tint (40%
+   --accent over --card = #12232C, 1.20:1 vs --card) gives: body text
+   14.41:1, --destructive 4.89, --muted-foreground 6.61, --positive 9.64,
+   --primary 11.83. Not red: rows aren't destructive. */
 .dark table.data-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 40%, var(--card)); }
 table.data-table td.amount { font-family: var(--font-mono); text-align: right; font-variant-numeric: tabular-nums; }
 table.data-table td.amount.positive { color: var(--positive); }
@@ -1010,12 +986,11 @@ table.data-table td.amount.negative { color: var(--destructive); }
   padding: 8px 0;
 }
 
-/* ---------- Public landing page (Home, pass 4 — corrected 2026-09-30:
-   this is the PRE-AUTH marketing page, not a signed-in screen. The hero
-   band is a fixed dark/brand backdrop (same posture as the login visual
-   pane — a deliberate "dark surface" context for --brand at full
-   strength); the feature/footer sections below it are theme-aware like
-   any other page. ---------- */
+/* ---------- Public landing page (Home): the PRE-AUTH marketing page,
+   not a signed-in screen. The hero band is a fixed dark/brand backdrop
+   (same posture as the login visual pane: a deliberate dark-surface
+   context for --brand at full strength); the feature/footer sections
+   below it are theme-aware like any other page. ---------- */
 .landing-hero {
   background: #070907;
   color: #EFF1EF;
@@ -1023,10 +998,9 @@ table.data-table td.amount.negative { color: var(--destructive); }
   padding: 96px 48px 80px;
 }
 
-/* Hero brand lockup (pass 14): the full seedling mark (with midribs, at
-   32px) to the left of the wordmark, both in the literal --brand on the
-   fixed dark hero (14.72:1). Renamed from .brand-mark, which is now the
-   SVG's own class. */
+/* Hero brand lockup: the full seedling mark (with midribs, at 32px) to
+   the left of the wordmark, both in the literal --brand on the fixed dark
+   hero (14.72:1). */
 .landing-hero .landing-brand {
   display: inline-flex;
   align-items: center;
@@ -1091,11 +1065,10 @@ table.data-table td.amount.negative { color: var(--destructive); }
   background: var(--background);
 }
 
-/* ---------- Split screen login page (pass 4, corrected 2026-09-30 to the
-   Principal's exact pattern + captured reference,
-   temp/design-refs/split-login-example.png). Form pane is theme-aware
+/* ---------- Split screen login page (reference:
+   temp/design-refs/split-login-example.png). The form pane is theme-aware
    (follows the user's stored preference like any other page); the visual
-   pane always carries the brand identity regardless of theme — the one
+   pane always carries the brand identity regardless of theme, the one
    deliberate exception, same posture as the landing hero above. ---------- */
 .auth-shell {
   min-height: 100vh;
@@ -1105,10 +1078,9 @@ table.data-table td.amount.negative { color: var(--destructive); }
   color: var(--foreground);
 }
 
-/* Pass 5 (Principal review 2): heading/copy/fields centered both
-   vertically AND horizontally as a fixed-max-width column — logo is the
-   one element that stays pinned top-left, via align-self overriding the
-   pane's own centering. */
+/* Heading/copy/fields are centered both vertically AND horizontally as a
+   fixed-max-width column; the logo is the one element pinned top-left,
+   via align-self overriding the pane's own centering. */
 .auth-form-pane {
   display: flex;
   flex-direction: column;
@@ -1125,9 +1097,9 @@ table.data-table td.amount.negative { color: var(--destructive); }
   font-weight: 700;
   font-size: 18px;
 }
-/* Pass 14: the 24px seedling left of the wordmark. The form pane is
-   theme-aware, so it takes --primary, the same rule as the shell-less
-   app bar: 4.75:1 light, 14.72:1 dark. */
+/* The 24px seedling left of the wordmark. The form pane is theme-aware,
+   so it takes --primary, the same rule as the shell-less app bar:
+   4.75:1 light, 14.72:1 dark. */
 .auth-form-pane .auth-logo .brand-icon { color: var(--primary); }
 
 .auth-form-inner {
@@ -1237,21 +1209,18 @@ table.data-table td.amount.negative { color: var(--destructive); }
 }
 
 /* =====================================================================
-   Pass 13 (2026-10-19): every page is a styled screen. The Principal
-   asked: "Any reason why we have wireframes when we can fully render
-   styled screens?" The wireframes are retired. The classes below cover
-   the nine screens promoted from them. They use the existing tokens
-   only, and each block names the shadcn-svelte component it stands in
-   for.
+   Screen components: the screens beyond the dashboard and transactions.
+   They use the existing tokens only, and each block names the
+   shadcn-svelte component it stands in for.
    ===================================================================== */
 
 /* Stacked-card spacing applies to a vertical stack only. Inside a grid,
-   the gap does the spacing. Bug fix: the second and third cards of every
-   .card-grid row sat 24px low, including on the dashboard. */
+   the gap does the spacing; otherwise every card after the first in a
+   .card-grid row would sit 24px low. */
 .card-grid > .card + .card { margin-top: 0; }
 
-/* Show-N select in an accordion header must never stretch. Bug fix: it
-   inherited .select's width:100% and squeezed the header title. */
+/* Show-N select in an accordion header never stretches (it would
+   inherit .select's width:100% and squeeze the header title). */
 .select.show-n-select { width: auto; flex-shrink: 0; }
 
 /* Breadcrumb links (multi-crumb pages, e.g. the account register). */
