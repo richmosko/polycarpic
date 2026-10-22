@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Login, caption option B</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<!-- Caption option B: one refined line, 'Your wealth, rooted.' It ties the seedling mark and the forest to the product's job. One of three caption options for review; login.html keeps the current caption until one is chosen. -->
+<!-- Split screen login page — the Principal's named pattern. Form-pane
+     content list is exact per direction: logo, "Welcome back" + subtext,
+     OAuth button, divider, email, password (+ forgot-password + reveal),
+     primary button, sign-up line, legal footer. References:
+     useorigin.com/authentication/login (no capture, splash loader) and
+     temp/design-refs/split-login-example.png (captured). Form pane is
+     theme-aware (this is the light-mode render); visual pane always
+     carries the brand identity regardless of theme. -->
+<div class="auth-shell">
+  <div class="auth-form-pane">
+    <div class="auth-logo"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></div>
+    <div class="auth-form-inner">
+      <div class="auth-title">Welcome back</div>
+      <p class="auth-subtitle">Sign in to your account</p>
+
+      <div class="auth-oauth-row">
+        <button class="btn btn-dark"><span class="oauth-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3.01h3.88c2.27-2.09 3.57-5.17 3.57-8.83z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.01c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.95H1.27v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.27 14.29A7.2 7.2 0 0 1 4.9 12c0-.8.14-1.57.37-2.29v-3.1H1.27A12 12 0 0 0 0 12c0 1.94.46 3.77 1.27 5.39l4-3.1z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.27 6.61l4 3.1C6.22 6.86 8.87 4.75 12 4.75z"/></svg></span>Continue with Google</button>
+      </div>
+      <div class="auth-divider">or</div>
+
+      <div class="auth-field">
+        <label>Email</label>
+        <input class="input" type="email" placeholder="you@example.com">
+      </div>
+      <div class="auth-field">
+        <div class="field-label-row">
+          <label>Password</label>
+          <a class="forgot-link" href="#">Forgot password?</a>
+        </div>
+        <div class="input-with-icon">
+          <input class="input" type="password" value="••••••••••••">
+          <button class="reveal-icon" aria-label="Show password"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></span></button>
+        </div>
+      </div>
+
+      <button class="btn btn-default auth-submit">Sign in</button>
+
+      <p class="auth-signup-line">Don't have an account? <a href="#">Sign up</a></p>
+
+      <p class="auth-legal-footer">By signing in you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
+    </div>
+  </div>
+
+  <div class="auth-visual-pane">
+    <!-- The art covers a tall pane, so the image's rendered side is the
+         larger of the pane's height (100vh - 48px) and width (50vw - 24px);
+         width wins only on viewports wider than ~2:1. `sizes` states that
+         side and the browser picks from srcset by it times the device pixel
+         ratio: a 1x desktop fetches the 1024px file, 2x the 2048, large
+         retina the 3072. -->
+    <img class="visual-art"
+         src="../brand/polycarpic-bg-forest.jpeg"
+         srcset="../brand/polycarpic-bg-forest.jpeg 1024w,
+                 ../brand/polycarpic-bg-forest-2048.jpeg 2048w,
+                 ../brand/polycarpic-bg-forest-3072.jpeg 3072w"
+         sizes="(min-aspect-ratio: 2/1) calc(50vw - 24px), calc(100vh - 48px)"
+         alt="" aria-hidden="true">
+    <div class="visual-caption visual-caption--line">Your wealth, rooted.</div>
+  </div>
+</div>
+</body>
+</html>

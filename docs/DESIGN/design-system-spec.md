@@ -492,6 +492,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Dialog, near-full-screen** | The journal-entry modal (header + legs) — manual "+ New entry", "Correct entry", Split, and Group & Summarize all reuse this one modal |
 | **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers; the suggested-offset-leg inline search dropdown (Pending inbox); per-card "show N" limit selector |
 | **Sidebar** | Primary nav, seven flat items (Settings proposed under the avatar popover) — inverted, a floating card (gutter on every side), collapsible to an icon rail, brand row on top (mark + wordmark + collapse control) + avatar-popover trigger on bottom (opens to the right) — see Sidebar information architecture |
+| **Button** | Variants: `default` (primary green fill: the one main action per view), `secondary`, `outline`, `ghost`, `destructive`, and `dark` (a solid `--foreground` fill with `--background` ink: near-black in light mode, near-white in dark). **Rule: never an outline button standing alone on `--background`.** Its `--border` edge is only 1.22:1 on the light page (~1.17:1 dark), so it all but disappears. Outline is for a secondary action set beside a filled one, or inside a card or bar that gives it a surface. A standalone secondary action uses `dark` instead (15.61:1 light / 17.92:1 dark against the page): Login's "Continue with Google" (with the Google G glyph). Hierarchy then comes from colour and position, not weight: the dark button is the heavier mass, so the primary stays the only green fill and sits last, after the divider |
 | **Skeleton** | Every async fetch boundary |
 | **Switch** | Settings' on/off preferences (auto-post matched recurring transactions, reduced motion), `.switch[role=switch]` |
 | **Brand app bar** | Every page without the app shell (Home, Membership setup, Admin): fixed near-black bar, lockup left, the page's trailing items right, a fade below — see Public screens § Brand app bar |
@@ -549,6 +550,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | Entity type badges: Person / Household / Trust / Business | `user` / `house` / `landmark` / `building-2` | Per § Entity, account, and category badges |
 | Admin: operator-session badge | `terminal` | |
 | Login: reveal password | `eye` (`eye-off` when revealed) | |
+| Login: Continue with Google | **not Lucide**: the Google "G" mark, four-colour | Google's own brand glyph on the dark button, as its sign-in branding asks |
 | Brand mark (sidebar brand row, rail expand button, app bar, Login, Home) | **not Lucide**: `brand/brand-mark-24.svg` / `brand/brand-mark.svg` | The seedling, traced; the one deliberate non-Lucide glyph |
 
 Every icon in use is named above. Add a row whenever a new control lands, rather than guessing ahead of the actual screen.
@@ -672,6 +674,8 @@ See `styled-screens/home.html`, `styled-screens/membership-setup.html`, `styled-
 Two references: `useorigin.com`'s own login (dark, brand pane + form card — behind a splash loader under automation, no direct capture) and a captured example (`temp/design-refs/split-login-example.png`: form pane left with a labeled email/password pair, a "Forgot password?" link and a reveal-eye icon, OAuth button, divider, primary button, sign-up link, legal footer at the very bottom; a full-bleed moody photo right, inset with rounded corners and a margin rather than flush to the viewport edge).
 
 **Form pane content, in order:** mark + wordmark (top-left), "Welcome back" heading + one-line subtext, an OAuth button, a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, a "Don't have an account? Sign up" line, and a legal footer ("By signing in you agree to...") at the bottom.
+
+**OAuth button:** "Continue with Google" is a `dark` button with the Google G glyph, not an outline one; see the Button row in § Component inventory for why. **Caption over the forest:** three options are up for review (none; "Your wealth, rooted."; "Grow what's yours."), each a single line in display weight rather than stacked fragments. `login.html` keeps the current caption until one is chosen; the recommendation is "Your wealth, rooted."
 
 **Ours, adapted:**
 - **Form pane:** sits on the theme-aware neutral (`--card`/`--background`) — follows the user's stored light/dark preference like the rest of the app, unlike the visual pane. The heading, subtext, and fields are centered both vertically and horizontally as a fixed-max-width (380px) column within the pane; the mark + wordmark is the one element pinned top-left, overriding the pane's own centering. Field labels, inputs, and links stay left-aligned *within* that centered column (only the heading/subtext text itself is center-aligned) — centering every line of text, including form labels, would read oddly for a form.
