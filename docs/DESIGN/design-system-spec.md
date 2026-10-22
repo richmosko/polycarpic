@@ -12,7 +12,7 @@ This project's UI direction is **SvelteKit + shadcn-svelte** (Tailwind, headless
 
 ## Inspiration: Monarch & Origin — measured, not remembered
 
-**Sources:** live captures in Chrome (`temp/design-refs/`) — `monarch-home-hero.jpg`, `monarch-tracking-page.jpg`, `monarch-app-accounts-zoom.png` (an actual **app** screenshot, not marketing — load-bearing for the typography decision below); `origin-home-hero.jpg`, `origin-product-cards.jpg`. Figures below are reproduced from that capture's README, not re-derived.
+**Sources:** live captures in Chrome of Monarch Money (https://www.monarchmoney.com) — its home hero, its tracking page, and a zoomed view of the app's Accounts screen (an actual **app** screenshot, not marketing — load-bearing for the typography decision below) — and of Origin (https://useorigin.com) — its home hero and its product cards. The screenshots themselves are third-party material and are not kept in the repo; the figures below were measured from them.
 
 ### What was measured
 
@@ -241,7 +241,7 @@ Both clear the 3:1 non-text floor, and the dark-mode value clears 4.5:1 too. Off
 
 ### Layout & shell
 
-The shell is shadcn's **sidebar-07** block (https://ui.shadcn.com/view/new-york-v4/sidebar-07, `temp/design-refs/shadcn-sidebar-07*.png`).
+The shell is shadcn's **sidebar-07** block (https://ui.shadcn.com/view/new-york-v4/sidebar-07).
 
 1. **The sidebar fills the vertical *screen*, not the vertical *page*, and is a floating card with a gutter on every side.** `position: fixed; top/left/bottom: var(--shell-gutter)` (16px), `border-radius` on all four corners. Composition, top to bottom: brand row → nav (seven items) → avatar trigger (opens the user-menu popover to its right — see § Sidebar).
 2. **No persistent header.** Nothing at the top of the main area stays put while the rest scrolls, and everything there shares the content's background token: "anything in the top part of the main viewing window should have the same background (token color) as the rest." The top row (`.topbar`) is not sticky, has no bottom border, and uses `--background` (not `--card`), so it is identical to the content below it and scrolls away with the page.
@@ -312,7 +312,7 @@ Why here rather than in the top row: the control sits on the thing it controls, 
 
 **Full viewport height.** "The entire vertical *screen* space. Not the vertical *page* space." `position: sticky` against the shell's flex row tracks the **page's** scroll position, not the **viewport**: any content above the shell in the DOM pushes a sticky sidebar's bottom edge below the visible viewport. `position: fixed` pins it to the viewport itself. `top`/`left`/`bottom` are all `var(--shell-gutter)`, so the card's height is implicit (the gap between the top and bottom insets) rather than a literal `100vh` — which is what allows a gutter on every side, including the bottom. `.shell-main` carries a `margin-left` of `2 × gutter + sidebar width` to avoid being covered.
 
-**Avatar popover.** The sidebar's bottom item (`.sidebar-avatar-trigger`) opens a popover to the RIGHT of the trigger, bottom-aligned with it (`left: calc(100% + 8px); bottom: 0`), as in the sidebar-07 reference (`temp/design-refs/shadcn-sidebar-07-user-popover.png`). The same in the collapsed icon rail: it opens to the right of the icon-only trigger.
+**Avatar popover.** The sidebar's bottom item (`.sidebar-avatar-trigger`) opens a popover to the RIGHT of the trigger, bottom-aligned with it (`left: calc(100% + 8px); bottom: 0`), as in the sidebar-07 block's own user menu (https://ui.shadcn.com/view/new-york-v4/sidebar-07). The same in the collapsed icon rail: it opens to the right of the icon-only trigger.
 
 | Order | Item | Status |
 |---|---|---|
@@ -329,7 +329,7 @@ Settings/Notifications carry a `.proposed-tag` badge in the styled screens — v
 
 ### Sidebar information architecture
 
-"I kind of feel like the transactions, Ledger entries, General Ledger, Custodial Accounts, and security views are mixed together. Needs some conceptual clean up." (Interview transcript: `temp/2026-10-02-sidebar-interview.md`.) The underlying issue is a **flow-vs-state conflation**: three pipeline stages (imported transaction → draft → posted journal entry) stacked on one screen, and two different concept layers (the GL abstraction vs. a physical custodial account) sharing one screen behind a silent toggle. The IA separates them.
+"I kind of feel like the transactions, Ledger entries, General Ledger, Custodial Accounts, and security views are mixed together. Needs some conceptual clean up." (From the Principal's sidebar interview.) The underlying issue is a **flow-vs-state conflation**: three pipeline stages (imported transaction → draft → posted journal entry) stacked on one screen, and two different concept layers (the GL abstraction vs. a physical custodial account) sharing one screen behind a silent toggle. The IA separates them.
 
 **Seven flat sidebar items, no nesting, plus one proposed avatar-popover entry (Settings).** The icon-rail collapse works because every item is flat.
 
@@ -396,7 +396,7 @@ See flow 5.2 (§ User Flows) for the decision diagram and `styled-screens/transa
 
 ## Transactions workflow
 
-The product specification for the Plaid bank-feed → journal-entry pipeline (starting point: `temp/2026-10-02-sidebar-interview.md`). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.2 for the full decision diagram.
+The product specification for the Plaid bank-feed → journal-entry pipeline (starting point: the Principal's sidebar interview). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.2 for the full decision diagram.
 
 **Layout:** a high-density table/list of unposted raw rows. Clicking a row expands it vertically (Accordion/Expansion pattern) — the matching workspace opens inline, no navigation away from the feed.
 
@@ -574,7 +574,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 
 | Component / region | shadcn-svelte component or block | Notes |
 |---|---|---|
-| App shell (sidebar + top row) | **Sidebar**, specifically the **sidebar-07** block (`https://ui.shadcn.com/view/new-york-v4/sidebar-07`; reference screenshots `temp/design-refs/shadcn-sidebar-07*.png`) | Direct reuse — our brand row ≈ its `SidebarHeader` (team-switcher slot), nav ≈ `SidebarMenu`, avatar trigger + right-opening popover ≈ its `SidebarFooter` pattern almost exactly. Its `SidebarTrigger` is replaced by the brand-row collapse/expand buttons calling the same `toggleSidebar()` |
+| App shell (sidebar + top row) | **Sidebar**, specifically the **sidebar-07** block (`https://ui.shadcn.com/view/new-york-v4/sidebar-07`) | Direct reuse — our brand row ≈ its `SidebarHeader` (team-switcher slot), nav ≈ `SidebarMenu`, avatar trigger + right-opening popover ≈ its `SidebarFooter` pattern almost exactly. Its `SidebarTrigger` is replaced by the brand-row collapse/expand buttons calling the same `toggleSidebar()` |
 | Avatar popover (user menu) | **Popover** + **DropdownMenu** (the popover is the container; its items are a DropdownMenu's item list) | Matches sidebar-07's footer example (avatar + name, opens a menu to the side) closely; two items (Settings, Notifications) are **proposed** |
 | Breadcrumbs | **Breadcrumb** | Direct reuse — single-crumb pages render a one-item Breadcrumb |
 | Top row separator | **Separator**, vertical orientation | One, before the "more" menu |
@@ -613,7 +613,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Skeleton | **Skeleton** | Direct reuse |
 | Tooltip (icon-button titles, truncated text, the rail's "Expand sidebar") | **Tooltip** | Direct reuse — used wherever an icon-only control needs a text label on hover |
 | Landing illustration (Home) | `custom` | A full-bleed decorative image under the brand app bar; no shadcn block fits |
-| Split-screen login | shadcn-svelte's own **login block** (`https://shadcn-svelte.com/blocks/login`, the two-pane pattern) as a starting point, customized | The reference screenshot (`temp/design-refs/split-login-example.png`) is close to this official block's shape; adopted as the base rather than built from scratch, then customized for our exact field list (§ Public screens: Home & Login) |
+| Split-screen login | shadcn-svelte's own **login block** (`https://shadcn-svelte.com/blocks/login`, the two-pane pattern) as a starting point, customized | The split-screen login reference the Principal supplied is close to this official block's shape; adopted as the base rather than built from scratch, then customized for our exact field list (§ Public screens: Home & Login) |
 
 **What's deliberately `custom` and why that's still "sticking to the designed stuff":** every `custom` row above is custom because shadcn-svelte genuinely has no matching primitive or block — not because an existing one was skipped. Each is built *from* shadcn-svelte primitives (Avatar, Popover, Card, Button) rather than from scratch, so the stability this is after — consistent tokens, consistent interaction patterns, one accessibility baseline — still holds even where the composition itself is ours.
 
@@ -694,7 +694,7 @@ There is no public sign-up: every instance is self-hosted, and accounts on it co
 
 ### Login — split screen login page
 
-Two references: `useorigin.com`'s own login (dark, brand pane + form card — behind a splash loader under automation, no direct capture) and a captured example (`temp/design-refs/split-login-example.png`: form pane left with a labeled email/password pair, a "Forgot password?" link and a reveal-eye icon, OAuth button, divider, primary button, sign-up link, legal footer at the very bottom; a full-bleed moody photo right, inset with rounded corners and a margin rather than flush to the viewport edge).
+Two references: `useorigin.com`'s own login (dark, brand pane + form card — behind a splash loader under automation, no direct capture) and a split-screen login example the Principal supplied (form pane left with a labeled email/password pair, a "Forgot password?" link and a reveal-eye icon, OAuth button, divider, primary button, sign-up link, legal footer at the very bottom; a full-bleed moody photo right, inset with rounded corners and a margin rather than flush to the viewport edge).
 
 **Form pane content, in order:** mark + wordmark (top-left), "Welcome back" heading + one-line subtext, an OAuth button, a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, the two-way account line ("Have an invite? Create your account" / "No invite? Set up your own instance"), and a legal footer ("By signing in you agree to...") at the bottom.
 
@@ -724,6 +724,8 @@ The 2048/3072 files come from a 3× Real-ESRGAN upscale of the 1024px original (
 | `polycarpic-bg-sunrise-tall-3072.jpeg` | 3072×4114 | 917 KB | 2× at 1440×1440 (needs ~2090px) |
 
 The 1024 file is encoded from the 1792×2400 original; the 2048/3072 files from its 2× Real-ESRGAN upscale (Upscayl, digital-art model). All are progressive JPEGs under 1 MB. Neither source file is committed.
+
+**Masters** (the original exports and the Upscayl PNGs) are kept outside the repo and are not tracked; only the encoded JPEGs above are committed.
 
 See `styled-screens/login.html`.
 
@@ -762,7 +764,7 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 ## Accessibility
 
-**Target: WCAG AA.** Every pair below is computed via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (scripts in `temp/`). See `tokens.html` for every token's value in both modes with a rendered swatch, alongside this written derivation.
+**Target: WCAG AA.** Every pair below is computed via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css`. See `tokens.html` for every token's value in both modes with a rendered swatch, alongside this written derivation.
 
 **The brand app bar's and Login's visual-pane colors are not new values** — `.brand-bar`/`.auth-visual-pane` use the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
 
@@ -868,5 +870,5 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 - Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.
 - Categorical (3+ hue) chart palette for transaction-category breakdowns — deferred until a concrete chart spec exists.
-- Compare `styled-screens/dashboard.html` against `temp/design-refs/monarch-app-accounts-zoom.png` component-by-component once frontend-lead builds the real screen.
+- Compare `styled-screens/dashboard.html` against Monarch Money's Accounts screen (https://www.monarchmoney.com) component-by-component once frontend-lead builds the real screen.
 - **CVD check on the brand hues:** flagged in Accessibility — two brand hues (green, blue) to check, not yet simulated.
