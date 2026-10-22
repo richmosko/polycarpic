@@ -7,11 +7,11 @@
 <link rel="stylesheet" href="../tokens.css">
 <link rel="stylesheet" href="../screen.css">
 </head>
-<body>
-<!-- Admin, the operator surface (pass 7 addendum; styled pass 13). Placeholder pending PRD/ARCH/SECURITY definition (POLY-81). Reached only through an SSH tunnel to the host: not a sidebar item, not part of the seven-item IA, no entity context, so no sidebar and no entity selector. Exists so the shape is not invented from scratch later. -->
-<header class="app-bar">
-  <div class="brand-lockup"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></div>
-  <span class="badge badge-outline"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg></span>Operator session · SSH tunnel</span>
+<body class="has-brand-bar">
+<!-- Admin, the operator surface. Placeholder pending PRD/ARCH/SECURITY definition (POLY-81). Reached only through an SSH tunnel to the host: not a sidebar item, not part of the seven-item IA, no entity context, so no sidebar and no entity selector. Under the brand app bar: lockup left (a link, the first keyboard stop), the operator-session badge right (status, not interactive). -->
+<header class="brand-bar brand-bar--plain">
+  <a class="brand-bar-lockup" href="home.html" aria-label="Polycarpic home"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></a>
+  <span class="badge badge-outline" role="status"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg></span>Operator session · SSH tunnel</span>
 </header>
 <main class="page-medium">
   <h1 class="page-title">Admin</h1>
