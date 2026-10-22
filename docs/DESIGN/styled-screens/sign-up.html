@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Sign up</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body>
+<!-- Sign up: invite-gated account creation, in Login's split layout. A visitor arrives from an invite link (shown: the code pre-filled and validated, naming the inviter and the entity) or types a code. Then the account: the Google button, or email + password. Create account hands off to Membership setup, where the invited entity is waiting. Visitors without an invite are pointed to Get started. -->
+<div class="auth-shell">
+  <div class="auth-form-pane">
+    <div class="auth-logo"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></div>
+    <div class="auth-form-inner">
+      <div class="auth-title">Create your account</div>
+      <p class="auth-subtitle">Accounts on this instance are by invitation.</p>
+
+      <div class="auth-field">
+        <label for="invite-code">Invite code</label>
+        <input id="invite-code" class="input mono" type="text" value="PLY-7K4M-Q9TX" aria-describedby="invite-status">
+        <div class="invite-status" id="invite-status"><span class="badge badge-positive-soft"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg></span>Valid invite</span>from Mosko, to The Moskos (Household)</div>
+      </div>
+
+      <div class="auth-oauth-row">
+        <button class="btn btn-dark"><span class="oauth-glyph" aria-hidden="true"><svg viewBox="0 0 24 24"><path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.53 5.53 0 0 1-2.4 3.63v3.01h3.88c2.27-2.09 3.57-5.17 3.57-8.83z"/><path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.88-3.01c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.95H1.27v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.27 14.29A7.2 7.2 0 0 1 4.9 12c0-.8.14-1.57.37-2.29v-3.1H1.27A12 12 0 0 0 0 12c0 1.94.46 3.77 1.27 5.39l4-3.1z"/><path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0A12 12 0 0 0 1.27 6.61l4 3.1C6.22 6.86 8.87 4.75 12 4.75z"/></svg></span>Continue with Google</button>
+      </div>
+      <div class="auth-divider">or</div>
+
+      <div class="auth-field">
+        <label for="su-email">Email</label>
+        <input id="su-email" class="input" type="email" value="sam@example.com">
+      </div>
+      <div class="auth-field">
+        <label for="su-password">Password</label>
+        <div class="input-with-icon">
+          <input id="su-password" class="input" type="password" placeholder="At least 12 characters">
+          <button class="reveal-icon" aria-label="Show password"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg></span></button>
+        </div>
+      </div>
+
+      <button class="btn btn-default auth-submit">Create account</button>
+
+      <p class="auth-signup-line">Already have an account? <a href="login.html">Sign in</a></p>
+      <p class="auth-signup-line">No invite? <a href="get-started.html">Set up your own instance</a></p>
+
+      <p class="auth-legal-footer">By creating an account you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
+    </div>
+  </div>
+
+  <div class="auth-visual-pane">
+    <!-- Sign up's own art: the sunrise over the peaks (portrait, 3:4), so
+         joining an instance reads differently from returning to it. Cover
+         crops the sides; the image's rendered width is the pane height
+         x 0.75, or the pane width on viewports wider than about 3:2, and
+         `sizes` states that width so the browser fetches only what it
+         needs: a 1x desktop gets the 1024px file, 2x the 2048, large retina
+         the 3072. -->
+    <img class="visual-art visual-art--sunrise"
+         src="../brand/polycarpic-bg-sunrise-tall.jpeg"
+         srcset="../brand/polycarpic-bg-sunrise-tall.jpeg 1024w,
+                 ../brand/polycarpic-bg-sunrise-tall-2048.jpeg 2048w,
+                 ../brand/polycarpic-bg-sunrise-tall-3072.jpeg 3072w"
+         sizes="(min-aspect-ratio: 3/2) calc(50vw - 24px), calc((100vh - 48px) * 0.75)"
+         alt="" aria-hidden="true">
+  </div>
+</div>
+</body>
+</html>

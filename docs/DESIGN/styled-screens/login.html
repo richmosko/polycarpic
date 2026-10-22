@@ -8,14 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Split screen login page — the Principal's named pattern. Form-pane
-     content list is exact per direction: logo, "Welcome back" + subtext,
-     OAuth button, divider, email, password (+ forgot-password + reveal),
-     primary button, sign-up line, legal footer. References:
-     useorigin.com/authentication/login (no capture, splash loader) and
-     temp/design-refs/split-login-example.png (captured). Form pane is
-     theme-aware (this is the light-mode render); visual pane always
-     carries the brand identity regardless of theme. -->
+<!-- Split screen login page. Form pane, in order: logo, "Welcome back" + subtext, the Google button, a divider, email, password (+ forgot-password + reveal), the primary Sign in button, the two-way branch for visitors without an account (an invite goes to Sign up; no invite goes to Get started), and the legal footer. The form pane follows the user's theme; the visual pane always carries the brand identity. -->
 <div class="auth-shell">
   <div class="auth-form-pane">
     <div class="auth-logo"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></div>
@@ -45,7 +38,8 @@
 
       <button class="btn btn-default auth-submit">Sign in</button>
 
-      <p class="auth-signup-line">Don't have an account? <a href="#">Sign up</a></p>
+      <p class="auth-signup-line">Have an invite? <a href="sign-up.html">Create your account</a></p>
+      <p class="auth-signup-line">No invite? <a href="get-started.html">Set up your own instance</a></p>
 
       <p class="auth-legal-footer">By signing in you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
     </div>
