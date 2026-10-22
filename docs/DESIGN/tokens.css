@@ -7,205 +7,147 @@
  * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
  * the swatches.
  *
- * ELEVENTH PASS (2026-10-19) — Principal: light --background off white
- * to #F9F8F8, near-neutral with a touch of warmth (iterated by eye
- * through #EFEDEB, #EFEEEE, #F7F5F3, #F9F7F5). By Principal ruling (11f)
- * --muted = --background, and every hover/active fill moves to --accent
- * (screen.css). --border/--input warm, a step darker than the page.
- * --primary/--ring, --destructive and --positive each a notch darker at
- * the same hue so they clear AA on --accent (hovered rows/menu items);
- * the light chart ramp keeps its pass-10 values. Dark tokens unchanged.
- *
- * SIXTH PASS (2026-10-01) — Principal review pass 4
- * (temp/2026-10-01-design-review-4.md): --warning moves from a darkened
- * brown-reading amber (H=26°) to a genuinely orange hue the Principal could
- * recognize as orange, paired with a dark ink instead of white (orange
- * cannot clear 4.5:1 with white text without going dark enough to read
- * brown — same problem destructive/positive solved by darkening, orange
- * can't); the light-mode chart ramp brightens across all 5 steps (the old
- * tail, L down to 0.061, read as "almost black" — compressed to L 0.18-0.34,
- * still clearing the 3:1 non-text floor against --card). See
- * design-system-spec.md § Foundations and § Financial semantics for the
- * full derivation and every contrast figure.
- *
- * FIFTH PASS (2026-09-30) — Principal review pass 3
- * (temp/2026-09-30-design-review-3.md): a secondary brand hue, sky blue
- * #05A9FF, is added alongside the neon-green --brand from pass 4 (same
- * "literal on dark surfaces, darkened-same-hue on light surfaces" pattern,
- * see --brand-2 below); the neutral scale (--background/--muted/--border)
- * re-tints from the green hue to this new blue hue, at a lower chroma than
- * pass 4's green tint ("much lighter"); the inverted sidebar, read by the
- * Principal as green-biased, moves to the same blue tint instead. See
- * design-system-spec.md § Foundations for the full derivation and every
- * contrast figure.
- *
- * Earlier passes' header comments (pass 4: neon green, warm/brown neutral
- * replacement; pass 3: Monarch/Origin measured references) are not
- * reproduced here — see design-system-spec.md's revision history for the
- * full chain. This header documents only what pass 5 changed.
+ * Two brand hues: a neon green (`--brand`) and a sky blue (`--brand-2`).
+ * Both fail AA as text or fills on a light surface, so each is used
+ * literally only on dark surfaces and decoratively. A darkened same-hue
+ * value does its job on light surfaces (`--primary` for the green,
+ * `--secondary-foreground` for the blue). Neutrals carry a faint tint of
+ * the blue hue; the light page canvas is a near-neutral warm off-white.
+ * Every hover/active fill is `--accent`. `--muted` equals `--background`
+ * and serves in-card wells, tracks and placeholders, never hovers.
+ * design-system-spec.md § Foundations and § Financial semantics hold the
+ * derivations and every contrast figure.
  *
  * Plain sRGB hex, not OKLCH — this system doesn't vendor a shadcn preset
  * and doesn't need OKLCH's multi-preset precision.
  *
- * CI note (POLY-78): scripts/cairn/tests/test_board_tokens_parity.py
- * asserted this file shares values with cairn's board tokens; POLY-78
- * removed that assertion. If it somehow reappears, do not re-add cairn's
- * values to satisfy it.
+ * CI note: scripts/cairn/tests/test_board_tokens_parity.py once asserted
+ * this file shares values with cairn's board tokens; that assertion was
+ * removed (POLY-78). If it reappears, do not re-add cairn's values to
+ * satisfy it — diverging from cairn is deliberate.
  *
  * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
  */
 
 :root {
-  /* Surfaces & text — pass 11 (2026-10-19): the page canvas moves off
-     white — Principal: "can we set --background to some subtle shade of
-     grey with a hint of brown?" Iterated by eye (#EFEDEB, #EFEEEE,
-     #F7F5F3, #F9F7F5); settled (11e) on #F9F8F8 — near-neutral, a touch
-     of warmth (L 0.97).
-     Why pass 5 ended at white: it read "much lighter" as LESS SATURATED
-     and dropped the tint to ~3% at L 0.996 — a value indistinguishable
-     from white — and pass 9 then made the shell's own background
-     --background (sidebar-07 inset), not --muted, so that near-white
-     became the whole page.
-     Scale: --card/--popover stay pure white and float on the page
-     (1.06:1 step + hairline). --muted = --background, Principal ruling
-     (11f): it serves in-card wells, tab/progress tracks and placeholder
-     blocks, where it reads at 1.06:1 against white; it is no longer a
-     hover fill — every hover/active fill is --accent (screen.css), which
-     stays visible on both page (1.05:1) and card (1.12:1).
+  /* Surfaces & text. The page canvas is a subtle warm grey (L 0.97), not
+     white, so pure-white cards and popovers float on it (1.06:1 step plus
+     a hairline). A tint at L ~0.996 is indistinguishable from white; this
+     is the lightest value that still reads as a canvas.
+     --muted = --background: it serves in-card wells, tab/progress tracks
+     and placeholder blocks, where it reads at 1.06:1 against white. It is
+     never a hover fill. Every hover/active fill is --accent (screen.css),
+     which stays visible on both page (1.05:1) and card (1.12:1).
      --border/--input are warm (30°), a step darker than the page. */
   --background: #F9F8F8;
-  --foreground: #1D1F20; /* near-black, barely blue, flatter than pass 4's green-cast ink */
+  --foreground: #1D1F20; /* near-black, barely blue, flat rather than tinted */
   --card: #FFFFFF;
   --card-foreground: #1D1F20;
   --popover: #FFFFFF;
   --popover-foreground: #1D1F20;
 
-  /* Primary — unchanged from pass 4: a darkened neon green (hue 110.6°,
-     same hue as --brand, L 0.26 vs the brand's L 0.51) — see --brand
-     below for why the raw brand hex can't be primary on a light surface. */
-  --primary: #148100; /* pass 11: L 0.26→0.253, same hue — #158500 is 4.30:1 on --accent (hovered rows); this is 4.52:1 */
+  /* Primary: a darkened neon green (hue 110.6°, same hue as --brand, L 0.253
+     vs the brand's L 0.51). See --brand below for why the raw brand hex
+     can't be primary on a light surface. */
+  --primary: #148100; /* 4.52:1 on --accent (hovered rows); one notch lighter would drop under AA there */
   --primary-foreground: #FFFFFF;
 
-  /* Secondary/accent — pass 5: moved from pass 4's pale GREEN tint to the
-     new secondary BLUE hue (200.6°), giving the blue brand a real surface
-     job (secondary buttons, info-weight badges, selected/non-primary
-     states) distinct from primary's green "main action" role — see
-     design-system-spec.md § Secondary accent for the full job
-     definition. One derived ink (#096FA5) serves both the fill-with-text
-     role (4.72:1 on --secondary) and the plain-text-on-card role (5.48:1). */
+  /* Secondary/accent: the blue hue (200.6°). It gives the blue brand a
+     real surface job (secondary buttons, info-weight badges,
+     selected/non-primary states) distinct from primary's green "main
+     action" role. See design-system-spec.md § Secondary accent for the
+     full job definition. One derived ink (#096FA5) serves both the
+     fill-with-text role (4.72:1 on --secondary) and the plain-text-on-card
+     role (5.48:1). */
   --secondary: #E3F0F7;
   --secondary-foreground: #096FA5;
-  --muted: #F9F8F8; /* pass 11f, Principal ruling: = --background. Wells/tracks/placeholders on cards (1.06:1 vs white); NOT a hover fill — hovers use --accent */
-  --muted-foreground: #5E5A55; /* pass 11: warm 33°, 6.45:1 on --background/--muted, 6.14:1 on --accent */
-  --accent: #EBF4F9; /* pass 11f: THE hover/active fill (Principal ruling) — 1.05:1 vs page, 1.12:1 vs card */
+  --muted: #F9F8F8; /* = --background. Wells/tracks/placeholders on cards (1.06:1 vs white); NOT a hover fill — hovers use --accent */
+  --muted-foreground: #5E5A55; /* warm 33°, 6.45:1 on --background/--muted, 6.14:1 on --accent */
+  --accent: #EBF4F9; /* THE hover/active fill — 1.05:1 vs page, 1.12:1 vs card */
   --accent-foreground: #096FA5;
 
-  /* --brand: the literal, undarkened neon green — logo references, chart
-     accent call-outs, decorative highlights, anywhere a dark surface sits
+  /* --brand: the literal, undarkened neon green — logo, chart accent
+     call-outs, decorative highlights, anywhere a dark surface sits
      underneath. Do not use for text or a light-surface fill; use
      --primary for that.
-     --brand-2 (pass 5, new): the literal, undarkened secondary sky blue
-     (#05A9FF, the Principal's own choice) — same rule: dark-surface/
-     decorative use only (2.44:1 against this light --background — far
-     below AA, same posture as --brand). Used for: the sidebar focus ring
-     (reads against the sidebar's own dark-in-light-mode surface), and as
-     the series-2 color in two-series comparison charts (nominal vs.
-     inflation-adjusted, actual vs. target) paired against the green
-     --chart-3 as series 1, on dark surfaces — on light surfaces, that
-     same chart-series-2 job uses the derived --secondary-foreground
-     ink (#096FA5) instead, the same "literal-on-dark, derived-on-light"
-     split every brand hue in this system follows. */
+     --brand-2: the literal, undarkened sky blue (#05A9FF). Same rule:
+     dark-surface/decorative use only (2.44:1 against this light
+     --background, far below AA). Used for the sidebar focus ring (it reads
+     against the sidebar's dark-in-light-mode surface), and as the series-2
+     color in two-series comparison charts (nominal vs. inflation-adjusted,
+     actual vs. target) against the green --chart-3 as series 1, on dark
+     surfaces. On light surfaces that same series-2 job uses the derived
+     --secondary-foreground ink (#096FA5) instead: the same
+     "literal-on-dark, derived-on-light" split every brand hue follows. */
   --brand: #2CFF05;
   --brand-2: #05A9FF;
 
-  /* Destructive — unchanged from pass 3/4. */
-  --destructive: #DE0404; /* pass 11: same hue, a notch darker — #E70404 is 4.49:1 on the page, 4.27:1 on --accent; this is 4.57:1 on --accent */
+  --destructive: #DE0404; /* 4.57:1 on --accent; a notch lighter falls under AA on hovered rows */
   --destructive-foreground: #FFFFFF;
 
-  --border: #E6E2DE; /* pass 11: warm, a step darker than the page — 1.29:1 on --card, 1.22:1 on --background */
-  --input: #DCD8D4; /* pass 11: one step stronger than --border, 1.42:1 on --card */
+  --border: #E6E2DE; /* warm, a step darker than the page — 1.29:1 on --card, 1.22:1 on --background */
+  --input: #DCD8D4; /* one step stronger than --border, 1.42:1 on --card */
   --ring: #148100;
 
-  /* Chart ramp — pass 10: re-hued from the green --primary (110.6°) to a
-     gradient of --brand-2, the secondary sky blue (200.6°, S=0.90, same
-     saturation the green ramp used) — Principal direction: "I'd like the
-     chart tokens to be gradients of --brand-2 (instead of --primary)."
-     Ordered light→dark, chart-1 brightest/chart-5 darkest — kept the same
-     direction as every prior pass's ramp (both modes) so no chart-N
-     meaning flips for frontend-lead. L steps 0.46→0.30 (step -0.04,
-     same cadence as pass 6's green ramp). Every step clears the 3:1
-     non-text floor against BOTH --background and --card (chart-1, the
-     tightest pre-pass-11: 3.22:1 vs --background #FEFEFE, 3.25:1 vs --card);
-     pairwise-adjacent steps sit ~1.18-1.21:1 apart, the same modest-but-
-     perceptible separation the superseded green ramp used at an
-     identical L cadence. Semantic --positive/--destructive/--warning are
-     untouched — this hue swap is chart-only. See --brand-2 above for the
-     literal undarkened blue (dark-surface/decorative use only, not part
-     of this ramp) and design-system-spec.md § Chart ramp for the full
-     derivation and all ten contrast figures. */
-  /* Pass 11: re-checked on the #F9F8F8 canvas — the pass-10 ramp still
-     clears 3:1 (chart-1 3.07:1 vs --background, 3.26:1 vs --card), so it
-     is kept unchanged. --muted now equals the page, so the same 3.07:1
-     holds in a muted well; not on --accent (2.92:1) — no chart inside a
-     hover fill. */
+  /* Chart ramp: a gradient of --brand-2's sky blue (200.6°, S=0.90),
+     ordered light→dark, chart-1 brightest / chart-5 darkest, the same
+     direction in both modes so no chart-N meaning flips between them.
+     L steps 0.46→0.30 (step -0.04). Every step clears the 3:1 non-text
+     floor against --background and --card (chart-1, the tightest: 3.07:1
+     vs --background, 3.26:1 vs --card), and the same 3.07:1 holds in a
+     --muted well. Not on --accent (2.92:1): no chart sits inside a hover
+     fill. Adjacent steps sit ~1.18-1.21:1 apart, modest but perceptible.
+     Semantic --positive/--destructive/--warning are separate hues; the
+     ramp is chart-only. design-system-spec.md § Chart ramp has all ten
+     contrast figures. */
   --chart-1: #0C96DF;
   --chart-2: #0B89CB;
   --chart-3: #0A7CB8;
   --chart-4: #096FA5;
   --chart-5: #086291;
 
-  /* Sidebar — pass 5: re-tinted blue (was green in pass 4 — the Principal
-     read the green cast as a bias, not a deliberate choice, and asked
-     for flat or blue-biased; blue was chosen to stay consistent with the
-     rest of the re-tinted neutral scale above rather than introducing a
-     third, truly-neutral grey). Still inverted (dark-on-light / light-
-     on-dark) and still a rounded, collapsible card — see
-     design-system-spec.md § Sidebar, unchanged from pass 4. Focus ring
-     also moved to --brand-2 (was the green --brand) to fully remove the
-     green cast from this component. */
+  /* Sidebar: inverted relative to the page (a dark card on the light page)
+     and tinted with the same blue as the neutral scale, so the whole
+     system carries one consistent cast rather than a third, truly-neutral
+     grey. The focus ring is --brand-2, so no green cast reaches this
+     component. */
   --sidebar: #1F2528;
   --sidebar-foreground: #F2F2F3;
   --sidebar-accent: #303B40;
   --sidebar-accent-foreground: #F2F2F3;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #05A9FF;
-  /* Pass 14: stroke of the seedling brand mark in the sidebar brand row.
-     The literal neon brand, 11.39:1 on this dark card. */
+  /* Stroke of the seedling brand mark in the sidebar brand row: the
+     literal neon brand, 11.39:1 on this dark card. */
   --sidebar-brand: #2CFF05;
 
-  /* Financial semantics — --positive unchanged from pass 3/4, re-verified
-     against the new (barely different) near-white surfaces.
-     --warning — pass 6: was #B45309 (H=26°, L=0.371 — reads brown, not
-     orange, to the Principal). A true vivid orange (H=25.7°, matching
-     Monarch's own measured orange hue of 22° — see Inspiration) can't
-     clear 4.5:1 with WHITE text without darkening past the point it still
-     reads as orange (destructive/positive solved this by darkening; orange
-     can't take that route and keep its hue legible). Paired with a dark
-     orange-black ink instead — one literal value doing both jobs: 5.54:1
-     for fill-with-text, 3.20:1 against --card for border/icon use
-     (used for: aged Cash-in-Transit exceptions, a stale provider link,
-     or a safe-harbor due date >14 days out — see Financial semantics §
-     Status tiers). */
-  --positive: #147F3C; /* pass 11f: a hair darker — #15803D is 4.4999:1 on --accent (hovered table rows), this is 4.56:1 */
+  /* Financial semantics.
+     --warning: a true vivid orange (H=25.7°, close to Monarch's measured
+     orange hue of 22°, see Inspiration). Orange can't clear 4.5:1 with
+     WHITE text without darkening until it reads brown (destructive and
+     positive can take that route; orange can't and keep its hue). So it
+     pairs with a dark orange-black ink instead. One literal value does
+     both jobs: 5.54:1 for fill-with-text, 3.20:1 against --card for
+     border/icon use. Used for: aged Cash-in-Transit exceptions, a stale
+     provider link, a safe-harbor due date >14 days out (Financial
+     semantics § Status tiers). */
+  --positive: #147F3C; /* 4.56:1 on --accent (hovered table rows); a hair lighter falls under AA there */
   --positive-foreground: #FFFFFF;
   --warning: #EA6A0A;
   --warning-foreground: #2A1200;
 
-  /* Radius — unchanged from pass 3/4. */
   --radius-sm: 6px;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 20px;
 
-  /* Typography — unchanged from pass 3/4. */
   --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-heading: var(--font-sans);
   --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 .dark {
-  /* Same blue-hue tint applied to a near-black base (pass 5 — was the
-     green-tinted #070907/#0D100C of pass 4). */
+  /* The same blue-hue tint on a near-black base. */
   --background: #070808;
   --foreground: #F2F2F3;
   --card: #0D0E0F;
@@ -213,13 +155,11 @@
   --popover: #0D0E0F;
   --popover-foreground: #F2F2F3;
 
-  /* Dark-mode --primary IS the raw brand green (unchanged from pass 4) —
-     it clears AA beautifully here where light mode's white base
-     couldn't use it at all. */
+  /* Dark-mode --primary IS the raw brand green: it clears AA comfortably
+     here, where a light base can't use it at all. */
   --primary: #2CFF05;
   --primary-foreground: #070808;
 
-  /* Secondary/accent — pass 5, new blue (was pale green in pass 4). */
   --secondary: #173C4F;
   --secondary-foreground: #68C3F3;
   --muted: #0F1112;
@@ -237,46 +177,41 @@
   --input: rgba(255, 255, 255, 0.12);
   --ring: #2CFF05;
 
-  /* Chart ramp — pass 10: same --brand-2 hue (200.6°, S=0.90) as :root,
-     re-lightened for the dark surface. L steps 0.88→0.42 (step -0.12);
-     chart-5's floor (#0B89CB) is the same hex as light mode's chart-2 —
-     coincidental, both ramps sample the same hue/saturation function, not
-     a themed link between the two modes. Every step clears 3:1 by a wide
-     margin (chart-5, the tightest: 5.23:1 vs --background, 5.04:1 vs
-     --card) — dark mode was never the tight constraint, see :root above
-     for the ramp that actually sets the floor. */
+  /* Chart ramp: the same --brand-2 hue (200.6°, S=0.90) as :root,
+     lightened for the dark surface. L steps 0.88→0.42 (step -0.12).
+     chart-5 (#0B89CB) is the same hex as light mode's chart-2 by
+     coincidence: both ramps sample one hue/saturation function, not a
+     themed link. Every step clears 3:1 by a wide margin (chart-5, the
+     tightest: 5.23:1 vs --background, 5.04:1 vs --card); light mode sets
+     the floor. */
   --chart-1: #C5E9FC;
   --chart-2: #8BD3F9;
   --chart-3: #51BDF6;
   --chart-4: #16A7F3;
   --chart-5: #0B89CB;
 
-  /* Sidebar — pass 5: still inverted the other way in dark mode (a LIGHT
-     card floating on the dark page, reusing the light mode canvas tone
-     directly) — now that canvas tone is blue-tinted too, so this stays
-     visually consistent automatically. Ring uses the light-mode derived
-     blue ink (#0078B8, NOT the raw --brand-2) since the raw brand blue
-     reads too close to this light sidebar's own near-white surface to
-     register as a distinct focus indicator. */
+  /* Sidebar: inverted the other way in dark mode, a LIGHT card on the dark
+     page, close to the light canvas tone. The ring uses a derived blue
+     ink (#0078B8, not the raw --brand-2), because the raw blue reads too
+     close to this near-white surface to register as a focus indicator. */
   --sidebar: #F7F8F8;
   --sidebar-foreground: #1D1F20;
   --sidebar-accent: #E3F0F7;
   --sidebar-accent-foreground: #096FA5;
   --sidebar-border: #E7E8E9;
   --sidebar-ring: #0078B8;
-  /* Pass 14: on this light card the raw neon is 1.28:1, so the mark takes
-     the light-mode primary green instead: 4.73:1 (>= 3:1 non-text). */
+  /* On this light card the raw neon is 1.28:1, so the mark takes the
+     light-mode primary green instead: 4.73:1 (>= 3:1 non-text). */
   --sidebar-brand: #148100;
 
   --positive: #52E0A4;
   --positive-foreground: #052E13;
-  /* --warning — pass 6: was #F3CA59, H=44° — a mustard/gold, not orange
-     (the dark-mode symptom of the same light-mode problem: a warm hue
-     pulled toward yellow to stay bright and legible). Same hue as the
-     light-mode fix (H≈23–26°), lightened for a dark surface; pairs with
-     the same dark orange-black ink as light mode (not a white/dark flip
-     like --destructive — orange never pairs with white text AA-safely at
-     a saturation that still reads as orange, in either mode). */
+  /* --warning: the light-mode orange hue (H≈23–26°), lightened for a dark
+     surface. A warm hue pulled toward yellow to stay bright reads as
+     mustard, not orange, so the hue is held and only L moves. It pairs
+     with the same dark orange-black ink as light mode, not a white/dark
+     flip like --destructive: orange never pairs AA-safely with white text
+     at a saturation that still reads as orange, in either mode. */
   --warning: #FF9452;
   --warning-foreground: #2A1200;
 }
