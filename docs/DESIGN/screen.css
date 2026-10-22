@@ -1036,6 +1036,78 @@ table.data-table td.amount.negative { color: var(--destructive); }
 .landing-hero .cta-row .btn-default { background: #2CFF05; color: #070907; }
 .landing-hero .cta-row .btn-outline { border-color: rgba(255,255,255,0.24); color: #EFF1EF; }
 
+/* ---------- Home hero with the mountains illustration: three options
+   for review (styled-screens/home-hero-*.html). Each keeps the copy as
+   neon green + near-white on the near-black hero (#070907), and brings in
+   brand/polycarpic-bg-mountains.jpeg (1600w, 3200w for 2x) differently.
+   The image is decorative: empty alt, hidden from assistive tech. ---------- */
+.hero-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.landing-hero > :not(.hero-art) { position: relative; z-index: 1; }
+
+/* Option A, fade: the image fills the hero and a vertical gradient keeps
+   its top solid near-black, so the mark, headline and CTAs sit on black;
+   the gradient clears through the middle and the peaks, pines and meadow
+   rise out of the black along the bottom. */
+.landing-hero.hero-fade { position: relative; overflow: hidden; padding-bottom: 340px; }
+.landing-hero.hero-fade .hero-art { object-position: 50% 78%; }
+.landing-hero.hero-fade::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(180deg, #070907 0%, #070907 46%, rgba(7, 9, 7, 0.72) 60%, rgba(7, 9, 7, 0.15) 80%, rgba(7, 9, 7, 0) 100%);
+}
+
+/* Option B, split: the black band holds the copy, left-aligned; the image
+   fills the right half and melts into the black along its left edge. */
+.landing-hero.hero-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  padding: 0;
+  text-align: left;
+  min-height: 560px;
+}
+.hero-split .hero-copy { padding: 88px 56px 80px 64px; align-self: center; }
+.hero-split .hero-copy h1 { margin: 0 0 16px; max-width: 16ch; }
+.hero-split .hero-copy .landing-subhead { margin: 0 0 32px; }
+.hero-split .hero-copy .cta-row { justify-content: flex-start; }
+.hero-split .hero-media { position: relative; overflow: hidden; }
+.hero-split .hero-media .hero-art { object-position: 42% 62%; }
+.hero-split .hero-media::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 45%;
+  z-index: 1;
+  background: linear-gradient(90deg, #070907 0%, rgba(7, 9, 7, 0) 100%);
+}
+
+/* Option C, band: the black hero is unchanged; below it a full-width band
+   of the image, whose top edge fades out of the hero's black so the two
+   read as one piece, with a 2px neon rule where they meet. */
+.landing-band {
+  position: relative;
+  height: 340px;
+  overflow: hidden;
+  background: #070907;
+  border-top: 2px solid var(--brand);
+}
+.landing-band .hero-art { object-position: 50% 72%; }
+.landing-band::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 45%;
+  z-index: 1;
+  background: linear-gradient(180deg, #070907 0%, rgba(7, 9, 7, 0) 100%);
+}
+
+@media (max-width: 760px) {
+  .landing-hero.hero-split { grid-template-columns: 1fr; }
+  .hero-split .hero-media { min-height: 260px; }
+  .hero-split .hero-media::before { inset: 0 0 auto 0; width: auto; height: 40%; background: linear-gradient(180deg, #070907 0%, rgba(7, 9, 7, 0) 100%); }
+}
+
 .landing-features {
   padding: 56px 48px;
   display: grid;
