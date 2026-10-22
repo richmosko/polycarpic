@@ -986,22 +986,70 @@ table.data-table td.amount.negative { color: var(--destructive); }
   padding: 8px 0;
 }
 
-/* ---------- Public landing page (Home): the PRE-AUTH marketing page,
-   not a signed-in screen. The hero band is a fixed dark/brand backdrop
-   (same posture as the login visual pane: a deliberate dark-surface
-   context for --brand at full strength); the feature/footer sections
-   below it are theme-aware like any other page. ---------- */
-.landing-hero {
+/* ---------- Brand app bar: the fixed near-black top bar of every page
+   without the app shell (Home, Membership setup, Admin). Lockup left,
+   the page's trailing item(s) right. The bar is #070907, the brand's
+   dark surface, the same in both themes; neon and near-white text only
+   ever sit on its solid black. A fixed fade hangs under it, so the page
+   scrolls under the black and emerges through the gradient.
+   Usage: <body class="has-brand-bar"> + <header class="brand-bar">,
+   first in the DOM, so the keyboard order is lockup, then the trailing
+   items, then the page. ---------- */
+.has-brand-bar {
+  --bar-h: 72px;
+  --bar-fade: 88px;
+  /* Clearance: the page starts below the fixed bar. */
+  padding-top: var(--bar-h);
+  /* Paint --background edge to edge: the global body canvas is --muted,
+     which differs from --background in dark mode and shows as a stripe
+     beside centred content. */
+  background: var(--background);
+}
+/* In-page anchors and focus scrolling land below the fixed bar. */
+html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); }
+
+.brand-bar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 50;
+  height: var(--bar-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 32px;
   background: #070907;
   color: #EFF1EF;
-  text-align: center;
-  padding: 96px 48px 80px;
 }
+/* The fade hangs below the bar and moves with it; it never takes clicks.
+   Over an illustration (Home) it is deep, so the image rises out of the
+   black. */
+.brand-bar::after {
+  content: "";
+  position: absolute;
+  inset: 100% 0 auto 0;
+  height: var(--bar-fade);
+  background: linear-gradient(180deg, #070907 0%, rgba(7, 9, 7, 0.55) 45%, rgba(7, 9, 7, 0) 100%);
+  pointer-events: none;
+}
+/* Over a plain page background (no image), a deep black fade reads as a
+   dirty smear on the light page. The plain variant is short and starts at
+   28% black, so it reads as the bar's shadow; content scrolling up still
+   passes under it and dims into the bar. In dark mode the page is already
+   near-black, so the same fade is close to invisible and a hairline marks
+   the bar's edge instead. */
+.brand-bar--plain { --bar-fade: 28px; }
+.brand-bar--plain::after {
+  background: linear-gradient(180deg, rgba(7, 9, 7, 0.28) 0%, rgba(7, 9, 7, 0.08) 55%, rgba(7, 9, 7, 0) 100%);
+}
+.dark .brand-bar--plain { box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.08); }
+.dark .brand-bar--plain::after { background: linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 100%); }
 
-/* Hero brand lockup: the full seedling mark (with midribs, at 32px) to
-   the left of the wordmark, both in the literal --brand on the fixed dark
-   hero (14.72:1). */
-.landing-hero .landing-brand {
+/* Lockup: the seedling mark left of the wordmark, both in the literal
+   --brand on the black bar (14.72:1). A link (Home: to the top of the
+   page), so it is the first stop in the keyboard order. Home uses the
+   full mark at 32px; the plain pages use the 24px mark. */
+.brand-bar-lockup {
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -1009,32 +1057,58 @@ table.data-table td.amount.negative { color: var(--destructive); }
   font-family: var(--font-heading);
   font-size: 22px;
   font-weight: 700;
-  margin-bottom: 32px;
+  text-decoration: none;
+  border-radius: var(--radius-md);
 }
-.landing-hero .landing-brand .brand-icon { width: 32px; height: 32px; color: var(--brand); }
+.brand-bar-lockup .brand-icon { width: 32px; height: 32px; color: var(--brand); }
+.brand-bar--plain .brand-bar-lockup { font-size: 18px; gap: 8px; }
+.brand-bar--plain .brand-bar-lockup .brand-icon { width: 24px; height: 24px; }
+.brand-bar-lockup:focus-visible { outline: 2px solid var(--brand); outline-offset: 4px; }
 
-.landing-hero h1 {
-  font-size: 40px;
-  font-weight: 700;
-  max-width: 20ch;
-  margin: 0 auto 16px;
+/* Trailing items, re-inked for the black bar (their default tokens assume
+   the page surface). */
+.brand-bar .cta-row { display: flex; gap: 12px; }
+.brand-bar .btn-default { background: #2CFF05; color: #070907; }
+.brand-bar .btn-outline { border-color: rgba(255, 255, 255, 0.24); color: #EFF1EF; }
+.brand-bar .btn:focus-visible { outline-color: var(--brand); }
+.brand-bar .badge-outline { color: #EFF1EF; border-color: rgba(255, 255, 255, 0.24); }
+.brand-bar .avatar-btn { padding: 0; border: none; background: none; border-radius: 50%; cursor: pointer; display: inline-flex; }
+.brand-bar .avatar-btn .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
+.brand-bar .avatar-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+
+@media (max-width: 760px) {
+  .has-brand-bar { --bar-h: 64px; }
+  .brand-bar { padding: 0 16px; }
+  .brand-bar-lockup { font-size: 18px; }
+  .brand-bar .cta-row { gap: 8px; }
+  .brand-bar .btn { padding: 6px 12px; font-size: 13px; }
 }
 
-.landing-hero .landing-subhead {
-  font-size: 18px;
-  color: #A1AD9F;
-  max-width: 46ch;
-  margin: 0 auto 32px;
-}
+/* ---------- Public landing page (Home): the PRE-AUTH marketing page,
+   not a signed-in screen. Under the brand app bar: the mountains
+   illustration, full width, then the headline, subhead and feature
+   cards, theme-aware like any other page. ---------- */
 
-.landing-hero .cta-row {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
+/* The image starts directly under the bar (the body's clearance), so at
+   rest the bar's fade lies over its top edge and the sky shows through.
+   Decorative: empty alt, hidden from assistive tech. */
+.landing-art {
+  position: relative;
+  height: 560px;
+  overflow: hidden;
+  background: #070907;
 }
+.landing-art .hero-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 28%; }
 
-.landing-hero .cta-row .btn-default { background: #2CFF05; color: #070907; }
-.landing-hero .cta-row .btn-outline { border-color: rgba(255,255,255,0.24); color: #EFF1EF; }
+/* Headline and subhead, below the image: theme-aware, on the page
+   background above the feature cards. */
+.landing-intro { text-align: center; padding: 48px 48px 0; background: var(--background); color: var(--foreground); }
+.landing-intro h1 { font-size: 36px; font-weight: 700; max-width: 22ch; margin: 0 auto 14px; }
+.landing-intro .landing-subhead { font-size: 18px; color: var(--muted-foreground); max-width: 46ch; margin: 0 auto; }
+
+@media (max-width: 760px) {
+  .landing-art { height: 360px; }
+}
 
 .landing-features {
   padding: 56px 48px;
@@ -1291,10 +1365,9 @@ table.data-table td.amount.negative { color: var(--destructive); }
 .switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .switch[disabled] { opacity: 0.5; cursor: not-allowed; }
 
-/* Shell-less pages (membership setup, admin) get a brand bar instead of
-   the sidebar. On the setup page no entity exists yet; on the operator
-   page no entity applies. */
-.app-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 24px; }
+/* Shell-less page bodies (membership setup, admin), under the brand app
+   bar instead of the sidebar: no entity exists yet (setup), or none
+   applies (operator). */
 .page-narrow { max-width: 520px; margin: 32px auto 64px; padding: 0 24px; }
 .page-medium { max-width: 760px; margin: 16px auto 64px; padding: 0 24px; }
 .page-title { font-family: var(--font-heading); font-size: 24px; font-weight: 700; margin-bottom: 6px; }

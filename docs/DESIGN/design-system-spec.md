@@ -233,11 +233,11 @@ Both clear the 3:1 non-text floor, and the dark-mode value clears 4.5:1 too. Off
 |---|---|---|---|
 | Sidebar brand row, expanded | 24px, left of the wordmark | `--sidebar-brand` | see above |
 | Sidebar rail, collapsed | 24px, the expand button's resting face; swaps to `panel-left-open` on hover or keyboard focus | `--sidebar-brand` | see above |
-| Shell-less app bar (membership setup, Admin) | 24px | `--primary` | 4.75:1 light, 14.72:1 dark |
-| Home hero (`.landing-brand`) | Full, 32px, left of the "Polycarpic" wordmark | Literal `--brand` on the fixed dark hero | 14.72:1 |
+| Brand app bar, plain pages (Membership setup, Admin) | 24px, left of the wordmark | Literal `--brand` on the bar (`#070907`) | 14.72:1 |
+| Brand app bar, Home | Full, 32px, left of the "Polycarpic" wordmark | Literal `--brand` on the bar (`#070907`) | 14.72:1 |
 | Login form pane (`.auth-logo`) | 24px, left of the wordmark, top-left | `--primary` | 4.75:1 light, 14.72:1 dark |
 
-`.brand-mark` is the SVG's own class; Home's lockup container is `.landing-brand`.
+`.brand-mark` is the SVG's own class; the brand app bar's lockup container is `.brand-bar-lockup`.
 
 ### Layout & shell
 
@@ -494,7 +494,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Sidebar** | Primary nav, seven flat items (Settings proposed under the avatar popover) — inverted, a floating card (gutter on every side), collapsible to an icon rail, brand row on top (mark + wordmark + collapse control) + avatar-popover trigger on bottom (opens to the right) — see Sidebar information architecture |
 | **Skeleton** | Every async fetch boundary |
 | **Switch** | Settings' on/off preferences (auto-post matched recurring transactions, reduced motion), `.switch[role=switch]` |
-| **Brand app bar** | Shell-less pages only (membership setup, Admin): brand lockup on the left, user avatar or operator badge on the right, no sidebar, `.app-bar` |
+| **Brand app bar** | Every page without the app shell (Home, Membership setup, Admin): fixed near-black bar, lockup left, the page's trailing items right, a fade below — see Public screens § Brand app bar |
 | **Sonner (toast)** | Import batch complete, entry posted, reconciliation break |
 | **Progress** | Import batch progress, safe-harbor paid-vs-required |
 | **Top row** | Starts right of the sidebar, not full-width, not sticky/bordered, same background token as the content below it: breadcrumb (left); entity selector + separator + "more" menu (right) — see Layout & shell, Header |
@@ -502,7 +502,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Popover / DropdownMenu** | Avatar popover at the sidebar's bottom — profile, **Settings (proposed)**, **Notifications (proposed)**, preferences, theme, keyboard shortcuts, Log out last (see Sidebar); the same primitive backs the top row's "more" menu |
 | **Breadcrumb** | The top row's "page title > breadcrumbs" — single crumb on most screens, multi-crumb on drill-downs (the account register) |
 | **Avatar cluster** | Overlapping initials-on-`--secondary` circles in the entity selector — membership at a glance, max 3 + overflow (see Header) |
-| **Public hero + feature call-outs** | Home — pre-auth landing page, product statement + brand identity + CTAs |
+| **Landing illustration + feature call-outs** | Home — under the brand app bar: the mountains illustration, then headline, subhead and three feature cards |
 | **Split screen login** | Login — theme-aware form pane (full field list: OAuth, email, password + reveal + forgot-password, sign-in, sign-up link, legal footer) + always-branded visual pane, stacks on phone width |
 
 **Page actions live in the "more" menu.** Monarch puts a page's actions in its top bar as visible buttons (page title + an outline action + a filled CTA). Here, a page's global actions (Dashboard's Refresh; Transactions' Sync Transactions and New entry) live in the top row's contextual "more" menu instead (§ Header), and posting happens per item in the Pending inbox, never as a single batch "confirm all".
@@ -594,7 +594,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Lots sub-card pull-down | **Collapsible** | Direct reuse — a simpler primitive than Accordion for a single expand/collapse row |
 | Settings on/off preferences | **Switch** | Direct reuse |
 | Settings theme picker (Light / Dark / Auto) | **Toggle Group** (single) | Rendered with the `.tabs` look; semantically a radio group, not tabs |
-| Shell-less brand bar (membership setup, Admin) | `custom` | A flex row of the brand lockup plus one trailing item; too small to be a block. No sidebar because no entity exists (setup) or none applies (operator) |
+| Brand app bar (Home, Membership setup, Admin) | `custom`, with **Button** / **Badge** / **Avatar** for the trailing items | One component for every shell-less page: a fixed bar with a lockup, trailing items and a fade; too small and too brand-specific to be a block. No sidebar because no entity exists (setup), none applies (operator), or the visitor is not signed in (Home) |
 | Register / any wide table | **Table** (its own overflow-x wrapper) | `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling |
 | Allocation actual-vs-target track | `custom` on **Progress** | A Progress track plus a target marker; shadcn Progress has no marker |
 | Provider-item dialog | **Dialog**, **Tabs** (source-type picker), **Select** (account mapping) | Composed from three existing primitives, no custom chrome |
@@ -605,7 +605,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Progress (import batch, safe-harbor paid-vs-required) | **Progress** | Direct reuse |
 | Skeleton | **Skeleton** | Direct reuse |
 | Tooltip (icon-button titles, truncated text, the rail's "Expand sidebar") | **Tooltip** | Direct reuse — used wherever an icon-only control needs a text label on hover |
-| Public hero (Home) | `custom` | Marketing/landing content; no shadcn block fits a bespoke brand hero |
+| Landing illustration (Home) | `custom` | A full-bleed decorative image under the brand app bar; no shadcn block fits |
 | Split-screen login | shadcn-svelte's own **login block** (`https://shadcn-svelte.com/blocks/login`, the two-pane pattern) as a starting point, customized | The reference screenshot (`temp/design-refs/split-login-example.png`) is close to this official block's shape; adopted as the base rather than built from scratch, then customized for our exact field list (§ Public screens: Home & Login) |
 
 **What's deliberately `custom` and why that's still "sticking to the designed stuff":** every `custom` row above is custom because shadcn-svelte genuinely has no matching primitive or block — not because an existing one was skipped. Each is built *from* shadcn-svelte primitives (Avatar, Popover, Card, Button) rather than from scratch, so the stability this is after — consistent tokens, consistent interaction patterns, one accessibility baseline — still holds even where the composition itself is ours.
@@ -638,13 +638,34 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 
 ### Home — public landing page
 
-**What it is:** the marketing/landing page a visitor sees before signing in — not a Dashboard, not authenticated, no ledger data. One screen, hero-led:
-- **Hero:** the seedling mark + "Polycarpic" wordmark, a product statement, and the neon-green brand identity front and center (a prime "dark or brand surface" context, so `--brand` at full strength is appropriate here, unlike anywhere in the authenticated app).
-- **What it does, in one screen:** a genuine double-entry ledger, multi-entity (Person/Trust/Business/Household), self-hosted — three short feature call-outs, not an exhaustive feature list.
-- **Calls to action:** "Sign in" and "Get started" (routes to Login).
-- **Footer:** minimal — links, no dense content.
+**What it is:** the marketing/landing page a visitor sees before signing in — not a Dashboard, not authenticated, no ledger data. Top to bottom:
 
-The hero band is fixed dark; the feature and footer sections follow the user's stored theme preference like the rest of the app (a landing page's canvas below the hero is content, not brand chrome). See `styled-screens/home.html`.
+- **Brand app bar** at the top (see **Brand app bar**, below): neon lockup left; **Get started** (neon fill, near-black ink) and **Sign in** (outline) right; the deep fade, so the illustration rises out of the black.
+- **The mountains illustration** (`.landing-art`), full width, 560px tall (360px below 760px), starting directly under the bar. At rest, the bar's fade lies over the image's top edge and the sky shows through it. Neon and near-white text sit only on the bar's solid black, never on the sky.
+- **Headline and subhead** (`.landing-intro`), then the **three feature call-outs** and a minimal **footer**. These follow the user's stored theme like the rest of the app.
+
+Clearance, keyboard order and the edge-to-edge background come from the brand app bar (below).
+
+**Image:** `brand/polycarpic-bg-mountains.jpeg` (1600w, 242 KB) and `polycarpic-bg-mountains-3200.jpeg` (3200w, 607 KB), served by `srcset` with `sizes="100vw"`. Both are derived from a 4096px Real-ESRGAN (Upscayl, digital-art) upscale; no smaller original exists, and the PNG is not committed. Decorative: empty alt, hidden from assistive tech.
+
+See `styled-screens/home.html`.
+
+### Brand app bar
+
+The one top bar of every page without the app shell: Home, Membership setup, Admin. Markup: `<body class="has-brand-bar">` with `<header class="brand-bar">` first in the DOM.
+
+- **The bar:** fixed, near-black `#070907` (the brand's dark surface, the same in both themes), 72px tall (64px below 760px).
+  - Left: the lockup (`.brand-bar-lockup`), a link, in the literal `--brand` (14.72:1).
+  - Right: the page's trailing items, re-inked for the black bar — Home's Get started + Sign in, Membership setup's account avatar button, Admin's operator-session status badge.
+- **The fade:** hangs under the bar and moves with it, so the page scrolls under the black and emerges through the gradient. Neon and near-white text only ever sit on the bar's solid black.
+  - Over Home's illustration: deep (88px, black → transparent), so the image rises out of the black.
+  - Over a plain page background (`.brand-bar--plain`): short (28px, starting at 28% black). A deep black fade on the light page reads as a dirty smear; the short one reads as the bar's shadow.
+  - Dark mode: the page is already near-black, so the plain fade is close to invisible and a 1px hairline marks the bar's edge.
+- **Clearance:** the body pads by the bar's height, so nothing renders under the bar at rest; `scroll-padding-top` keeps anchors and focus scrolling clear of it.
+- **Keyboard order:** the bar is first in the DOM, so Tab goes lockup, trailing items, then the page.
+- **Background:** the page paints `--background` edge to edge (the global body canvas is `--muted`, which differs in dark mode).
+
+See `styled-screens/home.html`, `styled-screens/membership-setup.html`, `styled-screens/admin.html`.
 
 ### Login — split screen login page
 
@@ -706,7 +727,7 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 **Target: WCAG AA.** Every pair below is computed via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (scripts in `temp/`). See `tokens.html` for every token's value in both modes with a rendered swatch, alongside this written derivation.
 
-**Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` use the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
+**The brand app bar's and Login's visual-pane colors are not new values** — `.brand-bar`/`.auth-visual-pane` use the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
 
 **Light mode — text pairs (floor 4.5:1), all PASS (canvas = `--muted` = `#F9F8F8`, hover fill `--accent` `#EBF4F9`):**
 

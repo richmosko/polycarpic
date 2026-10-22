@@ -9,7 +9,7 @@ Every page of the product, rendered with the design system. There is one fidelit
   ```
   Use the token-backed component classes (`.btn`, `.input`, `.card`, …). Never hardcode values.
 - **Naming:** `<screen>.html` (e.g. `dashboard.html`, `settings.html`).
-- **Shell:** app screens reuse the sidebar-07 shell verbatim. Copy it from `dashboard.html`, and point every nav link at the real screen file. Shell-less pages (membership setup, Admin) use `.app-bar`.
+- **Shell:** app screens reuse the sidebar-07 shell verbatim. Copy it from `dashboard.html`, and point every nav link at the real screen file. Shell-less pages (Home, Membership setup, Admin) use the brand app bar: `<body class="has-brand-bar">` + `<header class="brand-bar">` (add `brand-bar--plain` where there is no illustration under it).
 - **Explanatory notes** go in an HTML comment at the top of the file. They are never rendered as on-screen text.
 - **States shown open** (menus, popovers, dialogs) are static references. They are listed in `../design-system-spec.md` § Screen list.
 - **Review check:** each screen renders with 0 console errors and no page or in-card overflow at 960px and 1280px, in light mode and in dark mode (`.dark` on `<html>`).
