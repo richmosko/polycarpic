@@ -27,9 +27,9 @@ Work section by section. Use `AskUserQuestion` for converged decisions (palette 
 3. **Design Tokens** (`#tokens`) — write real values into `tokens.css`: color (semantic roles + contrast pairings), typography (families/scale/weights/leading), spacing scale, radius, shadow, motion, layout/breakpoints. The swatch preview in `index.html` reads these live.
 4. **Components & Screen Styles** (`#components`) — the component inventory; for each, document **all states** (default/hover/focus-visible/active/disabled/loading/error) in `design-system-spec.md` and implement token-backed styles in `screen.css`. Never hardcode a value — reference a `--token`.
 5. **User Flows** (`#flows`) — Mermaid `flowchart` for the top 3–8 PRD stories. First-pass inline in `index.html`; promote complex flows to files in `flows/`.
-6. **Screens** (`#screens`) — one fidelity tier: every page is a hi-fi HTML mockup in `styled-screens/` that links `tokens.css` + `screen.css`, with a thumbnail gallery in `index.html`. No separate low-fi wireframe pass (DECISIONS 2026-10-20); superseded sketches go to `history/`. The screens double as a visual-regression reference and a head-start for `frontend-lead`.
+6. **Screens** (`#screens`) — one fidelity tier: every page is a hi-fi HTML mockup in `styled-screens/` that links `tokens.css` + `screen.css`, with a thumbnail gallery in `index.html`. No separate low-fi wireframe pass (DECISIONS 2026-10-20). The screens double as a visual-regression reference and a head-start for `frontend-lead`.
 7. **Accessibility** (`#accessibility`) — target standard (default WCAG AA) + deliberate exceptions with rationale. Mirror into `design-system-spec.md`.
-8. **Open Questions** (`#open-questions`) — unresolved design decisions; drives the next conversation.
+8. **Open Questions** (`#open-questions`) — unresolved design decisions; drives the next conversation. A resolved question is removed, not annotated: the design docs carry no decision history, no pass numbers, no superseded-by notes (DECISIONS 2026-10-22). Git holds the revisions; `process/DECISIONS.md` holds the rulings.
 
 ## Writing to the files
 
