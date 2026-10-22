@@ -1023,13 +1023,21 @@ table.data-table td.amount.negative { color: var(--destructive); }
   padding: 96px 48px 80px;
 }
 
-.landing-hero .brand-mark {
-  color: #2CFF05;
+/* Hero brand lockup (pass 14): the full seedling mark (with midribs, at
+   32px) to the left of the wordmark, both in the literal --brand on the
+   fixed dark hero (14.72:1). Renamed from .brand-mark, which is now the
+   SVG's own class. */
+.landing-hero .landing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--brand);
   font-family: var(--font-heading);
   font-size: 22px;
   font-weight: 700;
   margin-bottom: 32px;
 }
+.landing-hero .landing-brand .brand-icon { width: 32px; height: 32px; color: var(--brand); }
 
 .landing-hero h1 {
   font-size: 40px;
@@ -1110,10 +1118,17 @@ table.data-table td.amount.negative { color: var(--destructive); }
 
 .auth-form-pane .auth-logo {
   align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 18px;
 }
+/* Pass 14: the 24px seedling left of the wordmark. The form pane is
+   theme-aware, so it takes --primary, the same rule as the shell-less
+   app bar: 4.75:1 light, 14.72:1 dark. */
+.auth-form-pane .auth-logo .brand-icon { color: var(--primary); }
 
 .auth-form-inner {
   max-width: 380px;
