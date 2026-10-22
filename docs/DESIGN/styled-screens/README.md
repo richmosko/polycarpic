@@ -1,6 +1,6 @@
 # Styled Screens
 
-Every page of the product, rendered with the design system. As of pass 13 there is one fidelity tier: the wireframe tier is retired.
+Every page of the product, rendered with the design system. There is one fidelity tier: every page is a styled screen.
 
 - **Format:** self-contained HTML that links the design system:
   ```html
