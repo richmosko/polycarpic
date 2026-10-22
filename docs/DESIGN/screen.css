@@ -1251,9 +1251,6 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
   overflow: hidden;
   position: relative;
   background: #0D2E07; /* the art's own deep green, shown only while the image loads */
-  display: flex;
-  align-items: flex-end;
-  padding: 40px;
 }
 
 /* The pane is tall and the art is square, so it covers and crops the
@@ -1269,35 +1266,6 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
   height: 100%;
   object-fit: cover;
   object-position: 78% 70%;
-}
-
-/* A bottom scrim keeps the caption legible over the stream's glow. */
-.auth-visual-pane::after {
-  content: "";
-  position: absolute;
-  inset: 55% 0 0 0;
-  background: linear-gradient(180deg, transparent, oklch(0 0 0 / 55%));
-  pointer-events: none;
-}
-
-.auth-visual-pane .visual-caption {
-  position: relative;
-  z-index: 1;
-  color: #EFF1EF;
-  font-size: 14px;
-  max-width: 28ch;
-  opacity: 0.9;
-}
-/* A single refined line: display weight, tight tracking, full opacity,
-   one phrase, never stacked fragments. It sits on the bottom scrim. */
-.auth-visual-pane .visual-caption--line {
-  font-family: var(--font-heading);
-  font-size: 24px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
-  max-width: none;
-  opacity: 1;
 }
 
 @media (max-width: 760px) {
