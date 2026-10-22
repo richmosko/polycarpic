@@ -12,31 +12,31 @@ This project's UI direction is **SvelteKit + shadcn-svelte** (Tailwind, headless
 
 ## Inspiration: Monarch & Origin — measured, not remembered
 
-**Sources:** live capture in Chrome, 2026-09-28 (`temp/design-refs/`) — `monarch-home-hero.jpg`, `monarch-tracking-page.jpg`, `monarch-app-accounts-zoom.png` (an actual **app** screenshot, not marketing — load-bearing for the typography decision below); `origin-home-hero.jpg`, `origin-product-cards.jpg`. Figures below are reproduced from that capture's README, not re-derived.
+**Sources:** live captures in Chrome (`temp/design-refs/`) — `monarch-home-hero.jpg`, `monarch-tracking-page.jpg`, `monarch-app-accounts-zoom.png` (an actual **app** screenshot, not marketing — load-bearing for the typography decision below); `origin-home-hero.jpg`, `origin-product-cards.jpg`. Figures below are reproduced from that capture's README, not re-derived.
 
 ### What was measured
 
 **Monarch (monarch.com):** page bg `#FFFAEC` warm cream (marketing only — the app canvas is off-white with pure-white cards); ink `#2A2926` near-black warm, secondary text `#65625D`; primary/CTA `#F86713` orange, pill-radius **on the marketing hero only**; accent `#EFB921` mustard (illustrations/promo); body face "ABC Oracle" (grotesque sans); display serif used **only** for emphasis words in marketing headlines ("your money", "Tracking that doesn't feel like a chore") — **the app screenshot's own page title ("Accounts") is bold sans, not serif**; mono "Beltram Mono" for small figures. App shell: left sidebar (Dashboard, Accounts, Transactions, Cash Flow, Reports, Budget, Recurring, Goals, Investments, Advice); top bar = page title + outline "Refresh all" + filled "+ Add account". Net-worth hero: eyebrow label, big figure (`$687,041.79`), signed delta with arrow + percentage + period, a **single-line area chart with soft gradient fill**, $K-formatted y-axis. Account rows grouped by type (Cash / Credit Cards / Investments), collapsible, group-level delta, row = institution logo + name + subtype + sparkline + balance + relative freshness ("16 hours ago"). Right-column summary: Assets/Liabilities each as a horizontal **segmented stacked bar** + colored-dot legend, Totals/Percent toggle. Measured card radius ~12px, button/input radius ~8px (the pill shape is the marketing hero's CTA only).
 
-**Origin (`useorigin.com` — corrects an earlier misidentification of `originfinancial.com`, an unrelated firm):** near-black base `#050505`, white ink, surfaces as `rgba(255,255,255,0.04–0.08)` overlays; body face "Suisse Intl" (neo-grotesque); display face "Lyon Display" serif with italic emphasis words, marketing-headline-only (no evidence it reaches the product UI — Origin's own product-card screenshots show only the mono/sans system, no serif); labels/buttons in **"Roboto Mono", uppercase, letterspaced** ("GET STARTED →", "UPCOMING TRANSACTIONS", "HOLDINGS") — this one reaches actual product-card modules, not just marketing copy; primary CTA = white button, black text, 8px radius; semantic colors measured directly: positive `#009C5A`, negative `#FC4A4A`, info `#195F97`, savings-chart line warm gold. Product cards: dark surfaces, mono uppercase section header, ticker rows (logo, ticker, name, sparkline, signed-% pill), a stat-trio pattern (`$8,000` / `5.52%` / `$577/yr`).
+**Origin (`useorigin.com`, not the unrelated `originfinancial.com`):** near-black base `#050505`, white ink, surfaces as `rgba(255,255,255,0.04–0.08)` overlays; body face "Suisse Intl" (neo-grotesque); display face "Lyon Display" serif with italic emphasis words, marketing-headline-only (no evidence it reaches the product UI — Origin's own product-card screenshots show only the mono/sans system, no serif); labels/buttons in **"Roboto Mono", uppercase, letterspaced** ("GET STARTED →", "UPCOMING TRANSACTIONS", "HOLDINGS") — this one reaches actual product-card modules, not just marketing copy; primary CTA = white button, black text, 8px radius; semantic colors measured directly: positive `#009C5A`, negative `#FC4A4A`, info `#195F97`, savings-chart line warm gold. Product cards: dark surfaces, mono uppercase section header, ticker rows (logo, ticker, name, sparkline, signed-% pill), a stat-trio pattern (`$8,000` / `5.52%` / `$577/yr`).
 
 ### What was taken, and why
 
 | Decision | Taken from | Why |
 |---|---|---|
-| Primary brand hue = blue (`#195F97`) | Origin's own measured "info" semantic color; corroborated by Monarch's net-worth chart line also being light blue | The one hue **both** products independently reach for in a calm/informational role, rather than an urgent one — every other strong hue in this system (orange-red destructive, green positive, mustard warning) is already spoken for by a financial semantic, so a shared, meaning-free hue for brand/primary avoids diluting those signals. Not simply "picked" — it's the one point where both references agree |
-| One grotesque sans throughout the **app** (Inter), no serif | Both products' actual app/product-card screenshots (not their marketing pages) | The serif emphasis both products use is confirmed, by direct comparison, to be a **marketing-headline-only** device — neither app screen (Monarch's Accounts screenshot; Origin's product cards) carries it. This design system governs the app, not a future marketing site, so the serif is deliberately not adopted here — a more careful reading of the evidence than the previous (rejected) pass's assumption |
+| A calm blue for the secondary/informational role | Origin's measured "info" semantic color (`#195F97`); corroborated by Monarch's net-worth chart line also being light blue | The one hue **both** products independently reach for in a calm/informational role rather than an urgent one. Every other strong hue (orange-red destructive, green positive, orange warning) is already spoken for by a financial semantic, so a meaning-free blue for secondary surfaces and charts avoids diluting those signals. The brand's own primary is the neon green (see Foundations) |
+| One grotesque sans throughout the **app** (Inter), no serif | Both products' actual app/product-card screenshots (not their marketing pages) | The serif emphasis both products use is, by direct comparison, a **marketing-headline-only** device — neither app screen (Monarch's Accounts screenshot; Origin's product cards) carries it. This design system governs the app, not a marketing site, so the serif is deliberately not adopted |
 | Uppercase, letterspaced mono for section/eyebrow labels (`--font-mono`, Roboto Mono) | Origin's product-card headers ("HOLDINGS", "UPCOMING TRANSACTIONS") | A real in-product pattern (not marketing-only), and a strong, cheap, on-brand signature for a ledger product's account numbers, tickers, and section headers |
-| Warm off-white canvas + near-black warm ink (light mode) | Monarch's measured app-canvas convention and ink color | Confirmed against the **app** screenshot specifically (not the cream marketing hero) — off-white canvas, pure-white cards, warm near-black text |
-| Near-black dark mode, subtle white-overlay surfaces | Origin's measured base and surface convention | Origin is dark-first; adopted verbatim as this system's dark-mode foundation rather than inventing one |
+| Warm off-white canvas + near-black ink (light mode) | Monarch's measured app-canvas convention and ink color | Confirmed against the **app** screenshot specifically (not the cream marketing hero) — off-white canvas, pure-white cards, near-black text |
+| Near-black dark mode, subtle white-overlay surfaces | Origin's measured base and surface convention | Origin is dark-first; adopted as this system's dark-mode foundation rather than inventing one |
 | Card radius 12px, button/input radius 8px | Both products' measured app-level values (Monarch app screenshot ~12px cards; Origin's stated 8px buttons, corroborated by Monarch's own app-level button radius, distinct from its marketing-only pill) | Direct measurement, not a guess — and explicitly **not** the pill shape, which only appears on Monarch's marketing CTA |
 | Net-worth-over-time as a single-line **area chart** with gradient fill | Monarch's hero chart, exactly this pattern | Matches PRD §4.1 directly and is the most literal transferable pattern available |
-| Grouped account rows (type group → institution rows, sparkline, freshness) | Monarch's Accounts screen | The closest existing analogue to our own Accounts/Dashboard wireframes — adopted close to verbatim, adapted for GL-vs-custodial grouping |
-| Segmented stacked bar + legend for allocation | Monarch's Assets/Liabilities summary panel | Directly reusable for our asset-allocation actual-vs-target view |
-| Positive/negative/warning hues sourced from measured brand values, not invented | Origin's measured green/red; Monarch's measured mustard | Real evidence over invention — each darkened only as far as needed to clear WCAG AA (see Accessibility), hue/saturation otherwise preserved |
+| Grouped account rows (type group → institution rows, sparkline, freshness) | Monarch's Accounts screen | The closest existing analogue to our own Dashboard account list — adopted close to verbatim, adapted for GL-vs-custodial grouping |
+| Segmented stacked bar + legend for allocation | Monarch's Assets/Liabilities summary panel | Directly reusable for the asset-allocation summary |
+| Positive/negative/warning hues sourced from measured brand values, not invented | Origin's measured green/red; Monarch's measured orange | Real evidence over invention — each darkened only as far as needed to clear WCAG AA (see Accessibility), hue/saturation otherwise preserved |
 | Destructive/CTA colors NOT copied at brand saturation | Both products' raw brand values | Monarch's orange (3.03:1) and Origin's red/green (3.4–3.6:1) only clear the 3:1 large-text/UI floor at their raw marketing saturation — this system needs 4.5:1 for normal text, so each was darkened (documented per-token below), not used as-is |
 
-**What was deliberately not copied:** the pill-shaped CTA button (marketing-only, not app-level, on either product); the serif display face (marketing-only); Origin's dark-first default for our *primary* mode (see below) — polycarpic's dashboard is a daily-use tool checked in normal daylight conditions more often than a marketing moment, so **light is the primary/default mode**, styled closely on Monarch's own app screenshot; dark mode (styled on Origin's measured base) is the secondary, equally real but not-designed-first mode. Chart library, motion design, and exact information density beyond what's listed above were not reverse-engineered — original composition for the screens with no direct analogue (Ledger, GL-vs-custodial toggle, entity/membership).
+**What was deliberately not copied:** the pill-shaped CTA button (marketing-only, not app-level, on either product); the serif display face (marketing-only); Origin's dark-first default for our *primary* mode — polycarpic's dashboard is a daily-use tool checked in normal daylight more often than a marketing moment, so **light is the primary/default mode**, styled closely on Monarch's own app screenshot; dark mode (styled on Origin's measured base) is the secondary, equally real but not-designed-first mode. Chart library, motion design, and exact information density beyond what's listed above were not reverse-engineered — original composition for the screens with no direct analogue (Transactions review, General Ledger vs. Custodial Accounts, entity/membership).
 
 ---
 
@@ -44,86 +44,82 @@ This project's UI direction is **SvelteKit + shadcn-svelte** (Tailwind, headless
 
 ### Color
 
-**Pass 4 (2026-09-30): brand hue is neon green.** The Principal's own choice: `#2CFF05`, "since the project name relates to fruiting plants... likely a dominant color in the logo." Measured: hue 110.6°, full saturation, L 0.51, **relative luminance 0.72 — only 1.36:1 against white**. Kept as the literal `--brand` value everywhere it measures well (dark surfaces, dark-mode `--primary`), with a darkened same-hue value (`#158500`, L 0.26) serving light-mode `--primary` — one number doing both the fill-with-white-text job and the plain-text-on-card job, both clearing 4.79:1.
+**Brand hue: neon green.** `#2CFF05`, chosen because "the project name relates to fruiting plants... likely a dominant color in the logo." Measured: hue 110.6°, full saturation, L 0.51, **relative luminance 0.72 — only 1.36:1 against white**. It is kept as the literal `--brand` value everywhere it measures well (dark surfaces, dark-mode `--primary`), with a darkened same-hue value (`#148100`, L 0.253) serving light-mode `--primary` — one number doing both the fill-with-white-text job and the plain-text-on-card job.
 
-**Pass 5 (2026-09-30): a second brand hue, sky blue.** The Principal: "Can we explore adding a secondary brand color? something in a desaturated blue would complement well like `#05A9FF`." Measured: hue 200.6°, full saturation, L 0.51 — **2.56:1 against the light background, same "fails as a light-surface fill/text" shape as the green brand.** Same resolution pattern: **`#05A9FF` is kept as the literal `--brand-2` value** (dark-surface/decorative use — the sidebar's focus ring, and the dark-mode half of the chart series-2 job, see **Secondary accent** below); **a darkened same-hue value (`#0078B8`, L 0.36) does the light-mode job** (`--secondary-foreground`, 4.72:1 on `--secondary`/5.48:1 on `--card`) instead of a separately-invented color.
+**Secondary brand hue: sky blue.** `#05A9FF`, "a desaturated blue would complement well." Measured: hue 200.6°, full saturation, L 0.51 — **2.44:1 against the light background**, the same "fails as a light-surface fill/text" shape as the green brand. Same resolution pattern: **`#05A9FF` is the literal `--brand-2` value** (dark-surface/decorative use — the sidebar's focus ring, see **Secondary accent** below); **a darkened same-hue value (`#096FA5`) does the light-mode job** (`--secondary-foreground`, 4.72:1 on `--secondary`, 5.48:1 on `--card`) instead of a separately invented color.
 
-**Neutrals re-tinted from green to blue, lighter (pass 5).** Pass 4 tinted every neutral (`--background`/`--muted`/`--border`/`--foreground`) at the green brand's hue, 6–14% saturation. The Principal: "the background: can we use the secondary blue shade above in the same style? A slight hint of the secondary color but much lighter" — and separately flagged the inverted sidebar as reading green-biased. **Both re-tinted to the new blue hue (200.6°) at a lower saturation than pass 4's green** (3–9%, vs. pass 4's 6–14%) — "much lighter" read as *less saturated*, not *higher lightness* (the lightness levels were already near-white/near-black; what the Principal was reacting to was how strongly the tint read as a hue at all). `--card` still stays true white/near-black, same "cards-on-tinted-canvas" convention as every prior pass.
+**Neutrals carry a faint tint of the blue hue** (`--foreground`, the dark-mode scale, the sidebar), at low saturation (3–9%), so the whole system carries one consistent cast. "Lighter" means *less saturated*: the lightness levels sit near-white/near-black already, so what reads is how strongly the tint shows as a hue at all. The light page canvas and its borders are the exception: a near-neutral warm off-white (below).
 
-**`--warning` becomes genuinely orange, paired with dark ink (pass 6).** The Principal's review: "Can we make this something that is more definitively Orange rather than brown? Please remind me what this token would be used for?" The prior value (`#B45309`, hue 26°) is in the orange hue range by number, but at L=0.371 with white text forcing it dark enough to clear 4.5:1, it reads as brown — the same trap destructive/positive avoid only because red and green stay legible when darkened; orange does not. **Fix: a true vivid orange (`#EA6A0A`, hue 25.7°, matching Monarch's own measured orange hue of 22° — see Inspiration) paired with a dark orange-black ink (`#2A1200`) instead of white.** One literal value does both jobs this system normally splits across two: 5.54:1 for fill-with-text, and (unlike `--brand`/`--brand-2`) 3.20:1 against `--card` too, so it also clears the non-text floor used directly as a border/icon color. Dark mode gets the same treatment, lightened for a dark surface (`#FF9452`, hue ≈23°) with the same dark ink (`#2A1200`) — not a white/dark flip like `--destructive`, because orange never pairs with white text AA-safely at a saturation that still reads as orange, in either mode. **Used for:** the caution status tier — an aged Cash-in-Transit exceptions-window item, a stale provider link, or a safe-harbor due date more than 14 days out (see Financial semantics § Status tiers).
+**`--warning` is a true orange, paired with dark ink.** An orange darkened far enough for white text to clear 4.5:1 reads as brown — the trap destructive/positive avoid only because red and green stay legible when darkened; orange does not. **So: a vivid orange (`#EA6A0A`, hue 25.7°, matching Monarch's own measured orange hue of 22° — see Inspiration) paired with a dark orange-black ink (`#2A1200`) instead of white.** One literal value does both jobs this system normally splits across two: 5.54:1 for fill-with-text, and (unlike `--brand`/`--brand-2`) 3.20:1 against `--card`, so it also clears the non-text floor used directly as a border/icon color. Dark mode gets the same treatment, lightened for a dark surface (`#FF9452`, hue ≈23°) with the same dark ink (`#2A1200`) — not a white/dark flip like `--destructive`, because orange never pairs with white text AA-safely at a saturation that still reads as orange, in either mode. A warm hue pulled toward yellow to stay bright reads as mustard, so the hue is held and only lightness moves. **Used for:** the caution status tier — an aged Cash-in-Transit exceptions-window item, a stale provider link, or a safe-harbor due date more than 14 days out (see Financial semantics § Status tiers).
 
-**Chart ramp brightened (pass 6, superseded pass 10).** The Principal: "Can we make the chart sequencing brighter? it is really dark, with the final few colors almost rendered as black." The light-mode ramp (hue 110.6°, S≈0.90) spanned L 0.300→0.061 — `--chart-5` at L=0.061 is genuinely close to black (17.73:1 against `--card`). Re-derived at L 0.34→0.18, same hue/saturation: `--chart-1` was brighter than the old `--chart-1` (3.26:1 vs white, was 4.11:1) and `--chart-5` far lighter than the old tail (8.78:1, was 17.73:1) — every step still cleared the 3:1 non-text floor, with margin at both ends. Dark mode's ramp (`#C1FBB6`→`#29CB0B`, 8.87:1→16.32:1 against `--card`) was already bright — the "almost black" complaint was a light-mode-only symptom, left unchanged at the time. This whole green ramp is superseded by pass 10 below.
+**Chart ramp: a gradient of `--brand-2`.** Sampled at `--brand-2`'s hue (200.6°, S=0.90), light mode L 0.46→0.30 (step −0.04), dark mode L 0.88→0.42 (step −0.12). **Ordered light→dark, `--chart-1` brightest → `--chart-5` darkest, in both modes**, so no `chart-N` meaning flips between modes. A ramp that runs too dark at its tail reads as "almost black"; this one keeps every step clearly a blue. Checked against **both** backgrounds, not just `--card`: light mode's floor is `--chart-1` at 3.07:1 against `--background` (and in a `--muted` well) / 3.26:1 against `--card` — the tightest pair in the ramp, still clearing 3:1. It is 2.92:1 on `--accent`, so no chart sits inside a hover fill. Dark mode is never the tight constraint (floor 5.04:1→5.23:1 at `--chart-5`). Adjacent steps sit ~1.18–1.21:1 apart in light mode (~1.27–1.44:1 in dark): modest but perceptible. `--positive`/`--warning`/`--destructive` are separate hues; this is the sequential/magnitude chart ramp only.
 
-**Chart ramp re-hued to `--brand-2` (pass 10).** Principal direction: "I'd like the chart tokens to be gradients of --brand-2 (instead of --primary)." Re-derived at `--brand-2`'s own hue (200.6°, S=0.90 — kept the green ramp's own saturation), same L cadence each mode used before (light: step −0.04 starting at L=0.46; dark: step −0.12 starting at L=0.88) so the brightness *shape* of the ramp (and which end reads as "current period/largest share" vs. "darkest/smallest") doesn't change, only the hue. **Ordered light→dark, `--chart-1` brightest → `--chart-5` darkest, in both modes** — the same direction every prior pass used, so no `chart-N` meaning flips for frontend-lead. Checked against **both** backgrounds per direction (not just `--card`): light mode's floor is `--chart-1` at 3.22:1 against `--background` (`#FEFEFE`) / 3.25:1 against `--card` (`#FFFFFF`) — the tightest pair in the whole ramp, still clearing 3:1 with margin. Dark mode was never the tight constraint (floor 5.04:1→5.23:1 at `--chart-5`). Adjacent steps sit ~1.18–1.21:1 apart in light mode (~1.27–1.44:1 in dark) — the same modest-but-perceptible pairwise separation the superseded green ramp produced at an identical L cadence, i.e. not a regression in distinguishability, just a hue swap. `--positive`/`--warning`/`--destructive` are untouched — this re-hue is the sequential/magnitude chart ramp only.
-
-Light (pass 10, re-checked and kept in pass 11): `--chart-1` `#0C96DF` · `--chart-2` `#0B89CB` · `--chart-3` `#0A7CB8` · `--chart-4` `#096FA5` · `--chart-5` `#086291`.
+Light: `--chart-1` `#0C96DF` · `--chart-2` `#0B89CB` · `--chart-3` `#0A7CB8` · `--chart-4` `#096FA5` · `--chart-5` `#086291`.
 Dark: `--chart-1` `#C5E9FC` · `--chart-2` `#8BD3F9` · `--chart-3` `#51BDF6` · `--chart-4` `#16A7F3` · `--chart-5` `#0B89CB`.
 
-**Series-2 hue collision, resolved.** Pre-pass-10, the two-series comparison job (nominal vs. inflation-adjusted, actual vs. target) paired green `--chart-3` (series 1) against blue `--brand-2` (series 2) — two different hues, easy to tell apart. Now that the sequential ramp itself samples `--brand-2`'s hue, that pairing would put both series in the same blue family. **Fix: series 2 flips to the green identity instead** — literal `--brand` on dark surfaces, `--primary` (the derived green ink, `#148100` as of pass 11) on light surfaces — the same "literal-on-dark/derived-on-light" split every brand hue in this system follows, just with the two hues' roles reversed from pre-pass-10. See **Secondary accent** below for the updated job definition.
+**Two-series charts use two hues.** Because the sequential ramp is blue, the two-series comparison job (nominal vs. inflation-adjusted, actual vs. target) puts series 1 on `--chart-3` (blue) and series 2 on the green identity — literal `--brand` on dark surfaces, `--primary` (`#148100`) on light surfaces — the same "literal-on-dark/derived-on-light" split every brand hue follows. See **Secondary accent** below.
 
-**Warm off-white canvas (pass 11, 2026-10-19).** The Principal: "somehow the background color got set to pure white. can we set --background to some subtle shade of grey with a hint of brown? something close to EFEEEE". **Why it ended at white:** pass 5 read "much lighter" as *less saturated* and cut the canvas tint to ~3% saturation at L 0.996 (`#FEFEFE`) — at that lightness no tint survives, so it was white in all but name. That was tolerable while `body` painted `--muted` as the canvas, but pass 9's sidebar-07 shell paints the inset/main area with `--background` itself, so the near-white became the whole page and cards stopped floating.
+**Warm off-white canvas.** "Can we set --background to some subtle shade of grey with a hint of brown?" A canvas tint at L ~0.996 (`#FEFEFE`) is white in all but name: no tint survives at that lightness. Because the sidebar-07 shell paints the inset/main area with `--background` itself, a near-white canvas becomes the whole page and cards stop floating. **`#F9F8F8`** (L 0.97) is near-neutral with a touch of warmth, light enough that the page doesn't read as grey while white cards still float on it. The neutrals around it carry the warm hue (30–33°), not `--brand-2`'s blue:
 
-**Iterated by eye, one value.** `#EFEDEB` (hue 30°, L 0.93), `#EFEEEE` (L 0.935), `#F7F5F3` (L 0.96) and `#F9F7F5` were each tried; the Principal settled on **`#F9F8F8`** (L 0.97) — near-neutral with a touch of warmth, light enough that the page doesn't read as grey while white cards still float on it. The neutrals around it carry the warm hue (30–33°), not `--brand-2`'s blue:
+- `--card`/`--popover` are pure `#FFFFFF` — they float on the canvas (1.06:1 step plus the hairline): Monarch's "white cards on an off-white canvas" convention.
+- **`--muted` = `--background` (`#F9F8F8`).** Its job is **in-card** wells, tab/progress tracks, skeletons and placeholder blocks, where it reads at **1.06:1 against white**. On the page itself it is invisible by design.
+- **Every hover/active fill is `--accent`** `#EBF4F9` (shadcn's own hover token), with `--accent-foreground` for text and icons — never `--muted`, which would vanish on the page. That covers the sidebar toggle, icon buttons (hover and active), the entity selector, popover/menu items and table rows. `--accent` reads on both surfaces: 1.05:1 against the page, 1.12:1 against a card. **Exception:** in dark mode a destructive menu item ("Log out") hovers on a 20% destructive tint, shadcn's `bg-destructive/20`: red on dark `--accent` is only 3.25:1; on the tint it is 4.64:1. **Dark table-row hover, same pattern:** a faint sky tint, 40% `--accent` over `--card` (`#12232C`, 1.20:1 vs `--card`), not dark `--accent`, where red amounts are 3.25:1 and meta text 4.40:1. On the tint: body text 14.41:1, `--destructive` 4.89:1, `--muted-foreground` 6.61:1, `--positive` 9.64:1, `--primary` 11.83:1. The tint is not red because rows are not destructive.
+- `--muted-foreground` `#5E5A55` (warm 33°) — 6.45:1 on the page/`--muted`, 6.14:1 on `--accent`.
+- `--border` `#E6E2DE`, a step darker than the page (1.29:1 on `--card`, 1.22:1 on the page); `--input` `#DCD8D4` one step stronger (1.42:1 on `--card`).
+- **Inks are checked on page, card and `--accent`.** `--accent` is the binding surface, because amounts and menu items sit on it when hovered. Each ink sits at the lightest value that still clears AA there:
+  - `--primary`/`--ring` `#148100`: 4.75 page / 4.52 accent / 5.04 white-on-fill.
+  - `--destructive` `#DE0404`: 4.80 / 4.57 / 5.09 white-on-fill.
+  - `--positive` `#147F3C`: 4.80 / 4.56 / 5.08 white-on-fill. (One hex step lighter is 4.4999:1 on `--accent`, strictly a fail.)
+  - `--secondary-foreground` `#096FA5`: 5.17 page / 4.92 accent.
+- Dark mode's light sidebar is `#F7F8F8`, a blue-tinted near-white; it does not mirror the warm light canvas.
 
-- `--card`/`--popover` stay pure `#FFFFFF` — they float on the canvas (1.06:1 step plus the hairline), the Monarch "white cards on an off-white canvas" convention from pass 3 restored.
-- **`--muted` = `--background` (`#F9F8F8`), by Principal ruling.** Tried as "halfway to card" (`#FCFBFA`, nearly invisible) and as a fixed darker step (`#F5F3F1`); the ruling makes it the page value. Its job narrows to **in-card** wells, tab/progress tracks, skeletons and placeholder blocks, where it reads at **1.06:1 against white**. On the page itself it is invisible by design.
-- **Hovers move to `--accent`, by Principal ruling.** `--muted` was also the hover/active fill on page-level controls, where it would now vanish. Every hover/active fill in `screen.css` is now `--accent` `#EBF4F9` (shadcn's own hover token) with `--accent-foreground` for text and icons. That covers the sidebar header toggle, icon buttons (hover and active), the entity selector, and popover/menu items; table rows already hovered on it. `--accent` reads on both surfaces: 1.05:1 against the page, 1.12:1 against a card. **One exception:** in dark mode a destructive menu item ("Log out") hovers on a 20% destructive tint, shadcn's `bg-destructive/20`. Red on dark `--accent` is only 3.25:1; on the tint it is 4.64:1. **Dark table-row hover, same pattern (Principal ruling, pass 11g):** a faint sky tint, 40% `--accent` over `--card` (`#12232C`, 1.20:1 vs `--card`), not dark `--accent`. On dark `--accent`, red amounts were 3.25:1 and meta text 4.40:1. On the tint: body text 14.41:1, `--destructive` 4.89:1, `--muted-foreground` 6.61:1, `--positive` 9.64:1, `--primary` 11.83:1. The tint is not red because rows are not destructive.
-- `--muted-foreground` `#5E5A55` (warm 33°, was blue-grey `#60686C`) — 6.45:1 on the page/`--muted`, 6.14:1 on `--accent`.
-- `--border` `#E6E2DE` a step darker than the page (1.29:1 on `--card`, 1.22:1 on the page); `--input` `#DCD8D4` one step stronger (1.42:1 on `--card`).
-- **Inks re-checked on page, card and `--accent`.** `--accent` is now the binding surface, because amounts and menu items sit on it when hovered. Every ink moves a notch darker at the same hue:
-  - `--primary`/`--ring` `#158500`→`#148100`: the pass-10 value is 4.52:1 on the page but 4.30:1 on `--accent`. New value: 4.75 page / 4.52 accent / 5.04 white-on-fill.
-  - `--destructive` `#E70404`→`#DE0404`: pass-10 is 4.49 page / 4.27 accent. New: 4.80 / 4.57 / 5.09 white-on-fill.
-  - `--positive` `#15803D`→`#147F3C`: pass-10 is 4.73 page but **4.4999** on `--accent`, a hair under AA. New: 4.80 / 4.56 / 5.08. Resolved: strictly a fail, so the value moved one hex step; no visible change.
-  - `--secondary-foreground` `#096FA5` is unchanged (5.17 page / 4.92 accent).
-- **Chart ramp (light)** — pass-10 values kept: `--chart-1` `#0C96DF` is 3.07:1 on the page and in a muted well, 3.26:1 on `--card`. It is 2.92:1 on `--accent`, so no chart sits inside a hover fill.
-- Unchanged: `--foreground`, `--secondary`, `--accent`, `--warning`, the light-mode (dark) sidebar, and all of dark mode. Dark mode's light sidebar keeps `#F7F8F8` — it no longer mirrors the light canvas literally (see its row below).
-
-Contrast figures were computed via the standard WCAG relative-luminance formula against these exact hex values (script in `temp/`, full pair-by-pair results in **Accessibility**).
+Contrast figures are computed via the standard WCAG relative-luminance formula against these exact hex values (full pair-by-pair results in **Accessibility**).
 
 #### Light (`:root`) — primary/default mode
 
 | Token | Value | Role |
 |---|---|---|
-| `--background` | `#F9F8F8` | **Pass 11.** Page canvas — near-neutral off-white, a touch of warmth (was near-white `#FEFEFE`; iterated by eye) |
-| `--foreground` | `#1D1F20` | Default body text — near-black, barely blue, flatter than pass 4's green-cast ink |
+| `--background` | `#F9F8F8` | Page canvas — near-neutral off-white, a touch of warmth |
+| `--foreground` | `#1D1F20` | Default body text — near-black, barely blue |
 | `--card` | `#FFFFFF` | Card surface |
 | `--popover` | `#FFFFFF` | Popover/dropdown surface |
-| `--primary` | `#148100` | Primary action fill — darkened brand green, same hue as `--brand`; pass 11 one small notch darker (was `#158500`, 4.30:1 on a hovered `--accent` row) |
+| `--primary` | `#148100` | Primary action fill — darkened brand green, same hue as `--brand`; 4.52:1 on a hovered `--accent` row |
 | `--primary-foreground` | `#FFFFFF` | Text on primary fill |
-| `--secondary` | `#E3F0F7` | **Pass 5, re-hued.** Secondary button/surface — pale *blue* tint (was pale green in pass 4) |
+| `--secondary` | `#E3F0F7` | Secondary button/surface — pale blue tint |
 | `--secondary-foreground` | `#096FA5` | Darkened `--brand-2`, same hue — see Secondary accent |
-| `--muted` | `#F9F8F8` | **Pass 11, Principal ruling: = `--background`.** In-card wells, tab/progress tracks, placeholders (1.06:1 vs `--card`). Not a hover fill |
-| `--muted-foreground` | `#5E5A55` | Muted/meta text — pass 11 warm (was `#60686C`) |
-| `--accent` | `#EBF4F9` | **The hover/active fill** (pass 11, Principal ruling) — same blue family as `--secondary`; 1.05:1 vs page, 1.12:1 vs card |
+| `--muted` | `#F9F8F8` | = `--background`. In-card wells, tab/progress tracks, placeholders (1.06:1 vs `--card`). Not a hover fill |
+| `--muted-foreground` | `#5E5A55` | Muted/meta text, warm |
+| `--accent` | `#EBF4F9` | **The hover/active fill** — same blue family as `--secondary`; 1.05:1 vs page, 1.12:1 vs card |
 | `--accent-foreground` | `#096FA5` | |
 | `--brand` | `#2CFF05` | Literal, undarkened neon green — logo, decorative highlights, dark-surface call-outs only; never text or a light-surface fill |
-| `--brand-2` | `#05A9FF` | **Pass 5, new.** Literal, undarkened sky blue — same dark-surface-only rule as `--brand`; see Secondary accent for its job |
-| `--destructive` | `#DE0404` | Destructive fill — pass 11 a notch darker (was `#E70404`, 4.27:1 on `--accent`) |
+| `--brand-2` | `#05A9FF` | Literal, undarkened sky blue — same dark-surface-only rule as `--brand`; see Secondary accent for its job |
+| `--destructive` | `#DE0404` | Destructive fill — 4.57:1 on `--accent` |
 | `--destructive-foreground` | `#FFFFFF` | Text on destructive fill |
-| `--border` | `#E6E2DE` | Default hairline border — pass 11 warm, a step darker than the page (was blue `#E7E8E9`) |
-| `--input` | `#DCD8D4` | Input border — pass 11, one step stronger than `--border` |
+| `--border` | `#E6E2DE` | Default hairline border — warm, a step darker than the page |
+| `--input` | `#DCD8D4` | Input border — one step stronger than `--border` |
 | `--ring` | `#148100` | Focus ring — follows `--primary` |
-| `--chart-1`…`--chart-5` | `#0C96DF` → `#086291` | **Re-hued pass 10** (was green `#21A509`→`#125705`, pass 6) — sequential/magnitude ramp, `--brand-2`'s blue hue; re-checked and kept in pass 11 |
-| `--sidebar` | `#1F2528` | **Re-hued pass 5** (was green `#20291F`) — inverted, a dark blue-tinted surface floating on the light page (see Sidebar) |
+| `--chart-1`…`--chart-5` | `#0C96DF` → `#086291` | Sequential/magnitude ramp in `--brand-2`'s blue hue |
+| `--sidebar` | `#1F2528` | Inverted — a dark blue-tinted surface floating on the light page (see Sidebar) |
 | `--sidebar-foreground` | `#F2F2F3` | |
 | `--sidebar-accent` | `#303B40` | |
 | `--sidebar-accent-foreground` | `#F2F2F3` | |
-| `--sidebar-ring` | `#05A9FF` | **Re-hued pass 5** (was raw `--brand` green) — the raw secondary blue, to fully remove the green cast from this component |
-| `--positive` | `#147F3C` | Gain / income / surplus — pass 11 a hair darker (was `#15803D`, 4.4999:1 on `--accent`) |
+| `--sidebar-ring` | `#05A9FF` | The raw secondary blue, so no green cast reaches this component |
+| `--sidebar-brand` | `#2CFF05` | Brand-mark stroke in the sidebar — 11.39:1 on the dark card (see Brand mark) |
+| `--positive` | `#147F3C` | Gain / income / surplus — 4.56:1 on `--accent` |
 | `--positive-foreground` | `#FFFFFF` | Text on positive fill |
-| `--warning` | `#EA6A0A` | **Pass 6, re-hued true orange** (was brown-reading `#B45309`) — caution tier: aged CIT exceptions, stale provider link, safe-harbor due date >14 days out |
-| `--warning-foreground` | `#2A1200` | **Pass 6, now dark ink** (was white — orange can't clear 4.5:1 with white without reading brown) |
+| `--warning` | `#EA6A0A` | True orange — caution tier: aged CIT exceptions, stale provider link, safe-harbor due date >14 days out |
+| `--warning-foreground` | `#2A1200` | Dark ink — orange can't clear 4.5:1 with white without reading brown |
 
 #### Dark (`.dark`) — secondary mode
 
 | Token | Value | Role |
 |---|---|---|
-| `--background` | `#070808` | Page background — pass 5, blue-tinted (was green `#070907`) |
+| `--background` | `#070808` | Page background — blue-tinted near-black |
 | `--foreground` | `#F2F2F3` | Default body text |
 | `--card` | `#0D0E0F` | Card surface |
-| `--primary` | `#2CFF05` | The raw brand green itself — unchanged from pass 4 |
+| `--primary` | `#2CFF05` | The raw brand green itself |
 | `--primary-foreground` | `#070808` | Dark ink — clears 14.7:1; white on this bright fill only clears 1.4:1 |
-| `--secondary` | `#173C4F` | **Pass 5, re-hued** (was pale green `#161F14`) |
+| `--secondary` | `#173C4F` | |
 | `--secondary-foreground` | `#68C3F3` | |
 | `--muted` | `#0F1112` | |
 | `--muted-foreground` | `#A0A7AB` | |
@@ -131,31 +127,32 @@ Contrast figures were computed via the standard WCAG relative-luminance formula 
 | `--accent-foreground` | `#68C3F3` | |
 | `--brand` | `#2CFF05` | Same literal value both modes |
 | `--brand-2` | `#05A9FF` | Same literal value both modes |
-| `--destructive` | `#FC4F4F` | Unchanged |
+| `--destructive` | `#FC4F4F` | |
 | `--destructive-foreground` | `#2A0507` | |
 | `--border` | `rgba(255,255,255,0.08)` | |
-| `--chart-1`…`--chart-5` | `#C5E9FC` → `#0B89CB` | **Re-hued pass 10** (was green `#C1FBB6`→`#29CB0B`, pass 6) — now `--brand-2`'s blue hue; note `--chart-5` here equals light mode's `--chart-2` — coincidental, both ramps sample the same hue/saturation function |
-| `--sidebar` | `#F7F8F8` | Inverted the other way — a light card floating on the dark page, pass-5 blue-tinted near-white; pass 11 left it as-is (dark mode unchanged), so it no longer mirrors the light canvas, which is now warm grey |
+| `--chart-1`…`--chart-5` | `#C5E9FC` → `#0B89CB` | `--brand-2`'s blue hue, lightened; `--chart-5` here equals light mode's `--chart-2` by coincidence — both ramps sample the same hue/saturation function |
+| `--sidebar` | `#F7F8F8` | Inverted the other way — a light, blue-tinted card floating on the dark page |
 | `--sidebar-foreground` | `#1D1F20` | |
 | `--sidebar-accent` | `#E3F0F7` | |
 | `--sidebar-accent-foreground` | `#096FA5` | |
-| `--sidebar-ring` | `#0078B8` | **Re-hued pass 5** (was `--primary` green) — the light-mode derived blue ink, since the raw `--brand-2` reads too close to this light sidebar's own near-white surface |
-| `--positive` | `#52E0A4` | Unchanged |
+| `--sidebar-ring` | `#0078B8` | A derived blue ink, since the raw `--brand-2` reads too close to this light sidebar's near-white surface |
+| `--sidebar-brand` | `#148100` | Brand-mark stroke — 4.73:1 on the light card; the raw neon would be 1.28:1 (see Brand mark) |
+| `--positive` | `#52E0A4` | |
 | `--positive-foreground` | `#052E13` | |
-| `--warning` | `#FF9452` | **Pass 6, re-hued true orange** (was mustard-reading `#F3CA59`, H=44°) — same hue family as light mode (≈23°), lightened for a dark surface |
-| `--warning-foreground` | `#2A1200` | **Pass 6** — same dark ink as light mode (not a white/dark flip like `--destructive`; orange never pairs with white text AA-safely at a legible saturation, in either mode) |
+| `--warning` | `#FF9452` | True orange, same hue family as light mode (≈23°), lightened for a dark surface |
+| `--warning-foreground` | `#2A1200` | Same dark ink as light mode (not a white/dark flip like `--destructive`; orange never pairs with white text AA-safely at a legible saturation, in either mode) |
 
-**Character read:** two brand hues now, each following the same rule — literal where it clears AA (dark surfaces), darkened at the same hue where it doesn't (light-mode surfaces): neon green (`--brand`/`--primary`, 110.6°) for the main/primary identity, sky blue (`--brand-2`/secondary family, 200.6°) for secondary surfaces, info-weight badges, and anywhere the system needs a calm non-primary affordance. The neutral scale and the sidebar both carry the blue tint now, not the green one — the Principal's read of the sidebar as "green-biased" generalizes to "the whole neutral scale was green-biased," and pass 5 fixes both the same way. `--positive` (gain green, hue ≈150°) stays a third, deliberately distinct green — checked against both `--brand` (110.6°) and against itself being mistaken for either brand hue.
+**Character read:** two brand hues, each following the same rule — literal where it clears AA (dark surfaces), darkened at the same hue where it doesn't (light-mode surfaces): neon green (`--brand`/`--primary`, 110.6°) for the main/primary identity, sky blue (`--brand-2`/secondary family, 200.6°) for secondary surfaces, info-weight badges, and anywhere the system needs a calm non-primary affordance. The dark neutral scale and the sidebar carry the blue tint rather than the green, so the green stays a deliberate signal instead of a cast over everything. `--positive` (gain green, hue ≈150°) is a third, deliberately distinct green — checked against `--brand` (110.6°) so it is never mistaken for a brand hue.
 
-### Secondary accent — job definition (pass 5)
+### Secondary accent — job definition
 
 A second brand hue needs an explicit job or it fights the first one for meaning. `--brand-2` / the blue `--secondary` family is used for:
-- **Secondary buttons and surfaces** — anywhere `--secondary`/`--accent` already applied (unchanged role, just a new hue).
+- **Secondary buttons and surfaces** — anywhere `--secondary`/`--accent` applies.
 - **Info-weight badges and callouts** — a step above `--muted-foreground` neutral, a step below `--warning`'s caution — e.g. "new feature," "beta," informational tooltips. Not a Financial-semantics status tier (those stay `--positive`/`--warning`/`--destructive`, see Financial semantics) — this is for product-chrome informational messaging, a different axis.
 - **Selected / non-primary-active states** — e.g. a selected row in a list that isn't *the* primary action of the screen, distinct from `--primary`'s "main CTA" meaning.
-- **Chart series 2** in genuine two-series comparison charts (nominal vs. inflation-adjusted, actual vs. target) — **roles reversed, pass 10:** series 1 uses `--chart-3` (mid-ramp, now `--brand-2`'s blue hue); series 2 uses literal `--brand` (green) on dark surfaces or `--primary` (the derived green ink, `#148100` as of pass 11) on light surfaces — not a new 5-step ramp, just one representative green accent value per mode, since a full categorical/sequential green ramp isn't needed for a 2-series case. (Pre-pass-10 this job was inverted — green series 1 / blue series 2 — swapped so the two series stay two different hues now that the sequential ramp itself is blue.)
+- **Chart series 1** in genuine two-series comparison charts (nominal vs. inflation-adjusted, actual vs. target): `--chart-3`, mid-ramp blue. Series 2 takes the green identity: literal `--brand` on dark surfaces, `--primary` (`#148100`) on light surfaces. One representative green accent per mode is enough for a 2-series case; no second ramp is needed.
 
-**Not used for:** anything `--primary` already owns (main CTAs, the brand's "default interactive" meaning) or anything a Financial-semantics tier already owns (gain/loss/caution/danger) — the whole point of giving it a job is so it doesn't become a second, redundant way to say what green or the semantic tiers already say.
+**Not used for:** anything `--primary` already owns (main CTAs, the brand's "default interactive" meaning) or anything a Financial-semantics tier already owns (gain/loss/caution/danger) — the point of giving it a job is so it doesn't become a second, redundant way to say what green or the semantic tiers already say.
 
 ### Typography
 
@@ -167,7 +164,7 @@ A second brand hue needs an explicit job or it fights the first one for meaning.
 | `--font-heading` | `var(--font-sans)` | Alias — no second family |
 | `--font-mono` | `'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace` | Origin's own measured choice — uppercase letterspaced section/eyebrow labels, account numbers, ticker symbols, tabular figures |
 
-**Two web fonts (Inter + Roboto Mono), not cairn's three, not the one-font pass-2 claimed.** Roboto Mono is a real added cost over a system-mono stack — justified here because its uppercase-letterspaced treatment is an actual adopted signature (Origin's section headers), not decoration; frontend-lead should subset it to uppercase Latin + digits if the eyebrow-label usage is the dominant one, to keep the request small.
+**Two web fonts (Inter + Roboto Mono).** Roboto Mono is a real added cost over a system-mono stack — justified because its uppercase-letterspaced treatment is an adopted signature (Origin's section headers), not decoration. frontend-lead should subset it to uppercase Latin + digits if the eyebrow-label usage is the dominant one, to keep the request small.
 
 | Token | Size | Line-height | Weight | Used for |
 |---|---|---|---|---|
@@ -176,13 +173,13 @@ A second brand hue needs an explicit job or it fights the first one for meaning.
 | `text-base` | 16px | 24px | 400 | Prose body copy |
 | `text-lg` | 18px | 28px | 600 | Card title, dialog title |
 | `text-xl` | 20px | 28px | 600 | Section heading |
-| `text-2xl` | 24px | 32px | 700 | Page title (e.g. Monarch's "Accounts") |
+| `text-2xl` | 24px | 32px | 700 | Page title on shell-less pages (e.g. Admin) |
 | `text-2xl`/`text-3xl` as **stat/display value** | 24–30px | 1.1–1.2 | 700 | Net-worth figure, pending liability — bold, tabular numerals |
 | `text-xs` uppercase, `--font-mono`, letterspaced | 11–12px | — | 500–600 | Eyebrow labels, section headers (Origin pattern: "NET WORTH", "HOLDINGS") |
 
 ### Dashboard scale
 
-Kept from the prior pass on its own merits (generic spacing rhythm), not re-measured against either reference at pixel precision.
+A generic spacing rhythm, not measured against either reference at pixel precision.
 
 | Element | Value |
 |---|---|
@@ -210,72 +207,64 @@ Kept from the prior pass on its own merits (generic spacing rhythm), not re-meas
 
 No custom `--shadow-*` overrides — inherits shadcn-svelte's default scale.
 
-### Brand mark (pass 14, 2026-10-21)
+### Brand mark
 
-**Source:** the Principal's own artwork, `brand/logo.jpeg` (1024px, neon-green seedling line art on a dark slate square, no alpha). Kept unmodified as the source of truth.
+**Source:** `brand/logo.jpeg` (1024px, neon-green seedling line art on a dark slate square, no alpha). Kept unmodified as the source of truth.
 
 **Traced, not embedded.** The JPEG can't sit on the sidebar: its slate square would show as a grey tile on both cards, and it has no alpha. So the line art is traced to a 24×24 SVG of open strokes in `currentColor` (`stroke-linecap/linejoin: round`, like Lucide) and inlined in the markup. No tile or background goes behind it; the strokes sit directly on the surface, as they do on the source's slate.
 
 | Variant | File | Use | Stroke |
 |---|---|---|---|
-| Full: two leaves, both midribs, stem, ground arc | `brand/brand-mark.svg` | 32px and up (login, landing, any large placement) | 1.25 |
-| Simplified: midribs dropped | `brand/brand-mark-24.svg`, inlined as `.brand-icon > .brand-mark` | 24px: the sidebar brand row (expanded and rail) and the shell-less app bar | 1.5 |
+| Full: two leaves, both midribs, stem, ground arc | `brand/brand-mark.svg` | 32px and up (Home hero, any large placement) | 1.25 |
+| Simplified: midribs dropped | `brand/brand-mark-24.svg`, inlined as `.brand-icon > .brand-mark` | 24px: the sidebar brand row (expanded and rail), the shell-less app bar, Login | 1.5 |
 
-**Why two variants.** At 24px the midribs close up the leaf interiors into solid blobs (measured by eye at 1.25, 1.5 and 2.0 strokes). Dropping them keeps the leaf outlines open. Stroke 1.5 at 24px is a 1.5px line, the same weight as the 18px Lucide nav icons beside it (2 × 18/24). The silhouette (leaf pair, stem, ground arc) is unchanged.
+**Why two variants.** At 24px the midribs close up the leaf interiors into solid blobs (checked by eye at 1.25, 1.5 and 2.0 strokes). Dropping them keeps the leaf outlines open. Stroke 1.5 at 24px is a 1.5px line, the same weight as the 18px Lucide nav icons beside it (2 × 18/24). The silhouette (leaf pair, stem, ground arc) is unchanged.
 
-**Colour: `--sidebar-brand`** (new token).
+**Colour: `--sidebar-brand`.**
 
 | Mode | Sidebar card | Mark | Contrast |
 |---|---|---|---|
 | Light | `#1F2528` (dark card) | `#2CFF05`, the literal `--brand` | 11.39:1 |
 | Dark | `#F7F8F8` (light card) | `#148100`, the light-mode `--primary` | 4.73:1 (the raw neon would be 1.28:1) |
 
-Both clear the 3:1 non-text floor, and the dark-mode value clears 4.5:1 too. Off the sidebar (the membership-setup and Admin app bar), the mark takes `--primary`: 4.75:1 on the light page, 14.72:1 on the dark page.
+Both clear the 3:1 non-text floor, and the dark-mode value clears 4.5:1 too. Off the sidebar, the mark takes `--primary`: 4.75:1 on the light page, 14.72:1 on the dark page.
 
-**Collapsed rail.** The mark is the expand button's resting face. On hover or keyboard focus it swaps to `panel-left-open` (pass 12, unchanged).
+| Placement | Variant and size | Colour | Contrast |
+|---|---|---|---|
+| Sidebar brand row, expanded | 24px, left of the wordmark | `--sidebar-brand` | see above |
+| Sidebar rail, collapsed | 24px, the expand button's resting face; swaps to `panel-left-open` on hover or keyboard focus | `--sidebar-brand` | see above |
+| Shell-less app bar (membership setup, Admin) | 24px | `--primary` | 4.75:1 light, 14.72:1 dark |
+| Home hero (`.landing-brand`) | Full, 32px, left of the "Polycarpic" wordmark | Literal `--brand` on the fixed dark hero | 14.72:1 |
+| Login form pane (`.auth-logo`) | 24px, left of the wordmark, top-left | `--primary` | 4.75:1 light, 14.72:1 dark |
 
-**Home and Login.**
+`.brand-mark` is the SVG's own class; Home's lockup container is `.landing-brand`.
 
-| Page | Placement | Variant and size | Colour | Contrast |
-|---|---|---|---|---|
-| Home | Left of the "Polycarpic" wordmark in the hero (`.landing-brand`) | Full, 32px | Literal `--brand` on the fixed dark hero | 14.72:1 |
-| Login | Left of the wordmark, top-left of the theme-aware form pane (`.auth-logo`) | 24px | `--primary` | 4.75:1 light, 14.72:1 dark |
+### Layout & shell
 
-Home's lockup class was renamed from `.brand-mark` to `.landing-brand`, because `.brand-mark` is now the SVG's own class.
+The shell is shadcn's **sidebar-07** block (https://ui.shadcn.com/view/new-york-v4/sidebar-07, `temp/design-refs/shadcn-sidebar-07*.png`).
 
-### Layout & shell (pass 4; rebuilt pass 8; refined pass 9, 2026-10-10 — Principal review 6)
+1. **The sidebar fills the vertical *screen*, not the vertical *page*, and is a floating card with a gutter on every side.** `position: fixed; top/left/bottom: var(--shell-gutter)` (16px), `border-radius` on all four corners. Composition, top to bottom: brand row → nav (seven items) → avatar trigger (opens the user-menu popover to its right — see § Sidebar).
+2. **No persistent header.** Nothing at the top of the main area stays put while the rest scrolls, and everything there shares the content's background token: "anything in the top part of the main viewing window should have the same background (token color) as the rest." The top row (`.topbar`) is not sticky, has no bottom border, and uses `--background` (not `--card`), so it is identical to the content below it and scrolls away with the page.
+3. **The top row starts to the right of the sidebar**, expanded or collapsed; it never spans the full width.
 
-**Pass 4 history (superseded, kept for the record):** "Can we have the top header bar span the full width, and have the side-bar under the header?" — pass 4's shell had a full-width header on top, with the sidebar + content as a two-column body below it.
+`.shell-main` carries a `margin-left` of `2 × gutter + sidebar width` (left gutter, sidebar, a matching gutter before the content starts) because the sidebar is out of normal document flow (`position: fixed`).
 
-**Pass 8 (superseded by pass 9's gutter, kept for what's still true):** rebuilt on the shadcn Sidebar component's own pattern (https://ui.shadcn.com/docs/components/base/sidebar), per the Principal: "we should have the sidebar take up the entire vertical *screen* space. Not the vertical *page* space... The header row would start at the right of the expanded or contracted sidebar." The top row stopped spanning the full width and started to the right of the sidebar instead — this is still true in pass 9, only the sidebar's own geometry and the top row's persistence changed again.
+See `styled-screens/` for the built version.
 
-**Pass 9, current shell** — refined once more against the specific shadcn block the Principal pointed to, sidebar-07 (https://ui.shadcn.com/view/new-york-v4/sidebar-07, `temp/design-refs/shadcn-sidebar-07*.png`): "I'm still not happy with the sidebar." Two changes from pass 8:
+### Header → "Top row"
 
-1. **Sidebar is now a true floating card, gutter on every side** — not flush to three of four edges. `position: fixed; top/left/bottom: var(--shell-gutter)` (16px), `border-radius` on all four corners. Composition unchanged top to bottom: brand → nav (seven items) → avatar trigger (opens the user-menu popover, now to its right — see § Sidebar).
-2. **No persistent header.** "I want to get rid of the persistent header bar... No top section which does not scroll with the rest of the main viewing window... anything in the top part of the main viewing window should have the same background (token color) as the rest." The top row (`.topbar`) drops `position: sticky`, its `border-bottom`, and its `--card` background — it's `--background` now, identical to the content below it, and scrolls away with the page like any other content.
-
-`.shell-main` carries a `margin-left` of `2 × gutter + sidebar width` (left gutter, sidebar, a matching gutter before the content starts) — the sidebar is out of normal document flow (`position: fixed`), so this is still a manual offset, now with twice the gutter value instead of none.
-
-This is a genuine restructure, not a cosmetic tweak — see `styled-screens/` for the built version.
-
-### Header → "Top row" (pass 5; rebuilt pass 8; reduced pass 9, 2026-10-10 — Principal review 6)
-
-**Renamed, pass 9:** this is no longer a header in any surface sense — see § Layout & shell. The name "Top row" describes what it actually is: the first row of the scrollable main area.
-
-**Pass 5/8 history (superseded, kept for the record):** brand lockup moved out (pass 8, into the sidebar's own top item); page title/actions moved into the content column (pass 5, still true). Pass 8's header carried five right-side icons (entity selector, AI, search, notifications, gear) — four of those five are gone as of pass 9.
-
-**Pass 9, current top row — the Principal's spec, restated exactly:**
+This is not a header in any surface sense (see § Layout & shell). "Top row" describes what it is: the first row of the scrollable main area.
 
 | Side | Items, in order |
 |---|---|
-| **Left** | Current page view **>** breadcrumbs (`.breadcrumbs`), no separator before it. *Pass 12: the expand/collapse icon and the separator after it left this row for the sidebar's brand row — see § Sidebar.* |
+| **Left** | Current page view **>** breadcrumbs (`.breadcrumbs`). No icon and no separator before it: the expand/collapse control lives in the sidebar's brand row (§ Sidebar). |
 | **Right** | Entity selector (name + avatar cluster) → vertical separator → "more" icon (Lucide `ellipsis-vertical`, `.more-menu-wrap`) |
 
-- **Breadcrumbs are still the only place a page's title renders** (pass 8 rule, unchanged) — most screens a single crumb, the account register the multi-crumb example ("General Ledger **>** Primary Checking").
-- **AI/agent, search, notifications, and the settings gear are dropped from this row entirely, for now.** Not deleted as product surfaces — ARCH §2.4 keeps Search and Notifications as real screens/overlays and Settings as a real screen — only their *entry point in the top row* is gone. **The Principal has not ruled on where these go instead; the following are proposed, not decided:**
+- **Breadcrumbs are the only place a page's title renders** — screens do not repeat it as an on-page heading. Most screens have a single crumb; the account register is the multi-crumb example ("General Ledger **>** Primary Checking").
+- **AI/agent, search, notifications, and a settings gear are not in this row.** They are not deleted as product surfaces — ARCH §2.4 keeps Search and Notifications as real screens/overlays and Settings as a real screen — only their *entry point in the top row* is absent. **Where they go instead is proposed, not decided:**
   - **Settings, Notifications** — proposed as items under the avatar popover (see § Sidebar). Marked "proposed" in the styled screens (`.proposed-tag`).
   - **Search** — proposed via a keyboard shortcut, plus a "Search…" entry in the "more" menu where relevant. No specific key combination chosen yet.
-  - **AI/agent** — no entry point proposed yet at all; the icon simply doesn't exist anywhere right now (pass 8's greyed/disabled placeholder is gone, not just hidden).
+  - **AI/agent** — no entry point proposed; no icon or disabled placeholder exists anywhere.
 - **The "more" menu is contextual per page view** — its contents are that page's global actions, not a fixed list. Defined per screen:
 
 | Screen | "More" menu contents |
@@ -289,73 +278,73 @@ This is a genuine restructure, not a cosmetic tweak — see `styled-screens/` fo
 | Entities | *(none specified yet — "+ Invite member" stays inline per-row)* |
 | Settings | *(none — this screen has no further global action of its own)* |
 
-  A screen with no defined actions still shows the "more" icon (consistent chrome) but its menu is empty when opened — not hidden. Only one screen per shell demonstrates the menu "open" in the styled screens (Dashboard; Transactions also shows it open since both entries were specified by the Principal/team-lead directly), the same "shown open as reference" convention as the avatar popover.
-- **Entity selector / avatar cluster are unchanged from pass 5/8** — same component, now the first item in the top row's right-justified group rather than one of five icons.
+  A screen with no defined actions still shows the "more" icon (consistent chrome), and its menu is empty when opened rather than hidden. Dashboard and Transactions show the menu "open" in the styled screens as the reference, the same "shown open as reference" convention as the avatar popover.
+- **Entity selector / avatar cluster** — the first item in the top row's right-justified group.
 
-**Avatar cluster (pass 5, unchanged since).** Overlapping circles representing the entity's membership:
-- 24px diameter, `-8px` overlap (each circle's `margin-left`), a 2px border in whatever surface color it sits on (`--card` in the header) to cut a visible ring between overlapping circles.
-- **Fallback is always initials** on a `--secondary` fill — no avatar-image asset exists for this product yet, so this isn't a "fallback for the rare case," it's the only case today.
-- **Max 3 shown**, a 4th+ member folds into a "+N" chip in the same slot and style, continuing the overlap (not yet built in the two reference screens — both shown entities have ≤2 members; the overflow rule is stated here for frontend-lead to implement against a real membership count).
+**Avatar cluster.** Overlapping circles representing the entity's membership:
+- 24px diameter, `-8px` overlap (each circle's `margin-left`), a 2px border in whatever surface color it sits on to cut a visible ring between overlapping circles.
+- **Fallback is always initials** on a `--secondary` fill — no avatar-image asset exists for this product, so this isn't a "fallback for the rare case," it's the only case.
+- **Max 3 shown**; a 4th+ member folds into a "+N" chip in the same slot and style, continuing the overlap. Not shown live in a styled screen (every shown entity has ≤2 members); the rule is stated here for frontend-lead to implement against a real membership count.
 
-### Sidebar (pass 4 — inverted, card, collapsible; pass 5 — option A chosen, full height, re-hued blue; pass 8 — shadcn pattern, viewport-fixed, avatar popover; pass 9 — floating card w/ gutter, popover opens right)
+### Sidebar
 
-**Principal direction (pass 4):** "Maybe we can play with an inverted background color for the sidebar. And while we are at it: Make it a card with the same rounded edges. I also want the ability to compact the sidebar to just icons."
+"Play with an inverted background color for the sidebar... make it a card with the same rounded edges... the ability to compact the sidebar to just icons."
 
-- **Inverted:** in light mode the sidebar is a dark surface (`--sidebar` = `#1F2528`, blue-tinted as of pass 5, was `#20291F` green) floating on the light page; in dark mode it's a light surface (`--sidebar` = `#F7F8F8`, the light mode's own canvas tone reused directly) floating on the dark page. A user should never see two dark (or two light) surfaces stacked with no separation across a mode switch — "inverted" means relative to the page, in both directions.
-- **Re-hued blue (pass 5).** The Principal, reviewing the pass-4 result: "check the background on the side-bar. Is that green biased? I want it more flat or blue-biased." It was — same hue family as the pass-4 primary green, just dark. Moved to the same blue hue (200.6°) as the pass-5 re-tinted neutral scale, rather than a true neutral grey, so the whole system (page canvas + sidebar) carries one consistent "barely blue" cast instead of introducing a third hue family. The sidebar's own focus ring moved too (`--brand-2` instead of the green `--brand`) so no green survives anywhere in this component.
-- **Card, pass-9 shape:** `border-radius` is on **all four corners** again (`var(--radius-lg)`) — pass 8 had rounded only the inner edge, flush to three of four sides. The Principal: "the rounded corners on the sidebar should be on all 4 corners. The sidebar itself should look like a card, with the appropriate border spacing." A `--shell-gutter` (16px) insets `top`/`left`/`bottom` so the card floats with visible space on every side, matching shadcn's sidebar-07 reference.
-- **Collapsible to an icon rail:** a compact state (~64px wide) showing only nav icons, no labels — expand restores the full ~240px width with labels. Unchanged since pass 8.
+- **Inverted:** in light mode the sidebar is a dark surface (`--sidebar` = `#1F2528`) floating on the light page; in dark mode it's a light surface (`--sidebar` = `#F7F8F8`) floating on the dark page. A user never sees two dark (or two light) surfaces stacked with no separation across a mode switch — "inverted" means relative to the page, in both directions.
+- **Blue-tinted, not green and not neutral grey.** A dark sidebar at the brand green's hue reads as a green bias, not a deliberate choice. It takes the same blue hue (200.6°) as the dark neutral scale, so the system carries one consistent "barely blue" cast instead of a third hue family. The sidebar's focus ring is `--brand-2`, not the green `--brand`, so no green cast reaches this component; the one deliberate green in it is the brand mark.
+- **Card:** `border-radius` on **all four corners** (`var(--radius-lg)`), "with the appropriate border spacing": a `--shell-gutter` (16px) insets `top`/`left`/`bottom` so the card floats with visible space on every side, as in the sidebar-07 reference.
+- **Collapsible to an icon rail:** a compact state (~64px wide) showing only nav icons, no labels — expand restores the full ~240px width with labels.
 
-**Composition, top to bottom (pass 8, unchanged in pass 9):**
-1. **Brand item** (`.sidebar-top`) — logo + "Polycarpic" wordmark, moved here from the header (pass 8). Pass 12: also carries the expand/collapse control (below). Collapses to the logo mark alone in the icon rail.
-2. **Nav** (`.sidebar-nav`) — seven items (was eight through pass 7; Settings left for a proposed avatar-popover entry, see § Sidebar information architecture — pass 9 also removed the pass-8 header-gear alternative, since the whole icon row it lived in is gone).
-3. **Avatar trigger** (`.sidebar-bottom`) — opens a user-menu popover (now to its right, see below). Collapses to the avatar circle alone in the icon rail.
+**Composition, top to bottom:**
+1. **Brand row** (`.sidebar-top`) — the seedling mark + "Polycarpic" wordmark, plus the expand/collapse control (below). Collapses to the mark alone in the icon rail.
+2. **Nav** (`.sidebar-nav`) — seven flat items (see § Sidebar information architecture). Settings is not a sidebar item; its entry point is a proposed avatar-popover item.
+3. **Avatar trigger** (`.sidebar-bottom`) — opens a user-menu popover to its right (see below). Collapses to the avatar circle alone in the icon rail.
 
-**Expand/collapse cue — brand-row toggle (pass 12, 2026-10-19, Principal direction; supersedes the top-row icon).** The Principal: "gemini.google.com has a sidebar implementation... the expand/contract icon is located on the right of the sidebar inline with the company logo... When contracted, this reduces to just the Gemini Logo/Icon. but on mouse hover, this switches to the expand/contract icon."
+**Expand/collapse cue — in the brand row (the gemini.google.com pattern).** The expand/contract icon sits on the right of the sidebar, inline with the logo; when contracted, the rail shows just the logo, and on hover that logo switches to the expand icon.
 
 | State | Brand row | Control |
 |---|---|---|
-| Expanded | Logo + "Polycarpic" left; collapse button right-aligned in the same row | `.sidebar-collapse` — Lucide `panel-left-close`, `aria-label`/tooltip "Collapse sidebar", `aria-expanded="true"` |
-| Collapsed, at rest | Logo mark alone, centred in the rail | `.sidebar-expand` — the logo mark *is* the button, `aria-label` "Expand sidebar", `aria-expanded="false"` |
-| Collapsed, hover **or** keyboard focus | Logo swaps to Lucide `panel-left-open` on a `--sidebar-accent` fill; tooltip "Expand sidebar" opens to the right (`.sidebar-tooltip`, shadcn Tooltip look: `--foreground` fill, `--background` ink) | Same button; `:focus-visible` adds the `--sidebar-ring` outline. The swap is a hover/focus *affordance* only — a click on the logo expands whether or not the swap is showing, so touch devices (no hover) still work |
+| Expanded | Mark + "Polycarpic" left; collapse button right-aligned in the same row | `.sidebar-collapse` — Lucide `panel-left-close`, `aria-label`/tooltip "Collapse sidebar", `aria-expanded="true"` |
+| Collapsed, at rest | Mark alone, centred in the rail | `.sidebar-expand` — the mark *is* the button, `aria-label` "Expand sidebar", `aria-expanded="false"` |
+| Collapsed, hover **or** keyboard focus | Mark swaps to Lucide `panel-left-open` on a `--sidebar-accent` fill; tooltip "Expand sidebar" opens to the right (`.sidebar-tooltip`, shadcn Tooltip look: `--foreground` fill, `--background` ink) | Same button; `:focus-visible` adds the `--sidebar-ring` outline. The swap is a hover/focus *affordance* only — a click on the mark expands whether or not the swap is showing, so touch devices (no hover) still work |
 
-The top row loses the icon and its left separator and now starts with the breadcrumb. Why this over the pass-8/9 top-row icon: the control sits on the thing it controls, the top row gets shorter, and the collapsed rail stays at three permanent elements (logo, nav, avatar) with no extra icon. Mockups render both buttons and toggle them with `.collapsed`; the real app renders one or the other from the sidebar's collapsed store (shadcn `Sidebar`'s `open` state; the block's `SidebarTrigger` is replaced by these two buttons calling the same `toggleSidebar()`). Never the hamburger `menu` icon: the glyphs are Lucide `panel-left-close` / `panel-left-open`.
+Why here rather than in the top row: the control sits on the thing it controls, the top row stays short, and the collapsed rail stays at three permanent elements (mark, nav, avatar) with no extra icon. Mockups render both buttons and toggle them with `.collapsed`; the real app renders one or the other from the sidebar's collapsed store (shadcn `Sidebar`'s `open` state; the block's `SidebarTrigger` is replaced by these two buttons calling the same `toggleSidebar()`). Never the hamburger `menu` icon: the glyphs are Lucide `panel-left-close` / `panel-left-open`.
 
-**Full height (pass 5; mechanism fixed pass 8; gutter added pass 9).** "Can we have the sidebar elongate down to fill the screen? ... the entire vertical *screen* space. Not the vertical *page* space." Pass 5 used `position: sticky` against `.shell-body`'s own flex row — this tracked the **page's** scroll position, not the **viewport**, and broke outright once a wireframe convention put an explanatory note above the shell: the sticky sidebar's natural document-flow offset pushed its bottom edge below the actual viewport. Pass 8 fixed this with `position: fixed; top: 0; left: 0; height: 100vh` — pinned to the viewport itself. **Pass 9** replaces the fixed `height: 100vh` with `top`/`left`/`bottom` all set to `var(--shell-gutter)` — the card's height is now implicit (the gap between the top and bottom insets) rather than a literal `100vh`, which is what makes the gutter possible on every side including the bottom. `.shell-main` carries a `margin-left` of `2 × gutter + sidebar width` to avoid being covered.
+**Full viewport height.** "The entire vertical *screen* space. Not the vertical *page* space." `position: sticky` against the shell's flex row tracks the **page's** scroll position, not the **viewport**: any content above the shell in the DOM pushes a sticky sidebar's bottom edge below the visible viewport. `position: fixed` pins it to the viewport itself. `top`/`left`/`bottom` are all `var(--shell-gutter)`, so the card's height is implicit (the gap between the top and bottom insets) rather than a literal `100vh` — which is what allows a gutter on every side, including the bottom. `.shell-main` carries a `margin-left` of `2 × gutter + sidebar width` to avoid being covered.
 
-**Avatar popover (pass 8, new component; direction corrected pass 9).** The sidebar's bottom item (`.sidebar-avatar-trigger`) opens a popover. **Pass 8** anchored it above the trigger (the trigger sits at the screen's bottom edge, so it opened upward, full sidebar width). **Pass 9, Principal review 6:** "I want the pop-over / pop-out of the user options at the bottom to open to the RIGHT like in the shadcn reference block" (sidebar-07, `temp/design-refs/shadcn-sidebar-07-user-popover.png`) — `left: calc(100% + 8px); bottom: 0`, bottom-aligned with the trigger but opening to its right instead of above it. Unchanged in the collapsed icon rail — the popover still opens to the right of the icon-only trigger, it just has less sidebar width to clear first.
+**Avatar popover.** The sidebar's bottom item (`.sidebar-avatar-trigger`) opens a popover to the RIGHT of the trigger, bottom-aligned with it (`left: calc(100% + 8px); bottom: 0`), as in the sidebar-07 reference (`temp/design-refs/shadcn-sidebar-07-user-popover.png`). The same in the collapsed icon rail: it opens to the right of the icon-only trigger.
 
 | Order | Item | Status |
 |---|---|---|
-| 1 | Profile | existing |
-| 2 | **Settings** | **proposed, pass 9** — entry point not yet decided by the Principal, see § Header |
-| 3 | **Notifications** | **proposed, pass 9** — same caveat |
-| 4 | Preferences | existing |
-| 5 | Theme | existing |
-| 6 | Keyboard shortcuts | existing |
+| 1 | Profile | decided |
+| 2 | **Settings** | **proposed** — entry point not decided, see § Header |
+| 3 | **Notifications** | **proposed** — same caveat |
+| 4 | Preferences | decided |
+| 5 | Theme | decided |
+| 6 | Keyboard shortcuts | decided |
 | — | divider | |
-| 7 | **Log out** (last, `--destructive`-styled) | existing |
+| 7 | **Log out** (last, `--destructive`-styled) | decided |
 
-Settings/Notifications are marked with a `.proposed-tag` badge in the styled screens — visually distinct from the five already-decided items, so a reviewer can tell at a glance which parts of this popover are still open questions. Shown "open" as the built reference on `styled-screens/dashboard.html` and `styled-screens/settings.html` (there with Settings marked current, to show its own proposed entry point); every other screen shows the trigger closed. This is a Popover, not a Sheet or Dialog — it doesn't block the rest of the screen and dismisses on outside click (see § shadcn-svelte reuse map, below, for the exact primitive).
+Settings/Notifications carry a `.proposed-tag` badge in the styled screens — visually distinct from the decided items, so a reviewer can tell at a glance which parts of this popover are still open questions. Shown "open" as the built reference on `styled-screens/dashboard.html` and `styled-screens/settings.html` (there with Settings marked current, to show its own proposed entry point); every other screen shows the trigger closed. This is a Popover, not a Sheet or Dialog — it doesn't block the rest of the screen and dismisses on outside click (see § shadcn-svelte reuse map for the exact primitive).
 
-### Sidebar information architecture (pass 7, 2026-10-02)
+### Sidebar information architecture
 
-**The Principal, pass 4 review:** "I kind of feel like the transactions, Ledger entries, General Ledger, Custodial Accounts, and security views are mixed together. Needs some conceptual clean up." Resolved via an interview (team-lead ran it; full transcript in `temp/2026-10-02-sidebar-interview.md`, held past this pass). The underlying issue was a **flow-vs-state conflation**: three pipeline stages (imported transaction → draft → posted journal entry) were stacked on one "Ledger" screen, and two different concept layers (the GL abstraction vs. a physical custodial account) shared one screen behind a silent toggle.
+"I kind of feel like the transactions, Ledger entries, General Ledger, Custodial Accounts, and security views are mixed together. Needs some conceptual clean up." (Interview transcript: `temp/2026-10-02-sidebar-interview.md`.) The underlying issue is a **flow-vs-state conflation**: three pipeline stages (imported transaction → draft → posted journal entry) stacked on one screen, and two different concept layers (the GL abstraction vs. a physical custodial account) sharing one screen behind a silent toggle. The IA separates them.
 
-**Final sidebar, pass 7: eight flat items, no nesting. Amended pass 8: seven sidebar items + one header surface. Amended again pass 9: seven sidebar items + one proposed avatar-popover entry** (Settings moved to the header's gear icon in pass 8; pass 9 removes that gear entirely and proposes an avatar-popover item instead — not yet decided, see § Header). The table below is pass 7's, with Settings' row marked to reflect where it actually lives now; everything else is unchanged, and the icon-collapsible mechanism is still flat-items-only.
+**Seven flat sidebar items, no nesting, plus one proposed avatar-popover entry (Settings).** The icon-rail collapse works because every item is flat.
 
-| # | Nav item | Replaces / absorbs | What it is |
+| # | Nav item | Absorbs | What it is |
 |---|---|---|---|
-| 1 | **Dashboard** | unchanged | Cross-cutting summary — net worth, cash flow, tax, allocation snapshot. |
-| 2 | **Transactions** | "Ledger" (renamed) | The time-ordered journal: three accordion cards in urgency order — Exceptions, Pending, Posted. The Pending card is the bank-feed review/match inbox (see § Transactions workflow). Import stats/status and the `[Sync Transactions]`/`[+ New entry]` actions live here too — "Import" as a separate nav item is gone. Not the chart-of-accounts; see General Ledger for that. |
-| 3 | **General Ledger** | half of old "Accounts" (the GL side of its toggle) | Opens to a chart-of-accounts **tree** (category → account → sub-account, balances, a custodial marker on accounts that mirror a physical account). Clicking an account opens that account's **register** — a separate page, breadcrumbed back to the tree — showing every line that hit it, in date order, with a running balance; each line links to its full journal entry. The register is account-scoped and running-balance-shaped; Transactions is entry-scoped and time-ordered — genuinely different questions, not two views of one screen. |
-| 4 | **Custodial Accounts** | the other half of old "Accounts"; absorbs "Securities" | The physical-account view — per-institution cards, reported balance, reconciliation status against the GL. Each account has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. Book-vs-market is implicit here (the lots themselves), not a separate chart. New custodial accounts and provider links are created via a `[+ New]` modal on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link-health (expired token, lost access, stale) shows as a badge on the row and a banner on Transactions. A `[Sync]` button here pulls positions and balances. |
-| 5 | **Allocation** | the allocation-vs-target half of old "Securities" | A dedicated actual-vs-target page — promoted out of Securities now that Securities itself is gone as a nav item. |
-| 6 | **Reports** | new | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (Component inventory, above) until POLY-M5 ships statements. Built as `styled-screens/reports.html`. |
-| 7 | **Entities** | unchanged | Entity list, memberships, invite. Never implicated in the "mixed together" complaint — intentionally left alone. |
-| — *(pass 9: proposed avatar-popover item, not a sidebar item)* | **Settings** | new; absorbs scheduling from old "Import" | Batch-import schedule and options, plus other app-level settings. **Pass 8** reached it via a header gear icon (no sidebar nav item active, gear shown `active` instead); **pass 9** removes that gear entirely along with the rest of the top row's global icons — Settings is now proposed as an avatar-popover item instead (§ Sidebar), marked `.proposed-tag` since the Principal hasn't ruled on it. No sidebar nav item is active on this screen either way. |
+| 1 | **Dashboard** | — | Cross-cutting summary — net worth, cash flow, tax, allocation snapshot. |
+| 2 | **Transactions** | the journal and import status | The time-ordered journal: three accordion cards in urgency order — Exceptions, Pending, Posted. The Pending card is the bank-feed review/match inbox (see § Transactions workflow). Import stats/status and the Sync Transactions / New entry actions live here; there is no separate "Import" item. Not the chart of accounts; see General Ledger for that. |
+| 3 | **General Ledger** | the GL side of accounts | Opens to a chart-of-accounts **tree** (category → account → sub-account, balances, a custodial marker on accounts that mirror a physical account). Clicking an account opens that account's **register** — a separate page, breadcrumbed back to the tree — showing every line that hit it, in date order, with a running balance; each line links to its full journal entry. The register is account-scoped and running-balance-shaped; Transactions is entry-scoped and time-ordered — genuinely different questions, not two views of one screen. |
+| 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, reported balance, reconciliation status against the GL. Each account has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. Book-vs-market is implicit here (the lots themselves), not a separate chart. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
+| 5 | **Allocation** | allocation vs. target | A dedicated actual-vs-target page. |
+| 6 | **Reports** | — | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (§ Component inventory) until POLY-M5 ships statements. |
+| 7 | **Entities** | — | Entity list, memberships, invite. |
+| — *(proposed avatar-popover item, not a sidebar item)* | **Settings** | import scheduling | Batch-import schedule and options, plus app-level preferences. Reached from the avatar popover (proposed, `.proposed-tag`). No sidebar nav item is active on this screen. |
 
-**What's explicitly gone:** "Securities" (folded into Custodial Accounts' lots sub-card + the new Allocation page) and "Import" (its setup is now a Custodial Accounts action; its stats live on Transactions; its scheduling lives in Settings). **Pass 8:** Settings itself also left the sidebar, for a header gear icon. **Pass 9:** that gear is gone too — Settings' entry point is now a *proposed* avatar-popover item, not yet decided. **What's unaffected:** the sidebar's own visual mechanism — inversion, icon-rail collapse — none of that changed; the card shape and the expand/collapse *cue* both did move again in pass 9 (§ Sidebar).
+There is no "Securities" item (lots live in Custodial Accounts' sub-card; allocation is its own page) and no "Import" item (setup is a Custodial Accounts action; stats live on Transactions; scheduling lives in Settings).
 
 ---
 
@@ -374,40 +363,40 @@ Settings/Notifications are marked with a `.proposed-tag` badge in the styled scr
 | Tier | Token | Product examples |
 |---|---|---|
 | Normal / on track | `--positive` or plain `--foreground` | Safe-harbor gap ≤ 0; reconciliation clean; import fully matched |
-| Caution | `--warning` | **(pass 6, the Principal asked what this is for)** Safe-harbor gap open, due date >14 days out; an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
+| Caution | `--warning` | Safe-harbor gap open, due date >14 days out; an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
 | Danger / overdue | `--destructive` | Safe-harbor payment overdue; exceptions-threshold breach; reconciliation break |
 
 ### Entity, account, and category badges — label + icon, not per-category hue
 
-Unchanged principle from prior passes: meaning by label/icon/variant weight, not a dedicated hue per category.
+Meaning by label/icon/variant weight, not a dedicated hue per category.
 
 | Category | Variant | Icon (Lucide, indicative) |
 |---|---|---|
 | Entity type — Person / Trust / Business / Household | `secondary` | `User` / `Landmark` / `Building2` / `Home` |
 | Account — GL / Custodial | `outline` | `BookText` / `Landmark` |
-| Transaction — Draft / Posted / Reversed / **Corrected** *(pass 6)* | `secondary` / `outline` / `outline` italic / **`outline` + `brand-2`-tinted dot** | `Clock` / `Check` / `RotateCcw` / `Pencil` |
+| Transaction — Draft / Posted / Reversed / **Corrected** | `secondary` / `outline` / `outline` italic / **`outline` + `brand-2`-tinted dot** | `Clock` / `Check` / `RotateCcw` / `Pencil` |
 | Role — Owner / Manager / Viewer | `default` / `secondary` / `outline` | — |
 
 **Open item:** a genuine 3+-hue categorical chart need isn't solved by this doc yet — decide against a concrete spec when one arises.
 
-### Correcting a posted entry — "Correct entry," not "edit" or "reverse" (pass 6)
+### Correcting a posted entry — "Correct entry," not "edit" or "reverse"
 
-**The Principal's framing (review 4):** the user-facing action and the underlying mechanism are two different claims, and the prior wording of flow 5.2 (design-system-spec.md / flow 5.2's own bullet) conflated them — "the UI never offers an edit affordance on a posted row, only reverse" describes the *mechanism* correctly but is not what the user should be told to click.
+The user-facing action and the underlying mechanism are two different claims. "The UI never offers an edit affordance on a posted row, only reverse" describes the *mechanism* correctly, but it is not what the user should be told to click.
 
-- **Import is the immutable baseline.** An imported bank transaction is never altered after import — this hasn't changed, and the user never corrects an import row directly.
-- **Nothing reaches the GL without a confirmation step.** Between import and posting, a draft is fully editable — category, tax-treatment tag, counterparty, amount allocation — exactly as today's flow 5.2 already describes. This is where a user fixes a mistake *before* it is load-bearing.
-- **After posting, the user-facing action is "Correct entry," not "edit."** Clicking it does not mutate the posted row — under the hood it posts a full reversal of the original entry plus a new corrected entry (unchanged mechanism, reversal-only, PRD §5) — but the user is never shown "reverse" as a verb for this, and never asked to manually construct the reversing entry themselves.
+- **Import is the immutable baseline.** An imported bank transaction is never altered after import, and the user never corrects an import row directly.
+- **Nothing reaches the GL without a confirmation step.** Between import and posting, a draft is fully editable — category, tax-treatment tag, counterparty, amount allocation — as flow 5.2 describes. This is where a user fixes a mistake *before* it is load-bearing.
+- **After posting, the user-facing action is "Correct entry," not "edit."** Clicking it does not mutate the posted row — under the hood it posts a full reversal of the original entry plus a new corrected entry (reversal-only, PRD §5) — but the user is never shown "reverse" as a verb for this, and never asked to construct the reversing entry themselves.
 - **A corrected row carries a badge** (see table above) distinguishing it from a plain Posted or a standalone Reversed (e.g. a reversal with no replacement) row.
 - **Click-through reveals the mechanism.** Opening a corrected entry's detail view shows the full underlying pair — the original entry's lines rendered shaded/struck-through, the reversal lines, and the new corrected entry — so the double-entry trail stays fully auditable (Overview principle: "every number earns trust") without the top-level row ever using the word "reverse" as the primary affordance.
-- **Auto-posted rows get the identical treatment (addendum, pass 6).** A row posted by a recurring rule rather than a manual confirm shows the same `Posted` badge plus a small `posted by rule — <rule name>` attribution line underneath it, and offers the exact same **Correct entry** action as any other posted row. There is no separate "edit" affordance for a rule-posted row, and no different correction mechanism — actor attribution (user / auto-post rule / system job, PRD §5) changes who gets credited, never how a mistake gets fixed. See `styled-screens/transactions.html` for the built example.
+- **Auto-posted rows get the identical treatment.** A row posted by a recurring rule rather than a manual confirm shows the same `Posted` badge plus a small `posted by rule — <rule name>` attribution line underneath it, and offers the exact same **Correct entry** action as any other posted row. There is no separate "edit" affordance for a rule-posted row, and no different correction mechanism — actor attribution (user / auto-post rule / system job, PRD §5) changes who gets credited, never how a mistake gets fixed.
 
-See flow 5.2 (§ User Flows) for the updated decision diagram and `styled-screens/transactions.html` for the built row action, badge, and click-through state.
+See flow 5.2 (§ User Flows) for the decision diagram and `styled-screens/transactions.html` for the built row action, badge, and click-through state.
 
 ---
 
-## Transactions workflow (pass 7, 2026-10-02)
+## Transactions workflow
 
-The Principal's own product specification for the Plaid bank-feed → journal-entry pipeline (`temp/2026-10-02-sidebar-interview.md`, kept as the starting point, refined here). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.2 for the full decision diagram.
+The product specification for the Plaid bank-feed → journal-entry pipeline (starting point: `temp/2026-10-02-sidebar-interview.md`). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.2 for the full decision diagram.
 
 **Layout:** a high-density table/list of unposted raw rows. Clicking a row expands it vertically (Accordion/Expansion pattern) — the matching workspace opens inline, no navigation away from the feed.
 
@@ -419,12 +408,12 @@ The Principal's own product specification for the Plaid bank-feed → journal-en
 
 **Flow B — Group (many raw rows → one entry).** For compressing many micro-transactions into one summary entry (prevents GL bloat). The user checkbox-selects rows in the primary table; a floating bulk-action bar appears; "Group & Summarize" opens the **same journal-entry modal** used everywhere else, pre-filled with one aggregated primary line and the user's chosen balancing distributions. **This is the system's one many-to-one draft→entry relationship** — every other posting path (manual entry, simple match, Split) is one draft (or one manual action) to one entry.
 
-**The journal-entry modal, one component reused everywhere.** Header (date, memo) + legs (account, Dr/Cr, amount) — a near-full-screen `Dialog`, not a drawer, because the Principal wants it to take up most of the screen. The exact same modal serves: manual **"+ New entry"**, **"Correct entry"** (§ Correcting a posted entry, above), **Split**, and **Group & Summarize** — only the pre-fill differs per entry point.
+**The journal-entry modal, one component reused everywhere.** Header (date, memo) + legs (account, Dr/Cr, amount) — a near-full-screen `Dialog`, not a drawer, because entering legs needs most of the screen. The same modal serves manual **"+ New entry"**, **"Correct entry"** (§ Correcting a posted entry, above), **Split**, and **Group & Summarize** — only the pre-fill differs per entry point.
 
-**Posting gate, stated explicitly (team-lead ruling, 2026-10-02):** a transaction cannot leave the Pending card unless **all** of the following hold —
+**Posting gate:** a transaction cannot leave the Pending card unless **all** of the following hold —
 1. Σ debits = Σ credits (balanced).
 2. The accounting equation holds, per entity (Assets = Liabilities + Equity).
-3. The entry date matches the bank date — or, for a date mismatch, the Cash-in-Transit clearing rule applies (2026-09-27 decision).
+3. The entry date matches the bank date — or, for a date mismatch, the Cash-in-Transit clearing rule applies.
 4. The posted draft links to exactly one journal entry (except Group, which links many drafts to the one entry it produced).
 
 Any gate failure keeps the item in Pending — there is no partial post and no silent failure. **"Approve & Post"** collapses the expanded panel with a fade-out and removes the item from the unposted inbox once the gate passes.
@@ -435,54 +424,52 @@ Any gate failure keeps the item in Pending — there is no partial post and no s
 
 ---
 
-## General Ledger: tree & register (pass 7, 2026-10-02)
+## General Ledger: tree & register
 
-**Team-lead ruling during the sidebar interview (the Principal did not object):** General Ledger opens to a **chart-of-accounts tree** — category → account → sub-account, each row showing its balance. Clicking an account opens that account's **register** as its own page, breadcrumbed back to the tree.
+General Ledger opens to a **chart-of-accounts tree** — category → account → sub-account, each row showing its balance. Clicking an account opens that account's **register** as its own page, breadcrumbed back to the tree.
 
-- **The custodial marker.** A tree row for a GL account that mirrors a physical custodial account (e.g. "Primary Checking") carries a small `custodial: <institution>` tag — a cross-reference only, not a second data source; the figure shown is always the GL's own balance. Not every account has one (Owner's Equity, Cash in Transit never do).
+- **The custodial marker.** A tree row for a GL account that mirrors a physical custodial account (e.g. "Primary Checking") carries a small custodial badge (`landmark` icon + institution) — a cross-reference only, not a second data source; the figure shown is always the GL's own balance. Not every account has one (Owner's Equity, Cash in Transit never do).
 - **The register is account-scoped and running-balance-shaped:** every line that hit this one account, in date order, with a running balance, each linking to its full journal entry (every leg, not just the one that hit this account) — the same "every number earns trust" principle as the Dashboard.
 - **Distinct from Transactions, deliberately.** Transactions (§ Transactions workflow, above) is entry-scoped and time-ordered across every account in the entity — the journal. The register is the opposite cut: one account, every entry that ever touched it. Neither view replaces the other.
 
-See `styled-screens/general-ledger.html` and `styled-screens/account-register.html` (styled pass 13).
+See `styled-screens/general-ledger.html` and `styled-screens/account-register.html`.
 
 ---
 
-## Custodial Accounts: lots & provider setup (pass 7, 2026-10-02)
+## Custodial Accounts: lots & provider setup
 
-**The Principal, verbatim (sidebar interview):** "Sub-card in the Custodial view... pull downs of each security to show lots. And for the Allocation vs target to be a dedicated page. The book vs market should be implicit in the custodial view, shown as whether the lots (and sum of lots) show the short/long/total current gains/losses." This absorbs both halves of what the old "Securities" nav item did — lots live here now; allocation-vs-target gets its own item (§ below is Custodial Accounts only; see the Allocation screen for that half).
+"Sub-card in the Custodial view... pull downs of each security to show lots. And for the Allocation vs target to be a dedicated page. The book vs market should be implicit in the custodial view, shown as whether the lots (and sum of lots) show the short/long/total current gains/losses." Lots live here; allocation vs. target is its own screen (§ Allocation, Reports & Settings).
 
-**Per-account card:** institution name, reported balance, link-health badge, and a reconciliation line against the GL (same clean/break tiers as before — danger tier surfaces on Dashboard too, per flow 5.4).
+**Per-account card:** institution name, reported balance, link-health badge, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.4).
 
 **The lots sub-card (only on accounts that hold securities):**
-- One row per security, collapsed by default — a pull-down (disclosure triangle) reveals its individual lots.
+- One row per security, collapsed by default — a pull-down (chevron) reveals its individual lots.
 - Each lot shows book value, market value, and its own short-term or long-term unrealized gain/loss.
 - The security's own row shows its summed book/market/gain across all its lots.
-- The account's lots sub-card totals short, long, and total unrealized gain/loss across every security — this **is** the book-vs-market comparison; there is no separate chart for it (the Principal's correction to the pre-pass-7 design, which had book-vs-market as its own line chart on the old Securities screen — that chart is retired).
+- The account's lots sub-card totals short, long, and total unrealized gain/loss across every security — this **is** the book-vs-market comparison; there is no separate book-vs-market chart.
 
-**The `[+ New]` provider-item modal** (absorbs the old "Import" screen's linking step):
+**The New provider item dialog:**
 - **Source type**, chosen first: aggregator (Plaid/SimpleFIN/fake), a manual account (no live link), or an imported file (CSV/OFX).
 - **Discovered-account mapping** (aggregator path only): a provider item can surface several accounts at once (e.g. a bank's checking + savings); each discovered account maps to an existing or new custodial account — a provider item is a first-class record that owns its discovered accounts (ARCH §3 data-model note), not folded directly into one custodial account.
-- **Token refresh** and **unlink** live in the same modal. Unlink states the revocation-lag note explicitly on the Vercel deployment target: access may persist up to 24h after unlinking.
-- **`[Sync]`** (top of Custodial Accounts, and a `[Sync Transactions]` counterpart on Transactions) pulls **both** balances and positions here — not transactions-only, which is what Sync means on Transactions.
-- **`[Import file]`** is the manual/file-source counterpart to Sync — same place, different action, for an account with no live aggregator link.
+- **Token refresh** and **unlink** live in the same dialog. Unlink states the revocation lag explicitly on the Vercel deployment target: access may persist up to 24h after unlinking.
+- **Sync** (on Custodial Accounts, with a Sync Transactions counterpart on Transactions) pulls **both** balances and positions here — not transactions-only, which is what Sync means on Transactions.
+- **Import file** is the manual/file-source counterpart to Sync — same place, different action, for an account with no live aggregator link.
 
-**Link health** (expired token, lost access, stale) is a badge on the custodial-account row here, and a banner at the top of Transactions — one state, shown in both places a user would reasonably look for it.
+**Link health** (expired token, lost access, stale) is a badge on the custodial-account card here, and a banner at the top of Transactions — one state, shown in both places a user would reasonably look for it.
 
-**Permissions:** `[+ New]`, token refresh, unlink, and `[Sync]`/`[Import file]` are Manager/Owner actions — a Viewer sees none of them (same posture as Transactions' posting actions, ARCH §2.4 permissions table).
+**Permissions:** New provider item, token refresh, unlink, and Sync/Import file are Manager/Owner actions — a Viewer sees none of them (same posture as Transactions' posting actions, ARCH §2.4 permissions table).
 
-See `styled-screens/custodial-accounts.html` (styled pass 13): the lots sub-card shows one security pulled down, and the provider-item dialog is shown open below the cards as the reference.
+See `styled-screens/custodial-accounts.html`: the lots sub-card shows one security pulled down, and the provider-item dialog is shown open below the cards as the reference.
 
 ---
 
-## Allocation, Reports & Settings (pass 7, 2026-10-02)
+## Allocation, Reports & Settings
 
-The remaining three new sidebar items, all new as of this pass (styled pass 13).
+**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.9) is orthogonal and applies here like any time-series view. Includes a target editor (targets must sum to 100%).
 
-**Allocation.** A dedicated actual-vs-target page, promoted out of the old Securities screen per the Principal's own direction (§ Custodial Accounts, above). Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.9) is orthogonal and applies here like any time-series view. Includes a target editor (must sum to 100%).
+**Reports.** A nav item **from day one**: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
 
-**Reports.** A nav item **from day one**, per the Principal: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the Component inventory's empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
-
-**Settings.** Absorbs the scheduling half of the old Import screen ("the undefined Settings View... all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window — a Household's schedule doesn't touch a Person entity) and **per-user** (theme, default entity on login, reduced motion). Viewers can view this page but the Manager/Owner-only actions (schedule, import options) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
+**Settings.** Batch-import scheduling ("all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window — a Household's schedule doesn't touch a Person entity) and **per-user** (theme, default entity on login, reduced motion). Viewers can view this page, but the Manager/Owner-only settings (schedule, import options) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
 
 See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-screens/settings.html`.
 
@@ -499,37 +486,37 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Table / custom grouped-row list** | **Grouped account list** (Monarch pattern) — type group header with group delta, rows with sparkline + relative freshness; also plain Table for the account register, lots, and exceptions |
 | **Segmented bar + legend** (custom, tokens-driven) | Allocation actual-vs-target, Assets/Liabilities summary — direct Monarch pattern |
 | **Badge** | Entity/account/transaction/role badges, safe-harbor status pill, link-health badge, Origin-style signed-% pill on ticker/delta rows |
-| **Accordion** *(pass 7, new)* | Transactions' three urgency-ordered cards (Exceptions, Pending, Posted); the Pending card's row-expansion (two-leg preview) |
-| **Tabs** | Entity switcher, nominal-vs-inflation-adjusted toggle, Totals/Percent toggle (Monarch pattern). **Pass 7:** the former GL-vs-custodial toggle is gone — General Ledger and Custodial Accounts are two separate nav items now, not a tab pair |
-| **Sheet / Dialog** | Transaction detail drawer; new-entity/membership dialog; provider-item modal (Custodial Accounts) |
-| **Dialog, near-full-screen** *(pass 7, new)* | The journal-entry modal (header + legs) — manual "+ New entry", "Correct entry", Split, and Group & Summarize all reuse this one modal |
+| **Accordion** | Transactions' three urgency-ordered cards (Exceptions, Pending, Posted); the Pending card's row expansion (two-leg preview) |
+| **Tabs** | Entity switcher, nominal-vs-inflation-adjusted toggle, Totals/Percent toggle (Monarch pattern), Reports' statement switcher. General Ledger and Custodial Accounts are two nav items, never a tab pair |
+| **Sheet / Dialog** | Transaction detail drawer; new-entity/membership dialog; provider-item dialog (Custodial Accounts) |
+| **Dialog, near-full-screen** | The journal-entry modal (header + legs) — manual "+ New entry", "Correct entry", Split, and Group & Summarize all reuse this one modal |
 | **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers; the suggested-offset-leg inline search dropdown (Pending inbox); per-card "show N" limit selector |
-| **Sidebar** | Primary nav, seven flat items (Settings proposed under the avatar popover, pass 9) — inverted, a floating card (gutter on every side, pass 9), collapsible to an icon rail, brand item on top + avatar-popover trigger on bottom (opens to the right, pass 9) — see Sidebar information architecture |
+| **Sidebar** | Primary nav, seven flat items (Settings proposed under the avatar popover) — inverted, a floating card (gutter on every side), collapsible to an icon rail, brand row on top (mark + wordmark + collapse control) + avatar-popover trigger on bottom (opens to the right) — see Sidebar information architecture |
 | **Skeleton** | Every async fetch boundary |
-| **Switch** *(pass 13, new)* | Settings' on/off preferences (auto-post matched recurring transactions, reduced motion), `.switch[role=switch]` |
-| **Brand app bar** *(pass 13, new)* | Shell-less pages only (membership setup, Admin): brand lockup on the left, user avatar or operator badge on the right, no sidebar, `.app-bar` |
+| **Switch** | Settings' on/off preferences (auto-post matched recurring transactions, reduced motion), `.switch[role=switch]` |
+| **Brand app bar** | Shell-less pages only (membership setup, Admin): brand lockup on the left, user avatar or operator badge on the right, no sidebar, `.app-bar` |
 | **Sonner (toast)** | Import batch complete, entry posted, reconciliation break |
 | **Progress** | Import batch progress, safe-harbor paid-vs-required |
-| **Top row** *(pass 4/5, rebuilt pass 8, reduced pass 9 — was "Header")* | Starts right of the sidebar, not full-width, not sticky/bordered (pass 9 — same background token as the content below it): breadcrumb (left; pass 12 moved the expand/collapse icon into the sidebar's brand row); entity selector + separator + "more" menu (right) — AI/search/notifications/gear dropped, see Layout & shell, Header |
-| **Separator** *(pass 9, new; one left as of pass 12)* | The top row's vertical divider before the "more" menu (the one after the old panel-left icon went with it, pass 12) |
-| **Popover / DropdownMenu** *(pass 8, new; items added pass 9)* | Avatar popover at the sidebar's bottom — profile, **Settings (proposed)**, **Notifications (proposed)**, preferences, theme, keyboard shortcuts, Log out last (see Sidebar); same primitive backs the top row's "more" menu |
-| **Breadcrumb** *(pass 8, new)* | The top row's "page title > breadcrumbs" — single crumb on most screens, multi-crumb on drill-downs (the account register) |
-| **Avatar cluster** *(pass 5, new)* | Overlapping initials-on-`--secondary` circles in the entity selector — membership at a glance, max 3 + overflow (see Header) |
-| **Public hero + feature call-outs** *(pass 4, corrected)* | Home — pre-auth landing page, product statement + brand identity + CTAs |
-| **Split screen login** *(pass 4)* | Login — theme-aware form pane (full field list: OAuth, email, password + reveal + forgot-password, sign-in, sign-up link, legal footer) + always-branded visual pane, stacks on phone width |
+| **Top row** | Starts right of the sidebar, not full-width, not sticky/bordered, same background token as the content below it: breadcrumb (left); entity selector + separator + "more" menu (right) — see Layout & shell, Header |
+| **Separator** | The top row's vertical divider before the "more" menu |
+| **Popover / DropdownMenu** | Avatar popover at the sidebar's bottom — profile, **Settings (proposed)**, **Notifications (proposed)**, preferences, theme, keyboard shortcuts, Log out last (see Sidebar); the same primitive backs the top row's "more" menu |
+| **Breadcrumb** | The top row's "page title > breadcrumbs" — single crumb on most screens, multi-crumb on drill-downs (the account register) |
+| **Avatar cluster** | Overlapping initials-on-`--secondary` circles in the entity selector — membership at a glance, max 3 + overflow (see Header) |
+| **Public hero + feature call-outs** | Home — pre-auth landing page, product statement + brand identity + CTAs |
+| **Split screen login** | Login — theme-aware form pane (full field list: OAuth, email, password + reveal + forgot-password, sign-in, sign-up link, legal footer) + always-branded visual pane, stacks on phone width |
 
-**Top bar pattern (Monarch):** page title (left) + a secondary outline action + a primary filled CTA (right) — e.g. Dashboard: "Refresh" (outline) + nothing else; Transactions: `[Sync Transactions]` (outline) + `[+ New entry]` (filled) *(pass 7, was Ledger's "Confirm all," since posting now happens per-item in the Pending inbox, not as a single batch action)*. **Pass 9:** both examples above now live in the top row's "more" menu, not a visible button in the content column at all (§ Header, "the 'more' menu is contextual per page view").
+**Page actions live in the "more" menu.** Monarch puts a page's actions in its top bar as visible buttons (page title + an outline action + a filled CTA). Here, a page's global actions (Dashboard's Refresh; Transactions' Sync Transactions and New entry) live in the top row's contextual "more" menu instead (§ Header), and posting happens per item in the Pending inbox, never as a single batch "confirm all".
 
-### Icon inventory — Lucide name per control (pass 9, 2026-10-10)
+### Icon inventory — Lucide name per control
 
-**The Principal: "we should be using the Icon set from Shadcn... like Lucide."** `lucide-svelte` is the package (shadcn-svelte's own icon set, MIT licensed); every icon below is named so Implement pulls the real component (`<PanelLeftClose />`, not a reinvented glyph). The styled screens embed simplified inline SVG stand-ins (same visual shape, hand-authored, not the literal `lucide-svelte` output) — close enough to review, not a substitute for the real package at Implement.
+**Lucide, shadcn's own icon set, everywhere.** `lucide-svelte` is the package (MIT licensed); every icon below is named so Implement pulls the real component (`<PanelLeftClose />`, not a reinvented glyph). The styled screens embed simplified inline SVG stand-ins (same visual shape, hand-authored, not the literal `lucide-svelte` output) — close enough to review, not a substitute for the real package at Implement.
 
 | Control | Lucide name | Notes |
 |---|---|---|
-| Sidebar collapse (expanded brand row, right-aligned) | `panel-left-close` | Pass 12; was `panel-left` in the top row (pass 9). Never the hamburger `menu` icon — the Principal's explicit correction |
-| Sidebar expand (collapsed rail, logo swaps to it on hover/focus) | `panel-left-open` | Pass 12; tooltip "Expand sidebar" |
+| Sidebar collapse (expanded brand row, right-aligned) | `panel-left-close` | Never the hamburger `menu` icon |
+| Sidebar expand (collapsed rail, the mark swaps to it on hover/focus) | `panel-left-open` | Tooltip "Expand sidebar" |
 | "More" menu trigger | `ellipsis-vertical` | Top row, right-justified |
-| Breadcrumb separator | `chevron-right` | Rendered as text `>` in the mockups for simplicity; same meaning |
+| Breadcrumb separator | `chevron-right` | |
 | Dashboard nav | `layout-dashboard` | |
 | Transactions nav | `arrow-left-right` | |
 | General Ledger nav | `book-text` | |
@@ -548,48 +535,48 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | "More" menu: Sync (Transactions, Custodial Accounts) | `refresh-cw` | Same icon as Refresh — both are "pull fresh data," same verb |
 | "More" menu: New entry / New provider item | `plus` | |
 | "More" menu: Export (General Ledger) | `download` | |
-| Locked leg indicator (Pending inbox, Split grid) | `lock` | design-system-spec.md § Transactions workflow |
+| Locked leg indicator (Pending inbox, Split grid) | `lock` | § Transactions workflow |
 | Correct entry / edit account (inline) | `pencil` | |
 | Link-health warning banner | `triangle-alert` | |
-| Search *(proposed entry point, not yet in the top row)* | `search` | Reserved for the keyboard-shortcut / "more"-menu entry point, § Header |
-| GL tree group disclosure; lots security pull-down | `chevron-down` (open) / `chevron-right` (closed) | Pass 13. Same pair for every disclosure row |
-| Custodial cross-reference badge (GL tree, register) | `landmark` | Pass 13. Same glyph as the Custodial Accounts nav item |
-| GL account badge (register) | `book-text` | Pass 13. Same glyph as the General Ledger nav item |
-| Provider dialog: Refresh token | `key` | Pass 13 |
-| Provider dialog: Unlink | `link-2-off` | Pass 13; `--destructive` text |
-| Entities: Invite member | `user-plus` | Pass 13 |
-| Entities: Create entity | `plus` | Pass 13 |
-| Entity type badges: Person / Household / Trust / Business | `user` / `house` / `landmark` / `building-2` | Pass 13; per § Entity, account, and category badges |
-| Admin: operator-session badge | `terminal` | Pass 13 |
-| Login: reveal password | `eye` (`eye-off` when revealed) | Pass 13; replaced an emoji glyph |
-| Brand mark (sidebar brand row, rail expand button, app bar) | **not Lucide**: `brand/brand-mark-24.svg` | Pass 14; the Principal's seedling, traced. The one deliberate non-Lucide glyph |
+| Search *(proposed entry point, not in the top row)* | `search` | Reserved for the keyboard-shortcut / "more"-menu entry point, § Header |
+| GL tree group disclosure; lots security pull-down | `chevron-down` (open) / `chevron-right` (closed) | Same pair for every disclosure row |
+| Custodial cross-reference badge (GL tree, register) | `landmark` | Same glyph as the Custodial Accounts nav item |
+| GL account badge (register) | `book-text` | Same glyph as the General Ledger nav item |
+| Provider dialog: Refresh token | `key` | |
+| Provider dialog: Unlink | `link-2-off` | `--destructive` text |
+| Entities: Invite member | `user-plus` | |
+| Entities: Create entity | `plus` | |
+| Entity type badges: Person / Household / Trust / Business | `user` / `house` / `landmark` / `building-2` | Per § Entity, account, and category badges |
+| Admin: operator-session badge | `terminal` | |
+| Login: reveal password | `eye` (`eye-off` when revealed) | |
+| Brand mark (sidebar brand row, rail expand button, app bar, Login, Home) | **not Lucide**: `brand/brand-mark-24.svg` / `brand/brand-mark.svg` | The seedling, traced; the one deliberate non-Lucide glyph |
 
-**Every screen is built (pass 13)**, so every icon in use is named above. Add a row whenever a new control lands, rather than guessing ahead of the actual screen.
+Every icon in use is named above. Add a row whenever a new control lands, rather than guessing ahead of the actual screen.
 
-**Empty-state pattern (ARCH §2.4 — Dashboard ships in M3 with the tax panel empty until 1.0, allocation panel empty until M4):** an empty panel keeps its real card chrome (eyebrow label, card shape, dashboard-scale padding) and states plainly that the feature isn't set up yet, in `--muted-foreground` body text — no illustration, no skeleton (a skeleton implies "loading," not "not built yet" — conflating the two is misleading). **Copy never names an internal milestone or version id** (architect's nit, 2026-09-28) — "Not set up yet," not "Available in v1.0"/"Available at M4": these panels are staging-only today, but neutral copy survives either way OQ-8 (0.x releases) resolves, without leaking internal roadmap language to a user. Example: the tax-liability card shows the eyebrow "PENDING TAX LIABILITY" and "Not set up yet" — same card shape as the live version will have, so the dashboard's layout doesn't visibly shift when the feature ships. See `styled-screens/dashboard.html` for the built example.
+**Empty-state pattern (ARCH §2.4 — Dashboard ships in M3 with the tax panel empty until 1.0, allocation panel empty until M4):** an empty panel keeps its real card chrome (eyebrow label, card shape, dashboard-scale padding) and states plainly that the feature isn't set up yet, in `--muted-foreground` body text — no illustration, no skeleton (a skeleton implies "loading," not "not built yet" — conflating the two is misleading). **Copy never names an internal milestone or version id** — "Not set up yet," not "Available in v1.0"/"Available at M4": neutral copy survives however OQ-8 (0.x releases) resolves, without leaking internal roadmap language to a user. Example: the tax-liability card shows the eyebrow "PENDING TAX LIABILITY" and "Not set up yet" — the same card shape as the live version will have, so the dashboard's layout doesn't visibly shift when the feature ships. See `styled-screens/dashboard.html` for the built example.
 
 **Still ours to set:** reduced-motion policy; loading-state discipline (per-feature).
 
 ---
 
-## shadcn-svelte reuse map (pass 8, 2026-10-02; updated pass 9, 2026-10-10)
+## shadcn-svelte reuse map
 
-**The Principal's question:** "How much of shadcn-svelte's components and blocks are we reusing? Ideally we would stick to the already designed stuff as much as possible for stability." Answered here, directly: every component and screen region in this system, mapped to the shadcn-svelte component or official block it's built from, or `custom` with one line why. The bias throughout is toward an existing component/block over a bespoke build — `custom` rows are the exception, not the default, and each states what shadcn-svelte doesn't already cover.
+"How much of shadcn-svelte's components and blocks are we reusing? Ideally we would stick to the already designed stuff as much as possible for stability." Answered here, directly: every component and screen region in this system, mapped to the shadcn-svelte component or official block it's built from, or `custom` with one line why. The bias throughout is toward an existing component/block over a bespoke build — `custom` rows are the exception, not the default, and each states what shadcn-svelte doesn't already cover.
 
-**Registry, version, and vendoring (the Principal also asked how blocks get in):** shadcn-svelte (https://shadcn-svelte.com, the Svelte port of shadcn/ui) follows shadcn's own distribution model — components are **copied into the repo** via `bunx shadcn-svelte@latest add <name>` (already stated in Component inventory, above), not installed as a versioned npm dependency. That means there is no single "shadcn-svelte version" pin the way there is for a normal package — each component is vendored source, owned and modified in-repo once added. **What is pinned:** the `shadcn-svelte` CLI/registry version used *at the moment each `add` command runs*, recorded as a decision in `process/DECISIONS.md` by frontend-lead at Implement kickoff (not a design-time decision — this spec fixes *which* components/blocks to use, not which CLI version generates them). Official **blocks** (pre-assembled multi-component screens — sidebar, dashboard, login blocks) are vendored the same way and are the preferred starting point wherever one exists close to our own screen shape, per the Principal's "stick to the already designed stuff" direction.
+**Registry, version, and vendoring:** shadcn-svelte (https://shadcn-svelte.com, the Svelte port of shadcn/ui) follows shadcn's own distribution model — components are **copied into the repo** via `bunx shadcn-svelte@latest add <name>` (see Component inventory, above), not installed as a versioned npm dependency. There is no single "shadcn-svelte version" pin the way there is for a normal package — each component is vendored source, owned and modified in-repo once added. **What is pinned:** the `shadcn-svelte` CLI/registry version used *at the moment each `add` command runs*, recorded as a decision in `process/DECISIONS.md` by frontend-lead at Implement kickoff (not a design-time decision — this spec fixes *which* components/blocks to use, not which CLI version generates them). Official **blocks** (pre-assembled multi-component screens — sidebar, dashboard, login blocks) are vendored the same way and are the preferred starting point wherever one exists close to our own screen shape.
 
 | Component / region | shadcn-svelte component or block | Notes |
 |---|---|---|
-| App shell (sidebar + top row) | **Sidebar**, specifically the **sidebar-07** block (`https://ui.shadcn.com/view/new-york-v4/sidebar-07`) — pass 9 narrows this from the generic Sidebar component page (pass 8) to this exact block, per the Principal's own reference screenshots (`temp/design-refs/shadcn-sidebar-07*.png`) | Direct reuse — our brand item ≈ its `SidebarHeader` (team-switcher slot), nav ≈ `SidebarMenu`, avatar trigger + right-opening popover ≈ its `SidebarFooter` pattern almost exactly |
-| Avatar popover (user menu) | **Popover** + **DropdownMenu** (the popover is the container; its items are a DropdownMenu's item list) | Matches shadcn's own sidebar-07 footer example (avatar + name, opens a menu to the side) closely; pass 9 adds two **proposed** items (Settings, Notifications) to the same list, not a structural change |
-| Breadcrumbs | **Breadcrumb** | Direct reuse — single-crumb pages just render a one-item Breadcrumb |
-| Top row separator | **Separator**, vertical orientation | Pass 9, new — one before the "more" menu (pass 12 removed the one after the old panel-left icon) |
-| "More" menu (top row) | **DropdownMenu**, triggered by an `ellipsis-vertical` icon button | Pass 9, new — same primitive as the avatar popover, different trigger and contents (per-page global actions, not the user menu) |
-| Search *(proposed entry point)* | **Command** (the `⌘K`-style command palette primitive) | Pass 9: no longer a top-row icon — proposed instead as a keyboard shortcut + a "more"-menu entry, opening the same Command dialog either way; the keyword/account/report-view search domains are three command groups within it |
-| Notification centre *(proposed entry point)* | `custom` | No official shadcn-svelte notification-center block exists; built from **Popover** (container) + **Badge** (unread count) + plain list markup — closest primitives, not a named block. Pass 9: its entry point is now the avatar popover, proposed, not a standalone top-row icon |
-| Settings *(proposed entry point)* | **Button** (icon variant), inside the avatar popover | Pass 9: no longer a top-row gear — a plain nav affordance (page link, not a menu) nested inside the avatar `DropdownMenu` instead |
-| AI/Agent icon | — *(removed, pass 9)* | Pass 8 reserved a disabled `Button` slot for this; pass 9 drops the icon from the top row with no entry point proposed anywhere yet — not a component-mapping question until there's a surface to map |
-| Icon library | **lucide-svelte** (`https://lucide.dev`, shadcn-svelte's own icon set) | Pass 9, new — every icon in § Icon inventory names its exact `lucide-svelte` component |
+| App shell (sidebar + top row) | **Sidebar**, specifically the **sidebar-07** block (`https://ui.shadcn.com/view/new-york-v4/sidebar-07`; reference screenshots `temp/design-refs/shadcn-sidebar-07*.png`) | Direct reuse — our brand row ≈ its `SidebarHeader` (team-switcher slot), nav ≈ `SidebarMenu`, avatar trigger + right-opening popover ≈ its `SidebarFooter` pattern almost exactly. Its `SidebarTrigger` is replaced by the brand-row collapse/expand buttons calling the same `toggleSidebar()` |
+| Avatar popover (user menu) | **Popover** + **DropdownMenu** (the popover is the container; its items are a DropdownMenu's item list) | Matches sidebar-07's footer example (avatar + name, opens a menu to the side) closely; two items (Settings, Notifications) are **proposed** |
+| Breadcrumbs | **Breadcrumb** | Direct reuse — single-crumb pages render a one-item Breadcrumb |
+| Top row separator | **Separator**, vertical orientation | One, before the "more" menu |
+| "More" menu (top row) | **DropdownMenu**, triggered by an `ellipsis-vertical` icon button | Same primitive as the avatar popover, different trigger and contents (per-page global actions, not the user menu) |
+| Search *(proposed entry point)* | **Command** (the `⌘K`-style command palette primitive) | Not a top-row icon — proposed as a keyboard shortcut + a "more"-menu entry, opening the same Command dialog either way; the keyword/account/report-view search domains are three command groups within it |
+| Notification centre *(proposed entry point)* | `custom` | No official shadcn-svelte notification-center block exists; built from **Popover** (container) + **Badge** (unread count) + plain list markup. Its entry point is the avatar popover, proposed |
+| Settings *(proposed entry point)* | **Button** (icon variant), inside the avatar popover | A plain nav affordance (page link, not a menu) nested inside the avatar `DropdownMenu` |
+| AI/Agent | — | No entry point proposed yet — not a component-mapping question until there's a surface to map |
+| Icon library | **lucide-svelte** (`https://lucide.dev`, shadcn-svelte's own icon set) | Every icon in § Icon inventory names its exact `lucide-svelte` component |
 | Entity selector | `custom` | shadcn-svelte has no "entity switcher" block; closest primitive is **DropdownMenu**, but the avatar-cluster trigger is bespoke (no shadcn component composes avatars this way) |
 | Avatar cluster | `custom` | Overlapping-avatars-with-overflow-chip is a known pattern (Origin, Monarch, GitHub) but not a shadcn-svelte component; built from **Avatar** primitives, manually overlapped |
 | KPI / stat cards | **Card** | Direct reuse everywhere |
@@ -601,33 +588,33 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | Pending row expansion | **Accordion** (nested item), **Select** (suggested-offset inline search) | The two-leg preview itself is custom content inside an Accordion item |
 | Split grid | `custom` | A dynamic multi-row form grid with live-sum validation; no shadcn block matches |
 | Bulk action bar | `custom` | A "floating selection toolbar" pattern (seen in many apps) but not a shadcn-svelte component |
-| Journal-entry modal | **Dialog**, sized near-full-screen | Direct reuse — just a non-default Dialog size, not a different primitive |
+| Journal-entry modal | **Dialog**, sized near-full-screen | Direct reuse — a non-default Dialog size, not a different primitive |
 | Transaction/account-register tables | **Table** | Direct reuse |
 | Chart-of-accounts tree | `custom` | No shadcn tree component; built from nested disclosure rows (could adopt a community tree primitive later if one matures) |
 | Lots sub-card pull-down | **Collapsible** | Direct reuse — a simpler primitive than Accordion for a single expand/collapse row |
-| Settings on/off preferences | **Switch** | Pass 13, new. Direct reuse |
-| Settings theme picker (Light / Dark / Auto) | **Toggle Group** (single) | Pass 13. Rendered with the `.tabs` look; semantically a radio group, not tabs |
-| Shell-less brand bar (membership setup, Admin) | `custom` | Pass 13. A flex row of the brand lockup plus one trailing item; too small to be a block. No sidebar because no entity exists (setup) or none applies (operator) |
-| Register / any wide table | **Table** (its own overflow-x wrapper) | Pass 13: `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling |
-| Allocation actual-vs-target track | `custom` on **Progress** | Pass 13. A Progress track plus a target marker; shadcn Progress has no marker |
-| Provider-item modal | **Dialog**, **Tabs** (source-type picker), **Select** (account mapping) | Composed from three existing primitives, no custom chrome |
-| Tabs (entity switcher pre-pass-8, nominal/real toggle, Totals/Percent) | **Tabs** | Direct reuse |
+| Settings on/off preferences | **Switch** | Direct reuse |
+| Settings theme picker (Light / Dark / Auto) | **Toggle Group** (single) | Rendered with the `.tabs` look; semantically a radio group, not tabs |
+| Shell-less brand bar (membership setup, Admin) | `custom` | A flex row of the brand lockup plus one trailing item; too small to be a block. No sidebar because no entity exists (setup) or none applies (operator) |
+| Register / any wide table | **Table** (its own overflow-x wrapper) | `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling |
+| Allocation actual-vs-target track | `custom` on **Progress** | A Progress track plus a target marker; shadcn Progress has no marker |
+| Provider-item dialog | **Dialog**, **Tabs** (source-type picker), **Select** (account mapping) | Composed from three existing primitives, no custom chrome |
+| Tabs (nominal/real toggle, Totals/Percent, Reports statements) | **Tabs** | Direct reuse |
 | Transaction detail drawer | **Sheet** | Direct reuse |
 | Select / Combobox (category, tax-treatment, jurisdiction) | **Select**, **Combobox** | Direct reuse |
 | Toasts (import complete, entry posted, reconciliation break) | **Sonner** | Direct reuse |
 | Progress (import batch, safe-harbor paid-vs-required) | **Progress** | Direct reuse |
 | Skeleton | **Skeleton** | Direct reuse |
-| Tooltip (icon-button titles, truncated text) | **Tooltip** | Direct reuse — used wherever an icon-only control needs a text label on hover |
+| Tooltip (icon-button titles, truncated text, the rail's "Expand sidebar") | **Tooltip** | Direct reuse — used wherever an icon-only control needs a text label on hover |
 | Public hero (Home) | `custom` | Marketing/landing content; no shadcn block fits a bespoke brand hero |
-| Split-screen login | shadcn-svelte's own **login block** (`https://shadcn-svelte.com/blocks/login`, the two-pane pattern) as a starting point, customized | The Principal's own reference screenshot (`temp/design-refs/split-login-example.png`) is close to this official block's shape; adopted as the base rather than built from scratch, then customized for our exact field list (§ New screens: Home & Login) |
+| Split-screen login | shadcn-svelte's own **login block** (`https://shadcn-svelte.com/blocks/login`, the two-pane pattern) as a starting point, customized | The reference screenshot (`temp/design-refs/split-login-example.png`) is close to this official block's shape; adopted as the base rather than built from scratch, then customized for our exact field list (§ Public screens: Home & Login) |
 
-**What's deliberately `custom` and why that's still "sticking to the designed stuff":** every `custom` row above is custom because shadcn-svelte genuinely has no matching primitive or block — not because an existing one was skipped. Each is built *from* shadcn-svelte primitives (Avatar, Popover, Card, Button) rather than from scratch, so the stability the Principal is asking for — consistent tokens, consistent interaction patterns, one accessibility baseline — still holds even where the composition itself is ours.
+**What's deliberately `custom` and why that's still "sticking to the designed stuff":** every `custom` row above is custom because shadcn-svelte genuinely has no matching primitive or block — not because an existing one was skipped. Each is built *from* shadcn-svelte primitives (Avatar, Popover, Card, Button) rather than from scratch, so the stability this is after — consistent tokens, consistent interaction patterns, one accessibility baseline — still holds even where the composition itself is ours.
 
 ---
 
-## Screen list (pass 13, 2026-10-20)
+## Screen list
 
-**One fidelity tier.** Every page is a styled screen in `styled-screens/`, on `tokens.css` + `screen.css` and the sidebar-07 shell. The wireframe tier and its traffic-priority rule are retired. Each screen supports light and dark (`.dark` on `<html>`) and must render with no console errors and no overflow at 960px and 1280px. That is the review check, run headless in both modes.
+**One fidelity tier.** Every page is a styled screen in `styled-screens/`, on `tokens.css` + `screen.css` and the sidebar-07 shell. Each screen supports light and dark (`.dark` on `<html>`) and must render with no console errors and no overflow at 960px and 1280px. That is the review check, run headless in both modes.
 
 | Screen | File | Shell | Shown open as reference |
 |---|---|---|---|
@@ -645,30 +632,30 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | Membership setup | `membership-setup.html` | brand app bar | — |
 | Admin *(operator surface)* | `admin.html` | brand app bar + operator badge | — |
 
-## New screens: Home & Login (pass 4, corrected same day)
+## Public screens: Home & Login
 
-**Correction, 2026-09-30 (same day as the original ask):** the first version of this section proposed "Home" as a signed-in entity-picker. The Principal's clarification: **Home is the public landing page a visitor sees before authentication, not a signed-in screen at all.** The entity-picker concept is dropped as a named screen — for a multi-entity user, entity selection is handled by the header's entity switcher (Layout & shell), already sufficient; no dedicated interstitial page is needed. Login also gained real specificity: it's the **"split screen login page"** pattern by name, with a fully specified form-pane content list, not just "email + continue + OAuth."
+**Home is the public landing page a visitor sees before authentication, not a signed-in screen.** There is no signed-in entity-picker page: for a multi-entity user, entity selection is the top row's entity selector (§ Header), which is sufficient. Login is the **"split screen login page"** pattern by name, with a fully specified form-pane content list.
 
 ### Home — public landing page
 
 **What it is:** the marketing/landing page a visitor sees before signing in — not a Dashboard, not authenticated, no ledger data. One screen, hero-led:
-- **Hero:** product statement + the neon-green brand identity front and center (this is a prime "dark or brand surface" context, so `--brand` at full strength is appropriate here, unlike anywhere in the authenticated app).
+- **Hero:** the seedling mark + "Polycarpic" wordmark, a product statement, and the neon-green brand identity front and center (a prime "dark or brand surface" context, so `--brand` at full strength is appropriate here, unlike anywhere in the authenticated app).
 - **What it does, in one screen:** a genuine double-entry ledger, multi-entity (Person/Trust/Business/Household), self-hosted — three short feature call-outs, not an exhaustive feature list.
 - **Calls to action:** "Sign in" and "Get started" (routes to Login).
 - **Footer:** minimal — links, no dense content.
 
-Both themes apply here like any other doc page (unlike Login's visual pane, a landing page's whole canvas is content, not brand chrome, so it follows the user's stored preference same as the rest of the app). See `styled-screens/home.html`.
+The hero band is fixed dark; the feature and footer sections follow the user's stored theme preference like the rest of the app (a landing page's canvas below the hero is content, not brand chrome). See `styled-screens/home.html`.
 
-### Login — split screen login page (pass 4, refined pass 5)
+### Login — split screen login page
 
-**Principal's exact pattern, named:** "split screen login page." Two references: `useorigin.com`'s own login (dark, brand pane + form card — behind a splash loader under automation, no direct capture) and a captured example (`temp/design-refs/split-login-example.png`, form pane left including a labeled email/password pair with a "Forgot password?" link and a reveal-eye icon, OAuth button, divider, primary button, sign-up link, legal footer at the very bottom; a full-bleed moody photo right, inset with rounded corners and a margin rather than flush to the viewport edge).
+Two references: `useorigin.com`'s own login (dark, brand pane + form card — behind a splash loader under automation, no direct capture) and a captured example (`temp/design-refs/split-login-example.png`: form pane left with a labeled email/password pair, a "Forgot password?" link and a reveal-eye icon, OAuth button, divider, primary button, sign-up link, legal footer at the very bottom; a full-bleed moody photo right, inset with rounded corners and a margin rather than flush to the viewport edge).
 
-**Form pane content, in order** (per the Principal's explicit list): logo (top-left), "Welcome back" heading + one-line subtext, an OAuth button, a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, a "Don't have an account? Sign up" line, and a legal footer ("By signing in you agree to...") pinned at the bottom.
+**Form pane content, in order:** mark + wordmark (top-left), "Welcome back" heading + one-line subtext, an OAuth button, a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, a "Don't have an account? Sign up" line, and a legal footer ("By signing in you agree to...") at the bottom.
 
 **Ours, adapted:**
-- **Form pane:** sits on the theme-aware tinted neutral (`--card`/`--background`) — follows the user's stored light/dark preference like the rest of the app, unlike the visual pane. **Pass 5:** the heading, subtext, and fields are centered both vertically and horizontally as a fixed-max-width (380px) column within the pane — the logo is the one element that stays pinned top-left, overriding the pane's own centering. Field labels, inputs, and links stay left-aligned *within* that centered column (only the heading/subtext text itself is center-aligned) — a defensible reading of "centred," stated explicitly since the alternative (centering every line of text, including form labels) would read oddly for a form.
+- **Form pane:** sits on the theme-aware neutral (`--card`/`--background`) — follows the user's stored light/dark preference like the rest of the app, unlike the visual pane. The heading, subtext, and fields are centered both vertically and horizontally as a fixed-max-width (380px) column within the pane; the mark + wordmark is the one element pinned top-left, overriding the pane's own centering. Field labels, inputs, and links stay left-aligned *within* that centered column (only the heading/subtext text itself is center-aligned) — centering every line of text, including form labels, would read oddly for a form.
 - **Visual pane:** always carries the brand identity regardless of the user's theme preference — inset with rounded corners and a margin, matching the captured reference's proportions rather than flush edges. It shows the forest illustration, `brand/polycarpic-bg-forest.jpeg` (dark-green illustrated forest, a cabin with chimney smoke, a glowing sky-blue stream and plants along the bottom third), as an `<img class="visual-art">` with `object-fit: cover`. The pane is tall and the art is square, so the sides crop; `object-position: 78% 70%` keeps the cabin and the whole stream in frame from a 960px viewport (pane ~456×852) up. A bottom scrim (`::after`, transparent → 55% black) keeps the caption legible over the stream's glow; the pane's own background is the art's deep green (`#0D2E07`) while the image loads. The image is decorative (`alt=""`, `aria-hidden`). **Source resolution:** the supplied file is 1024×1024 (156 KB). On a 1280×900 desktop the pane is ~852 CSS px tall, so at 2× pixel density it needs ~1700 device px of height and the 1024px source is upscaled ~1.7× (soft, not blocky, given the flat style). Production wants a larger export: 2048px square at minimum, 3072px for large retina displays.
-- **Responsive:** collapses to a single stacked pane (form only, visual pane hidden) below the phone-width breakpoint — a login form doesn't need to fight a hero image for a 375px-wide screen.
+- **Responsive:** collapses to a single stacked pane (form only, visual pane hidden) below the phone-width breakpoint — a login form doesn't need to fight a hero image on a 375px-wide screen.
 
 See `styled-screens/login.html`.
 
@@ -678,7 +665,7 @@ See `styled-screens/login.html`.
 
 For architect's Screen DTO work (ARCH §2.4, OQ-11 resolved in outline). Model constraints: amounts are signed per line with Dr/Cr derived for display; drafts are separate from posted entries and posted entries are immutable; Cash-in-Transit open items get an exceptions view; access comes from membership only (no parent/child inheritance); `import_batch` holds new/duplicate/needs-category counts.
 
-**Pass 7 (2026-10-02):** rebuilt for the eight-item sidebar (§ Sidebar information architecture, above). Mirrors ARCH §2.4's screen→DTO table exactly — this is the DESIGN-owned half of that same contract, not a second source of truth.
+This mirrors ARCH §2.4's screen→DTO table exactly — the DESIGN-owned half of that same contract, not a second source of truth.
 
 | Screen / surface | Data shown | DTO(s) → owning package | Milestone note |
 |---|---|---|---|
@@ -688,69 +675,64 @@ For architect's Screen DTO work (ARCH §2.4, OQ-11 resolved in outline). Model c
 | General Ledger — chart-of-accounts tree | Category → account → sub-account, balances, custodial marker | `ChartTree` → ledger | M2 |
 | General Ledger — account register page | Lines on one account, date order, running balance, link to entry | `AccountRegister` → ledger | M2 |
 | Custodial Accounts | Balance, reconciliation status, link-health badge; lots sub-card per security (lots, short/long/total unrealized gain, per lot and summed) | `CustodialAccountList` → posting + import; `LotsCard` → securities | M3 (lots card at M4) |
-| Provider-item modal ("+ New" on Custodial Accounts) | Source type (aggregator / broker API / file / manual); discovered accounts mapped to custodial accounts; token refresh; unlink + revocation-lag note | `ProviderItem` → import | M2 (fake + file); real aggregators at 1.0 |
+| Provider-item dialog (New provider item on Custodial Accounts) | Source type (aggregator / broker API / file / manual); discovered accounts mapped to custodial accounts; token refresh; unlink + revocation-lag note | `ProviderItem` → import | M2 (fake + file); real aggregators at 1.0 |
 | Sync (Transactions, Custodial Accounts) / "Import file" | Job status; on Custodial Accounts also pulls balances and positions | `SyncRequest` → import | M2 |
 | Allocation | Actual vs. target allocation; target editor | `AllocationVsTarget`, target editor → portfolio | M4 |
 | Reports | Balance Sheet, Income Statement, Cash Flow; NAV and NAV delta | `ReportTable` → reports | M5; empty state until then |
 | Entities | Entity list; memberships; invite action | `EntityList`, `MembershipList`, invite command → tenancy | M1 |
 | Settings | Per-entity batch-import schedule and options; app preferences | `ImportSchedule` → import; app preferences → tenancy | M2 |
-| Home *(pass 4, corrected)* | **No DTO** — public landing page, static marketing content, unauthenticated, no membership/ledger data at all | — | Not a package concern |
-| Login *(pass 4)* | Unauthenticated — email/password, OAuth provider list (Google/Apple/GitHub, PRD §8); no ledger data | → `packages/auth` | |
-
-**Gone as of pass 7:** "Ledger" (renamed Transactions), "Accounts" (split into General Ledger / Custodial Accounts), "Securities" (folded into Custodial Accounts' lots sub-card + the new Allocation page), "Import" (its setup is the provider-item modal on Custodial Accounts; its stats live on Transactions; its scheduling lives in Settings).
+| Home | **No DTO** — public landing page, static marketing content, unauthenticated, no membership/ledger data at all | — | Not a package concern |
+| Login | Unauthenticated — email/password, OAuth provider list (Google/Apple/GitHub, PRD §8); no ledger data | → `packages/auth` | |
 
 ---
 
 ## Provenance & shared tooling
 
-polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte app with its own vendored preset and its own generated theme-variant pipeline (`gen_variants.py` → `docs/DESIGN/variants.css`). **This product's palette does not inherit cairn's tokens** (rejected at pass 1) — it's a fully separate identity derived from Monarch/Origin measurements (pass 3, this revision).
-
-**CI hazard, in progress (POLY-78):** `scripts/cairn/tests/test_board_tokens_parity.py` asserts `docs/DESIGN/tokens.css` parity with cairn's board tokens and runs in the required `cairn` CI check — this divergence fails it until POLY-78 merges. Expected, not to be worked around. `docs/DESIGN/variants.css` has been removed from this branch (it belongs to cairn's generator, not the product) — expect a trivial merge conflict against POLY-78's own removal.
+polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte app with its own vendored preset and its own generated theme-variant pipeline. **This product's palette does not inherit cairn's tokens** — it's a fully separate identity derived from Monarch/Origin measurements. A CI assertion of token parity with cairn's board (`scripts/cairn/tests/test_board_tokens_parity.py`) was removed (POLY-78); cairn's generated `variants.css` belongs to cairn's generator, not to `docs/DESIGN/`.
 
 ---
 
 ## Accessibility
 
-**Target: WCAG AA.** Light-mode pairs re-run for pass 11's off-white canvas, `#F9F8F8` (= `--muted`), with `--accent` as the hover fill (2026-10-19); dark-mode pairs unchanged since pass 10. Earlier: every pair re-run for pass 6's palette via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (script in `temp/`, `2026-09-30-ux-designer-wcag-contrast-check-pass3.py`; pass 6's warning/chart figures computed via a successor script in the same `temp/` directory). See `tokens.html` for every token's value in both modes with a rendered swatch, alongside this written derivation.
+**Target: WCAG AA.** Every pair below is computed via the standard WCAG relative-luminance formula against the exact hex values in `tokens.css` (scripts in `temp/`). See `tokens.html` for every token's value in both modes with a rendered swatch, alongside this written derivation.
 
-**Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` hardcode the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
+**Login/Home's fixed dark hero and visual-pane colors are not new values** — `.landing-hero`/`.auth-visual-pane` use the same hex already verified in the dark-mode table below rather than reading `.dark`-scoped tokens, since these two surfaces are deliberately always-dark regardless of the page's own theme.
 
-**Pass 5 header/sidebar/login-centering changes (review 2) introduced no new token values** — unchanged from the prior revision's note.
-
-**Light mode — text pairs (floor 4.5:1), all PASS (pass 11, canvas = `--muted` = `#F9F8F8`, hover fill `--accent` `#EBF4F9`):**
+**Light mode — text pairs (floor 4.5:1), all PASS (canvas = `--muted` = `#F9F8F8`, hover fill `--accent` `#EBF4F9`):**
 
 | Pair | Contrast |
 |---|---|
-| `--foreground` / `--background`(=`--muted`) · `--card` · `--accent` | 15.61:1 · 16.55:1 · 14.85:1 (was 16.41:1 on `#FEFEFE`) |
+| `--foreground` / `--background`(=`--muted`) · `--card` · `--accent` | 15.61:1 · 16.55:1 · 14.85:1 |
 | `--primary-foreground` / `--primary` (fill) | 5.04:1 |
-| `--primary` / `--background` · `--card` · `--accent` (text, e.g. links, row actions) | 4.75:1 · 5.04:1 · 4.52:1 — `--accent` is the binding pair that set `#148100` (pass-10 `#158500` is 4.30:1 there) |
+| `--primary` / `--background` · `--card` · `--accent` (text, e.g. links, row actions) | 4.75:1 · 5.04:1 · 4.52:1 — `--accent` is the binding pair that sets `#148100` (one notch lighter is 4.30:1 there) |
 | `--secondary-foreground` / `--secondary` (fill) | 4.72:1 |
 | `--secondary-foreground` / `--background` · `--card` | 5.17:1 · 5.48:1 |
 | `--accent-foreground` / `--accent` (hovered text/icons) | 4.92:1 |
 | `--muted-foreground` / `--background` · `--card` · `--accent` | 6.45:1 · 6.84:1 · 6.14:1 |
 | `--muted-foreground` / `--secondary` | 5.89:1 |
 | `--destructive-foreground` / `--destructive` | 5.09:1 |
-| `--destructive` / `--background` · `--card` · `--accent` (text, incl. hovered "Log out") | 4.80:1 · 5.09:1 · 4.57:1 (pass-10 `#E70404` is 4.27:1 on `--accent`) |
+| `--destructive` / `--background` · `--card` · `--accent` (text, incl. hovered "Log out") | 4.80:1 · 5.09:1 · 4.57:1 (one notch lighter is 4.27:1 on `--accent`) |
 | `--positive-foreground` / `--positive` (fill) | 5.08:1 |
-| `--positive` / `--background` · `--card` · `--accent` (text, incl. hovered table rows) | 4.80:1 · 5.08:1 · 4.56:1 (pass-10 `#15803D` is 4.4999:1 on `--accent`) |
-| `--sidebar-foreground` / `--sidebar` | 13.87:1 (unchanged) |
-| `--sidebar-accent-foreground` / `--sidebar-accent` | 10.28:1 (unchanged) |
-| `--warning-foreground` / `--warning` (fill) | 5.54:1 (unchanged) |
+| `--positive` / `--background` · `--card` · `--accent` (text, incl. hovered table rows) | 4.80:1 · 5.08:1 · 4.56:1 (one hex step lighter is 4.4999:1 on `--accent`) |
+| `--sidebar-foreground` / `--sidebar` | 13.87:1 |
+| `--sidebar-accent-foreground` / `--sidebar-accent` | 10.28:1 |
+| `--warning-foreground` / `--warning` (fill) | 5.54:1 |
 
-**Light mode — non-text pairs (floor 3:1) (pass 11):**
+**Light mode — non-text pairs (floor 3:1):**
 
 | Pair | Contrast | Result |
 |---|---|---|
 | `--ring` / `--background` · `--card` | 4.75:1 · 5.04:1 | PASS |
 | `--primary` icon / `--accent` (`.icon-btn.active`) | 4.52:1 | PASS |
-| `--sidebar-ring` / `--sidebar` | 6.00:1 | PASS (unchanged) |
-| `--chart-1`…`--chart-5` / `--card` | 3.26:1 → 6.63:1 | PASS all 5 — pass-10 ramp, unchanged |
+| `--sidebar-ring` / `--sidebar` | 6.00:1 | PASS |
+| `--sidebar-brand` / `--sidebar` (brand mark) | 11.39:1 | PASS |
+| `--chart-1`…`--chart-5` / `--card` | 3.26:1 → 6.63:1 | PASS all 5 |
 | `--chart-1`…`--chart-5` / `--background` (= `--muted`) | 3.07:1 → 6.26:1 | PASS all 5 |
 | `--chart-1` / `--accent` | 2.92:1 | **Below floor** — no chart inside a hover fill |
 | `--warning` / `--card` · `--background` (border/icon use) | 3.20:1 · 3.02:1 | PASS |
 | `--warning` / `--accent` | 2.87:1 | **Below floor** — a bare warning icon on a hovered row needs its label |
 | `--card` / `--background` | 1.06:1 | Surface step, not a content pair — cards also carry the `--border` hairline |
-| `--muted` / `--card` | 1.06:1 | In-card wells/tracks/placeholders (Principal ruling: `--muted` = page) |
+| `--muted` / `--card` | 1.06:1 | In-card wells/tracks/placeholders (`--muted` = page) |
 | `--accent` / `--background` · `--card` | 1.05:1 · 1.12:1 | Hover/active fill, visible on both |
 | `--border` / `--card` · `--background` | 1.29:1 · 1.22:1 | Below floor — decorative hairline, accepted |
 | `--input` / `--card` | 1.42:1 | Below floor — same posture as `--border` (the field's label and placeholder carry identification) |
@@ -764,8 +746,8 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | `--foreground` / `--background` | 17.92:1 |
 | `--primary-foreground` / `--primary` (fill) | 14.72:1 |
 | `--primary` / `--card` (text-only) | 14.18:1 |
-| `--secondary-foreground` / `--secondary` (fill, NEW blue) | 5.95:1 |
-| `--secondary-foreground` / `--card` (text-only, NEW blue) | 9.83:1 |
+| `--secondary-foreground` / `--secondary` (fill) | 5.95:1 |
+| `--secondary-foreground` / `--card` (text-only) | 9.83:1 |
 | `--muted-foreground` / `--muted` | 7.76:1 |
 | `--muted-foreground` / `--card` | 7.92:1 |
 | `--accent-foreground` / `--accent` | 5.46:1 |
@@ -773,9 +755,9 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | `--sidebar-foreground` / `--sidebar` | 15.55:1 |
 | `--sidebar-accent-foreground` / `--sidebar-accent` | 4.72:1 |
 | `--positive-foreground` / `--positive` (fill) | 8.93:1 |
-| `--warning-foreground` / `--warning` (fill, **pass 6, re-hued true orange, same dark ink as light mode**) | 8.11:1 |
+| `--warning-foreground` / `--warning` (fill, same dark ink as light mode) | 8.11:1 |
 
-**Dark mode — hover fills (pass 11g), text pairs, all PASS:**
+**Dark mode — hover fills, text pairs, all PASS:**
 
 | Pair | On the row-hover tint `#12232C` | On the "Log out" tint (20% `--destructive` over `--popover`) |
 |---|---|---|
@@ -790,11 +772,12 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | Pair | Contrast | Result |
 |---|---|---|
 | `--ring` / `--card` | 14.18:1 | PASS |
-| `--sidebar-ring` / `--sidebar` (NEW, derived light-mode blue ink) | 4.51:1 | PASS |
+| `--sidebar-ring` / `--sidebar` (derived blue ink) | 4.51:1 | PASS |
+| `--sidebar-brand` / `--sidebar` (brand mark) | 4.73:1 | PASS |
 | `--brand-2` / `--background` | 7.76:1 | PASS — this dark surface is exactly what `--brand-2` is for |
-| `--chart-1`…`--chart-5` / `--card` (**pass 10, re-hued to `--brand-2`**) | 5.04:1 → 15.12:1 | PASS all 5 — superseded green ramp (pass 6) was 8.87:1→16.32:1 |
-| `--chart-1`…`--chart-5` / `--background` (**pass 10, checked against both backgrounds per direction**) | 5.23:1 → 15.69:1 | PASS all 5 — dark mode was never the tight constraint, see light-mode table above |
-| `--warning` / `--card` (**pass 6, new**) | 8.84:1 | PASS |
+| `--chart-1`…`--chart-5` / `--card` | 5.04:1 → 15.12:1 | PASS all 5 |
+| `--chart-1`…`--chart-5` / `--background` | 5.23:1 → 15.69:1 | PASS all 5 — light mode sets the ramp's floor |
+| `--warning` / `--card` | 8.84:1 | PASS |
 
 | Concern | Standard / approach |
 |---|---|
@@ -805,9 +788,9 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | Motion | Respect `prefers-reduced-motion` (open item) |
 
 **Open items:**
-- No CVD simulation run on the new palette yet — now TWO brand hues (green 110.6°, blue 200.6°) to check, not just one; higher priority with each pass that adds more meaning-bearing color.
-- `--border`/`--card` is a low-contrast hairline by design (1.29:1 as of pass 11) — decorative, consistent with common practice.
-- `--warning` and `--chart-1` fall under 3:1 only on an `--accent` hover fill (2.87:1 / 2.92:1, pass 11) — no chart inside a hover; a bare warning icon on a hovered row keeps its label.
+- No CVD simulation run on the palette yet — two brand hues (green 110.6°, blue 200.6°) to check; high priority, since both carry meaning.
+- `--border`/`--card` is a low-contrast hairline by design (1.29:1) — decorative, consistent with common practice.
+- `--warning` and `--chart-1` fall under 3:1 only on an `--accent` hover fill (2.87:1 / 2.92:1) — no chart inside a hover; a bare warning icon on a hovered row keeps its label.
 - Reduced-motion policy not yet written.
 - Radius-xl (sheets) not measured against either reference — extrapolated.
 
@@ -817,5 +800,5 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 
 - Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.
 - Categorical (3+ hue) chart palette for transaction-category breakdowns — deferred until a concrete chart spec exists.
-- Compare `styled-screens/dashboard.html` against `temp/design-refs/monarch-app-accounts-zoom.png` component-by-component once frontend-lead builds the real screen — this pass matched structure and the net-worth hero closely but did not build the full grouped-account-list + segmented-bar right column (time-boxed to the highest-traffic pattern); flag as a fast-follow if the gap matters before Implement.
-- **CVD check on the brand hues (pass 4/5):** flagged in Accessibility — two brand hues now (green, blue) to check, not yet simulated.
+- Compare `styled-screens/dashboard.html` against `temp/design-refs/monarch-app-accounts-zoom.png` component-by-component once frontend-lead builds the real screen.
+- **CVD check on the brand hues:** flagged in Accessibility — two brand hues (green, blue) to check, not yet simulated.
