@@ -1185,23 +1185,50 @@ table.data-table td.amount.negative { color: var(--destructive); }
 
 /* Visual pane — always dark/branded, inset with rounded corners and a
    margin (matching the captured reference's proportions), not flush to
-   the viewport edge. No photo asset exists yet, so a brand gradient
-   stands in — see design-system-spec.md § New screens for the reasoning. */
+   the viewport edge. It carries the forest illustration
+   (brand/polycarpic-bg-forest.jpeg); see design-system-spec.md § Login. */
 .auth-visual-pane {
   margin: 24px 24px 24px 0;
   border-radius: var(--radius-xl);
   overflow: hidden;
-  background: linear-gradient(160deg, #2CFF05 0%, #0D2E07 45%, #070907 85%);
+  position: relative;
+  background: #0D2E07; /* the art's own deep green, shown only while the image loads */
   display: flex;
   align-items: flex-end;
   padding: 40px;
 }
 
+/* The pane is tall and the art is square, so it covers and crops the
+   sides. The focal point sits on the cabin and the glowing stream: the
+   stream runs to ~92% of the art's width, so x is 78%, not centre. At a
+   960px viewport (pane ~456 x 852) that keeps the cabin and the whole
+   stream in frame; 65% clips the stream's right edge there. Decorative:
+   empty alt, hidden from assistive tech. */
+.auth-visual-pane .visual-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 78% 70%;
+}
+
+/* A bottom scrim keeps the caption legible over the stream's glow. */
+.auth-visual-pane::after {
+  content: "";
+  position: absolute;
+  inset: 55% 0 0 0;
+  background: linear-gradient(180deg, transparent, oklch(0 0 0 / 55%));
+  pointer-events: none;
+}
+
 .auth-visual-pane .visual-caption {
+  position: relative;
+  z-index: 1;
   color: #EFF1EF;
   font-size: 14px;
   max-width: 28ch;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 @media (max-width: 760px) {
