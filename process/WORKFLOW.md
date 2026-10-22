@@ -486,7 +486,7 @@ To tear down: _"Clean up the team."_
 │   │   ├── design-system-spec.md  written spec
 │   │   ├── tokens.css             design tokens
 │   │   ├── screen.css             component/screen styles
-│   │   ├── flows/  styled-screens/  history/
+│   │   ├── brand/  flows/  styled-screens/
 │   └── _assets/                 shared CSS + mermaid loader
 ├── process/cairn/               the tracker's data — majors, milestones, issues, archive
 │                                (config.yml committed; see TRACKER.md)
