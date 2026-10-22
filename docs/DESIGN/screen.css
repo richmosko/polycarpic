@@ -1194,7 +1194,19 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
 .auth-form-inner .auth-subtitle { color: var(--muted-foreground); margin-bottom: 24px; font-size: 14px; }
 
 .auth-oauth-row { margin-bottom: 20px; }
-.auth-oauth-row .btn-outline { width: 100%; justify-content: center; }
+.auth-oauth-row .btn { width: 100%; justify-content: center; }
+
+/* Dark secondary button: a solid --foreground fill with --background ink
+   (near-black in light mode, near-white in dark mode). It exists because
+   an outline button standing alone on --background is nearly invisible:
+   its --border edge is 1.22:1 on the light page and ~1.17:1 on the dark
+   one. This fill is 15.61:1 (light) / 17.92:1 (dark) against the page,
+   and the label is the same against the fill. Used for the OAuth
+   "Continue with Google" button on Login. */
+.btn-dark { background: var(--foreground); color: var(--background); }
+.btn-dark:hover { filter: none; background: color-mix(in srgb, var(--foreground) 88%, var(--background)); }
+.btn-dark .oauth-glyph { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; }
+.btn-dark .oauth-glyph svg { width: 100%; height: 100%; display: block; }
 
 .auth-divider { display: flex; align-items: center; gap: 10px; margin: 0 0 20px; color: var(--muted-foreground); font-size: 12px; }
 .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: var(--border); }
@@ -1239,9 +1251,6 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
   overflow: hidden;
   position: relative;
   background: #0D2E07; /* the art's own deep green, shown only while the image loads */
-  display: flex;
-  align-items: flex-end;
-  padding: 40px;
 }
 
 /* The pane is tall and the art is square, so it covers and crops the
@@ -1257,24 +1266,6 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
   height: 100%;
   object-fit: cover;
   object-position: 78% 70%;
-}
-
-/* A bottom scrim keeps the caption legible over the stream's glow. */
-.auth-visual-pane::after {
-  content: "";
-  position: absolute;
-  inset: 55% 0 0 0;
-  background: linear-gradient(180deg, transparent, oklch(0 0 0 / 55%));
-  pointer-events: none;
-}
-
-.auth-visual-pane .visual-caption {
-  position: relative;
-  z-index: 1;
-  color: #EFF1EF;
-  font-size: 14px;
-  max-width: 28ch;
-  opacity: 0.9;
 }
 
 @media (max-width: 760px) {
