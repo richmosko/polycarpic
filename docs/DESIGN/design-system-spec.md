@@ -504,7 +504,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Breadcrumb** | The top row's "page title > breadcrumbs" — single crumb on most screens, multi-crumb on drill-downs (the account register) |
 | **Avatar cluster** | Overlapping initials-on-`--secondary` circles in the entity selector — membership at a glance, max 3 + overflow (see Header) |
 | **Landing illustration + feature call-outs** | Home — under the brand app bar: the mountains illustration, then headline, subhead and three feature cards |
-| **Split screen login** | Login — theme-aware form pane (full field list: OAuth, email, password + reveal + forgot-password, sign-in, sign-up link, legal footer) + always-branded visual pane, stacks on phone width |
+| **Split screen login** | Login — theme-aware form pane (full field list: OAuth, email, password + reveal + forgot-password, sign-in, the invite / own-instance account line, legal footer) + always-branded visual pane, stacks on phone width |
 
 **Page actions live in the "more" menu.** Monarch puts a page's actions in its top bar as visible buttons (page title + an outline action + a filled CTA). Here, a page's global actions (Dashboard's Refresh; Transactions' Sync Transactions and New entry) live in the top row's contextual "more" menu instead (§ Header), and posting happens per item in the Pending inbox, never as a single batch "confirm all".
 
@@ -550,6 +550,11 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | Entity type badges: Person / Household / Trust / Business | `user` / `house` / `landmark` / `building-2` | Per § Entity, account, and category badges |
 | Admin: operator-session badge | `terminal` | |
 | Login: reveal password | `eye` (`eye-off` when revealed) | |
+| Get started: "I have an invite" card | `mail` | |
+| Get started: "I'm setting up my own instance" card; walkthrough Requirements | `server` | |
+| Walkthrough: Deploy / First operator sign-in / Invite members | `terminal` / `log-in` / `user-plus` | |
+| Get started: Create your account / Start the walkthrough | `arrow-right` / `arrow-down` | Trailing icon inside the button |
+| Sign up: valid-invite badge | `circle-check` | |
 | Login: Continue with Google | **not Lucide**: the Google "G" mark, four-colour | Google's own brand glyph on the dark button, as its sign-in branding asks |
 | Brand mark (sidebar brand row, rail expand button, app bar, Login, Home) | **not Lucide**: `brand/brand-mark-24.svg` / `brand/brand-mark.svg` | The seedling, traced; the one deliberate non-Lucide glyph |
 
@@ -631,6 +636,8 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Settings | `settings.html` | sidebar, no nav item active | avatar popover with Settings current |
 | Home | `home.html` | none (public) | — |
 | Login | `login.html` | none (split screen) | — |
+| Get started | `get-started.html` | brand app bar | — |
+| Sign up | `sign-up.html` | none (split screen) | invite code pre-filled and validated |
 | Membership setup | `membership-setup.html` | brand app bar | — |
 | Admin *(operator surface)* | `admin.html` | brand app bar + operator badge | — |
 
@@ -669,11 +676,27 @@ The one top bar of every page without the app shell: Home, Membership setup, Adm
 
 See `styled-screens/home.html`, `styled-screens/membership-setup.html`, `styled-screens/admin.html`.
 
+### Get started and Sign up
+
+There is no public sign-up: every instance is self-hosted, and accounts on it come by invitation from an entity owner. Home's "Get started" therefore leads to a fork, and Login's account line offers the same two branches. See flow 5.6.
+
+- **Get started** (`get-started.html`, brand app bar with Sign in on the right): one page, not a modal. On top are two cards:
+  - "I have an invite", which leads to Sign up (primary button);
+  - "I'm setting up my own instance", which scrolls to the walkthrough (`dark` button).
+
+  The walkthrough sits directly below as four numbered steps: requirements, deploy, first operator sign-in, invite members. It is an outline that grows as the deployment docs are written.
+- **Sign up** (`sign-up.html`, Login's split layout and forest pane), invite-gated:
+  - Fields, in order: the invite code, then the account (the `dark` Google button, or email + password).
+  - From an invite link, the code arrives pre-filled and validated, with a line naming who invited the visitor and to which entity. An invalid or used code shows an inline error under the field.
+  - "Create account" hands off to Membership setup, where the invited entity is waiting.
+  - Footer: "Already have an account? Sign in", then "No invite? Set up your own instance".
+- **Login's account line:** "Have an invite? **Create your account**" leads to Sign up; "No invite? **Set up your own instance**" leads to Get started.
+
 ### Login — split screen login page
 
 Two references: `useorigin.com`'s own login (dark, brand pane + form card — behind a splash loader under automation, no direct capture) and a captured example (`temp/design-refs/split-login-example.png`: form pane left with a labeled email/password pair, a "Forgot password?" link and a reveal-eye icon, OAuth button, divider, primary button, sign-up link, legal footer at the very bottom; a full-bleed moody photo right, inset with rounded corners and a margin rather than flush to the viewport edge).
 
-**Form pane content, in order:** mark + wordmark (top-left), "Welcome back" heading + one-line subtext, an OAuth button, a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, a "Don't have an account? Sign up" line, and a legal footer ("By signing in you agree to...") at the bottom.
+**Form pane content, in order:** mark + wordmark (top-left), "Welcome back" heading + one-line subtext, an OAuth button, a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, the two-way account line ("Have an invite? Create your account" / "No invite? Set up your own instance"), and a legal footer ("By signing in you agree to...") at the bottom.
 
 **OAuth button:** "Continue with Google" is a `dark` button with the Google G glyph, not an outline one; see the Button row in § Component inventory for why.
 

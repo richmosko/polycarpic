@@ -333,6 +333,27 @@ flowchart TD
     <li>A Household's membership never transitively grants access to a member Person entity, or vice versa (PRD §5, hard requirement).</li>
     <li>A viewer never sees a write affordance rendered-then-disabled — write controls are omitted entirely, not shown-and-greyed.</li>
   </ul>
+
+  <h3 id="flow-home-entry">5.6 Home entry: Sign in, Get started, Sign up</h3>
+  <p class="section-hint"><strong>Story:</strong> a visitor's first move from Home, on a product with no public sign-up. Source: <a href="flows/home-entry-flow.md">flows/home-entry-flow.md</a>.</p>
+  <pre class="mermaid">
+flowchart TD
+  home([Visitor on Home]) -- Sign in --> login[Login]
+  home -- Get started --> gs{Get started:\ninvited to\nthis instance?}
+  invite([Invite link from\nan entity owner]) --> signup
+  login -- "Have an invite?\nCreate your account" --> signup[Sign up:\ninvite code, then account\nGoogle or email + password]
+  login -- "No invite?\nSet up your own instance" --> gs
+  login -- signed in --> landed([Dashboard, or Membership\nsetup if no membership])
+  gs -- "yes: I have an invite" --> signup
+  gs -- "no: my own instance" --> walk[Walkthrough, same page:\nrequirements, deploy,\noperator sign-in, invite]
+  signup -- valid invite --> setup([Membership setup,\ninvited entity waiting])
+  </pre>
+  <ul>
+    <li><strong>No public sign-up:</strong> every instance is self-hosted; accounts come by invitation from an entity owner. The bar's action is "Get started", never "Sign up".</li>
+    <li><strong>Get started is one page:</strong> the two-way fork on top ("I have an invite" → Sign up; "I'm setting up my own instance" → the walkthrough directly below). <em>Alternative:</em> a modal from Home's Get started button holding just the two cards; lighter on Home, but the walkthrough then needs its own page anyway.</li>
+    <li><strong>Login shows the same branch:</strong> "Have an invite? Create your account" → Sign up; "No invite? Set up your own instance" → Get started.</li>
+    <li><strong>Sign up is invite-gated:</strong> the code arrives pre-filled from an invite link or is typed; a valid invite names the inviter and the entity; the account (Google, or email + password) hands off to Membership setup. An invalid code shows an inline error, never a dead end.</li>
+  </ul>
 </section>
 
 <section id="screens" data-section="screens">
@@ -354,6 +375,8 @@ flowchart TD
   <div class="screen-gallery">
     <figure class="screen-card"><a href="styled-screens/home.html"><img src="styled-screens/thumbs/home.png" alt="Home screen"></a><figcaption><a href="styled-screens/home.html">Home</a><span>Public pre-auth landing page: a fixed black top bar (neon lockup left, Get started + Sign in right) fading over the mountains illustration; headline, subhead and cards below.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/login.html"><img src="styled-screens/thumbs/login.png" alt="Login screen"></a><figcaption><a href="styled-screens/login.html">Login</a><span>Split screen: centered form pane, always-branded visual pane.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/get-started.html"><img src="styled-screens/thumbs/get-started.png" alt="Get started screen"></a><figcaption><a href="styled-screens/get-started.html">Get started</a><span>Where Home's Get started leads: a two-way fork (I have an invite / I'm setting up my own instance) with the self-host walkthrough below.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/sign-up.html"><img src="styled-screens/thumbs/sign-up.png" alt="Sign up screen"></a><figcaption><a href="styled-screens/sign-up.html">Sign up</a><span>Invite-gated account creation in Login's split layout; hands off to Membership setup.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/membership-setup.html"><img src="styled-screens/thumbs/membership-setup.png" alt="Membership setup screen"></a><figcaption><a href="styled-screens/membership-setup.html">Membership setup</a><span>First run with no membership: create an entity or accept an invite. No sidebar.</span></figcaption></figure>
   </div>
 

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Get started</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+</head>
+<body class="has-brand-bar">
+<!-- Get started: where Home's "Get started" leads. Polycarpic has no
+     public sign-up: every instance is self-hosted, and accounts on it come
+     by invitation. So the page opens on a two-way fork. "I have an invite"
+     goes to Sign up; "I'm setting up my own instance" scrolls to the
+     walkthrough directly below, so a self-hosting visitor never leaves the
+     page. The walkthrough is an outline; it expands as the deployment docs
+     are written. -->
+<header class="brand-bar brand-bar--plain">
+  <a class="brand-bar-lockup" href="home.html" aria-label="Polycarpic home"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></a>
+  <nav class="cta-row" aria-label="Account">
+    <a class="btn btn-outline" href="login.html">Sign in</a>
+  </nav>
+</header>
+
+<main class="page-medium" style="max-width:880px;">
+  <h1 class="page-title">Get started</h1>
+  <p class="page-lede">Polycarpic has no public sign-up. Every instance is self-hosted, and accounts on an instance come by invitation from its owner.</p>
+
+  <div class="fork-grid">
+    <div class="card fork-card">
+      <span class="fork-icon"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg></span></span>
+      <div class="card-title">I have an invite</div>
+      <p>Someone running a Polycarpic instance invited you to it. Create your account there with the invite code or link you received.</p>
+      <a class="btn btn-default" href="sign-up.html">Create your account <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg></span></a>
+    </div>
+    <div class="card fork-card">
+      <span class="fork-icon"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg></span></span>
+      <div class="card-title">I'm setting up my own instance</div>
+      <p>Run Polycarpic on a server you control and become its operator. The walkthrough below takes you from an empty server to your first invited member.</p>
+      <a class="btn btn-dark" href="#walkthrough">Start the walkthrough <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg></span></a>
+    </div>
+  </div>
+
+  <section id="walkthrough" aria-labelledby="walkthrough-title">
+    <h2 class="section-heading" id="walkthrough-title">Set up your own instance</h2>
+    <p class="page-lede" style="margin-bottom:0;">Four steps, about half an hour on a fresh server.</p>
+    <ol class="steps">
+      <li class="step"><div class="card">
+        <div class="card-title"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg></span>Requirements</div>
+        <ul>
+          <li>A Linux server you control: a small VPS is enough.</li>
+          <li>Docker with Docker Compose.</li>
+          <li>A domain name pointed at the server, for HTTPS and invite links.</li>
+          <li>An email provider API key, so the instance can send invites.</li>
+        </ul>
+      </div></li>
+      <li class="step"><div class="card">
+        <div class="card-title"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg></span>Deploy</div>
+        <p>Fetch the release, set your domain and email key, and start the stack. PostgreSQL runs inside it.</p>
+        <pre class="code-block">git clone https://github.com/richmosko/polycarpic.git
+cd polycarpic
+cp .env.example .env      # set DOMAIN and EMAIL_API_KEY
+docker compose up -d</pre>
+      </div></li>
+      <li class="step"><div class="card">
+        <div class="card-title"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg></span>First operator sign-in</div>
+        <p>Open your domain and sign in with the operator account the setup created. You land on Membership setup: create your first entity (a Person, Trust, Business or Household).</p>
+      </div></li>
+      <li class="step"><div class="card">
+        <div class="card-title"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></span>Invite members</div>
+        <p>On Entities, choose Invite member. Each person you invite receives a link that opens Sign up on your instance, with their invite already filled in.</p>
+      </div></li>
+    </ol>
+  </section>
+</main>
+</body>
+</html>
