@@ -1102,6 +1102,36 @@ table.data-table td.amount.negative { color: var(--destructive); }
   background: linear-gradient(180deg, #070907 0%, rgba(7, 9, 7, 0) 100%);
 }
 
+/* Options A2 and A3: option A with a narrower black band, so the peaks and
+   sky show. The band holds less copy: A2 the lockup + headline, A3 the
+   lockup only. The rest moves below the hero into a light intro section.
+   The fade is kept: neon text only ever sits on solid near-black, never on
+   sky blue. The image starts just below the black band, not behind it, so
+   the sky shows instead of being painted over; the band's black fades
+   down over the image's top edge (--band: band height, --fade: fade
+   depth). */
+.landing-hero.hero-fade.hero-a2,
+.landing-hero.hero-fade.hero-a3 { padding-bottom: 0; }
+.landing-hero.hero-fade.hero-a2 .hero-art,
+.landing-hero.hero-fade.hero-a3 .hero-art { top: var(--band); height: calc(100% - var(--band)); object-position: 50% 28%; }
+.landing-hero.hero-fade.hero-a2::before,
+.landing-hero.hero-fade.hero-a3::before {
+  inset: 0 0 auto 0;
+  height: calc(var(--band) + var(--fade));
+  background: linear-gradient(180deg, #070907 0%, #070907 calc(100% - var(--fade)), rgba(7, 9, 7, 0.55) calc(100% - var(--fade) * 0.55), rgba(7, 9, 7, 0) 100%);
+}
+.landing-hero.hero-fade.hero-a2 { --band: 236px; --fade: 110px; height: 700px; padding-top: 56px; }
+.landing-hero.hero-fade.hero-a2 h1 { margin-bottom: 0; }
+.landing-hero.hero-fade.hero-a3 { --band: 104px; --fade: 90px; height: 640px; padding-top: 40px; }
+.landing-hero.hero-fade.hero-a3 .landing-brand { margin-bottom: 0; }
+
+/* The copy that moved out of the hero: theme-aware, on the page
+   background above the feature cards. */
+.landing-intro { text-align: center; padding: 48px 48px 0; background: var(--background); color: var(--foreground); }
+.landing-intro h1 { font-size: 36px; font-weight: 700; max-width: 22ch; margin: 0 auto 14px; }
+.landing-intro .landing-subhead { font-size: 18px; color: var(--muted-foreground); max-width: 46ch; margin: 0 auto 28px; }
+.landing-intro .cta-row { display: flex; gap: 12px; justify-content: center; }
+
 @media (max-width: 760px) {
   .landing-hero.hero-split { grid-template-columns: 1fr; }
   .hero-split .hero-media { min-height: 260px; }
