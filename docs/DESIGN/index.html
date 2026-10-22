@@ -28,8 +28,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Draft — Plan phase, matured alongside ARCH</span>
-    <span><strong>Version:</strong> 0.13</span>
-    <span><strong>Last updated:</strong> 2026-10-20</span>
+    <span><strong>Version:</strong> 0.14</span>
+    <span><strong>Last updated:</strong> 2026-10-21</span>
   </div>
 </header>
 
@@ -44,7 +44,6 @@
     <li><a href="#screens">Screens</a>
       <ol>
         <li><a href="#operator-surfaces">Operator surfaces</a></li>
-        <li><a href="#design-history">Design history</a></li>
       </ol>
     </li>
     <li><a href="#accessibility">Accessibility</a></li>
@@ -363,13 +362,6 @@ flowchart TD
   <div class="screen-gallery">
     <figure class="screen-card"><a href="styled-screens/admin.html"><img src="styled-screens/thumbs/admin.png" alt="Admin screen"></a><figcaption><a href="styled-screens/admin.html">Admin</a><span><strong>Placeholder, pending PRD/ARCH/SECURITY definition (POLY-81).</strong> Services, versions, database and backups, last sync; administrative actions shown disabled until defined.</span></figcaption></figure>
   </div>
-
-  <h3 id="design-history">6.2 Design history</h3>
-  <p class="section-hint">Sketches kept as a record of how a decision was reached, not as screens.</p>
-  <ul>
-    <li><a href="history/sidebar-cues.html">Sidebar expand/collapse cue</a>: the decided brand-row toggle (pass 12) and the options it superseded (bottom chevron, top-row icon, hover-reveal, keyboard-only).</li>
-  </ul>
-  <p class="section-hint"><strong>Retired:</strong> <code>wireframes/</code> and <code>wireframe.css</code> (pass 13, every page is now a styled screen); <code>securities</code> and <code>import</code> (pass 7, absorbed into Custodial Accounts).</p>
 </section>
 
 <section id="accessibility" data-section="accessibility">
@@ -391,18 +383,8 @@ flowchart TD
   <h2>8. Open Questions</h2>
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
-    <li><strong>Resolved 2026-10-20 (pass 13):</strong> every page is a styled screen (Principal: "Any reason why we have wireframes when we can fully render styled screens? I'd like for all the pages to be presented as styled screens"). Nine screens promoted: membership setup, General Ledger, account register, Custodial Accounts, Allocation, Reports, Settings, Entities, Admin. <code>wireframes/</code> and <code>wireframe.css</code> are retired, and the traffic-priority fidelity rule is gone. Two layout bugs fixed along the way: grid cards no longer sit 24px low, and Show-N selects no longer stretch. One new component, <strong>Switch</strong> (Settings). See <a href="#screens">§ 6 Screens</a>.</li>
-    <li><strong>Resolved 2026-10-19 (pass 12):</strong> sidebar expand/collapse moves into the sidebar's brand row, the gemini.google.com pattern (Principal direction) — expanded: <code>panel-left-close</code> right-aligned beside logo + wordmark; collapsed: the logo mark is the expand button and swaps to <code>panel-left-open</code> with an "Expand sidebar" tooltip on hover or keyboard focus. The top row now starts with the breadcrumb. See <a href="history/sidebar-cues.html">history/sidebar-cues.html</a>.</li>
-    <li><strong>Resolved 2026-10-11 (pass 10):</strong> chart ramp re-hued from the green <code>--primary</code> to a gradient of <code>--brand-2</code>'s sky blue (Principal: "I'd like the chart tokens to be gradients of --brand-2 instead of --primary") — same light→dark ordering and L cadence as the superseded green ramp, every step still ≥3:1 against both <code>--background</code> and <code>--card</code> in its own mode (light floor 3.22:1 at <code>--chart-1</code>; dark floor 5.23:1 at <code>--chart-5</code>). The two-series comparison chart's series-2 accent flips to green <code>--brand</code>/<code>--primary</code> (was blue) so the two series stay distinguishable now that the ramp itself is blue. See <a href="design-system-spec.md">design-system-spec.md § Foundations</a> and <a href="tokens.html">tokens.html § 6 Charts</a> for all ten hex values and contrast figures.</li>
-    <li><strong>Resolved 2026-10-10 (pass 9):</strong> refined again on the specific shadcn <strong>sidebar-07</strong> block (Principal review 6, "I'm still not happy with the sidebar...") — the sidebar is now a true floating card, rounded all 4 corners with a gutter on every side (<code>position: fixed</code> with inset <code>top</code>/<code>left</code>/<code>bottom</code>, not a hardcoded <code>height: 100vh</code>); the avatar popover opens to the RIGHT of the trigger, not above; the persistent/sticky header is gone entirely — renamed "Top row," it scrolls with the page and shares the content's own background token; the top row drops to panel-left icon + separator + breadcrumb (left) and entity selector + separator + a contextual "more" menu (right) — AI/search/notifications/settings-gear are removed, with Settings and Notifications proposed (not decided) as new avatar-popover items; every icon in the system is now Lucide, named per control in design-system-spec.md § Icon inventory. Applied to screen.css, wireframe.css, both styled screens, all nine sidebar-bearing wireframes, and sidebar-cues.html.</li>
-    <li><strong>Resolved 2026-10-02 (pass 8):</strong> app shell rebuilt on the shadcn Sidebar component's own pattern (Principal review 5) — sidebar now fills the viewport height (<code>position: fixed</code>, not <code>sticky</code>, fixing a real bug where a wireframe's own explanatory note pushed the sidebar below the visible viewport), brand moved to the sidebar's top item, an avatar-popover user menu (profile/preferences/theme/shortcuts/Log out) replaces the old bottom chevron, and Settings left the sidebar for a header gear icon (seven nav items remain). Header now starts right of the sidebar: expand/contract icon + breadcrumb left, entity selector/AI-icon/search/notifications/gear right — screens no longer repeat their title as an on-page heading. New <a href="design-system-spec.md#shadcn-svelte-reuse-map-pass-8-2026-10-02">§ shadcn-svelte reuse map</a> answers the Principal's reuse question directly. Applied to screen.css, wireframe.css, both styled screens, and all nine sidebar-bearing wireframes.</li>
-    <li><strong>Resolved 2026-10-02 (pass 7, all 5 stages):</strong> sidebar reworked to eight items per the Principal's interview (<code>temp/2026-10-02-sidebar-interview.md</code>) — Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, Reports, Entities, Settings. "Securities" and "Import" are gone. Transactions rebuilt around the Plaid review/match workflow (expansion, Split, Group, a shared journal-entry modal); General Ledger opens to a chart-of-accounts tree with a per-account register page; Custodial Accounts gained a lots sub-card and a provider-item modal; Allocation, Reports (empty until POLY-M5), and Settings are new. See design-system-spec.md § Sidebar information architecture onward. <strong>Judgment call (superseded by pass 13):</strong> only Dashboard and Transactions got styled-screen fidelity at the time; every page is styled as of pass 13.</li>
-    <li><strong>Resolved 2026-10-01 (pass 6):</strong> <code>--warning</code> re-hued to a true orange with a dark ink (was brown-reading); light-mode chart ramp brightened; <a href="tokens.html">tokens.html</a> added; Login wireframe corrected to match the centered styled screen; dashboard first-run/empty-state wireframe added (now <a href="styled-screens/membership-setup.html">styled-screens/membership-setup.html</a>); skeleton-vs-spinner explained in plain words; flow 5.2 reframed around the user-facing "Correct entry" action; flow 5.3 redrawn to remove the app-initiates-payment step.</li>
-    <li><strong>Resolved 2026-09-30 (pass 5):</strong> sidebar expand/collapse cue — option A (chevron) chosen; sidebar now full-height; header restructured to brand lockup + entity selector with an avatar cluster; login form pane centered — design-system-spec.md § Header, § Sidebar, § Login.</li>
     <li><strong>Avatar cluster overflow (pass 5):</strong> the "+N" fold for 4th+ members is specified but not yet shown live in either reference screen (both currently have ≤2 members) — worth a quick visual check once a real multi-member entity exists.</li>
-    <li><strong>Login's visual pane (pass 4):</strong> built as a brand gradient, not a photo — no photography asset exists for this product. A real photo/illustration asset (in the style of the captured `dribbble` reference) would likely read stronger; flagging as a design-asset gap, not a layout question.</li>
     <li>No CVD (color-vision-deficiency) simulation run on the new palette yet — now higher priority given how central the brand hue is (recommended before lock, design-system-spec.md § Accessibility).</li>
-    <li><strong>Superseded by pass 7, closed by pass 13:</strong> the former Accounts screen's grouped-account-list + segmented-bar treatment was only built on the Dashboard styled screen — Accounts itself is now split into General Ledger and Custodial Accounts (both wireframe fidelity, stages 3–4); promote either the same way as a fast-follow if the gap matters before Implement.</li>
     <li>Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.</li>
     <li><code>prototype/</code> throwaway UX prototype (kickoff §2.9) not yet built — confirm ownership/timing with team-lead.</li>
   </ul>

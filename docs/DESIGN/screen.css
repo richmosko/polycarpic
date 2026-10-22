@@ -171,13 +171,22 @@ h1, h2, h3, .heading {
   font-size: 16px;
 }
 
-.brand-lockup .brand-icon {
+/* Brand mark (pass 14): the Principal's seedling, traced from
+   brand/logo.jpeg to an inline SVG stroked in currentColor. No tile behind
+   it: the line art sits directly on the surface, as it does on the
+   source's slate. Off the sidebar (shell-less app bar) it takes --primary;
+   in the sidebar it takes --sidebar-brand (below). 24px uses the
+   simplified mark (no midribs, 1.5 stroke). See design-system-spec.md
+   § Brand mark. */
+.brand-icon {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
-  background: var(--primary);
   flex-shrink: 0;
+  display: inline-flex;
+  color: var(--primary);
 }
+.brand-icon .brand-mark { display: block; width: 100%; height: 100%; }
+.sidebar .brand-icon { color: var(--sidebar-brand); }
 
 /* Entity selector — entity name + avatar cluster, opens the switcher on
    click. Stays in the header's right-justified icon row (pass 8,
@@ -333,7 +342,8 @@ h1, h2, h3, .heading {
 .sidebar-expand:focus-visible .brand-icon { display: none; }
 .sidebar-expand:hover .sidebar-expand-icon,
 .sidebar-expand:focus-visible .sidebar-expand-icon { display: flex; }
-.sidebar-expand .brand-icon { width: 24px; height: 24px; border-radius: 6px; background: var(--primary); flex-shrink: 0; }
+/* The rail's expand button shows the same 24px seedling (.brand-icon,
+   above), with no separate tile style. */
 
 /* Tooltip — shadcn Tooltip's own look (inverted: --foreground fill,
    --background ink), opening right of the rail, vertically centred on
@@ -1013,13 +1023,21 @@ table.data-table td.amount.negative { color: var(--destructive); }
   padding: 96px 48px 80px;
 }
 
-.landing-hero .brand-mark {
-  color: #2CFF05;
+/* Hero brand lockup (pass 14): the full seedling mark (with midribs, at
+   32px) to the left of the wordmark, both in the literal --brand on the
+   fixed dark hero (14.72:1). Renamed from .brand-mark, which is now the
+   SVG's own class. */
+.landing-hero .landing-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--brand);
   font-family: var(--font-heading);
   font-size: 22px;
   font-weight: 700;
   margin-bottom: 32px;
 }
+.landing-hero .landing-brand .brand-icon { width: 32px; height: 32px; color: var(--brand); }
 
 .landing-hero h1 {
   font-size: 40px;
@@ -1100,10 +1118,17 @@ table.data-table td.amount.negative { color: var(--destructive); }
 
 .auth-form-pane .auth-logo {
   align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-heading);
   font-weight: 700;
   font-size: 18px;
 }
+/* Pass 14: the 24px seedling left of the wordmark. The form pane is
+   theme-aware, so it takes --primary, the same rule as the shell-less
+   app bar: 4.75:1 light, 14.72:1 dark. */
+.auth-form-pane .auth-logo .brand-icon { color: var(--primary); }
 
 .auth-form-inner {
   max-width: 380px;
@@ -1160,23 +1185,50 @@ table.data-table td.amount.negative { color: var(--destructive); }
 
 /* Visual pane — always dark/branded, inset with rounded corners and a
    margin (matching the captured reference's proportions), not flush to
-   the viewport edge. No photo asset exists yet, so a brand gradient
-   stands in — see design-system-spec.md § New screens for the reasoning. */
+   the viewport edge. It carries the forest illustration
+   (brand/polycarpic-bg-forest.jpeg); see design-system-spec.md § Login. */
 .auth-visual-pane {
   margin: 24px 24px 24px 0;
   border-radius: var(--radius-xl);
   overflow: hidden;
-  background: linear-gradient(160deg, #2CFF05 0%, #0D2E07 45%, #070907 85%);
+  position: relative;
+  background: #0D2E07; /* the art's own deep green, shown only while the image loads */
   display: flex;
   align-items: flex-end;
   padding: 40px;
 }
 
+/* The pane is tall and the art is square, so it covers and crops the
+   sides. The focal point sits on the cabin and the glowing stream: the
+   stream runs to ~92% of the art's width, so x is 78%, not centre. At a
+   960px viewport (pane ~456 x 852) that keeps the cabin and the whole
+   stream in frame; 65% clips the stream's right edge there. Decorative:
+   empty alt, hidden from assistive tech. */
+.auth-visual-pane .visual-art {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 78% 70%;
+}
+
+/* A bottom scrim keeps the caption legible over the stream's glow. */
+.auth-visual-pane::after {
+  content: "";
+  position: absolute;
+  inset: 55% 0 0 0;
+  background: linear-gradient(180deg, transparent, oklch(0 0 0 / 55%));
+  pointer-events: none;
+}
+
 .auth-visual-pane .visual-caption {
+  position: relative;
+  z-index: 1;
   color: #EFF1EF;
   font-size: 14px;
   max-width: 28ch;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 
 @media (max-width: 760px) {
