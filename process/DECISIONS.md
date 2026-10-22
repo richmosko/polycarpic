@@ -149,3 +149,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the Principal asked why wireframes exist when the design system can render every page ("I'd like for all the pages to be presented as style screens"). Once tokens and screen styles exist, a low-fi tier costs a second maintenance pass and shows the reviewer a layout that is not what ships.
 **Alternatives considered:** keeping wireframes as a traffic-priority gate for low-traffic pages (two artifacts to keep in sync for no reviewer benefit); Figma as the only hi-fi record (not in-repo, not what `frontend-lead` consumes).
 **Approved by:** richmosko (2026-10-20, "merge 55")
+
+### 2026-10-22 — Design docs carry no decision history
+**Decision:** `docs/DESIGN/` states what the design is and why, never when it changed or what it replaced. The Design history section, `docs/DESIGN/history/`, the spec's revision-history paragraph, the Resolved/Superseded bullets in Open Questions and the inline "pass N" annotations are removed (PR #58 and a follow-up). A resolved open question is deleted, not annotated. The `generate-designdoc` skill and the `ux-designer` agent definition carry the rule.
+**Why:** the Principal: "I don't want to get into the habit of logging decision history in the design docs (we already have revision control in git)." Git holds the revisions; this log holds the rulings; the design docs stay a description of the current design that `frontend-lead` can read without archaeology.
+**Alternatives considered:** keeping a compact changelog at the top of the spec (duplicates `git log` and drifts); keeping superseded sketches under `history/` (a design decision lives here or in git, not in a third place).
+**Approved by:** richmosko (2026-10-22, "please purge the legacy history prose")
