@@ -185,6 +185,18 @@ section .section-hint {
 
 p { margin: 0 0 1rem; }
 
+/* Call-to-action link: a bordered, accent-edged block for the one link a reader must not miss. */
+a.doc-cta {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.75rem;
+  margin: 0 0 1.25rem; padding: 0.7rem 1rem;
+  background: var(--doc-accent-bg); color: var(--fg);
+  border: 1px solid var(--doc-border); border-left: 4px solid var(--doc-accent);
+  border-radius: 8px; text-decoration: none; font-size: 0.95rem;
+}
+a.doc-cta span { color: var(--doc-muted); font-size: 0.85rem; }
+a.doc-cta:hover { border-color: var(--doc-accent); }
+a.doc-cta:focus-visible { outline: 2px solid var(--doc-accent); outline-offset: 2px; }
+
 /* Prose links: neutral text + underline (like the reference), lime only on hover.
    Lime is reserved for accents (active TOC item, blockquote bar), never body text. */
 a {
