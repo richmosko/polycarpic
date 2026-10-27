@@ -149,15 +149,15 @@ A second brand hue needs an explicit job or it fights the first one for meaning.
 
 ### Typography
 
-**One grotesque sans throughout the app** (`Inter`) — confirmed against both references' actual product UI, not their marketing pages (see Inspiration for why the serif device both products use is deliberately not adopted). `--font-heading` is an alias onto the same family — hierarchy is by weight/size, not face.
+**Space Grotesk throughout the app**, following the shadcn template's grotesque-sans direction. One family for body and headings; `--font-heading` is an alias, so hierarchy is by weight and size, not face. Space Grotesk supports `tnum`, so `font-variant-numeric: tabular-nums` works on any figure; money columns still use `--font-mono`.
 
 | Token | Stack | Notes |
 |---|---|---|
-| `--font-sans` | `'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif` | Everywhere — body, buttons, inputs, table cells, headings, stat values |
+| `--font-sans` | `'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif` | Everywhere — body, buttons, inputs, table cells, headings, stat values |
 | `--font-heading` | `var(--font-sans)` | Alias — no second family |
 | `--font-mono` | `'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace` | Origin's own measured choice — uppercase letterspaced section/eyebrow labels, account numbers, ticker symbols, tabular figures |
 
-**Two web fonts (Inter + Roboto Mono).** Roboto Mono is a real added cost over a system-mono stack — justified because its uppercase-letterspaced treatment is an adopted signature (Origin's section headers), not decoration. frontend-lead should subset it to uppercase Latin + digits if the eyebrow-label usage is the dominant one, to keep the request small.
+**Two web fonts (Space Grotesk + Roboto Mono).** Roboto Mono is a real added cost over a system-mono stack — justified because its uppercase-letterspaced treatment is an adopted signature (Origin's section headers), not decoration. frontend-lead should subset it to uppercase Latin + digits if the eyebrow-label usage is the dominant one, to keep the request small.
 
 | Token | Size | Line-height | Weight | Used for |
 |---|---|---|---|---|

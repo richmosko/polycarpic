@@ -105,7 +105,7 @@
     '  var onChart1 = bestInk(c1, [fg, bg]);   // guaranteed-best-of-two-tokens ink for the chart-1 node fill, both modes',
     '  return {',
     '    darkMode: relLuminance(bg) < 0.5,   // "dark" means MY OWN background is dark, not a re-derivation of why',
-    '    fontFamily: "Inter, system-ui, -apple-system, sans-serif",',
+    '    fontFamily: "Space Grotesk Variable, system-ui, -apple-system, sans-serif",',
     '    background: card,',
     '    primaryColor: c1, primaryBorderColor: line, primaryTextColor: onChart1,',
     '    secondaryColor: c2bg, secondaryBorderColor: line, secondaryTextColor: fg,',
