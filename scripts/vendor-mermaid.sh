@@ -59,7 +59,7 @@ cat > "$INIT_JS" <<'EOF'
       securityLevel: "loose",
       flowchart: { curve: "basis" },
       themeVariables: {
-        fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, Space Grotesk Variable, system-ui, sans-serif"
+        fontFamily: "-apple-system, BlinkMacSystemFont, Segoe UI, system-ui, sans-serif"
       }
     });
     window.mermaid.run();
