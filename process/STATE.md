@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-79a-docs-server-restart-mermaid-br`
 - **Started:** 2026-10-31
 - **Goal:** the docs server rebinds its port immediately after a restart, and Mermaid honours `<br/>` label breaks in every doc.
-- **Status:** In Progress
+- **Status:** In Review — PR #68
 
 ## Releases
 

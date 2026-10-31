@@ -1,7 +1,7 @@
 ---
 id: POLY-79a
 title: Docs server restart and Mermaid line breaks
-status: in-progress
+status: in-review
 milestone: null
 parent: POLY-79
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [scripts/serve-docs.py, scripts/serve-docs.sh, scripts/vendor-mermaid.sh, docs/_assets/mermaid-init.js, tests/workflow/**, docs/*/*.pdf]
 labels: [tooling]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/68
 created: 2026-10-31
 updated: 2026-10-31
 ---
@@ -33,3 +33,7 @@ Two docs-tooling defects found 2026-10-31 while landing PR #67: the docs server 
 ### @team-lead — 2026-10-31
 
 Feature started. Branch: `feature/poly-79a-docs-server-restart-mermaid-br`. Run during Plan at the Principal's request (tooling, like POLY-74/78/80).
+
+### @team-lead — 2026-10-31
+
+PR opened: https://github.com/richmosko/polycarpic/pull/68. qa-engineer validated green @ 4d1f9c5. Two pre-existing finish-gate failures fixed on the branch at the Principal's request: prices.json rows for sonnet-5-5/haiku-5-5 (16e9342), and dashboard dist/ rebuilt byte-identical (no commit). Note: check_feature_branch_invariant.py can't parse sub-issue IDs like 79a; invariant verified by hand (1 feature branch, 0 worktree-*, 1 PR).
