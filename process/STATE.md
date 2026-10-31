@@ -15,13 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Docs server restart and Mermaid line breaks
-- **Issue:** `POLY-79a` (cairn; sub-issue of `POLY-79`)
-- **Milestone:** none (tooling)
-- **Branch:** `feature/poly-79a-docs-server-restart-mermaid-br`
-- **Started:** 2026-10-31
-- **Goal:** the docs server rebinds its port immediately after a restart, and Mermaid honours `<br/>` label breaks in every doc.
-- **Status:** In Review — PR #68
+_None — Plan phase. Story-grain issues are filed into `POLY-M1`…`POLY-M5` / `POLY-1.0`; tooling follow-ups collect under `POLY-79`._
 
 ## Releases
 

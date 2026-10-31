@@ -11,7 +11,7 @@ labels: [tooling]
 priority: null
 pr: null
 created: 2026-09-28
-updated: 2026-10-20
+updated: 2026-10-31
 ---
 
 Umbrella for tooling gaps found while running the Plan team in parallel worktrees on 2026-09-28: issue-ID collisions, the hand-off location rule, priority validation at creation, and guard-push counting add-then-remove as a touch. Add further items here rather than filing one issue each.
@@ -33,3 +33,7 @@ Umbrella for tooling gaps surfaced 2026-09-28 while running the Plan team in par
 ### @team-lead — 2026-10-20
 
 Tooling gap (2026-10-20): `test_prices_table` fails locally whenever the metrics worktree is present — `scripts/cairn/board/prices.json` has no rates for `claude-haiku-5-5` and `claude-sonnet-5-5`, which appear in `process/cairn/metrics/token-usage.jsonl`. CI passes only because the metrics file is absent there, so a local `--gate green` cannot go clean until the two rows are added. Owner: devops-engineer.
+
+### @team-lead — 2026-10-31
+
+Follow-ups from POLY-79a (2026-10-31): (1) `scripts/cairn/check_feature_branch_invariant.py` can't derive an issue ID from sub-issue branches like `feature/poly-79a-*`; it bails instead of checking. (2) `tests/workflow/test_docs_mermaid_linebreaks.py` skips on CI because the CDN-loaded Mermaid never renders on the ubuntu runner (cause unconfirmed). Point the test at the vendored bundle from `scripts/vendor-mermaid.sh` so the line-break check runs in CI.
