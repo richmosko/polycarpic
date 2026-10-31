@@ -49,6 +49,15 @@ cat > "$INIT_JS" <<'EOF'
 // To revert to the CDN variant: `git checkout docs/_assets/mermaid-init.js`.
 
 (function () {
+  // Authors write <br/> inside <pre class="mermaid">; the HTML parser turns it
+  // into a real <br> element, which textContent (ours and Mermaid's) drops.
+  // Rebuild each as the literal text "<br/>" so Mermaid sees the line break.
+  function restoreBr() {
+    document.querySelectorAll(".mermaid br").forEach(function (br) {
+      br.replaceWith(document.createTextNode("<br/>"));
+    });
+  }
+  restoreBr();
   var bundle = document.createElement("script");
   bundle.src = "../_assets/vendor/mermaid.min.js";
   bundle.onload = function () {
@@ -77,6 +86,7 @@ cat > "$INIT_JS" <<'EOF'
 
   // Cache raw mermaid source before mermaid mutates it (used on theme switch).
   window.addEventListener("DOMContentLoaded", function () {
+    restoreBr();
     document.querySelectorAll(".mermaid").forEach(function (el) {
       if (!el.dataset.source) el.dataset.source = el.textContent;
     });

@@ -17,6 +17,15 @@
   // This <script defer> runs after the DOM is parsed but before Mermaid loads,
   // so .mermaid elements still hold their RAW source here. Capture it now — once
   // Mermaid renders, textContent becomes SVG and the source is lost.
+  // Authors write <br/> inside <pre class="mermaid">; the HTML parser turns it
+  // into a real <br> element, which textContent (ours and Mermaid's) drops.
+  // Rebuild each as the literal text "<br/>" so Mermaid sees the line break.
+  function restoreBr() {
+    document.querySelectorAll(".mermaid br").forEach(function (br) {
+      br.replaceWith(document.createTextNode("<br/>"));
+    });
+  }
+  restoreBr();
   document.querySelectorAll(".mermaid").forEach(function (el) {
     if (el.dataset.source == null) el.dataset.source = el.textContent;
   });

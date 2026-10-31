@@ -15,7 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — Plan phase. The thirteen story-grain issues `POLY-62`–`POLY-73`, `POLY-75` sit in `backlog` with no milestone until the architect files them into `POLY-M1…`; `POLY-74` (CI filter) is an unmilestoned tooling follow-up._
+_None — Plan phase. Story-grain issues are filed into `POLY-M1`…`POLY-M5` / `POLY-1.0`; tooling follow-ups collect under `POLY-79`._
 
 ## Releases
 

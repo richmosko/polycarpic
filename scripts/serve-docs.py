@@ -162,6 +162,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._send_json(500, {"error": str(e)})
 
 
+class ReuseServer(socketserver.TCPServer):
+    # Rebind immediately after a restart despite TIME_WAIT leftovers.
+    allow_reuse_address = True
+
+
 def main():
     os.chdir(REPO_ROOT)
     print(f"Serving docs/ at http://{HOST}:{PORT}/")
@@ -173,7 +178,7 @@ def main():
     print(f"  GET  /api/comments?doc=<PRD|ARCH|SECURITY|DESIGN>")
     print(f"  POST /api/comments  body={{doc, section, body}}")
     print(f"\nCtrl+C to stop.\n")
-    with socketserver.TCPServer((HOST, PORT), Handler) as httpd:
+    with ReuseServer((HOST, PORT), Handler) as httpd:
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:
