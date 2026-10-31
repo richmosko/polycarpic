@@ -1,32 +1,12 @@
-// Loads Mermaid from CDN and themes every diagram from the design-system tokens
-// (docs/DESIGN/tokens.css): the blue CHART ramp for nodes (chart-1 fill,
-// chart-3 outline), the full chart ramp for series/pie, muted neutrals for edges.
+// Loads Mermaid from CDN and themes every diagram from the docs' own neutral
+// theme (--doc-* in docs/_assets/doc.css), never the product tokens: the
+// --doc-chart ramp for nodes and series/pie, muted neutrals for edges.
 //
-// 2026-09-29 fix (Principal review of ARCH found diagrams unreadable — black
-// node/cluster fills, edge-label text invisible against its own background):
-// two root causes, both fixed here.
-//   1. Every token this file read (--color-on-warning, --color-text, etc.) was
-//      the OLD generic template naming. tokens.css moved to shadcn-native names
-//      during the Monarch/Origin design passes and this file was never updated,
-//      so every var() resolved to nothing and fell through to the browser's
-//      default (near-black) `color` — the same near-black on every node/cluster/
-//      label regardless of theme is exactly the symptom that was reported.
-//   2. `darkMode` read the OS media query directly, ignoring toc.js's explicit
-//      .light/.dark override — a page pinned to Light while the OS prefers dark
-//      (or vice versa) rendered Mermaid's theme inverted from the page's own.
-//      Fixed by deriving darkMode from the page's own RESOLVED --background
-//      luminance (below), not by re-deriving "should this page be dark" from
-//      class/media-query logic — checked during this fix and found that
-//      tokens.css itself has no @media(prefers-color-scheme) fallback (only
-//      the explicit .dark class toc.js toggles), so replicating toc.js's
-//      class-then-OS-fallback logic here would have reintroduced the same
-//      mismatch in "Auto" mode on an OS with a dark preference: mermaid would
-//      go dark (from the OS query) while the page itself stayed light (since
-//      its own tokens never shifted). Asking "is my own background dark"
-//      instead of "what produced this page's theme" can't go stale if the
-//      page's theming mechanism changes again later.
+// darkMode comes from the page's own RESOLVED --doc-bg luminance, not from the
+// OS media query: toc.js can pin Light or Dark against the OS preference, and
+// asking "is my own background dark" cannot drift from how the page is themed.
 //
-// Mermaid's color parser (khroma) doesn't understand OKLCH/hex-with-var(), so we
+// Mermaid's color parser (khroma) doesn't understand var()/color-mix(), so we
 // resolve each token to sRGB hex via a temp element + canvas before handing it
 // over. Diagrams re-render on light/dark changes — both the OS scheme and the
 // .light/.dark class toggled by toc.js.
@@ -90,22 +70,22 @@
     '}',
     '',
     'function themeVars() {',
-    '  // Nodes use the CHART (blue) palette: chart-1 fill, outlined in the same',
+    '  // Nodes use the --doc-chart (indigo) palette: chart-1 fill, outlined in the same',
     '  // muted color as the edges/arrows.',
-    '  var fg     = toHex("var(--foreground)");',
-    '  var bg     = toHex("var(--background)");',
-    '  var line   = toHex("var(--muted-foreground)");',
-    '  var card   = toHex("var(--card)");',
-    '  var muted  = toHex("var(--muted)");',
-    '  var border = toHex("var(--border)");',
-    '  var c1 = toHex("var(--chart-1)"), c2 = toHex("var(--chart-2)"), c3 = toHex("var(--chart-3)"),',
-    '      c4 = toHex("var(--chart-4)"), c5 = toHex("var(--chart-5)");',
-    '  var c2bg = toHex("color-mix(in srgb, var(--chart-2) 16%, var(--card))");',
-    '  var c3bg = toHex("color-mix(in srgb, var(--chart-3) 16%, var(--card))");',
+    '  var fg     = toHex("var(--doc-fg)");',
+    '  var bg     = toHex("var(--doc-bg)");',
+    '  var line   = toHex("var(--doc-muted)");',
+    '  var card   = toHex("var(--doc-card)");',
+    '  var muted  = toHex("var(--doc-accent-bg)");',
+    '  var border = toHex("var(--doc-border)");',
+    '  var c1 = toHex("var(--doc-chart-1)"), c2 = toHex("var(--doc-chart-2)"), c3 = toHex("var(--doc-chart-3)"),',
+    '      c4 = toHex("var(--doc-chart-4)"), c5 = toHex("var(--doc-chart-5)");',
+    '  var c2bg = toHex("color-mix(in srgb, var(--doc-chart-2) 16%, var(--doc-card))");',
+    '  var c3bg = toHex("color-mix(in srgb, var(--doc-chart-3) 16%, var(--doc-card))");',
     '  var onChart1 = bestInk(c1, [fg, bg]);   // guaranteed-best-of-two-tokens ink for the chart-1 node fill, both modes',
     '  return {',
     '    darkMode: relLuminance(bg) < 0.5,   // "dark" means MY OWN background is dark, not a re-derivation of why',
-    '    fontFamily: "Inter, system-ui, -apple-system, sans-serif",',
+    '    fontFamily: "system-ui, -apple-system, Segoe UI, sans-serif",',
     '    background: card,',
     '    primaryColor: c1, primaryBorderColor: line, primaryTextColor: onChart1,',
     '    secondaryColor: c2bg, secondaryBorderColor: line, secondaryTextColor: fg,',

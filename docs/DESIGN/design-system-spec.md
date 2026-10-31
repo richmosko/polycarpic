@@ -10,33 +10,26 @@ This project's UI direction is **SvelteKit + shadcn-svelte** (Tailwind, headless
 
 ---
 
-## Inspiration: Monarch & Origin — measured, not remembered
+## Inspiration: Monarch & Origin
 
-**Sources:** live captures in Chrome of Monarch Money (https://www.monarchmoney.com) — its home hero, its tracking page, and a zoomed view of the app's Accounts screen (an actual **app** screenshot, not marketing — load-bearing for the typography decision below) — and of Origin (https://useorigin.com) — its home hero and its product cards. The screenshots themselves are third-party material and are not kept in the repo; the figures below were measured from them.
+Monarch Money and Origin (`useorigin.com`) are inspiration, not templates. What this system took from each:
 
-### What was measured
+**From Monarch** (app screens, not its marketing site)
+- Warm off-white canvas, pure-white cards, near-black ink; light is the primary mode.
+- Net worth as a single-line area chart with a soft gradient fill.
+- Account list grouped by type, with group deltas, sparklines and relative freshness.
+- Segmented stacked bar plus legend for allocation.
 
-**Monarch (monarch.com):** page bg `#FFFAEC` warm cream (marketing only — the app canvas is off-white with pure-white cards); ink `#2A2926` near-black warm, secondary text `#65625D`; primary/CTA `#F86713` orange, pill-radius **on the marketing hero only**; accent `#EFB921` mustard (illustrations/promo); body face "ABC Oracle" (grotesque sans); display serif used **only** for emphasis words in marketing headlines ("your money", "Tracking that doesn't feel like a chore") — **the app screenshot's own page title ("Accounts") is bold sans, not serif**; mono "Beltram Mono" for small figures. App shell: left sidebar (Dashboard, Accounts, Transactions, Cash Flow, Reports, Budget, Recurring, Goals, Investments, Advice); top bar = page title + outline "Refresh all" + filled "+ Add account". Net-worth hero: eyebrow label, big figure (`$687,041.79`), signed delta with arrow + percentage + period, a **single-line area chart with soft gradient fill**, $K-formatted y-axis. Account rows grouped by type (Cash / Credit Cards / Investments), collapsible, group-level delta, row = institution logo + name + subtype + sparkline + balance + relative freshness ("16 hours ago"). Right-column summary: Assets/Liabilities each as a horizontal **segmented stacked bar** + colored-dot legend, Totals/Percent toggle. Measured card radius ~12px, button/input radius ~8px (the pill shape is the marketing hero's CTA only).
+**From Origin**
+- Near-black dark mode with subtle white-overlay surfaces.
+- Uppercase, letterspaced mono (`--font-mono`) for section and eyebrow labels.
+- A calm blue for the secondary/informational role, and measured semantic hues for positive, negative and warning (darkened only as far as WCAG AA needs; see Accessibility).
 
-**Origin (`useorigin.com`, not the unrelated `originfinancial.com`):** near-black base `#050505`, white ink, surfaces as `rgba(255,255,255,0.04–0.08)` overlays; body face "Suisse Intl" (neo-grotesque); display face "Lyon Display" serif with italic emphasis words, marketing-headline-only (no evidence it reaches the product UI — Origin's own product-card screenshots show only the mono/sans system, no serif); labels/buttons in **"Roboto Mono", uppercase, letterspaced** ("GET STARTED →", "UPCOMING TRANSACTIONS", "HOLDINGS") — this one reaches actual product-card modules, not just marketing copy; primary CTA = white button, black text, 8px radius; semantic colors measured directly: positive `#009C5A`, negative `#FC4A4A`, info `#195F97`, savings-chart line warm gold. Product cards: dark surfaces, mono uppercase section header, ticker rows (logo, ticker, name, sparkline, signed-% pill), a stat-trio pattern (`$8,000` / `5.52%` / `$577/yr`).
+**Shared**
+- Card radius 12px, button/input radius 8px.
+- One grotesque sans for the whole app, no display serif (both products reserve the serif for marketing headlines).
 
-### What was taken, and why
-
-| Decision | Taken from | Why |
-|---|---|---|
-| A calm blue for the secondary/informational role | Origin's measured "info" semantic color (`#195F97`); corroborated by Monarch's net-worth chart line also being light blue | The one hue **both** products independently reach for in a calm/informational role rather than an urgent one. Every other strong hue (orange-red destructive, green positive, orange warning) is already spoken for by a financial semantic, so a meaning-free blue for secondary surfaces and charts avoids diluting those signals. The brand's own primary is the neon green (see Foundations) |
-| One grotesque sans throughout the **app** (Inter), no serif | Both products' actual app/product-card screenshots (not their marketing pages) | The serif emphasis both products use is, by direct comparison, a **marketing-headline-only** device — neither app screen (Monarch's Accounts screenshot; Origin's product cards) carries it. This design system governs the app, not a marketing site, so the serif is deliberately not adopted |
-| Uppercase, letterspaced mono for section/eyebrow labels (`--font-mono`, Roboto Mono) | Origin's product-card headers ("HOLDINGS", "UPCOMING TRANSACTIONS") | A real in-product pattern (not marketing-only), and a strong, cheap, on-brand signature for a ledger product's account numbers, tickers, and section headers |
-| Warm off-white canvas + near-black ink (light mode) | Monarch's measured app-canvas convention and ink color | Confirmed against the **app** screenshot specifically (not the cream marketing hero) — off-white canvas, pure-white cards, near-black text |
-| Near-black dark mode, subtle white-overlay surfaces | Origin's measured base and surface convention | Origin is dark-first; adopted as this system's dark-mode foundation rather than inventing one |
-| Card radius 12px, button/input radius 8px | Both products' measured app-level values (Monarch app screenshot ~12px cards; Origin's stated 8px buttons, corroborated by Monarch's own app-level button radius, distinct from its marketing-only pill) | Direct measurement, not a guess — and explicitly **not** the pill shape, which only appears on Monarch's marketing CTA |
-| Net-worth-over-time as a single-line **area chart** with gradient fill | Monarch's hero chart, exactly this pattern | Matches PRD §4.1 directly and is the most literal transferable pattern available |
-| Grouped account rows (type group → institution rows, sparkline, freshness) | Monarch's Accounts screen | The closest existing analogue to our own Dashboard account list — adopted close to verbatim, adapted for GL-vs-custodial grouping |
-| Segmented stacked bar + legend for allocation | Monarch's Assets/Liabilities summary panel | Directly reusable for the asset-allocation summary |
-| Positive/negative/warning hues sourced from measured brand values, not invented | Origin's measured green/red; Monarch's measured orange | Real evidence over invention — each darkened only as far as needed to clear WCAG AA (see Accessibility), hue/saturation otherwise preserved |
-| Destructive/CTA colors NOT copied at brand saturation | Both products' raw brand values | Monarch's orange (3.03:1) and Origin's red/green (3.4–3.6:1) only clear the 3:1 large-text/UI floor at their raw marketing saturation — this system needs 4.5:1 for normal text, so each was darkened (documented per-token below), not used as-is |
-
-**What was deliberately not copied:** the pill-shaped CTA button (marketing-only, not app-level, on either product); the serif display face (marketing-only); Origin's dark-first default for our *primary* mode — polycarpic's dashboard is a daily-use tool checked in normal daylight more often than a marketing moment, so **light is the primary/default mode**, styled closely on Monarch's own app screenshot; dark mode (styled on Origin's measured base) is the secondary, equally real but not-designed-first mode. Chart library, motion design, and exact information density beyond what's listed above were not reverse-engineered — original composition for the screens with no direct analogue (Transactions review, General Ledger vs. Custodial Accounts, entity/membership).
+**Not taken:** the pill CTA (marketing-only), the display serif, and Origin's dark-first default. Screens with no direct analogue (Transactions review, General Ledger vs. Custodial Accounts, entity/membership) are original compositions.
 
 ---
 
@@ -156,15 +149,15 @@ A second brand hue needs an explicit job or it fights the first one for meaning.
 
 ### Typography
 
-**One grotesque sans throughout the app** (`Inter`) — confirmed against both references' actual product UI, not their marketing pages (see Inspiration for why the serif device both products use is deliberately not adopted). `--font-heading` is an alias onto the same family — hierarchy is by weight/size, not face.
+**Space Grotesk throughout the app**, following the shadcn template's grotesque-sans direction. One family for body and headings; `--font-heading` is an alias, so hierarchy is by weight and size, not face. Space Grotesk supports `tnum`, so `font-variant-numeric: tabular-nums` works on any figure; money columns still use `--font-mono`.
 
 | Token | Stack | Notes |
 |---|---|---|
-| `--font-sans` | `'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif` | Everywhere — body, buttons, inputs, table cells, headings, stat values |
+| `--font-sans` | `'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif` | Everywhere — body, buttons, inputs, table cells, headings, stat values |
 | `--font-heading` | `var(--font-sans)` | Alias — no second family |
 | `--font-mono` | `'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace` | Origin's own measured choice — uppercase letterspaced section/eyebrow labels, account numbers, ticker symbols, tabular figures |
 
-**Two web fonts (Inter + Roboto Mono).** Roboto Mono is a real added cost over a system-mono stack — justified because its uppercase-letterspaced treatment is an adopted signature (Origin's section headers), not decoration. frontend-lead should subset it to uppercase Latin + digits if the eyebrow-label usage is the dominant one, to keep the request small.
+**Two web fonts (Space Grotesk + Roboto Mono).** Roboto Mono is a real added cost over a system-mono stack — justified because its uppercase-letterspaced treatment is an adopted signature (Origin's section headers), not decoration. frontend-lead should subset it to uppercase Latin + digits if the eyebrow-label usage is the dominant one, to keep the request small.
 
 | Token | Size | Line-height | Weight | Used for |
 |---|---|---|---|---|

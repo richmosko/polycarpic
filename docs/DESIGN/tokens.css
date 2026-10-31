@@ -29,6 +29,16 @@
  * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
  */
 
+/* Space Grotesk is self-hosted (Fontsource variable woff2, SIL OFL); the path is
+   relative to this file, so every page that links tokens.css gets the face. */
+@font-face {
+  font-family: 'Space Grotesk Variable';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('../_assets/fonts/space-grotesk-latin-wght-normal.woff2') format('woff2-variations');
+}
+
 :root {
   /* Surfaces & text. The page canvas is a subtle warm grey (L 0.97), not
      white, so pure-white cards and popovers float on it (1.06:1 step plus
@@ -141,7 +151,7 @@
   --radius-lg: 12px;
   --radius-xl: 20px;
 
-  --font-sans: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-sans: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-heading: var(--font-sans);
   --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }

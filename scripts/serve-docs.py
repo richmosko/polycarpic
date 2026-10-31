@@ -95,6 +95,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(DOCS_DIR), **kwargs)
 
+    def guess_type(self, path):
+        """Declare UTF-8 on every text/* response. Without a charset the
+        browser guesses Windows-1252 for .md (text/markdown) and renders
+        em-dashes as 'â€”'; docs are always UTF-8."""
+        ctype = super().guess_type(path)
+        if ctype.startswith("text/") and "charset" not in ctype:
+            ctype += "; charset=utf-8"
+        return ctype
+
     def log_message(self, fmt, *args):
         sys.stderr.write(f"  {self.command} {self.path} → {args[1] if len(args) > 1 else '-'}\n")
 
