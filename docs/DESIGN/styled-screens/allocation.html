@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Allocation (pass 7; styled pass 13). Actual vs. target by asset class, aggregated from the same lot data as Custodial Accounts' lots sub-card across every custodial account for this entity. The nominal / inflation-adjusted toggle (CPI-U, PRD 4.9) is orthogonal to actual-vs-target. Drift uses a neutral outline badge, not a status hue: a 2-point drift is information, not a warning. Save is enabled only when the targets total 100%. -->
+<!-- Allocation. Actual vs. target by asset class, aggregated from the same lot data as Custodial Accounts' lots sub-card across every custodial account for this entity. The nominal / inflation-adjusted toggle (CPI-U, PRD 4.9) is orthogonal to actual-vs-target. Drift uses a neutral outline badge, not a status hue: a 2-point drift is information, not a warning. Save is enabled only when the targets total 100%. Each asset-class name drills to the lots behind it on Custodial Accounts (filtered to that class). -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -66,25 +66,25 @@
         <span class="alloc-legend"><span><span style="width:16px;height:8px;border-radius:999px;background:var(--chart-1);display:inline-block;"></span>Actual</span><span><span style="width:2px;height:12px;background:var(--foreground);display:inline-block;"></span>Target</span></span>
       </div>
         <div class="alloc-row">
-          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);display:inline-block;"></span>US Equity</span>
+          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind US Equity">US Equity</a></span>
           <div class="alloc-track" role="img" aria-label="US Equity: actual 42%, target 40%"><span class="alloc-fill" style="width:42%; background:var(--chart-1);"></span><span class="alloc-target" style="left:40%;"></span></div>
           <span class="alloc-figs">42% / 40%</span>
           <span class="badge badge-outline">+2 pt over</span>
         </div>
         <div class="alloc-row">
-          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);display:inline-block;"></span>Intl Equity</span>
+          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Intl Equity">Intl Equity</a></span>
           <div class="alloc-track" role="img" aria-label="Intl Equity: actual 18%, target 20%"><span class="alloc-fill" style="width:18%; background:var(--chart-2);"></span><span class="alloc-target" style="left:20%;"></span></div>
           <span class="alloc-figs">18% / 20%</span>
           <span class="badge badge-outline">−2 pt under</span>
         </div>
         <div class="alloc-row">
-          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-3);display:inline-block;"></span>Fixed Income</span>
+          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-3);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Fixed Income">Fixed Income</a></span>
           <div class="alloc-track" role="img" aria-label="Fixed Income: actual 25%, target 25%"><span class="alloc-fill" style="width:25%; background:var(--chart-3);"></span><span class="alloc-target" style="left:25%;"></span></div>
           <span class="alloc-figs">25% / 25%</span>
           <span class="badge badge-positive-soft">On target</span>
         </div>
         <div class="alloc-row">
-          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);display:inline-block;"></span>Cash</span>
+          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Cash">Cash</a></span>
           <div class="alloc-track" role="img" aria-label="Cash: actual 15%, target 15%"><span class="alloc-fill" style="width:15%; background:var(--chart-4);"></span><span class="alloc-target" style="left:15%;"></span></div>
           <span class="alloc-figs">15% / 15%</span>
           <span class="badge badge-positive-soft">On target</span>

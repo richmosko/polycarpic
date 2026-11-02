@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Custodial Accounts (pass 7; styled pass 13). One card per physical account: balance, link health (caution tier for an expired or stale link that still has cached data), reconciliation vs. GL, and for a brokerage the lots sub-card (Collapsible, one security pulled down). Sync pulls balances AND positions. The provider-item Dialog (More > New provider item) is shown open below the cards as the reference, same convention as the journal-entry modal. Viewers see no Sync / New / token-refresh / unlink actions. -->
+<!-- Custodial Accounts. A totals card, then one card per physical account. Every card shows the same three figures side by side: cash balance, book value (the GL's cost basis, cash included) and market value (cash + positions at EOD prices), then market minus book; the totals card sums them across accounts. Then link health (caution tier for an expired or stale link that still has cached data), reconciliation vs. GL, and for a brokerage the lots sub-card (Collapsible, one security pulled down). Sync pulls balances AND positions. The provider-item Dialog (More > New provider item) is shown open below the cards as the reference, same convention as the journal-entry modal. Viewers see no Sync / New / token-refresh / unlink actions. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -56,10 +56,27 @@
     </div>
 
   <main class="content" style="padding-top:8px;">
+    <div class="card custodial-totals">
+      <div class="custodial-head">
+        <span class="custodial-name">All custodial accounts <span class="institution">3 accounts · prices as of Oct 30 close</span></span>
+      </div>
+      <div class="custodial-figs">
+        <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$27,644.75</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Book value · GL</span><span class="custodial-fig-value">$226,244.75</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$231,864.85</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Market − book</span><span class="custodial-fig-value"><span class="gain-positive">+$5,620.10</span></span></div>
+      </div>
+    </div>
     <div class="card">
       <div class="custodial-head">
         <span class="custodial-name">Primary Checking <span class="institution">Bank Y</span></span>
-        <span class="custodial-meta"><span class="custodial-balance">$15,234.75</span><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+      </div>
+      <div class="custodial-figs">
+        <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$15,234.75</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Book value · GL</span><span class="custodial-fig-value">$15,234.75</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$15,234.75</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Market − book</span><span class="custodial-fig-value">$0.00</span></div>
       </div>
       <div class="custodial-recon">
         <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span></div>
@@ -68,7 +85,13 @@
     <div class="card">
       <div class="custodial-head">
         <span class="custodial-name">Crypto Wallet <span class="institution">Coinbase</span></span>
-        <span class="custodial-meta"><span class="custodial-balance">$8,420.10</span><span class="badge badge-warning-soft"><span class="status-dot"></span>Token expired · re-auth needed</span></span>
+        <span class="custodial-meta"><span class="badge badge-warning-soft"><span class="status-dot"></span>Token expired · re-auth needed</span></span>
+      </div>
+      <div class="custodial-figs">
+        <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$0.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Book value · GL</span><span class="custodial-fig-value">$6,900.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$8,420.10</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Market − book</span><span class="custodial-fig-value"><span class="gain-positive">+$1,520.10</span></span></div>
       </div>
       <div class="custodial-recon">
         <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-warning-soft"><span class="status-dot"></span>Stale · last synced 6 days ago</span></span></div>
@@ -77,7 +100,13 @@
     <div class="card">
       <div class="custodial-head">
         <span class="custodial-name">Brokerage <span class="institution">Custodian X</span></span>
-        <span class="custodial-meta"><span class="custodial-balance">$204,110.00</span><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+      </div>
+      <div class="custodial-figs">
+        <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$12,410.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Book value · GL</span><span class="custodial-fig-value">$204,110.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$208,210.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Market − book</span><span class="custodial-fig-value"><span class="gain-positive">+$4,100.00</span></span></div>
       </div>
       <div class="custodial-recon">
         <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span></div>
@@ -88,7 +117,8 @@
         <div class="lot-detail"><span>50 sh · acquired Mar 4, 2021 · long-term</span><span class="lot-figs">book $6,200 · mkt $8,900 <span class="gain-positive">+$2,700</span></span></div>
         <div class="lot-detail"><span>25 sh · acquired Jan 18, 2026 · short-term</span><span class="lot-figs">book $2,900 · mkt $4,450 <span class="gain-positive">+$1,550</span></span></div>
         <div class="lot-security" aria-expanded="false"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>VTI <span class="card-sub" style="font-weight:400;">100 sh</span></span><span class="lot-figs">book $22,000 · mkt $24,100 <span class="gain-positive">+$2,100</span></span></div>
-        <div class="lots-total"><span>Unrealized, account total</span><span class="lot-figs">short <span class="gain-positive">+$1,550</span> · long <span class="gain-positive">+$4,800</span> · total <span class="gain-positive">+$6,350</span></span></div>
+        <div class="lot-security" aria-expanded="false"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>BND <span class="card-sub" style="font-weight:400;">2,200 sh</span></span><span class="lot-figs">book $160,600 · mkt $158,350 <span class="gain-negative">−$2,250</span></span></div>
+        <div class="lots-total"><span>Unrealized, account total</span><span class="lot-figs">short <span class="gain-positive">+$1,550</span> · long <span class="gain-positive">+$2,550</span> · total <span class="gain-positive">+$4,100</span></span></div>
       </div>
     </div>
     <div class="je-modal-scrim" style="margin-top:24px;">

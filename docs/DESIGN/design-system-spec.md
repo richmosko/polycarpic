@@ -331,7 +331,7 @@ Settings/Notifications carry a `.proposed-tag` badge in the styled screens — v
 | 1 | **Dashboard** | — | Cross-cutting summary — net worth, cash flow, tax, allocation snapshot. |
 | 2 | **Transactions** | the journal and import status | The time-ordered journal: three accordion cards in urgency order — Exceptions, Pending, Posted. The Pending card is the bank-feed review/match inbox (see § Transactions workflow). Import stats/status and the Sync Transactions / New entry actions live here; there is no separate "Import" item. Not the chart of accounts; see General Ledger for that. |
 | 3 | **General Ledger** | the GL side of accounts | Opens to a chart-of-accounts **tree** (category → account → sub-account, balances, a custodial marker on accounts that mirror a physical account). Clicking an account opens that account's **register** — a separate page, breadcrumbed back to the tree — showing every line that hit it, in date order, with a running balance; each line links to its full journal entry. The register is account-scoped and running-balance-shaped; Transactions is entry-scoped and time-ordered — genuinely different questions, not two views of one screen. |
-| 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, reported balance, reconciliation status against the GL. Each account has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. Book-vs-market is implicit here (the lots themselves), not a separate chart. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
+| 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, each showing **cash balance, book value (GL cost basis) and market value (EOD prices) side by side, with market minus book**, plus reconciliation status against the GL; a totals card sums the three figures across accounts. Each account that holds securities has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
 | 5 | **Allocation** | allocation vs. target | A dedicated actual-vs-target page. |
 | 6 | **Reports** | — | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (§ Component inventory) until POLY-M5 ships statements. |
 | 7 | **Entities** | — | Entity list, memberships, invite, and create — every entity beyond the user's own Person entity is created here (§ Entities & membership). |
@@ -431,15 +431,26 @@ See `styled-screens/general-ledger.html` and `styled-screens/account-register.ht
 
 ## Custodial Accounts: lots & provider setup
 
-"Sub-card in the Custodial view... pull downs of each security to show lots. And for the Allocation vs target to be a dedicated page. The book vs market should be implicit in the custodial view, shown as whether the lots (and sum of lots) show the short/long/total current gains/losses." Lots live here; allocation vs. target is its own screen (§ Allocation, Reports & Settings).
+"Sub-card in the Custodial view... pull downs of each security to show lots. And for the Allocation vs target to be a dedicated page." Lots live here; allocation vs. target is its own screen (§ Allocation, Reports & Settings).
 
-**Per-account card:** institution name, reported balance, link-health badge, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.4).
+**Three figures on every account, side by side.** Each custodial-account card shows, in one row:
+
+| Figure | What it is | Source |
+|---|---|---|
+| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | Custodian-reported, reconciled to the GL |
+| **Book value · GL** | Cost basis of everything in the account, cash included — the GL's own balance for the mirrored account | General Ledger (lots at cost) |
+| **Market value · EOD** | Cash plus every position at the last end-of-day price | Lots × daily EOD price feed |
+| **Market − book** | Unrealized gain or loss, signed and coloured per § Delta coloring | Derived |
+
+A cash-only account shows the same row with the three figures equal and a `$0.00` delta: the row keeps one shape on every card, so accounts scan as a column. A **totals card** above the account cards sums the same four figures across every custodial account for the entity, with the price date ("prices as of <date> close"). Market − book on an account equals its lots sub-card's total unrealized gain; the two figures must agree.
+
+**Per-account card:** institution name, link-health badge, the three-figure row, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.5).
 
 **The lots sub-card (only on accounts that hold securities):**
 - One row per security, collapsed by default — a pull-down (chevron) reveals its individual lots.
 - Each lot shows book value, market value, and its own short-term or long-term unrealized gain/loss.
 - The security's own row shows its summed book/market/gain across all its lots.
-- The account's lots sub-card totals short, long, and total unrealized gain/loss across every security — this **is** the book-vs-market comparison; there is no separate book-vs-market chart.
+- The account's lots sub-card totals short, long, and total unrealized gain/loss across every security; the total equals the card's Market − book figure. There is no separate book-vs-market chart.
 
 **The New provider item dialog:**
 - **Source type**, chosen first: aggregator (Plaid/SimpleFIN/fake), a manual account (no live link), or an imported file (CSV/OFX).
@@ -458,7 +469,7 @@ See `styled-screens/custodial-accounts.html`: the lots sub-card shows one securi
 
 ## Allocation, Reports & Settings
 
-**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.9) is orthogonal and applies here like any time-series view. Includes a target editor (targets must sum to 100%).
+**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.9) is orthogonal and applies here like any time-series view. Includes a target editor (targets must sum to 100%). Each asset class drills to the lots behind it on Custodial Accounts, filtered to that class. Flow 5.6.
 
 **Reports.** A nav item **from day one**: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
 
