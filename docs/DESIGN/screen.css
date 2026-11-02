@@ -1239,6 +1239,10 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
 /* Sign up's invite field in its pre-filled state (arrived from an invite
    link): the code, plus a line naming who invited the visitor and to
    what, marked valid. */
+/* Sign up: the invite code is common to BOTH account paths (Google and
+   email), so a full-width rule and a caption separate it from the OAuth
+   button below. Without the break the code reads as paired with Google. */
+.auth-section-break { margin: 32px 0 20px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
 .invite-status { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted-foreground); flex-wrap: wrap; }
 .auth-field .field-help { font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
 
