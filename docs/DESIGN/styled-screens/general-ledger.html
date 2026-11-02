@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- General Ledger (pass 7; styled pass 13). Chart-of-accounts tree, the accounting abstraction. Each account opens its own register page. The custodial badge is a cross-reference only: the balance shown is always the GL's own figure, and not every GL account has a custodial counterpart (Owner's Equity, Cash in Transit). More menu: Export. -->
+<!-- General Ledger. Chart-of-accounts tree, the accounting abstraction. Above it, a PROTOTYPE balance-sheet treemap (design-system-spec.md § General Ledger: tree & register → Treemap prototype): two equal halves, Assets | Liabilities + Equity, nested category → account → sub-account, area = |balance|, fill = --chart-3 / --chart-4 / --chart-5 by element; static layout from a squarified pass, every tile links to its register. Each account opens its own register page. The custodial badge is a cross-reference only: the balance shown is always the GL's own figure, and not every GL account has a custodial counterpart (Owner's Equity, Cash in Transit). More menu: Export. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -26,6 +26,7 @@
       <a class="nav-item active" href="general-ledger.html" aria-current="page"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h6"/><path d="M8 11h8"/></svg></span><span class="nav-label">General Ledger</span></a>
       <a class="nav-item" href="custodial-accounts.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="nav-label">Custodial Accounts</span></a>
       <a class="nav-item" href="allocation.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span><span class="nav-label">Allocation</span></a>
+      <a class="nav-item" href="tax.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg></span><span class="nav-label">Tax</span></a>
       <a class="nav-item" href="reports.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span><span class="nav-label">Reports</span></a>
       <a class="nav-item" href="entities.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="nav-label">Entities</span></a>
     </nav>
@@ -57,6 +58,30 @@
 
   <main class="content" style="padding-top:8px;">
     <p class="card-sub" style="margin-bottom:16px;">Balances are the ledger's own figures. A <span class="badge badge-outline badge-sm"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>custodian</span> badge marks an account mirrored by a physical account; reconcile it on <a href="custodial-accounts.html" style="color:var(--primary);">Custodial Accounts</a>.</p>
+    <div class="card tm-card" aria-labelledby="tm-title">
+      <div class="card-head">
+        <span class="card-title" id="tm-title">Balance sheet map</span>
+        <span class="badge badge-outline">Prototype · under review</span>
+      </div>
+      <div class="tm-cols" aria-hidden="true">
+        <span><span class="tm-swatch tm-assets"></span>Assets <span class="mono">$412,884.21</span></span>
+        <span><span class="tm-swatch tm-liabilities"></span>Liabilities <span class="mono">$1,704.00</span> <span class="tm-plus">+</span> <span class="tm-swatch tm-equity"></span>Equity <span class="mono">$411,180.21</span></span>
+      </div>
+      <div class="tm-map" role="group" aria-label="Balance sheet treemap: Assets $412,884.21 on the left; Liabilities $1,704.00 and Equity $411,180.21 on the right">
+        <span class="tm-group" style="left:0.00%;top:0.00%;width:25.01%;height:100.00%" aria-hidden="true"></span>
+        <a class="tm-tile tm-assets" href="account-register.html" style="left:0.22%;top:0.83%;width:24.57%;height:98.33%" title="Assets › Investments › Brokerage: $204,110.00" aria-label="Assets › Investments › Brokerage: $204,110.00"><span class="tm-inner"><span class="tm-label">Brokerage</span><span class="tm-value">$204,110.00</span></span></a>
+        <a class="tm-tile tm-assets" href="account-register.html" style="left:25.01%;top:0.00%;width:24.32%;height:65.51%" title="Assets › Real Estate: $130,000.00" aria-label="Assets › Real Estate: $130,000.00"><span class="tm-inner"><span class="tm-label">Real Estate</span><span class="tm-value">$130,000.00</span></span></a>
+        <span class="tm-group" style="left:25.01%;top:65.51%;width:23.22%;height:34.49%" aria-hidden="true"></span>
+        <a class="tm-tile tm-assets" href="account-register.html" style="left:25.24%;top:66.34%;width:17.46%;height:32.82%" title="Assets › Cash › Savings: $50,107.55" aria-label="Assets › Cash › Savings: $50,107.55"><span class="tm-inner"><span class="tm-label">Savings</span><span class="tm-value">$50,107.55</span></span></a>
+        <a class="tm-tile tm-assets" href="account-register.html" style="left:42.70%;top:66.34%;width:5.31%;height:32.82%" title="Assets › Cash › Primary Checking: $15,234.75" aria-label="Assets › Cash › Primary Checking: $15,234.75"><span class="tm-inner"><span class="tm-label">Primary Checking</span><span class="tm-value">$15,234.75</span></span></a>
+        <a class="tm-tile tm-assets" href="account-register.html" style="left:48.23%;top:65.51%;width:1.10%;height:34.49%" title="Assets › Prepaid Tax — Federal: $3,100.00" aria-label="Assets › Prepaid Tax — Federal: $3,100.00"><span class="tm-inner"><span class="tm-label">Prepaid Tax — Federal</span><span class="tm-value">$3,100.00</span></span></a>
+        <a class="tm-tile tm-equity" href="account-register.html" style="left:50.67%;top:0.00%;width:49.13%;height:100.00%" title="Equity › Owner&#x27;s Equity: $411,180.21" aria-label="Equity › Owner&#x27;s Equity: $411,180.21"><span class="tm-inner"><span class="tm-label">Owner&#x27;s Equity</span><span class="tm-value">$411,180.21</span></span></a>
+        <span class="tm-group" style="left:99.80%;top:0.00%;width:0.20%;height:70.66%" aria-hidden="true"></span>
+        <a class="tm-tile tm-liabilities" href="account-register.html" style="left:99.80%;top:0.00%;width:0.20%;height:70.66%" title="Liabilities › Credit Cards › Visa — Bank Y: $1,204.00" aria-label="Liabilities › Credit Cards › Visa — Bank Y: $1,204.00"><span class="tm-inner"><span class="tm-label">Visa — Bank Y</span><span class="tm-value">$1,204.00</span></span></a>
+        <a class="tm-tile tm-liabilities" href="account-register.html" style="left:99.80%;top:70.66%;width:0.20%;height:29.34%" title="Liabilities › Cash in Transit (clearing): $500.00" aria-label="Liabilities › Cash in Transit (clearing): $500.00"><span class="tm-inner"><span class="tm-label">Cash in Transit (clearing)</span><span class="tm-value">$500.00</span></span></a>
+      </div>
+      <p class="tm-note">Area is the size of each balance; the two halves are equal because assets equal liabilities plus equity. Too small to draw: <a href="account-register.html">Prepaid Tax — Federal</a> $3,100.00 (0.8%), <a href="account-register.html">Visa — Bank Y</a> $1,204.00 and <a href="account-register.html">Cash in Transit</a> $500.00 (Liabilities, 0.4% together). Unlabelled tiles name themselves on hover and focus. Income and Expenses are period flows, not balances, and are not on this map.</p>
+    </div>
     <div class="card" style="padding:0;">
       <div class="gl-tree" role="tree" aria-label="Chart of accounts">
           <div class="tree-row depth-0"><span class="tree-name"><span class="tree-chevron"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span></span>Assets</span><span class="tree-balance">$412,884.21</span></div>

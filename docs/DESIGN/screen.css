@@ -987,7 +987,7 @@ table.data-table td.amount.negative { color: var(--destructive); }
 }
 
 /* ---------- Brand app bar: the fixed near-black top bar of every page
-   without the app shell (Home, Membership setup, Admin). Lockup left,
+   without the app shell (Home, Get started, Admin). Lockup left,
    the page's trailing item(s) right. The bar is #070907, the brand's
    dark surface, the same in both themes; neon and near-white text only
    ever sit on its solid black. A fixed fade hangs under it, so the page
@@ -1072,9 +1072,6 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
 .brand-bar .btn-outline { border-color: rgba(255, 255, 255, 0.24); color: #EFF1EF; }
 .brand-bar .btn:focus-visible { outline-color: var(--brand); }
 .brand-bar .badge-outline { color: #EFF1EF; border-color: rgba(255, 255, 255, 0.24); }
-.brand-bar .avatar-btn { padding: 0; border: none; background: none; border-radius: 50%; cursor: pointer; display: inline-flex; }
-.brand-bar .avatar-btn .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-.brand-bar .avatar-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 
 @media (max-width: 760px) {
   .has-brand-bar { --bar-h: 64px; }
@@ -1239,6 +1236,10 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
 /* Sign up's invite field in its pre-filled state (arrived from an invite
    link): the code, plus a line naming who invited the visitor and to
    what, marked valid. */
+/* Sign up: the invite code is common to BOTH account paths (Google and
+   email), so a full-width rule and a caption separate it from the OAuth
+   button below. Without the break the code reads as paired with Google. */
+.auth-section-break { margin: 32px 0 20px; padding-top: 16px; border-top: 1px solid var(--border); font-size: 12px; font-weight: 500; color: var(--muted-foreground); }
 .invite-status { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: var(--muted-foreground); flex-wrap: wrap; }
 .auth-field .field-help { font-size: 12px; color: var(--muted-foreground); margin-top: 6px; }
 
@@ -1372,14 +1373,11 @@ a.btn { text-decoration: none; }
 .switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .switch[disabled] { opacity: 0.5; cursor: not-allowed; }
 
-/* Shell-less page bodies (membership setup, admin), under the brand app
-   bar instead of the sidebar: no entity exists yet (setup), or none
-   applies (operator). */
-.page-narrow { max-width: 520px; margin: 32px auto 64px; padding: 0 24px; }
+/* Shell-less page bodies (Get started, Admin), under the brand app bar
+   instead of the sidebar: no entity applies to them. */
 .page-medium { max-width: 760px; margin: 16px auto 64px; padding: 0 24px; }
 .page-title { font-family: var(--font-heading); font-size: 24px; font-weight: 700; margin-bottom: 6px; }
 .page-lede { color: var(--muted-foreground); font-size: 14px; margin-bottom: 24px; }
-.center { text-align: center; }
 
 /* ---------- General Ledger: chart-of-accounts tree. Custom: shadcn has
    no tree component, so these are nested disclosure rows. ---------- */
@@ -1419,6 +1417,16 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .dark .badge-warning-soft { color: var(--warning); }
 .badge-positive-soft { background: color-mix(in srgb, var(--positive) 12%, var(--card)); color: var(--positive); border-color: color-mix(in srgb, var(--positive) 35%, var(--card)); }
 .badge .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+/* The three figures every custodial account shows side by side: cash
+   balance, book value (the GL's cost basis, cash included) and market
+   value (cash + positions at EOD prices), then market minus book. One
+   row per account card, and the same row summed on the totals card. */
+.custodial-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
+.custodial-fig { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.custodial-fig .eyebrow { white-space: nowrap; }
+.custodial-fig-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.custodial-totals .custodial-fig-value { font-size: 18px; }
+@media (max-width: 1100px) { .custodial-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .custodial-recon { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border); }
 .lots { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); overflow: hidden; }
 .lots-head { padding: 12px 16px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 12px; }
@@ -1438,6 +1446,8 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .alloc-row { display: grid; grid-template-columns: 160px 1fr 150px 110px; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .alloc-row:last-child { border-bottom: none; }
 .alloc-row .alloc-name { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.alloc-row .alloc-name a { color: inherit; text-decoration: none; }
+.alloc-row .alloc-name a:hover, .alloc-row .alloc-name a:focus-visible { text-decoration: underline; }
 .alloc-row .alloc-figs { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted-foreground); text-align: right; }
 .alloc-row .badge { justify-self: end; }
 .alloc-track { position: relative; height: 10px; border-radius: 999px; background: var(--muted); }
@@ -1513,3 +1523,98 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
   .alloc-row { grid-template-columns: 120px 1fr 120px 96px; gap: 12px; }
   .form-row { grid-template-columns: 1fr 160px auto; }
 }
+
+/* ---------- Balance-sheet treemap (PROTOTYPE on general-ledger.html).
+   Two equal halves, Assets | Liabilities + Equity: the accounting
+   equation makes their areas equal. Tiles are absolutely positioned by
+   percentage (the prototype's layout is one static squarified pass at
+   900x240; the real LayerChart Treemap re-lays out on resize). Fill by
+   accounting element from the chart ramp's three AA-safe steps for a
+   --card-ink label: chart-3 4.58:1, chart-4 5.48:1, chart-5 6.63:1 on
+   white in light mode; dark mode inverts (light ramp, dark ink). Labels
+   clip by container query: value hidden under 96x38, label under 64x22.
+   Colour is never alone: every tile carries its name (or a title/aria
+   label when too small), and the halves are captioned above. Padding
+   sits on .tm-inner, never on the tile, so a sub-pixel tile stays
+   sub-pixel instead of growing to the padding's width. */
+.tm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 8px; font-size: 13px; font-weight: 500; }
+.tm-cols > span { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tm-cols .mono { color: var(--muted-foreground); font-weight: 400; }
+.tm-plus { color: var(--muted-foreground); }
+.tm-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.tm-map { position: relative; height: 240px; }
+.tm-group { position: absolute; background: var(--border); border-radius: 4px; }
+.tm-tile { position: absolute; box-sizing: border-box; border: 1px solid var(--card); border-radius: 3px; overflow: hidden; container-type: size; text-decoration: none; color: var(--card); }
+.tm-inner { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; min-width: 0; }
+.tm-tile:hover { filter: brightness(1.08); }
+.tm-tile:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; z-index: 1; }
+.tm-label { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; white-space: nowrap; }
+@container (max-width: 96px) { .tm-value { display: none; } }
+@container (max-height: 38px) { .tm-value { display: none; } }
+@container (max-width: 64px) { .tm-label { display: none; } }
+@container (max-height: 22px) { .tm-label { display: none; } }
+.tm-assets { background: var(--chart-3); }
+.tm-liabilities { background: var(--chart-4); }
+.tm-equity { background: var(--chart-5); }
+.tm-note { margin-top: 10px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+.tm-note a { color: var(--primary); }
+
+/* ---------- Entity roll-up map (Entities). The build uses LayerChart's
+   Pack (d3.pack); this static mock draws the same picture with flex
+   circles. Parents are --muted circles holding their base entities as
+   --card circles; a base entity in two parents appears in both with an
+   "also in" chip. All circles in a level share one size: the map shows
+   structure, not wealth (sizing by balance would also leak magnitude
+   across an access boundary). The current entity carries a --ring. */
+.pack { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; padding: 8px 0 4px; }
+.pack-parent { width: 296px; aspect-ratio: 1; border-radius: 50%; background: var(--muted); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 28px; box-sizing: border-box; }
+.pack-parent-head { display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none; color: var(--foreground); border-radius: var(--radius-md); padding: 2px 8px; }
+.pack-children { display: flex; gap: 8px; margin-top: 10px; }
+.pack-child { position: relative; width: 128px; aspect-ratio: 1; border-radius: 50%; background: var(--card); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px; box-sizing: border-box; text-align: center; text-decoration: none; color: var(--foreground); }
+.pack-child:hover, .pack-parent-head:hover { background: var(--accent); }
+.pack-child:focus-visible, .pack-parent-head:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.pack-current { box-shadow: 0 0 0 2px var(--ring); }
+.pack-type { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted-foreground); }
+.pack-name { font-size: 13px; font-weight: 600; line-height: 1.25; }
+.pack-also { position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); color: var(--muted-foreground); }
+.pack-also .icon { width: 10px; height: 10px; }
+.entity-rel { font-size: 12px; color: var(--muted-foreground); margin: -4px 0 10px; }
+
+/* ---------- Tax (tax.html). The status line leads with the tier badge
+   (label + icon, never colour alone). The two figures sit side by side
+   with their own arithmetic underneath, so Pending liability and Gap are
+   never read as one sum. The installment timeline is an ordered list on
+   a track: paid (--positive), overdue (--destructive), due (outline). */
+.tax-status-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; margin-bottom: 20px; }
+.tax-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.tax-fig { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tax-fig + .tax-fig { border-left: 1px solid var(--border); padding-left: 24px; }
+.tax-math { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: 13px; color: var(--muted-foreground); margin-top: 6px; max-width: 320px; }
+.tax-math .mono { text-align: right; font-variant-numeric: tabular-nums; }
+.tax-help { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+.tax-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.tax-timeline { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; position: relative; }
+.tax-timeline::before { content: ""; position: absolute; top: 5px; left: 6px; right: 6px; height: 2px; background: var(--border); }
+.tax-inst { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-top: 22px; min-width: 0; }
+.tax-inst-dot { position: absolute; top: 0; left: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 2px solid var(--border); box-sizing: border-box; }
+.tax-inst.is-paid .tax-inst-dot { background: var(--positive); border-color: var(--positive); }
+.tax-inst.is-overdue .tax-inst-dot { background: var(--destructive); border-color: var(--destructive); }
+.tax-inst.is-due .tax-inst-dot { border-color: var(--foreground); }
+.tax-inst-req { font-weight: 600; font-size: 14px; }
+.tax-inst-sub { font-size: 11px; color: var(--muted-foreground); }
+.tax-inst .badge { margin-top: 4px; white-space: nowrap; }
+.tax-lower { grid-template-columns: 2fr 1fr; margin-top: 24px; }
+.tax-link { color: var(--primary); font-weight: 500; }
+@media (max-width: 1100px) { .tax-lower { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .tax-timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; } .tax-timeline::before { display: none; } }
+
+/* A card eyebrow that links to the card's own screen (Dashboard tax card -> Tax). */
+.eyebrow.card-link { display: inline-flex; gap: 6px; color: inherit; text-decoration: none; }
+.eyebrow.card-link:hover, .eyebrow.card-link:focus-visible { color: var(--foreground); text-decoration: underline; }
+
+/* Known unposted delta (Custodial Accounts reconciliation): information,
+   not a status tier. Muted fill, clock icon, and it is a link to the
+   staged drafts in Pending. */
+.badge-muted { background: var(--muted); color: var(--muted-foreground); border-color: var(--border); text-decoration: none; }
+a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }

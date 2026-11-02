@@ -226,7 +226,7 @@ Both clear the 3:1 non-text floor, and the dark-mode value clears 4.5:1 too. Off
 |---|---|---|---|
 | Sidebar brand row, expanded | 24px, left of the wordmark | `--sidebar-brand` | see above |
 | Sidebar rail, collapsed | 24px, the expand button's resting face; swaps to `panel-left-open` on hover or keyboard focus | `--sidebar-brand` | see above |
-| Brand app bar, plain pages (Membership setup, Admin) | 24px, left of the wordmark | Literal `--brand` on the bar (`#070907`) | 14.72:1 |
+| Brand app bar, plain pages (Get started, Admin) | 24px, left of the wordmark | Literal `--brand` on the bar (`#070907`) | 14.72:1 |
 | Brand app bar, Home | Full, 32px, left of the "Polycarpic" wordmark | Literal `--brand` on the bar (`#070907`) | 14.72:1 |
 | Login form pane (`.auth-logo`) | 24px, left of the wordmark, top-left | `--primary` | 4.75:1 light, 14.72:1 dark |
 
@@ -236,7 +236,7 @@ Both clear the 3:1 non-text floor, and the dark-mode value clears 4.5:1 too. Off
 
 The shell is shadcn's **sidebar-07** block (https://ui.shadcn.com/view/new-york-v4/sidebar-07).
 
-1. **The sidebar fills the vertical *screen*, not the vertical *page*, and is a floating card with a gutter on every side.** `position: fixed; top/left/bottom: var(--shell-gutter)` (16px), `border-radius` on all four corners. Composition, top to bottom: brand row → nav (seven items) → avatar trigger (opens the user-menu popover to its right — see § Sidebar).
+1. **The sidebar fills the vertical *screen*, not the vertical *page*, and is a floating card with a gutter on every side.** `position: fixed; top/left/bottom: var(--shell-gutter)` (16px), `border-radius` on all four corners. Composition, top to bottom: brand row → nav (eight items) → avatar trigger (opens the user-menu popover to its right — see § Sidebar).
 2. **No persistent header.** Nothing at the top of the main area stays put while the rest scrolls, and everything there shares the content's background token: "anything in the top part of the main viewing window should have the same background (token color) as the rest." The top row (`.topbar`) is not sticky, has no bottom border, and uses `--background` (not `--card`), so it is identical to the content below it and scrolls away with the page.
 3. **The top row starts to the right of the sidebar**, expanded or collapsed; it never spans the full width.
 
@@ -290,7 +290,7 @@ This is not a header in any surface sense (see § Layout & shell). "Top row" des
 
 **Composition, top to bottom:**
 1. **Brand row** (`.sidebar-top`) — the seedling mark + "Polycarpic" wordmark, plus the expand/collapse control (below). Collapses to the mark alone in the icon rail.
-2. **Nav** (`.sidebar-nav`) — seven flat items (see § Sidebar information architecture). Settings is not a sidebar item; its entry point is a proposed avatar-popover item.
+2. **Nav** (`.sidebar-nav`) — eight flat items (see § Sidebar information architecture). Settings is not a sidebar item; its entry point is a proposed avatar-popover item.
 3. **Avatar trigger** (`.sidebar-bottom`) — opens a user-menu popover to its right (see below). Collapses to the avatar circle alone in the icon rail.
 
 **Expand/collapse cue — in the brand row (the gemini.google.com pattern).** The expand/contract icon sits on the right of the sidebar, inline with the logo; when contracted, the rail shows just the logo, and on hover that logo switches to the expand icon.
@@ -324,17 +324,18 @@ Settings/Notifications carry a `.proposed-tag` badge in the styled screens — v
 
 "I kind of feel like the transactions, Ledger entries, General Ledger, Custodial Accounts, and security views are mixed together. Needs some conceptual clean up." (From the Principal's sidebar interview.) The underlying issue is a **flow-vs-state conflation**: three pipeline stages (imported transaction → draft → posted journal entry) stacked on one screen, and two different concept layers (the GL abstraction vs. a physical custodial account) sharing one screen behind a silent toggle. The IA separates them.
 
-**Seven flat sidebar items, no nesting, plus one proposed avatar-popover entry (Settings).** The icon-rail collapse works because every item is flat.
+**Eight flat sidebar items, no nesting, plus one proposed avatar-popover entry (Settings).** The icon-rail collapse works because every item is flat.
 
 | # | Nav item | Absorbs | What it is |
 |---|---|---|---|
 | 1 | **Dashboard** | — | Cross-cutting summary — net worth, cash flow, tax, allocation snapshot. |
 | 2 | **Transactions** | the journal and import status | The time-ordered journal: three accordion cards in urgency order — Exceptions, Pending, Posted. The Pending card is the bank-feed review/match inbox (see § Transactions workflow). Import stats/status and the Sync Transactions / New entry actions live here; there is no separate "Import" item. Not the chart of accounts; see General Ledger for that. |
 | 3 | **General Ledger** | the GL side of accounts | Opens to a chart-of-accounts **tree** (category → account → sub-account, balances, a custodial marker on accounts that mirror a physical account). Clicking an account opens that account's **register** — a separate page, breadcrumbed back to the tree — showing every line that hit it, in date order, with a running balance; each line links to its full journal entry. The register is account-scoped and running-balance-shaped; Transactions is entry-scoped and time-ordered — genuinely different questions, not two views of one screen. |
-| 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, reported balance, reconciliation status against the GL. Each account has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. Book-vs-market is implicit here (the lots themselves), not a separate chart. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
+| 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, each showing **cash balance, book value (GL cost basis) and market value (EOD prices) side by side, with market minus book**, plus reconciliation status against the GL; a totals card sums the three figures across accounts. Each account that holds securities has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
 | 5 | **Allocation** | allocation vs. target | A dedicated actual-vs-target page. |
-| 6 | **Reports** | — | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (§ Component inventory) until POLY-M5 ships statements. |
-| 7 | **Entities** | — | Entity list, memberships, invite. |
+| 6 | **Tax** | the tax liability view | Per entity and jurisdiction: pending liability, the safe-harbor gap and its status tier, next due date, the custodial prepaid-tax account, the year's installment timeline, and the "Post your payment" action (never "Pay"). The Dashboard's Pending tax liability card links here (§ Allocation, Reports & Settings → Tax; flow 5.4). |
+| 7 | **Reports** | — | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (§ Component inventory) until POLY-M5 ships statements. |
+| 8 | **Entities** | — | Entity list, memberships, invite, and create — every entity beyond the user's own Person entity is created here (§ Entities & membership). |
 | — *(proposed avatar-popover item, not a sidebar item)* | **Settings** | import scheduling | Batch-import schedule and options, plus app-level preferences. Reached from the avatar popover (proposed, `.proposed-tag`). No sidebar nav item is active on this screen. |
 
 There is no "Securities" item (lots live in Custodial Accounts' sub-card; allocation is its own page) and no "Import" item (setup is a Custodial Accounts action; stats live on Transactions; scheduling lives in Settings).
@@ -355,9 +356,9 @@ There is no "Securities" item (lots live in Custodial Accounts' sub-card; alloca
 
 | Tier | Token | Product examples |
 |---|---|---|
-| Normal / on track | `--positive` or plain `--foreground` | Safe-harbor gap ≤ 0; reconciliation clean; import fully matched |
-| Caution | `--warning` | Safe-harbor gap open, due date >14 days out; an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
-| Danger / overdue | `--destructive` | Safe-harbor payment overdue; exceptions-threshold breach; reconciliation break |
+| Normal / on track | `--positive` or plain `--foreground` | Safe-harbor gap < 0 (prepaid ahead of the requirement); reconciliation clean; import fully matched |
+| Caution | `--warning` | Safe-harbor gap ≥ 0, due date more than 14 days out (gap = 0 is exactly at the safe-harbor line, nothing in hand beyond it, so never on track); an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
+| Danger / overdue | `--destructive` | Safe-harbor gap ≥ 0 with the due date within 14 days or passed; exceptions-threshold breach; reconciliation break |
 
 ### Entity, account, and category badges — label + icon, not per-category hue
 
@@ -365,7 +366,7 @@ Meaning by label/icon/variant weight, not a dedicated hue per category.
 
 | Category | Variant | Icon (Lucide, indicative) |
 |---|---|---|
-| Entity type — Person / Trust / Business / Household | `secondary` | `User` / `Landmark` / `Building2` / `Home` |
+| Entity type — Person / Trust / Business (base); Household / Holding (parent) | `secondary` | `User` / `Landmark` / `Building2` / `Home` / `Layers` |
 | Account — GL / Custodial | `outline` | `BookText` / `Landmark` |
 | Transaction — Draft / Posted / Reversed / **Corrected** | `secondary` / `outline` / `outline` italic / **`outline` + `brand-2`-tinted dot** | `Clock` / `Check` / `RotateCcw` / `Pencil` |
 | Role — Owner / Manager / Viewer | `default` / `secondary` / `outline` | — |
@@ -377,19 +378,19 @@ Meaning by label/icon/variant weight, not a dedicated hue per category.
 The user-facing action and the underlying mechanism are two different claims. "The UI never offers an edit affordance on a posted row, only reverse" describes the *mechanism* correctly, but it is not what the user should be told to click.
 
 - **Import is the immutable baseline.** An imported bank transaction is never altered after import, and the user never corrects an import row directly.
-- **Nothing reaches the GL without a confirmation step.** Between import and posting, a draft is fully editable — category, tax-treatment tag, counterparty, amount allocation — as flow 5.2 describes. This is where a user fixes a mistake *before* it is load-bearing.
+- **Nothing reaches the GL without a confirmation step.** Between import and posting, a draft is fully editable — category, tax-treatment tag, counterparty, amount allocation — as flow 5.3 describes. This is where a user fixes a mistake *before* it is load-bearing.
 - **After posting, the user-facing action is "Correct entry," not "edit."** Clicking it does not mutate the posted row — under the hood it posts a full reversal of the original entry plus a new corrected entry (reversal-only, PRD §5) — but the user is never shown "reverse" as a verb for this, and never asked to construct the reversing entry themselves.
 - **A corrected row carries a badge** (see table above) distinguishing it from a plain Posted or a standalone Reversed (e.g. a reversal with no replacement) row.
 - **Click-through reveals the mechanism.** Opening a corrected entry's detail view shows the full underlying pair — the original entry's lines rendered shaded/struck-through, the reversal lines, and the new corrected entry — so the double-entry trail stays fully auditable (Overview principle: "every number earns trust") without the top-level row ever using the word "reverse" as the primary affordance.
 - **Auto-posted rows get the identical treatment.** A row posted by a recurring rule rather than a manual confirm shows the same `Posted` badge plus a small `posted by rule — <rule name>` attribution line underneath it, and offers the exact same **Correct entry** action as any other posted row. There is no separate "edit" affordance for a rule-posted row, and no different correction mechanism — actor attribution (user / auto-post rule / system job, PRD §5) changes who gets credited, never how a mistake gets fixed.
 
-See flow 5.2 (§ User Flows) for the decision diagram and `styled-screens/transactions.html` for the built row action, badge, and click-through state.
+See flow 5.3 (§ User Flows) for the decision diagram and `styled-screens/transactions.html` for the built row action, badge, and click-through state.
 
 ---
 
 ## Transactions workflow
 
-The product specification for the Plaid bank-feed → journal-entry pipeline (starting point: the Principal's sidebar interview). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.2 for the full decision diagram.
+The product specification for the Plaid bank-feed → journal-entry pipeline (starting point: the Principal's sidebar interview). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.3 for the full decision diagram.
 
 **Layout:** a high-density table/list of unposted raw rows. Clicking a row expands it vertically (Accordion/Expansion pattern) — the matching workspace opens inline, no navigation away from the feed.
 
@@ -427,19 +428,51 @@ General Ledger opens to a **chart-of-accounts tree** — category → account �
 
 See `styled-screens/general-ledger.html` and `styled-screens/account-register.html`.
 
+### Treemap prototype — balance sheet map
+
+A nested treemap of the chart of accounts, prototyped as a card above the tree on `styled-screens/general-ledger.html` (static layout from one squarified pass; the build would use LayerChart's `Treemap`). Nesting is category → account → sub-account, area is |balance|, and every tile links to its register.
+
+**What the prototype settles:**
+- **Balance sheet only, two equal halves.** Assets on the left; Liabilities + Equity on the right. The accounting equation makes the halves equal in area, so the map shows the equation itself: a reader sees at once that the halves balance. Income and Expenses are period flows, not balances; on one area scale with balances they are invisible (month-to-date $2,400 against $412,884) and they would break the equal halves. They are not on this map. An income-statement counterpart (Income | Expenses + net income, also equal halves) belongs with Reports if it is wanted.
+- **Colour by element, from three ramp steps.** Assets `--chart-3`, Liabilities `--chart-4`, Equity `--chart-5`, with labels in `--card` ink: 4.58 / 5.48 / 6.63:1 in light mode, and the dark ramp with dark ink in dark mode. `--chart-1`/`--chart-2` fail AA under a label (3.26 / 3.85:1), so a five-element map would need two more AA-safe fills that do not exist (§ Entity, account, and category badges, open item). The three steps sit only ~1.2:1 apart, so colour separates elements weakly; the halves and their captions carry the meaning, and colour is never alone.
+- **Credit-balance accounts are fine.** Liabilities and Equity carry credit-normal balances; |balance| gives them positive area on their own side.
+- **Labels are fixed-size HTML, clipped by container query:** the value hides under 96×38px, the name under 64×22px; an unlabelled tile names itself on hover, focus and to assistive tech (full path in its accessible name). Text inside a scaled SVG `viewBox` shrinks with the card and is unreadable at 960px, so labels must not scale with the layout.
+
+**What does not work, or needs a rule before build:**
+- **Tiny accounts vanish.** On the reference entity, Liabilities are 0.4% of a half and draw as a 2px sliver; Prepaid Tax is 0.8%. A household ledger is dominated by a home and a brokerage, so the accounts used daily (checking, cards) are the smallest tiles: the map says least about what the user touches most. The card lists every tile below a size floor in a "too small to draw" note with links; a minimum tile size is rejected because it misstates proportions.
+- **Contra and wrong-side balances.** A contra account (accumulated depreciation) or a balance on the wrong side of its element (an overdrawn checking account, a card in credit) would add area where it subtracts. Rule: net it into its parent for area, and list it in the note with its sign.
+- **Zero balances** have no area and are omitted; the tree stays the complete list.
+- **Negative equity** (liabilities above assets) breaks the equal halves: the right half is Liabilities alone and the left is smaller. Proposed: a hatched "deficit" tile in the Assets half, sized to |equity|, so the halves still balance. Not prototyped.
+- **Resize.** The prototype positions tiles by percentage of one 900×240 layout, so tiles stretch at 960px; the real component re-lays out on resize. Below ~600px wide the map is unreadable: hide the card under the `md` breakpoint.
+- **Accessibility.** A treemap is not navigable as a structure by a screen reader. Tiles are links with full-path names, but the tree remains the accessible primary view; the map is a supplement, never a replacement.
+- **LayerChart specifics are unverified:** its tiling method, padding options (for group outlines) and label slot were not checked against the docs page, which renders client-side. Confirm before build.
+
+**Recommendation: go, scoped.** Ship the balance-sheet map (Assets | Liabilities + Equity, equal halves, three ramp fills, size-floor note) as a card above the tree on desktop widths; it earns its place by making the accounting equation visible. No-go on a single five-element map of the whole chart of accounts: flows and balances do not share an area scale, and two of the five fills fail AA.
+
 ---
 
 ## Custodial Accounts: lots & provider setup
 
-"Sub-card in the Custodial view... pull downs of each security to show lots. And for the Allocation vs target to be a dedicated page. The book vs market should be implicit in the custodial view, shown as whether the lots (and sum of lots) show the short/long/total current gains/losses." Lots live here; allocation vs. target is its own screen (§ Allocation, Reports & Settings).
+"Sub-card in the Custodial view... pull downs of each security to show lots. And for the Allocation vs target to be a dedicated page." Lots live here; allocation vs. target is its own screen (§ Allocation, Reports & Settings).
 
-**Per-account card:** institution name, reported balance, link-health badge, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.4).
+**Three figures on every account, side by side.** Each custodial-account card shows, in one row:
+
+| Figure | What it is | Source |
+|---|---|---|
+| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | The GL's cash balance; when the custodian reports a different figure, the reconciliation line shows it |
+| **Book value · GL** | Cost basis of everything in the account, cash included — the GL's own balance for the mirrored account | General Ledger (lots at cost) |
+| **Market value · EOD** | Cash plus every position at the last end-of-day price | Lots × daily EOD price feed |
+| **Market − book** | Unrealized gain or loss, signed and coloured per § Delta coloring | Derived |
+
+A cash-only account shows the same row with the three figures equal and a `$0.00` delta: the row keeps one shape on every card, so accounts scan as a column. A **totals card** above the account cards sums the same four figures across every custodial account for the entity, with the price date ("prices as of <date> close"). Market − book on an account equals its lots sub-card's total unrealized gain; the two figures must agree.
+
+**Per-account card:** institution name, link-health badge, the three-figure row, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.5). A difference explained exactly by the account's staged drafts is a **known unposted delta**, not a break: the line shows the custodian's figure and a muted `Known delta` badge (clock icon, `--muted` fill, no status hue) naming the draft count and amount, linking to those drafts in Pending on Transactions.
 
 **The lots sub-card (only on accounts that hold securities):**
 - One row per security, collapsed by default — a pull-down (chevron) reveals its individual lots.
 - Each lot shows book value, market value, and its own short-term or long-term unrealized gain/loss.
 - The security's own row shows its summed book/market/gain across all its lots.
-- The account's lots sub-card totals short, long, and total unrealized gain/loss across every security — this **is** the book-vs-market comparison; there is no separate book-vs-market chart.
+- The account's lots sub-card totals short, long, and total unrealized gain/loss across every security; the total equals the card's Market − book figure. There is no separate book-vs-market chart.
 
 **The New provider item dialog:**
 - **Source type**, chosen first: aggregator (Plaid/SimpleFIN/fake), a manual account (no live link), or an imported file (CSV/OFX).
@@ -458,13 +491,34 @@ See `styled-screens/custodial-accounts.html`: the lots sub-card shows one securi
 
 ## Allocation, Reports & Settings
 
-**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.9) is orthogonal and applies here like any time-series view. Includes a target editor (targets must sum to 100%).
+**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.10) is orthogonal and applies here like any time-series view. Includes a target editor (targets must sum to 100%). Each asset class drills to the lots behind it on Custodial Accounts, filtered to that class. Flow 5.6.
 
 **Reports.** A nav item **from day one**: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
 
 **Settings.** Batch-import scheduling ("all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window — a Household's schedule doesn't touch a Person entity) and **per-user** (theme, default entity on login, reduced motion). Viewers can view this page, but the Manager/Owner-only settings (schedule, import options) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
 
 See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-screens/settings.html`.
+
+**Tax.** Its own sidebar item, after Allocation; also reached from the Dashboard's Pending tax liability card. One view per entity, with a tab per jurisdiction the entity files in (data-driven, never only Federal) and a tax-year selector. Top card: the status tier badge and a one-line reason, then the two figures side by side, each with its own arithmetic underneath, so they are never read as one sum: **Pending liability** = annualized tax to date − custodial prepaid balance; **Safe-harbor gap** = required payments to date (the lesser safe-harbor basis, cumulative to the latest installment) − the same balance. The tier follows the gap (§ Status tiers). The one action is **Post your payment**, which leads to the imported bank transaction on Transactions — the app never moves money. Below: the year's installments on a track (paid / short / due, label + icon, never colour alone) and the custodial prepaid-tax account card with its GL balance and a link to its register. See `styled-screens/tax.html`.
+
+---
+
+## Entities & membership
+
+**Every user owns a default base entity from account creation.** Creating an account also creates a **Person** entity named after the user (`<Name> (Person)`, e.g. "Mosko (Person)"), with the user as its owner. It is the base unit for the user's personal custodial accounts. There is therefore no signed-in state without an entity: sign-in always lands on a dashboard.
+
+- **Landing entity on sign-in:** the last-viewed entity, else the user's own Person entity. An invited user's first sign-in lands on the entity they were invited to.
+- **Base entities hold the accounts.** Custodial and GL accounts live only in base entities: Person, Trust, Business. Further base entities are created from Entities.
+- **Parent entities roll up whole base entities.** A parent (Household; Holding for a holding structure) includes whole base entities, never individual accounts, and shows their consolidated figures. A base entity may belong to more than one parent (a Business in a Household and in a Holding).
+- **Access is explicit membership only** (owner / manager / viewer), never inherited through a roll-up in either direction — flow 5.7.
+
+**The drill-through boundary.** A parent's viewer sees the parent's consolidated figures, and every figure stays clickable. Drilling into a figure that comes from an included base entity the user holds no membership on opens a **boundary panel** in place of that entity's register: the entity's name and type badge, the text "Included from <entity>. You don't have access to that entity's ledger.", and a way back. No number is greyed or made unclickable, and nothing is shown from beyond the boundary beyond the figure the parent already showed.
+
+**The entity switcher** (header entity selector) is always present: every user holds at least their own Person entity. It lists every entity the user holds membership on, base and parent, with each parent's included base entities nested beneath it; a base entity in two parents is listed under both. An included entity the user has no membership on is listed with a lock, and selecting it opens the boundary panel.
+
+**Roll-up map (Entities).** A card above the membership list draws every entity the user holds membership on as a **Pack** (LayerChart `Pack`, d3.pack, for frontend-lead): parents as `--muted` circles, each holding its base entities as `--card` circles; a base entity in no parent sits at top level. A base entity in several parents is drawn once in each, with an "also in <parent>" chip; there is no overlap geometry. Each circle shows the type icon and label, name and role badge, and switches to that entity on click; the current entity carries a `--ring`. **Circles are equal in size per level:** the map shows structure, not wealth. Sizing by balance would shrink small entities past legibility and would leak magnitude across the access boundary. The membership list below stays the accessible fallback, each card with an Includes / Included in line. Dashboard roll-ups may likewise list an included entity under each parent it belongs to.
+
+See `styled-screens/entities.html`.
 
 ---
 
@@ -484,11 +538,11 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Sheet / Dialog** | Transaction detail drawer; new-entity/membership dialog; provider-item dialog (Custodial Accounts) |
 | **Dialog, near-full-screen** | The journal-entry modal (header + legs) — manual "+ New entry", "Correct entry", Split, and Group & Summarize all reuse this one modal |
 | **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers; the suggested-offset-leg inline search dropdown (Pending inbox); per-card "show N" limit selector |
-| **Sidebar** | Primary nav, seven flat items (Settings proposed under the avatar popover) — inverted, a floating card (gutter on every side), collapsible to an icon rail, brand row on top (mark + wordmark + collapse control) + avatar-popover trigger on bottom (opens to the right) — see Sidebar information architecture |
+| **Sidebar** | Primary nav, eight flat items (Settings proposed under the avatar popover) — inverted, a floating card (gutter on every side), collapsible to an icon rail, brand row on top (mark + wordmark + collapse control) + avatar-popover trigger on bottom (opens to the right) — see Sidebar information architecture |
 | **Button** | Variants: `default` (primary green fill: the one main action per view), `secondary`, `outline`, `ghost`, `destructive`, and `dark` (a solid `--foreground` fill with `--background` ink: near-black in light mode, near-white in dark). **Rule: never an outline button standing alone on `--background`.** Its `--border` edge is only 1.22:1 on the light page (~1.17:1 dark), so it all but disappears. Outline is for a secondary action set beside a filled one, or inside a card or bar that gives it a surface. A standalone secondary action uses `dark` instead (15.61:1 light / 17.92:1 dark against the page): Login's "Continue with Google" (with the Google G glyph). Hierarchy then comes from colour and position, not weight: the dark button is the heavier mass, so the primary stays the only green fill and sits last, after the divider |
 | **Skeleton** | Every async fetch boundary |
 | **Switch** | Settings' on/off preferences (auto-post matched recurring transactions, reduced motion), `.switch[role=switch]` |
-| **Brand app bar** | Every page without the app shell (Home, Membership setup, Admin): fixed near-black bar, lockup left, the page's trailing items right, a fade below — see Public screens § Brand app bar |
+| **Brand app bar** | Every page without the app shell (Home, Get started, Admin): fixed near-black bar, lockup left, the page's trailing items right, a fade below — see Public screens § Brand app bar |
 | **Sonner (toast)** | Import batch complete, entry posted, reconciliation break |
 | **Progress** | Import batch progress, safe-harbor paid-vs-required |
 | **Top row** | Starts right of the sidebar, not full-width, not sticky/bordered, same background token as the content below it: breadcrumb (left); entity selector + separator + "more" menu (right) — see Layout & shell, Header |
@@ -516,6 +570,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | General Ledger nav | `book-text` | |
 | Custodial Accounts nav | `landmark` | |
 | Allocation nav | `pie-chart` | |
+| Tax nav | `receipt` | `landmark` is taken by Custodial Accounts |
 | Reports nav | `file-text` | |
 | Entities nav | `users` | |
 | Avatar popover: Profile | `user` | |
@@ -594,7 +649,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Lots sub-card pull-down | **Collapsible** | Direct reuse — a simpler primitive than Accordion for a single expand/collapse row |
 | Settings on/off preferences | **Switch** | Direct reuse |
 | Settings theme picker (Light / Dark / Auto) | **Toggle Group** (single) | Rendered with the `.tabs` look; semantically a radio group, not tabs |
-| Brand app bar (Home, Membership setup, Admin) | `custom`, with **Button** / **Badge** / **Avatar** for the trailing items | One component for every shell-less page: a fixed bar with a lockup, trailing items and a fade; too small and too brand-specific to be a block. No sidebar because no entity exists (setup), none applies (operator), or the visitor is not signed in (Home) |
+| Brand app bar (Home, Get started, Admin) | `custom`, with **Button** / **Badge** / **Avatar** for the trailing items | One component for every shell-less page: a fixed bar with a lockup, trailing items and a fade; too small and too brand-specific to be a block. No sidebar because no entity exists (setup), none applies (operator), or the visitor is not signed in (Home) |
 | Register / any wide table | **Table** (its own overflow-x wrapper) | `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling |
 | Allocation actual-vs-target track | `custom` on **Progress** | A Progress track plus a target marker; shadcn Progress has no marker |
 | Provider-item dialog | **Dialog**, **Tabs** (source-type picker), **Select** (account mapping) | Composed from three existing primitives, no custom chrome |
@@ -624,6 +679,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Account register | `account-register.html` | sidebar (multi-crumb) | — |
 | Custodial Accounts | `custodial-accounts.html` | sidebar | lots sub-card (AAPL pulled down), provider-item dialog |
 | Allocation | `allocation.html` | sidebar | — |
+| Tax | `tax.html` | sidebar | Federal tab, danger tier (Q3 installment $200 short) |
 | Reports | `reports.html` | sidebar | dimmed statement previews (review only, not shipped) |
 | Entities | `entities.html` | sidebar | — |
 | Settings | `settings.html` | sidebar, no nav item active | avatar popover with Settings current |
@@ -631,7 +687,6 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Login | `login.html` | none (split screen) | — |
 | Get started | `get-started.html` | brand app bar | — |
 | Sign up | `sign-up.html` | none (split screen) | invite code pre-filled and validated |
-| Membership setup | `membership-setup.html` | brand app bar | — |
 | Admin *(operator surface)* | `admin.html` | brand app bar + operator badge | — |
 
 ## Public screens: Home & Login
@@ -654,11 +709,11 @@ See `styled-screens/home.html`.
 
 ### Brand app bar
 
-The one top bar of every page without the app shell: Home, Membership setup, Admin. Markup: `<body class="has-brand-bar">` with `<header class="brand-bar">` first in the DOM.
+The one top bar of every page without the app shell: Home, Get started, Admin. Markup: `<body class="has-brand-bar">` with `<header class="brand-bar">` first in the DOM.
 
 - **The bar:** fixed, near-black `#070907` (the brand's dark surface, the same in both themes), 72px tall (64px below 760px).
   - Left: the lockup (`.brand-bar-lockup`), a link, in the literal `--brand` (14.72:1).
-  - Right: the page's trailing items, re-inked for the black bar — Home's Get started + Sign in, Membership setup's account avatar button, Admin's operator-session status badge.
+  - Right: the page's trailing items, re-inked for the black bar — Home's Get started + Sign in, Get started's Sign in, Admin's operator-session status badge.
 - **The fade:** hangs under the bar and moves with it, so the page scrolls under the black and emerges through the gradient. Neon and near-white text only ever sit on the bar's solid black.
   - Over Home's illustration: deep (88px, black → transparent), so the image rises out of the black.
   - Over a plain page background (`.brand-bar--plain`): short (28px, starting at 28% black). A deep black fade on the light page reads as a dirty smear; the short one reads as the bar's shadow.
@@ -667,11 +722,11 @@ The one top bar of every page without the app shell: Home, Membership setup, Adm
 - **Keyboard order:** the bar is first in the DOM, so Tab goes lockup, trailing items, then the page.
 - **Background:** the page paints `--background` edge to edge (the global body canvas is `--muted`, which differs in dark mode).
 
-See `styled-screens/home.html`, `styled-screens/membership-setup.html`, `styled-screens/admin.html`.
+See `styled-screens/home.html`, `styled-screens/get-started.html`, `styled-screens/admin.html`.
 
 ### Get started and Sign up
 
-There is no public sign-up: every instance is self-hosted, and accounts on it come by invitation from an entity owner. Home's "Get started" therefore leads to a fork, and Login's account line offers the same two branches. See flow 5.6.
+There is no public sign-up: every instance is self-hosted, and accounts on it come by invitation from an entity owner. Home's "Get started" therefore leads to a fork, and Login's account line offers the same two branches. See flow 5.1.
 
 - **Get started** (`get-started.html`, brand app bar with Sign in on the right): one page, not a modal. On top are two cards:
   - "I have an invite", which leads to Sign up (primary button);
@@ -681,7 +736,7 @@ There is no public sign-up: every instance is self-hosted, and accounts on it co
 - **Sign up** (`sign-up.html`, Login's split layout with its own visual pane, the sunrise; see **Visual-pane image sources**), invite-gated:
   - Fields, in order: the invite code, then the account (the `dark` Google button, or email + password).
   - From an invite link, the code arrives pre-filled and validated, with a line naming who invited the visitor and to which entity. An invalid or used code shows an inline error under the field.
-  - "Create account" hands off to Membership setup, where the invited entity is waiting.
+  - "Create account" creates the user's own Person entity (§ Entities & membership) and lands on the dashboard of the invited entity.
   - Footer: "Already have an account? Sign in", then "No invite? Set up your own instance".
 - **Login's account line:** "Have an invite? **Create your account**" leads to Sign up; "No invite? **Set up your own instance**" leads to Get started.
 
