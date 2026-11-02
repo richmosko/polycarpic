@@ -355,9 +355,9 @@ There is no "Securities" item (lots live in Custodial Accounts' sub-card; alloca
 
 | Tier | Token | Product examples |
 |---|---|---|
-| Normal / on track | `--positive` or plain `--foreground` | Safe-harbor gap ≤ 0; reconciliation clean; import fully matched |
-| Caution | `--warning` | Safe-harbor gap open, due date >14 days out; an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
-| Danger / overdue | `--destructive` | Safe-harbor payment overdue; exceptions-threshold breach; reconciliation break |
+| Normal / on track | `--positive` or plain `--foreground` | Safe-harbor gap < 0 (prepaid ahead of the requirement); reconciliation clean; import fully matched |
+| Caution | `--warning` | Safe-harbor gap ≥ 0, due date >14 days out (gap = 0 is exactly at the safe-harbor line, nothing in hand beyond it, so never on track); an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
+| Danger / overdue | `--destructive` | Safe-harbor gap ≥ 0 with the due date passed; exceptions-threshold breach; reconciliation break |
 
 ### Entity, account, and category badges — label + icon, not per-category hue
 
@@ -377,19 +377,19 @@ Meaning by label/icon/variant weight, not a dedicated hue per category.
 The user-facing action and the underlying mechanism are two different claims. "The UI never offers an edit affordance on a posted row, only reverse" describes the *mechanism* correctly, but it is not what the user should be told to click.
 
 - **Import is the immutable baseline.** An imported bank transaction is never altered after import, and the user never corrects an import row directly.
-- **Nothing reaches the GL without a confirmation step.** Between import and posting, a draft is fully editable — category, tax-treatment tag, counterparty, amount allocation — as flow 5.2 describes. This is where a user fixes a mistake *before* it is load-bearing.
+- **Nothing reaches the GL without a confirmation step.** Between import and posting, a draft is fully editable — category, tax-treatment tag, counterparty, amount allocation — as flow 5.3 describes. This is where a user fixes a mistake *before* it is load-bearing.
 - **After posting, the user-facing action is "Correct entry," not "edit."** Clicking it does not mutate the posted row — under the hood it posts a full reversal of the original entry plus a new corrected entry (reversal-only, PRD §5) — but the user is never shown "reverse" as a verb for this, and never asked to construct the reversing entry themselves.
 - **A corrected row carries a badge** (see table above) distinguishing it from a plain Posted or a standalone Reversed (e.g. a reversal with no replacement) row.
 - **Click-through reveals the mechanism.** Opening a corrected entry's detail view shows the full underlying pair — the original entry's lines rendered shaded/struck-through, the reversal lines, and the new corrected entry — so the double-entry trail stays fully auditable (Overview principle: "every number earns trust") without the top-level row ever using the word "reverse" as the primary affordance.
 - **Auto-posted rows get the identical treatment.** A row posted by a recurring rule rather than a manual confirm shows the same `Posted` badge plus a small `posted by rule — <rule name>` attribution line underneath it, and offers the exact same **Correct entry** action as any other posted row. There is no separate "edit" affordance for a rule-posted row, and no different correction mechanism — actor attribution (user / auto-post rule / system job, PRD §5) changes who gets credited, never how a mistake gets fixed.
 
-See flow 5.2 (§ User Flows) for the decision diagram and `styled-screens/transactions.html` for the built row action, badge, and click-through state.
+See flow 5.3 (§ User Flows) for the decision diagram and `styled-screens/transactions.html` for the built row action, badge, and click-through state.
 
 ---
 
 ## Transactions workflow
 
-The product specification for the Plaid bank-feed → journal-entry pipeline (starting point: the Principal's sidebar interview). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.2 for the full decision diagram.
+The product specification for the Plaid bank-feed → journal-entry pipeline (starting point: the Principal's sidebar interview). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.3 for the full decision diagram.
 
 **Layout:** a high-density table/list of unposted raw rows. Clicking a row expands it vertically (Accordion/Expansion pattern) — the matching workspace opens inline, no navigation away from the feed.
 
@@ -490,7 +490,7 @@ See `styled-screens/custodial-accounts.html`: the lots sub-card shows one securi
 
 ## Allocation, Reports & Settings
 
-**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.9) is orthogonal and applies here like any time-series view. Includes a target editor (targets must sum to 100%). Each asset class drills to the lots behind it on Custodial Accounts, filtered to that class. Flow 5.6.
+**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.10) is orthogonal and applies here like any time-series view. Includes a target editor (targets must sum to 100%). Each asset class drills to the lots behind it on Custodial Accounts, filtered to that class. Flow 5.6.
 
 **Reports.** A nav item **from day one**: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
 
@@ -502,7 +502,7 @@ See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-scr
 
 ## Entities & membership
 
-**Every user owns a default base entity from account creation.** Creating an account also creates a **Person** entity named after the user (`<Name> (Person)`, e.g. "Mosko (Person)"), with the user as its owner. It is the base unit for the user's personal custodial accounts. There is therefore no signed-in state without an entity, and no first-run membership-setup page: sign-in lands on a dashboard.
+**Every user owns a default base entity from account creation.** Creating an account also creates a **Person** entity named after the user (`<Name> (Person)`, e.g. "Mosko (Person)"), with the user as its owner. It is the base unit for the user's personal custodial accounts. There is therefore no signed-in state without an entity: sign-in always lands on a dashboard.
 
 - **Landing entity on sign-in:** the last-viewed entity, else the user's own Person entity. An invited user's first sign-in lands on the entity they were invited to.
 - **Broader structures are created from Entities:** a Trust, a Business, or a Household that rolls up base entities. The roll-up model and its visualisation are not yet specified.
@@ -714,7 +714,7 @@ See `styled-screens/home.html`, `styled-screens/get-started.html`, `styled-scree
 
 ### Get started and Sign up
 
-There is no public sign-up: every instance is self-hosted, and accounts on it come by invitation from an entity owner. Home's "Get started" therefore leads to a fork, and Login's account line offers the same two branches. See flow 5.6.
+There is no public sign-up: every instance is self-hosted, and accounts on it come by invitation from an entity owner. Home's "Get started" therefore leads to a fork, and Login's account line offers the same two branches. See flow 5.1.
 
 - **Get started** (`get-started.html`, brand app bar with Sign in on the right): one page, not a modal. On top are two cards:
   - "I have an invite", which leads to Sign up (primary button);
