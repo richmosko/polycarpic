@@ -236,7 +236,7 @@ Both clear the 3:1 non-text floor, and the dark-mode value clears 4.5:1 too. Off
 
 The shell is shadcn's **sidebar-07** block (https://ui.shadcn.com/view/new-york-v4/sidebar-07).
 
-1. **The sidebar fills the vertical *screen*, not the vertical *page*, and is a floating card with a gutter on every side.** `position: fixed; top/left/bottom: var(--shell-gutter)` (16px), `border-radius` on all four corners. Composition, top to bottom: brand row → nav (seven items) → avatar trigger (opens the user-menu popover to its right — see § Sidebar).
+1. **The sidebar fills the vertical *screen*, not the vertical *page*, and is a floating card with a gutter on every side.** `position: fixed; top/left/bottom: var(--shell-gutter)` (16px), `border-radius` on all four corners. Composition, top to bottom: brand row → nav (eight items) → avatar trigger (opens the user-menu popover to its right — see § Sidebar).
 2. **No persistent header.** Nothing at the top of the main area stays put while the rest scrolls, and everything there shares the content's background token: "anything in the top part of the main viewing window should have the same background (token color) as the rest." The top row (`.topbar`) is not sticky, has no bottom border, and uses `--background` (not `--card`), so it is identical to the content below it and scrolls away with the page.
 3. **The top row starts to the right of the sidebar**, expanded or collapsed; it never spans the full width.
 
@@ -290,7 +290,7 @@ This is not a header in any surface sense (see § Layout & shell). "Top row" des
 
 **Composition, top to bottom:**
 1. **Brand row** (`.sidebar-top`) — the seedling mark + "Polycarpic" wordmark, plus the expand/collapse control (below). Collapses to the mark alone in the icon rail.
-2. **Nav** (`.sidebar-nav`) — seven flat items (see § Sidebar information architecture). Settings is not a sidebar item; its entry point is a proposed avatar-popover item.
+2. **Nav** (`.sidebar-nav`) — eight flat items (see § Sidebar information architecture). Settings is not a sidebar item; its entry point is a proposed avatar-popover item.
 3. **Avatar trigger** (`.sidebar-bottom`) — opens a user-menu popover to its right (see below). Collapses to the avatar circle alone in the icon rail.
 
 **Expand/collapse cue — in the brand row (the gemini.google.com pattern).** The expand/contract icon sits on the right of the sidebar, inline with the logo; when contracted, the rail shows just the logo, and on hover that logo switches to the expand icon.
@@ -324,7 +324,7 @@ Settings/Notifications carry a `.proposed-tag` badge in the styled screens — v
 
 "I kind of feel like the transactions, Ledger entries, General Ledger, Custodial Accounts, and security views are mixed together. Needs some conceptual clean up." (From the Principal's sidebar interview.) The underlying issue is a **flow-vs-state conflation**: three pipeline stages (imported transaction → draft → posted journal entry) stacked on one screen, and two different concept layers (the GL abstraction vs. a physical custodial account) sharing one screen behind a silent toggle. The IA separates them.
 
-**Seven flat sidebar items, no nesting, plus one proposed avatar-popover entry (Settings).** The icon-rail collapse works because every item is flat.
+**Eight flat sidebar items, no nesting, plus one proposed avatar-popover entry (Settings).** The icon-rail collapse works because every item is flat.
 
 | # | Nav item | Absorbs | What it is |
 |---|---|---|---|
@@ -333,8 +333,9 @@ Settings/Notifications carry a `.proposed-tag` badge in the styled screens — v
 | 3 | **General Ledger** | the GL side of accounts | Opens to a chart-of-accounts **tree** (category → account → sub-account, balances, a custodial marker on accounts that mirror a physical account). Clicking an account opens that account's **register** — a separate page, breadcrumbed back to the tree — showing every line that hit it, in date order, with a running balance; each line links to its full journal entry. The register is account-scoped and running-balance-shaped; Transactions is entry-scoped and time-ordered — genuinely different questions, not two views of one screen. |
 | 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, each showing **cash balance, book value (GL cost basis) and market value (EOD prices) side by side, with market minus book**, plus reconciliation status against the GL; a totals card sums the three figures across accounts. Each account that holds securities has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
 | 5 | **Allocation** | allocation vs. target | A dedicated actual-vs-target page. |
-| 6 | **Reports** | — | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (§ Component inventory) until POLY-M5 ships statements. |
-| 7 | **Entities** | — | Entity list, memberships, invite, and create — every entity beyond the user's own Person entity is created here (§ Entities & membership). |
+| 6 | **Tax** | the tax liability view | Per entity and jurisdiction: pending liability, the safe-harbor gap and its status tier, next due date, the custodial prepaid-tax account, the year's installment timeline, and the "Post your payment" action (never "Pay"). The Dashboard's Pending tax liability card links here (§ Allocation, Reports & Settings → Tax; flow 5.4). |
+| 7 | **Reports** | — | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (§ Component inventory) until POLY-M5 ships statements. |
+| 8 | **Entities** | — | Entity list, memberships, invite, and create — every entity beyond the user's own Person entity is created here (§ Entities & membership). |
 | — *(proposed avatar-popover item, not a sidebar item)* | **Settings** | import scheduling | Batch-import schedule and options, plus app-level preferences. Reached from the avatar popover (proposed, `.proposed-tag`). No sidebar nav item is active on this screen. |
 
 There is no "Securities" item (lots live in Custodial Accounts' sub-card; allocation is its own page) and no "Import" item (setup is a Custodial Accounts action; stats live on Transactions; scheduling lives in Settings).
@@ -498,6 +499,8 @@ See `styled-screens/custodial-accounts.html`: the lots sub-card shows one securi
 
 See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-screens/settings.html`.
 
+**Tax.** Its own sidebar item, after Allocation; also reached from the Dashboard's Pending tax liability card. One view per entity, with a tab per jurisdiction the entity files in (data-driven, never only Federal) and a tax-year selector. Top card: the status tier badge and a one-line reason, then the two figures side by side, each with its own arithmetic underneath, so they are never read as one sum: **Pending liability** = annualized tax to date − custodial prepaid balance; **Safe-harbor gap** = required payments to date (the lesser safe-harbor basis, cumulative to the latest installment) − the same balance. The tier follows the gap (§ Status tiers). The one action is **Post your payment**, which leads to the imported bank transaction on Transactions — the app never moves money. Below: the year's installments on a track (paid / short / due, label + icon, never colour alone) and the custodial prepaid-tax account card with its GL balance and a link to its register. See `styled-screens/tax.html`.
+
 ---
 
 ## Entities & membership
@@ -535,7 +538,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Sheet / Dialog** | Transaction detail drawer; new-entity/membership dialog; provider-item dialog (Custodial Accounts) |
 | **Dialog, near-full-screen** | The journal-entry modal (header + legs) — manual "+ New entry", "Correct entry", Split, and Group & Summarize all reuse this one modal |
 | **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers; the suggested-offset-leg inline search dropdown (Pending inbox); per-card "show N" limit selector |
-| **Sidebar** | Primary nav, seven flat items (Settings proposed under the avatar popover) — inverted, a floating card (gutter on every side), collapsible to an icon rail, brand row on top (mark + wordmark + collapse control) + avatar-popover trigger on bottom (opens to the right) — see Sidebar information architecture |
+| **Sidebar** | Primary nav, eight flat items (Settings proposed under the avatar popover) — inverted, a floating card (gutter on every side), collapsible to an icon rail, brand row on top (mark + wordmark + collapse control) + avatar-popover trigger on bottom (opens to the right) — see Sidebar information architecture |
 | **Button** | Variants: `default` (primary green fill: the one main action per view), `secondary`, `outline`, `ghost`, `destructive`, and `dark` (a solid `--foreground` fill with `--background` ink: near-black in light mode, near-white in dark). **Rule: never an outline button standing alone on `--background`.** Its `--border` edge is only 1.22:1 on the light page (~1.17:1 dark), so it all but disappears. Outline is for a secondary action set beside a filled one, or inside a card or bar that gives it a surface. A standalone secondary action uses `dark` instead (15.61:1 light / 17.92:1 dark against the page): Login's "Continue with Google" (with the Google G glyph). Hierarchy then comes from colour and position, not weight: the dark button is the heavier mass, so the primary stays the only green fill and sits last, after the divider |
 | **Skeleton** | Every async fetch boundary |
 | **Switch** | Settings' on/off preferences (auto-post matched recurring transactions, reduced motion), `.switch[role=switch]` |
@@ -567,6 +570,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | General Ledger nav | `book-text` | |
 | Custodial Accounts nav | `landmark` | |
 | Allocation nav | `pie-chart` | |
+| Tax nav | `receipt` | `landmark` is taken by Custodial Accounts |
 | Reports nav | `file-text` | |
 | Entities nav | `users` | |
 | Avatar popover: Profile | `user` | |
@@ -675,6 +679,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Account register | `account-register.html` | sidebar (multi-crumb) | — |
 | Custodial Accounts | `custodial-accounts.html` | sidebar | lots sub-card (AAPL pulled down), provider-item dialog |
 | Allocation | `allocation.html` | sidebar | — |
+| Tax | `tax.html` | sidebar | Federal tab, danger tier (Q3 installment $200 short) |
 | Reports | `reports.html` | sidebar | dimmed statement previews (review only, not shipped) |
 | Entities | `entities.html` | sidebar | — |
 | Settings | `settings.html` | sidebar, no nav item active | avatar popover with Settings current |

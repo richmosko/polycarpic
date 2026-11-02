@@ -165,7 +165,7 @@
       <tr><td>Transaction detail</td><td>Sheet</td><td>Drill into a posted/draft entry, its journal lines, source doc</td></tr>
       <tr><td>Empty state</td><td>Card + plain text, no skeleton</td><td>Dashboard panels not yet shipped (tax at 1.0, allocation at M4) — see styled-screens/dashboard.html</td></tr>
       <tr><td>Top row</td><td>—, starts right of the sidebar</td><td>Not sticky, same background as content: breadcrumb left (expand/collapse lives in the sidebar brand row); entity selector + separator + "more" menu right — AI/search/notifications/gear dropped — see design-system-spec.md § Header</td></tr>
-      <tr><td>Sidebar</td><td>Sidebar (shadcn-svelte sidebar-07 block)</td><td>Floating card, gutter + rounded all 4 corners, seven nav items, brand top item carrying the expand/collapse control (<code>panel-left-close</code> right-aligned; collapsed, the mark swaps to <code>panel-left-open</code> on hover/focus), avatar-popover bottom item opening right — see design-system-spec.md § Sidebar</td></tr>
+      <tr><td>Sidebar</td><td>Sidebar (shadcn-svelte sidebar-07 block)</td><td>Floating card, gutter + rounded all 4 corners, eight nav items, brand top item carrying the expand/collapse control (<code>panel-left-close</code> right-aligned; collapsed, the mark swaps to <code>panel-left-open</code> on hover/focus), avatar-popover bottom item opening right — see design-system-spec.md § Sidebar</td></tr>
       <tr><td>"More" menu</td><td>DropdownMenu</td><td>Top row, right-justified — per-page global actions (Sync, New entry, Export, ...)</td></tr>
       <tr><td>Avatar cluster</td><td>—, custom</td><td>Overlapping initials in the entity selector, max 3 + overflow</td></tr>
       <tr><td>Avatar popover</td><td>Popover / DropdownMenu</td><td>User menu at the sidebar's bottom, opens to the right — profile, Settings (proposed), Notifications (proposed), preferences, theme, keyboard shortcuts, Log out last</td></tr>
@@ -284,10 +284,12 @@ flowchart TD
   </ul>
 
   <h3 id="flow-tax-liability">5.4 Tax liability &amp; safe-harbor</h3>
-  <p class="section-hint"><strong>Story (PRD §4.5):</strong> pending liability, required payment, gap, post your payment. Source: <a href="flows/tax-liability-flow.md">flows/tax-liability-flow.md</a>.</p>
+  <p class="section-hint"><strong>Story (PRD §4.5):</strong> pending liability, required payment, gap, post your payment. Tax is a sidebar item. Source: <a href="flows/tax-liability-flow.md">flows/tax-liability-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
-  view([Open Tax Liability view\nfor entity + jurisdiction]) --> accrual[Running accrual annualizes\nincome to date by tax treatment]
+  nav([Sidebar: Tax]) --> view[Tax view for the entity:\njurisdiction tab selected]
+  card([Dashboard: Pending tax\nliability card]) --> view
+  view --> accrual[Running accrual annualizes\nincome to date by tax treatment]
   accrual --> pending[Pending liability =\nannualized tax to date minus\ncustodial prepaid balance]
   accrual --> safeharbor[Two safe-harbor bases computed:\nprior-year and current-year]
   safeharbor --> required[Required payment to date =\nlesser of the two safe-harbor bases]
@@ -309,6 +311,7 @@ flowchart TD
   freeze --> accrual
   </pre>
   <ul>
+    <li><strong>Reached from the sidebar or the Dashboard card;</strong> both land on the same per-entity view with a jurisdiction selector.</li>
     <li><strong>Tiers:</strong> on track when <code>gap &lt; 0</code> (prepaid ahead of the safe-harbor requirement); caution when <code>gap &gt;= 0</code> and the due date is more than 14 days out; danger when <code>gap &gt;= 0</code> and the due date has passed. They reuse the product-wide status vocabulary — design-system-spec.md § Status tiers.</li>
     <li><strong>Gap = 0 is not on track.</strong> It means exactly at the safe-harbor line, with nothing in hand beyond the requirement, so it takes the caution or danger tier by due date.</li>
     <li><strong>Two figures,</strong> both measured against the custodial account's balance but not against each other: <strong>Pending liability = annualized tax to date − custodial prepaid balance</strong> (what you would owe net of prepayments, if filed today); <strong>Gap = required payments to date (safe harbor) − custodial balance</strong> ("are you current with the authority"). Gap is never <code>required − pending</code>.</li>
@@ -452,15 +455,15 @@ flowchart TD
   </ul>
 
   <h3 id="flow-sidebar">5.10 Sidebar &amp; app shell</h3>
-  <p class="section-hint"><strong>Story:</strong> the shell itself: seven flat items, icon-rail collapse, entity selector, avatar popover, keyboard. Source: <a href="flows/sidebar-flow.md">flows/sidebar-flow.md</a>.</p>
+  <p class="section-hint"><strong>Story:</strong> the shell itself: eight flat items, icon-rail collapse, entity selector, avatar popover, keyboard. Source: <a href="flows/sidebar-flow.md">flows/sidebar-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
   load([Any app screen loads]) --> state{Remembered\nsidebar state}
-  state -- expanded --> full[Expanded, ~240px:\nmark + wordmark, collapse button,\n7 labelled items, avatar + name]
-  state -- collapsed --> rail[Icon rail, ~64px:\nmark, 7 icons, avatar]
+  state -- expanded --> full[Expanded, ~240px:\nmark + wordmark, collapse button,\n8 labelled items, avatar + name]
+  state -- collapsed --> rail[Icon rail, ~64px:\nmark, 8 icons, avatar]
   full -- collapse button --> rail
   rail -- click the mark --> full
-  full --> nav[Pick a nav item:\nDashboard, Transactions, General Ledger,\nCustodial Accounts, Allocation,\nReports, Entities]
+  full --> nav[Pick a nav item:\nDashboard, Transactions, General Ledger,\nCustodial Accounts, Allocation,\nTax, Reports, Entities]
   rail --> nav
   nav --> screen([Screen renders,\nitem marked current])
   full --> avatar[Avatar trigger]
@@ -471,13 +474,12 @@ flowchart TD
   switcher --> rescope([Current screen re-renders\nfor the chosen entity])
   </pre>
   <ul>
-    <li><strong>Seven flat items, no nesting</strong> (design-system-spec.md § Sidebar information architecture). Flat is what makes the icon rail work.</li>
+    <li><strong>Eight flat items, no nesting</strong> (design-system-spec.md § Sidebar information architecture). Flat is what makes the icon rail work.</li>
     <li><strong>Collapse to an icon rail.</strong> The cue sits in the brand row: expanded shows a <code>panel-left-close</code> button right of the wordmark; collapsed shows the mark alone, which is itself the expand button and swaps to <code>panel-left-open</code> on hover or keyboard focus.</li>
     <li><strong>Remembered state:</strong> the expanded or collapsed choice persists per user across screens and reloads (shadcn <code>Sidebar</code>'s stored <code>open</code> state).</li>
     <li><strong>Header entity selector:</strong> the current entity's name and its member avatar cluster (max 3 + "+N"); it opens the entity switcher, and the current screen re-renders for the chosen entity (flow 5.7).</li>
     <li><strong>Avatar popover</strong> opens to the right of the trigger, in both widths. Settings and Notifications are proposed entry points (<code>.proposed-tag</code>); Log out is last, <code>--destructive</code>-styled.</li>
     <li><strong>Keyboard:</strong> Tab order is brand-row button → nav items → avatar trigger; the header follows in the main region. Enter or Space activates; Esc closes the popover and returns focus to its trigger. Every control shows the <code>--sidebar-ring</code> focus outline.</li>
-    <li><strong>Open question:</strong> Tax may become an eighth item (the Principal is deciding where the Tax Liability view lives).</li>
   </ul>
 </section>
 
@@ -492,6 +494,7 @@ flowchart TD
     <figure class="screen-card"><a href="styled-screens/account-register.html"><img src="styled-screens/thumbs/account-register.png" alt="Account register screen"></a><figcaption><a href="styled-screens/account-register.html">Account register</a><span>Drill-down from the GL: multi-crumb breadcrumb, Dr/Cr/running-balance table, Corrected and rule-posted rows.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/custodial-accounts.html"><img src="styled-screens/thumbs/custodial-accounts.png" alt="Custodial Accounts screen"></a><figcaption><a href="styled-screens/custodial-accounts.html">Custodial Accounts</a><span>Totals card, then per-account cards: cash, book value and market value side by side, link health, reconciliation, a lots sub-card; the provider-item dialog shown open.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class drilling to its lots; target editor; nominal / CPI-U toggle.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/tax.html"><img src="styled-screens/thumbs/tax.png" alt="Tax screen"></a><figcaption><a href="styled-screens/tax.html">Tax</a><span>Per entity and jurisdiction: pending liability and safe-harbor gap side by side, status tier, installment timeline, prepaid-tax account; Post your payment.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/reports.html"><img src="styled-screens/thumbs/reports.png" alt="Reports screen"></a><figcaption><a href="styled-screens/reports.html">Reports</a><span>Balance Sheet empty state plus dimmed previews of the Income Statement and Cash Flow shapes.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/entities.html"><img src="styled-screens/thumbs/entities.png" alt="Entities screen"></a><figcaption><a href="styled-screens/entities.html">Entities</a><span>Roll-up map (Pack): parents holding whole base entities, a shared entity drawn in each parent; membership cards with Includes / Included in, role badges, invite and create below.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/settings.html"><img src="styled-screens/thumbs/settings.png" alt="Settings screen"></a><figcaption><a href="styled-screens/settings.html">Settings</a><span>Per-entity import schedule and options, per-user preferences; avatar popover open with Settings current (proposed entry point).</span></figcaption></figure>
@@ -506,7 +509,7 @@ flowchart TD
 
 
   <h3 id="operator-surfaces">6.1 Operator surfaces</h3>
-  <p class="section-hint">Not reachable from any in-app nav and not part of the seven-item IA. Operator-only, reached by SSH tunnel to the host.</p>
+  <p class="section-hint">Not reachable from any in-app nav and not part of the eight-item IA. Operator-only, reached by SSH tunnel to the host.</p>
   <div class="screen-gallery">
     <figure class="screen-card"><a href="styled-screens/admin.html"><img src="styled-screens/thumbs/admin.png" alt="Admin screen"></a><figcaption><a href="styled-screens/admin.html">Admin</a><span><strong>Placeholder, pending PRD/ARCH/SECURITY definition (POLY-81).</strong> Services, versions, database and backups, last sync; administrative actions shown disabled until defined.</span></figcaption></figure>
   </div>

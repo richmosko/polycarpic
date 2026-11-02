@@ -1580,3 +1580,35 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .pack-also { position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); color: var(--muted-foreground); }
 .pack-also .icon { width: 10px; height: 10px; }
 .entity-rel { font-size: 12px; color: var(--muted-foreground); margin: -4px 0 10px; }
+
+/* ---------- Tax (tax.html). The status line leads with the tier badge
+   (label + icon, never colour alone). The two figures sit side by side
+   with their own arithmetic underneath, so Pending liability and Gap are
+   never read as one sum. The installment timeline is an ordered list on
+   a track: paid (--positive), overdue (--destructive), due (outline). */
+.tax-status-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 14px; margin-bottom: 20px; }
+.tax-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.tax-fig { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.tax-fig + .tax-fig { border-left: 1px solid var(--border); padding-left: 24px; }
+.tax-math { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-size: 13px; color: var(--muted-foreground); margin-top: 6px; max-width: 320px; }
+.tax-math .mono { text-align: right; font-variant-numeric: tabular-nums; }
+.tax-help { font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+.tax-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
+.tax-timeline { list-style: none; margin: 8px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; position: relative; }
+.tax-timeline::before { content: ""; position: absolute; top: 5px; left: 6px; right: 6px; height: 2px; background: var(--border); }
+.tax-inst { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding-top: 22px; min-width: 0; }
+.tax-inst-dot { position: absolute; top: 0; left: 0; width: 12px; height: 12px; border-radius: 50%; background: var(--card); border: 2px solid var(--border); box-sizing: border-box; }
+.tax-inst.is-paid .tax-inst-dot { background: var(--positive); border-color: var(--positive); }
+.tax-inst.is-overdue .tax-inst-dot { background: var(--destructive); border-color: var(--destructive); }
+.tax-inst.is-due .tax-inst-dot { border-color: var(--foreground); }
+.tax-inst-req { font-weight: 600; font-size: 14px; }
+.tax-inst-sub { font-size: 11px; color: var(--muted-foreground); }
+.tax-inst .badge { margin-top: 4px; white-space: nowrap; }
+.tax-lower { grid-template-columns: 2fr 1fr; margin-top: 24px; }
+.tax-link { color: var(--primary); font-weight: 500; }
+@media (max-width: 1100px) { .tax-lower { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .tax-timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; } .tax-timeline::before { display: none; } }
+
+/* A card eyebrow that links to the card's own screen (Dashboard tax card -> Tax). */
+.eyebrow.card-link { display: inline-flex; gap: 6px; color: inherit; text-decoration: none; }
+.eyebrow.card-link:hover, .eyebrow.card-link:focus-visible { color: var(--foreground); text-decoration: underline; }

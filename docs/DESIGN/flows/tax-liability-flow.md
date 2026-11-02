@@ -4,7 +4,9 @@
 
 ```mermaid
 flowchart TD
-  view([Open Tax Liability view\nfor entity + jurisdiction]) --> accrual[Running accrual annualizes\nincome to date by tax treatment]
+  nav([Sidebar: Tax]) --> view[Tax view for the entity:\njurisdiction tab selected]
+  card([Dashboard: Pending tax\nliability card]) --> view
+  view --> accrual[Running accrual annualizes\nincome to date by tax treatment]
   accrual --> pending[Pending liability =\nannualized tax to date minus\ncustodial prepaid balance]
   accrual --> safeharbor[Two safe-harbor bases computed:\nprior-year and current-year]
   safeharbor --> required[Required payment to date =\nlesser of the two safe-harbor bases]
@@ -27,6 +29,7 @@ flowchart TD
 ```
 
 **Notes**
+- **Reached from the sidebar or the Dashboard card;** both land on the same per-entity view with a jurisdiction selector.
 - **Tiers:** on track when `gap < 0` (prepaid ahead of the safe-harbor requirement); caution when `gap >= 0` and the due date is more than 14 days out; danger when `gap >= 0` and the due date has passed. They reuse the product-wide status vocabulary — design-system-spec.md § Status tiers.
 - **Gap = 0 is not on track.** It means exactly at the safe-harbor line, with nothing in hand beyond the requirement, so it takes the caution or danger tier by due date.
 - **Two figures,** both measured against the custodial account's balance but not against each other: **Pending liability = annualized tax to date − custodial prepaid balance** (what you would owe net of prepayments, if filed today); **Gap = required payments to date (safe harbor) − custodial balance** ("are you current with the authority"). Gap is never `required − pending`.
