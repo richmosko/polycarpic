@@ -226,7 +226,7 @@ Both clear the 3:1 non-text floor, and the dark-mode value clears 4.5:1 too. Off
 |---|---|---|---|
 | Sidebar brand row, expanded | 24px, left of the wordmark | `--sidebar-brand` | see above |
 | Sidebar rail, collapsed | 24px, the expand button's resting face; swaps to `panel-left-open` on hover or keyboard focus | `--sidebar-brand` | see above |
-| Brand app bar, plain pages (Membership setup, Admin) | 24px, left of the wordmark | Literal `--brand` on the bar (`#070907`) | 14.72:1 |
+| Brand app bar, plain pages (Get started, Admin) | 24px, left of the wordmark | Literal `--brand` on the bar (`#070907`) | 14.72:1 |
 | Brand app bar, Home | Full, 32px, left of the "Polycarpic" wordmark | Literal `--brand` on the bar (`#070907`) | 14.72:1 |
 | Login form pane (`.auth-logo`) | 24px, left of the wordmark, top-left | `--primary` | 4.75:1 light, 14.72:1 dark |
 
@@ -334,7 +334,7 @@ Settings/Notifications carry a `.proposed-tag` badge in the styled screens — v
 | 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, reported balance, reconciliation status against the GL. Each account has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. Book-vs-market is implicit here (the lots themselves), not a separate chart. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
 | 5 | **Allocation** | allocation vs. target | A dedicated actual-vs-target page. |
 | 6 | **Reports** | — | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (§ Component inventory) until POLY-M5 ships statements. |
-| 7 | **Entities** | — | Entity list, memberships, invite. |
+| 7 | **Entities** | — | Entity list, memberships, invite, and create — every entity beyond the user's own Person entity is created here (§ Entities & membership). |
 | — *(proposed avatar-popover item, not a sidebar item)* | **Settings** | import scheduling | Batch-import schedule and options, plus app-level preferences. Reached from the avatar popover (proposed, `.proposed-tag`). No sidebar nav item is active on this screen. |
 
 There is no "Securities" item (lots live in Custodial Accounts' sub-card; allocation is its own page) and no "Import" item (setup is a Custodial Accounts action; stats live on Transactions; scheduling lives in Settings).
@@ -468,6 +468,18 @@ See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-scr
 
 ---
 
+## Entities & membership
+
+**Every user owns a default base entity from account creation.** Creating an account also creates a **Person** entity named after the user (`<Name> (Person)`, e.g. "Mosko (Person)"), with the user as its owner. It is the base unit for the user's personal custodial accounts. There is therefore no signed-in state without an entity, and no first-run membership-setup page: sign-in lands on a dashboard.
+
+- **Landing entity on sign-in:** the last-viewed entity, else the user's own Person entity. An invited user's first sign-in lands on the entity they were invited to.
+- **Broader structures are created from Entities:** a Trust, a Business, or a Household that rolls up base entities. The roll-up model and its visualisation are not yet specified.
+- **Access is explicit membership only** (owner / manager / viewer), never inherited through a roll-up — flow 5.7.
+
+See `styled-screens/entities.html`.
+
+---
+
 ## Component inventory
 
 Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@latest add <name>`.
@@ -488,7 +500,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Button** | Variants: `default` (primary green fill: the one main action per view), `secondary`, `outline`, `ghost`, `destructive`, and `dark` (a solid `--foreground` fill with `--background` ink: near-black in light mode, near-white in dark). **Rule: never an outline button standing alone on `--background`.** Its `--border` edge is only 1.22:1 on the light page (~1.17:1 dark), so it all but disappears. Outline is for a secondary action set beside a filled one, or inside a card or bar that gives it a surface. A standalone secondary action uses `dark` instead (15.61:1 light / 17.92:1 dark against the page): Login's "Continue with Google" (with the Google G glyph). Hierarchy then comes from colour and position, not weight: the dark button is the heavier mass, so the primary stays the only green fill and sits last, after the divider |
 | **Skeleton** | Every async fetch boundary |
 | **Switch** | Settings' on/off preferences (auto-post matched recurring transactions, reduced motion), `.switch[role=switch]` |
-| **Brand app bar** | Every page without the app shell (Home, Membership setup, Admin): fixed near-black bar, lockup left, the page's trailing items right, a fade below — see Public screens § Brand app bar |
+| **Brand app bar** | Every page without the app shell (Home, Get started, Admin): fixed near-black bar, lockup left, the page's trailing items right, a fade below — see Public screens § Brand app bar |
 | **Sonner (toast)** | Import batch complete, entry posted, reconciliation break |
 | **Progress** | Import batch progress, safe-harbor paid-vs-required |
 | **Top row** | Starts right of the sidebar, not full-width, not sticky/bordered, same background token as the content below it: breadcrumb (left); entity selector + separator + "more" menu (right) — see Layout & shell, Header |
@@ -594,7 +606,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Lots sub-card pull-down | **Collapsible** | Direct reuse — a simpler primitive than Accordion for a single expand/collapse row |
 | Settings on/off preferences | **Switch** | Direct reuse |
 | Settings theme picker (Light / Dark / Auto) | **Toggle Group** (single) | Rendered with the `.tabs` look; semantically a radio group, not tabs |
-| Brand app bar (Home, Membership setup, Admin) | `custom`, with **Button** / **Badge** / **Avatar** for the trailing items | One component for every shell-less page: a fixed bar with a lockup, trailing items and a fade; too small and too brand-specific to be a block. No sidebar because no entity exists (setup), none applies (operator), or the visitor is not signed in (Home) |
+| Brand app bar (Home, Get started, Admin) | `custom`, with **Button** / **Badge** / **Avatar** for the trailing items | One component for every shell-less page: a fixed bar with a lockup, trailing items and a fade; too small and too brand-specific to be a block. No sidebar because no entity exists (setup), none applies (operator), or the visitor is not signed in (Home) |
 | Register / any wide table | **Table** (its own overflow-x wrapper) | `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling |
 | Allocation actual-vs-target track | `custom` on **Progress** | A Progress track plus a target marker; shadcn Progress has no marker |
 | Provider-item dialog | **Dialog**, **Tabs** (source-type picker), **Select** (account mapping) | Composed from three existing primitives, no custom chrome |
@@ -631,7 +643,6 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Login | `login.html` | none (split screen) | — |
 | Get started | `get-started.html` | brand app bar | — |
 | Sign up | `sign-up.html` | none (split screen) | invite code pre-filled and validated |
-| Membership setup | `membership-setup.html` | brand app bar | — |
 | Admin *(operator surface)* | `admin.html` | brand app bar + operator badge | — |
 
 ## Public screens: Home & Login
@@ -654,11 +665,11 @@ See `styled-screens/home.html`.
 
 ### Brand app bar
 
-The one top bar of every page without the app shell: Home, Membership setup, Admin. Markup: `<body class="has-brand-bar">` with `<header class="brand-bar">` first in the DOM.
+The one top bar of every page without the app shell: Home, Get started, Admin. Markup: `<body class="has-brand-bar">` with `<header class="brand-bar">` first in the DOM.
 
 - **The bar:** fixed, near-black `#070907` (the brand's dark surface, the same in both themes), 72px tall (64px below 760px).
   - Left: the lockup (`.brand-bar-lockup`), a link, in the literal `--brand` (14.72:1).
-  - Right: the page's trailing items, re-inked for the black bar — Home's Get started + Sign in, Membership setup's account avatar button, Admin's operator-session status badge.
+  - Right: the page's trailing items, re-inked for the black bar — Home's Get started + Sign in, Get started's Sign in, Admin's operator-session status badge.
 - **The fade:** hangs under the bar and moves with it, so the page scrolls under the black and emerges through the gradient. Neon and near-white text only ever sit on the bar's solid black.
   - Over Home's illustration: deep (88px, black → transparent), so the image rises out of the black.
   - Over a plain page background (`.brand-bar--plain`): short (28px, starting at 28% black). A deep black fade on the light page reads as a dirty smear; the short one reads as the bar's shadow.
@@ -667,7 +678,7 @@ The one top bar of every page without the app shell: Home, Membership setup, Adm
 - **Keyboard order:** the bar is first in the DOM, so Tab goes lockup, trailing items, then the page.
 - **Background:** the page paints `--background` edge to edge (the global body canvas is `--muted`, which differs in dark mode).
 
-See `styled-screens/home.html`, `styled-screens/membership-setup.html`, `styled-screens/admin.html`.
+See `styled-screens/home.html`, `styled-screens/get-started.html`, `styled-screens/admin.html`.
 
 ### Get started and Sign up
 
@@ -681,7 +692,7 @@ There is no public sign-up: every instance is self-hosted, and accounts on it co
 - **Sign up** (`sign-up.html`, Login's split layout with its own visual pane, the sunrise; see **Visual-pane image sources**), invite-gated:
   - Fields, in order: the invite code, then the account (the `dark` Google button, or email + password).
   - From an invite link, the code arrives pre-filled and validated, with a line naming who invited the visitor and to which entity. An invalid or used code shows an inline error under the field.
-  - "Create account" hands off to Membership setup, where the invited entity is waiting.
+  - "Create account" creates the user's own Person entity (§ Entities & membership) and lands on the dashboard of the invited entity.
   - Footer: "Already have an account? Sign in", then "No invite? Set up your own instance".
 - **Login's account line:** "Have an invite? **Create your account**" leads to Sign up; "No invite? **Set up your own instance**" leads to Get started.
 

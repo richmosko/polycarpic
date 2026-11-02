@@ -987,7 +987,7 @@ table.data-table td.amount.negative { color: var(--destructive); }
 }
 
 /* ---------- Brand app bar: the fixed near-black top bar of every page
-   without the app shell (Home, Membership setup, Admin). Lockup left,
+   without the app shell (Home, Get started, Admin). Lockup left,
    the page's trailing item(s) right. The bar is #070907, the brand's
    dark surface, the same in both themes; neon and near-white text only
    ever sit on its solid black. A fixed fade hangs under it, so the page
@@ -1072,9 +1072,6 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
 .brand-bar .btn-outline { border-color: rgba(255, 255, 255, 0.24); color: #EFF1EF; }
 .brand-bar .btn:focus-visible { outline-color: var(--brand); }
 .brand-bar .badge-outline { color: #EFF1EF; border-color: rgba(255, 255, 255, 0.24); }
-.brand-bar .avatar-btn { padding: 0; border: none; background: none; border-radius: 50%; cursor: pointer; display: inline-flex; }
-.brand-bar .avatar-btn .avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 13px; font-weight: 600; display: flex; align-items: center; justify-content: center; }
-.brand-bar .avatar-btn:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
 
 @media (max-width: 760px) {
   .has-brand-bar { --bar-h: 64px; }
@@ -1376,14 +1373,11 @@ a.btn { text-decoration: none; }
 .switch:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .switch[disabled] { opacity: 0.5; cursor: not-allowed; }
 
-/* Shell-less page bodies (membership setup, admin), under the brand app
-   bar instead of the sidebar: no entity exists yet (setup), or none
-   applies (operator). */
-.page-narrow { max-width: 520px; margin: 32px auto 64px; padding: 0 24px; }
+/* Shell-less page bodies (Get started, Admin), under the brand app bar
+   instead of the sidebar: no entity applies to them. */
 .page-medium { max-width: 760px; margin: 16px auto 64px; padding: 0 24px; }
 .page-title { font-family: var(--font-heading); font-size: 24px; font-weight: 700; margin-bottom: 6px; }
 .page-lede { color: var(--muted-foreground); font-size: 14px; margin-bottom: 24px; }
-.center { text-align: center; }
 
 /* ---------- General Ledger: chart-of-accounts tree. Custom: shadcn has
    no tree component, so these are nested disclosure rows. ---------- */
