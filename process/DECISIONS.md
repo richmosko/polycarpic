@@ -155,3 +155,27 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the Principal: "I don't want to get into the habit of logging decision history in the design docs (we already have revision control in git)." Git holds the revisions; this log holds the rulings; the design docs stay a description of the current design that `frontend-lead` can read without archaeology.
 **Alternatives considered:** keeping a compact changelog at the top of the spec (duplicates `git log` and drifts); keeping superseded sketches under `history/` (a design decision lives here or in git, not in a third place).
 **Approved by:** richmosko (2026-10-22, "please purge the legacy history prose")
+
+### 2026-11-02 — Every user owns a default Person entity; the Membership setup screen is retired
+**Decision:** account creation creates a Person entity named after the user with an owner membership; it is the base unit for personal custodial accounts. There is no no-membership state: an invited user lands on the invited entity, otherwise on their Person entity. `styled-screens/membership-setup.html` is removed; Home entry becomes User Flow 5.1 and PRD story 1.
+**Why:** the Principal: "each user should have a default entity allocation called Self … the base unit of personal custodial accounts." A first-run setup page was a dead end the product no longer needs.
+**Alternatives considered:** keeping the setup page as the invite-acceptance landing (an invite already names its entity).
+**Approved by:** richmosko (2026-11-02)
+
+### 2026-11-02 — Roll-up model: parents include whole base entities, a base entity may sit in several parents, one level of nesting
+**Decision:** Person, Trust and Business are base entities and hold accounts; Household and the new generic **Holding** type are parents that roll up whole base entities (never individual accounts, never another parent). A base entity may belong to more than one parent, so the parent link is a many-to-many junction (ARCH). Access is unchanged: membership per entity only; a parent member sees consolidated figures, and drill-through into an included entity stops at its boundary unless the viewer holds membership there, stated in the UI. The Entities screen shows the structure as a Pack map, equal-size circles, a shared entity drawn once per parent with an "also in" marker; no Venn geometry.
+**Why:** the Principal: accounts "group first in base layer entities and those get included in roll ups to parent entities"; overlap allowed; "I'm ok without having the overlapping Pack visualization. The drill downs can have duplicated entity listings." Equal circle sizes keep small entities legible and never leak magnitudes across the access boundary.
+**Alternatives considered:** one parent per base entity (simpler, Pack-exact, rejected for flexibility); per-account inclusion (roll-ups stop matching the base entity's own balance sheet); keeping four types with Household as the only parent (a holding structure is not a household); Venn-style overlap (degrades past three parents).
+**Approved by:** richmosko (2026-11-02)
+
+### 2026-11-02 — Tax is a sidebar item with its own screen
+**Decision:** the Tax Liability view is the eighth flat sidebar item, after Allocation (Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, Tax, Reports, Entities), with `styled-screens/tax.html`; the Dashboard's tax card links into it. Status tiers: on track `gap < 0`; caution `gap ≥ 0` and the due date more than 14 days out; danger `gap ≥ 0` and the due date within 14 days or passed (the 0–14-day window was previously unassigned).
+**Why:** no screen or nav path existed for the PRD §4 tax story; a per-entity, per-jurisdiction view with its own quarterly rhythm earns a top-level entry rather than a drill-down behind an often-empty card.
+**Alternatives considered:** Dashboard-card drill-down only (one click deeper, invisible when the card is empty); a statement under Reports (Reports is empty until POLY-M5).
+**Approved by:** richmosko (2026-11-02)
+
+### 2026-11-02 — An unmatched transfer leg stays a staged draft until matched or explicitly approved into Cash in Transit
+**Decision:** nothing reaches the ledger before approval. An unmatched leg waits in the Pending inbox for its counterpart, or the user approves it into Cash in Transit as a one-sided in-flight item; drafts and CIT items older than the threshold (default 3 business days) go to Exceptions. The PRD §2 metric covers approved CIT items plus staged drafts; reconciliation shows unapproved drafts as a known unposted delta, not a break.
+**Why:** the PRD's earlier wording posted unmatched legs to CIT on arrival, which conflicted with the Plaid-style review inbox and "immutability is visible": a matcher mistake would need a visible correction.
+**Alternatives considered:** post to CIT immediately (ledger mirrors the bank same day; wrong guesses fixed with Correct entry).
+**Approved by:** richmosko (2026-11-02)
