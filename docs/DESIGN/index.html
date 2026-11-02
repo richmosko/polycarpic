@@ -238,9 +238,12 @@ flowchart TD
   transfer -- same posting date --> autoEntry[Locked debit leg +\nsuggested offset leg\ntwo-line preview]
   transfer -- different dates --> citEntry[Two entries via\nCash in Transit clearing account]
   transfer -- unmatched --> openItem[Remains a single-leg\nPending row]
+  openItem -- counterpart arrives --> transfer
+  openItem -- user approves into CIT --> citOne[One-sided in-flight item:\ncash leg vs. Cash in Transit,\ncounterpart still to come]
+  citOne --> post
   openItem --> aging{Older than\nexceptions threshold\ndefault 3 business days?}
   aging -- yes --> exceptions[Surface on\nExceptions card]
-  aging -- no --> stage
+  aging -- no --> openItem
   citEntry --> autoEntry
   autoEntry --> expand[User expands the row:\nAuto-Suggest Match view]
   expand --> action{User action}
@@ -272,6 +275,7 @@ flowchart TD
   <ul>
     <li><strong>The locked leg is always the custodial cash side</strong> — verified bank reality (the Plaid transaction itself), never editable, in the two-line preview, the Split grid, or the Group modal. <strong>The suggested offset leg</strong> is pre-filled from historical rules + the Plaid category and overridden in place via an inline search dropdown, never a blank field.</li>
     <li><strong>Split</strong> is one draft → one multi-leg entry, live-validated: submission stays disabled until the rows sum exactly to the raw transaction's absolute total. <strong>Group</strong> is many drafts → one entry (the one many-to-one case, ARCH §3) via the shared journal-entry modal, pre-filled with one aggregate line + balancing distributions.</li>
+    <li><strong>An unmatched transfer leg stays a staged draft</strong> in Pending until its counterpart arrives (then it matches like any transfer), or until the user explicitly approves it into Cash in Transit as a one-sided in-flight item — a balanced entry, cash leg against the CIT clearing account, cleared when the counterpart posts. A draft still unmatched past the exceptions threshold moves to Exceptions.</li>
     <li><strong>Posting gate:</strong> Σ debits = Σ credits; the accounting equation holds per entity; the entry date matches the bank date (or the Cash-in-Transit rule); every posted draft links to exactly one entry. Any failure keeps the item in Pending — no partial or silent post.</li>
     <li>A posted row's user-facing action is <strong>"Correct entry"</strong>, never "edit" or "reverse" — reversal-only underneath (PRD §5). Click-through shows the full trail: original lines shaded/struck, the reversal, and the new entry. See design-system-spec.md § Correcting a posted entry.</li>
     <li>Badges: <code>Draft (staged)</code> (<code>--secondary</code>, clock), <code>Posted</code> (<code>--outline</code>, check), <code>Corrected</code> (<code>--outline</code> + <code>--brand-2</code>-tinted dot, pencil). An auto-posted row carries <code>Posted</code> plus a <code>posted by rule — &lt;name&gt;</code> line and the same Correct entry action.</li>
@@ -327,7 +331,9 @@ flowchart TD
   accounts --> reconcile[Reconcile GL balance\nagainst custodian-reported balance]
   reconcile --> match{Balances match\nwithin tolerance?}
   match -- yes --> clean[Reconciliation: clean\npositive tier]
-  match -- no --> brk[Reconciliation: break\ndanger tier, flagged\nalso on the Dashboard]
+  match -- "no: difference = staged drafts" --> unposted[Known unposted delta:\nthe unapproved drafts listed,\nnot a break]
+  unposted --> glLink
+  match -- "no: unexplained" --> brk[Reconciliation: break\ndanger tier, flagged\nalso on the Dashboard]
   clean --> glLink[General Ledger account register\nshows the same balance, GL side]
   brk --> glLink
   glLink --> done([View complete])
@@ -336,6 +342,7 @@ flowchart TD
     <li><strong>Three figures on every account, side by side:</strong> cash balance; book value (the GL's cost basis, cash included — the GL's own balance for the mirrored account); market value (cash plus every position at the last EOD price); and market minus book, signed and coloured per § Delta coloring. A cash-only account shows the same row with equal figures and a <code>$0.00</code> delta, so cards scan as columns. A totals card sums the four figures across accounts, with the price date.</li>
     <li>An account's market minus book equals its lots sub-card's total unrealized gain; the two must agree.</li>
     <li><strong>No toggle:</strong> General Ledger and Custodial Accounts are two separate nav items, not one screen behind a <code>Tabs</code> switch. Both read the same lot and journal data; the split is presentation, not a data fork.</li>
+    <li><strong>Unapproved drafts are a known unposted delta, not a break.</strong> When the GL and custodian balances differ by exactly the account's staged drafts (e.g. an unmatched transfer leg not yet approved into Cash in Transit), the card shows the delta and lists those drafts, linking to Pending on Transactions; no danger tier. Only a difference the drafts do not explain is a break.</li>
     <li>A reconciliation break uses the danger tier (<code>--destructive</code>) and surfaces on the Dashboard glance too, not only here.</li>
     <li>Allocation (actual vs. target by asset class) is its own flow, 5.6.</li>
   </ul>

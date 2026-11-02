@@ -465,7 +465,7 @@ A nested treemap of the chart of accounts, prototyped as a card above the tree o
 
 A cash-only account shows the same row with the three figures equal and a `$0.00` delta: the row keeps one shape on every card, so accounts scan as a column. A **totals card** above the account cards sums the same four figures across every custodial account for the entity, with the price date ("prices as of <date> close"). Market − book on an account equals its lots sub-card's total unrealized gain; the two figures must agree.
 
-**Per-account card:** institution name, link-health badge, the three-figure row, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.5).
+**Per-account card:** institution name, link-health badge, the three-figure row, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.5). A difference explained exactly by the account's staged drafts is a **known unposted delta**, not a break: the line names the delta and links to those drafts in Pending.
 
 **The lots sub-card (only on accounts that hold securities):**
 - One row per security, collapsed by default — a pull-down (chevron) reveals its individual lots.

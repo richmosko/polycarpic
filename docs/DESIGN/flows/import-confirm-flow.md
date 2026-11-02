@@ -9,9 +9,12 @@ flowchart TD
   transfer -- same posting date --> autoEntry[Locked debit leg +\nsuggested offset leg\ntwo-line preview]
   transfer -- different dates --> citEntry[Two entries via\nCash in Transit clearing account]
   transfer -- unmatched --> openItem[Remains a single-leg\nPending row]
+  openItem -- counterpart arrives --> transfer
+  openItem -- user approves into CIT --> citOne[One-sided in-flight item:\ncash leg vs. Cash in Transit,\ncounterpart still to come]
+  citOne --> post
   openItem --> aging{Older than\nexceptions threshold\ndefault 3 business days?}
   aging -- yes --> exceptions[Surface on\nExceptions card]
-  aging -- no --> stage
+  aging -- no --> openItem
   citEntry --> autoEntry
   autoEntry --> expand[User expands the row:\nAuto-Suggest Match view]
   expand --> action{User action}
@@ -44,6 +47,7 @@ flowchart TD
 **Notes**
 - **The locked leg is always the custodial cash side** — verified bank reality (the Plaid transaction itself), never editable, in the two-line preview, the Split grid, or the Group modal. **The suggested offset leg** is pre-filled from historical rules + the Plaid category and overridden in place via an inline search dropdown, never a blank field.
 - **Split** is one draft → one multi-leg entry, live-validated: submission stays disabled until the rows sum exactly to the raw transaction's absolute total. **Group** is many drafts → one entry (the one many-to-one case, ARCH §3) via the shared journal-entry modal, pre-filled with one aggregate line + balancing distributions.
+- **An unmatched transfer leg stays a staged draft** in Pending until its counterpart arrives (then it matches like any transfer), or until the user explicitly approves it into Cash in Transit as a one-sided in-flight item — a balanced entry, cash leg against the CIT clearing account, cleared when the counterpart posts. A draft still unmatched past the exceptions threshold moves to Exceptions.
 - **Posting gate:** Σ debits = Σ credits; the accounting equation holds per entity; the entry date matches the bank date (or the Cash-in-Transit rule); every posted draft links to exactly one entry. Any failure keeps the item in Pending — no partial or silent post.
 - A posted row's user-facing action is **"Correct entry"**, never "edit" or "reverse" — reversal-only underneath (PRD §5). Click-through shows the full trail: original lines shaded/struck, the reversal, and the new entry. See design-system-spec.md § Correcting a posted entry.
 - Badges: `Draft (staged)` (`--secondary`, clock), `Posted` (`--outline`, check), `Corrected` (`--outline` + `--brand-2`-tinted dot, pencil). An auto-posted row carries `Posted` plus a `posted by rule — <name>` line and the same Correct entry action.
