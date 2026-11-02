@@ -357,8 +357,8 @@ There is no "Securities" item (lots live in Custodial Accounts' sub-card; alloca
 | Tier | Token | Product examples |
 |---|---|---|
 | Normal / on track | `--positive` or plain `--foreground` | Safe-harbor gap < 0 (prepaid ahead of the requirement); reconciliation clean; import fully matched |
-| Caution | `--warning` | Safe-harbor gap ≥ 0, due date >14 days out (gap = 0 is exactly at the safe-harbor line, nothing in hand beyond it, so never on track); an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
-| Danger / overdue | `--destructive` | Safe-harbor gap ≥ 0 with the due date passed; exceptions-threshold breach; reconciliation break |
+| Caution | `--warning` | Safe-harbor gap ≥ 0, due date more than 14 days out (gap = 0 is exactly at the safe-harbor line, nothing in hand beyond it, so never on track); an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
+| Danger / overdue | `--destructive` | Safe-harbor gap ≥ 0 with the due date within 14 days or passed; exceptions-threshold breach; reconciliation break |
 
 ### Entity, account, and category badges — label + icon, not per-category hue
 
@@ -459,14 +459,14 @@ A nested treemap of the chart of accounts, prototyped as a card above the tree o
 
 | Figure | What it is | Source |
 |---|---|---|
-| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | Custodian-reported, reconciled to the GL |
+| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | The GL's cash balance; when the custodian reports a different figure, the reconciliation line shows it |
 | **Book value · GL** | Cost basis of everything in the account, cash included — the GL's own balance for the mirrored account | General Ledger (lots at cost) |
 | **Market value · EOD** | Cash plus every position at the last end-of-day price | Lots × daily EOD price feed |
 | **Market − book** | Unrealized gain or loss, signed and coloured per § Delta coloring | Derived |
 
 A cash-only account shows the same row with the three figures equal and a `$0.00` delta: the row keeps one shape on every card, so accounts scan as a column. A **totals card** above the account cards sums the same four figures across every custodial account for the entity, with the price date ("prices as of <date> close"). Market − book on an account equals its lots sub-card's total unrealized gain; the two figures must agree.
 
-**Per-account card:** institution name, link-health badge, the three-figure row, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.5). A difference explained exactly by the account's staged drafts is a **known unposted delta**, not a break: the line names the delta and links to those drafts in Pending.
+**Per-account card:** institution name, link-health badge, the three-figure row, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.5). A difference explained exactly by the account's staged drafts is a **known unposted delta**, not a break: the line shows the custodian's figure and a muted `Known delta` badge (clock icon, `--muted` fill, no status hue) naming the draft count and amount, linking to those drafts in Pending on Transactions.
 
 **The lots sub-card (only on accounts that hold securities):**
 - One row per security, collapsed by default — a pull-down (chevron) reveals its individual lots.

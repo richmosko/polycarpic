@@ -1612,3 +1612,9 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 /* A card eyebrow that links to the card's own screen (Dashboard tax card -> Tax). */
 .eyebrow.card-link { display: inline-flex; gap: 6px; color: inherit; text-decoration: none; }
 .eyebrow.card-link:hover, .eyebrow.card-link:focus-visible { color: var(--foreground); text-decoration: underline; }
+
+/* Known unposted delta (Custodial Accounts reconciliation): information,
+   not a status tier. Muted fill, clock icon, and it is a link to the
+   staged drafts in Pending. */
+.badge-muted { background: var(--muted); color: var(--muted-foreground); border-color: var(--border); text-decoration: none; }
+a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }

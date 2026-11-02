@@ -14,8 +14,8 @@ flowchart TD
   pending --> display[Display gauge + figures]
   gap --> tier{Gap status}
   tier -- "gap < 0" --> onTrack[Tier: Normal / on track\nprepaid ahead of safe harbor\npositive token]
-  tier -- "gap >= 0, due date > 14d out" --> caution[Tier: Caution\nwarning token]
-  tier -- "gap >= 0, due date passed" --> danger[Tier: Danger / overdue\ndestructive token]
+  tier -- "gap ≥ 0, due more than 14 days out" --> caution[Tier: Caution\nwarning token]
+  tier -- "gap ≥ 0, due within 14 days or passed" --> danger[Tier: Danger\ndestructive token]
   onTrack --> display
   caution --> display
   danger --> display
@@ -30,7 +30,7 @@ flowchart TD
 
 **Notes**
 - **Reached from the sidebar or the Dashboard card;** both land on the same per-entity view with a jurisdiction selector.
-- **Tiers:** on track when `gap < 0` (prepaid ahead of the safe-harbor requirement); caution when `gap >= 0` and the due date is more than 14 days out; danger when `gap >= 0` and the due date has passed. They reuse the product-wide status vocabulary — design-system-spec.md § Status tiers.
+- **Tiers:** on track when `gap < 0` (prepaid ahead of the safe-harbor requirement); caution when `gap ≥ 0` and the due date is more than 14 days out; danger when `gap ≥ 0` and the due date is within 14 days or has passed. They reuse the product-wide status vocabulary — design-system-spec.md § Status tiers.
 - **Gap = 0 is not on track.** It means exactly at the safe-harbor line, with nothing in hand beyond the requirement, so it takes the caution or danger tier by due date.
 - **Two figures,** both measured against the custodial account's balance but not against each other: **Pending liability = annualized tax to date − custodial prepaid balance** (what you would owe net of prepayments, if filed today); **Gap = required payments to date (safe harbor) − custodial balance** ("are you current with the authority"). Gap is never `required − pending`.
 - **v1 never moves money.** There is no pay button: the user pays the tax authority at their own bank; the payment lands as an imported transaction with no counterparty; the user posts the GL entry, debiting the custodial tax-authority account (a prepaid-tax asset). Copy says "post your payment" or "record your payment", never "pay" or "transfer".
