@@ -365,7 +365,7 @@ Meaning by label/icon/variant weight, not a dedicated hue per category.
 
 | Category | Variant | Icon (Lucide, indicative) |
 |---|---|---|
-| Entity type — Person / Trust / Business / Household | `secondary` | `User` / `Landmark` / `Building2` / `Home` |
+| Entity type — Person / Trust / Business (base); Household / Holding (parent) | `secondary` | `User` / `Landmark` / `Building2` / `Home` / `Layers` |
 | Account — GL / Custodial | `outline` | `BookText` / `Landmark` |
 | Transaction — Draft / Posted / Reversed / **Corrected** | `secondary` / `outline` / `outline` italic / **`outline` + `brand-2`-tinted dot** | `Clock` / `Check` / `RotateCcw` / `Pencil` |
 | Role — Owner / Manager / Viewer | `default` / `secondary` / `outline` | — |
@@ -505,8 +505,15 @@ See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-scr
 **Every user owns a default base entity from account creation.** Creating an account also creates a **Person** entity named after the user (`<Name> (Person)`, e.g. "Mosko (Person)"), with the user as its owner. It is the base unit for the user's personal custodial accounts. There is therefore no signed-in state without an entity: sign-in always lands on a dashboard.
 
 - **Landing entity on sign-in:** the last-viewed entity, else the user's own Person entity. An invited user's first sign-in lands on the entity they were invited to.
-- **Broader structures are created from Entities:** a Trust, a Business, or a Household that rolls up base entities. The roll-up model and its visualisation are not yet specified.
-- **Access is explicit membership only** (owner / manager / viewer), never inherited through a roll-up — flow 5.7.
+- **Base entities hold the accounts.** Custodial and GL accounts live only in base entities: Person, Trust, Business. Further base entities are created from Entities.
+- **Parent entities roll up whole base entities.** A parent (Household; Holding for a holding structure) includes whole base entities, never individual accounts, and shows their consolidated figures. A base entity may belong to more than one parent (a Business in a Household and in a Holding).
+- **Access is explicit membership only** (owner / manager / viewer), never inherited through a roll-up in either direction — flow 5.7.
+
+**The drill-through boundary.** A parent's viewer sees the parent's consolidated figures, and every figure stays clickable. Drilling into a figure that comes from an included base entity the user holds no membership on opens a **boundary panel** in place of that entity's register: the entity's name and type badge, the text "Included from <entity>. You don't have access to that entity's ledger.", and a way back. No number is greyed or made unclickable, and nothing is shown from beyond the boundary beyond the figure the parent already showed.
+
+**The entity switcher** (header entity selector) is always present: every user holds at least their own Person entity. It lists every entity the user holds membership on, base and parent, with each parent's included base entities nested beneath it; a base entity in two parents is listed under both. An included entity the user has no membership on is listed with a lock, and selecting it opens the boundary panel.
+
+**Roll-up map (Entities).** A card above the membership list draws every entity the user holds membership on as a **Pack** (LayerChart `Pack`, d3.pack, for frontend-lead): parents as `--muted` circles, each holding its base entities as `--card` circles; a base entity in no parent sits at top level. A base entity in several parents is drawn once in each, with an "also in <parent>" chip; there is no overlap geometry. Each circle shows the type icon and label, name and role badge, and switches to that entity on click; the current entity carries a `--ring`. **Circles are equal in size per level:** the map shows structure, not wealth. Sizing by balance would shrink small entities past legibility and would leak magnitude across the access boundary. The membership list below stays the accessible fallback, each card with an Includes / Included in line. Dashboard roll-ups may likewise list an included entity under each parent it belongs to.
 
 See `styled-screens/entities.html`.
 

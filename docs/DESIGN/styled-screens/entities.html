@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Entities (pass 5; styled pass 13). One card per entity the user belongs to. A Household's membership never implies access to a member Person's finances, or vice versa: every grant is an explicit row here. Role badges use decreasing weight: Owner (default) / Manager (secondary) / Viewer (outline). Invite shows only where the user is an Owner of a multi-member entity in this mock. -->
+<!-- Entities. Top: the roll-up map (LayerChart Pack in the build; static flex circles here). Parents (Household, Holding) roll up WHOLE base entities (Person, Trust, Business); a base entity in several parents is drawn once in each with an "also in" marker; circles are equal in size (structure, not wealth). Each circle switches entity; the current entity has a ring. Below: one card per entity the user holds membership on, the accessible fallback, with Includes / Included in lines. A parent's membership never implies access to an included base entity, or vice versa: every grant is an explicit row here. Role badges use decreasing weight: Owner (default) / Manager (secondary) / Viewer (outline). -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -56,23 +56,55 @@
     </div>
 
   <main class="content" style="padding-top:8px;">
-    <div class="card-grid" style="grid-template-columns:repeat(2, 1fr);">
+    <div class="card pack-card" aria-labelledby="pack-title">
+      <div class="card-head">
+        <span class="card-title" id="pack-title">Your entities</span>
+        <span class="card-sub">Parents roll up whole base entities. Click any entity to switch to it.</span>
+      </div>
+      <div class="pack" role="group" aria-label="Entity roll-up: The Moskos includes Mosko (Person) and Mosko Consulting LLC; Mosko Holdings includes Mosko Consulting LLC and Family Trust">
+      <div class="pack-parent">
+        <a class="pack-parent-head" href="dashboard.html" aria-label="Switch to The Moskos, Household, Owner"><span class="pack-type"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Household</span><span class="pack-name">The Moskos</span><span class="badge badge-sm badge-default">Owner</span></a>
+        <div class="pack-children">
+          <a class="pack-child pack-current" href="dashboard.html" aria-current="true" aria-label="Switch to Mosko (Person), Person, Owner"><span class="pack-type"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>Person</span><span class="pack-name">Mosko (Person)</span><span class="badge badge-sm badge-default">Owner</span></a>
+          <a class="pack-child" href="dashboard.html" aria-label="Switch to Mosko Consulting LLC, Business, Owner, also in Mosko Holdings"><span class="pack-type"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></span>Business</span><span class="pack-name">Mosko Consulting LLC</span><span class="badge badge-sm badge-default">Owner</span><span class="pack-also"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>also in Mosko Holdings</span></a>
+        </div>
+      </div>
+      <div class="pack-parent">
+        <a class="pack-parent-head" href="dashboard.html" aria-label="Switch to Mosko Holdings, Holding, Owner"><span class="pack-type"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>Holding</span><span class="pack-name">Mosko Holdings</span><span class="badge badge-sm badge-default">Owner</span></a>
+        <div class="pack-children">
+          <a class="pack-child" href="dashboard.html" aria-label="Switch to Mosko Consulting LLC, Business, Owner, also in The Moskos"><span class="pack-type"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></span>Business</span><span class="pack-name">Mosko Consulting LLC</span><span class="badge badge-sm badge-default">Owner</span><span class="pack-also"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>also in The Moskos</span></a>
+          <a class="pack-child" href="dashboard.html" aria-label="Switch to Family Trust, Trust, Manager"><span class="pack-type"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Trust</span><span class="pack-name">Family Trust</span><span class="badge badge-sm badge-secondary">Manager</span></a>
+        </div>
+      </div>
+      </div>
+      <p class="tm-note">A base entity in more than one parent is drawn once in each, marked "also in". A base entity in no parent sits beside the parents at top level. Circles are equal in size: the map shows structure, not wealth.</p>
+    </div>
+    <div class="card-grid" style="grid-template-columns:repeat(2, 1fr); margin-top:24px;">
       <div class="card entity-card">
-        <div class="entity-head"><span class="entity-name">Mosko</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>Person</span></div>
+        <div class="entity-head"><span class="entity-name">Mosko (Person)</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></span>Person</span></div>
+        <div class="entity-rel">Included in The Moskos</div>
         <div class="member-row"><span class="avatar">M</span><span class="member-name">You</span><span class="badge badge-default">Owner</span></div>
       </div>
       <div class="card entity-card">
         <div class="entity-head"><span class="entity-name">The Moskos</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Household</span></div>
+        <div class="entity-rel">Includes Mosko (Person), Mosko Consulting LLC</div>
         <div class="member-row"><span class="avatar">M</span><span class="member-name">You</span><span class="badge badge-default">Owner</span></div>
         <div class="member-row"><span class="avatar">S</span><span class="member-name">Sam Mosko</span><span class="badge badge-outline">Viewer</span></div>
         <div style="padding-top:12px; border-top:1px solid var(--border);"><button class="btn btn-outline btn-sm"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg></span>Invite member</button></div>
       </div>
       <div class="card entity-card">
         <div class="entity-head"><span class="entity-name">Family Trust</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Trust</span></div>
+        <div class="entity-rel">Included in Mosko Holdings</div>
         <div class="member-row"><span class="avatar">M</span><span class="member-name">You</span><span class="badge badge-secondary">Manager</span></div>
       </div>
       <div class="card entity-card">
         <div class="entity-head"><span class="entity-name">Mosko Consulting LLC</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></span>Business</span></div>
+        <div class="entity-rel">Included in The Moskos, Mosko Holdings</div>
+        <div class="member-row"><span class="avatar">M</span><span class="member-name">You</span><span class="badge badge-default">Owner</span></div>
+      </div>
+      <div class="card entity-card">
+        <div class="entity-head"><span class="entity-name">Mosko Holdings</span><span class="badge badge-secondary"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>Holding</span></div>
+        <div class="entity-rel">Includes Mosko Consulting LLC, Family Trust</div>
         <div class="member-row"><span class="avatar">M</span><span class="member-name">You</span><span class="badge badge-default">Owner</span></div>
       </div>
     </div>
@@ -80,7 +112,7 @@
       <div class="card-title">Create a new entity</div>
       <div class="form-row">
         <div class="field"><label for="new-entity">Entity name</label><input id="new-entity" class="input" type="text" placeholder="e.g. Family Trust"></div>
-        <div class="field"><label for="new-type">Type</label><select id="new-type" class="select"><option>Person</option><option>Trust</option><option>Business</option><option>Household</option></select></div>
+        <div class="field"><label for="new-type">Type</label><select id="new-type" class="select"><option>Person</option><option>Trust</option><option>Business</option><option>Household</option><option>Holding</option></select></div>
         <button class="btn btn-default"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>Create entity</button>
       </div>
     </div>

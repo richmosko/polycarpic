@@ -373,14 +373,13 @@ flowchart TD
     <li><strong>Nominal / CPI-U toggle</strong> (PRD §4.10) is orthogonal to actual-vs-target: it restates dollar figures and the over-time view in real terms; the percentage split itself does not change with the basis.</li>
   </ul>
 
-  <h3 id="flow-entity-membership">5.7 Entity switch &amp; membership access</h3>
-  <p class="section-hint"><strong>Story (PRD §4.9):</strong> owner / manager / viewer boundary. Source: <a href="flows/entity-membership-flow.md">flows/entity-membership-flow.md</a>.</p>
+  <h3 id="flow-entity-membership">5.7 Entity switch, roll-up &amp; membership access</h3>
+  <p class="section-hint"><strong>Story (PRD §4.9):</strong> parents roll up whole base entities; owner / manager / viewer per entity; the drill-through boundary. Source: <a href="flows/entity-membership-flow.md">flows/entity-membership-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
-  login([User logs in]) --> memberships[Load user's memberships:\nentity, role]
-  memberships --> list{More than one\nentity?}
-  list -- no --> single[Land directly on the\none entity, no switcher shown]
-  list -- yes --> switcher[Entity switcher in header:\nlist entities by membership]
+  login([User logs in]) --> memberships[Load memberships:\nbase and parent entities,\nrole on each]
+  memberships --> land[Land on last-viewed entity,\nelse the user's own Person entity]
+  land --> switcher[Entity switcher, always present:\nevery entity with membership,\nparents with their included\nbase entities nested]
   switcher --> select[User selects an entity]
   select --> roleCheck{Role on\nselected entity}
   roleCheck -- owner --> ownerView[Full read/write:\npost, edit memberships, purge]
@@ -390,12 +389,22 @@ flowchart TD
   managerView --> guard
   viewerView --> guard
   guard -- "no (always)" --> explicit[Only explicit membership\ngrants access, never inherited]
-  explicit --> render([Render scoped dashboard])
+  explicit --> kind{Selected entity\nis a parent?}
+  kind -- no --> baseView([Render the base entity's\nown ledger and accounts])
+  kind -- yes --> consolidated[Render consolidated figures\nacross the whole included\nbase entities]
+  consolidated --> drill[User clicks a figure\nfrom an included entity]
+  drill --> boundary{Membership on\nthat base entity?}
+  boundary -- yes --> into([Drill into that entity's\nregister or lots])
+  boundary -- no --> stop([Boundary panel:\nIncluded from the named entity,\nno access to its ledger])
   </pre>
   <ul>
-    <li>A Household's membership never transitively grants access to a member Person entity, or vice versa — every access is an explicit membership row (PRD §5, hard requirement).</li>
-    <li>Role badges (<code>Owner</code> / <code>Manager</code> / <code>Viewer</code>) use decreasing visual weight — <code>default</code> / <code>secondary</code> / <code>outline</code> — matching the product-wide "variant weight encodes meaning" rule (design-system-spec.md § Entity, account, and category badges).</li>
+    <li><strong>Base and parent entities.</strong> Accounts (custodial and GL) live only in base entities: Person, Trust, Business. A parent (Household; Holding) rolls up <strong>whole</strong> base entities, never individual accounts. A base entity may belong to more than one parent.</li>
+    <li><strong>The switcher is always present,</strong> because every user owns at least their own Person entity. It lists every entity the user holds membership on, base and parent, with each parent's included base entities nested under it; a base entity in two parents is listed under both.</li>
+    <li><strong>Access is explicit membership only</strong> (PRD §5, hard requirement): a parent's membership never grants access to an included base entity, or vice versa.</li>
+    <li><strong>The drill-through boundary.</strong> A parent viewer sees the parent's consolidated figures. Every figure stays clickable; a drill into an included base entity the user has no membership on opens a boundary panel — "Included from &lt;entity&gt;. You don't have access to that entity's ledger." — instead of the register, never a disabled number or a silent dead end.</li>
+    <li>Role badges (<code>Owner</code> / <code>Manager</code> / <code>Viewer</code>) use decreasing visual weight — <code>default</code> / <code>secondary</code> / <code>outline</code> (design-system-spec.md § Entity, account, and category badges).</li>
     <li>A viewer never sees a write affordance rendered-then-disabled: write controls are omitted entirely for a role that cannot use them.</li>
+    <li><strong>Roll-up map:</strong> Entities opens with a Pack of every entity the user holds membership on — parents as circles holding their base entities, a shared base entity drawn once in each parent with an "also in" marker; each circle switches entity. The membership list below it is the accessible fallback. See design-system-spec.md § Entities &amp; membership.</li>
   </ul>
 
   <h3 id="flow-general-ledger">5.8 General Ledger: tree, register, entry</h3>
@@ -484,7 +493,7 @@ flowchart TD
     <figure class="screen-card"><a href="styled-screens/custodial-accounts.html"><img src="styled-screens/thumbs/custodial-accounts.png" alt="Custodial Accounts screen"></a><figcaption><a href="styled-screens/custodial-accounts.html">Custodial Accounts</a><span>Totals card, then per-account cards: cash, book value and market value side by side, link health, reconciliation, a lots sub-card; the provider-item dialog shown open.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class drilling to its lots; target editor; nominal / CPI-U toggle.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/reports.html"><img src="styled-screens/thumbs/reports.png" alt="Reports screen"></a><figcaption><a href="styled-screens/reports.html">Reports</a><span>Balance Sheet empty state plus dimmed previews of the Income Statement and Cash Flow shapes.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/entities.html"><img src="styled-screens/thumbs/entities.png" alt="Entities screen"></a><figcaption><a href="styled-screens/entities.html">Entities</a><span>Membership cards with entity-type and role badges, invite, and create.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/entities.html"><img src="styled-screens/thumbs/entities.png" alt="Entities screen"></a><figcaption><a href="styled-screens/entities.html">Entities</a><span>Roll-up map (Pack): parents holding whole base entities, a shared entity drawn in each parent; membership cards with Includes / Included in, role badges, invite and create below.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/settings.html"><img src="styled-screens/thumbs/settings.png" alt="Settings screen"></a><figcaption><a href="styled-screens/settings.html">Settings</a><span>Per-entity import schedule and options, per-user preferences; avatar popover open with Settings current (proposed entry point).</span></figcaption></figure>
   </div>
   <h3>Public &amp; onboarding</h3>
