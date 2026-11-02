@@ -427,6 +427,27 @@ General Ledger opens to a **chart-of-accounts tree** — category → account �
 
 See `styled-screens/general-ledger.html` and `styled-screens/account-register.html`.
 
+### Treemap prototype — balance sheet map
+
+A nested treemap of the chart of accounts, prototyped as a card above the tree on `styled-screens/general-ledger.html` (static layout from one squarified pass; the build would use LayerChart's `Treemap`). Nesting is category → account → sub-account, area is |balance|, and every tile links to its register.
+
+**What the prototype settles:**
+- **Balance sheet only, two equal halves.** Assets on the left; Liabilities + Equity on the right. The accounting equation makes the halves equal in area, so the map shows the equation itself: a reader sees at once that the halves balance. Income and Expenses are period flows, not balances; on one area scale with balances they are invisible (month-to-date $2,400 against $412,884) and they would break the equal halves. They are not on this map. An income-statement counterpart (Income | Expenses + net income, also equal halves) belongs with Reports if it is wanted.
+- **Colour by element, from three ramp steps.** Assets `--chart-3`, Liabilities `--chart-4`, Equity `--chart-5`, with labels in `--card` ink: 4.58 / 5.48 / 6.63:1 in light mode, and the dark ramp with dark ink in dark mode. `--chart-1`/`--chart-2` fail AA under a label (3.26 / 3.85:1), so a five-element map would need two more AA-safe fills that do not exist (§ Entity, account, and category badges, open item). The three steps sit only ~1.2:1 apart, so colour separates elements weakly; the halves and their captions carry the meaning, and colour is never alone.
+- **Credit-balance accounts are fine.** Liabilities and Equity carry credit-normal balances; |balance| gives them positive area on their own side.
+- **Labels are fixed-size HTML, clipped by container query:** the value hides under 96×38px, the name under 64×22px; an unlabelled tile names itself on hover, focus and to assistive tech (full path in its accessible name). Text inside a scaled SVG `viewBox` shrinks with the card and is unreadable at 960px, so labels must not scale with the layout.
+
+**What does not work, or needs a rule before build:**
+- **Tiny accounts vanish.** On the reference entity, Liabilities are 0.4% of a half and draw as a 2px sliver; Prepaid Tax is 0.8%. A household ledger is dominated by a home and a brokerage, so the accounts used daily (checking, cards) are the smallest tiles: the map says least about what the user touches most. The card lists every tile below a size floor in a "too small to draw" note with links; a minimum tile size is rejected because it misstates proportions.
+- **Contra and wrong-side balances.** A contra account (accumulated depreciation) or a balance on the wrong side of its element (an overdrawn checking account, a card in credit) would add area where it subtracts. Rule: net it into its parent for area, and list it in the note with its sign.
+- **Zero balances** have no area and are omitted; the tree stays the complete list.
+- **Negative equity** (liabilities above assets) breaks the equal halves: the right half is Liabilities alone and the left is smaller. Proposed: a hatched "deficit" tile in the Assets half, sized to |equity|, so the halves still balance. Not prototyped.
+- **Resize.** The prototype positions tiles by percentage of one 900×240 layout, so tiles stretch at 960px; the real component re-lays out on resize. Below ~600px wide the map is unreadable: hide the card under the `md` breakpoint.
+- **Accessibility.** A treemap is not navigable as a structure by a screen reader. Tiles are links with full-path names, but the tree remains the accessible primary view; the map is a supplement, never a replacement.
+- **LayerChart specifics are unverified:** its tiling method, padding options (for group outlines) and label slot were not checked against the docs page, which renders client-side. Confirm before build.
+
+**Recommendation: go, scoped.** Ship the balance-sheet map (Assets | Liabilities + Equity, equal halves, three ramp fills, size-floor note) as a card above the tree on desktop widths; it earns its place by making the accounting equation visible. No-go on a single five-element map of the whole chart of accounts: flows and balances do not share an area scale, and two of the five fills fail AA.
+
 ---
 
 ## Custodial Accounts: lots & provider setup

@@ -1523,3 +1523,39 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
   .alloc-row { grid-template-columns: 120px 1fr 120px 96px; gap: 12px; }
   .form-row { grid-template-columns: 1fr 160px auto; }
 }
+
+/* ---------- Balance-sheet treemap (PROTOTYPE on general-ledger.html).
+   Two equal halves, Assets | Liabilities + Equity: the accounting
+   equation makes their areas equal. Tiles are absolutely positioned by
+   percentage (the prototype's layout is one static squarified pass at
+   900x240; the real LayerChart Treemap re-lays out on resize). Fill by
+   accounting element from the chart ramp's three AA-safe steps for a
+   --card-ink label: chart-3 4.58:1, chart-4 5.48:1, chart-5 6.63:1 on
+   white in light mode; dark mode inverts (light ramp, dark ink). Labels
+   clip by container query: value hidden under 96x38, label under 64x22.
+   Colour is never alone: every tile carries its name (or a title/aria
+   label when too small), and the halves are captioned above. Padding
+   sits on .tm-inner, never on the tile, so a sub-pixel tile stays
+   sub-pixel instead of growing to the padding's width. */
+.tm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 4px 0 8px; font-size: 13px; font-weight: 500; }
+.tm-cols > span { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.tm-cols .mono { color: var(--muted-foreground); font-weight: 400; }
+.tm-plus { color: var(--muted-foreground); }
+.tm-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.tm-map { position: relative; height: 240px; }
+.tm-group { position: absolute; background: var(--border); border-radius: 4px; }
+.tm-tile { position: absolute; box-sizing: border-box; border: 1px solid var(--card); border-radius: 3px; overflow: hidden; container-type: size; text-decoration: none; color: var(--card); }
+.tm-inner { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; min-width: 0; }
+.tm-tile:hover { filter: brightness(1.08); }
+.tm-tile:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; z-index: 1; }
+.tm-label { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tm-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; white-space: nowrap; }
+@container (max-width: 96px) { .tm-value { display: none; } }
+@container (max-height: 38px) { .tm-value { display: none; } }
+@container (max-width: 64px) { .tm-label { display: none; } }
+@container (max-height: 22px) { .tm-label { display: none; } }
+.tm-assets { background: var(--chart-3); }
+.tm-liabilities { background: var(--chart-4); }
+.tm-equity { background: var(--chart-5); }
+.tm-note { margin-top: 10px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
+.tm-note a { color: var(--primary); }
