@@ -49,6 +49,7 @@
     <li><a href="#semantic">Semantic (financial status)</a></li>
     <li><a href="#borders">Borders &amp; Focus</a></li>
     <li><a href="#charts">Charts</a></li>
+    <li><a href="#categorical">Categorical</a></li>
     <li><a href="#sidebar">Sidebar</a></li>
     <li><a href="#type">Typography</a></li>
     <li><a href="#radius">Radius &amp; Spacing</a></li>
@@ -241,8 +242,51 @@
   </table>
 </section>
 
+<section id="categorical" data-section="categorical">
+  <h2>7. Categorical (identity, not magnitude)</h2>
+  <p class="section-hint group-note">Seven hues in a fixed order plus a neutral Other, for charts where colour says <em>which thing</em>: treemaps, Pack, Sankey, grouped and stacked bars. The <code>--chart</code> ramp above stays the magnitude ramp. Slot 1 is the brand green and slot 2 the brand sky blue; the other five sit around them on the wheel and skip the status hues (red, orange, gain green). Each slot has a <code>-foreground</code> label ink that clears AA on the fill. Figures are contrast vs <code>--background</code> / <code>--card</code> in that mode, then the label ink and its ratio. Validated with the dataviz skill's <code>validate_palette.js</code>, both modes — see design-system-spec.md § Categorical palette.</p>
+  <table class="token-table">
+    <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Fixed assignment</th></tr></thead>
+    <tbody>
+      <tr><td><code>--cat-1</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#148100;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#148100 (4.75 / 5.04)</span><span class="hex">label white 5.04</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#4BA341;color:#070808;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#4BA341 (6.32 / 6.09)</span><span class="hex">label dark 6.32</span></div></td>
+        <td>Green — brand anchor (= light <code>--primary</code>). Assets · Person · US Equity.</td></tr>
+      <tr><td><code>--cat-2</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#0C96DF;color:#1D1F20;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#0C96DF (3.07 / 3.26)</span><span class="hex">label fg 5.08</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#009EED;color:#070808;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#009EED (6.79 / 6.55)</span><span class="hex">label dark 6.79</span></div></td>
+        <td>Sky blue — brand anchor (= light <code>--chart-1</code>). Liabilities · Trust · Intl Equity.</td></tr>
+      <tr><td><code>--cat-3</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#B18900;color:#1D1F20;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#B18900 (3.07 / 3.26)</span><span class="hex">label fg 5.08</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#7E6100;color:#F2F2F3;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#7E6100 (3.43 / 3.31)</span><span class="hex">label fg 5.22</span></div></td>
+        <td>Gold. Equity · Business · Fixed Income.</td></tr>
+      <tr><td><code>--cat-4</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#A1367B;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#A1367B (5.95 / 6.31)</span><span class="hex">label white 6.31</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#C6589C;color:#070808;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#C6589C (5.04 / 4.86)</span><span class="hex">label dark 5.04</span></div></td>
+        <td>Magenta. Income · Household · Cash.</td></tr>
+      <tr><td><code>--cat-5</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#3D43A8;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#3D43A8 (7.72 / 8.18)</span><span class="hex">label white 8.18</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#505AC8;color:#F2F2F3;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#505AC8 (3.47 / 3.35)</span><span class="hex">label fg 5.16</span></div></td>
+        <td>Indigo. Expense · Holding.</td></tr>
+      <tr><td><code>--cat-6</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#009E98;color:#1D1F20;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#009E98 (3.12 / 3.31)</span><span class="hex">label fg 5.00</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#009E98;color:#070808;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#009E98 (6.06 / 5.84)</span><span class="hex">label dark 6.06</span></div></td>
+        <td>Teal. Sixth series by first appearance.</td></tr>
+      <tr><td><code>--cat-7</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#824EB4;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#824EB4 (5.36 / 5.68)</span><span class="hex">label white 5.68</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#9A66CF;color:#070808;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#9A66CF (4.94 / 4.76)</span><span class="hex">label dark 4.94</span></div></td>
+        <td>Violet. Seventh series by first appearance.</td></tr>
+      <tr><td><code>--cat-other</code></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#78736E;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#78736E (4.43 / 4.69)</span><span class="hex">label white 4.69</span></div></td>
+        <td class="pair"><div class="mode"><span class="chip" style="background:#7C8387;color:#070808;display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:600">Aa</span><span class="hex">#7C8387 (5.21 / 5.02)</span><span class="hex">label dark 5.21</span></div></td>
+        <td>Neutral. Every series from the eighth on, folded into one “Other”.</td></tr>
+    </tbody>
+  </table>
+  <p class="section-hint group-note"><strong>Colour follows the entity, never its rank.</strong> The accounting elements (Assets, Liabilities, Equity, Income, Expense) and the entity types (Person, Trust, Business, Household, Holding) both use slots 1–5; they never share a chart. Asset classes use slots 1–4 and a sub-category takes its parent’s slot. Anything else (transaction categories, Sankey flows) is assigned in order of first appearance, persisted, and folds into <code>--cat-other</code> from the eighth on.</p>
+</section>
+
 <section id="sidebar" data-section="sidebar">
-  <h2>7. Sidebar</h2>
+  <h2>8. Sidebar</h2>
   <p class="section-hint group-note">Inverted relative to the page (dark-on-light / light-on-dark), re-hued blue in pass 5 to remove a green cast the Principal flagged.</p>
   <table class="token-table">
     <thead><tr><th>Token</th><th>Light</th><th>Dark</th><th>Used for</th></tr></thead>
@@ -272,7 +316,7 @@
 </section>
 
 <section id="type" data-section="type">
-  <h2>8. Typography</h2>
+  <h2>9. Typography</h2>
   <table class="token-table">
     <thead><tr><th>Token</th><th>Sample</th><th>Used for</th></tr></thead>
     <tbody>
@@ -290,7 +334,7 @@
 </section>
 
 <section id="radius" data-section="radius">
-  <h2>9. Radius &amp; Spacing</h2>
+  <h2>10. Radius &amp; Spacing</h2>
   <p class="section-hint group-note">Radius values are real tokens in <code>tokens.css</code>. The spacing figures below (page margins, card gaps/padding) are a fixed reference scale used consistently throughout <code>screen.css</code>, not yet promoted to their own CSS custom properties — flagged as an open item if that promotion becomes worth doing.</p>
   <table class="token-table">
     <thead><tr><th>Token</th><th>Sample</th><th>Value</th><th>Used for</th></tr></thead>

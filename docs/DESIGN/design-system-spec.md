@@ -92,6 +92,7 @@ Contrast figures are computed via the standard WCAG relative-luminance formula a
 | `--input` | `#DCD8D4` | Input border — one step stronger than `--border` |
 | `--ring` | `#148100` | Focus ring — follows `--primary` |
 | `--chart-1`…`--chart-5` | `#0C96DF` → `#086291` | Sequential/magnitude ramp in `--brand-2`'s blue hue |
+| `--cat-1`…`--cat-7`, `--cat-other` | `#148100` · `#0C96DF` · `#B18900` · `#A1367B` · `#3D43A8` · `#009E98` · `#824EB4` · `#78736E` | Categorical (identity) palette, each with a `-foreground` label ink — § Categorical palette |
 | `--sidebar` | `#1F2528` | Inverted — a dark blue-tinted surface floating on the light page (see Sidebar) |
 | `--sidebar-foreground` | `#F2F2F3` | |
 | `--sidebar-accent` | `#303B40` | |
@@ -123,6 +124,7 @@ Contrast figures are computed via the standard WCAG relative-luminance formula a
 | `--destructive` | `#FC4F4F` | |
 | `--destructive-foreground` | `#2A0507` | |
 | `--border` | `rgba(255,255,255,0.08)` | |
+| `--cat-1`…`--cat-7`, `--cat-other` | `#4BA341` · `#009EED` · `#7E6100` · `#C6589C` · `#505AC8` · `#009E98` · `#9A66CF` · `#7C8387` | Categorical palette, dark steps, same slot order — § Categorical palette |
 | `--chart-1`…`--chart-5` | `#C5E9FC` → `#0B89CB` | `--brand-2`'s blue hue, lightened; `--chart-5` here equals light mode's `--chart-2` by coincidence — both ramps sample the same hue/saturation function |
 | `--sidebar` | `#F7F8F8` | Inverted the other way — a light, blue-tinted card floating on the dark page |
 | `--sidebar-foreground` | `#1D1F20` | |
@@ -136,6 +138,55 @@ Contrast figures are computed via the standard WCAG relative-luminance formula a
 | `--warning-foreground` | `#2A1200` | Same dark ink as light mode (not a white/dark flip like `--destructive`; orange never pairs with white text AA-safely at a legible saturation, in either mode) |
 
 **Character read:** two brand hues, each following the same rule — literal where it clears AA (dark surfaces), darkened at the same hue where it doesn't (light-mode surfaces): neon green (`--brand`/`--primary`, 110.6°) for the main/primary identity, sky blue (`--brand-2`/secondary family, 200.6°) for secondary surfaces, info-weight badges, and anywhere the system needs a calm non-primary affordance. The dark neutral scale and the sidebar carry the blue tint rather than the green, so the green stays a deliberate signal instead of a cast over everything. `--positive` (gain green, hue ≈150°) is a third, deliberately distinct green — checked against `--brand` (110.6°) so it is never mistaken for a brand hue.
+
+#### Categorical palette
+
+The `--chart` ramp encodes **how much**. Treemaps, Pack, Sankey and grouped or stacked bars need colour that says **which thing**, and a one-hue ramp cannot do that (its steps sit ~1.2:1 apart). `--cat-1`…`--cat-7` plus `--cat-other` are the identity palette. Method: the dataviz skill's colour formula (four colour jobs, six checks), computed with its `validate_palette.js`, never by eye.
+
+**Hues.** Stated in OKLCH (the skill's space; the HSL hues quoted above for the brand are 110.6° / 200.6°). Slot 1 is the brand green and slot 2 the brand sky blue, so the set is anchored on the two brand hues. The other five sit around them at matched chroma (C 0.10–0.17): gold 88°, magenta 345°, indigo 275°, teal 190°, violet 305°. They skip the three status arcs, red (~29°), orange (~48°) and gain green (~150°). Seven hues, not the skill's eight: every candidate eighth hue (rose, olive, coral) lands on a status hue or on gold/green.
+
+| Slot | Hue | Light | Label ink (light) | Dark | Label ink (dark) |
+|---|---|---|---|---|---|
+| `--cat-1` | green 142° | `#148100` (= `--primary`) | `#FFFFFF` 5.04:1 | `#4BA341` | `#070808` 6.32:1 |
+| `--cat-2` | sky 242° | `#0C96DF` (= `--chart-1`) | `#1D1F20` 5.08:1 | `#009EED` | `#070808` 6.79:1 |
+| `--cat-3` | gold 88° | `#B18900` | `#1D1F20` 5.08:1 | `#7E6100` | `#F2F2F3` 5.22:1 |
+| `--cat-4` | magenta 345° | `#A1367B` | `#FFFFFF` 6.31:1 | `#C6589C` | `#070808` 5.04:1 |
+| `--cat-5` | indigo 275° | `#3D43A8` | `#FFFFFF` 8.18:1 | `#505AC8` | `#F2F2F3` 5.16:1 |
+| `--cat-6` | teal 190° | `#009E98` | `#1D1F20` 5.00:1 | `#009E98` | `#070808` 6.06:1 |
+| `--cat-7` | violet 305° | `#824EB4` | `#FFFFFF` 5.68:1 | `#9A66CF` | `#070808` 4.94:1 |
+| `--cat-other` | neutral | `#78736E` | `#FFFFFF` 4.69:1 | `#7C8387` | `#070808` 5.21:1 |
+
+**Steps.** Each mode has its own steps in the skill's lightness band (OKLCH L 0.43–0.77 light, 0.48–0.67 dark), in the same slot order. Lightness alternates between a white-ink step and a dark-ink step. That alternation, not hue, is what keeps neighbours apart under colour-blindness, and it is why the label ink differs by slot. Every slot carries an AA label (≥ 4.5:1) as its `--cat-N-foreground`, so a treemap tile or Pack circle can always be labelled on its fill. The neon `#2CFF05` is above the dark band (L 0.87) and the raw `#05A9FF` sits at its edge (L 0.71), so dark mode uses in-band steps of the same hues.
+
+**Validator results** (`validate_palette.js`, run against `--card` and `--background` in each mode; all pass, exit 0). ΔE is OKLab distance ×100; CVD is the worse of protanopia and deuteranopia (Machado 2009, severity 1.0), target ≥ 8, floor ≥ 6 with labels; normal vision must clear 15. The brand pair on its own clears it easily: light `--primary`↔`--secondary-foreground` CVD 20.6 / normal 22.6, dark `--brand`↔`--brand-2` 36.0 / 39.7.
+
+| Run | Light | Dark |
+|---|---|---|
+| Adjacent pairs, slots 1–7 (bars, stacks, Sankey bands) | CVD ΔE 8.7 (indigo↔magenta), normal 19.5 | CVD ΔE 10.5 (violet↔teal), normal 21.3 |
+| All pairs, slots 1–5 (treemap, Pack: any two can touch) | CVD ΔE 7.1 (gold↔green, floor band), normal 19.1 | CVD ΔE 10.7, normal 17.6 |
+| Lightness band, chroma floor | pass, all ≥ 0.10 | pass, all ≥ 0.10 |
+| Contrast vs surface (≥ 3:1) | tightest 3.07:1 on `--background` (slots 2, 3) | tightest 3.31:1 on `--card` (slot 3) |
+
+The light all-pairs run sits in the skill's 6–8 floor band, which is legal only with secondary encoding: treemap tiles and Pack circles always carry direct labels, so it holds. Past five series, an all-pairs chart form folds to Other or facets; the palette does not grow.
+
+**Status hues stay reserved.** No slot is red, orange or gain green, and a categorical fill never carries gain/loss: when a series means good or bad it wears `--positive`/`--destructive`, never a slot (one chart never mixes both). One near-collision is accepted and measured: light `--cat-1` is the brand green, 4.4 ΔE from light `--positive` (`#147F3C`, 8° of hue apart). The pair is held apart by job: `--positive` is a text colour on signed figures with a `+`/arrow, a categorical slot is a labelled fill. In dark mode the nearest pairs are `--cat-1`↔`--positive` 18.4 and `--cat-4`↔`--destructive` 14.4.
+
+**Fixed assignments: colour follows the entity, never its rank.** Filtering a series out never repaints the survivors.
+
+| Set | Slot 1 | Slot 2 | Slot 3 | Slot 4 | Slot 5 |
+|---|---|---|---|---|---|
+| Accounting elements (GL treemap, Sankey, bars) | Assets | Liabilities | Equity | Income | Expense |
+| Entity types (Entities Pack) | Person | Trust | Business | Household | Holding |
+| Asset classes (Allocation) | US Equity | Intl Equity | Fixed Income | Cash | — |
+
+The accounting elements and the entity types reuse slots 1–5; the two sets never appear on the same chart. An asset-class sub-category takes its parent's slot. Anything else (transaction categories in bars, Sankey flows) takes slots in order of first appearance, persisted per entity so a category keeps its colour across sessions; from the eighth series on, the tail folds into one "Other" in `--cat-other`.
+
+**Usage rules (from the skill).**
+- **A legend is always present for two or more series**; direct-label selectively (the tile or band that matters, the extremes), and let the table view carry every value. A label renders inside a fill only when it fits with padding, otherwise it moves outside the mark or to the tooltip; colour is never the only channel.
+- **Separate fills with a 2px surface gap**, never a drawn border.
+- **Large blocks stay quiet:** a treemap is the exception the label inks were built for; Pack circles and wide areas take the slot as a 2px stroke on a `--card`/`--muted` fill, not a solid fill.
+- **Texture fallback:** one "Lines" fill at 45° (and its 135° mirror), inked tone-on-tone in a darker step of the slot's own hue. Opt-in only: the accessibility setting, print, or `forced-colors`. Never decorative, never on by default.
+- **One series is one colour.** The bars of a single series all take one colour (`--chart-3`) and are never coloured by value; slots are for two or more identities.
 
 ### Secondary accent — job definition
 
@@ -371,7 +422,7 @@ Meaning by label/icon/variant weight, not a dedicated hue per category.
 | Transaction — Draft / Posted / Reversed / **Corrected** | `secondary` / `outline` / `outline` italic / **`outline` + `brand-2`-tinted dot** | `Clock` / `Check` / `RotateCcw` / `Pencil` |
 | Role — Owner / Manager / Viewer | `default` / `secondary` / `outline` | — |
 
-**Open item:** a genuine 3+-hue categorical chart need isn't solved by this doc yet — decide against a concrete spec when one arises.
+Badges stay monochrome. Charts that need a hue per identity use the categorical palette (§ Foundations → Categorical palette).
 
 ### Correcting a posted entry — "Correct entry," not "edit" or "reverse"
 
@@ -434,7 +485,7 @@ A nested treemap of the chart of accounts, prototyped as a card above the tree o
 
 **What the prototype settles:**
 - **Balance sheet only, two equal halves.** Assets on the left; Liabilities + Equity on the right. The accounting equation makes the halves equal in area, so the map shows the equation itself: a reader sees at once that the halves balance. Income and Expenses are period flows, not balances; on one area scale with balances they are invisible (month-to-date $2,400 against $412,884) and they would break the equal halves. They are not on this map. An income-statement counterpart (Income | Expenses + net income, also equal halves) belongs with Reports if it is wanted.
-- **Colour by element, from three ramp steps.** Assets `--chart-3`, Liabilities `--chart-4`, Equity `--chart-5`, with labels in `--card` ink: 4.58 / 5.48 / 6.63:1 in light mode, and the dark ramp with dark ink in dark mode. `--chart-1`/`--chart-2` fail AA under a label (3.26 / 3.85:1), so a five-element map would need two more AA-safe fills that do not exist (§ Entity, account, and category badges, open item). The three steps sit only ~1.2:1 apart, so colour separates elements weakly; the halves and their captions carry the meaning, and colour is never alone.
+- **Colour by element, from the categorical slots.** Assets `--cat-1`, Liabilities `--cat-2`, Equity `--cat-3` (the accounting-element assignment, § Categorical palette), each label in its slot's `-foreground` ink: 5.04 / 5.08 / 5.08:1 in light mode, 6.32 / 6.79 / 5.22:1 in dark. The slots are distinct hues, validated all-pairs, so colour separates the elements; the halves and their captions still carry the meaning, and colour is never alone.
 - **Credit-balance accounts are fine.** Liabilities and Equity carry credit-normal balances; |balance| gives them positive area on their own side.
 - **Labels are fixed-size HTML, clipped by container query:** the value hides under 96×38px, the name under 64×22px; an unlabelled tile names itself on hover, focus and to assistive tech (full path in its accessible name). Text inside a scaled SVG `viewBox` shrinks with the card and is unreadable at 960px, so labels must not scale with the layout.
 
@@ -447,7 +498,7 @@ A nested treemap of the chart of accounts, prototyped as a card above the tree o
 - **Accessibility.** A treemap is not navigable as a structure by a screen reader. Tiles are links with full-path names, but the tree remains the accessible primary view; the map is a supplement, never a replacement.
 - **LayerChart specifics are unverified:** its tiling method, padding options (for group outlines) and label slot were not checked against the docs page, which renders client-side. Confirm before build.
 
-**Recommendation: go, scoped.** Ship the balance-sheet map (Assets | Liabilities + Equity, equal halves, three ramp fills, size-floor note) as a card above the tree on desktop widths; it earns its place by making the accounting equation visible. No-go on a single five-element map of the whole chart of accounts: flows and balances do not share an area scale, and two of the five fills fail AA.
+**Recommendation: go, scoped.** Ship the balance-sheet map (Assets | Liabilities + Equity, equal halves, categorical fills, size-floor note) as a card above the tree on desktop widths; it earns its place by making the accounting equation visible. No-go on a single five-element map of the whole chart of accounts: flows and balances do not share an area scale.
 
 ---
 
@@ -516,7 +567,7 @@ See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-scr
 
 **The entity switcher** (header entity selector) is always present: every user holds at least their own Person entity. It lists every entity the user holds membership on, base and parent, with each parent's included base entities nested beneath it; a base entity in two parents is listed under both. An included entity the user has no membership on is listed with a lock, and selecting it opens the boundary panel.
 
-**Roll-up map (Entities).** A card above the membership list draws every entity the user holds membership on as a **Pack** (LayerChart `Pack`, d3.pack, for frontend-lead): parents as `--muted` circles, each holding its base entities as `--card` circles; a base entity in no parent sits at top level. A base entity in several parents is drawn once in each, with an "also in <parent>" chip; there is no overlap geometry. Each circle shows the type icon and label, name and role badge, and switches to that entity on click; the current entity carries a `--ring`. **Circles are equal in size per level:** the map shows structure, not wealth. Sizing by balance would shrink small entities past legibility and would leak magnitude across the access boundary. The membership list below stays the accessible fallback, each card with an Includes / Included in line. Dashboard roll-ups may likewise list an included entity under each parent it belongs to.
+**Roll-up map (Entities).** A card above the membership list draws every entity the user holds membership on as a **Pack** (LayerChart `Pack`, d3.pack, for frontend-lead): parents as `--muted` circles, each holding its base entities as `--card` circles; each circle's 2px stroke is its entity type's categorical slot (Person `--cat-1`, Trust `--cat-2`, Business `--cat-3`, Household `--cat-4`, Holding `--cat-5`), with the type icon and label beside it, so colour is never alone; a base entity in no parent sits at top level. A base entity in several parents is drawn once in each, with an "also in <parent>" chip; there is no overlap geometry. Each circle shows the type icon and label, name and role badge, and switches to that entity on click; the current entity carries a `--ring` outside a 3px `--card` gap, so it never merges with a green Person stroke. **Circles are equal in size per level:** the map shows structure, not wealth. Sizing by balance would shrink small entities past legibility and would leak magnitude across the access boundary. The membership list below stays the accessible fallback, each card with an Includes / Included in line. Dashboard roll-ups may likewise list an included entity under each parent it belongs to.
 
 See `styled-screens/entities.html`.
 
@@ -906,7 +957,6 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | Motion | Respect `prefers-reduced-motion` (open item) |
 
 **Open items:**
-- No CVD simulation run on the palette yet — two brand hues (green 110.6°, blue 200.6°) to check; high priority, since both carry meaning.
 - `--border`/`--card` is a low-contrast hairline by design (1.29:1) — decorative, consistent with common practice.
 - `--warning` and `--chart-1` fall under 3:1 only on an `--accent` hover fill (2.87:1 / 2.92:1) — no chart inside a hover; a bare warning icon on a hovered row keeps its label.
 - Reduced-motion policy not yet written.
@@ -917,6 +967,4 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 ## Open questions
 
 - Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.
-- Categorical (3+ hue) chart palette for transaction-category breakdowns — deferred until a concrete chart spec exists.
 - Compare `styled-screens/dashboard.html` against Monarch Money's Accounts screen (https://www.monarchmoney.com) component-by-component once frontend-lead builds the real screen.
-- **CVD check on the brand hues:** flagged in Accessibility — two brand hues (green, blue) to check, not yet simulated.
