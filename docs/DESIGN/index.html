@@ -357,15 +357,13 @@ flowchart TD
   </ul>
 
   <h3 id="flow-allocation">5.6 Allocation vs. target</h3>
-  <p class="section-hint"><strong>Stories (PRD §4.8, §4.10):</strong> actual vs. target by asset class, drift, target editor, nominal / CPI-U toggle. Source: <a href="flows/allocation-flow.md">flows/allocation-flow.md</a>.</p>
+  <p class="section-hint"><strong>Story (PRD §4.8):</strong> actual vs. target by asset class, drift, target editor. Source: <a href="flows/allocation-flow.md">flows/allocation-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
   open([Open Allocation\nfor entity]) --> actual[Actual by asset class:\nmarket value from lots,\nacross every custodial account]
   actual --> target[Overlay the target\nper class]
   target --> drift[Drift per class:\nactual minus target, in points]
   drift --> act{User action}
-  act -- toggle basis --> basis[Nominal or\ninflation-adjusted CPI-U]
-  basis --> actual
   act -- drill a class --> lots([Custodial Accounts lots,\nfiltered to that class])
   act -- adjust target --> edit[Target editor:\npercent per class]
   edit --> sum{Targets total\n100%?}
@@ -379,7 +377,7 @@ flowchart TD
     <li><strong>Drift is information, not a warning.</strong> Over or under target shows as a neutral <code>outline</code> badge ("+2 pt over", "−2 pt under"); on target shows the positive soft badge. No caution or danger hue.</li>
     <li><strong>Drill:</strong> each asset-class name opens Custodial Accounts' lots, filtered to that class, so every percentage traces to the lots behind it.</li>
     <li><strong>Target editor:</strong> Save is enabled only when the targets total 100%. Viewers see the chart but no editor and no Save (write controls are omitted, not greyed).</li>
-    <li><strong>Nominal / CPI-U toggle</strong> (PRD §4.10) is orthogonal to actual-vs-target: it restates dollar figures and the over-time view in real terms; the percentage split itself does not change with the basis.</li>
+    <li><strong>No nominal / inflation-adjusted toggle here.</strong> Allocation is a contemporaneous snapshot of today's holdings, so a CPI-U restatement adds no information; the toggle (PRD §4.10) belongs to the time-series views (Dashboard net-worth chart, Reports).</li>
   </ul>
 
   <h3 id="flow-entity-membership">5.7 Entity switch, roll-up &amp; membership access</h3>
@@ -499,7 +497,7 @@ flowchart TD
     <figure class="screen-card"><a href="styled-screens/general-ledger.html"><img src="styled-screens/thumbs/general-ledger.png" alt="General Ledger screen"></a><figcaption><a href="styled-screens/general-ledger.html">General Ledger</a><span>Balance-sheet treemap (prototype) above the chart-of-accounts tree with custodial cross-reference badges; each account opens its register.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/account-register.html"><img src="styled-screens/thumbs/account-register.png" alt="Account register screen"></a><figcaption><a href="styled-screens/account-register.html">Account register</a><span>Drill-down from the GL: multi-crumb breadcrumb, Dr/Cr/running-balance table, Corrected and rule-posted rows.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/custodial-accounts.html"><img src="styled-screens/thumbs/custodial-accounts.png" alt="Custodial Accounts screen"></a><figcaption><a href="styled-screens/custodial-accounts.html">Custodial Accounts</a><span>Totals card, then per-account cards: market value, book value and cash side by side, link health, reconciliation, a lots sub-card; the provider-item dialog shown open.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class drilling to its lots; target editor; nominal / CPI-U toggle.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class drilling to its lots; target editor.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/tax.html"><img src="styled-screens/thumbs/tax.png" alt="Tax screen"></a><figcaption><a href="styled-screens/tax.html">Tax</a><span>Per entity and jurisdiction: pending liability and safe-harbor gap side by side, status tier, installment timeline, prepaid-tax account; Post your payment.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/reports.html"><img src="styled-screens/thumbs/reports.png" alt="Reports screen"></a><figcaption><a href="styled-screens/reports.html">Reports</a><span>Balance Sheet empty state plus dimmed previews of the Income Statement and Cash Flow shapes.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/entities.html"><img src="styled-screens/thumbs/entities.png" alt="Entities screen"></a><figcaption><a href="styled-screens/entities.html">Entities</a><span>Roll-up map (Pack): parents holding whole base entities, a shared entity drawn in each parent; membership cards with Includes / Included in, role badges, invite and create below.</span></figcaption></figure>

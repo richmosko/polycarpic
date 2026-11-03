@@ -491,7 +491,7 @@ See `styled-screens/custodial-accounts.html`: the lots sub-card shows one securi
 
 ## Allocation, Reports & Settings
 
-**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.10) is orthogonal and applies here like any time-series view. Includes a target editor (targets must sum to 100%). Each asset class drills to the lots behind it on Custodial Accounts, filtered to that class. Flow 5.6.
+**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. No nominal/inflation-adjusted toggle: allocation is a contemporaneous snapshot of today's holdings, so a CPI-U restatement adds no information (the toggle, PRD §4.10, lives on time-series views). Includes a target editor (targets must sum to 100%). Each asset class drills to the lots behind it on Custodial Accounts, filtered to that class. Flow 5.6.
 
 **Reports.** A nav item **from day one**: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
 
@@ -534,7 +534,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Segmented bar + legend** (custom, tokens-driven) | Allocation actual-vs-target, Assets/Liabilities summary — direct Monarch pattern |
 | **Badge** | Entity/account/transaction/role badges, safe-harbor status pill, link-health badge, Origin-style signed-% pill on ticker/delta rows |
 | **Accordion** | Transactions' three urgency-ordered cards (Exceptions, Pending, Posted); the Pending card's row expansion (two-leg preview) |
-| **Tabs** | Entity switcher, nominal-vs-inflation-adjusted toggle, Totals/Percent toggle (Monarch pattern), Reports' statement switcher. General Ledger and Custodial Accounts are two nav items, never a tab pair |
+| **Tabs** | Entity switcher, nominal-vs-inflation-adjusted toggle on time-series views (Dashboard net-worth chart, Reports; never Allocation), Totals/Percent toggle (Monarch pattern), Reports' statement switcher. General Ledger and Custodial Accounts are two nav items, never a tab pair |
 | **Sheet / Dialog** | Transaction detail drawer; new-entity/membership dialog; provider-item dialog (Custodial Accounts) |
 | **Dialog, near-full-screen** | The journal-entry modal (header + legs) — manual "+ New entry", "Correct entry", Split, and Group & Summarize all reuse this one modal |
 | **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers; the suggested-offset-leg inline search dropdown (Pending inbox); per-card "show N" limit selector |
@@ -653,7 +653,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Register / any wide table | **Table** (its own overflow-x wrapper) | `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling |
 | Allocation actual-vs-target track | `custom` on **Progress** | A Progress track plus a target marker; shadcn Progress has no marker |
 | Provider-item dialog | **Dialog**, **Tabs** (source-type picker), **Select** (account mapping) | Composed from three existing primitives, no custom chrome |
-| Tabs (nominal/real toggle, Totals/Percent, Reports statements) | **Tabs** | Direct reuse |
+| Tabs (nominal/real toggle on time-series views, Totals/Percent, Reports statements) | **Tabs** | Direct reuse |
 | Transaction detail drawer | **Sheet** | Direct reuse |
 | Select / Combobox (category, tax-treatment, jurisdiction) | **Select**, **Combobox** | Direct reuse |
 | Toasts (import complete, entry posted, reconciliation break) | **Sonner** | Direct reuse |
