@@ -1419,7 +1419,7 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .badge .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
 /* The three figures every custodial account shows, left to right: market
    value (cash + positions at EOD prices), book value (the GL's cost basis,
-   cash included) and cash balance, then market minus book. One
+   cash included) and cash balance, then Unrealized. One
    row per account card, and the same row summed on the totals card. */
 .custodial-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
 .custodial-fig { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
