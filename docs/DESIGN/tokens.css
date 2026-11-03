@@ -130,7 +130,7 @@
      cat-1..5 CVD 8.3, normal 17.1. WAIVED by the same ruling: the 3:1
      surface contrast on light surfaces (tightest 1.29:1, neon on
      --background) and the mode lightness band. Compensated on every
-     mark: a label or legend, a 1px --border hairline or a 2px surface
+     mark: a label or legend, a 1px --cat-edge hairline and a 2px surface
      gap, and the dark label ink on the line (AA on the fill).
      design-system-spec.md § Categorical palette has the full method. */
   --cat-1: var(--brand);   --cat-1-foreground: #1D1F20; /* neon green, 12.15:1 */
@@ -144,6 +144,13 @@
      --muted-foreground), at the set's brightness but with no chroma, so
      it never reads as an eighth hue. */
   --cat-other: #A8A39D;    --cat-other-foreground: #1D1F20; /* 6.61:1 */
+  /* The 1px edge on a categorical mark: --foreground at 35%, translucent so
+     it reads as a darker step of whatever it sits on. Inset on a fill:
+     neon 2.09:1 against the fill and 2.68:1 against --background, cyan
+     2.04 / 2.98, gold 1.94 / 3.69. Outset on a surface: 2.14:1 against
+     --background, 2.15:1 against --card. --border is 1.06:1 on the neon,
+     too faint to edge the brightest slots. */
+  --cat-edge: rgba(29, 31, 32, 0.35);
 
   /* Sidebar: inverted relative to the page (a dark card on the light page)
      and tinted with the same blue as the neutral scale, so the whole
@@ -241,6 +248,11 @@
   --cat-6-foreground: #070808;     /*  7.48:1 */
   --cat-7-foreground: #070808;     /*  7.38:1 */
   --cat-other-foreground: #070808; /*  8.01:1 */
+  /* --foreground at 25%. The fills already clear the surface here, so the
+     edge only has to show, not to separate: outset 2.08:1 on --card and
+     2.00:1 on --background, a soft ring rather than a halo. Inset it barely
+     registers on a fill this bright (neon 1.00:1, cyan 1.04, gold 1.15). */
+  --cat-edge: rgba(242, 242, 243, 0.25);
 
   /* Sidebar: inverted the other way in dark mode, a LIGHT card on the dark
      page, close to the light canvas tone. The ring uses a derived blue
