@@ -331,7 +331,7 @@ Settings/Notifications carry a `.proposed-tag` badge in the styled screens — v
 | 1 | **Dashboard** | — | Cross-cutting summary — net worth, cash flow, tax, allocation snapshot. |
 | 2 | **Transactions** | the journal and import status | The time-ordered journal: three accordion cards in urgency order — Exceptions, Pending, Posted. The Pending card is the bank-feed review/match inbox (see § Transactions workflow). Import stats/status and the Sync Transactions / New entry actions live here; there is no separate "Import" item. Not the chart of accounts; see General Ledger for that. |
 | 3 | **General Ledger** | the GL side of accounts | Opens to a chart-of-accounts **tree** (category → account → sub-account, balances, a custodial marker on accounts that mirror a physical account). Clicking an account opens that account's **register** — a separate page, breadcrumbed back to the tree — showing every line that hit it, in date order, with a running balance; each line links to its full journal entry. The register is account-scoped and running-balance-shaped; Transactions is entry-scoped and time-ordered — genuinely different questions, not two views of one screen. |
-| 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, each showing **cash balance, book value (GL cost basis) and market value (EOD prices) side by side, with market minus book**, plus reconciliation status against the GL; a totals card sums the three figures across accounts. Each account that holds securities has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
+| 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, each showing **market value (EOD prices), book value (GL cost basis) and cash balance side by side, left to right, with market minus book**, plus reconciliation status against the GL; a totals card sums the three figures across accounts. Each account that holds securities has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
 | 5 | **Allocation** | allocation vs. target | A dedicated actual-vs-target page. |
 | 6 | **Tax** | the tax liability view | Per entity and jurisdiction: pending liability, the safe-harbor gap and its status tier, next due date, the custodial prepaid-tax account, the year's installment timeline, and the "Post your payment" action (never "Pay"). The Dashboard's Pending tax liability card links here (§ Allocation, Reports & Settings → Tax; flow 5.4). |
 | 7 | **Reports** | — | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (§ Component inventory) until POLY-M5 ships statements. |
@@ -455,13 +455,13 @@ A nested treemap of the chart of accounts, prototyped as a card above the tree o
 
 "Sub-card in the Custodial view... pull downs of each security to show lots. And for the Allocation vs target to be a dedicated page." Lots live here; allocation vs. target is its own screen (§ Allocation, Reports & Settings).
 
-**Three figures on every account, side by side.** Each custodial-account card shows, in one row:
+**Three figures on every account, side by side.** Each custodial-account card shows, in one row, left to right in this order — market value, book value, cash, then the derived market − book. Cash sits last so the row reads as "market and book include cash": the two totals first, the cash already inside them after.
 
 | Figure | What it is | Source |
 |---|---|---|
-| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | The GL's cash balance; when the custodian reports a different figure, the reconciliation line shows it |
-| **Book value · GL** | Cost basis of everything in the account, cash included — the GL's own balance for the mirrored account | General Ledger (lots at cost) |
 | **Market value · EOD** | Cash plus every position at the last end-of-day price | Lots × daily EOD price feed |
+| **Book value · GL** | Cost basis of everything in the account, cash included — the GL's own balance for the mirrored account | General Ledger (lots at cost) |
+| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | The GL's cash balance; when the custodian reports a different figure, the reconciliation line shows it |
 | **Market − book** | Unrealized gain or loss, signed and coloured per § Delta coloring | Derived |
 
 A cash-only account shows the same row with the three figures equal and a `$0.00` delta: the row keeps one shape on every card, so accounts scan as a column. A **totals card** above the account cards sums the same four figures across every custodial account for the entity, with the price date ("prices as of <date> close"). Market − book on an account equals its lots sub-card's total unrealized gain; the two figures must agree.
@@ -470,7 +470,7 @@ A cash-only account shows the same row with the three figures equal and a `$0.00
 
 **The lots sub-card (only on accounts that hold securities):**
 - One row per security, collapsed by default — a pull-down (chevron) reveals its individual lots.
-- Each lot shows book value, market value, and its own short-term or long-term unrealized gain/loss.
+- Each lot shows market value, book value (the same left-to-right order as the account row), and its own short-term or long-term unrealized gain/loss.
 - The security's own row shows its summed book/market/gain across all its lots.
 - The account's lots sub-card totals short, long, and total unrealized gain/loss across every security; the total equals the card's Market − book figure. There is no separate book-vs-market chart.
 
