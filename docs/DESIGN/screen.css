@@ -1726,3 +1726,66 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
 .alloc-total .card-sub { margin-right: auto; }
 /* A sub-row group closes with a rule unless it is the card's last block. */
 .alloc-sub-group > .alloc-row:last-child, .alloc-sub-group > .kv-row:last-child { border-bottom: 1px solid var(--border); }
+
+/* ---------- Journal ID ----------
+   The human reference for a posted entry, on every journal-entries view
+   (General Ledger's Journal entries card, Transactions' Posted card, the
+   account register): a per-entity display number assigned at posting,
+   distinct from the UUID key. Mono, like amounts. The copy control keeps
+   its space when hidden so the column does not shift, shows on row hover
+   or keyboard focus, and stays visible where there is no hover. */
+.je-id { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; font-style: normal; color: var(--foreground); white-space: nowrap; }
+.je-copy { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 3px; background: none; border: none; border-radius: var(--radius-sm); color: var(--muted-foreground); cursor: pointer; opacity: 0; }
+.je-copy svg { display: block; width: 100%; height: 100%; }
+tr:hover .je-copy, .je-copy:focus-visible, .je-copy.copied { opacity: 1; }
+.je-copy:hover { color: var(--foreground); }
+.je-copy:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.je-copy .je-copied-glyph, .je-copy.copied .je-copy-glyph { display: none; }
+.je-copy.copied .je-copied-glyph { display: block; }
+.je-copy.copied { color: var(--positive); }
+@media (hover: none) { .je-copy { opacity: 1; } }
+.je-modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+
+/* ---------- Reversed status: `outline` italic ---------- */
+.badge-reversed { background: transparent; color: var(--muted-foreground); border-color: var(--border); font-style: italic; }
+
+/* ---------- Header row on a zero-padding card (Chart of accounts,
+   Journal entries): lines the title up with the tree rows below it. ---------- */
+.card-head.card-head-inset { padding: 20px 24px 0; margin-bottom: 0; }
+
+/* ---------- General Ledger: Journal entries card ----------
+   One row of controls at the card top, then the table. Cell padding 16 +
+   body padding 8 = the card's 24px text edge. An expanded entry is a table
+   row holding the .correction-trail block, on Transactions' Posted card
+   too, so the two cards share one expansion. */
+.je-title-row { display: inline-flex; align-items: baseline; gap: 10px; }
+.je-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.je-body { padding: 8px 8px 20px; }
+table.data-table td.je-toggle-cell { width: 20px; padding-right: 0; }
+.je-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); } /* chevron-down open, chevron-right closed */
+tr:has(+ tr.je-expand:not([hidden])) td { border-bottom: none; }
+table.data-table tr.je-expand > td { padding-top: 0; }
+table.data-table tbody tr.je-expand:hover, .dark table.data-table tbody tr.je-expand:hover { background: transparent; }
+tr.je-expand .correction-trail { margin-top: 0; }
+.correction-trail .trail-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+.table-pager { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted-foreground); }
+
+/* ---------- Date range popover (shadcn Popover + Range Calendar) ----------
+   Presets on the left, a month on the right; picking days replaces the
+   preset. In product it opens under the trigger; the styled screen renders
+   it statically as the reference, like .account-menu. */
+.date-menu { display: inline-flex; gap: 12px; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 8px 24px oklch(0 0 0 / 20%); padding: 6px; }
+.date-presets { width: 160px; border-right: 1px solid var(--border); padding-right: 6px; }
+.date-presets .account-menu-check { margin-left: auto; color: var(--primary); }
+.range-cal { padding: 6px 8px 8px 0; }
+.range-month { font-size: 13px; font-weight: 600; text-align: center; padding: 4px 0 8px; }
+.range-grid { display: grid; grid-template-columns: repeat(7, 32px); row-gap: 2px; }
+.range-dow { font-size: 11px; color: var(--muted-foreground); text-align: center; padding: 4px 0; }
+.range-day { height: 32px; border: none; background: none; color: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.range-day.in-range { background: var(--accent); color: var(--accent-foreground); }
+.dark .range-day.in-range { background: color-mix(in srgb, var(--accent) 40%, var(--card)); color: var(--foreground); }
+.range-day.range-start, .range-day.range-end { background: var(--primary); color: var(--primary-foreground); }
+.range-day.range-start { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.range-day.range-end { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.range-day.range-today { font-weight: 700; text-decoration: underline; }
+.range-day:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }

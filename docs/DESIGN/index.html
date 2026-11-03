@@ -185,6 +185,7 @@
       <tr><td>Landing illustration</td><td>—, custom</td><td>Home — the mountains illustration under the brand app bar, then headline, subhead and feature cards; not a signed-in screen</td></tr>
       <tr><td>Switch</td><td>Switch</td><td>Settings on/off preferences (auto-post matched recurring transactions, reduced motion)</td></tr>
       <tr><td>Chart-of-accounts tree</td><td>—, custom (nested disclosure rows)</td><td>General Ledger: group rows with chevrons, account rows link to the register, custodial cross-reference badge</td></tr>
+      <tr><td>Date range control</td><td>Popover + Range Calendar</td><td>General Ledger's Journal entries card: presets plus one month grid</td></tr>
       <tr><td>Brand app bar</td><td>—, custom</td><td>Every page without the app shell (Home, Get started, Admin): fixed near-black bar, neon lockup left, the page's trailing items right, a fade below (deep over Home's image, a short shadow over plain pages)</td></tr>
       <tr><td>Split screen login</td><td>—, custom</td><td>Login — full field list, centered form column, always-branded visual pane</td></tr>
     </tbody>
@@ -444,12 +445,17 @@ flowchart TD
   register --> line[Click a register line]
   line --> entry([Journal entry:\nevery leg, actor,\nCorrect entry action])
   register -- breadcrumb --> tree
+  tree --> journal[Journal entries card:\nby date, page size,\ndate range, sort]
+  journal -- click opens the entry --> entry
   </pre>
   <ul>
     <li><strong>The tree is the GL's own view:</strong> every balance is the ledger's figure. The custodial badge (<code>landmark</code> icon + institution) is a cross-reference to Custodial Accounts, never a second data source; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.</li>
+    <li><strong>The tree is a titled card,</strong> "Chart of accounts", with the same header as the Balance sheet map.</li>
     <li><strong>The register is account-scoped and running-balance-shaped;</strong> Transactions is entry-scoped and time-ordered across every account. Different questions, deliberately two screens.</li>
     <li><strong>A register line opens its full journal entry</strong> — every leg, not just the one that hit this account — with actor attribution and the Correct entry action (flow 5.3).</li>
     <li><strong>Balance sheet map (prototype):</strong> a nested treemap card above the tree, Assets | Liabilities + Equity as equal halves, each element in its fixed categorical slot; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
+    <li><strong>Journal entries card:</strong> below the tree, every posted entry header for the entity, newest first, with page size, date range (default This month) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.</li>
+    <li><strong>Journal ID:</strong> a short per-entity display number, <code>JE-000214</code>, assigned at posting and distinct from the UUID key. It leads the Journal entries card, the Posted card and the register, copied on hover, so any entry can be cited exactly.</li>
   </ul>
 
   <h3 id="flow-reports">5.9 Reports</h3>
@@ -509,9 +515,9 @@ flowchart TD
   <h3>App screens</h3>
   <div class="screen-gallery">
     <figure class="screen-card"><a href="styled-screens/dashboard.html"><img src="styled-screens/thumbs/dashboard.png" alt="Dashboard screen"></a><figcaption><a href="styled-screens/dashboard.html">Dashboard</a><span>Per-entity financial health: net worth, accounts, summary, empty tax/allocation cards.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/transactions.html"><img src="styled-screens/thumbs/transactions.png" alt="Transactions screen"></a><figcaption><a href="styled-screens/transactions.html">Transactions</a><span>Exceptions / Pending / Posted accordions; the Plaid review-and-match inbox, split grid, bulk bar, journal-entry modal.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/general-ledger.html"><img src="styled-screens/thumbs/general-ledger.png" alt="General Ledger screen"></a><figcaption><a href="styled-screens/general-ledger.html">General Ledger</a><span>Balance-sheet treemap (prototype) above the chart-of-accounts tree with custodial cross-reference badges; each account opens its register.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/account-register.html"><img src="styled-screens/thumbs/account-register.png" alt="Account register screen"></a><figcaption><a href="styled-screens/account-register.html">Account register</a><span>Drill-down from the GL: multi-crumb breadcrumb, Dr/Cr/running-balance table, Corrected and rule-posted rows.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/transactions.html"><img src="styled-screens/thumbs/transactions.png" alt="Transactions screen"></a><figcaption><a href="styled-screens/transactions.html">Transactions</a><span>Exceptions / Pending / Posted accordions; the Plaid review-and-match inbox, split grid, bulk bar, Posted rows led by Journal ID, journal-entry modal.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/general-ledger.html"><img src="styled-screens/thumbs/general-ledger.png" alt="General Ledger screen"></a><figcaption><a href="styled-screens/general-ledger.html">General Ledger</a><span>Balance-sheet treemap (prototype), then the Chart of accounts card with custodial cross-reference badges, each account opening its register, then the Journal entries card with page size, date range and sort.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/account-register.html"><img src="styled-screens/thumbs/account-register.png" alt="Account register screen"></a><figcaption><a href="styled-screens/account-register.html">Account register</a><span>Drill-down from the GL: multi-crumb breadcrumb, Journal ID plus Dr/Cr/running-balance table, Corrected and rule-posted rows.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/custodial-accounts.html"><img src="styled-screens/thumbs/custodial-accounts.png" alt="Custodial Accounts screen"></a><figcaption><a href="styled-screens/custodial-accounts.html">Custodial Accounts</a><span>Totals card, then per-account cards: market value, book value and cash side by side, link health, reconciliation, a lots sub-card; the provider-item dialog shown open.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class pulling down to its sub-categories and drilling to its lots; two-level target editor.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/tax.html"><img src="styled-screens/thumbs/tax.png" alt="Tax screen"></a><figcaption><a href="styled-screens/tax.html">Tax</a><span>Per entity and jurisdiction: pending liability and safe-harbor gap side by side, status tier, installment timeline, prepaid-tax account; Post your payment.</span></figcaption></figure>

@@ -172,54 +172,69 @@
       </div>
     </div>
 
-    <!-- ============ Posted — paged, least urgent ============ -->
+    <!-- ============ Posted — paged, least urgent ============
+         The Journal ID leads every row: the per-entity display number
+         assigned at posting, with copy on hover. A corrected row carries
+         the corrected entry's ID; the trail names all three. -->
     <div class="card accordion-card" style="padding:0;">
       <div class="accordion-header">
         <span class="accordion-title">Posted <span class="accordion-count">— 214 entries</span></span>
         <select class="select show-n-select"><option>Show 25</option></select>
       </div>
       <div class="accordion-body">
+        <div class="table-wrap">
         <table class="data-table">
           <thead>
-            <tr><th>Date</th><th>Payee</th><th>Category</th><th></th><th>Status</th><th style="text-align:right;">Amount</th><th></th></tr>
+            <tr><th>Journal ID</th><th>Date</th><th>Payee</th><th>Category</th><th>Status</th><th style="text-align:right;">Amount</th><th></th></tr>
           </thead>
           <tbody>
             <tr>
-              <td>Sep 10</td><td>Streaming Svc<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Subscriptions</td><td></td>
+              <td><span class="je-id">JE-000214<button class="je-copy" type="button" data-id="JE-000214" title="Copy JE-000214" aria-label="Copy journal ID JE-000214"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 12</td><td>Client Payment<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Revenue</td>
+              <td><span class="badge badge-outline">Posted</span></td>
+              <td class="amount positive">+$2,400.00</td>
+              <td class="nowrap"><button class="row-action">Correct entry</button></td>
+            </tr>
+            <tr>
+              <td><span class="je-id">JE-000213<button class="je-copy" type="button" data-id="JE-000213" title="Copy JE-000213" aria-label="Copy journal ID JE-000213"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 10</td><td>Streaming Svc<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Subscriptions</td>
               <td><span class="badge badge-outline">Posted</span></td>
               <td class="amount negative">−$12.99</td>
-              <td><button class="row-action">Correct entry</button></td>
+              <td class="nowrap"><button class="row-action">Correct entry</button></td>
             </tr>
             <tr>
-              <td>Sep 9</td><td>Office Supply Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Office expense</td><td></td>
+              <td><span class="je-id">JE-000212<button class="je-copy" type="button" data-id="JE-000212" title="Copy JE-000212" aria-label="Copy journal ID JE-000212"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 9</td><td>Office Supply Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Office expense</td>
               <td><span class="badge badge-corrected"><span class="badge-dot"></span>Corrected</span></td>
               <td class="amount negative">−$68.50</td>
-              <td><button class="row-action">View correction ⌄</button></td>
+              <td class="nowrap"><button class="row-action">View correction ⌄</button></td>
+            </tr>
+            <!-- Click-through state: the Corrected row above, expanded. -->
+            <tr class="je-expand">
+              <td colspan="7">
+                <div class="correction-trail">
+                  <div class="trail-label">Original entry JE-000209 (Sep 8) — reversed</div>
+                  <div class="trail-row struck"><span>Dr Office Expense</span><span>$84.20</span></div>
+                  <div class="trail-row struck"><span>Cr Primary Checking</span><span>−$84.20</span></div>
+                  <div class="trail-label">Reversal JE-000211 (Sep 9)</div>
+                  <div class="trail-row"><span>Cr Office Expense</span><span>−$84.20</span></div>
+                  <div class="trail-row"><span>Dr Primary Checking</span><span>$84.20</span></div>
+                  <div class="trail-label">Corrected entry JE-000212 (Sep 9)</div>
+                  <div class="trail-row"><span>Dr Office Expense</span><span>$68.50</span></div>
+                  <div class="trail-row"><span>Cr Primary Checking</span><span>−$68.50</span></div>
+                </div>
+              </td>
             </tr>
             <tr>
-              <td>Sep 9</td><td>Property Mgmt Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Rent</td><td></td>
+              <td><span class="je-id">JE-000210<button class="je-copy" type="button" data-id="JE-000210" title="Copy JE-000210" aria-label="Copy journal ID JE-000210"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 9</td><td>Property Mgmt Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Rent</td>
               <td>
                 <span class="badge badge-outline">Posted</span>
                 <div class="row-meta">posted by rule — Recurring rent</div>
               </td>
               <td class="amount negative">−$2,200.00</td>
-              <td><button class="row-action">Correct entry</button></td>
+              <td class="nowrap"><button class="row-action">Correct entry</button></td>
             </tr>
           </tbody>
         </table>
-        <!-- Click-through state (pass 6) — the Corrected row above, expanded. -->
-        <div class="correction-trail">
-          <div class="trail-label">Original entry (Sep 8) — reversed</div>
-          <div class="trail-row struck"><span>Dr Office expense</span><span>$84.20</span></div>
-          <div class="trail-row struck"><span>Cr Checking</span><span>−$84.20</span></div>
-          <div class="trail-label">Reversal (Sep 9)</div>
-          <div class="trail-row"><span>Cr Office expense</span><span>−$84.20</span></div>
-          <div class="trail-row"><span>Dr Checking</span><span>$84.20</span></div>
-          <div class="trail-label">Corrected entry (Sep 9)</div>
-          <div class="trail-row"><span>Dr Office expense</span><span>$68.50</span></div>
-          <div class="trail-row"><span>Cr Checking</span><span>−$68.50</span></div>
         </div>
-        <div style="text-align:center; margin-top:16px; font-size:13px; color:var(--muted-foreground);">‹ Prev · Page 1 of 9 · Next ›</div>
+        <div class="table-pager">‹ Prev · Page 1 of 9 · Next ›</div>
       </div>
     </div>
 
@@ -241,7 +256,7 @@
          convention as .correction-trail above. -->
     <div class="je-modal-scrim">
       <div class="je-modal">
-        <div class="je-modal-title">New journal entry</div>
+        <div class="je-modal-head"><div class="je-modal-title">New journal entry</div><span class="card-sub">Journal ID assigned at posting</span></div>
         <div class="je-modal-subtitle">Header + legs — the same modal reused for Correct entry, Split, and Group &amp; Summarize, pre-filled differently per entry point.</div>
         <div style="display:flex; gap:16px; margin-bottom:16px;">
           <div style="flex:1;"><label style="font-size:13px; font-weight:500;">Date</label><input class="input" style="width:100%; margin-top:4px;" value="Sep 12, 2026"></div>
@@ -265,5 +280,14 @@
   </main>
   </div>
 </div>
+<script>
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('.je-copy');
+  if (!btn) return;
+  navigator.clipboard?.writeText(btn.dataset.id);
+  btn.classList.add('copied');
+  setTimeout(() => btn.classList.remove('copied'), 1200);
+});
+</script>
 </body>
 </html>
