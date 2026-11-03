@@ -1690,12 +1690,23 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
    target; the class row carries its own reconcile badge. */
 .alloc-disclosure { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; margin: 0; background: none; border: none; border-radius: var(--radius-sm); color: var(--muted-foreground); cursor: pointer; flex-shrink: 0; }
 .alloc-disclosure:hover, .alloc-disclosure:focus-visible { background: var(--accent); color: var(--accent-foreground); }
-.alloc-row.alloc-sub { padding: 8px 0; font-size: 13px; }
-.alloc-row.alloc-sub .alloc-name { font-weight: 400; padding-left: 28px; }
+/* Nesting: the class name starts 44px in (chevron 20 + gap 8 + dot 8 +
+   gap 8); a sub-name starts 24px further right, at 68px. The sub-row's
+   name column is 24px wider, so its track starts 24px right of the class
+   track; the fixed figure and badge columns keep their x, so values scan. */
+.alloc-row.alloc-sub { grid-template-columns: 184px 1fr 150px 110px; padding: 8px 0; font-size: 13px; }
+.alloc-row.alloc-sub .alloc-name { font-weight: 400; padding-left: 68px; }
 .alloc-row.alloc-sub .alloc-track { height: 6px; }
 .kv-row .alloc-class { display: flex; align-items: center; gap: 8px; font-weight: 500; }
-.kv-row.alloc-sub-target { padding: 8px 0 8px 28px; font-size: 13px; }
-.kv-row.alloc-sub-target .input-pct { height: 30px; }
+/* Editor: the class name starts 28px in (chevron 20 + gap 8); a sub-name
+   starts at 52px. The sub-input is narrower with its right edge (and the
+   % sign) on the class input's, so its left edge also steps in. */
+.kv-row.alloc-sub-target { padding: 8px 0 8px 52px; font-size: 13px; }
+.kv-row.alloc-sub-target .input-pct { width: 64px; height: 30px; }
+@media (max-width: 1100px) {
+  .alloc-row.alloc-sub { grid-template-columns: 144px 1fr 120px 96px; }
+  .alloc-row.alloc-sub .alloc-name { padding-left: 56px; }
+}
 .alloc-total .card-sub { margin-right: auto; }
 /* A sub-row group closes with a rule unless it is the card's last block. */
 .alloc-sub-group > .alloc-row:last-child, .alloc-sub-group > .kv-row:last-child { border-bottom: 1px solid var(--border); }
