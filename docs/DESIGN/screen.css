@@ -1680,3 +1680,22 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
 .row-source .icon { width: 12px; height: 12px; }
 .pending-lead { display: inline-flex; align-items: flex-start; }
 .pending-lead .pending-checkbox { margin-top: 2px; }
+
+/* ---------- Allocation: sub-category pull-downs ----------
+   Each asset class has sub-categories behind a chevron, the same
+   disclosure as the lots sub-card on Custodial Accounts. In the chart,
+   a sub-row repeats the class row's grid (name, track, actual / target,
+   drift badge) indented, on a thinner track. In the target editor,
+   sub-targets are whole-portfolio percent and must sum to the class
+   target; the class row carries its own reconcile badge. */
+.alloc-disclosure { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; margin: 0; background: none; border: none; border-radius: var(--radius-sm); color: var(--muted-foreground); cursor: pointer; flex-shrink: 0; }
+.alloc-disclosure:hover, .alloc-disclosure:focus-visible { background: var(--accent); color: var(--accent-foreground); }
+.alloc-row.alloc-sub { padding: 8px 0; font-size: 13px; }
+.alloc-row.alloc-sub .alloc-name { font-weight: 400; padding-left: 28px; }
+.alloc-row.alloc-sub .alloc-track { height: 6px; }
+.kv-row .alloc-class { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+.kv-row.alloc-sub-target { padding: 8px 0 8px 28px; font-size: 13px; }
+.kv-row.alloc-sub-target .input-pct { height: 30px; }
+.alloc-total .card-sub { margin-right: auto; }
+/* A sub-row group closes with a rule unless it is the card's last block. */
+.alloc-sub-group > .alloc-row:last-child, .alloc-sub-group > .kv-row:last-child { border-bottom: 1px solid var(--border); }

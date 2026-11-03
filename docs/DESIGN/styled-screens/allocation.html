@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Allocation. Actual vs. target by asset class, aggregated from the same lot data as Custodial Accounts' lots sub-card across every custodial account for this entity. No nominal / inflation-adjusted toggle: allocation is a snapshot of today's holdings, so a CPI-U restatement adds nothing. Drift uses a neutral outline badge, not a status hue: a 2-point drift is information, not a warning. Save is enabled only when the targets total 100%. Each asset-class name drills to the lots behind it on Custodial Accounts (filtered to that class). -->
+<!-- Allocation. Actual vs. target by asset class, aggregated from the same lot data as Custodial Accounts' lots sub-card across every custodial account for this entity. No nominal / inflation-adjusted toggle: allocation is a snapshot of today's holdings, so a CPI-U restatement adds nothing. Drift uses a neutral outline badge, not a status hue: a 2-point drift is information, not a warning. Every class row has a chevron pull-down to its sub-categories (the lots sub-card's disclosure pattern): in the chart (US Equity shown open) each sub-category gets its own actual / target and drift badge; in the target editor (Fixed Income shown open, 2 pt unassigned) sub-targets are whole-portfolio percent and must sum to the class target. Save is enabled only when the classes total 100% and every class's sub-targets reconcile. Each class or sub-category name drills to the lots behind it on Custodial Accounts, filtered to it. Sub-category taxonomy in the mock is the seeded default. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -63,25 +63,39 @@
         <span class="alloc-legend"><span><span style="width:16px;height:8px;border-radius:999px;background:var(--chart-1);display:inline-block;"></span>Actual</span><span><span style="width:2px;height:12px;background:var(--foreground);display:inline-block;"></span>Target</span></span>
       </div>
         <div class="alloc-row">
-          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind US Equity">US Equity</a></span>
+          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="true" aria-controls="chart-us-equity" aria-label="Hide US Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-1);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind US Equity">US Equity</a></span>
           <div class="alloc-track" role="img" aria-label="US Equity: actual 42%, target 40%"><span class="alloc-fill" style="width:42%; background:var(--chart-1);"></span><span class="alloc-target" style="left:40%;"></span></div>
           <span class="alloc-figs">42% / 40%</span>
           <span class="badge badge-outline">+2 pt over</span>
         </div>
+        <div class="alloc-sub-group" id="chart-us-equity" role="group" aria-label="US Equity sub-categories">
+        <div class="alloc-row alloc-sub">
+          <span class="alloc-name"><a href="custodial-accounts.html" title="See the lots behind Large cap">Large cap</a></span>
+          <div class="alloc-track" role="img" aria-label="Large cap: actual 33%, target 30%"><span class="alloc-fill" style="width:33%; background:var(--chart-1);"></span><span class="alloc-target" style="left:30%;"></span></div>
+          <span class="alloc-figs">33% / 30%</span>
+          <span class="badge badge-outline">+3 pt over</span>
+        </div>
+        <div class="alloc-row alloc-sub">
+          <span class="alloc-name"><a href="custodial-accounts.html" title="See the lots behind Mid/Small cap">Mid/Small cap</a></span>
+          <div class="alloc-track" role="img" aria-label="Mid/Small cap: actual 9%, target 10%"><span class="alloc-fill" style="width:9%; background:var(--chart-1);"></span><span class="alloc-target" style="left:10%;"></span></div>
+          <span class="alloc-figs">9% / 10%</span>
+          <span class="badge badge-outline">−1 pt under</span>
+        </div>
+        </div>
         <div class="alloc-row">
-          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Intl Equity">Intl Equity</a></span>
+          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="chart-intl-equity" aria-label="Show Intl Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-2);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Intl Equity">Intl Equity</a></span>
           <div class="alloc-track" role="img" aria-label="Intl Equity: actual 18%, target 20%"><span class="alloc-fill" style="width:18%; background:var(--chart-2);"></span><span class="alloc-target" style="left:20%;"></span></div>
           <span class="alloc-figs">18% / 20%</span>
           <span class="badge badge-outline">−2 pt under</span>
         </div>
         <div class="alloc-row">
-          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-3);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Fixed Income">Fixed Income</a></span>
+          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="chart-fixed-income" aria-label="Show Fixed Income sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-3);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Fixed Income">Fixed Income</a></span>
           <div class="alloc-track" role="img" aria-label="Fixed Income: actual 25%, target 25%"><span class="alloc-fill" style="width:25%; background:var(--chart-3);"></span><span class="alloc-target" style="left:25%;"></span></div>
           <span class="alloc-figs">25% / 25%</span>
           <span class="badge badge-positive-soft">On target</span>
         </div>
         <div class="alloc-row">
-          <span class="alloc-name"><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Cash">Cash</a></span>
+          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="chart-cash" aria-label="Show Cash sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--chart-4);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Cash">Cash</a></span>
           <div class="alloc-track" role="img" aria-label="Cash: actual 15%, target 15%"><span class="alloc-fill" style="width:15%; background:var(--chart-4);"></span><span class="alloc-target" style="left:15%;"></span></div>
           <span class="alloc-figs">15% / 15%</span>
           <span class="badge badge-positive-soft">On target</span>
@@ -89,11 +103,17 @@
     </div>
     <div class="card">
       <div class="card-title">Target allocation</div>
-        <div class="kv-row"><span>US Equity</span><span class="kv-value"><input class="input input-pct" type="text" value="40" aria-label="US Equity target percent">%</span></div>
-        <div class="kv-row"><span>Intl Equity</span><span class="kv-value"><input class="input input-pct" type="text" value="20" aria-label="Intl Equity target percent">%</span></div>
-        <div class="kv-row"><span>Fixed Income</span><span class="kv-value"><input class="input input-pct" type="text" value="25" aria-label="Fixed Income target percent">%</span></div>
-        <div class="kv-row"><span>Cash</span><span class="kv-value"><input class="input input-pct" type="text" value="15" aria-label="Cash target percent">%</span></div>
-      <div class="alloc-total"><span>Total</span><span class="badge badge-positive-soft">100%</span><button class="btn btn-default">Save target</button></div>
+      <p class="card-sub" style="margin:4px 0 8px;">Percent of the whole portfolio. Open a class to set its sub-category targets.</p>
+        <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-us-equity" aria-label="Show US Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>US Equity</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 40%</span><input class="input input-pct" type="text" value="40" aria-label="US Equity target percent">%</span></div>
+        <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-intl-equity" aria-label="Show Intl Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>Intl Equity</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 20%</span><input class="input input-pct" type="text" value="20" aria-label="Intl Equity target percent">%</span></div>
+        <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="true" aria-controls="target-fixed-income" aria-label="Hide Fixed Income sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>Fixed Income</span><span class="kv-value"><span class="badge badge-outline">2 pt unassigned</span><input class="input input-pct" type="text" value="25" aria-label="Fixed Income target percent">%</span></div>
+        <div class="alloc-sub-group" id="target-fixed-income" role="group" aria-label="Fixed Income sub-targets">
+          <div class="kv-row alloc-sub-target"><span>Treasuries</span><span class="kv-value"><input class="input input-pct" type="text" value="12" aria-label="Fixed Income, Treasuries target percent">%</span></div>
+          <div class="kv-row alloc-sub-target"><span>Corporate</span><span class="kv-value"><input class="input input-pct" type="text" value="8" aria-label="Fixed Income, Corporate target percent">%</span></div>
+          <div class="kv-row alloc-sub-target"><span>Municipal</span><span class="kv-value"><input class="input input-pct" type="text" value="3" aria-label="Fixed Income, Municipal target percent">%</span></div>
+        </div>
+        <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-cash" aria-label="Show Cash sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>Cash</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 15%</span><input class="input input-pct" type="text" value="15" aria-label="Cash target percent">%</span></div>
+      <div class="alloc-total"><span class="card-sub">Save turns on when the classes total 100% and every class's sub-targets sum to it.</span><span>Total</span><span class="badge badge-positive-soft">100%</span><button class="btn btn-default" disabled>Save target</button></div>
     </div>
   </main>
   </div>

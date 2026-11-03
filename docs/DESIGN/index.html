@@ -357,16 +357,18 @@ flowchart TD
   </ul>
 
   <h3 id="flow-allocation">5.6 Allocation vs. target</h3>
-  <p class="section-hint"><strong>Story (PRD §4.8):</strong> actual vs. target by asset class, drift, target editor. Source: <a href="flows/allocation-flow.md">flows/allocation-flow.md</a>.</p>
+  <p class="section-hint"><strong>Story (PRD §4.8):</strong> actual vs. target by asset class and sub-category, drift, two-level target editor. Source: <a href="flows/allocation-flow.md">flows/allocation-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
   open([Open Allocation\nfor entity]) --> actual[Actual by asset class:\nmarket value from lots,\nacross every custodial account]
   actual --> target[Overlay the target\nper class]
   target --> drift[Drift per class:\nactual minus target, in points]
   drift --> act{User action}
+  act -- expand a class --> subs[Sub-category rows:\nactual vs. target and drift\nper sub-category]
+  subs -- drill a sub-category --> lots
   act -- drill a class --> lots([Custodial Accounts lots,\nfiltered to that class])
-  act -- adjust target --> edit[Target editor:\npercent per class]
-  edit --> sum{Targets total\n100%?}
+  act -- adjust target --> edit[Target editor, two levels:\npercent per class, then\nper sub-category behind a pull-down]
+  edit --> sum{Classes total 100%\nand each class equals\nthe sum of its sub-targets?}
   sum -- no --> edit
   sum -- yes --> save[Save target]
   save --> drift
@@ -375,8 +377,9 @@ flowchart TD
   <ul>
     <li><strong>Same data, different aggregation:</strong> actual allocation is the lots' market value summed by asset class across every custodial account for the entity — not a new data source.</li>
     <li><strong>Drift is information, not a warning.</strong> Over or under target shows as a neutral <code>outline</code> badge ("+2 pt over", "−2 pt under"); on target shows the positive soft badge. No caution or danger hue.</li>
-    <li><strong>Drill:</strong> each asset-class name opens Custodial Accounts' lots, filtered to that class, so every percentage traces to the lots behind it.</li>
-    <li><strong>Target editor:</strong> Save is enabled only when the targets total 100%. Viewers see the chart but no editor and no Save (write controls are omitted, not greyed).</li>
+    <li><strong>Drill:</strong> each asset-class or sub-category name opens Custodial Accounts' lots, filtered to it, so every percentage traces to the lots behind it.</li>
+    <li><strong>Sub-categories behind a pull-down.</strong> Every class row, in the chart and in the target editor, has a chevron that reveals its sub-categories (the lots sub-card's disclosure pattern). Seeded defaults: US Equity → Large cap, Mid/Small cap; Intl Equity → Developed, Emerging; Fixed Income → Treasuries, Corporate, Municipal; Cash → Cash, Money market. In the chart, each sub-row shows its own actual / target and drift badge.</li>
+    <li><strong>Target editor, two levels:</strong> sub-targets are whole-portfolio percent and must sum to their class target; the class row stays editable and carries a reconcile badge (positive soft "Sub-targets sum to N%", or neutral outline "N pt unassigned"). Save is enabled only when the classes total 100% and every class reconciles. Viewers see the chart but no editor and no Save (write controls are omitted, not greyed).</li>
     <li><strong>No nominal / inflation-adjusted toggle here.</strong> Allocation is a contemporaneous snapshot of today's holdings, so a CPI-U restatement adds no information; the toggle (PRD §4.10) belongs to the time-series views (Dashboard net-worth chart, Reports).</li>
   </ul>
 
@@ -497,7 +500,7 @@ flowchart TD
     <figure class="screen-card"><a href="styled-screens/general-ledger.html"><img src="styled-screens/thumbs/general-ledger.png" alt="General Ledger screen"></a><figcaption><a href="styled-screens/general-ledger.html">General Ledger</a><span>Balance-sheet treemap (prototype) above the chart-of-accounts tree with custodial cross-reference badges; each account opens its register.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/account-register.html"><img src="styled-screens/thumbs/account-register.png" alt="Account register screen"></a><figcaption><a href="styled-screens/account-register.html">Account register</a><span>Drill-down from the GL: multi-crumb breadcrumb, Dr/Cr/running-balance table, Corrected and rule-posted rows.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/custodial-accounts.html"><img src="styled-screens/thumbs/custodial-accounts.png" alt="Custodial Accounts screen"></a><figcaption><a href="styled-screens/custodial-accounts.html">Custodial Accounts</a><span>Totals card, then per-account cards: market value, book value and cash side by side, link health, reconciliation, a lots sub-card; the provider-item dialog shown open.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class drilling to its lots; target editor.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class pulling down to its sub-categories and drilling to its lots; two-level target editor.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/tax.html"><img src="styled-screens/thumbs/tax.png" alt="Tax screen"></a><figcaption><a href="styled-screens/tax.html">Tax</a><span>Per entity and jurisdiction: pending liability and safe-harbor gap side by side, status tier, installment timeline, prepaid-tax account; Post your payment.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/reports.html"><img src="styled-screens/thumbs/reports.png" alt="Reports screen"></a><figcaption><a href="styled-screens/reports.html">Reports</a><span>Balance Sheet empty state plus dimmed previews of the Income Statement and Cash Flow shapes.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/entities.html"><img src="styled-screens/thumbs/entities.png" alt="Entities screen"></a><figcaption><a href="styled-screens/entities.html">Entities</a><span>Roll-up map (Pack): parents holding whole base entities, a shared entity drawn in each parent; membership cards with Includes / Included in, role badges, invite and create below.</span></figcaption></figure>
