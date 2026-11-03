@@ -1451,8 +1451,8 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .alloc-row .alloc-figs { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted-foreground); text-align: right; }
 .alloc-row .badge { justify-self: end; }
 .alloc-track { position: relative; height: 10px; border-radius: 999px; background: var(--muted); }
-.alloc-track .alloc-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--border); }
-.alloc-name .dot { box-shadow: 0 0 0 1px var(--border); }
+.alloc-track .alloc-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--cat-edge); }
+.alloc-name .dot { box-shadow: 0 0 0 1px var(--cat-edge); }
 .alloc-track .alloc-target { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--foreground); border-radius: 1px; }
 .alloc-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted-foreground); }
 .alloc-legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -1534,7 +1534,7 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
    Liabilities --cat-2, Equity --cat-3), each label in the slot's
    dark -foreground ink: 12.15 / 6.40 / 8.23:1 light, 14.72 / 7.76 /
    9.97:1 dark. The 1px --card tile border is the surface gap between
-   fills (2px between two tiles), and the inset --border hairline edges
+   fills (2px between two tiles), and the inset --cat-edge hairline edges
    the bright fills on white. Labels
    clip by container query: value hidden under 96x38, label under 64x22.
    Colour is never alone: every tile carries its name (or a title/aria
@@ -1545,10 +1545,10 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .tm-cols > span { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .tm-cols .mono { color: var(--muted-foreground); font-weight: 400; }
 .tm-plus { color: var(--muted-foreground); }
-.tm-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; box-shadow: 0 0 0 1px var(--border); }
+.tm-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; box-shadow: 0 0 0 1px var(--cat-edge); }
 .tm-map { position: relative; height: 240px; }
 .tm-group { position: absolute; background: var(--border); border-radius: 4px; }
-.tm-tile { position: absolute; box-sizing: border-box; border: 1px solid var(--card); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--border); overflow: hidden; container-type: size; text-decoration: none; color: var(--card); }
+.tm-tile { position: absolute; box-sizing: border-box; border: 1px solid var(--card); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--cat-edge); overflow: hidden; container-type: size; text-decoration: none; color: var(--card); }
 .tm-inner { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; min-width: 0; }
 .tm-tile:hover { filter: brightness(1.08); }
 .tm-tile:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; z-index: 1; }
@@ -1572,7 +1572,7 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
    structure, not wealth (sizing by balance would also leak magnitude
    across an access boundary). Each circle's 3px stroke is its entity
    type's categorical slot (.pack-t-person … .pack-t-holding), edged by
-   a 1px --border hairline, beside
+   a 1px --cat-edge hairline, beside
    the type icon and label, so colour is never alone. The current entity
    carries a --ring outside a 3px --card gap, so a green Person stroke
    and the green ring never merge. */
@@ -1583,8 +1583,8 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .pack-child { position: relative; width: 128px; aspect-ratio: 1; border-radius: 50%; background: var(--card); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px; box-sizing: border-box; text-align: center; text-decoration: none; color: var(--foreground); }
 .pack-child:hover, .pack-parent-head:hover { background: var(--accent); }
 .pack-child:focus-visible, .pack-parent-head:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.pack-t-person, .pack-t-trust, .pack-t-business, .pack-t-household, .pack-t-holding { box-shadow: 0 0 0 1px var(--border); }
-.pack-current { box-shadow: 0 0 0 1px var(--border), 0 0 0 3px var(--card), 0 0 0 5px var(--ring); }
+.pack-t-person, .pack-t-trust, .pack-t-business, .pack-t-household, .pack-t-holding { box-shadow: 0 0 0 1px var(--cat-edge); }
+.pack-current { box-shadow: 0 0 0 1px var(--cat-edge), 0 0 0 3px var(--card), 0 0 0 5px var(--ring); }
 .pack-parent.pack-t-household, .pack-parent.pack-t-holding, .pack-child { border-width: 3px; }
 .pack-t-person { border-color: var(--cat-1); }
 .pack-t-trust { border-color: var(--cat-2); }
