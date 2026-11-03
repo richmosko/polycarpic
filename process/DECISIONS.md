@@ -179,3 +179,33 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the PRD's earlier wording posted unmatched legs to CIT on arrival, which conflicted with the Plaid-style review inbox and "immutability is visible": a matcher mistake would need a visible correction.
 **Alternatives considered:** post to CIT immediately (ledger mirrors the bank same day; wrong guesses fixed with Correct entry).
 **Approved by:** richmosko (2026-11-02)
+
+### 2026-11-03 — Categorical chart palette is brand-literal and vivid; the fill-vs-surface contrast rule is waived for it
+**Decision:** identity-coded charts (treemap, Pack, Sankey, bars, Allocation) use seven fixed-order categorical tokens plus a neutral Other, the same values in both modes: `--cat-1` is the literal brand green `#2CFF05`, `--cat-2` the literal sky blue `#05A9FF`, and gold, magenta, cyan, violet and rose are derived at the brand pair's lightness and chroma. Each slot carries its own AA label ink and a 1px `--cat-edge` hairline (page ink at 35% light / 25% dark) plus a 2px surface gap. Colour-vision separation must pass the dataviz validator; the lightness-band and fill-vs-surface checks are accepted as failed and compensated by label, edge and gap. Assignments are fixed: accounting elements and entity types take slots 1–5, asset classes 1–4, anything else by first appearance, folding into Other past the seventh. The sequential `--chart-1..5` ramp remains the magnitude ramp.
+**Why:** the first, validator-conforming palette (darkened steps for 3:1 against white) was rejected by the Principal: "too dark. the colors are muted and depressing. I would like the actual brand colors to be used, and to have the other colors mimic their brightness and intensity." The hairline was tried and kept ("that looks good"); the large neon Assets tile and the one-step-dimmer gold were accepted.
+**Alternatives considered:** the darkened palette (passes every check, reads as a different brand); eight slots (every eighth hue collides with a status hue or a neighbour); darkening only the light-mode steps (contradicts the ruling).
+**Approved by:** richmosko (2026-11-03)
+
+### 2026-11-03 — Allocation is contemporaneous: no inflation toggle; targets are two-level with sub-categories
+**Decision:** the nominal / inflation-adjusted (CPI-U) toggle is removed from Allocation only; PRD §4.10 still applies to time-series views (Dashboard, Reports). Asset classes carry sub-categories behind a pull-down in both the chart and the target editor; sub-targets are whole-portfolio percent that must sum to their class, and Save waits for both levels to reconcile. Sub-rows are indented under their class.
+**Why:** the Principal: "the Allocation is contemporaneous, so inflation adjusted does not add relevant information"; "Allocation targets should have pull downs for sub-categories." Whether the taxonomy is fixed or user-editable, and how a security gets its sub-category, are open (DESIGN/ARCH).
+**Alternatives considered:** keeping the toggle for an over-time allocation view (no such view exists); sub-targets as a share of the parent rather than whole-portfolio points (two scales on one editor).
+**Approved by:** richmosko (2026-11-02)
+
+### 2026-11-03 — Custodial figures read market value, book value, cash; the derived figure is labelled "Unrealized"
+**Decision:** every custodial card and the totals card list, left to right, market value, book value, cash, then Unrealized (= market value − book value, signed, Delta-coloured). Lot rows follow the same order.
+**Why:** the Principal: the order "more clearly implies that the market/book values include cash holdings"; "unrealized is more concise and more naturally descriptive" than "Market − book".
+**Alternatives considered:** cash first (reads as if cash were outside market and book).
+**Approved by:** richmosko (2026-11-02 order; 2026-11-03 label)
+
+### 2026-11-03 — Transactions has a top-level account filter; every entry row names its source account and provider
+**Decision:** a selector above the Exceptions / Pending / Posted cards scopes all three at once; opening Transactions from the sidebar always lands on All Transactions. Each row carries a muted source line (account · institution via provider), omitted when the filter already names one account.
+**Why:** the Principal: "Mentally easier to go through if the user can select the Account that the transactions were imported from"; "Each transaction header bar should indicate somewhere which Account (and service?) the import came from."
+**Alternatives considered:** per-card filters (three controls for one question); a badge per row (too loud at the mock's density).
+**Approved by:** richmosko (2026-11-02)
+
+### 2026-11-03 — Journal entries carry a per-entity, gapless, human-readable Journal ID; the General Ledger gains a Journal entries card
+**Decision:** every posted journal entry shows a display number (`JE-000214` style) that is serialized per entity, gapless and never reused, distinct from the UUID key; it appears as a column on the General Ledger's new Journal entries card, the Transactions Posted card and the account register, is searchable, and deep-links to its entry. The GL card lists entries by posting date with page size, a date range defaulting to This month, and sort; it lists reversed originals and reversals by default, greyed, with the reversed original's description struck through. The chart-of-accounts tree gets a card header. Gapless numbering means ARCH must serialize postings per entity (a locked counter row inside the posting transaction) rather than a bare sequence, which would burn a number on rollback.
+**Why:** the Principal asked for the header, the card ("the normal qty limit and probably a date range and sort criteria selection") and "a column for the Journal Header ID for exact reference"; on gaps: "serialized and non-reused is fine" once the only gap source (a rolled-back posting) was explained as avoidable.
+**Alternatives considered:** showing the UUID (not a human reference); monotone-but-gapped numbers from a plain sequence (accountants expect gapless); hiding reversals behind a filter (the card is the audit view).
+**Approved by:** richmosko (2026-11-03)
