@@ -447,6 +447,9 @@ flowchart TD
   register -- breadcrumb --> tree
   tree --> journal[Journal entries card:\nby date, page size,\ndate range, sort]
   journal -- click opens the entry --> entry
+  register -- Journal ID link --> journal
+  posted([Transactions: Posted card]) -- Journal ID link --> journal
+  search([Search by Journal ID]) -.-> journal
   </pre>
   <ul>
     <li><strong>The tree is the GL's own view:</strong> every balance is the ledger's figure. The custodial badge (<code>landmark</code> icon + institution) is a cross-reference to Custodial Accounts, never a second data source; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.</li>
@@ -454,8 +457,10 @@ flowchart TD
     <li><strong>The register is account-scoped and running-balance-shaped;</strong> Transactions is entry-scoped and time-ordered across every account. Different questions, deliberately two screens.</li>
     <li><strong>A register line opens its full journal entry</strong> — every leg, not just the one that hit this account — with actor attribution and the Correct entry action (flow 5.3).</li>
     <li><strong>Balance sheet map (prototype):</strong> a nested treemap card above the tree, Assets | Liabilities + Equity as equal halves, each element in its fixed categorical slot; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
-    <li><strong>Journal entries card:</strong> below the tree, every posted entry header for the entity, newest first, with page size, date range (default This month) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.</li>
-    <li><strong>Journal ID:</strong> a short per-entity display number, <code>JE-000214</code>, assigned at posting and distinct from the UUID key. It leads the Journal entries card, the Posted card and the register, copied on hover, so any entry can be cited exactly.</li>
+    <li><strong>Journal entries card:</strong> below the tree, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.</li>
+    <li><strong>Journal ID:</strong> a short per-entity display number, <code>JE-000214</code>, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted card and the register, copied on hover, so any entry can be cited exactly.</li>
+    <li><strong>Journal ID links:</strong> on the register and the Posted card the ID links to the entry's row on the Journal entries card (<code>general-ledger.html#je-000212</code>), which highlights and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).</li>
+    <li><strong>Reversed entries stay listed, muted:</strong> no filter hides them. A Reversed original and its reversal render in muted ink, the original's description struck through; the Journal ID keeps full ink because it is the reference.</li>
   </ul>
 
   <h3 id="flow-reports">5.9 Reports</h3>

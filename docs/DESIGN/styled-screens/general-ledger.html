@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- General Ledger. Chart-of-accounts tree, the accounting abstraction. Above it, a PROTOTYPE balance-sheet treemap (design-system-spec.md § General Ledger: tree & register → Treemap prototype): two equal halves, Assets | Liabilities + Equity, nested category → account → sub-account, area = |balance|, fill = the element's fixed categorical slot (--cat-1 / --cat-2 / --cat-3); static layout from a squarified pass, every tile links to its register. Each account opens its own register page. The custodial badge is a cross-reference only: the balance shown is always the GL's own figure, and not every GL account has a custodial counterpart (Owner's Equity, Cash in Transit). Below the tree, the Journal entries card: every posted entry header for the entity, newest first, with page size, date range and sort. A chevron opens an entry's legs in the same .correction-trail block as Transactions' Posted card; rows are a sample of the page, and viewers see no Correct entry. More menu: Export. -->
+<!-- General Ledger. Chart-of-accounts tree, the accounting abstraction. Above it, a PROTOTYPE balance-sheet treemap (design-system-spec.md § General Ledger: tree & register → Treemap prototype): two equal halves, Assets | Liabilities + Equity, nested category → account → sub-account, area = |balance|, fill = the element's fixed categorical slot (--cat-1 / --cat-2 / --cat-3); static layout from a squarified pass, every tile links to its register. Each account opens its own register page. The custodial badge is a cross-reference only: the balance shown is always the GL's own figure, and not every GL account has a custodial counterpart (Owner's Equity, Cash in Transit). Below the tree, the Journal entries card: every posted entry header for the entity, newest first, with page size, date range and sort. A chevron opens an entry's legs in the same .correction-trail block as Transactions' Posted card; rows are a sample of the page, and viewers see no Correct entry. A Reversed original and its reversal stay listed in muted ink, the original's description struck through and the Journal ID at full ink. Each row is the deep-link target #je-000212: arriving on it highlights the row and opens its legs. More menu: Export. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -131,7 +131,7 @@
             <tr><th aria-label="Expand"></th><th>Journal ID</th><th>Date</th><th>Description</th><th>Actor</th><th>Status</th><th class="num">Amount</th></tr>
           </thead>
           <tbody>
-            <tr>
+            <tr id="je-000214">
               <td class="je-toggle-cell"><button class="alloc-disclosure je-toggle" type="button" aria-expanded="false" aria-controls="je-214" aria-label="Show the legs of JE-000214"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button></td>
               <td><span class="je-id">JE-000214<button class="je-copy" type="button" data-id="JE-000214" title="Copy JE-000214" aria-label="Copy journal ID JE-000214"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 12</td><td>Client Payment</td><td>Mosko</td>
               <td><span class="badge badge-outline">Posted</span></td>
@@ -147,7 +147,7 @@
                 </div>
               </td>
             </tr>
-            <tr>
+            <tr id="je-000213">
               <td class="je-toggle-cell"><button class="alloc-disclosure je-toggle" type="button" aria-expanded="false" aria-controls="je-213" aria-label="Show the legs of JE-000213"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button></td>
               <td><span class="je-id">JE-000213<button class="je-copy" type="button" data-id="JE-000213" title="Copy JE-000213" aria-label="Copy journal ID JE-000213"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 10</td><td>Streaming Svc</td><td>Mosko</td>
               <td><span class="badge badge-outline">Posted</span></td>
@@ -163,7 +163,7 @@
                 </div>
               </td>
             </tr>
-            <tr>
+            <tr id="je-000212">
               <td class="je-toggle-cell"><button class="alloc-disclosure je-toggle" type="button" aria-expanded="true" aria-controls="je-212" aria-label="Show the legs of JE-000212"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button></td>
               <td><span class="je-id">JE-000212<button class="je-copy" type="button" data-id="JE-000212" title="Copy JE-000212" aria-label="Copy journal ID JE-000212"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 9</td><td>Office Supply Co.<div class="row-meta">corrects <span class="mono">JE-000209</span></div></td><td>Mosko</td>
               <td><span class="badge badge-corrected"><span class="badge-dot"></span>Corrected</span></td>
@@ -184,7 +184,7 @@
                 </div>
               </td>
             </tr>
-            <tr>
+            <tr id="je-000211" class="je-muted">
               <td class="je-toggle-cell"><button class="alloc-disclosure je-toggle" type="button" aria-expanded="false" aria-controls="je-211" aria-label="Show the legs of JE-000211"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button></td>
               <td><span class="je-id">JE-000211<button class="je-copy" type="button" data-id="JE-000211" title="Copy JE-000211" aria-label="Copy journal ID JE-000211"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 9</td><td>Office Supply Co.<div class="row-meta">reversal of <span class="mono">JE-000209</span></div></td><td>Mosko</td>
               <td><span class="badge badge-outline">Posted</span></td>
@@ -199,7 +199,7 @@
                 </div>
               </td>
             </tr>
-            <tr>
+            <tr id="je-000210">
               <td class="je-toggle-cell"><button class="alloc-disclosure je-toggle" type="button" aria-expanded="false" aria-controls="je-210" aria-label="Show the legs of JE-000210"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button></td>
               <td><span class="je-id">JE-000210<button class="je-copy" type="button" data-id="JE-000210" title="Copy JE-000210" aria-label="Copy journal ID JE-000210"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 9</td><td>Property Mgmt Co.</td><td>Rule<div class="row-meta">Recurring rent</div></td>
               <td><span class="badge badge-outline">Posted</span></td>
@@ -215,9 +215,9 @@
                 </div>
               </td>
             </tr>
-            <tr>
+            <tr id="je-000209" class="je-muted">
               <td class="je-toggle-cell"><button class="alloc-disclosure je-toggle" type="button" aria-expanded="false" aria-controls="je-209" aria-label="Show the legs of JE-000209"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button></td>
-              <td><span class="je-id">JE-000209<button class="je-copy" type="button" data-id="JE-000209" title="Copy JE-000209" aria-label="Copy journal ID JE-000209"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 8</td><td>Office Supply Co.<div class="row-meta">reversed by <span class="mono">JE-000211</span></div></td><td>Mosko</td>
+              <td><span class="je-id">JE-000209<button class="je-copy" type="button" data-id="JE-000209" title="Copy JE-000209" aria-label="Copy journal ID JE-000209"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 8</td><td><span class="je-struck">Office Supply Co.</span><div class="row-meta">reversed by <span class="mono">JE-000211</span></div></td><td>Mosko</td>
               <td><span class="badge badge-reversed">Reversed</span></td>
               <td class="amount">$84.20</td>
             </tr>
@@ -225,12 +225,12 @@
               <td colspan="7">
                 <div class="correction-trail">
                   <div class="trail-label">Entry JE-000209 (Sep 8)</div>
-                  <div class="trail-row"><span>Dr Office Expense</span><span>$84.20</span></div>
-                  <div class="trail-row"><span>Cr Primary Checking</span><span>−$84.20</span></div>
+                  <div class="trail-row struck"><span>Dr Office Expense</span><span>$84.20</span></div>
+                  <div class="trail-row struck"><span>Cr Primary Checking</span><span>−$84.20</span></div>
                 </div>
               </td>
             </tr>
-            <tr>
+            <tr id="je-000208">
               <td class="je-toggle-cell"><button class="alloc-disclosure je-toggle" type="button" aria-expanded="false" aria-controls="je-208" aria-label="Show the legs of JE-000208"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button></td>
               <td><span class="je-id">JE-000208<button class="je-copy" type="button" data-id="JE-000208" title="Copy JE-000208" aria-label="Copy journal ID JE-000208"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 1</td><td>Opening balance<div class="row-meta">Primary Checking</div></td><td>System</td>
               <td><span class="badge badge-outline">Posted</span></td>
@@ -291,6 +291,12 @@ document.addEventListener('click', (e) => {
   btn.setAttribute('aria-expanded', open);
   document.getElementById(btn.getAttribute('aria-controls')).hidden = !open;
 });
+function openLinkedEntry() {
+  const toggle = location.hash && document.getElementById(location.hash.slice(1))?.querySelector('.je-toggle');
+  if (toggle && toggle.getAttribute('aria-expanded') !== 'true') toggle.click();
+}
+window.addEventListener('hashchange', openLinkedEntry);
+openLinkedEntry();
 </script>
 </body>
 </html>
