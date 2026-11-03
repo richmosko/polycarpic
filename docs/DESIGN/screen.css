@@ -1618,3 +1618,65 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
    staged drafts in Pending. */
 .badge-muted { background: var(--muted); color: var(--muted-foreground); border-color: var(--border); text-decoration: none; }
 a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
+
+/* ---------- Transactions: account filter ----------
+   The top-level scope for all three cards (Exceptions, Pending, Posted)
+   at once. Default is "All Transactions" — every custodial account in the
+   entity; that is where the sidebar lands. The trigger reads like a
+   select (outline, chevron) and opens a popover in the .more-menu visual
+   language: "All Transactions", a divider, then one item per custodial
+   account with its provider and open-item counts. The list mirrors
+   Custodial Accounts' cards, so the two screens name accounts the same. */
+.txn-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.account-filter-wrap { position: relative; }
+.account-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.account-filter:hover { background: var(--accent); }
+.account-filter .icon { color: var(--muted-foreground); }
+/* Open state. In product it is absolutely positioned under the trigger;
+   the styled screen renders it statically as the reference. */
+.account-menu {
+  width: 360px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 20%);
+  padding: 6px;
+}
+.account-menu .popover-item { align-items: flex-start; }
+.account-menu .popover-item .icon { margin-top: 1px; }
+.account-menu .account-menu-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.account-menu .account-menu-meta { font-size: 12px; color: var(--muted-foreground); }
+.account-menu .popover-item:hover .account-menu-meta { color: var(--accent-foreground); }
+.account-menu .account-menu-check { margin-left: auto; color: var(--primary); }
+
+/* ---------- Transactions: per-row source line ----------
+   Every transaction row (Exceptions, Pending, Posted) carries one muted
+   line under the payee: landmark icon + "<account> · <institution> via
+   <provider>". Same icon as the GL tree's custodial marker. Shown in the
+   All Transactions view; when the filter names one account, the line is
+   omitted (the trigger already says it). */
+.row-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.row-source .icon { width: 12px; height: 12px; }
+.pending-lead { display: inline-flex; align-items: flex-start; }
+.pending-lead .pending-checkbox { margin-top: 2px; }

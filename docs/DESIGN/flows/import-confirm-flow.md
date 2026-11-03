@@ -4,6 +4,10 @@
 
 ```mermaid
 flowchart TD
+  nav([Open Transactions\nfrom the sidebar]) --> filter[Account filter:\nAll Transactions by default,\nor one custodial account]
+  filter -. scopes .-> stage
+  filter -. scopes .-> exceptions
+  filter -. scopes .-> posted
   poll([Plaid adapter polls\nor fake source generates batch]) --> stage[Raw transaction lands\nin the Pending card]
   stage --> transfer{Two legs match\nwithin date window?}
   transfer -- same posting date --> autoEntry[Locked debit leg +\nsuggested offset leg\ntwo-line preview]
@@ -45,6 +49,8 @@ flowchart TD
 ```
 
 **Notes**
+- **Account filter.** A top-level selector above the three cards scopes Exceptions, Pending and Posted together. Opening Transactions from the sidebar always lands on **All Transactions** (every custodial account in the entity); the popover lists each custodial account by the name Custodial Accounts uses, with its provider and open-item counts. The Known delta badge on a Custodial Accounts card deep-links here with the filter preset to that account.
+- **Every row names its source.** Each Exceptions, Pending and Posted row carries one muted line under the payee: `landmark` icon + `<account> · <institution> via <provider>` (e.g. "Primary Checking · Bank Y via Plaid"). With the filter on one account, the line is omitted — the trigger already names it.
 - **The locked leg is always the custodial cash side** — verified bank reality (the Plaid transaction itself), never editable, in the two-line preview, the Split grid, or the Group modal. **The suggested offset leg** is pre-filled from historical rules + the Plaid category and overridden in place via an inline search dropdown, never a blank field.
 - **Split** is one draft → one multi-leg entry, live-validated: submission stays disabled until the rows sum exactly to the raw transaction's absolute total. **Group** is many drafts → one entry (the one many-to-one case, ARCH §3) via the shared journal-entry modal, pre-filled with one aggregate line + balancing distributions.
 - **An unmatched transfer leg stays a staged draft** in Pending until its counterpart arrives (then it matches like any transfer), or until the user explicitly approves it into Cash in Transit as a one-sided in-flight item — a balanced entry, cash leg against the CIT clearing account, cleared when the counterpart posts. A draft still unmatched past the exceptions threshold moves to Exceptions.

@@ -73,9 +73,21 @@
     </div>
 
   <main class="content" style="padding-top:8px;">
+    <!-- ============ Account filter — scopes all three cards ============
+         Default "All Transactions" (every custodial account in the entity) is
+         the sidebar landing. Picking an account filters Exceptions, Pending
+         and Posted together; the card counts follow. The open popover is
+         rendered below the cards as the reference. -->
+    <div class="txn-toolbar">
+      <div class="account-filter-wrap">
+        <button class="account-filter" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account: All Transactions"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>All Transactions<span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>
+      </div>
+      <span class="card-sub">3 accounts · 1 exception · 3 pending</span>
+    </div>
+
     <div class="link-health-banner warning">
       <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
-      <span><strong>Coinbase</strong> — token expired, needs re-auth. <strong>Fidelity</strong> synced 14 min ago.</span>
+      <span><strong>Coinbase</strong> — token expired, needs re-auth. <strong>Bank Y</strong> and <strong>Custodian X</strong> synced 14 min ago.</span>
     </div>
 
     <!-- ============ Exceptions — most urgent ============ -->
@@ -87,7 +99,7 @@
       <div class="accordion-body">
         <table class="data-table">
           <tbody>
-            <tr><td>Sep 5</td><td>Cash in Transit — source leg only</td><td>Transfer</td><td><span class="badge badge-destructive">Overdue</span></td><td class="amount negative">−$500.00</td></tr>
+            <tr><td>Sep 5</td><td>Cash in Transit — source leg only<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Transfer</td><td><span class="badge badge-destructive">Overdue</span></td><td class="amount negative">−$500.00</td></tr>
           </tbody>
         </table>
       </div>
@@ -111,7 +123,7 @@
         <!-- Collapsed row -->
         <div class="pending-row">
           <div class="pending-summary">
-            <span><input type="checkbox" class="pending-checkbox">Sep 12 · Stripe Payout</span>
+            <span class="pending-lead"><input type="checkbox" class="pending-checkbox"><span>Sep 12 · Stripe Payout<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></span></span>
             <span class="amount positive">+$1,500.00 ▾</span>
           </div>
         </div>
@@ -119,7 +131,7 @@
         <!-- Expanded row — "Auto-Suggest Match" -->
         <div class="pending-row">
           <div class="pending-summary">
-            <span><input type="checkbox" class="pending-checkbox">Sep 12 · Office Supply Co.</span>
+            <span class="pending-lead"><input type="checkbox" class="pending-checkbox"><span>Sep 12 · Office Supply Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></span></span>
             <span class="amount negative">−$84.20 ▴</span>
           </div>
           <div class="pending-expand">
@@ -139,7 +151,7 @@
         <!-- Expanded + split (Flow A) -->
         <div class="pending-row">
           <div class="pending-summary">
-            <span><input type="checkbox" class="pending-checkbox" checked>Sep 11 · Custodial Payout — Fidelity</span>
+            <span class="pending-lead"><input type="checkbox" class="pending-checkbox" checked><span>Sep 11 · Custodial Payout — Custodian X<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Brokerage · Custodian X via Plaid</div></span></span>
             <span class="amount negative">−$1,200.00 ▴</span>
           </div>
           <div class="pending-expand">
@@ -173,19 +185,19 @@
           </thead>
           <tbody>
             <tr>
-              <td>Sep 10</td><td>Streaming Svc</td><td>Subscriptions</td><td></td>
+              <td>Sep 10</td><td>Streaming Svc<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Subscriptions</td><td></td>
               <td><span class="badge badge-outline">Posted</span></td>
               <td class="amount negative">−$12.99</td>
               <td><button class="row-action">Correct entry</button></td>
             </tr>
             <tr>
-              <td>Sep 9</td><td>Office Supply Co.</td><td>Office expense</td><td></td>
+              <td>Sep 9</td><td>Office Supply Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Office expense</td><td></td>
               <td><span class="badge badge-corrected"><span class="badge-dot"></span>Corrected</span></td>
               <td class="amount negative">−$68.50</td>
               <td><button class="row-action">View correction ⌄</button></td>
             </tr>
             <tr>
-              <td>Sep 9</td><td>Property Mgmt Co.</td><td>Rent</td><td></td>
+              <td>Sep 9</td><td>Property Mgmt Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Rent</td><td></td>
               <td>
                 <span class="badge badge-outline">Posted</span>
                 <div class="row-meta">posted by rule — Recurring rent</div>
@@ -208,6 +220,18 @@
           <div class="trail-row"><span>Cr Checking</span><span>−$68.50</span></div>
         </div>
         <div style="text-align:center; margin-top:16px; font-size:13px; color:var(--muted-foreground);">‹ Prev · Page 1 of 9 · Next ›</div>
+      </div>
+    </div>
+
+    <!-- ============ Account filter, open (reference) ============ -->
+    <div style="margin-top:24px;">
+      <div class="eyebrow" style="margin-bottom:8px;">Account filter — open</div>
+      <div class="account-menu" role="menu" aria-label="Filter by account">
+          <button class="popover-item" role="menuitemradio" aria-checked="true" aria-current="true"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span><span class="account-menu-text"><span>All Transactions</span><span class="account-menu-meta">Every custodial account · 1 exception, 3 pending</span></span><span class="icon icon-sm account-menu-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></button>
+          <div class="popover-divider"></div>
+          <button class="popover-item" role="menuitemradio" aria-checked="false"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="account-menu-text"><span>Primary Checking</span><span class="account-menu-meta">Bank Y via Plaid · 1 exception, 2 pending</span></span></button>
+          <button class="popover-item" role="menuitemradio" aria-checked="false"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="account-menu-text"><span>Crypto Wallet</span><span class="account-menu-meta">Coinbase via Plaid · token expired · nothing open</span></span></button>
+          <button class="popover-item" role="menuitemradio" aria-checked="false"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="account-menu-text"><span>Brokerage</span><span class="account-menu-meta">Custodian X via Plaid · 1 pending</span></span></button>
       </div>
     </div>
 
