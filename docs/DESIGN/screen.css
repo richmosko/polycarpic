@@ -1529,9 +1529,10 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
    equation makes their areas equal. Tiles are absolutely positioned by
    percentage (the prototype's layout is one static squarified pass at
    900x240; the real LayerChart Treemap re-lays out on resize). Fill by
-   accounting element from the chart ramp's three AA-safe steps for a
-   --card-ink label: chart-3 4.58:1, chart-4 5.48:1, chart-5 6.63:1 on
-   white in light mode; dark mode inverts (light ramp, dark ink). Labels
+   accounting element from its fixed categorical slot (Assets --cat-1,
+   Liabilities --cat-2, Equity --cat-3), each label in the slot's
+   -foreground ink: 5.04 / 5.08 / 5.08:1 light, 6.32 / 6.79 / 5.22:1
+   dark. The 1px --card tile border is the surface gap between fills. Labels
    clip by container query: value hidden under 96x38, label under 64x22.
    Colour is never alone: every tile carries its name (or a title/aria
    label when too small), and the halves are captioned above. Padding
@@ -1554,9 +1555,9 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 @container (max-height: 38px) { .tm-value { display: none; } }
 @container (max-width: 64px) { .tm-label { display: none; } }
 @container (max-height: 22px) { .tm-label { display: none; } }
-.tm-assets { background: var(--chart-3); }
-.tm-liabilities { background: var(--chart-4); }
-.tm-equity { background: var(--chart-5); }
+.tm-assets { background: var(--cat-1); color: var(--cat-1-foreground); }
+.tm-liabilities { background: var(--cat-2); color: var(--cat-2-foreground); }
+.tm-equity { background: var(--cat-3); color: var(--cat-3-foreground); }
 .tm-note { margin-top: 10px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
 .tm-note a { color: var(--primary); }
 
@@ -1566,7 +1567,11 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
    --card circles; a base entity in two parents appears in both with an
    "also in" chip. All circles in a level share one size: the map shows
    structure, not wealth (sizing by balance would also leak magnitude
-   across an access boundary). The current entity carries a --ring. */
+   across an access boundary). Each circle's 2px stroke is its entity
+   type's categorical slot (.pack-t-person … .pack-t-holding), beside
+   the type icon and label, so colour is never alone. The current entity
+   carries a --ring outside a 3px --card gap, so a green Person stroke
+   and the green ring never merge. */
 .pack { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; padding: 8px 0 4px; }
 .pack-parent { width: 296px; aspect-ratio: 1; border-radius: 50%; background: var(--muted); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 28px; box-sizing: border-box; }
 .pack-parent-head { display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none; color: var(--foreground); border-radius: var(--radius-md); padding: 2px 8px; }
@@ -1574,7 +1579,13 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .pack-child { position: relative; width: 128px; aspect-ratio: 1; border-radius: 50%; background: var(--card); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px; box-sizing: border-box; text-align: center; text-decoration: none; color: var(--foreground); }
 .pack-child:hover, .pack-parent-head:hover { background: var(--accent); }
 .pack-child:focus-visible, .pack-parent-head:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.pack-current { box-shadow: 0 0 0 2px var(--ring); }
+.pack-current { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px var(--ring); }
+.pack-parent.pack-t-household, .pack-parent.pack-t-holding, .pack-child { border-width: 2px; }
+.pack-t-person { border-color: var(--cat-1); }
+.pack-t-trust { border-color: var(--cat-2); }
+.pack-t-business { border-color: var(--cat-3); }
+.pack-t-household { border-color: var(--cat-4); }
+.pack-t-holding { border-color: var(--cat-5); }
 .pack-type { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted-foreground); }
 .pack-name { font-size: 13px; font-weight: 600; line-height: 1.25; }
 .pack-also { position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); color: var(--muted-foreground); }

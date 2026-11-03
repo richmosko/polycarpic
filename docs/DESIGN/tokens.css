@@ -116,6 +116,34 @@
   --chart-4: #096FA5;
   --chart-5: #086291;
 
+  /* Categorical palette: identity, not magnitude (the --chart ramp stays
+     the magnitude ramp). Seven hues in a fixed order plus a neutral
+     Other; colour follows the entity, never its rank. Hue is OKLCH:
+     cat-1 is --primary itself (brand green, H 142), cat-2 is --chart-1
+     (brand sky blue, H 242); the rest sit around them at C 0.11-0.17
+     (gold 88, magenta 345, indigo 275, teal 190, violet 305), skipping the
+     status arcs (red ~29, orange ~48, positive green ~150). Lightness
+     alternates between a white-ink and a dark-ink step, which is what
+     separates neighbours under colour-blindness. Validated with the
+     dataviz skill's validate_palette.js on --card and --background:
+     adjacent (7) worst CVD dE 8.7, normal-vision 19.5; all-pairs over
+     cat-1..5 CVD 7.1 (floor band: labels required), normal 19.1. Every
+     slot >= 3:1 on --background (tightest 3.07:1, cat-2/cat-3). Each
+     slot's -foreground is its AA label ink (ratio on the line). cat-1 sits
+     4.4 dE from --positive: categorical fills never carry gain/loss.
+     design-system-spec.md § Categorical palette has the full method. */
+  --cat-1: #148100; --cat-1-foreground: #FFFFFF; /* green,   5.04:1 */
+  --cat-2: #0C96DF; --cat-2-foreground: #1D1F20; /* sky,     5.08:1 */
+  --cat-3: #B18900; --cat-3-foreground: #1D1F20; /* gold,    5.08:1 */
+  --cat-4: #A1367B; --cat-4-foreground: #FFFFFF; /* magenta, 6.31:1 */
+  --cat-5: #3D43A8; --cat-5-foreground: #FFFFFF; /* indigo,  8.18:1 */
+  --cat-6: #009E98; --cat-6-foreground: #1D1F20; /* teal,    5.00:1 */
+  --cat-7: #824EB4; --cat-7-foreground: #FFFFFF; /* violet,  5.68:1 */
+  /* Other: the 8th+ series folded together. Neutral (warm, like
+     --muted-foreground) so it never reads as an eighth hue; 4.43:1 on
+     --background, 4.69:1 on --card. */
+  --cat-other: #78736E; --cat-other-foreground: #FFFFFF; /* 4.69:1 */
+
   /* Sidebar: inverted relative to the page (a dark card on the light page)
      and tinted with the same blue as the neutral scale, so the whole
      system carries one consistent cast rather than a third, truly-neutral
@@ -199,6 +227,22 @@
   --chart-3: #51BDF6;
   --chart-4: #16A7F3;
   --chart-5: #0B89CB;
+
+  /* Categorical palette, dark steps: same seven hues, same slot order as
+     :root, re-stepped into the dark band (OKLCH L 0.48-0.67). cat-1 is
+     the brand green pulled down from the neon into the band; cat-2 the
+     brand sky likewise. Validated on --card and --background: adjacent (7)
+     worst CVD dE 10.5, normal-vision 21.3; all-pairs over cat-1..5 CVD
+     10.7, normal 17.6. Every slot >= 3:1 on --card (tightest cat-3
+     3.31:1). Label ink per slot on the line. */
+  --cat-1: #4BA341; --cat-1-foreground: #070808; /* green,   6.32:1 */
+  --cat-2: #009EED; --cat-2-foreground: #070808; /* sky,     6.79:1 */
+  --cat-3: #7E6100; --cat-3-foreground: #F2F2F3; /* gold,    5.22:1 */
+  --cat-4: #C6589C; --cat-4-foreground: #070808; /* magenta, 5.04:1 */
+  --cat-5: #505AC8; --cat-5-foreground: #F2F2F3; /* indigo,  5.16:1 */
+  --cat-6: #009E98; --cat-6-foreground: #070808; /* teal,    6.06:1 */
+  --cat-7: #9A66CF; --cat-7-foreground: #070808; /* violet,  4.94:1 */
+  --cat-other: #7C8387; --cat-other-foreground: #070808; /* 5.21:1; 5.02:1 on --card */
 
   /* Sidebar: inverted the other way in dark mode, a LIGHT card on the dark
      page, close to the light canvas tone. The ring uses a derived blue

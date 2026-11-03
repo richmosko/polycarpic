@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- General Ledger. Chart-of-accounts tree, the accounting abstraction. Above it, a PROTOTYPE balance-sheet treemap (design-system-spec.md § General Ledger: tree & register → Treemap prototype): two equal halves, Assets | Liabilities + Equity, nested category → account → sub-account, area = |balance|, fill = --chart-3 / --chart-4 / --chart-5 by element; static layout from a squarified pass, every tile links to its register. Each account opens its own register page. The custodial badge is a cross-reference only: the balance shown is always the GL's own figure, and not every GL account has a custodial counterpart (Owner's Equity, Cash in Transit). More menu: Export. -->
+<!-- General Ledger. Chart-of-accounts tree, the accounting abstraction. Above it, a PROTOTYPE balance-sheet treemap (design-system-spec.md § General Ledger: tree & register → Treemap prototype): two equal halves, Assets | Liabilities + Equity, nested category → account → sub-account, area = |balance|, fill = the element's fixed categorical slot (--cat-1 / --cat-2 / --cat-3); static layout from a squarified pass, every tile links to its register. Each account opens its own register page. The custodial badge is a cross-reference only: the balance shown is always the GL's own figure, and not every GL account has a custodial counterpart (Owner's Equity, Cash in Transit). More menu: Export. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,

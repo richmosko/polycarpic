@@ -137,7 +137,20 @@
     <div class="swatch"><span class="chip" style="background:var(--chart-5)"></span><span class="name">--chart-5</span></div>
   </div>
 
-  <h3 id="tokens-sidebar">3.6 Sidebar (inverted, blue-tinted)</h3>
+  <h3 id="tokens-categorical">3.6 Categorical (identity, not magnitude)</h3>
+  <p>Seven fixed-order hues anchored on the brand green and sky blue, plus a neutral Other, for treemaps, Pack, Sankey and bars. Colour follows the entity, never its rank. Values, label inks and fixed assignments: <a href="tokens.html#categorical">tokens.html § 7</a>; method and validator results: design-system-spec.md § Categorical palette.</p>
+  <div class="tokens-grid">
+    <div class="swatch"><span class="chip" style="background:var(--cat-1)"></span><span class="name">--cat-1</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-2)"></span><span class="name">--cat-2</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-3)"></span><span class="name">--cat-3</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-4)"></span><span class="name">--cat-4</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-5)"></span><span class="name">--cat-5</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-6)"></span><span class="name">--cat-6</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-7)"></span><span class="name">--cat-7</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-other)"></span><span class="name">--cat-other</span></div>
+  </div>
+
+  <h3 id="tokens-sidebar">3.7 Sidebar (inverted, blue-tinted)</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--sidebar)"></span><span class="name">--sidebar</span></div>
     <div class="swatch"><span class="chip" style="background:var(--sidebar-accent)"></span><span class="name">--sidebar-accent</span></div>
@@ -414,7 +427,7 @@ flowchart TD
     <li><strong>The drill-through boundary.</strong> A parent viewer sees the parent's consolidated figures. Every figure stays clickable; a drill into an included base entity the user has no membership on opens a boundary panel — "Included from &lt;entity&gt;. You don't have access to that entity's ledger." — instead of the register, never a disabled number or a silent dead end.</li>
     <li>Role badges (<code>Owner</code> / <code>Manager</code> / <code>Viewer</code>) use decreasing visual weight — <code>default</code> / <code>secondary</code> / <code>outline</code> (design-system-spec.md § Entity, account, and category badges).</li>
     <li>A viewer never sees a write affordance rendered-then-disabled: write controls are omitted entirely for a role that cannot use them.</li>
-    <li><strong>Roll-up map:</strong> Entities opens with a Pack of every entity the user holds membership on — parents as circles holding their base entities, a shared base entity drawn once in each parent with an "also in" marker; each circle switches entity. The membership list below it is the accessible fallback. See design-system-spec.md § Entities &amp; membership.</li>
+    <li><strong>Roll-up map:</strong> Entities opens with a Pack of every entity the user holds membership on — parents as circles holding their base entities, each circle stroked in its entity type's categorical slot, a shared base entity drawn once in each parent with an "also in" marker; each circle switches entity. The membership list below it is the accessible fallback. See design-system-spec.md § Entities &amp; membership.</li>
   </ul>
 
   <h3 id="flow-general-ledger">5.8 General Ledger: tree, register, entry</h3>
@@ -436,7 +449,7 @@ flowchart TD
     <li><strong>The tree is the GL's own view:</strong> every balance is the ledger's figure. The custodial badge (<code>landmark</code> icon + institution) is a cross-reference to Custodial Accounts, never a second data source; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.</li>
     <li><strong>The register is account-scoped and running-balance-shaped;</strong> Transactions is entry-scoped and time-ordered across every account. Different questions, deliberately two screens.</li>
     <li><strong>A register line opens its full journal entry</strong> — every leg, not just the one that hit this account — with actor attribution and the Correct entry action (flow 5.3).</li>
-    <li><strong>Balance sheet map (prototype):</strong> a nested treemap card above the tree, Assets | Liabilities + Equity as equal halves; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
+    <li><strong>Balance sheet map (prototype):</strong> a nested treemap card above the tree, Assets | Liabilities + Equity as equal halves, each element in its fixed categorical slot; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
   </ul>
 
   <h3 id="flow-reports">5.9 Reports</h3>
