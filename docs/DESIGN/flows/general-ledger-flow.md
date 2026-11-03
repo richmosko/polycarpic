@@ -14,10 +14,15 @@ flowchart TD
   register --> line[Click a register line]
   line --> entry([Journal entry:\nevery leg, actor,\nCorrect entry action])
   register -- breadcrumb --> tree
+  tree --> journal[Journal entries card:\nby date, page size,\ndate range, sort]
+  journal -- click opens the entry --> entry
 ```
 
 **Notes**
 - **The tree is the GL's own view:** every balance is the ledger's figure. The custodial badge (`landmark` icon + institution) is a cross-reference to Custodial Accounts, never a second data source; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.
+- **The tree is a titled card,** "Chart of accounts", with the same header as the Balance sheet map.
 - **The register is account-scoped and running-balance-shaped;** Transactions is entry-scoped and time-ordered across every account. Different questions, deliberately two screens.
 - **A register line opens its full journal entry** — every leg, not just the one that hit this account — with actor attribution and the Correct entry action (flow 5.3).
 - **Balance sheet map (prototype):** a nested treemap card above the tree, Assets | Liabilities + Equity as equal halves; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.
+- **Journal entries card:** below the tree, every posted entry header for the entity, newest first, with page size, date range (default This month) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.
+- **Journal ID:** a short per-entity display number, `JE-000214`, assigned at posting and distinct from the UUID key. It leads the Journal entries card, the Posted card and the register, copied on hover, so any entry can be cited exactly.
