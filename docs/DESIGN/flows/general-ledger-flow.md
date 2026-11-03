@@ -16,6 +16,9 @@ flowchart TD
   register -- breadcrumb --> tree
   tree --> journal[Journal entries card:\nby date, page size,\ndate range, sort]
   journal -- click opens the entry --> entry
+  register -- Journal ID link --> journal
+  posted([Transactions: Posted card]) -- Journal ID link --> journal
+  search([Search by Journal ID]) -.-> journal
 ```
 
 **Notes**
@@ -24,5 +27,7 @@ flowchart TD
 - **The register is account-scoped and running-balance-shaped;** Transactions is entry-scoped and time-ordered across every account. Different questions, deliberately two screens.
 - **A register line opens its full journal entry** — every leg, not just the one that hit this account — with actor attribution and the Correct entry action (flow 5.3).
 - **Balance sheet map (prototype):** a nested treemap card above the tree, Assets | Liabilities + Equity as equal halves; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.
-- **Journal entries card:** below the tree, every posted entry header for the entity, newest first, with page size, date range (default This month) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.
-- **Journal ID:** a short per-entity display number, `JE-000214`, assigned at posting and distinct from the UUID key. It leads the Journal entries card, the Posted card and the register, copied on hover, so any entry can be cited exactly.
+- **Journal entries card:** below the tree, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.
+- **Journal ID:** a short per-entity display number, `JE-000214`, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted card and the register, copied on hover, so any entry can be cited exactly.
+- **Journal ID links:** on the register and the Posted card the ID links to the entry's row on the Journal entries card (`general-ledger.html#je-000212`), which highlights and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).
+- **Reversed entries stay listed, muted:** no filter hides them. A Reversed original and its reversal render in muted ink, the original's description struck through; the Journal ID keeps full ink because it is the reference.

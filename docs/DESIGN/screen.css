@@ -1768,6 +1768,18 @@ table.data-table tr.je-expand > td { padding-top: 0; }
 table.data-table tbody tr.je-expand:hover, .dark table.data-table tbody tr.je-expand:hover { background: transparent; }
 tr.je-expand .correction-trail { margin-top: 0; }
 .correction-trail .trail-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+/* Journal ID deep links and muted reversals. The ID links to its row on the
+   Journal entries card (tr#je-000212), which highlights on arrival. A Reversed
+   original and its reversal go to muted ink; .je-id keeps its own ink, because
+   the ID is the reference. */
+.je-link { color: inherit; text-decoration: underline; text-decoration-color: var(--muted-foreground); text-underline-offset: 2px; }
+.je-link:hover { color: var(--primary); text-decoration-color: currentColor; }
+.je-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; border-radius: var(--radius-sm); }
+table.data-table tr[id^="je-"] { scroll-margin-top: 16px; }
+table.data-table tr:target td { background: var(--muted); }
+table.data-table tr.je-muted td { color: var(--muted-foreground); }
+table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
+.je-struck { text-decoration: line-through; }
 .table-pager { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted-foreground); }
 
 /* ---------- Date range popover (shadcn Popover + Range Calendar) ----------
