@@ -1794,6 +1794,15 @@ table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
 .je-popover-body { padding: 12px 16px; overflow-y: auto; }
 .je-popover-body .correction-trail { margin-top: 0; }
 .je-popover-foot { display: flex; justify-content: flex-end; padding: 8px 16px; border-top: 1px solid var(--border); font-size: 13px; }
+.je-popover-foot.spread { justify-content: space-between; align-items: center; }
+
+/* Potential-duplicate warning (New entry modal) and its Posted row badge.
+   Caution tier: same ink rule as .link-health-banner.warning. */
+.je-dup-warning { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; padding: 10px 12px; border-radius: var(--radius-md); font-size: 13px; background: color-mix(in srgb, var(--warning) 14%, var(--card)); color: var(--warning-foreground); }
+.dark .je-dup-warning { color: var(--warning); }
+.je-dup-warning .icon { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+.row-flag { margin-top: 4px; }
+.badge-outline.badge-quiet { color: var(--muted-foreground); }
 
 /* ---------- Date range popover (shadcn Popover + Range Calendar) ----------
    Presets on the left, a month on the right; picking days replaces the
