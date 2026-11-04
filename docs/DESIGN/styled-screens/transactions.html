@@ -189,15 +189,18 @@
          by Journal ID. Correct entry on any of them corrects that one entry.
          A corrected row carries the corrected entry's ID; the trail names all
          three. A manual entry (New entry modal) is a row like any other: its
-         source line reads Manual entry, and its Amount is the unsigned sum
-         of debits. A reversal is part of a correction and an opening balance
+         source line reads Manual entry, and on All Transactions its Amount is
+         the unsigned sum of debits. With one account selected, only rows
+         whose own leg posts to it show: one row of a transfer, one row for a
+         manual entry's leg. Date is the transaction date, so a backdated
+         entry sorts by it. A reversal is part of a correction and an opening balance
          is a system entry, so they are Journal entries rows, not rows here.
          The August sample predates the GL card's This month list. Badge 231
          counts rows; the GL card's 214 counts entries. -->
     <div id="posted" role="tabpanel" aria-labelledby="tab-posted" hidden>
       <div class="card" style="padding:0;">
         <div class="card-head card-head-inset">
-          <span class="card-sub">Posted transactions and manual entries, newest first. Rows sharing a Journal ID posted into one entry.</span>
+          <span class="card-sub">Posted transactions and manual entries, by transaction date, newest first. Rows sharing a Journal ID posted into one entry.</span>
           <select class="select show-n-select" aria-label="Rows to show"><option>Show 25</option></select>
         </div>
         <div class="je-body">
@@ -335,7 +338,7 @@
       <div class="je-popover" role="dialog" aria-label="Journal entry JE-000212">
         <div class="je-popover-head">
           <span class="je-id">JE-000212<button class="je-copy" type="button" data-id="JE-000212" title="Copy JE-000212" aria-label="Copy journal ID JE-000212"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span>
-          <span class="je-popover-meta">Sep 9 · Mosko</span>
+          <span class="je-popover-meta">Sep 9 · Mosko · logged Sep 9, 2026, 4:12 PM</span>
           <span class="badge badge-corrected"><span class="badge-dot"></span>Corrected</span>
         </div>
         <div class="je-popover-body">
@@ -364,7 +367,7 @@
         <div class="je-modal-head"><div class="je-modal-title">New journal entry</div><span class="card-sub">Journal ID assigned at posting</span></div>
         <div class="je-modal-subtitle">Header + legs — the same modal reused for Correct entry, Split, and Group &amp; Summarize, pre-filled differently per entry point.</div>
         <div style="display:flex; gap:16px; margin-bottom:16px;">
-          <div style="flex:1;"><label style="font-size:13px; font-weight:500;">Date</label><input class="input" style="width:100%; margin-top:4px;" value="Sep 12, 2026"></div>
+          <div style="flex:1;"><label style="font-size:13px; font-weight:500;">Date</label><input class="input" style="width:100%; margin-top:4px;" value="Sep 12, 2026"><div class="row-meta">The date of the transaction, not when it is logged</div></div>
           <div style="flex:2;"><label style="font-size:13px; font-weight:500;">Memo</label><input class="input" style="width:100%; margin-top:4px;" placeholder="Optional memo"></div>
         </div>
         <div class="eyebrow" style="margin-bottom:8px;">Legs</div>
@@ -378,6 +381,82 @@
           <button class="btn btn-outline">Cancel</button>
           <button class="btn btn-default" disabled>Post</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ============ New journal entry: potential duplicate (reference) ============
+         A custodial leg matches an imported Pending or Posted transaction:
+         same account, same amount and direction, date within the exceptions
+         window. Post anyway takes the Post button's place. A Posted candidate
+         reads Open that entry instead of Match. -->
+    <div style="margin-top:24px;">
+      <div class="eyebrow" style="margin-bottom:8px;">New journal entry — potential duplicate</div>
+      <div class="je-modal-scrim">
+        <div class="je-modal">
+          <div class="je-modal-head"><div class="je-modal-title">New journal entry</div><span class="card-sub">Journal ID assigned at posting</span></div>
+          <div style="display:flex; gap:16px; margin:16px 0;">
+            <div style="flex:1;"><label style="font-size:13px; font-weight:500;">Date</label><input class="input" style="width:100%; margin-top:4px;" value="Sep 11, 2026"><div class="row-meta">The date of the transaction, not when it is logged</div></div>
+            <div style="flex:2;"><label style="font-size:13px; font-weight:500;">Memo</label><input class="input" style="width:100%; margin-top:4px;" value="Stripe Payout"></div>
+          </div>
+          <div class="eyebrow" style="margin-bottom:8px;">Legs</div>
+          <div class="split-grid">
+            <div class="split-row je-leg"><select class="select"><option>Debit</option></select><select class="select"><option>Primary Checking</option></select><input class="input" value="$1,500.00"></div>
+            <div class="split-row je-leg"><select class="select"><option>Credit</option></select><select class="select"><option>Revenue</option></select><input class="input" value="$1,500.00"></div>
+            <div class="split-row"><button class="btn btn-outline" style="font-size:12px; padding:4px 10px;">+ Add leg</button></div>
+            <div class="split-total balanced">Σ Debits $1,500.00 = Σ Credits $1,500.00 — balanced</div>
+          </div>
+          <div class="je-dup-warning" role="status"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><span>Looks like <strong>Sep 12 · Stripe Payout +$1,500.00</strong> on Primary Checking, Pending</span></div>
+          <div class="je-modal-footer">
+            <button class="btn btn-outline">Cancel</button>
+            <button class="btn btn-outline">Post anyway</button>
+            <button class="btn btn-default">Match to that transaction instead</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ After Post anyway (reference) ============
+         The row as All Transactions shows it, and its popover with the
+         dismiss control. Not in the Posted list above: the modal has not
+         posted, so the tab counts exclude it. -->
+    <div style="margin-top:24px;">
+      <div class="eyebrow" style="margin-bottom:8px;">Posted row after Post anyway, and its popover</div>
+      <div class="card" style="padding:0;">
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Journal ID</th><th>Date</th><th>Payee</th><th>Category</th><th>Status</th><th style="text-align:right;">Amount</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="je-id"><button class="je-link" type="button" aria-haspopup="dialog" aria-expanded="false" title="Show JE-000215">JE-000215</button><button class="je-copy" type="button" data-id="JE-000215" title="Copy JE-000215" aria-label="Copy journal ID JE-000215"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 11</td><td>Stripe Payout<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 21h8"/><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg></span>Manual entry</div></td><td>Revenue</td>
+                <td>
+                  <span class="badge badge-outline">Posted</span>
+                  <div class="row-flag"><span class="badge badge-outline badge-sm badge-quiet">possible duplicate</span></div>
+                </td>
+                <td class="amount">$1,500.00</td>
+                <td class="nowrap"><button class="row-action">Correct entry</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="je-popover" role="dialog" aria-label="Journal entry JE-000215" style="margin-top:16px;">
+        <div class="je-popover-head">
+          <span class="je-id">JE-000215<button class="je-copy" type="button" data-id="JE-000215" title="Copy JE-000215" aria-label="Copy journal ID JE-000215"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span>
+          <span class="je-popover-meta">Sep 11 · Mosko · logged Sep 12, 2026, 9:41 AM</span>
+          <span class="badge badge-outline">Posted</span>
+        </div>
+        <div class="je-popover-body">
+          <div class="correction-trail">
+            <div class="trail-label">Legs</div>
+            <div class="trail-row"><span>Dr Primary Checking</span><span>$1,500.00</span></div>
+            <div class="trail-row"><span>Cr Revenue</span><span>−$1,500.00</span></div>
+            <div class="trail-label">Possible duplicate of</div>
+            <div class="trail-row"><span>Sep 12 · Stripe Payout · Primary Checking, Pending</span><span>+$1,500.00</span></div>
+          </div>
+        </div>
+        <div class="je-popover-foot spread"><button class="row-action" type="button">Dismiss possible duplicate</button><a class="je-link" href="general-ledger.html#je-000215">Open in General Ledger</a></div>
       </div>
     </div>
 
