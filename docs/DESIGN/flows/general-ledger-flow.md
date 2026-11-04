@@ -17,7 +17,7 @@ flowchart TD
   register -- breadcrumb --> tree
   journal -- chevron --> entry
   register -- Journal ID link --> journal
-  posted([Transactions: Posted card]) -- Journal ID link --> journal
+  posted([Transactions: Posted tab]) -- Journal ID link --> journal
   search([Search by Journal ID]) -.-> journal
 ```
 
@@ -27,7 +27,7 @@ flowchart TD
 - **The register is account-scoped and running-balance-shaped;** Transactions is entry-scoped and time-ordered across every account. Different questions, deliberately two screens.
 - **A register line expands to its full journal entry** in the same block as the Journal entries card: every leg, not just the one that hit this account, plus the correction trail where one exists, with actor attribution and the Correct entry action (flow 5.3). Its Journal ID links to the GL card.
 - **Balance sheet map (prototype):** a nested treemap on its own tab, Assets | Liabilities + Equity as equal halves; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.
-- **Journal entries card:** on its own tab, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.
-- **Journal ID:** a short per-entity display number, `JE-000214`, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted card and the register, copied on hover, so any entry can be cited exactly.
-- **Journal ID links:** on the register and the Posted card the ID links to the entry's row on the Journal entries card (`general-ledger.html#je-000212`), which selects the tab, highlights the row and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).
+- **Journal entries card:** on its own tab, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted tab. It lists a correction's three entries as three rows; the Posted tab rolls them into one.
+- **Journal ID:** a short per-entity display number, `JE-000214`, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted tab and the register, copied on hover, so any entry can be cited exactly.
+- **Journal ID links:** on the register and the Posted tab the ID links to the entry's row on the Journal entries card (`general-ledger.html#je-000212`), which selects the tab, highlights the row and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).
 - **Reversed entries stay listed, muted:** no filter hides them. A Reversed original and its reversal render in muted ink, the original's description struck through; the Journal ID keeps full ink because it is the reference.
