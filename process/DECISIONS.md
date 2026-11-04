@@ -215,3 +215,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the Principal: the GL "is getting a bit busy. I would like select toggle buttons at the top like the tax and Reports pages", and for Transactions "The top header … could be select buttons with count badges." This reverses the 2026-10-02 choice of stacked accordion cards over tabs, which was made because tabs hid the exception and pending counts; count badges on the tabs keep those counts visible, so the objection no longer holds.
 **Alternatives considered:** keeping stacked cards with collapse controls (still three cards of chrome on one page); a dropdown section switcher (hides the counts again).
 **Approved by:** richmosko (2026-11-03)
+
+### 2026-11-04 — The Posted list is transaction-grained; the GL Journal entries card is the entry-grained view
+**Decision:** on Transactions, Posted mirrors Pending: one row per posted transaction (the imported transaction or draft that was approved), each carrying its journal entry's Journal ID. An entry built from several transactions (a grouped entry, a matched transfer) appears as several rows sharing one ID; a split stays one row with a multi-leg entry. The GL Journal entries card remains one row per entry. The account filter sits at the right end of the tab row; the "3 accounts" summary tag is dropped as redundant with the filter's own account list.
+**Why:** the Principal asked to confirm "that Posted Card shows the posted Transactions (mirroring the Pending) and not just the list of Journal Entries"; the mock and spec had drifted to one row per entry ("entry-scoped"), which hides which bank transactions produced an entry.
+**Alternatives considered:** keeping Posted entry-grained with the transactions nested under each row (two grains on one list; Pending and Posted stop mirroring each other).
+**Approved by:** richmosko (2026-11-04)
