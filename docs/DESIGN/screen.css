@@ -1678,8 +1678,9 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
    Every transaction row (Exceptions, Pending, Posted) carries one muted
    line under the payee: landmark icon + "<account> · <institution> via
    <provider>". Same icon as the GL tree's custodial marker. Shown in the
-   All Transactions view; when the filter names one account, the line is
-   omitted (the trigger already says it). */
+   All Transactions view; when the filter names one account, a line that
+   only repeats the trigger is omitted. A manual entry on Posted reads
+   pen-line icon + "Manual entry" instead. */
 .row-source {
   display: flex;
   align-items: center;
@@ -1771,12 +1772,28 @@ tr.je-expand .correction-trail { margin-top: 0; }
 .je-link { color: inherit; text-decoration: underline; text-decoration-color: var(--muted-foreground); text-underline-offset: 2px; }
 .je-link:hover { color: var(--primary); text-decoration-color: currentColor; }
 .je-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; border-radius: var(--radius-sm); }
+button.je-link { background: none; border: none; padding: 0; font: inherit; cursor: pointer; }
 table.data-table tr[id^="je-"] { scroll-margin-top: 16px; }
 table.data-table tr:target td { background: var(--muted); }
 table.data-table tr.je-muted td { color: var(--muted-foreground); }
 table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
 .je-struck { text-decoration: line-through; }
 .table-pager { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted-foreground); }
+
+/* ---------- Journal entry popover (shadcn Popover) ----------
+   Opened from a Journal ID on Transactions' Posted tab. Header line, the
+   entry's legs and any correction trail in .correction-trail markup, footer
+   link to the GL row. A long trail scrolls in the body; the footer stays. In
+   product it is anchored to the ID; the styled screen renders it statically
+   as the reference, like .account-menu. */
+.je-popover { display: flex; flex-direction: column; width: 400px; max-width: 100%; max-height: min(480px, 80vh); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 8px 24px oklch(0 0 0 / 20%); }
+.je-popover-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.je-popover-head .je-copy { opacity: 1; }
+.je-popover-meta { color: var(--muted-foreground); font-size: 12px; }
+.je-popover-head .badge { margin-left: auto; }
+.je-popover-body { padding: 12px 16px; overflow-y: auto; }
+.je-popover-body .correction-trail { margin-top: 0; }
+.je-popover-foot { display: flex; justify-content: flex-end; padding: 8px 16px; border-top: 1px solid var(--border); font-size: 13px; }
 
 /* ---------- Date range popover (shadcn Popover + Range Calendar) ----------
    Presets on the left, a month on the right; picking days replaces the
