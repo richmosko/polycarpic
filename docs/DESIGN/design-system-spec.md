@@ -416,7 +416,7 @@ There is no "Securities" item (lots live in Custodial Accounts' sub-card; alloca
 | Tier | Token | Product examples |
 |---|---|---|
 | Normal / on track | `--positive` or plain `--foreground` | Safe-harbor gap < 0 (prepaid ahead of the requirement); reconciliation clean; import fully matched |
-| Caution | `--warning` | Safe-harbor gap ≥ 0, due date more than 14 days out (gap = 0 is exactly at the safe-harbor line, nothing in hand beyond it, so never on track); an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a manual entry that matches an imported transaction; a stale/expired provider link that still has cached data to show |
+| Caution | `--warning` | Safe-harbor gap ≥ 0, due date more than 14 days out (gap = 0 is exactly at the safe-harbor line, nothing in hand beyond it, so never on track); an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a manual entry and an imported transaction that match; a stale/expired provider link that still has cached data to show |
 | Danger / overdue | `--destructive` | Safe-harbor gap ≥ 0 with the due date within 14 days or passed; exceptions-threshold breach; reconciliation break |
 
 ### Entity, account, and category badges — label + icon, not per-category hue
@@ -480,18 +480,22 @@ Any gate failure keeps the item in Pending — there is no partial post and no s
 
 **Row Date is the transaction date.** Date on Posted and on the Journal entries card is the date the user entered on the entry, never the time it was logged. The New entry modal's Date field is that date, so a backdated entry sorts by it on both lists, while its Journal ID still orders by posting. The audit trail (actor, logged-at) lives in the Journal ID popover and the GL entry view, not in the list.
 
-**Potential-duplicate warning.** While a manual entry is open in the New entry modal, each custodial leg is compared with imported transactions that are Pending or Posted. A candidate has the same custodial account, the same amount and direction, and a date within the exceptions window of the entry's Date, either side (default 3 business days). A candidate shows a caution-tier warning (`--warning`, `triangle-alert`) above the actions naming it: "Looks like Sep 12 · Stripe Payout +$1,500.00 on Primary Checking, Pending". The nearest date is named, and a Pending candidate wins a tie. The check reruns as Date, legs or amounts change, and the warning clears when nothing matches.
+**Potential-duplicate warning.** While a manual entry is open in the New entry modal, each custodial leg is compared with imported transactions that are Pending or Posted. A candidate has the same custodial account, the same amount and direction, and a date within the entity's Duplicate detection window of the entry's Date, either side (Settings, default ±1 day). A candidate shows a caution-tier warning (`--warning`, `triangle-alert`) above the actions naming it: "Looks like Sep 12 · Stripe Payout +$1,500.00 on Primary Checking, Pending". The nearest date is named, and a Pending candidate wins a tie. The check reruns as Date, legs or amounts change, and the warning clears when nothing matches.
 
 - **Match to that transaction instead** is the default action. It discards the manual entry and opens the Pending row's review panel, pre-filled with the modal's offset leg. For a Posted candidate the action reads **Open that entry** and opens its Journal ID popover, as there is no review panel left to fill.
-- **Post anyway** takes the Post button's place, so Enter cannot slip past the warning. It posts the entry, and the row carries a muted `outline` `possible duplicate` badge under its status until the user dismisses it from the popover. The badge is a review note on the row, not a ledger state: the entry posts like any other.
+- **Post anyway** takes the Post button's place, so Enter cannot slip past the warning. It posts the entry, and the row carries a muted `outline` `possible duplicate` badge under its status until the user dismisses it from the popover or matches the import. The badge is a review note on the row, not a ledger state: the entry posts like any other.
 
-Only the New entry path checks, because Correct entry, Split and Group start from a real transaction.
+Only New entry and imports check, because Correct entry, Split and Group start from a real transaction.
+
+**Mirror on Pending.** The same rule and window run on Pending: an imported transaction that matches a posted manual entry, whichever arrived first, shows a caution line on its row: "Looks like manual entry JE-000215 · Sep 11 · +$1,500.00". The line shows collapsed or expanded, and the Journal ID opens that entry's popover. The nearest date is named, and an entry already linked to an import is no longer a candidate. The review panel adds **Match to that entry** as its default action, and Approve & Post steps down to an outline button beside it so Enter cannot slip past it. 
+
+**Match to that entry** links the import to the existing entry and posts nothing: the row leaves Pending, the entry stays as it is, and the Posted count holds. The entry's row gains a `matched import` status line and loses any `possible duplicate` badge, and its popover lists the import. Approve & Post past the caution keeps both. Dismiss possible duplicate on the entry clears the caution on the row it names.
 
 **Journal entry popover.** Clicking a Journal ID on Posted opens a `Popover` anchored to the ID, not a navigation, so an entry can be read without leaving the list. Header line: Journal ID with copy (always visible here), transaction date, actor, "logged <timestamp>", status badge. Body: every leg, in `.trail-row` markup, then the correction trail if any: the original and its reversal, since the entry's own legs are already above. Footer: **Open in General Ledger**, to `general-ledger.html#je-…`, plus **Dismiss possible duplicate** on a row that carries that badge. It is non-modal: an outside click or Esc dismisses it and focus returns to the ID. A long trail scrolls inside the popover and the footer stays visible. The popover is where Posted shows the actor and the logged time, as the list has neither. **View correction** on a Corrected row is a separate control: it expands the trail in place. The account register keeps its ID as a link (see Journal ID links).
 
 **"show N" selector:** each of the three tabs (Exceptions, Pending, Posted) has its own limit selector — a user with a large Posted history isn't forced to render all of it; Posted is paged, Exceptions/Pending show their full (usually small) count by default.
 
-**Permissions:** New entry, Sync, Split, Group, Approve & Post, Dismiss possible duplicate, and the rule auto-post opt-in are Manager/Owner actions — a Viewer sees none of these affordances anywhere on this screen (SECURITY §4.2.1 matrix, ARCH §2.4 permissions table).
+**Permissions:** New entry, Sync, Split, Group, Approve & Post, Match to that entry, Dismiss possible duplicate, and the rule auto-post opt-in are Manager/Owner actions — a Viewer sees none of these affordances anywhere on this screen (SECURITY §4.2.1 matrix, ARCH §2.4 permissions table).
 
 ---
 
@@ -578,7 +582,7 @@ See `styled-screens/custodial-accounts.html`: the lots sub-card shows one securi
 
 **Reports.** A nav item **from day one**: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
 
-**Settings.** Batch-import scheduling ("all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window — a Household's schedule doesn't touch a Person entity) and **per-user** (theme, default entity on login, reduced motion). Viewers can view this page, but the Manager/Owner-only settings (schedule, import options) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
+**Settings.** Batch-import scheduling ("all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window, which also governs manual-entry duplicate warnings — a Household's schedule doesn't touch a Person entity) and **per-user** (theme, default entity on login, reduced motion). Viewers can view this page, but the Manager/Owner-only settings (schedule, import options) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
 
 See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-screens/settings.html`.
 
@@ -733,7 +737,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Transaction/account-register/journal-entries tables | **Table** | Direct reuse |
 | Journal entries date range | **Popover** + **Range Calendar** | The shadcn date-range-picker pattern; the preset list is `.popover-item`s beside the calendar |
 | Journal entry popover (Transactions Posted) | **Popover** + **Badge** + plain `.trail-row` markup | The entry read in place from its Journal ID; non-modal, so the list stays usable |
-| Potential-duplicate warning (New entry modal) | Caution-tier inline block + two **Button**s | Names the matched transaction above the modal's actions; the row badge is `outline` in muted ink |
+| Potential-duplicate warning (New entry modal, Pending row) | Caution-tier inline block + **Button**s | Names the matched transaction above the modal's actions, or the matched manual entry on a Pending row; the row badge is `outline` in muted ink |
 | Chart-of-accounts tree | `custom` | No shadcn tree component; built from nested disclosure rows (could adopt a community tree primitive later if one matures) |
 | Lots sub-card pull-down | **Collapsible** | Direct reuse — a simpler primitive than Accordion for a single expand/collapse row |
 | Settings on/off preferences | **Switch** | Direct reuse |

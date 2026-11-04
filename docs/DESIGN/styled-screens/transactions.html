@@ -126,11 +126,30 @@
             </span>
           </div>
 
-          <!-- Collapsed row -->
+          <!-- Expanded row matching a posted manual entry: same rule and window
+               as the New entry warning. JE-000215 is the reference entry below,
+               held out of the Posted list so the tab counts stay as drawn. Match
+               to that entry links the import and posts nothing. -->
           <div class="pending-row">
             <div class="pending-summary">
               <span class="pending-lead"><input type="checkbox" class="pending-checkbox"><span>Sep 12 · Stripe Payout<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></span></span>
-              <span class="amount positive">+$1,500.00 ▾</span>
+              <span class="amount positive">+$1,500.00 ▴</span>
+            </div>
+            <div class="je-dup-warning row-dup-warning" role="status"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span><span>Looks like manual entry <button class="je-link" type="button" aria-haspopup="dialog" aria-expanded="false" title="Show JE-000215">JE-000215</button> · Sep 11 · +$1,500.00</span></div>
+            <div class="pending-expand">
+              <div class="eyebrow" style="margin-bottom:10px;">Account suggestions — double-entry preview</div>
+              <div class="leg-row leg-locked"><span class="leg-label"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span> Line 1 — Debit: Plaid Custodial Cash Account</span><span>$1,500.00</span></div>
+              <div class="leg-row"><span class="leg-label">Line 2 — Credit: <select class="select" style="display:inline-block; width:auto;"><option>Revenue</option></select></span><span>$1,500.00</span></div>
+              <div class="pending-actions">
+                <span class="secondary-actions">
+                  <button class="btn btn-outline">Group with others</button>
+                  <button class="btn btn-outline">Split transaction</button>
+                </span>
+                <span class="secondary-actions">
+                  <button class="btn btn-outline">Approve &amp; Post</button>
+                  <button class="btn btn-default">Match to that entry</button>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -386,8 +405,8 @@
 
     <!-- ============ New journal entry: potential duplicate (reference) ============
          A custodial leg matches an imported Pending or Posted transaction:
-         same account, same amount and direction, date within the exceptions
-         window. Post anyway takes the Post button's place. A Posted candidate
+         same account, same amount and direction, date within the entity's
+         Duplicate detection window (Settings). Post anyway takes the Post button's place. A Posted candidate
          reads Open that entry instead of Match. -->
     <div style="margin-top:24px;">
       <div class="eyebrow" style="margin-bottom:8px;">New journal entry — potential duplicate</div>
@@ -417,8 +436,9 @@
 
     <!-- ============ After Post anyway (reference) ============
          The row as All Transactions shows it, and its popover with the
-         dismiss control. Not in the Posted list above: the modal has not
-         posted, so the tab counts exclude it. -->
+         dismiss control. Reference only: it stays out of the Posted list above,
+         so the tab counts and the GL card hold, and the Pending row above
+         points at it. -->
     <div style="margin-top:24px;">
       <div class="eyebrow" style="margin-bottom:8px;">Posted row after Post anyway, and its popover</div>
       <div class="card" style="padding:0;">
