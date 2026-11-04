@@ -11,8 +11,7 @@ flowchart TD
   act -- open an account --> register[Account register:\nevery line that hit it,\ndate order, running balance]
   map -- click a tile --> register
   act -- custodial badge --> custodial([Custodial Accounts:\nthe mirrored physical account])
-  register --> line[Click a register line]
-  line --> entry([Journal entry:\nevery leg, actor,\nCorrect entry action])
+  register -- line chevron --> entry([Journal entry, expanded in place:\nevery leg, actor,\nCorrect entry action])
   register -- breadcrumb --> tree
   tree --> journal[Journal entries card:\nby date, page size,\ndate range, sort]
   journal -- click opens the entry --> entry
@@ -25,7 +24,7 @@ flowchart TD
 - **The tree is the GL's own view:** every balance is the ledger's figure. The custodial badge (`landmark` icon + institution) is a cross-reference to Custodial Accounts, never a second data source; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.
 - **The tree is a titled card,** "Chart of accounts", with the same header as the Balance sheet map.
 - **The register is account-scoped and running-balance-shaped;** Transactions is entry-scoped and time-ordered across every account. Different questions, deliberately two screens.
-- **A register line opens its full journal entry** — every leg, not just the one that hit this account — with actor attribution and the Correct entry action (flow 5.3).
+- **A register line expands to its full journal entry** in the same block as the Journal entries card: every leg, not just the one that hit this account, plus the correction trail where one exists, with actor attribution and the Correct entry action (flow 5.3). Its Journal ID links to the GL card.
 - **Balance sheet map (prototype):** a nested treemap card above the tree, Assets | Liabilities + Equity as equal halves; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.
 - **Journal entries card:** below the tree, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.
 - **Journal ID:** a short per-entity display number, `JE-000214`, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted card and the register, copied on hover, so any entry can be cited exactly.
