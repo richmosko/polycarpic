@@ -5,10 +5,11 @@
 ```mermaid
 flowchart TD
   nav([Open Transactions\nfrom the sidebar]) --> filter[Account filter:\nAll Transactions by default,\nor one custodial account]
-  filter -. scopes .-> stage
-  filter -. scopes .-> exceptions
-  filter -. scopes .-> posted
-  poll([Plaid adapter polls\nor fake source generates batch]) --> stage[Raw transaction lands\nin the Pending card]
+  filter -. scopes .-> tabs[Tabs with count badges:\nExceptions, Pending, Posted;\nopens on Pending]
+  tabs --> stage
+  tabs --> exceptions
+  tabs --> posted
+  poll([Plaid adapter polls\nor fake source generates batch]) --> stage[Raw transaction lands\nin the Pending tab]
   stage --> transfer{Two legs match\nwithin date window?}
   transfer -- same posting date --> autoEntry[Locked debit leg +\nsuggested offset leg\ntwo-line preview]
   transfer -- different dates --> citEntry[Two entries via\nCash in Transit clearing account]
@@ -17,7 +18,7 @@ flowchart TD
   openItem -- user approves into CIT --> citOne[One-sided in-flight item:\ncash leg vs. Cash in Transit,\ncounterpart still to come]
   citOne --> post
   openItem --> aging{Older than\nexceptions threshold\ndefault 3 business days?}
-  aging -- yes --> exceptions[Surface on\nExceptions card]
+  aging -- yes --> exceptions[Surface on\nExceptions tab]
   aging -- no --> openItem
   citEntry --> autoEntry
   autoEntry --> expand[User expands the row:\nAuto-Suggest Match view]
@@ -49,7 +50,8 @@ flowchart TD
 ```
 
 **Notes**
-- **Account filter.** A top-level selector above the three cards scopes Exceptions, Pending and Posted together. Opening Transactions from the sidebar always lands on **All Transactions** (every custodial account in the entity); the popover lists each custodial account by the name Custodial Accounts uses, with its provider and open-item counts. The Known delta badge on a Custodial Accounts card deep-links here with the filter preset to that account.
+- **Account filter.** A top-level selector in the row above the tabs scopes Exceptions, Pending and Posted together, count badges included. Opening Transactions from the sidebar always lands on **All Transactions** (every custodial account in the entity); the popover lists each custodial account by the name Custodial Accounts uses, with its provider and open-item counts. The Known delta badge on a Custodial Accounts card deep-links here with the filter preset to that account.
+- **Tabs with count badges.** Exceptions, Pending and Posted are one `Tabs` row under the account filter, one visible at a time, in urgency order. Each tab carries its count, so every stage's load stays visible while another is open: `secondary`, `destructive-soft` on Exceptions when non-zero. Transactions opens on Pending, the review inbox; a non-zero Exceptions count does not take the default, its badge is red instead. The counts follow the account filter, changing the filter keeps the current tab, and the URL hash carries the tab.
 - **Every row names its source.** Each Exceptions, Pending and Posted row carries one muted line under the payee: `landmark` icon + `<account> · <institution> via <provider>` (e.g. "Primary Checking · Bank Y via Plaid"). With the filter on one account, the line is omitted — the trigger already names it.
 - **The locked leg is always the custodial cash side** — verified bank reality (the Plaid transaction itself), never editable, in the two-line preview, the Split grid, or the Group modal. **The suggested offset leg** is pre-filled from historical rules + the Plaid category and overridden in place via an inline search dropdown, never a blank field.
 - **Split** is one draft → one multi-leg entry, live-validated: submission stays disabled until the rows sum exactly to the raw transaction's absolute total. **Group** is many drafts → one entry (the one many-to-one case, ARCH §3) via the shared journal-entry modal, pre-filled with one aggregate line + balancing distributions.

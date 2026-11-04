@@ -648,20 +648,8 @@ h1, h2, h3, .heading {
 .correction-trail .trail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
 .correction-trail .trail-row.struck { text-decoration: line-through; color: var(--muted-foreground); opacity: 0.75; }
 
-/* ---------- Accordion: Transactions' three urgency-ordered cards
-   (Exceptions, Pending, Posted; design-system-spec.md § Transactions
-   workflow) ---------- */
-.accordion-card + .accordion-card { margin-top: 16px; }
-.accordion-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  cursor: pointer;
-}
-.accordion-header .accordion-title { font-size: 15px; font-weight: 600; }
-.accordion-header .accordion-count { color: var(--muted-foreground); font-weight: 400; font-size: 13px; margin-left: 6px; }
-.accordion-body { padding: 0 20px 20px; }
+/* ---------- Transactions' tab panels ---------- */
+.txn-body { padding: 8px 24px 20px; }
 .show-n-select { font-size: 12px; }
 
 /* ---------- Pending row expansion (the "Auto-Suggest Match" view) ----------
@@ -745,6 +733,7 @@ h1, h2, h3, .heading {
    the literal --warning fill only clears AA text contrast against --card
    at 3.20:1, below the 4.5:1 text floor (see tokens.css § warning). */
 .link-health-banner.warning { background: color-mix(in srgb, var(--warning) 14%, var(--card)); color: var(--warning-foreground); }
+.dark .link-health-banner.warning { color: var(--warning); }
 
 /* ---------- Button ---------- */
 .btn {
@@ -818,7 +807,7 @@ table.data-table td.amount { font-family: var(--font-mono); text-align: right; f
 table.data-table td.amount.positive { color: var(--positive); }
 table.data-table td.amount.negative { color: var(--destructive); }
 
-/* ---------- Tabs (entity switcher, GL-vs-custodial, nominal-vs-real) ---------- */
+/* ---------- Tabs (section and statement switchers, nominal-vs-real) ---------- */
 .tabs {
   display: inline-flex;
   padding: 4px;
@@ -839,6 +828,10 @@ table.data-table td.amount.negative { color: var(--destructive); }
 }
 
 .tabs .tab.active { background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px oklch(0 0 0 / 8%); }
+/* A count badge sits inside the tab label (Transactions). */
+.tabs .tab:has(> .badge) { display: inline-flex; align-items: center; gap: 6px; }
+/* A tab's own URL hash must not scroll its tab row off the top. */
+[role="tabpanel"] { scroll-margin-top: 130px; }
 
 /* ---------- Sheet / drawer (transaction detail) ---------- */
 .sheet-overlay {
@@ -1328,7 +1321,7 @@ a.btn { text-decoration: none; }
 .card-grid > .card + .card,
 .fork-grid > .card + .card { margin-top: 0; }
 
-/* Show-N select in an accordion header never stretches (it would
+/* Show-N select in a card header never stretches (it would
    inherit .select's width:100% and squeeze the header title). */
 .select.show-n-select { width: auto; flex-shrink: 0; }
 
@@ -1415,6 +1408,9 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .custodial-meta { display: flex; align-items: center; gap: 10px; }
 .badge-warning-soft { background: color-mix(in srgb, var(--warning) 18%, var(--card)); color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 45%, var(--card)); }
 .dark .badge-warning-soft { color: var(--warning); }
+/* Soft destructive: the raw token falls under AA on its own tint in light mode, so the ink takes a share of --foreground. */
+.badge-destructive-soft { background: color-mix(in srgb, var(--destructive) 12%, var(--card)); color: color-mix(in srgb, var(--destructive) 80%, var(--foreground)); border-color: color-mix(in srgb, var(--destructive) 35%, var(--card)); }
+.dark .badge-destructive-soft { color: var(--destructive); }
 .badge-positive-soft { background: color-mix(in srgb, var(--positive) 12%, var(--card)); color: var(--positive); border-color: color-mix(in srgb, var(--positive) 35%, var(--card)); }
 .badge .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
 /* The three figures every custodial account shows, left to right: market

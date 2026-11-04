@@ -69,99 +69,115 @@
     </div>
 
   <main class="content" style="padding-top:8px;">
-    <!-- ============ Account filter — scopes all three cards ============
-         Default "All Transactions" (every custodial account in the entity) is
-         the sidebar landing. Picking an account filters Exceptions, Pending
-         and Posted together; the card counts follow. The open popover is
-         rendered below the cards as the reference. -->
-    <div class="txn-toolbar">
-      <div class="account-filter-wrap">
-        <button class="account-filter" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account: All Transactions"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>All Transactions<span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>
-      </div>
-      <span class="card-sub">3 accounts · 1 exception · 3 pending</span>
-    </div>
-
     <div class="link-health-banner warning">
       <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
       <span><strong>Coinbase</strong> — token expired, needs re-auth. <strong>Bank Y</strong> and <strong>Custodian X</strong> synced 14 min ago.</span>
     </div>
 
-    <!-- ============ Exceptions — most urgent ============ -->
-    <div class="card accordion-card" style="padding:0;">
-      <div class="accordion-header">
-        <span class="accordion-title">Exceptions <span class="accordion-count">— unmatched transfer legs &gt; 3 business days (1)</span></span>
-        <select class="select show-n-select"><option>Show 10</option></select>
+    <!-- ============ Account filter — scopes all three tabs ============
+         Default "All Transactions" (every custodial account in the entity) is
+         the sidebar landing. Picking an account filters Exceptions, Pending
+         and Posted together; the tab badges follow. The open popover is
+         rendered below the tabs as the reference. -->
+    <div class="txn-toolbar">
+      <div class="account-filter-wrap">
+        <button class="account-filter" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account: All Transactions"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>All Transactions<span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>
       </div>
-      <div class="accordion-body">
-        <table class="data-table">
-          <tbody>
-            <tr><td>Sep 5</td><td>Cash in Transit — source leg only<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Transfer</td><td><span class="badge badge-destructive">Overdue</span></td><td class="amount negative">−$500.00</td></tr>
-          </tbody>
-        </table>
+      <span class="card-sub">3 accounts</span>
+    </div>
+
+    <!-- ============ Tabs: one stage at a time, counts always visible ============
+         Pending, the review inbox, is the default. Exceptions never takes the
+         default; its badge turns destructive-soft when non-zero, secondary at
+         zero. The hash carries the tab (#pending). -->
+    <div class="card-head">
+      <div class="tabs" role="tablist" aria-label="Transactions by stage">
+        <button class="tab" role="tab" id="tab-exceptions" aria-selected="false" aria-controls="exceptions">Exceptions<span class="badge badge-destructive-soft badge-sm">1</span></button>
+        <button class="tab active" role="tab" id="tab-pending" aria-selected="true" aria-controls="pending">Pending<span class="badge badge-secondary badge-sm">3</span></button>
+        <button class="tab" role="tab" id="tab-posted" aria-selected="false" aria-controls="posted">Posted<span class="badge badge-secondary badge-sm">214</span></button>
+      </div>
+    </div>
+
+    <!-- ============ Exceptions — most urgent ============ -->
+    <div id="exceptions" role="tabpanel" aria-labelledby="tab-exceptions" hidden>
+      <div class="card" style="padding:0;">
+        <div class="card-head card-head-inset">
+          <span class="card-sub">Unmatched transfer legs older than 3 business days</span>
+          <select class="select show-n-select" aria-label="Rows to show"><option>Show 10</option></select>
+        </div>
+        <div class="je-body">
+          <table class="data-table">
+            <tbody>
+              <tr><td>Sep 5</td><td>Cash in Transit — source leg only<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Transfer</td><td><span class="badge badge-destructive">Overdue</span></td><td class="amount negative">−$500.00</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
     <!-- ============ Pending — the review/match inbox ============ -->
-    <div class="card accordion-card" style="padding:0;">
-      <div class="accordion-header">
-        <span class="accordion-title">Pending <span class="accordion-count">— unposted, needs review (3)</span></span>
-        <select class="select show-n-select"><option>Show 25</option></select>
-      </div>
-      <div class="accordion-body">
-        <div class="bulk-bar">
-          <span>2 selected</span>
-          <span style="display:flex; gap:8px;">
-            <button class="btn btn-secondary">Group &amp; Summarize</button>
-            <button class="btn btn-outline">Clear</button>
-          </span>
+    <div id="pending" role="tabpanel" aria-labelledby="tab-pending">
+      <div class="card" style="padding:0;">
+        <div class="card-head card-head-inset">
+          <span class="card-sub">Unposted, needs review</span>
+          <select class="select show-n-select" aria-label="Rows to show"><option>Show 25</option></select>
         </div>
-
-        <!-- Collapsed row -->
-        <div class="pending-row">
-          <div class="pending-summary">
-            <span class="pending-lead"><input type="checkbox" class="pending-checkbox"><span>Sep 12 · Stripe Payout<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></span></span>
-            <span class="amount positive">+$1,500.00 ▾</span>
+        <div class="txn-body">
+          <div class="bulk-bar">
+            <span>2 selected</span>
+            <span style="display:flex; gap:8px;">
+              <button class="btn btn-secondary">Group &amp; Summarize</button>
+              <button class="btn btn-outline">Clear</button>
+            </span>
           </div>
-        </div>
 
-        <!-- Expanded row — "Auto-Suggest Match" -->
-        <div class="pending-row">
-          <div class="pending-summary">
-            <span class="pending-lead"><input type="checkbox" class="pending-checkbox"><span>Sep 12 · Office Supply Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></span></span>
-            <span class="amount negative">−$84.20 ▴</span>
-          </div>
-          <div class="pending-expand">
-            <div class="eyebrow" style="margin-bottom:10px;">Account suggestions — double-entry preview</div>
-            <div class="leg-row leg-locked"><span class="leg-label"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span> Line 1 — Debit: Plaid Custodial Cash Account</span><span>$84.20</span></div>
-            <div class="leg-row"><span class="leg-label">Line 2 — Credit: <select class="select" style="display:inline-block; width:auto;"><option>Office Expense</option></select></span><span>$84.20</span></div>
-            <div class="pending-actions">
-              <span class="secondary-actions">
-                <button class="btn btn-outline">Group with others</button>
-                <button class="btn btn-outline">Split transaction</button>
-              </span>
-              <button class="btn btn-default">Approve &amp; Post</button>
+          <!-- Collapsed row -->
+          <div class="pending-row">
+            <div class="pending-summary">
+              <span class="pending-lead"><input type="checkbox" class="pending-checkbox"><span>Sep 12 · Stripe Payout<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></span></span>
+              <span class="amount positive">+$1,500.00 ▾</span>
             </div>
           </div>
-        </div>
 
-        <!-- Expanded + split (Flow A) -->
-        <div class="pending-row">
-          <div class="pending-summary">
-            <span class="pending-lead"><input type="checkbox" class="pending-checkbox" checked><span>Sep 11 · Custodial Payout — Custodian X<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Brokerage · Custodian X via Plaid</div></span></span>
-            <span class="amount negative">−$1,200.00 ▴</span>
-          </div>
-          <div class="pending-expand">
-            <div class="eyebrow" style="margin-bottom:10px;">Split transaction — multi-column grid</div>
-            <div class="split-grid">
-              <div class="split-row"><span>Line 1 <span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span></span><span>Debit</span><span>Plaid Custodial Cash Account</span><span class="amount">$1,200.00</span></div>
-              <div class="split-row"><span>Line 2</span><span>Credit</span><select class="select"><option>Platform Fee Expense</option></select><span class="amount">$20.00</span></div>
-              <div class="split-row"><span>Line 3</span><span>Credit</span><select class="select"><option>Custodial Clearing</option></select><span class="amount">$1,180.00</span></div>
-              <div class="split-row"><button class="btn btn-outline" style="font-size:12px; padding:4px 10px;">+ Add row</button></div>
-              <div class="split-total balanced">Split total $1,200.00 = Plaid total $1,200.00 — balanced</div>
+          <!-- Expanded row — "Auto-Suggest Match" -->
+          <div class="pending-row">
+            <div class="pending-summary">
+              <span class="pending-lead"><input type="checkbox" class="pending-checkbox"><span>Sep 12 · Office Supply Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></span></span>
+              <span class="amount negative">−$84.20 ▴</span>
             </div>
-            <div class="pending-actions">
-              <button class="btn btn-outline">Cancel split</button>
-              <button class="btn btn-default">Approve &amp; Post</button>
+            <div class="pending-expand">
+              <div class="eyebrow" style="margin-bottom:10px;">Account suggestions — double-entry preview</div>
+              <div class="leg-row leg-locked"><span class="leg-label"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span> Line 1 — Debit: Plaid Custodial Cash Account</span><span>$84.20</span></div>
+              <div class="leg-row"><span class="leg-label">Line 2 — Credit: <select class="select" style="display:inline-block; width:auto;"><option>Office Expense</option></select></span><span>$84.20</span></div>
+              <div class="pending-actions">
+                <span class="secondary-actions">
+                  <button class="btn btn-outline">Group with others</button>
+                  <button class="btn btn-outline">Split transaction</button>
+                </span>
+                <button class="btn btn-default">Approve &amp; Post</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Expanded + split (Flow A) -->
+          <div class="pending-row">
+            <div class="pending-summary">
+              <span class="pending-lead"><input type="checkbox" class="pending-checkbox" checked><span>Sep 11 · Custodial Payout — Custodian X<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Brokerage · Custodian X via Plaid</div></span></span>
+              <span class="amount negative">−$1,200.00 ▴</span>
+            </div>
+            <div class="pending-expand">
+              <div class="eyebrow" style="margin-bottom:10px;">Split transaction — multi-column grid</div>
+              <div class="split-grid">
+                <div class="split-row"><span>Line 1 <span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></span></span><span>Debit</span><span>Plaid Custodial Cash Account</span><span class="amount">$1,200.00</span></div>
+                <div class="split-row"><span>Line 2</span><span>Credit</span><select class="select"><option>Platform Fee Expense</option></select><span class="amount">$20.00</span></div>
+                <div class="split-row"><span>Line 3</span><span>Credit</span><select class="select"><option>Custodial Clearing</option></select><span class="amount">$1,180.00</span></div>
+                <div class="split-row"><button class="btn btn-outline" style="font-size:12px; padding:4px 10px;">+ Add row</button></div>
+                <div class="split-total balanced">Split total $1,200.00 = Plaid total $1,200.00 — balanced</div>
+              </div>
+              <div class="pending-actions">
+                <button class="btn btn-outline">Cancel split</button>
+                <button class="btn btn-default">Approve &amp; Post</button>
+              </div>
             </div>
           </div>
         </div>
@@ -173,65 +189,67 @@
          assigned at posting, with copy on hover and linked to the entry's row
          on the General Ledger Journal entries card. A corrected row carries
          the corrected entry's ID; the trail names all three. -->
-    <div class="card accordion-card" style="padding:0;">
-      <div class="accordion-header">
-        <span class="accordion-title">Posted <span class="accordion-count">— 214 entries</span></span>
-        <select class="select show-n-select"><option>Show 25</option></select>
-      </div>
-      <div class="accordion-body">
-        <div class="table-wrap">
-        <table class="data-table">
-          <thead>
-            <tr><th>Journal ID</th><th>Date</th><th>Payee</th><th>Category</th><th>Status</th><th style="text-align:right;">Amount</th><th></th></tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><span class="je-id"><a class="je-link" href="general-ledger.html#je-000214" title="Open JE-000214 in General Ledger">JE-000214</a><button class="je-copy" type="button" data-id="JE-000214" title="Copy JE-000214" aria-label="Copy journal ID JE-000214"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 12</td><td>Client Payment<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Revenue</td>
-              <td><span class="badge badge-outline">Posted</span></td>
-              <td class="amount positive">+$2,400.00</td>
-              <td class="nowrap"><button class="row-action">Correct entry</button></td>
-            </tr>
-            <tr>
-              <td><span class="je-id"><a class="je-link" href="general-ledger.html#je-000213" title="Open JE-000213 in General Ledger">JE-000213</a><button class="je-copy" type="button" data-id="JE-000213" title="Copy JE-000213" aria-label="Copy journal ID JE-000213"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 10</td><td>Streaming Svc<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Subscriptions</td>
-              <td><span class="badge badge-outline">Posted</span></td>
-              <td class="amount negative">−$12.99</td>
-              <td class="nowrap"><button class="row-action">Correct entry</button></td>
-            </tr>
-            <tr>
-              <td><span class="je-id"><a class="je-link" href="general-ledger.html#je-000212" title="Open JE-000212 in General Ledger">JE-000212</a><button class="je-copy" type="button" data-id="JE-000212" title="Copy JE-000212" aria-label="Copy journal ID JE-000212"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 9</td><td>Office Supply Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Office expense</td>
-              <td><span class="badge badge-corrected"><span class="badge-dot"></span>Corrected</span></td>
-              <td class="amount negative">−$68.50</td>
-              <td class="nowrap"><button class="row-action">View correction ⌄</button></td>
-            </tr>
-            <!-- Click-through state: the Corrected row above, expanded. -->
-            <tr class="je-expand">
-              <td colspan="7">
-                <div class="correction-trail">
-                  <div class="trail-label">Original entry JE-000209 (Sep 8) — reversed</div>
-                  <div class="trail-row struck"><span>Dr Office Expense</span><span>$84.20</span></div>
-                  <div class="trail-row struck"><span>Cr Primary Checking</span><span>−$84.20</span></div>
-                  <div class="trail-label">Reversal JE-000211 (Sep 9)</div>
-                  <div class="trail-row"><span>Cr Office Expense</span><span>−$84.20</span></div>
-                  <div class="trail-row"><span>Dr Primary Checking</span><span>$84.20</span></div>
-                  <div class="trail-label">Corrected entry JE-000212 (Sep 9)</div>
-                  <div class="trail-row"><span>Dr Office Expense</span><span>$68.50</span></div>
-                  <div class="trail-row"><span>Cr Primary Checking</span><span>−$68.50</span></div>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td><span class="je-id"><a class="je-link" href="general-ledger.html#je-000210" title="Open JE-000210 in General Ledger">JE-000210</a><button class="je-copy" type="button" data-id="JE-000210" title="Copy JE-000210" aria-label="Copy journal ID JE-000210"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 9</td><td>Property Mgmt Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Rent</td>
-              <td>
-                <span class="badge badge-outline">Posted</span>
-                <div class="row-meta">posted by rule — Recurring rent</div>
-              </td>
-              <td class="amount negative">−$2,200.00</td>
-              <td class="nowrap"><button class="row-action">Correct entry</button></td>
-            </tr>
-          </tbody>
-        </table>
+    <div id="posted" role="tabpanel" aria-labelledby="tab-posted" hidden>
+      <div class="card" style="padding:0;">
+        <div class="card-head card-head-inset">
+          <span class="card-sub">Posted journal entries, newest first</span>
+          <select class="select show-n-select" aria-label="Rows to show"><option>Show 25</option></select>
         </div>
-        <div class="table-pager">‹ Prev · Page 1 of 9 · Next ›</div>
+        <div class="je-body">
+          <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Journal ID</th><th>Date</th><th>Payee</th><th>Category</th><th>Status</th><th style="text-align:right;">Amount</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><span class="je-id"><a class="je-link" href="general-ledger.html#je-000214" title="Open JE-000214 in General Ledger">JE-000214</a><button class="je-copy" type="button" data-id="JE-000214" title="Copy JE-000214" aria-label="Copy journal ID JE-000214"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 12</td><td>Client Payment<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Revenue</td>
+                <td><span class="badge badge-outline">Posted</span></td>
+                <td class="amount positive">+$2,400.00</td>
+                <td class="nowrap"><button class="row-action">Correct entry</button></td>
+              </tr>
+              <tr>
+                <td><span class="je-id"><a class="je-link" href="general-ledger.html#je-000213" title="Open JE-000213 in General Ledger">JE-000213</a><button class="je-copy" type="button" data-id="JE-000213" title="Copy JE-000213" aria-label="Copy journal ID JE-000213"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 10</td><td>Streaming Svc<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Subscriptions</td>
+                <td><span class="badge badge-outline">Posted</span></td>
+                <td class="amount negative">−$12.99</td>
+                <td class="nowrap"><button class="row-action">Correct entry</button></td>
+              </tr>
+              <tr>
+                <td><span class="je-id"><a class="je-link" href="general-ledger.html#je-000212" title="Open JE-000212 in General Ledger">JE-000212</a><button class="je-copy" type="button" data-id="JE-000212" title="Copy JE-000212" aria-label="Copy journal ID JE-000212"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 9</td><td>Office Supply Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Office expense</td>
+                <td><span class="badge badge-corrected"><span class="badge-dot"></span>Corrected</span></td>
+                <td class="amount negative">−$68.50</td>
+                <td class="nowrap"><button class="row-action">View correction ⌄</button></td>
+              </tr>
+              <!-- Click-through state: the Corrected row above, expanded. -->
+              <tr class="je-expand">
+                <td colspan="7">
+                  <div class="correction-trail">
+                    <div class="trail-label">Original entry JE-000209 (Sep 8) — reversed</div>
+                    <div class="trail-row struck"><span>Dr Office Expense</span><span>$84.20</span></div>
+                    <div class="trail-row struck"><span>Cr Primary Checking</span><span>−$84.20</span></div>
+                    <div class="trail-label">Reversal JE-000211 (Sep 9)</div>
+                    <div class="trail-row"><span>Cr Office Expense</span><span>−$84.20</span></div>
+                    <div class="trail-row"><span>Dr Primary Checking</span><span>$84.20</span></div>
+                    <div class="trail-label">Corrected entry JE-000212 (Sep 9)</div>
+                    <div class="trail-row"><span>Dr Office Expense</span><span>$68.50</span></div>
+                    <div class="trail-row"><span>Cr Primary Checking</span><span>−$68.50</span></div>
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td><span class="je-id"><a class="je-link" href="general-ledger.html#je-000210" title="Open JE-000210 in General Ledger">JE-000210</a><button class="je-copy" type="button" data-id="JE-000210" title="Copy JE-000210" aria-label="Copy journal ID JE-000210"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Sep 9</td><td>Property Mgmt Co.<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Rent</td>
+                <td>
+                  <span class="badge badge-outline">Posted</span>
+                  <div class="row-meta">posted by rule — Recurring rent</div>
+                </td>
+                <td class="amount negative">−$2,200.00</td>
+                <td class="nowrap"><button class="row-action">Correct entry</button></td>
+              </tr>
+            </tbody>
+          </table>
+          </div>
+          <div class="table-pager">‹ Prev · Page 1 of 9 · Next ›</div>
+        </div>
       </div>
     </div>
 
@@ -285,6 +303,27 @@ document.addEventListener('click', (e) => {
   btn.classList.add('copied');
   setTimeout(() => btn.classList.remove('copied'), 1200);
 });
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+function selectTab(panelId) {
+  tabs.forEach((tab) => {
+    const panel = tab.getAttribute('aria-controls');
+    tab.classList.toggle('active', panel === panelId);
+    tab.setAttribute('aria-selected', panel === panelId);
+    document.getElementById(panel).hidden = panel !== panelId;
+  });
+}
+document.addEventListener('click', (e) => {
+  const tab = e.target.closest('[role="tab"]');
+  if (!tab) return;
+  selectTab(tab.getAttribute('aria-controls'));
+  history.replaceState(null, '', '#' + tab.getAttribute('aria-controls'));
+});
+function selectFromHash() {
+  const panel = location.hash && document.getElementById(location.hash.slice(1));
+  if (panel?.matches('[role="tabpanel"]')) selectTab(panel.id);
+}
+window.addEventListener('hashchange', selectFromHash);
+selectFromHash();
 </script>
 </body>
 </html>
