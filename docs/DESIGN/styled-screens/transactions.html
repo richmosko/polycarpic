@@ -74,27 +74,22 @@
       <span><strong>Coinbase</strong> — token expired, needs re-auth. <strong>Bank Y</strong> and <strong>Custodian X</strong> synced 14 min ago.</span>
     </div>
 
-    <!-- ============ Account filter — scopes all three tabs ============
-         Default "All Transactions" (every custodial account in the entity) is
-         the sidebar landing. Picking an account filters Exceptions, Pending
-         and Posted together; the tab badges follow. The open popover is
-         rendered below the tabs as the reference. -->
-    <div class="txn-toolbar">
-      <div class="account-filter-wrap">
-        <button class="account-filter" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account: All Transactions"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>All Transactions<span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>
-      </div>
-      <span class="card-sub">3 accounts</span>
-    </div>
-
-    <!-- ============ Tabs: one stage at a time, counts always visible ============
+    <!-- ============ Tabs + account filter: one row ============
          Pending, the review inbox, is the default. Exceptions never takes the
          default; its badge turns destructive-soft when non-zero, secondary at
-         zero. The hash carries the tab (#pending). -->
-    <div class="card-head">
+         zero. The hash carries the tab (#pending). The account filter sits at
+         the row's right end and scopes all three tabs, badges included.
+         Default "All Transactions" (every custodial account in the entity) is
+         the sidebar landing. The open popover is rendered below as the
+         reference. -->
+    <div class="txn-toolbar">
       <div class="tabs" role="tablist" aria-label="Transactions by stage">
         <button class="tab" role="tab" id="tab-exceptions" aria-selected="false" aria-controls="exceptions">Exceptions<span class="badge badge-destructive-soft badge-sm">1</span></button>
         <button class="tab active" role="tab" id="tab-pending" aria-selected="true" aria-controls="pending">Pending<span class="badge badge-secondary badge-sm">3</span></button>
-        <button class="tab" role="tab" id="tab-posted" aria-selected="false" aria-controls="posted">Posted<span class="badge badge-secondary badge-sm">214</span></button>
+        <button class="tab" role="tab" id="tab-posted" aria-selected="false" aria-controls="posted">Posted<span class="badge badge-secondary badge-sm">231</span></button>
+      </div>
+      <div class="account-filter-wrap">
+        <button class="account-filter" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Account: All Transactions"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span>All Transactions<span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>
       </div>
     </div>
 
@@ -185,14 +180,21 @@
     </div>
 
     <!-- ============ Posted — paged, least urgent ============
-         The Journal ID leads every row: the per-entity display number
-         assigned at posting, with copy on hover and linked to the entry's row
-         on the General Ledger Journal entries card. A corrected row carries
-         the corrected entry's ID; the trail names all three. -->
+         One row per posted transaction, mirroring Pending. The Journal ID
+         leads every row: the per-entity display number assigned at posting,
+         with copy on hover and linked to the entry's row on the General
+         Ledger Journal entries card. Rows posted into one entry repeat its
+         ID and sit together: an entry has one date, and same-date rows order
+         by Journal ID. Correct entry on any of them corrects that one entry.
+         A corrected row carries the corrected entry's ID; the trail names all
+         three. A reversal and an opening balance consume no transaction, so
+         they are Journal entries rows, not rows here. The August sample
+         predates the GL card's This month list, so its ID links land on that
+         tab. Badge 231 counts transactions; the GL card's 214 counts entries. -->
     <div id="posted" role="tabpanel" aria-labelledby="tab-posted" hidden>
       <div class="card" style="padding:0;">
         <div class="card-head card-head-inset">
-          <span class="card-sub">Posted journal entries, newest first</span>
+          <span class="card-sub">Posted transactions, newest first. Rows sharing a Journal ID posted into one entry.</span>
           <select class="select show-n-select" aria-label="Rows to show"><option>Show 25</option></select>
         </div>
         <div class="je-body">
@@ -245,10 +247,58 @@
                 <td class="amount negative">−$2,200.00</td>
                 <td class="nowrap"><button class="row-action">Correct entry</button></td>
               </tr>
+              <!-- A matched transfer: two transactions, two rows, one entry. -->
+              <tr>
+                <td><span class="je-id"><a class="je-link" href="general-ledger.html#journal-entries" title="Open JE-000207 in General Ledger">JE-000207</a><button class="je-copy" type="button" data-id="JE-000207" title="Copy JE-000207" aria-label="Copy journal ID JE-000207"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Aug 31</td><td>Transfer to Primary Checking<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Savings · Bank Y via Plaid</div></td><td>Transfer</td>
+                <td>
+                  <span class="badge badge-outline">Posted</span>
+                  <div class="row-meta">matched transfer — 1 entry</div>
+                </td>
+                <td class="amount negative">−$1,000.00</td>
+                <td class="nowrap"><button class="row-action">Correct entry</button></td>
+              </tr>
+              <tr>
+                <td><span class="je-id"><a class="je-link" href="general-ledger.html#journal-entries" title="Open JE-000207 in General Ledger">JE-000207</a><button class="je-copy" type="button" data-id="JE-000207" title="Copy JE-000207" aria-label="Copy journal ID JE-000207"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Aug 31</td><td>Transfer from Savings<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Transfer</td>
+                <td>
+                  <span class="badge badge-outline">Posted</span>
+                  <div class="row-meta">matched transfer — 1 entry</div>
+                </td>
+                <td class="amount positive">+$1,000.00</td>
+                <td class="nowrap"><button class="row-action">Correct entry</button></td>
+              </tr>
+              <!-- Group & Summarize: two transactions, two rows, one entry. -->
+              <tr>
+                <td><span class="je-id"><a class="je-link" href="general-ledger.html#journal-entries" title="Open JE-000206 in General Ledger">JE-000206</a><button class="je-copy" type="button" data-id="JE-000206" title="Copy JE-000206" aria-label="Copy journal ID JE-000206"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Aug 28</td><td>Stripe Payout<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Revenue</td>
+                <td>
+                  <span class="badge badge-outline">Posted</span>
+                  <div class="row-meta">grouped — 1 entry</div>
+                </td>
+                <td class="amount positive">+$640.00</td>
+                <td class="nowrap"><button class="row-action">Correct entry</button></td>
+              </tr>
+              <tr>
+                <td><span class="je-id"><a class="je-link" href="general-ledger.html#journal-entries" title="Open JE-000206 in General Ledger">JE-000206</a><button class="je-copy" type="button" data-id="JE-000206" title="Copy JE-000206" aria-label="Copy journal ID JE-000206"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Aug 28</td><td>Stripe Payout<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Revenue</td>
+                <td>
+                  <span class="badge badge-outline">Posted</span>
+                  <div class="row-meta">grouped — 1 entry</div>
+                </td>
+                <td class="amount positive">+$385.50</td>
+                <td class="nowrap"><button class="row-action">Correct entry</button></td>
+              </tr>
+              <!-- A split: one transaction, one row, a multi-leg entry. -->
+              <tr>
+                <td><span class="je-id"><a class="je-link" href="general-ledger.html#journal-entries" title="Open JE-000205 in General Ledger">JE-000205</a><button class="je-copy" type="button" data-id="JE-000205" title="Copy JE-000205" aria-label="Copy journal ID JE-000205"><svg class="je-copy-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg><svg class="je-copied-glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></button></span></td><td class="nowrap">Aug 27</td><td>Consulting Payout<div class="row-source"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span>Primary Checking · Bank Y via Plaid</div></td><td>Split<div class="row-meta">Revenue, Platform Fee Expense</div></td>
+                <td>
+                  <span class="badge badge-outline">Posted</span>
+                  <div class="row-meta">split — 3 legs</div>
+                </td>
+                <td class="amount positive">+$1,480.00</td>
+                <td class="nowrap"><button class="row-action">Correct entry</button></td>
+              </tr>
             </tbody>
           </table>
           </div>
-          <div class="table-pager">‹ Prev · Page 1 of 9 · Next ›</div>
+          <div class="table-pager">‹ Prev · Page 1 of 10 · Next ›</div>
         </div>
       </div>
     </div>
@@ -260,6 +310,7 @@
           <button class="popover-item" role="menuitemradio" aria-checked="true" aria-current="true"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg></span><span class="account-menu-text"><span>All Transactions</span><span class="account-menu-meta">Every custodial account · 1 exception, 3 pending</span></span><span class="icon icon-sm account-menu-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></button>
           <div class="popover-divider"></div>
           <button class="popover-item" role="menuitemradio" aria-checked="false"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="account-menu-text"><span>Primary Checking</span><span class="account-menu-meta">Bank Y via Plaid · 1 exception, 2 pending</span></span></button>
+          <button class="popover-item" role="menuitemradio" aria-checked="false"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="account-menu-text"><span>Savings</span><span class="account-menu-meta">Bank Y via Plaid · nothing open</span></span></button>
           <button class="popover-item" role="menuitemradio" aria-checked="false"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="account-menu-text"><span>Crypto Wallet</span><span class="account-menu-meta">Coinbase via Plaid · token expired · nothing open</span></span></button>
           <button class="popover-item" role="menuitemradio" aria-checked="false"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="account-menu-text"><span>Brokerage</span><span class="account-menu-meta">Custodian X via Plaid · 1 pending</span></span></button>
       </div>
