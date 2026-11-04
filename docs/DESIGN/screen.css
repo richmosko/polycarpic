@@ -1639,7 +1639,7 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
    language: "All Transactions", a divider, then one item per custodial
    account with its provider and open-item counts. The list mirrors
    Custodial Accounts' cards, so the two screens name accounts the same. */
-.txn-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.txn-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
 .account-filter-wrap { position: relative; }
 .account-filter {
   display: inline-flex;
