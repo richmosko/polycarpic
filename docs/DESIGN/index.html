@@ -432,11 +432,13 @@ flowchart TD
   </ul>
 
   <h3 id="flow-general-ledger">5.8 General Ledger: tree, register, entry</h3>
-  <p class="section-hint"><strong>Story (PRD §4.7):</strong> chart-of-accounts tree → account register → journal entry, with a custodial cross-reference. Source: <a href="flows/general-ledger-flow.md">flows/general-ledger-flow.md</a>.</p>
+  <p class="section-hint"><strong>Story (PRD §4.7):</strong> three tabs; chart-of-accounts tree → account register → journal entry, with a custodial cross-reference. Source: <a href="flows/general-ledger-flow.md">flows/general-ledger-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
-  open([Open General Ledger\nfor entity]) --> tree[Chart-of-accounts tree:\ncategory → account → sub-account,\nGL balances]
-  open --> map[Balance sheet map, prototype:\nAssets vs. Liabilities + Equity]
+  open([Open General Ledger\nfor entity]) --> tabs{Tab}
+  tabs -- default --> tree[Chart of accounts tab:\ncategory → account → sub-account,\nGL balances]
+  tabs --> map[Balance sheet map tab, prototype:\nAssets vs. Liabilities + Equity]
+  tabs --> journal[Journal entries tab:\nby date, page size,\ndate range, sort]
   tree --> act{User action}
   act -- expand or collapse --> tree
   act -- open an account --> register[Account register:\nevery line that hit it,\ndate order, running balance]
@@ -444,21 +446,20 @@ flowchart TD
   act -- custodial badge --> custodial([Custodial Accounts:\nthe mirrored physical account])
   register -- line chevron --> entry([Journal entry, expanded in place:\nevery leg, actor,\nCorrect entry action])
   register -- breadcrumb --> tree
-  tree --> journal[Journal entries card:\nby date, page size,\ndate range, sort]
-  journal -- click opens the entry --> entry
+  journal -- chevron --> entry
   register -- Journal ID link --> journal
   posted([Transactions: Posted card]) -- Journal ID link --> journal
   search([Search by Journal ID]) -.-> journal
   </pre>
   <ul>
+    <li><strong>Three tabs, one section at a time:</strong> Chart of accounts (the default), Balance sheet map and Journal entries, in one <code>Tabs</code> row at the top of the content. Each keeps its card header. The URL hash carries the tab, so Back from a register returns to the tab it left; a Journal ID link selects Journal entries; the register's breadcrumb returns to the tree.</li>
     <li><strong>The tree is the GL's own view:</strong> every balance is the ledger's figure. The custodial badge (<code>landmark</code> icon + institution) is a cross-reference to Custodial Accounts, never a second data source; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.</li>
-    <li><strong>The tree is a titled card,</strong> "Chart of accounts", with the same header as the Balance sheet map.</li>
     <li><strong>The register is account-scoped and running-balance-shaped;</strong> Transactions is entry-scoped and time-ordered across every account. Different questions, deliberately two screens.</li>
     <li><strong>A register line expands to its full journal entry</strong> in the same block as the Journal entries card: every leg, not just the one that hit this account, plus the correction trail where one exists, with actor attribution and the Correct entry action (flow 5.3). Its Journal ID links to the GL card.</li>
-    <li><strong>Balance sheet map (prototype):</strong> a nested treemap card above the tree, Assets | Liabilities + Equity as equal halves, each element in its fixed categorical slot; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
-    <li><strong>Journal entries card:</strong> below the tree, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.</li>
+    <li><strong>Balance sheet map (prototype):</strong> a nested treemap on its own tab, Assets | Liabilities + Equity as equal halves, each element in its fixed categorical slot; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
+    <li><strong>Journal entries card:</strong> on its own tab, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted card. It lists a correction's three entries as three rows; the Posted card rolls them into one.</li>
     <li><strong>Journal ID:</strong> a short per-entity display number, <code>JE-000214</code>, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted card and the register, copied on hover, so any entry can be cited exactly.</li>
-    <li><strong>Journal ID links:</strong> on the register and the Posted card the ID links to the entry's row on the Journal entries card (<code>general-ledger.html#je-000212</code>), which highlights and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).</li>
+    <li><strong>Journal ID links:</strong> on the register and the Posted card the ID links to the entry's row on the Journal entries card (<code>general-ledger.html#je-000212</code>), which selects the tab, highlights the row and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).</li>
     <li><strong>Reversed entries stay listed, muted:</strong> no filter hides them. A Reversed original and its reversal render in muted ink, the original's description struck through; the Journal ID keeps full ink because it is the reference.</li>
   </ul>
 
@@ -520,7 +521,7 @@ flowchart TD
   <div class="screen-gallery">
     <figure class="screen-card"><a href="styled-screens/dashboard.html"><img src="styled-screens/thumbs/dashboard.png" alt="Dashboard screen"></a><figcaption><a href="styled-screens/dashboard.html">Dashboard</a><span>Per-entity financial health: net worth, accounts, summary, empty tax/allocation cards.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/transactions.html"><img src="styled-screens/thumbs/transactions.png" alt="Transactions screen"></a><figcaption><a href="styled-screens/transactions.html">Transactions</a><span>Exceptions / Pending / Posted accordions; the Plaid review-and-match inbox, split grid, bulk bar, Posted rows led by Journal ID, journal-entry modal.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/general-ledger.html"><img src="styled-screens/thumbs/general-ledger.png" alt="General Ledger screen"></a><figcaption><a href="styled-screens/general-ledger.html">General Ledger</a><span>Balance-sheet treemap (prototype), then the Chart of accounts card with custodial cross-reference badges, each account opening its register, then the Journal entries card with page size, date range and sort.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/general-ledger.html"><img src="styled-screens/thumbs/general-ledger.png" alt="General Ledger screen"></a><figcaption><a href="styled-screens/general-ledger.html">General Ledger</a><span>Three tabs: Chart of accounts (default) with custodial cross-reference badges, each account opening its register; Balance sheet map (prototype treemap); Journal entries with page size, date range and sort.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/account-register.html"><img src="styled-screens/thumbs/account-register.png" alt="Account register screen"></a><figcaption><a href="styled-screens/account-register.html">Account register</a><span>Drill-down from the GL: multi-crumb breadcrumb, Journal ID plus Dr/Cr/running-balance table, each line expanding to its full entry; Corrected and rule-posted rows.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/custodial-accounts.html"><img src="styled-screens/thumbs/custodial-accounts.png" alt="Custodial Accounts screen"></a><figcaption><a href="styled-screens/custodial-accounts.html">Custodial Accounts</a><span>Totals card, then per-account cards: market value, book value and cash side by side, link health, reconciliation, a lots sub-card; the provider-item dialog shown open.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class pulling down to its sub-categories and drilling to its lots; two-level target editor.</span></figcaption></figure>
