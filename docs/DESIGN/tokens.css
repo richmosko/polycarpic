@@ -116,6 +116,42 @@
   --chart-4: #096FA5;
   --chart-5: #086291;
 
+  /* Categorical palette: identity, not magnitude (the --chart ramp stays
+     the magnitude ramp). Seven hues in a fixed order plus a neutral
+     Other; colour follows the entity, never its rank. Principal ruling:
+     the brand colours themselves, and five more at their brightness and
+     intensity. cat-1 and cat-2 ARE --brand and --brand-2; the other five
+     sit at OKLCH L 0.71-0.84, C 0.14-0.26, each at or near the sRGB limit
+     for its hue (the brand pair measures L 0.87/0.71, C 0.29/0.17), and
+     skip the status arcs (red ~29, orange ~48, positive green ~150-162).
+     Same values in both modes; only the label ink changes, in the dark
+     block below. Validated with the dataviz skill's validate_palette.js:
+     adjacent (7) worst CVD dE 12.0, normal-vision 16.3; all-pairs over
+     cat-1..5 CVD 8.3, normal 17.1. WAIVED by the same ruling: the 3:1
+     surface contrast on light surfaces (tightest 1.29:1, neon on
+     --background) and the mode lightness band. Compensated on every
+     mark: a label or legend, a 1px --cat-edge hairline and a 2px surface
+     gap, and the dark label ink on the line (AA on the fill).
+     design-system-spec.md § Categorical palette has the full method. */
+  --cat-1: var(--brand);   --cat-1-foreground: #1D1F20; /* neon green, 12.15:1 */
+  --cat-2: var(--brand-2); --cat-2-foreground: #1D1F20; /* sky,         6.40:1 */
+  --cat-3: #E2B003;        --cat-3-foreground: #1D1F20; /* gold,        8.23:1 */
+  --cat-4: #FF49D8;        --cat-4-foreground: #1D1F20; /* magenta,     5.67:1 */
+  --cat-5: #06E5F7;        --cat-5-foreground: #1D1F20; /* cyan,       10.68:1 */
+  --cat-6: #C67EFF;        --cat-6-foreground: #1D1F20; /* violet,      6.17:1 */
+  --cat-7: #FF67A4;        --cat-7-foreground: #1D1F20; /* rose,        6.09:1 */
+  /* Other: the 8th+ series folded together. Neutral (warm, like
+     --muted-foreground), at the set's brightness but with no chroma, so
+     it never reads as an eighth hue. */
+  --cat-other: #A8A39D;    --cat-other-foreground: #1D1F20; /* 6.61:1 */
+  /* The 1px edge on a categorical mark: --foreground at 35%, translucent so
+     it reads as a darker step of whatever it sits on. Inset on a fill:
+     neon 2.09:1 against the fill and 2.68:1 against --background, cyan
+     2.04 / 2.98, gold 1.94 / 3.69. Outset on a surface: 2.14:1 against
+     --background, 2.15:1 against --card. --border is 1.06:1 on the neon,
+     too faint to edge the brightest slots. */
+  --cat-edge: rgba(29, 31, 32, 0.35);
+
   /* Sidebar: inverted relative to the page (a dark card on the light page)
      and tinted with the same blue as the neutral scale, so the whole
      system carries one consistent cast rather than a third, truly-neutral
@@ -199,6 +235,24 @@
   --chart-3: #51BDF6;
   --chart-4: #16A7F3;
   --chart-5: #0B89CB;
+
+  /* Categorical palette: the --cat-N fills are the :root values, unthemed
+     like --brand itself. Every slot >= 6.62:1 on --card here, so the
+     surface checks pass in dark mode; only the label ink changes, to the
+     dark page colour (ratio on the line). */
+  --cat-1-foreground: #070808;     /* 14.72:1 */
+  --cat-2-foreground: #070808;     /*  7.76:1 */
+  --cat-3-foreground: #070808;     /*  9.97:1 */
+  --cat-4-foreground: #070808;     /*  6.87:1 */
+  --cat-5-foreground: #070808;     /* 12.95:1 */
+  --cat-6-foreground: #070808;     /*  7.48:1 */
+  --cat-7-foreground: #070808;     /*  7.38:1 */
+  --cat-other-foreground: #070808; /*  8.01:1 */
+  /* --foreground at 25%. The fills already clear the surface here, so the
+     edge only has to show, not to separate: outset 2.08:1 on --card and
+     2.00:1 on --background, a soft ring rather than a halo. Inset it barely
+     registers on a fill this bright (neon 1.00:1, cyan 1.04, gold 1.15). */
+  --cat-edge: rgba(242, 242, 243, 0.25);
 
   /* Sidebar: inverted the other way in dark mode, a LIGHT card on the dark
      page, close to the light canvas tone. The ring uses a derived blue

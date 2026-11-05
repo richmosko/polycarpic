@@ -137,7 +137,20 @@
     <div class="swatch"><span class="chip" style="background:var(--chart-5)"></span><span class="name">--chart-5</span></div>
   </div>
 
-  <h3 id="tokens-sidebar">3.6 Sidebar (inverted, blue-tinted)</h3>
+  <h3 id="tokens-categorical">3.6 Categorical (identity, not magnitude)</h3>
+  <p>Seven fixed-order hues, the literal <code>--brand</code> and <code>--brand-2</code> plus five at their brightness and intensity, and a neutral Other, for treemaps, Pack, Sankey and bars. Colour follows the entity, never its rank. The light-mode 3:1 surface rule is waived for these fills, compensated by a label, a hairline or gap, and dark label ink. Values, label inks and fixed assignments: <a href="tokens.html#categorical">tokens.html § 7</a>; method and validator results: design-system-spec.md § Categorical palette.</p>
+  <div class="tokens-grid">
+    <div class="swatch"><span class="chip" style="background:var(--cat-1)"></span><span class="name">--cat-1</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-2)"></span><span class="name">--cat-2</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-3)"></span><span class="name">--cat-3</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-4)"></span><span class="name">--cat-4</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-5)"></span><span class="name">--cat-5</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-6)"></span><span class="name">--cat-6</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-7)"></span><span class="name">--cat-7</span></div>
+    <div class="swatch"><span class="chip" style="background:var(--cat-other)"></span><span class="name">--cat-other</span></div>
+  </div>
+
+  <h3 id="tokens-sidebar">3.7 Sidebar (inverted, blue-tinted)</h3>
   <div class="tokens-grid">
     <div class="swatch"><span class="chip" style="background:var(--sidebar)"></span><span class="name">--sidebar</span></div>
     <div class="swatch"><span class="chip" style="background:var(--sidebar-accent)"></span><span class="name">--sidebar-accent</span></div>
@@ -159,7 +172,8 @@
       <tr><td>Segmented bar + legend</td><td>Custom, tokens-driven</td><td>Assets/Liabilities, allocation actual-vs-target — Monarch-inspired</td></tr>
       <tr><td>Badge</td><td>Badge</td><td>Entity/account/transaction status, link-health — see Financial semantics</td></tr>
       <tr><td>Transaction table</td><td>Table</td><td>Account register, exceptions report, lots</td></tr>
-      <tr><td>Accordion</td><td>Accordion</td><td>Transactions' three urgency-ordered cards (Exceptions/Pending/Posted); Pending row expansion</td></tr>
+      <tr><td>Accordion</td><td>Accordion</td><td>Pending row expansion</td></tr>
+      <tr><td>Tabs</td><td>Tabs</td><td>Transactions' stages with count badges; General Ledger's sections; Reports' statements; Tax's jurisdictions</td></tr>
       <tr><td>Near-full-screen modal</td><td>Dialog</td><td>Journal-entry modal (header + legs) — manual entry, Correct entry, Split, Group &amp; Summarize</td></tr>
       <tr><td>Entity switcher</td><td>Tabs / Sidebar</td><td>Switch between Person/Trust/Business/Household</td></tr>
       <tr><td>Transaction detail</td><td>Sheet</td><td>Drill into a posted/draft entry, its journal lines, source doc</td></tr>
@@ -172,6 +186,8 @@
       <tr><td>Landing illustration</td><td>—, custom</td><td>Home — the mountains illustration under the brand app bar, then headline, subhead and feature cards; not a signed-in screen</td></tr>
       <tr><td>Switch</td><td>Switch</td><td>Settings on/off preferences (auto-post matched recurring transactions, reduced motion)</td></tr>
       <tr><td>Chart-of-accounts tree</td><td>—, custom (nested disclosure rows)</td><td>General Ledger: group rows with chevrons, account rows link to the register, custodial cross-reference badge</td></tr>
+      <tr><td>Date range control</td><td>Popover + Range Calendar</td><td>General Ledger's Journal entries card: presets plus one month grid</td></tr>
+      <tr><td>Journal entry popover</td><td>Popover</td><td>Transactions' Posted tab: a Journal ID opens the entry in place, with its legs, correction trail and a link to the General Ledger</td></tr>
       <tr><td>Brand app bar</td><td>—, custom</td><td>Every page without the app shell (Home, Get started, Admin): fixed near-black bar, neon lockup left, the page's trailing items right, a fade below (deep over Home's image, a short shadow over plain pages)</td></tr>
       <tr><td>Split screen login</td><td>—, custom</td><td>Login — full field list, centered form column, always-branded visual pane</td></tr>
     </tbody>
@@ -233,8 +249,18 @@ flowchart TD
   <p class="section-hint"><strong>Story (PRD §4.3):</strong> staged for review → matched / split / grouped → posted → correctable. The review mechanics follow a Plaid bank-feed workflow: every imported transaction is reviewed, matched, split or grouped, then posted. Source: <a href="flows/import-confirm-flow.md">flows/import-confirm-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
-  poll([Plaid adapter polls\nor fake source generates batch]) --> stage[Raw transaction lands\nin the Pending card]
-  stage --> transfer{Two legs match\nwithin date window?}
+  nav([Open Transactions\nfrom the sidebar]) --> filter[Account filter:\nAll Transactions by default,\nor one custodial account]
+  filter -. scopes .-> tabs[Tabs with count badges:\nExceptions, Pending, Posted;\nopens on Pending]
+  tabs --> stage
+  tabs --> exceptions
+  tabs --> posted
+  poll([Plaid adapter polls\nor fake source generates batch]) --> stage[Raw transaction lands\nin the Pending tab]
+  stage --> entryMatch{Matches a posted\nmanual entry?}
+  entryMatch -- no --> transfer{Two legs match\nwithin date window?}
+  entryMatch -- yes --> rowWarn[Pending row shows a caution line\nnaming the entry; review panel\noffers Match to that entry]
+  rowWarn -- match to that entry --> entryLinked[Entry gains the import link;\nrow leaves Pending]
+  entryLinked --> posted
+  rowWarn -- review as usual --> transfer
   transfer -- same posting date --> autoEntry[Locked debit leg +\nsuggested offset leg\ntwo-line preview]
   transfer -- different dates --> citEntry[Two entries via\nCash in Transit clearing account]
   transfer -- unmatched --> openItem[Remains a single-leg\nPending row]
@@ -242,7 +268,7 @@ flowchart TD
   openItem -- user approves into CIT --> citOne[One-sided in-flight item:\ncash leg vs. Cash in Transit,\ncounterpart still to come]
   citOne --> post
   openItem --> aging{Older than\nexceptions threshold\ndefault 3 business days?}
-  aging -- yes --> exceptions[Surface on\nExceptions card]
+  aging -- yes --> exceptions[Surface on\nExceptions tab]
   aging -- no --> openItem
   citEntry --> autoEntry
   autoEntry --> expand[User expands the row:\nAuto-Suggest Match view]
@@ -261,24 +287,44 @@ flowchart TD
   gate -- fail --> stage
   gate -- pass --> commit[Row fades out of Pending;\nbalanced entry commits to the GL]
   commit --> toast[Toast: entry posted]
-  commit --> posted([Appears on Posted,\npaged])
+  commit --> posted([Each transaction appears on\nPosted with the Journal ID,\npaged])
   exceptions --> resolve{Resolved manually?}
   resolve -- yes --> post
   resolve -- no --> exceptions
+  manual([New entry modal:\nDate is the transaction date;\nPost enabled once balanced]) --> dup{Duplicate candidate?\nA leg matches an imported\nPending or Posted transaction}
+  dup -- no --> posted
+  dup -- yes --> dupWarn[Caution warning above Post\nnames the matched transaction]
+  dupWarn -- match to that transaction --> expand
+  dupWarn -- match is already Posted --> jePopover
+  dupWarn -- post anyway --> dupRow[Posted row carries a muted\npossible duplicate badge]
+  dupRow --> posted
+  posted -- click Journal ID --> jePopover[Journal entry popover:\nlegs, correction trail,\nactor, logged time]
+  jePopover -- Open in General Ledger --> glRow([Entry's row on the\nJournal entries card])
+  jePopover -- dismiss --> posted
+  jePopover -- dismiss possible duplicate --> posted
   posted --> correctQ{User clicks\nCorrect entry?}
   correctQ -- yes --> doCorrect[System posts the reversal\n+ the new corrected entry\nuser never sees reverse as the verb]
-  doCorrect --> correctedBadge[Row now shows\nCorrected badge]
+  doCorrect --> correctedBadge[The entry's rows now show\nCorrected badge]
   correctedBadge --> clickThrough[Click-through: original lines\nshaded/struck + reversal + new entry]
   correctQ -- no --> complete([Flow complete])
   clickThrough --> complete
   </pre>
   <ul>
+    <li><strong>Account filter.</strong> A selector at the right end of the tab row scopes Exceptions, Pending and Posted together, count badges included. Opening Transactions from the sidebar always lands on <strong>All Transactions</strong> (every custodial account in the entity); the popover lists each custodial account by the name Custodial Accounts uses, with its provider and open-item counts. The Known delta badge on a Custodial Accounts card deep-links here with the filter preset to that account. On Posted the rule is leg-level and the same for every row: with one account selected, only the rows whose own leg posts a debit or credit to that account show, so the counterpart row of a transfer does not appear. A manual entry with a leg on that account shows as one row for that leg. All Transactions shows everything, including a manual entry with no custodial leg, such as an accrual, which no single account's view lists.</li>
+    <li><strong>Tabs with count badges.</strong> Exceptions, Pending and Posted are one <code>Tabs</code> row, left of the account filter, one visible at a time, in urgency order. Each tab carries its count, so every stage's load stays visible while another is open: <code>secondary</code>, <code>destructive-soft</code> on Exceptions when non-zero. Transactions opens on Pending, the review inbox; a non-zero Exceptions count does not take the default, its badge is red instead. The counts follow the account filter, changing the filter keeps the current tab, and the URL hash carries the tab.</li>
+    <li><strong>Every row names its source.</strong> Each Exceptions, Pending and Posted row carries one muted line under the payee: <code>landmark</code> icon + <code>&lt;account&gt; · &lt;institution&gt; via &lt;provider&gt;</code> (e.g. "Primary Checking · Bank Y via Plaid"). A manual entry has no bank source, so its line reads <code>pen-line</code> icon + "Manual entry". With the filter on one account, a line that only repeats the trigger is omitted; a Manual entry line stays.</li>
     <li><strong>The locked leg is always the custodial cash side</strong> — verified bank reality (the Plaid transaction itself), never editable, in the two-line preview, the Split grid, or the Group modal. <strong>The suggested offset leg</strong> is pre-filled from historical rules + the Plaid category and overridden in place via an inline search dropdown, never a blank field.</li>
-    <li><strong>Split</strong> is one draft → one multi-leg entry, live-validated: submission stays disabled until the rows sum exactly to the raw transaction's absolute total. <strong>Group</strong> is many drafts → one entry (the one many-to-one case, ARCH §3) via the shared journal-entry modal, pre-filled with one aggregate line + balancing distributions.</li>
+    <li><strong>Split</strong> is one draft → one multi-leg entry, live-validated: submission stays disabled until the rows sum exactly to the raw transaction's absolute total. <strong>Group</strong> is many drafts → one entry (ARCH §3), the same many-to-one shape as a same-date matched transfer, via the shared journal-entry modal, pre-filled with one aggregate line + balancing distributions.</li>
+    <li><strong>Posted is transaction-scoped.</strong> Every posted transaction is a row, mirroring Pending, and carries its entry's Journal ID. An entry built from several transactions appears as several rows with one ID: a group, or a same-date matched transfer (two legs, one entry). The rows sit together, because an entry has one date and same-date rows order by Journal ID. A split stays one row, however many legs its entry has. A transfer whose legs land on different dates posts as two entries through Cash in Transit, so its two rows carry two IDs. With the filter on one account, only that account's row of a transfer shows, whether the transfer is one entry or two; the Journal ID popover still lists both legs. The Posted badge counts rows, so it differs from the entry count on the GL Journal entries card, which is the entry-grained view.</li>
+    <li><strong>A manual entry is a Posted row like any other.</strong> On All Transactions, an entry from the New entry modal is one row with its own Journal ID, however many legs it has, and its Amount is the entry's sum of debits, unsigned, because it has no bank sign. With one account selected it is one row for the leg on that account, signed like a bank row: a debit to a cash account reads +. It cannot exist outside a compliant journal entry, so the same rules apply: the account filter, Correct entry, the Journal ID popover.</li>
+    <li><strong>Row Date is the transaction date.</strong> Date on Posted and on the GL Journal entries card is the date the user entered on the entry, never the time it was logged. The New entry modal's Date field is that date, so a backdated entry sorts by it on both lists, while its Journal ID still orders by posting. The audit trail (actor, logged-at) lives in the Journal ID popover and the GL entry view, not in the list.</li>
+    <li><strong>Potential-duplicate warning.</strong> While a manual entry is open in the New entry modal, each custodial leg is compared with imported transactions that are Pending or Posted. A candidate has the same custodial account, the same amount and direction, and a date within the entity's Duplicate detection window of the entry's Date, either side (Settings, default ±1 day). A candidate shows a caution-tier warning above the actions naming it: "Looks like Sep 12 · Stripe Payout +$1,500.00 on Primary Checking, Pending". The nearest date is named, and a Pending candidate wins a tie. <strong>Match to that transaction instead</strong> discards the manual entry and opens the Pending row's review panel, pre-filled with the modal's offset leg; for a Posted candidate this action reads <strong>Open that entry</strong> and opens its Journal ID popover. <strong>Post anyway</strong> takes the Post button's place and posts the entry: its row carries a muted <code>outline</code> <code>possible duplicate</code> badge under its status until the user dismisses it from the popover or matches the import. Only New entry and imports check, because Correct entry, Split and Group start from a real transaction.</li>
+    <li><strong>Mirror on Pending.</strong> The same rule and window run on Pending: an imported transaction that matches a posted manual entry, whichever arrived first, shows a caution line on its row: "Looks like manual entry JE-000215 · Sep 11 · +$1,500.00". The line shows collapsed or expanded, and the Journal ID opens that entry's popover. The nearest date is named, and an entry already linked to an import is no longer a candidate. The review panel adds <strong>Match to that entry</strong> as its default action, and Approve &amp; Post steps down to an outline button beside it so Enter cannot slip past it. <strong>Match to that entry</strong> links the import to the existing entry and posts nothing: the row leaves Pending, the entry stays as it is, and the Posted count holds. The entry's row gains a <code>matched import</code> status line and loses any <code>possible duplicate</code> badge, and its popover lists the import. Approve &amp; Post past the caution keeps both. Dismiss possible duplicate on the entry clears the caution on the row it names.</li>
+    <li><strong>Journal ID popover.</strong> Clicking a Journal ID on Posted opens a <code>Popover</code> anchored to the ID, so an entry can be read without leaving the list. Header line: Journal ID with copy, transaction date, actor, "logged &lt;timestamp&gt;", status badge. Body: every leg, then the correction trail if any (the original and its reversal, since the entry's own legs are already above). Footer: <strong>Open in General Ledger</strong>, to the entry's row on the Journal entries card, plus <strong>Dismiss possible duplicate</strong> on a row that carries that badge. It is non-modal: an outside click or Esc dismisses it and focus returns to the ID. The View correction chevron on a Corrected row is a separate control: it expands the trail in place. The account register's Journal ID stays a link to the GL.</li>
     <li><strong>An unmatched transfer leg stays a staged draft</strong> in Pending until its counterpart arrives (then it matches like any transfer), or until the user explicitly approves it into Cash in Transit as a one-sided in-flight item — a balanced entry, cash leg against the CIT clearing account, cleared when the counterpart posts. A draft still unmatched past the exceptions threshold moves to Exceptions.</li>
-    <li><strong>Posting gate:</strong> Σ debits = Σ credits; the accounting equation holds per entity; the entry date matches the bank date (or the Cash-in-Transit rule); every posted draft links to exactly one entry. Any failure keeps the item in Pending — no partial or silent post.</li>
-    <li>A posted row's user-facing action is <strong>"Correct entry"</strong>, never "edit" or "reverse" — reversal-only underneath (PRD §5). Click-through shows the full trail: original lines shaded/struck, the reversal, and the new entry. See design-system-spec.md § Correcting a posted entry.</li>
-    <li>Badges: <code>Draft (staged)</code> (<code>--secondary</code>, clock), <code>Posted</code> (<code>--outline</code>, check), <code>Corrected</code> (<code>--outline</code> + <code>--brand-2</code>-tinted dot, pencil). An auto-posted row carries <code>Posted</code> plus a <code>posted by rule — &lt;name&gt;</code> line and the same Correct entry action.</li>
+    <li><strong>Posting gate:</strong> Σ debits = Σ credits; the accounting equation holds per entity; the entry date matches the bank date (or the Cash-in-Transit rule); every posted draft links to exactly one entry, and several drafts may share it (a group, a same-date matched transfer). Any failure keeps the item in Pending — no partial or silent post.</li>
+    <li>A posted row's user-facing action is <strong>"Correct entry"</strong>, never "edit" or "reverse" — reversal-only underneath (PRD §5). Click-through shows the full trail: original lines shaded/struck, the reversal, and the new entry. Correct entry on any row of a multi-row entry corrects that one entry, and every row of it then carries the corrected entry's ID and the Corrected badge. See design-system-spec.md § Correcting a posted entry.</li>
+    <li>Badges: <code>Draft (staged)</code> (<code>--secondary</code>, clock), <code>Posted</code> (<code>--outline</code>, check), <code>Corrected</code> (<code>--outline</code> + <code>--brand-2</code>-tinted dot, pencil). An auto-posted row carries <code>Posted</code> plus a <code>posted by rule — &lt;name&gt;</code> line and the same Correct entry action. <code>possible duplicate</code> (<code>--outline</code>, muted ink) sits under the status of a manual row posted past the duplicate warning; <code>matched import</code> is the status line of a manual row linked to its import.</li>
     <li>Actor attribution (user / auto-post rule / system job) is shown on every draft and posted row, never inferred (PRD §5).</li>
     <li>Import stats and link status (provider sync time, link health) show as a banner at the top of Transactions, not as a separate nav item.</li>
   </ul>
@@ -324,9 +370,9 @@ flowchart TD
   <p class="section-hint"><strong>Stories (PRD §4.6–4.7):</strong> three figures per account, lots, and GL vs. custodial reconciliation. General Ledger and Custodial Accounts are two nav items, not a toggle. Source: <a href="flows/securities-lots-flow.md">flows/securities-lots-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
-  view([Open Custodial Accounts\nfor entity]) --> totals[Totals card:\ncash, book value, market value,\nmarket minus book, summed]
+  view([Open Custodial Accounts\nfor entity]) --> totals[Totals card:\nmarket value, book value, cash,\nUnrealized, summed]
   view --> accounts[Per-account cards:\nlink-health badge]
-  accounts --> figs[Three figures side by side:\ncash balance, book value = GL cost basis,\nmarket value at EOD prices,\nand market minus book]
+  accounts --> figs[Three figures, left to right:\nmarket value at EOD prices,\nbook value = GL cost basis, cash balance,\nand Unrealized]
   priceFeed[Daily EOD price feed] --> figs
   figs --> totals
   accounts --> lotsCard[Lots sub-card per security:\npull-down shows lots,\nshort/long/total gain per lot + summed]
@@ -342,8 +388,8 @@ flowchart TD
   glLink --> done([View complete])
   </pre>
   <ul>
-    <li><strong>Three figures on every account, side by side:</strong> cash balance; book value (the GL's cost basis, cash included — the GL's own balance for the mirrored account); market value (cash plus every position at the last EOD price); and market minus book, signed and coloured per § Delta coloring. A cash-only account shows the same row with equal figures and a <code>$0.00</code> delta, so cards scan as columns. A totals card sums the four figures across accounts, with the price date.</li>
-    <li>An account's market minus book equals its lots sub-card's total unrealized gain; the two must agree.</li>
+    <li><strong>Three figures on every account, left to right:</strong> market value (cash plus every position at the last EOD price); book value (the GL's cost basis, cash included — the GL's own balance for the mirrored account); cash balance; and Unrealized = market − book, signed and coloured per § Delta coloring. A cash-only account shows the same row with equal figures and a <code>$0.00</code> delta, so cards scan as columns. A totals card sums the four figures across accounts, with the price date. Cash sits last so the row reads as "market and book include cash" — the two totals first, the cash already inside them after.</li>
+    <li>An account's Unrealized figure equals its lots sub-card's total unrealized gain; the two must agree.</li>
     <li><strong>No toggle:</strong> General Ledger and Custodial Accounts are two separate nav items, not one screen behind a <code>Tabs</code> switch. Both read the same lot and journal data; the split is presentation, not a data fork.</li>
     <li><strong>Unapproved drafts are a known unposted delta, not a break.</strong> When the GL and custodian balances differ by exactly the account's staged drafts (e.g. an unmatched transfer leg not yet approved into Cash in Transit), the card shows the delta and lists those drafts, linking to Pending on Transactions; no danger tier. Only a difference the drafts do not explain is a break.</li>
     <li>A reconciliation break uses the danger tier (<code>--destructive</code>) and surfaces on the Dashboard glance too, not only here.</li>
@@ -351,18 +397,18 @@ flowchart TD
   </ul>
 
   <h3 id="flow-allocation">5.6 Allocation vs. target</h3>
-  <p class="section-hint"><strong>Stories (PRD §4.8, §4.10):</strong> actual vs. target by asset class, drift, target editor, nominal / CPI-U toggle. Source: <a href="flows/allocation-flow.md">flows/allocation-flow.md</a>.</p>
+  <p class="section-hint"><strong>Story (PRD §4.8):</strong> actual vs. target by asset class and sub-category, drift, two-level target editor. Source: <a href="flows/allocation-flow.md">flows/allocation-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
   open([Open Allocation\nfor entity]) --> actual[Actual by asset class:\nmarket value from lots,\nacross every custodial account]
   actual --> target[Overlay the target\nper class]
   target --> drift[Drift per class:\nactual minus target, in points]
   drift --> act{User action}
-  act -- toggle basis --> basis[Nominal or\ninflation-adjusted CPI-U]
-  basis --> actual
+  act -- expand a class --> subs[Sub-category rows:\nactual vs. target and drift\nper sub-category]
+  subs -- drill a sub-category --> lots
   act -- drill a class --> lots([Custodial Accounts lots,\nfiltered to that class])
-  act -- adjust target --> edit[Target editor:\npercent per class]
-  edit --> sum{Targets total\n100%?}
+  act -- adjust target --> edit[Target editor, two levels:\npercent per class, then\nper sub-category behind a pull-down]
+  edit --> sum{Classes total 100%\nand each class equals\nthe sum of its sub-targets?}
   sum -- no --> edit
   sum -- yes --> save[Save target]
   save --> drift
@@ -371,9 +417,10 @@ flowchart TD
   <ul>
     <li><strong>Same data, different aggregation:</strong> actual allocation is the lots' market value summed by asset class across every custodial account for the entity — not a new data source.</li>
     <li><strong>Drift is information, not a warning.</strong> Over or under target shows as a neutral <code>outline</code> badge ("+2 pt over", "−2 pt under"); on target shows the positive soft badge. No caution or danger hue.</li>
-    <li><strong>Drill:</strong> each asset-class name opens Custodial Accounts' lots, filtered to that class, so every percentage traces to the lots behind it.</li>
-    <li><strong>Target editor:</strong> Save is enabled only when the targets total 100%. Viewers see the chart but no editor and no Save (write controls are omitted, not greyed).</li>
-    <li><strong>Nominal / CPI-U toggle</strong> (PRD §4.10) is orthogonal to actual-vs-target: it restates dollar figures and the over-time view in real terms; the percentage split itself does not change with the basis.</li>
+    <li><strong>Drill:</strong> each asset-class or sub-category name opens Custodial Accounts' lots, filtered to it, so every percentage traces to the lots behind it.</li>
+    <li><strong>Sub-categories behind a pull-down.</strong> Every class row, in the chart and in the target editor, has a chevron that reveals its sub-categories (the lots sub-card's disclosure pattern). Seeded defaults: US Equity → Large cap, Mid/Small cap; Intl Equity → Developed, Emerging; Fixed Income → Treasuries, Corporate, Municipal; Cash → Cash, Money market. In the chart, each sub-row shows its own actual / target and drift badge.</li>
+    <li><strong>Target editor, two levels:</strong> sub-targets are whole-portfolio percent and must sum to their class target; the class row stays editable and carries a reconcile badge (positive soft "Sub-targets sum to N%", or neutral outline "N pt unassigned"). Save is enabled only when the classes total 100% and every class reconciles. Viewers see the chart but no editor and no Save (write controls are omitted, not greyed).</li>
+    <li><strong>No nominal / inflation-adjusted toggle here.</strong> Allocation is a contemporaneous snapshot of today's holdings, so a CPI-U restatement adds no information; the toggle (PRD §4.10) belongs to the time-series views (Dashboard net-worth chart, Reports).</li>
   </ul>
 
   <h3 id="flow-entity-membership">5.7 Entity switch, roll-up &amp; membership access</h3>
@@ -407,29 +454,39 @@ flowchart TD
     <li><strong>The drill-through boundary.</strong> A parent viewer sees the parent's consolidated figures. Every figure stays clickable; a drill into an included base entity the user has no membership on opens a boundary panel — "Included from &lt;entity&gt;. You don't have access to that entity's ledger." — instead of the register, never a disabled number or a silent dead end.</li>
     <li>Role badges (<code>Owner</code> / <code>Manager</code> / <code>Viewer</code>) use decreasing visual weight — <code>default</code> / <code>secondary</code> / <code>outline</code> (design-system-spec.md § Entity, account, and category badges).</li>
     <li>A viewer never sees a write affordance rendered-then-disabled: write controls are omitted entirely for a role that cannot use them.</li>
-    <li><strong>Roll-up map:</strong> Entities opens with a Pack of every entity the user holds membership on — parents as circles holding their base entities, a shared base entity drawn once in each parent with an "also in" marker; each circle switches entity. The membership list below it is the accessible fallback. See design-system-spec.md § Entities &amp; membership.</li>
+    <li><strong>Roll-up map:</strong> Entities opens with a Pack of every entity the user holds membership on — parents as circles holding their base entities, each circle stroked in its entity type's categorical slot, a shared base entity drawn once in each parent with an "also in" marker; each circle switches entity. The membership list below it is the accessible fallback. See design-system-spec.md § Entities &amp; membership.</li>
   </ul>
 
   <h3 id="flow-general-ledger">5.8 General Ledger: tree, register, entry</h3>
-  <p class="section-hint"><strong>Story (PRD §4.7):</strong> chart-of-accounts tree → account register → journal entry, with a custodial cross-reference. Source: <a href="flows/general-ledger-flow.md">flows/general-ledger-flow.md</a>.</p>
+  <p class="section-hint"><strong>Story (PRD §4.7):</strong> three tabs; chart-of-accounts tree → account register → journal entry, with a custodial cross-reference. Source: <a href="flows/general-ledger-flow.md">flows/general-ledger-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
-  open([Open General Ledger\nfor entity]) --> tree[Chart-of-accounts tree:\ncategory → account → sub-account,\nGL balances]
-  open --> map[Balance sheet map, prototype:\nAssets vs. Liabilities + Equity]
+  open([Open General Ledger\nfor entity]) --> tabs{Tab}
+  tabs -- default --> tree[Chart of accounts tab:\ncategory → account → sub-account,\nGL balances]
+  tabs --> map[Balance sheet map tab, prototype:\nAssets vs. Liabilities + Equity]
+  tabs --> journal[Journal entries tab:\nby date, page size,\ndate range, sort]
   tree --> act{User action}
   act -- expand or collapse --> tree
   act -- open an account --> register[Account register:\nevery line that hit it,\ndate order, running balance]
   map -- click a tile --> register
   act -- custodial badge --> custodial([Custodial Accounts:\nthe mirrored physical account])
-  register --> line[Click a register line]
-  line --> entry([Journal entry:\nevery leg, actor,\nCorrect entry action])
+  register -- line chevron --> entry([Journal entry, expanded in place:\nevery leg, actor,\nCorrect entry action])
   register -- breadcrumb --> tree
+  journal -- chevron --> entry
+  register -- Journal ID link --> journal
+  posted([Transactions: Posted tab]) -- Journal ID popover footer link --> journal
+  search([Search by Journal ID]) -.-> journal
   </pre>
   <ul>
+    <li><strong>Three tabs, one section at a time:</strong> Chart of accounts (the default), Balance sheet map and Journal entries, in one <code>Tabs</code> row at the top of the content. Each keeps its card header. The URL hash carries the tab, so Back from a register returns to the tab it left; a Journal ID link selects Journal entries; the register's breadcrumb returns to the tree.</li>
     <li><strong>The tree is the GL's own view:</strong> every balance is the ledger's figure. The custodial badge (<code>landmark</code> icon + institution) is a cross-reference to Custodial Accounts, never a second data source; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.</li>
-    <li><strong>The register is account-scoped and running-balance-shaped;</strong> Transactions is entry-scoped and time-ordered across every account. Different questions, deliberately two screens.</li>
-    <li><strong>A register line opens its full journal entry</strong> — every leg, not just the one that hit this account — with actor attribution and the Correct entry action (flow 5.3).</li>
-    <li><strong>Balance sheet map (prototype):</strong> a nested treemap card above the tree, Assets | Liabilities + Equity as equal halves; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
+    <li><strong>The register is account-scoped and running-balance-shaped;</strong> Transactions is transaction-scoped: every posted transaction is a row and carries its entry's Journal ID; an entry built from several transactions appears as several rows with one ID; the GL Journal entries card is the entry-grained view. Different questions, deliberately two screens.</li>
+    <li><strong>A register line expands to its full journal entry</strong> in the same block as the Journal entries card: every leg, not just the one that hit this account, plus the correction trail where one exists, with actor attribution and the Correct entry action (flow 5.3). Its Journal ID links to the GL card.</li>
+    <li><strong>Balance sheet map (prototype):</strong> a nested treemap on its own tab, Assets | Liabilities + Equity as equal halves, each element in its fixed categorical slot; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
+    <li><strong>Journal entries card:</strong> on its own tab, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted tab. It lists a correction's three entries as three rows; the Posted tab rolls them into one.</li>
+    <li><strong>Journal ID:</strong> a short per-entity display number, <code>JE-000214</code>, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted tab and the register, copied on hover, so any entry can be cited exactly.</li>
+    <li><strong>Journal ID links:</strong> on the register the ID links to the entry's row on the Journal entries card (<code>general-ledger.html#je-000212</code>), and on the Posted tab the ID opens a popover whose Open in General Ledger link goes to the same row (flow 5.3). Arriving selects the tab, highlights the row and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).</li>
+    <li><strong>Reversed entries stay listed, muted:</strong> no filter hides them. A Reversed original and its reversal render in muted ink, the original's description struck through; the Journal ID keeps full ink because it is the reference.</li>
   </ul>
 
   <h3 id="flow-reports">5.9 Reports</h3>
@@ -489,11 +546,11 @@ flowchart TD
   <h3>App screens</h3>
   <div class="screen-gallery">
     <figure class="screen-card"><a href="styled-screens/dashboard.html"><img src="styled-screens/thumbs/dashboard.png" alt="Dashboard screen"></a><figcaption><a href="styled-screens/dashboard.html">Dashboard</a><span>Per-entity financial health: net worth, accounts, summary, empty tax/allocation cards.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/transactions.html"><img src="styled-screens/thumbs/transactions.png" alt="Transactions screen"></a><figcaption><a href="styled-screens/transactions.html">Transactions</a><span>Exceptions / Pending / Posted accordions; the Plaid review-and-match inbox, split grid, bulk bar, journal-entry modal.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/general-ledger.html"><img src="styled-screens/thumbs/general-ledger.png" alt="General Ledger screen"></a><figcaption><a href="styled-screens/general-ledger.html">General Ledger</a><span>Balance-sheet treemap (prototype) above the chart-of-accounts tree with custodial cross-reference badges; each account opens its register.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/account-register.html"><img src="styled-screens/thumbs/account-register.png" alt="Account register screen"></a><figcaption><a href="styled-screens/account-register.html">Account register</a><span>Drill-down from the GL: multi-crumb breadcrumb, Dr/Cr/running-balance table, Corrected and rule-posted rows.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/custodial-accounts.html"><img src="styled-screens/thumbs/custodial-accounts.png" alt="Custodial Accounts screen"></a><figcaption><a href="styled-screens/custodial-accounts.html">Custodial Accounts</a><span>Totals card, then per-account cards: cash, book value and market value side by side, link health, reconciliation, a lots sub-card; the provider-item dialog shown open.</span></figcaption></figure>
-    <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class drilling to its lots; target editor; nominal / CPI-U toggle.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/transactions.html"><img src="styled-screens/thumbs/transactions.png" alt="Transactions screen"></a><figcaption><a href="styled-screens/transactions.html">Transactions</a><span>Exceptions / Pending / Posted tabs with count badges, opening on the Plaid review-and-match inbox; split grid, bulk bar, Posted rows led by Journal ID, journal entry popover, journal-entry modal.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/general-ledger.html"><img src="styled-screens/thumbs/general-ledger.png" alt="General Ledger screen"></a><figcaption><a href="styled-screens/general-ledger.html">General Ledger</a><span>Three tabs: Chart of accounts (default) with custodial cross-reference badges, each account opening its register; Balance sheet map (prototype treemap); Journal entries with page size, date range and sort.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/account-register.html"><img src="styled-screens/thumbs/account-register.png" alt="Account register screen"></a><figcaption><a href="styled-screens/account-register.html">Account register</a><span>Drill-down from the GL: multi-crumb breadcrumb, Journal ID plus Dr/Cr/running-balance table, each line expanding to its full entry; Corrected and rule-posted rows.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/custodial-accounts.html"><img src="styled-screens/thumbs/custodial-accounts.png" alt="Custodial Accounts screen"></a><figcaption><a href="styled-screens/custodial-accounts.html">Custodial Accounts</a><span>Totals card, then per-account cards: market value, book value and cash side by side, link health, reconciliation, a lots sub-card; the provider-item dialog shown open.</span></figcaption></figure>
+    <figure class="screen-card"><a href="styled-screens/allocation.html"><img src="styled-screens/thumbs/allocation.png" alt="Allocation screen"></a><figcaption><a href="styled-screens/allocation.html">Allocation</a><span>Actual vs. target by asset class with target markers, each class pulling down to its sub-categories and drilling to its lots; two-level target editor.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/tax.html"><img src="styled-screens/thumbs/tax.png" alt="Tax screen"></a><figcaption><a href="styled-screens/tax.html">Tax</a><span>Per entity and jurisdiction: pending liability and safe-harbor gap side by side, status tier, installment timeline, prepaid-tax account; Post your payment.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/reports.html"><img src="styled-screens/thumbs/reports.png" alt="Reports screen"></a><figcaption><a href="styled-screens/reports.html">Reports</a><span>Balance Sheet empty state plus dimmed previews of the Income Statement and Cash Flow shapes.</span></figcaption></figure>
     <figure class="screen-card"><a href="styled-screens/entities.html"><img src="styled-screens/thumbs/entities.png" alt="Entities screen"></a><figcaption><a href="styled-screens/entities.html">Entities</a><span>Roll-up map (Pack): parents holding whole base entities, a shared entity drawn in each parent; membership cards with Includes / Included in, role badges, invite and create below.</span></figcaption></figure>

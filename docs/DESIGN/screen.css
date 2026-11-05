@@ -648,20 +648,8 @@ h1, h2, h3, .heading {
 .correction-trail .trail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
 .correction-trail .trail-row.struck { text-decoration: line-through; color: var(--muted-foreground); opacity: 0.75; }
 
-/* ---------- Accordion: Transactions' three urgency-ordered cards
-   (Exceptions, Pending, Posted; design-system-spec.md § Transactions
-   workflow) ---------- */
-.accordion-card + .accordion-card { margin-top: 16px; }
-.accordion-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  cursor: pointer;
-}
-.accordion-header .accordion-title { font-size: 15px; font-weight: 600; }
-.accordion-header .accordion-count { color: var(--muted-foreground); font-weight: 400; font-size: 13px; margin-left: 6px; }
-.accordion-body { padding: 0 20px 20px; }
+/* ---------- Transactions' tab panels ---------- */
+.txn-body { padding: 8px 24px 20px; }
 .show-n-select { font-size: 12px; }
 
 /* ---------- Pending row expansion (the "Auto-Suggest Match" view) ----------
@@ -745,6 +733,7 @@ h1, h2, h3, .heading {
    the literal --warning fill only clears AA text contrast against --card
    at 3.20:1, below the 4.5:1 text floor (see tokens.css § warning). */
 .link-health-banner.warning { background: color-mix(in srgb, var(--warning) 14%, var(--card)); color: var(--warning-foreground); }
+.dark .link-health-banner.warning { color: var(--warning); }
 
 /* ---------- Button ---------- */
 .btn {
@@ -818,7 +807,7 @@ table.data-table td.amount { font-family: var(--font-mono); text-align: right; f
 table.data-table td.amount.positive { color: var(--positive); }
 table.data-table td.amount.negative { color: var(--destructive); }
 
-/* ---------- Tabs (entity switcher, GL-vs-custodial, nominal-vs-real) ---------- */
+/* ---------- Tabs (section and statement switchers, nominal-vs-real) ---------- */
 .tabs {
   display: inline-flex;
   padding: 4px;
@@ -839,6 +828,10 @@ table.data-table td.amount.negative { color: var(--destructive); }
 }
 
 .tabs .tab.active { background: var(--card); color: var(--foreground); box-shadow: 0 1px 2px oklch(0 0 0 / 8%); }
+/* A count badge sits inside the tab label (Transactions). */
+.tabs .tab:has(> .badge) { display: inline-flex; align-items: center; gap: 6px; }
+/* A tab's own URL hash must not scroll its tab row off the top. */
+[role="tabpanel"] { scroll-margin-top: 130px; }
 
 /* ---------- Sheet / drawer (transaction detail) ---------- */
 .sheet-overlay {
@@ -1328,7 +1321,7 @@ a.btn { text-decoration: none; }
 .card-grid > .card + .card,
 .fork-grid > .card + .card { margin-top: 0; }
 
-/* Show-N select in an accordion header never stretches (it would
+/* Show-N select in a card header never stretches (it would
    inherit .select's width:100% and squeeze the header title). */
 .select.show-n-select { width: auto; flex-shrink: 0; }
 
@@ -1415,11 +1408,14 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .custodial-meta { display: flex; align-items: center; gap: 10px; }
 .badge-warning-soft { background: color-mix(in srgb, var(--warning) 18%, var(--card)); color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 45%, var(--card)); }
 .dark .badge-warning-soft { color: var(--warning); }
+/* Soft destructive: the raw token falls under AA on its own tint in light mode, so the ink takes a share of --foreground. */
+.badge-destructive-soft { background: color-mix(in srgb, var(--destructive) 12%, var(--card)); color: color-mix(in srgb, var(--destructive) 80%, var(--foreground)); border-color: color-mix(in srgb, var(--destructive) 35%, var(--card)); }
+.dark .badge-destructive-soft { color: var(--destructive); }
 .badge-positive-soft { background: color-mix(in srgb, var(--positive) 12%, var(--card)); color: var(--positive); border-color: color-mix(in srgb, var(--positive) 35%, var(--card)); }
 .badge .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
-/* The three figures every custodial account shows side by side: cash
-   balance, book value (the GL's cost basis, cash included) and market
-   value (cash + positions at EOD prices), then market minus book. One
+/* The three figures every custodial account shows, left to right: market
+   value (cash + positions at EOD prices), book value (the GL's cost basis,
+   cash included) and cash balance, then Unrealized. One
    row per account card, and the same row summed on the totals card. */
 .custodial-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-top: 14px; }
 .custodial-fig { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
@@ -1451,7 +1447,8 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .alloc-row .alloc-figs { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted-foreground); text-align: right; }
 .alloc-row .badge { justify-self: end; }
 .alloc-track { position: relative; height: 10px; border-radius: 999px; background: var(--muted); }
-.alloc-track .alloc-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; }
+.alloc-track .alloc-fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--cat-edge); }
+.alloc-name .dot { box-shadow: 0 0 0 1px var(--cat-edge); }
 .alloc-track .alloc-target { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--foreground); border-radius: 1px; }
 .alloc-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted-foreground); }
 .alloc-legend span { display: inline-flex; align-items: center; gap: 6px; }
@@ -1529,9 +1526,12 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
    equation makes their areas equal. Tiles are absolutely positioned by
    percentage (the prototype's layout is one static squarified pass at
    900x240; the real LayerChart Treemap re-lays out on resize). Fill by
-   accounting element from the chart ramp's three AA-safe steps for a
-   --card-ink label: chart-3 4.58:1, chart-4 5.48:1, chart-5 6.63:1 on
-   white in light mode; dark mode inverts (light ramp, dark ink). Labels
+   accounting element from its fixed categorical slot (Assets --cat-1,
+   Liabilities --cat-2, Equity --cat-3), each label in the slot's
+   dark -foreground ink: 12.15 / 6.40 / 8.23:1 light, 14.72 / 7.76 /
+   9.97:1 dark. The 1px --card tile border is the surface gap between
+   fills (2px between two tiles), and the inset --cat-edge hairline edges
+   the bright fills on white. Labels
    clip by container query: value hidden under 96x38, label under 64x22.
    Colour is never alone: every tile carries its name (or a title/aria
    label when too small), and the halves are captioned above. Padding
@@ -1541,10 +1541,10 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .tm-cols > span { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .tm-cols .mono { color: var(--muted-foreground); font-weight: 400; }
 .tm-plus { color: var(--muted-foreground); }
-.tm-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.tm-swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; box-shadow: 0 0 0 1px var(--cat-edge); }
 .tm-map { position: relative; height: 240px; }
 .tm-group { position: absolute; background: var(--border); border-radius: 4px; }
-.tm-tile { position: absolute; box-sizing: border-box; border: 1px solid var(--card); border-radius: 3px; overflow: hidden; container-type: size; text-decoration: none; color: var(--card); }
+.tm-tile { position: absolute; box-sizing: border-box; border: 1px solid var(--card); border-radius: 3px; box-shadow: inset 0 0 0 1px var(--cat-edge); overflow: hidden; container-type: size; text-decoration: none; color: var(--card); }
 .tm-inner { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; min-width: 0; }
 .tm-tile:hover { filter: brightness(1.08); }
 .tm-tile:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; z-index: 1; }
@@ -1554,9 +1554,9 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 @container (max-height: 38px) { .tm-value { display: none; } }
 @container (max-width: 64px) { .tm-label { display: none; } }
 @container (max-height: 22px) { .tm-label { display: none; } }
-.tm-assets { background: var(--chart-3); }
-.tm-liabilities { background: var(--chart-4); }
-.tm-equity { background: var(--chart-5); }
+.tm-assets { background: var(--cat-1); color: var(--cat-1-foreground); }
+.tm-liabilities { background: var(--cat-2); color: var(--cat-2-foreground); }
+.tm-equity { background: var(--cat-3); color: var(--cat-3-foreground); }
 .tm-note { margin-top: 10px; font-size: 12px; color: var(--muted-foreground); line-height: 1.5; }
 .tm-note a { color: var(--primary); }
 
@@ -1566,7 +1566,12 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
    --card circles; a base entity in two parents appears in both with an
    "also in" chip. All circles in a level share one size: the map shows
    structure, not wealth (sizing by balance would also leak magnitude
-   across an access boundary). The current entity carries a --ring. */
+   across an access boundary). Each circle's 3px stroke is its entity
+   type's categorical slot (.pack-t-person … .pack-t-holding), edged by
+   a 1px --cat-edge hairline, beside
+   the type icon and label, so colour is never alone. The current entity
+   carries a --ring outside a 3px --card gap, so a green Person stroke
+   and the green ring never merge. */
 .pack { display: flex; flex-wrap: wrap; justify-content: center; gap: 24px; padding: 8px 0 4px; }
 .pack-parent { width: 296px; aspect-ratio: 1; border-radius: 50%; background: var(--muted); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; padding-top: 28px; box-sizing: border-box; }
 .pack-parent-head { display: flex; flex-direction: column; align-items: center; gap: 3px; text-decoration: none; color: var(--foreground); border-radius: var(--radius-md); padding: 2px 8px; }
@@ -1574,7 +1579,14 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .pack-child { position: relative; width: 128px; aspect-ratio: 1; border-radius: 50%; background: var(--card); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px; box-sizing: border-box; text-align: center; text-decoration: none; color: var(--foreground); }
 .pack-child:hover, .pack-parent-head:hover { background: var(--accent); }
 .pack-child:focus-visible, .pack-parent-head:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-.pack-current { box-shadow: 0 0 0 2px var(--ring); }
+.pack-t-person, .pack-t-trust, .pack-t-business, .pack-t-household, .pack-t-holding { box-shadow: 0 0 0 1px var(--cat-edge); }
+.pack-current { box-shadow: 0 0 0 1px var(--cat-edge), 0 0 0 3px var(--card), 0 0 0 5px var(--ring); }
+.pack-parent.pack-t-household, .pack-parent.pack-t-holding, .pack-child { border-width: 3px; }
+.pack-t-person { border-color: var(--cat-1); }
+.pack-t-trust { border-color: var(--cat-2); }
+.pack-t-business { border-color: var(--cat-3); }
+.pack-t-household { border-color: var(--cat-4); }
+.pack-t-holding { border-color: var(--cat-5); }
 .pack-type { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted-foreground); }
 .pack-name { font-size: 13px; font-weight: 600; line-height: 1.25; }
 .pack-also { position: absolute; bottom: -9px; left: 50%; transform: translateX(-50%); white-space: nowrap; display: inline-flex; align-items: center; gap: 3px; font-size: 10px; padding: 1px 6px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); color: var(--muted-foreground); }
@@ -1618,3 +1630,197 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
    staged drafts in Pending. */
 .badge-muted { background: var(--muted); color: var(--muted-foreground); border-color: var(--border); text-decoration: none; }
 a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
+
+/* ---------- Transactions: account filter ----------
+   The top-level scope for all three cards (Exceptions, Pending, Posted)
+   at once. Default is "All Transactions" — every custodial account in the
+   entity; that is where the sidebar lands. The trigger reads like a
+   select (outline, chevron) and opens a popover in the .more-menu visual
+   language: "All Transactions", a divider, then one item per custodial
+   account with its provider and open-item counts. The list mirrors
+   Custodial Accounts' cards, so the two screens name accounts the same. */
+.txn-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+.account-filter-wrap { position: relative; }
+.account-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--input);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.account-filter:hover { background: var(--accent); }
+.account-filter .icon { color: var(--muted-foreground); }
+/* Open state. In product it is absolutely positioned under the trigger;
+   the styled screen renders it statically as the reference. */
+.account-menu {
+  width: 360px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 20%);
+  padding: 6px;
+}
+.account-menu .popover-item { align-items: flex-start; }
+.account-menu .popover-item .icon { margin-top: 1px; }
+.account-menu .account-menu-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.account-menu .account-menu-meta { font-size: 12px; color: var(--muted-foreground); }
+.account-menu .popover-item:hover .account-menu-meta { color: var(--accent-foreground); }
+.account-menu .account-menu-check { margin-left: auto; color: var(--primary); }
+
+/* ---------- Transactions: per-row source line ----------
+   Every transaction row (Exceptions, Pending, Posted) carries one muted
+   line under the payee: landmark icon + "<account> · <institution> via
+   <provider>". Same icon as the GL tree's custodial marker. Shown in the
+   All Transactions view; when the filter names one account, a line that
+   only repeats the trigger is omitted. A manual entry on Posted reads
+   pen-line icon + "Manual entry" instead. */
+.row-source {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+.row-source .icon { width: 12px; height: 12px; }
+.pending-lead { display: inline-flex; align-items: flex-start; }
+.pending-lead .pending-checkbox { margin-top: 2px; }
+
+/* ---------- Allocation: sub-category pull-downs ----------
+   Each asset class has sub-categories behind a chevron, the same
+   disclosure as the lots sub-card on Custodial Accounts. In the chart,
+   a sub-row repeats the class row's grid (name, track, actual / target,
+   drift badge) indented, on a thinner track. In the target editor,
+   sub-targets are whole-portfolio percent and must sum to the class
+   target; the class row carries its own reconcile badge. */
+.alloc-disclosure { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; margin: 0; background: none; border: none; border-radius: var(--radius-sm); color: var(--muted-foreground); cursor: pointer; flex-shrink: 0; }
+.alloc-disclosure:hover, .alloc-disclosure:focus-visible { background: var(--accent); color: var(--accent-foreground); }
+/* Nesting: the class name starts 44px in (chevron 20 + gap 8 + dot 8 +
+   gap 8); a sub-name starts 24px further right, at 68px. The sub-row's
+   name column is 24px wider, so its track starts 24px right of the class
+   track; the fixed figure and badge columns keep their x, so values scan. */
+.alloc-row.alloc-sub { grid-template-columns: 184px 1fr 150px 110px; padding: 8px 0; font-size: 13px; }
+.alloc-row.alloc-sub .alloc-name { font-weight: 400; padding-left: 68px; }
+.alloc-row.alloc-sub .alloc-track { height: 6px; }
+.kv-row .alloc-class { display: flex; align-items: center; gap: 8px; font-weight: 500; }
+/* Editor: the class name starts 28px in (chevron 20 + gap 8); a sub-name
+   starts at 52px. The sub-input is narrower with its right edge (and the
+   % sign) on the class input's, so its left edge also steps in. */
+.kv-row.alloc-sub-target { padding: 8px 0 8px 52px; font-size: 13px; }
+.kv-row.alloc-sub-target .input-pct { width: 64px; height: 30px; }
+@media (max-width: 1100px) {
+  .alloc-row.alloc-sub { grid-template-columns: 144px 1fr 120px 96px; }
+  .alloc-row.alloc-sub .alloc-name { padding-left: 56px; }
+}
+.alloc-total .card-sub { margin-right: auto; }
+/* A sub-row group closes with a rule unless it is the card's last block. */
+.alloc-sub-group > .alloc-row:last-child, .alloc-sub-group > .kv-row:last-child { border-bottom: 1px solid var(--border); }
+
+/* ---------- Journal ID ----------
+   The human reference for a posted entry, on every journal-entries view
+   (General Ledger's Journal entries card, Transactions' Posted card, the
+   account register): a per-entity display number assigned at posting,
+   distinct from the UUID key. Mono, like amounts. The copy control keeps
+   its space when hidden so the column does not shift, shows on row hover
+   or keyboard focus, and stays visible where there is no hover. */
+.je-id { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; font-style: normal; color: var(--foreground); white-space: nowrap; }
+.je-copy { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 3px; background: none; border: none; border-radius: var(--radius-sm); color: var(--muted-foreground); cursor: pointer; opacity: 0; }
+.je-copy svg { display: block; width: 100%; height: 100%; }
+tr:hover .je-copy, .je-copy:focus-visible, .je-copy.copied { opacity: 1; }
+.je-copy:hover { color: var(--foreground); }
+.je-copy:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.je-copy .je-copied-glyph, .je-copy.copied .je-copy-glyph { display: none; }
+.je-copy.copied .je-copied-glyph { display: block; }
+.je-copy.copied { color: var(--positive); }
+@media (hover: none) { .je-copy { opacity: 1; } }
+.je-modal-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+
+/* ---------- Reversed status: `outline` italic ---------- */
+.badge-reversed { background: transparent; color: var(--muted-foreground); border-color: var(--border); font-style: italic; }
+
+/* ---------- Header row on a zero-padding card (Chart of accounts,
+   Journal entries): lines the title up with the tree rows below it. ---------- */
+.card-head.card-head-inset { padding: 20px 24px 0; margin-bottom: 0; }
+
+/* ---------- General Ledger: Journal entries card ----------
+   One row of controls at the card top, then the table. Cell padding 16 +
+   body padding 8 = the card's 24px text edge. An expanded entry is a table
+   row holding the .correction-trail block, on Transactions' Posted card
+   too, so the two cards share one expansion. */
+.je-title-row { display: inline-flex; align-items: baseline; gap: 10px; }
+.je-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.je-body { padding: 8px 8px 20px; }
+table.data-table td.je-toggle-cell { width: 20px; padding-right: 0; }
+.je-toggle[aria-expanded="false"] svg { transform: rotate(-90deg); } /* chevron-down open, chevron-right closed */
+tr:has(+ tr.je-expand:not([hidden])) td { border-bottom: none; }
+table.data-table tr.je-expand > td { padding-top: 0; }
+table.data-table tbody tr.je-expand:hover, .dark table.data-table tbody tr.je-expand:hover { background: transparent; }
+tr.je-expand .correction-trail { margin-top: 0; }
+.correction-trail .trail-actions { display: flex; justify-content: flex-end; margin-top: 8px; }
+/* Journal ID deep links and muted reversals. The ID links to its row on the
+   Journal entries card (tr#je-000212), which highlights on arrival. A Reversed
+   original and its reversal go to muted ink; .je-id keeps its own ink, because
+   the ID is the reference. */
+.je-link { color: inherit; text-decoration: underline; text-decoration-color: var(--muted-foreground); text-underline-offset: 2px; }
+.je-link:hover { color: var(--primary); text-decoration-color: currentColor; }
+.je-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; border-radius: var(--radius-sm); }
+button.je-link { background: none; border: none; padding: 0; font: inherit; cursor: pointer; }
+table.data-table tr[id^="je-"] { scroll-margin-top: 16px; }
+table.data-table tr:target td { background: var(--muted); }
+table.data-table tr.je-muted td { color: var(--muted-foreground); }
+table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
+.je-struck { text-decoration: line-through; }
+.table-pager { text-align: center; margin-top: 16px; font-size: 13px; color: var(--muted-foreground); }
+
+/* ---------- Journal entry popover (shadcn Popover) ----------
+   Opened from a Journal ID on Transactions' Posted tab. Header line, the
+   entry's legs and any correction trail in .correction-trail markup, footer
+   link to the GL row. A long trail scrolls in the body; the footer stays. In
+   product it is anchored to the ID; the styled screen renders it statically
+   as the reference, like .account-menu. */
+.je-popover { display: flex; flex-direction: column; width: 400px; max-width: 100%; max-height: min(480px, 80vh); background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 8px 24px oklch(0 0 0 / 20%); }
+.je-popover-head { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); font-size: 13px; }
+.je-popover-head .je-copy { opacity: 1; }
+.je-popover-meta { color: var(--muted-foreground); font-size: 12px; }
+.je-popover-head .badge { margin-left: auto; }
+.je-popover-body { padding: 12px 16px; overflow-y: auto; }
+.je-popover-body .correction-trail { margin-top: 0; }
+.je-popover-foot { display: flex; justify-content: flex-end; padding: 8px 16px; border-top: 1px solid var(--border); font-size: 13px; }
+.je-popover-foot.spread { justify-content: space-between; align-items: center; }
+
+/* Potential-duplicate warning (New entry modal, Pending row) and its Posted row badge.
+   Caution tier: same ink rule as .link-health-banner.warning. */
+.je-dup-warning { display: flex; align-items: flex-start; gap: 8px; margin-top: 16px; padding: 10px 12px; border-radius: var(--radius-md); font-size: 13px; background: color-mix(in srgb, var(--warning) 14%, var(--card)); color: var(--warning-foreground); }
+.dark .je-dup-warning { color: var(--warning); }
+.row-dup-warning { margin: 0 16px 12px; }
+.je-dup-warning .icon { flex: none; width: 16px; height: 16px; margin-top: 1px; }
+.row-flag { margin-top: 4px; }
+.badge-outline.badge-quiet { color: var(--muted-foreground); }
+
+/* ---------- Date range popover (shadcn Popover + Range Calendar) ----------
+   Presets on the left, a month on the right; picking days replaces the
+   preset. In product it opens under the trigger; the styled screen renders
+   it statically as the reference, like .account-menu. */
+.date-menu { display: inline-flex; gap: 12px; background: var(--popover); color: var(--popover-foreground); border: 1px solid var(--border); border-radius: var(--radius-md); box-shadow: 0 8px 24px oklch(0 0 0 / 20%); padding: 6px; }
+.date-presets { width: 160px; border-right: 1px solid var(--border); padding-right: 6px; }
+.date-presets .account-menu-check { margin-left: auto; color: var(--primary); }
+.range-cal { padding: 6px 8px 8px 0; }
+.range-month { font-size: 13px; font-weight: 600; text-align: center; padding: 4px 0 8px; }
+.range-grid { display: grid; grid-template-columns: repeat(7, 32px); row-gap: 2px; }
+.range-dow { font-size: 11px; color: var(--muted-foreground); text-align: center; padding: 4px 0; }
+.range-day { height: 32px; border: none; background: none; color: inherit; font-size: 12px; font-variant-numeric: tabular-nums; cursor: pointer; }
+.range-day.in-range { background: var(--accent); color: var(--accent-foreground); }
+.dark .range-day.in-range { background: color-mix(in srgb, var(--accent) 40%, var(--card)); color: var(--foreground); }
+.range-day.range-start, .range-day.range-end { background: var(--primary); color: var(--primary-foreground); }
+.range-day.range-start { border-radius: var(--radius-md) 0 0 var(--radius-md); }
+.range-day.range-end { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.range-day.range-today { font-weight: 700; text-decoration: underline; }
+.range-day:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }

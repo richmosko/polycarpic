@@ -92,6 +92,8 @@ Contrast figures are computed via the standard WCAG relative-luminance formula a
 | `--input` | `#DCD8D4` | Input border — one step stronger than `--border` |
 | `--ring` | `#148100` | Focus ring — follows `--primary` |
 | `--chart-1`…`--chart-5` | `#0C96DF` → `#086291` | Sequential/magnitude ramp in `--brand-2`'s blue hue |
+| `--cat-1`…`--cat-7`, `--cat-other` | `#2CFF05` · `#05A9FF` · `#E2B003` · `#FF49D8` · `#06E5F7` · `#C67EFF` · `#FF67A4` · `#A8A39D` | Categorical (identity) palette, slots 1–2 are `--brand`/`--brand-2`, each with a dark `-foreground` label ink — § Categorical palette |
+| `--cat-edge` | `rgba(29,31,32,0.35)` | The 1px edge on a categorical mark, `--foreground` at 35% — § Categorical palette |
 | `--sidebar` | `#1F2528` | Inverted — a dark blue-tinted surface floating on the light page (see Sidebar) |
 | `--sidebar-foreground` | `#F2F2F3` | |
 | `--sidebar-accent` | `#303B40` | |
@@ -123,6 +125,8 @@ Contrast figures are computed via the standard WCAG relative-luminance formula a
 | `--destructive` | `#FC4F4F` | |
 | `--destructive-foreground` | `#2A0507` | |
 | `--border` | `rgba(255,255,255,0.08)` | |
+| `--cat-1`…`--cat-7`, `--cat-other` | same values as light | Unthemed, like `--brand`; only the `-foreground` label ink changes, to `#070808` — § Categorical palette |
+| `--cat-edge` | `rgba(242,242,243,0.25)` | `--foreground` at 25% — § Categorical palette |
 | `--chart-1`…`--chart-5` | `#C5E9FC` → `#0B89CB` | `--brand-2`'s blue hue, lightened; `--chart-5` here equals light mode's `--chart-2` by coincidence — both ramps sample the same hue/saturation function |
 | `--sidebar` | `#F7F8F8` | Inverted the other way — a light, blue-tinted card floating on the dark page |
 | `--sidebar-foreground` | `#1D1F20` | |
@@ -136,6 +140,61 @@ Contrast figures are computed via the standard WCAG relative-luminance formula a
 | `--warning-foreground` | `#2A1200` | Same dark ink as light mode (not a white/dark flip like `--destructive`; orange never pairs with white text AA-safely at a legible saturation, in either mode) |
 
 **Character read:** two brand hues, each following the same rule — literal where it clears AA (dark surfaces), darkened at the same hue where it doesn't (light-mode surfaces): neon green (`--brand`/`--primary`, 110.6°) for the main/primary identity, sky blue (`--brand-2`/secondary family, 200.6°) for secondary surfaces, info-weight badges, and anywhere the system needs a calm non-primary affordance. The dark neutral scale and the sidebar carry the blue tint rather than the green, so the green stays a deliberate signal instead of a cast over everything. `--positive` (gain green, hue ≈150°) is a third, deliberately distinct green — checked against `--brand` (110.6°) so it is never mistaken for a brand hue.
+
+#### Categorical palette
+
+The `--chart` ramp encodes **how much**. Treemaps, Pack, Sankey and grouped or stacked bars need colour that says **which thing**, and a one-hue ramp cannot do that (its steps sit ~1.2:1 apart). `--cat-1`…`--cat-7` plus `--cat-other` are the identity palette. Method: the dataviz skill's colour formula (four colour jobs, six checks), computed with its `validate_palette.js`, never by eye.
+
+**Hues: the brand colours, and five more at their brightness and intensity.** A Principal ruling sets this. Slots 1 and 2 are `--brand` and `--brand-2` themselves, literal and unthemed, and the other five match them: the brand pair measures OKLCH L 0.87 / 0.71, C 0.29 / 0.17, and every slot sits inside L 0.71–0.87. Chroma is the most sRGB allows at each hue's lightness, which is C 0.14–0.26: at their steps gold and cyan stop just short of the sky blue's 0.17. Fill values are the same in both modes. The hues skip the status arcs (red ~29°, orange ~48°, gain green ~150–162°). Seven hues, not eight: an eighth can pass the adjacent checks at the end of the order, but the only in-band candidates at least 15 ΔE from every slot in normal vision are pale pinks, off the brand's intensity and 2.1 ΔE from an existing slot under colour-blindness, so an eighth would be a near-repeat of a colour already in the set.
+
+| Slot | Hue (OKLCH) | Fill, both modes | L / C | Contrast on `--background` / `--card` (light) | Label ink (light) | Label ink (dark) |
+|---|---|---|---|---|---|---|
+| `--cat-1` | neon green 142° | `#2CFF05` (= `--brand`) | 0.87 / 0.29 | 1.29 / 1.36:1 | `#1D1F20` 12.15:1 | `#070808` 14.72:1 |
+| `--cat-2` | sky 243° | `#05A9FF` (= `--brand-2`) | 0.71 / 0.17 | 2.44 / 2.58:1 | `#1D1F20` 6.40:1 | `#070808` 7.76:1 |
+| `--cat-3` | gold 88° | `#E2B003` | 0.78 / 0.16 | 1.90 / 2.01:1 | `#1D1F20` 8.23:1 | `#070808` 9.97:1 |
+| `--cat-4` | magenta 338° | `#FF49D8` | 0.71 / 0.26 | 2.75 / 2.92:1 | `#1D1F20` 5.67:1 | `#070808` 6.87:1 |
+| `--cat-5` | cyan 205° | `#06E5F7` | 0.84 / 0.14 | 1.46 / 1.55:1 | `#1D1F20` 10.68:1 | `#070808` 12.95:1 |
+| `--cat-6` | violet 308° | `#C67EFF` | 0.72 / 0.19 | 2.53 / 2.68:1 | `#1D1F20` 6.17:1 | `#070808` 7.48:1 |
+| `--cat-7` | rose 358° | `#FF67A4` | 0.72 / 0.19 | 2.56 / 2.72:1 | `#1D1F20` 6.09:1 | `#070808` 7.38:1 |
+| `--cat-other` | neutral | `#A8A39D` | 0.72 / 0.01 | 2.36 / 2.50:1 | `#1D1F20` 6.61:1 | `#070808` 8.01:1 |
+
+**Order.** All 120 orders of the five non-brand hues were enumerated, with the brand pair fixed at 1–2; the order here ties for the best worst case over adjacent pairs across seven slots and all pairs across slots 1–5. In so narrow a brightness band lightness cannot do the separating alone, so step and position do. Violet stays out of slots 1–5 because it collapses onto the sky blue under colour-blindness. Gold is stepped below its brightest because at L 0.85 (`#FFC400`) it is 1.6 ΔE from the neon under colour-blindness; at L 0.78 it clears the target.
+
+**Validator results** (`validate_palette.js`, run against `--card` and `--background` in each mode). ΔE is OKLab distance ×100; CVD is the worse of protanopia and deuteranopia (Machado 2009, severity 1.0), target ≥ 8, floor ≥ 6 with labels; normal vision must clear 15. Separation does not depend on the surface, so one figure holds for both modes.
+
+| Run | Result |
+|---|---|
+| Adjacent pairs, slots 1–7 (bars, stacks, Sankey bands) | **PASS**: CVD ΔE 12.0 (magenta↔cyan), normal 16.3 (violet↔rose) |
+| All pairs, slots 1–5 (treemap, Pack: any two can touch) | **PASS**: CVD ΔE 8.3 (neon↔gold), normal 17.1 (sky↔cyan) |
+| All pairs, slots 1–7 | **FAIL**: CVD ΔE 2.6 (sky↔violet), normal 10.2 (magenta↔rose). Six and seven series are for adjacent-pair forms, or direct labels on every mark |
+| Chroma floor | **PASS**: all ≥ 0.10 |
+| Contrast vs surface (≥ 3:1) | **WARN, light; waived.** 1.29–2.92:1 on `--background`/`--card`. Dark: PASS, ≥ 6.62:1 |
+| Lightness band | **FAIL, both modes; waived.** Light band 0.43–0.77: neon, gold 0.78, cyan out. Dark band 0.48–0.67: all seven out |
+
+**The waiver, and what pays for it.** By Principal ruling the light-mode 3:1 surface rule and the lightness band do not apply to categorical fills: the brand colours are the palette, and darkening them is exactly what the ruling rejected. Distinctness is not waived; the separation runs above still gate. Every categorical mark pays three ways, in every mode:
+
+1. **A visible label or legend.** Colour is never alone; a chart that cannot label a mark shows it in its table view.
+2. **An edge.** A 1px `--cat-edge` hairline on the fill, and a 2px surface gap between touching fills. `--cat-edge` is the page ink at partial alpha, so it reads as a darker step of whatever it sits on: `--foreground` at 35% in light mode, where an inset edge clears about 2:1 against the brightest fills and more against the page (neon 2.09:1 / 2.68:1, cyan 2.04 / 2.98, gold 1.94 / 3.69), and an outset edge is 2.14:1 on `--background`, 2.15:1 on `--card`. In dark mode it is `--foreground` at 25%, because the fills already clear the surface and the edge only has to show: outset 2.08:1 on `--card` and 2.00:1 on `--background`, a soft ring with no halo; inset it barely registers on the brightest fills (neon 1.00:1, cyan 1.04, gold 1.15) and needs to do no more. `--border` is not the edge: at 1.06:1 on the neon it disappears.
+3. **Dark label ink on the fill.** Every `--cat-N-foreground` is dark: `#1D1F20` in light mode (tightest 5.67:1, magenta) and `#070808` in dark (tightest 6.87:1, magenta), AA throughout. Text is never set in a slot colour on a light surface.
+
+**Status hues stay reserved.** No slot is red, orange or gain green, and a categorical fill never carries gain/loss: when a series means good or bad it wears `--positive`/`--destructive`, never a slot (one chart never mixes both). Status colours are text on signed figures with a `+`/arrow, and a slot is a labelled fill, so the nearest pairs are held apart by job as well as by distance: `--cat-3` gold↔dark `--warning` 10.1, `--cat-7` rose↔dark `--destructive` 10.7, `--cat-5` cyan↔dark `--positive` 11.1, `--cat-1`↔dark `--positive` 16.7.
+
+**Fixed assignments: colour follows the entity, never its rank.** Filtering a series out never repaints the survivors.
+
+| Set | Slot 1 | Slot 2 | Slot 3 | Slot 4 | Slot 5 |
+|---|---|---|---|---|---|
+| Accounting elements (GL treemap, Sankey, bars) | Assets | Liabilities | Equity | Income | Expense |
+| Entity types (Entities Pack) | Person | Trust | Business | Household | Holding |
+| Asset classes (Allocation) | US Equity | Intl Equity | Fixed Income | Cash | — |
+
+The accounting elements and the entity types reuse slots 1–5; the two sets never appear on the same chart. An asset-class sub-category takes its parent's slot. Anything else (transaction categories in bars, Sankey flows) takes slots in order of first appearance, persisted per entity so a category keeps its colour across sessions; from the eighth series on, the tail folds into one "Other" in `--cat-other`.
+
+**Usage rules (from the skill).**
+- **A legend is always present for two or more series**; direct-label selectively (the tile or band that matters, the extremes), and let the table view carry every value. A label renders inside a fill only when it fits with padding, otherwise it moves outside the mark or to the tooltip; colour is never the only channel.
+- **Separate touching fills with a 2px surface gap**, and edge each mark with the 1px `--cat-edge` hairline (§ the waiver above).
+- **Large blocks stay quiet:** a treemap is the exception the label inks were built for; Pack circles and wide areas take the slot as a 3px stroke on a `--card`/`--muted` fill, not a solid fill.
+- **Texture fallback:** one "Lines" fill at 45° (and its 135° mirror), inked tone-on-tone in a darker step of the slot's own hue. Opt-in only: the accessibility setting, print, or `forced-colors`. Never decorative, never on by default.
+- **One series is one colour.** The bars of a single series all take one colour (`--chart-3`) and are never coloured by value; slots are for two or more identities.
 
 ### Secondary accent — job definition
 
@@ -256,7 +315,7 @@ This is not a header in any surface sense (see § Layout & shell). "Top row" des
 - **Breadcrumbs are the only place a page's title renders** — screens do not repeat it as an on-page heading. Most screens have a single crumb; the account register is the multi-crumb example ("General Ledger **>** Primary Checking").
 - **AI/agent, search, notifications, and a settings gear are not in this row.** They are not deleted as product surfaces — ARCH §2.4 keeps Search and Notifications as real screens/overlays and Settings as a real screen — only their *entry point in the top row* is absent. **Where they go instead is proposed, not decided:**
   - **Settings, Notifications** — proposed as items under the avatar popover (see § Sidebar). Marked "proposed" in the styled screens (`.proposed-tag`).
-  - **Search** — proposed via a keyboard shortcut, plus a "Search…" entry in the "more" menu where relevant. No specific key combination chosen yet.
+  - **Search** — proposed via a keyboard shortcut, plus a "Search…" entry in the "more" menu where relevant. No specific key combination chosen yet. Whatever surface ships, a Journal ID is a search key (§ General Ledger: tree & register).
   - **AI/agent** — no entry point proposed; no icon or disabled placeholder exists anywhere.
 - **The "more" menu is contextual per page view** — its contents are that page's global actions, not a fixed list. Defined per screen:
 
@@ -329,9 +388,9 @@ Settings/Notifications carry a `.proposed-tag` badge in the styled screens — v
 | # | Nav item | Absorbs | What it is |
 |---|---|---|---|
 | 1 | **Dashboard** | — | Cross-cutting summary — net worth, cash flow, tax, allocation snapshot. |
-| 2 | **Transactions** | the journal and import status | The time-ordered journal: three accordion cards in urgency order — Exceptions, Pending, Posted. The Pending card is the bank-feed review/match inbox (see § Transactions workflow). Import stats/status and the Sync Transactions / New entry actions live here; there is no separate "Import" item. Not the chart of accounts; see General Ledger for that. |
-| 3 | **General Ledger** | the GL side of accounts | Opens to a chart-of-accounts **tree** (category → account → sub-account, balances, a custodial marker on accounts that mirror a physical account). Clicking an account opens that account's **register** — a separate page, breadcrumbed back to the tree — showing every line that hit it, in date order, with a running balance; each line links to its full journal entry. The register is account-scoped and running-balance-shaped; Transactions is entry-scoped and time-ordered — genuinely different questions, not two views of one screen. |
-| 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, each showing **cash balance, book value (GL cost basis) and market value (EOD prices) side by side, with market minus book**, plus reconciliation status against the GL; a totals card sums the three figures across accounts. Each account that holds securities has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
+| 2 | **Transactions** | transactions and import status | The time-ordered transaction feed: one `Tabs` row in urgency order — Exceptions, Pending, Posted — one stage visible at a time, each tab carrying a **count badge** so every stage's load stays visible while another is open. It opens on Pending, the bank-feed review/match inbox (see § Transactions workflow); a non-zero Exceptions count does not take the default, its badge turns `destructive-soft` instead. An **account filter** at the right end of the tab row scopes all three at once, badges included; the sidebar lands on **All Transactions** (every custodial account), and the popover lists the custodial accounts as Custodial Accounts names them. Every row carries a muted **source line** under the payee — `landmark` icon + `<account> · <institution> via <provider>`, or `pen-line` icon + "Manual entry" — omitted where it only repeats the filter; with one account selected, Posted shows only the rows whose own leg posts to it. Row Date is the transaction date, never the time an entry was logged. Posted is transaction-scoped: every posted transaction is a row and carries its entry's Journal ID; an entry built from several transactions appears as several rows with one ID; the GL Journal entries card is the entry-grained view (§ Transactions workflow). Posted rows lead with the **Journal ID** (§ General Ledger: tree & register), which opens the **journal entry popover**. Import stats/status and the Sync Transactions / New entry actions live here; there is no separate "Import" item. Not the chart of accounts; see General Ledger for that. |
+| 3 | **General Ledger** | the GL side of accounts | One `Tabs` row at the top of the content shows one section at a time: **Chart of accounts**, **Balance sheet map**, **Journal entries**. It opens to the chart-of-accounts **tree** (category → account → sub-account, balances, a custodial marker on accounts that mirror a physical account). Clicking an account opens that account's **register** — a separate page, breadcrumbed back to the tree — showing every line that hit it, in date order, with a running balance; each line expands to its full journal entry, and its Journal ID links to the GL card. The **Journal entries** tab lists every posted entry header for the entity by date, with page size, date range and sort. The register is account-scoped and running-balance-shaped; Transactions is transaction-scoped and time-ordered — genuinely different questions, not two views of one screen. |
+| 4 | **Custodial Accounts** | the physical side of accounts, and securities | The physical-account view — per-institution cards, each showing **market value (EOD prices), book value (GL cost basis) and cash balance side by side, left to right, with Unrealized**, plus reconciliation status against the GL; a totals card sums the three figures across accounts. Each account that holds securities has a **lots sub-card**: a pull-down per security showing its lots and short/long/total current gain or loss, summed per security and per account. New custodial accounts and provider links are created via a New provider item dialog on this screen (aggregator, manual, or file-import source type; a discovered-account mapping step; token refresh; unlink, with the ≤24h revocation-lag note on the Vercel target). Link health (expired token, lost access, stale) shows as a badge on the card and a banner on Transactions. Sync here pulls positions and balances. |
 | 5 | **Allocation** | allocation vs. target | A dedicated actual-vs-target page. |
 | 6 | **Tax** | the tax liability view | Per entity and jurisdiction: pending liability, the safe-harbor gap and its status tier, next due date, the custodial prepaid-tax account, the year's installment timeline, and the "Post your payment" action (never "Pay"). The Dashboard's Pending tax liability card links here (§ Allocation, Reports & Settings → Tax; flow 5.4). |
 | 7 | **Reports** | — | Balance Sheet, Income Statement, Cash Flow — the Dashboard's empty-state pattern (§ Component inventory) until POLY-M5 ships statements. |
@@ -357,7 +416,7 @@ There is no "Securities" item (lots live in Custodial Accounts' sub-card; alloca
 | Tier | Token | Product examples |
 |---|---|---|
 | Normal / on track | `--positive` or plain `--foreground` | Safe-harbor gap < 0 (prepaid ahead of the requirement); reconciliation clean; import fully matched |
-| Caution | `--warning` | Safe-harbor gap ≥ 0, due date more than 14 days out (gap = 0 is exactly at the safe-harbor line, nothing in hand beyond it, so never on track); an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a stale/expired provider link that still has cached data to show |
+| Caution | `--warning` | Safe-harbor gap ≥ 0, due date more than 14 days out (gap = 0 is exactly at the safe-harbor line, nothing in hand beyond it, so never on track); an unmatched transfer leg aged inside the Cash-in-Transit exceptions window; a manual entry and an imported transaction that match; a stale/expired provider link that still has cached data to show |
 | Danger / overdue | `--destructive` | Safe-harbor gap ≥ 0 with the due date within 14 days or passed; exceptions-threshold breach; reconciliation break |
 
 ### Entity, account, and category badges — label + icon, not per-category hue
@@ -368,10 +427,11 @@ Meaning by label/icon/variant weight, not a dedicated hue per category.
 |---|---|---|
 | Entity type — Person / Trust / Business (base); Household / Holding (parent) | `secondary` | `User` / `Landmark` / `Building2` / `Home` / `Layers` |
 | Account — GL / Custodial | `outline` | `BookText` / `Landmark` |
+| Tab count | `secondary`; **`destructive-soft`** on Exceptions when non-zero | none |
 | Transaction — Draft / Posted / Reversed / **Corrected** | `secondary` / `outline` / `outline` italic / **`outline` + `brand-2`-tinted dot** | `Clock` / `Check` / `RotateCcw` / `Pencil` |
 | Role — Owner / Manager / Viewer | `default` / `secondary` / `outline` | — |
 
-**Open item:** a genuine 3+-hue categorical chart need isn't solved by this doc yet — decide against a concrete spec when one arises.
+Badges stay monochrome. Charts that need a hue per identity use the categorical palette (§ Foundations → Categorical palette).
 
 ### Correcting a posted entry — "Correct entry," not "edit" or "reverse"
 
@@ -381,7 +441,7 @@ The user-facing action and the underlying mechanism are two different claims. "T
 - **Nothing reaches the GL without a confirmation step.** Between import and posting, a draft is fully editable — category, tax-treatment tag, counterparty, amount allocation — as flow 5.3 describes. This is where a user fixes a mistake *before* it is load-bearing.
 - **After posting, the user-facing action is "Correct entry," not "edit."** Clicking it does not mutate the posted row — under the hood it posts a full reversal of the original entry plus a new corrected entry (reversal-only, PRD §5) — but the user is never shown "reverse" as a verb for this, and never asked to construct the reversing entry themselves.
 - **A corrected row carries a badge** (see table above) distinguishing it from a plain Posted or a standalone Reversed (e.g. a reversal with no replacement) row.
-- **Click-through reveals the mechanism.** Opening a corrected entry's detail view shows the full underlying pair — the original entry's lines rendered shaded/struck-through, the reversal lines, and the new corrected entry — so the double-entry trail stays fully auditable (Overview principle: "every number earns trust") without the top-level row ever using the word "reverse" as the primary affordance.
+- **Click-through reveals the mechanism.** Opening a corrected entry's detail view shows the full underlying pair — the original entry's lines rendered shaded/struck-through, the reversal lines, and the new corrected entry, each block labelled with its Journal ID — so the double-entry trail stays fully auditable (Overview principle: "every number earns trust") without the top-level row ever using the word "reverse" as the primary affordance.
 - **Auto-posted rows get the identical treatment.** A row posted by a recurring rule rather than a manual confirm shows the same `Posted` badge plus a small `posted by rule — <rule name>` attribution line underneath it, and offers the exact same **Correct entry** action as any other posted row. There is no separate "edit" affordance for a rule-posted row, and no different correction mechanism — actor attribution (user / auto-post rule / system job, PRD §5) changes who gets credited, never how a mistake gets fixed.
 
 See flow 5.3 (§ User Flows) for the decision diagram and `styled-screens/transactions.html` for the built row action, badge, and click-through state.
@@ -390,7 +450,7 @@ See flow 5.3 (§ User Flows) for the decision diagram and `styled-screens/transa
 
 ## Transactions workflow
 
-The product specification for the Plaid bank-feed → journal-entry pipeline (starting point: the Principal's sidebar interview). Governs the **Pending** accordion card on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.3 for the full decision diagram.
+The product specification for the Plaid bank-feed → journal-entry pipeline (starting point: the Principal's sidebar interview). Governs the **Pending** tab on Transactions — see § Sidebar information architecture for where this sits in the nav, and flow 5.3 for the full decision diagram.
 
 **Layout:** a high-density table/list of unposted raw rows. Clicking a row expands it vertically (Accordion/Expansion pattern) — the matching workspace opens inline, no navigation away from the feed.
 
@@ -400,41 +460,68 @@ The product specification for the Plaid bank-feed → journal-entry pipeline (st
 
 **Flow A — Split (one raw row → one multi-leg entry).** For a transaction that represents multiple contexts (e.g. a $1,200 payout that nets a $20 platform fee). The expanded row morphs into a multi-column grid; the user adds unlimited offsetting rows. A live validation loop disables "Approve & Post" until the split rows' total exactly matches the raw transaction's absolute total — never a partial or over/under split.
 
-**Flow B — Group (many raw rows → one entry).** For compressing many micro-transactions into one summary entry (prevents GL bloat). The user checkbox-selects rows in the primary table; a floating bulk-action bar appears; "Group & Summarize" opens the **same journal-entry modal** used everywhere else, pre-filled with one aggregated primary line and the user's chosen balancing distributions. **This is the system's one many-to-one draft→entry relationship** — every other posting path (manual entry, simple match, Split) is one draft (or one manual action) to one entry.
+**Flow B — Group (many raw rows → one entry).** For compressing many micro-transactions into one summary entry (prevents GL bloat). The user checkbox-selects rows in the primary table; a floating bulk-action bar appears; "Group & Summarize" opens the **same journal-entry modal** used everywhere else, pre-filled with one aggregated primary line and the user's chosen balancing distributions. **This is one of the system's two many-to-one draft→entry relationships;** the other is a same-date matched transfer, whose two legs post into one entry. Every other posting path (manual entry, simple match, Split) is one draft (or one manual action) to one entry.
 
 **The journal-entry modal, one component reused everywhere.** Header (date, memo) + legs (account, Dr/Cr, amount) — a near-full-screen `Dialog`, not a drawer, because entering legs needs most of the screen. The same modal serves manual **"+ New entry"**, **"Correct entry"** (§ Correcting a posted entry, above), **Split**, and **Group & Summarize** — only the pre-fill differs per entry point.
 
-**Posting gate:** a transaction cannot leave the Pending card unless **all** of the following hold —
+**Posting gate:** a transaction cannot leave Pending unless **all** of the following hold —
 1. Σ debits = Σ credits (balanced).
 2. The accounting equation holds, per entity (Assets = Liabilities + Equity).
 3. The entry date matches the bank date — or, for a date mismatch, the Cash-in-Transit clearing rule applies.
-4. The posted draft links to exactly one journal entry (except Group, which links many drafts to the one entry it produced).
+4. The posted draft links to exactly one journal entry. Several drafts may share that entry: a group, or a same-date matched transfer.
 
 Any gate failure keeps the item in Pending — there is no partial post and no silent failure. **"Approve & Post"** collapses the expanded panel with a fade-out and removes the item from the unposted inbox once the gate passes.
 
-**"show N" selector:** each of the three accordion cards (Exceptions, Pending, Posted) has its own limit selector — a user with a large Posted history isn't forced to render all of it; Posted is paged, Exceptions/Pending show their full (usually small) count by default.
+**Posted is transaction-scoped: every posted transaction is a row and carries its entry's Journal ID; an entry built from several transactions appears as several rows with one ID; the GL Journal entries card is the entry-grained view.** Each row mirrors Pending's: the bank transaction as imported, its payee, source line and signed amount, under the Journal ID. A group and a same-date matched transfer each show one row per transaction with one ID; the rows sit together, because an entry has one date and same-date rows order by Journal ID. A status-column line names the shape (`grouped — 1 entry`, `matched transfer — 1 entry`). A split stays one row, with Category reading `Split` over its categories. A transfer whose legs land on different dates is two entries through Cash in Transit, so its rows carry two IDs. **Correct entry** on any row of a multi-row entry corrects that one entry, and every row of it then carries the corrected entry's ID and the `Corrected` badge. A reversal is part of the correction its Corrected row rolls up, and an opening balance is a system entry, so each is a Journal entries row and not a Posted row. The Posted badge counts rows; the Journal entries card counts entries, and the two numbers differ by design. The filter trigger right-aligns its popover at the row's end.
 
-**Permissions:** New entry, Sync, Split, Group, Approve & Post, and the rule auto-post opt-in are Manager/Owner actions — a Viewer sees none of these affordances anywhere on this screen (SECURITY §4.2.1 matrix, ARCH §2.4 permissions table).
+**Manual entries are Posted rows.** On All Transactions, an entry from the New entry modal is one row with its own Journal ID, however many legs it has, and its Amount is the entry's sum of debits, unsigned, because it has no bank sign. With one account selected it is one row for the leg on that account, signed like a bank row: a debit to a cash account reads +. It cannot exist outside a compliant journal entry, so it takes the same rules as every other row, Correct entry included. Its source line reads "Manual entry" with `pen-line` in place of `<account> · <institution> via <provider>`.
+
+**Account filter on Posted: leg-level, one rule for every row.** With one account selected, Posted shows only the rows whose own leg posts a debit or credit to that account; All Transactions shows everything. An imported row's own leg is its transaction's cash leg, so a transfer shows only that account's row and its counterpart row does not appear, whether the transfer is one entry or two. A manual entry with a leg on the selected account shows as one row for that leg. A manual entry with no custodial leg, such as an accrual, shows only on All Transactions. The source line is omitted where it would repeat the trigger; a Manual entry line stays.
+
+**Row Date is the transaction date.** Date on Posted and on the Journal entries card is the date the user entered on the entry, never the time it was logged. The New entry modal's Date field is that date, so a backdated entry sorts by it on both lists, while its Journal ID still orders by posting. The audit trail (actor, logged-at) lives in the Journal ID popover and the GL entry view, not in the list.
+
+**Potential-duplicate warning.** While a manual entry is open in the New entry modal, each custodial leg is compared with imported transactions that are Pending or Posted. A candidate has the same custodial account, the same amount and direction, and a date within the entity's Duplicate detection window of the entry's Date, either side (Settings, default ±1 day). A candidate shows a caution-tier warning (`--warning`, `triangle-alert`) above the actions naming it: "Looks like Sep 12 · Stripe Payout +$1,500.00 on Primary Checking, Pending". The nearest date is named, and a Pending candidate wins a tie. The check reruns as Date, legs or amounts change, and the warning clears when nothing matches.
+
+- **Match to that transaction instead** is the default action. It discards the manual entry and opens the Pending row's review panel, pre-filled with the modal's offset leg. For a Posted candidate the action reads **Open that entry** and opens its Journal ID popover, as there is no review panel left to fill.
+- **Post anyway** takes the Post button's place, so Enter cannot slip past the warning. It posts the entry, and the row carries a muted `outline` `possible duplicate` badge under its status until the user dismisses it from the popover or matches the import. The badge is a review note on the row, not a ledger state: the entry posts like any other.
+
+Only New entry and imports check, because Correct entry, Split and Group start from a real transaction.
+
+**Mirror on Pending.** The same rule and window run on Pending: an imported transaction that matches a posted manual entry, whichever arrived first, shows a caution line on its row: "Looks like manual entry JE-000215 · Sep 11 · +$1,500.00". The line shows collapsed or expanded, and the Journal ID opens that entry's popover. The nearest date is named, and an entry already linked to an import is no longer a candidate. The review panel adds **Match to that entry** as its default action, and Approve & Post steps down to an outline button beside it so Enter cannot slip past it. 
+
+**Match to that entry** links the import to the existing entry and posts nothing: the row leaves Pending, the entry stays as it is, and the Posted count holds. The entry's row gains a `matched import` status line and loses any `possible duplicate` badge, and its popover lists the import. Approve & Post past the caution keeps both. Dismiss possible duplicate on the entry clears the caution on the row it names.
+
+**Journal entry popover.** Clicking a Journal ID on Posted opens a `Popover` anchored to the ID, not a navigation, so an entry can be read without leaving the list. Header line: Journal ID with copy (always visible here), transaction date, actor, "logged <timestamp>", status badge. Body: every leg, in `.trail-row` markup, then the correction trail if any: the original and its reversal, since the entry's own legs are already above. Footer: **Open in General Ledger**, to `general-ledger.html#je-…`, plus **Dismiss possible duplicate** on a row that carries that badge. It is non-modal: an outside click or Esc dismisses it and focus returns to the ID. A long trail scrolls inside the popover and the footer stays visible. The popover is where Posted shows the actor and the logged time, as the list has neither. **View correction** on a Corrected row is a separate control: it expands the trail in place. The account register keeps its ID as a link (see Journal ID links).
+
+**"show N" selector:** each of the three tabs (Exceptions, Pending, Posted) has its own limit selector — a user with a large Posted history isn't forced to render all of it; Posted is paged, Exceptions/Pending show their full (usually small) count by default.
+
+**Permissions:** New entry, Sync, Split, Group, Approve & Post, Match to that entry, Dismiss possible duplicate, and the rule auto-post opt-in are Manager/Owner actions — a Viewer sees none of these affordances anywhere on this screen (SECURITY §4.2.1 matrix, ARCH §2.4 permissions table).
 
 ---
 
 ## General Ledger: tree & register
 
-General Ledger opens to a **chart-of-accounts tree** — category → account → sub-account, each row showing its balance. Clicking an account opens that account's **register** as its own page, breadcrumbed back to the tree.
+General Ledger is three sections behind one `Tabs` row at the top of the content, one visible at a time: **Chart of accounts** (the default), **Balance sheet map** and **Journal entries**. Each section keeps its card header. The URL hash carries the tab, so Back from a register returns to the tab it left, and a `#je-…` link selects Journal entries.
+
+The Chart of accounts tab is the **chart-of-accounts tree** in a titled card — category → account → sub-account, each row showing its balance. Clicking an account opens that account's **register** as its own page, breadcrumbed back to the tree.
 
 - **The custodial marker.** A tree row for a GL account that mirrors a physical custodial account (e.g. "Primary Checking") carries a small custodial badge (`landmark` icon + institution) — a cross-reference only, not a second data source; the figure shown is always the GL's own balance. Not every account has one (Owner's Equity, Cash in Transit never do).
-- **The register is account-scoped and running-balance-shaped:** every line that hit this one account, in date order, with a running balance, each linking to its full journal entry (every leg, not just the one that hit this account) — the same "every number earns trust" principle as the Dashboard.
-- **Distinct from Transactions, deliberately.** Transactions (§ Transactions workflow, above) is entry-scoped and time-ordered across every account in the entity — the journal. The register is the opposite cut: one account, every entry that ever touched it. Neither view replaces the other.
+- **The register is account-scoped and running-balance-shaped:** every line that hit this one account, in date order, with a running balance. Each line's chevron expands to its full journal entry in the same `.correction-trail` block as the Journal entries card (every leg, not just the one that hit this account, plus the correction trail where one exists), and its Journal ID links to the GL card. The register has no Actor column, so the block's labels name the actor. The same "every number earns trust" principle as the Dashboard.
+- **Distinct from Transactions, deliberately.** Transactions (§ Transactions workflow, above) is transaction-scoped: every posted transaction is a row and carries its entry's Journal ID; an entry built from several transactions appears as several rows with one ID; the GL Journal entries card is the entry-grained view. The register is the opposite cut: one account, every entry that ever touched it. Neither view replaces the other.
+- **Journal entries card.** Posted entry headers, not lines, listed by date, newest first; same-date entries order by Journal ID. This is the audit view, so it lists every header: a correction's original, reversal and corrected entry are three rows here, where Transactions' Posted tab rolls them into one Corrected row. Columns: Journal ID, Date, Description, Actor (a user, a rule with its name, or System), Status (Posted, Corrected, Reversed; § Correcting a posted entry), Amount. Amount is the entry's sum of debits, unsigned, because an entry has no single direction. Controls sit in one row at the card top: **date range** (default This month, by ruling: it matches the month-to-date figures in the tree), **sort** (date, amount or Journal ID, each both ways) and the normal **show N** limit; a paged footer closes the card. The title's count reads "<in range> of <all> entries". A chevron opens an entry's legs in the same `.correction-trail` block as the Posted tab, a Corrected row showing its whole chain. Reversal rows name each other by Journal ID. **Correct entry** sits in the opened block of a live Posted entry; an entry already reversed, and the reversal itself, offer none. Viewers see no Correct entry.
+- **Journal ID.** The exact reference for a posted entry: a short per-entity display number, `JE-000214`, assigned at posting: gapless, serialized per entity, never reused (the mechanism is ARCH's). A reversal and a corrected entry each take their own number. It is distinct from the entry's UUID key, which is never shown, and the data model has to add it (ARCH keys every row by UUID). It leads every view of posted work (Journal entries card, Transactions' Posted tab, account register), in the mono face, with a Lucide `copy` control on row hover or keyboard focus, always visible on touch; a corrected row carries the corrected entry's ID. It also labels each block of an opened entry, and the journal-entry modal shows it read-only: a new entry reads "Journal ID assigned at posting", Correct entry shows the ID being corrected, and the "entry posted" toast names the new number. The ID orders by posting; Date is the entry date, so a backdated entry sorts differently on the two.
+- **Journal ID links.** On the account register the ID is a link to that entry's row on the Journal entries card (`general-ledger.html#je-000212`). On Transactions' Posted tab the ID opens the journal entry popover instead, and its Open in General Ledger footer goes to the same row (§ Transactions workflow): Posted reads an entry in place, while the register is already inside the ledger. Arriving selects the Journal entries tab, highlights the row and opens its legs, and the card widens its date range if the entry falls outside it. The card itself shows the ID as text, since the row is the destination. The ID is also searchable: an exact `JE-000212` in search resolves within the active entity to the same row. No search surface is drawn yet (§ Header), so this states the intent for whichever surface ships.
+- **Reversed entries stay listed, muted.** The Journal entries card lists Reversed originals and their reversals by default, with no filter to reveal them, because it is the audit view. Both rows render in `--muted-foreground`, badge included, and the Reversed original's description is struck through; a row's secondary line is not struck, so "reversed by" stays readable. The Journal ID keeps full ink on both rows: it is the reference. The corrected entry that replaces them is live and renders normally.
 
 See `styled-screens/general-ledger.html` and `styled-screens/account-register.html`.
 
 ### Treemap prototype — balance sheet map
 
-A nested treemap of the chart of accounts, prototyped as a card above the tree on `styled-screens/general-ledger.html` (static layout from one squarified pass; the build would use LayerChart's `Treemap`). Nesting is category → account → sub-account, area is |balance|, and every tile links to its register.
+A nested treemap of the chart of accounts, prototyped on the Balance sheet map tab of `styled-screens/general-ledger.html` (static layout from one squarified pass; the build would use LayerChart's `Treemap`). Nesting is category → account → sub-account, area is |balance|, and every tile links to its register.
 
 **What the prototype settles:**
-- **Balance sheet only, two equal halves.** Assets on the left; Liabilities + Equity on the right. The accounting equation makes the halves equal in area, so the map shows the equation itself: a reader sees at once that the halves balance. Income and Expenses are period flows, not balances; on one area scale with balances they are invisible (month-to-date $2,400 against $412,884) and they would break the equal halves. They are not on this map. An income-statement counterpart (Income | Expenses + net income, also equal halves) belongs with Reports if it is wanted.
-- **Colour by element, from three ramp steps.** Assets `--chart-3`, Liabilities `--chart-4`, Equity `--chart-5`, with labels in `--card` ink: 4.58 / 5.48 / 6.63:1 in light mode, and the dark ramp with dark ink in dark mode. `--chart-1`/`--chart-2` fail AA under a label (3.26 / 3.85:1), so a five-element map would need two more AA-safe fills that do not exist (§ Entity, account, and category badges, open item). The three steps sit only ~1.2:1 apart, so colour separates elements weakly; the halves and their captions carry the meaning, and colour is never alone.
+- **Balance sheet only, two equal halves.** Assets on the left; Liabilities + Equity on the right. The accounting equation makes the halves equal in area, so the map shows the equation itself: a reader sees at once that the halves balance. Income and Expenses are period flows, not balances; on one area scale with balances they are invisible (month-to-date $2,400 against $411,852) and they would break the equal halves. They are not on this map. An income-statement counterpart (Income | Expenses + net income, also equal halves) belongs with Reports if it is wanted.
+- **Colour by element, from the categorical slots.** Assets `--cat-1`, Liabilities `--cat-2`, Equity `--cat-3` (the accounting-element assignment, § Categorical palette), each label in its slot's dark `-foreground` ink: 12.15 / 6.40 / 8.23:1 in light mode, 14.72 / 7.76 / 9.97:1 in dark. Tiles keep a 1px `--cat-edge` hairline and a 2px `--card` gap (§ Categorical palette → the waiver). The slots are distinct hues, validated all-pairs, so colour separates the elements; the halves and their captions still carry the meaning, and colour is never alone.
 - **Credit-balance accounts are fine.** Liabilities and Equity carry credit-normal balances; |balance| gives them positive area on their own side.
 - **Labels are fixed-size HTML, clipped by container query:** the value hides under 96×38px, the name under 64×22px; an unlabelled tile names itself on hover, focus and to assistive tech (full path in its accessible name). Text inside a scaled SVG `viewBox` shrinks with the card and is unreadable at 960px, so labels must not scale with the layout.
 
@@ -447,7 +534,7 @@ A nested treemap of the chart of accounts, prototyped as a card above the tree o
 - **Accessibility.** A treemap is not navigable as a structure by a screen reader. Tiles are links with full-path names, but the tree remains the accessible primary view; the map is a supplement, never a replacement.
 - **LayerChart specifics are unverified:** its tiling method, padding options (for group outlines) and label slot were not checked against the docs page, which renders client-side. Confirm before build.
 
-**Recommendation: go, scoped.** Ship the balance-sheet map (Assets | Liabilities + Equity, equal halves, three ramp fills, size-floor note) as a card above the tree on desktop widths; it earns its place by making the accounting equation visible. No-go on a single five-element map of the whole chart of accounts: flows and balances do not share an area scale, and two of the five fills fail AA.
+**Recommendation: go, scoped.** Ship the balance-sheet map (Assets | Liabilities + Equity, equal halves, categorical fills, size-floor note) as the Balance sheet map tab on desktop widths; it earns its place by making the accounting equation visible. No-go on a single five-element map of the whole chart of accounts: flows and balances do not share an area scale.
 
 ---
 
@@ -455,24 +542,24 @@ A nested treemap of the chart of accounts, prototyped as a card above the tree o
 
 "Sub-card in the Custodial view... pull downs of each security to show lots. And for the Allocation vs target to be a dedicated page." Lots live here; allocation vs. target is its own screen (§ Allocation, Reports & Settings).
 
-**Three figures on every account, side by side.** Each custodial-account card shows, in one row:
+**Three figures on every account, side by side.** Each custodial-account card shows, in one row, left to right in this order — market value, book value, cash, then the derived Unrealized = market − book. Cash sits last so the row reads as "market and book include cash": the two totals first, the cash already inside them after.
 
 | Figure | What it is | Source |
 |---|---|---|
-| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | The GL's cash balance; when the custodian reports a different figure, the reconciliation line shows it |
-| **Book value · GL** | Cost basis of everything in the account, cash included — the GL's own balance for the mirrored account | General Ledger (lots at cost) |
 | **Market value · EOD** | Cash plus every position at the last end-of-day price | Lots × daily EOD price feed |
-| **Market − book** | Unrealized gain or loss, signed and coloured per § Delta coloring | Derived |
+| **Book value · GL** | Cost basis of everything in the account, cash included — the GL's own balance for the mirrored account | General Ledger (lots at cost) |
+| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | The GL's cash balance; when the custodian reports a different figure, the reconciliation line shows it |
+| **Unrealized** | Unrealized gain or loss, signed and coloured per § Delta coloring | Derived |
 
-A cash-only account shows the same row with the three figures equal and a `$0.00` delta: the row keeps one shape on every card, so accounts scan as a column. A **totals card** above the account cards sums the same four figures across every custodial account for the entity, with the price date ("prices as of <date> close"). Market − book on an account equals its lots sub-card's total unrealized gain; the two figures must agree.
+A cash-only account shows the same row with the three figures equal and a `$0.00` delta: the row keeps one shape on every card, so accounts scan as a column. A **totals card** above the account cards sums the same four figures across every custodial account for the entity, with the price date ("prices as of <date> close"). Unrealized on an account equals its lots sub-card's total unrealized gain; the two figures must agree.
 
 **Per-account card:** institution name, link-health badge, the three-figure row, and a reconciliation line against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.5). A difference explained exactly by the account's staged drafts is a **known unposted delta**, not a break: the line shows the custodian's figure and a muted `Known delta` badge (clock icon, `--muted` fill, no status hue) naming the draft count and amount, linking to those drafts in Pending on Transactions.
 
 **The lots sub-card (only on accounts that hold securities):**
 - One row per security, collapsed by default — a pull-down (chevron) reveals its individual lots.
-- Each lot shows book value, market value, and its own short-term or long-term unrealized gain/loss.
+- Each lot shows market value, book value (the same left-to-right order as the account row), and its own short-term or long-term unrealized gain/loss.
 - The security's own row shows its summed book/market/gain across all its lots.
-- The account's lots sub-card totals short, long, and total unrealized gain/loss across every security; the total equals the card's Market − book figure. There is no separate book-vs-market chart.
+- The account's lots sub-card totals short, long, and total unrealized gain/loss across every security; the total equals the card's Unrealized figure. There is no separate book-vs-market chart.
 
 **The New provider item dialog:**
 - **Source type**, chosen first: aggregator (Plaid/SimpleFIN/fake), a manual account (no live link), or an imported file (CSV/OFX).
@@ -491,11 +578,11 @@ See `styled-screens/custodial-accounts.html`: the lots sub-card shows one securi
 
 ## Allocation, Reports & Settings
 
-**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. The nominal/inflation-adjusted (CPI-U) toggle (PRD §4.10) is orthogonal and applies here like any time-series view. Includes a target editor (targets must sum to 100%). Each asset class drills to the lots behind it on Custodial Accounts, filtered to that class. Flow 5.6.
+**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. No nominal/inflation-adjusted toggle: allocation is a contemporaneous snapshot of today's holdings, so a CPI-U restatement adds no information (the toggle, PRD §4.10, lives on time-series views). Every asset class has sub-categories behind a chevron pull-down (the lots sub-card's disclosure pattern), seeded with defaults (US Equity → Large cap, Mid/Small cap; Intl Equity → Developed, Emerging; Fixed Income → Treasuries, Corporate, Municipal; Cash → Cash, Money market). The chart's class rows expand the same way, each sub-row with its own actual / target and drift badge. The target editor is two-level: class targets must total 100%, and each class's sub-targets (whole-portfolio percent) must sum to that class's target, shown per class as a positive soft "Sub-targets sum to N%" badge or a neutral outline "N pt unassigned"; Save stays disabled until both levels reconcile. Each class or sub-category drills to the lots behind it on Custodial Accounts, filtered to it. Flow 5.6.
 
 **Reports.** A nav item **from day one**: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
 
-**Settings.** Batch-import scheduling ("all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window — a Household's schedule doesn't touch a Person entity) and **per-user** (theme, default entity on login, reduced motion). Viewers can view this page, but the Manager/Owner-only settings (schedule, import options) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
+**Settings.** Batch-import scheduling ("all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window, which also governs manual-entry duplicate warnings — a Household's schedule doesn't touch a Person entity) and **per-user** (theme, default entity on login, reduced motion). Viewers can view this page, but the Manager/Owner-only settings (schedule, import options) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
 
 See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-screens/settings.html`.
 
@@ -516,7 +603,7 @@ See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-scr
 
 **The entity switcher** (header entity selector) is always present: every user holds at least their own Person entity. It lists every entity the user holds membership on, base and parent, with each parent's included base entities nested beneath it; a base entity in two parents is listed under both. An included entity the user has no membership on is listed with a lock, and selecting it opens the boundary panel.
 
-**Roll-up map (Entities).** A card above the membership list draws every entity the user holds membership on as a **Pack** (LayerChart `Pack`, d3.pack, for frontend-lead): parents as `--muted` circles, each holding its base entities as `--card` circles; a base entity in no parent sits at top level. A base entity in several parents is drawn once in each, with an "also in <parent>" chip; there is no overlap geometry. Each circle shows the type icon and label, name and role badge, and switches to that entity on click; the current entity carries a `--ring`. **Circles are equal in size per level:** the map shows structure, not wealth. Sizing by balance would shrink small entities past legibility and would leak magnitude across the access boundary. The membership list below stays the accessible fallback, each card with an Includes / Included in line. Dashboard roll-ups may likewise list an included entity under each parent it belongs to.
+**Roll-up map (Entities).** A card above the membership list draws every entity the user holds membership on as a **Pack** (LayerChart `Pack`, d3.pack, for frontend-lead): parents as `--muted` circles, each holding its base entities as `--card` circles; each circle's 3px stroke is its entity type's categorical slot (Person `--cat-1`, Trust `--cat-2`, Business `--cat-3`, Household `--cat-4`, Holding `--cat-5`), edged by a 1px `--cat-edge` hairline, with the type icon and label beside it, so colour is never alone; a base entity in no parent sits at top level. A base entity in several parents is drawn once in each, with an "also in <parent>" chip; there is no overlap geometry. Each circle shows the type icon and label, name and role badge, and switches to that entity on click; the current entity carries a `--ring` outside a 3px `--card` gap, so it never merges with a green Person stroke. **Circles are equal in size per level:** the map shows structure, not wealth. Sizing by balance would shrink small entities past legibility and would leak magnitude across the access boundary. The membership list below stays the accessible fallback, each card with an Includes / Included in line. Dashboard roll-ups may likewise list an included entity under each parent it belongs to.
 
 See `styled-screens/entities.html`.
 
@@ -533,11 +620,12 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Table / custom grouped-row list** | **Grouped account list** (Monarch pattern) — type group header with group delta, rows with sparkline + relative freshness; also plain Table for the account register, lots, and exceptions |
 | **Segmented bar + legend** (custom, tokens-driven) | Allocation actual-vs-target, Assets/Liabilities summary — direct Monarch pattern |
 | **Badge** | Entity/account/transaction/role badges, safe-harbor status pill, link-health badge, Origin-style signed-% pill on ticker/delta rows |
-| **Accordion** | Transactions' three urgency-ordered cards (Exceptions, Pending, Posted); the Pending card's row expansion (two-leg preview) |
-| **Tabs** | Entity switcher, nominal-vs-inflation-adjusted toggle, Totals/Percent toggle (Monarch pattern), Reports' statement switcher. General Ledger and Custodial Accounts are two nav items, never a tab pair |
+| **Accordion** | The Pending tab's row expansion (two-leg preview) |
+| **Tabs** | Entity switcher, nominal-vs-inflation-adjusted toggle on time-series views (Dashboard net-worth chart, Reports; never Allocation), Totals/Percent toggle (Monarch pattern), Reports' statement switcher, Tax's jurisdictions, General Ledger's three sections, Transactions' three stages with count badges (`.tab` + `badge-sm`: `secondary`, `destructive-soft` on Exceptions when non-zero). General Ledger and Custodial Accounts are two nav items, never a tab pair |
 | **Sheet / Dialog** | Transaction detail drawer; new-entity/membership dialog; provider-item dialog (Custodial Accounts) |
 | **Dialog, near-full-screen** | The journal-entry modal (header + legs) — manual "+ New entry", "Correct entry", Split, and Group & Summarize all reuse this one modal |
-| **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers; the suggested-offset-leg inline search dropdown (Pending inbox); per-card "show N" limit selector |
+| **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers; the suggested-offset-leg inline search dropdown (Pending inbox); per-card "show N" limit selector; Journal entries sort selector |
+| **Popover + Range Calendar** | Journal entries date range: presets plus one month grid, opened from a select-like trigger |
 | **Sidebar** | Primary nav, eight flat items (Settings proposed under the avatar popover) — inverted, a floating card (gutter on every side), collapsible to an icon rail, brand row on top (mark + wordmark + collapse control) + avatar-popover trigger on bottom (opens to the right) — see Sidebar information architecture |
 | **Button** | Variants: `default` (primary green fill: the one main action per view), `secondary`, `outline`, `ghost`, `destructive`, and `dark` (a solid `--foreground` fill with `--background` ink: near-black in light mode, near-white in dark). **Rule: never an outline button standing alone on `--background`.** Its `--border` edge is only 1.22:1 on the light page (~1.17:1 dark), so it all but disappears. Outline is for a secondary action set beside a filled one, or inside a card or bar that gives it a surface. A standalone secondary action uses `dark` instead (15.61:1 light / 17.92:1 dark against the page): Login's "Continue with Google" (with the Google G glyph). Hierarchy then comes from colour and position, not weight: the dark button is the heavier mass, so the primary stays the only green fill and sits last, after the divider |
 | **Skeleton** | Every async fetch boundary |
@@ -547,7 +635,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Progress** | Import batch progress, safe-harbor paid-vs-required |
 | **Top row** | Starts right of the sidebar, not full-width, not sticky/bordered, same background token as the content below it: breadcrumb (left); entity selector + separator + "more" menu (right) — see Layout & shell, Header |
 | **Separator** | The top row's vertical divider before the "more" menu |
-| **Popover / DropdownMenu** | Avatar popover at the sidebar's bottom — profile, **Settings (proposed)**, **Notifications (proposed)**, preferences, theme, keyboard shortcuts, Log out last (see Sidebar); the same primitive backs the top row's "more" menu |
+| **Popover / DropdownMenu** | Avatar popover at the sidebar's bottom — profile, **Settings (proposed)**, **Notifications (proposed)**, preferences, theme, keyboard shortcuts, Log out last (see Sidebar); the same primitive backs the top row's "more" menu and, without the menu items, the Transactions **journal entry popover** on Posted (header, legs, correction trail, Open in General Ledger) |
 | **Breadcrumb** | The top row's "page title > breadcrumbs" — single crumb on most screens, multi-crumb on drill-downs (the account register) |
 | **Avatar cluster** | Overlapping initials-on-`--secondary` circles in the entity selector — membership at a glance, max 3 + overflow (see Header) |
 | **Landing illustration + feature call-outs** | Home — under the brand app bar: the mountains illustration, then headline, subhead and three feature cards |
@@ -586,9 +674,12 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | "More" menu: Export (General Ledger) | `download` | |
 | Locked leg indicator (Pending inbox, Split grid) | `lock` | § Transactions workflow |
 | Correct entry / edit account (inline) | `pencil` | |
-| Link-health warning banner | `triangle-alert` | |
+| Link-health warning banner; potential-duplicate warning | `triangle-alert` | |
 | Search *(proposed entry point, not in the top row)* | `search` | Reserved for the keyboard-shortcut / "more"-menu entry point, § Header |
-| GL tree group disclosure; lots security pull-down | `chevron-down` (open) / `chevron-right` (closed) | Same pair for every disclosure row |
+| GL tree group disclosure; lots security pull-down; Journal entries row | `chevron-down` (open) / `chevron-right` (closed) | Same pair for every disclosure row |
+| Journal ID: copy / copied | `copy` / `check` | `check` for 1.2s after the click |
+| Manual entry source line (Transactions Posted) | `pen-line` | Stands where `landmark` names a bank source |
+| Journal entries date range trigger | `calendar` | |
 | Custodial cross-reference badge (GL tree, register) | `landmark` | Same glyph as the Custodial Accounts nav item |
 | GL account badge (register) | `book-text` | Same glyph as the General Ledger nav item |
 | Provider dialog: Refresh token | `key` | |
@@ -639,12 +730,14 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Grouped account list | **Table**, `custom` grouping | Table primitive; the type-group header + sparkline + freshness row composition is ours |
 | Segmented bar + legend | `custom` | No shadcn equivalent; tokens-driven custom component |
 | Badge (status, role, link-health) | **Badge** | Direct reuse, variants only |
-| Accordion (Transactions' 3 cards) | **Accordion** | Direct reuse |
 | Pending row expansion | **Accordion** (nested item), **Select** (suggested-offset inline search) | The two-leg preview itself is custom content inside an Accordion item |
 | Split grid | `custom` | A dynamic multi-row form grid with live-sum validation; no shadcn block matches |
 | Bulk action bar | `custom` | A "floating selection toolbar" pattern (seen in many apps) but not a shadcn-svelte component |
 | Journal-entry modal | **Dialog**, sized near-full-screen | Direct reuse — a non-default Dialog size, not a different primitive |
-| Transaction/account-register tables | **Table** | Direct reuse |
+| Transaction/account-register/journal-entries tables | **Table** | Direct reuse |
+| Journal entries date range | **Popover** + **Range Calendar** | The shadcn date-range-picker pattern; the preset list is `.popover-item`s beside the calendar |
+| Journal entry popover (Transactions Posted) | **Popover** + **Badge** + plain `.trail-row` markup | The entry read in place from its Journal ID; non-modal, so the list stays usable |
+| Potential-duplicate warning (New entry modal, Pending row) | Caution-tier inline block + **Button**s | Names the matched transaction above the modal's actions, or the matched manual entry on a Pending row; the row badge is `outline` in muted ink |
 | Chart-of-accounts tree | `custom` | No shadcn tree component; built from nested disclosure rows (could adopt a community tree primitive later if one matures) |
 | Lots sub-card pull-down | **Collapsible** | Direct reuse — a simpler primitive than Accordion for a single expand/collapse row |
 | Settings on/off preferences | **Switch** | Direct reuse |
@@ -653,7 +746,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Register / any wide table | **Table** (its own overflow-x wrapper) | `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling |
 | Allocation actual-vs-target track | `custom` on **Progress** | A Progress track plus a target marker; shadcn Progress has no marker |
 | Provider-item dialog | **Dialog**, **Tabs** (source-type picker), **Select** (account mapping) | Composed from three existing primitives, no custom chrome |
-| Tabs (nominal/real toggle, Totals/Percent, Reports statements) | **Tabs** | Direct reuse |
+| Tabs (nominal/real toggle on time-series views, Totals/Percent, Reports statements, Tax jurisdictions, General Ledger sections, Transactions stages) | **Tabs** | Direct reuse |
 | Transaction detail drawer | **Sheet** | Direct reuse |
 | Select / Combobox (category, tax-treatment, jurisdiction) | **Select**, **Combobox** | Direct reuse |
 | Toasts (import complete, entry posted, reconciliation break) | **Sonner** | Direct reuse |
@@ -674,9 +767,9 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Screen | File | Shell | Shown open as reference |
 |---|---|---|---|
 | Dashboard | `dashboard.html` | sidebar | "more" menu, avatar popover |
-| Transactions | `transactions.html` | sidebar | "more" menu, expanded Pending row, split grid, bulk bar, journal-entry modal |
-| General Ledger | `general-ledger.html` | sidebar | — |
-| Account register | `account-register.html` | sidebar (multi-crumb) | — |
+| Transactions | `transactions.html` | sidebar | "more" menu, tabs with count badges, expanded Pending row, split grid, bulk bar, journal-entry modal |
+| General Ledger | `general-ledger.html` | sidebar | three tabs, expanded Journal entries row, date range popover |
+| Account register | `account-register.html` | sidebar (multi-crumb) | expanded register line |
 | Custodial Accounts | `custodial-accounts.html` | sidebar | lots sub-card (AAPL pulled down), provider-item dialog |
 | Allocation | `allocation.html` | sidebar | — |
 | Tax | `tax.html` | sidebar | Federal tab, danger tier (Q3 installment $200 short) |
@@ -788,10 +881,11 @@ This mirrors ARCH §2.4's screen→DTO table exactly — the DESIGN-owned half o
 | Screen / surface | Data shown | DTO(s) → owning package | Milestone note |
 |---|---|---|---|
 | Dashboard | Net worth + delta; cash-flow by period; recent activity; pending tax liability + safe-harbor gap; allocation actual-vs-target | `NetWorthSeries`, `CashFlowByPeriod`, `RecentActivity` → ledger; `TaxPosition` → tax; `AllocationVsTarget` → portfolio | M3 (panels fill in at M4 and 1.0) — see Component inventory § Empty-state pattern |
-| Transactions — three accordion cards (Exceptions, Pending, Posted), each with a "show N" limit | Aged CIT exceptions + link-health banners; the Pending review/match inbox (locked custodial leg + suggested offset leg); posted, paged journal entries with correction badges; import stats/status | `ExceptionList`, `PendingInbox`, `ImportStatus` → posting + import; `PostedJournal` → ledger | M2 (CIT exceptions in M3) |
+| Transactions — three tabs with count badges (Exceptions, Pending, Posted), each with a "show N" limit | Aged CIT exceptions + link-health banners; the Pending review/match inbox (locked custodial leg + suggested offset leg); posted, paged rows with Journal IDs, correction badges and the journal entry popover, manual entries included; import stats/status | `ExceptionList`, `PendingInbox`, `ImportStatus` → posting + import; `PostedJournal` → ledger | M2 (CIT exceptions in M3) |
 | Journal-entry modal (header + legs) — split, group, manual "+ New entry", "Correct entry" | Entry draft in, posting-gate result out | `EntryDraft` in, `GateResult` out → posting | M2 |
 | General Ledger — chart-of-accounts tree | Category → account → sub-account, balances, custodial marker | `ChartTree` → ledger | M2 |
-| General Ledger — account register page | Lines on one account, date order, running balance, link to entry | `AccountRegister` → ledger | M2 |
+| General Ledger — account register page | Lines on one account, date order, running balance, Journal ID, each line's full entry (every leg, correction trail, actor), link to entry | `AccountRegister` → ledger | M2 |
+| General Ledger — Journal entries tab | Posted entry headers by date: Journal ID, description, actor, status, sum of debits, legs; date range, sort, paging | `JournalEntries` → ledger | M2 |
 | Custodial Accounts | Balance, reconciliation status, link-health badge; lots sub-card per security (lots, short/long/total unrealized gain, per lot and summed) | `CustodialAccountList` → posting + import; `LotsCard` → securities | M3 (lots card at M4) |
 | Provider-item dialog (New provider item on Custodial Accounts) | Source type (aggregator / broker API / file / manual); discovered accounts mapped to custodial accounts; token refresh; unlink + revocation-lag note | `ProviderItem` → import | M2 (fake + file); real aggregators at 1.0 |
 | Sync (Transactions, Custodial Accounts) / "Import file" | Job status; on Custodial Accounts also pulls balances and positions | `SyncRequest` → import | M2 |
@@ -906,7 +1000,6 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 | Motion | Respect `prefers-reduced-motion` (open item) |
 
 **Open items:**
-- No CVD simulation run on the palette yet — two brand hues (green 110.6°, blue 200.6°) to check; high priority, since both carry meaning.
 - `--border`/`--card` is a low-contrast hairline by design (1.29:1) — decorative, consistent with common practice.
 - `--warning` and `--chart-1` fall under 3:1 only on an `--accent` hover fill (2.87:1 / 2.92:1) — no chart inside a hover; a bare warning icon on a hovered row keeps its label.
 - Reduced-motion policy not yet written.
@@ -917,6 +1010,4 @@ polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte 
 ## Open questions
 
 - Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.
-- Categorical (3+ hue) chart palette for transaction-category breakdowns — deferred until a concrete chart spec exists.
 - Compare `styled-screens/dashboard.html` against Monarch Money's Accounts screen (https://www.monarchmoney.com) component-by-component once frontend-lead builds the real screen.
-- **CVD check on the brand hues:** flagged in Accessibility — two brand hues (green, blue) to check, not yet simulated.
