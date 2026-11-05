@@ -455,8 +455,8 @@ The product specification for the Plaid bank-feed → journal-entry pipeline (st
 **Layout:** a high-density table/list of unposted raw rows. Clicking a row expands it vertically (Accordion/Expansion pattern) — the matching workspace opens inline, no navigation away from the feed.
 
 **The two-line preview (every expanded row starts here):**
-- **Line 1, the locked leg.** Always the custodial cash side — debited or credited per the Plaid transaction type — named by the row's own custodial account. Locked because it represents verified bank reality; never editable, here or in Split/Group.
-- **Line 2, the suggested offset leg.** The system scans historical rules and the Plaid category to pre-fill an educated guess (e.g. Accounts Receivable, Software Expense, Custodial Clearing). Shown as an inline search dropdown the user can override in place — never a blank field. The control shows the chosen account as a full path, and the dropdown lists paths (§ General Ledger: tree & register, Account path).
+- **Line 1, the locked leg.** Always the custodial cash side, debit on inflows, credit on outflows, named by the row's own custodial account. Locked because it represents verified bank reality; never editable, here or in Split/Group.
+- **Line 2, the suggested offset leg.** Always the opposite side from Line 1. The system scans historical rules and the Plaid category to pre-fill an educated guess (e.g. Accounts Receivable, Software Expense, Custodial Clearing). Shown as an inline search dropdown the user can override in place — never a blank field. The control shows the chosen account as a full path, and the dropdown lists paths (§ General Ledger: tree & register, Account path).
 
 **Flow A — Split (one raw row → one multi-leg entry).** For a transaction that represents multiple contexts (e.g. a $1,200 payout that nets a $20 platform fee). The expanded row morphs into a multi-column grid; the user adds unlimited offsetting rows. A live validation loop disables "Approve & Post" until the split rows' total exactly matches the raw transaction's absolute total — never a partial or over/under split.
 
