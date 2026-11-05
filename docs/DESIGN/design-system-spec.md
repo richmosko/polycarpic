@@ -185,7 +185,7 @@ The `--chart` ramp encodes **how much**. Treemaps, Pack, Sankey and grouped or s
 |---|---|---|---|---|---|
 | Accounting elements (GL treemap, Sankey, bars) | Assets | Liabilities | Equity | Income | Expense |
 | Entity types (Entities Pack) | Person | Trust | Business | Household | Holding |
-| Asset classes (Allocation) | US Equity | Intl Equity | Fixed Income | Cash | — |
+| Asset classes (Allocation map and bars) | US Equity | Intl Equity | Fixed Income | Cash | — |
 
 The accounting elements and the entity types reuse slots 1–5; the two sets never appear on the same chart. An asset-class sub-category takes its parent's slot. Anything else (transaction categories in bars, Sankey flows) takes slots in order of first appearance, persisted per entity so a category keeps its colour across sessions; from the eighth series on, the tail folds into one "Other" in `--cat-other`.
 
@@ -325,7 +325,7 @@ This is not a header in any surface sense (see § Layout & shell). "Top row" des
 | Transactions | Sync Transactions, New entry |
 | General Ledger (tree + register) | Export |
 | Custodial Accounts | Sync, New provider item |
-| Allocation | *(none specified yet — target-save stays inline in the content column)* |
+| Allocation | *(none specified yet — target editing opens from the gear on the Actual vs. target card)* |
 | Reports | *(none specified yet)* |
 | Entities | *(none specified yet — "+ Invite member" stays inline per-row)* |
 | Settings | *(none — this screen has no further global action of its own)* |
@@ -537,6 +537,8 @@ A nested treemap of the chart of accounts, prototyped on the Balance sheet map t
 - **Accessibility.** A treemap is not navigable as a structure by a screen reader. Tiles are links with full-path names, but the tree remains the accessible primary view; the map is a supplement, never a replacement.
 - **LayerChart specifics are unverified:** its tiling method, padding options (for group outlines) and label slot were not checked against the docs page, which renders client-side. Confirm before build.
 
+**Second instance.** Allocation's current-allocation map (§ Allocation, Reports & Settings) reuses this pattern with a class header strip added, because its sub-tiles share their class's fill.
+
 **Recommendation: go, scoped.** Ship the balance-sheet map (Assets | Liabilities + Equity, equal halves, categorical fills, size-floor note) as the Balance sheet map tab on desktop widths; it earns its place by making the accounting equation visible. No-go on a single five-element map of the whole chart of accounts: flows and balances do not share an area scale.
 
 ---
@@ -581,7 +583,11 @@ See `styled-screens/custodial-accounts.html`: the lots sub-card shows one securi
 
 ## Allocation, Reports & Settings
 
-**Allocation.** A dedicated actual-vs-target page. Pulls from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. No nominal/inflation-adjusted toggle: allocation is a contemporaneous snapshot of today's holdings, so a CPI-U restatement adds no information (the toggle, PRD §4.10, lives on time-series views). Every asset class has sub-categories behind a chevron pull-down (the lots sub-card's disclosure pattern), seeded with defaults (US Equity → Large cap, Mid/Small cap; Intl Equity → Developed, Emerging; Fixed Income → Treasuries, Corporate, Municipal; Cash → Cash, Money market). The chart's class rows expand the same way, each sub-row with its own actual / target and drift badge. The target editor is two-level: class targets must total 100%, and each class's sub-targets (whole-portfolio percent) must sum to that class's target, shown per class as a positive soft "Sub-targets sum to N%" badge or a neutral outline "N pt unassigned"; Save stays disabled until both levels reconcile. Each class or sub-category drills to the lots behind it on Custodial Accounts, filtered to it. Flow 5.6.
+**Allocation.** A dedicated page in two cards: the current allocation as a treemap, then actual vs. target. Both pull from the same lot data as Custodial Accounts' lots sub-card, aggregated by asset class across every custodial account for the entity — not a new data source, a different aggregation. No nominal/inflation-adjusted toggle: allocation is a contemporaneous snapshot of today's holdings, so a CPI-U restatement adds no information (the toggle, PRD §4.10, lives on time-series views). Every asset class has sub-categories behind a chevron pull-down (the lots sub-card's disclosure pattern), seeded with defaults (US Equity → Large cap, Mid/Small cap; Intl Equity → Developed, Emerging; Fixed Income → Treasuries, Corporate, Municipal; Cash → Cash, Money market). The Actual vs. target card's class rows expand the same way, each sub-row with its own actual / target and drift badge. The target editor is two-level: class targets must total 100%, and each class's sub-targets (whole-portfolio percent) must sum to that class's target, shown per class as a positive soft "Sub-targets sum to N%" badge or a neutral outline "N pt unassigned"; Save stays disabled until both levels reconcile. Each tile, class or sub-category drills to the lots behind it on Custodial Accounts, filtered to it. Flow 5.6.
+
+- **Current allocation map.** The top card, so the shape of today's holdings reads before any comparison: the second instance of the treemap pattern (§ General Ledger → Treemap prototype), with the same tile, label, gap and hairline rules. Nesting is asset class → sub-category; area is share of market value, and the card states the total, which is Custodial Accounts' market-value total. Each class is one rectangle in its fixed slot, 1–4 (§ Categorical palette), and a sub-category takes its parent's slot, so a class reads as one block with hairline divisions. Because a class's sub-tiles share a fill, a **class header strip** (`.tm-head`) names it: class, percent and, where it fits, dollars. The strip sits inside the class rectangle, so class areas are exact and sub-tiles compare within their class; the percent labels compare across classes. Every labelled tile shows name and percent, and dollars where they fit. A tile too narrow for its name is listed in the note under the map with its link, percent and dollars.
+- **Identity and detail.** A legend names the four classes, and every class is also named on its strip, so colour is never alone. The mock's hover layer is the native `title`; the build's tooltip shows full path (Fixed Income › Municipal), percent, dollars, target and drift. The Actual vs. target card is the map's table view: every figure is there, and it is the accessible primary view, the map a supplement. Under the `md` breakpoint the map card hides, as the balance sheet map does.
+- **Target editor popover.** A `settings` (gear) icon button at the top right of the Actual vs. target card (`aria-label="Edit target allocation"`, `aria-haspopup="dialog"`) opens the editor in a shadcn `Popover` anchored to it, right edges aligned. Non-modal, so the bars stay readable while targets change; it holds about eight inputs, so it takes the `.je-popover` surface at 460px with a scrolling body, and the Save rule, Total, Cancel and Save target stay in the footer. Cancel or Esc closes it and discards the edits; a click outside closes it only when nothing has been edited, so a stray click cannot lose them. Focus moves to the first input on open and returns to the gear on close. Below the `md` breakpoint it opens as a full-width `Dialog`. Viewers get no gear. The styled screen renders it open, as a reference below the card.
 
 **Reports.** A nav item **from day one**: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping.
 
@@ -661,6 +667,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | General Ledger nav | `book-text` | |
 | Custodial Accounts nav | `landmark` | |
 | Allocation nav | `pie-chart` | |
+| Allocation: edit target | `settings` | Gear on the Actual vs. target card; opens the target editor popover |
 | Tax nav | `receipt` | `landmark` is taken by Custodial Accounts |
 | Reports nav | `file-text` | |
 | Entities nav | `users` | |
@@ -750,6 +757,8 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Brand app bar (Home, Get started, Admin) | `custom`, with **Button** / **Badge** / **Avatar** for the trailing items | One component for every shell-less page: a fixed bar with a lockup, trailing items and a fade; too small and too brand-specific to be a block. No sidebar because no entity exists (setup), none applies (operator), or the visitor is not signed in (Home) |
 | Register / any wide table | **Table** (its own overflow-x wrapper) | `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling |
 | Allocation actual-vs-target track | `custom` on **Progress** | A Progress track plus a target marker; shadcn Progress has no marker |
+| Allocation current-allocation map | **LayerChart** `Treemap` | The balance sheet map's component with a class header strip; tiling and label options unverified, as there |
+| Allocation target editor | **Popover** + **Input** + **Badge** + **Button** | A form anchored to the gear; non-modal, so the bars stay readable. `Dialog` below `md` |
 | Provider-item dialog | **Dialog**, **Tabs** (source-type picker), **Select** (account mapping) | Composed from three existing primitives, no custom chrome |
 | Tabs (nominal/real toggle on time-series views, Totals/Percent, Reports statements, Tax jurisdictions, General Ledger sections, Transactions stages) | **Tabs** | Direct reuse |
 | Transaction detail drawer | **Sheet** | Direct reuse |
@@ -776,7 +785,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | General Ledger | `general-ledger.html` | sidebar | three tabs, expanded Journal entries row, date range popover |
 | Account register | `account-register.html` | sidebar (multi-crumb) | expanded register line |
 | Custodial Accounts | `custodial-accounts.html` | sidebar | lots sub-card (AAPL pulled down), provider-item dialog |
-| Allocation | `allocation.html` | sidebar | — |
+| Allocation | `allocation.html` | sidebar | target editor popover (open, as a reference below the card) |
 | Tax | `tax.html` | sidebar | Federal tab, danger tier (Q3 installment $200 short) |
 | Reports | `reports.html` | sidebar | dimmed statement previews (review only, not shipped) |
 | Entities | `entities.html` | sidebar | — |
@@ -894,7 +903,7 @@ This mirrors ARCH §2.4's screen→DTO table exactly — the DESIGN-owned half o
 | Custodial Accounts | Balance, reconciliation status, link-health badge; lots sub-card per security (lots, short/long/total unrealized gain, per lot and summed) | `CustodialAccountList` → posting + import; `LotsCard` → securities | M3 (lots card at M4) |
 | Provider-item dialog (New provider item on Custodial Accounts) | Source type (aggregator / broker API / file / manual); discovered accounts mapped to custodial accounts; token refresh; unlink + revocation-lag note | `ProviderItem` → import | M2 (fake + file); real aggregators at 1.0 |
 | Sync (Transactions, Custodial Accounts) / "Import file" | Job status; on Custodial Accounts also pulls balances and positions | `SyncRequest` → import | M2 |
-| Allocation | Actual vs. target allocation; target editor | `AllocationVsTarget`, target editor → portfolio | M4 |
+| Allocation | Current-allocation treemap; actual vs. target; target editor popover | `AllocationVsTarget`, target editor → portfolio | M4 |
 | Reports | Balance Sheet, Income Statement, Cash Flow; NAV and NAV delta | `ReportTable` → reports | M5; empty state until then |
 | Entities | Entity list; memberships; invite action | `EntityList`, `MembershipList`, invite command → tenancy | M1 |
 | Settings | Per-entity batch-import schedule and options; app preferences | `ImportSchedule` → import; app preferences → tenancy | M2 |

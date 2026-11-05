@@ -1490,7 +1490,6 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .alloc-track .alloc-target { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--foreground); border-radius: 1px; }
 .alloc-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted-foreground); }
 .alloc-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.alloc-total { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin-top: 16px; font-size: 13px; }
 
 /* ---------- Reports: the planned shape of a statement that has not
    shipped yet. ---------- */
@@ -1758,7 +1757,44 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
   .alloc-row.alloc-sub { grid-template-columns: 144px 1fr 120px 96px; }
   .alloc-row.alloc-sub .alloc-name { padding-left: 56px; }
 }
-.alloc-total .card-sub { margin-right: auto; }
+/* Current-allocation treemap: the .tm-map idiom with one change, a class
+   header strip. A group is one asset class in its fixed slot (.tm-c1 ...
+   .tm-c4, a sub-category takes its parent's slot), so its sub-tiles share
+   a fill and the strip names the class. The strip and sub-tiles sit inside
+   the class rectangle, whose area is exact; sub-tiles divide what remains
+   in proportion, so they compare within a class, and their percent labels
+   compare across classes. The strip always shows its percent; its dollars
+   drop first when it narrows. Same label inks and contrast as .tm-assets
+   and siblings. */
+.tm-c1 { background: var(--cat-1); color: var(--cat-1-foreground); }
+.tm-c2 { background: var(--cat-2); color: var(--cat-2-foreground); }
+.tm-c3 { background: var(--cat-3); color: var(--cat-3-foreground); }
+.tm-c4 { background: var(--cat-4); color: var(--cat-4-foreground); }
+.tm-map-alloc { height: 300px; }
+.tm-pct { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.tm-head .tm-inner { flex-direction: row; align-items: baseline; gap: 8px; padding: 4px 8px; }
+.tm-map-alloc .tm-label { white-space: normal; overflow-wrap: anywhere; }
+.tm-map-alloc .tm-head .tm-label { flex: 1; min-width: 0; white-space: nowrap; }
+.tm-head .tm-value { display: block; }
+@container (max-width: 64px) { .tm-pct { display: none; } }
+@container (max-height: 22px) { .tm-tile:not(.tm-head) .tm-pct { display: none; } }
+@container (max-width: 216px) { .tm-head .tm-value { display: none; } }
+.alloc-map-sub { margin: -8px 0 12px; }
+.alloc-head-actions { display: inline-flex; align-items: center; gap: 12px; margin-left: auto; }
+
+/* Target editor: the .je-popover surface, wider for the reconcile badges,
+   holding a form. Anchored to the gear in product, right edges aligned;
+   the styled screen renders it statically below the card. Total and the
+   Save gate stay in the footer while the body scrolls. */
+.alloc-editor-ref { margin-top: 24px; display: flex; flex-direction: column; align-items: flex-end; }
+.alloc-editor-ref .eyebrow { width: 460px; max-width: 100%; }
+.je-popover.alloc-editor { width: 460px; max-height: min(640px, 80vh); }
+.alloc-editor .card-title { margin-bottom: 0; }
+.alloc-editor .je-popover-body > .card-sub { margin: 0 0 4px; }
+.alloc-editor-total, .alloc-editor-actions { display: inline-flex; align-items: center; gap: 8px; }
+.alloc-editor-foot { flex-wrap: wrap; gap: 8px; }
+.alloc-editor-hint { flex-basis: 100%; font-size: 12px; }
+
 /* A sub-row group closes with a rule unless it is the card's last block. */
 .alloc-sub-group > .alloc-row:last-child, .alloc-sub-group > .kv-row:last-child { border-bottom: 1px solid var(--border); }
 

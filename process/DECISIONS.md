@@ -221,3 +221,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the Principal asked to confirm "that Posted Card shows the posted Transactions (mirroring the Pending) and not just the list of Journal Entries"; the mock and spec had drifted to one row per entry ("entry-scoped"), which hides which bank transactions produced an entry.
 **Alternatives considered:** keeping Posted entry-grained with the transactions nested under each row (two grains on one list; Pending and Posted stop mirroring each other).
 **Approved by:** richmosko (2026-11-04)
+
+### 2026-11-04 — Allocation opens on a current-allocation treemap; target editing moves behind a gear
+**Decision:** the Allocation page leads with the current allocation as a nested treemap, one tile per asset class in its fixed categorical slot with sub-categories nested inside it. The Actual vs. target card follows as its table view. Target editing leaves the page and opens from a gear at that card's top right, in a popover anchored to the gear.
+**Why:** the Principal: "a tree map with each major asset category in a different cat-* color. This should be the top thing shown, displaying the *current* allocation", with target editing as "a popup menu that comes up by clicking a gear icon on the target/actual card."
+**Alternatives considered:** a modal `Dialog` for the editor (covers the bars the targets are being set against); keeping the editor as a third card (a form most visits never use takes a full card).
+**Approved by:** richmosko (2026-11-04)

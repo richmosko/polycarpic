@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Allocation. Actual vs. target by asset class, aggregated from the same lot data as Custodial Accounts' lots sub-card across every custodial account for this entity. No nominal / inflation-adjusted toggle: allocation is a snapshot of today's holdings, so a CPI-U restatement adds nothing. Drift uses a neutral outline badge, not a status hue: a 2-point drift is information, not a warning. Every class row has a chevron pull-down to its sub-categories (the lots sub-card's disclosure pattern): in the chart (US Equity shown open) each sub-category gets its own actual / target and drift badge; in the target editor (Fixed Income shown open, 2 pt unassigned) sub-targets are whole-portfolio percent and must sum to the class target. Save is enabled only when the classes total 100% and every class's sub-targets reconcile. Each class or sub-category name drills to the lots behind it on Custodial Accounts, filtered to it. Sub-category taxonomy in the mock is the seeded default. -->
+<!-- Allocation. Two cards, one aggregation: both read the same lot data as Custodial Accounts' lots sub-card, across every custodial account for this entity. Current allocation comes first, as a nested treemap (the General Ledger balance-sheet map's idiom): one tile per asset class in its fixed categorical slot, its sub-categories inside it in the same slot, area = share of market value, so the shape of today's holdings reads before any comparison. Actual vs. target comes second and is the treemap's table view: every class row has a chevron pull-down to its sub-categories (the lots sub-card's disclosure pattern; US Equity shown open), each with its own actual / target and drift badge. Drift uses a neutral outline badge, not a status hue: a 2-point drift is information, not a warning. The gear at that card's top right opens the target editor in a popover anchored to it, non-modal so the bars stay readable while targets change; it is shown open as a reference below the card, with Fixed Income open at 2 pt unassigned. Sub-targets are whole-portfolio percent and must sum to the class target; Save is enabled only when the classes total 100% and every class's sub-targets reconcile. Viewers get no gear. Each tile, class or sub-category name drills to the lots behind it on Custodial Accounts, filtered to it. No nominal / inflation-adjusted toggle: allocation is a snapshot of today's holdings, so a CPI-U restatement adds nothing. Sub-category taxonomy in the mock is the seeded default. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -57,10 +57,40 @@
     </div>
 
   <main class="content" style="padding-top:8px;">
+    <div class="card tm-card" aria-labelledby="alloc-map-title">
+      <div class="card-head">
+        <span class="card-title" id="alloc-map-title">Current allocation</span>
+        <span class="alloc-legend" aria-hidden="true"><span><span class="tm-swatch tm-c1"></span>US Equity</span><span><span class="tm-swatch tm-c2"></span>Intl Equity</span><span><span class="tm-swatch tm-c3"></span>Fixed Income</span><span><span class="tm-swatch tm-c4"></span>Cash</span></span>
+      </div>
+      <p class="card-sub alloc-map-sub"><span class="mono">$234,264.85</span> market value across every custodial account · prices as of Oct 30 close</p>
+      <div class="tm-map tm-map-alloc" role="group" aria-label="Current allocation treemap: US Equity 42%, Fixed Income 25%, Intl Equity 18%, Cash 15%">
+          <span class="tm-group" style="left:0.00%;top:0.00%;width:42.00%;height:100.00%" aria-hidden="true"></span>
+          <a class="tm-tile tm-head tm-c1" href="custodial-accounts.html" style="left:0.22%;top:0.67%;width:41.56%;height:9.33%" title="US Equity: 42%, $98,391.24" aria-label="US Equity: 42%, $98,391.24"><span class="tm-inner"><span class="tm-label">US Equity</span><span class="tm-pct">42%</span><span class="tm-value">$98,391.24</span></span></a>
+          <a class="tm-tile tm-c1" href="custodial-accounts.html" style="left:0.22%;top:10.00%;width:32.65%;height:89.33%" title="US Equity › Large cap: 33%, $77,307.40" aria-label="US Equity › Large cap: 33%, $77,307.40"><span class="tm-inner"><span class="tm-label">Large cap</span><span class="tm-pct">33%</span><span class="tm-value">$77,307.40</span></span></a>
+          <a class="tm-tile tm-c1" href="custodial-accounts.html" style="left:32.87%;top:10.00%;width:8.90%;height:89.33%" title="US Equity › Mid/Small cap: 9%, $21,083.84" aria-label="US Equity › Mid/Small cap: 9%, $21,083.84"><span class="tm-inner"><span class="tm-label">Mid/Small cap</span><span class="tm-pct">9%</span><span class="tm-value">$21,083.84</span></span></a>
+          <span class="tm-group" style="left:42.00%;top:0.00%;width:25.00%;height:100.00%" aria-hidden="true"></span>
+          <a class="tm-tile tm-head tm-c3" href="custodial-accounts.html" style="left:42.22%;top:0.67%;width:24.56%;height:9.33%" title="Fixed Income: 25%, $58,566.21" aria-label="Fixed Income: 25%, $58,566.21"><span class="tm-inner"><span class="tm-label">Fixed Income</span><span class="tm-pct">25%</span><span class="tm-value">$58,566.21</span></span></a>
+          <a class="tm-tile tm-c3" href="custodial-accounts.html" style="left:42.22%;top:10.00%;width:24.56%;height:46.45%" title="Fixed Income › Treasuries: 13%, $30,454.43" aria-label="Fixed Income › Treasuries: 13%, $30,454.43"><span class="tm-inner"><span class="tm-label">Treasuries</span><span class="tm-pct">13%</span><span class="tm-value">$30,454.43</span></span></a>
+          <a class="tm-tile tm-c3" href="custodial-accounts.html" style="left:42.22%;top:56.45%;width:18.42%;height:42.88%" title="Fixed Income › Corporate: 9%, $21,083.84" aria-label="Fixed Income › Corporate: 9%, $21,083.84"><span class="tm-inner"><span class="tm-label">Corporate</span><span class="tm-pct">9%</span><span class="tm-value">$21,083.84</span></span></a>
+          <a class="tm-tile tm-c3" href="custodial-accounts.html" style="left:60.64%;top:56.45%;width:6.14%;height:42.88%" title="Fixed Income › Municipal: 3%, $7,027.94" aria-label="Fixed Income › Municipal: 3%, $7,027.94"><span class="tm-inner"><span class="tm-label">Municipal</span><span class="tm-pct">3%</span><span class="tm-value">$7,027.94</span></span></a>
+          <span class="tm-group" style="left:67.00%;top:0.00%;width:33.00%;height:54.55%" aria-hidden="true"></span>
+          <a class="tm-tile tm-head tm-c2" href="custodial-accounts.html" style="left:67.22%;top:0.67%;width:32.56%;height:9.33%" title="Intl Equity: 18%, $42,167.67" aria-label="Intl Equity: 18%, $42,167.67"><span class="tm-inner"><span class="tm-label">Intl Equity</span><span class="tm-pct">18%</span><span class="tm-value">$42,167.67</span></span></a>
+          <a class="tm-tile tm-c2" href="custodial-accounts.html" style="left:67.22%;top:10.00%;width:25.32%;height:43.88%" title="Intl Equity › Developed: 14%, $32,797.08" aria-label="Intl Equity › Developed: 14%, $32,797.08"><span class="tm-inner"><span class="tm-label">Developed</span><span class="tm-pct">14%</span><span class="tm-value">$32,797.08</span></span></a>
+          <a class="tm-tile tm-c2" href="custodial-accounts.html" style="left:92.54%;top:10.00%;width:7.23%;height:43.88%" title="Intl Equity › Emerging: 4%, $9,370.59" aria-label="Intl Equity › Emerging: 4%, $9,370.59"><span class="tm-inner"><span class="tm-label">Emerging</span><span class="tm-pct">4%</span><span class="tm-value">$9,370.59</span></span></a>
+          <span class="tm-group" style="left:67.00%;top:54.55%;width:33.00%;height:45.45%" aria-hidden="true"></span>
+          <a class="tm-tile tm-head tm-c4" href="custodial-accounts.html" style="left:67.22%;top:55.21%;width:32.56%;height:9.33%" title="Cash: 15%, $35,139.73" aria-label="Cash: 15%, $35,139.73"><span class="tm-inner"><span class="tm-label">Cash</span><span class="tm-pct">15%</span><span class="tm-value">$35,139.73</span></span></a>
+          <a class="tm-tile tm-c4" href="custodial-accounts.html" style="left:67.22%;top:64.55%;width:27.84%;height:34.79%" title="Cash › Cash: 13%, $30,044.75" aria-label="Cash › Cash: 13%, $30,044.75"><span class="tm-inner"><span class="tm-label">Cash</span><span class="tm-pct">13%</span><span class="tm-value">$30,044.75</span></span></a>
+          <a class="tm-tile tm-c4" href="custodial-accounts.html" style="left:95.06%;top:64.55%;width:4.72%;height:34.79%" title="Cash › Money market: 2%, $5,094.98" aria-label="Cash › Money market: 2%, $5,094.98"><span class="tm-inner"><span class="tm-label">Money market</span><span class="tm-pct">2%</span><span class="tm-value">$5,094.98</span></span></a>
+      </div>
+      <p class="tm-note">Area is each class's share of market value, divided among its sub-categories. Too small to label: <a href="custodial-accounts.html">Emerging</a> 4%, $9,370.59; <a href="custodial-accounts.html">Municipal</a> 3%, $7,027.94; <a href="custodial-accounts.html">Money market</a> 2%, $5,094.98. Every figure and its target are in the card below.</p>
+    </div>
     <div class="card">
       <div class="card-head">
         <span class="card-title">Actual vs. target, by asset class</span>
-        <span class="alloc-legend"><span><span style="width:16px;height:8px;border-radius:999px;background:var(--muted-foreground);display:inline-block;"></span>Actual</span><span><span style="width:2px;height:12px;background:var(--foreground);display:inline-block;"></span>Target</span></span>
+        <span class="alloc-head-actions">
+          <span class="alloc-legend"><span><span style="width:16px;height:8px;border-radius:999px;background:var(--muted-foreground);display:inline-block;"></span>Actual</span><span><span style="width:2px;height:12px;background:var(--foreground);display:inline-block;"></span>Target</span></span>
+          <button class="icon-btn" type="button" aria-label="Edit target allocation" title="Edit target allocation" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-target-editor"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg></span></button>
+        </span>
       </div>
         <div class="alloc-row">
           <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="true" aria-controls="chart-us-equity" aria-label="Hide US Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--cat-1);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind US Equity">US Equity</a></span>
@@ -101,9 +131,16 @@
           <span class="badge badge-positive-soft">On target</span>
         </div>
     </div>
-    <div class="card">
-      <div class="card-title">Target allocation</div>
-      <p class="card-sub" style="margin:4px 0 8px;">Percent of the whole portfolio. Open a class to set its sub-category targets.</p>
+    <!-- ============ Target editor popover, open (reference) ============
+         Anchored to the gear on the Actual vs. target card in product,
+         right edges aligned, opening below it. Non-modal, so the bars stay
+         readable; the body scrolls and the footer stays. -->
+    <div class="alloc-editor-ref">
+      <div class="eyebrow" style="margin-bottom:8px;">Target editor popover — open</div>
+      <div class="je-popover alloc-editor" id="alloc-target-editor" role="dialog" aria-labelledby="alloc-editor-title">
+        <div class="je-popover-head"><span class="card-title" id="alloc-editor-title">Target allocation</span></div>
+        <div class="je-popover-body">
+          <p class="card-sub">Percent of the whole portfolio. Open a class to set its sub-category targets.</p>
         <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-us-equity" aria-label="Show US Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>US Equity</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 40%</span><input class="input input-pct" type="text" value="40" aria-label="US Equity target percent">%</span></div>
         <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-intl-equity" aria-label="Show Intl Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>Intl Equity</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 20%</span><input class="input input-pct" type="text" value="20" aria-label="Intl Equity target percent">%</span></div>
         <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="true" aria-controls="target-fixed-income" aria-label="Hide Fixed Income sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>Fixed Income</span><span class="kv-value"><span class="badge badge-outline">2 pt unassigned</span><input class="input input-pct" type="text" value="25" aria-label="Fixed Income target percent">%</span></div>
@@ -113,7 +150,13 @@
           <div class="kv-row alloc-sub-target"><span>Municipal</span><span class="kv-value"><input class="input input-pct" type="text" value="3" aria-label="Fixed Income, Municipal target percent">%</span></div>
         </div>
         <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-cash" aria-label="Show Cash sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>Cash</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 15%</span><input class="input input-pct" type="text" value="15" aria-label="Cash target percent">%</span></div>
-      <div class="alloc-total"><span class="card-sub">Save turns on when the classes total 100% and every class's sub-targets sum to it.</span><span>Total</span><span class="badge badge-positive-soft">100%</span><button class="btn btn-default" disabled>Save target</button></div>
+        </div>
+        <div class="je-popover-foot spread alloc-editor-foot">
+          <span class="card-sub alloc-editor-hint">Save turns on when the classes total 100% and every class's sub-targets sum to it.</span>
+          <span class="alloc-editor-total"><span>Total</span><span class="badge badge-positive-soft">100%</span></span>
+          <span class="alloc-editor-actions"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button" disabled>Save target</button></span>
+        </div>
+      </div>
     </div>
   </main>
   </div>
