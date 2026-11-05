@@ -645,8 +645,43 @@ h1, h2, h3, .heading {
   margin: 10px 0 4px;
 }
 .correction-trail .trail-label:first-child { margin-top: 0; }
-.correction-trail .trail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
+.correction-trail .trail-row { display: flex; align-items: baseline; gap: 8px; font-size: 13px; padding: 2px 0; }
+.correction-trail .trail-row > .acct-path { flex: 1; min-width: 0; }
 .correction-trail .trail-row.struck { text-decoration: line-through; color: var(--muted-foreground); opacity: 0.75; }
+.correction-trail .trail-row > span:last-child { flex-shrink: 0; margin-left: 4px; white-space: nowrap; }
+
+/* ---------- Account path (a journal-entry leg's account) ----------
+   Every leg names its account root to leaf: muted ancestors and separators,
+   the leaf in the row's own ink so it reads first (and inherits a struck or
+   locked row's treatment). The separator is the breadcrumb's chevron-right.
+   Below 320px of row width the middle segments collapse to an ellipsis,
+   keeping root and leaf; they stay readable to assistive tech, and the
+   title carries the full path. */
+.trail-row, .leg-row, .split-row { container: acct-row / inline-size; }
+.acct-seg, .acct-sep, .acct-more { color: var(--muted-foreground); }
+.acct-sep { display: inline-block; margin: 0 2px; }
+.acct-sep svg { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; }
+.acct-more { display: none; }
+@container acct-row (max-width: 319px) {
+  .acct-mid { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .acct-more { display: inline; }
+}
+
+/* ---------- Leg side (a journal-entry leg's debit or credit) ----------
+   Its own fixed column before the account path, so every path in a block
+   starts at the same x and the side never reads as part of the path. An
+   <abbr> carries the full word for hover and assistive tech. */
+.leg-side {
+  flex: none;
+  display: inline-block;
+  width: 2.5ch;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+.leg-side-select { font-family: var(--font-mono); font-size: 11px; font-weight: 500; }
 
 /* ---------- Transactions' tab panels ---------- */
 .txn-body { padding: 8px 24px 20px; }
@@ -668,7 +703,10 @@ h1, h2, h3, .heading {
 .pending-summary .pending-checkbox { margin-right: 10px; }
 .pending-expand { background: var(--muted); border-top: 1px solid var(--border); padding: 16px; }
 .leg-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; font-size: 13px; font-family: var(--font-mono); }
-.leg-row .leg-label { font-family: var(--font-sans); }
+.leg-row .leg-label { display: flex; align-items: center; gap: 8px; min-width: 0; font-family: var(--font-sans); }
+.leg-row:not(.leg-locked) .leg-label { padding-left: 22px; } /* clears the locked row's icon, so the columns line up */
+.leg-row .leg-label > .icon { flex: 0 0 14px; }
+.leg-line { flex: none; width: 56px; }
 .leg-locked { color: var(--muted-foreground); }
 .leg-locked .lock-icon { margin-right: 4px; }
 .pending-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
@@ -676,11 +714,11 @@ h1, h2, h3, .heading {
 
 /* ---------- Split grid (Flow A — splitting a single transaction) ---------- */
 .split-grid { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px; background: var(--card); margin-top: 8px; }
-.split-row { display: grid; grid-template-columns: 90px 90px 1fr 110px; gap: 8px; align-items: center; padding: 4px 0; font-size: 13px; }
-/* Journal-entry modal's own leg rows: Dr/Cr select, account select (gets
+.split-row { display: grid; grid-template-columns: 90px max-content 1fr 110px; gap: 8px; align-items: center; padding: 4px 0; font-size: 13px; }
+/* Journal-entry modal's own leg rows: side select, account select (gets
    the room), amount — a different shape from the locked-leg split rows
    above (those reserve a column for the lock icon/label). */
-.split-row.je-leg { grid-template-columns: 100px 1fr 120px; }
+.split-row.je-leg { grid-template-columns: 76px 1fr 120px; }
 .split-total { text-align: right; font-size: 12px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); }
 .split-total.balanced { color: var(--positive); }
 .split-total.unbalanced { color: var(--destructive); }
