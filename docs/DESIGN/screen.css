@@ -647,6 +647,24 @@ h1, h2, h3, .heading {
 .correction-trail .trail-label:first-child { margin-top: 0; }
 .correction-trail .trail-row { display: flex; justify-content: space-between; font-size: 13px; padding: 2px 0; }
 .correction-trail .trail-row.struck { text-decoration: line-through; color: var(--muted-foreground); opacity: 0.75; }
+.correction-trail .trail-row > span:last-child { flex-shrink: 0; margin-left: 12px; white-space: nowrap; }
+
+/* ---------- Account path (a journal-entry leg's account) ----------
+   Every leg names its account root to leaf: muted ancestors and separators,
+   the leaf in the row's own ink so it reads first (and inherits a struck or
+   locked row's treatment). The separator is the breadcrumb's chevron-right.
+   Below 320px of row width the middle segments collapse to an ellipsis,
+   keeping root and leaf; they stay readable to assistive tech, and the
+   title carries the full path. */
+.trail-row, .leg-row, .split-row { container: acct-row / inline-size; }
+.acct-seg, .acct-sep, .acct-more { color: var(--muted-foreground); }
+.acct-sep { display: inline-block; margin: 0 2px; }
+.acct-sep svg { display: inline-block; width: 12px; height: 12px; vertical-align: -2px; }
+.acct-more { display: none; }
+@container acct-row (max-width: 319px) {
+  .acct-mid { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .acct-more { display: inline; }
+}
 
 /* ---------- Transactions' tab panels ---------- */
 .txn-body { padding: 8px 24px 20px; }
