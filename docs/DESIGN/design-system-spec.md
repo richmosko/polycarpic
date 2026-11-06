@@ -553,7 +553,7 @@ A nested treemap of the chart of accounts, prototyped on the Balance sheet map t
 |---|---|---|
 | **Market value · EOD** | Cash plus every position at the last end-of-day price | Lots × daily EOD price feed |
 | **Book value · GL** | Cost basis of everything in the account, cash included — the GL's own balance for the mirrored account | General Ledger (lots at cost) |
-| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | The GL's cash balance; when the custodian reports a different figure, the reconciliation details show it |
+| **Cash** | The account's cash balance (a brokerage's sweep cash; the whole balance of a bank account) | The GL's cash balance; when the custodian reports a different figure, the card's details show it |
 | **Unrealized** | Unrealized gain or loss, signed and coloured per § Delta coloring | Derived |
 
 A cash-only account shows the same row with the three figures equal and a `$0.00` delta: the row keeps one shape on every card, so accounts scan as a column. A **totals card** above the account cards sums the same four figures across every custodial asset account for the entity, with the price date ("prices as of <date> close"). Unrealized on an account equals its lots sub-card's total unrealized gain; the two figures must agree.
@@ -562,7 +562,7 @@ A cash-only account shows the same row with the three figures equal and a `$0.00
 
 **A credit card is a liability.** Its card keeps the row's shape: market value and book value both show what is owed, as a negative in plain ink (`−$1,204.00`, not a loss, so no `--destructive`); cash and Unrealized show a dash, because neither applies. In a group header the negative nets into market and book value, and cash stays the cash of the group's asset accounts. The totals card sums asset accounts only, which is the figure Allocation reads, and a line under it states what is owed on credit cards and the net.
 
-**Per-account card:** a chevron and the account and institution names on the left; two badges on the right, in a fixed order; the three-figure row below. The first badge is link health, the second reconciliation against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.5). Link health comes first because a reconciliation is only as current as the link behind it. A card rests collapsed to its header and figures, so status reads at a glance and costs one row. The chevron (the `.alloc-disclosure` idiom, a `Collapsible`) opens the **reconciliation details**: the custodian's figure against the GL, in words, and the link to any staged drafts. Each card opens on its own. The lots sub-card stays its own `Collapsible` outside those details, visible on a collapsed card: lots answer what is held, reconciliation whether the balances agree. A difference explained exactly by the account's staged drafts is a **known unposted delta**, not a break: the header carries a muted `Known delta` badge (clock icon, `--muted` fill, no status hue) naming the draft count and amount and linking to those drafts in Pending on Transactions, and the details show the custodian's figure and the same link.
+**Per-account card:** a chevron and the account and institution names on the left; two badges on the right, in a fixed order; the three-figure row below. The first badge is link health, the second reconciliation against the GL (clean / stale / break, per the status tiers — the danger tier surfaces on the Dashboard too, per flow 5.5). Link health comes first because a reconciliation is only as current as the link behind it. A card rests collapsed to its header and figures, so status reads at a glance and costs one row. The chevron (the `.alloc-disclosure` idiom, a `Collapsible`) opens the card's **details**: first reconciliation, the custodian's figure against the GL in words and the link to any staged drafts; then, on an account that holds securities, the lots sub-card with its pull-down per security. Each card opens on its own. A drill to lots, from Allocation for one, arrives with that account's card open. A difference explained exactly by the account's staged drafts is a **known unposted delta**, not a break: the header carries a muted `Known delta` badge (clock icon, `--muted` fill, no status hue) naming the draft count and amount and linking to those drafts in Pending on Transactions, and the details show the custodian's figure and the same link.
 
 **The lots sub-card (only on accounts that hold securities):**
 - One row per security, collapsed by default — a pull-down (chevron) reveals its individual lots.
@@ -581,7 +581,7 @@ A cash-only account shows the same row with the three figures equal and a `$0.00
 
 **Permissions:** New provider item, token refresh, unlink, and Sync/Import file are Manager/Owner actions — a Viewer sees none of them (same posture as Transactions' posting actions, ARCH §2.4 permissions table).
 
-See `styled-screens/custodial-accounts.html`: the lots sub-card shows one security pulled down, and the provider-item dialog is shown open below the cards as the reference.
+See `styled-screens/custodial-accounts.html`: two cards are open, Primary Checking for reconciliation and Brokerage for its lots sub-card with one security pulled down, and the provider-item dialog is shown open below the cards as the reference.
 
 ---
 
@@ -756,7 +756,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Potential-duplicate warning (New entry modal, Pending row) | Caution-tier inline block + **Button**s | Names the matched transaction above the modal's actions, or the matched manual entry on a Pending row; the row badge is `outline` in muted ink |
 | Chart-of-accounts tree | `custom` | No shadcn tree component; built from nested disclosure rows (could adopt a community tree primitive later if one matures) |
 | Lots sub-card pull-down | **Collapsible** | Direct reuse — a simpler primitive than Accordion for a single expand/collapse row |
-| Custodial card reconciliation details | **Collapsible** | Each card opens independently, so not an Accordion |
+| Custodial card details | **Collapsible** | Each card opens independently, so not an Accordion |
 | Settings on/off preferences | **Switch** | Direct reuse |
 | Settings theme picker (Light / Dark / Auto) | **Toggle Group** (single) | Rendered with the `.tabs` look; semantically a radio group, not tabs |
 | Brand app bar (Home, Get started, Admin) | `custom`, with **Button** / **Badge** / **Avatar** for the trailing items | One component for every shell-less page: a fixed bar with a lockup, trailing items and a fade; too small and too brand-specific to be a block. No sidebar because no entity exists (setup), none applies (operator), or the visitor is not signed in (Home) |
@@ -789,7 +789,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Transactions | `transactions.html` | sidebar | "more" menu, tabs with count badges, expanded Pending row, split grid, bulk bar, journal-entry modal |
 | General Ledger | `general-ledger.html` | sidebar | three tabs, expanded Journal entries row, date range popover |
 | Account register | `account-register.html` | sidebar (multi-crumb) | expanded register line |
-| Custodial Accounts | `custodial-accounts.html` | sidebar | group-by toggle (Institution on, Account type headers as a reference), reconciliation details (Primary Checking open, the rest collapsed), lots sub-card (AAPL pulled down), provider-item dialog |
+| Custodial Accounts | `custodial-accounts.html` | sidebar | group-by toggle (Institution on, Account type headers as a reference), card details (Primary Checking and Brokerage open, the rest collapsed), lots sub-card (AAPL pulled down), provider-item dialog |
 | Allocation | `allocation.html` | sidebar | target editor popover (open, as a reference below the card) |
 | Tax | `tax.html` | sidebar | Federal tab, danger tier (Q3 installment $200 short) |
 | Reports | `reports.html` | sidebar | dimmed statement previews (review only, not shipped) |

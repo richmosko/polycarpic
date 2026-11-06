@@ -1475,9 +1475,11 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .custodial-group-figs .mono { font-variant-numeric: tabular-nums; font-weight: 600; }
 .custodial-group-ref { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border); }
 .custodial-group-ref .custodial-group-head { margin: 12px 0 0; }
-.custodial-recon { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border); }
-.custodial-recon[hidden] { display: none; }
-.custodial-recon .je-link { font-size: 13px; }
+.custodial-details { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border); }
+.custodial-details[hidden] { display: none; }
+.custodial-details .je-link { font-size: 13px; }
+.custodial-details > .kv-row { border-bottom: none; }
+.custodial-details > .lots { margin-top: 4px; }
 .lots { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); overflow: hidden; }
 .lots-head { padding: 12px 16px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 12px; }
 .lot-security { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 13px; background: var(--card); cursor: pointer; }
