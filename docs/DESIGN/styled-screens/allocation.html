@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Allocation. Actual vs. target by asset class, aggregated from the same lot data as Custodial Accounts' lots sub-card across every custodial account for this entity. No nominal / inflation-adjusted toggle: allocation is a snapshot of today's holdings, so a CPI-U restatement adds nothing. Drift uses a neutral outline badge, not a status hue: a 2-point drift is information, not a warning. Every class row has a chevron pull-down to its sub-categories (the lots sub-card's disclosure pattern): in the chart (US Equity shown open) each sub-category gets its own actual / target and drift badge; in the target editor (Fixed Income shown open, 2 pt unassigned) sub-targets are whole-portfolio percent and must sum to the class target. Save is enabled only when the classes total 100% and every class's sub-targets reconcile. Each class or sub-category name drills to the lots behind it on Custodial Accounts, filtered to it. Sub-category taxonomy in the mock is the seeded default. -->
+<!-- Allocation. Two cards, one aggregation: both read the same lot data as Custodial Accounts' lots sub-card, across every custodial account for this entity. The hierarchy is tier (Current / Non-Current), class, sub-category. Tier is a label, never a colour. Marketable Securities are Non-Current because a personal or trust entity holds them over 12 months for long-term capital-gains treatment. Current allocation comes first, as a nested treemap (the General Ledger balance-sheet map's idiom): the two tiers are captioned columns sized to their share, each class one tile in its fixed categorical slot with its sub-categories inside it in the same slot, area = share of market value, so the shape of today's holdings reads before any comparison. Actual vs. target comes second and is the treemap's table view, with the tiers as group headers: every class row has a chevron pull-down to its sub-categories (the lots sub-card's disclosure pattern; Marketable Securities shown open), each with its own actual / target and drift badge. Drift uses a neutral outline badge, not a status hue: a 2-point drift is information, not a warning. The gear at that card's top right opens the target editor in a popover anchored to it, non-modal so the bars stay readable while targets change; it is shown open as a reference below the card, with Fixed Income Securities open at 2 pt unassigned. Sub-targets are whole-portfolio percent and must sum to the class target; Save is enabled only when the classes total 100% and every class's sub-targets reconcile. Viewers get no gear. Each tile, class or sub-category name opens a read-only holdings popover in place, because a class spans accounts and no single Custodial card can show it: the holdings behind that figure, grouped by custodial account, with the lots pull-downs of the Custodial card, an aggregate total and one link to Custodial Accounts. It is shown open as a reference for Cash, which spans three accounts. No nominal / inflation-adjusted toggle: allocation is a snapshot of today's holdings, so a CPI-U restatement adds nothing. The taxonomy in the mock is the seeded default. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -57,63 +57,170 @@
     </div>
 
   <main class="content" style="padding-top:8px;">
+    <div class="card tm-card" aria-labelledby="alloc-map-title">
+      <div class="card-head">
+        <span class="card-title" id="alloc-map-title">Current allocation</span>
+        <span class="alloc-legend" aria-hidden="true"><span><span class="tm-swatch tm-c1"></span>Cash &amp; Cash Equivalents</span><span><span class="tm-swatch tm-c2"></span>Fixed Income Securities</span><span><span class="tm-swatch tm-c3"></span>Marketable Securities</span><span><span class="tm-swatch tm-c4"></span>Alternative Investment Assets</span></span>
+      </div>
+      <p class="card-sub alloc-map-sub"><span class="mono">$234,264.85</span> market value across every custodial account · prices as of Oct 30 close</p>
+      <div class="tm-tiers" style="grid-template-columns:35140fr 199125fr" aria-hidden="true">
+        <span><span class="eyebrow">Current</span> <span class="mono">15%</span></span>
+        <span><span class="eyebrow">Non-Current</span> <span class="mono">85%</span> <span class="mono">$199,125.12</span></span>
+      </div>
+      <div class="tm-map tm-map-alloc" role="group" aria-label="Current allocation treemap. Current: Cash &amp; Cash Equivalents 15%. Non-Current: Marketable Securities 56%, Fixed Income Securities 25%, Alternative Investment Assets 4%.">
+          <span class="tm-group" style="left:0.00%;top:0.00%;width:14.87%;height:100.00%" aria-hidden="true"></span>
+          <button class="tm-tile tm-head tm-head-2 tm-c1" type="button" style="left:0.22%;top:0.67%;width:14.42%;height:14.67%" title="Current › Cash &amp; Cash Equivalents: 15%, $35,139.73" aria-label="Current › Cash &amp; Cash Equivalents: 15%, $35,139.73" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Cash &amp; Cash Equivalents</span><span class="tm-pct">15%</span><span class="tm-value">$35,139.73</span></span></button>
+          <button class="tm-tile tm-c1" type="button" style="left:0.22%;top:15.33%;width:14.42%;height:71.82%" title="Current › Cash &amp; Cash Equivalents › Cash: 13%, $30,044.75" aria-label="Current › Cash &amp; Cash Equivalents › Cash: 13%, $30,044.75" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Cash</span><span class="tm-pct">13%</span><span class="tm-value">$30,044.75</span></span></button>
+          <button class="tm-tile tm-c1" type="button" style="left:0.22%;top:87.15%;width:14.42%;height:12.18%" title="Current › Cash &amp; Cash Equivalents › Money market: 2%, $5,094.98" aria-label="Current › Cash &amp; Cash Equivalents › Money market: 2%, $5,094.98" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Money market</span><span class="tm-pct">2%</span><span class="tm-value">$5,094.98</span></span></button>
+          <span class="tm-group" style="left:15.76%;top:0.00%;width:55.90%;height:100.00%" aria-hidden="true"></span>
+          <button class="tm-tile tm-head tm-c3" type="button" style="left:15.98%;top:0.67%;width:55.46%;height:9.33%" title="Non-Current › Marketable Securities: 56%, $132,138.81" aria-label="Non-Current › Marketable Securities: 56%, $132,138.81" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Marketable Securities</span><span class="tm-pct">56%</span><span class="tm-value">$132,138.81</span></span></button>
+          <button class="tm-tile tm-c3" type="button" style="left:15.98%;top:10.00%;width:30.48%;height:89.33%" title="Non-Current › Marketable Securities › US Large cap: 31%, $72,622.10" aria-label="Non-Current › Marketable Securities › US Large cap: 31%, $72,622.10" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">US Large cap</span><span class="tm-pct">31%</span><span class="tm-value">$72,622.10</span></span></button>
+          <button class="tm-tile tm-c3" type="button" style="left:46.46%;top:10.00%;width:24.98%;height:45.71%" title="Non-Current › Marketable Securities › Intl Developed: 13%, $30,454.43" aria-label="Non-Current › Marketable Securities › Intl Developed: 13%, $30,454.43" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Intl Developed</span><span class="tm-pct">13%</span><span class="tm-value">$30,454.43</span></span></button>
+          <button class="tm-tile tm-c3" type="button" style="left:46.46%;top:55.71%;width:16.11%;height:43.62%" title="Non-Current › Marketable Securities › US Mid/Small cap: 8%, $18,741.19" aria-label="Non-Current › Marketable Securities › US Mid/Small cap: 8%, $18,741.19" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">US Mid/Small cap</span><span class="tm-pct">8%</span><span class="tm-value">$18,741.19</span></span></button>
+          <button class="tm-tile tm-c3" type="button" style="left:62.57%;top:55.71%;width:8.87%;height:43.62%" title="Non-Current › Marketable Securities › Intl Emerging: 4%, $10,321.09" aria-label="Non-Current › Marketable Securities › Intl Emerging: 4%, $10,321.09" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Intl Emerging</span><span class="tm-pct">4%</span><span class="tm-value">$10,321.09</span></span></button>
+          <span class="tm-group" style="left:71.66%;top:0.00%;width:28.34%;height:87.43%" aria-hidden="true"></span>
+          <button class="tm-tile tm-head tm-c2" type="button" style="left:71.88%;top:0.67%;width:27.90%;height:9.33%" title="Non-Current › Fixed Income Securities: 25%, $58,566.21" aria-label="Non-Current › Fixed Income Securities: 25%, $58,566.21" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Fixed Income Securities</span><span class="tm-pct">25%</span><span class="tm-value">$58,566.21</span></span></button>
+          <button class="tm-tile tm-c2" type="button" style="left:71.88%;top:10.00%;width:14.51%;height:76.76%" title="Non-Current › Fixed Income Securities › Treasuries: 13%, $30,454.43" aria-label="Non-Current › Fixed Income Securities › Treasuries: 13%, $30,454.43" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Treasuries</span><span class="tm-pct">13%</span><span class="tm-value">$30,454.43</span></span></button>
+          <button class="tm-tile tm-c2" type="button" style="left:86.39%;top:10.00%;width:13.39%;height:57.57%" title="Non-Current › Fixed Income Securities › Corporate: 9%, $21,083.84" aria-label="Non-Current › Fixed Income Securities › Corporate: 9%, $21,083.84" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Corporate</span><span class="tm-pct">9%</span><span class="tm-value">$21,083.84</span></span></button>
+          <button class="tm-tile tm-c2" type="button" style="left:86.39%;top:67.57%;width:13.39%;height:19.19%" title="Non-Current › Fixed Income Securities › Municipal: 3%, $7,027.94" aria-label="Non-Current › Fixed Income Securities › Municipal: 3%, $7,027.94" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Municipal</span><span class="tm-pct">3%</span><span class="tm-value">$7,027.94</span></span></button>
+          <span class="tm-group" style="left:71.66%;top:87.43%;width:28.34%;height:12.57%" aria-hidden="true"></span>
+          <button class="tm-tile tm-head tm-c4" type="button" style="left:71.88%;top:88.10%;width:27.90%;height:11.24%" title="Non-Current › Alternative Investment Assets › Digital Assets: 4%, $8,420.10" aria-label="Non-Current › Alternative Investment Assets › Digital Assets: 4%, $8,420.10" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings"><span class="tm-inner"><span class="tm-label">Alternative Investment Assets</span><span class="tm-pct">4%</span><span class="tm-value">$8,420.10</span></span></button>
+      </div>
+      <p class="tm-note">Area is each class's share of market value, divided among its sub-categories. Too small to label: <button class="je-link" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings">Digital Assets</button> 4%, $8,420.10. Every percent and its target are in the card below.</p>
+    </div>
     <div class="card">
       <div class="card-head">
         <span class="card-title">Actual vs. target, by asset class</span>
-        <span class="alloc-legend"><span><span style="width:16px;height:8px;border-radius:999px;background:var(--muted-foreground);display:inline-block;"></span>Actual</span><span><span style="width:2px;height:12px;background:var(--foreground);display:inline-block;"></span>Target</span></span>
+        <span class="alloc-head-actions">
+          <span class="alloc-legend"><span><span style="width:16px;height:8px;border-radius:999px;background:var(--muted-foreground);display:inline-block;"></span>Actual</span><span><span style="width:2px;height:12px;background:var(--foreground);display:inline-block;"></span>Target</span></span>
+          <button class="icon-btn" type="button" aria-label="Edit target allocation" title="Edit target allocation" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-target-editor"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg></span></button>
+        </span>
       </div>
-        <div class="alloc-row">
-          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="true" aria-controls="chart-us-equity" aria-label="Hide US Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--cat-1);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind US Equity">US Equity</a></span>
-          <div class="alloc-track" role="img" aria-label="US Equity: actual 42%, target 40%"><span class="alloc-fill" style="width:42%; background:var(--cat-1);"></span><span class="alloc-target" style="left:40%;"></span></div>
-          <span class="alloc-figs">42% / 40%</span>
-          <span class="badge badge-outline">+2 pt over</span>
-        </div>
-        <div class="alloc-sub-group" id="chart-us-equity" role="group" aria-label="US Equity sub-categories">
-        <div class="alloc-row alloc-sub">
-          <span class="alloc-name"><a href="custodial-accounts.html" title="See the lots behind Large cap">Large cap</a></span>
-          <div class="alloc-track" role="img" aria-label="Large cap: actual 33%, target 30%"><span class="alloc-fill" style="width:33%; background:var(--cat-1);"></span><span class="alloc-target" style="left:30%;"></span></div>
-          <span class="alloc-figs">33% / 30%</span>
-          <span class="badge badge-outline">+3 pt over</span>
-        </div>
-        <div class="alloc-row alloc-sub">
-          <span class="alloc-name"><a href="custodial-accounts.html" title="See the lots behind Mid/Small cap">Mid/Small cap</a></span>
-          <div class="alloc-track" role="img" aria-label="Mid/Small cap: actual 9%, target 10%"><span class="alloc-fill" style="width:9%; background:var(--cat-1);"></span><span class="alloc-target" style="left:10%;"></span></div>
-          <span class="alloc-figs">9% / 10%</span>
-          <span class="badge badge-outline">−1 pt under</span>
-        </div>
+        <div class="alloc-row alloc-tier" role="heading" aria-level="3">
+          <span class="eyebrow">Current</span><span></span><span class="alloc-figs">15% / 15%</span><span></span>
         </div>
         <div class="alloc-row">
-          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="chart-intl-equity" aria-label="Show Intl Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--cat-2);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Intl Equity">Intl Equity</a></span>
-          <div class="alloc-track" role="img" aria-label="Intl Equity: actual 18%, target 20%"><span class="alloc-fill" style="width:18%; background:var(--cat-2);"></span><span class="alloc-target" style="left:20%;"></span></div>
-          <span class="alloc-figs">18% / 20%</span>
-          <span class="badge badge-outline">−2 pt under</span>
+          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="chart-cash" aria-label="Show Cash &amp; Cash Equivalents sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--cat-1);display:inline-block;"></span><button class="alloc-name-btn" type="button" title="See the holdings behind Cash &amp; Cash Equivalents" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings">Cash &amp; Cash Equivalents</button></span>
+          <div class="alloc-track" role="img" aria-label="Cash &amp; Cash Equivalents: actual 15%, target 15%"><span class="alloc-fill" style="width:15%; background:var(--cat-1);"></span><span class="alloc-target" style="left:15%;"></span></div>
+          <span class="alloc-figs">15% / 15%</span>
+          <span class="badge badge-positive-soft">On target</span>
+        </div>
+        <div class="alloc-row alloc-tier" role="heading" aria-level="3">
+          <span class="eyebrow">Non-Current</span><span></span><span class="alloc-figs">85% / 85%</span><span></span>
         </div>
         <div class="alloc-row">
-          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="chart-fixed-income" aria-label="Show Fixed Income sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--cat-3);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Fixed Income">Fixed Income</a></span>
-          <div class="alloc-track" role="img" aria-label="Fixed Income: actual 25%, target 25%"><span class="alloc-fill" style="width:25%; background:var(--cat-3);"></span><span class="alloc-target" style="left:25%;"></span></div>
+          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="chart-fixed-income" aria-label="Show Fixed Income Securities sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--cat-2);display:inline-block;"></span><button class="alloc-name-btn" type="button" title="See the holdings behind Fixed Income Securities" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings">Fixed Income Securities</button></span>
+          <div class="alloc-track" role="img" aria-label="Fixed Income Securities: actual 25%, target 25%"><span class="alloc-fill" style="width:25%; background:var(--cat-2);"></span><span class="alloc-target" style="left:25%;"></span></div>
           <span class="alloc-figs">25% / 25%</span>
           <span class="badge badge-positive-soft">On target</span>
         </div>
         <div class="alloc-row">
-          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="chart-cash" aria-label="Show Cash sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--cat-4);display:inline-block;"></span><a href="custodial-accounts.html" title="See the lots behind Cash">Cash</a></span>
-          <div class="alloc-track" role="img" aria-label="Cash: actual 15%, target 15%"><span class="alloc-fill" style="width:15%; background:var(--cat-4);"></span><span class="alloc-target" style="left:15%;"></span></div>
-          <span class="alloc-figs">15% / 15%</span>
+          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="true" aria-controls="chart-marketable" aria-label="Hide Marketable Securities sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--cat-3);display:inline-block;"></span><button class="alloc-name-btn" type="button" title="See the holdings behind Marketable Securities" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings">Marketable Securities</button></span>
+          <div class="alloc-track" role="img" aria-label="Marketable Securities: actual 56%, target 55%"><span class="alloc-fill" style="width:56%; background:var(--cat-3);"></span><span class="alloc-target" style="left:55%;"></span></div>
+          <span class="alloc-figs">56% / 55%</span>
+          <span class="badge badge-outline">+1 pt over</span>
+        </div>
+        <div class="alloc-sub-group" id="chart-marketable" role="group" aria-label="Marketable Securities sub-categories">
+        <div class="alloc-row alloc-sub">
+          <span class="alloc-name"><button class="alloc-name-btn" type="button" title="See the holdings behind US Large cap" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings">US Large cap</button></span>
+          <div class="alloc-track" role="img" aria-label="US Large cap: actual 31%, target 28%"><span class="alloc-fill" style="width:31%; background:var(--cat-3);"></span><span class="alloc-target" style="left:28%;"></span></div>
+          <span class="alloc-figs">31% / 28%</span>
+          <span class="badge badge-outline">+3 pt over</span>
+        </div>
+        <div class="alloc-row alloc-sub">
+          <span class="alloc-name"><button class="alloc-name-btn" type="button" title="See the holdings behind US Mid/Small cap" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings">US Mid/Small cap</button></span>
+          <div class="alloc-track" role="img" aria-label="US Mid/Small cap: actual 8%, target 9%"><span class="alloc-fill" style="width:8%; background:var(--cat-3);"></span><span class="alloc-target" style="left:9%;"></span></div>
+          <span class="alloc-figs">8% / 9%</span>
+          <span class="badge badge-outline">−1 pt under</span>
+        </div>
+        <div class="alloc-row alloc-sub">
+          <span class="alloc-name"><button class="alloc-name-btn" type="button" title="See the holdings behind Intl Developed" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings">Intl Developed</button></span>
+          <div class="alloc-track" role="img" aria-label="Intl Developed: actual 13%, target 14%"><span class="alloc-fill" style="width:13%; background:var(--cat-3);"></span><span class="alloc-target" style="left:14%;"></span></div>
+          <span class="alloc-figs">13% / 14%</span>
+          <span class="badge badge-outline">−1 pt under</span>
+        </div>
+        <div class="alloc-row alloc-sub">
+          <span class="alloc-name"><button class="alloc-name-btn" type="button" title="See the holdings behind Intl Emerging" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings">Intl Emerging</button></span>
+          <div class="alloc-track" role="img" aria-label="Intl Emerging: actual 4%, target 4%"><span class="alloc-fill" style="width:4%; background:var(--cat-3);"></span><span class="alloc-target" style="left:4%;"></span></div>
+          <span class="alloc-figs">4% / 4%</span>
           <span class="badge badge-positive-soft">On target</span>
         </div>
-    </div>
-    <div class="card">
-      <div class="card-title">Target allocation</div>
-      <p class="card-sub" style="margin:4px 0 8px;">Percent of the whole portfolio. Open a class to set its sub-category targets.</p>
-        <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-us-equity" aria-label="Show US Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>US Equity</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 40%</span><input class="input input-pct" type="text" value="40" aria-label="US Equity target percent">%</span></div>
-        <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-intl-equity" aria-label="Show Intl Equity sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>Intl Equity</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 20%</span><input class="input input-pct" type="text" value="20" aria-label="Intl Equity target percent">%</span></div>
-        <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="true" aria-controls="target-fixed-income" aria-label="Hide Fixed Income sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>Fixed Income</span><span class="kv-value"><span class="badge badge-outline">2 pt unassigned</span><input class="input input-pct" type="text" value="25" aria-label="Fixed Income target percent">%</span></div>
-        <div class="alloc-sub-group" id="target-fixed-income" role="group" aria-label="Fixed Income sub-targets">
-          <div class="kv-row alloc-sub-target"><span>Treasuries</span><span class="kv-value"><input class="input input-pct" type="text" value="12" aria-label="Fixed Income, Treasuries target percent">%</span></div>
-          <div class="kv-row alloc-sub-target"><span>Corporate</span><span class="kv-value"><input class="input input-pct" type="text" value="8" aria-label="Fixed Income, Corporate target percent">%</span></div>
-          <div class="kv-row alloc-sub-target"><span>Municipal</span><span class="kv-value"><input class="input input-pct" type="text" value="3" aria-label="Fixed Income, Municipal target percent">%</span></div>
         </div>
-        <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-cash" aria-label="Show Cash sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>Cash</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 15%</span><input class="input input-pct" type="text" value="15" aria-label="Cash target percent">%</span></div>
-      <div class="alloc-total"><span class="card-sub">Save turns on when the classes total 100% and every class's sub-targets sum to it.</span><span>Total</span><span class="badge badge-positive-soft">100%</span><button class="btn btn-default" disabled>Save target</button></div>
+        <div class="alloc-row">
+          <span class="alloc-name"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="chart-alternatives" aria-label="Show Alternative Investment Assets sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="dot" style="width:8px;height:8px;border-radius:50%;background:var(--cat-4);display:inline-block;"></span><button class="alloc-name-btn" type="button" title="See the holdings behind Alternative Investment Assets" aria-haspopup="dialog" aria-expanded="false" aria-controls="alloc-holdings">Alternative Investment Assets</button></span>
+          <div class="alloc-track" role="img" aria-label="Alternative Investment Assets: actual 4%, target 5%"><span class="alloc-fill" style="width:4%; background:var(--cat-4);"></span><span class="alloc-target" style="left:5%;"></span></div>
+          <span class="alloc-figs">4% / 5%</span>
+          <span class="badge badge-outline">−1 pt under</span>
+        </div>
+    </div>
+    <!-- ============ Holdings popover, open (reference) ============
+         Anchored to the tile or bar-row name it opens from in product.
+         Shown for Cash, which spans three accounts and ties to its tile.
+         Read-only and non-modal: Esc or a click outside closes it. -->
+    <div class="alloc-holdings-ref">
+      <div class="eyebrow" style="margin-bottom:8px;">Holdings popover — open, from the Cash tile</div>
+      <div class="je-popover alloc-editor" id="alloc-holdings" role="dialog" aria-labelledby="alloc-holdings-title">
+        <div class="je-popover-head alloc-holdings-head">
+          <span class="card-title" id="alloc-holdings-title">Cash</span><span class="badge badge-positive-soft">On target</span>
+          <span class="je-popover-meta alloc-holdings-line">Current › Cash &amp; Cash Equivalents › Cash</span>
+          <span class="mono alloc-holdings-line">13% · $30,044.75 · target 13%</span>
+        </div>
+        <div class="je-popover-body">
+          <div class="lots alloc-holding">
+            <div class="lots-head"><span>Primary Checking <span class="card-sub" style="font-weight:400;">Bank Y</span></span><span class="card-sub" style="font-weight:400;">59% of this figure</span></div>
+            <div class="lot-security lot-static"><span class="lot-name">Cash balance</span><span class="lot-figs">mkt $17,634.75 · book $17,634.75 $0.00</span></div>
+          </div>
+          <div class="lots alloc-holding">
+            <div class="lots-head"><span>Brokerage <span class="card-sub" style="font-weight:400;">Custodian X</span></span><span class="card-sub" style="font-weight:400;">28% of this figure</span></div>
+            <div class="lot-security lot-static"><span class="lot-name">Cash balance</span><span class="lot-figs">mkt $8,410.00 · book $8,410.00 $0.00</span></div>
+          </div>
+          <div class="lots alloc-holding">
+            <div class="lots-head"><span>Roth IRA <span class="card-sub" style="font-weight:400;">Custodian X</span></span><span class="card-sub" style="font-weight:400;">13% of this figure</span></div>
+            <div class="lot-security lot-static"><span class="lot-name">Cash balance</span><span class="lot-figs">mkt $4,000.00 · book $4,000.00 $0.00</span></div>
+          </div>
+        </div>
+        <div class="je-popover-foot spread alloc-holdings-foot">
+          <span class="alloc-holdings-total"><span>Total</span><span class="lot-figs">mkt $30,044.75 · book $30,044.75 $0.00</span></span>
+          <a class="je-link" href="custodial-accounts.html">Open Custodial Accounts</a>
+        </div>
+      </div>
+      <div class="eyebrow" style="margin:16px 0 8px;">A holding with securities — lots pull down as on the Custodial card</div>
+      <div class="lots alloc-holding alloc-holding-sample">
+        <div class="lots-head"><span>Brokerage <span class="card-sub" style="font-weight:400;">Custodian X</span></span></div>
+      <div class="lot-security" aria-expanded="true"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>AAPL <span class="card-sub" style="font-weight:400;">75 sh</span></span><span class="lot-figs">mkt $13,350 · book $9,100 <span class="gain-positive">+$4,250</span></span></div>
+      <div class="lot-detail"><span>50 sh · acquired Mar 4, 2021 · long-term</span><span class="lot-figs">mkt $8,900 · book $6,200 <span class="gain-positive">+$2,700</span></span></div>
+      <div class="lot-detail"><span>25 sh · acquired Jan 18, 2026 · short-term</span><span class="lot-figs">mkt $4,450 · book $2,900 <span class="gain-positive">+$1,550</span></span></div>
+      <div class="lot-security" aria-expanded="false"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>VTI <span class="card-sub" style="font-weight:400;">100 sh</span></span><span class="lot-figs">mkt $24,100 · book $22,000 <span class="gain-positive">+$2,100</span></span></div>
+      </div>
+    </div>
+    <!-- ============ Target editor popover, open (reference) ============
+         Anchored to the gear on the Actual vs. target card in product,
+         right edges aligned, opening below it. Non-modal, so the bars stay
+         readable; the body scrolls and the footer stays. -->
+    <div class="alloc-editor-ref">
+      <div class="eyebrow" style="margin-bottom:8px;">Target editor popover — open</div>
+      <div class="je-popover alloc-editor" id="alloc-target-editor" role="dialog" aria-labelledby="alloc-editor-title">
+        <div class="je-popover-head"><span class="card-title" id="alloc-editor-title">Target allocation</span></div>
+        <div class="je-popover-body">
+          <p class="card-sub">Percent of the whole portfolio. Open a class to set its sub-category targets.</p>
+          <div class="alloc-editor-tier" role="heading" aria-level="3"><span class="eyebrow">Current</span><span class="mono">15%</span></div>
+          <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-cash" aria-label="Show Cash &amp; Cash Equivalents sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>Cash &amp; Cash Equivalents</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 15%</span><input class="input input-pct" type="text" value="15" aria-label="Cash &amp; Cash Equivalents target percent">%</span></div>
+          <div class="alloc-editor-tier" role="heading" aria-level="3"><span class="eyebrow">Non-Current</span><span class="mono">85%</span></div>
+          <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="true" aria-controls="target-fixed-income" aria-label="Hide Fixed Income Securities sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button>Fixed Income Securities</span><span class="kv-value"><span class="badge badge-outline">2 pt unassigned</span><input class="input input-pct" type="text" value="25" aria-label="Fixed Income Securities target percent">%</span></div>
+          <div class="alloc-sub-group" id="target-fixed-income" role="group" aria-label="Fixed Income Securities sub-targets">
+            <div class="kv-row alloc-sub-target"><span>Treasuries</span><span class="kv-value"><input class="input input-pct" type="text" value="12" aria-label="Fixed Income Securities, Treasuries target percent">%</span></div>
+            <div class="kv-row alloc-sub-target"><span>Corporate</span><span class="kv-value"><input class="input input-pct" type="text" value="8" aria-label="Fixed Income Securities, Corporate target percent">%</span></div>
+            <div class="kv-row alloc-sub-target"><span>Municipal</span><span class="kv-value"><input class="input input-pct" type="text" value="3" aria-label="Fixed Income Securities, Municipal target percent">%</span></div>
+          </div>
+          <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-marketable" aria-label="Show Marketable Securities sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>Marketable Securities</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 55%</span><input class="input input-pct" type="text" value="55" aria-label="Marketable Securities target percent">%</span></div>
+          <div class="kv-row"><span class="alloc-class"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="target-alternatives" aria-label="Show Alternative Investment Assets sub-categories"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button>Alternative Investment Assets</span><span class="kv-value"><span class="badge badge-positive-soft">Sub-targets sum to 5%</span><input class="input input-pct" type="text" value="5" aria-label="Alternative Investment Assets target percent">%</span></div>
+        </div>
+        <div class="je-popover-foot spread alloc-editor-foot">
+          <span class="card-sub alloc-editor-hint">Save turns on when the classes total 100% and every class's sub-targets sum to it.</span>
+          <span class="alloc-editor-total"><span>Total</span><span class="badge badge-positive-soft">100%</span></span>
+          <span class="alloc-editor-actions"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button" disabled>Save target</button></span>
+        </div>
+      </div>
     </div>
   </main>
   </div>
