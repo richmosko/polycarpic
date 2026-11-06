@@ -239,3 +239,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the Principal: "have a selection toggle at the top to choose to group by Institution, or Account Type (ie: credit cards grouped together)." Institution is the default because a provider link belongs to an institution, so a broken link reads as one group. The totals stay asset-only so they remain the figure Allocation reads. On the card, the Principal: the reconciliation line "takes up a lot of visual attention", asking for "a header badge... and a way to accordian expand the card", and "The lots should show below (with individual accordions) when the chevron for the account expands for more information."
 **Alternatives considered:** a fixed grouping by institution (loses the credit-cards cut); netting cards into the totals card (the total stops matching Allocation).
 **Approved by:** richmosko (2026-11-06)
+
+### 2026-11-06 — The Allocation drill opens an in-place holdings popover
+**Decision:** a treemap tile, class name or sub-category name on Allocation opens a read-only popover on the page: the holdings behind that figure, grouped by custodial account, with the Custodial card's lots pull-downs and an aggregate total. Custodial Accounts is reached from one link in its footer, which arrives with the listed accounts' cards open. This replaces navigation to Custodial Accounts as the drill.
+**Why:** the Principal: "The drill into lots from Allocation doesn't really work because those categorical sums can (and do) span multiple accounts. We need a way to view the aggregate in place."
+**Alternatives considered:** navigating to Custodial Accounts filtered to the class (cards are per account, so the aggregate is never on screen).
+**Approved by:** richmosko (2026-11-06)

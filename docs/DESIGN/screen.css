@@ -1825,6 +1825,25 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
 .alloc-editor-foot { flex-wrap: wrap; gap: 8px; }
 .alloc-editor-hint { flex-basis: 100%; font-size: 12px; }
 
+/* Holdings popover: the target editor's surface, read-only, opened from a
+   tile or a bar-row name, which are buttons here because they open in
+   place. Each custodial account is a .lots block, so a security row and
+   its lots are the Custodial card's own markup. A row with no lots (a
+   cash balance) is .lot-static. */
+.tm-map-alloc button.tm-tile { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; padding: 0; font: inherit; text-align: left; cursor: pointer; }
+.alloc-name-btn { padding: 0; background: none; border: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.alloc-name-btn:hover, .alloc-name-btn:focus-visible { text-decoration: underline; }
+.tm-note .je-link { padding: 0; background: none; border: none; font: inherit; color: var(--primary); cursor: pointer; }
+.alloc-holdings-ref { margin-top: 24px; }
+.alloc-holdings-head .alloc-holdings-line { flex-basis: 100%; }
+.alloc-holdings-head .mono { font-size: 13px; font-variant-numeric: tabular-nums; }
+.alloc-holdings-foot { flex-wrap: wrap; gap: 6px 12px; justify-content: flex-end; }
+.alloc-holdings-total { flex-basis: 100%; display: flex; justify-content: space-between; gap: 12px; font-weight: 600; }
+.alloc-holding { margin-top: 0; }
+.alloc-holding + .alloc-holding { margin-top: 8px; }
+.alloc-holding-sample { width: 520px; max-width: 100%; }
+.lot-security.lot-static { cursor: default; }
+
 /* A tier heads its classes in the bars and the editor: a label with its
    share, never a colour. */
 .alloc-row.alloc-tier { padding: 12px 0 6px; }
