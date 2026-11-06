@@ -1477,7 +1477,7 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 /* ---------- Allocation: actual-vs-target rows. Each asset class gets a
    progress track with a target marker (custom, built on shadcn
    Progress). ---------- */
-.alloc-row { display: grid; grid-template-columns: 160px 1fr 150px 110px; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.alloc-row { display: grid; grid-template-columns: 252px 1fr 150px 110px; align-items: center; gap: 16px; padding: 14px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
 .alloc-row:last-child { border-bottom: none; }
 .alloc-row .alloc-name { display: flex; align-items: center; gap: 8px; font-weight: 500; }
 .alloc-row .alloc-name a { color: inherit; text-decoration: none; }
@@ -1554,7 +1554,7 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
    these rules keep the multi-column rows from overflowing. ---------- */
 @media (max-width: 1100px) {
   table.data-table th, table.data-table td { padding-left: 12px; padding-right: 12px; }
-  .alloc-row { grid-template-columns: 120px 1fr 120px 96px; gap: 12px; }
+  .alloc-row { grid-template-columns: 180px 1fr 120px 96px; gap: 12px; }
   .form-row { grid-template-columns: 1fr 160px auto; }
 }
 
@@ -1744,7 +1744,7 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
    gap 8); a sub-name starts 24px further right, at 68px. The sub-row's
    name column is 24px wider, so its track starts 24px right of the class
    track; the fixed figure and badge columns keep their x, so values scan. */
-.alloc-row.alloc-sub { grid-template-columns: 184px 1fr 150px 110px; padding: 8px 0; font-size: 13px; }
+.alloc-row.alloc-sub { grid-template-columns: 276px 1fr 150px 110px; padding: 8px 0; font-size: 13px; }
 .alloc-row.alloc-sub .alloc-name { font-weight: 400; padding-left: 68px; }
 .alloc-row.alloc-sub .alloc-track { height: 6px; }
 .kv-row .alloc-class { display: flex; align-items: center; gap: 8px; font-weight: 500; }
@@ -1754,18 +1754,25 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
 .kv-row.alloc-sub-target { padding: 8px 0 8px 52px; font-size: 13px; }
 .kv-row.alloc-sub-target .input-pct { width: 64px; height: 30px; }
 @media (max-width: 1100px) {
-  .alloc-row.alloc-sub { grid-template-columns: 144px 1fr 120px 96px; }
+  .alloc-row.alloc-sub { grid-template-columns: 204px 1fr 120px 96px; }
   .alloc-row.alloc-sub .alloc-name { padding-left: 56px; }
 }
-/* Current-allocation treemap: the .tm-map idiom with one change, a class
-   header strip. A group is one asset class in its fixed slot (.tm-c1 ...
+/* Current-allocation treemap: the .tm-map idiom with two changes, tier
+   captions and a class header strip. The tiers (Current, Non-Current) are
+   columns sized to their share, 8px apart, captioned above in plain text:
+   a tier is a label and never takes a colour. A group is one asset class in its fixed slot (.tm-c1 ...
    .tm-c4, a sub-category takes its parent's slot), so its sub-tiles share
    a fill and the strip names the class. The strip and sub-tiles sit inside
    the class rectangle, whose area is exact; sub-tiles divide what remains
    in proportion, so they compare within a class, and their percent labels
    compare across classes. The strip always shows its percent; its dollars
-   drop first when it narrows. Same label inks and contrast as .tm-assets
+   drop first when it narrows. A strip too narrow for its
+   name takes two lines (.tm-head-2); a class with one sub-category is
+   one tile, the strip alone. Same label inks and contrast as .tm-assets
    and siblings. */
+.tm-tiers { display: grid; column-gap: 8px; margin-bottom: 6px; font-size: 12px; }
+.tm-tiers > span { display: flex; align-items: baseline; gap: 6px; min-width: 0; white-space: nowrap; }
+.tm-tiers .mono { color: var(--muted-foreground); }
 .tm-c1 { background: var(--cat-1); color: var(--cat-1-foreground); }
 .tm-c2 { background: var(--cat-2); color: var(--cat-2-foreground); }
 .tm-c3 { background: var(--cat-3); color: var(--cat-3-foreground); }
@@ -1776,10 +1783,15 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
 .tm-map-alloc .tm-label { white-space: normal; overflow-wrap: anywhere; }
 .tm-map-alloc .tm-head .tm-label { flex: 1; min-width: 0; white-space: nowrap; }
 .tm-head .tm-value { display: block; }
+.tm-map-alloc .tm-head-2 .tm-label { white-space: normal; line-height: 16px; }
+.tm-head-2 .tm-inner { align-items: center; }
 @container (max-width: 64px) { .tm-pct { display: none; } }
 @container (max-height: 22px) { .tm-tile:not(.tm-head) .tm-pct { display: none; } }
-@container (max-width: 216px) { .tm-head .tm-value { display: none; } }
-.alloc-map-sub { margin: -8px 0 12px; }
+@container (max-width: 304px) { .tm-head .tm-value { display: none; } }
+@container (max-height: 46px) { .tm-tile:not(.tm-head) .tm-inner { flex-direction: row; align-items: baseline; gap: 6px; padding: 4px 6px; } .tm-tile:not(.tm-head) .tm-label { flex: 1; min-width: 0; font-size: 12px; white-space: nowrap; } }
+@container (max-width: 110px) { .tm-map-alloc .tm-head-2 .tm-label { white-space: nowrap; } }
+@container (max-height: 66px) { .tm-map-alloc .tm-tile:not(.tm-head) .tm-value { display: none; } }
+.alloc-map-sub { margin: -8px 0 10px; }
 .alloc-head-actions { display: inline-flex; align-items: center; gap: 12px; margin-left: auto; }
 
 /* Target editor: the .je-popover surface, wider for the reconcile badges,
@@ -1787,13 +1799,19 @@ a.badge-muted:hover, a.badge-muted:focus-visible { color: var(--foreground); }
    the styled screen renders it statically below the card. Total and the
    Save gate stay in the footer while the body scrolls. */
 .alloc-editor-ref { margin-top: 24px; display: flex; flex-direction: column; align-items: flex-end; }
-.alloc-editor-ref .eyebrow { width: 460px; max-width: 100%; }
-.je-popover.alloc-editor { width: 460px; max-height: min(640px, 80vh); }
+.alloc-editor-ref > .eyebrow { width: 520px; max-width: 100%; }
+.je-popover.alloc-editor { width: 520px; max-height: min(680px, 80vh); }
 .alloc-editor .card-title { margin-bottom: 0; }
 .alloc-editor .je-popover-body > .card-sub { margin: 0 0 4px; }
 .alloc-editor-total, .alloc-editor-actions { display: inline-flex; align-items: center; gap: 8px; }
 .alloc-editor-foot { flex-wrap: wrap; gap: 8px; }
 .alloc-editor-hint { flex-basis: 100%; font-size: 12px; }
+
+/* A tier heads its classes in the bars and the editor: a label with its
+   share, never a colour. */
+.alloc-row.alloc-tier { padding: 12px 0 6px; }
+.alloc-editor-tier { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 0 6px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.alloc-editor-tier .mono { color: var(--muted-foreground); }
 
 /* A sub-row group closes with a rule unless it is the card's last block. */
 .alloc-sub-group > .alloc-row:last-child, .alloc-sub-group > .kv-row:last-child { border-bottom: 1px solid var(--border); }

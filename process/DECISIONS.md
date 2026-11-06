@@ -227,3 +227,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the Principal: "a tree map with each major asset category in a different cat-* color. This should be the top thing shown, displaying the *current* allocation", with target editing as "a popup menu that comes up by clicking a gear icon on the target/actual card."
 **Alternatives considered:** a modal `Dialog` for the editor (covers the bars the targets are being set against); keeping the editor as a third card (a form most visits never use takes a full card).
 **Approved by:** richmosko (2026-11-04)
+
+### 2026-11-05 — Allocation classes: four classes under Current / Non-Current, Digital Assets under Alternatives
+**Decision:** the seeded allocation hierarchy is tier, class, sub-category. Current: Cash & Cash Equivalents. Non-Current: Fixed Income Securities, Marketable Securities, Alternative Investment Assets. Crypto sits as Digital Assets under Alternative Investment Assets. US and international equity fold into Marketable Securities as sub-categories. A tier is a label and takes no categorical slot. The target editor stays a popover with its unsaved-edit guards, and the gap between the mock's lots and its allocation percentages is accepted.
+**Why:** the Principal set "the top level classes (initial mapping)" on 2026-11-05, placing crypto as "Digital Assets" under Alternative Investment Assets, and ruled to "accept the gap in the mock" and that "the unsaved form is fine." Crypto is part of the custodial total and needed a class.
+**Alternatives considered:** keeping the four US Equity / Intl Equity / Fixed Income / Cash classes with crypto as a fifth (no liquidity grouping); a modal `Dialog` for the editor (covers the bars).
+**Approved by:** richmosko (2026-11-05)
