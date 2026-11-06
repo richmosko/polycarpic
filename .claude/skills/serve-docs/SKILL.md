@@ -108,7 +108,7 @@ If the loop completes without success, the server failed to start. Surface the e
 Print:
 
 ```
-Server running at http://localhost:8765/
+Server running at http://localhost:8765/   (index page: links to every doc and to the cairn board)
   PRD:      http://localhost:8765/PRD/
   ARCH:     http://localhost:8765/ARCH/
   SECURITY: http://localhost:8765/SECURITY/
@@ -144,4 +144,5 @@ open -a "Google Chrome" "http://localhost:${PORT:-8765}/${doc}/" 2>/dev/null \
 - **Server lifecycle is bound to the Claude session.** The harness manages the background process; quitting the session terminates it. This is intentional — review sessions are bounded, and we'd rather not leave dangling localhost processes cluttering the system.
 - **Server logs go to the harness's background-shell buffer**, not your terminal. To see them, you'd need to read the background shell's output via the harness (typically via a `BashOutput` tool or similar). For most review sessions you don't need this; if you do, run the script directly in a terminal instead.
 - **One server at a time.** The default port is 8765; override with `DOCS_PORT=8080 ./scripts/serve-docs.sh` if you need to run a separate instance. The skill doesn't currently expose the port override — edit the script invocation if you need it.
+- **`/serve` starts this server and the cairn board together** (`scripts/serve.sh`); use it when you want both.
 - **Pairs with `/refine-doc`.** Typical session: `/serve-docs PRD` → review in browser + add comments via the widget → `/refine-doc PRD` → `/start-doc-update` → `/finish-doc-update` → `/merge-pr`.

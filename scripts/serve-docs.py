@@ -170,6 +170,7 @@ class ReuseServer(socketserver.TCPServer):
 def main():
     os.chdir(REPO_ROOT)
     print(f"Serving docs/ at http://{HOST}:{PORT}/")
+    print(f"  Index:    http://{HOST}:{PORT}/")
     print(f"  PRD:      http://{HOST}:{PORT}/PRD/")
     print(f"  ARCH:     http://{HOST}:{PORT}/ARCH/")
     print(f"  SECURITY: http://{HOST}:{PORT}/SECURITY/")
