@@ -5,7 +5,9 @@
 ```mermaid
 flowchart TD
   view([Open Custodial Accounts\nfor entity]) --> totals[Totals card:\nmarket value, book value, cash,\nUnrealized, summed]
-  view --> accounts[Per-account cards:\nlink-health badge]
+  view --> groupBy[Group-by toggle:\nInstitution or Account type]
+  groupBy --> groups[Group headers: count,\nsummed market, book and cash]
+  groups --> accounts[Per-account cards:\nlink-health badge]
   accounts --> figs[Three figures, left to right:\nmarket value at EOD prices,\nbook value = GL cost basis, cash balance,\nand Unrealized]
   priceFeed[Daily EOD price feed] --> figs
   figs --> totals
@@ -24,8 +26,10 @@ flowchart TD
 
 **Notes**
 - **Three figures on every account, left to right:** market value (cash plus every position at the last EOD price); book value (the GL's cost basis, cash included — the GL's own balance for the mirrored account); cash balance; and Unrealized = market − book, signed and coloured per § Delta coloring. A cash-only account shows the same row with equal figures and a `$0.00` delta, so cards scan as columns. A totals card sums the four figures across accounts, with the price date. Cash sits last so the row reads as "market and book include cash" — the two totals first, the cash already inside them after.
+- **Group by Institution or Account type.** A `Tabs` toggle under the totals card groups the account cards; Institution is the default, and the choice persists per user. A group header carries the account count and the summed market value, book value and cash. The totals card sums asset accounts whichever grouping is on.
+- **A credit card is a liability.** Market value and book value both show what is owed, as a negative; cash and Unrealized show a dash. The negative nets into its group, and the totals card states it beside the asset total.
 - An account's Unrealized figure equals its lots sub-card's total unrealized gain; the two must agree.
-- **No toggle:** General Ledger and Custodial Accounts are two separate nav items, not one screen behind a `Tabs` switch. Both read the same lot and journal data; the split is presentation, not a data fork.
+- **Two nav items:** General Ledger and Custodial Accounts are two separate nav items, not one screen behind a `Tabs` switch. Both read the same lot and journal data; the split is presentation, not a data fork.
 - **Unapproved drafts are a known unposted delta, not a break.** When the GL and custodian balances differ by exactly the account's staged drafts (e.g. an unmatched transfer leg not yet approved into Cash in Transit), the card shows the delta and lists those drafts, linking to Pending on Transactions; no danger tier. Only a difference the drafts do not explain is a break.
 - A reconciliation break uses the danger tier (`--destructive`) and surfaces on the Dashboard glance too, not only here.
 - Allocation (actual vs. target by asset class) is its own flow, 5.6.

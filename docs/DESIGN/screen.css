@@ -1461,6 +1461,19 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .custodial-fig-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; white-space: nowrap; }
 .custodial-totals .custodial-fig-value { font-size: 18px; }
 @media (max-width: 1100px) { .custodial-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Group-by toggle and group headers. A header is a label over the cards,
+   not a card: name, count and the three summed figures in the card's
+   order, on the page background. */
+.custodial-owed { margin-top: 12px; }
+.custodial-toolbar { display: flex; align-items: center; gap: 10px; margin: 20px 0 4px; }
+.custodial-group-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 24px; flex-wrap: wrap; margin: 20px 0 10px; }
+.custodial-group-name { margin: 0; font-size: 15px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
+.custodial-group-name .card-sub { font-weight: 400; }
+.custodial-group-figs { display: flex; gap: 24px; font-size: 13px; }
+.custodial-group-figs > span { display: inline-flex; align-items: baseline; gap: 6px; }
+.custodial-group-figs .mono { font-variant-numeric: tabular-nums; font-weight: 600; }
+.custodial-group-ref { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border); }
+.custodial-group-ref .custodial-group-head { margin: 12px 0 0; }
 .custodial-recon { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border); }
 .lots { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); overflow: hidden; }
 .lots-head { padding: 12px 16px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 12px; }

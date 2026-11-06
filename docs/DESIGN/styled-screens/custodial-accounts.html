@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Custodial Accounts. A totals card, then one card per physical account. Every card shows the same three figures side by side, left to right: market value (cash + positions at EOD prices), book value (the GL's cost basis, cash included) and cash balance, then Unrealized; the order reads as "market and book include cash"; the totals card sums them across accounts. Then link health (caution tier for an expired or stale link that still has cached data), reconciliation vs. GL (Primary Checking shows a known unposted delta: the custodian is $42.00 below the GL by exactly one staged draft, a muted badge linking to Pending, not a break), and for a brokerage the lots sub-card (Collapsible, one security pulled down). Sync pulls balances AND positions. The provider-item Dialog (More > New provider item) is shown open below the cards as the reference, same convention as the journal-entry modal. Viewers see no Sync / New / token-refresh / unlink actions. -->
+<!-- Custodial Accounts. A totals card, a group-by toggle (Institution by default, or Account type), then one card per physical account under group headers. A group header carries the account count and the summed market value, book value and cash; the Account type headers are shown as a reference below the groups. The default is Institution because a link and its sync, token and re-auth belong to one provider, so a broken link reads as one group. Every card shows the same three figures side by side, left to right: market value (cash + positions at EOD prices), book value (the GL's cost basis, cash included) and cash balance, then Unrealized; the order reads as "market and book include cash"; the totals card sums them across asset accounts, whichever grouping is on, and states what is owed on credit cards beside it. A credit card shows what is owed as a negative market and book value, with no cash or Unrealized, and that negative nets into its group. Then link health (caution tier for an expired or stale link that still has cached data), reconciliation vs. GL (Primary Checking shows a known unposted delta: the custodian is $42.00 below the GL by exactly one staged draft, a muted badge linking to Pending, not a break), and for a brokerage the lots sub-card (Collapsible, one security pulled down). Sync pulls balances AND positions. The provider-item Dialog (More > New provider item) is shown open below the cards as the reference, same convention as the journal-entry modal. Viewers see no Sync / New / token-refresh / unlink actions. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -59,7 +59,7 @@
   <main class="content" style="padding-top:8px;">
     <div class="card custodial-totals">
       <div class="custodial-head">
-        <span class="custodial-name">All custodial accounts <span class="institution">3 accounts · prices as of Oct 30 close</span></span>
+        <span class="custodial-name">All custodial accounts <span class="institution">5 accounts · prices as of Oct 30 close</span></span>
       </div>
       <div class="custodial-figs">
         <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$234,264.85</span></div>
@@ -67,7 +67,65 @@
         <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$30,044.75</span></div>
         <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value"><span class="gain-positive">+$5,620.10</span></span></div>
       </div>
+      <p class="card-sub custodial-owed">Assets only. Owed on credit cards <span class="mono">−$1,204.00</span>, net <span class="mono">$233,060.85</span>.</p>
     </div>
+    <div class="custodial-toolbar">
+      <span class="card-sub">Group by</span>
+      <div class="tabs" role="tablist" aria-label="Group accounts by">
+        <button class="tab active" role="tab" aria-selected="true">Institution</button>
+        <button class="tab" role="tab" aria-selected="false">Account type</button>
+      </div>
+    </div>
+    <section class="custodial-group" aria-labelledby="group-custodian-x">
+      <div class="custodial-group-head">
+        <h2 class="custodial-group-name" id="group-custodian-x">Custodian X <span class="card-sub">2 accounts</span></h2>
+        <span class="custodial-group-figs"><span><span class="eyebrow">Market</span><span class="mono">$208,210.00</span></span><span><span class="eyebrow">Book</span><span class="mono">$204,110.00</span></span><span><span class="eyebrow">Cash</span><span class="mono">$12,410.00</span></span></span>
+      </div>
+    <div class="card">
+      <div class="custodial-head">
+        <span class="custodial-name">Brokerage <span class="institution">Custodian X</span></span>
+        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+      </div>
+      <div class="custodial-figs">
+        <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$204,210.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Book value · GL</span><span class="custodial-fig-value">$200,110.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$8,410.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value"><span class="gain-positive">+$4,100.00</span></span></div>
+      </div>
+      <div class="custodial-recon">
+        <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span></div>
+      </div>
+      <div class="lots">
+        <div class="lots-head"><span>Lots</span><span class="card-sub" style="font-weight:400;">Select a security to see its lots</span></div>
+        <div class="lot-security" aria-expanded="true"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>AAPL <span class="card-sub" style="font-weight:400;">75 sh</span></span><span class="lot-figs">mkt $13,350 · book $9,100 <span class="gain-positive">+$4,250</span></span></div>
+        <div class="lot-detail"><span>50 sh · acquired Mar 4, 2021 · long-term</span><span class="lot-figs">mkt $8,900 · book $6,200 <span class="gain-positive">+$2,700</span></span></div>
+        <div class="lot-detail"><span>25 sh · acquired Jan 18, 2026 · short-term</span><span class="lot-figs">mkt $4,450 · book $2,900 <span class="gain-positive">+$1,550</span></span></div>
+        <div class="lot-security" aria-expanded="false"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>VTI <span class="card-sub" style="font-weight:400;">100 sh</span></span><span class="lot-figs">mkt $24,100 · book $22,000 <span class="gain-positive">+$2,100</span></span></div>
+        <div class="lot-security" aria-expanded="false"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>BND <span class="card-sub" style="font-weight:400;">2,200 sh</span></span><span class="lot-figs">mkt $158,350 · book $160,600 <span class="gain-negative">−$2,250</span></span></div>
+        <div class="lots-total"><span>Unrealized, account total</span><span class="lot-figs">short <span class="gain-positive">+$1,550</span> · long <span class="gain-positive">+$2,550</span> · total <span class="gain-positive">+$4,100</span></span></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="custodial-head">
+        <span class="custodial-name">Roth IRA <span class="institution">Custodian X</span></span>
+        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+      </div>
+      <div class="custodial-figs">
+        <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$4,000.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Book value · GL</span><span class="custodial-fig-value">$4,000.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$4,000.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value">$0.00</span></div>
+      </div>
+      <div class="custodial-recon">
+        <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span></div>
+      </div>
+    </div>
+    </section>
+    <section class="custodial-group" aria-labelledby="group-bank-y">
+      <div class="custodial-group-head">
+        <h2 class="custodial-group-name" id="group-bank-y">Bank Y <span class="card-sub">2 accounts</span></h2>
+        <span class="custodial-group-figs"><span><span class="eyebrow">Market</span><span class="mono">$16,430.75</span></span><span><span class="eyebrow">Book</span><span class="mono">$16,430.75</span></span><span><span class="eyebrow">Cash</span><span class="mono">$17,634.75</span></span></span>
+      </div>
     <div class="card">
       <div class="custodial-head">
         <span class="custodial-name">Primary Checking <span class="institution">Bank Y</span></span>
@@ -85,6 +143,27 @@
     </div>
     <div class="card">
       <div class="custodial-head">
+        <span class="custodial-name">Visa — Bank Y <span class="institution">Credit card</span></span>
+        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+      </div>
+      <div class="custodial-figs">
+        <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">−$1,204.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Book value · GL</span><span class="custodial-fig-value">−$1,204.00</span></div>
+        <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value"><span aria-label="Not applicable">—</span></span></div>
+        <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value"><span aria-label="Not applicable">—</span></span></div>
+      </div>
+      <div class="custodial-recon">
+        <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span></div>
+      </div>
+    </div>
+    </section>
+    <section class="custodial-group" aria-labelledby="group-coinbase">
+      <div class="custodial-group-head">
+        <h2 class="custodial-group-name" id="group-coinbase">Coinbase <span class="card-sub">1 account</span></h2>
+        <span class="custodial-group-figs"><span><span class="eyebrow">Market</span><span class="mono">$8,420.10</span></span><span><span class="eyebrow">Book</span><span class="mono">$6,900.00</span></span><span><span class="eyebrow">Cash</span><span class="mono">$0.00</span></span></span>
+      </div>
+    <div class="card">
+      <div class="custodial-head">
         <span class="custodial-name">Crypto Wallet <span class="institution">Coinbase</span></span>
         <span class="custodial-meta"><span class="badge badge-warning-soft"><span class="status-dot"></span>Token expired · re-auth needed</span></span>
       </div>
@@ -98,28 +177,27 @@
         <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-warning-soft"><span class="status-dot"></span>Stale · last synced 6 days ago</span></span></div>
       </div>
     </div>
-    <div class="card">
-      <div class="custodial-head">
-        <span class="custodial-name">Brokerage <span class="institution">Custodian X</span></span>
-        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+    </section>
+    <!-- ============ Group by Account type, headers (reference) ============
+         The same cards sit under each header in product. A type with no
+         accounts draws no group. -->
+    <div class="custodial-group-ref">
+      <div class="eyebrow" style="margin-bottom:4px;">Grouped by Account type — group headers</div>
+      <div class="custodial-group-head">
+        <h3 class="custodial-group-name" id="type-brokerage">Brokerage <span class="card-sub">2 accounts</span></h3>
+        <span class="custodial-group-figs"><span><span class="eyebrow">Market</span><span class="mono">$208,210.00</span></span><span><span class="eyebrow">Book</span><span class="mono">$204,110.00</span></span><span><span class="eyebrow">Cash</span><span class="mono">$12,410.00</span></span></span>
       </div>
-      <div class="custodial-figs">
-        <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$208,210.00</span></div>
-        <div class="custodial-fig"><span class="eyebrow">Book value · GL</span><span class="custodial-fig-value">$204,110.00</span></div>
-        <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$12,410.00</span></div>
-        <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value"><span class="gain-positive">+$4,100.00</span></span></div>
+      <div class="custodial-group-head">
+        <h3 class="custodial-group-name" id="type-checking">Checking <span class="card-sub">1 account</span></h3>
+        <span class="custodial-group-figs"><span><span class="eyebrow">Market</span><span class="mono">$17,634.75</span></span><span><span class="eyebrow">Book</span><span class="mono">$17,634.75</span></span><span><span class="eyebrow">Cash</span><span class="mono">$17,634.75</span></span></span>
       </div>
-      <div class="custodial-recon">
-        <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span></div>
+      <div class="custodial-group-head">
+        <h3 class="custodial-group-name" id="type-crypto">Crypto wallets <span class="card-sub">1 account</span></h3>
+        <span class="custodial-group-figs"><span><span class="eyebrow">Market</span><span class="mono">$8,420.10</span></span><span><span class="eyebrow">Book</span><span class="mono">$6,900.00</span></span><span><span class="eyebrow">Cash</span><span class="mono">$0.00</span></span></span>
       </div>
-      <div class="lots">
-        <div class="lots-head"><span>Lots</span><span class="card-sub" style="font-weight:400;">Select a security to see its lots</span></div>
-        <div class="lot-security" aria-expanded="true"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>AAPL <span class="card-sub" style="font-weight:400;">75 sh</span></span><span class="lot-figs">mkt $13,350 · book $9,100 <span class="gain-positive">+$4,250</span></span></div>
-        <div class="lot-detail"><span>50 sh · acquired Mar 4, 2021 · long-term</span><span class="lot-figs">mkt $8,900 · book $6,200 <span class="gain-positive">+$2,700</span></span></div>
-        <div class="lot-detail"><span>25 sh · acquired Jan 18, 2026 · short-term</span><span class="lot-figs">mkt $4,450 · book $2,900 <span class="gain-positive">+$1,550</span></span></div>
-        <div class="lot-security" aria-expanded="false"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>VTI <span class="card-sub" style="font-weight:400;">100 sh</span></span><span class="lot-figs">mkt $24,100 · book $22,000 <span class="gain-positive">+$2,100</span></span></div>
-        <div class="lot-security" aria-expanded="false"><span class="lot-name"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span>BND <span class="card-sub" style="font-weight:400;">2,200 sh</span></span><span class="lot-figs">mkt $158,350 · book $160,600 <span class="gain-negative">−$2,250</span></span></div>
-        <div class="lots-total"><span>Unrealized, account total</span><span class="lot-figs">short <span class="gain-positive">+$1,550</span> · long <span class="gain-positive">+$2,550</span> · total <span class="gain-positive">+$4,100</span></span></div>
+      <div class="custodial-group-head">
+        <h3 class="custodial-group-name" id="type-credit">Credit cards <span class="card-sub">1 account</span></h3>
+        <span class="custodial-group-figs"><span><span class="eyebrow">Market</span><span class="mono">−$1,204.00</span></span><span><span class="eyebrow">Book</span><span class="mono">−$1,204.00</span></span><span><span class="eyebrow">Cash</span><span class="mono">—</span></span></span>
       </div>
     </div>
     <div class="je-modal-scrim" style="margin-top:24px;">
