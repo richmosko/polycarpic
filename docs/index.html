@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docs — Polycarpic</title>
+  <link rel="stylesheet" href="_assets/doc.css">
+  <style>
+    .doc-index { list-style: none; padding: 0; margin: 1.5rem 0; display: grid; gap: 0.75rem; }
+    .doc-index li {
+      border: 1px solid var(--doc-border); border-radius: var(--doc-radius-md);
+      padding: 0.9rem 1.1rem; background: var(--doc-card);
+    }
+    .doc-index li a { font-weight: 600; text-decoration: none; color: var(--doc-accent); }
+    .doc-index li a:hover { text-decoration: underline; }
+    .doc-index li p { margin: 0.25rem 0 0; color: var(--doc-muted); font-size: 0.95em; }
+    .doc-index li.board { border-color: var(--doc-accent); }
+    .doc-index .path { font-family: var(--doc-font-mono); font-size: 0.85em; color: var(--doc-muted); margin-left: 0.5rem; }
+  </style>
+</head>
+<body>
+
+<header class="doc-header">
+  <h1>Polycarpic documents</h1>
+  <p class="doc-subtitle">The four phase artifacts, the kickoff record, and the issue board</p>
+  <div class="doc-meta">
+    <span><strong>Served by:</strong> <code>scripts/serve-docs.sh</code> (or <code>./scripts/serve.sh</code> for docs + board together)</span>
+    <span><strong>Comments:</strong> the inline widget on each doc writes to <code>docs/&lt;DOC&gt;/comments.md</code>; <code>/refine-doc &lt;DOC&gt;</code> addresses them</span>
+  </div>
+</header>
+
+<main>
+  <section id="docs">
+    <h2>Phase artifacts</h2>
+    <ul class="doc-index">
+      <li><a href="PRD/">Product Requirements</a><span class="path">docs/PRD/</span>
+        <p>What we are building and for whom. Owner: <code>product-manager</code>.</p></li>
+      <li><a href="ARCH/">Architecture &amp; Infrastructure</a><span class="path">docs/ARCH/</span>
+        <p>Layer model, stack, data flow, deployment topology. Owner: <code>architect</code>.</p></li>
+      <li><a href="SECURITY/">Security &amp; Compliance</a><span class="path">docs/SECURITY/</span>
+        <p>Threat model, trust boundaries, controls catalog. Owner: <code>seceng</code>.</p></li>
+      <li><a href="DESIGN/">Design System &amp; UX</a><span class="path">docs/DESIGN/</span>
+        <p>Tokens, flows, styled screens, component reuse map. Owner: <code>ux-designer</code>.</p></li>
+    </ul>
+  </section>
+
+  <section id="board">
+    <h2>Tracker</h2>
+    <ul class="doc-index">
+      <li class="board"><a href="http://localhost:8766/">Cairn board</a><span class="path">process/cairn/</span>
+        <p>Majors, milestones, and issues as a Kanban (<a href="http://localhost:8766/list">list</a>, <a href="http://localhost:8766/dashboard">dashboard</a>).
+           A separate server on port 8766: start it with <code>/cairn</code>, or <code>./scripts/serve.sh</code> starts it alongside this one.
+           If the link fails, the board server is not running.</p></li>
+    </ul>
+  </section>
+
+  <section id="source">
+    <h2>Source records</h2>
+    <ul class="doc-index">
+      <li><a href="project_kickoff.md">Project kickoff</a><span class="path">docs/project_kickoff.md</span>
+        <p>The operative kickoff record: vision, scope, and every architecture and workflow decision.</p></li>
+      <li><a href="project_manifesto.md">Project manifesto</a><span class="path">docs/project_manifesto.md</span>
+        <p>The original brief, frozen as written.</p></li>
+    </ul>
+  </section>
+</main>
+
+</body>
+</html>
