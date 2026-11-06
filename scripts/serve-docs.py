@@ -162,14 +162,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             self._send_json(500, {"error": str(e)})
 
 
-class ReuseServer(socketserver.TCPServer):
+class ReuseServer(socketserver.ThreadingTCPServer):
     # Rebind immediately after a restart despite TIME_WAIT leftovers.
     allow_reuse_address = True
+    # One handler thread per connection: a browser's idle keep-alive or
+    # speculative preconnect used to hold the single-threaded accept loop,
+    # hanging every later request until that socket closed.
+    daemon_threads = True
 
 
 def main():
     os.chdir(REPO_ROOT)
     print(f"Serving docs/ at http://{HOST}:{PORT}/")
+    print(f"  Index:    http://{HOST}:{PORT}/")
     print(f"  PRD:      http://{HOST}:{PORT}/PRD/")
     print(f"  ARCH:     http://{HOST}:{PORT}/ARCH/")
     print(f"  SECURITY: http://{HOST}:{PORT}/SECURITY/")

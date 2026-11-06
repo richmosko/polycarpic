@@ -76,6 +76,6 @@ open -a "Google Chrome" "http://localhost:${CAIRN_PORT:-8766}/" 2>/dev/null \
 
 ## Notes
 
-- **Coexists with `/serve-docs`** — separate servers, separate ports (docs 8765, board 8766), by design (see `process/TRACKER.md` → Coexistence).
+- **Coexists with `/serve-docs`** — separate servers, separate ports (docs 8765, board 8766), by design (see `process/TRACKER.md` → Coexistence). `/serve` starts both at once; the docs index at `http://localhost:8765/` links here.
 - **No auto-commit** — board edits accumulate in the working tree and are committed by the session/feature-close discipline, exactly like agent edits.
 - **Persistent option** — for a board that outlives the session, run `./scripts/cairn/cairn serve` in your own terminal (or under launchd) instead; the data can't tell the difference.

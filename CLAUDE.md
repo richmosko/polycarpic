@@ -31,6 +31,8 @@ This repo was bootstrapped from [project_template](https://github.com/richmosko/
 
 Open any HTML doc with `/open-doc docs/PRD/index.html` (or just double-click it).
 
+`/serve` starts the docs server (8765) and the cairn board (8766) together; the docs index at `http://localhost:8765/` links to every doc and to the board. `/serve-docs` and `/cairn` still start each one alone.
+
 ## Team agents
 
 **This template requires Claude Code's experimental team-agents feature.** The workflow assumes each specialist Agent runs as a persistent teammate with its own context, mailbox, and access to the shared task list — not as one-shot subagents. The template ships with `env.CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS: "1"`, `env.CLAUDE_CODE_ENABLE_TODO_TOOLS: "1"` (the shared task list is session-gated by model without it — see `process/WORKFLOW.md` → Task-tool availability), and `teammateMode: "tmux"` already set in [`.claude/settings.json`](.claude/settings.json); do not disable them. If team-agents is off, `SendMessage`, the shared task list, and the anchor-task coordination pattern in [`process/WORKFLOW.md`](process/WORKFLOW.md) all break.
