@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Custodial Accounts. A totals card, a group-by toggle (Institution by default, or Account type), then one card per physical account under group headers. A group header carries the account count and the summed market value, book value and cash; the Account type headers are shown as a reference below the groups. The default is Institution because a link and its sync, token and re-auth belong to one provider, so a broken link reads as one group. Every card shows the same three figures side by side, left to right: market value (cash + positions at EOD prices), book value (the GL's cost basis, cash included) and cash balance, then Unrealized; the order reads as "market and book include cash"; the totals card sums them across asset accounts, whichever grouping is on, and states what is owed on credit cards beside it. A credit card shows what is owed as a negative market and book value, with no cash or Unrealized, and that negative nets into its group. Then link health (caution tier for an expired or stale link that still has cached data), reconciliation vs. GL (Primary Checking shows a known unposted delta: the custodian is $42.00 below the GL by exactly one staged draft, a muted badge linking to Pending, not a break), and for a brokerage the lots sub-card (Collapsible, one security pulled down). Sync pulls balances AND positions. The provider-item Dialog (More > New provider item) is shown open below the cards as the reference, same convention as the journal-entry modal. Viewers see no Sync / New / token-refresh / unlink actions. -->
+<!-- Custodial Accounts. A totals card, a group-by toggle (Institution by default, or Account type), then one card per physical account under group headers. A group header carries the account count and the summed market value, book value and cash; the Account type headers are shown as a reference below the groups. The default is Institution because a link and its sync, token and re-auth belong to one provider, so a broken link reads as one group. Every card shows the same three figures side by side, left to right: market value (cash + positions at EOD prices), book value (the GL's cost basis, cash included) and cash balance, then Unrealized; the order reads as "market and book include cash"; the totals card sums them across asset accounts, whichever grouping is on, and states what is owed on credit cards beside it. A credit card shows what is owed as a negative market and book value, with no cash or Unrealized, and that negative nets into its group. The card header carries two badges in a fixed order: link health first (caution tier for an expired or stale link that still has cached data), then reconciliation vs. GL, because a reconciliation is only as current as the link behind it. A card rests collapsed to its header and figures; a chevron left of the title opens its reconciliation details (Primary Checking shown open: a known unposted delta, the custodian $42.00 below the GL by exactly one staged draft, with the muted badge and a link to Pending, not a break). For a brokerage the lots sub-card stays its own Collapsible outside those details, one security pulled down, because lots answer a different question from reconciliation. Sync pulls balances AND positions. The provider-item Dialog (More > New provider item) is shown open below the cards as the reference, same convention as the journal-entry modal. Viewers see no Sync / New / token-refresh / unlink actions. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -83,8 +83,8 @@
       </div>
     <div class="card">
       <div class="custodial-head">
-        <span class="custodial-name">Brokerage <span class="institution">Custodian X</span></span>
-        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+        <span class="custodial-title"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="recon-brokerage" aria-label="Show Brokerage reconciliation details"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="custodial-name">Brokerage <span class="institution">Custodian X</span></span></span>
+        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span><span title="Reconciliation vs. GL" class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span>
       </div>
       <div class="custodial-figs">
         <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$204,210.00</span></div>
@@ -92,8 +92,8 @@
         <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$8,410.00</span></div>
         <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value"><span class="gain-positive">+$4,100.00</span></span></div>
       </div>
-      <div class="custodial-recon">
-        <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span></div>
+      <div class="custodial-recon" id="recon-brokerage" role="group" aria-label="Brokerage reconciliation details" hidden>
+        <div class="kv-row"><span class="kv-label">Reconciliation vs. GL<span class="kv-help">Custodian positions and cash match the GL as of the last sync, 14 min ago.</span></span></div>
       </div>
       <div class="lots">
         <div class="lots-head"><span>Lots</span><span class="card-sub" style="font-weight:400;">Select a security to see its lots</span></div>
@@ -107,8 +107,8 @@
     </div>
     <div class="card">
       <div class="custodial-head">
-        <span class="custodial-name">Roth IRA <span class="institution">Custodian X</span></span>
-        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+        <span class="custodial-title"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="recon-roth-ira" aria-label="Show Roth IRA reconciliation details"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="custodial-name">Roth IRA <span class="institution">Custodian X</span></span></span>
+        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span><span title="Reconciliation vs. GL" class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span>
       </div>
       <div class="custodial-figs">
         <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$4,000.00</span></div>
@@ -116,8 +116,8 @@
         <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$4,000.00</span></div>
         <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value">$0.00</span></div>
       </div>
-      <div class="custodial-recon">
-        <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span></div>
+      <div class="custodial-recon" id="recon-roth-ira" role="group" aria-label="Roth IRA reconciliation details" hidden>
+        <div class="kv-row"><span class="kv-label">Reconciliation vs. GL<span class="kv-help">Custodian cash matches the GL as of the last sync, 14 min ago.</span></span></div>
       </div>
     </div>
     </section>
@@ -128,8 +128,8 @@
       </div>
     <div class="card">
       <div class="custodial-head">
-        <span class="custodial-name">Primary Checking <span class="institution">Bank Y</span></span>
-        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+        <span class="custodial-title"><button class="alloc-disclosure" type="button" aria-expanded="true" aria-controls="recon-primary-checking" aria-label="Hide Primary Checking reconciliation details"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span></button><span class="custodial-name">Primary Checking <span class="institution">Bank Y</span></span></span>
+        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span><a class="badge badge-muted" href="transactions.html?account=primary-checking#pending" title="Open the staged draft in Pending, filtered to Primary Checking"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>Known delta: 1 staged draft, −$42.00</a></span>
       </div>
       <div class="custodial-figs">
         <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$17,634.75</span></div>
@@ -137,14 +137,14 @@
         <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$17,634.75</span></div>
         <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value">$0.00</span></div>
       </div>
-      <div class="custodial-recon">
-        <div class="kv-row"><span class="kv-label">Reconciliation vs. GL<span class="kv-help">Custodian reports $17,592.75; GL $17,634.75.</span></span><span class="kv-value"><a class="badge badge-muted" href="transactions.html?account=primary-checking#pending" title="Open the staged draft in Pending, filtered to Primary Checking"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>Known delta: 1 staged draft, −$42.00</a></span></div>
+      <div class="custodial-recon" id="recon-primary-checking" role="group" aria-label="Primary Checking reconciliation details">
+        <div class="kv-row"><span class="kv-label">Reconciliation vs. GL<span class="kv-help">Custodian reports $17,592.75; GL $17,634.75. The difference is one staged draft, not a break.</span></span><span class="kv-value"><a class="je-link" href="transactions.html?account=primary-checking#pending">Open the staged draft in Pending</a></span></div>
       </div>
     </div>
     <div class="card">
       <div class="custodial-head">
-        <span class="custodial-name">Visa — Bank Y <span class="institution">Credit card</span></span>
-        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span></span>
+        <span class="custodial-title"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="recon-visa-bank-y" aria-label="Show Visa — Bank Y reconciliation details"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="custodial-name">Visa — Bank Y <span class="institution">Credit card</span></span></span>
+        <span class="custodial-meta"><span class="badge badge-positive-soft"><span class="status-dot"></span>Synced 14 min ago</span><span title="Reconciliation vs. GL" class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span>
       </div>
       <div class="custodial-figs">
         <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">−$1,204.00</span></div>
@@ -152,8 +152,8 @@
         <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value"><span aria-label="Not applicable">—</span></span></div>
         <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value"><span aria-label="Not applicable">—</span></span></div>
       </div>
-      <div class="custodial-recon">
-        <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-positive-soft"><span class="status-dot"></span>Clean · matches GL</span></span></div>
+      <div class="custodial-recon" id="recon-visa-bank-y" role="group" aria-label="Visa — Bank Y reconciliation details" hidden>
+        <div class="kv-row"><span class="kv-label">Reconciliation vs. GL<span class="kv-help">Custodian reports $1,204.00 owed; GL $1,204.00.</span></span></div>
       </div>
     </div>
     </section>
@@ -164,8 +164,8 @@
       </div>
     <div class="card">
       <div class="custodial-head">
-        <span class="custodial-name">Crypto Wallet <span class="institution">Coinbase</span></span>
-        <span class="custodial-meta"><span class="badge badge-warning-soft"><span class="status-dot"></span>Token expired · re-auth needed</span></span>
+        <span class="custodial-title"><button class="alloc-disclosure" type="button" aria-expanded="false" aria-controls="recon-crypto-wallet" aria-label="Show Crypto Wallet reconciliation details"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span></button><span class="custodial-name">Crypto Wallet <span class="institution">Coinbase</span></span></span>
+        <span class="custodial-meta"><span class="badge badge-warning-soft"><span class="status-dot"></span>Token expired · re-auth needed</span><span title="Reconciliation vs. GL" class="badge badge-warning-soft"><span class="status-dot"></span>Stale · last synced 6 days ago</span></span>
       </div>
       <div class="custodial-figs">
         <div class="custodial-fig"><span class="eyebrow">Market value · EOD</span><span class="custodial-fig-value">$8,420.10</span></div>
@@ -173,8 +173,8 @@
         <div class="custodial-fig"><span class="eyebrow">Cash</span><span class="custodial-fig-value">$0.00</span></div>
         <div class="custodial-fig"><span class="eyebrow">Unrealized</span><span class="custodial-fig-value"><span class="gain-positive">+$1,520.10</span></span></div>
       </div>
-      <div class="custodial-recon">
-        <div class="kv-row"><span>Reconciliation vs. GL</span><span class="kv-value"><span class="badge badge-warning-soft"><span class="status-dot"></span>Stale · last synced 6 days ago</span></span></div>
+      <div class="custodial-recon" id="recon-crypto-wallet" role="group" aria-label="Crypto Wallet reconciliation details" hidden>
+        <div class="kv-row"><span class="kv-label">Reconciliation vs. GL<span class="kv-help">The custodian balance is from the last sync, 6 days ago. Re-authenticate the provider to reconcile.</span></span></div>
       </div>
     </div>
     </section>

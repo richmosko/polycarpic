@@ -1440,10 +1440,11 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 /* ---------- Custodial Accounts: a card per account, a lots sub-card
    (Collapsible), and the provider-item Dialog. ---------- */
 .custodial-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.custodial-title { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
 .custodial-head .custodial-name { font-size: 16px; font-weight: 600; display: flex; align-items: baseline; gap: 8px; }
 .custodial-head .institution { font-size: 13px; font-weight: 400; color: var(--muted-foreground); }
 .custodial-head .custodial-balance { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 600; }
-.custodial-meta { display: flex; align-items: center; gap: 10px; }
+.custodial-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .badge-warning-soft { background: color-mix(in srgb, var(--warning) 18%, var(--card)); color: var(--warning-foreground); border-color: color-mix(in srgb, var(--warning) 45%, var(--card)); }
 .dark .badge-warning-soft { color: var(--warning); }
 /* Soft destructive: the raw token falls under AA on its own tint in light mode, so the ink takes a share of --foreground. */
@@ -1475,6 +1476,8 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 .custodial-group-ref { margin-top: 28px; padding-top: 16px; border-top: 1px solid var(--border); }
 .custodial-group-ref .custodial-group-head { margin: 12px 0 0; }
 .custodial-recon { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--border); }
+.custodial-recon[hidden] { display: none; }
+.custodial-recon .je-link { font-size: 13px; }
 .lots { margin-top: 16px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); overflow: hidden; }
 .lots-head { padding: 12px 16px; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; gap: 12px; }
 .lot-security { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; padding: 10px 16px; border-top: 1px solid var(--border); font-size: 13px; background: var(--card); cursor: pointer; }
