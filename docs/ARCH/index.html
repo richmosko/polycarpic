@@ -19,7 +19,7 @@
     <span><strong>Owner:</strong> <code>architect</code> agent</span>
     <span><strong>Status:</strong> Draft v1 — pending SecEng / DevOps / QA folds and Principal review</span>
     <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1 (Approved 2026-09-27)</a>, <a href="../project_kickoff.md">kickoff record</a></span>
-    <span><strong>Last updated:</strong> 2026-09-27</span>
+    <span><strong>Last updated:</strong> 2026-11-06</span>
   </div>
 </header>
 
@@ -46,7 +46,7 @@
   <h2>1. System Context</h2>
   <p class="section-hint">The system and the actors around it. C4 context level.</p>
 
-  <p>Polycarpic is a single self-hosted web application backed by one PostgreSQL database. Users (the Principal, household members holding a membership grant, later native iOS/macOS clients and a user-scoped MCP server) reach it over HTTPS. Inside, a genuine double-entry general ledger lives in Postgres under row-level security keyed on the <em>membership</em> join. Outbound, the system pulls transactions from bank/brokerage aggregators through a provider-agnostic adapter interface (a deterministic fake first, then SimpleFIN, Plaid, and direct broker APIs), end-of-day prices and the CPI-U series as reference data, and sends transactional email through Resend. Identity is local (BetterAuth in our own Postgres) with Google / Apple / GitHub as OAuth identity providers. Nothing about a user's books leaves the box except through a provider call the user initiated or an owner-initiated export.</p>
+  <p>Polycarpic is a single self-hosted web application backed by one PostgreSQL database. Users (the Principal, household members holding a membership grant, later native iOS/macOS clients and a user-scoped MCP server) reach it over HTTPS. Inside, a genuine double-entry general ledger lives in Postgres under row-level security keyed on the <em>membership</em> join. Outbound, the system pulls transactions from bank/brokerage aggregators through a provider-agnostic adapter interface (a deterministic fake first, then SimpleFIN, Plaid, and direct broker APIs), end-of-day prices and the CPI-U series as reference data, and sends transactional email through Resend. Identity is local (BetterAuth in our own Postgres) with sign-in through outside identity providers (IdPs): Google, Apple and GitHub confirm who a user is, so the user has no separate password with us, and BetterAuth then starts a session of our own. Nothing about a user's books leaves the box except through a provider call the user initiated or an owner-initiated export.</p>
 
   <pre class="mermaid">
 flowchart LR
@@ -57,7 +57,8 @@ flowchart LR
     worker["Worker"]
     db[("PostgreSQL")]
   end
-  app --> idp["Login IdPs,<br/>Resend"]
+  app --> idp["Sign-in providers<br/>(Google, Apple, GitHub)"]
+  app --> mail["Resend<br/>(email)"]
   app --> db
   worker --> db
   db -.-> backup[("Off-box<br/>backup")]
@@ -515,6 +516,31 @@ flowchart TB
   end
   pgp -.->|encrypted| backup[("Off-box backup")]
   </pre>
+  <p class="section-hint">Co-located: the Docker Compose path on the Hetzner VPS. One box runs everything behind Caddy.</p>
+
+  <pre class="mermaid">
+flowchart TB
+  users(["Users"]) -->|"HTTPS, TB-1 and TB-2"| webf
+  cron(["Vercel Cron"]) -->|"CRON_SECRET"| jobf
+  subgraph vercel["Vercel account: TLS at the edge"]
+    subgraph webproj["web project"]
+      webf["User routes + API<br/>public keys only"]
+    end
+    subgraph jobproj["jobs project"]
+      jobf["Cron routes only<br/>credential keyring"]
+    end
+  end
+  webf -.-|"TB-4: separate projects,<br/>no direct path"| jobf
+  subgraph neon["Neon"]
+    pgn[("Postgres<br/>behind the pooler")]
+  end
+  webf -->|"poly_app, TB-3"| pgn
+  jobf -->|"poly_worker, TB-3"| pgn
+  webf -->|"TB-6"| signin["Sign-in providers<br/>(Google, Apple, GitHub)"]
+  webf -->|"TB-6"| mail["Resend<br/>(email)"]
+  jobf -->|"TB-5, egress only"| ext["Banks, brokers,<br/>prices, BLS"]
+  </pre>
+  <p class="section-hint">Split: the Vercel + Neon path (<a href="#vercel-split">§7.6</a>). What differs from Compose: there is no Caddy, because Vercel terminates TLS. There is no worker container: <code>jobs</code> runs the same job units when Vercel Cron calls them, capped at once daily on the Hobby plan. Postgres is Neon's, reached through its pooler. Secrets are Vercel env vars instead of mounted files. Migrations run as a build step. The <code>web</code> ↔ <code>jobs</code> line is the same TB-4 as <code>web</code> ↔ <code>worker</code> on the box, held by a project boundary instead of a container boundary.</p>
 
   <ul>
     <li><strong>Trust boundaries</strong> (numbering and controls from SECURITY §3):
@@ -524,7 +550,7 @@ flowchart TB
         <li>TB-3: app / worker ↔ Postgres (limited roles, RLS).</li>
         <li>TB-4: <code>web</code> (seals with public keys only) ↔ <code>worker</code> (holds the private keyring, mounted into worker only; plaintext exists only inside one <code>open()</code> call frame). Redefined by SECURITY §6.3.</li>
         <li>TB-5: worker ↔ providers (egress only).</li>
-        <li>TB-6: app ↔ OAuth IdPs and Resend.</li>
+        <li>TB-6: app ↔ sign-in providers (Google, Apple, GitHub) and Resend.</li>
         <li>TB-7: box ↔ backup store (encrypted before it leaves the box).</li>
         <li>TB-8: operator SSH ↔ box (superuser; accepted risk R-1).</li>
         <li>TB-9: ordinary write path ↔ purge path.</li>
@@ -559,7 +585,7 @@ flowchart TB
     <li><strong>Staging co-location:</strong> staging stays on the prod VPS (confirms §10's trade-off). Staging holds fake data only, so its compromise has no ledger-confidentiality blast radius; splitting to a second box roughly doubles the fixed monthly cost for a single-household deployment with no compliance driver forcing separation. Revisit only if the app is offered to other self-hosters at meaningfully larger scale, or staging starts touching anything beyond fake data.</li>
     <li><strong>Backup store:</strong> Hetzner Storage Box (same account, cheap) as the default, configured for <strong>append-only</strong> access (a restricted SSH/SFTP subaccount with no delete/overwrite permission on existing objects — Hetzner Storage Box's "no substitution" / read-append mode <strong>(unmeasured)</strong> until the C-73 cannot-delete test in the restore drill below actually passes against it); an S3-compatible bucket with Object Lock in compliance mode is the documented drop-in alternative for self-hosters outside Hetzner. Either way the store credential itself cannot delete or overwrite history (SECURITY C-73's own test: "a test that the store credential cannot delete").</li>
     <li><strong>Mechanism, revised per SECURITY §6.6 (asymmetric recipient, not restic's symmetric repository password):</strong> a nightly <code>pg_dump --format=custom</code> logical backup and continuously-shipped WAL segments are each encrypted with <a href="https://age-encryption.org/"><code>age</code></a> (X25519, the same primitive family as the credential keyring's HPKE scheme) to a <strong>recipient public key</strong>, then uploaded. The box holds only the age <em>public</em> key — sufficient to encrypt, useless to decrypt. This is a deliberate change from an earlier <code>restic</code>-based draft: restic's repository password is symmetric, so a box holding it to <em>write</em> backups could also <em>read</em> them, which fails SECURITY §6.6's "box holds only the public half" requirement outright. Dedup/incremental snapshotting is given up for this; at single-household data volumes the cost is negligible.</li>
-    <li><strong>Key custody:</strong> the age keypair is generated once at bootstrap, off the box. The public half is placed on the VPS (non-secret — it can only encrypt). The private half lives in the operator's password manager and a printed offline recovery copy per the runbook; it is <strong>never</strong> on the VPS, and is a wholly separate key from the credential keyring (§6.1/§6.4) — the two are never stored together, so a single compromised secret can't unwrap both live credentials and backup history. Rotation (new keypair) is a manual runbook step on suspected compromise; old backups stay readable under the old private key, which the runbook says to retain until its last covered backup expires.</li>
+    <li><strong>Key custody:</strong> in plain terms, backups are locked with a key that never lives on the server, so stealing the server does not open them, and losing both offline copies of that key means the backups can never be opened. The age keypair is generated once at bootstrap, off the box. The public half is placed on the VPS (non-secret — it can only encrypt). The private half lives in the operator's password manager and a printed offline recovery copy per the runbook; it is <strong>never</strong> on the VPS, and is a wholly separate key from the credential keyring (§6.1/§6.4) — the two are never stored together, so a single compromised secret can't unwrap both live credentials and backup history. Rotation (new keypair) is a manual runbook step on suspected compromise; old backups stay readable under the old private key, which the runbook says to retain until its last covered backup expires.</li>
     <li><strong>RPO:</strong> ≤ 15 minutes via continuous, individually-encrypted WAL segment shipping; the nightly full dump is the tested fallback restore point (RPO 24h) if WAL replay is unavailable.</li>
     <li><strong>RTO:</strong> ≤ 4 hours for total loss of the VPS — provision a replacement box from the same IaC, decrypt the latest dump and WAL with the offline private key, restore, replay, redeploy the last tagged release image. ≤ 30 minutes for a bad-migration rollback that doesn't need a box rebuild (§8.1).</li>
     <li><strong>Restore drills:</strong> monthly (SECURITY C-73, tightened from this section's earlier quarterly draft), scripted, and run <strong>off the prod VPS</strong> — the operator's own machine, or a throwaway scratch VPS spun up and destroyed for the drill — never a scratch compose project on the box itself: that would put the age private key on the VPS for the drill, which this section's own key-custody rule (§7.2 above) forbids outright, drill or not. Checked against a fixture query (trial balance sums to zero); logged as a runbook checklist item, not assumed to work from the backup job succeeding alone. The drill script also asserts the store credential cannot delete an existing object (C-73's second test, and the measurement the append-only bullet above is waiting on).</li>
