@@ -253,6 +253,27 @@
         <p class="empty-state">Not set up yet. This card will compare your actual allocation to your target once securities/lot tracking ships.</p>
       </div>
     </div>
+
+    <!-- Parent view (POLY-1.1), reference: the Dashboard with a parent
+         selected. Gross is the roll-up as it stands; Economic weights every
+         figure by the viewer's stake from the cap tables and adds economic
+         net worth. It weights exactly the entities the gross roll-up shows,
+         each once, and adds none. A 0% entity stays listed. Drawn here in
+         the Economic state while the page shows Mosko (Person). -->
+    <div class="card" style="margin-top:24px;" aria-labelledby="econ-title">
+      <div class="card-head">
+        <div><span class="eyebrow">Parent selected (reference)</span><div class="card-title" id="econ-title">The Moskos · net worth</div></div>
+        <div class="view-toggle"><div class="tabs" role="radiogroup" aria-label="Figures"><button class="tab" role="radio" aria-checked="false">Gross</button><button class="tab active" role="radio" aria-checked="true">Economic</button></div><span class="badge badge-outline badge-sm">POLY-1.1</span></div>
+      </div>
+      <div style="display:flex; align-items:baseline; gap:12px; flex-wrap:wrap;"><span class="mono" style="font-size:28px; font-weight:600;">$417,347.42</span><span class="card-sub">economic net worth · gross $641,347.42</span></div>
+      <div class="weight-list" style="margin-top:12px;">
+        <div class="kv-row"><span class="kv-label">Mosko (Person)<span class="kv-help">Your own Person</span></span><span class="kv-value"><span class="badge badge-outline badge-sm">100%</span><span class="mono">$354,697.42</span></span></div>
+        <div class="kv-row"><span class="kv-label">The Moskos, own accounts<span class="kv-help">Your 60 of 100 units</span></span><span class="kv-value"><span class="badge badge-outline badge-sm">60%</span><span class="mono">$14,400.00</span></span></div>
+        <div class="kv-row"><span class="kv-label">Mosko Consulting LLC<span class="kv-help">Your 100 of 100 units</span></span><span class="kv-value"><span class="badge badge-outline badge-sm">100%</span><span class="mono">$48,250.00</span></span></div>
+        <div class="kv-row"><span class="kv-label">Sam Mosko (Person)<span class="kv-help">Another Person's own entity</span></span><span class="kv-value"><span class="badge badge-outline badge-sm">0%</span><span class="mono">$0.00</span></span></div>
+      </div>
+      <p class="tm-note">Each figure is the gross figure times your weight: your units in the entity, plus your share through an entity that holds it. Only the entities this parent rolls up are counted.</p>
+    </div>
   </main>
   </div>
 </div>

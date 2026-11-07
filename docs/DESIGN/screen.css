@@ -1986,3 +1986,37 @@ table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
 .tax-close .trail-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
 .tax-close .trail-row .mono { margin-left: auto; }
 .tax-close .tax-actions { margin-top: 12px; }
+
+/* Entities: the cap table beside the membership list. One list of
+   holders and members, two columns: Access and Units. The Outside owners
+   row is computed, never typed. */
+.cap-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+table.data-table.cap-table { font-size: 14px; }
+table.data-table.cap-table th { padding: 8px 6px; font-size: 11px; }
+table.data-table.cap-table td { padding: 8px 6px; vertical-align: middle; }
+table.data-table.cap-table tbody tr:hover { background: transparent; }
+table.data-table.cap-table td.num, table.data-table.cap-table th.num { text-align: right; white-space: nowrap; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+table.data-table.cap-table .input-pct { width: 72px; height: 30px; }
+.cap-holder { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.cap-holder .avatar { width: 24px; height: 24px; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.cap-table .cap-sub { display: block; font-style: normal; font-size: 12px; color: var(--muted-foreground); }
+.cap-invite { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted-foreground); margin-top: 2px; }
+.cap-invite input { accent-color: var(--primary); }
+table.data-table.cap-table tr.cap-outside td { color: var(--muted-foreground); font-style: italic; }
+table.data-table.cap-table tr.cap-total td { font-weight: 600; border-bottom: none; border-top: 2px solid var(--border); }
+table.data-table.cap-table tr.cap-add td { border-bottom: 1px solid var(--border); }
+.cap-save { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.cap-save .field { margin-bottom: 0; }
+.cap-save .input { width: 160px; }
+.cap-history { list-style: none; margin: 6px 0 0; padding: 0; font-size: 13px; }
+.cap-history li { display: flex; gap: 12px; padding: 6px 0; border-top: 1px solid var(--border); }
+.cap-history .mono { flex: none; width: 136px; white-space: nowrap; color: var(--muted-foreground); }
+.cap-error { font-size: 12px; margin-top: 4px; color: color-mix(in srgb, var(--destructive) 80%, var(--foreground)); }
+.cap-refusals { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.cap-refusals .field { margin-bottom: 0; }
+
+/* Parent views (POLY-1.1): the gross / economic toggle and the viewer's
+   weight per entity. A 0% weight is listed like any other, never hidden. */
+.view-toggle { display: inline-flex; align-items: center; gap: 8px; }
+.weight-list .kv-row:last-child { border-bottom: none; }
+.weight-list .kv-value .badge { min-width: 48px; justify-content: center; }
