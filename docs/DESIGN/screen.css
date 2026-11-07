@@ -1980,3 +1980,9 @@ table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
 .treatment-text > span { color: var(--muted-foreground); }
 .map-security { display: flex; align-items: flex-end; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
 .map-security .field { flex: 1 1 200px; }
+
+/* Tax: the reporting-period close card. */
+.tax-close { margin-top: 24px; }
+.tax-close .trail-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+.tax-close .trail-row .mono { margin-left: auto; }
+.tax-close .tax-actions { margin-top: 12px; }

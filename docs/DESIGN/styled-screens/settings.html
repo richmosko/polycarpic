@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Settings (pass 7; styled pass 13). Entry point is PROPOSED under the avatar popover, shown open here with Settings marked current; the Principal has not ruled on the placement. No sidebar nav item is active. Schedule and import options are per entity; app preferences are per user. Viewers can see this page but cannot change schedule/import options (Manager/Owner only, ARCH 2.4). -->
+<!-- Settings (pass 7; styled pass 13). Entry point is PROPOSED under the avatar popover, shown open here with Settings marked current; the Principal has not ruled on the placement. No sidebar nav item is active. Schedule, import options and the tax close cadence (monthly by default, or quarterly; shown only on a taxpayer entity) are per entity; app preferences are per user. Viewers can see this page but cannot change schedule/import options (Manager/Owner only, ARCH 2.4). -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -78,6 +78,10 @@
       <div class="card-head"><span class="card-title">Import options</span><span class="card-sub">This entity only</span></div>
       <div class="kv-row"><span class="kv-label">Cash-in-Transit exceptions threshold<span class="kv-help">An unmatched transfer leg older than this becomes an exception.</span></span><select class="select select-inline" aria-label="Exceptions threshold"><option>3 business days</option><option>5 business days</option><option>10 business days</option></select></div>
       <div class="kv-row"><span class="kv-label">Duplicate detection window<span class="kv-help">Also governs manual-entry duplicate warnings, in New entry and on Pending.</span></span><select class="select select-inline" aria-label="Duplicate detection window"><option>±1 day</option><option>±2 days</option><option>±3 days</option></select></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Tax close</span><span class="card-sub">This entity only</span></div>
+      <div class="kv-row"><span class="kv-label">Reporting-period close cadence<span class="kv-help">How often the tax accrual is trued up. A change applies from the next period end.</span></span><select class="select select-inline" aria-label="Reporting-period close cadence"><option>Monthly</option><option>Quarterly</option></select></div>
     </div>
     <div class="card">
       <div class="card-head"><span class="card-title">App preferences</span><span class="card-sub">Just you, every entity</span></div>

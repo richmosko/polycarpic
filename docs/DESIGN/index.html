@@ -355,14 +355,21 @@ flowchart TD
   danger --> display
   display --> extPay[User pays the tax authority\nat their own bank, the app\nnever initiates a payment]
   extPay --> imported[Payment appears as an imported\nbank transaction, no counterparty]
-  imported --> postEntry[User posts the GL entry:\ndebit the tax-authority custodial\naccount, pending liability itself\ndoes not change, not filed yet]
+  imported --> postEntry[User posts the GL entry:\ndebit the tax-authority custodial\nprepaid account, which lowers\nthe pending liability]
   postEntry --> accrual
   display --> waitNode([Wait for next period cutoff])
   waitNode --> freeze[Period cutoff freezes\nannualized figure for due date]
   freeze --> accrual
+  display --> closeDue{Period ended and\nentity a taxpayer?}
+  closeDue -- yes --> closePrompt[Close-due prompt, per jurisdiction:\ntrue-up since last close]
+  closePrompt --> closeConfirm[User confirms: expense against\nincome tax payable, one entry]
+  closeConfirm --> closed([Last closed through updates])
+  closeDue -- "no, pass-through" --> allocated[Income allocates to owners\nby share; each Person accrues]
   </pre>
   <ul>
     <li><strong>Reached from the sidebar or the Dashboard card;</strong> both land on the same per-entity view with a jurisdiction selector.</li>
+    <li><strong>Reporting-period close.</strong> A taxpayer entity trues up its accrual at each close, monthly by default or quarterly (Settings). A close-due prompt shows per jurisdiction; the user confirms one entry of expense against income tax payable, computed before prepaid. "Last closed through &lt;date&gt;" shows the status. A wrong close is fixed by closing again.</li>
+    <li><strong>Pass-through income.</strong> A pass-through or grantor entity accrues nothing; a Person sees income allocated from such entities by ownership share, totals only.</li>
     <li><strong>Tiers:</strong> on track when <code>gap &lt; 0</code> (prepaid ahead of the safe-harbor requirement); caution when <code>gap ≥ 0</code> and the due date is more than 14 days out; danger when <code>gap ≥ 0</code> and the due date is within 14 days or has passed. They reuse the product-wide status vocabulary — design-system-spec.md § Status tiers.</li>
     <li><strong>Gap = 0 is not on track.</strong> It means exactly at the safe-harbor line, with nothing in hand beyond the requirement, so it takes the caution or danger tier by due date.</li>
     <li><strong>Two figures,</strong> both measured against the custodial account's balance but not against each other: <strong>Pending liability = annualized tax to date − custodial prepaid balance</strong> (what you would owe net of prepayments, if filed today); <strong>Gap = required payments to date (safe harbor) − custodial balance</strong> ("are you current with the authority"). Gap is never <code>required − pending</code>.</li>
@@ -529,9 +536,10 @@ flowchart TD
   <ul>
     <li><strong>A nav item from day one.</strong> Until POLY-M5 ships statements, every tab shows the Dashboard's empty-state pattern: real card chrome and plain "Not set up yet" copy that never names a milestone or version. The tab is never hidden or disabled.</li>
     <li><strong>Custodial NAV and NAV delta</strong> (ARCH §2.4) sit beside the Balance Sheet, not as extra tabs.</li>
+    <li><strong>Estimated tax since last close.</strong> Between closes the Balance Sheet and NAV add one computed line, labelled as an estimate and kept out of the trial balance, with "last closed through" under the statement. Net assets are right on any day with nothing posted on read.</li>
     <li>The as-of date (Balance Sheet) or period (Income Statement, Cash Flow) and the entity scope every figure; the entity comes from the header selector.</li>
     <li>Every statement line drills to the account register behind it (flow 5.8). Export formats are not yet specified.</li>
-    <li><code>reports.html</code> shows dimmed Income Statement and Cash Flow previews for review only; they do not ship.</li>
+    <li><code>reports.html</code> shows dimmed Balance Sheet, Income Statement and Cash Flow previews for review only; they do not ship.</li>
   </ul>
 
   <h3 id="flow-sidebar">5.10 Sidebar &amp; app shell</h3>
