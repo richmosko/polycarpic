@@ -1957,3 +1957,16 @@ table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
 /* Allocation: the unmapped-holdings gap row closes the Actual vs. target card. */
 .alloc-gap .card-sub { min-width: 0; }
 .alloc-gap .alloc-name .je-link { color: var(--primary); text-decoration: underline; }
+
+/* Entities: nested parents, a parent's own accounts, and the card sections. */
+.pack-outer { width: 640px; justify-content: center; padding-top: 0; }
+.pack-outer > .pack-children { align-items: center; margin-top: 8px; }
+.pack-outer .pack-parent { width: 300px; flex: none; }
+.pack-outer .pack-parent .pack-child { width: 116px; }
+.pack-own { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--muted-foreground); }
+.pack-own .icon { width: 10px; height: 10px; }
+.entity-section { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--border); }
+.incl-row { display: flex; align-items: center; gap: 8px; font-size: 14px; min-height: 32px; }
+.entity-tax { border-top: 1px solid var(--border); border-bottom: none; }
+.entity-tax .select { flex: none; width: 216px; }
+.entity-section .kv-row:last-child { border-bottom: none; }
