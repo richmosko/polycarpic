@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Tax. Per entity, per jurisdiction (tabs are data-driven: one per jurisdiction the entity files in). Two figures that are never combined: Pending liability = annualized tax to date - custodial prepaid balance (what you would owe, net of prepayments, if you filed today); Gap = required safe-harbor payments to date - custodial prepaid balance (are you current with the authority). The tier follows the gap: on track gap < 0; caution gap >= 0 with the due date more than 14 days out; danger gap >= 0 with the due date within 14 days or passed (flow 5.4). Shown: Federal 2026 on Nov 2, 2026, with the Sep 15 installment $200 short, so the danger tier. The prepaid balance is the GL account Prepaid Tax - Federal ($3,100.00, same as the General Ledger tree) and links to its register. The app never moves money: the action is "Post your payment" (from the imported bank transaction on Transactions), never "Pay". Reached from the sidebar Tax item or the Dashboard tax card. -->
+<!-- Tax. Per entity, per jurisdiction (tabs are data-driven: one per jurisdiction the entity files in). Two figures that are never combined: Pending liability = annualized tax to date - custodial prepaid balance (what you would owe, net of prepayments, if you filed today); Gap = required safe-harbor payments to date - custodial prepaid balance (are you current with the authority). The tier follows the gap: on track gap < 0; caution gap >= 0 with the due date more than 14 days out; danger gap >= 0 with the due date within 14 days or passed (flow 5.4). Shown: Federal 2026 on Nov 2, 2026, with the Sep 15 installment $200 short, so the danger tier. The prepaid balance is the GL account Prepaid Tax - Federal ($3,100.00, same as the General Ledger tree) and links to its register. The app never moves money: the action is "Post your payment" (from the imported bank transaction on Transactions), never "Pay". Reached from the sidebar Tax item or the Dashboard tax card. Reporting-period close, per jurisdiction, for a taxpayer entity: at period end a close-due prompt and notification appear, and the user confirms one entry per jurisdiction, the change in the to-date tax before prepaid since the last close, against income tax payable. "Last closed through" shows the status. Nothing accrues between closes. A pass-through or grantor entity has no close card. The Income allocated card shows a Person its share of pass-through entities' income, totals only. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -90,6 +90,21 @@
       </div>
     </div>
 
+    <div class="card tax-close" aria-labelledby="close-title">
+      <div class="card-head">
+        <span class="card-title" id="close-title">Reporting-period close</span>
+        <span class="badge badge-warning-soft">Close due</span>
+      </div>
+      <p class="card-sub">Last closed through <strong>Sep 30, 2026</strong>. October ended, so the Federal accrual is ready to true up. Monthly close; change the cadence in <a class="je-link" href="settings.html">Settings</a>.</p>
+      <div class="tax-math"><span>Annualized tax to date, Oct 31</span><span class="mono">$5,600.00</span><span>− Accrued through Sep 30</span><span class="mono">$5,133.33</span><span>= True-up to post</span><span class="mono">$466.67</span></div>
+      <div class="trail-row" style="margin-top:12px;"><abbr class="leg-side" title="Debit">DR</abbr><span class="acct-path" title="Expenses › Income tax expense — Federal"><span class="acct-seg">Expenses</span><span class="acct-sep" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="acct-leaf">Income tax expense — Federal</span></span><span class="mono">$466.67</span></div>
+      <div class="trail-row"><abbr class="leg-side" title="Credit">CR</abbr><span class="acct-path" title="Liabilities › Income tax payable — Federal"><span class="acct-seg">Liabilities</span><span class="acct-sep" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></span><span class="acct-leaf">Income tax payable — Federal</span></span><span class="mono">$466.67</span></div>
+      <div class="tax-actions">
+        <button class="btn btn-default" type="button">Confirm Federal close through Oct 31</button>
+        <span class="card-sub">Each jurisdiction closes on its own tab. The amount is before prepaid, which stays a separate asset. A wrong close is fixed by closing that period again.</span>
+      </div>
+    </div>
+
     <div class="card-grid tax-lower">
       <div class="card">
         <div class="card-title">2026 installments</div>
@@ -107,6 +122,12 @@
         <div class="kv-row"><span>Last payment posted</span><span class="kv-value">Sep 12, 2026</span></div>
         <p class="tax-help" style="margin-top:12px;">Both figures above subtract this balance. Open the register to see every posted payment.</p>
       </div>
+    </div>
+    <div class="card" style="margin-top:24px;" aria-labelledby="alloc-inc-title">
+      <div class="card-head"><span class="card-title" id="alloc-inc-title">Income allocated to you</span><span class="card-sub">From pass-through entities, tax year 2026 to date</span></div>
+      <div class="kv-row"><span class="kv-label">Mosko Consulting LLC<span class="kv-help">Business, pass-through · your share 100%</span></span><span class="kv-value mono">$18,400.00</span></div>
+      <div class="kv-row"><span class="kv-label">The Moskos<span class="kv-help">Household, pass-through to members · your share 60%</span></span><span class="kv-value mono">$2,100.00</span></div>
+      <p class="tax-help" style="margin-top:12px;">Already inside annualized tax to date above. Shares are set on <a class="je-link" href="entities.html">Entities</a>; only these totals reach this page.</p>
     </div>
   </main>
   </div>

@@ -21,15 +21,22 @@ flowchart TD
   danger --> display
   display --> extPay[User pays the tax authority\nat their own bank, the app\nnever initiates a payment]
   extPay --> imported[Payment appears as an imported\nbank transaction, no counterparty]
-  imported --> postEntry[User posts the GL entry:\ndebit the tax-authority custodial\naccount, pending liability itself\ndoes not change, not filed yet]
+  imported --> postEntry[User posts the GL entry:\ndebit the tax-authority custodial\nprepaid account, which lowers\nthe pending liability]
   postEntry --> accrual
   display --> waitNode([Wait for next period cutoff])
   waitNode --> freeze[Period cutoff freezes\nannualized figure for due date]
   freeze --> accrual
+  display --> closeDue{Period ended and\nentity a taxpayer?}
+  closeDue -- yes --> closePrompt[Close-due prompt, per jurisdiction:\ntrue-up since last close]
+  closePrompt --> closeConfirm[User confirms: expense against\nincome tax payable, one entry]
+  closeConfirm --> closed([Last closed through updates])
+  closeDue -- "no, pass-through" --> allocated[Income allocates to owners\nby share; each Person accrues]
 ```
 
 **Notes**
 - **Reached from the sidebar or the Dashboard card;** both land on the same per-entity view with a jurisdiction selector.
+- **Reporting-period close.** A taxpayer entity trues up its accrual at each close, monthly by default or quarterly (Settings). A close-due prompt shows per jurisdiction; the user confirms one entry of expense against income tax payable, computed before prepaid. "Last closed through <date>" shows the status. A wrong close is fixed by closing again.
+- **Pass-through income.** A pass-through or grantor entity accrues nothing; a Person sees income allocated from such entities by ownership share, totals only.
 - **Tiers:** on track when `gap < 0` (prepaid ahead of the safe-harbor requirement); caution when `gap ≥ 0` and the due date is more than 14 days out; danger when `gap ≥ 0` and the due date is within 14 days or has passed. They reuse the product-wide status vocabulary — design-system-spec.md § Status tiers.
 - **Gap = 0 is not on track.** It means exactly at the safe-harbor line, with nothing in hand beyond the requirement, so it takes the caution or danger tier by due date.
 - **Two figures,** both measured against the custodial account's balance but not against each other: **Pending liability = annualized tax to date − custodial prepaid balance** (what you would owe net of prepayments, if filed today); **Gap = required payments to date (safe harbor) − custodial balance** ("are you current with the authority"). Gap is never `required − pending`.

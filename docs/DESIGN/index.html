@@ -263,6 +263,8 @@ flowchart TD
   rowWarn -- review as usual --> transfer
   transfer -- same posting date --> autoEntry[Locked custodial leg +\nsuggested offset leg\ntwo-line preview]
   transfer -- different dates --> citEntry[Two entries via\nCash in Transit clearing account]
+  transfer -- between two entities --> treatment{Treatment on the draft:\ncontribution / distribution preselected,\nor due-to / due-from}
+  treatment --> perEntity[One entry per entity]
   transfer -- unmatched --> openItem[Remains a single-leg\nPending row]
   openItem -- counterpart arrives --> transfer
   openItem -- user approves into CIT --> citOne[One-sided in-flight item:\ncash leg vs. Cash in Transit,\ncounterpart still to come]
@@ -322,6 +324,8 @@ flowchart TD
     <li><strong>Potential-duplicate warning.</strong> While a manual entry is open in the New entry modal, each custodial leg is compared with imported transactions that are Pending or Posted. A candidate has the same custodial account, the same amount and direction, and a date within the entity's Duplicate detection window of the entry's Date, either side (Settings, default ±1 day). A candidate shows a caution-tier warning above the actions naming it: "Looks like Sep 12 · Stripe Payout +$1,500.00 on Primary Checking, Pending". The nearest date is named, and a Pending candidate wins a tie. <strong>Match to that transaction instead</strong> discards the manual entry and opens the Pending row's review panel, pre-filled with the modal's offset leg; for a Posted candidate this action reads <strong>Open that entry</strong> and opens its Journal ID popover. <strong>Post anyway</strong> takes the Post button's place and posts the entry: its row carries a muted <code>outline</code> <code>possible duplicate</code> badge under its status until the user dismisses it from the popover or matches the import. Only New entry and imports check, because Correct entry, Split and Group start from a real transaction.</li>
     <li><strong>Mirror on Pending.</strong> The same rule and window run on Pending: an imported transaction that matches a posted manual entry, whichever arrived first, shows a caution line on its row: "Looks like manual entry JE-000215 · Sep 11 · +$1,500.00". The line shows collapsed or expanded, and the Journal ID opens that entry's popover. The nearest date is named, and an entry already linked to an import is no longer a candidate. The review panel adds <strong>Match to that entry</strong> as its default action, and Approve &amp; Post steps down to an outline button beside it so Enter cannot slip past it. <strong>Match to that entry</strong> links the import to the existing entry and posts nothing: the row leaves Pending, the entry stays as it is, and the Posted count holds. The entry's row gains a <code>matched import</code> status line and loses any <code>possible duplicate</code> badge, and its popover lists the import. Approve &amp; Post past the caution keeps both. Dismiss possible duplicate on the entry clears the caution on the row it names.</li>
     <li><strong>Journal ID popover.</strong> Clicking a Journal ID on Posted opens a <code>Popover</code> anchored to the ID, so an entry can be read without leaving the list. Header line: Journal ID with copy, transaction date, actor, "logged &lt;timestamp&gt;", status badge. Body: every leg, then the correction trail if any (the original and its reversal, since the entry's own legs are already above). Footer: <strong>Open in General Ledger</strong>, to the entry's row on the Journal entries card, plus <strong>Dismiss possible duplicate</strong> on a row that carries that badge. It is non-modal: an outside click or Esc dismisses it and focus returns to the ID. The View correction chevron on a Corrected row is a separate control: it expands the trail in place. The account register's Journal ID stays a link to the GL.</li>
+    <li><strong>A cross-entity transfer carries one treatment choice</strong> on the draft: contribution / distribution preselected, or due-to / due-from. Each option says in plain language what it does to both balance sheets, and due-to / due-from says repayment is expected. One entry posts per entity, and both need Manager.</li>
+    <li><strong>A brokerage draft splits by nature,</strong> one line per security under its nature account, with the cash leg locked. A trade in an unmapped security stays in Pending with an inline Map security form; mapping clears every waiting trade in it and Allocation's gap.</li>
     <li><strong>An unmatched transfer leg stays a staged draft</strong> in Pending until its counterpart arrives (then it matches like any transfer), or until the user explicitly approves it into Cash in Transit as a one-sided in-flight item — a balanced entry, cash leg against the CIT clearing account, cleared when the counterpart posts. A draft still unmatched past the exceptions threshold moves to Exceptions.</li>
     <li><strong>Posting gate:</strong> Σ debits = Σ credits; the accounting equation holds per entity; the entry date matches the bank date (or the Cash-in-Transit rule); every posted draft links to exactly one entry, and several drafts may share it (a group, a same-date matched transfer). Any failure keeps the item in Pending — no partial or silent post.</li>
     <li>A posted row's user-facing action is <strong>"Correct entry"</strong>, never "edit" or "reverse" — reversal-only underneath (PRD §5). Click-through shows the full trail: original lines shaded/struck, the reversal, and the new entry. Correct entry on any row of a multi-row entry corrects that one entry, and every row of it then carries the corrected entry's ID and the Corrected badge. See design-system-spec.md § Correcting a posted entry.</li>
@@ -351,14 +355,21 @@ flowchart TD
   danger --> display
   display --> extPay[User pays the tax authority\nat their own bank, the app\nnever initiates a payment]
   extPay --> imported[Payment appears as an imported\nbank transaction, no counterparty]
-  imported --> postEntry[User posts the GL entry:\ndebit the tax-authority custodial\naccount, pending liability itself\ndoes not change, not filed yet]
+  imported --> postEntry[User posts the GL entry:\ndebit the tax-authority custodial\nprepaid account, which lowers\nthe pending liability]
   postEntry --> accrual
   display --> waitNode([Wait for next period cutoff])
   waitNode --> freeze[Period cutoff freezes\nannualized figure for due date]
   freeze --> accrual
+  display --> closeDue{Period ended and\nentity a taxpayer?}
+  closeDue -- yes --> closePrompt[Close-due prompt, per jurisdiction:\ntrue-up since last close]
+  closePrompt --> closeConfirm[User confirms: expense against\nincome tax payable, one entry]
+  closeConfirm --> closed([Last closed through updates])
+  closeDue -- "no, pass-through" --> allocated[Income allocates to owners\nby share; each Person accrues]
   </pre>
   <ul>
     <li><strong>Reached from the sidebar or the Dashboard card;</strong> both land on the same per-entity view with a jurisdiction selector.</li>
+    <li><strong>Reporting-period close.</strong> A taxpayer entity trues up its accrual at each close, monthly by default or quarterly (Settings). A close-due prompt shows per jurisdiction; the user confirms one entry of expense against income tax payable, computed before prepaid. "Last closed through &lt;date&gt;" shows the status. A wrong close is fixed by closing again.</li>
+    <li><strong>Pass-through income.</strong> A pass-through or grantor entity accrues nothing; a Person sees income allocated from such entities by ownership share, totals only.</li>
     <li><strong>Tiers:</strong> on track when <code>gap &lt; 0</code> (prepaid ahead of the safe-harbor requirement); caution when <code>gap ≥ 0</code> and the due date is more than 14 days out; danger when <code>gap ≥ 0</code> and the due date is within 14 days or has passed. They reuse the product-wide status vocabulary — design-system-spec.md § Status tiers.</li>
     <li><strong>Gap = 0 is not on track.</strong> It means exactly at the safe-harbor line, with nothing in hand beyond the requirement, so it takes the caution or danger tier by due date.</li>
     <li><strong>Two figures,</strong> both measured against the custodial account's balance but not against each other: <strong>Pending liability = annualized tax to date − custodial prepaid balance</strong> (what you would owe net of prepayments, if filed today); <strong>Gap = required payments to date (safe harbor) − custodial balance</strong> ("are you current with the authority"). Gap is never <code>required − pending</code>.</li>
@@ -422,27 +433,30 @@ flowchart TD
   sum -- no --> edit
   sum -- yes --> save[Save target]
   save --> drift
+  act -- open the unmapped gap row --> gap([Pending on Transactions:\nthe staged trade, map the security])
   act -- none --> done([View complete])
   </pre>
   <ul>
-    <li><strong>Same data, different aggregation:</strong> actual allocation is the lots' market value summed by asset class across every custodial account for the entity — not a new data source.</li>
+    <li><strong>Same data, different aggregation:</strong> the four classes are the ledger's nature classes. The market reading (lots by class, plus cash) ties to Custodial Accounts' market value; the book reading (the nature accounts) ties to its book value and the General Ledger tree.</li>
+    <li><strong>Classes fixed, sub-categories yours.</strong> The target editor cannot add or remove a class, because the ledger is organised by them. Sub-categories are a per-security mapping outside the ledger and stay editable.</li>
+    <li><strong>Unmapped holdings are a visible gap,</strong> never silently excluded: a position the custodian reports with no class mapping shows as a gap row with its dollars and a route to the staged trade in Pending, outside the total until mapped.</li>
     <li><strong>Drift is information, not a warning.</strong> Over or under target shows as a neutral <code>outline</code> badge ("+2 pt over", "−2 pt under"); on target shows the positive soft badge. No caution or danger hue.</li>
-    <li><strong>Tier, class, sub-category.</strong> Asset classes sit under two tiers: Current (Cash &amp; Cash Equivalents) and Non-Current (Fixed Income Securities, Marketable Securities, Alternative Investment Assets). A tier is a label with its share, never a colour: captions over the treemap's two columns, group headers in the bars and the target editor.</li>
+    <li><strong>Tier, class, sub-category.</strong> Asset classes sit under two tiers: Current (Cash and cash equivalents) and Non-Current (Fixed income securities, Marketable securities, Alternative investment assets). A tier is a label with its share, never a colour: captions over the treemap's two columns, group headers in the bars and the target editor.</li>
     <li><strong>Treemap first, table second.</strong> The page opens on the current allocation as a nested treemap: one tile per asset class in its fixed categorical slot, its sub-categories inside it in the same slot. The Actual vs. target card below is its table view and carries every percent.</li>
     <li><strong>Drill opens in place.</strong> Each treemap tile and each asset-class or sub-category name opens a read-only holdings popover on Allocation, because a class spans accounts and no single Custodial card can show it. Header: name, tier path, actual percent and dollars, target, drift badge. Body: the holdings behind that figure, grouped by custodial account with the account's share, each security with the Custodial card's lots pull-down; a cash sub-category lists cash balances per account. Footer: the aggregate total and one link, Open Custodial Accounts, which arrives with those accounts' cards open. Esc or a click outside closes it.</li>
-    <li><strong>Sub-categories behind a pull-down.</strong> Every class row, in the Actual vs. target card and in the target editor, has a chevron that reveals its sub-categories (the lots sub-card's disclosure pattern). Seeded defaults: Cash &amp; Cash Equivalents → Cash, Money market; Fixed Income Securities → Treasuries, Corporate, Municipal; Marketable Securities → US Large cap, US Mid/Small cap, Intl Developed, Intl Emerging; Alternative Investment Assets → Digital Assets. In the Actual vs. target card, each sub-row shows its own actual / target and drift badge.</li>
+    <li><strong>Sub-categories behind a pull-down.</strong> Every class row, in the Actual vs. target card and in the target editor, has a chevron that reveals its sub-categories (the lots sub-card's disclosure pattern). Seeded defaults: Cash and cash equivalents → Cash, Money market; Fixed income securities → Treasuries, Corporate, Municipal; Marketable securities → US Large cap, US Mid/Small cap, Intl Developed, Intl Emerging; Alternative investment assets → Digital Assets. In the Actual vs. target card, each sub-row shows its own actual / target and drift badge.</li>
     <li><strong>The gear opens the target editor.</strong> A gear icon button at the top right of the Actual vs. target card opens the editor in a popover anchored to it, non-modal so the bars stay readable while targets change. Cancel or Esc closes it and discards the edits; a click outside closes it only when nothing has been edited. Focus moves to the first input on open and returns to the gear on close.</li>
     <li><strong>Target editor, two levels:</strong> sub-targets are whole-portfolio percent and must sum to their class target; the class row stays editable and carries a reconcile badge (positive soft "Sub-targets sum to N%", or neutral outline "N pt unassigned"). Save is enabled only when the classes total 100% and every class reconciles. Viewers see the treemap and the bars but no gear (write controls are omitted, not greyed).</li>
     <li><strong>No nominal / inflation-adjusted toggle here.</strong> Allocation is a contemporaneous snapshot of today's holdings, so a CPI-U restatement adds no information; the toggle (PRD §4.10) belongs to the time-series views (Dashboard net-worth chart, Reports).</li>
   </ul>
 
   <h3 id="flow-entity-membership">5.7 Entity switch, roll-up &amp; membership access</h3>
-  <p class="section-hint"><strong>Story (PRD §4.9):</strong> parents roll up whole base entities; owner / manager / viewer per entity; the drill-through boundary. Source: <a href="flows/entity-membership-flow.md">flows/entity-membership-flow.md</a>.</p>
+  <p class="section-hint"><strong>Story (PRD §4.9):</strong> parents hold accounts and roll up whole entities to any depth; owner / manager / viewer per entity; the drill-through boundary. Source: <a href="flows/entity-membership-flow.md">flows/entity-membership-flow.md</a>.</p>
   <pre class="mermaid">
 flowchart TD
   login([User logs in]) --> memberships[Load memberships:\nbase and parent entities,\nrole on each]
   memberships --> land[Land on last-viewed entity,\nelse the user's own Person entity]
-  land --> switcher[Entity switcher, always present:\nevery entity with membership,\nparents with their included\nbase entities nested]
+  land --> switcher[Entity switcher, always present:\nevery entity with membership,\nparents with their included\nentities nested]
   switcher --> select[User selects an entity]
   select --> roleCheck{Role on\nselected entity}
   roleCheck -- owner --> ownerView[Full read/write:\npost, edit memberships, purge]
@@ -454,20 +468,22 @@ flowchart TD
   guard -- "no (always)" --> explicit[Only explicit membership\ngrants access, never inherited]
   explicit --> kind{Selected entity\nis a parent?}
   kind -- no --> baseView([Render the base entity's\nown ledger and accounts])
-  kind -- yes --> consolidated[Render consolidated figures\nacross the whole included\nbase entities]
+  kind -- yes --> consolidated[Render consolidated figures:\nits own accounts plus the whole\nincluded entities, each once]
   consolidated --> drill[User clicks a figure\nfrom an included entity]
-  drill --> boundary{Membership on\nthat base entity?}
+  drill --> boundary{Membership on\nthat entity?}
   boundary -- yes --> into([Drill into that entity's\nregister or lots])
   boundary -- no --> stop([Boundary panel:\nIncluded from the named entity,\nno access to its ledger])
   </pre>
   <ul>
-    <li><strong>Base and parent entities.</strong> Accounts (custodial and GL) live only in base entities: Person, Trust, Business. A parent (Household; Holding) rolls up <strong>whole</strong> base entities, never individual accounts. A base entity may belong to more than one parent.</li>
-    <li><strong>The switcher is always present,</strong> because every user owns at least their own Person entity. It lists every entity the user holds membership on, base and parent, with each parent's included base entities nested under it; a base entity in two parents is listed under both.</li>
+    <li><strong>Base and parent entities.</strong> Any entity may hold accounts: a base entity (Person, Trust, Business) has no children, and a parent (Household; Holding) may own accounts directly, such as joint checking. A parent rolls up its own accounts and <strong>whole</strong> entities to any depth, never individual accounts, each entity counted once. An entity may belong to more than one parent.</li>
+    <li><strong>The switcher is always present,</strong> because every user owns at least their own Person entity. It lists every entity the user holds membership on, base and parent, with each parent's included entities nested under it; an entity in two parents is listed under both.</li>
     <li><strong>Access is explicit membership only</strong> (PRD §5, hard requirement): a parent's membership never grants access to an included base entity, or vice versa.</li>
-    <li><strong>The drill-through boundary.</strong> A parent viewer sees the parent's consolidated figures. Every figure stays clickable; a drill into an included base entity the user has no membership on opens a boundary panel — "Included from &lt;entity&gt;. You don't have access to that entity's ledger." — instead of the register, never a disabled number or a silent dead end.</li>
+    <li><strong>Placement is notify-and-pull-out.</strong> Agreeing to a parent accepts its later placement: every owner beneath is notified, the notification routes to the entity's Included under list, which names the parents above it with direct links marked, and an owner can remove a direct link. Either the entity's owner or the parent's owner may remove it.</li>
+    <li><strong>Tax classification and shares.</strong> A settable field on every entity. A parent is Joint filers or Pass-through to members, the default for a new Household. A pass-through entity has an ownership-share editor that must total 100%.</li>
+    <li><strong>The drill-through boundary.</strong> A parent viewer sees the parent's consolidated figures. Every figure stays clickable; a drill into an included entity the user has no membership on opens a boundary panel — "Included from &lt;entity&gt;. You don't have access to that entity's ledger." — instead of the register, never a disabled number or a silent dead end.</li>
     <li>Role badges (<code>Owner</code> / <code>Manager</code> / <code>Viewer</code>) use decreasing visual weight — <code>default</code> / <code>secondary</code> / <code>outline</code> (design-system-spec.md § Entity, account, and category badges).</li>
     <li>A viewer never sees a write affordance rendered-then-disabled: write controls are omitted entirely for a role that cannot use them.</li>
-    <li><strong>Roll-up map:</strong> Entities opens with a Pack of every entity the user holds membership on — parents as circles holding their base entities, each circle stroked in its entity type's categorical slot, a shared base entity drawn once in each parent with an "also in" marker; each circle switches entity. The membership list below it is the accessible fallback. See design-system-spec.md § Entities &amp; membership.</li>
+    <li><strong>Roll-up map:</strong> Entities opens with a Pack of every entity the user holds membership on — parents as circles nested to any depth, stating any accounts of their own, each circle stroked in its entity type's categorical slot, a shared base entity drawn once in each parent with an "also in" marker; each circle switches entity. The membership list below it is the accessible fallback. See design-system-spec.md § Entities &amp; membership.</li>
   </ul>
 
   <h3 id="flow-general-ledger">5.8 General Ledger: tree, register, entry</h3>
@@ -475,7 +491,7 @@ flowchart TD
   <pre class="mermaid">
 flowchart TD
   open([Open General Ledger\nfor entity]) --> tabs{Tab}
-  tabs -- default --> tree[Chart of accounts tab:\ncategory → account → sub-account,\nGL balances]
+  tabs -- default --> tree[Chart of accounts tab:\ncategory → nature class →\ncustodian sub-account, GL balances]
   tabs --> map[Balance sheet map tab, prototype:\nAssets vs. Liabilities + Equity]
   tabs --> journal[Journal entries tab:\nby date, page size,\ndate range, sort]
   tree --> act{User action}
@@ -492,11 +508,11 @@ flowchart TD
   </pre>
   <ul>
     <li><strong>Three tabs, one section at a time:</strong> Chart of accounts (the default), Balance sheet map and Journal entries, in one <code>Tabs</code> row at the top of the content. Each keeps its card header. The URL hash carries the tab, so Back from a register returns to the tab it left; a Journal ID link selects Journal entries; the register's breadcrumb returns to the tree.</li>
-    <li><strong>The tree is the GL's own view:</strong> every balance is the ledger's figure. The custodial badge (<code>landmark</code> icon + institution) is a cross-reference to Custodial Accounts, never a second data source; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.</li>
+    <li><strong>The tree is the GL's own view:</strong> every balance is the ledger's figure. Under Assets the rows are the four nature classes, each with a sub-account per custodian. The custodial badge (<code>landmark</code> icon + the custodial account's name) ties a sub-account to its card on Custodial Accounts and is never a second data source; one custodial account can sit under several classes, and its book value is the sum of those rows; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.</li>
     <li><strong>The register is account-scoped and running-balance-shaped;</strong> Transactions is transaction-scoped: every posted transaction is a row and carries its entry's Journal ID; an entry built from several transactions appears as several rows with one ID; the GL Journal entries card is the entry-grained view. Different questions, deliberately two screens.</li>
     <li><strong>A register line expands to its full journal entry</strong> in the same block as the Journal entries card: every leg, not just the one that hit this account, plus the correction trail where one exists, with actor attribution and the Correct entry action (flow 5.3). Its Journal ID links to the GL card.</li>
     <li><strong>Balance sheet map (prototype):</strong> a nested treemap on its own tab, Assets | Liabilities + Equity as equal halves, each element in its fixed categorical slot; each tile opens its register. Allocation's current-allocation map is the second instance of the pattern. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
-    <li><strong>A leg always names its account by full path,</strong> root to leaf, in the expanded entry on the register and on the Journal entries card: Assets › Cash › Primary Checking. The tree and the treemap show the leaf alone.</li>
+    <li><strong>A leg always names its account by full path,</strong> root to leaf, in the expanded entry on the register and on the Journal entries card: Assets › Marketable securities › Schwab brokerage. The tree and the treemap show the leaf alone.</li>
     <li><strong>Journal entries card:</strong> on its own tab, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted tab. It lists a correction's three entries as three rows; the Posted tab rolls them into one.</li>
     <li><strong>Journal ID:</strong> a short per-entity display number, <code>JE-000214</code>, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted tab and the register, copied on hover, so any entry can be cited exactly.</li>
     <li><strong>Journal ID links:</strong> on the register the ID links to the entry's row on the Journal entries card (<code>general-ledger.html#je-000212</code>), and on the Posted tab the ID opens a popover whose Open in General Ledger link goes to the same row (flow 5.3). Arriving selects the tab, highlights the row and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).</li>
@@ -520,9 +536,10 @@ flowchart TD
   <ul>
     <li><strong>A nav item from day one.</strong> Until POLY-M5 ships statements, every tab shows the Dashboard's empty-state pattern: real card chrome and plain "Not set up yet" copy that never names a milestone or version. The tab is never hidden or disabled.</li>
     <li><strong>Custodial NAV and NAV delta</strong> (ARCH §2.4) sit beside the Balance Sheet, not as extra tabs.</li>
+    <li><strong>Estimated tax since last close.</strong> Between closes the Balance Sheet and NAV add one computed line, labelled as an estimate and kept out of the trial balance, with "last closed through" under the statement. Net assets are right on any day with nothing posted on read.</li>
     <li>The as-of date (Balance Sheet) or period (Income Statement, Cash Flow) and the entity scope every figure; the entity comes from the header selector.</li>
     <li>Every statement line drills to the account register behind it (flow 5.8). Export formats are not yet specified.</li>
-    <li><code>reports.html</code> shows dimmed Income Statement and Cash Flow previews for review only; they do not ship.</li>
+    <li><code>reports.html</code> shows dimmed Balance Sheet, Income Statement and Cash Flow previews for review only; they do not ship.</li>
   </ul>
 
   <h3 id="flow-sidebar">5.10 Sidebar &amp; app shell</h3>

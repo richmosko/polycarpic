@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Reports (pass 7; styled pass 13). Balance Sheet / Income Statement / Cash Flow. Today: the Balance Sheet card is the Dashboard's empty-state pattern (real card chrome, plain 'Not set up yet' copy that never names a milestone). The two dimmed Preview cards show the planned statement shape for review only; they do not ship as previews. NAV and NAV delta (ARCH 2.4) surface beside the Balance Sheet once it ships. -->
+<!-- Reports (pass 7; styled pass 13). Balance Sheet / Income Statement / Cash Flow. Today: the Balance Sheet card is the Dashboard's empty-state pattern (real card chrome, plain 'Not set up yet' copy that never names a milestone). The three dimmed Preview cards show the planned statement shape for review only; they do not ship as previews. NAV and NAV delta (ARCH 2.4) surface beside the Balance Sheet once it ships. Between closes the Balance Sheet and NAV add one computed line, "Estimated tax since last close", labelled as an estimate, with "last closed through" under the statement; both arrive with tax. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -63,11 +63,19 @@
         <button class="tab" role="tab">Income Statement</button>
         <button class="tab" role="tab">Cash Flow</button>
       </div>
-      <select class="select select-inline" aria-label="As of"><option>As of Sep 30, 2026</option></select>
+      <select class="select select-inline" aria-label="As of"><option>As of Nov 2, 2026</option></select>
     </div>
     <div class="card">
       <span class="eyebrow">Balance sheet</span>
       <p class="empty-state">Not set up yet. This report will show assets, liabilities and equity as of a chosen date, sourced from the General Ledger.</p>
+    </div>
+    <div class="card planned" style="margin-top:24px;" aria-label="Preview of the planned Balance Sheet">
+      <div class="card-head"><span class="card-title">Balance Sheet</span><span class="badge badge-outline">Preview · Nov 2, 2026</span></div>
+      <div class="statement-row"><span>Assets</span><span class="mono">$362,744.75</span></div>
+      <div class="statement-row"><span>Liabilities</span><span class="mono">−$8,047.33</span></div>
+      <div class="statement-row"><span>Estimated tax since last close <span class="badge badge-outline badge-sm">Estimate</span></span><span class="mono">−$568.67</span></div>
+      <div class="statement-row total"><span>Net assets</span><span class="mono">$354,128.75</span></div>
+      <p class="card-sub" style="margin-top:8px;">Last closed through Sep 30, 2026. The estimate is computed for this date, is not a ledger balance and stays out of the trial balance.</p>
     </div>
     <div class="card-grid" style="grid-template-columns:1fr 1fr; margin-top:24px;">
       <div class="card planned" aria-label="Preview of the planned Income Statement">
