@@ -1970,3 +1970,13 @@ table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
 .entity-tax { border-top: 1px solid var(--border); border-bottom: none; }
 .entity-tax .select { flex: none; width: 216px; }
 .entity-section .kv-row:last-child { border-bottom: none; }
+
+/* Transactions: the cross-entity treatment choice and the security mapping form. */
+.treatment { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.treatment-option { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); font-size: 13px; line-height: 1.5; cursor: pointer; }
+.treatment-option.is-selected { border-color: var(--ring); box-shadow: 0 0 0 1px var(--ring); }
+.treatment-option input { margin-top: 3px; accent-color: var(--primary); }
+.treatment-text { display: flex; flex-direction: column; gap: 4px; }
+.treatment-text > span { color: var(--muted-foreground); }
+.map-security { display: flex; align-items: flex-end; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.map-security .field { flex: 1 1 200px; }

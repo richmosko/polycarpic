@@ -469,6 +469,7 @@ The product specification for the Plaid bank-feed → journal-entry pipeline (st
 2. The accounting equation holds, per entity (Assets = Liabilities + Equity).
 3. The entry date matches the bank date — or, for a date mismatch, the Cash-in-Transit clearing rule applies.
 4. The posted draft links to exactly one journal entry. Several drafts may share that entry: a group, or a same-date matched transfer.
+5. Every securities line has its lot write and a security with an asset class. A trade in an unmapped security therefore stays in Pending.
 
 Any gate failure keeps the item in Pending — there is no partial post and no silent failure. **"Approve & Post"** collapses the expanded panel with a fade-out and removes the item from the unposted inbox once the gate passes.
 
@@ -493,9 +494,18 @@ Only New entry and imports check, because Correct entry, Split and Group start f
 
 **Journal entry popover.** Clicking a Journal ID on Posted opens a `Popover` anchored to the ID, not a navigation, so an entry can be read without leaving the list. Header line: Journal ID with copy (always visible here), transaction date, actor, "logged <timestamp>", status badge. Body: every leg, in `.trail-row` markup with its side and its account's full path, then the correction trail if any: the original and its reversal, since the entry's own legs are already above. Footer: **Open in General Ledger**, to `general-ledger.html#je-…`, plus **Dismiss possible duplicate** on a row that carries that badge. It is non-modal: an outside click or Esc dismisses it and focus returns to the ID. A long trail scrolls inside the popover and the footer stays visible. The popover is where Posted shows the actor and the logged time, as the list has neither. **View correction** on a Corrected row is a separate control: it expands the trail in place. The account register keeps its ID as a link (see Journal ID links).
 
+**Cross-entity transfers.** A transfer between two entities the user manages posts one entry per entity, and the draft carries one choice, shown as two option cards (`RadioGroup`) above a preview with one block per entity. **Contribution / distribution** is preselected. **Due-to / due-from** is the alternative. Each card says in plain language what it does to both balance sheets, and the due-to / due-from card says repayment is expected:
+
+- *Contribution / distribution:* "The money has moved for good, and nobody owes anybody. <Sender> records a distribution: its cash and its equity each fall by <amount>. <Receiver> records a contribution: its cash and its equity each rise by <amount>."
+- *Due-to / due-from:* "This is a loan, and repayment is expected. <Sender> swaps <amount> of cash for money it is owed, so its total assets and equity stay the same. <Receiver> gains <amount> of cash and owes the same amount, so its equity stays the same. Both balances stay open until it is repaid."
+
+The preview's legs follow the choice, and each entity's cash leg stays locked. Pairing and posting need Manager on both entities; without it the row offers no Approve & Post and says which entity needs a Manager. A later change of mind is a Correct entry. Transfers inside one entity are unchanged and carry no choice.
+
+**Trade drafts.** A brokerage draft splits by nature before posting: one locked cash leg, then one line per security under its nature account (`Assets › Marketable securities › Schwab brokerage`), each with a note naming the security, quantity and lot action. The line's class comes from the security's mapping, so it is not editable on the row; changing it means changing the mapping. A trade in a security with **no mapping** stays in Pending with a caution line ("ARKK has no asset class yet, so this trade cannot post."), Approve & Post disabled, and an inline **Map security** form (Asset class: the four fixed classes; Sub-category). Mapping is per security, so it clears every waiting trade in that security at once and removes it from Allocation's unmapped gap. Allocation's gap row and the known-delta badge on Custodial Accounts both link to this row.
+
 **"show N" selector:** each of the three tabs (Exceptions, Pending, Posted) has its own limit selector — a user with a large Posted history isn't forced to render all of it; Posted is paged, Exceptions/Pending show their full (usually small) count by default.
 
-**Permissions:** New entry, Sync, Split, Group, Approve & Post, Match to that entry, Dismiss possible duplicate, and the rule auto-post opt-in are Manager/Owner actions — a Viewer sees none of these affordances anywhere on this screen (SECURITY §4.2.1 matrix, ARCH §2.4 permissions table).
+**Permissions:** New entry, Sync, Split, Group, Approve & Post, Match to that entry, Map security, the transfer treatment choice, Dismiss possible duplicate, and the rule auto-post opt-in are Manager/Owner actions — a Viewer sees none of these affordances anywhere on this screen (SECURITY §4.2.1 matrix, ARCH §2.4 permissions table).
 
 ---
 
@@ -763,6 +773,8 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Chart-of-accounts tree | `custom` | No shadcn tree component; built from nested disclosure rows (could adopt a community tree primitive later if one matures) |
 | Lots sub-card pull-down | **Collapsible** | Direct reuse — a simpler primitive than Accordion for a single expand/collapse row |
 | Custodial card details | **Collapsible** | Each card opens independently, so not an Accordion |
+| Cross-entity treatment choice | **Radio Group** (`.treatment`) | Two bordered option cards, each with a label and a plain-language body; the selected card takes `--ring` |
+| Map security form (trade draft) | **Select** + **Button** | Inline on the Pending row |
 | Settings on/off preferences | **Switch** | Direct reuse |
 | Settings theme picker (Light / Dark / Auto) | **Toggle Group** (single) | Rendered with the `.tabs` look; semantically a radio group, not tabs |
 | Brand app bar (Home, Get started, Admin) | `custom`, with **Button** / **Badge** / **Avatar** for the trailing items | One component for every shell-less page: a fixed bar with a lockup, trailing items and a fade; too small and too brand-specific to be a block. No sidebar because no entity exists (setup), none applies (operator), or the visitor is not signed in (Home) |
@@ -793,7 +805,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Screen | File | Shell | Shown open as reference |
 |---|---|---|---|
 | Dashboard | `dashboard.html` | sidebar | "more" menu, avatar popover |
-| Transactions | `transactions.html` | sidebar | "more" menu, tabs with count badges, expanded Pending row, split grid, bulk bar, journal-entry modal |
+| Transactions | `transactions.html` | sidebar | "more" menu, tabs with count badges, expanded Pending row, cross-entity transfer draft, unmapped and mapped trade drafts, split grid, bulk bar, journal-entry modal |
 | General Ledger | `general-ledger.html` | sidebar | three tabs, expanded Journal entries row, date range popover |
 | Account register | `account-register.html` | sidebar (multi-crumb) | expanded register line |
 | Custodial Accounts | `custodial-accounts.html` | sidebar | group-by toggle (Institution on, Account type headers as a reference), card details (Primary Checking and Brokerage open, the rest collapsed), lots sub-card (AAPL pulled down), provider-item dialog |
