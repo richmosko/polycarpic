@@ -5,7 +5,7 @@
 ```mermaid
 flowchart TD
   open([Open General Ledger\nfor entity]) --> tabs{Tab}
-  tabs -- default --> tree[Chart of accounts tab:\ncategory → account → sub-account,\nGL balances]
+  tabs -- default --> tree[Chart of accounts tab:\ncategory → nature class →\ncustodian sub-account, GL balances]
   tabs --> map[Balance sheet map tab, prototype:\nAssets vs. Liabilities + Equity]
   tabs --> journal[Journal entries tab:\nby date, page size,\ndate range, sort]
   tree --> act{User action}
@@ -23,11 +23,11 @@ flowchart TD
 
 **Notes**
 - **Three tabs, one section at a time:** Chart of accounts (the default), Balance sheet map and Journal entries, in one `Tabs` row at the top of the content. Each keeps its card header. The URL hash carries the tab, so Back from a register returns to the tab it left; a Journal ID link selects Journal entries; the register's breadcrumb returns to the tree.
-- **The tree is the GL's own view:** every balance is the ledger's figure. The custodial badge (`landmark` icon + institution) is a cross-reference to Custodial Accounts, never a second data source; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.
+- **The tree is the GL's own view:** every balance is the ledger's figure. Under Assets the rows are the four nature classes, each with a sub-account per custodian. The custodial badge (`landmark` icon + the custodial account's name) ties a sub-account to its card on Custodial Accounts and is never a second data source; one custodial account can sit under several classes, and its book value is the sum of those rows; accounts with no physical counterpart (Owner's Equity, Cash in Transit) carry none.
 - **The register is account-scoped and running-balance-shaped;** Transactions is transaction-scoped: every posted transaction is a row and carries its entry's Journal ID; an entry built from several transactions appears as several rows with one ID; the GL Journal entries card is the entry-grained view. Different questions, deliberately two screens.
 - **A register line expands to its full journal entry** in the same block as the Journal entries card: every leg, not just the one that hit this account, plus the correction trail where one exists, with actor attribution and the Correct entry action (flow 5.3). Its Journal ID links to the GL card.
 - **Balance sheet map (prototype):** a nested treemap on its own tab, Assets | Liabilities + Equity as equal halves; each tile opens its register. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.
-- **A leg always names its account by full path,** root to leaf, in the expanded entry on the register and on the Journal entries card: Assets › Cash › Primary Checking. The tree and the treemap show the leaf alone.
+- **A leg always names its account by full path,** root to leaf, in the expanded entry on the register and on the Journal entries card: Assets › Marketable securities › Schwab brokerage. The tree and the treemap show the leaf alone.
 - **Journal entries card:** on its own tab, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted tab. It lists a correction's three entries as three rows; the Posted tab rolls them into one.
 - **Journal ID:** a short per-entity display number, `JE-000214`, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted tab and the register, copied on hover, so any entry can be cited exactly.
 - **Journal ID links:** on the register the ID links to the entry's row on the Journal entries card (`general-ledger.html#je-000212`), and on the Posted tab the ID opens a popover whose Open in General Ledger link goes to the same row (flow 5.3). Arriving selects the tab, highlights the row and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).

@@ -1953,3 +1953,36 @@ table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
 .range-day.range-end { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
 .range-day.range-today { font-weight: 700; text-decoration: underline; }
 .range-day:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+/* Allocation: the unmapped-holdings gap row closes the Actual vs. target card. */
+.alloc-gap .card-sub { min-width: 0; }
+.alloc-gap .alloc-name .je-link { color: var(--primary); text-decoration: underline; }
+
+/* Entities: nested parents, a parent's own accounts, and the card sections. */
+.pack-outer { width: 640px; justify-content: center; padding-top: 0; }
+.pack-outer > .pack-children { align-items: center; margin-top: 8px; }
+.pack-outer .pack-parent { width: 300px; flex: none; }
+.pack-outer .pack-parent .pack-child { width: 116px; }
+.pack-own { display: inline-flex; align-items: center; gap: 3px; font-size: 10px; color: var(--muted-foreground); }
+.pack-own .icon { width: 10px; height: 10px; }
+.entity-section { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--border); }
+.incl-row { display: flex; align-items: center; gap: 8px; font-size: 14px; min-height: 32px; }
+.entity-tax { border-top: 1px solid var(--border); border-bottom: none; }
+.entity-tax .select { flex: none; width: 216px; }
+.entity-section .kv-row:last-child { border-bottom: none; }
+
+/* Transactions: the cross-entity treatment choice and the security mapping form. */
+.treatment { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.treatment-option { display: flex; gap: 10px; align-items: flex-start; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--card); font-size: 13px; line-height: 1.5; cursor: pointer; }
+.treatment-option.is-selected { border-color: var(--ring); box-shadow: 0 0 0 1px var(--ring); }
+.treatment-option input { margin-top: 3px; accent-color: var(--primary); }
+.treatment-text { display: flex; flex-direction: column; gap: 4px; }
+.treatment-text > span { color: var(--muted-foreground); }
+.map-security { display: flex; align-items: flex-end; gap: 12px; margin-top: 12px; flex-wrap: wrap; }
+.map-security .field { flex: 1 1 200px; }
+
+/* Tax: the reporting-period close card. */
+.tax-close { margin-top: 24px; }
+.tax-close .trail-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
+.tax-close .trail-row .mono { margin-left: auto; }
+.tax-close .tax-actions { margin-top: 12px; }
