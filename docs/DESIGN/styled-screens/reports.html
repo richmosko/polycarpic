@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Reports (pass 7; styled pass 13). Balance Sheet / Income Statement / Cash Flow. Today: the Balance Sheet card is the Dashboard's empty-state pattern (real card chrome, plain 'Not set up yet' copy that never names a milestone). The three dimmed Preview cards show the planned statement shape for review only; they do not ship as previews. NAV and NAV delta (ARCH 2.4) surface beside the Balance Sheet once it ships. Between closes the Balance Sheet and NAV add one computed line, "Estimated tax since last close", labelled as an estimate, with "last closed through" under the statement; both arrive with tax. -->
+<!-- Reports (pass 7; styled pass 13). Balance Sheet / Income Statement / Cash Flow. Today: the Balance Sheet card is the Dashboard's empty-state pattern (real card chrome, plain 'Not set up yet' copy that never names a milestone). The three dimmed Preview cards show the planned statement shape for review only; they do not ship as previews. NAV and NAV delta (ARCH 2.4) surface beside the Balance Sheet once it ships. Assets list the four nature classes, then Real estate and Prepaid tax beside them. A parent's consolidated statement has the same lines with the no-class accounts summed as "Other assets", and from POLY-1.1 carries the Gross / Economic toggle: Economic weights every line by the viewer's stake and closes on economic net worth. Between closes the Balance Sheet and NAV add one computed line, "Estimated tax since last close", labelled as an estimate, with "last closed through" under the statement; both arrive with tax. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -71,11 +71,28 @@
     </div>
     <div class="card planned" style="margin-top:24px;" aria-label="Preview of the planned Balance Sheet">
       <div class="card-head"><span class="card-title">Balance Sheet</span><span class="badge badge-outline">Preview · Nov 2, 2026</span></div>
-      <div class="statement-row"><span>Assets</span><span class="mono">$362,744.75</span></div>
+      <div class="statement-row"><span>Cash and cash equivalents</span><span class="mono">$36,139.73</span></div>
+      <div class="statement-row"><span>Fixed income securities</span><span class="mono">$60,816.21</span></div>
+      <div class="statement-row"><span>Marketable securities</span><span class="mono">$125,788.81</span></div>
+      <div class="statement-row"><span>Alternative investment assets</span><span class="mono">$6,900.00</span></div>
+      <div class="statement-row"><span>Real estate</span><span class="mono">$130,000.00</span></div>
+      <div class="statement-row"><span>Prepaid tax</span><span class="mono">$3,100.00</span></div>
+      <div class="statement-row total"><span>Total assets</span><span class="mono">$362,744.75</span></div>
       <div class="statement-row"><span>Liabilities</span><span class="mono">−$8,047.33</span></div>
       <div class="statement-row"><span>Estimated tax since last close <span class="badge badge-outline badge-sm">Estimate</span></span><span class="mono">−$568.67</span></div>
       <div class="statement-row total"><span>Net assets</span><span class="mono">$354,128.75</span></div>
       <p class="card-sub" style="margin-top:8px;">Last closed through Sep 30, 2026. The estimate is computed for this date, is not a ledger balance and stays out of the trial balance.</p>
+    </div>
+    <div class="card planned" style="margin-top:24px;" aria-label="Preview of the consolidated Balance Sheet for a parent, economic figures">
+      <div class="card-head"><span class="card-title">Balance Sheet · The Moskos, consolidated</span><div class="view-toggle"><div class="tabs" role="radiogroup" aria-label="Figures"><button class="tab" role="radio" aria-checked="false">Gross</button><button class="tab active" role="radio" aria-checked="true">Economic</button></div><span class="badge badge-outline badge-sm">POLY-1.1</span></div></div>
+      <div class="statement-row"><span>Cash and cash equivalents</span><span class="mono">$100,789.73</span></div>
+      <div class="statement-row"><span>Fixed income securities</span><span class="mono">$60,816.21</span></div>
+      <div class="statement-row"><span>Marketable securities</span><span class="mono">$125,788.81</span></div>
+      <div class="statement-row"><span>Alternative investment assets</span><span class="mono">$6,900.00</span></div>
+      <div class="statement-row"><span>Other assets <span class="card-sub">real estate, prepaid tax and the like, at book</span></span><span class="mono">$133,100.00</span></div>
+      <div class="statement-row"><span>Liabilities</span><span class="mono">−$10,047.33</span></div>
+      <div class="statement-row total"><span>Economic net worth</span><span class="mono">$417,347.42</span></div>
+      <p class="card-sub" style="margin-top:8px;">Gross net worth $641,347.42. Economic weights each entity this parent rolls up by your stake on Nov 2, 2026; Sam Mosko (Person) weighs 0% and is still counted, at zero.</p>
     </div>
     <div class="card-grid" style="grid-template-columns:1fr 1fr; margin-top:24px;">
       <div class="card planned" aria-label="Preview of the planned Income Statement">
