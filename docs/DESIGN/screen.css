@@ -1953,3 +1953,7 @@ table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
 .range-day.range-end { border-radius: 0 var(--radius-md) var(--radius-md) 0; }
 .range-day.range-today { font-weight: 700; text-decoration: underline; }
 .range-day:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+
+/* Allocation: the unmapped-holdings gap row closes the Actual vs. target card. */
+.alloc-gap .card-sub { min-width: 0; }
+.alloc-gap .alloc-name .je-link { color: var(--primary); text-decoration: underline; }
