@@ -617,6 +617,7 @@ flowchart TB
         <li>Another session, or a new sign-in, starts again from the list.</li>
         <li>If the 5-minute step-up lapses mid-run, the user is prompted again. The run never continues silently.</li>
       </ul></li>
+    <li><strong>Founder succession.</strong> For each entity where the user is the founding owner and other owners remain, the flow requires a successor named among them (§4.2.2). A sole-owned entity's transfer target becomes founder.</li>
     <li><strong>Exports.</strong> Every purge choice carries its own <code>export.completed</code> event, by this user, within 24 hours (guard 3). The flow produces these exports before the final confirmation.</li>
     <li><strong>Order.</strong> Transfers first, then purges, then the tombstone.
       <ul>
