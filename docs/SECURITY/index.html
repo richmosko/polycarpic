@@ -852,13 +852,13 @@ flowchart TB
               <li>A later role raise on the parent does not.</li>
               <li>Nothing waits on the recipients.</li>
             </ul></li>
-          <li><strong>Consent disclosure (P2, 2026-11-07).</strong> The inclusion step (adding an entity to a parent) and the upward-consent notice both state plainly that:
+          <li><strong>Consent disclosure (P2, 2026-11-07; text fixed in v1.2).</strong> The inclusion step (adding an entity to a parent), the placement notice and the new-member-above notice carry this text verbatim, as three sentences, with <code>&lt;parent&gt;</code> the only variable:
+            <blockquote>Members of &lt;parent&gt;, and of any parent above it, see class and category totals for this entity for any period.<br>For a small entity, that effectively reveals individual amounts and their dates.<br>Nothing else is shown: no payee, memo, account or counterparty.</blockquote>
             <ul>
-              <li>parent members see class and category totals for <em>any</em> period;</li>
-              <li>for a small entity that effectively reveals individual amounts and their dates;</li>
-              <li>nothing else is shown: no payee, memo, account or counterparty.</li>
+              <li>Sentences two and three confirm the DESIGN v0.16 rendering. Sentence one is amended: "Members of &lt;parent&gt; see…" understated the audience. A member of any ancestor can call the roll-up on that ancestor, and its descendants, at any depth, include this entity (<code>app.rollup_descendants()</code>). So members of every parent above see the same totals, now and after any later placement (T-73).</li>
+              <li><code>&lt;parent&gt;</code> is the parent the entity is being added to, or, in a notice, the parent named in its first sentence.</li>
             </ul>
-            The wording is a security requirement. Changing it needs a security-gate review. Any date range is allowed: there is no period guard.</li>
+            The wording is a security requirement. The Playwright check compares the rendered block to this text exactly. Changing it needs a security-gate review. Any date range is allowed: there is no period guard.</li>
           <li><strong>Holdings popover on a parent.</strong> Positions come only through ordinary <code>poly_app</code> RLS, for the parent's own accounts and for entities where the viewer is a member. Any other entity shows its total and the boundary panel. No definer returns a position.</li>
           <li>All of these functions are on the definer allowlist (C-15) and in the role-hygiene set (C-10).</li>
         </ul><p class="ctl-meta"><strong>Lives at:</strong> <code>packages/db</code> SQL; <code>packages/tenancy</code><br><strong>Tested by:</strong> pgTAP (ARCH §3.3a–c tests, plus):
@@ -895,6 +895,7 @@ flowchart TB
           <li><code>app.apply_change</code> is owned by <code>poly_govern</code>. It recomputes the approvers at apply time and re-validates the payload.</li>
           <li>Requests expire after 14 days. Step-up on request, approve and decline. An audit event at every step.</li>
           <li>The invite email is sent only on apply.</li>
+          <li>At the 1 → 2 owner transition, every outstanding direct-path invitation is revoked in the same transaction, under a lock on the entity row (OQ-31, §4.2.2).</li>
           <li>The founding owner, with <code>app.force_change</code>, can force only co-owner removal or demotion, after a decline or expiry. Transfer is founder-only, and the founder must hold owner.</li>
         </ul><p class="ctl-meta"><strong>Lives at:</strong> <code>packages/tenancy</code>; <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP:
         <ul>
@@ -908,9 +909,14 @@ flowchart TB
           <li><code>force_change</code> by a non-founder, on a pending request, on an invite or a cap-table edit, or targeting the founder, is denied;</li>
           <li>a forced removal notifies the target and writes <code>change.forced</code>;</li>
           <li>the founder cannot drop their owner role without first transferring the founder role;</li>
-          <li>the tombstone is refused while the user is still the founder of a multi-owner entity.</li>
+          <li>the tombstone is refused while the user is still the founder of a multi-owner entity;</li>
+          <li>when a second owner joins, every other outstanding direct invitation (any role) is revoked in that transaction and its inviter notified; an invitation applied through <code>apply_change</code> is not;</li>
+          <li>a revoked invitation's token is refused at acceptance;</li>
+          <li>two direct owner invitations accepted concurrently end with exactly two owners and the other invitation revoked;</li>
+          <li>after dropping back to one owner, a new direct invitation is revoked again at the next 1 → 2 transition;</li>
+          <li>a raised owner still waiting for enrolment does not trigger the transition; enrolment does.</li>
         </ul>
-        Integration: no invite email before apply; each step without a recent re-auth returns 403.</p></td><td>T-26, T-15</td><td>POLY-1.0 (sharing, POLY-70); the cap-table edit with the editor</td></tr>
+        Integration: no invite email before apply; each step without a recent re-auth returns 403.</p></td><td>T-26, T-15, T-81</td><td>The gate, the founder trigger and the 1 → 2 revocation in POLY-M1, with tenancy (ARCH §3.1b); the request flow in POLY-1.0 (sharing, POLY-70); the cap-table edit with the editor</td></tr>
       <tr><td>C-21</td><td>Append-only: row-level BEFORE UPDATE/DELETE triggers plus a statement-level BEFORE TRUNCATE trigger. The only exception is <code>current_user = 'poly_purge'</code> together with a matching <code>app.purge_entity</code>.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP: UPDATE, DELETE and TRUNCATE all raise for <code>poly_app</code>, <code>poly_worker</code> and <code>poly_owner</code>; <code>poly_app</code> with the GUC set still raises.</p></td><td>T-21, T-50</td><td>POLY-M2</td></tr>
       <tr><td>C-22</td><td>Deferred balance constraint trigger (ARCH §3.2).<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/ledger</code> SQL<br><strong>Tested by:</strong> pgTAP + property-based tests.</p></td><td>T-22</td><td>POLY-M2</td></tr>
       <tr><td>C-23</td><td>A BEFORE INSERT trigger <em>forces</em> the actor from the session context. <code>actor_kind = user</code> requires <code>actor_id = app.current_user_id()</code>.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP: a forged <code>actor_id</code> is overwritten or rejected.</p></td><td>T-23, T-25</td><td>POLY-M2</td></tr>
@@ -1025,21 +1031,27 @@ flowchart TB
                   <li>A subdomain of a domain the operator owns, resolved only on the LAN (split-horizon). There is no public A or AAAA record.</li>
                   <li>A DNS-01 wildcard certificate (<code>*.home.&lt;domain&gt;</code>), so the box's own name stays out of public CT logs.</li>
                   <li>The registrar or DNS-API token is limited to that one zone, a file secret mounted into Caddy only (R-18).</li>
-                  <li>Google and Apple sign-in work.</li>
+                  <li>Google, Apple and GitHub sign-in work.</li>
                 </ul></li>
               <li><strong>Supported fallback, <code>.local</code> with a private CA.</strong>
                 <ul>
                   <li>The operator runs a private CA and installs its root on each device. The root carries X.509 <code>nameConstraints</code> permitting only the box's name. Browser enforcement of constraints on a locally installed root is unmeasured. Measuring it, for each supported browser, is a <strong>gate item for the first home-box deploy</strong> (R-20).</li>
                   <li>The root key is generated off the box and kept offline (the operator's password manager). The box holds only a name-constrained intermediate that issues short-lived leaf certificates (T-79, R-20).</li>
-                  <li>The mode is explicit configuration (<code>TLS_MODE=private-ca</code>). At startup the app cross-checks it: a public name that does not resolve publicly, or that ends in <code>.local</code>, must be in private-CA mode, or the app refuses to start.</li>
-                  <li>In private-CA mode the Google and Apple buttons are hidden <em>and</em> the OAuth routes return 404 server-side. Sign-in is email + password + the second step (P1).</li>
+                  <li>In private-CA mode the Google, Apple and GitHub buttons are hidden <em>and</em> every OAuth route returns 404 server-side. Sign-in is email + password + the second step (P1).</li>
                   <li>Whether passkeys work on a <code>.local</code> RP ID is unmeasured; TOTP is always offered.</li>
+                </ul></li>
+              <li><strong>The mode is explicit, and checked at startup (OQ-32, amended in v1.2).</strong> <code>TLS_MODE</code> must be set; nothing infers it. The check tests the zone, never the host, because in real-domain mode the host deliberately has no public record:
+                <ul>
+                  <li><strong>Offline, decisive.</strong> A public origin ending in <code>.local</code>, or whose registrable domain is not under a public suffix (the bundled Public Suffix List), requires <code>private-ca</code>.</li>
+                  <li><strong>Online.</strong> Any other name requires <code>real-domain</code>, and its registrable domain's zone must resolve publicly (an SOA from a public resolver). An NXDOMAIN for the zone refuses start. A DNS timeout does not: the app starts, logs the unverified check, and retries it. A missed check costs only sign-in and certificate issuance, never exposure. A public A or AAAA record for the box's own name is logged as a warning, because it breaks the split-horizon promise.</li>
+                  <li>A mismatch either way refuses start, with the reason logged.</li>
+                  <li><strong>Certificate issuer.</strong> The provisioning check and the heartbeat health check confirm the served leaf matches the mode: in private-CA mode it chains to the box's name-constrained intermediate, and in real-domain mode to a public ACME issuer. A mismatch alerts the operator.</li>
                 </ul></li>
               <li><strong>Moving a <code>.local</code> box to a real domain later.</strong>
                 <ul>
                   <li>Every session ends, because cookies are host-bound.</li>
                   <li>Passkeys do not survive, because they are bound to the old RP ID. Before the move, the runbook requires each owner and manager to hold TOTP or backup codes, with the operator's <code>reset-mfa</code> CLI as the fallback.</li>
-                  <li>Google or Apple sign-in is then added by linking from Settings while signed in (C-05: an existing session and a verified email). It is never auto-linked by email.</li>
+                  <li>Google, Apple or GitHub sign-in is then added by linking from Settings while signed in (C-05: an existing session and a verified email). It is never auto-linked by email.</li>
                   <li>Every device should remove the old private root.</li>
                 </ul></li>
             </ul></li>
@@ -1049,7 +1061,9 @@ flowchart TB
           <li>an outside-in scan, from a host off the LAN, of the home's public IPv4 and the box's IPv6 address, showing nothing open;</li>
           <li>a test that an outbound connection to a non-allowed port fails;</li>
           <li>an auth route over plain http is refused in both modes;</li>
-          <li>in private-CA mode the OAuth routes return 404, and a <code>.local</code> name outside private-CA mode refuses to start;</li>
+          <li>in private-CA mode every OAuth route (all three providers) returns 404;</li>
+          <li>startup: a <code>.local</code> name, or a name under no public suffix, outside private-CA mode refuses; a public-suffix name in private-CA mode refuses; real-domain mode on a host with no public record but a resolvable zone starts; a zone NXDOMAIN refuses; a DNS timeout starts and logs;</li>
+          <li>the issuer check alerts when the served leaf does not match the mode;</li>
           <li>a certificate for an out-of-constraint name issued under the private root is rejected by each supported browser.</li>
         </ul></p></td><td>T-60, T-67, T-68, T-79</td><td>Before the first local-box deploy</td></tr>
       <tr><td>C-77</td><td>Staging credential isolation (ARCH §7.5, Principal, 2026-11-06):
@@ -1202,7 +1216,7 @@ flowchart TB
       <tr><td>R-15</td><td>A parent-link or cap-table refusal ("would make an entity its own ancestor", "too deep") reveals that some link exists, possibly through entities the user cannot see (T-78).</td><td>The inserter must own both ends, so the bit is about paths between their own entities. The error names no entity, and naming nothing would make the refusal unexplainable.</td><td>Errors name no entity (C-25). Refusals are audited.</td><td>If links ever become insertable by a non-owner</td><td>Rich Mosko (2026-11-07, P3)</td></tr>
       <tr><td>R-16</td><td>A purge, including one inside an account deletion, runs immediately with no cancellable delay. A hijacked session that passes step-up can destroy an entity's books at once.</td><td>The Principal's ruling (OQ-23). A delay needs a background purge the design forbids, and would make the freshness guards stale.</td><td>Step-up within 5 minutes (C-03, with a second factor required for owners, P1). Typed entity name. A fresh export by the same user. Every member emailed immediately. Operator backups (C-73). R-5 bounds how long recovery is possible.</td><td>If a purge is ever reported as unwanted</td><td>Rich Mosko (2026-11-06, OQ-23)</td></tr>
       <tr><td>R-19</td><td>Hostile or captured founder. Other owners cannot remove the founding owner in-app. A founder, or someone in control of the founder's session, can force out co-owners one by one, each after a decline or the 14-day expiry. <em>Replaces</em> the earlier deadlock text: the founder now breaks removal deadlocks (Principal, 2026-11-07).</td><td>Without a tie-breaker, a two-owner dispute blocks forever. The founder's extra power is limited to co-owner removal or demotion, and is never immediate.</td><td>Step-up with the second factor (C-03, P1). The decline or expiry wait. A notice to every owner, the target included, plus <code>change.forced</code> audit events (C-28). No extra founder power over invites, roles or the cap table. The operator CLI as the backstop.</td><td>On the first reported forced removal</td><td>Rich Mosko (2026-11-07)</td></tr>
-      <tr><td>R-18</td><td>Real-domain mode on the local box keeps a zone-limited DNS-API token on the box (T-68). Whoever steals it can issue certificates for that zone, or publish records in it.</td><td>It is what keeps Google and Apple sign-in on a box nothing can reach. The box is unreachable from the internet, so a stolen token gets no path in.</td><td>The token is scoped to one zone and mounted into Caddy only (C-76). It is rotated at the provider on suspicion. CT-log monitoring of the zone is optional.</td><td>On any change to the local-box TLS mode</td><td>Rich Mosko (2026-11-07, P7)</td></tr>
+      <tr><td>R-18</td><td>Real-domain mode on the local box keeps a zone-limited DNS-API token on the box (T-68). Whoever steals it can issue certificates for that zone, or publish records in it.</td><td>It is what keeps Google, Apple and GitHub sign-in on a box nothing can reach. The box is unreachable from the internet, so a stolen token gets no path in.</td><td>The token is scoped to one zone and mounted into Caddy only (C-76). It is rotated at the provider on suspicion. CT-log monitoring of the zone is optional.</td><td>On any change to the local-box TLS mode</td><td>Rich Mosko (2026-11-07, P7)</td></tr>
       <tr><td>R-20</td><td>Private-CA mode installs an operator root on each device (T-79). If browsers do not enforce its name constraint, a stolen root key could impersonate any site to those devices.</td><td>It is the supported fallback for an operator without a domain (P7).</td><td>A name-constrained root, its key offline, and only an intermediate on the box (C-76). The runbook says to remove the root from every device on decommission or on a move to a real domain.</td><td>At the first private-CA deploy, after measuring constraint enforcement. That measurement is a gate item for the first home-box deploy.</td><td>Rich Mosko (2026-11-07)</td></tr>
       <tr><td>R-21</td><td>With TPM auto-unlock, a thief who takes the <em>whole</em> home box gets a machine that boots and unlocks its disk. The data is then protected only by OS login, SSH keys and app authentication, and remains exposed to an OS or service exploit, or to cold-boot and DMA attacks on the running machine.</td><td>The Principal's choice (P8). A passphrase at boot would leave the box down after every power cut. Theft of a whole box from a home is rare, and a pulled disk stays unreadable.</td><td>C-72: sealed to Secure Boot, firmware password, no USB boot, no unauthenticated console. Unattended updates (C-76). Backups encrypted separately (C-73). On theft, run RB-2: rotate every secret and revoke every bank token.</td><td>If the box moves out of the home, or holds data for others</td><td>Rich Mosko (2026-11-07, P8)</td></tr>
       <tr><td>R-17</td><td>Aggregate inference. Roll-up figures shown to a parent's members, the economic view, and allocated income shown to a holder's owners can be combined to infer things. Dividing economic by gross gives the viewer's own look-through stake. Allocated income divided by stake gives a pass-through entity's tagged income totals, as a K-1 tells a partner. Observing "today" figures every day accumulates detail over time. <em>Widened by P2:</em> a parent member may request roll-up totals for any date range. For a small entity, one-day periods and day-to-day balance differences reveal individual amounts and their dates, though never payee, memo, account or counterparty.</td><td>Each figure is one the viewer is entitled to by the Principal's rulings. Inclusion in a parent is an explicit grant by the entity's owner, so the exposure is consented, provided the consent is honest.</td><td>Consent disclosure at inclusion and in the upward-consent notice (C-25). The fixed aggregate shapes (C-25, C-27). Own and member entities are unaffected.</td><td>With POLY-1.1, and on any cross-parent "my net worth" proposal (OQ-29)</td><td>Rich Mosko (2026-11-07, P2)</td></tr>
@@ -1253,6 +1267,9 @@ flowchart TB
           <li><strong>Staging keyring.</strong> C-77.</li>
           <li><strong>Deletion purge invoker.</strong> §4.6, C-52.</li>
         </ul></td><td><strong>New.</strong> ARCH's "owners of a holder read their row" policy becomes the <code>app.my_stakes()</code> definer (A-18).</td><td>§3.8, §4.6; C-25, C-27, C-52, C-77</td></tr>
+      <tr><td>OQ-30</td><td><strong>Confirmed with changes.</strong> <code>poly_journal</code>, NOLOGIN and NOBYPASSRLS, owns the numbering and chain triggers. Its grants are column-limited UPDATE on the counter, INSERT on the counter only from an <code>entity</code> AFTER INSERT trigger, INSERT-only on <code>journal_chain</code>, and a trigger-only wide SELECT. A BEFORE INSERT trigger on <code>journal_line</code> refuses a line once its entry is chained, which closes the <code>SET CONSTRAINTS … IMMEDIATE</code> early fire. It joins the hygiene set and the allowlist.</td><td><strong>New</strong> (ARCH v1.4).</td><td>C-10, C-15, C-24; T-80; A-23</td></tr>
+      <tr><td>OQ-31</td><td><strong>Confirmed, with three conditions.</strong> The revocation runs in the same transaction as the membership write that makes the second owner, under a lock on the entity row. The invitation's issue path is recorded and not updatable. It counts effective owners only.</td><td><strong>New</strong> (ARCH v1.4).</td><td>§4.2.2; C-28; A-24</td></tr>
+      <tr><td>OQ-32</td><td><strong>Confirmed, with additions.</strong> The predicate tests the zone, not the host: <code>.local</code> or no public suffix means <code>private-ca</code>, offline; otherwise <code>real-domain</code>, with a publicly resolvable zone. A zone NXDOMAIN refuses start; a DNS timeout does not. The served leaf's issuer is checked against the mode by the provisioning and health checks.</td><td><strong>New</strong> (ARCH v1.4).</td><td>C-76; A-26</td></tr>
     </tbody>
   </table>
 
@@ -1275,17 +1292,17 @@ flowchart TB
       <tr><td>A-13</td><td>§6.2 / POLY-76</td><td>Add spike acceptance criterion (e): FORCE RLS, a role-targeted <code>pgPolicy</code> (<code>to:</code>), and a definer function owned by a non-owner NOLOGIN role must round-trip through <code>generate</code> and apply as <code>poly_migrator</code>.</td></tr>
       <tr><td>A-14</td><td>§3.1, §5 (<em>gap</em>)</td><td>Attachments appear in PRD §5 export and purge but have no storage design. They need: a location; size and type limits; serving with <code>Content-Disposition: attachment</code> and <code>nosniff</code>; and inclusion in both purge and export.</td></tr>
       <tr><td>A-15</td><td>§7 TB list</td><td>Add TB-11 (upload ↔ parser) and TB-12 (supply chain ↔ prod).</td></tr>
-      <tr><td>A-16</td><td>§3.3b, §3.1a, §3.3 roles</td><td><code>app.check_rollup_edge()</code> and <code>app.check_equity_holding()</code> are owned by a new NOLOGIN, NOBYPASSRLS <code>poly_graph</code> role. It has graph-wide SELECT on <code>entity_rollup</code> and <code>equity_holding</code>, SELECT on owner <code>membership</code> rows and <code>entity.kind</code>, and INSERT on <code>notification</code>. Add it to the role list. Add a test: a cycle through an entity invisible to <code>poly_rollup</code>'s predicate is refused.</td></tr>
-      <tr><td>A-17</td><td>§3.1 <code>entity_rollup</code> row</td><td><code>app.parents_of</code> is owned by <code>poly_rollup</code>, under a second role-targeted predicate: ancestors of entities the caller owns. It is on the allowlist.</td></tr>
-      <tr><td>A-18</td><td>§3.1a "Who reads", §4.5 "The read", §3.3 roles</td><td>Add a new NOLOGIN, NOBYPASSRLS <code>poly_stake</code> role. It owns <code>app.cap_table_candidates</code>, <code>app.allocated_income</code> and a new <code>app.my_stakes()</code>. That function replaces the holder-owner SELECT widening on <code>equity_*</code>. Reads are confined to <code>app.held_entities()</code> (and, for candidates, to members' own Persons). See C-27.</td></tr>
-      <tr><td>A-19</td><td>§3.4, §3.1a (<em>gap</em>)</td><td>Purging an entity that is a <em>holder</em> on other entities' cap tables. Those <code>equity_holding</code> rows are append-only, and they are the other entity's history. SecEng proposes:
+      <tr><td>A-16</td><td>§3.3b, §3.1a, §3.3 roles. <em>Folded in ARCH v1.4: §3.3 roles, §3.3b.</em></td><td><code>app.check_rollup_edge()</code> and <code>app.check_equity_holding()</code> are owned by a new NOLOGIN, NOBYPASSRLS <code>poly_graph</code> role. It has graph-wide SELECT on <code>entity_rollup</code> and <code>equity_holding</code>, SELECT on owner <code>membership</code> rows and <code>entity.kind</code>, and INSERT on <code>notification</code>. Add it to the role list. Add a test: a cycle through an entity invisible to <code>poly_rollup</code>'s predicate is refused.</td></tr>
+      <tr><td>A-17</td><td>§3.1 <code>entity_rollup</code> row. <em>Folded in ARCH v1.4: §3.1, §3.3 roles.</em></td><td><code>app.parents_of</code> is owned by <code>poly_rollup</code>, under a second role-targeted predicate: ancestors of entities the caller owns. It is on the allowlist.</td></tr>
+      <tr><td>A-18</td><td>§3.1a "Who reads", §4.5 "The read", §3.3 roles. <em>Folded in ARCH v1.4: §3.1a, §3.3 roles.</em></td><td>Add a new NOLOGIN, NOBYPASSRLS <code>poly_stake</code> role. It owns <code>app.cap_table_candidates</code>, <code>app.allocated_income</code> and a new <code>app.my_stakes()</code>. That function replaces the holder-owner SELECT widening on <code>equity_*</code>. Reads are confined to <code>app.held_entities()</code> (and, for candidates, to members' own Persons). See C-27.</td></tr>
+      <tr><td>A-19</td><td>§3.4, §3.1a (<em>gap</em>). <em>Folded in ARCH v1.4: new §3.4b, §3.1a; the name shown ruled by the Principal (OQ-33).</em></td><td>Purging an entity that is a <em>holder</em> on other entities' cap tables. Those <code>equity_holding</code> rows are append-only, and they are the other entity's history. SecEng proposes:
         <ul>
           <li>the purged entity's row becomes a tombstone (as the user row does), so those rows still resolve, to "former holder";</li>
           <li>its units allocate as outside owners from the purge date;</li>
           <li>the owners of each affected entity are notified.</li>
         </ul>
         Shape needed before POLY-1.0.</td></tr>
-      <tr><td>A-20</td><td>§3.1 membership and invitation, §3.1a "Who writes", §3.3 roles</td><td>Co-owner approval (P5b, SECURITY §4.2.2):
+      <tr><td>A-20</td><td>§3.1 membership and invitation, §3.1a "Who writes", §3.3 roles. <em>Folded in ARCH v1.4: §3.1b, §3.3 roles.</em></td><td>Co-owner approval (P5b, SECURITY §4.2.2):
         <ul>
           <li><code>change_request</code> and <code>change_approval</code> tables;</li>
           <li>direct writes to <code>membership</code>, <code>invitation</code> and <code>equity_*</code> gated on <code>app.owner_count = 1</code>;</li>
@@ -1294,14 +1311,42 @@ flowchart TB
           <li>a 14-day expiry, run as a scheduled job that only flips the status;</li>
           <li>re-evaluation on an owner's tombstone (§3.4a).</li>
         </ul></td></tr>
-      <tr><td>A-22</td><td>§3.1 entity, §3.4a, §3.3 roles</td><td>Founding owner (R-19 ruling, SECURITY §4.2.2):
+      <tr><td>A-22</td><td>§3.1 entity, §3.4a, §3.3 roles. <em>Folded in ARCH v1.4: §3.1 entity, §3.1b, §3.4a.</em></td><td>Founding owner (R-19 ruling, SECURITY §4.2.2):
         <ul>
           <li><code>entity.founding_owner_user_id</code>, NOT NULL, set to the creator, with a trigger that it holds owner;</li>
           <li><code>app.force_change</code> and the founder transfer as <code>poly_govern</code> definers;</li>
           <li>in §3.4a, a successor step for a founder of a multi-owner entity, and a tombstone re-check;</li>
           <li>the transfer target becomes founder when a sole-owned entity is transferred.</li>
         </ul></td></tr>
-      <tr><td>A-21</td><td>§3.3b</td><td>The ancestor-invite notice (P5) is a second <code>poly_graph</code> trigger: AFTER INSERT on <code>invitation</code> (and on <code>membership</code> without an invitation) on a parent-kind entity. It walks the descendants and notifies their owners in the same transaction. Not on a role raise.</td></tr>
+      <tr><td>A-21</td><td>§3.3b. <em>Folded in ARCH v1.4: §3.3b, §3.3 roles.</em></td><td>The ancestor-invite notice (P5) is a second <code>poly_graph</code> trigger: AFTER INSERT on <code>invitation</code> (and on <code>membership</code> without an invitation) on a parent-kind entity. It walks the descendants and notifies their owners in the same transaction. Not on a role raise.</td></tr>
+      <tr><td>A-23</td><td>§3.2.7, §3.2.9, §3.3 roles (OQ-30)</td><td><code>poly_journal</code>'s grants as in C-24:
+        <ul>
+          <li>role-targeted policies <code>TO poly_journal</code> on the counter, <code>journal_chain</code>, <code>journal_entry</code> and <code>journal_line</code>;</li>
+          <li>UPDATE on the counter limited to <code>last_number</code>, <code>head_number</code> and <code>head_hash</code>;</li>
+          <li>the counter row created by a <code>poly_journal</code> AFTER INSERT trigger on <code>entity</code>, with no INSERT grant to <code>poly_app</code>;</li>
+          <li><code>journal_chain</code> append-only under C-21, with the purge exception;</li>
+          <li>a <code>poly_journal</code> BEFORE INSERT trigger on <code>journal_line</code> refusing a line whose entry is already chained;</li>
+          <li>tenant-RLS SELECT for <code>poly_app</code> and <code>poly_worker</code> on the chain and the head;</li>
+          <li>the C-24 tests added in v1.2.</li>
+        </ul></td></tr>
+      <tr><td>A-24</td><td>§3.1 invitation, §3.1b (OQ-31)</td><td>Add <code>invitation.issued_via</code> (direct, or the applying <code>change_request</code>), not updatable. The 1 → 2 revocation runs in the membership write's transaction, after an entity-row lock taken before <code>owner_count</code> is read. Revoked tokens are refused at acceptance. It counts effective owners only. Add the C-28 tests added in v1.2.</td></tr>
+      <tr><td>A-25</td><td>§3.1 membership, §3.1b, §3.3 (held role)</td><td>A role raised to manager or owner is not effective until the member enrols a second step (§4.1, C-03). ARCH chooses the mechanism, a pending role on <code>membership</code> or refusal at apply. Either must satisfy all of these:
+        <ul>
+          <li>the stored value every check reads stays at the previous role until enrolment, so a check that forgets the pending state fails closed;</li>
+          <li><code>has_role</code>, the policies, <code>owner_count</code>, the approver set, the 1 → 2 transition and founder eligibility all see the previous role;</li>
+          <li>the only write that makes the role effective is a definer that requires an enrolled factor for that user, changes nothing else, and writes an <code>audit_event</code>;</li>
+          <li>an owner can cancel a pending raise as a lowering, with no approval;</li>
+          <li>on a multi-owner entity, a co-owner raise already approved is not re-approved at enrolment.</li>
+        </ul></td></tr>
+      <tr><td>A-26</td><td>§7.8 "Mode cross-check at startup" (OQ-32)</td><td>Align with C-76:
+        <ul>
+          <li>the suffix test is offline and decisive;</li>
+          <li>the zone test is an SOA from a public resolver;</li>
+          <li>an NXDOMAIN refuses start, and a DNS timeout starts, logs and retries;</li>
+          <li>a public record for the box's own name is a warning;</li>
+          <li>the issuer is checked against the mode by the provisioning and health checks.</li>
+        </ul></td></tr>
+      <tr><td>A-27</td><td>§7.8 "OAuth sign-in", <code>packages/auth</code> (providers)</td><td>Add GitHub (Principal, 2026-11-08): "Google, Apple and GitHub work" in real-domain mode, and all three are disabled server-side in private-CA mode. GitHub's verified email comes only from <code>/user/emails</code> (primary and verified), with scopes <code>read:user</code> and <code>user:email</code> (C-05).</td></tr>
     </tbody>
   </table>
 
@@ -1317,7 +1362,7 @@ flowchart TB
         <li>Assert the connection-pooler mode on both targets.</li>
         <li><em>v1.1:</em> local-box provisioning and its checks (C-76); staging's secrets directory, keyring and Plaid sandbox secret (C-77).</li>
       </ul></li>
-    <li><strong>ux-designer:</strong> the co-owner approval screens (§4.2.2):
+    <li><strong>ux-designer:</strong> <em>closed in DESIGN v0.16 (2026-11-08): every item below is specified (§ Co-owner approval, § Notifications, § Account deletion). Open from v1.2: the consent text's first sentence is amended (C-25); the spec block and the Playwright check take the new text verbatim.</em> The co-owner approval screens (§4.2.2):
       <ul>
         <li>a request shown as pending on the members list and the cap table;</li>
         <li>an approve / decline screen with step-up, showing exactly what changes;</li>
@@ -1335,7 +1380,9 @@ flowchart TB
         <li>The battery adds: pool reuse on a dirty backend (C-12); WITH CHECK forgery; catalog coverage plus canary; the definer allowlist; <code>security_invoker</code>; TRUNCATE; purge negatives and the zero-rows-remain check (C-50).</li>
         <li>The log canary (C-33) must land before the first real adapter.</li>
         <li><em>v1.1:</em> the C-19, C-25 and C-27 tests (graph triggers, roll-up shapes, holder reads), the §4.6 deletion-flow negatives (C-52), and the C-77 config refusals.</li>
+        <li><em>v1.2:</em> the C-24 <code>poly_journal</code> tests, the C-28 1 → 2 revocation tests, the C-03 held-role tests, the C-05 per-provider verification tests, the C-76 startup matrix, and the C-25 consent-text exact match.</li>
       </ul></li>
+    <li><strong>product-manager (v1.2):</strong> PRD §5's consent requirement carries the amended first sentence (C-25): "members of the parent, and of any parent above it, see …".</li>
     <li><strong>Principal (via team-lead), 2026-11-07 question set: all ruled.</strong> Q2 was withdrawn after OQ-23. Q1 and Q3 to Q5 are restated as P1, P3, P4 and P6.
       <ul>
         <li><strong>P1. Ruled 2026-11-07:</strong> a second factor is required for owners and managers, and optional for viewers. C-03 and R-7 are updated.</li>
