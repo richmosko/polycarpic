@@ -25,10 +25,26 @@
   <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
-    <span><strong>Status:</strong> Draft v1 (reviewed rewrite, supersedes 8963efb). Pending the architect's re-fold (§12.2) and the Principal's review (§11 approvals, §12.3).</span>
-    <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1</a> (Approved 2026-09-27), <a href="../ARCH/">ARCH v1 draft</a> (@ db8aa61)</span>
-    <span><strong>Last updated:</strong> 2026-09-28</span>
+    <span><strong>Status:</strong> Draft v1.1. SecEng confirmations on ARCH v1.3 (OQ-19, OQ-23, OQ-24, OQ-25) are folded in. Pending: the architect's re-fold (§12.2) and the Principal's rulings (§12.3).</span>
+    <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1.3</a>, <a href="../ARCH/">ARCH v1.3 draft</a>, <a href="../../process/DECISIONS.md">DECISIONS</a> through 2026-11-07</span>
+    <span><strong>Last updated:</strong> 2026-11-07</span>
   </div>
+  <details class="doc-changelog">
+    <summary>Changelog</summary>
+    <ul>
+      <li><strong>v1.1 (2026-11-07).</strong>
+        <ul>
+          <li>Nesting, roll-up and cap table: §3.8, C-19 amended, new C-25 and C-27, and new roles <code>poly_graph</code> and <code>poly_stake</code>.</li>
+          <li>Account deletion in-flow: §4.6 and C-52.</li>
+          <li>The purge delay is removed (OQ-23, R-16).</li>
+          <li>Staging keyring and Plaid Sandbox (C-77).</li>
+          <li>Local-network box posture (C-76).</li>
+          <li>Vercel is now the tertiary target.</li>
+          <li>New risks R-15 to R-17.</li>
+        </ul></li>
+      <li><strong>v1 (2026-09-28).</strong> Reviewed rewrite that supersedes 8963efb.</li>
+    </ul>
+  </details>
 </header>
 
 <nav class="toc">
@@ -74,7 +90,7 @@
   <table>
     <thead><tr><th>#</th><th>From</th><th>To</th><th>Boundary type</th><th>Notes</th></tr></thead>
     <tbody>
-      <tr><td>TB-1</td><td>Internet</td><td>Caddy</td><td>Network, TLS</td><td>TLS 1.2+ with HSTS. Caddy is the only container that publishes ports (80 and 443).</td></tr>
+      <tr><td>TB-1</td><td>Internet</td><td>Caddy</td><td>Network, TLS</td><td>TLS 1.2+ with HSTS. Caddy is the only container that publishes ports (80 and 443). <em>Local-network box (ARCH §7.8):</em> the "From" side is the LAN only. Nothing on the internet reaches Caddy, and the posture is C-76.</td></tr>
       <tr><td>TB-2</td><td>Browser, native and MCP clients</td><td>SvelteKit <code>web</code></td><td>Authentication</td><td>A session cookie or bearer token goes through <code>getSession()</code> and becomes a branded <code>SessionUserId</code>. Anything else is anonymous. CSRF and origin checks sit here.</td></tr>
       <tr><td>TB-3</td><td><code>web</code> / <code>worker</code></td><td>Postgres</td><td>DB role + RLS</td><td>The primary authorization boundary. Apps connect as <code>poly_app</code> or <code>poly_worker</code>, never as the owner. Tenant context is transaction-local (§4.3).</td></tr>
       <tr><td>TB-4</td><td><code>web</code></td><td><code>worker</code> (the credential-opening capability)</td><td>Process + key separation</td><td><code>web</code> can seal credentials but cannot open them; only <code>worker</code> holds the private key (§6.3). The two share only the database. <em>Revised:</em> 8963efb had a symmetric master key mounted into the app.</td></tr>
@@ -83,7 +99,8 @@
       <tr><td>TB-7</td><td>Box</td><td>Off-box backup store</td><td>Custody</td><td>Backups are encrypted before egress, with a key separate from the credential key (§6.6).</td></tr>
       <tr><td>TB-8</td><td>Operator (SSH, <code>docker compose exec</code>)</td><td>Box, Postgres superuser</td><td>Administrative</td><td>Bypasses RLS and triggers by definition (R-1). C-24 is the compensating control.</td></tr>
       <tr><td>TB-9</td><td>Ordinary write path</td><td>Purge path</td><td>Privilege (DB role)</td><td>The only path that deletes posted rows. It runs inside a function owned by the NOLOGIN <code>poly_purge</code> role (§4.5).</td></tr>
-      <tr><td>TB-10</td><td>Staging compose project</td><td>Prod compose project</td><td>Container isolation, shared kernel</td><td>Staging auto-deploys every merge to <code>main</code> and holds fake data only. It has separate networks, secrets and database, and no credential private key (R-4).</td></tr>
+      <tr><td>TB-10</td><td>Staging compose project</td><td>Prod compose project</td><td>Container isolation, shared kernel</td><td>Staging auto-deploys every merge to <code>main</code> and holds no real books. Its data is the fake source plus Plaid Sandbox and SimpleFIN demo data (Principal, 2026-11-06). It has separate networks, secrets and database. <em>Revised in v1.1:</em> staging has its own keyring, which seals sandbox tokens only, and it never holds prod's keyring or the production Plaid secret (C-77, R-4).</td></tr>
+      <tr><td>TB-14</td><td>Parent member (<code>poly_app</code>)</td><td>Aggregates of entities beneath the parent</td><td>Privilege (definer role)</td><td>The only path by which structure grants anything. Allowlisted definers owned by <code>poly_rollup</code> return fixed aggregate shapes, never rows. Their reads are confined by role-targeted policies to the caller's descendants. The cap-table and allocated-income definers (<code>poly_stake</code>) and the graph triggers (<code>poly_graph</code>) sit on the same boundary (§3.8, C-25, C-27).</td></tr>
       <tr><td>TB-11</td><td>User upload (CSV / OFX)</td><td><code>web</code> parser</td><td>Untrusted file</td><td>The credential-free import path, and a parser attack surface (C-40).</td></tr>
       <tr><td>TB-12</td><td>GitHub (CI, Actions, Renovate, registry)</td><td>Release images, prod deploy</td><td>Supply chain</td><td>Whoever can publish an image that prod runs owns the box (§8).</td></tr>
       <tr><td>TB-13</td><td>Operator (SSH tunnel)</td><td>Admin view listener, bound to loopback and never routed by Caddy</td><td>Administrative, out-of-band</td><td><em>Placeholder; defined under POLY-81.</em> The design options are ARCH OQ-15: (a) a loopback route group inside <code>web</code>, or (b) a separate admin service with a read-only status DB role. The threats and controls are written when POLY-81 is ruled.</td></tr>
@@ -147,7 +164,7 @@ flowchart TB
       <tr><td>T-05</td><td>CSRF on state-changing form actions or <code>/api/v1</code>.</td><td>T / E</td><td>M</td><td>H</td><td>C-06</td></tr>
       <tr><td>T-06</td><td>Stored XSS through provider payee or memo strings, or through entity or report names set by a co-member.</td><td>T / E</td><td>M</td><td>H</td><td>C-41, C-07</td></tr>
       <tr><td>T-07</td><td>Account enumeration through login, reset or signup responses.</td><td>I</td><td>M</td><td>L</td><td>C-04</td></tr>
-      <tr><td>T-08</td><td>A stolen session is used for an irreversible or exfiltration-shaped action: purge, export, provider link, membership grant.</td><td>S / E</td><td>L</td><td>H</td><td>C-03 (step-up), C-50</td></tr>
+      <tr><td>T-08</td><td>A stolen session is used for an irreversible or exfiltration-shaped action: purge, export, provider link, membership grant.</td><td>S / E</td><td>L</td><td>H</td><td>C-03 (step-up), C-50, C-52. A purge runs with no delay (R-16), so the controls are step-up, the typed name, a fresh export and an immediate email to every member.</td></tr>
       <tr><td>T-09</td><td>Floods against expensive endpoints: reports, export, upload.</td><td>D</td><td>L</td><td>M</td><td>C-04, C-40, C-42</td></tr>
     </tbody>
   </table>
@@ -232,6 +249,26 @@ flowchart TB
       <tr><td>T-64</td><td>A GitHub or Actions compromise pushes to prod through a deploy key.</td><td>E</td><td>L</td><td>H</td><td>C-81, C-83</td></tr>
       <tr><td>T-65</td><td>Code merged but not yet released runs on staging on the prod kernel, then escapes its container.</td><td>E</td><td>L</td><td>H</td><td>C-70, C-74, R-4</td></tr>
       <tr><td>T-66</td><td>A secret is committed to the repo or baked into an image.</td><td>I</td><td>M</td><td>H</td><td>C-82, C-74</td></tr>
+      <tr><td>T-67</td><td>The local box, meant to be LAN-only, becomes reachable from the internet. Causes: a router UPnP auto-forward, a home router that allows inbound IPv6 to the box's global address, or a Docker-published port bypassing the host firewall.</td><td>I / E</td><td>M</td><td>H</td><td>C-76</td></tr>
+      <tr><td>T-68</td><td>The DNS-API token on the local box, used for the DNS-01 certificate, is stolen. The thief can issue certificates for the zone, or redirect the name for clients that resolve it publicly.</td><td>S / I</td><td>L</td><td>M</td><td>C-76 (token scoped to one zone, a file secret mounted into Caddy only); <em>pending Principal A7</em></td></tr>
+      <tr><td>T-69</td><td>The whole local box is stolen from the home.</td><td>I</td><td>L</td><td>H</td><td>C-72 (unlock mode <em>pending Principal A8</em>), C-73 (backups encrypted separately)</td></tr>
+      <tr><td>T-76</td><td>Staging, which now holds a keyring and sandbox tokens, is configured with prod's keyring, the production Plaid secret or a real SimpleFIN token. Real bank access then lands on the box that runs unreleased code.</td><td>I / E</td><td>L</td><td>H</td><td>C-77, C-74</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.8 TB-14 — Nesting, roll-up &amp; cap table (<code>poly_rollup</code>, <code>poly_stake</code>, <code>poly_graph</code>)</h3>
+  <p>ARCH §3.1a and §3.3a–c, on the Principal's rulings of 2026-11-06/07. Access stays per entity. These are the only paths by which structure or equity yields any figure about an entity the caller holds no membership on.</p>
+  <table>
+    <thead><tr><th>ID</th><th>Threat</th><th>STRIDE</th><th>L</th><th>I</th><th>Control(s)</th></tr></thead>
+    <tbody>
+      <tr><td>T-70</td><td>A parent member with no membership on a child reads the child's rows (entries, lines, payees, memos, lots, positions) through a roll-up definer, the holdings popover, or a bug in a definer body.</td><td>I</td><td>M</td><td>H</td><td>C-25</td></tr>
+      <tr><td>T-71</td><td>Structure enumeration: a non-member reads <code>entity_rollup</code> rows, or ancestor names, beyond the ruled grant (members of the parent; the child's owner sees parent names only).</td><td>I</td><td>M</td><td>L</td><td>C-19, C-25</td></tr>
+      <tr><td>T-72</td><td>Time-slicing: calling the roll-up, economic or allocated-income definer for one-day periods, or comparing balances on consecutive days, rebuilds near-transaction-level detail of an entity the caller is not a member of.</td><td>I</td><td>M</td><td>M</td><td><em>Pending Principal A2</em> (period bounds for non-member entities); R-17</td></tr>
+      <tr><td>T-73</td><td>The audience of an entity's totals grows without its owner knowing. It grows when the entity's parent is placed under another parent (consent travels upward), or when a member is added to an ancestor.</td><td>I</td><td>M</td><td>M</td><td>C-25 (placement notice through the <code>poly_graph</code> trigger, <code>app.parents_of</code>, pull-out); the notice on an ancestor grant is <em>pending Principal A5</em></td></tr>
+      <tr><td>T-74</td><td>The cap-table candidate list, or the holder notification, leaks names of Persons or entities to someone with no relation to them.</td><td>I</td><td>L</td><td>M</td><td>C-27</td></tr>
+      <tr><td>T-75</td><td>A holder's owners, who have no membership on the held entity, read other holders' rows or the held entity's books.</td><td>I</td><td>M</td><td>M</td><td>C-27</td></tr>
+      <tr><td>T-77</td><td>A cycle check or holder-graph check runs under a role that cannot see the whole graph, so a cycle through entities invisible to that role is accepted. Roll-ups then double-count, and allocations loop.</td><td>T</td><td>M</td><td>M</td><td>C-25 (graph triggers owned by <code>poly_graph</code>, with a graph-wide read)</td></tr>
+      <tr><td>T-78</td><td>A cycle or depth refusal reveals that a hidden link exists.</td><td>I</td><td>L</td><td>L</td><td>R-15. The inserter must own both ends, and the error names no entity.</td></tr>
     </tbody>
   </table>
 </section>
