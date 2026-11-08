@@ -24,7 +24,7 @@
   <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
-    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). Seven questions for the Principal are in §10. Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
+    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). Six questions for the Principal remain in §10 (Q1 ruled). Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
     <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1.4</a>, <a href="../ARCH/">ARCH v1.7</a>, <a href="../SECURITY/">SECURITY v1.2.3</a>, <a href="../../process/DECISIONS.md">DECISIONS</a> through 2026-11-08</span>
     <span><strong>Last updated:</strong> 2026-11-08</span>
   </div>
@@ -98,7 +98,7 @@ flowchart TB
       <tr><td>Machine</td><td>One Hetzner Cloud server, 4 vCPU / 8 GB / shared x86, Ubuntu Server 24.04 LTS (§2.1). IPv4 and IPv6 both enabled on the server; both are covered by the firewall rules.</td></tr>
       <tr><td>Ports</td><td>The Cloud Firewall (outside the host, C-71) admits 22, 80 and 443 only. On the host only Caddy publishes ports; the compose-policy lint (C-70) and the post-deploy outside-in scan (§7.1 step 15) both enforce this.</td></tr>
       <tr><td>SSH</td><td>Key-only, no root login, no password auth. Port 22 stays open to the world because a home connection's address changes. The key and the unattended-upgrade posture are the control (§3.1). Restricting 22 to your current address in the firewall is an option, not the default, and a mistake there locks you out (§8.9).</td></tr>
-      <tr><td>DNS</td><td>Two <code>A</code>/<code>AAAA</code> records: <code>app.&lt;domain&gt;</code> to prod, <code>staging.&lt;domain&gt;</code> to staging, both pointing at the one server. Public DNS is at the zone's DNS host (§10 Q1 recommends Cloudflare DNS-only, no proxy).</td></tr>
+      <tr><td>DNS</td><td>Two <code>A</code>/<code>AAAA</code> records: <code>app.&lt;domain&gt;</code> to prod, <code>staging.&lt;domain&gt;</code> to staging, both pointing at the one server. Public DNS is Cloudflare's free DNS in DNS-only mode (grey cloud, no proxy), with the registrar unchanged (Principal, 2026-11-08, Q1).</td></tr>
       <tr><td>TLS</td><td>Caddy obtains and renews public certificates by ACME HTTP-01 (port 80). No operator action. Staging sits behind Caddy basic auth plus an IP allowlist (ARCH §7.1).</td></tr>
       <tr><td>Third parties on this path</td><td>GitHub (image registry, release metadata, attestations; pulled by the box, §4.4); Resend (outbound mail); Plaid, SimpleFIN, direct broker APIs, the EOD price provider (OQ-5) and BLS (outbound, worker); Google, Apple and GitHub OAuth; the backup bucket; one outside monitor. Each is outbound-only from the box except the browser's own redirect.</td></tr>
     </tbody>
@@ -525,7 +525,7 @@ laptop$ git tag -v v1.0.0     # from v1.0; before then use main</code></pre>
       <pre class="cmd"><code>laptop$ infra/hetzner/create.sh --name polycarpic --location &lt;nearest&gt; \
           --ssh-key ~/.ssh/polycarpic_ed25519.pub</code></pre>
       <p class="expect">Expect: it prints the server's IPv4 and IPv6 addresses and ends with <code>created: server, firewall (22,80,443 in), volume 20 GB</code>. It is safe to run again; it skips what exists. If it says the location has no stock, choose another location. If it prints anything about opening ports other than 22, 80, 443, stop.</p></li>
-    <li><strong>Point your DNS at it.</strong> At your DNS host create <code>A</code> and <code>AAAA</code> records: <code>app</code> and <code>staging</code> → the two addresses. TTL 300.
+    <li><strong>Point your DNS at it.</strong> If the domain's name servers are not yet Cloudflare's: add the domain to a free Cloudflare account, copy the two name servers it gives you into the registrar's "name servers" setting (the registrar stays the registrar), and wait until Cloudflare shows the zone Active (minutes to a day). Then in Cloudflare DNS create <code>A</code> and <code>AAAA</code> records: <code>app</code> and <code>staging</code> → the two addresses. TTL 300, proxy status <strong>DNS only</strong> (grey cloud; an orange cloud would put Cloudflare in front of the server and break the design).
       <pre class="cmd"><code>laptop$ dig +short app.example.com A
 laptop$ dig +short app.example.com AAAA</code></pre>
       <p class="expect">Expect: the server's addresses within a few minutes. If empty after 30 minutes, the records are on the wrong zone or have a typo.</p></li>
@@ -634,13 +634,13 @@ box$ curl -sS --max-time 5 http://example.com:8080 || echo blocked</code></pre>
   <h3 id="rb-tls">7.3 Home-box TLS, step by step</h3>
   <h4>Mode A (default): real domain, DNS-01 wildcard</h4>
   <ol>
-    <li>In the DNS host for your domain create an API token that can <strong>edit DNS records in this one zone only</strong> (for Cloudflare: My Profile → API Tokens → Create → "Edit zone DNS" template, Zone Resources → Include → Specific zone → your domain). Name it <code>polycarpic-home-caddy</code>.</li>
+    <li>In Cloudflare create an API token that can <strong>edit DNS records in this one zone only</strong> (My Profile → API Tokens → Create → "Edit zone DNS" template, Zone Resources → Include → Specific zone → your domain). Name it <code>polycarpic-home-caddy</code>.</li>
     <li><code>box$ sudo polycarpic-ops set-secret dns_api_token</code> and paste it. Set <code>TLS_MODE=real-domain</code>, <code>PUBLIC_ORIGIN=https://polycarpic.home.example.com</code> in <code>/etc/polycarpic/host.env</code>.
       <p class="expect">Expect: <code>list-secrets</code> shows the token, mounted only into <code>caddy</code> (<code>polycarpic-ops show-mounts</code>).</p></li>
     <li><strong>Make the name resolve on your LAN only.</strong> Preferred: in the router's DNS settings add a local record <code>polycarpic.home.example.com → &lt;box address&gt;</code>. If your router cannot, add the line <code>192.168.1.20 polycarpic.home.example.com</code> to <code>/etc/hosts</code> (macOS/Linux) or <code>C:\Windows\System32\drivers\etc\hosts</code> on each device.
       <pre class="cmd"><code>laptop-on-LAN$ dig +short polycarpic.home.example.com
 laptop-off-LAN$ dig +short polycarpic.home.example.com @1.1.1.1</code></pre>
-      <p class="expect">Expect: the first shows the box's address (or use <code>ping</code> if you used a hosts file); the second shows nothing. If the second shows an address, you published the box's name: delete that record at the DNS host.</p></li>
+      <p class="expect">Expect: the first shows the box's address (or use <code>ping</code> if you used a hosts file); the second shows nothing. If the second shows an address, you published the box's name: delete that record in Cloudflare.</p></li>
     <li>First deploy requests the wildcard. Expect in <code>polycarpic-ops logs caddy</code>: <code>certificate obtained successfully</code> within about two minutes. Browse to the name from a LAN device: a normal padlock, issuer a public CA. If the order fails with <code>DNS problem</code>, the token's zone or permission is wrong; if with <code>rate limit</code>, wait an hour and do not retry in a loop.</li>
     <li>Register your sign-in apps with Google, Apple and GitHub using the callback URL <code>https://polycarpic.home.example.com/api/auth/callback/&lt;provider&gt;</code>, then <code>set-secret</code> each client secret. GitHub asks for <code>read:user</code> and <code>user:email</code> only.</li>
   </ol>
@@ -728,9 +728,9 @@ laptop$ infra/vercel/deploy.sh --tag v1.0.0</code></pre>
 
   <h3>8.3 Rotate the DNS token (home, real-domain mode)</h3>
   <ol>
-    <li>At the DNS host, create a new token with the same single-zone scope; <code>box$ sudo polycarpic-ops set-secret dns_api_token</code>; <code>sudo polycarpic-ops restart caddy</code>.</li>
+    <li>In Cloudflare, create a new token with the same single-zone scope; <code>box$ sudo polycarpic-ops set-secret dns_api_token</code>; <code>sudo polycarpic-ops restart caddy</code>.</li>
     <li>Force a renewal test: <code>sudo polycarpic-ops caddy-renew-test</code>. Expect: <code>staging ACME order succeeded</code> (it uses the issuer's test environment).</li>
-    <li>Delete the old token at the DNS host. Expect nothing else to change.</li>
+    <li>Delete the old token in Cloudflare. Expect nothing else to change.</li>
   </ol>
 
   <h3>8.4 Renew the GitHub read token (every 90 days)</h3>
@@ -866,13 +866,13 @@ box$ sudo polycarpic-ops status</code></pre>
 <!-- ============================================================ -->
 <section id="open-questions" data-section="open-questions">
   <h2>10. Open Questions</h2>
-  <p class="section-hint">Q1 to Q7 need the Principal (cost or product calls; the lead runs the interview). OQ-INFRA rows are measurements or rulings with an owner and a trigger.</p>
+  <p class="section-hint">Q2 to Q7 need the Principal (cost or product calls; the lead runs the interview). OQ-INFRA rows are measurements or rulings with an owner and a trigger.</p>
 
   <h3>10.1 For the Principal</h3>
   <table>
     <thead><tr><th>#</th><th>Question</th><th>Options and mechanics</th><th>Recommendation</th></tr></thead>
     <tbody>
-      <tr><td>Q1</td><td>Where does your domain's DNS live?</td><td>Caddy needs a DNS provider plugin for the home box's wildcard certificate. (a) Move the domain's name servers to Cloudflare's free DNS (DNS only, no proxy): one token scoped to one zone, a well-maintained Caddy plugin. (b) Keep the registrar's DNS if its API has a Caddy plugin and zone-scoped tokens. Needed for step 8 of §7.1 and Mode A.</td><td>(a), unless your registrar already offers scoped tokens</td></tr>
+      <tr><td>Q1</td><td>Where does your domain's DNS live?</td><td><strong>Ruled (Principal, 2026-11-08), option (a):</strong> move the domain's name servers to Cloudflare's free DNS, DNS-only mode; one zone-scoped token on the home box; the registrar is unchanged. Applied in §1.2, §3.4, §7.1 step 8 and §7.3 Mode A. Closed.</td><td>Closed</td></tr>
       <tr><td>Q2</td><td>Hetzner location?</td><td>US (Ashburn, Hillsboro) or EU (Falkenstein, Nuremberg, Helsinki). US has a smaller included traffic allowance and a different price (unmeasured); EU is cheaper and further away. Latency is a few tens of milliseconds, invisible for this app.</td><td>Nearest to the household; US if everyone is in the US</td></tr>
       <tr><td>Q3</td><td>Backup bucket provider (about cents a month)?</td><td>(a) Backblaze B2 with Object Lock: documented compliance-mode locks, pay-as-you-go. (b) Hetzner Object Storage, same account, if its Object Lock is verified in compliance mode <em>(unmeasured)</em>. (c) Hetzner Storage Box, a flat monthly fee, but no documented immutable mode and its SFTP port conflicts with the home box's firewall. A third-party account is one more login to protect.</td><td>(a), or (b) after the lock is verified</td></tr>
       <tr><td>Q4</td><td>An outside monitor service (free tier)?</td><td>Receives only "I am alive" pings and can email you if they stop; holds no data. Healthchecks.io free tier, or UptimeRobot. Without it a dead box and a dead Resend are silent together.</td><td>Healthchecks.io</td></tr>
