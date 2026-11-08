@@ -383,3 +383,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** a passphrase-at-boot box stays down after every power cut, a pulled disk stays unreadable, and whole-box theft from a home is rare. Append-only storage means a compromised box cannot destroy its own history.
 **Alternatives considered:** passphrase at every boot; a rotated removable drive only; both destinations.
 **Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — A purged holder shows as "Former holder" with an optional owner-typed label
+**Decision:** every entity purge tombstones the entity row (id and purge date, no name), so other entities' append-only cap-table rows that name it still resolve. On those cap tables the holder reads "Former holder (purged <date>)"; its units count as outside owners from the purge date by a read rule, with no new rows and no exception to the append-only trigger; the affected owners are notified. The other entity's owners may type an optional label for the former holder, stored as their own append-only data, read through their entity's RLS, purged only with their entity, and gated as a cap-table edit on a multi-owner entity.
+**Why:** the purge promise (PRD §5) holds because the system copies nothing of the purged entity; the other entity's owners keep their ownership history using knowledge they already had. Shape: ARCH v1.4 §3.4b (OQ-33).
+**Alternatives considered:** "Former holder" with no label (loses the name from the other entity's records); keeping the purged entity's name as it stood (its name survives in records its owner can no longer see or remove).
+**Approved by:** richmosko (2026-11-07)
