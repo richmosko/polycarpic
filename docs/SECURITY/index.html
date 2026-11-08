@@ -251,7 +251,8 @@ flowchart TB
       <tr><td>T-65</td><td>Code merged but not yet released runs on staging on the prod kernel, then escapes its container.</td><td>E</td><td>L</td><td>H</td><td>C-70, C-74, R-4</td></tr>
       <tr><td>T-66</td><td>A secret is committed to the repo or baked into an image.</td><td>I</td><td>M</td><td>H</td><td>C-82, C-74</td></tr>
       <tr><td>T-67</td><td>The local box, meant to be LAN-only, becomes reachable from the internet. Causes: a router UPnP auto-forward, a home router that allows inbound IPv6 to the box's global address, or a Docker-published port bypassing the host firewall.</td><td>I / E</td><td>M</td><td>H</td><td>C-76</td></tr>
-      <tr><td>T-68</td><td>The DNS-API token on the local box, used for the DNS-01 certificate, is stolen. The thief can issue certificates for the zone, or redirect the name for clients that resolve it publicly.</td><td>S / I</td><td>L</td><td>M</td><td>C-76 (token scoped to one zone, a file secret mounted into Caddy only); <em>pending Principal P7</em></td></tr>
+      <tr><td>T-68</td><td>The DNS-API token on the local box, used for the DNS-01 certificate, is stolen. The thief can issue certificates for the zone, or redirect the name for clients that resolve it publicly.</td><td>S / I</td><td>L</td><td>M</td><td>C-76 (token scoped to one zone, a file secret mounted into Caddy only); R-18</td></tr>
+      <tr><td>T-79</td><td>Private-CA mode on the local box. The operator's root certificate is installed on every device, so whoever holds its signing key can impersonate <em>any</em> website to those devices, banks included.</td><td>S / I</td><td>L</td><td>H</td><td>C-76: a name-constrained root, the root key offline, only an intermediate on the box. R-20.</td></tr>
       <tr><td>T-69</td><td>The whole local box is stolen from the home.</td><td>I</td><td>L</td><td>H</td><td>C-72 (unlock mode <em>pending Principal P8</em>), C-73 (backups encrypted separately)</td></tr>
       <tr><td>T-76</td><td>Staging, which now holds a keyring and sandbox tokens, is configured with prod's keyring, the production Plaid secret or a real SimpleFIN token. Real bank access then lands on the box that runs unreleased code.</td><td>I / E</td><td>L</td><td>H</td><td>C-77, C-74</td></tr>
     </tbody>
@@ -644,7 +645,7 @@ flowchart TB
       <tr><td>Plaid client secret, broker OAuth clients, price-provider key, BLS key</td><td>Host secrets directory</td><td><code>worker</code>, plus <code>web</code> for the Plaid token exchange</td><td>At the provider, on suspicion</td></tr>
       <tr><td>Backup encryption key and store credential</td><td>The public half (recipient) on the box; the private half offline (§6.6)</td><td>Backup job</td><td>On a change of operator. Keep the old key until its last backup expires.</td></tr>
       <tr><td>Staging credential keyring (sandbox tokens only)</td><td>The staging secrets directory, separate from prod's</td><td>Staging <code>worker</code> only</td><td>Freely: losing it means relinking sandbox items</td></tr>
-      <tr><td>DNS-API token (local box, if DNS-01; pending Principal P7)</td><td>Host secrets directory</td><td>Caddy only</td><td>At the DNS provider, on suspicion. Scoped to one zone.</td></tr>
+      <tr><td>DNS-API token (local box, real-domain mode, P7)</td><td>Host secrets directory</td><td>Caddy only</td><td>At the DNS provider, on suspicion. Scoped to one zone.</td></tr>
       <tr><td><code>CRON_SECRET</code> (Vercel only)</td><td>Vercel env var</td><td>Internal cron route</td><td>On compromise</td></tr>
       <tr><td>CI deploy credential or registry token</td><td>GitHub <em>environment</em> secret, with required reviewers</td><td>Actions runner</td><td>On compromise. Revocable independently of the operator's SSH key.</td></tr>
       <tr><td>Aggregator tokens and URLs (T2)</td><td>Postgres, sealed (§6.3)</td><td>Opened only in <code>worker</code></td><td>Driven by the provider. Re-sealed on key rotation.</td></tr>
@@ -665,7 +666,7 @@ flowchart TB
     <li><strong>Fail closed at startup.</strong> Outside development, the app refuses to start if a required secret is missing, or if a secret-looking env var is set in production.</li>
     <li><strong>Read once.</strong> Secrets are read at startup. There is no runtime secret-fetch path and no admin endpoint that reveals configuration.</li>
     <li><strong>Vercel.</strong> The tertiary target uses Vercel's encrypted env vars (R-3). The hosting order is Hetzner, then the local box, then Vercel + Neon (Principal, 2026-11-06).</li>
-    <li><strong>Local box.</strong> Same file layout as the Hetzner path. If it uses a DNS-01 certificate (pending Principal P7), the DNS-API token is a file secret mounted into Caddy only, scoped to one zone (C-76).</li>
+    <li><strong>Local box.</strong> Same file layout as the Hetzner path. In real-domain mode (P7) the DNS-API token is a file secret mounted into Caddy only, scoped to one zone (C-76).</li>
   </ul>
 
   <h3 id="sealing">6.3 Credential sealing — ruling on OQ-1 (revised)</h3>
@@ -926,13 +927,40 @@ flowchart TB
           <li><strong>Updates.</strong> Unattended security upgrades.</li>
           <li><strong>Monitoring.</strong> An outbound heartbeat, and its absence alerts.</li>
           <li><strong>Remote access.</strong> None from outside the LAN in v1. A VPN later is a new security review.</li>
-          <li><strong>TLS.</strong> The certificate source is pending Principal P7. If DNS-01, use a wildcard on a subdomain resolved only on the LAN (split-horizon), so the box's own name is not in public CT logs. The DNS-API token is scoped to that one zone (T-68).</li>
+          <li><strong>TLS: two modes</strong> (Principal, 2026-11-07, P7). Plain-http sign-in is refused in both: Caddy redirects 80 to 443, and the app rejects any auth route reached over plain http, trusting the forwarded protocol only from Caddy. <code>__Host-</code> cookies need <code>Secure</code> anyway.
+            <ul>
+              <li><strong>Default, real-domain mode.</strong>
+                <ul>
+                  <li>A subdomain of a domain the operator owns, resolved only on the LAN (split-horizon). There is no public A or AAAA record.</li>
+                  <li>A DNS-01 wildcard certificate (<code>*.home.&lt;domain&gt;</code>), so the box's own name stays out of public CT logs.</li>
+                  <li>The registrar or DNS-API token is limited to that one zone, a file secret mounted into Caddy only (R-18).</li>
+                  <li>Google and Apple sign-in work.</li>
+                </ul></li>
+              <li><strong>Supported fallback, <code>.local</code> with a private CA.</strong>
+                <ul>
+                  <li>The operator runs a private CA and installs its root on each device. The root carries X.509 <code>nameConstraints</code> permitting only the box's name. Browser enforcement of constraints on a locally installed root is unmeasured, and is verified at the first local-box deploy.</li>
+                  <li>The root key is generated off the box and kept offline (the operator's password manager). The box holds only a name-constrained intermediate that issues short-lived leaf certificates (T-79, R-20).</li>
+                  <li>The mode is explicit configuration (<code>TLS_MODE=private-ca</code>). At startup the app cross-checks it: a public name that does not resolve publicly, or that ends in <code>.local</code>, must be in private-CA mode, or the app refuses to start.</li>
+                  <li>In private-CA mode the Google and Apple buttons are hidden <em>and</em> the OAuth routes return 404 server-side. Sign-in is email + password + the second step (P1).</li>
+                  <li>Whether passkeys work on a <code>.local</code> RP ID is unmeasured; TOTP is always offered.</li>
+                </ul></li>
+              <li><strong>Moving a <code>.local</code> box to a real domain later.</strong>
+                <ul>
+                  <li>Every session ends, because cookies are host-bound.</li>
+                  <li>Passkeys do not survive, because they are bound to the old RP ID. Before the move, the runbook requires each owner and manager to hold TOTP or backup codes, with the operator's <code>reset-mfa</code> CLI as the fallback.</li>
+                  <li>Google or Apple sign-in is then added by linking from Settings while signed in (C-05: an existing session and a verified email). It is never auto-linked by email.</li>
+                  <li>Every device should remove the old private root.</li>
+                </ul></li>
+            </ul></li>
         </ul><p class="ctl-meta"><strong>Lives at:</strong> INFRA local-box provisioning (DevOps)<br><strong>Tested by:</strong>
         <ul>
           <li>a provisioning check script (nftables rules, the <code>DOCKER-USER</code> rule, the publish binding, the sshd config);</li>
           <li>an outside-in scan, from a host off the LAN, of the home's public IPv4 and the box's IPv6 address, showing nothing open;</li>
-          <li>a test that an outbound connection to a non-allowed port fails.</li>
-        </ul></p></td><td>T-60, T-67, T-68</td><td>Before the first local-box deploy</td></tr>
+          <li>a test that an outbound connection to a non-allowed port fails;</li>
+          <li>an auth route over plain http is refused in both modes;</li>
+          <li>in private-CA mode the OAuth routes return 404, and a <code>.local</code> name outside private-CA mode refuses to start;</li>
+          <li>a certificate for an out-of-constraint name issued under the private root is rejected by each supported browser.</li>
+        </ul></p></td><td>T-60, T-67, T-68, T-79</td><td>Before the first local-box deploy</td></tr>
       <tr><td>C-77</td><td>Staging credential isolation (ARCH §7.5, Principal, 2026-11-06):
         <ul>
           <li><strong>Its own keyring.</strong> Staging's keyring has distinct <code>key_id</code>s, lives in its own secrets directory, and is mounted into staging <code>worker</code> only.</li>
@@ -1083,6 +1111,8 @@ flowchart TB
       <tr><td>R-15</td><td>A parent-link or cap-table refusal ("would make an entity its own ancestor", "too deep") reveals that some link exists, possibly through entities the user cannot see (T-78).</td><td>The inserter must own both ends, so the bit is about paths between their own entities. The error names no entity, and naming nothing would make the refusal unexplainable.</td><td>Errors name no entity (C-25). Refusals are audited.</td><td>If links ever become insertable by a non-owner</td><td>Rich Mosko (2026-11-07, P3)</td></tr>
       <tr><td>R-16</td><td>A purge, including one inside an account deletion, runs immediately with no cancellable delay. A hijacked session that passes step-up can destroy an entity's books at once.</td><td>The Principal's ruling (OQ-23). A delay needs a background purge the design forbids, and would make the freshness guards stale.</td><td>Step-up within 5 minutes (C-03, with a second factor required for owners, P1). Typed entity name. A fresh export by the same user. Every member emailed immediately. Operator backups (C-73). R-5 bounds how long recovery is possible.</td><td>If a purge is ever reported as unwanted</td><td>Rich Mosko (2026-11-06, OQ-23)</td></tr>
       <tr><td>R-19</td><td>Co-owner deadlock. Under §4.2.2 one owner who declines, or never responds, blocks an invite, a cap-table edit or another owner's removal indefinitely. A target co-owner can always block their own removal.</td><td>Group governance is the point of the Principal's P5b ruling. An automatic way past it would let one owner act alone, which is T-26.</td><td>Expiry and reminders (§4.2.2). Anyone may give up their own role. Out-of-band resolution: the operator's audited CLI (<code>polycarpic membership …</code>), which notifies every owner and writes an <code>audit_event</code>. The operator is already the trust root (R-1).</td><td>On the first reported deadlock</td><td>pending</td></tr>
+      <tr><td>R-18</td><td>Real-domain mode on the local box keeps a zone-limited DNS-API token on the box (T-68). Whoever steals it can issue certificates for that zone, or publish records in it.</td><td>It is what keeps Google and Apple sign-in on a box nothing can reach. The box is unreachable from the internet, so a stolen token gets no path in.</td><td>The token is scoped to one zone and mounted into Caddy only (C-76). It is rotated at the provider on suspicion. CT-log monitoring of the zone is optional.</td><td>On any change to the local-box TLS mode</td><td>Rich Mosko (2026-11-07, P7)</td></tr>
+      <tr><td>R-20</td><td>Private-CA mode installs an operator root on each device (T-79). If browsers do not enforce its name constraint, a stolen root key could impersonate any site to those devices.</td><td>It is the supported fallback for an operator without a domain (P7).</td><td>A name-constrained root, its key offline, and only an intermediate on the box (C-76). The runbook says to remove the root from every device on decommission or on a move to a real domain.</td><td>At the first private-CA deploy, after measuring constraint enforcement</td><td>pending</td></tr>
       <tr><td>R-17</td><td>Aggregate inference. Roll-up figures shown to a parent's members, the economic view, and allocated income shown to a holder's owners can be combined to infer things. Dividing economic by gross gives the viewer's own look-through stake. Allocated income divided by stake gives a pass-through entity's tagged income totals, as a K-1 tells a partner. Observing "today" figures every day accumulates detail over time. <em>Widened by P2:</em> a parent member may request roll-up totals for any date range. For a small entity, one-day periods and day-to-day balance differences reveal individual amounts and their dates, though never payee, memo, account or counterparty.</td><td>Each figure is one the viewer is entitled to by the Principal's rulings. Inclusion in a parent is an explicit grant by the entity's owner, so the exposure is consented, provided the consent is honest.</td><td>Consent disclosure at inclusion and in the upward-consent notice (C-25). The fixed aggregate shapes (C-25, C-27). Own and member entities are unaffected.</td><td>With POLY-1.1, and on any cross-parent "my net worth" proposal (OQ-29)</td><td>Rich Mosko (2026-11-07, P2)</td></tr>
     </tbody>
   </table>
@@ -1118,7 +1148,7 @@ flowchart TB
       <tr><td>OQ-4</td><td>The purge function is SECURITY DEFINER, owned by a <strong>NOLOGIN <code>poly_purge</code></strong> role. It uses role-targeted DELETE policies, and the append-only trigger makes an exception only when <code>current_user = 'poly_purge'</code>. ARCH's guard order is kept, plus two new guards: no writes since the export, and an assertion that zero rows remain.</td><td><strong>Revised.</strong> A purge owned by <code>poly_owner</code> deletes zero rows under FORCE RLS (T-51).</td><td>§4.5; C-21, C-50</td></tr>
       <tr><td>OQ-19</td><td>C-19 amended. The owner-on-both insert rule is kept. No <code>poly_app</code> or <code>poly_worker</code> policy reads <code>entity_rollup</code>; only <code>poly_rollup</code>'s role-targeted policies do, behind fixed aggregate shapes. The one-bit refusal disclosure is accepted (R-15).</td><td><strong>New in v1.1.</strong> <em>Finding:</em> the cycle trigger must not be owned by <code>poly_rollup</code>, whose confined reads would miss a cycle outside the caller's descendants. Hence <code>poly_graph</code> (A-16).</td><td>§3.8; C-19, C-25</td></tr>
       <tr><td>OQ-23</td><td>Recorded: no purge delay (Principal). The guards stand and every member is emailed immediately.</td><td>Q2 withdrawn</td><td>§4.5; R-16</td></tr>
-      <tr><td>OQ-24</td><td>Local-box posture C-76: router with no forward and UPnP off; IPv6 closed; a host nftables default-deny with a LAN-only allow; Caddy bound to the LAN address plus a <code>DOCKER-USER</code> rule; outbound limited to DNS, NTP and HTTPS; an outbound heartbeat. The TLS source, disk unlock and backup destination are Principal questions P7–P9.</td><td><strong>New.</strong></td><td>C-76; T-67 to T-69</td></tr>
+      <tr><td>OQ-24</td><td>Local-box posture C-76: router with no forward and UPnP off; IPv6 closed; a host nftables default-deny with a LAN-only allow; Caddy bound to the LAN address plus a <code>DOCKER-USER</code> rule; outbound limited to DNS, NTP and HTTPS; an outbound heartbeat. TLS: two modes, a real domain by default with a <code>.local</code> private-CA fallback (P7). Disk unlock and backup destination are P8 and P9.</td><td><strong>New.</strong></td><td>C-76; T-67 to T-69</td></tr>
       <tr><td>OQ-25</td><td>Confirmed, with the shapes in §3.8:
         <ul>
           <li><strong>Junction read and <code>parents_of</code>.</strong> Read with any membership on the parent, or owner on the child. <code>parents_of</code> returns names only, to the owner only.</li>
@@ -1212,7 +1242,7 @@ flowchart TB
         <li><strong>P5b. Ruled 2026-11-07:</strong> on a multi-owner entity, every other owner approves invites, role raises, a co-owner's removal or demotion, and cap-table edits (§4.2.2, C-28, T-26). The edges are SecEng rulings in §4.2.2. R-19 (deadlock) is pending approval.</li>
         <li><strong>P5. Ruled 2026-11-07:</strong> notify, never block. When an invitation to a parent goes live, every owner beneath is notified with the disclosure sentence and the pull-out link (C-25, T-73).</li>
         <li><strong>P6. Ruled 2026-11-07:</strong> there is no reopen switch. Invitation is the only way in, plus <code>polycarpic user invite &lt;email&gt;</code> (C-01, §4.1).</li>
-        <li><strong>P7.</strong> Local-box TLS: a real subdomain with a split-horizon DNS-01 wildcard, or a private CA? <em>Recommend the subdomain</em> (keeps Google sign-in).</li>
+        <li><strong>P7. Ruled 2026-11-07:</strong> the default is a real domain resolved only on the LAN, with a DNS-01 wildcard (R-18 approved). The supported fallback is <code>.local</code> with a name-constrained private CA, OAuth disabled, and email + password + second step (C-76). Plain-http sign-in is refused in both. R-20 is pending.</li>
         <li><strong>P8.</strong> Local-box disk unlock: a passphrase at boot, or the TPM? <em>Recommend the TPM.</em></li>
         <li><strong>P9.</strong> Local-box backups: an append-only online store, or a rotated drive? <em>Recommend the online store.</em></li>
       </ul></li>
