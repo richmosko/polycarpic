@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infrastructure &amp; Operations — Polycarpic</title>
+  <link rel="stylesheet" href="../_assets/doc.css">
+  <link rel="stylesheet" href="../_assets/comments.css">
+  <style>
+    /* INFRA-local: let long identifiers wrap inside table cells; keep command blocks readable. */
+    td { overflow-wrap: anywhere; }
+    td code { white-space: normal; }
+    pre.cmd { overflow-x: auto; }
+    .expect { margin: 0.2rem 0 0.8rem; font-size: 0.92em; color: var(--doc-muted); }
+  </style>
+  <script defer src="../_assets/mermaid-init.js"></script>
+  <script defer src="../_assets/comments.js"></script>
+  <script defer src="../_assets/toc.js"></script>
+</head>
+<body>
+
+<header class="doc-header">
+  <h1>Infrastructure &amp; Operations</h1>
+  <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
+  <div class="doc-meta">
+    <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
+    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). All seven Principal questions (Q1 to Q7) are ruled and closed in §10.1. Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
+    <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1.4</a>, <a href="../ARCH/">ARCH v1.7</a>, <a href="../SECURITY/">SECURITY v1.2.3</a>, <a href="../../process/DECISIONS.md">DECISIONS</a> through 2026-11-08</span>
+    <span><strong>Last updated:</strong> 2026-11-08</span>
+  </div>
+  <details class="doc-changelog">
+    <summary>Changelog</summary>
+    <ul>
+      <li><strong>v1.0 (2026-11-08).</strong> First version, with the Principal's rulings Q1 to Q7 of 2026-11-08 applied: Cloudflare DNS-only (Q1), Hetzner EU Falkenstein (Q2), Backblaze B2 Object Lock backups (Q3), Healthchecks.io heartbeat (Q4), weekly manual Neon export and no GitHub-held credential (Q5), no passphrase-at-boot fallback (Q6), no spare box, Hetzner break-glass recovery (Q7). Three targets in the ruled order, resource allocation, keys and TLS, environments and CI/CD, patch schedule, disaster recovery, a deployment runbook for a novice operator, a day-2 runbook, and the rulings on the devops asks.</li>
+    </ul>
+  </details>
+</header>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#targets">Targets &amp; Topology</a></li>
+    <li><a href="#resources">Resource Allocation</a></li>
+    <li><a href="#identity">Identity, Keys &amp; TLS</a></li>
+    <li><a href="#cicd">Environments &amp; CI/CD</a></li>
+    <li><a href="#patching">Update &amp; Patch Schedule</a></li>
+    <li><a href="#dr">Disaster Recovery &amp; Monitoring</a></li>
+    <li><a href="#deploy-runbook">Deployment Runbook</a></li>
+    <li><a href="#ops-runbook">Operations Runbook</a></li>
+    <li><a href="#rulings">Rulings &amp; Asks on Other Owners</a></li>
+    <li><a href="#open-questions">Open Questions</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<section id="targets" data-section="targets">
+  <h2>1. Targets &amp; Topology</h2>
+  <p class="section-hint">Ruled order (Principal, 2026-11-06): a Hetzner VPS, then a local-network box, then Vercel + Neon. ARCH §7 says what each is; SECURITY C-70 to C-77 say why it is built this way; this document says how to stand it up and run it. The three are deployment targets of one application, not three architectures.</p>
+
+  <h3>1.1 Reading this document as the operator</h3>
+  <ul>
+    <li>You are one person running one instance for your own household (PRD §3). Nothing here is written for hosting other people, and nothing here makes that safe (SECURITY R-6).</li>
+    <li>If you only read two sections, read <a href="#deploy-runbook">§7</a> (to stand it up) and <a href="#ops-runbook">§8</a> (to keep it alive). Everything else is the reasoning behind them.</li>
+    <li>Terms: the <strong>box</strong> is the machine running the containers; the <strong>operator</strong> is you; a <strong>digest</strong> is the exact fingerprint of one build of the app image (<code>sha256:…</code>); <strong>compose</strong> is the tool that starts the containers listed in <code>compose.yml</code>.</li>
+  </ul>
+
+  <h3>1.2 Primary: Hetzner VPS (Docker Compose)</h3>
+  <pre class="mermaid">
+flowchart TB
+  user(["Browser"]) -->|"443, 80 to 443"| fw
+  op(["Operator laptop"]) -->|"22, key only"| fw
+  subgraph hz["Hetzner Cloud"]
+    fw{{"Cloud Firewall: 22, 80, 443 in"}} --> vps
+    subgraph vps["VPS: Ubuntu 24.04, one Compose host"]
+      caddy["Caddy: TLS, only published ports"]
+      subgraph prodnet["prod project and network"]
+        webp["web"] --> pgp[("Postgres")]
+        wkp["worker"] --> pgp
+      end
+      subgraph stgnet["staging project and network"]
+        webs["web"] --> pgs[("Postgres")]
+        wks["worker"] --> pgs
+      end
+      caddy --> webp
+      caddy --> webs
+      timer["deploy timer: polls, verifies, deploys"]
+    end
+  end
+  timer -->|"HTTPS pull by digest"| gh["GitHub: GHCR, Releases, attestations"]
+  wkp -->|"HTTPS out"| ext["Plaid, SimpleFIN, brokers, prices, BLS"]
+  webp -->|"HTTPS out"| mail["Resend, Google, Apple, GitHub"]
+  vps -.->|"age-encrypted, put-only"| bk[("Object-lock backup bucket")]
+  vps -.->|"heartbeat"| hb["Outside monitor"]
+  </pre>
+  <table>
+    <thead><tr><th>Concern</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Machine</td><td>One Hetzner Cloud server, 4 vCPU / 8 GB / shared x86, Ubuntu Server 24.04 LTS (§2.1). Location: <strong>Falkenstein (<code>fsn1</code>)</strong>, EU (Principal, 2026-11-08, Q2). Reason: it is the default Hetzner location with the widest plan availability, and the latency difference to Nuremberg or Helsinki is invisible for this app; Helsinki has no concrete advantage here. EU prices and included traffic are cheaper than the US locations (figures unmeasured; read them on the order page). IPv4 and IPv6 both enabled on the server; both are covered by the firewall rules.</td></tr>
+      <tr><td>Ports</td><td>The Cloud Firewall (outside the host, C-71) admits 22, 80 and 443 only. On the host only Caddy publishes ports; the compose-policy lint (C-70) and the post-deploy outside-in scan (§7.1 step 15) both enforce this.</td></tr>
+      <tr><td>SSH</td><td>Key-only, no root login, no password auth. Port 22 stays open to the world because a home connection's address changes. The key and the unattended-upgrade posture are the control (§3.1). Restricting 22 to your current address in the firewall is an option, not the default, and a mistake there locks you out (§8.9).</td></tr>
+      <tr><td>DNS</td><td>Two <code>A</code>/<code>AAAA</code> records: <code>app.&lt;domain&gt;</code> to prod, <code>staging.&lt;domain&gt;</code> to staging, both pointing at the one server. Public DNS is Cloudflare's free DNS in DNS-only mode (grey cloud, no proxy), with the registrar unchanged (Principal, 2026-11-08, Q1).</td></tr>
+      <tr><td>TLS</td><td>Caddy obtains and renews public certificates by ACME HTTP-01 (port 80). No operator action. Staging sits behind Caddy basic auth plus an IP allowlist (ARCH §7.1).</td></tr>
+      <tr><td>Third parties on this path</td><td>GitHub (image registry, release metadata, attestations; pulled by the box, §4.4); Resend (outbound mail); Plaid, SimpleFIN, direct broker APIs, the EOD price provider (OQ-5) and BLS (outbound, worker); Google, Apple and GitHub OAuth; the backup bucket; one outside monitor. Each is outbound-only from the box except the browser's own redirect.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>1.3 Secondary: local-network box (outbound-only)</h3>
+  <pre class="mermaid">
+flowchart TB
+  lan(["Browsers on the LAN"]) -->|"HTTPS 443"| nft
+  subgraph home["Home network"]
+    router{{"Router: no port forward, UPnP off"}}
+    dns["LAN DNS: name to box address"]
+    subgraph box["Linux box: LUKS2, TPM unlock, nftables default-deny"]
+      nft{{"nftables plus DOCKER-USER"}} --> caddyl["Caddy bound to the LAN address"]
+      caddyl --> webl["web"]
+      webl --> pgl[("Postgres")]
+      wkl["worker"] --> pgl
+      timerl["deploy timer"]
+    end
+  end
+  box -->|"outbound 443, DNS, NTP only"| router
+  router --> out["GitHub, Resend, providers, ACME DNS-01, heartbeat, backup bucket"]
+  caddyl -.->|"DNS-01 TXT, zone-scoped token"| zone["Public DNS zone"]
+  </pre>
+  <table>
+    <thead><tr><th>Concern</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Who may reach it</td><td>Browsers on the LAN only (C-76). No inbound path from the internet exists: the router forwards nothing, UPnP and NAT-PMP are off, the host drops inbound IPv6, and nftables allows 443 (80 redirects) and SSH from the LAN CIDR only. Away from home there is no access in v1.</td></tr>
+      <tr><td>Outbound allowlist</td><td>DNS, NTP and TCP 443 only (C-76). <strong>Consequence found here:</strong> an SFTP upload to a Hetzner Storage Box uses port 22 or 23 and is blocked, which is one reason §9 rules the backup destination to an S3-compatible bucket over 443 on every target.</td></tr>
+      <tr><td>DNS</td><td>Real-domain mode (default): the name is <code>polycarpic.home.&lt;domain&gt;</code>, defined only on the LAN (router DNS override, or one hosts-file line per device). There is no public <code>A</code> or <code>AAAA</code> record for it. The public zone holds only short-lived <code>_acme-challenge</code> TXT records written by Caddy. <code>.local</code> mode: the name is <code>polycarpic.local</code>, answered by mDNS or the same LAN DNS override.</td></tr>
+      <tr><td>TLS</td><td>Two modes selected by <code>TLS_MODE</code> (§3.4): <code>real-domain</code> (DNS-01 wildcard from a public ACME issuer) or <code>private-ca</code> (name-constrained operator CA). The app refuses to start on a mismatch (ARCH §7.8, SECURITY C-76).</td></tr>
+      <tr><td>Third parties</td><td>Same as §1.2 minus nothing; all are outbound over 443. OAuth sign-in works in real-domain mode and is disabled server-side in private-CA mode. A verification email link only opens from the LAN.</td></tr>
+      <tr><td>Hardware</td><td>Any x86-64 mini PC or small server with a TPM 2.0, UEFI Secure Boot, 8 GB RAM or more, a 256 GB or larger SSD, and wired Ethernet. Put it on a small UPS. Buying advice is in §7.2 step 1.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>1.4 Tertiary: Vercel + Neon (serverless fallback)</h3>
+  <pre class="mermaid">
+flowchart TB
+  users(["Browsers"]) -->|"HTTPS, TLS at the edge"| webv["Vercel project: web"]
+  cron(["Vercel Cron, daily on Hobby"]) -->|"CRON_SECRET"| jobv["Vercel project: jobs"]
+  webv -->|"poly_app, pooled endpoint"| neon[("Neon Postgres")]
+  jobv -->|"poly_worker, pooled endpoint"| neon
+  build["Build step"] -->|"poly_migrator, direct endpoint"| neon
+  jobv -->|"egress"| ext["Providers"]
+  webv -->|"egress"| mail["Resend, sign-in providers"]
+  gha["GitHub Actions: topology checks"] -.->|"names only"| vapi["Vercel API"]
+  </pre>
+  <table>
+    <thead><tr><th>Concern</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Shape</td><td>Two Vercel projects from one repo, one Neon project (ARCH §7.6, SECURITY C-61). No Caddy, no worker container, no deploy timer: Vercel deploys on a Git push to the production branch/tag, and migrations run as a build step.</td></tr>
+      <tr><td>Connections</td><td>Runtime uses Neon's <strong>pooled</strong> endpoint (PgBouncer, transaction mode). The migrate build step uses the <strong>direct</strong> endpoint, because a migration that sets role or takes advisory locks must not run through a transaction-mode pooler (§9.1 ruling D-6).</td></tr>
+      <tr><td>Freshness</td><td>Hobby cron is once a day. Imports and period-end jobs run daily at best (ARCH §7.6, accepted).</td></tr>
+      <tr><td>Backups</td><td>OQ-26 answered in §6.6: Neon's restore window plus an operator-run weekly encrypted export; no nightly automated export and no credential in GitHub (Principal, 2026-11-08, Q5).</td></tr>
+      <tr><td>When to use it</td><td>When you have no machine you trust to keep running, or as a temporary landing place while a primary is rebuilt. It is the weakest target for secrets (SECURITY R-3). Do not link real aggregators here until POLY-77 and the R-3 review.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="resources" data-section="resources">
+  <h2>2. Resource Allocation</h2>
+  <p class="section-hint">Compose layout, sizing, volumes and storage. Sizing numbers are starting values, <strong>unmeasured</strong> until POLY-M1 produces real metrics (ARCH §7.3); every number is one line in <code>compose.yml</code> or the provisioning file.</p>
+
+  <h3>2.1 Host</h3>
+  <table>
+    <thead><tr><th>Item</th><th>Hetzner VPS</th><th>Local box</th></tr></thead>
+    <tbody>
+      <tr><td>OS</td><td>Ubuntu Server 24.04 LTS</td><td>Ubuntu Server 24.04 LTS (same, so one set of instructions)</td></tr>
+      <tr><td>Size</td><td>4 vCPU, 8 GB RAM, the cost-optimised shared-x86 class (ARCH §7.3 names CX32; Hetzner renames its plans, so pick the 4 vCPU / 8 GB shared-x86 plan on the order page and record its name in the ledger). Downgrade to 2 vCPU / 4 GB is a one-line change if metrics allow.</td><td>8 GB RAM minimum, 16 GB comfortable</td></tr>
+      <tr><td>Root disk</td><td>Plan default (about 80 GB)</td><td>256 GB SSD or larger</td></tr>
+      <tr><td>Data volume</td><td>A separate Hetzner Cloud Volume of 20 GB, mounted at <code>/srv/polycarpic</code>, formatted LUKS2 (§3.2)</td><td>A LUKS2 partition on the SSD, mounted at <code>/srv/polycarpic</code>, TPM-unlocked (§7.2)</td></tr>
+      <tr><td>Docker</td><td colspan="2">Docker Engine and the Compose plugin from Docker's apt repository, <code>live-restore</code> on, <code>json-file</code> log driver with <code>max-size 10m</code> and <code>max-file 5</code>. Upgraded by hand in the monthly window (§5).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 Compose layout</h3>
+  <p>Two compose projects on the Hetzner host, <code>polycarpic-prod</code> and <code>polycarpic-staging</code>, each with its own network, plus one shared <code>edge</code> project holding Caddy. The local box runs only <code>polycarpic-prod</code> and <code>edge</code>. Caddy joins each project's network through an external network named per project, so a staging container has no route to a prod container (TB-10, C-70).</p>
+  <table>
+    <thead><tr><th>Service</th><th>Project</th><th>Image</th><th>Entrypoint</th><th>Memory cap (start)</th><th>Secrets mounted</th></tr></thead>
+    <tbody>
+      <tr><td><code>caddy</code></td><td>edge</td><td>Custom Caddy build (DNS plugin on the local box), pinned by digest, built and scanned in CI</td><td>default</td><td>128 MB</td><td>Home real-domain mode: <code>dns_api_token</code>. Staging: <code>staging_basic_auth</code>. Nothing else.</td></tr>
+      <tr><td><code>postgres</code></td><td>prod</td><td>Official Postgres image at the pinned major, by digest</td><td>default</td><td>3 GB, <code>shared_buffers</code> 768 MB</td><td><code>db_superuser_password</code></td></tr>
+      <tr><td><code>web</code></td><td>prod</td><td>The app image, by digest</td><td><code>web</code></td><td>768 MB</td><td><code>db_password_app</code>, <code>auth_secret</code>, OAuth client secrets, <code>resend_api_key</code>, <code>plaid_secret</code> (token exchange). No keyring.</td></tr>
+      <tr><td><code>worker</code></td><td>prod</td><td>The same app image</td><td><code>worker</code></td><td>768 MB</td><td><code>db_password_worker</code>, <code>auth_secret</code>, <code>credential_keyring</code>, provider and price/BLS keys, <code>resend_api_key</code></td></tr>
+      <tr><td><code>migrate</code></td><td>prod</td><td>The same app image</td><td><code>migrate</code>, one-off</td><td>512 MB</td><td><code>db_password_migrator</code> only</td></tr>
+      <tr><td><code>postgres</code>, <code>web</code>, <code>worker</code>, <code>migrate</code></td><td>staging</td><td>Same images</td><td>same</td><td>1 GB / 384 MB / 384 MB / 512 MB</td><td>Distinct values from <code>/etc/polycarpic/staging-secrets/</code>, its own keyring, Plaid sandbox secret only (C-77)</td></tr>
+      <tr><td><code>backup</code></td><td>prod</td><td>The same app image, or a small tools image (<code>age</code>, <code>rclone</code>, <code>pg_basebackup</code>), by digest</td><td><code>backup</code>, run by a systemd timer</td><td>256 MB</td><td><code>backup_store_credential</code>; the age <em>public</em> key as config. Never the private key.</td></tr>
+    </tbody>
+  </table>
+  <p>Planned total caps are about 7.1 GB for a prod+staging host that is never fully busy at once; the host keeps the remainder. Unmeasured. If <code>docker stats</code> after POLY-M1 shows the caps are hit, raise the plan size before raising a cap.</p>
+  <ul>
+    <li>Only <code>caddy</code> has a <code>ports:</code> mapping. On the local box it is bound to the LAN address (<code>"192.168.1.20:443:443"</code>), never <code>0.0.0.0</code>.</li>
+    <li>Every container: non-root user, <code>read_only: true</code> with named <code>tmpfs</code> for writable paths, <code>cap_drop: [ALL]</code>, <code>security_opt: [no-new-privileges:true]</code>, <code>restart: unless-stopped</code>, a <code>healthcheck</code>. No Docker socket is mounted anywhere.</li>
+    <li>The compose-policy lint (C-70) is a CI job that parses the rendered config (<code>docker compose config</code>) and fails on any violation of the list above, any secret in <code>environment:</code>, any <code>ports:</code> outside <code>caddy</code>, or any service on both project networks.</li>
+    <li>Postgres runs with the C-75 settings from a mounted <code>postgresql.conf</code> fragment: <code>log_parameter_max_length = 0</code>, <code>log_parameter_max_length_on_error = 0</code>, <code>log_statement = 'ddl'</code>, plus <code>archive_mode = on</code>, <code>archive_timeout = 300</code> and <code>archive_command</code> pointing at the spool script (§6.2).</li>
+  </ul>
+
+  <h3>2.3 Volumes, storage and buckets</h3>
+  <table>
+    <thead><tr><th>Where</th><th>What</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>/srv/polycarpic/pg-prod</code>, <code>/srv/polycarpic/pg-staging</code></td><td>Postgres data directories</td><td>On the LUKS volume (C-72).</td></tr>
+      <tr><td><code>/srv/polycarpic/spool</code></td><td>Encrypted-but-not-yet-uploaded backup files and WAL</td><td>Same LUKS volume. Pruned after a verified upload. A spool older than 2 hours alerts (§6.5).</td></tr>
+      <tr><td><code>/srv/polycarpic/caddy</code></td><td>Caddy's certificate and ACME account storage</td><td>Losing it only forces reissue, but keep it to stay inside Let's Encrypt rate limits.</td></tr>
+      <tr><td><code>/etc/polycarpic/secrets/</code>, <code>/etc/polycarpic/staging-secrets/</code></td><td>Secret files (§3.1)</td><td>root:root, directory 0700, files 0400. Not on the data volume and never in a backup.</td></tr>
+      <tr><td><code>/opt/polycarpic/</code></td><td>The deploy script, the timer unit, per-release ops bundles (<code>releases/&lt;digest&gt;/</code>), the <code>desired-digest</code> and <code>current-digest</code> files, <code>deploy.log</code></td><td>No secrets. The ops bundle (compose files, Caddyfile, scripts) is extracted from the verified image, so the same attestation covers it (§4.4).</td></tr>
+      <tr><td>Backup bucket</td><td>A Backblaze B2 bucket with Object Lock in compliance mode, default retention 35 days, in B2's EU region (§6.1, ruling D-3; Principal, 2026-11-08, Q3)</td><td>One bucket per instance, reached through B2's S3-compatible endpoint with <code>rclone</code>. Cost: pay-as-you-go storage (a few USD per TB-month, a small free allowance) so cents per month at household volume; unmeasured, confirm on B2's pricing page at signup.</td></tr>
+      <tr><td>Off-box copies the operator holds</td><td>The age private key, the keyring offline copy, the LUKS recovery passphrase, the private CA root (if used), registrar and DNS logins</td><td>In the operator's password manager plus a printed recovery sheet in a safe place (§3.6).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="identity" data-section="identity">
+  <h2>3. Identity, Keys &amp; TLS</h2>
+  <p class="section-hint">Who holds what, and what each holder can do with it. Implements SECURITY §6 (secrets), C-71/C-72/C-74/C-76. Compliance boundary: one operator, one household, no hosting for others (PRD §3, SECURITY §1, R-6).</p>
+
+  <h3>3.1 Who holds what</h3>
+  <table>
+    <thead><tr><th>Holder</th><th>Holds</th><th>Can do</th><th>Cannot do</th></tr></thead>
+    <tbody>
+      <tr><td>Operator (you)</td><td>SSH private key (one per laptop, passphrase-protected, hardware-backed if you own a security key); password manager vault; age <em>private</em> key; keyring offline copy; LUKS recovery passphrase; registrar, DNS, GitHub, Hetzner, bucket and Resend logins</td><td>Everything. You are the root of trust (SECURITY R-1).</td><td>—</td></tr>
+      <tr><td>The box (root)</td><td>Secret files; age <em>public</em> key; bucket <em>put-only</em> credential; read-only GitHub token (or none if the package is public)</td><td>Run the app; encrypt and upload backups; pull verified releases</td><td>Decrypt any backup; delete or overwrite any stored backup; deploy anything unverified</td></tr>
+      <tr><td><code>web</code> container</td><td>Its own secret files, public sealing keys</td><td>Seal credentials</td><td>Open credentials; read the keyring or the backup key</td></tr>
+      <tr><td><code>worker</code> container</td><td>The keyring and provider secrets</td><td>Open credentials, inside one call frame</td><td>Reach the internet beyond what the host firewall allows</td></tr>
+      <tr><td>Caddy container</td><td>Only the DNS-01 token (home) or the staging basic-auth hash</td><td>Terminate TLS</td><td>Read any app secret</td></tr>
+      <tr><td>GitHub Actions</td><td>Build and attest permissions; no credential that can reach any box</td><td>Publish an attested image</td><td>Log in to, or push to, a box (C-83)</td></tr>
+      <tr><td>Backup bucket credentials</td><td>Two, separate: <strong>put-only</strong> on the box; <strong>read and list</strong> on the operator's drill machine only</td><td>—</td><td>Neither can delete or shorten retention; Object Lock enforces that at the store</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 Secret files on the host</h3>
+  <p>Every operator secret is a file under <code>/etc/polycarpic/secrets/</code> (staging: <code>staging-secrets/</code>, different values, no shared file). Compose mounts each file as a <code>secrets:</code> entry at <code>/run/secrets/&lt;name&gt;</code> into only the containers listed in §2.2. The app reads them through the <code>*_FILE</code> convention and refuses to start if one is missing or if a secret-looking environment variable is set in production (SECURITY §6.2).</p>
+  <table>
+    <thead><tr><th>File</th><th>Contents</th><th>Created by</th></tr></thead>
+    <tbody>
+      <tr><td><code>db_superuser_password</code>, <code>db_password_app</code>, <code>db_password_worker</code>, <code>db_password_migrator</code></td><td>Random, 32 bytes base64 each</td><td><code>provision.sh</code> generates them on the box; you never type them</td></tr>
+      <tr><td><code>auth_secret</code></td><td>BetterAuth secret, random 32 bytes. Versioned (§8.1).</td><td><code>provision.sh</code></td></tr>
+      <tr><td><code>credential_keyring</code></td><td>X25519 private keys by <code>key_id</code></td><td><code>polycarpic secrets init</code>, run once in the worker; you then save the offline copy (§7.1 step 14)</td></tr>
+      <tr><td><code>oauth_google_secret</code>, <code>oauth_apple_key</code>, <code>oauth_github_secret</code>, <code>resend_api_key</code>, <code>plaid_secret</code>, broker client secrets, <code>price_api_key</code>, <code>bls_api_key</code></td><td>Provider-issued</td><td>You paste each with <code>polycarpic-ops set-secret &lt;name&gt;</code>, which reads from the terminal without echo and writes 0400</td></tr>
+      <tr><td><code>backup_store_credential</code></td><td>The put-only access key id and secret for the bucket</td><td>You, same command</td></tr>
+      <tr><td><code>heartbeat_url</code></td><td>The Healthchecks.io ping base URL with the project's ping key (anyone holding it can fake a heartbeat)</td><td>You, same command</td></tr>
+      <tr><td><code>dns_api_token</code> (home, real-domain mode)</td><td>DNS-edit token scoped to one zone</td><td>You (§3.4)</td></tr>
+      <tr><td><code>staging_basic_auth</code></td><td>A bcrypt hash, not the password</td><td><code>polycarpic-ops staging-auth</code></td></tr>
+    </tbody>
+  </table>
+  <p>The Hetzner data volume's LUKS key is a file on the root disk (<code>/etc/polycarpic/luks.key</code>, 0400). That protects against a detached or snapshotted volume only; it does not protect against someone who gets the running server or its root disk. Said plainly so nobody believes more than that. The home box does better (TPM, §3.5).</p>
+
+  <h3>3.3 SSH, GitHub token, signing</h3>
+  <ul>
+    <li><strong>Operator SSH.</strong> One <code>ed25519</code> key per laptop, listed in <code>~/.ssh/authorized_keys</code> of a non-root sudo user <code>polyops</code>. Root login and password auth are off. Adding or removing a laptop is §8.8. Hetzner's console is the break-glass path if you lose every key.</li>
+    <li><strong>The box's GitHub credential (ARCH §8.1).</strong> A fine-grained personal access token, this repository only, <code>contents:read</code> and <code>packages:read</code>, expiry 90 days, stored as <code>github_read_token</code> and used only by the deploy script. If the package and repository become public, delete it. Renewal is §8.4. A reminder is set 14 days before expiry by the same outside monitor (§6.5).</li>
+    <li><strong>Release signing.</strong> The prod tag is accepted only if its SSH signature verifies against <code>/etc/polycarpic/allowed_signers</code>. That file is <strong>installed at bootstrap from your own machine, not fetched from the repository</strong>: a copy pulled from the repo would be forgeable by whoever can push to it (ruling D-5, re-fold R-3).</li>
+    <li><strong>Image trust.</strong> <code>gh attestation verify</code> pins the repository and the signer workflow <code>.github/workflows/build.yml</code> (§4.4).</li>
+  </ul>
+
+  <h3>3.4 TLS</h3>
+  <table>
+    <thead><tr><th>Target / mode</th><th>How the certificate is made</th><th>Renewal</th><th>What the operator does</th></tr></thead>
+    <tbody>
+      <tr><td>Hetzner</td><td>Caddy, ACME HTTP-01 on port 80, public issuer (Let's Encrypt by default)</td><td>Automatic, about 30 days before expiry</td><td>Nothing. The health check alerts if the served certificate has under 14 days left.</td></tr>
+      <tr><td>Home, <code>real-domain</code></td><td>Caddy with the DNS provider's plugin, ACME DNS-01 for <code>*.home.&lt;domain&gt;</code>. Wildcard, so the box's own name never appears in public certificate-transparency logs. The token is scoped to the one zone (Edit DNS on that zone, nothing else) and mounted into Caddy only (R-18).</td><td>Automatic</td><td>Rotate the token at the DNS provider yearly or on suspicion (§8.3). Optional: watch the zone's CT-log feed.</td></tr>
+      <tr><td>Home, <code>private-ca</code></td><td>An operator CA. <strong>Root</strong>: generated on your laptop, X.509 name-constrained to <code>polycarpic.local</code>, key kept offline in the password manager, validity 10 years, never on the box. <strong>Intermediate</strong>: signed by the root, validity 2 years, on the box, issues leaves. Caddy's internal issuer uses the intermediate; leaf validity 7 days, renewed automatically.</td><td>Leaves automatic. Intermediate by hand before it expires (§8.5).</td><td>Install the root on every device (§7.3). Remove it from every device on decommission or a move to a real domain.</td></tr>
+      <tr><td>Vercel</td><td>Vercel terminates TLS</td><td>Automatic</td><td>Nothing</td></tr>
+    </tbody>
+  </table>
+  <p>Gate item (SECURITY R-20): before the first home-box deploy in private-CA mode, run the name-constraint test of §7.3 step 6 on each browser and OS you use. If any browser ignores the constraint, that browser must not have the root installed, and the box moves to real-domain mode.</p>
+  <p>Startup mode check: the app derives the required mode from its public origin and refuses to start on a mismatch (suffix test offline, then an SOA query for the zone; SECURITY C-76, ARCH §7.8). INFRA adds only that the deploy script runs <code>polycarpic check-config</code> in the <code>migrate</code> container before any migration, so a wrong <code>TLS_MODE</code> fails the deploy cleanly instead of crash-looping <code>web</code>.</p>
+
+  <h3>3.5 Home-box disk unlock (TPM)</h3>
+  <p>LUKS2 with two key slots: a TPM2 slot sealed to Secure Boot state (PCR 7), and a long recovery passphrase kept offline. <strong>Use PCR 7 only</strong> by default. Adding PCR 11 (the kernel image) makes every kernel update change the measurement and leave the box locked after the automatic reboot, unless the distribution ships signed PCR policies; whether Ubuntu 24.04 does is unmeasured and is a first-deploy measurement (SECURITY C-72 already marks PCR 11 per-distro). Firmware checklist, console hardening and verification are in §7.3 step 4.</p>
+
+  <h3>3.6 The recovery sheet</h3>
+  <p>One printed page, kept somewhere that survives a house fire, listing: where the password manager's emergency kit is; the age private key (as the <code>AGE-SECRET-KEY-…</code> line); the credential keyring offline copy; the LUKS recovery passphrase; the private CA root key (private-CA mode). <strong>The age key and the keyring are written on separate lines of separate sheets and never in the same file</strong>; a lost keyring costs a relink (RB-4), a lost age key costs every backup (§6.1). Nothing on the sheet is stored on the box or in a backup.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="cicd" data-section="cicd">
+  <h2>4. Environments &amp; CI/CD</h2>
+  <p class="section-hint">ARCH §7.1 and §8 give the shape; SECURITY §8 (C-80 to C-83) the controls. Budgets: inner loop under 5 minutes, full pipeline under 15. Docs and tracker-only changes never start the app jobs.</p>
+
+  <h3>4.1 Environments</h3>
+  <table>
+    <thead><tr><th>Environment</th><th>Where</th><th>Data and secrets</th><th>Deploys when</th></tr></thead>
+    <tbody>
+      <tr><td>dev</td><td>Laptop, local compose (Postgres, web, worker)</td><td><code>fake</code> provider. <code>.env.example</code> is the only env file in git; names and comments, no values.</td><td>By hand</td></tr>
+      <tr><td>CI</td><td>GitHub-hosted runner, fresh Postgres service per run</td><td>Throwaway secrets generated per run. No repository secret reaches a fork PR (C-81).</td><td>Every pull request</td></tr>
+      <tr><td>staging</td><td>The Hetzner VPS, project <code>polycarpic-staging</code>, its own database</td><td>Fake source plus Plaid Sandbox and the SimpleFIN demo token. Own keyring and own secret directory (C-77). Never real books.</td><td>Automatically, every merge to <code>main</code>, within about 10 minutes</td></tr>
+      <tr><td>prod (Hetzner)</td><td>Same VPS, project <code>polycarpic-prod</code></td><td>Real data from v1.0</td><td>A signed <code>v1.*</code> tag, within 5 minutes of the release being published. A <code>0.x</code> tag is staging-only and prod ignores it.</td></tr>
+      <tr><td>prod (home box)</td><td>Local box, project <code>polycarpic-prod</code></td><td>Real data</td><td>Same tag rule; the box polls outbound. No staging on the box: it runs releases that staging already proved.</td></tr>
+      <tr><td>prod (Vercel)</td><td>Two Vercel projects + Neon</td><td>Vercel env vars (R-3)</td><td>The operator's <code>infra/vercel/deploy.sh</code> on a verified tag (D-11); migration runs in the build step</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.2 Pipeline</h3>
+  <pre class="mermaid">
+flowchart LR
+  pr["Pull request"] --> chg["Change detection"]
+  chg -->|"docs, process, tracker only"| skip["Skip app jobs"]
+  chg -->|"code or config"| lint["Lint, types, compose lint"]
+  lint --> unit["Unit tests, affected packages"]
+  unit --> db["DB battery, auth routing test"]
+  db --> build["Build: node image, vercel x2"]
+  build --> scan["Audit, gitleaks, CodeQL, Trivy"]
+  scan --> merge{{"Merge to main"}}
+  merge --> bimg["build.yml: image, SBOM, attestation, push GHCR"]
+  bimg --> stg["Staging box polls and deploys"]
+  stg --> smoke["Playwright smoke against staging"]
+  smoke --> tag{{"/merge-pr cuts signed v1.x tag"}}
+  tag --> rel["release.yml: records digest in GitHub Release"]
+  rel --> prod["Prod boxes poll, verify, deploy"]
+  </pre>
+
+  <h3>4.3 Which jobs run on which paths</h3>
+  <p>Workflows follow the pattern already proven in <code>.github/workflows/ci.yml</code>: <strong>no workflow-level <code>paths:</code> filter</strong> on anything that is a required check (a required check whose workflow never starts blocks the merge forever); the filter is a <code>changes</code> step inside the job and every later step is gated on it, failing closed. Inside the app, Turborepo's affected graph narrows the work to touched packages.</p>
+  <table>
+    <thead><tr><th>Changed paths</th><th>Jobs that run</th></tr></thead>
+    <tbody>
+      <tr><td><code>docs/**</code>, <code>process/**</code> except the two the tooling tests read, <code>*.md</code></td><td>Nothing in the app workflow. Doc lint only.</td></tr>
+      <tr><td><code>packages/*</code>, <code>apps/*</code></td><td>Lint and types; Vitest on affected packages and their dependents; build</td></tr>
+      <tr><td><code>packages/db/**</code>, any migration, any policy</td><td>The above, plus the DB battery on a fresh Postgres at the pinned major: apply every migration as <code>poly_migrator</code>, pgTAP RLS and trigger battery, the C-75 config assertion, the pooler-reuse assertion (§9.1 D-6)</td></tr>
+      <tr><td><code>packages/auth/**</code>, <code>packages/tenancy/**</code>, <code>better-auth</code> or <code>@better-auth/passkey</code> version</td><td>The BetterAuth routing-pool test (ARCH §8, SECURITY A-31, A-33). A dependency bot's bump of either package cannot merge without it.</td></tr>
+      <tr><td><code>compose*.yml</code>, <code>Caddyfile</code>, <code>infra/**</code>, <code>Dockerfile*</code></td><td>Compose-policy lint (C-70); image build; Trivy; provisioning-script <code>shellcheck</code> and a dry run in a container</td></tr>
+      <tr><td><code>apps/web/src/routes/**</code>, Vercel project config</td><td>Vercel topology check, three legs plus the env-name check (ARCH §7.6)</td></tr>
+      <tr><td><code>.github/workflows/**</code>, <code>scripts/cairn/**</code>, <code>.claude/**</code></td><td>The existing <code>cairn</code> job, unchanged. Workflow edits also run an action-pin check (every <code>uses:</code> pinned by commit SHA, C-81).</td></tr>
+      <tr><td>Merge to <code>main</code>, any code path</td><td><code>build.yml</code> (§4.4), then the staging smoke</td></tr>
+      <tr><td>Weekly schedule</td><td>Rebuild from <code>main</code> to pick up base-image patches, full scan, and a restore-drill reminder issue on the first of the month (§6.7)</td></tr>
+    </tbody>
+  </table>
+  <p>Required checks on <code>main</code> stay as they are (<code>cairn</code> plus the new <code>app</code> aggregate job, which is the single required check for all app jobs so that path-skipped jobs never leave a check "Expected"). Speed levers, in order: Turborepo remote cache off (no third party), pnpm store cached by lockfile hash, Playwright browsers cached, the DB battery on one Postgres service container shared by the packages that need it. If the inner loop passes 5 minutes, split the battery into a second parallel job before dropping a test.</p>
+
+  <h3>4.4 Build, scan, attest, deploy (pull-based)</h3>
+  <ol>
+    <li><strong>Build once.</strong> <code>build.yml</code> runs on every push to <code>main</code>: <code>pnpm install --frozen-lockfile</code> with lifecycle scripts blocked (C-80), build the one <code>adapter-node</code> image, push to GHCR tagged with the git sha, record the digest.</li>
+    <li><strong>Scan and attest.</strong> Trivy on the image (fail on fixable critical or high and on embedded secrets, C-82); CycloneDX SBOM; <code>actions/attest-build-provenance</code> for the digest. The same step builds and attests the custom Caddy image and the tools image.</li>
+    <li><strong>Release.</strong> When <code>/merge-pr</code> pushes a signed <code>v1.*</code> tag, <code>release.yml</code> looks up the digest already built for that commit (never rebuilds), checks that its attestation exists, and publishes a GitHub Release whose body is one line, <code>digest: sha256:…</code>. If no image exists for the tagged commit the workflow fails and nothing deploys.</li>
+    <li><strong>The box polls.</strong> A systemd timer runs <code>polycarpic-deploy</code> every 5 minutes (with 60 s jitter) under <code>flock</code>, so two runs never overlap. Staging: newest <code>main</code> digest from GHCR. Prod: newest <code>v1.*</code> release from the Releases API.</li>
+    <li><strong>Verify, then act.</strong> If the digest equals <code>current-digest</code>, exit. Otherwise: pull by digest; <code>gh attestation verify --repo richmosko/polycarpic --signer-workflow .github/workflows/build.yml</code>; <strong>for prod also</strong> <code>git verify-tag</code> against <code>/etc/polycarpic/allowed_signers</code> and a check that the tag's commit is the one the digest was built from (the image carries its commit as a label, also covered by the attestation). Any failure: log, alert, stop. The box never runs an unverified image.</li>
+    <li><strong>Extract the ops bundle</strong> (compose files, Caddyfile, scripts) from the verified image into <code>/opt/polycarpic/releases/&lt;digest&gt;/</code>, so the compose definitions are covered by the same attestation as the code.</li>
+    <li><strong>Pre-migration check</strong>, then the migration (§4.5), <code>docker compose up -d</code> for the project, then poll <code>/api/v1/health</code> for up to 120 seconds.</li>
+    <li><strong>Result.</strong> Healthy: write <code>current-digest</code>, log the deploy, ping the monitor. Unhealthy: automatic rollback (§4.6) and an alert.</li>
+  </ol>
+  <p>Not changing during a deploy: secrets (placed by you, never by CI), the deploy script itself and the timer unit. Those change by an operator step (<code>polycarpic-ops self-update</code>, §8.7) that runs the same verification on a newer release, because a script that rewrites itself from the network is the supply-chain path this design exists to close.</p>
+
+  <h3>4.5 Migration deployment mechanism</h3>
+  <p>The tool is the one the POLY-76 spike ratifies (Drizzle Kit recommended, ARCH §6.2). Whichever tool wins, the mechanism below is fixed because it follows from the spike's constraints.</p>
+  <ul>
+    <li><strong>One-off container, not app startup.</strong> The <code>migrate</code> service (same image, <code>migrate</code> entrypoint) connects as <code>poly_migrator</code>, the only login that may run DDL, and runs each file as <code>set role poly_owner … reset role</code> so objects are owned by the NOLOGIN owner and FORCE RLS holds. <code>web</code> and <code>worker</code> never get the migrator password and refuse to start if the schema version is behind the image.</li>
+    <li><strong>Definers and policies.</strong> SECURITY DEFINER functions are created owned by their role (<code>poly_authz</code>, <code>poly_purge</code>, and so on) and policies target roles with <code>to:</code>; the DB battery proves both through the same runner on every PR, so a migration that works only for a superuser cannot reach the box.</li>
+    <li><strong>Order.</strong> <code>check-config</code> (secrets present, <code>TLS_MODE</code>, <code>PLAID_ENV</code>) → <code>migrate --plan</code> (lists pending files, exits) → if any are pending, a <strong>pre-migration backup</strong> (a <code>pg_dump</code> encrypted to the age public key, uploaded like any backup, plus kept in the local spool for 7 days) → <code>migrate</code> under an advisory lock → <code>up -d</code>.</li>
+    <li><strong>Failure.</strong> Each file runs in a transaction, so a failed file leaves the schema as it was. The deploy stops, the old containers keep running on the old digest, and an alert is sent. Nothing is rolled forward by hand.</li>
+    <li><strong>Expand and contract.</strong> A release only ever adds (columns, tables, nullable fields, new functions). A removal ships at least one release after the code that used the thing is gone. Therefore the previous release's code always runs on the new schema, which is what makes rollback a one-file change.</li>
+    <li><strong>Vercel and Neon.</strong> The same <code>migrate</code> entrypoint runs in the Vercel build step against Neon's <strong>direct</strong> endpoint; the runtime uses the pooled one (§1.4, D-6).</li>
+  </ul>
+
+  <h3>4.6 Rollback</h3>
+  <ul>
+    <li><strong>Automatic.</strong> If health does not pass in 120 seconds after <code>up -d</code>, the script points <code>desired-digest</code> back at <code>current-digest</code>, restarts that release's containers from its own ops bundle, writes the failure to <code>deploy.log</code> and alerts. The failed digest is recorded in <code>/opt/polycarpic/quarantine</code> and skipped by the poll until a newer one appears.</li>
+    <li><strong>Manual, one command.</strong> <code>polycarpic-ops rollback</code> reverts to the previous digest recorded in <code>deploy.log</code> without contacting GitHub, then keeps the poll from re-deploying the newer release by quarantining it. §8.6 has the steps.</li>
+    <li><strong>Schema.</strong> A code rollback never needs a schema rollback (expand-contract). A schema-level undo is the restore path (§6.8), starting from the pre-migration backup.</li>
+    <li><strong>Brief interruption.</strong> <code>up -d</code> recreates <code>web</code>, so for a few seconds Caddy has no healthy upstream; Caddy retries for 10 seconds (<code>lb_try_duration</code>) which hides it for most requests. ARCH §8.1's "keeps routing to the last healthy containers" is not literally achievable with a plain recreate on one box; v1 accepts the few seconds (re-fold R-4).</li>
+  </ul>
+
+  <h3>4.7 Vercel path</h3>
+  <p>The operator deploys a verified signed tag with <code>infra/vercel/deploy.sh</code> (D-11), after the topology checks of ARCH §7.6 which run in GitHub Actions on every PR touching routes or project config. The Vercel environment-variable names check uses a read-scoped Vercel token held as a GitHub environment secret with required reviewers; it reads names, never values. No deployment credential for Vercel lives in GitHub. A failed migration step fails the build and Vercel keeps serving the previous deployment.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="patching" data-section="patching">
+  <h2>5. Update &amp; Patch Schedule</h2>
+  <p class="section-hint">Automatic where an unattended failure is cheap, manual in a fixed window where it is not. Times are the operator's local time.</p>
+  <table>
+    <thead><tr><th>What</th><th>How</th><th>When</th><th>Who</th></tr></thead>
+    <tbody>
+      <tr><td>Ubuntu security updates (kernel, libc, openssl, sshd)</td><td><code>unattended-upgrades</code>, security pocket only. Automatic reboot at 04:30 if a reboot is needed. Containers return on their own (<code>restart: unless-stopped</code>, <code>live-restore</code>). Home box: PCR 7 only keeps the TPM unlock valid across kernel updates (§3.5).</td><td>Daily check; reboot in the window</td><td>Automatic. The outside monitor alerts if the box is down for more than 15 minutes after 04:30.</td></tr>
+      <tr><td>Other apt packages, Docker Engine, Compose plugin</td><td><code>apt full-upgrade</code> by hand, in the window, one box at a time (§8.2)</td><td>First Sunday of the month</td><td>Operator</td></tr>
+      <tr><td>Application base images (Node, Postgres minor, Caddy), OS layers inside images</td><td>Weekly scheduled rebuild of <code>main</code> picks up patched base layers; Renovate proposes pinned-digest bumps. Staging deploys automatically.</td><td>Weekly rebuild Monday 03:00; Renovate weekly</td><td>CI. Merges are reviewed; minor and patch bumps may auto-merge only when CI is green and <code>minimumReleaseAge</code> of 3 days has passed (C-80). Majors never auto-merge.</td></tr>
+      <tr><td>A prod release</td><td>A signed tag cut by <code>/merge-pr</code> from a staging-proven <code>main</code></td><td>When a feature ships, and at least monthly while any base-image or dependency fix is pending</td><td>Team-lead via <code>/merge-pr</code>; the box deploys itself</td></tr>
+      <tr><td>Vulnerability response in a deployed dependency or image</td><td>Known-exploited or critical with a fix: patch release within 48 hours. High with a fix: within 7 days. Anything else: next monthly release. Compromised dependency: SECURITY RB-6.</td><td>As found by Trivy, audit, or advisories</td><td>Team-lead dispatches; the box deploys</td></tr>
+      <tr><td><code>better-auth</code>, <code>@better-auth/passkey</code></td><td>Exact version pins (no ranges). A bump is its own PR and must pass the routing-pool test and the pinned-option checks of SECURITY A-33.</td><td>Reviewed when Renovate proposes; at the latest each quarter</td><td>Backend lead with SecEng review</td></tr>
+      <tr><td>Postgres minor</td><td>Arrives with the image digest bump; runs the DB battery first</td><td>With the weekly rebuild</td><td>CI</td></tr>
+      <tr><td>Postgres major</td><td>Never in place. Dump and restore into a new volume as a drill (§6.7) on staging first; scheduled once a year or when the major nears end of life, and Neon's major is changed in step.</td><td>Evaluated each October</td><td>Operator with architect</td></tr>
+      <tr><td>Operator secrets</td><td>Rotation schedule in §8</td><td>Annual review; on suspicion immediately</td><td>Operator</td></tr>
+      <tr><td>GitHub read token</td><td>Expires every 90 days</td><td>Renew in week 11</td><td>Operator</td></tr>
+      <tr><td>Private CA intermediate (private-CA mode)</td><td>2-year validity</td><td>Replace 60 days before expiry</td><td>Operator</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Restart-after-change pattern.</strong> The repository already has the rule for the tooling receiver: a merge changes what should be running, and whatever serves it is restarted by the merge process, not remembered by a person (CLAUDE.md, <code>/merge-pr</code>). The deploy script applies the same rule to the app: the poll compares what is running with what should be, and a deploy always ends with a health check, never with "the command returned".</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="dr" data-section="dr">
+  <h2>6. Disaster Recovery &amp; Monitoring</h2>
+  <p class="section-hint">Resolves ARCH OQ-9 detail and OQ-26; ruled in §9 (D-1 to D-4). In plain terms: backups are locked with a key that never lives on the server, stored where the server cannot delete them, and proven by restoring them somewhere else once a month.</p>
+
+  <h3>6.1 What is backed up and how</h3>
+  <pre class="mermaid">
+flowchart LR
+  pg[("Postgres prod")] --> base["Nightly: pg_basebackup plus pg_dump plus globals"]
+  pg --> wal["Continuous: WAL segments, archive_timeout 5 min"]
+  base --> enc["age encrypt to public key"]
+  wal --> enc
+  enc --> spool["Local spool, LUKS volume"]
+  spool --> up["rclone put-only, HTTPS 443"]
+  up --> bucket[("Object-lock bucket, 35 days")]
+  bucket -.->|"read credential, operator laptop"| drill["Monthly restore drill"]
+  priv["age PRIVATE key: password manager and printed sheet"] -.-> drill
+  </pre>
+  <ul>
+    <li><strong>Nightly (02:15).</strong> Three artifacts, each encrypted on the box to the age recipient before it leaves: (1) a <code>pg_basebackup</code> tar of the cluster, the base for point-in-time recovery; (2) a <code>pg_dump --format=custom</code> of the database, the portable fallback that restores onto any Postgres of the same or a newer major; (3) <code>pg_dumpall --globals-only</code>, which carries the roles (<code>poly_owner</code>, <code>poly_app</code> and the rest) that a per-database dump omits. A restore without (3) comes up without its RLS roles, so the drill checks for it.</li>
+    <li><strong>Continuous.</strong> Postgres <code>archive_command</code> copies each WAL segment to the spool; a one-minute timer encrypts and uploads it; <code>archive_timeout = 300</code> forces a segment at least every 5 minutes, so the worst case loss is about 5 minutes plus upload delay, inside the 15-minute RPO.</li>
+    <li><strong>Correction to ARCH §7.2.</strong> WAL replay needs a physical base backup; a <code>pg_dump</code> alone cannot be the base for WAL. The nightly set above adds <code>pg_basebackup</code> (re-fold R-5). Physical restore needs the same Postgres major, so the image's major is pinned and recorded in each backup's name.</li>
+    <li><strong>Not backed up, by design:</strong> the credential keyring (SECURITY §6.4: losing it means relinking), the secrets directory, staging's database, the age private key. Anything in the secrets directory is recreated from the password manager and provider consoles (§8.9).</li>
+    <li><strong>Where (Principal, 2026-11-08, Q3).</strong> A <strong>Backblaze B2</strong> bucket (EU region) with Object Lock in compliance mode and a 35-day default retention, reached through B2's S3-compatible endpoint with <code>rclone</code> (<code>type = s3</code>, <code>provider = Other</code>, <code>endpoint = https://s3.&lt;region&gt;.backblazeb2.com</code>, <code>no_check_bucket = true</code> because the key is bucket-restricted), written by a put-only credential over HTTPS 443 (works on every target, including the home box's outbound allowlist). The store, not the box, enforces that nothing can be deleted or overwritten before 35 days. The box credential cannot shorten retention or delete versions. This replaces the Storage Box default (ruling D-3): a Storage Box "append-only" mode is unmeasured and its SFTP port is blocked on the home box. A Storage Box remains a documented fallback on the Hetzner target once its cannot-delete drill passes. Hetzner Object Storage stays a noted alternative pending verification of its compliance-mode lock; the Storage Box is the fallback only. B2 specifics <em>(unmeasured until the first drill, OQ-INFRA-4)</em>: the put-only application key holds the <code>writeFiles</code> capability on this bucket only (plus <code>listBuckets</code> if rclone needs it) and none of <code>deleteFiles</code>, <code>bypassGovernance</code>, <code>writeFileRetentions</code>, <code>writeBucketRetentions</code>; the read key holds <code>listFiles</code> and <code>readFiles</code> only; the account's master key is never put on the box or used for backups. A lifecycle rule hides objects 36 days after upload and deletes the hidden version a day later, so storage does not grow without bound while the lock still guarantees 35 full days.</li>
+  </ul>
+
+  <h3>6.2 Naming and integrity</h3>
+  <p>Objects are named <code>&lt;instance&gt;/&lt;pgmajor&gt;/&lt;yyyy&gt;/&lt;mm&gt;/&lt;dd&gt;/&lt;kind&gt;-&lt;utc-timestamp&gt;.age</code> with a <code>.sha256</code> sibling written after the upload. The backup job fails, and alerts, if a listed object does not match its recorded checksum after upload. The age private key never appears in any path or log.</p>
+
+  <h3>6.3 Retention (SECURITY R-5)</h3>
+  <p>Everything in the bucket expires 35 days after it is written and the store allows nothing earlier. So a purged entity's data can remain in backups for at most <strong>35 days</strong> after the purge; the purge confirmation screen should say "up to 35 days" (re-fold S-3). There is no long-term archive tier in v1: if you need a yearly keepsake, export from the app (the export carries the hash-chain head) and keep it yourself. Lifecycle expiry is a bucket rule, so no deletion credential exists anywhere.</p>
+
+  <h3>6.4 RPO and RTO by target</h3>
+  <table>
+    <thead><tr><th>Target</th><th>RPO</th><th>RTO</th><th>How</th></tr></thead>
+    <tbody>
+      <tr><td>Hetzner VPS</td><td>15 minutes (WAL). Fallback: 24 hours (nightly dump).</td><td>4 hours for total loss of the server: provision from the same provisioning files, restore, redeploy the last release. 30 minutes for a bad migration with the box intact (§4.6, pre-migration backup).</td><td>§8.10, rehearsed monthly in part (§6.7)</td></tr>
+      <tr><td>Local box</td><td>15 minutes (same WAL path)</td><td>1 day to repair or replace the box if you hold spare hardware or can buy it; 4 hours to a <strong>temporary Hetzner VPS</strong> restored from the same bucket, then move back (§8.10). Because the box is the secondary target, rented capacity is the break-glass.</td><td>Restore drill identical to Hetzner</td></tr>
+      <tr><td>Vercel + Neon</td><td>Neon's restore window (unmeasured; plan-dependent) plus weekly export: worst case 7 days</td><td>4 hours: new Neon project, restore export, repoint env vars</td><td>§6.6</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.5 Monitoring, heartbeat and alert routing</h3>
+  <ul>
+    <li><strong>Two independent alert paths</strong>, so one failure never silences both. Path A: the app and host scripts email you through Resend (SECURITY §9 list, plus backup, deploy and certificate events). Path B: an outside monitor that does not depend on the box or Resend: <strong>Healthchecks.io</strong>, free tier (Principal, 2026-11-08, Q4), a dead-man's-switch service. Each box pings it, and silence past a check's grace period emails you. It holds no data: a ping carries no body, only the fact that it arrived.</li>
+    <li><strong>What pings Path B.</strong> (1) Every 5 minutes, only if local <code>/api/v1/health</code> is OK <em>and</em> the served certificate's issuer matches <code>TLS_MODE</code> (C-76); (2) after each successful backup upload; (3) after each successful deploy poll. Grace: 15 minutes, 26 hours and 20 minutes respectively. The ping carries no data. Healthchecks.io only listens; it does not probe your URL. So before the 5-minute ping the host script makes the same request a browser would (the Hetzner box requests its public name through public DNS, the home box its LAN name) and skips the ping if that fails, which covers Caddy and DNS faults a local health check would miss. A script that detects a failure on its own (a failed backup, a rolled-back deploy) sends the ping to the check's <code>/fail</code> address so the alert arrives at once instead of at the grace deadline.</li>
+    <li><strong>Healthchecks.io setup (once).</strong> Create the account with two-step sign-in and your own address as the alert email. In one project create six checks: <code>polycarpic-hetzner-alive</code>, <code>-backup</code>, <code>-deploy</code> and, for the home box, <code>polycarpic-home-alive</code>, <code>-backup</code>, <code>-deploy</code>, each with the period and grace given above and a name that tells you which box it is. Copy the project's <em>ping key</em>; the secret <code>heartbeat_url</code> on each box is <code>https://hc-ping.com/&lt;ping-key&gt;/</code> and the scripts append the check's slug. Leave auto-creation of checks off. The monthly drill and the 90-day GitHub token get a check each too (period 35 days and 90 days, pinged by you at the end of the task, §8.2 and §8.4). Free-tier check count and grace limits are unmeasured (OQ-INFRA-9).</li>
+    <li><strong>Health endpoint exposure (re-fold R-6).</strong> Public <code>/api/v1/health</code> returns only <code>ok</code> or not. The detailed fields ARCH §7.4 lists (last migration, last backup time) are served on the loopback-only admin listener and read by the host scripts, so a stranger learns nothing about backup cadence.</li>
+    <li><strong>Alerts that need no new service:</strong> spool older than 2 hours; backup older than 26 hours; certificate under 14 days; disk over 80 percent; deploy failed or rolled back; <code>unattended-upgrades</code> pending reboot for more than 3 days; GitHub token under 14 days; ledger hash-chain break (SEV1) or a verifier silent for 8 days. All thresholds are provisional and tuned after POLY-M1.</li>
+    <li><strong>Logs.</strong> JSON to stdout, Docker <code>json-file</code> rotation, 30 days on the box (SECURITY §9). The operator's query surface is <code>docker compose logs</code> and <code>journalctl</code>. No log service in v1.</li>
+    <li><strong>The dashboard the lead can point to:</strong> the monitor's check list (green or red per box) plus <code>polycarpic-ops status</code>, which prints the running digest, last deploy, last backup, certificate days left and disk use on one screen.</li>
+  </ul>
+
+  <h3>6.6 Vercel + Neon backups (answers OQ-26)</h3>
+  <ul>
+    <li>A cron function cannot run <code>pg_dump</code> or ship WAL, so the Compose mechanism does not apply.</li>
+    <li><strong>Default (v1.0, no new trust):</strong> rely on Neon's point-in-time restore for the plan in use (window unmeasured; read it on the plan page at deploy time and record it here), and run <code>polycarpic-ops neon-export</code> <strong>from the operator's laptop weekly</strong>: <code>pg_dump</code> through a read-only role, age-encrypted to the same public key, uploaded with the put-only credential to the same bucket. RPO is then up to 7 days beyond Neon's window, stated honestly.</li>
+    <li><strong>Ruled (Principal, 2026-11-08, Q5): the weekly operator-run export stands; no database credential is held in GitHub.</strong> Revisit with SecEng only if real data ever lands on the tertiary target; a nightly Actions export would make GitHub a holder of a ledger-read credential (TB-12) and needs a SecEng ruling first (OQ-INFRA-1, S-6).</li>
+    <li>Restore: create a Neon project, run <code>polycarpic-ops restore --dump</code> from the laptop (§8.10), repoint the Vercel variables, redeploy.</li>
+  </ul>
+
+  <h3>6.7 The restore drill (a GA gate)</h3>
+  <p>Monthly, scripted, and <strong>run off the box</strong>: your laptop or a throwaway server, never the VPS, because the age private key must never reach it (ARCH §7.2). The first passing drill against real backup objects is a gate for v1.0 (DECISIONS 2026-11-06); a drill that has not run in 45 days raises an issue and an email.</p>
+  <ol>
+    <li>List the bucket with the read credential; take the newest base backup and WAL.</li>
+    <li>Decrypt with the age private key from the password manager.</li>
+    <li>Start a scratch Postgres at the recorded major; restore the globals, then recover to the latest WAL; separately restore the <code>pg_dump</code> into a second scratch instance.</li>
+    <li>Assert: the trial balance of every entity sums to zero; the per-entity hash-chain verifier passes (C-24); the roles from the globals file exist; the latest journal entry is within 20 minutes of the drill's start for the WAL path.</li>
+    <li>Assert, using the box credential file copied for the drill, that <strong>deleting an existing object fails</strong> and so does shortening its retention (C-73's second test).</li>
+    <li>Record date, backup names, timings and pass or fail in <code>process/cairn/reviews/restore-drill-&lt;date&gt;.md</code> via the lead (not edited by hand on the box). Destroy the scratch instances.</li>
+  </ol>
+
+  <h3>6.8 Recovery procedures</h3>
+  <table>
+    <thead><tr><th>Event</th><th>Procedure</th></tr></thead>
+    <tbody>
+      <tr><td>Bad migration or bad release, box intact</td><td>§8.6 rollback. If data changed wrongly, restore the pre-migration backup into a scratch database, compare, and decide; do not overwrite prod without the drill checks.</td></tr>
+      <tr><td>Box lost (fire, failed disk, dead provider)</td><td>§8.10: new server from the same files, restore from the bucket, redeploy the last release, re-enter secrets from the password manager, verify, repoint DNS.</td></tr>
+      <tr><td>Suspected compromise of the box or of an operator secret</td><td>SECURITY RB-1 and RB-2. Commands in §8.11.</td></tr>
+      <tr><td>Stolen home box (RB-2 variant)</td><td>The disk stays locked only while the thief cannot boot it; assume it boots (R-21). Within the hour: (1) from the registrar/DNS console, revoke the zone token; (2) revoke every bank connection at its provider (Plaid <code>/item/remove</code>, SimpleFIN bridge, broker OAuth); (3) rotate the age keypair is <em>not</em> needed, but rotate the bucket put-credential at the provider and the Resend key; (4) rotate the BetterAuth secret and every OAuth client secret; (5) tell the household; (6) stand up a replacement (§8.10) from backups taken before the theft and relink every connection; (7) file the postmortem within 5 business days (SECURITY §10). The private CA root, if used, was never on the box; replace the intermediate.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="deploy-runbook" data-section="deploy-runbook">
+  <h2>7. Deployment Runbook</h2>
+  <p class="section-hint">Written for someone who has not run a server before. Every step has the command, what you should see, and what to do if you do not. Do the steps in order and do not skip the checks. Commands marked <code>laptop$</code> run on your own computer, <code>box$</code> on the server. <code>polycarpic-ops</code> is the small operator tool the repository ships under <code>infra/</code>; its subcommands are specified here and built under POLY-M1.</p>
+
+  <blockquote><strong>Before you start.</strong> No real books exist before v1.0 (Principal, 2026-11-06). Until then, do §7.1 with <em>staging only</em> to learn the process with fake data; the prod steps are marked <em>(from v1.0)</em>. If any step fails twice, stop and ask. Do not improvise on a box that will hold real data.</blockquote>
+
+  <h3 id="rb-prereq">7.0 What you need before step 1</h3>
+  <table>
+    <thead><tr><th>Item</th><th>Why</th><th>Cost (unmeasured)</th></tr></thead>
+    <tbody>
+      <tr><td>A password manager you trust, with an emergency kit</td><td>Holds every key and recovery code</td><td>Whatever you use now</td></tr>
+      <tr><td>A domain name you own, and an account where you can edit its DNS</td><td>Names, certificates, sign-in providers</td><td>About 10 to 15 USD a year</td></tr>
+      <tr><td>A Hetzner Cloud account (card required, ID check possible)</td><td>The primary server</td><td>Roughly 10 to 15 EUR a month for the server, volume and backup</td></tr>
+      <tr><td>A Backblaze B2 account (Object Lock bucket)</td><td>Backups</td><td>Cents a month at this size</td></tr>
+      <tr><td>A Resend account and a verified sending domain</td><td>Sign-in and security email</td><td>Free tier</td></tr>
+      <tr><td>A Healthchecks.io account</td><td>Tells you when a box goes quiet; see §6.5</td><td>Free tier (limits unmeasured)</td></tr>
+      <tr><td>Your GitHub login, and the <code>gh</code> tool signed in</td><td>Pulling releases and checking they are genuine</td><td>Free</td></tr>
+      <tr><td>A Mac or Linux laptop with a terminal</td><td>Everything marked <code>laptop$</code></td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="rb-hetzner">7.1 Primary target: Hetzner VPS</h3>
+  <ol>
+    <li><strong>Install the tools on your laptop.</strong>
+      <pre class="cmd"><code>laptop$ brew install age hcloud gh git rclone nmap
+laptop$ age --version &amp;&amp; hcloud version &amp;&amp; gh --version | head -1</code></pre>
+      <p class="expect">Expect: a version line from each of the three. If <code>command not found</code>, the install failed: read the error from <code>brew</code>; on Linux use your package manager for the same names.</p></li>
+    <li><strong>Create your SSH key</strong> (your proof of identity to the server).
+      <pre class="cmd"><code>laptop$ ssh-keygen -t ed25519 -C "polycarpic-operator" -f ~/.ssh/polycarpic_ed25519
+laptop$ cat ~/.ssh/polycarpic_ed25519.pub</code></pre>
+      <p class="expect">Expect: it asks for a passphrase: set one, and store it in the password manager. The second command prints one line starting <code>ssh-ed25519</code>. Never share the file without <code>.pub</code>.</p></li>
+    <li><strong>Create the backup key</strong> (this is the most important key you will ever make).
+      <pre class="cmd"><code>laptop$ age-keygen -o polycarpic-backup.key
+Public key: age1...</code></pre>
+      <p class="expect">Expect: it prints <code>Public key: age1…</code>. Copy the public key line into a note called <code>backup-public-key</code>. Open <code>polycarpic-backup.key</code>, copy the whole file into the password manager as a secure note, and print one copy for the recovery sheet (§3.6). Then <code>rm polycarpic-backup.key</code>. If you lose this key, <strong>no backup can ever be opened</strong>; if someone else gets it, they can read every backup. Keep it off the server forever.</p></li>
+    <li><strong>Create the backup bucket and two keys at Backblaze B2.</strong> Sign up at backblaze.com (turn on two-step sign-in and save the codes in the password manager). In B2 Cloud Storage → Buckets → Create a Bucket: name <code>polycarpic-&lt;yourname&gt;-backups</code>, <strong>Private</strong>, encryption off (the files are already age-encrypted), and <strong>Object Lock: Enable</strong>, which can only be done at creation. Then open the bucket's Object Lock settings: default retention <strong>Compliance mode, 35 days</strong>. Add a lifecycle rule: hide 36 days after upload, delete 1 day after hiding. Under App Keys → Add a New Application Key create two keys, each <strong>restricted to this bucket</strong>: <code>polycarpic-put</code> with only the <em>write</em> permission (B2 shows this as "Write Only" access), and <code>polycarpic-read</code> with <em>Read Only</em>. Copy each key ID and key once. Note the bucket's S3 endpoint (shown on the bucket page, like <code>s3.eu-central-003.backblazeb2.com</code>).
+      <p class="expect">Expect: you now hold two key pairs. Store both in the password manager, labelled <code>b2-put-only (goes on the server)</code> and <code>b2-read (laptop only)</code>, together with the endpoint. Check: <code>rclone lsd</code> or <code>rclone ls</code> with the read key lists the empty bucket without error. If the bucket page shows Object Lock as "disabled", it was created without it and cannot be fixed: delete the empty bucket and create it again. If only "governance" mode is offered, stop and ask: governance mode can be bypassed by a key holding that permission, so it is not what was ruled.</p></li>
+    <li><strong>Hetzner project and API token.</strong> In the Hetzner Cloud console create a project named <code>polycarpic</code>, then Security → API tokens → Generate (Read &amp; Write). Copy the token once.
+      <pre class="cmd"><code>laptop$ hcloud context create polycarpic
+(paste the token when asked)
+laptop$ hcloud server list</code></pre>
+      <p class="expect">Expect: an empty table, no error. If it says <code>unauthorized</code>, the token was copied wrong: generate a new one.</p></li>
+    <li><strong>Get the repository and read the plan.</strong>
+      <pre class="cmd"><code>laptop$ git clone git@github.com:richmosko/polycarpic.git &amp;&amp; cd polycarpic
+laptop$ git tag -v v1.0.0     # from v1.0; before then use main</code></pre>
+      <p class="expect">Expect (from v1.0): <code>Good "git" signature for …</code>. If it says <code>BAD</code> or shows no signature, do not continue.</p></li>
+    <li><strong>Create the server, firewall and volume.</strong>
+      <pre class="cmd"><code>laptop$ infra/hetzner/create.sh --name polycarpic --location fsn1 \
+          --ssh-key ~/.ssh/polycarpic_ed25519.pub</code></pre>
+      <p class="expect">Expect: it prints the server's IPv4 and IPv6 addresses and ends with <code>created: server, firewall (22,80,443 in), volume 20 GB</code>. It is safe to run again; it skips what exists. If it says the location has no stock, use <code>nbg1</code> (Nuremberg): same country, same prices, and the backup bucket is unaffected. If it prints anything about opening ports other than 22, 80, 443, stop.</p></li>
+    <li><strong>Point your DNS at it.</strong> If the domain's name servers are not yet Cloudflare's: add the domain to a free Cloudflare account, copy the two name servers it gives you into the registrar's "name servers" setting (the registrar stays the registrar), and wait until Cloudflare shows the zone Active (minutes to a day). Then in Cloudflare DNS create <code>A</code> and <code>AAAA</code> records: <code>app</code> and <code>staging</code> → the two addresses. TTL 300, proxy status <strong>DNS only</strong> (grey cloud; an orange cloud would put Cloudflare in front of the server and break the design).
+      <pre class="cmd"><code>laptop$ dig +short app.example.com A
+laptop$ dig +short app.example.com AAAA</code></pre>
+      <p class="expect">Expect: the server's addresses within a few minutes. If empty after 30 minutes, the records are on the wrong zone or have a typo.</p></li>
+    <li><strong>First login.</strong>
+      <pre class="cmd"><code>laptop$ ssh -i ~/.ssh/polycarpic_ed25519 polyops@app.example.com
+box$ cloud-init status --wait</code></pre>
+      <p class="expect">Expect: the first time, a question about the host fingerprint: compare it with the one in the Hetzner console (server → Console shows it in the boot log) before typing <code>yes</code>. Then <code>status: done</code>. If <code>status: error</code>, run <code>sudo cat /var/log/cloud-init-output.log | tail -50</code> and ask; do not continue. If login is refused, the key in step 7 was not the one in step 2.</p></li>
+    <li><strong>Hand the box its three public facts</strong> (nothing secret yet).
+      <pre class="cmd"><code>laptop$ scp -i ~/.ssh/polycarpic_ed25519 \
+          ~/.config/polycarpic/allowed_signers \
+          polyops@app.example.com:/tmp/allowed_signers
+laptop$ ssh polyops@app.example.com "echo 'age1...yourpublickey' | sudo tee /etc/polycarpic/backup.pub"</code></pre>
+      <p class="expect">Expect: the file copy shows 100 percent. <code>allowed_signers</code> is your own copy of the release-signing public keys (make it from the key <code>/merge-pr</code> signs with, once; keep it in the password manager). It must not come from the repository (§3.3).</p></li>
+    <li><strong>Provision the box.</strong>
+      <pre class="cmd"><code>box$ sudo polycarpic-ops provision --target hetzner --domain example.com
+box$ sudo polycarpic-ops provision-check</code></pre>
+      <p class="expect">Expect: <code>provision</code> prints each stage and ends <code>done</code>; <code>provision-check</code> ends <code>ALL CHECKS PASSED</code>, listing: SSH key-only and no root login; unattended upgrades on; Docker installed; the data volume encrypted and mounted at <code>/srv/polycarpic</code>; swap off; secrets directory 0700 and empty of anything but generated files; deploy timer enabled. Any line that says <code>FAIL</code> names the fix; rerun <code>provision</code> and then the check. Do not continue past a FAIL.</p></li>
+    <li><strong>Enter the provider secrets.</strong> For each secret in the list below, run the command and paste the value when prompted (nothing is shown as you type).
+      <pre class="cmd"><code>box$ sudo polycarpic-ops set-secret resend_api_key
+box$ sudo polycarpic-ops set-secret backup_store_credential   # the PUT-ONLY pair
+box$ sudo polycarpic-ops set-secret heartbeat_url
+box$ sudo polycarpic-ops set-secret oauth_google_secret      # and the other providers you use
+box$ sudo polycarpic-ops list-secrets</code></pre>
+      <p class="expect">Expect: <code>list-secrets</code> prints names, sizes and permissions (<code>0400 root</code>), never values. For staging add <code>--staging</code> to each command and use sandbox values only. Missing a required one is not a problem now: the first start tells you which. Never paste a secret into a chat, an issue or a file in the repository.</p></li>
+    <li><strong>First deploy of staging.</strong>
+      <pre class="cmd"><code>box$ sudo polycarpic-ops first-deploy staging
+box$ sudo polycarpic-ops init-keyring --staging</code></pre>
+      <p class="expect">Expect: it pulls the newest <code>main</code> image, prints <code>attestation verified</code>, runs the config check and the migration, starts the containers and ends <code>healthy</code>. <code>init-keyring</code> prints the staging keyring once; staging's keyring may be lost freely (relink sandbox items), so do not worry about saving it. If it prints <code>attestation verification FAILED</code>: <strong>stop</strong>; do not override; check that <code>gh</code> on the box is signed in with the read token (<code>polycarpic-ops set-secret github_read_token</code>) and that the image really came from this repository.</p></li>
+    <li><strong>Prod (from v1.0): the keyring, then the first deploy, with the door closed.</strong>
+      <pre class="cmd"><code>box$ sudo polycarpic-ops first-deploy prod
+box$ sudo polycarpic-ops init-keyring</code></pre>
+      <p class="expect">Expect: <code>first-deploy prod</code> requires the signed tag check to pass and ends <code>healthy (maintenance page is serving)</code>: Caddy shows a static "not open yet" page for the prod name until you open it in step 17. <code>init-keyring</code> prints the prod keyring <strong>once</strong>: copy the whole block into the password manager (as a secure note separate from the age key) and the recovery sheet, then confirm with <code>polycarpic-ops keyring-fingerprint</code> that what you saved has the same fingerprint it prints. The keyring is not in any backup (SECURITY §6.4).</p></li>
+    <li><strong>Prove the outside world sees only what it should.</strong> From a machine <em>not</em> on the box's network (your laptop at home is fine for the Hetzner target):
+      <pre class="cmd"><code>laptop$ nmap -Pn -p- app.example.com
+laptop$ nmap -Pn -6 -p- app.example.com
+laptop$ curl -sI https://app.example.com | head -5
+laptop$ ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no polyops@app.example.com</code></pre>
+      <p class="expect">Expect: exactly three open ports, 22, 80 and 443, in both scans (a full scan can take 10 to 20 minutes). The <code>curl</code> shows <code>HTTP/2 200</code> (staging) or the maintenance response (prod) over a valid certificate. The last command ends <code>Permission denied (publickey)</code>. Any other open port, especially 5432, 2375 or 3000, means a containment failure: close it (<code>polycarpic-ops lockdown</code> stops all containers except Caddy), and tell the team-lead before doing anything else.</p></li>
+    <li><strong>Make the bootstrap user</strong> (needs SECURITY change S-1, §9.2: an invitation on an empty instance, so the first sign-up cannot be won by a stranger).
+      <pre class="cmd"><code>box$ sudo polycarpic-ops cli user invite you@example.com --bootstrap</code></pre>
+      <p class="expect">Expect: it prints "invitation recorded" and emails you a sign-up link; the link works only for that address. If no email arrives within 5 minutes, check the Resend dashboard and the spam folder; <code>polycarpic-ops logs web | tail -50</code> shows the send result without any secret.</p></li>
+    <li><strong>Open the door, sign up, and set the second step.</strong>
+      <pre class="cmd"><code>box$ sudo polycarpic-ops open prod</code></pre>
+      <p class="expect">Expect: <code>prod is open</code>. Click your emailed link, create a password, confirm the emailed code, and set up an authenticator app as your second step. Save the backup codes in the password manager. If you are asked to sign in before an invitation exists, step 16 did not complete: run <code>polycarpic-ops close prod</code> and repeat from 16.</p></li>
+    <li><strong>First backup, on demand.</strong>
+      <pre class="cmd"><code>box$ sudo systemctl start polycarpic-backup.service
+box$ sudo polycarpic-ops status</code></pre>
+      <p class="expect">Expect: the service ends <code>Finished</code>; <code>status</code> shows a backup time of a few minutes ago and a heartbeat OK, and your monitor shows the check green. If the upload fails with an access error, the put-only key was pasted wrong; if it fails with a lock error, the bucket's Object Lock is not enabled (step 4).</p></li>
+    <li><strong>First restore drill, from your laptop</strong> (this is a v1.0 gate; do it now while it holds nothing, and monthly after).
+      <pre class="cmd"><code>laptop$ infra/drill.sh --bucket polycarpic-&lt;yourname&gt;-backups</code></pre>
+      <p class="expect">Expect: it asks for the read key and the age private key file (paste it from the password manager into a temporary file it deletes afterwards), restores into a scratch Postgres on your laptop, and ends <code>DRILL PASSED</code> with the five checks of §6.7, including <code>delete attempt: DENIED</code>. A <code>FAILED</code> line names the check. Do not go live with real data until this passes.</p></li>
+  </ol>
+
+  <h3 id="rb-home">7.2 Secondary target: the local-network box</h3>
+  <p>Do §7.1 steps 1 to 4, 12, 14 and 16 to 19 unchanged (names and addresses differ). This section covers what is different: the hardware, the disk, the network lockdown and TLS. Do all of it <em>before</em> any real data touches the box.</p>
+  <ol>
+    <li><strong>Hardware and firmware.</strong> A small x86-64 PC with a working TPM 2.0 (listed as fTPM, PTT or "Security Device" in the firmware; see the pre-purchase checks under Troubleshooting step 6 below), wired Ethernet, an SSD, and a UPS. In the firmware setup (usually Delete or F2 at power-on), do the whole checklist:
+      <ul>
+        <li>Update the firmware to the manufacturer's latest.</li>
+        <li>Set a <strong>setup (administrator) password</strong>; store it in the password manager.</li>
+        <li>Secure Boot <strong>on</strong>, in user or deployed mode with the factory keys (not "setup mode").</li>
+        <li>TPM <strong>enabled</strong>.</li>
+        <li>Boot from USB and from network (PXE): <strong>disabled</strong>. Boot order: the internal SSD only. (Temporarily enable USB for the install in step 2, then disable it again in step 8.)</li>
+        <li>"After power loss": <strong>power on</strong>.</li>
+      </ul>
+      <p class="expect">Expect: the settings stick after a save and reboot. If the machine has no setup-password option, it is not suitable for this role (the firmware password is the control, C-72): choose different hardware.</p></li>
+    <li><strong>Install Ubuntu Server 24.04 LTS</strong> from a USB stick (download from ubuntu.com; verify its checksum there). In the installer: language, keyboard, wired network (static address later), "Ubuntu Server (minimized)" is fine; storage: <strong>custom</strong>, make a 1 GB EFI partition, an 80 GB ext4 partition mounted at <code>/</code>, and leave the rest <strong>unformatted</strong> (the encrypted data partition comes in step 6); name the server <code>polycarpic</code>; create user <code>polyops</code> with a long password you keep in the password manager; tick "Install OpenSSH server" and import your SSH key from GitHub; no extra snaps.
+      <p class="expect">Expect: it reboots to a login prompt. If it does not boot, re-check that the SSD is first in the boot order.</p></li>
+    <li><strong>Give it a fixed address.</strong> In your router, reserve the box's current address for its network card (DHCP reservation). Write the address down.
+      <p class="expect">Expect: after a reboot of the box, it has the same address. Check from the laptop: <code>ssh -i ~/.ssh/polycarpic_ed25519 polyops@&lt;address&gt;</code> works.</p></li>
+    <li><strong>Router settings.</strong> Log in to the router. Confirm: no port forwarding rules; UPnP and NAT-PMP <strong>off</strong>; no "DMZ host"; IPv6 either off or its firewall set to block inbound. Screenshot the pages to the password manager's note for this box.
+      <p class="expect">Expect: all four true. If your router cannot turn UPnP off, replace the router before continuing: it can open the box to the internet without asking.</p></li>
+    <li><strong>Provision the host.</strong>
+      <pre class="cmd"><code>laptop$ scp -i ~/.ssh/polycarpic_ed25519 ~/.config/polycarpic/allowed_signers polyops@&lt;address&gt;:/tmp/
+box$ sudo polycarpic-ops provision --target home --lan-cidr 192.168.1.0/24 --data-device /dev/nvme0n1p3
+box$ sudo polycarpic-ops provision-check</code></pre>
+      <p class="expect">Expect: <code>provision-check</code> ends <code>ALL CHECKS PASSED</code>, covering: nftables default-deny with inbound 443 (80 redirects) and SSH from the LAN only; the <code>DOCKER-USER</code> drop rule for non-LAN sources; Caddy's publish address equals the LAN address; IPv6 disabled; outbound limited to DNS, NTP and 443 (the check tries port 25 and 8080 and expects failure); sshd key-only without root login; swap off. Find the device name first with <code>lsblk</code>: the right one is the large unformatted partition. Picking the wrong device destroys data: the script refuses a device that has a filesystem.</p></li>
+    <li><strong>Encrypt the data partition and bind it to the TPM.</strong> (The script wraps the commands below; shown so you know what happens.)
+      <pre class="cmd"><code>box$ sudo polycarpic-ops disk-init --device /dev/nvme0n1p3
+   # = cryptsetup luksFormat --type luks2  (asks for the RECOVERY PASSPHRASE)
+   # + systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7
+   # + crypttab entry with tpm2-device=auto, mount at /srv/polycarpic
+box$ sudo reboot
+box$ sudo systemd-cryptenroll /dev/nvme0n1p3</code></pre>
+      <p class="expect">Expect: <code>disk-init</code> asks you to <strong>type a new long recovery passphrase</strong>: generate it in the password manager (six or more random words) and also write it on the recovery sheet. After the reboot the box comes back <em>without</em> asking for a passphrase, and the last command lists two slots: <code>password</code> and <code>tpm2</code>. On this box the secrets directory lives on the encrypted partition too, so a pulled disk yields no secrets. If the reboot waits for a passphrase, the TPM slot did not bind: type the recovery passphrase to continue, then see <em>Troubleshooting</em> below. PCR 11 is deliberately not used (§3.5).</p></li>
+    <li><strong>Prove the disk stays locked when the machine is tampered with.</strong> Enter the firmware setup, turn <strong>Secure Boot off</strong>, save, and let it boot.
+      <p class="expect">Expect: Linux asks for the recovery passphrase instead of unlocking silently. That proves the key is tied to the Secure Boot state. Then go back into the firmware, turn Secure Boot <strong>on</strong>, save, reboot, and confirm it unlocks by itself again. If it unlocked silently with Secure Boot off, the TPM binding is not what it claims: do not store real data; re-run step 6 with <code>--tpm2-pcrs=7</code> and repeat.</p></li>
+    <li><strong>Harden the console.</strong> The script sets these and the check verifies them; in plain terms: no automatic console login; the emergency and single-user shells ask for a root password (set with <code>sudo passwd root</code>: long, random, saved in the password manager); the bootloader has a password and no editable or recovery entries. Now disable USB boot again in the firmware (the install is finished).
+      <pre class="cmd"><code>box$ sudo polycarpic-ops harden-console
+box$ sudo polycarpic-ops provision-check --console</code></pre>
+      <p class="expect">Expect: <code>ALL CHECKS PASSED</code>. As a hands-on test, power-cycle the box and at the boot menu press <code>e</code>: it must ask for the bootloader password.</p></li>
+    <li><strong>DNS and TLS: choose one mode and set it before first deploy.</strong> The mode is set by <code>TLS_MODE</code> in <code>/etc/polycarpic/host.env</code> and the app refuses to start on a mismatch. See 7.3 for each mode, then return here.</li>
+    <li><strong>Secrets, first deploy, keyring, outside-in check.</strong> Do §7.1 steps 12 and 14 (secrets; first deploy and keyring for prod) with <code>--target home</code>; the bootstrap, open, backup and drill steps (16 to 19) follow once the checks in steps 11 and 12 below pass. There is no staging on this box: run the process in staging on the Hetzner server first.
+      <p class="expect">Expect the same results, except the first-deploy check also prints <code>served certificate issuer matches TLS_MODE</code>.</p></li>
+    <li><strong>Outside-in scan of your home from outside.</strong> Use your phone on mobile data as a hotspot for the laptop (or a cloud shell). Find your home's public IPv4 address (visit any "what is my IP" page from home) and the box's IPv6 global address if it has one (<code>ip -6 addr</code> on the box; disabled means none).
+      <pre class="cmd"><code>laptop-off-LAN$ nmap -Pn -p- &lt;home-public-ipv4&gt;
+laptop-off-LAN$ nmap -Pn -6 -p- &lt;box-ipv6-if-any&gt;</code></pre>
+      <p class="expect">Expect: all ports <code>filtered</code> or <code>closed</code>, none open. Also try browsing to the box's name from mobile data: it must not resolve (real-domain mode) or not be found. Anything open: unplug the box's network cable, then fix the router or firewall (C-76).</p></li>
+    <li><strong>Outbound test.</strong>
+      <pre class="cmd"><code>box$ curl -sS --max-time 5 https://github.com -o /dev/null -w "%{http_code}\n"
+box$ curl -sS --max-time 5 http://example.com:8080 || echo blocked</code></pre>
+      <p class="expect">Expect: <code>200</code> (or a 3xx) for the first; <code>blocked</code> (a timeout) for the second.</p></li>
+  </ol>
+  <p><strong>Troubleshooting step 6.</strong> If the TPM slot will not bind: check <code>systemd-cryptenroll --tpm2-device=list</code> shows a device; confirm the firmware's TPM is enabled and in TPM 2.0 mode; confirm Secure Boot shows "enabled" in <code>mokutil --sb-state</code>. If it still fails, <strong>stop: this machine will not do; use hardware with a working TPM2 and Secure Boot.</strong> There is no passphrase-at-every-boot fallback (Principal, 2026-11-08, Q6; P8 stands), so do not put real data on a box whose disk cannot be bound to the TPM. Do not buy hardware before checking, on the model's own spec sheet or by booting a live USB on it: (1) a TPM 2.0 (fTPM, Intel PTT or discrete) is listed and can be enabled in the firmware; (2) Secure Boot can be turned on and off, with factory keys; (3) the firmware has a setup (administrator) password; (4) USB and network boot can be disabled; (5) it has an "After power loss: power on" option; (6) a live Ubuntu 24.04 USB shows the TPM, <code>ls /dev/tpmrm0</code> exists and <code>systemd-cryptenroll --tpm2-device=list</code> lists a device. Unmeasured per model; buy from a seller with a return window until step 7 has passed.</p>
+
+  <h3 id="rb-tls">7.3 Home-box TLS, step by step</h3>
+  <h4>Mode A (default): real domain, DNS-01 wildcard</h4>
+  <ol>
+    <li>In Cloudflare create an API token that can <strong>edit DNS records in this one zone only</strong> (My Profile → API Tokens → Create → "Edit zone DNS" template, Zone Resources → Include → Specific zone → your domain). Name it <code>polycarpic-home-caddy</code>.</li>
+    <li><code>box$ sudo polycarpic-ops set-secret dns_api_token</code> and paste it. Set <code>TLS_MODE=real-domain</code>, <code>PUBLIC_ORIGIN=https://polycarpic.home.example.com</code> in <code>/etc/polycarpic/host.env</code>.
+      <p class="expect">Expect: <code>list-secrets</code> shows the token, mounted only into <code>caddy</code> (<code>polycarpic-ops show-mounts</code>).</p></li>
+    <li><strong>Make the name resolve on your LAN only.</strong> Preferred: in the router's DNS settings add a local record <code>polycarpic.home.example.com → &lt;box address&gt;</code>. If your router cannot, add the line <code>192.168.1.20 polycarpic.home.example.com</code> to <code>/etc/hosts</code> (macOS/Linux) or <code>C:\Windows\System32\drivers\etc\hosts</code> on each device.
+      <pre class="cmd"><code>laptop-on-LAN$ dig +short polycarpic.home.example.com
+laptop-off-LAN$ dig +short polycarpic.home.example.com @1.1.1.1</code></pre>
+      <p class="expect">Expect: the first shows the box's address (or use <code>ping</code> if you used a hosts file); the second shows nothing. If the second shows an address, you published the box's name: delete that record in Cloudflare.</p></li>
+    <li>First deploy requests the wildcard. Expect in <code>polycarpic-ops logs caddy</code>: <code>certificate obtained successfully</code> within about two minutes. Browse to the name from a LAN device: a normal padlock, issuer a public CA. If the order fails with <code>DNS problem</code>, the token's zone or permission is wrong; if with <code>rate limit</code>, wait an hour and do not retry in a loop.</li>
+    <li>Register your sign-in apps with Google, Apple and GitHub using the callback URL <code>https://polycarpic.home.example.com/api/auth/callback/&lt;provider&gt;</code>, then <code>set-secret</code> each client secret. GitHub asks for <code>read:user</code> and <code>user:email</code> only.</li>
+  </ol>
+  <h4>Mode B (fallback): <code>.local</code> with a private CA</h4>
+  <ol>
+    <li><strong>Make the CA on your laptop, not the box.</strong>
+      <pre class="cmd"><code>laptop$ infra/ca/ca.sh init --name polycarpic.local
+laptop$ infra/ca/ca.sh intermediate --out ./box-intermediate</code></pre>
+      <p class="expect">Expect: <code>root.crt</code> (public: this goes on devices), <code>root.key</code> (private: it must go into the password manager as a secure note, then be deleted from the laptop) and a folder with the intermediate cert and key. Running <code>ca.sh show root.crt</code> must print <code>Name Constraints: permitted DNS polycarpic.local</code>. If it does not, the CA is unconstrained: delete it and do not continue.</p></li>
+    <li>Copy only the intermediate to the box: <code>scp box-intermediate/* polyops@&lt;address&gt;:/tmp/</code>, then <code>box$ sudo polycarpic-ops install-intermediate /tmp/…</code>. Set <code>TLS_MODE=private-ca</code>, <code>PUBLIC_ORIGIN=https://polycarpic.local</code>. The root key never leaves the password manager.</li>
+    <li><strong>Install the root certificate on every device that will sign in:</strong>
+      <ul>
+        <li><em>macOS:</em> <code>sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain root.crt</code> (also needed in Firefox: Settings → Privacy &amp; Security → Certificates → Import, tick "trust to identify websites").</li>
+        <li><em>iPhone/iPad:</em> AirDrop <code>root.crt</code>, open it, install in Settings → Profile Downloaded; then Settings → General → About → Certificate Trust Settings → enable full trust.</li>
+        <li><em>Windows:</em> double-click, Install Certificate → Local Machine → "Trusted Root Certification Authorities".</li>
+        <li><em>Android:</em> Settings → Security → Encryption &amp; credentials → Install a certificate → CA certificate.</li>
+        <li><em>Linux:</em> copy to <code>/usr/local/share/ca-certificates/</code> and run <code>sudo update-ca-certificates</code>.</li>
+      </ul></li>
+    <li><strong>Gate item, once per browser and OS you use (R-20).</strong>
+      <pre class="cmd"><code>laptop$ infra/ca/ca.sh test-constraint
+   # issues a certificate for evil.example.com signed under the intermediate and serves it on https://127.0.0.1:8443 with a hosts-file line you add as it prints</code></pre>
+      <p class="expect">Expect: in each installed browser the page shows a certificate error (name constraint violated). If any browser loads it as trusted, that browser ignores the constraint: remove the root from that device and do not use that browser for this box, or move the box to Mode A. Record the result per browser in the ledger via the team-lead.</p></li>
+    <li>Make <code>polycarpic.local</code> resolve: most devices find it by themselves (mDNS). If not, add a router DNS record or a hosts-file line as in Mode A step 3. Open <code>https://polycarpic.local</code>: padlock, no warning. OAuth buttons are absent and OAuth routes return 404 by design; sign in with email, password and the second step. Passkeys on a <code>.local</code> name are unmeasured: use an authenticator app.</li>
+  </ol>
+  <h4>Moving a <code>.local</code> box to a real domain</h4>
+  <ol>
+    <li>Everyone who is an owner or manager must already have an authenticator app or backup codes (passkeys will not survive, because they are tied to the old name; every session ends). Check each member: <code>box$ polycarpic-ops cli user mfa-methods --all-owners</code> must show TOTP or backup codes for each. Anyone without: ask them to add one, or use <code>polycarpic-ops cli user reset-mfa &lt;email&gt;</code> on their behalf afterwards.</li>
+    <li>Tell the household first: everyone will be signed out once.</li>
+    <li>Do Mode A steps 1 to 4. Change <code>TLS_MODE</code> and <code>PUBLIC_ORIGIN</code>; <code>polycarpic-ops redeploy home</code>.
+      <p class="expect">Expect: the app starts and the served certificate chains to a public CA. If the app refuses to start with a mode message, the settings disagree: fix <code>host.env</code>.</p></li>
+    <li>Each person signs in with email, password and an authenticator code, then adds Google/Apple/GitHub from Settings while signed in. It is never linked automatically by matching email.</li>
+    <li><strong>Remove the old root from every device</strong> (reverse of the install steps), then delete the intermediate from the box (<code>polycarpic-ops remove-intermediate</code>). Keep the root key in the password manager for the record, or destroy it.</li>
+  </ol>
+
+  <h3 id="rb-vercel">7.4 Tertiary target: Vercel + Neon</h3>
+  <ol>
+    <li><strong>Neon.</strong> Create a project, same Postgres major as the other targets, nearest region. In the SQL editor create the login roles <code>poly_migrator</code>, <code>poly_app</code>, <code>poly_worker</code> (the first migration creates the NOLOGIN roles and grants). Copy two connection strings per role: the <strong>pooled</strong> one (host contains <code>-pooler</code>) and the <strong>direct</strong> one.
+      <p class="expect">Expect: <code>select version();</code> shows the pinned major. Record Neon's restore window for your plan from the plan page (§6.6).</p></li>
+    <li><strong>Vercel.</strong> Create the team with MFA on, then two projects from the repository: <code>polycarpic-web</code> and <code>polycarpic-jobs</code>, build command and output per <code>infra/vercel/README</code>. Set environment variables <strong>per project</strong> from the table in that file: <code>web</code> gets the public keys and <code>poly_app</code> pooled URL; <code>jobs</code> gets the keyring, <code>poly_worker</code> pooled URL and <code>CRON_SECRET</code>; the migrate step gets the <code>poly_migrator</code> <em>direct</em> URL as a build-only variable on <code>web</code> only. Set Production Branch to a branch nobody pushes to, so Vercel never deploys on its own.</li>
+    <li><strong>Deploy a verified release, by hand.</strong>
+      <pre class="cmd"><code>laptop$ git fetch --tags &amp;&amp; git tag -v v1.0.0
+laptop$ git checkout v1.0.0
+laptop$ infra/vercel/deploy.sh --tag v1.0.0</code></pre>
+      <p class="expect">Expect: <code>tag signature verified</code>, two builds, the migration running in the web build and ending <code>0 pending</code> on the next run, and two deployment URLs. Then attach your domain to <code>web</code>. If the migration step fails, the build fails and the previous deployment keeps serving.</p></li>
+    <li><strong>Confirm the split.</strong> <code>infra/vercel/check.sh</code> lists variable <em>names</em> per project and prints <code>keyring: jobs only</code>. A cron route requested without the secret must return 401; the same route on the web project must return 404.</li>
+    <li><strong>Backups.</strong> Add the weekly export to your calendar and run <code>polycarpic-ops neon-export</code> once now (§6.6). Daily imports are the platform ceiling on the Hobby plan; the unlink screen says provider revocation can lag up to a day.</li>
+  </ol>
+
+  <h3 id="rb-cli">7.5 The operator commands you will use</h3>
+  <p>Run on the box. <code>polycarpic-ops cli …</code> executes the application CLI inside the <code>worker</code> container as the operator; each command writes an <code>audit_event</code> (SECURITY C-01, C-35, §4.1).</p>
+  <table>
+    <thead><tr><th>Command</th><th>What it does</th><th>You should see</th></tr></thead>
+    <tbody>
+      <tr><td><code>polycarpic-ops cli user invite &lt;email&gt;</code></td><td>Invite a person who shares no entity with anyone yet. The only way in besides a membership invitation (there is no open sign-up).</td><td>"invitation recorded", an email to them</td></tr>
+      <tr><td><code>polycarpic-ops cli user reset-mfa &lt;email&gt;</code></td><td>Removes that person's second-step methods and ends their sessions; they re-enrol on next sign-in. Use after verifying who is asking, in person or by a call you place yourself.</td><td>"sessions revoked: N", an <code>audit_event</code>, and an email to the user</td></tr>
+      <tr><td><code>polycarpic-ops cli membership remove-owner &lt;entity&gt; &lt;email&gt;</code></td><td>The audited backstop for removing a co-owner who cannot or will not act (R-19). Notifies every owner, the target included.</td><td>"change.forced recorded", emails sent</td></tr>
+      <tr><td><code>polycarpic-ops cli entity set-founder &lt;entity&gt; &lt;email&gt;</code></td><td>Sets a new founding owner when the founder has vanished without transferring</td><td>As above</td></tr>
+      <tr><td><code>polycarpic-ops cli secrets rotate</code></td><td>Keyring rotation (§8.12)</td><td>"rows remaining under old key: 0"</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="ops-runbook" data-section="ops-runbook">
+  <h2>8. Operations Runbook</h2>
+  <p class="section-hint">Day-2. Same format: command, what you should see, what to do otherwise. After any step that changes the box, run <code>polycarpic-ops status</code> and confirm green before you close the laptop.</p>
+
+  <h3>8.1 Rotate a secret</h3>
+  <ul>
+    <li><strong>Provider key or token</strong> (Resend, price, BLS, OAuth client secret, Plaid secret, bucket put-key): create the new one at the provider, then <code>sudo polycarpic-ops set-secret &lt;name&gt;</code>, then <code>sudo polycarpic-ops restart web worker</code>, then revoke the old one at the provider. Expect <code>status</code> green and (for the bucket key) a successful backup within 5 minutes after <code>systemctl start polycarpic-backup</code>. Order matters: revoke last.</li>
+    <li><strong>Database role password:</strong> <code>sudo polycarpic-ops rotate-db-password app|worker|migrator</code>. It changes the role in Postgres and the file in one step and restarts the matching container. Expect <code>healthy</code>.</li>
+    <li><strong>BetterAuth secret (planned rotation, SECURITY A-33):</strong> <code>sudo polycarpic-ops auth-secret add</code> adds a new version that encrypts new data while older versions still decrypt; restart; run <code>polycarpic-ops cli auth rewrite-secrets</code> (re-encrypts TOTP seeds, backup codes and OAuth tokens under the newest version); when it reports <code>0 rows on old versions</code>, run <code>polycarpic-ops auth-secret retire &lt;version&gt;</code>. Expect that nobody is signed out. <strong>Never replace the secret outright</strong> outside an incident: it ends every session and makes every enrolled second step undecryptable (everyone would need <code>reset-mfa</code>).</li>
+    <li>Annual review: list every secret with <code>list-secrets</code> and rotate any that you cannot account for.</li>
+  </ul>
+
+  <h3>8.2 The monthly window (first Sunday, about 45 minutes)</h3>
+  <ol>
+    <li>Run the restore drill from the laptop (§6.7). Expect <code>DRILL PASSED</code>; a failure is SEV2 (RB-5).</li>
+    <li><code>box$ sudo apt update &amp;&amp; sudo apt full-upgrade</code>, then <code>sudo reboot</code> if it says so. Expect: after about two minutes <code>polycarpic-ops status</code> is green. The home box must come back without asking for a passphrase.</li>
+    <li>Docker: if <code>apt</code> held back Docker packages, upgrade them now; containers restart.</li>
+    <li>Check <code>polycarpic-ops status</code>: disk under 80 percent, certificate more than 14 days left, GitHub token more than 14 days left.</li>
+    <li>Read the month's alerts and any rolled-back deploys in <code>/opt/polycarpic/deploy.log</code>.</li>
+    <li>Check Renovate PRs waiting more than 7 days with the team-lead.</li>
+    <li>Tell Healthchecks.io the drill happened: <code>laptop$ curl -fsS -m 10 --retry 3 "$(polycarpic-ops heartbeat-url drill)"</code> (the helper prints the check's address from the ping key kept in the password manager). Expect: the <code>polycarpic-drill</code> check turns green; if it is not pinged for 35 days you get an email.</li>
+  </ol>
+
+  <h3>8.3 Rotate the DNS token (home, real-domain mode)</h3>
+  <ol>
+    <li>In Cloudflare, create a new token with the same single-zone scope; <code>box$ sudo polycarpic-ops set-secret dns_api_token</code>; <code>sudo polycarpic-ops restart caddy</code>.</li>
+    <li>Force a renewal test: <code>sudo polycarpic-ops caddy-renew-test</code>. Expect: <code>staging ACME order succeeded</code> (it uses the issuer's test environment).</li>
+    <li>Delete the old token in Cloudflare. Expect nothing else to change.</li>
+  </ol>
+
+  <h3>8.4 Renew the GitHub read token (every 90 days)</h3>
+  <p>GitHub → Settings → Developer settings → Fine-grained tokens → generate: this repository only; <code>Contents: read</code>, <code>Packages: read</code> (repository permissions: Metadata read is automatic); 90 days. <code>box$ sudo polycarpic-ops set-secret github_read_token</code>, then <code>sudo systemctl start polycarpic-deploy</code>. Expect: <code>deploy.log</code> shows a poll with "up to date". Then delete the old token and ping the <code>polycarpic-token</code> check so its 90-day clock restarts. If the repository and package are public, remove the token (<code>polycarpic-ops remove-secret github_read_token</code>) and the reminder.</p>
+
+  <h3>8.5 Replace the private CA intermediate (60 days before expiry)</h3>
+  <ol>
+    <li>Laptop: fetch the root key from the password manager to a temporary folder, run <code>infra/ca/ca.sh intermediate --out ./new-intermediate</code>, then delete the root key file.</li>
+    <li>Copy and install: <code>box$ sudo polycarpic-ops install-intermediate /tmp/new-intermediate/…</code>. Caddy reissues leaves from it. Expect: browsers show no warning, and <code>polycarpic-ops status</code> shows the issuer chain. Devices need no change because they trust the root, not the intermediate.</li>
+    <li>If the <em>root</em> must be replaced (compromise or 10-year expiry), every device needs the new root installed and the old one removed (§7.3 Mode B step 3), so schedule it; or move to Mode A.</li>
+  </ol>
+
+  <h3>8.6 Roll back a release</h3>
+  <pre class="cmd"><code>box$ sudo polycarpic-ops rollback prod
+box$ sudo polycarpic-ops status</code></pre>
+  <p class="expect">Expect: <code>rolled back to sha256:… (previous)</code>, <code>healthy</code>, and the bad digest listed under <code>quarantined</code> so the poll does not redeploy it. Tell the team-lead; the fix ships as a new release, and quarantine clears when a newer digest appears. If the rollback itself is unhealthy, the schema may have moved in an incompatible way: do not change anything else; use the pre-migration backup (§4.5, §6.8) and ask.</p>
+
+  <h3>8.7 Update the operator tooling itself</h3>
+  <p><code>box$ sudo polycarpic-ops self-update</code> fetches the newest release's ops bundle, verifies the attestation and tag signature exactly as a deploy does, shows a diff of the deploy script and timer unit against what is installed, and waits for you to type <code>yes</code>. Read the diff; if you do not understand a change, answer no and ask. Expect: <code>self-update complete</code> and the next poll runs on the new script.</p>
+
+  <h3>8.8 Add or remove a laptop's SSH key</h3>
+  <ol>
+    <li>Add: on the new laptop make a key (§7.1 step 2). From a laptop that still works: <code>ssh polyops@box "sudo polycarpic-ops ssh-key add"</code> and paste the <code>.pub</code> line. Expect: the new laptop can log in. Test before removing anything.</li>
+    <li>Remove (lost laptop): <code>sudo polycarpic-ops ssh-key list</code>, then <code>ssh-key remove &lt;id&gt;</code>. A lost laptop also means: rotate the bucket read-key, treat its password manager as exposed if it was unlocked, and run SECURITY RB-2 if the laptop held an unlocked session.</li>
+  </ol>
+
+  <h3>8.9 Locked out, or lost a secret</h3>
+  <table>
+    <thead><tr><th>Situation</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>Lost every SSH key (Hetzner)</td><td>Hetzner console → server → Rescue → enable rescue system, reboot, mount the root disk, add a public key to <code>polyops</code>'s <code>authorized_keys</code>, disable rescue, reboot. Expect: SSH works with the new key. This is why the Hetzner account and its recovery codes are in the password manager.</td></tr>
+      <tr><td>Locked yourself out with a firewall rule</td><td>Hetzner console → Firewalls: edit the rule (the console is unaffected by the firewall).</td></tr>
+      <tr><td>Home box asks for a passphrase at boot</td><td>Type the recovery passphrase from the recovery sheet. Then find why the TPM no longer matches (firmware update? Secure Boot changed?), and re-bind: <code>sudo polycarpic-ops disk-rebind</code>. A passphrase prompt you did not cause (nothing changed) can mean the box was tampered with: run the checks in §8.11 before trusting it.</td></tr>
+      <tr><td>A household member lost their authenticator</td><td><code>polycarpic-ops cli user reset-mfa &lt;email&gt;</code> after verifying them by a channel you control.</td></tr>
+      <tr><td>Lost the keyring</td><td>RB-4: <code>polycarpic-ops cli secrets init --force</code>; every connection then shows "relink required"; the ledger is untouched.</td></tr>
+      <tr><td>Lost the age private key</td><td>Existing backups cannot be opened, ever. Generate a new keypair (§7.1 step 3), replace <code>/etc/polycarpic/backup.pub</code>, run a manual backup, and consider the old backups gone. This is why the key has two homes.</td></tr>
+      <tr><td>Lost the recovery passphrase of the home box's disk</td><td>While the box still unlocks by itself: add a new passphrase slot (<code>sudo cryptsetup luksAddKey</code>) and remove the old one. If the TPM no longer unlocks it and the passphrase is gone, restore from backup onto new disk (§8.10).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.10 Restore from backup and replace a box</h3>
+  <ol>
+    <li><strong>Get the keys in front of you:</strong> age private key, the keyring offline copy, the provider secrets from their consoles, the recovery sheet.</li>
+    <li><strong>Build the replacement</strong> by repeating §7.1 steps 6 to 11 (Hetzner) or §7.2 (home) <em>with a new, empty data volume</em>, but do not yet point DNS at it and do not run <code>first-deploy</code>.</li>
+    <li><strong>Restore the data</strong> on your laptop first (it needs the age private key, which must not touch the new box): <code>laptop$ infra/restore.sh --bucket … --to-file ./restore.tar.age-decrypted</code> decrypts the latest base backup and WAL into a directory; copy that directory (plain data) to the new box over SSH into <code>/srv/polycarpic/restore/</code>, then <code>box$ sudo polycarpic-ops restore-apply prod</code>. Expect: Postgres recovers to the latest WAL and reports <code>recovery complete</code>, then the verifier prints <code>trial balance: ok; hash chain: ok</code>. Delete the plain copy from the laptop when done (<code>rm -rf</code>) and from <code>/srv/polycarpic/restore/</code>.<p class="expect">The plain data exists on your laptop and then on the new box's encrypted volume only. If the laptop is shared or unencrypted, use a throwaway server for the decrypt step instead.</p></li>
+    <li><strong>Re-enter the secrets</strong> (§7.1 step 12), restore the keyring file from the offline copy (<code>polycarpic-ops restore-keyring</code>; <code>keyring-fingerprint</code> must match what you wrote down), or generate a new keyring and relink every connection (RB-4).</li>
+    <li><strong>Deploy the last release</strong> (<code>polycarpic-ops first-deploy prod</code>), open it, switch DNS to the new address, and confirm in the outside-in scan (§7.1 step 15).</li>
+    <li>Run a backup and the monitor check; run the restore drill once more within the week.</li>
+    <li>Time yourself. RTO is 4 hours on Hetzner; if you took longer, write down the slow step and tell the team-lead so §7 improves.</li>
+  </ol>
+  <p><strong>Temporary landing on Hetzner for a lost home box:</strong> do the same on a Hetzner server with <code>--target hetzner</code>, using a temporary DNS name. Household members use that name until the home box is rebuilt. Real-domain mode on the home box is unaffected by this.</p>
+  <p><strong>Neon:</strong> create a new Neon project, restore with <code>polycarpic-ops neon-restore</code> from the latest weekly export (decrypt on the laptop), update the Vercel variables, redeploy with <code>infra/vercel/deploy.sh</code>.</p>
+
+  <h3>8.11 Suspected compromise (commands for SECURITY RB-1, RB-2)</h3>
+  <ol>
+    <li><strong>Stop the bleeding.</strong> <code>box$ sudo polycarpic-ops lockdown</code>: Caddy serves the maintenance page and every other container stops. Expect: the outside scan shows only Caddy. If you cannot log in, disable the server's network in the provider console (Hetzner) or unplug the cable (home).</li>
+    <li><strong>Keep the evidence.</strong> Hetzner: take a server snapshot in the console. Home box: do not power off if you can avoid it; copy <code>deploy.log</code> and <code>docker logs</code> output to the laptop.</li>
+    <li><strong>If the worker or keyring may be exposed (RB-1):</strong> revoke every bank token at its provider (Plaid <code>/item/remove</code>, SimpleFIN, broker OAuth), then after the replacement is up, generate a new keyring and relink. If only the keyring leaked, <code>polycarpic-ops cli secrets rotate</code> (§8.12) is enough; if the database and the keyring may both have been exposed, rotation is not enough.</li>
+    <li><strong>Rotate every operator secret</strong> (§8.1), the BetterAuth secret by replacement this time (sessions all end), the bucket keys and the DNS token. Remove the SSH keys you cannot account for (§8.8).</li>
+    <li><strong>Rebuild</strong> from a clean attested image on a fresh host (§8.10), restoring the last backup taken before the compromise, and verify it against the hash chain and against the head of the last export an owner holds off the box (RB-2 step 6).</li>
+    <li>Postmortem within 5 business days (SECURITY §10).</li>
+  </ol>
+
+  <h3>8.12 Rotate the credential keyring</h3>
+  <p><code>box$ sudo polycarpic-ops cli secrets rotate</code>. Expect: it adds key <em>n+1</em>, re-seals every connection under it, and ends <code>rows remaining under old key: 0; removed key n; audit_event written</code>. Save the new keyring offline immediately: <code>polycarpic-ops keyring-show</code> prints it once; replace the password-manager note and the printed sheet, and confirm with <code>keyring-fingerprint</code>. If it stops midway it is safe to run again.</p>
+
+  <h3>8.13 Decommission</h3>
+  <ol>
+    <li>Export everything each household member wants to keep (app export carries the hash-chain head); run a final backup; wait for it to appear in the bucket.</li>
+    <li>Revoke every bank connection from the app (Settings → Connections → Unlink) and confirm each at its provider.</li>
+    <li>Hetzner: delete the server, the volume, the firewall, the SSH key and the project. Home box: remove the intermediate/DNS token, then securely erase the disk (<code>sudo cryptsetup erase /dev/…</code> then <code>blkdiscard</code>, or physically destroy it).</li>
+    <li>Delete the DNS records and the DNS token; remove the private CA root from every device; delete the Resend domain, OAuth apps, monitors and the GitHub token.</li>
+    <li>Backups: nothing to delete; they expire in 35 days and cannot be removed earlier. Destroy the age private key only after you are certain you will never restore (or after the last backup expires).</li>
+  </ol>
+</section>
+
+<!-- ============================================================ -->
+<section id="rulings" data-section="rulings">
+  <h2>9. Rulings &amp; Asks on Other Owners</h2>
+  <p class="section-hint">Decisions on the devops items ARCH §7 and SECURITY §12.3 left open. Each cites its measurement or is tagged <em>(unmeasured)</em>; an unmeasured claim is a first-deploy check, not a promise.</p>
+
+  <h3>9.1 Rulings (D-1 to D-12)</h3>
+  <table>
+    <thead><tr><th>#</th><th>Item (source)</th><th>Ruling</th></tr></thead>
+    <tbody>
+      <tr><td>D-1</td><td>Secrets as files, scoped per container (SECURITY §6.2, C-74)</td><td>Confirmed as ARCH §7.5 states it. File inventory and per-container mounts: §2.2 and §3.2. Non-secret host config (<code>TLS_MODE</code>, <code>PUBLIC_ORIGIN</code>, instance name) lives in <code>/etc/polycarpic/host.env</code>. On the home box the secrets directory sits on the TPM-unlocked partition, so a pulled disk yields no secrets; on Hetzner it sits on the root disk and the data volume's LUKS key is a file on that disk, which protects a detached volume only, not a captured server (said plainly in §3.2).</td></tr>
+      <tr><td>D-2</td><td>Only Caddy publishes ports; firewall outside the host (C-70, C-71)</td><td>Confirmed. Hetzner Cloud Firewall admits 22, 80, 443 on IPv4 and IPv6. SSH stays open to the internet with key-only login, because the operator's address changes (a restriction by address is optional and §8.9 says how to recover). Acceptance is behavioural: the compose-policy lint in CI and the outside-in scan after every provisioning (§7.1 step 15), not the config alone.</td></tr>
+      <tr><td>D-3</td><td>Backup store and mechanism (§6.6, C-73)</td><td><strong>Backblaze B2 bucket (EU) with Object Lock in compliance mode, 35-day retention, put-only box key, separate read key on the operator's laptop</strong> (Principal, 2026-11-08, Q3), written over HTTPS 443 through B2's S3-compatible endpoint, <code>rclone</code> as the uploader, <code>age</code> to a recipient public key. Why not the Storage Box default: the C-76 outbound allowlist (DNS, NTP, 443) blocks SFTP on 22/23 on the home box, and a Storage Box "append-only" mode is <em>(unmeasured)</em>. A Storage Box stays a documented fallback on Hetzner once the cannot-delete drill passes against it. One mechanism on all targets is simpler to drill and to explain. Hetzner Object Storage is a noted alternative pending verification of its lock; the Storage Box is fallback only. Nightly set is base backup + dump + globals, WAL continuous (§6.1).</td></tr>
+      <tr><td>D-4</td><td>RPO and RTO (SECURITY §6.6 "DevOps's call"; R-5)</td><td>RPO 15 minutes, RTO 4 hours on Hetzner; home box RTO 1 day with a Hetzner break-glass at 4 hours, no spare hardware (Principal, 2026-11-08, Q7); Vercel/Neon per §6.4. Retention 35 days, enforced by the store; this bounds R-5 at 35 days.</td></tr>
+      <tr><td>D-5</td><td>Pull-based deploy (C-83)</td><td>Confirmed and made concrete in §4.4. Added: the ops bundle is extracted from the attested image; the prod tag's signer list (<code>allowed_signers</code>) is installed at bootstrap from the operator's own machine, never fetched from the repository; deploy failure rolls back automatically within 120 seconds; the poll quarantines a failed digest.</td></tr>
+      <tr><td>D-6</td><td>Connection-pooler mode on both targets (§12.3)</td><td>Compose targets: <strong>no pooler in v1</strong>; the app's own pool holds connections and <code>set_config(…, true)</code> is transaction-local, so reuse is safe. A pooler service in compose is refused by the policy lint unless it declares transaction mode. Neon: the runtime uses the <strong>pooled</strong> endpoint (PgBouncer transaction mode); migrations use the <strong>direct</strong> endpoint. CI: on a fixed pooler-reuse test, connect through each target's endpoint (a local PgBouncer in transaction mode stands in for Neon, and a real Neon branch is used on the scheduled run), set the GUC inside a transaction, commit, and assert a later transaction on the same backend sees it empty.</td></tr>
+      <tr><td>D-7</td><td>Provisioning tool</td><td>Committed <code>hcloud</code> CLI scripts and a cloud-init file (<code>infra/hetzner/</code>), idempotent, plus the on-box <code>polycarpic-ops provision</code>; not OpenTofu. Reason: a state file is one more thing for a novice to lose, and one server, one firewall and one volume do not need a planner. Revisit with a second server. The scripts are the source of truth: a console change that the scripts do not make gets reverted on the next run.</td></tr>
+      <tr><td>D-8</td><td>Postgres logging (C-75)</td><td>A mounted configuration fragment sets the three C-75 values; the DB battery runs <code>SHOW</code> on each and fails if any differs. Same assertion runs against the staging and local-box containers in <code>provision-check</code>.</td></tr>
+      <tr><td>D-9</td><td>Local-box provisioning checks (C-76) and staging isolation (C-77)</td><td><code>provision-check</code> is the check script both controls ask for: nftables rules, the <code>DOCKER-USER</code> rule, publish binding, sshd, IPv6, outbound allowlist, swap, TPM slots, console hardening, and that the staging and prod secrets directories share no file and staging's <code>PLAID_ENV</code> is <code>sandbox</code>. Outside-in scan: §7.2 step 11.</td></tr>
+      <tr><td>D-10</td><td>Monitoring and alerts (ARCH §7.4, C-76 heartbeat)</td><td>Two independent paths: app email through Resend, and an outside dead-man's-switch monitor (Healthchecks.io, free tier; Principal, 2026-11-08) that does not depend on the box or Resend (§6.5). Public health endpoint says only ok or not.</td></tr>
+      <tr><td>D-11</td><td>Vercel deploy path</td><td>The operator deploys a signature-verified tag by running <code>infra/vercel/deploy.sh</code> from the laptop; Vercel's own Git deployment is pointed at a branch nobody pushes to. No Vercel deployment credential lives in GitHub, consistent with the C-83 principle that nothing GitHub holds can move a deployment.</td></tr>
+      <tr><td>D-12</td><td>OQ-26: backups on Vercel</td><td>Neon restore window plus a weekly operator-run encrypted export; no nightly export, no GitHub-held credential (Q5 ruled); revisited with SecEng only if real data lands on the target (OQ-INFRA-1). §6.6.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>9.2 ARCH and SECURITY changes to re-fold</h3>
+  <table>
+    <thead><tr><th>#</th><th>Where</th><th>Change</th></tr></thead>
+    <tbody>
+      <tr><td>R-1</td><td>ARCH §7.2 backup store</td><td>Default store becomes the Object-Lock bucket (D-3); Storage Box moves to "documented fallback, once the cannot-delete test passes". Retention 35 days.</td></tr>
+      <tr><td>R-2</td><td>ARCH §7.8 Backups row</td><td>Upload is over 443 to the same bucket; SFTP is not available under C-76. RTO for the home box: 1 day, with a Hetzner break-glass at 4 hours.</td></tr>
+      <tr><td>R-3</td><td>ARCH §8.1</td><td>"Checked-in <code>allowed_signers</code>" becomes "installed on the box at bootstrap by the operator and changed only by an operator step" (§3.3).</td></tr>
+      <tr><td>R-4</td><td>ARCH §8.1 deploy script and rollback</td><td>Recreate with 10-second Caddy retry replaces "keeps routing to the last healthy containers"; add the pre-migration backup, the automatic rollback at 120 seconds, the quarantine, and the ops bundle extracted from the attested image.</td></tr>
+      <tr><td>R-5</td><td>ARCH §7.2 mechanism</td><td>WAL replay needs a physical base backup: nightly set is <code>pg_basebackup</code> + <code>pg_dump</code> + <code>pg_dumpall --globals-only</code>, and the image's Postgres major is pinned (§6.1).</td></tr>
+      <tr><td>R-6</td><td>ARCH §7.4</td><td>Public <code>/api/v1/health</code> returns ok or not only; migration and backup fields move to a loopback-only admin listener (TB-13, POLY-81). Add the dead-man's-switch alert path.</td></tr>
+      <tr><td>R-7</td><td>ARCH §7.6, §8 Vercel rows</td><td>Deploy is the operator's <code>deploy.sh</code> on a verified tag (D-11); the env-name check uses a read-scoped Vercel token in a GitHub environment with required reviewers.</td></tr>
+      <tr><td>R-8</td><td>ARCH §7.3, §7.5, §10</td><td>Plan named by specification (4 vCPU / 8 GB), a 20 GB LUKS data volume, swap off; the pooler wording of §7.5 becomes D-6; staging stays co-located (no change).</td></tr>
+      <tr><td>S-1</td><td>SECURITY C-01, §4.1 bootstrap</td><td>The bootstrap user is created by <code>polycarpic user invite &lt;email&gt; --bootstrap</code> on an empty instance, and an empty instance accepts no other first sign-up. As written ("the first user on an empty instance"), a stranger can win a race on a public VPS between the first deploy and the operator's first sign-up. INFRA's runbook also keeps prod behind a maintenance page until the bootstrap invitation is used (§7.1 step 14).</td></tr>
+      <tr><td>S-2</td><td>SECURITY C-73, §6.6, §6.1</td><td>Store is an Object-Lock bucket with a put-only box credential and a separate read credential; add the secrets <code>github_read_token</code>, <code>heartbeat_url</code>, <code>staging_basic_auth</code> and the split bucket credentials to the §6.1 inventory.</td></tr>
+      <tr><td>S-3</td><td>SECURITY R-5; ARCH purge screen copy</td><td>The retention bound is 35 days; the purge confirmation says "up to 35 days in backups".</td></tr>
+      <tr><td>S-4</td><td>SECURITY C-72 (home box)</td><td>Default PCR 7 only; PCR 11 only if signed policies are measured. The secrets directory lives on the encrypted partition. Root password for the emergency shell and a bootloader password with recovery entries removed. Swap off. Test: Secure Boot off at the firmware must produce a passphrase prompt (§7.2 step 7).</td></tr>
+      <tr><td>S-5</td><td>SECURITY C-83</td><td>Signer list from the operator, not the repository; tag-to-digest binding via an image label covered by the attestation; PAT 90-day expiry and renewal reminder.</td></tr>
+      <tr><td>S-6</td><td>SECURITY (new ruling) for OQ-INFRA-1</td><td>Q5 ruled that the weekly operator-run export stands. Record that default, and rule on a GitHub-held read-all-ledger role (TB-12) only if real data ever lands on the Vercel target.</td></tr>
+      <tr><td>S-7</td><td>SECURITY C-71</td><td>Record that SSH is open to the internet on the Hetzner target by design (key-only, no root, unattended upgrades) and that an address restriction is optional.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>9.3 Asks on other owners</h3>
+  <ul>
+    <li><strong>architect:</strong> fold R-1 to R-8. Pin the Postgres major and record it in a file CI, compose and the Neon runbook all read. Specify the loopback admin listener (TB-13) and the <code>check-config</code> and <code>migrate --plan</code> subcommands that §4.5 relies on.</li>
+    <li><strong>seceng:</strong> fold S-1 to S-7. Record S-6 (default ruled; revisit only on real data at the tertiary target). Review the <code>provision-check</code> script as the evidence for C-70, C-71, C-72, C-76 and C-77.</li>
+    <li><strong>backend-lead:</strong> the <code>*_FILE</code> config loader, <code>polycarpic cli</code> subcommands named in §7.5 and §8.1 (<code>user mfa-methods</code>, <code>auth rewrite-secrets</code>, <code>secrets init --force</code>, <code>membership remove-owner</code>, <code>secrets rotate</code>), the log schema agreed before POLY-M1 logs anything, and the commit label on the image.</li>
+    <li><strong>qa-engineer:</strong> the pooler-reuse test, the compose-policy lint fixtures, the topology-check fixtures, the drill script's five assertions, and Playwright smoke against staging after each deploy.</li>
+    <li><strong>team-lead:</strong> add the INFRA row to the Artifacts table; own the ledger entries for the Principal answers below; run the monthly drill reminder issue until it is automated.</li>
+  </ul>
+</section>
+
+<!-- ============================================================ -->
+<section id="open-questions" data-section="open-questions">
+  <h2>10. Open Questions</h2>
+  <p class="section-hint">Q1 to Q7 were all ruled by the Principal on 2026-11-08 and are closed; none remains open. OQ-INFRA rows are measurements or rulings with an owner and a trigger.</p>
+
+  <h3>10.1 For the Principal (all closed)</h3>
+  <table>
+    <thead><tr><th>#</th><th>Question</th><th>Options and mechanics</th><th>Recommendation</th></tr></thead>
+    <tbody>
+      <tr><td>Q1</td><td>Where does your domain's DNS live?</td><td><strong>Ruled (Principal, 2026-11-08), option (a):</strong> move the domain's name servers to Cloudflare's free DNS, DNS-only mode; one zone-scoped token on the home box; the registrar is unchanged. Applied in §1.2, §3.4, §7.1 step 8 and §7.3 Mode A. Closed.</td><td>Closed</td></tr>
+      <tr><td>Q2</td><td>Hetzner location?</td><td><strong>Ruled (Principal, 2026-11-08): EU.</strong> Default Falkenstein (<code>fsn1</code>), fallback Nuremberg (<code>nbg1</code>); reasoning in §1.2. Closed.</td><td>Closed</td></tr>
+      <tr><td>Q3</td><td>Backup bucket provider?</td><td><strong>Ruled (Principal, 2026-11-08), option (a):</strong> Backblaze B2 with Object Lock in compliance mode (35 days), put-only box key, separate read key held by the operator, rclone over 443. Hetzner Object Storage stays a noted alternative pending lock verification; the Storage Box is the fallback only. Applied in §2.3, §6.1, §7.0, §7.1 step 4 and D-3. Closed.</td><td>Closed</td></tr>
+      <tr><td>Q4</td><td>An outside monitor service?</td><td><strong>Ruled (Principal, 2026-11-08):</strong> Healthchecks.io free tier receives heartbeat pings from both boxes and emails the operator when they stop; it holds no data. Recorded in §6.5, §7.1 step 12 and D-10. Closed.</td><td>Closed</td></tr>
+      <tr><td>Q5</td><td>Nightly Neon export credential in GitHub?</td><td><strong>Ruled (Principal, 2026-11-08):</strong> no. Weekly operator-run encrypted export from the laptop to the backup bucket, Neon PITR for the rest, no credential in GitHub. Revisit with SecEng only if real data ever lands on the tertiary target. Closed.</td><td>Closed</td></tr>
+      <tr><td>Q6</td><td>If the home box's hardware cannot bind the TPM, accept a passphrase at every boot?</td><td><strong>Ruled (Principal, 2026-11-08): no.</strong> P8 stands. If §7.2 step 6 cannot bind the TPM the runbook stops ("this machine will not do; use hardware with a working TPM2 and Secure Boot") and lists what to check before buying. Applied in §7.2 step 1 and Troubleshooting step 6. Closed.</td><td>Closed</td></tr>
+      <tr><td>Q7</td><td>Home-box recovery time: is 1 day acceptable, or buy a spare?</td><td><strong>Ruled (Principal, 2026-11-08): no spare.</strong> The recovery path is the rented-Hetzner break-glass restore (about 4 hours of work, 1-day RTO), which is the same procedure as the GA restore drill (§6.7, §8.10), so rehearsing one rehearses the other. Closed.</td><td>Closed</td></tr>
+    </tbody>
+  </table>
+
+  <h3>10.2 Measurements and rulings</h3>
+  <table>
+    <thead><tr><th>#</th><th>Question</th><th>Owner</th><th>Resolve by</th></tr></thead>
+    <tbody>
+      <tr><td>OQ-INFRA-1</td><td>Nightly Neon export credential in GitHub (S-6). Default ruled: no (Q5); weekly manual export stands.</td><td>seceng + Principal</td><td>Trigger: real data first lands on the Vercel target</td></tr>
+      <tr><td>OQ-INFRA-2</td><td>Does Ubuntu 24.04 ship signed PCR policies so PCR 11 can be added? TPM2 unlock of a non-root volume through <code>crypttab</code> on 24.04?</td><td>devops-engineer</td><td>First home-box deploy</td></tr>
+      <tr><td>OQ-INFRA-3</td><td>Browser enforcement of name constraints on a locally installed root, per browser and OS (R-20)</td><td>devops-engineer</td><td>First private-CA deploy</td></tr>
+      <tr><td>OQ-INFRA-4</td><td>B2: compliance-mode Object Lock on a bucket-default retention, the exact capability set of the put-only key (does rclone need <code>listBuckets</code>?), the lifecycle rule, and the cannot-delete and cannot-shorten tests</td><td>devops-engineer</td><td>Before the first backup (first drill)</td></tr>
+      <tr><td>OQ-INFRA-5</td><td>Container memory caps, plan size, volume size, disk and egress use</td><td>devops-engineer</td><td>After POLY-M1 lands, then at GA</td></tr>
+      <tr><td>OQ-INFRA-6</td><td>Neon restore window on the plan in use; Vercel Hobby limits at deploy time</td><td>devops-engineer</td><td>When the tertiary target is first stood up</td></tr>
+      <tr><td>OQ-INFRA-7</td><td>Hetzner current plan name and price; Hetzner Cloud Firewall rule counts and IPv6 behaviour</td><td>devops-engineer</td><td>At the first order</td></tr>
+      <tr><td>OQ-INFRA-8</td><td>Every command in §7 and §8 verified once on a real machine; v1.1 corrects whatever differs</td><td>devops-engineer</td><td>First staging deploy (POLY-M1)</td></tr>
+      <tr><td>OQ-INFRA-9</td><td>Healthchecks.io free-tier limits (check count, minimum period and grace, ping-key behaviour, <code>/fail</code> handling)</td><td>devops-engineer</td><td>At account creation</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<footer class="doc-footer">
+  Generated by the <code>devops-engineer</code> agent. Update when ARCH or SECURITY decisions change; log decisions in <a href="../../process/DECISIONS.md">process/DECISIONS.md</a>.
+</footer>
+
+</body>
+</html>
