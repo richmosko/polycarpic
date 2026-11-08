@@ -323,3 +323,63 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the architect found the two sentences in conflict when a Person holds units in an entity outside the viewed parent, possibly with no membership on it. Weighting the parent's own set keeps the privacy grain ruled on 2026-11-06 intact; a user who wants everything includes those entities in a parent of their own.
 **Alternatives considered:** summing every held entity regardless of parent (reveals totals of entities the viewer has no membership on).
 **Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — A second sign-in step is required for owners and managers
+**Decision:** owners and managers must enrol a second factor (an authenticator app or a passkey); viewers may. Signing in with Google or Apple does not exempt anyone. The second factor is asked on a new device and at the step-up before export, purge, granting access and linking a bank; a known device asks nothing until the session expires. Lockout recovery is the operator's audited reset command.
+**Why:** those roles can export, purge, link banks and grant access, so a stolen password alone must not reach them. The people who can do damage carry the one-minute cost; people who only look do not.
+**Alternatives considered:** required for everyone, viewers included; optional for all (the PRD's "MFA available").
+**Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — Parent members may query a non-member entity's totals over any date range, under explicit consent
+**Decision:** no period guard on the roll-up, economic or allocated-income figures. The step that places an entity under a parent, and the upward-consent notice, state plainly that parent members see class and category totals for any period, which for a small entity effectively reveals individual amounts and dates, and never a payee, memo, account or counterparty. That wording is a security requirement; the residual is an accepted risk.
+**Why:** the Principal: inclusion in a parent is an explicit grant by the entity's owner, so the exposure is consented, provided the consent is honest about what it grants.
+**Alternatives considered:** whole calendar months for history with today live (seceng's recommendation); whole quarters.
+**Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — Every accepted security risk is approved; R-1 re-confirmed on its corrected text
+**Decision:** SECURITY §11 rows R-2 to R-5, R-8 to R-13 and R-15 are approved. R-1 is re-confirmed as corrected: the operator's superuser can disable the append-only triggers and edit history undetectably; nothing inside the database binds the owner of the machine, and detection (the hash chain) is the only countermeasure.
+**Why:** each row is inherent to a self-hosted single-operator system or costs more to remove than it is worth, and each has a compensating control.
+**Alternatives considered:** ruling row by row.
+**Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — The ledger hash chain ships with the ledger in POLY-M2
+**Decision:** each entity's posted entries are chained by SHA-256 in journal-number order, written at commit into an append-only chain table with the head on the journal-counter row; a weekly verifier alerts a break as SEV1; every export carries the head and a purge records the final head.
+**Why:** the gapless journal counter already serialises postings per entity, so most of the cost is paid, and with no real books before GA a chain built now covers every real entry. A chain added after launch leaves the first real year unverifiable. Seceng reversed its own earlier "after GA" recommendation.
+**Alternatives considered:** after GA.
+**Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — Owners beneath are notified when anyone is invited to a parent above them
+**Decision:** when an invitation to a parent goes live, every owner of every entity beneath it, at any depth, is notified. The notice names the parent and the new member, carries the consent sentence above and the pull-out link; any role triggers it, a later role raise does not, and nothing waits on the recipients.
+**Why:** the notify-never-block rule set for placement, applied to the other way a parent's audience grows.
+**Alternatives considered:** no notice; owners beneath approve each new member first; per-entity opt-in with default exclude.
+**Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — On a multi-owner entity every other owner approves membership, owner and cap-table changes
+**Decision:** with more than one owner, these take effect only once every other owner has approved: inviting a member or raising a role; removing or demoting a co-owner; any cap-table edit. The change is held pending and the invite email goes out only after approval. Removing a viewer or manager, and lowering one's own role, stay single-owner actions. A request unanswered for 14 days expires as declined, with a reminder at day 7; a departing owner's approvals stop counting; the sole owner adds the first co-owner alone. Sole-owner entities are unaffected.
+**Why:** the Principal: if there is more than one owner "and just one owner added a new member, then the other owners (in my mind this is like trustees) didn't vote on if this was acceptable." Since owner is an access role and not a stake, a 0-unit owner could otherwise admit anyone or rewrite ownership alone.
+**Alternatives considered:** any owner acts alone with others notified (the prior rule); any one other owner approves; a per-entity setting defaulting to all-owners.
+**Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — The founding owner breaks a co-owner removal deadlock
+**Decision:** each entity records a founding owner, its creator, who must hold owner. The target of a removal or demotion still votes; after a decline or expiry the founder may force it, with step-up, an audit event and a notice to every owner including the target. The founder has no other extra power; leaves the role only by stepping down or transferring it; must name a successor among the owners before deleting their account; and the operator's audited command is the backstop for a founder who vanishes. The hostile-founder case is an accepted risk.
+**Why:** without a tie-breaker a two-owner dispute blocks forever and only the box operator, who is outside the entity, could resolve it; without the target's vote either owner of a two-owner entity could remove the other alone. The Principal proposed the creator who issued the invites as the final say.
+**Alternatives considered:** deadlock stands with the operator command as the only escape (seceng's recommendation); the target has no vote.
+**Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — No switch reopens public sign-up
+**Decision:** after the bootstrap user, invitation is the only way in and no configuration flag enables self-signup. An operator command on the box issues an audited, single-use invitation that shares no entity, for adding a person before any entity is shared with them.
+**Why:** a reopen switch has one use, letting strangers in, and hosting for others is a standing non-goal; a switch that exists can be flipped by mistake or by an attacker in the configuration. Seceng reversed its own earlier off-by-default switch.
+**Alternatives considered:** keep the switch, off by default.
+**Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — Home-box TLS: a real domain by default, a `.local` private CA as a supported fallback
+**Decision:** default: a subdomain resolved only on the LAN with a DNS-01 wildcard certificate and a zone-limited registrar token on the box, which keeps Google and Apple sign-in. Supported fallback: a `.local` name with an operator-run, name-constrained private CA; in that mode the OAuth providers are disabled server-side and sign-in is email, password and the second factor. Plain-http sign-in is refused in both modes. Moving from `.local` to a real domain ends every session and passkey, so authenticator or backup codes are required first.
+**Why:** the Principal: a registered domain enables OAuth; where the box runs on a `.local` name it is acceptable for OAuth to be disabled. The registrar token on the box and the private root on each device are accepted risks (R-18, R-20), the latter gated on measuring browser name-constraint enforcement at the first home-box deploy.
+**Alternatives considered:** real domain only; private CA only.
+**Approved by:** richmosko (2026-11-07)
+
+### 2026-11-07 — The home box's disk unlocks automatically through the TPM; backups go to append-only off-box storage
+**Decision:** LUKS2 with a TPM2 key slot sealed to Secure Boot and an offline recovery passphrase; firmware password, no USB or network boot, no unauthenticated console or emergency shell. Whole-box theft yielding a box that boots and unlocks itself is an accepted risk (R-21). Nightly encrypted backups go to an internet storage box on a credential that can add but never delete; a rotated drive is optional and never kept beside the box.
+**Why:** a passphrase-at-boot box stays down after every power cut, a pulled disk stays unreadable, and whole-box theft from a home is rare. Append-only storage means a compromised box cannot destroy its own history.
+**Alternatives considered:** passphrase at every boot; a rotated removable drive only; both destinations.
+**Approved by:** richmosko (2026-11-07)
