@@ -389,3 +389,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the purge promise (PRD §5) holds because the system copies nothing of the purged entity; the other entity's owners keep their ownership history using knowledge they already had. Shape: ARCH v1.4 §3.4b (OQ-33).
 **Alternatives considered:** "Former holder" with no label (loses the name from the other entity's records); keeping the purged entity's name as it stood (its name survives in records its owner can no longer see or remove).
 **Approved by:** richmosko (2026-11-07)
+
+### 2026-11-08 — Login and Sign up offer Google, Apple and GitHub sign-in in v1
+**Decision:** the Login and Sign up screens show "Continue with Google", "Continue with Apple" and "Continue with GitHub", the three providers SECURITY §4.1 names. On a `.local` home box all three are hidden and sign-in is email, password and the second step.
+**Why:** the designed screens showed Google only and the ux-designer asked which providers v1 offers; the Principal chose all three, matching the PRD §8 line "OAuth day one via Google, Apple, GitHub". Each provider is one OAuth client to register per box.
+**Alternatives considered:** Google only until native iOS (the ux-designer's recommendation); Google and Apple.
+**Approved by:** richmosko (2026-11-08)
