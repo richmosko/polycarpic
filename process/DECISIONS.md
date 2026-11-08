@@ -401,3 +401,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the architect found the literal reading of SECURITY §4.1 made "optional for viewers" empty. The exemption keeps the intent, the people who can do damage carry the cost, with damage measured by what they actually do.
 **Alternatives considered:** everyone enrols at sign-up (simplest rule; reverses "optional for viewers").
 **Approved by:** richmosko (2026-11-08)
+
+### 2026-11-08 — First second-step enrolment is anchored on the account email; an unenrolled account is deleted with password plus email confirmation
+**Decision:** setting up a user's first second-step factor requires confirming a code or link sent to the account's email address, in addition to the password. This applies wherever the OQ-34 gate forces enrolment (creating an entity, sharing the own Person, a role raise, export, purge, grant, bank link). Deleting an account that has no second step requires the password plus the same email confirmation, with no factor set-up. Once a factor exists, later actions use it as before.
+**Why:** the Principal: "can't the password thief do all of the same steps on their own device? especially since the system has nothing to compare it to?" A gate that asks for the password and then accepts whatever first factor is offered stops only someone at an unlocked laptop, not a stolen password. The account email is the one thing such a thief is unlikely to hold, and SECURITY already treats it as the recovery root (invitations, new-device alerts, operator reset). A departing user gains nothing from a factor they would use once.
+**Alternatives considered:** email-anchored enrolment with deletion still going through enrolment; the gate as drawn (password then set-up), which a stolen password defeats for unenrolled users.
+**Approved by:** richmosko (2026-11-08)
