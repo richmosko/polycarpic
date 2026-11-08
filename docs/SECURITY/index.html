@@ -183,6 +183,7 @@ flowchart TB
       <tr><td>T-17</td><td>Existence oracle: FK checks bypass RLS, so sequential IDs let an attacker probe for other tenants' rows.</td><td>I</td><td>M</td><td>L</td><td>C-18</td></tr>
       <tr><td>T-18</td><td>SQL injection in <code>poly_app</code> sets <code>app.user_id</code> to anyone. The GUC is asserted by the app, not authenticated by the database.</td><td>S / I / E</td><td>L</td><td>H</td><td>C-44 prevents it; RLS does not (R-2)</td></tr>
       <tr><td>T-19</td><td>Cross-tenant metadata read through user-defined entity types. This is by design (kickoff §2.4).</td><td>I</td><td>H</td><td>L</td><td>R-9; the C-14 view exposes the label only</td></tr>
+      <tr><td>T-26</td><td>On a multi-owner entity (co-trustees, partners), one owner acts alone. They admit a member or raise a role, remove a co-owner, or rewrite the cap table, possibly as a 0-unit bookkeeper owner or from a hijacked owner session.</td><td>E / T</td><td>M</td><td>H</td><td>C-28 (every other owner approves, enforced in the database), C-03 step-up</td></tr>
       <tr><td>T-20</td><td>Membership-table policies recurse through the authz functions, or FORCE RLS blinds those functions, so policies fail open or error.</td><td>E / D</td><td>M</td><td>H</td><td>C-15 (functions owned by <code>poly_authz</code>)</td></tr>
     </tbody>
   </table>
@@ -361,14 +362,78 @@ flowchart TB
       <tr><td>Read parent links; see the parents above my entity</td><td>links where a member of the parent</td><td>as viewer</td><td>as viewer, plus <code>app.parents_of</code> on an owned child</td><td>SELECT policy on <code>entity_rollup</code>: any membership on the parent, or owner on the child. <code>app.parents_of</code> returns ancestor ids and names only (C-19).</td></tr>
       <tr><td>Read a parent's consolidated totals (POLY-1.1)</td><td>✓</td><td>✓</td><td>✓</td><td><code>app.rollup_totals</code> / <code>app.rollup_economic</code>, guarded by viewer+ on the parent. Aggregates only, never rows (C-25).</td></tr>
       <tr><td>Read the cap table</td><td>✓</td><td>✓</td><td>✓</td><td>SELECT policy on <code>equity_total</code> / <code>equity_holding</code> by <code>entity_id</code>. A holder's owners who are not members use <code>app.my_stakes()</code> (C-27).</td></tr>
-      <tr><td>Edit the cap table; read holder candidates</td><td>✗</td><td>✗</td><td>✓</td><td>INSERT policy on <code>equity_*</code>: owner. <code>app.cap_table_candidates</code> is owner-only (C-27).</td></tr>
-      <tr><td>Grant, revoke or change a membership; add or transfer an owner</td><td>✗</td><td>✗</td><td>✓ step-up</td><td>Owner-only policies on <code>membership</code>, plus a last-owner trigger (C-20)</td></tr>
+      <tr><td>Edit the cap table; read holder candidates</td><td>✗</td><td>✗</td><td>✓ step-up; co-owner approval if more than one owner</td><td>INSERT policy on <code>equity_*</code>: sole owner only. With more than one owner, the edit is held and applied only through <code>app.apply_change</code> (§4.2.2, C-28). <code>app.cap_table_candidates</code> is owner-only (C-27).</td></tr>
+      <tr><td>Invite a member, raise a role, add an owner</td><td>✗</td><td>✗</td><td>✓ step-up; co-owner approval if more than one owner</td><td>INSERT and UPDATE policies on <code>membership</code> (and <code>invitation</code>): sole owner only. Otherwise the change goes through §4.2.2. The invite email is sent only once the change applies (C-20, C-28).</td></tr>
+      <tr><td>Remove or demote a co-owner</td><td>✗</td><td>✗</td><td>✓ step-up; every other owner approves, the target included</td><td>Through §4.2.2 only. A last-owner trigger also applies (C-20).</td></tr>
+      <tr><td>Remove a viewer or manager; lower or give up one's own role</td><td>✗</td><td>✗</td><td>✓ step-up (own role: self, any role)</td><td>A single-owner action (Principal, P5b). DELETE and UPDATE policies on <code>membership</code>, plus the last-owner trigger (C-20).</td></tr>
       <tr><td>Export the entity's complete books</td><td>✗</td><td>✗</td><td>✓ step-up</td><td>PRD §5 grants this to the owner. It is exfiltration-shaped, so it is audited (C-51). <em>Revised:</em> 8963efb allowed manager+.</td></tr>
       <tr><td>Purge the entity's books</td><td>✗</td><td>✗</td><td>sole owner, step-up</td><td>C-50 (§4.5)</td></tr>
       <tr><td>Read the entity's <code>audit_event</code> rows</td><td>✗</td><td>✗</td><td>✓</td><td>SELECT policy: owner, or <code>actor_id = app.current_user_id()</code></td></tr>
       <tr><td>Clone or edit own report definitions; export own personal data; delete own account</td><td>self</td><td>self</td><td>self</td><td>Owner-user policies. Account deletion resolves every solely-owned entity in the flow, by transfer or purge, or the user aborts. The user is the only invoker (§4.6, C-52). <em>Revised in v1.1:</em> deletion was refused for a sole owner.</td></tr>
     </tbody>
   </table>
+  <h4 id="co-owner-approval">4.2.2 Co-owner approval on multi-owner entities (Principal, 2026-11-07, P5b)</h4>
+  <p>Co-trustees and partners govern as a group. Without this rule, any one owner, including a 0-unit bookkeeper owner, could admit anyone, raise a role or rewrite ownership alone (T-26). On an entity with more than one owner, these changes need the approval of <strong>every other current owner</strong>:</p>
+  <ul>
+    <li>(a) inviting a member, or raising a role (viewer → manager → owner);</li>
+    <li>(b) removing or demoting a co-owner;</li>
+    <li>(c) any cap-table edit (<code>equity_total</code>, <code>equity_holding</code>).</li>
+  </ul>
+  <p>Removing a viewer or manager, and lowering or giving up one's own role, stay single-owner actions. Sole-owner entities are unaffected.</p>
+  <ul>
+    <li><strong>A pending state, enforced in the database.</strong>
+      <ul>
+        <li><strong>The request.</strong> A <code>change_request</code> row holds entity, kind, payload, requester, created time, expiry and status (<code>pending | applied | declined | expired | withdrawn</code>). One <code>change_approval</code> row is written per approving owner, and both tables are append-only apart from the status.</li>
+        <li><strong>Direct writes.</strong> <code>poly_app</code>'s direct INSERT and UPDATE on <code>membership</code>, <code>invitation</code> and <code>equity_*</code>, for the actions above, pass only while <code>app.owner_count(entity_id) = 1</code>.</li>
+        <li><strong>Multi-owner path.</strong> Otherwise the only write path is <code>app.apply_change(change_id)</code>. It is an allowlisted definer owned by a new NOLOGIN, NOBYPASSRLS <code>poly_govern</code> role, holding role-targeted INSERT and UPDATE on exactly those tables. A <code>can()</code>-only gate fails the §4.2 design test.</li>
+      </ul></li>
+    <li><strong>Who approves.</strong> The approvers are every current owner other than the requester, recomputed when the change is applied, never fixed when it is requested.
+      <ul>
+        <li>For a co-owner's removal or demotion, the target is one of the approvers, so no owner can be removed by the others alone. A deadlock is handled under R-19.</li>
+        <li>An approval counts only if its approver is still an owner at apply time.</li>
+        <li>One decline ends the request.</li>
+        <li>The requester may withdraw it.</li>
+      </ul></li>
+    <li><strong>Applying.</strong> When the last approval lands, <code>apply_change</code> runs in that approver's transaction and re-validates the payload against current state:
+      <ul>
+        <li>the role still exists;</li>
+        <li>the cap-table Σ invariant holds;</li>
+        <li>the entity version the request was made against is unchanged, or there is no conflicting applied change since.</li>
+      </ul>
+      If validation fails, the request is declined as stale and nothing applies. Only on apply does the invitation become live and its email go out.</li>
+    <li><strong>Step-up.</strong> Requesting, approving and declining each need a re-authentication within 5 minutes, with the second factor required for owners (C-03, P1).</li>
+    <li><strong>Audit and notice.</strong> Each step writes an <code>audit_event</code>: <code>change.requested</code>, <code>.approved</code>, <code>.declined</code>, <code>.withdrawn</code>, <code>.expired</code> and <code>.applied</code>. Every owner is notified on request and on outcome. Pending requests, including an invitee's email address, are visible to owners only.</li>
+    <li><strong>Edges</strong> (SecEng rulings):
+      <ul>
+        <li><strong>An owner who never responds.</strong>
+          <ul>
+            <li>A request expires 14 days after it is made, and expired counts as declined. Silence never approves.</li>
+            <li>Owners are reminded at day 7.</li>
+            <li>The requester may ask again. One open request per kind and target, and an expired request can be re-raised at most once per 7 days.</li>
+          </ul></li>
+        <li><strong>An approver in the middle of account deletion.</strong>
+          <ul>
+            <li>While their deletion flow runs they are still an owner and may approve or decline.</li>
+            <li>At their tombstone they stop being an owner, so their approvals stop counting and they stop being required.</li>
+            <li>Each pending request on their entities is re-evaluated. If it is now fully approved, it is <em>not</em> auto-applied: the requester is notified to confirm, with step-up.</li>
+            <li>Leaving an entity is giving up one's own role, so it needs no approval.</li>
+          </ul></li>
+        <li><strong>The owner set changes while a request is pending.</strong>
+          <ul>
+            <li>A new owner becomes a required approver.</li>
+            <li>A departed owner drops out, and the requester-confirm rule above applies.</li>
+          </ul></li>
+        <li><strong>Bootstrap, when the second owner is added.</strong>
+          <ul>
+            <li>A sole owner adds the first co-owner, by invite or by raising a member's role, as a single-owner action. There is nobody to approve.</li>
+            <li>The invitee's acceptance is their own consent, and they do not approve their own admission.</li>
+            <li>From the moment two owners exist, every further change in (a) to (c) needs approval.</li>
+            <li>The entity-creation default cap table, and transfer in account deletion, are sole-owner cases.</li>
+          </ul></li>
+        <li><strong>Pending changes and the purge.</strong> A purge needs a sole owner, so §4.2.2 never meets it. Pending requests on a purged entity are deleted with it, and their audit events survive.</li>
+      </ul></li>
+  </ul>
+
   <p><strong>pgTAP for the sidebar-IA rows (qa-engineer, C-17).</strong> Each row gets an allow test and a deny test, run as <code>poly_app</code> with the app layer bypassed:</p>
   <ul>
     <li>A viewer cannot run any of the actions: every INSERT or UPDATE is rejected by policy.</li>
@@ -739,7 +804,25 @@ flowchart TB
           <li>a holder's owner reads 0 rows from <code>equity_holding</code> directly on a held entity where they are not a member;</li>
           <li><code>allocated_income</code> returns totals equal to Σ(tagged income × stake), and 0 rows for an entity outside <code>held_entities()</code>.</li>
         </ul></p></td><td>T-74, T-75</td><td>POLY-1.0 (tax allocation); <code>my_stakes</code> with the cap-table editor</td></tr>
-      <tr><td>C-20</td><td>Only owners change membership. A trigger keeps at least one owner (except during purge). Every change writes an <code>audit_event</code>.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/tenancy</code>; trigger<br><strong>Tested by:</strong> pgTAP: a manager's grant is denied; removing the last owner raises.</p></td><td>T-15</td><td>POLY-M1</td></tr>
+      <tr><td>C-20</td><td>Only owners change membership. A trigger keeps at least one owner (except during purge). Every change writes an <code>audit_event</code>. With more than one owner, the actions in §4.2.2 go through C-28.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/tenancy</code>; trigger<br><strong>Tested by:</strong> pgTAP: a manager's grant is denied; removing the last owner raises.</p></td><td>T-15</td><td>POLY-M1</td></tr>
+      <tr><td>C-28</td><td>Co-owner approval (§4.2.2, P5b):
+        <ul>
+          <li><code>change_request</code> and <code>change_approval</code> tables.</li>
+          <li>Direct <code>poly_app</code> writes for (a) to (c) pass only while <code>app.owner_count = 1</code>.</li>
+          <li><code>app.apply_change</code> is owned by <code>poly_govern</code>. It recomputes the approvers at apply time and re-validates the payload.</li>
+          <li>Requests expire after 14 days. Step-up on request, approve and decline. An audit event at every step.</li>
+          <li>The invite email is sent only on apply.</li>
+        </ul><p class="ctl-meta"><strong>Lives at:</strong> <code>packages/tenancy</code>; <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP:
+        <ul>
+          <li>with 2 owners, a direct membership INSERT, a role raise or an <code>equity_holding</code> INSERT by one owner is denied;</li>
+          <li><code>apply_change</code> with one approval missing is denied;</li>
+          <li>an approval by an ex-owner does not count;</li>
+          <li>a decline or an expiry blocks;</li>
+          <li>a stale cap-table payload is declined;</li>
+          <li>a sole owner's invite applies at once;</li>
+          <li>removing a viewer stays single-owner.</li>
+        </ul>
+        Integration: no invite email before apply; each step without a recent re-auth returns 403.</p></td><td>T-26, T-15</td><td>POLY-1.0 (sharing, POLY-70); the cap-table edit with the editor</td></tr>
       <tr><td>C-21</td><td>Append-only: row-level BEFORE UPDATE/DELETE triggers plus a statement-level BEFORE TRUNCATE trigger. The only exception is <code>current_user = 'poly_purge'</code> together with a matching <code>app.purge_entity</code>.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP: UPDATE, DELETE and TRUNCATE all raise for <code>poly_app</code>, <code>poly_worker</code> and <code>poly_owner</code>; <code>poly_app</code> with the GUC set still raises.</p></td><td>T-21, T-50</td><td>POLY-M2</td></tr>
       <tr><td>C-22</td><td>Deferred balance constraint trigger (ARCH §3.2).<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/ledger</code> SQL<br><strong>Tested by:</strong> pgTAP + property-based tests.</p></td><td>T-22</td><td>POLY-M2</td></tr>
       <tr><td>C-23</td><td>A BEFORE INSERT trigger <em>forces</em> the actor from the session context. <code>actor_kind = user</code> requires <code>actor_id = app.current_user_id()</code>.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP: a forged <code>actor_id</code> is overwritten or rejected.</p></td><td>T-23, T-25</td><td>POLY-M2</td></tr>
@@ -957,7 +1040,7 @@ flowchart TB
 
 <section id="risks" data-section="risks">
   <h2>11. Open Risks (Accepted)</h2>
-  <p class="section-hint">Each risk has a rationale, a compensating control, a re-evaluation date and an approver. Every row is approved. The pending rows were approved together on 2026-11-07 (P3). ARCH cites R-1 and R-4, and both keep their meaning; the other numbers are reassigned from 8963efb.</p>
+  <p class="section-hint">Each risk has a rationale, a compensating control, a re-evaluation date and an approver. The rows pending before 2026-11-07 were approved together that day (P3). Later rows show their own status. ARCH cites R-1 and R-4, and both keep their meaning; the other numbers are reassigned from 8963efb.</p>
   <table>
     <thead><tr><th>#</th><th>Risk</th><th>Why acceptable</th><th>Compensating control</th><th>Re-evaluate by</th><th>Approved by</th></tr></thead>
     <tbody>
@@ -977,6 +1060,7 @@ flowchart TB
       <tr><td>R-14</td><td>Cross-root read access (PT-3, tooling). <code>cairn serve</code> reads directories named in a committed <code>roots:</code> config (or <code>--repos</code>), which can be outside the repo. A malicious <code>roots:</code> entry in a PR could point a reviewer's local board at a sibling directory, e.g. <code>../../.ssh</code>.</td><td>The server is read-only and localhost-only, with no write path to a secondary root. The <code>/api/board</code> payload carries only parsed cairn frontmatter, so there is no exfiltration channel. A directory without a <code>config.yml</code> is skipped before anything is read. Anyone who can commit a <code>roots:</code> entry already has a stronger vector, editing <code>cairn.py</code> or <code>board.js</code> directly, so a runtime path-jail would be theater.</td><td>When more than one root loads, a startup stderr banner logs each resolved absolute root path. It is a human tripwire against a stale or mistyped <code>roots:</code> entry silently serving the wrong tracker. Re-evaluate if cairn ever gains a write path to non-primary roots.</td><td>2027-02-21</td><td>Rich Mosko</td></tr>
       <tr><td>R-15</td><td>A parent-link or cap-table refusal ("would make an entity its own ancestor", "too deep") reveals that some link exists, possibly through entities the user cannot see (T-78).</td><td>The inserter must own both ends, so the bit is about paths between their own entities. The error names no entity, and naming nothing would make the refusal unexplainable.</td><td>Errors name no entity (C-25). Refusals are audited.</td><td>If links ever become insertable by a non-owner</td><td>Rich Mosko (2026-11-07, P3)</td></tr>
       <tr><td>R-16</td><td>A purge, including one inside an account deletion, runs immediately with no cancellable delay. A hijacked session that passes step-up can destroy an entity's books at once.</td><td>The Principal's ruling (OQ-23). A delay needs a background purge the design forbids, and would make the freshness guards stale.</td><td>Step-up within 5 minutes (C-03, with a second factor required for owners, P1). Typed entity name. A fresh export by the same user. Every member emailed immediately. Operator backups (C-73). R-5 bounds how long recovery is possible.</td><td>If a purge is ever reported as unwanted</td><td>Rich Mosko (2026-11-06, OQ-23)</td></tr>
+      <tr><td>R-19</td><td>Co-owner deadlock. Under §4.2.2 one owner who declines, or never responds, blocks an invite, a cap-table edit or another owner's removal indefinitely. A target co-owner can always block their own removal.</td><td>Group governance is the point of the Principal's P5b ruling. An automatic way past it would let one owner act alone, which is T-26.</td><td>Expiry and reminders (§4.2.2). Anyone may give up their own role. Out-of-band resolution: the operator's audited CLI (<code>polycarpic membership …</code>), which notifies every owner and writes an <code>audit_event</code>. The operator is already the trust root (R-1).</td><td>On the first reported deadlock</td><td>pending</td></tr>
       <tr><td>R-17</td><td>Aggregate inference. Roll-up figures shown to a parent's members, the economic view, and allocated income shown to a holder's owners can be combined to infer things. Dividing economic by gross gives the viewer's own look-through stake. Allocated income divided by stake gives a pass-through entity's tagged income totals, as a K-1 tells a partner. Observing "today" figures every day accumulates detail over time. <em>Widened by P2:</em> a parent member may request roll-up totals for any date range. For a small entity, one-day periods and day-to-day balance differences reveal individual amounts and their dates, though never payee, memo, account or counterparty.</td><td>Each figure is one the viewer is entitled to by the Principal's rulings. Inclusion in a parent is an explicit grant by the entity's owner, so the exposure is consented, provided the consent is honest.</td><td>Consent disclosure at inclusion and in the upward-consent notice (C-25). The fixed aggregate shapes (C-25, C-27). Own and member entities are unaffected.</td><td>With POLY-1.1, and on any cross-parent "my net worth" proposal (OQ-29)</td><td>Rich Mosko (2026-11-07, P2)</td></tr>
     </tbody>
   </table>
@@ -1057,6 +1141,15 @@ flowchart TB
           <li>the owners of each affected entity are notified.</li>
         </ul>
         Shape needed before POLY-1.0.</td></tr>
+      <tr><td>A-20</td><td>§3.1 membership and invitation, §3.1a "Who writes", §3.3 roles</td><td>Co-owner approval (P5b, SECURITY §4.2.2):
+        <ul>
+          <li><code>change_request</code> and <code>change_approval</code> tables;</li>
+          <li>direct writes to <code>membership</code>, <code>invitation</code> and <code>equity_*</code> gated on <code>app.owner_count = 1</code>;</li>
+          <li>a new NOLOGIN <code>poly_govern</code> role owning <code>app.apply_change</code>, with role-targeted writes on those tables;</li>
+          <li>approvers recomputed at apply time, with payload re-validation;</li>
+          <li>a 14-day expiry, run as a scheduled job that only flips the status;</li>
+          <li>re-evaluation on an owner's tombstone (§3.4a).</li>
+        </ul></td></tr>
     </tbody>
   </table>
 
@@ -1072,6 +1165,14 @@ flowchart TB
         <li>Assert the connection-pooler mode on both targets.</li>
         <li><em>v1.1:</em> local-box provisioning and its checks (C-76); staging's secrets directory, keyring and Plaid sandbox secret (C-77).</li>
       </ul></li>
+    <li><strong>ux-designer:</strong> the co-owner approval screens (§4.2.2):
+      <ul>
+        <li>a request shown as pending on the members list and the cap table;</li>
+        <li>an approve / decline screen with step-up, showing exactly what changes;</li>
+        <li>the expiry and reminder copy;</li>
+        <li>the requester-confirm prompt after the owner set changes;</li>
+        <li>the invitee sees nothing until apply.</li>
+      </ul></li>
     <li><strong>qa-engineer:</strong>
       <ul>
         <li>Every row of §4.2.1 becomes a pgTAP assertion.</li>
@@ -1085,6 +1186,7 @@ flowchart TB
         <li><strong>P2. Ruled 2026-11-07:</strong> any date range, with honest consent. The inclusion step and the upward-consent notice carry the disclosure (C-25), and the residual is folded into R-17 and approved. There is no period guard in ARCH.</li>
         <li><strong>P3. Ruled 2026-11-07:</strong> every pending §11 row is approved. R-1 is re-confirmed on its corrected text. R-3 and R-4 are approved on their updated text.</li>
         <li><strong>P4. Ruled 2026-11-07:</strong> the hash chain is built with the ledger in POLY-M2. The weekly verifier and the export head line are in scope (C-24).</li>
+        <li><strong>P5b. Ruled 2026-11-07:</strong> on a multi-owner entity, every other owner approves invites, role raises, a co-owner's removal or demotion, and cap-table edits (§4.2.2, C-28, T-26). The edges are SecEng rulings in §4.2.2. R-19 (deadlock) is pending approval.</li>
         <li><strong>P5.</strong> Notify the owners beneath when a member is added to an ancestor parent? <em>Recommend yes</em> (T-73).</li>
         <li><strong>P6.</strong> Drop the operator switch that would reopen public sign-up, in favour of a CLI invite that shares no entity? <em>Recommend drop</em> (revised).</li>
         <li><strong>P7.</strong> Local-box TLS: a real subdomain with a split-horizon DNS-01 wildcard, or a private CA? <em>Recommend the subdomain</em> (keeps Google sign-in).</li>
