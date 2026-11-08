@@ -987,6 +987,21 @@ flowchart TB
           <li>Cash-in-Transit aging is computed on read.</li>
         </ul></td><td><strong>Extended.</strong> The POLY-64 scope comment stays valid.</td><td>§4.4; C-60</td></tr>
       <tr><td>OQ-4</td><td>The purge function is SECURITY DEFINER, owned by a <strong>NOLOGIN <code>poly_purge</code></strong> role. It uses role-targeted DELETE policies, and the append-only trigger makes an exception only when <code>current_user = 'poly_purge'</code>. ARCH's guard order is kept, plus two new guards: no writes since the export, and an assertion that zero rows remain.</td><td><strong>Revised.</strong> A purge owned by <code>poly_owner</code> deletes zero rows under FORCE RLS (T-51).</td><td>§4.5; C-21, C-50</td></tr>
+      <tr><td>OQ-19</td><td>C-19 amended. The owner-on-both insert rule is kept. No <code>poly_app</code> or <code>poly_worker</code> policy reads <code>entity_rollup</code>; only <code>poly_rollup</code>'s role-targeted policies do, behind fixed aggregate shapes. The one-bit refusal disclosure is accepted (R-15).</td><td><strong>New in v1.1.</strong> <em>Finding:</em> the cycle trigger must not be owned by <code>poly_rollup</code>, whose confined reads would miss a cycle outside the caller's descendants. Hence <code>poly_graph</code> (A-16).</td><td>§3.8; C-19, C-25</td></tr>
+      <tr><td>OQ-23</td><td>Recorded: no purge delay (Principal). The guards stand and every member is emailed immediately.</td><td>Q2 withdrawn</td><td>§4.5; R-16</td></tr>
+      <tr><td>OQ-24</td><td>Local-box posture C-76: router with no forward and UPnP off; IPv6 closed; a host nftables default-deny with a LAN-only allow; Caddy bound to the LAN address plus a <code>DOCKER-USER</code> rule; outbound limited to DNS, NTP and HTTPS; an outbound heartbeat. The TLS source, disk unlock and backup destination are Principal questions P7–P9.</td><td><strong>New.</strong></td><td>C-76; T-67 to T-69</td></tr>
+      <tr><td>OQ-25</td><td>Confirmed, with the shapes in §3.8:
+        <ul>
+          <li><strong>Junction read and <code>parents_of</code>.</strong> Read with any membership on the parent, or owner on the child. <code>parents_of</code> returns names only, to the owner only.</li>
+          <li><strong>Upward consent.</strong> The notice names the new top parent and what becomes visible.</li>
+          <li><strong>OQ-18 grain at depth.</strong> Unchanged: depth widens who sees, never what.</li>
+          <li><strong>Holdings popover.</strong> Ordinary RLS only.</li>
+          <li><strong>Cap table.</strong> Candidates, holder read path and notification go to <code>poly_stake</code> and <code>poly_graph</code>.</li>
+          <li><strong>Economic view.</strong> It discloses only the viewer's own look-through stake.</li>
+          <li><strong>Allocated income.</strong> A <code>poly_stake</code> definer, totals only.</li>
+          <li><strong>Staging keyring.</strong> C-77.</li>
+          <li><strong>Deletion purge invoker.</strong> §4.6, C-52.</li>
+        </ul></td><td><strong>New.</strong> ARCH's "owners of a holder read their row" policy becomes the <code>app.my_stakes()</code> definer (A-18).</td><td>§3.8, §4.6; C-25, C-27, C-52, C-77</td></tr>
     </tbody>
   </table>
 
@@ -1009,6 +1024,16 @@ flowchart TB
       <tr><td>A-13</td><td>§6.2 / POLY-76</td><td>Add spike acceptance criterion (e): FORCE RLS, a role-targeted <code>pgPolicy</code> (<code>to:</code>), and a definer function owned by a non-owner NOLOGIN role must round-trip through <code>generate</code> and apply as <code>poly_migrator</code>.</td></tr>
       <tr><td>A-14</td><td>§3.1, §5 (<em>gap</em>)</td><td>Attachments appear in PRD §5 export and purge but have no storage design. They need: a location; size and type limits; serving with <code>Content-Disposition: attachment</code> and <code>nosniff</code>; and inclusion in both purge and export.</td></tr>
       <tr><td>A-15</td><td>§7 TB list</td><td>Add TB-11 (upload ↔ parser) and TB-12 (supply chain ↔ prod).</td></tr>
+      <tr><td>A-16</td><td>§3.3b, §3.1a, §3.3 roles</td><td><code>app.check_rollup_edge()</code> and <code>app.check_equity_holding()</code> are owned by a new NOLOGIN, NOBYPASSRLS <code>poly_graph</code> role. It has graph-wide SELECT on <code>entity_rollup</code> and <code>equity_holding</code>, SELECT on owner <code>membership</code> rows and <code>entity.kind</code>, and INSERT on <code>notification</code>. Add it to the role list. Add a test: a cycle through an entity invisible to <code>poly_rollup</code>'s predicate is refused.</td></tr>
+      <tr><td>A-17</td><td>§3.1 <code>entity_rollup</code> row</td><td><code>app.parents_of</code> is owned by <code>poly_rollup</code>, under a second role-targeted predicate: ancestors of entities the caller owns. It is on the allowlist.</td></tr>
+      <tr><td>A-18</td><td>§3.1a "Who reads", §4.5 "The read", §3.3 roles</td><td>Add a new NOLOGIN, NOBYPASSRLS <code>poly_stake</code> role. It owns <code>app.cap_table_candidates</code>, <code>app.allocated_income</code> and a new <code>app.my_stakes()</code>. That function replaces the holder-owner SELECT widening on <code>equity_*</code>. Reads are confined to <code>app.held_entities()</code> (and, for candidates, to members' own Persons). See C-27.</td></tr>
+      <tr><td>A-19</td><td>§3.4, §3.1a (<em>gap</em>)</td><td>Purging an entity that is a <em>holder</em> on other entities' cap tables. Those <code>equity_holding</code> rows are append-only, and they are the other entity's history. SecEng proposes:
+        <ul>
+          <li>the purged entity's row becomes a tombstone (as the user row does), so those rows still resolve, to "former holder";</li>
+          <li>its units allocate as outside owners from the purge date;</li>
+          <li>the owners of each affected entity are notified.</li>
+        </ul>
+        Shape needed before POLY-1.0.</td></tr>
     </tbody>
   </table>
 
@@ -1022,20 +1047,26 @@ flowchart TB
         <li>C-75: Postgres logging settings.</li>
         <li>C-83: a pull-based deploy is preferred.</li>
         <li>Assert the connection-pooler mode on both targets.</li>
+        <li><em>v1.1:</em> local-box provisioning and its checks (C-76); staging's secrets directory, keyring and Plaid sandbox secret (C-77).</li>
       </ul></li>
     <li><strong>qa-engineer:</strong>
       <ul>
         <li>Every row of §4.2.1 becomes a pgTAP assertion.</li>
         <li>The battery adds: pool reuse on a dirty backend (C-12); WITH CHECK forgery; catalog coverage plus canary; the definer allowlist; <code>security_invoker</code>; TRUNCATE; purge negatives and the zero-rows-remain check (C-50).</li>
         <li>The log canary (C-33) must land before the first real adapter.</li>
+        <li><em>v1.1:</em> the C-19, C-25 and C-27 tests (graph triggers, roll-up shapes, holder reads), the §4.6 deletion-flow negatives (C-52), and the C-77 config refusals.</li>
       </ul></li>
-    <li><strong>Principal (via team-lead).</strong> Five questions, each with SecEng's recommendation:
+    <li><strong>Principal (via team-lead), 2026-11-07 question set.</strong> Each question carries SecEng's recommendation. Q2 was withdrawn after OQ-23. Q1 and Q3 to Q5 are restated as P1, P3, P4 and P6.
       <ul>
-        <li>Q1: Require MFA for the owner and manager roles? <em>Recommend yes.</em> The operator reset CLI covers lockout recovery.</li>
-        <li>Q2: Run a purge only after a cancellable 24 h delay, emailing every member? <em>Recommend yes.</em></li>
-        <li>Q3: Approve R-2 to R-5 and R-7 to R-13, and re-confirm R-1's corrected text? <em>Recommend approving all.</em></li>
-        <li>Q4: Build the ledger hash chain (C-24) in v1, or after GA? <em>Recommend after GA.</em></li>
-        <li>Q5: Make registration invite-only after the bootstrap user, with a reopen flag that is off by default? <em>Recommend yes.</em></li>
+        <li><strong>P1.</strong> Require a second factor for owners and managers? <em>Recommend yes</em> (viewers optional).</li>
+        <li><strong>P2.</strong> For entities the viewer is not a member of, limit past roll-up, economic and allocated-income figures to whole months, with today live? <em>Recommend yes</em> (T-72).</li>
+        <li><strong>P3.</strong> Approve the accepted risks: R-2 to R-5, R-8 to R-13, R-15 and R-17 (R-7 follows P1). Re-confirm R-1's corrected text. <em>Recommend approving all.</em></li>
+        <li><strong>P4.</strong> Build the ledger hash chain (C-24) in v1, or after GA? <em>Recommend v1</em> (revised from "after GA"). The gapless journal-counter lock already provides the ordering a chain needs, and no real books exist before GA.</li>
+        <li><strong>P5.</strong> Notify the owners beneath when a member is added to an ancestor parent? <em>Recommend yes</em> (T-73).</li>
+        <li><strong>P6.</strong> Drop the operator switch that would reopen public sign-up, in favour of a CLI invite that shares no entity? <em>Recommend drop</em> (revised).</li>
+        <li><strong>P7.</strong> Local-box TLS: a real subdomain with a split-horizon DNS-01 wildcard, or a private CA? <em>Recommend the subdomain</em> (keeps Google sign-in).</li>
+        <li><strong>P8.</strong> Local-box disk unlock: a passphrase at boot, or the TPM? <em>Recommend the TPM.</em></li>
+        <li><strong>P9.</strong> Local-box backups: an append-only online store, or a rotated drive? <em>Recommend the online store.</em></li>
       </ul></li>
   </ul>
 </section>
