@@ -24,7 +24,7 @@
   <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
-    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). Four questions for the Principal remain in §10 (Q1 to Q3 ruled). Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
+    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). Three questions for the Principal remain in §10 (Q1 to Q4 ruled). Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
     <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1.4</a>, <a href="../ARCH/">ARCH v1.7</a>, <a href="../SECURITY/">SECURITY v1.2.3</a>, <a href="../../process/DECISIONS.md">DECISIONS</a> through 2026-11-08</span>
     <span><strong>Last updated:</strong> 2026-11-08</span>
   </div>
@@ -242,7 +242,7 @@ flowchart TB
       <tr><td><code>credential_keyring</code></td><td>X25519 private keys by <code>key_id</code></td><td><code>polycarpic secrets init</code>, run once in the worker; you then save the offline copy (§7.1 step 14)</td></tr>
       <tr><td><code>oauth_google_secret</code>, <code>oauth_apple_key</code>, <code>oauth_github_secret</code>, <code>resend_api_key</code>, <code>plaid_secret</code>, broker client secrets, <code>price_api_key</code>, <code>bls_api_key</code></td><td>Provider-issued</td><td>You paste each with <code>polycarpic-ops set-secret &lt;name&gt;</code>, which reads from the terminal without echo and writes 0400</td></tr>
       <tr><td><code>backup_store_credential</code></td><td>The put-only access key id and secret for the bucket</td><td>You, same command</td></tr>
-      <tr><td><code>heartbeat_url</code></td><td>The monitor's ping URL (anyone holding it can fake a heartbeat)</td><td>You, same command</td></tr>
+      <tr><td><code>heartbeat_url</code></td><td>The Healthchecks.io ping base URL with the project's ping key (anyone holding it can fake a heartbeat)</td><td>You, same command</td></tr>
       <tr><td><code>dns_api_token</code> (home, real-domain mode)</td><td>DNS-edit token scoped to one zone</td><td>You (§3.4)</td></tr>
       <tr><td><code>staging_basic_auth</code></td><td>A bcrypt hash, not the password</td><td><code>polycarpic-ops staging-auth</code></td></tr>
     </tbody>
@@ -435,8 +435,9 @@ flowchart LR
 
   <h3>6.5 Monitoring, heartbeat and alert routing</h3>
   <ul>
-    <li><strong>Two independent alert paths</strong>, so one failure never silences both. Path A: the app and host scripts email you through Resend (SECURITY §9 list, plus backup, deploy and certificate events). Path B: an outside monitor that does not depend on the box or Resend: a free-tier dead-man's-switch service (Principal question Q4; recommendation: Healthchecks.io). The box pings it, and silence past the grace period emails you.</li>
-    <li><strong>What pings Path B.</strong> (1) Every 5 minutes, only if local <code>/api/v1/health</code> is OK <em>and</em> the served certificate's issuer matches <code>TLS_MODE</code> (C-76); (2) after each successful backup upload; (3) after each successful deploy poll. Grace: 15 minutes, 26 hours and 20 minutes respectively. The ping carries no data. On the Hetzner target the same service also checks the public URL from outside.</li>
+    <li><strong>Two independent alert paths</strong>, so one failure never silences both. Path A: the app and host scripts email you through Resend (SECURITY §9 list, plus backup, deploy and certificate events). Path B: an outside monitor that does not depend on the box or Resend: <strong>Healthchecks.io</strong>, free tier (Principal, 2026-11-08, Q4), a dead-man's-switch service. Each box pings it, and silence past a check's grace period emails you. It holds no data: a ping carries no body, only the fact that it arrived.</li>
+    <li><strong>What pings Path B.</strong> (1) Every 5 minutes, only if local <code>/api/v1/health</code> is OK <em>and</em> the served certificate's issuer matches <code>TLS_MODE</code> (C-76); (2) after each successful backup upload; (3) after each successful deploy poll. Grace: 15 minutes, 26 hours and 20 minutes respectively. The ping carries no data. Healthchecks.io only listens; it does not probe your URL. So before the 5-minute ping the host script makes the same request a browser would (the Hetzner box requests its public name through public DNS, the home box its LAN name) and skips the ping if that fails, which covers Caddy and DNS faults a local health check would miss. A script that detects a failure on its own (a failed backup, a rolled-back deploy) sends the ping to the check's <code>/fail</code> address so the alert arrives at once instead of at the grace deadline.</li>
+    <li><strong>Healthchecks.io setup (once).</strong> Create the account with two-step sign-in and your own address as the alert email. In one project create six checks: <code>polycarpic-hetzner-alive</code>, <code>-backup</code>, <code>-deploy</code> and, for the home box, <code>polycarpic-home-alive</code>, <code>-backup</code>, <code>-deploy</code>, each with the period and grace given above and a name that tells you which box it is. Copy the project's <em>ping key</em>; the secret <code>heartbeat_url</code> on each box is <code>https://hc-ping.com/&lt;ping-key&gt;/</code> and the scripts append the check's slug. Leave auto-creation of checks off. The monthly drill and the 90-day GitHub token get a check each too (period 35 days and 90 days, pinged by you at the end of the task, §8.2 and §8.4). Free-tier check count and grace limits are unmeasured (OQ-INFRA-9).</li>
     <li><strong>Health endpoint exposure (re-fold R-6).</strong> Public <code>/api/v1/health</code> returns only <code>ok</code> or not. The detailed fields ARCH §7.4 lists (last migration, last backup time) are served on the loopback-only admin listener and read by the host scripts, so a stranger learns nothing about backup cadence.</li>
     <li><strong>Alerts that need no new service:</strong> spool older than 2 hours; backup older than 26 hours; certificate under 14 days; disk over 80 percent; deploy failed or rolled back; <code>unattended-upgrades</code> pending reboot for more than 3 days; GitHub token under 14 days; ledger hash-chain break (SEV1) or a verifier silent for 8 days. All thresholds are provisional and tuned after POLY-M1.</li>
     <li><strong>Logs.</strong> JSON to stdout, Docker <code>json-file</code> rotation, 30 days on the box (SECURITY §9). The operator's query surface is <code>docker compose logs</code> and <code>journalctl</code>. No log service in v1.</li>
@@ -490,7 +491,7 @@ flowchart LR
       <tr><td>A Hetzner Cloud account (card required, ID check possible)</td><td>The primary server</td><td>Roughly 10 to 15 EUR a month for the server, volume and backup</td></tr>
       <tr><td>A Backblaze B2 account (Object Lock bucket)</td><td>Backups</td><td>Cents a month at this size</td></tr>
       <tr><td>A Resend account and a verified sending domain</td><td>Sign-in and security email</td><td>Free tier</td></tr>
-      <tr><td>A dead-man's-switch monitor account (Q4)</td><td>Tells you when the box goes quiet</td><td>Free tier</td></tr>
+      <tr><td>A Healthchecks.io account</td><td>Tells you when a box goes quiet; see §6.5</td><td>Free tier (limits unmeasured)</td></tr>
       <tr><td>Your GitHub login, and the <code>gh</code> tool signed in</td><td>Pulling releases and checking they are genuine</td><td>Free</td></tr>
       <tr><td>A Mac or Linux laptop with a terminal</td><td>Everything marked <code>laptop$</code></td><td>—</td></tr>
     </tbody>
@@ -724,6 +725,7 @@ laptop$ infra/vercel/deploy.sh --tag v1.0.0</code></pre>
     <li>Check <code>polycarpic-ops status</code>: disk under 80 percent, certificate more than 14 days left, GitHub token more than 14 days left.</li>
     <li>Read the month's alerts and any rolled-back deploys in <code>/opt/polycarpic/deploy.log</code>.</li>
     <li>Check Renovate PRs waiting more than 7 days with the team-lead.</li>
+    <li>Tell Healthchecks.io the drill happened: <code>laptop$ curl -fsS -m 10 --retry 3 "$(polycarpic-ops heartbeat-url drill)"</code> (the helper prints the check's address from the ping key kept in the password manager). Expect: the <code>polycarpic-drill</code> check turns green; if it is not pinged for 35 days you get an email.</li>
   </ol>
 
   <h3>8.3 Rotate the DNS token (home, real-domain mode)</h3>
@@ -734,7 +736,7 @@ laptop$ infra/vercel/deploy.sh --tag v1.0.0</code></pre>
   </ol>
 
   <h3>8.4 Renew the GitHub read token (every 90 days)</h3>
-  <p>GitHub → Settings → Developer settings → Fine-grained tokens → generate: this repository only; <code>Contents: read</code>, <code>Packages: read</code> (repository permissions: Metadata read is automatic); 90 days. <code>box$ sudo polycarpic-ops set-secret github_read_token</code>, then <code>sudo systemctl start polycarpic-deploy</code>. Expect: <code>deploy.log</code> shows a poll with "up to date". Then delete the old token. If the repository and package are public, remove the token (<code>polycarpic-ops remove-secret github_read_token</code>) and the reminder.</p>
+  <p>GitHub → Settings → Developer settings → Fine-grained tokens → generate: this repository only; <code>Contents: read</code>, <code>Packages: read</code> (repository permissions: Metadata read is automatic); 90 days. <code>box$ sudo polycarpic-ops set-secret github_read_token</code>, then <code>sudo systemctl start polycarpic-deploy</code>. Expect: <code>deploy.log</code> shows a poll with "up to date". Then delete the old token and ping the <code>polycarpic-token</code> check so its 90-day clock restarts. If the repository and package are public, remove the token (<code>polycarpic-ops remove-secret github_read_token</code>) and the reminder.</p>
 
   <h3>8.5 Replace the private CA intermediate (60 days before expiry)</h3>
   <ol>
@@ -825,7 +827,7 @@ box$ sudo polycarpic-ops status</code></pre>
       <tr><td>D-7</td><td>Provisioning tool</td><td>Committed <code>hcloud</code> CLI scripts and a cloud-init file (<code>infra/hetzner/</code>), idempotent, plus the on-box <code>polycarpic-ops provision</code>; not OpenTofu. Reason: a state file is one more thing for a novice to lose, and one server, one firewall and one volume do not need a planner. Revisit with a second server. The scripts are the source of truth: a console change that the scripts do not make gets reverted on the next run.</td></tr>
       <tr><td>D-8</td><td>Postgres logging (C-75)</td><td>A mounted configuration fragment sets the three C-75 values; the DB battery runs <code>SHOW</code> on each and fails if any differs. Same assertion runs against the staging and local-box containers in <code>provision-check</code>.</td></tr>
       <tr><td>D-9</td><td>Local-box provisioning checks (C-76) and staging isolation (C-77)</td><td><code>provision-check</code> is the check script both controls ask for: nftables rules, the <code>DOCKER-USER</code> rule, publish binding, sshd, IPv6, outbound allowlist, swap, TPM slots, console hardening, and that the staging and prod secrets directories share no file and staging's <code>PLAID_ENV</code> is <code>sandbox</code>. Outside-in scan: §7.2 step 11.</td></tr>
-      <tr><td>D-10</td><td>Monitoring and alerts (ARCH §7.4, C-76 heartbeat)</td><td>Two independent paths: app email through Resend, and an outside dead-man's-switch monitor that does not depend on the box or Resend (§6.5). Public health endpoint says only ok or not.</td></tr>
+      <tr><td>D-10</td><td>Monitoring and alerts (ARCH §7.4, C-76 heartbeat)</td><td>Two independent paths: app email through Resend, and an outside dead-man's-switch monitor (Healthchecks.io, free tier; Principal, 2026-11-08) that does not depend on the box or Resend (§6.5). Public health endpoint says only ok or not.</td></tr>
       <tr><td>D-11</td><td>Vercel deploy path</td><td>The operator deploys a signature-verified tag by running <code>infra/vercel/deploy.sh</code> from the laptop; Vercel's own Git deployment is pointed at a branch nobody pushes to. No Vercel deployment credential lives in GitHub, consistent with the C-83 principle that nothing GitHub holds can move a deployment.</td></tr>
       <tr><td>D-12</td><td>OQ-26: backups on Vercel</td><td>Neon restore window plus a weekly operator-run encrypted export; nightly automated export is recommended before real data and needs a SecEng ruling (OQ-INFRA-1, Q5). §6.6.</td></tr>
     </tbody>
@@ -866,7 +868,7 @@ box$ sudo polycarpic-ops status</code></pre>
 <!-- ============================================================ -->
 <section id="open-questions" data-section="open-questions">
   <h2>10. Open Questions</h2>
-  <p class="section-hint">Q4 to Q7 need the Principal (cost or product calls; the lead runs the interview). OQ-INFRA rows are measurements or rulings with an owner and a trigger.</p>
+  <p class="section-hint">Q5 to Q7 need the Principal (cost or product calls; the lead runs the interview). OQ-INFRA rows are measurements or rulings with an owner and a trigger.</p>
 
   <h3>10.1 For the Principal</h3>
   <table>
@@ -875,7 +877,7 @@ box$ sudo polycarpic-ops status</code></pre>
       <tr><td>Q1</td><td>Where does your domain's DNS live?</td><td><strong>Ruled (Principal, 2026-11-08), option (a):</strong> move the domain's name servers to Cloudflare's free DNS, DNS-only mode; one zone-scoped token on the home box; the registrar is unchanged. Applied in §1.2, §3.4, §7.1 step 8 and §7.3 Mode A. Closed.</td><td>Closed</td></tr>
       <tr><td>Q2</td><td>Hetzner location?</td><td><strong>Ruled (Principal, 2026-11-08): EU.</strong> Default Falkenstein (<code>fsn1</code>), fallback Nuremberg (<code>nbg1</code>); reasoning in §1.2. Closed.</td><td>Closed</td></tr>
       <tr><td>Q3</td><td>Backup bucket provider?</td><td><strong>Ruled (Principal, 2026-11-08), option (a):</strong> Backblaze B2 with Object Lock in compliance mode (35 days), put-only box key, separate read key held by the operator, rclone over 443. Hetzner Object Storage stays a noted alternative pending lock verification; the Storage Box is the fallback only. Applied in §2.3, §6.1, §7.0, §7.1 step 4 and D-3. Closed.</td><td>Closed</td></tr>
-      <tr><td>Q4</td><td>An outside monitor service (free tier)?</td><td>Receives only "I am alive" pings and can email you if they stop; holds no data. Healthchecks.io free tier, or UptimeRobot. Without it a dead box and a dead Resend are silent together.</td><td>Healthchecks.io</td></tr>
+      <tr><td>Q4</td><td>An outside monitor service?</td><td><strong>Ruled (Principal, 2026-11-08):</strong> Healthchecks.io free tier receives heartbeat pings from both boxes and emails the operator when they stop; it holds no data. Recorded in §6.5, §7.1 step 12 and D-10. Closed.</td><td>Closed</td></tr>
       <tr><td>Q5</td><td>Vercel + Neon: may a nightly export credential live in GitHub (OQ-INFRA-1)?</td><td>Weekly manual export from your laptop (RPO up to 7 days) vs a nightly GitHub Actions job holding a read-everything database credential (RPO about 1 day, but GitHub becomes a holder of ledger-read access). Needed only if you run real data on the tertiary target.</td><td>Weekly manual until real data is on that target, then decide with SecEng</td></tr>
       <tr><td>Q6</td><td>If the home box's hardware cannot bind the TPM (§7.2 step 6), accept a passphrase at every boot?</td><td>Changes ruling P8: the box stays down after every power cut until you type it. Alternative: buy different hardware.</td><td>Buy different hardware; ask again only if that happens</td></tr>
       <tr><td>Q7</td><td>Home-box recovery time: is 1 day acceptable, or buy a spare?</td><td>A spare mini PC (about 200 to 400 USD, unmeasured) cuts it to hours. Otherwise the break-glass is a rented Hetzner server restored from the same backups (4 hours).</td><td>No spare; rely on the Hetzner break-glass</td></tr>
@@ -894,7 +896,7 @@ box$ sudo polycarpic-ops status</code></pre>
       <tr><td>OQ-INFRA-6</td><td>Neon restore window on the plan in use; Vercel Hobby limits at deploy time</td><td>devops-engineer</td><td>When the tertiary target is first stood up</td></tr>
       <tr><td>OQ-INFRA-7</td><td>Hetzner current plan name and price; Hetzner Cloud Firewall rule counts and IPv6 behaviour</td><td>devops-engineer</td><td>At the first order</td></tr>
       <tr><td>OQ-INFRA-8</td><td>Every command in §7 and §8 verified once on a real machine; v1.1 corrects whatever differs</td><td>devops-engineer</td><td>First staging deploy (POLY-M1)</td></tr>
-      <tr><td>OQ-INFRA-9</td><td>Free-tier limits of the chosen monitor (check count, grace periods)</td><td>devops-engineer</td><td>When Q4 is answered</td></tr>
+      <tr><td>OQ-INFRA-9</td><td>Healthchecks.io free-tier limits (check count, minimum period and grace, ping-key behaviour, <code>/fail</code> handling)</td><td>devops-engineer</td><td>At account creation</td></tr>
     </tbody>
   </table>
 </section>
