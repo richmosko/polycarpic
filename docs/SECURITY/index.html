@@ -183,7 +183,7 @@ flowchart TB
       <tr><td>T-17</td><td>Existence oracle: FK checks bypass RLS, so sequential IDs let an attacker probe for other tenants' rows.</td><td>I</td><td>M</td><td>L</td><td>C-18</td></tr>
       <tr><td>T-18</td><td>SQL injection in <code>poly_app</code> sets <code>app.user_id</code> to anyone. The GUC is asserted by the app, not authenticated by the database.</td><td>S / I / E</td><td>L</td><td>H</td><td>C-44 prevents it; RLS does not (R-2)</td></tr>
       <tr><td>T-19</td><td>Cross-tenant metadata read through user-defined entity types. This is by design (kickoff §2.4).</td><td>I</td><td>H</td><td>L</td><td>R-9; the C-14 view exposes the label only</td></tr>
-      <tr><td>T-26</td><td>On a multi-owner entity (co-trustees, partners), one owner acts alone. They admit a member or raise a role, remove a co-owner, or rewrite the cap table, possibly as a 0-unit bookkeeper owner or from a hijacked owner session.</td><td>E / T</td><td>M</td><td>H</td><td>C-28 (every other owner approves, enforced in the database), C-03 step-up</td></tr>
+      <tr><td>T-26</td><td>On a multi-owner entity (co-trustees, partners), one owner acts alone. They admit a member or raise a role, remove a co-owner, or rewrite the cap table, possibly as a 0-unit bookkeeper owner or from a hijacked owner session.</td><td>E / T</td><td>M</td><td>H</td><td>C-28 (every other owner approves, enforced in the database), C-03 step-up. The founder's force path is narrow: co-owner removal or demotion only, after a decline or expiry, with notice. R-19.</td></tr>
       <tr><td>T-20</td><td>Membership-table policies recurse through the authz functions, or FORCE RLS blinds those functions, so policies fail open or error.</td><td>E / D</td><td>M</td><td>H</td><td>C-15 (functions owned by <code>poly_authz</code>)</td></tr>
     </tbody>
   </table>
@@ -372,7 +372,8 @@ flowchart TB
       <tr><td>Read the cap table</td><td>✓</td><td>✓</td><td>✓</td><td>SELECT policy on <code>equity_total</code> / <code>equity_holding</code> by <code>entity_id</code>. A holder's owners who are not members use <code>app.my_stakes()</code> (C-27).</td></tr>
       <tr><td>Edit the cap table; read holder candidates</td><td>✗</td><td>✗</td><td>✓ step-up; co-owner approval if more than one owner</td><td>INSERT policy on <code>equity_*</code>: sole owner only. With more than one owner, the edit is held and applied only through <code>app.apply_change</code> (§4.2.2, C-28). <code>app.cap_table_candidates</code> is owner-only (C-27).</td></tr>
       <tr><td>Invite a member, raise a role, add an owner</td><td>✗</td><td>✗</td><td>✓ step-up; co-owner approval if more than one owner</td><td>INSERT and UPDATE policies on <code>membership</code> (and <code>invitation</code>): sole owner only. Otherwise the change goes through §4.2.2. The invite email is sent only once the change applies (C-20, C-28).</td></tr>
-      <tr><td>Remove or demote a co-owner</td><td>✗</td><td>✗</td><td>✓ step-up; every other owner approves, the target included</td><td>Through §4.2.2 only. A last-owner trigger also applies (C-20).</td></tr>
+      <tr><td>Remove or demote a co-owner</td><td>✗</td><td>✗</td><td>✓ step-up; every other owner approves, the target included. After a decline or expiry, the founding owner may force it.</td><td>Through §4.2.2 only (<code>app.apply_change</code>, or <code>app.force_change</code> for the founder). A last-owner trigger also applies (C-20). The founder cannot be removed or demoted this way.</td></tr>
+      <tr><td>Transfer the founding-owner role, or step down from it</td><td>✗</td><td>✗</td><td>founder only, step-up</td><td>An UPDATE of <code>entity.founding_owner_user_id</code> through a <code>poly_govern</code> definer. The new founder must be a current owner. Every owner is notified, and an <code>audit_event</code> is written (§4.2.2).</td></tr>
       <tr><td>Remove a viewer or manager; lower or give up one's own role</td><td>✗</td><td>✗</td><td>✓ step-up (own role: self, any role)</td><td>A single-owner action (Principal, P5b). DELETE and UPDATE policies on <code>membership</code>, plus the last-owner trigger (C-20).</td></tr>
       <tr><td>Export the entity's complete books</td><td>✗</td><td>✗</td><td>✓ step-up</td><td>PRD §5 grants this to the owner. It is exfiltration-shaped, so it is audited (C-51). <em>Revised:</em> 8963efb allowed manager+.</td></tr>
       <tr><td>Purge the entity's books</td><td>✗</td><td>✗</td><td>sole owner, step-up</td><td>C-50 (§4.5)</td></tr>
@@ -397,7 +398,7 @@ flowchart TB
       </ul></li>
     <li><strong>Who approves.</strong> The approvers are every current owner other than the requester, recomputed when the change is applied, never fixed when it is requested.
       <ul>
-        <li>For a co-owner's removal or demotion, the target is one of the approvers, so no owner can be removed by the others alone. A deadlock is handled under R-19.</li>
+        <li>For a co-owner's removal or demotion, the target is one of the approvers, so no owner can be removed by the others alone. A deadlock is broken by the founding owner (below).</li>
         <li>An approval counts only if its approver is still an owner at apply time.</li>
         <li>One decline ends the request.</li>
         <li>The requester may withdraw it.</li>
@@ -411,6 +412,29 @@ flowchart TB
       If validation fails, the request is declined as stale and nothing applies. Only on apply does the invitation become live and its email go out.</li>
     <li><strong>Step-up.</strong> Requesting, approving and declining each need a re-authentication within 5 minutes, with the second factor required for owners (C-03, P1).</li>
     <li><strong>Audit and notice.</strong> Each step writes an <code>audit_event</code>: <code>change.requested</code>, <code>.approved</code>, <code>.declined</code>, <code>.withdrawn</code>, <code>.expired</code> and <code>.applied</code>. Every owner is notified on request and on outcome. Pending requests, including an invitee's email address, are visible to owners only.</li>
+    <li><strong>The founding owner (Principal, 2026-11-07, R-19 ruling).</strong> Each entity records one founding owner, <code>entity.founding_owner_user_id</code>, set to its creator. For a Person entity that is its own user.
+      <ul>
+        <li><strong>Always an owner.</strong> A trigger refuses any state where the founder does not hold owner.</li>
+        <li><strong>Breaking a removal deadlock.</strong> Once a request to remove or demote a co-owner is <code>declined</code> or <code>expired</code>, the founder may force it through <code>app.force_change(change_id)</code>, a <code>poly_govern</code> definer.
+          <ul>
+            <li>It requires that the caller is the founder, that the kind is a co-owner removal or demotion, and that the status is declined or expired.</li>
+            <li>It requires a step-up within 5 minutes, with the second factor.</li>
+            <li>It writes a <code>change.forced</code> <code>audit_event</code> and notifies every owner, the target included.</li>
+            <li>The founder may raise the request themselves. The force still needs the decline or the 14-day expiry first, so the target always has warning.</li>
+          </ul></li>
+        <li><strong>No other extra power.</strong> The founder has none over invites, role raises or cap-table edits, which still need every other owner. The founder is never a target of <code>force_change</code>.</li>
+        <li><strong>Leaving the role.</strong> The founder can only step down or transfer it in-app, as a founder-only action, with step-up and a notice to every owner.
+          <ul>
+            <li>Stepping down names a successor among the current owners.</li>
+            <li>A founder who would give up their own owner role must transfer the founder role first, if another owner exists.</li>
+          </ul></li>
+        <li><strong>Account deletion.</strong>
+          <ul>
+            <li>In the in-flow deletion (§4.6), a founder of an entity with other owners must name a successor among them. The tombstone transaction refuses while any entity still names them as founder.</li>
+            <li>On a sole-owned entity, the transfer target becomes founder. On a purge, the question does not arise.</li>
+          </ul></li>
+        <li><strong>A founder who vanishes without deleting.</strong> The backstop is the operator CLI (<code>polycarpic entity set-founder</code>, <code>polycarpic membership …</code>), which is audited and notifies every owner.</li>
+      </ul></li>
     <li><strong>Edges</strong> (SecEng rulings):
       <ul>
         <li><strong>An owner who never responds.</strong>
@@ -835,6 +859,7 @@ flowchart TB
           <li><code>app.apply_change</code> is owned by <code>poly_govern</code>. It recomputes the approvers at apply time and re-validates the payload.</li>
           <li>Requests expire after 14 days. Step-up on request, approve and decline. An audit event at every step.</li>
           <li>The invite email is sent only on apply.</li>
+          <li>The founding owner, with <code>app.force_change</code>, can force only co-owner removal or demotion, after a decline or expiry. Transfer is founder-only, and the founder must hold owner.</li>
         </ul><p class="ctl-meta"><strong>Lives at:</strong> <code>packages/tenancy</code>; <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP:
         <ul>
           <li>with 2 owners, a direct membership INSERT, a role raise or an <code>equity_holding</code> INSERT by one owner is denied;</li>
@@ -843,7 +868,11 @@ flowchart TB
           <li>a decline or an expiry blocks;</li>
           <li>a stale cap-table payload is declined;</li>
           <li>a sole owner's invite applies at once;</li>
-          <li>removing a viewer stays single-owner.</li>
+          <li>removing a viewer stays single-owner;</li>
+          <li><code>force_change</code> by a non-founder, on a pending request, on an invite or a cap-table edit, or targeting the founder, is denied;</li>
+          <li>a forced removal notifies the target and writes <code>change.forced</code>;</li>
+          <li>the founder cannot drop their owner role without first transferring the founder role;</li>
+          <li>the tombstone is refused while the user is still the founder of a multi-owner entity.</li>
         </ul>
         Integration: no invite email before apply; each step without a recent re-auth returns 403.</p></td><td>T-26, T-15</td><td>POLY-1.0 (sharing, POLY-70); the cap-table edit with the editor</td></tr>
       <tr><td>C-21</td><td>Append-only: row-level BEFORE UPDATE/DELETE triggers plus a statement-level BEFORE TRUNCATE trigger. The only exception is <code>current_user = 'poly_purge'</code> together with a matching <code>app.purge_entity</code>.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP: UPDATE, DELETE and TRUNCATE all raise for <code>poly_app</code>, <code>poly_worker</code> and <code>poly_owner</code>; <code>poly_app</code> with the GUC set still raises.</p></td><td>T-21, T-50</td><td>POLY-M2</td></tr>
@@ -1110,7 +1139,7 @@ flowchart TB
       <tr><td>R-14</td><td>Cross-root read access (PT-3, tooling). <code>cairn serve</code> reads directories named in a committed <code>roots:</code> config (or <code>--repos</code>), which can be outside the repo. A malicious <code>roots:</code> entry in a PR could point a reviewer's local board at a sibling directory, e.g. <code>../../.ssh</code>.</td><td>The server is read-only and localhost-only, with no write path to a secondary root. The <code>/api/board</code> payload carries only parsed cairn frontmatter, so there is no exfiltration channel. A directory without a <code>config.yml</code> is skipped before anything is read. Anyone who can commit a <code>roots:</code> entry already has a stronger vector, editing <code>cairn.py</code> or <code>board.js</code> directly, so a runtime path-jail would be theater.</td><td>When more than one root loads, a startup stderr banner logs each resolved absolute root path. It is a human tripwire against a stale or mistyped <code>roots:</code> entry silently serving the wrong tracker. Re-evaluate if cairn ever gains a write path to non-primary roots.</td><td>2027-02-21</td><td>Rich Mosko</td></tr>
       <tr><td>R-15</td><td>A parent-link or cap-table refusal ("would make an entity its own ancestor", "too deep") reveals that some link exists, possibly through entities the user cannot see (T-78).</td><td>The inserter must own both ends, so the bit is about paths between their own entities. The error names no entity, and naming nothing would make the refusal unexplainable.</td><td>Errors name no entity (C-25). Refusals are audited.</td><td>If links ever become insertable by a non-owner</td><td>Rich Mosko (2026-11-07, P3)</td></tr>
       <tr><td>R-16</td><td>A purge, including one inside an account deletion, runs immediately with no cancellable delay. A hijacked session that passes step-up can destroy an entity's books at once.</td><td>The Principal's ruling (OQ-23). A delay needs a background purge the design forbids, and would make the freshness guards stale.</td><td>Step-up within 5 minutes (C-03, with a second factor required for owners, P1). Typed entity name. A fresh export by the same user. Every member emailed immediately. Operator backups (C-73). R-5 bounds how long recovery is possible.</td><td>If a purge is ever reported as unwanted</td><td>Rich Mosko (2026-11-06, OQ-23)</td></tr>
-      <tr><td>R-19</td><td>Co-owner deadlock. Under §4.2.2 one owner who declines, or never responds, blocks an invite, a cap-table edit or another owner's removal indefinitely. A target co-owner can always block their own removal.</td><td>Group governance is the point of the Principal's P5b ruling. An automatic way past it would let one owner act alone, which is T-26.</td><td>Expiry and reminders (§4.2.2). Anyone may give up their own role. Out-of-band resolution: the operator's audited CLI (<code>polycarpic membership …</code>), which notifies every owner and writes an <code>audit_event</code>. The operator is already the trust root (R-1).</td><td>On the first reported deadlock</td><td>pending</td></tr>
+      <tr><td>R-19</td><td>Hostile or captured founder. Other owners cannot remove the founding owner in-app. A founder, or someone in control of the founder's session, can force out co-owners one by one, each after a decline or the 14-day expiry. <em>Replaces</em> the earlier deadlock text: the founder now breaks removal deadlocks (Principal, 2026-11-07).</td><td>Without a tie-breaker, a two-owner dispute blocks forever. The founder's extra power is limited to co-owner removal or demotion, and is never immediate.</td><td>Step-up with the second factor (C-03, P1). The decline or expiry wait. A notice to every owner, the target included, plus <code>change.forced</code> audit events (C-28). No extra founder power over invites, roles or the cap table. The operator CLI as the backstop.</td><td>On the first reported forced removal</td><td>Rich Mosko (2026-11-07)</td></tr>
       <tr><td>R-18</td><td>Real-domain mode on the local box keeps a zone-limited DNS-API token on the box (T-68). Whoever steals it can issue certificates for that zone, or publish records in it.</td><td>It is what keeps Google and Apple sign-in on a box nothing can reach. The box is unreachable from the internet, so a stolen token gets no path in.</td><td>The token is scoped to one zone and mounted into Caddy only (C-76). It is rotated at the provider on suspicion. CT-log monitoring of the zone is optional.</td><td>On any change to the local-box TLS mode</td><td>Rich Mosko (2026-11-07, P7)</td></tr>
       <tr><td>R-20</td><td>Private-CA mode installs an operator root on each device (T-79). If browsers do not enforce its name constraint, a stolen root key could impersonate any site to those devices.</td><td>It is the supported fallback for an operator without a domain (P7).</td><td>A name-constrained root, its key offline, and only an intermediate on the box (C-76). The runbook says to remove the root from every device on decommission or on a move to a real domain.</td><td>At the first private-CA deploy, after measuring constraint enforcement</td><td>pending</td></tr>
       <tr><td>R-17</td><td>Aggregate inference. Roll-up figures shown to a parent's members, the economic view, and allocated income shown to a holder's owners can be combined to infer things. Dividing economic by gross gives the viewer's own look-through stake. Allocated income divided by stake gives a pass-through entity's tagged income totals, as a K-1 tells a partner. Observing "today" figures every day accumulates detail over time. <em>Widened by P2:</em> a parent member may request roll-up totals for any date range. For a small entity, one-day periods and day-to-day balance differences reveal individual amounts and their dates, though never payee, memo, account or counterparty.</td><td>Each figure is one the viewer is entitled to by the Principal's rulings. Inclusion in a parent is an explicit grant by the entity's owner, so the exposure is consented, provided the consent is honest.</td><td>Consent disclosure at inclusion and in the upward-consent notice (C-25). The fixed aggregate shapes (C-25, C-27). Own and member entities are unaffected.</td><td>With POLY-1.1, and on any cross-parent "my net worth" proposal (OQ-29)</td><td>Rich Mosko (2026-11-07, P2)</td></tr>
@@ -1202,6 +1231,13 @@ flowchart TB
           <li>a 14-day expiry, run as a scheduled job that only flips the status;</li>
           <li>re-evaluation on an owner's tombstone (§3.4a).</li>
         </ul></td></tr>
+      <tr><td>A-22</td><td>§3.1 entity, §3.4a, §3.3 roles</td><td>Founding owner (R-19 ruling, SECURITY §4.2.2):
+        <ul>
+          <li><code>entity.founding_owner_user_id</code>, NOT NULL, set to the creator, with a trigger that it holds owner;</li>
+          <li><code>app.force_change</code> and the founder transfer as <code>poly_govern</code> definers;</li>
+          <li>in §3.4a, a successor step for a founder of a multi-owner entity, and a tombstone re-check;</li>
+          <li>the transfer target becomes founder when a sole-owned entity is transferred.</li>
+        </ul></td></tr>
       <tr><td>A-21</td><td>§3.3b</td><td>The ancestor-invite notice (P5) is a second <code>poly_graph</code> trigger: AFTER INSERT on <code>invitation</code> (and on <code>membership</code> without an invitation) on a parent-kind entity. It walks the descendants and notifies their owners in the same transaction. Not on a role raise.</td></tr>
     </tbody>
   </table>
@@ -1224,7 +1260,11 @@ flowchart TB
         <li>an approve / decline screen with step-up, showing exactly what changes;</li>
         <li>the expiry and reminder copy;</li>
         <li>the requester-confirm prompt after the owner set changes;</li>
-        <li>the invitee sees nothing until apply.</li>
+        <li>the invitee sees nothing until apply;</li>
+        <li>a founder marker in the member list;</li>
+        <li>the founder's force screen, shown after a decline or expiry, with step-up and plain copy that every owner, the target included, will be told;</li>
+        <li>the founder transfer and step-down screen;</li>
+        <li>the successor step in the account-deletion flow.</li>
       </ul></li>
     <li><strong>qa-engineer:</strong>
       <ul>
@@ -1239,7 +1279,8 @@ flowchart TB
         <li><strong>P2. Ruled 2026-11-07:</strong> any date range, with honest consent. The inclusion step and the upward-consent notice carry the disclosure (C-25), and the residual is folded into R-17 and approved. There is no period guard in ARCH.</li>
         <li><strong>P3. Ruled 2026-11-07:</strong> every pending §11 row is approved. R-1 is re-confirmed on its corrected text. R-3 and R-4 are approved on their updated text.</li>
         <li><strong>P4. Ruled 2026-11-07:</strong> the hash chain is built with the ledger in POLY-M2. The weekly verifier and the export head line are in scope (C-24).</li>
-        <li><strong>P5b. Ruled 2026-11-07:</strong> on a multi-owner entity, every other owner approves invites, role raises, a co-owner's removal or demotion, and cap-table edits (§4.2.2, C-28, T-26). The edges are SecEng rulings in §4.2.2. R-19 (deadlock) is pending approval.</li>
+        <li><strong>P5b. Ruled 2026-11-07:</strong> on a multi-owner entity, every other owner approves invites, role raises, a co-owner's removal or demotion, and cap-table edits (§4.2.2, C-28, T-26). The edges are SecEng rulings in §4.2.2.</li>
+        <li><strong>R-19. Ruled 2026-11-07:</strong> the target still votes, and a founding owner (the creator) may force a declined or expired co-owner removal, with step-up and a notice to all. The founder is removable only by stepping down or transferring, and names a successor on account deletion. R-19 now records the hostile-founder risk, approved.</li>
         <li><strong>P5. Ruled 2026-11-07:</strong> notify, never block. When an invitation to a parent goes live, every owner beneath is notified with the disclosure sentence and the pull-out link (C-25, T-73).</li>
         <li><strong>P6. Ruled 2026-11-07:</strong> there is no reopen switch. Invitation is the only way in, plus <code>polycarpic user invite &lt;email&gt;</code> (C-01, §4.1).</li>
         <li><strong>P7. Ruled 2026-11-07:</strong> the default is a real domain resolved only on the LAN, with a DNS-01 wildcard (R-18 approved). The supported fallback is <code>.local</code> with a name-constrained private CA, OAuth disabled, and email + password + second step (C-76). Plain-http sign-in is refused in both. R-20 is pending.</li>
