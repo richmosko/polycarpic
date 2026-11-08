@@ -25,13 +25,20 @@
   <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
-    <span><strong>Status:</strong> Draft v1.2. A-16 to A-22 are folded in ARCH v1.4. SecEng rulings on ARCH OQ-30, OQ-31 and OQ-32 are in §12.1. Pending: the architect's re-fold of A-23 to A-27 (§12.2), and the PRD/DESIGN copy of the amended consent text (C-25).</span>
-    <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1.4</a>, <a href="../ARCH/">ARCH v1.4 draft</a>, <a href="../DESIGN/">DESIGN v0.16</a>, <a href="../../process/DECISIONS.md">DECISIONS</a> through 2026-11-08</span>
+    <span><strong>Status:</strong> Draft v1.2.1. A-16 to A-27 are folded in ARCH v1.5. SecEng rulings on ARCH OQ-30, OQ-31, OQ-32 and OQ-34 are in §12.1. Pending: A-28 (§12.2), and the PRD/DESIGN copy of the amended consent text (C-25) and of the own-Person exemption (§12.3).</span>
+    <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1.4</a>, <a href="../ARCH/">ARCH v1.5 draft</a>, <a href="../DESIGN/">DESIGN v0.16</a>, <a href="../../process/DECISIONS.md">DECISIONS</a> through 2026-11-08</span>
     <span><strong>Last updated:</strong> 2026-11-08</span>
   </div>
   <details class="doc-changelog">
     <summary>Changelog</summary>
     <ul>
+      <li><strong>v1.2.1 (2026-11-08).</strong>
+        <ul>
+          <li>OQ-34 (Principal, 2026-11-08): the owner row on a user's own Person is exempt from the second step while that Person is unshared; the first real action forces enrolment (§4.1, C-03, R-7).</li>
+          <li>The held role uses ARCH §3.1c's mechanism, <code>membership.pending_role</code>, which meets A-25; its edges are in §4.1.</li>
+          <li>Step-up adds removing a second-step method, the co-owner request steps, editing the cap table, cancelling a held raise, and transferring or stepping down from the founder role (§4.1).</li>
+          <li>§12.2: A-23 to A-27 folded in ARCH v1.5; new A-28.</li>
+        </ul></li>
       <li><strong>v1.2 (2026-11-08).</strong>
         <ul>
           <li>OQ-30: <code>poly_journal</code> confirmed with narrowed grants; the counter row is created by its trigger, and a line can no longer be added once its entry is chained (C-24, T-80).</li>
@@ -204,7 +211,7 @@ flowchart TB
       <tr><td>T-18</td><td>SQL injection in <code>poly_app</code> sets <code>app.user_id</code> to anyone. The GUC is asserted by the app, not authenticated by the database.</td><td>S / I / E</td><td>L</td><td>H</td><td>C-44 prevents it; RLS does not (R-2)</td></tr>
       <tr><td>T-19</td><td>Cross-tenant metadata read through user-defined entity types. This is by design (kickoff §2.4).</td><td>I</td><td>H</td><td>L</td><td>R-9; the C-14 view exposes the label only</td></tr>
       <tr><td>T-26</td><td>On a multi-owner entity (co-trustees, partners), one owner acts alone. They admit a member or raise a role, remove a co-owner, or rewrite the cap table, possibly as a 0-unit bookkeeper owner or from a hijacked owner session.</td><td>E / T</td><td>M</td><td>H</td><td>C-28 (every other owner approves, enforced in the database; direct invitations revoked at the 1 → 2 transition), C-03 step-up. The founder's force path is narrow: co-owner removal or demotion only, after a decline or expiry, with notice. R-19.</td></tr>
-      <tr><td>T-81</td><td>A member raised to manager or owner gets the new role's power before enrolling a second step. A phished password then holds owner, or a pending owner counts toward the approver set or the 1 → 2 transition.</td><td>E</td><td>M</td><td>H</td><td>C-03 (raised role not effective until enrolment, fail-closed), C-28</td></tr>
+      <tr><td>T-81</td><td>A member raised to manager or owner gets the new role's power before enrolling a second step. A phished password then holds owner, or a pending owner counts toward the approver set or the 1 → 2 transition.</td><td>E</td><td>M</td><td>H</td><td>C-03 (the raise held in <code>pending_role</code> with <code>role</code> unchanged until enrolment, fail-closed), C-28 (direct-path held raises cancelled at 1 → 2)</td></tr>
       <tr><td>T-20</td><td>Membership-table policies recurse through the authz functions, or FORCE RLS blinds those functions, so policies fail open or error.</td><td>E / D</td><td>M</td><td>H</td><td>C-15 (functions owned by <code>poly_authz</code>)</td></tr>
     </tbody>
   </table>
@@ -325,20 +332,44 @@ flowchart TB
       </ul></li>
     <li><strong>MFA (C-03).</strong> TOTP and passkeys, with single-use backup codes stored hashed.
       <ul>
-        <li><strong>Ruled (Principal, 2026-11-07, P1):</strong> MFA is required for any user holding owner or manager on any entity. It is optional for viewers (R-7). OAuth-only users must enrol a passkey or TOTP to hold those roles, because we cannot verify the IdP's MFA.</li>
-        <li><strong>A raised role waits for enrolment (v1.2).</strong> When a member without a second step is raised to manager or owner, the raised role is not effective until they enrol one. Until then every authorization decision treats them at their previous role. That covers <code>has_role</code>, the RLS policies, <code>app.owner_count</code>, the §4.2.2 approver set, the 1 → 2 transition and founder eligibility. Enrolment makes the role effective and writes an <code>audit_event</code>; nothing else does. The mechanism is ARCH's (A-25). Whichever it is must fail closed: a check that forgets the pending state must see the old role, never the new one (C-03, T-81).</li>
+        <li><strong>Ruled (Principal, 2026-11-07, P1):</strong> a second step (TOTP or a passkey) is required for any user holding owner or manager on any entity, with the one exemption below. It is optional for viewers (R-7). OAuth-only users must enrol a passkey or TOTP to hold those roles, because we cannot verify the IdP's MFA.</li>
+        <li><strong>The own Person is exempt until the first real action (Principal, 2026-11-08, OQ-34).</strong> Every user owns their own Person from sign-up, so without an exemption the rule above would bind everyone, viewers included. The owner row on a user's own Person (<code>entity.self_user_id</code>) is exempt while that Person is unshared: it has no other member, and it is not rolled up into a parent entity (A-28). Enrolment is forced, and the action is not performed, before any of these:
+          <ul>
+            <li>creating a Trust, Business, Household or Holding (the creator's owner row is refused);</li>
+            <li>sharing the own Person: the first invitation on it, or linking it under a parent, whose members would then see it (C-25);</li>
+            <li>accepting an owner or manager invitation, or having a raise to manager or owner take effect (held, below);</li>
+            <li>any step-up action on the own Person (export, purge, granting access, linking a bank), because step-up needs a second factor.</li>
+          </ul>
+          Viewing shared entities never triggers it. Unenrolled, the user can read and keep their own unshared books by hand, and nothing more. The refusals are in the database (BEFORE INSERT triggers on <code>membership</code> and <code>invitation</code>, ARCH §3.1c), not only in the UI.</li>
+        <li><strong>A raised role waits for enrolment (v1.2; mechanism ARCH §3.1c).</strong> When a member without a second step is raised to manager or owner, <code>membership.role</code> stays the role in force (viewer), and the raise is parked in <code>membership.pending_role</code>, with who raised it and, on the approval path, the applying <code>change_request</code>. Nothing that authorizes reads <code>pending_role</code>: <code>has_role</code>, the RLS policies, <code>app.owner_count</code>, the §4.2.2 approver set, the 1 → 2 transition and founder eligibility all see viewer, so a check that forgets the pending state fails closed (C-03, T-81). A-25 is met:
+          <ul>
+            <li><code>user.second_step_at</code> is written only by a <code>poly_govern</code> definer trigger that recomputes it from BetterAuth's factor tables. <code>poly_app</code> cannot set it.</li>
+            <li>The only write that makes the role effective is <code>app.promote_held_roles()</code> (<code>poly_govern</code>), in the enrolment's own transaction. It re-checks for a factor row, changes only the role columns, and writes a <code>role.promoted</code> <code>audit_event</code>. An approved co-owner raise is not re-approved.</li>
+            <li>An INSERT of manager or owner for an unenrolled user is refused, so an owner or manager invitee enrols before the row exists and is never a held viewer.</li>
+            <li>Any owner may cancel a held raise as a lowering, with no approval. A held raise does not expire.</li>
+          </ul>
+          The edges:
+          <ul>
+            <li><strong>A new owner never inherits a raise they had no vote on.</strong> At the 1 → 2 transition, a held raise the sole owner made directly is cancelled along with the direct invitations, in the same transaction and under the same entity-row lock (C-28), and its raiser is notified. A held raise applied through <code>app.apply_change</code> stays, as an invitation applied that way does, because the owners at the time approved it.</li>
+            <li><strong>The last method cannot be removed</strong> while the user holds manager or owner outside the own-Person exemption. The operator's audited <code>reset-mfa</code> is the only way past. It revokes every session, and the sign-in gate then reaches no route but Set up a second step until they enrol.</li>
+            <li>A held owner is not eligible for a founder transfer, and the account-deletion transfer offers only enrolled members (§4.6).</li>
+          </ul></li>
         <li>8963efb recommended MFA-optional, fearing lockout with no support desk. The lockout risk has a cheaper answer: an operator-side CLI (<code>polycarpic user reset-mfa &lt;email&gt;</code>). It runs only on the box and writes an <code>audit_event</code>. The operator is already the trust root (R-1).</li>
       </ul></li>
     <li><strong>Step-up.</strong> These actions require a re-authentication within the last 5 minutes (password + MFA, or a passkey):
       <ul>
         <li>purge</li>
         <li>entity export</li>
-        <li>granting a membership or changing a role</li>
-        <li>linking or unlinking a provider</li>
-        <li>disabling MFA</li>
+        <li>granting a membership, changing a role, or cancelling a held raise</li>
+        <li>requesting, approving, declining or forcing a co-owner request (§4.2.2)</li>
+        <li>editing the cap table</li>
+        <li>transferring the founding-owner role, or stepping down from it</li>
+        <li>linking, relinking or unlinking a provider</li>
+        <li>removing a second-step method, or disabling MFA</li>
         <li>changing email</li>
         <li>deleting the account</li>
-      </ul></li>
+      </ul>
+      Step-up always takes the second factor. A user with none who starts one of these actions, on their own Person included, is sent to Set up a second step first, and the action is not performed (OQ-34).</li>
     <li><strong>Web sessions (C-02).</strong> Server-side BetterAuth records.
       <ul>
         <li>The cookie is <code>__Host-</code>-prefixed, <code>HttpOnly</code>, <code>Secure</code> and <code>SameSite=Lax</code>.</li>
@@ -794,7 +825,7 @@ flowchart TB
           <li>a config scan finds no self-signup flag.</li>
         </ul></p></td><td>T-01</td><td>POLY-M1</td></tr>
       <tr><td>C-02</td><td>Session cookie is <code>__Host-</code>, <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>. 7 days idle, 30 days absolute. All sessions revoked on a password or MFA change.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/auth</code> config<br><strong>Tested by:</strong> Playwright <code>Set-Cookie</code> assertions; config unit test.</p></td><td>T-04</td><td>POLY-M1</td></tr>
-      <tr><td>C-03</td><td>MFA (TOTP, passkeys) per §4.1. Step-up re-auth within 5 minutes on the listed actions. Operator MFA-reset CLI, audited. A role raised to manager or owner is not effective until the member enrols a second step; until then they hold their previous role in every check (§4.1; mechanism in ARCH, A-25).<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/auth</code>; the <code>requireRecentAuth()</code> guard; worker CLI; <code>packages/tenancy</code><br><strong>Tested by:</strong> Integration: every step-up action returns 403 without a recent re-auth; the CLI writes an <code>audit_event</code>. pgTAP: a viewer raised to owner without a second step is refused a manager write and an owner write, is not counted by <code>app.owner_count</code>, and is not a required approver; after enrolment all four flip and an <code>audit_event</code> is written.</p></td><td>T-02, T-08, T-81</td><td>POLY-M1 (MFA, required for owner and manager per P1), then with each gated feature</td></tr>
+      <tr><td>C-03</td><td>MFA (TOTP, passkeys) per §4.1: required for owner and manager, except the owner row on a user's own unshared Person (OQ-34); optional for viewers. Step-up re-auth within 5 minutes on the listed actions, always with the second factor. Operator MFA-reset CLI, audited. A role raised to manager or owner is held in <code>membership.pending_role</code>, with <code>role</code> unchanged, until the member enrols; only the <code>poly_govern</code> promotion makes it effective (§4.1; ARCH §3.1c).<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/auth</code>; the <code>requireRecentAuth()</code> guard; worker CLI; <code>packages/tenancy</code>; the ARCH §3.1c triggers<br><strong>Tested by:</strong> Integration: every step-up action returns 403 without a recent re-auth; the CLI writes an <code>audit_event</code>. pgTAP: a viewer raised to owner without a second step is refused a manager write and an owner write, is not counted by <code>app.owner_count</code>, and is not a required approver; after enrolment all four flip and an <code>audit_event</code> is written. pgTAP: <code>poly_app</code> cannot set <code>second_step_at</code> or promote a held row; at 1 → 2 a direct-path held raise is cancelled and an approved one kept; removing the last method is refused while manager and allowed while viewer. OQ-34, integration: an unenrolled user whose only membership is their own unshared Person can sign in and view; their first gated action (creating a Trust, the first invitation on the own Person, linking it under a parent, an export, a bank link) redirects to Set up a second step and is not performed, with no row written; each succeeds after enrolment.</p></td><td>T-02, T-08, T-81</td><td>POLY-M1 (MFA, required for owner and manager per P1), then with each gated feature</td></tr>
       <tr><td>C-04</td><td>BetterAuth <code>rateLimit</code> with database storage (e.g. sign-in 5/min per IP and per email). Generic auth error messages. Body-size limits on every route.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/auth</code>; <code>hooks.server.ts</code><br><strong>Tested by:</strong> Integration: the 6th attempt returns 429; responses for known and unknown emails are identical.</p></td><td>T-02, T-07, T-09</td><td>POLY-M1</td></tr>
       <tr><td>C-05</td><td>OAuth uses PKCE and <code>state</code>. Accounts link only when the IdP asserts a verified email <em>and</em> there is either an existing session or a matching pending invite. The providers are Google, Apple and GitHub (Principal, 2026-11-08), and each asserts verification differently:
         <ul>
@@ -1205,7 +1236,7 @@ flowchart TB
       <tr><td>R-4</td><td>Staging shares the prod kernel and auto-deploys unreleased code from <code>main</code> (TB-10). <em>Updated in v1.1:</em> staging now holds its own keyring and Plaid Sandbox / SimpleFIN demo tokens (Principal, 2026-11-06).</td><td>It saves a second box. Staging's data and tokens reach no real bank, so what is at risk is a pivot into prod, not staging's own data.</td><td>C-70 (separate compose networks, non-root, read-only containers, no Docker socket); C-74 (distinct secrets); C-77 (staging's own keyring, sandbox secret only, refuses production endpoints); staging sits behind Caddy basic auth or an IP allowlist (ARCH §7.1).</td><td>ARCH §7.2 @ 6b2f11b keeps staging co-located. Re-evaluate if staging ever touches non-fake data, or the app is offered at larger scale.</td><td>Rich Mosko (2026-11-07, P3)</td></tr>
       <tr><td>R-5</td><td>Purged entity data persists in backups until the retention window rolls.</td><td>Rewriting encrypted backups is disproportionate.</td><td>The purge warning says so. INFRA bounds retention.</td><td>INFRA v1</td><td>Rich Mosko (2026-11-07, P3)</td></tr>
       <tr><td>R-6</td><td>The multi-tenant design leaves a hosted offering possible. Reversing the non-goal would bring in GLBA, state privacy law and possibly PCI, and would make R-1, R-2 and R-13 unacceptable.</td><td>Hosting for others is a standing non-goal (PRD §3).</td><td>This row makes any reversal a deliberate, costed decision that re-opens §1.</td><td>Only on a deliberate decision to host</td><td>Rich Mosko (PRD §3, 2026-09-27)</td></tr>
-      <tr><td>R-7</td><td>Viewers are not required to use MFA. Owners and managers are (P1).</td><td>Viewers cannot mutate data, link credentials or grant access.</td><td>C-04 rate limiting; onboarding leads with OAuth; new-device email (§9).</td><td>GA</td><td>Rich Mosko (2026-11-07, P1)</td></tr>
+      <tr><td>R-7</td><td>Viewers are not required to use MFA, nor is the owner of a user's own Person while it is unshared (OQ-34). Owners and managers elsewhere are (P1).</td><td>Viewers cannot mutate data, link credentials or grant access. The unenrolled own-Person owner can edit only their own unshared books; exporting, purging, sharing, granting and linking a bank all force enrolment first.</td><td>C-04 rate limiting; onboarding leads with OAuth; new-device email (§9).</td><td>GA</td><td>Rich Mosko (2026-11-07, P1; 2026-11-08, OQ-34)</td></tr>
       <tr><td>R-8</td><td>Losing the keyring makes sealed credentials unrecoverable, and rotation is a manual operator step.</td><td>Automating rotation would mean storing the new key somewhere automation can reach. Unrecoverable is the right failure mode here, because recovery is simply relinking.</td><td>The rotate command is idempotent and resumable (C-35); the runbook states the failure mode plainly; the ledger is not encrypted under this key.</td><td>Annually</td><td>Rich Mosko (2026-11-07, P3)</td></tr>
       <tr><td>R-9</td><td>User-defined entity types are readable across tenants, by anyone with a membership on an entity of that type (kickoff §2.4).</td><td>A viewer needs the type label to render the entity.</td><td>A narrow policy plus a <code>security_invoker</code> view expose the label and tax defaults only, never the creator ID (C-14). Users are told that custom type names are shared.</td><td>If types ever carry more than a label</td><td>Rich Mosko (2026-11-07, P3)</td></tr>
       <tr><td>R-10</td><td>Commits are unsigned.</td><td>With per-agent worktree identities, commit signatures prove little. Branch protection already prevents unreviewed merges.</td><td>Branch protection (admins included, no force-push, required <code>cairn</code> check). Release tags are signed (§8).</td><td>First prod deploy</td><td>Rich Mosko (2026-11-07, P3)</td></tr>
@@ -1270,6 +1301,7 @@ flowchart TB
       <tr><td>OQ-30</td><td><strong>Confirmed with changes.</strong> <code>poly_journal</code>, NOLOGIN and NOBYPASSRLS, owns the numbering and chain triggers. Its grants are column-limited UPDATE on the counter, INSERT on the counter only from an <code>entity</code> AFTER INSERT trigger, INSERT-only on <code>journal_chain</code>, and a trigger-only wide SELECT. A BEFORE INSERT trigger on <code>journal_line</code> refuses a line once its entry is chained, which closes the <code>SET CONSTRAINTS … IMMEDIATE</code> early fire. It joins the hygiene set and the allowlist.</td><td><strong>New</strong> (ARCH v1.4).</td><td>C-10, C-15, C-24; T-80; A-23</td></tr>
       <tr><td>OQ-31</td><td><strong>Confirmed, with three conditions.</strong> The revocation runs in the same transaction as the membership write that makes the second owner, under a lock on the entity row. The invitation's issue path is recorded and not updatable. It counts effective owners only.</td><td><strong>New</strong> (ARCH v1.4).</td><td>§4.2.2; C-28; A-24</td></tr>
       <tr><td>OQ-32</td><td><strong>Confirmed, with additions.</strong> The predicate tests the zone, not the host: <code>.local</code> or no public suffix means <code>private-ca</code>, offline; otherwise <code>real-domain</code>, with a publicly resolvable zone. A zone NXDOMAIN refuses start; a DNS timeout does not. The served leaf's issuer is checked against the mode by the provisioning and health checks.</td><td><strong>New</strong> (ARCH v1.4).</td><td>C-76; A-26</td></tr>
+      <tr><td>OQ-34</td><td><strong>Confirmed (the Principal ruled option i, 2026-11-08).</strong> The own-Person owner row is exempt from the second step while that Person is unshared: no other member, and not rolled up into a parent. Enrolment is forced before creating a non-Person entity, sharing the own Person (a first invitation or a roll-up edge), accepting a manager or owner role, and any step-up action. Viewing never triggers it. The held role is ARCH §3.1c's <code>pending_role</code>, which meets A-25.</td><td><strong>New</strong> (ARCH v1.5).</td><td>§4.1; C-03; R-7; T-81; A-25, A-28</td></tr>
     </tbody>
   </table>
 
@@ -1319,7 +1351,7 @@ flowchart TB
           <li>the transfer target becomes founder when a sole-owned entity is transferred.</li>
         </ul></td></tr>
       <tr><td>A-21</td><td>§3.3b. <em>Folded in ARCH v1.4: §3.3b, §3.3 roles.</em></td><td>The ancestor-invite notice (P5) is a second <code>poly_graph</code> trigger: AFTER INSERT on <code>invitation</code> (and on <code>membership</code> without an invitation) on a parent-kind entity. It walks the descendants and notifies their owners in the same transaction. Not on a role raise.</td></tr>
-      <tr><td>A-23</td><td>§3.2.7, §3.2.9, §3.3 roles (OQ-30)</td><td><code>poly_journal</code>'s grants as in C-24:
+      <tr><td>A-23</td><td>§3.2.7, §3.2.9, §3.3 roles (OQ-30). <em>Folded in ARCH v1.5: §3.1, §3.2.7, §3.2.9, §3.3 roles.</em></td><td><code>poly_journal</code>'s grants as in C-24:
         <ul>
           <li>role-targeted policies <code>TO poly_journal</code> on the counter, <code>journal_chain</code>, <code>journal_entry</code> and <code>journal_line</code>;</li>
           <li>UPDATE on the counter limited to <code>last_number</code>, <code>head_number</code> and <code>head_hash</code>;</li>
@@ -1329,8 +1361,8 @@ flowchart TB
           <li>tenant-RLS SELECT for <code>poly_app</code> and <code>poly_worker</code> on the chain and the head;</li>
           <li>the C-24 tests added in v1.2.</li>
         </ul></td></tr>
-      <tr><td>A-24</td><td>§3.1 invitation, §3.1b (OQ-31)</td><td>Add <code>invitation.issued_via</code> (direct, or the applying <code>change_request</code>), not updatable. The 1 → 2 revocation runs in the membership write's transaction, after an entity-row lock taken before <code>owner_count</code> is read. Revoked tokens are refused at acceptance. It counts effective owners only. Add the C-28 tests added in v1.2.</td></tr>
-      <tr><td>A-25</td><td>§3.1 membership, §3.1b, §3.3 (held role)</td><td>A role raised to manager or owner is not effective until the member enrols a second step (§4.1, C-03). ARCH chooses the mechanism, a pending role on <code>membership</code> or refusal at apply. Either must satisfy all of these:
+      <tr><td>A-24</td><td>§3.1 invitation, §3.1b (OQ-31). <em>Folded in ARCH v1.5: §3.1, §3.1b.</em></td><td>Add <code>invitation.issued_via</code> (direct, or the applying <code>change_request</code>), not updatable. The 1 → 2 revocation runs in the membership write's transaction, after an entity-row lock taken before <code>owner_count</code> is read. Revoked tokens are refused at acceptance. It counts effective owners only. Add the C-28 tests added in v1.2.</td></tr>
+      <tr><td>A-25</td><td>§3.1 membership, §3.1b, §3.3 (held role). <em>Folded in ARCH v1.5: new §3.1c, a pending role on <code>membership</code>; every condition below is met.</em></td><td>A role raised to manager or owner is not effective until the member enrols a second step (§4.1, C-03). ARCH chooses the mechanism, a pending role on <code>membership</code> or refusal at apply. Either must satisfy all of these:
         <ul>
           <li>the stored value every check reads stays at the previous role until enrolment, so a check that forgets the pending state fails closed;</li>
           <li><code>has_role</code>, the policies, <code>owner_count</code>, the approver set, the 1 → 2 transition and founder eligibility all see the previous role;</li>
@@ -1338,7 +1370,7 @@ flowchart TB
           <li>an owner can cancel a pending raise as a lowering, with no approval;</li>
           <li>on a multi-owner entity, a co-owner raise already approved is not re-approved at enrolment.</li>
         </ul></td></tr>
-      <tr><td>A-26</td><td>§7.8 "Mode cross-check at startup" (OQ-32)</td><td>Align with C-76:
+      <tr><td>A-26</td><td>§7.8 "Mode cross-check at startup" (OQ-32). <em>Folded in ARCH v1.5: §7.8.</em></td><td>Align with C-76:
         <ul>
           <li>the suffix test is offline and decisive;</li>
           <li>the zone test is an SOA from a public resolver;</li>
@@ -1346,7 +1378,8 @@ flowchart TB
           <li>a public record for the box's own name is a warning;</li>
           <li>the issuer is checked against the mode by the provisioning and health checks.</li>
         </ul></td></tr>
-      <tr><td>A-27</td><td>§7.8 "OAuth sign-in", <code>packages/auth</code> (providers)</td><td>Add GitHub (Principal, 2026-11-08): "Google, Apple and GitHub work" in real-domain mode, and all three are disabled server-side in private-CA mode. GitHub's verified email comes only from <code>/user/emails</code> (primary and verified), with scopes <code>read:user</code> and <code>user:email</code> (C-05).</td></tr>
+      <tr><td>A-27</td><td>§7.8 "OAuth sign-in", <code>packages/auth</code> (providers). <em>Folded in ARCH v1.5: §2.2, §7.8.</em></td><td>Add GitHub (Principal, 2026-11-08): "Google, Apple and GitHub work" in real-domain mode, and all three are disabled server-side in private-CA mode. GitHub's verified email comes only from <code>/user/emails</code> (primary and verified), with scopes <code>read:user</code> and <code>user:email</code> (C-05).</td></tr>
+      <tr><td>A-28</td><td>§3.1c "Exempt", "Keeping the second step", "The sign-in gate"; §2.4 <code>SecondStep</code> (OQ-34)</td><td>The own-Person exemption holds only while the Person is unshared: no other member <em>and</em> no <code>entity_rollup</code> edge with it as the child. Today whoever adds that edge is enrolled, because they own the parent. If they later give up the parent role, "no other member" alone would restore the exemption, so they could remove their last method while the parent's members still see the Person. Use the same predicate in the last-method trigger, the sign-in gate and <code>SecondStep.required</code>. Test: a user who rolled their Person into a Household and then left it as owner cannot remove their last method while the edge remains.</td></tr>
     </tbody>
   </table>
 
@@ -1381,11 +1414,15 @@ flowchart TB
         <li>The log canary (C-33) must land before the first real adapter.</li>
         <li><em>v1.1:</em> the C-19, C-25 and C-27 tests (graph triggers, roll-up shapes, holder reads), the §4.6 deletion-flow negatives (C-52), and the C-77 config refusals.</li>
         <li><em>v1.2:</em> the C-24 <code>poly_journal</code> tests, the C-28 1 → 2 revocation tests, the C-03 held-role tests, the C-05 per-provider verification tests, the C-76 startup matrix, and the C-25 consent-text exact match.</li>
+        <li><em>v1.2.1:</em> the C-03 OQ-34 exemption tests, and the A-28 roll-up predicate test.</li>
       </ul></li>
     <li><strong>product-manager (v1.2):</strong> PRD §5's consent requirement carries the amended first sentence (C-25): "members of the parent, and of any parent above it, see …".</li>
+    <li><strong>product-manager (v1.2.1):</strong> PRD §5's "optional for viewers" gains the own-Person exemption and the actions that end it (OQ-34, §4.1).</li>
+    <li><strong>ux-designer (v1.2.1):</strong> Set up a second step appears as an interstitial for an unenrolled user before Create entity, before the first invite on the own Person, and before Confirm it's you on any step-up action (ARCH §3.1c).</li>
     <li><strong>Principal (via team-lead), 2026-11-07 question set: all ruled.</strong> Q2 was withdrawn after OQ-23. Q1 and Q3 to Q5 are restated as P1, P3, P4 and P6.
       <ul>
         <li><strong>P1. Ruled 2026-11-07:</strong> a second factor is required for owners and managers, and optional for viewers. C-03 and R-7 are updated.</li>
+        <li><strong>OQ-34. Ruled 2026-11-08 (closed):</strong> the own Person is exempt from P1 until the user's first real action (option i). §4.1, C-03 and R-7 are updated.</li>
         <li><strong>P2. Ruled 2026-11-07:</strong> any date range, with honest consent. The inclusion step and the upward-consent notice carry the disclosure (C-25), and the residual is folded into R-17 and approved. There is no period guard in ARCH.</li>
         <li><strong>P3. Ruled 2026-11-07:</strong> every pending §11 row is approved. R-1 is re-confirmed on its corrected text. R-3 and R-4 are approved on their updated text.</li>
         <li><strong>P4. Ruled 2026-11-07:</strong> the hash chain is built with the ledger in POLY-M2. The weekly verifier and the export head line are in scope (C-24).</li>
