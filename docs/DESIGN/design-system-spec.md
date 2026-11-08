@@ -607,7 +607,7 @@ See `styled-screens/custodial-accounts.html`: two cards are open, Primary Checki
 
 **Reports.** A nav item **from day one**: "its own sidebar item from day one... built in POLY-M5 (Statements); until then it shows the Dashboard's empty-state pattern." Three statements — Balance Sheet, Income Statement, Cash Flow — behind the same `Tabs` pattern used elsewhere. Before M5, every tab uses the empty-state convention (real card chrome, "Not set up yet," no milestone/version naming) rather than being hidden or disabled — the nav item itself is never gated on the feature shipping. **Between closes** the Balance Sheet and NAV add one computed line, "Estimated tax since last close", with an `outline` `Estimate` badge, above Net assets, and "Last closed through <date>" sits under the statement. The line covers every unfiled year, is not a ledger balance, and stays out of the trial balance. Both arrive with tax, so statements before that render without them. Assets list the four nature classes, then Real estate and Prepaid tax beside them. A parent's consolidated Balance Sheet carries the roll-up's lines: the four classes, **Other assets** (the no-class accounts, at book), liabilities and net worth.
 
-**Settings.** Batch-import scheduling ("all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window, which also governs manual-entry duplicate warnings, and the reporting-period close cadence, monthly by default or quarterly, shown only on a taxpayer entity — a Household's schedule doesn't touch a Person entity) and **per-user** (theme, default entity on login, reduced motion). Viewers can view this page, but the Manager/Owner-only settings (schedule, import options, close cadence) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
+**Settings.** Batch-import scheduling ("all the option selections for batch scheduled imports") plus general app preferences. Two scopes that must not be conflated: **per-entity** (import schedule, CIT exceptions threshold, duplicate-detection window, which also governs manual-entry duplicate warnings, and the reporting-period close cadence, monthly by default or quarterly, shown only on a taxpayer entity — a Household's schedule doesn't touch a Person entity; and **Export this entity** for owners, with its fingerprint receipt) and **per-user** (theme, default entity on login, reduced motion; **Sign-in and second step**; **Delete your account**). The last three are specified in § Access & account safety. Viewers can view this page, but the Manager/Owner-only settings (schedule, import options, close cadence) are read-only for them — same posture as every other write action in this system (ARCH §2.4 permissions table).
 
 See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-screens/settings.html`.
 
@@ -625,11 +625,15 @@ See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-scr
 - **Landing entity on sign-in:** the last-viewed entity, else the user's own Person entity. An invited user's first sign-in lands on the entity they were invited to.
 - **Any entity may hold accounts.** A base entity (Person, Trust, Business) has no children; a parent may also own accounts directly, so a joint checking account lives in the Household. Further entities are created from Entities.
 - **Parent entities roll up whole entities.** A parent (Household; Holding for a holding structure) includes whole entities, base or parent to any depth, never individual accounts, and shows consolidated figures: its own accounts plus everything beneath it, each entity counted once however many paths reach it. An entity may belong to more than one parent (a Business in a Household and in a Holding).
-- **Agreeing to a parent accepts its later placement.** Placing a parent inside another parent asks no one beneath it for approval. Every owner beneath is notified: "<entity> is now included under <parent>, because <inner parent> was placed inside it. Its members see totals, never your accounts or entries." The notification routes to that entity's Included under list.
+- **Agreeing to a parent accepts its later placement.** Placing a parent inside another parent asks no one beneath it for approval. Every owner beneath is notified: "<entity> is now included under <parent>, because <inner parent> was placed inside it.", then the consent text (§ Access & account safety → Consent text). The notification routes to that entity's Included under list.
+- **Adding to a parent.** An owner of both ends reaches it from **Add to a parent** (`layers`) at the foot of an entity's Included under list. It opens a confirmation, "Include <entity> in <parent>?", whose body is the consent text, then one line: a later parent above sees the same totals and the owner is told; the link can be removed from Included under. Buttons: Cancel, **Include in <parent>**.
+- **A new member on a parent above.** When an invite to a parent is sent, any role, every owner of every entity beneath it gets one notice per person: "<person> was invited to <parent> as a <role>. <parent> includes your entities <entity>, through <path>, …", the consent text, and **See included under**. A later role raise sends none.
 - **Included under.** Every entity card lists the parents above it, read-only and by name only: a direct link carries a `Direct` badge and, for an owner of the entity, **Remove**; an indirect one names its path ("through The Moskos"), because a Person's owner leaves a Holding by leaving the Household inside it. The parent's owner can remove the same link; removal is immediate and needs no confirmation from the other side.
 - **Tax classification.** A settable field on every entity's card. Base entities: Individual; Trust, non-grantor or grantor; Business, pass-through or C-corp. Parents: **Joint filers** (the parent accrues its own payable at close) or **Pass-through to members**, the default for a new Household or Holding. A taxpayer entity has a reporting-period close (§ Allocation, Reports & Settings → Tax).
 - **Members and cap table.** Every entity card carries one list of its members and holders, two columns: **Access** (Owner / Manager / Viewer, or None) and **Units**, each with its percent of the total. Membership says who may do what; the cap table says who owns how much, and neither derives from the other: a 0-unit Manager keeps the books, and a holder may have no access at all. Order: owner-access members, then other members, then holders with no access, then **Outside owners** (the total less every holder, computed and never typed: real owners the app doesn't track, whose share allocates to no one), then the **total units**. A holder is a Person, Trust or Business, never a parent. A Person holder with no access is offered **Invite as viewer**, in the row and in the save that adds it; an entity holder gets no offer, because membership belongs to people. A Person's own table is implicit, itself at all units, and its card says so with nothing to edit.
-- **Editing the cap table.** Owners only; every member reads it, and an owner of a holder sees that holder's row and the total, never the other rows. **Edit cap table** turns the units and the total into inputs, adds **Add holder** (the members' own Persons first, then the editor's other Persons, Trusts and Businesses; anyone else is invited as a member first or stays in Outside owners) and an **Effective from** date. Save adds a dated change and never rewrites an earlier date, so income keeps the split in force on its own date; each holder added or changed is notified. **History** lists the changes newest first: the date in force, the split and total, and who recorded it. A correction is a new change at the same date. The creation form shows the table preset to 100 units, all held by the creator's Person from the creation date, for a Trust, Business, Household or Holding.
+- **Founder and pending rows.** The entity's founding owner carries an outline `Founder` badge beside Owner, and the founder alone sees "Founding owner: you" with **Transfer founder** on the card. On a multi-owner entity a requested invite is a members-list row (email, role, outline `Pending approval` badge with `clock`, "Invite requested by <name> · awaiting <names> · expires <date>"), shown to owners only; a member whose raise waits for a second step shows the new role and an outline `Waiting for second step` badge. The section heading carries the count ("2 pending"). § Access & account safety.
+- **Former holder.** A purged holder's row reads "Former holder (purged <date>)", italic, with Access None and its units marked "counted in Outside owners"; Outside owners includes them from the purge date and its sub-line says so. Nothing of the purged entity is shown. Owners may type a label, shown as "Your label: <text>" with **Edit label**; the label is a cap-table edit, so on a multi-owner entity it goes through approval. A former holder can never be added again, and the editor offers no units input for it.
+- **Editing the cap table.** Owners only; every member reads it, and an owner of a holder sees that holder's row and the total, never the other rows. **Edit cap table** turns the units and the total into inputs, adds **Add holder** (the members' own Persons first, then the editor's other Persons, Trusts and Businesses; anyone else is invited as a member first or stays in Outside owners) and an **Effective from** date. On a multi-owner entity the save becomes a request: **Save change** reads **Request change**, and the proposed split shows as a dashed `.cap-pending` line under the table (split, effective date, who it waits on, expiry, **Withdraw** for the requester) until it applies; while it is open, **Edit cap table** is omitted. Save adds a dated change and never rewrites an earlier date, so income keeps the split in force on its own date; each holder added or changed is notified. **History** lists the changes newest first: the date in force, the split and total, and who recorded it. A correction is a new change at the same date. The creation form shows the table preset to 100 units, all held by the creator's Person from the creation date, for a Trust, Business, Household or Holding.
 - **Cap-table refusals.** A failed check saves nothing and leaves the editor open with the entries as typed, the message under the field (destructive-ink text, `aria-describedby`, the input `aria-invalid`): "Can't save: units exceed the total on <date>." · "Can't save: this would make an entity its own holder." · "Can't save: ownership chains deeper than one entity aren't supported yet." No message names an entity the editor cannot see.
 - **Access is explicit membership only** (owner / manager / viewer), never inherited through a roll-up in either direction — flow 5.7.
 
@@ -642,6 +646,71 @@ See `styled-screens/allocation.html`, `styled-screens/reports.html`, `styled-scr
 **Roll-up map (Entities).** A card above the membership list draws every entity the user holds membership on as a **Pack** (LayerChart `Pack`, d3.pack, for frontend-lead): parents as `--muted` circles, nested to any depth, each holding its entities: base entities as `--card` circles, a nested parent as a `--muted` circle inside it; each circle's 3px stroke is its entity type's categorical slot (Person `--cat-1`, Trust `--cat-2`, Business `--cat-3`, Household `--cat-4`, Holding `--cat-5`), edged by a 1px `--cat-edge` hairline, with the type icon and label beside it, so colour is never alone; an entity in no parent sits at top level. A parent holding accounts itself shows "N own accounts" under its name. An entity in several parents is drawn once in each, with an "also in <parent>" chip, across levels; there is no overlap geometry. Each circle shows the type icon and label, name and role badge, and switches to that entity on click; the current entity carries a `--ring` outside a 3px `--card` gap, so it never merges with a green Person stroke. **Circles are equal in size per level:** the map shows structure, not wealth. Sizing by balance would shrink small entities past legibility and would leak magnitude across the access boundary. The membership list below stays the accessible fallback, each card with an Includes line and an Included under list. Dashboard roll-ups may likewise list an included entity under each parent it belongs to.
 
 See `styled-screens/entities.html`.
+
+---
+
+## Access & account safety
+
+The moments where the app asks for more than a click: the second step, consent to a parent, co-owner approval, the founder, account deletion and export. Every confirmation here is the `.je-modal` dialog surface (title, one-line subtitle, body, Cancel left of the action); every status is an outline badge with a label, so colour never carries it alone. Flows 5.11–5.13.
+
+### Second step
+
+- **Who.** Required for anyone holding owner or manager on any entity; offered to viewers. Methods: an authenticator app (TOTP) or a passkey, plus ten single-use backup codes. Signing in with Google, Apple or GitHub exempts no one.
+- **Set up.** On Sign up for an owner or manager invitee (§ Public screens → Get started and Sign up); on a role raise, the new role waits until the step is set up and the member keeps viewer access meanwhile; and from Settings.
+- **Settings → Sign-in and second step** (per user, `#second-step`): the status (`positive-soft` `On` badge with `shield-check`), each method with its added date and **Remove**, **Add passkey**, backup codes left with **Make new codes**, and **Change password** ("Changing it signs you out everywhere else."). While the user holds owner or manager anywhere, the last method has no Remove and the help line says the step is required.
+- **Step-up: "Confirm it's you".** Before export, purge, granting access or changing a role, linking or unlinking a bank, answering, forcing or confirming a co-owner request, transferring the founder role, removing a second-step method and deleting the account, unless the user was checked in the last 5 minutes. Subtitle names the action ("Exporting Mosko (Person) needs a fresh check. You won't be asked again for 5 minutes."). Body: password, then the 6-digit code; **Use a passkey instead** and **Use a backup code** beneath. A user without a password (Google, Apple or GitHub only) is sent to that provider to sign in again, then asked for the code. Cancel abandons the action with nothing changed. Focus starts in the first field; Esc is Cancel.
+
+### Consent text
+
+One fixed block, `.consent-text` (muted panel with a `--ring` left rule), used verbatim wherever an entity joins a parent's audience: the Add to a parent confirmation, the placement notice and the new-member-above notice. `<parent>` is the only variable.
+
+> Members of <parent> see class and category totals for this entity for any period.
+> For a small entity, that effectively reveals individual amounts and their dates.
+> Nothing else is shown: no payee, memo, account or counterparty.
+
+The wording is a security requirement (SECURITY C-25): no screen paraphrases or shortens it, and a change to it needs a security review. Parent views keep any date range selectable; no date picker snaps to whole months or quarters.
+
+### Notifications
+
+Each is a `.notice` row: icon, a bold first sentence that says what happened, detail, a meta line (kind · date), and at most two actions on the right. They open from the avatar popover's Notifications entry. Copy, with the styled screen's names:
+
+| Notice | To | Text | Actions |
+|---|---|---|---|
+| Placement | every owner beneath | "**Mosko (Person) is now included under Mosko Holdings**, because The Moskos was placed inside it." + consent text | See included under |
+| New member on a parent above | every owner of every entity beneath, once per person | "**Alex Rivera was invited to Mosko Holdings as a viewer.** Mosko Holdings includes your entities Mosko (Person), through The Moskos, and Mosko Consulting LLC." + consent text | See included under |
+| Approval request | every other owner | "**Sam Mosko asks to invite jo@example.com to The Moskos as a manager.** The invite is sent once every other owner approves." Meta: "requested Nov 7 · expires Nov 21 unless every owner approves" | Approve · Decline |
+| Reminder, day 7 | owners who have not answered | "**Reminder: 7 days left** to answer Sam Mosko's request to …" / "A request nobody answers expires as declined on Nov 21." | Approve · Decline |
+| Outcome | every owner | "Your request to … was approved and applied." · "… was declined by Sam Mosko." · "… expired on Nov 21 without every approval." | — (founder: Force removal, below) |
+| Requester confirm | the requester | "**Every remaining owner has approved** your request to … One approver stopped being an owner before it applied, so it waits for you to confirm." | Confirm and send · Withdraw |
+| Forced | every owner, the target included | "Mosko forced Sam Mosko's removal from The Moskos after Sam Mosko declined." | — |
+| Founder transferred | every owner | "Mosko transferred the founder role for The Moskos to Sam Mosko." | — |
+| Former holder | each owner of each entity whose cap table named it | "**A holder on Mosko Holdings' cap table was purged.** It now reads "Former holder (purged Oct 2, 2026)", and its 15 units count as outside owners from that date. You may add a label of your own." | Open cap table |
+| Role raise waiting | the member raised | "**You are now a manager of The Moskos.** Set up a second sign-in step to start; until then you keep viewer access." | Set up second step |
+
+Approve, Decline, Force removal and Confirm each pass through Confirm it's you. Pending requests, an invitee's email included, are shown to owners only.
+
+### Co-owner approval
+
+- **What waits, on an entity with more than one owner:** inviting a member or raising a role; removing or demoting a co-owner; any cap-table edit, a former holder's label included. Removing a viewer or manager, and lowering or giving up one's own role, act at once. A sole owner acts alone, including adding the first co-owner.
+- **Badges.** `Pending approval` (outline, `clock`) on a pending members-list row and on the cap-table pending line; the card heading counts them ("2 pending"). `Founder` (outline, small) beside the founder's Owner badge. `Waiting for second step` (outline, small) beside a raised role not yet in force.
+- **Invite dialog.** Email and Role. On a multi-owner entity the subtitle reads "<entity> has two owners, so the invite is sent after <names> approve." (or "approves" for one), the button reads **Request invite**, and the body states the window: "Every other owner has 14 days to answer, with a reminder at day 7; a request nobody answers expires as declined." It also says owners and managers set up a second step when they join, and that owners of every entity a parent includes are told when the invite is sent. On a sole-owner entity: no subtitle, **Send invite**.
+- **Expiry wording.** A pending row and line always carry "expires <date>"; the reminder says "7 days left"; an expiry reads "expired on <date> without every approval". The requester may ask again; after an expiry, once per 7 days.
+- **Force removal.** Offered to the founder alone, on the notice of a declined or expired request to remove or demote a co-owner (**Force removal** or **Force demotion**). Confirmation: "Force Sam Mosko's removal from The Moskos?", subtitle "Sam Mosko declined this request on Nov 9.", body "As the founding owner you can apply it anyway. Sam Mosko loses owner access at once. Sam Mosko and every other owner are notified, and the change is recorded in the audit log. You confirm with your second step." Action `destructive`.
+- **Transfer founder.** On the entity card, for the founder alone: "Founding owner: you" with the help line "Breaks a deadlock over removing or demoting a co-owner; no other extra power." and **Transfer founder**. Confirmation: "Transfer the founder role for <entity>", a select of the current owners, "You stay an owner. Every owner is notified." Stepping down is this action; a founder cannot give up owner without it.
+
+### Account deletion
+
+Settings → Delete your account → **Delete account…** opens one dialog of choices, in three steps, and applies nothing until **Delete my account** (`destructive`, unavailable until every entity has a choice, then Confirm it's you). Flow 5.13.
+
+1. **Name a successor founder** for each entity the user founded that has other owners: a select among those owners.
+2. **Entities only you own:** Transfer to a member (who becomes owner and founder) or Purge, after an export; a purge choice shows `Export ready` and the fingerprint line once its export exists.
+3. **Entities you leave:** named, with "they are notified that you left".
+
+### Export receipt
+
+Export this entity (Settings, per entity, owners) runs after Confirm it's you and leaves a `.receipt`: a `positive-soft` `Exported` badge, the time, who, and the file name; then **Ledger fingerprint**, in mono, as the last Journal ID and a shortened hash ("JE-000214 · 9f3a1c2e…26d17b04"), the full hash in the title and behind **Copy** (`aria-label="Copy the full ledger fingerprint"`); then one line: "The fingerprint covers every posted entry up to the last one named. Keep the file somewhere other than this box: a later check against it shows whether any entry was changed." The same fingerprint line appears on each purge choice in account deletion.
+
+See `styled-screens/entities.html`, `styled-screens/settings.html`, `styled-screens/login.html`, `styled-screens/sign-up.html`.
 
 ---
 
@@ -663,7 +732,7 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | **Select / Combobox** | Category, tax-treatment tag, jurisdiction pickers; the suggested-offset-leg inline search dropdown (Pending inbox); per-card "show N" limit selector; Journal entries sort selector |
 | **Popover + Range Calendar** | Journal entries date range: presets plus one month grid, opened from a select-like trigger |
 | **Sidebar** | Primary nav, eight flat items (Settings proposed under the avatar popover) — inverted, a floating card (gutter on every side), collapsible to an icon rail, brand row on top (mark + wordmark + collapse control) + avatar-popover trigger on bottom (opens to the right) — see Sidebar information architecture |
-| **Button** | Variants: `default` (primary green fill: the one main action per view), `secondary`, `outline`, `ghost`, `destructive`, and `dark` (a solid `--foreground` fill with `--background` ink: near-black in light mode, near-white in dark). **Rule: never an outline button standing alone on `--background`.** Its `--border` edge is only 1.22:1 on the light page (~1.17:1 dark), so it all but disappears. Outline is for a secondary action set beside a filled one, or inside a card or bar that gives it a surface. A standalone secondary action uses `dark` instead (15.61:1 light / 17.92:1 dark against the page): Login's "Continue with Google" (with the Google G glyph). Hierarchy then comes from colour and position, not weight: the dark button is the heavier mass, so the primary stays the only green fill and sits last, after the divider |
+| **Button** | Variants: `default` (primary green fill: the one main action per view), `secondary`, `outline`, `ghost`, `destructive`, and `dark` (a solid `--foreground` fill with `--background` ink: near-black in light mode, near-white in dark). **Rule: never an outline button standing alone on `--background`.** Its `--border` edge is only 1.22:1 on the light page (~1.17:1 dark), so it all but disappears. Outline is for a secondary action set beside a filled one, or inside a card or bar that gives it a surface. A standalone secondary action uses `dark` instead (15.61:1 light / 17.92:1 dark against the page): the OAuth buttons on Login and Sign up, "Continue with Google", "Continue with Apple" and "Continue with GitHub", each with the provider's own glyph. Hierarchy then comes from colour and position, not weight: the dark button is the heavier mass, so the primary stays the only green fill and sits last, after the divider |
 | **Skeleton** | Every async fetch boundary |
 | **Switch** | Settings' on/off preferences (auto-post matched recurring transactions, reduced motion), `.switch[role=switch]` |
 | **Brand app bar** | Every page without the app shell (Home, Get started, Admin): fixed near-black bar, lockup left, the page's trailing items right, a fade below — see Public screens § Brand app bar |
@@ -727,6 +796,14 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | Entities: cap table History | `history` | |
 | Entities: Add holder | `plus` | |
 | Entities: Invite as viewer | `user-plus` | |
+| Entities: Add to a parent | `layers` | |
+| Entities: Transfer founder | `arrow-right-left` | |
+| Pending approval badge | `clock` | Outline badge; the label carries the meaning |
+| Notifications: placement, new member above, former holder / approval request / reminder / declined / applied / role raise | `bell` / `user-plus` / `clock` / `x` / `check` / `shield-check` | |
+| Settings: Export / Copy fingerprint | `download` / `copy` | |
+| Settings: second step on / Authenticator app / Passkey | `shield-check` / `smartphone` / `key-round` | |
+| Settings: Delete account | `trash-2` | |
+| Login `#local` note | `info` | |
 | Entity type badges: Person / Household / Trust / Business | `user` / `house` / `landmark` / `building-2` | Per § Entity, account, and category badges |
 | Admin: operator-session badge | `terminal` | |
 | Login: reveal password | `eye` (`eye-off` when revealed) | |
@@ -735,7 +812,9 @@ Map to shadcn-svelte's shipped components; install via `bunx shadcn-svelte@lates
 | Walkthrough: Deploy / First operator sign-in / Invite members | `terminal` / `log-in` / `user-plus` | |
 | Get started: Create your account / Start the walkthrough | `arrow-right` / `arrow-down` | Trailing icon inside the button |
 | Sign up: valid-invite badge | `circle-check` | |
-| Login: Continue with Google | **not Lucide**: the Google "G" mark, four-colour | Google's own brand glyph on the dark button, as its sign-in branding asks |
+| Login / Sign up: Continue with Google | **not Lucide**: the Google "G" mark, four-colour | Google's own brand glyph on the dark button, as its sign-in branding asks |
+| Login / Sign up: Continue with Apple | **not Lucide**: the Apple logo, monochrome `currentColor` | Apple's own mark; on the `dark` button it takes the button ink (white on black in light mode), as Apple's sign-in guidelines ask |
+| Login / Sign up: Continue with GitHub | **not Lucide**: the GitHub mark (Invertocat), monochrome `currentColor` | GitHub's own mark, in the button ink |
 | Brand mark (sidebar brand row, rail expand button, app bar, Login, Home) | **not Lucide**: `brand/brand-mark-24.svg` / `brand/brand-mark.svg` | The seedling, traced; the one deliberate non-Lucide glyph |
 
 Every icon in use is named above. Add a row whenever a new control lands, rather than guessing ahead of the actual screen.
@@ -823,12 +902,12 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Allocation | `allocation.html` | sidebar | holdings popover and target editor popover (open, as references below the cards) |
 | Tax | `tax.html` | sidebar | Federal tab, danger tier (Q3 installment $200 short), close-due card, income allocated from pass-through entities |
 | Reports | `reports.html` | sidebar | dimmed statement previews, with the estimated-tax line on the Balance Sheet (review only, not shipped) |
-| Entities | `entities.html` | sidebar | nested roll-up map, Included under lists, tax classification, members and cap table (read, editing, history, creation preset, refusals), placement notification |
-| Settings | `settings.html` | sidebar, no nav item active | avatar popover with Settings current |
+| Entities | `entities.html` | sidebar | nested roll-up map, Included under lists, tax classification, members and cap table (read, editing, history, creation preset, refusals), a two-owner entity (Founder, Pending approval, Waiting for second step, pending cap-table change, Transfer founder), a former holder, notifications (placement, new member above, approval request, day-7 reminder, declined with Force removal, requester confirm, former holder, role raise), confirmations (add to a parent, invite on a multi-owner entity, force removal, transfer founder) |
+| Settings | `settings.html` | sidebar, no nav item active | avatar popover with Settings current; export receipt with ledger fingerprint; Sign-in and second step; Delete account; step-up prompt and account-deletion choices (references) |
 | Home | `home.html` | none (public) | — |
-| Login | `login.html` | none (split screen) | — |
+| Login | `login.html` | none (split screen) | states `#second-step`, `#local` |
 | Get started | `get-started.html` | brand app bar | — |
-| Sign up | `sign-up.html` | none (split screen) | invite code pre-filled and validated |
+| Sign up | `sign-up.html` | none (split screen) | invite code pre-filled and validated; state `#second-step` |
 | Admin *(operator surface)* | `admin.html` | brand app bar + operator badge | — |
 
 ## Public screens: Home & Login
@@ -876,19 +955,24 @@ There is no public sign-up: every instance is self-hosted, and accounts on it co
 
   The walkthrough sits directly below as four numbered steps: requirements, deploy, first operator sign-in, invite members. It is an outline that grows as the deployment docs are written.
 - **Sign up** (`sign-up.html`, Login's split layout with its own visual pane, the sunrise; see **Visual-pane image sources**), invite-gated:
-  - Fields, in order: the invite code, then the account (the `dark` Google button, or email + password).
+  - Fields, in order: the invite code, then the account (the three `dark` OAuth buttons, or email + password).
   - From an invite link, the code arrives pre-filled and validated, with a line naming who invited the visitor and to which entity. An invalid or used code shows an inline error under the field.
   - "Create account" creates the user's own Person entity (§ Entities & membership) and lands on the dashboard of the invited entity.
   - Footer: "Already have an account? Sign in", then "No invite? Set up your own instance".
+  - **Second step, `sign-up.html#second-step`.** After Create account, an invitee joining as owner or manager sets one up before landing: "Set up a second step", one line naming the entity and role and why, two radio `.fork-card`s (Authenticator app · Passkey), then for the app a QR code with the key typed out and a 6-digit check, **Turn on second step**, and ten backup codes shown once. A viewer invitee sees the same step with **Skip for now**.
 - **Login's account line:** "Have an invite? **Create your account**" leads to Sign up; "No invite? **Set up your own instance**" leads to Get started.
 
 ### Login — split screen login page
 
 Two references: `useorigin.com`'s own login (dark, brand pane + form card — behind a splash loader under automation, no direct capture) and a split-screen login example the Principal supplied (form pane left with a labeled email/password pair, a "Forgot password?" link and a reveal-eye icon, OAuth button, divider, primary button, sign-up link, legal footer at the very bottom; a full-bleed moody photo right, inset with rounded corners and a margin rather than flush to the viewport edge).
 
-**Form pane content, in order:** mark + wordmark (top-left), "Welcome back" heading + one-line subtext, an OAuth button, a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, the two-way account line ("Have an invite? Create your account" / "No invite? Set up your own instance"), and a legal footer ("By signing in you agree to...") at the bottom.
+**Form pane content, in order:** mark + wordmark (top-left), "Welcome back" heading + one-line subtext, three OAuth buttons stacked 8px apart (Google, Apple, GitHub), a divider ("or"), email field (labeled), password field (labeled, with a "Forgot password?" link and a show/hide reveal icon), primary "Sign in" button, the two-way account line ("Have an invite? Create your account" / "No invite? Set up your own instance"), and a legal footer ("By signing in you agree to...") at the bottom.
 
-**OAuth button:** "Continue with Google" is a `dark` button with the Google G glyph, not an outline one; see the Button row in § Component inventory for why.
+**OAuth buttons:** "Continue with Google", "Continue with Apple" and "Continue with GitHub", the three providers v1 offers, each a full-width `dark` button with the provider's own glyph, stacked in that order 8px apart. They are `dark`, not outline; see the Button row in § Component inventory for why. Sign up shows the same three.
+
+**States, by URL hash in the mock** (`login.html#…`; in the build these are server-rendered states of one route):
+- **`#second-step`, a new device.** After the password or an OAuth provider: "Second step", "This device is new to your account. Enter the code from your authenticator app.", a 6-digit `.code-input` (`inputmode="numeric"`, `autocomplete="one-time-code"`), **Continue**, then **Use a passkey instead** and **Use a backup code**, and "Lost every method? The person who runs this instance can reset your second step." A known device skips this state.
+- **`#local`, a home box on a `.local` name.** The OAuth row and the "or" divider are not rendered (no Google, Apple or GitHub), and an `.auth-note` with `info` takes their place: "Google, Apple and GitHub sign-in are not available on this home box, because it runs on a local network name (polycarpic.local). Sign in with your email, password and second step." Sign up drops its OAuth buttons and shows the same note, and its caption reads "Then create your account with email" (`sign-up.html#local`). A home box on a real domain shows the buttons as usual.
 
 **Ours, adapted:**
 - **Form pane:** sits on the theme-aware neutral (`--card`/`--background`) — follows the user's stored light/dark preference like the rest of the app, unlike the visual pane. The heading, subtext, and fields are centered both vertically and horizontally as a fixed-max-width (380px) column within the pane; the mark + wordmark is the one element pinned top-left, overriding the pane's own centering. Field labels, inputs, and links stay left-aligned *within* that centered column (only the heading/subtext text itself is center-aligned) — centering every line of text, including form labels, would read oddly for a form.

@@ -1221,7 +1221,7 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
 .auth-form-inner .auth-title { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
 .auth-form-inner .auth-subtitle { color: var(--muted-foreground); margin-bottom: 24px; font-size: 14px; }
 
-.auth-oauth-row { margin-bottom: 20px; }
+.auth-oauth-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .auth-oauth-row .btn { width: 100%; justify-content: center; }
 
 /* Dark secondary button: a solid --foreground fill with --background ink
@@ -1230,7 +1230,7 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
    its --border edge is 1.22:1 on the light page and ~1.17:1 on the dark
    one. This fill is 15.61:1 (light) / 17.92:1 (dark) against the page,
    and the label is the same against the fill. Used for the OAuth
-   "Continue with Google" button on Login. */
+   "Continue with Google / Apple / GitHub" buttons on Login and Sign up. */
 .btn-dark { background: var(--foreground); color: var(--background); }
 .btn-dark:hover { filter: none; background: color-mix(in srgb, var(--foreground) 88%, var(--background)); }
 .btn-dark .oauth-glyph { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; }
@@ -2020,3 +2020,44 @@ table.data-table.cap-table tr.cap-add td { border-bottom: 1px solid var(--border
 .view-toggle { display: inline-flex; align-items: center; gap: 8px; }
 .weight-list .kv-row:last-child { border-bottom: none; }
 .weight-list .kv-value .badge { min-width: 48px; justify-content: center; }
+
+/* Access and account safety: the second step, step-up, consent, co-owner
+   approval, founder and former holder. Every confirmation here is the
+   .je-modal surface; every status is a badge with a label, never colour
+   alone. */
+.auth-state { display: none; }
+html[data-state="default"] .auth-state[data-state="default"],
+html[data-state="local"] .auth-state[data-state="local"],
+html[data-state="second-step"] .auth-state[data-state="second-step"] { display: block; }
+.auth-note { text-align: left; display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); font-size: 13px; color: var(--muted-foreground); }
+.auth-note .icon { flex: none; margin-top: 1px; }
+.code-input { font-family: var(--font-mono); font-size: 20px; letter-spacing: 0.4em; text-align: center; }
+.factor-choice { text-align: left; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.factor-choice .fork-card { padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.factor-choice .fork-card[aria-checked="true"] { border-color: var(--ring); box-shadow: 0 0 0 1px var(--ring); }
+.factor-choice .fork-card p { font-size: 13px; }
+.factor-choice .fork-card .card-title { display: flex; align-items: center; gap: 6px; font-size: 15px; }
+.qr-box { width: 132px; height: 132px; border: 1px solid var(--border); border-radius: var(--radius-md); background: repeating-conic-gradient(var(--foreground) 0 25%, var(--card) 0 50%) 0 0 / 12px 12px; flex: none; }
+.enrol-row { text-align: left; display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; font-size: 13px; color: var(--muted-foreground); }
+.backup-codes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 13px; }
+.consent-text { margin: 12px 0; padding: 12px 14px; border-left: 3px solid var(--ring); background: var(--muted); border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: 14px; }
+.consent-text p { margin: 0 0 6px; }
+.consent-text p:last-child { margin-bottom: 0; }
+.notice-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.notice { display: grid; grid-template-columns: 20px 1fr auto; gap: 4px 10px; padding: 12px 0; border-top: 1px solid var(--border); font-size: 14px; }
+.notice > .icon { margin-top: 2px; color: var(--muted-foreground); }
+.notice-body p { margin: 0 0 4px; }
+.notice-meta { font-size: 12px; color: var(--muted-foreground); }
+.notice-actions { display: flex; gap: 8px; align-items: flex-start; flex-wrap: wrap; }
+.notice .consent-text { margin: 6px 0; font-size: 13px; }
+.cap-pending { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; padding: 8px 10px; border: 1px dashed var(--border); border-radius: var(--radius-md); font-size: 13px; }
+.cap-pending .card-sub { flex: 1; min-width: 200px; }
+table.data-table.cap-table tr.cap-pending-row td { color: var(--muted-foreground); }
+table.data-table.cap-table tr.cap-former td:first-child { font-style: italic; }
+.cap-badges { display: inline-flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.fingerprint { font-family: var(--font-mono); font-size: 12px; overflow-wrap: anywhere; }
+.receipt { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 13px; }
+.receipt-line { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.plan-step { padding: 14px 0; border-top: 1px solid var(--border); }
+.plan-step:first-of-type { border-top: none; }
+.plan-step .kv-row { padding: 8px 0; }
