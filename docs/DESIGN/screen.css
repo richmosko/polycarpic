@@ -1221,7 +1221,7 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
 .auth-form-inner .auth-title { font-size: 26px; font-weight: 700; margin-bottom: 4px; }
 .auth-form-inner .auth-subtitle { color: var(--muted-foreground); margin-bottom: 24px; font-size: 14px; }
 
-.auth-oauth-row { margin-bottom: 20px; }
+.auth-oauth-row { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
 .auth-oauth-row .btn { width: 100%; justify-content: center; }
 
 /* Dark secondary button: a solid --foreground fill with --background ink
@@ -1230,7 +1230,7 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
    its --border edge is 1.22:1 on the light page and ~1.17:1 on the dark
    one. This fill is 15.61:1 (light) / 17.92:1 (dark) against the page,
    and the label is the same against the fill. Used for the OAuth
-   "Continue with Google" button on Login. */
+   "Continue with Google / Apple / GitHub" buttons on Login and Sign up. */
 .btn-dark { background: var(--foreground); color: var(--background); }
 .btn-dark:hover { filter: none; background: color-mix(in srgb, var(--foreground) 88%, var(--background)); }
 .btn-dark .oauth-glyph { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; }
