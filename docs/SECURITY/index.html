@@ -265,7 +265,7 @@ flowchart TB
       <tr><td>T-70</td><td>A parent member with no membership on a child reads the child's rows (entries, lines, payees, memos, lots, positions) through a roll-up definer, the holdings popover, or a bug in a definer body.</td><td>I</td><td>M</td><td>H</td><td>C-25</td></tr>
       <tr><td>T-71</td><td>Structure enumeration: a non-member reads <code>entity_rollup</code> rows, or ancestor names, beyond the ruled grant (members of the parent; the child's owner sees parent names only).</td><td>I</td><td>M</td><td>L</td><td>C-19, C-25</td></tr>
       <tr><td>T-72</td><td>Time-slicing: calling the roll-up, economic or allocated-income definer for one-day periods, or comparing balances on consecutive days, rebuilds near-transaction-level detail of an entity the caller is not a member of.</td><td>I</td><td>M</td><td>M</td><td>Consent disclosure (C-25): the inclusion step and the upward-consent notice state that any period is visible. No period guard, by the Principal's ruling (P2, 2026-11-07). R-17.</td></tr>
-      <tr><td>T-73</td><td>The audience of an entity's totals grows without its owner knowing. It grows when the entity's parent is placed under another parent (consent travels upward), or when a member is added to an ancestor.</td><td>I</td><td>M</td><td>M</td><td>C-25 (placement notice through the <code>poly_graph</code> trigger, <code>app.parents_of</code>, pull-out); the notice on an ancestor grant is <em>pending Principal P5</em></td></tr>
+      <tr><td>T-73</td><td>The audience of an entity's totals grows without its owner knowing. It grows when the entity's parent is placed under another parent (consent travels upward), or when a member is added to an ancestor.</td><td>I</td><td>M</td><td>M</td><td>C-25: a placement notice and an ancestor-invite notice, both written by <code>poly_graph</code> triggers and both carrying the consent-disclosure sentence and the pull-out link. Also <code>app.parents_of</code> and pull-out. Notify, never block (P5, 2026-11-07).</td></tr>
       <tr><td>T-74</td><td>The cap-table candidate list, or the holder notification, leaks names of Persons or entities to someone with no relation to them.</td><td>I</td><td>L</td><td>M</td><td>C-27</td></tr>
       <tr><td>T-75</td><td>A holder's owners, who have no membership on the held entity, read other holders' rows or the held entity's books.</td><td>I</td><td>M</td><td>M</td><td>C-27</td></tr>
       <tr><td>T-77</td><td>A cycle check or holder-graph check runs under a role that cannot see the whole graph, so a cycle through entities invisible to that role is accepted. Roll-ups then double-count, and allocations loop.</td><td>T</td><td>M</td><td>M</td><td>C-25 (graph triggers owned by <code>poly_graph</code>, with a graph-wide read)</td></tr>
@@ -770,6 +770,13 @@ flowchart TB
               <li>Both triggers take the advisory lock.</li>
             </ul></li>
           <li><strong>Placement notice.</strong> A notice goes to every owner beneath, in the same transaction, with an <code>audit_event</code>. It names the new top-level parent and says what becomes visible.</li>
+          <li><strong>Ancestor-invite notice (P5, 2026-11-07).</strong> When an invitation to a parent becomes live (after any §4.2.2 approval, before the invitee's first sign-in), every owner of every entity beneath that parent, at any depth, gets a notification. It is written in the same transaction by a <code>poly_graph</code> trigger (AFTER INSERT on <code>invitation</code>, and on <code>membership</code> for a membership created without one, deduplicated per person).
+            <ul>
+              <li>It names the parent and the new member, and carries the consent-disclosure sentence and the pull-out link.</li>
+              <li>Any role triggers it, because viewers see totals too.</li>
+              <li>A later role raise on the parent does not.</li>
+              <li>Nothing waits on the recipients.</li>
+            </ul></li>
           <li><strong>Consent disclosure (P2, 2026-11-07).</strong> The inclusion step (adding an entity to a parent) and the upward-consent notice both state plainly that:
             <ul>
               <li>parent members see class and category totals for <em>any</em> period;</li>
@@ -783,7 +790,8 @@ flowchart TB
         <ul>
           <li>a parent viewer without child membership gets totals equal to the child owner's figures, and 0 rows from every tenant table and from the popover's position read for that child;</li>
           <li>a cycle through an entity invisible to both the inserter and <code>poly_rollup</code> is refused;</li>
-          <li>Playwright: the inclusion step and the placement notice render the consent-disclosure text;</li>
+          <li>Playwright: the inclusion step, the placement notice and the ancestor-invite notice render the consent-disclosure text;</li>
+          <li>pgTAP: an invitation going live on a Holding notifies the owners of a Person two levels down whom the inviter cannot see, and a role raise does not;</li>
           <li>calling a <code>poly_graph</code> function directly fails;</li>
           <li>the result-column set of each <code>poly_rollup</code> function equals its pinned shape.</li>
         </ul></p></td><td>T-70, T-71, T-72, T-73, T-77, T-78</td><td>Triggers with the junction (POLY-M1); definers and popover with POLY-1.1</td></tr>
@@ -1150,6 +1158,7 @@ flowchart TB
           <li>a 14-day expiry, run as a scheduled job that only flips the status;</li>
           <li>re-evaluation on an owner's tombstone (§3.4a).</li>
         </ul></td></tr>
+      <tr><td>A-21</td><td>§3.3b</td><td>The ancestor-invite notice (P5) is a second <code>poly_graph</code> trigger: AFTER INSERT on <code>invitation</code> (and on <code>membership</code> without an invitation) on a parent-kind entity. It walks the descendants and notifies their owners in the same transaction. Not on a role raise.</td></tr>
     </tbody>
   </table>
 
@@ -1187,7 +1196,7 @@ flowchart TB
         <li><strong>P3. Ruled 2026-11-07:</strong> every pending §11 row is approved. R-1 is re-confirmed on its corrected text. R-3 and R-4 are approved on their updated text.</li>
         <li><strong>P4. Ruled 2026-11-07:</strong> the hash chain is built with the ledger in POLY-M2. The weekly verifier and the export head line are in scope (C-24).</li>
         <li><strong>P5b. Ruled 2026-11-07:</strong> on a multi-owner entity, every other owner approves invites, role raises, a co-owner's removal or demotion, and cap-table edits (§4.2.2, C-28, T-26). The edges are SecEng rulings in §4.2.2. R-19 (deadlock) is pending approval.</li>
-        <li><strong>P5.</strong> Notify the owners beneath when a member is added to an ancestor parent? <em>Recommend yes</em> (T-73).</li>
+        <li><strong>P5. Ruled 2026-11-07:</strong> notify, never block. When an invitation to a parent goes live, every owner beneath is notified with the disclosure sentence and the pull-out link (C-25, T-73).</li>
         <li><strong>P6.</strong> Drop the operator switch that would reopen public sign-up, in favour of a CLI invite that shares no entity? <em>Recommend drop</em> (revised).</li>
         <li><strong>P7.</strong> Local-box TLS: a real subdomain with a split-horizon DNS-01 wildcard, or a private CA? <em>Recommend the subdomain</em> (keeps Google sign-in).</li>
         <li><strong>P8.</strong> Local-box disk unlock: a passphrase at boot, or the TPM? <em>Recommend the TPM.</em></li>
