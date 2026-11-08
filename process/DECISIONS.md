@@ -395,3 +395,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the designed screens showed Google only and the ux-designer asked which providers v1 offers; the Principal chose all three, matching the PRD §8 line "OAuth day one via Google, Apple, GitHub". Each provider is one OAuth client to register per box.
 **Alternatives considered:** Google only until native iOS (the ux-designer's recommendation); Google and Apple.
 **Approved by:** richmosko (2026-11-08)
+
+### 2026-11-08 — The own Person is exempt from the second-step requirement until the first real action
+**Decision:** every user owns their own Person from sign-up, so the 2026-11-07 rule "a second step is required for owners and managers" would otherwise bind everyone. The owner row on a user's own Person is exempt while that Person has no other member. Enrolment is forced before: creating a Trust, Business, Household or Holding; sharing the own Person; accepting a raise to manager or owner, or an owner or manager invitation; and any step-up action on the own Person (export, purge, granting access, linking a bank). Viewing shared entities never triggers it. A raise to manager or owner on a shared entity is held as a pending role, with the member keeping viewer access, until they enrol (ARCH §3.1c).
+**Why:** the architect found the literal reading of SECURITY §4.1 made "optional for viewers" empty. The exemption keeps the intent, the people who can do damage carry the cost, with damage measured by what they actually do.
+**Alternatives considered:** everyone enrols at sign-up (simplest rule; reverses "optional for viewers").
+**Approved by:** richmosko (2026-11-08)
