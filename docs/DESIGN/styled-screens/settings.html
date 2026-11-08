@@ -152,7 +152,24 @@
           <p class="card-sub">Family Trust and Mosko Holdings keep their other owners; they are notified that you left.</p>
         </div>
         <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-destructive btn-sm" type="button" disabled aria-disabled="true">Delete my account</button></div>
-        <p class="card-sub" style="text-align:right;">Delete stays unavailable until every entity above has a choice. It asks for your second step.</p>
+        <p class="card-sub" style="text-align:right;">Delete stays unavailable until every entity above has a choice. It asks for your second step, or, without one, your password and a code sent to your email.</p>
+      </div></div>
+    </div>
+    <div class="card" id="second-step-off">
+      <span class="eyebrow">Sign-in and second step, none set up yet (reference)</span>
+      <div class="kv-row" style="margin-top:12px;"><span class="kv-label">Second step<span class="kv-help">Off. Set one up to own or manage a shared entity. Setting up your first asks for your password and a code sent to your email, then the method.</span></span><span class="kv-value"><span class="badge badge-outline">Off</span><button class="btn btn-outline btn-sm" type="button">Set up second step</button></span></div>
+      <p class="card-sub">Opens "Set up a second step": the same three steps as Set up a second step first on Entities, with nothing to continue afterwards.</p>
+    </div>
+    <div class="card" id="delete-no-second-step">
+      <span class="eyebrow">Delete account, no second step yet (reference): your password, then the emailed code, then the choices above. No second step is set up.</span>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Confirm it's you, step 2 of 2" style="max-width:440px;">
+        <div class="je-modal-title">Confirm it's you</div>
+        <div class="je-modal-subtitle">Deleting your account needs a fresh check. You have no second step, so we use your password and your email.</div>
+        <p class="card-sub">Step 2 of 2 · Check your email</p>
+        <p>We sent a code to <span class="mono">m•••@example.com</span>.</p>
+        <div class="auth-field"><label for="del-email-code">Code from the email</label><input id="del-email-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="" placeholder="000000"></div>
+        <p class="card-sub">The code works once and expires shortly. Didn't get it? Check spam, or <a class="je-link" href="#">resend the code</a>.</p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Continue</button></div>
       </div></div>
     </div>
   </main>
