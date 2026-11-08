@@ -24,7 +24,7 @@
   <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
-    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). Three questions for the Principal remain in §10 (Q1 to Q4 ruled). Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
+    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). Two questions for the Principal remain in §10 (Q1 to Q5 ruled). Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
     <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1.4</a>, <a href="../ARCH/">ARCH v1.7</a>, <a href="../SECURITY/">SECURITY v1.2.3</a>, <a href="../../process/DECISIONS.md">DECISIONS</a> through 2026-11-08</span>
     <span><strong>Last updated:</strong> 2026-11-08</span>
   </div>
@@ -153,7 +153,7 @@ flowchart TB
       <tr><td>Shape</td><td>Two Vercel projects from one repo, one Neon project (ARCH §7.6, SECURITY C-61). No Caddy, no worker container, no deploy timer: Vercel deploys on a Git push to the production branch/tag, and migrations run as a build step.</td></tr>
       <tr><td>Connections</td><td>Runtime uses Neon's <strong>pooled</strong> endpoint (PgBouncer, transaction mode). The migrate build step uses the <strong>direct</strong> endpoint, because a migration that sets role or takes advisory locks must not run through a transaction-mode pooler (§9.1 ruling D-6).</td></tr>
       <tr><td>Freshness</td><td>Hobby cron is once a day. Imports and period-end jobs run daily at best (ARCH §7.6, accepted).</td></tr>
-      <tr><td>Backups</td><td>OQ-26 answered in §6.6: Neon's restore window plus an operator-run weekly encrypted export; a nightly automated export is recommended before real data and needs a SecEng ruling.</td></tr>
+      <tr><td>Backups</td><td>OQ-26 answered in §6.6: Neon's restore window plus an operator-run weekly encrypted export; no nightly automated export and no credential in GitHub (Principal, 2026-11-08, Q5).</td></tr>
       <tr><td>When to use it</td><td>When you have no machine you trust to keep running, or as a temporary landing place while a primary is rebuilt. It is the weakest target for secrets (SECURITY R-3). Do not link real aggregators here until POLY-77 and the R-3 review.</td></tr>
     </tbody>
   </table>
@@ -448,7 +448,7 @@ flowchart LR
   <ul>
     <li>A cron function cannot run <code>pg_dump</code> or ship WAL, so the Compose mechanism does not apply.</li>
     <li><strong>Default (v1.0, no new trust):</strong> rely on Neon's point-in-time restore for the plan in use (window unmeasured; read it on the plan page at deploy time and record it here), and run <code>polycarpic-ops neon-export</code> <strong>from the operator's laptop weekly</strong>: <code>pg_dump</code> through a read-only role, age-encrypted to the same public key, uploaded with the put-only credential to the same bucket. RPO is then up to 7 days beyond Neon's window, stated honestly.</li>
-    <li><strong>Recommended before real data lands on this target:</strong> a nightly GitHub Actions export. It needs a database role that can read every ledger row to live in a GitHub environment secret, which makes GitHub a holder of a ledger-read credential (TB-12). That is a SecEng ruling and a Principal acceptance, not a devops default. Until then the default stands. Recorded as OQ-INFRA-1.</li>
+    <li><strong>Ruled (Principal, 2026-11-08, Q5): the weekly operator-run export stands; no database credential is held in GitHub.</strong> Revisit with SecEng only if real data ever lands on the tertiary target; a nightly Actions export would make GitHub a holder of a ledger-read credential (TB-12) and needs a SecEng ruling first (OQ-INFRA-1, S-6).
     <li>Restore: create a Neon project, run <code>polycarpic-ops restore --dump</code> from the laptop (§8.10), repoint the Vercel variables, redeploy.</li>
   </ul>
 
@@ -829,7 +829,7 @@ box$ sudo polycarpic-ops status</code></pre>
       <tr><td>D-9</td><td>Local-box provisioning checks (C-76) and staging isolation (C-77)</td><td><code>provision-check</code> is the check script both controls ask for: nftables rules, the <code>DOCKER-USER</code> rule, publish binding, sshd, IPv6, outbound allowlist, swap, TPM slots, console hardening, and that the staging and prod secrets directories share no file and staging's <code>PLAID_ENV</code> is <code>sandbox</code>. Outside-in scan: §7.2 step 11.</td></tr>
       <tr><td>D-10</td><td>Monitoring and alerts (ARCH §7.4, C-76 heartbeat)</td><td>Two independent paths: app email through Resend, and an outside dead-man's-switch monitor (Healthchecks.io, free tier; Principal, 2026-11-08) that does not depend on the box or Resend (§6.5). Public health endpoint says only ok or not.</td></tr>
       <tr><td>D-11</td><td>Vercel deploy path</td><td>The operator deploys a signature-verified tag by running <code>infra/vercel/deploy.sh</code> from the laptop; Vercel's own Git deployment is pointed at a branch nobody pushes to. No Vercel deployment credential lives in GitHub, consistent with the C-83 principle that nothing GitHub holds can move a deployment.</td></tr>
-      <tr><td>D-12</td><td>OQ-26: backups on Vercel</td><td>Neon restore window plus a weekly operator-run encrypted export; nightly automated export is recommended before real data and needs a SecEng ruling (OQ-INFRA-1, Q5). §6.6.</td></tr>
+      <tr><td>D-12</td><td>OQ-26: backups on Vercel</td><td>Neon restore window plus a weekly operator-run encrypted export; no nightly export, no GitHub-held credential (Q5 ruled); revisited with SecEng only if real data lands on the target (OQ-INFRA-1). §6.6.</td></tr>
     </tbody>
   </table>
 
@@ -850,7 +850,7 @@ box$ sudo polycarpic-ops status</code></pre>
       <tr><td>S-3</td><td>SECURITY R-5; ARCH purge screen copy</td><td>The retention bound is 35 days; the purge confirmation says "up to 35 days in backups".</td></tr>
       <tr><td>S-4</td><td>SECURITY C-72 (home box)</td><td>Default PCR 7 only; PCR 11 only if signed policies are measured. The secrets directory lives on the encrypted partition. Root password for the emergency shell and a bootloader password with recovery entries removed. Swap off. Test: Secure Boot off at the firmware must produce a passphrase prompt (§7.2 step 7).</td></tr>
       <tr><td>S-5</td><td>SECURITY C-83</td><td>Signer list from the operator, not the repository; tag-to-digest binding via an image label covered by the attestation; PAT 90-day expiry and renewal reminder.</td></tr>
-      <tr><td>S-6</td><td>SECURITY (new ruling) for OQ-INFRA-1</td><td>Decide whether a read-all-ledger database role may live in a GitHub environment secret for a nightly Neon export (TB-12), or whether the weekly operator-run export stands.</td></tr>
+      <tr><td>S-6</td><td>SECURITY (new ruling) for OQ-INFRA-1</td><td>Q5 ruled that the weekly operator-run export stands. Record that default, and rule on a GitHub-held read-all-ledger role (TB-12) only if real data ever lands on the Vercel target.</td></tr>
       <tr><td>S-7</td><td>SECURITY C-71</td><td>Record that SSH is open to the internet on the Hetzner target by design (key-only, no root, unattended upgrades) and that an address restriction is optional.</td></tr>
     </tbody>
   </table>
@@ -858,7 +858,7 @@ box$ sudo polycarpic-ops status</code></pre>
   <h3>9.3 Asks on other owners</h3>
   <ul>
     <li><strong>architect:</strong> fold R-1 to R-8. Pin the Postgres major and record it in a file CI, compose and the Neon runbook all read. Specify the loopback admin listener (TB-13) and the <code>check-config</code> and <code>migrate --plan</code> subcommands that §4.5 relies on.</li>
-    <li><strong>seceng:</strong> fold S-1 to S-7. Rule S-6. Review the <code>provision-check</code> script as the evidence for C-70, C-71, C-72, C-76 and C-77.</li>
+    <li><strong>seceng:</strong> fold S-1 to S-7. Record S-6 (default ruled; revisit only on real data at the tertiary target). Review the <code>provision-check</code> script as the evidence for C-70, C-71, C-72, C-76 and C-77.</li>
     <li><strong>backend-lead:</strong> the <code>*_FILE</code> config loader, <code>polycarpic cli</code> subcommands named in §7.5 and §8.1 (<code>user mfa-methods</code>, <code>auth rewrite-secrets</code>, <code>secrets init --force</code>, <code>membership remove-owner</code>, <code>secrets rotate</code>), the log schema agreed before POLY-M1 logs anything, and the commit label on the image.</li>
     <li><strong>qa-engineer:</strong> the pooler-reuse test, the compose-policy lint fixtures, the topology-check fixtures, the drill script's five assertions, and Playwright smoke against staging after each deploy.</li>
     <li><strong>team-lead:</strong> add the INFRA row to the Artifacts table; own the ledger entries for the Principal answers below; run the monthly drill reminder issue until it is automated.</li>
@@ -868,7 +868,7 @@ box$ sudo polycarpic-ops status</code></pre>
 <!-- ============================================================ -->
 <section id="open-questions" data-section="open-questions">
   <h2>10. Open Questions</h2>
-  <p class="section-hint">Q5 to Q7 need the Principal (cost or product calls; the lead runs the interview). OQ-INFRA rows are measurements or rulings with an owner and a trigger.</p>
+  <p class="section-hint">Q6 and Q7 need the Principal (cost or product calls; the lead runs the interview). OQ-INFRA rows are measurements or rulings with an owner and a trigger.</p>
 
   <h3>10.1 For the Principal</h3>
   <table>
@@ -878,7 +878,7 @@ box$ sudo polycarpic-ops status</code></pre>
       <tr><td>Q2</td><td>Hetzner location?</td><td><strong>Ruled (Principal, 2026-11-08): EU.</strong> Default Falkenstein (<code>fsn1</code>), fallback Nuremberg (<code>nbg1</code>); reasoning in §1.2. Closed.</td><td>Closed</td></tr>
       <tr><td>Q3</td><td>Backup bucket provider?</td><td><strong>Ruled (Principal, 2026-11-08), option (a):</strong> Backblaze B2 with Object Lock in compliance mode (35 days), put-only box key, separate read key held by the operator, rclone over 443. Hetzner Object Storage stays a noted alternative pending lock verification; the Storage Box is the fallback only. Applied in §2.3, §6.1, §7.0, §7.1 step 4 and D-3. Closed.</td><td>Closed</td></tr>
       <tr><td>Q4</td><td>An outside monitor service?</td><td><strong>Ruled (Principal, 2026-11-08):</strong> Healthchecks.io free tier receives heartbeat pings from both boxes and emails the operator when they stop; it holds no data. Recorded in §6.5, §7.1 step 12 and D-10. Closed.</td><td>Closed</td></tr>
-      <tr><td>Q5</td><td>Vercel + Neon: may a nightly export credential live in GitHub (OQ-INFRA-1)?</td><td>Weekly manual export from your laptop (RPO up to 7 days) vs a nightly GitHub Actions job holding a read-everything database credential (RPO about 1 day, but GitHub becomes a holder of ledger-read access). Needed only if you run real data on the tertiary target.</td><td>Weekly manual until real data is on that target, then decide with SecEng</td></tr>
+      <tr><td>Q5</td><td>Nightly Neon export credential in GitHub?</td><td><strong>Ruled (Principal, 2026-11-08):</strong> no. Weekly operator-run encrypted export from the laptop to the backup bucket, Neon PITR for the rest, no credential in GitHub. Revisit with SecEng only if real data ever lands on the tertiary target. Closed.</td><td>Closed</td></tr>
       <tr><td>Q6</td><td>If the home box's hardware cannot bind the TPM (§7.2 step 6), accept a passphrase at every boot?</td><td>Changes ruling P8: the box stays down after every power cut until you type it. Alternative: buy different hardware.</td><td>Buy different hardware; ask again only if that happens</td></tr>
       <tr><td>Q7</td><td>Home-box recovery time: is 1 day acceptable, or buy a spare?</td><td>A spare mini PC (about 200 to 400 USD, unmeasured) cuts it to hours. Otherwise the break-glass is a rented Hetzner server restored from the same backups (4 hours).</td><td>No spare; rely on the Hetzner break-glass</td></tr>
     </tbody>
@@ -888,7 +888,7 @@ box$ sudo polycarpic-ops status</code></pre>
   <table>
     <thead><tr><th>#</th><th>Question</th><th>Owner</th><th>Resolve by</th></tr></thead>
     <tbody>
-      <tr><td>OQ-INFRA-1</td><td>Nightly Neon export credential in GitHub (S-6)</td><td>seceng + Principal</td><td>Before real data on the Vercel target</td></tr>
+      <tr><td>OQ-INFRA-1</td><td>Nightly Neon export credential in GitHub (S-6). Default ruled: no (Q5); weekly manual export stands.</td><td>seceng + Principal</td><td>Trigger: real data first lands on the Vercel target</td></tr>
       <tr><td>OQ-INFRA-2</td><td>Does Ubuntu 24.04 ship signed PCR policies so PCR 11 can be added? TPM2 unlock of a non-root volume through <code>crypttab</code> on 24.04?</td><td>devops-engineer</td><td>First home-box deploy</td></tr>
       <tr><td>OQ-INFRA-3</td><td>Browser enforcement of name constraints on a locally installed root, per browser and OS (R-20)</td><td>devops-engineer</td><td>First private-CA deploy</td></tr>
       <tr><td>OQ-INFRA-4</td><td>B2: compliance-mode Object Lock on a bucket-default retention, the exact capability set of the put-only key (does rclone need <code>listBuckets</code>?), the lifecycle rule, and the cannot-delete and cannot-shorten tests</td><td>devops-engineer</td><td>Before the first backup (first drill)</td></tr>
