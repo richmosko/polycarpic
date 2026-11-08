@@ -291,7 +291,14 @@ flowchart TB
       <ul>
         <li>Self-signup is off. New users arrive only through a membership invitation from an entity owner.</li>
         <li>OAuth sign-in for an unknown email with no pending invite is rejected.</li>
-        <li>An operator flag can re-open signup. It is off by default (Principal Q5).</li>
+        <li><strong>No switch reopens public sign-up</strong> (Principal, 2026-11-07, P6). No configuration flag or environment variable enables self-signup, so there is nothing to flip by mistake or through a configuration compromise.</li>
+        <li><strong>An invitation that shares no entity:</strong> <code>polycarpic user invite &lt;email&gt;</code>.
+          <ul>
+            <li>Runs on the box only, by the operator, and writes an <code>audit_event</code>.</li>
+            <li>Creates a single-use invitation with the same expiry as an entity invitation.</li>
+            <li>The invitee gets only their own Person entity.</li>
+            <li>No entity is involved, so neither the co-owner approval (§4.2.2) nor the ancestor-invite notice applies.</li>
+          </ul></li>
       </ul></li>
     <li><strong>MFA (C-03).</strong> TOTP and passkeys, with single-use backup codes stored hashed.
       <ul>
@@ -722,7 +729,14 @@ flowchart TB
   <table>
     <thead><tr><th>ID</th><th>Control, location and test</th><th>Threats</th><th>Status</th></tr></thead>
     <tbody>
-      <tr><td>C-01</td><td>Invite-only registration after the bootstrap user. OAuth sign-in for an unknown email is rejected unless an invite is pending.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/auth</code> hooks<br><strong>Tested by:</strong> Integration: a 2nd signup is rejected; OAuth for an unknown email is rejected; an invite accept works.</p></td><td>T-01</td><td>POLY-M1</td></tr>
+      <tr><td>C-01</td><td>Invite-only registration after the bootstrap user. OAuth sign-in for an unknown email is rejected unless an invite is pending. There is no reopen switch (P6). The operator CLI <code>polycarpic user invite &lt;email&gt;</code> issues an audited invitation that shares no entity.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/auth</code> hooks; worker CLI<br><strong>Tested by:</strong> Integration:
+        <ul>
+          <li>a 2nd signup is rejected;</li>
+          <li>OAuth for an unknown email is rejected;</li>
+          <li>an invite accept works;</li>
+          <li>a CLI invite yields a user with only their own Person, and writes an <code>audit_event</code>;</li>
+          <li>a config scan finds no self-signup flag.</li>
+        </ul></p></td><td>T-01</td><td>POLY-M1</td></tr>
       <tr><td>C-02</td><td>Session cookie is <code>__Host-</code>, <code>HttpOnly</code>, <code>Secure</code>, <code>SameSite=Lax</code>. 7 days idle, 30 days absolute. All sessions revoked on a password or MFA change.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/auth</code> config<br><strong>Tested by:</strong> Playwright <code>Set-Cookie</code> assertions; config unit test.</p></td><td>T-04</td><td>POLY-M1</td></tr>
       <tr><td>C-03</td><td>MFA (TOTP, passkeys) per §4.1. Step-up re-auth within 5 minutes on the listed actions. Operator MFA-reset CLI, audited.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/auth</code>; the <code>requireRecentAuth()</code> guard; worker CLI<br><strong>Tested by:</strong> Integration: every step-up action returns 403 without a recent re-auth; the CLI writes an <code>audit_event</code>.</p></td><td>T-02, T-08</td><td>POLY-M1 (MFA, required for owner and manager per P1), then with each gated feature</td></tr>
       <tr><td>C-04</td><td>BetterAuth <code>rateLimit</code> with database storage (e.g. sign-in 5/min per IP and per email). Generic auth error messages. Body-size limits on every route.<p class="ctl-meta"><strong>Lives at:</strong> <code>packages/auth</code>; <code>hooks.server.ts</code><br><strong>Tested by:</strong> Integration: the 6th attempt returns 429; responses for known and unknown emails are identical.</p></td><td>T-02, T-07, T-09</td><td>POLY-M1</td></tr>
@@ -1197,7 +1211,7 @@ flowchart TB
         <li><strong>P4. Ruled 2026-11-07:</strong> the hash chain is built with the ledger in POLY-M2. The weekly verifier and the export head line are in scope (C-24).</li>
         <li><strong>P5b. Ruled 2026-11-07:</strong> on a multi-owner entity, every other owner approves invites, role raises, a co-owner's removal or demotion, and cap-table edits (§4.2.2, C-28, T-26). The edges are SecEng rulings in §4.2.2. R-19 (deadlock) is pending approval.</li>
         <li><strong>P5. Ruled 2026-11-07:</strong> notify, never block. When an invitation to a parent goes live, every owner beneath is notified with the disclosure sentence and the pull-out link (C-25, T-73).</li>
-        <li><strong>P6.</strong> Drop the operator switch that would reopen public sign-up, in favour of a CLI invite that shares no entity? <em>Recommend drop</em> (revised).</li>
+        <li><strong>P6. Ruled 2026-11-07:</strong> there is no reopen switch. Invitation is the only way in, plus <code>polycarpic user invite &lt;email&gt;</code> (C-01, §4.1).</li>
         <li><strong>P7.</strong> Local-box TLS: a real subdomain with a split-horizon DNS-01 wildcard, or a private CA? <em>Recommend the subdomain</em> (keeps Google sign-in).</li>
         <li><strong>P8.</strong> Local-box disk unlock: a passphrase at boot, or the TPM? <em>Recommend the TPM.</em></li>
         <li><strong>P9.</strong> Local-box backups: an append-only online store, or a rotated drive? <em>Recommend the online store.</em></li>
