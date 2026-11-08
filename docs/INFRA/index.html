@@ -24,7 +24,7 @@
   <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
-    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). Six questions for the Principal remain in §10 (Q1 ruled). Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
+    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). Five questions for the Principal remain in §10 (Q1, Q2 ruled). Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
     <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1.4</a>, <a href="../ARCH/">ARCH v1.7</a>, <a href="../SECURITY/">SECURITY v1.2.3</a>, <a href="../../process/DECISIONS.md">DECISIONS</a> through 2026-11-08</span>
     <span><strong>Last updated:</strong> 2026-11-08</span>
   </div>
@@ -95,7 +95,7 @@ flowchart TB
   <table>
     <thead><tr><th>Concern</th><th>Decision</th></tr></thead>
     <tbody>
-      <tr><td>Machine</td><td>One Hetzner Cloud server, 4 vCPU / 8 GB / shared x86, Ubuntu Server 24.04 LTS (§2.1). IPv4 and IPv6 both enabled on the server; both are covered by the firewall rules.</td></tr>
+      <tr><td>Machine</td><td>One Hetzner Cloud server, 4 vCPU / 8 GB / shared x86, Ubuntu Server 24.04 LTS (§2.1). Location: <strong>Falkenstein (<code>fsn1</code>)</strong>, EU (Principal, 2026-11-08, Q2). Reason: it is the default Hetzner location with the widest plan availability, and the latency difference to Nuremberg or Helsinki is invisible for this app; Helsinki has no concrete advantage here. EU prices and included traffic are cheaper than the US locations (figures unmeasured; read them on the order page). IPv4 and IPv6 both enabled on the server; both are covered by the firewall rules.</td></tr>
       <tr><td>Ports</td><td>The Cloud Firewall (outside the host, C-71) admits 22, 80 and 443 only. On the host only Caddy publishes ports; the compose-policy lint (C-70) and the post-deploy outside-in scan (§7.1 step 15) both enforce this.</td></tr>
       <tr><td>SSH</td><td>Key-only, no root login, no password auth. Port 22 stays open to the world because a home connection's address changes. The key and the unattended-upgrade posture are the control (§3.1). Restricting 22 to your current address in the firewall is an option, not the default, and a mistake there locks you out (§8.9).</td></tr>
       <tr><td>DNS</td><td>Two <code>A</code>/<code>AAAA</code> records: <code>app.&lt;domain&gt;</code> to prod, <code>staging.&lt;domain&gt;</code> to staging, both pointing at the one server. Public DNS is Cloudflare's free DNS in DNS-only mode (grey cloud, no proxy), with the registrar unchanged (Principal, 2026-11-08, Q1).</td></tr>
@@ -522,9 +522,9 @@ laptop$ hcloud server list</code></pre>
 laptop$ git tag -v v1.0.0     # from v1.0; before then use main</code></pre>
       <p class="expect">Expect (from v1.0): <code>Good "git" signature for …</code>. If it says <code>BAD</code> or shows no signature, do not continue.</p></li>
     <li><strong>Create the server, firewall and volume.</strong>
-      <pre class="cmd"><code>laptop$ infra/hetzner/create.sh --name polycarpic --location &lt;nearest&gt; \
+      <pre class="cmd"><code>laptop$ infra/hetzner/create.sh --name polycarpic --location fsn1 \
           --ssh-key ~/.ssh/polycarpic_ed25519.pub</code></pre>
-      <p class="expect">Expect: it prints the server's IPv4 and IPv6 addresses and ends with <code>created: server, firewall (22,80,443 in), volume 20 GB</code>. It is safe to run again; it skips what exists. If it says the location has no stock, choose another location. If it prints anything about opening ports other than 22, 80, 443, stop.</p></li>
+      <p class="expect">Expect: it prints the server's IPv4 and IPv6 addresses and ends with <code>created: server, firewall (22,80,443 in), volume 20 GB</code>. It is safe to run again; it skips what exists. If it says the location has no stock, use <code>nbg1</code> (Nuremberg): same country, same prices, and the backup bucket is unaffected. If it prints anything about opening ports other than 22, 80, 443, stop.</p></li>
     <li><strong>Point your DNS at it.</strong> If the domain's name servers are not yet Cloudflare's: add the domain to a free Cloudflare account, copy the two name servers it gives you into the registrar's "name servers" setting (the registrar stays the registrar), and wait until Cloudflare shows the zone Active (minutes to a day). Then in Cloudflare DNS create <code>A</code> and <code>AAAA</code> records: <code>app</code> and <code>staging</code> → the two addresses. TTL 300, proxy status <strong>DNS only</strong> (grey cloud; an orange cloud would put Cloudflare in front of the server and break the design).
       <pre class="cmd"><code>laptop$ dig +short app.example.com A
 laptop$ dig +short app.example.com AAAA</code></pre>
@@ -866,14 +866,14 @@ box$ sudo polycarpic-ops status</code></pre>
 <!-- ============================================================ -->
 <section id="open-questions" data-section="open-questions">
   <h2>10. Open Questions</h2>
-  <p class="section-hint">Q2 to Q7 need the Principal (cost or product calls; the lead runs the interview). OQ-INFRA rows are measurements or rulings with an owner and a trigger.</p>
+  <p class="section-hint">Q3 to Q7 need the Principal (cost or product calls; the lead runs the interview). OQ-INFRA rows are measurements or rulings with an owner and a trigger.</p>
 
   <h3>10.1 For the Principal</h3>
   <table>
     <thead><tr><th>#</th><th>Question</th><th>Options and mechanics</th><th>Recommendation</th></tr></thead>
     <tbody>
       <tr><td>Q1</td><td>Where does your domain's DNS live?</td><td><strong>Ruled (Principal, 2026-11-08), option (a):</strong> move the domain's name servers to Cloudflare's free DNS, DNS-only mode; one zone-scoped token on the home box; the registrar is unchanged. Applied in §1.2, §3.4, §7.1 step 8 and §7.3 Mode A. Closed.</td><td>Closed</td></tr>
-      <tr><td>Q2</td><td>Hetzner location?</td><td>US (Ashburn, Hillsboro) or EU (Falkenstein, Nuremberg, Helsinki). US has a smaller included traffic allowance and a different price (unmeasured); EU is cheaper and further away. Latency is a few tens of milliseconds, invisible for this app.</td><td>Nearest to the household; US if everyone is in the US</td></tr>
+      <tr><td>Q2</td><td>Hetzner location?</td><td><strong>Ruled (Principal, 2026-11-08): EU.</strong> Default Falkenstein (<code>fsn1</code>), fallback Nuremberg (<code>nbg1</code>); reasoning in §1.2. Closed.</td><td>Closed</td></tr>
       <tr><td>Q3</td><td>Backup bucket provider (about cents a month)?</td><td>(a) Backblaze B2 with Object Lock: documented compliance-mode locks, pay-as-you-go. (b) Hetzner Object Storage, same account, if its Object Lock is verified in compliance mode <em>(unmeasured)</em>. (c) Hetzner Storage Box, a flat monthly fee, but no documented immutable mode and its SFTP port conflicts with the home box's firewall. A third-party account is one more login to protect.</td><td>(a), or (b) after the lock is verified</td></tr>
       <tr><td>Q4</td><td>An outside monitor service (free tier)?</td><td>Receives only "I am alive" pings and can email you if they stop; holds no data. Healthchecks.io free tier, or UptimeRobot. Without it a dead box and a dead Resend are silent together.</td><td>Healthchecks.io</td></tr>
       <tr><td>Q5</td><td>Vercel + Neon: may a nightly export credential live in GitHub (OQ-INFRA-1)?</td><td>Weekly manual export from your laptop (RPO up to 7 days) vs a nightly GitHub Actions job holding a read-everything database credential (RPO about 1 day, but GitHub becomes a holder of ledger-read access). Needed only if you run real data on the tertiary target.</td><td>Weekly manual until real data is on that target, then decide with SecEng</td></tr>
