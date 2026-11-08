@@ -425,3 +425,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** a nightly Actions export would make GitHub a holder of ledger-read access for a target that may never carry real data; a passphrase box stays down after every power cut; a day without a household ledger loses nothing, since syncs catch up, and the spare would cost money and upkeep.
 **Alternatives considered:** nightly GitHub Actions export; passphrase at every boot; a spare mini PC.
 **Approved by:** richmosko (2026-11-08)
+
+### 2026-11-08 — The home box encrypts its root partition too, unlocked by the TPM
+**Decision:** the home box's root partition is encrypted alongside the data volume and unlocked by the same TPM path, so the box still restarts unattended. DevOps proves the method on Ubuntu 24.04 server at the first home-box deploy (INFRA OQ-INFRA-10). The whole-box-theft risk (SECURITY R-21) is re-approved on its reworded text; tampering with the small unencrypted boot files remains the accepted residual.
+**Why:** SecEng found that PCR 7 binds the TPM unlock to the Secure Boot policy, not to the files that boot, and INFRA v1.0 left the root partition in the clear, so an attacker with the box for an hour could add a login to the unencrypted system, reboot, and have the TPM unlock the data for them. Encrypting root costs about an hour once and nothing day to day; a PIN at boot would reinstate the cost the 2026-11-07 TPM ruling rejected.
+**Alternatives considered:** keep the layout and accept that opening the case yields everything; a PIN at every boot.
+**Approved by:** richmosko (2026-11-08)
