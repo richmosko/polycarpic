@@ -205,7 +205,7 @@ flowchart TD
   home([Visitor on Home]) -- Sign in --> login[Login]
   home -- Get started --> gs{Get started:\ninvited to\nthis instance?}
   invite([Invite link from\nan entity owner]) --> signup
-  login -- "Have an invite?\nCreate your account" --> signup[Sign up:\ninvite code, then account\nGoogle or email + password]
+  login -- "Have an invite?\nCreate your account" --> signup[Sign up:\ninvite code, then account\nGoogle, Apple, GitHub\nor email + password]
   login -- "No invite?\nSet up your own instance" --> gs
   login -- enter login credentials --> known{Known device?}
   known -- yes --> landed([Dashboard])
@@ -222,10 +222,10 @@ flowchart TD
     <li><strong>Get started is one page, not a modal.</strong> The fork sits on top as two cards ("I have an invite" → Sign up; "I'm setting up my own instance" → the walkthrough directly below), so a self-hosting visitor never leaves the page and the walkthrough has room to grow. <em>Alternative:</em> a modal from Home's Get started button holding just the two cards; lighter on Home, but the walkthrough then needs its own page anyway.</li>
     <li><strong>Login shows the same branch.</strong> Its account line reads "Have an invite? <strong>Create your account</strong>" (to Sign up) and "No invite? <strong>Set up your own instance</strong>" (to Get started).</li>
     <li><strong>Every sign-in lands on a dashboard.</strong> Account creation also creates the user's own Person entity, so there is no signed-in state without an entity (design-system-spec.md § Entities &amp; membership). Login lands on the last-viewed entity, else that Person entity; the operator's first sign-in after setup lands on the operator's own Person entity.</li>
-    <li><strong>Sign up is invite-gated.</strong> The code arrives pre-filled and validated from an invite link, or is typed. A valid invite names the inviter and the entity. The invite is common to both account paths (Google, or email + password), and creating the account lands on the dashboard of the invited entity.</li>
+    <li><strong>Sign up is invite-gated.</strong> The code arrives pre-filled and validated from an invite link, or is typed. A valid invite names the inviter and the entity. The invite is common to both account paths (Google, Apple or GitHub, or email + password), and creating the account lands on the dashboard of the invited entity.</li>
     <li>An invalid or used code keeps the visitor on Sign up with an inline error under the field; it never sends them to a dead end.</li>
-    <li><strong>A second step for owners and managers.</strong> An invitee joining as owner or manager sets up an authenticator app or a passkey on Sign up before landing, then receives backup codes; a viewer is offered the same step with <strong>Skip for now</strong>. Choosing Google exempts no one. Sign in asks for the code or passkey only on a new device. Flow 5.11.</li>
-    <li><strong>Home box on a <code>.local</code> name.</strong> Login and Sign up render no Google or Apple button and no "or" divider; one line in their place reads "Google and Apple sign-in are not available on this home box, because it runs on a local network name (polycarpic.local). Sign in with your email, password and second step." (<code>login.html#local</code>). On a home box with a real domain, the buttons show as usual.</li>
+    <li><strong>A second step for owners and managers.</strong> An invitee joining as owner or manager sets up an authenticator app or a passkey on Sign up before landing, then receives backup codes; a viewer is offered the same step with <strong>Skip for now</strong>. Choosing Google, Apple or GitHub exempts no one. Sign in asks for the code or passkey only on a new device. Flow 5.11.</li>
+    <li><strong>Home box on a <code>.local</code> name.</strong> Login and Sign up render no Google, Apple or GitHub button and no "or" divider; one line in their place reads "Google, Apple and GitHub sign-in are not available on this home box, because it runs on a local network name (polycarpic.local). Sign in with your email, password and second step." (<code>login.html#local</code>). On a home box with a real domain, the buttons show as usual.</li>
   </ul>
 
   <h3 id="flow-dashboard-glance">5.2 Dashboard glance</h3>
@@ -591,7 +591,7 @@ flowchart TD
   raise([Viewer raised to manager\nor owner, approvals done]) --> held[Role waits:\nviewer access kept,\nnotice to set up a second step]
   held --> enrol[Set up a second step:\nauthenticator app or passkey,\nthen ten backup codes]
   enrol --> active([New role in force])
-  signin([Sign in on a new device]) --> ask[Password, or Google,\nthen code or passkey]
+  signin([Sign in on a new device]) --> ask[Password, or Google /\nApple / GitHub,\nthen code or passkey]
   ask --> known([Signed in; the device asks\nnothing more until the session ends])
   risky([Export, purge, grant access,\nlink a bank, answer a request]) --> fresh{Checked in the\nlast 5 minutes?}
   fresh -- yes --> go([Action runs])
@@ -601,11 +601,11 @@ flowchart TD
   reset --> enrol
   </pre>
   <ul>
-    <li><strong>Required for owners and managers, offered to viewers.</strong> Anyone joining as owner or manager sets up an authenticator app or a passkey on Sign up, before landing (<code>sign-up.html#second-step</code>). A viewer sees the same step with <strong>Skip for now</strong>. Signing up or in with Google or Apple exempts no one, because the app cannot see the provider's own second factor.</li>
+    <li><strong>Required for owners and managers, offered to viewers.</strong> Anyone joining as owner or manager sets up an authenticator app or a passkey on Sign up, before landing (<code>sign-up.html#second-step</code>). A viewer sees the same step with <strong>Skip for now</strong>. Signing up or in with Google, Apple or GitHub exempts no one, because the app cannot see the provider's own second factor.</li>
     <li><strong>Two methods, then backup codes.</strong> The choice is two radio cards, Authenticator app (a QR code, the key typed out, and a 6-digit check) or Passkey. Ten single-use backup codes follow, shown once.</li>
     <li><strong>A role raise waits for the second step.</strong> When a viewer without one is raised to manager or owner (after any co-owner approval), the new role does not take effect until they set one up; they keep viewer access meanwhile, and the notice "You are now a manager of &lt;entity&gt;. Set up a second sign-in step to start; until then you keep viewer access." links to Settings → Sign-in and second step. The members list shows their new role with an outline <code>Waiting for second step</code> badge.</li>
-    <li><strong>Asked on a new device, not every time.</strong> After the password (or Google), a new device asks for the code, with <strong>Use a passkey instead</strong> and <strong>Use a backup code</strong> below (<code>login.html#second-step</code>). A known device asks nothing until its session ends.</li>
-    <li><strong>Step-up before risky actions.</strong> Export, purge, granting access or changing a role, linking or unlinking a bank, answering a co-owner request, forcing a removal, transferring the founder role, deleting the account, and removing a second-step method each open <strong>Confirm it's you</strong> unless the user was checked in the last 5 minutes: password and code, or a passkey. A Google-only user is sent to Google to sign in again, then asked for the code. The dialog names the action ("Exporting Mosko (Person) needs a fresh check") and says it won't ask again for 5 minutes.</li>
+    <li><strong>Asked on a new device, not every time.</strong> After the password (or an OAuth provider), a new device asks for the code, with <strong>Use a passkey instead</strong> and <strong>Use a backup code</strong> below (<code>login.html#second-step</code>). A known device asks nothing until its session ends.</li>
+    <li><strong>Step-up before risky actions.</strong> Export, purge, granting access or changing a role, linking or unlinking a bank, answering a co-owner request, forcing a removal, transferring the founder role, deleting the account, and removing a second-step method each open <strong>Confirm it's you</strong> unless the user was checked in the last 5 minutes: password and code, or a passkey. A user without a password (Google, Apple or GitHub only) is sent to that provider to sign in again, then asked for the code. The dialog names the action ("Exporting Mosko (Person) needs a fresh check") and says it won't ask again for 5 minutes.</li>
     <li><strong>Settings → Sign-in and second step</strong> lists each method with the date it was added and <strong>Remove</strong>, <strong>Add passkey</strong>, the backup codes left with <strong>Make new codes</strong>, and <strong>Change password</strong>. While the user is an owner or manager anywhere, the last method has no Remove, and the panel says why.</li>
     <li><strong>Lockout.</strong> "Lost every method? The person who runs this instance can reset your second step." There is no in-app recovery: the operator's audited reset on the box is the path.</li>
   </ul>
