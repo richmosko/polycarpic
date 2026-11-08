@@ -448,7 +448,7 @@ flowchart LR
   <ul>
     <li>A cron function cannot run <code>pg_dump</code> or ship WAL, so the Compose mechanism does not apply.</li>
     <li><strong>Default (v1.0, no new trust):</strong> rely on Neon's point-in-time restore for the plan in use (window unmeasured; read it on the plan page at deploy time and record it here), and run <code>polycarpic-ops neon-export</code> <strong>from the operator's laptop weekly</strong>: <code>pg_dump</code> through a read-only role, age-encrypted to the same public key, uploaded with the put-only credential to the same bucket. RPO is then up to 7 days beyond Neon's window, stated honestly.</li>
-    <li><strong>Ruled (Principal, 2026-11-08, Q5): the weekly operator-run export stands; no database credential is held in GitHub.</strong> Revisit with SecEng only if real data ever lands on the tertiary target; a nightly Actions export would make GitHub a holder of a ledger-read credential (TB-12) and needs a SecEng ruling first (OQ-INFRA-1, S-6).
+    <li><strong>Ruled (Principal, 2026-11-08, Q5): the weekly operator-run export stands; no database credential is held in GitHub.</strong> Revisit with SecEng only if real data ever lands on the tertiary target; a nightly Actions export would make GitHub a holder of a ledger-read credential (TB-12) and needs a SecEng ruling first (OQ-INFRA-1, S-6).</li>
     <li>Restore: create a Neon project, run <code>polycarpic-ops restore --dump</code> from the laptop (§8.10), repoint the Vercel variables, redeploy.</li>
   </ul>
 
