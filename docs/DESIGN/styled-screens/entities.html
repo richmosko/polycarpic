@@ -222,7 +222,7 @@
         <p class="card-sub">Step 2 of 3 · Check your email</p>
         <p>We sent a code to <span class="mono">m•••@example.com</span>. This confirms it's really you before your first second step is set up.</p>
         <div class="auth-field"><label for="gate-email-code">Code from the email</label><input id="gate-email-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="" placeholder="000000"></div>
-        <p class="card-sub">The code works once and expires shortly. Didn't get it? Check spam, or <a class="je-link" href="#">resend the code</a>.</p>
+        <p class="card-sub">This code works for 10 minutes, once, in this window. Didn't get it? Check spam, or <a class="je-link" href="#">resend the code</a>.</p>
         <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Continue</button></div>
       </div></div>
       <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Set up a second step first, step 2 of 3, code not accepted" style="max-width:520px;">
@@ -230,7 +230,7 @@
         <div class="je-modal-subtitle">Creating Family Trust makes you its owner. Owners confirm sign-ins with a second step, so a stolen password alone can't reach the books.</div>
         <p class="card-sub">Step 2 of 3 · Check your email — the code was not accepted</p>
         <p>We sent a code to <span class="mono">m•••@example.com</span>. This confirms it's really you before your first second step is set up.</p>
-        <div class="auth-field"><label for="gate-email-code-err">Code from the email</label><input id="gate-email-code-err" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="482913" aria-invalid="true" aria-describedby="gate-email-code-msg"><div class="cap-error" id="gate-email-code-msg" role="alert">That code is wrong or has expired. Check the latest email, or resend the code.</div></div>
+        <div class="auth-field"><label for="gate-email-code-err">Code from the email</label><input id="gate-email-code-err" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="482913" aria-invalid="true" aria-describedby="gate-email-code-msg"><div class="cap-error" id="gate-email-code-msg" role="alert">That code is wrong or has expired. Check the latest email, or resend the code. After 5 wrong tries a code stops working.</div></div>
         <p class="card-sub">Didn't get it? Check spam, or <a class="je-link" href="#">resend the code</a>. A new code replaces the last one.</p>
         <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Continue</button></div>
       </div></div>
@@ -244,7 +244,7 @@
         </div>
         <div class="enrol-row"><div class="qr-box" role="img" aria-label="QR code for your authenticator app"></div><div>Scan this with your authenticator app, or enter the key by hand:<div class="mono" style="margin-top:6px;color:var(--foreground);">JBSW Y3DP EHPK 3PXP</div></div></div>
         <div class="auth-field"><label for="gate-code">Enter the 6-digit code it shows</label><input id="gate-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>
-        <p class="card-sub">Next you get ten backup codes to keep somewhere safe, then Family Trust is created. Before an export, purge, grant or bank link, Confirm it's you follows, with the method you just set up.</p>
+        <p class="card-sub">Next you get ten backup codes to keep somewhere safe, then Family Trust is created. Setting up counts as your fresh check: an export, purge, grant or bank link goes ahead without asking again for 5 minutes.</p>
         <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Turn on and continue</button></div>
       </div></div>
     </div>
