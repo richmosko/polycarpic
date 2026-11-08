@@ -36,7 +36,7 @@ BASE="http://127.0.0.1:${PORT}"
 
 DOCS=("$@")
 if [ ${#DOCS[@]} -eq 0 ]; then
-  DOCS=(PRD ARCH SECURITY DESIGN)
+  DOCS=(PRD ARCH SECURITY INFRA DESIGN)
 fi
 
 # ── Locate a Chromium-family browser ────────────────────────────────────────

@@ -413,3 +413,15 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the Principal asked to resolve the measurement rather than leave it to Implement. On R-12: "accept as measured" at no cost, against a patch maintained on every upgrade.
 **Alternatives considered:** patch or fork BetterAuth to hash session tokens.
 **Approved by:** richmosko (2026-11-08)
+
+### 2026-11-08 — INFRA v1 vendor and location choices: Cloudflare DNS, Hetzner EU, Backblaze B2 Object Lock, Healthchecks.io
+**Decision:** the domain's name servers move to Cloudflare's free DNS in DNS-only mode, so the home box holds one zone-scoped token for its wildcard certificate. The primary Hetzner VPS is in an EU location (devops picks the site). Backups go to a Backblaze B2 bucket with Object Lock in compliance mode (35-day lock), the box holding a put-only key and the operator a separate read key, over port 443; Hetzner Object Storage is an alternative once its lock is verified and the Storage Box is the fallback only. Both boxes send heartbeat pings to Healthchecks.io's free tier, which emails the operator when they stop and holds no data.
+**Why:** the Principal chose each from devops's options in INFRA §10.1. Cloudflare has a maintained Caddy plugin and scoped tokens; the EU sites are cheaper with a larger traffic allowance and latency is invisible for this app; the Storage Box has no documented immutable mode and its SFTP port is blocked by the home box's outbound allowlist (SECURITY C-76); without an outside monitor a dead box and a dead email relay fail silently together.
+**Alternatives considered:** the registrar's own DNS; a US Hetzner site; Hetzner Object Storage or Storage Box; UptimeRobot or no monitor.
+**Approved by:** richmosko (2026-11-08)
+
+### 2026-11-08 — Tertiary-target backups are weekly and manual; no passphrase fallback for the home box; no spare box
+**Decision:** on the Vercel + Neon tertiary target the self-held backup is a weekly operator-run encrypted export, with Neon's point-in-time restore for the rest, and no database credential in GitHub; revisited with seceng only if real data ever lands there. If the home box's hardware cannot bind the TPM at setup, the runbook stops and different hardware is used; the automatic-unlock ruling of 2026-11-07 stands and no passphrase-at-boot path is designed. Home-box recovery is the rented-Hetzner break-glass restore (about four hours of work, one-day RTO), the same drill as the GA restore gate; no spare machine is kept.
+**Why:** a nightly Actions export would make GitHub a holder of ledger-read access for a target that may never carry real data; a passphrase box stays down after every power cut; a day without a household ledger loses nothing, since syncs catch up, and the spare would cost money and upkeep.
+**Alternatives considered:** nightly GitHub Actions export; passphrase at every boot; a spare mini PC.
+**Approved by:** richmosko (2026-11-08)
