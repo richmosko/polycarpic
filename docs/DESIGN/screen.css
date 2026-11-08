@@ -2029,15 +2029,16 @@ table.data-table.cap-table tr.cap-add td { border-bottom: 1px solid var(--border
 html[data-state="default"] .auth-state[data-state="default"],
 html[data-state="local"] .auth-state[data-state="local"],
 html[data-state="second-step"] .auth-state[data-state="second-step"] { display: block; }
-.auth-note { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); font-size: 13px; color: var(--muted-foreground); }
+.auth-note { text-align: left; display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); font-size: 13px; color: var(--muted-foreground); }
 .auth-note .icon { flex: none; margin-top: 1px; }
 .code-input { font-family: var(--font-mono); font-size: 20px; letter-spacing: 0.4em; text-align: center; }
-.factor-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.factor-choice { text-align: left; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
 .factor-choice .fork-card { padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 .factor-choice .fork-card[aria-checked="true"] { border-color: var(--ring); box-shadow: 0 0 0 1px var(--ring); }
 .factor-choice .fork-card p { font-size: 13px; }
+.factor-choice .fork-card .card-title { display: flex; align-items: center; gap: 6px; font-size: 15px; }
 .qr-box { width: 132px; height: 132px; border: 1px solid var(--border); border-radius: var(--radius-md); background: repeating-conic-gradient(var(--foreground) 0 25%, var(--card) 0 50%) 0 0 / 12px 12px; flex: none; }
-.enrol-row { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; font-size: 13px; color: var(--muted-foreground); }
+.enrol-row { text-align: left; display: flex; gap: 16px; align-items: flex-start; margin-bottom: 16px; font-size: 13px; color: var(--muted-foreground); }
 .backup-codes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-md); font-family: var(--font-mono); font-size: 13px; }
 .consent-text { margin: 12px 0; padding: 12px 14px; border-left: 3px solid var(--ring); background: var(--muted); border-radius: 0 var(--radius-md) var(--radius-md) 0; font-size: 14px; }
 .consent-text p { margin: 0 0 6px; }
