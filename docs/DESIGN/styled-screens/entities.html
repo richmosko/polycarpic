@@ -207,18 +207,44 @@
       </div>
     </div>
     <div class="card" style="margin-top:24px;" id="second-step-first">
-      <span class="eyebrow">Create entity, no second step yet (reference). The same dialog opens before the first invite to your own Person, and before export, purge, granting access, linking a bank and deleting the account.</span>
-      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Set up a second step first" style="max-width:520px;">
+      <span class="eyebrow">Create entity, no second step yet (reference): three steps in one dialog, password, the emailed code, then the method. The same dialog opens before the first invite to your own Person, and before export, purge, granting access and linking a bank. Deleting the account asks for the password and the emailed code only (Settings).</span>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Set up a second step first, step 1 of 3" style="max-width:520px;">
         <div class="je-modal-title">Set up a second step first</div>
         <div class="je-modal-subtitle">Creating Family Trust makes you its owner. Owners confirm sign-ins with a second step, so a stolen password alone can't reach the books.</div>
+        <p class="card-sub">Step 1 of 3 · Your password</p>
         <div class="auth-field"><label for="gate-pw">Password</label><input id="gate-pw" class="input" type="password" value="••••••••••••"></div>
+        <p class="card-sub">Signed in with Google, Apple or GitHub? You are sent to that provider to sign in again in place of the password.</p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Continue</button></div>
+      </div></div>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Set up a second step first, step 2 of 3" style="max-width:520px;">
+        <div class="je-modal-title">Set up a second step first</div>
+        <div class="je-modal-subtitle">Creating Family Trust makes you its owner. Owners confirm sign-ins with a second step, so a stolen password alone can't reach the books.</div>
+        <p class="card-sub">Step 2 of 3 · Check your email</p>
+        <p>We sent a code to <span class="mono">m•••@example.com</span>. This confirms it's really you before your first second step is set up.</p>
+        <div class="auth-field"><label for="gate-email-code">Code from the email</label><input id="gate-email-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="" placeholder="000000"></div>
+        <p class="card-sub">The code works once and expires shortly. Didn't get it? Check spam, or <a class="je-link" href="#">resend the code</a>.</p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Continue</button></div>
+      </div></div>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Set up a second step first, step 2 of 3, code not accepted" style="max-width:520px;">
+        <div class="je-modal-title">Set up a second step first</div>
+        <div class="je-modal-subtitle">Creating Family Trust makes you its owner. Owners confirm sign-ins with a second step, so a stolen password alone can't reach the books.</div>
+        <p class="card-sub">Step 2 of 3 · Check your email — the code was not accepted</p>
+        <p>We sent a code to <span class="mono">m•••@example.com</span>. This confirms it's really you before your first second step is set up.</p>
+        <div class="auth-field"><label for="gate-email-code-err">Code from the email</label><input id="gate-email-code-err" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="482913" aria-invalid="true" aria-describedby="gate-email-code-msg"><div class="cap-error" id="gate-email-code-msg" role="alert">That code is wrong or has expired. Check the latest email, or resend the code.</div></div>
+        <p class="card-sub">Didn't get it? Check spam, or <a class="je-link" href="#">resend the code</a>. A new code replaces the last one.</p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Continue</button></div>
+      </div></div>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Set up a second step first, step 3 of 3" style="max-width:520px;">
+        <div class="je-modal-title">Set up a second step first</div>
+        <div class="je-modal-subtitle">Creating Family Trust makes you its owner. Owners confirm sign-ins with a second step, so a stolen password alone can't reach the books.</div>
+        <p class="card-sub">Step 3 of 3 · Choose your second step</p>
         <div class="factor-choice" role="radiogroup" aria-label="Second step method">
           <div class="fork-card" role="radio" aria-checked="true" tabindex="0"><div class="card-title"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span> Authenticator app</div><p>A 6-digit code from an app on your phone. Works on every device.</p></div>
           <div class="fork-card" role="radio" aria-checked="false" tabindex="-1"><div class="card-title"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span> Passkey</div><p>Touch ID, Face ID or a security key on this device.</p></div>
         </div>
         <div class="enrol-row"><div class="qr-box" role="img" aria-label="QR code for your authenticator app"></div><div>Scan this with your authenticator app, or enter the key by hand:<div class="mono" style="margin-top:6px;color:var(--foreground);">JBSW Y3DP EHPK 3PXP</div></div></div>
         <div class="auth-field"><label for="gate-code">Enter the 6-digit code it shows</label><input id="gate-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000"></div>
-        <p class="card-sub">Next you get ten backup codes to keep somewhere safe, then Family Trust is created. Before an export, purge, grant or bank link, Confirm it's you follows, with the method you just set up. Signed in with Google, Apple or GitHub? You are sent to that provider to sign in again in place of the password.</p>
+        <p class="card-sub">Next you get ten backup codes to keep somewhere safe, then Family Trust is created. Before an export, purge, grant or bank link, Confirm it's you follows, with the method you just set up.</p>
         <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Turn on and continue</button></div>
       </div></div>
     </div>
