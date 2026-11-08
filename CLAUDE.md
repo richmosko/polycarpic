@@ -22,6 +22,7 @@ This repo was bootstrapped from [project_template](https://github.com/richmosko/
 | Product Requirements | [`docs/PRD/index.html`](docs/PRD/index.html) | product-manager |
 | Architecture & Infrastructure | [`docs/ARCH/index.html`](docs/ARCH/index.html) | architect |
 | Security & Compliance | [`docs/SECURITY/index.html`](docs/SECURITY/index.html) | seceng |
+| Infrastructure & Operations | [`docs/INFRA/index.html`](docs/INFRA/index.html) | devops-engineer |
 | Design System & UX | [`docs/DESIGN/index.html`](docs/DESIGN/index.html) | ux-designer |
 | Workflow definition | [`process/WORKFLOW.md`](process/WORKFLOW.md) | team-lead (the main session) |
 | Tracker spec (cairn) | [`process/TRACKER.md`](process/TRACKER.md) | architect |
