@@ -473,3 +473,336 @@ flowchart LR
     </tbody>
   </table>
 </section>
+
+<!-- ============================================================ -->
+<section id="deploy-runbook" data-section="deploy-runbook">
+  <h2>7. Deployment Runbook</h2>
+  <p class="section-hint">Written for someone who has not run a server before. Every step has the command, what you should see, and what to do if you do not. Do the steps in order and do not skip the checks. Commands marked <code>laptop$</code> run on your own computer, <code>box$</code> on the server. <code>polycarpic-ops</code> is the small operator tool the repository ships under <code>infra/</code>; its subcommands are specified here and built under POLY-M1.</p>
+
+  <blockquote><strong>Before you start.</strong> No real books exist before v1.0 (Principal, 2026-11-06). Until then, do §7.1 with <em>staging only</em> to learn the process with fake data; the prod steps are marked <em>(from v1.0)</em>. If any step fails twice, stop and ask. Do not improvise on a box that will hold real data.</blockquote>
+
+  <h3 id="rb-prereq">7.0 What you need before step 1</h3>
+  <table>
+    <thead><tr><th>Item</th><th>Why</th><th>Cost (unmeasured)</th></tr></thead>
+    <tbody>
+      <tr><td>A password manager you trust, with an emergency kit</td><td>Holds every key and recovery code</td><td>Whatever you use now</td></tr>
+      <tr><td>A domain name you own, and an account where you can edit its DNS</td><td>Names, certificates, sign-in providers</td><td>About 10 to 15 USD a year</td></tr>
+      <tr><td>A Hetzner Cloud account (card required, ID check possible)</td><td>The primary server</td><td>Roughly 10 to 15 EUR a month for the server, volume and backup</td></tr>
+      <tr><td>A bucket account with Object Lock (Principal question Q3)</td><td>Backups</td><td>Cents a month at this size</td></tr>
+      <tr><td>A Resend account and a verified sending domain</td><td>Sign-in and security email</td><td>Free tier</td></tr>
+      <tr><td>A dead-man's-switch monitor account (Q4)</td><td>Tells you when the box goes quiet</td><td>Free tier</td></tr>
+      <tr><td>Your GitHub login, and the <code>gh</code> tool signed in</td><td>Pulling releases and checking they are genuine</td><td>Free</td></tr>
+      <tr><td>A Mac or Linux laptop with a terminal</td><td>Everything marked <code>laptop$</code></td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="rb-hetzner">7.1 Primary target: Hetzner VPS</h3>
+  <ol>
+    <li><strong>Install the tools on your laptop.</strong>
+      <pre class="cmd"><code>laptop$ brew install age hcloud gh git rclone nmap
+laptop$ age --version &amp;&amp; hcloud version &amp;&amp; gh --version | head -1</code></pre>
+      <p class="expect">Expect: a version line from each of the three. If <code>command not found</code>, the install failed: read the error from <code>brew</code>; on Linux use your package manager for the same names.</p></li>
+    <li><strong>Create your SSH key</strong> (your proof of identity to the server).
+      <pre class="cmd"><code>laptop$ ssh-keygen -t ed25519 -C "polycarpic-operator" -f ~/.ssh/polycarpic_ed25519
+laptop$ cat ~/.ssh/polycarpic_ed25519.pub</code></pre>
+      <p class="expect">Expect: it asks for a passphrase: set one, and store it in the password manager. The second command prints one line starting <code>ssh-ed25519</code>. Never share the file without <code>.pub</code>.</p></li>
+    <li><strong>Create the backup key</strong> (this is the most important key you will ever make).
+      <pre class="cmd"><code>laptop$ age-keygen -o polycarpic-backup.key
+Public key: age1...</code></pre>
+      <p class="expect">Expect: it prints <code>Public key: age1…</code>. Copy the public key line into a note called <code>backup-public-key</code>. Open <code>polycarpic-backup.key</code>, copy the whole file into the password manager as a secure note, and print one copy for the recovery sheet (§3.6). Then <code>rm polycarpic-backup.key</code>. If you lose this key, <strong>no backup can ever be opened</strong>; if someone else gets it, they can read every backup. Keep it off the server forever.</p></li>
+    <li><strong>Create the backup bucket and two keys</strong> (provider consoles differ; the settings do not). Create a bucket named <code>polycarpic-&lt;yourname&gt;-backups</code> with <strong>Object Lock enabled at creation</strong> (it cannot be added later), default retention <strong>Compliance mode, 35 days</strong>. Create one access key with permission to <em>write</em> objects only (no delete, no bypass-governance, no change-retention) and a second with <em>read and list</em> only.
+      <p class="expect">Expect: you now hold two key pairs. Store both in the password manager, labelled <code>bucket-put-only (goes on the server)</code> and <code>bucket-read (laptop only)</code>. Check: <code>rclone</code> with the read key can list the empty bucket. If the console offers only "governance" mode or no lock option, stop: choose another provider or ask (Q3).</p></li>
+    <li><strong>Hetzner project and API token.</strong> In the Hetzner Cloud console create a project named <code>polycarpic</code>, then Security → API tokens → Generate (Read &amp; Write). Copy the token once.
+      <pre class="cmd"><code>laptop$ hcloud context create polycarpic
+(paste the token when asked)
+laptop$ hcloud server list</code></pre>
+      <p class="expect">Expect: an empty table, no error. If it says <code>unauthorized</code>, the token was copied wrong: generate a new one.</p></li>
+    <li><strong>Get the repository and read the plan.</strong>
+      <pre class="cmd"><code>laptop$ git clone git@github.com:richmosko/polycarpic.git &amp;&amp; cd polycarpic
+laptop$ git tag -v v1.0.0     # from v1.0; before then use main</code></pre>
+      <p class="expect">Expect (from v1.0): <code>Good "git" signature for …</code>. If it says <code>BAD</code> or shows no signature, do not continue.</p></li>
+    <li><strong>Create the server, firewall and volume.</strong>
+      <pre class="cmd"><code>laptop$ infra/hetzner/create.sh --name polycarpic --location &lt;nearest&gt; \
+          --ssh-key ~/.ssh/polycarpic_ed25519.pub</code></pre>
+      <p class="expect">Expect: it prints the server's IPv4 and IPv6 addresses and ends with <code>created: server, firewall (22,80,443 in), volume 20 GB</code>. It is safe to run again; it skips what exists. If it says the location has no stock, choose another location. If it prints anything about opening ports other than 22, 80, 443, stop.</p></li>
+    <li><strong>Point your DNS at it.</strong> At your DNS host create <code>A</code> and <code>AAAA</code> records: <code>app</code> and <code>staging</code> → the two addresses. TTL 300.
+      <pre class="cmd"><code>laptop$ dig +short app.example.com A
+laptop$ dig +short app.example.com AAAA</code></pre>
+      <p class="expect">Expect: the server's addresses within a few minutes. If empty after 30 minutes, the records are on the wrong zone or have a typo.</p></li>
+    <li><strong>First login.</strong>
+      <pre class="cmd"><code>laptop$ ssh -i ~/.ssh/polycarpic_ed25519 polyops@app.example.com
+box$ cloud-init status --wait</code></pre>
+      <p class="expect">Expect: the first time, a question about the host fingerprint: compare it with the one in the Hetzner console (server → Console shows it in the boot log) before typing <code>yes</code>. Then <code>status: done</code>. If <code>status: error</code>, run <code>sudo cat /var/log/cloud-init-output.log | tail -50</code> and ask; do not continue. If login is refused, the key in step 7 was not the one in step 2.</p></li>
+    <li><strong>Hand the box its three public facts</strong> (nothing secret yet).
+      <pre class="cmd"><code>laptop$ scp -i ~/.ssh/polycarpic_ed25519 \
+          ~/.config/polycarpic/allowed_signers \
+          polyops@app.example.com:/tmp/allowed_signers
+laptop$ ssh polyops@app.example.com "echo 'age1...yourpublickey' | sudo tee /etc/polycarpic/backup.pub"</code></pre>
+      <p class="expect">Expect: the file copy shows 100 percent. <code>allowed_signers</code> is your own copy of the release-signing public keys (make it from the key <code>/merge-pr</code> signs with, once; keep it in the password manager). It must not come from the repository (§3.3).</p></li>
+    <li><strong>Provision the box.</strong>
+      <pre class="cmd"><code>box$ sudo polycarpic-ops provision --target hetzner --domain example.com
+box$ sudo polycarpic-ops provision-check</code></pre>
+      <p class="expect">Expect: <code>provision</code> prints each stage and ends <code>done</code>; <code>provision-check</code> ends <code>ALL CHECKS PASSED</code>, listing: SSH key-only and no root login; unattended upgrades on; Docker installed; the data volume encrypted and mounted at <code>/srv/polycarpic</code>; swap off; secrets directory 0700 and empty of anything but generated files; deploy timer enabled. Any line that says <code>FAIL</code> names the fix; rerun <code>provision</code> and then the check. Do not continue past a FAIL.</p></li>
+    <li><strong>Enter the provider secrets.</strong> For each secret in the list below, run the command and paste the value when prompted (nothing is shown as you type).
+      <pre class="cmd"><code>box$ sudo polycarpic-ops set-secret resend_api_key
+box$ sudo polycarpic-ops set-secret backup_store_credential   # the PUT-ONLY pair
+box$ sudo polycarpic-ops set-secret heartbeat_url
+box$ sudo polycarpic-ops set-secret oauth_google_secret      # and the other providers you use
+box$ sudo polycarpic-ops list-secrets</code></pre>
+      <p class="expect">Expect: <code>list-secrets</code> prints names, sizes and permissions (<code>0400 root</code>), never values. For staging add <code>--staging</code> to each command and use sandbox values only. Missing a required one is not a problem now: the first start tells you which. Never paste a secret into a chat, an issue or a file in the repository.</p></li>
+    <li><strong>First deploy of staging.</strong>
+      <pre class="cmd"><code>box$ sudo polycarpic-ops first-deploy staging
+box$ sudo polycarpic-ops init-keyring --staging</code></pre>
+      <p class="expect">Expect: it pulls the newest <code>main</code> image, prints <code>attestation verified</code>, runs the config check and the migration, starts the containers and ends <code>healthy</code>. <code>init-keyring</code> prints the staging keyring once; staging's keyring may be lost freely (relink sandbox items), so do not worry about saving it. If it prints <code>attestation verification FAILED</code>: <strong>stop</strong>; do not override; check that <code>gh</code> on the box is signed in with the read token (<code>polycarpic-ops set-secret github_read_token</code>) and that the image really came from this repository.</p></li>
+    <li><strong>Prod (from v1.0): the keyring, then the first deploy, with the door closed.</strong>
+      <pre class="cmd"><code>box$ sudo polycarpic-ops first-deploy prod
+box$ sudo polycarpic-ops init-keyring</code></pre>
+      <p class="expect">Expect: <code>first-deploy prod</code> requires the signed tag check to pass and ends <code>healthy (maintenance page is serving)</code>: Caddy shows a static "not open yet" page for the prod name until you open it in step 16. <code>init-keyring</code> prints the prod keyring <strong>once</strong>: copy the whole block into the password manager (as a secure note separate from the age key) and the recovery sheet, then confirm with <code>polycarpic-ops keyring-fingerprint</code> that what you saved has the same fingerprint it prints. The keyring is not in any backup (SECURITY §6.4).</p></li>
+    <li><strong>Prove the outside world sees only what it should.</strong> From a machine <em>not</em> on the box's network (your laptop at home is fine for the Hetzner target):
+      <pre class="cmd"><code>laptop$ nmap -Pn -p- app.example.com
+laptop$ nmap -Pn -6 -p- app.example.com
+laptop$ curl -sI https://app.example.com | head -5
+laptop$ ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no polyops@app.example.com</code></pre>
+      <p class="expect">Expect: exactly three open ports, 22, 80 and 443, in both scans (a full scan can take 10 to 20 minutes). The <code>curl</code> shows <code>HTTP/2 200</code> (staging) or the maintenance response (prod) over a valid certificate. The last command ends <code>Permission denied (publickey)</code>. Any other open port, especially 5432, 2375 or 3000, means a containment failure: close it (<code>polycarpic-ops lockdown</code> stops all containers except Caddy), and tell the team-lead before doing anything else.</p></li>
+    <li><strong>Make the bootstrap user</strong> (needs SECURITY change S-1, §9.2: an invitation on an empty instance, so the first sign-up cannot be won by a stranger).
+      <pre class="cmd"><code>box$ sudo polycarpic-ops cli user invite you@example.com --bootstrap</code></pre>
+      <p class="expect">Expect: it prints "invitation recorded" and emails you a sign-up link; the link works only for that address. If no email arrives within 5 minutes, check the Resend dashboard and the spam folder; <code>polycarpic-ops logs web | tail -50</code> shows the send result without any secret.</p></li>
+    <li><strong>Open the door, sign up, and set the second step.</strong>
+      <pre class="cmd"><code>box$ sudo polycarpic-ops open prod</code></pre>
+      <p class="expect">Expect: <code>prod is open</code>. Click your emailed link, create a password, confirm the emailed code, and set up an authenticator app as your second step. Save the backup codes in the password manager. If you are asked to sign in before an invitation exists, step 15 did not complete: run <code>polycarpic-ops close prod</code> and repeat from 15.</p></li>
+    <li><strong>First backup, on demand.</strong>
+      <pre class="cmd"><code>box$ sudo systemctl start polycarpic-backup.service
+box$ sudo polycarpic-ops status</code></pre>
+      <p class="expect">Expect: the service ends <code>Finished</code>; <code>status</code> shows a backup time of a few minutes ago and a heartbeat OK, and your monitor shows the check green. If the upload fails with an access error, the put-only key was pasted wrong; if it fails with a lock error, the bucket's Object Lock is not enabled (step 4).</p></li>
+    <li><strong>First restore drill, from your laptop</strong> (this is a v1.0 gate; do it now while it holds nothing, and monthly after).
+      <pre class="cmd"><code>laptop$ infra/drill.sh --bucket polycarpic-&lt;yourname&gt;-backups</code></pre>
+      <p class="expect">Expect: it asks for the read key and the age private key file (paste it from the password manager into a temporary file it deletes afterwards), restores into a scratch Postgres on your laptop, and ends <code>DRILL PASSED</code> with the five checks of §6.7, including <code>delete attempt: DENIED</code>. A <code>FAILED</code> line names the check. Do not go live with real data until this passes.</p></li>
+  </ol>
+
+  <h3 id="rb-home">7.2 Secondary target: the local-network box</h3>
+  <p>Do §7.1 steps 1, 3, 4, 5 and 10 to 12 and 17 to 19 unchanged (names and addresses differ). This section covers what is different: the hardware, the disk, the network lockdown and TLS. Do all of it <em>before</em> any real data touches the box.</p>
+  <ol>
+    <li><strong>Hardware and firmware.</strong> A small x86-64 PC with a TPM 2.0 (listed as fTPM, PTT or "Security Device" in the firmware), wired Ethernet, an SSD, and a UPS. In the firmware setup (usually Delete or F2 at power-on), do the whole checklist:
+      <ul>
+        <li>Update the firmware to the manufacturer's latest.</li>
+        <li>Set a <strong>setup (administrator) password</strong>; store it in the password manager.</li>
+        <li>Secure Boot <strong>on</strong>, in user or deployed mode with the factory keys (not "setup mode").</li>
+        <li>TPM <strong>enabled</strong>.</li>
+        <li>Boot from USB and from network (PXE): <strong>disabled</strong>. Boot order: the internal SSD only. (Temporarily enable USB for the install in step 2, then disable it again in step 8.)</li>
+        <li>"After power loss": <strong>power on</strong>.</li>
+      </ul>
+      <p class="expect">Expect: the settings stick after a save and reboot. If the machine has no setup-password option, it is not suitable for this role (the firmware password is the control, C-72): choose different hardware.</p></li>
+    <li><strong>Install Ubuntu Server 24.04 LTS</strong> from a USB stick (download from ubuntu.com; verify its checksum there). In the installer: language, keyboard, wired network (static address later), "Ubuntu Server (minimized)" is fine; storage: <strong>custom</strong>, make a 1 GB EFI partition, an 80 GB ext4 partition mounted at <code>/</code>, and leave the rest <strong>unformatted</strong> (the encrypted data partition comes in step 6); name the server <code>polycarpic</code>; create user <code>polyops</code> with a long password you keep in the password manager; tick "Install OpenSSH server" and import your SSH key from GitHub; no extra snaps.
+      <p class="expect">Expect: it reboots to a login prompt. If it does not boot, re-check that the SSD is first in the boot order.</p></li>
+    <li><strong>Give it a fixed address.</strong> In your router, reserve the box's current address for its network card (DHCP reservation). Write the address down.
+      <p class="expect">Expect: after a reboot of the box, it has the same address. Check from the laptop: <code>ssh -i ~/.ssh/polycarpic_ed25519 polyops@&lt;address&gt;</code> works.</p></li>
+    <li><strong>Router settings.</strong> Log in to the router. Confirm: no port forwarding rules; UPnP and NAT-PMP <strong>off</strong>; no "DMZ host"; IPv6 either off or its firewall set to block inbound. Screenshot the pages to the password manager's note for this box.
+      <p class="expect">Expect: all four true. If your router cannot turn UPnP off, replace the router before continuing: it can open the box to the internet without asking.</p></li>
+    <li><strong>Provision the host.</strong>
+      <pre class="cmd"><code>laptop$ scp -i ~/.ssh/polycarpic_ed25519 ~/.config/polycarpic/allowed_signers polyops@&lt;address&gt;:/tmp/
+box$ sudo polycarpic-ops provision --target home --lan-cidr 192.168.1.0/24 --data-device /dev/nvme0n1p3
+box$ sudo polycarpic-ops provision-check</code></pre>
+      <p class="expect">Expect: <code>provision-check</code> ends <code>ALL CHECKS PASSED</code>, covering: nftables default-deny with inbound 443 (80 redirects) and SSH from the LAN only; the <code>DOCKER-USER</code> drop rule for non-LAN sources; Caddy's publish address equals the LAN address; IPv6 disabled; outbound limited to DNS, NTP and 443 (the check tries port 25 and 8080 and expects failure); sshd key-only without root login; swap off. Find the device name first with <code>lsblk</code>: the right one is the large unformatted partition. Picking the wrong device destroys data: the script refuses a device that has a filesystem.</p></li>
+    <li><strong>Encrypt the data partition and bind it to the TPM.</strong> (The script wraps the commands below; shown so you know what happens.)
+      <pre class="cmd"><code>box$ sudo polycarpic-ops disk-init --device /dev/nvme0n1p3
+   # = cryptsetup luksFormat --type luks2  (asks for the RECOVERY PASSPHRASE)
+   # + systemd-cryptenroll --tpm2-device=auto --tpm2-pcrs=7
+   # + crypttab entry with tpm2-device=auto, mount at /srv/polycarpic
+box$ sudo reboot
+box$ sudo systemd-cryptenroll /dev/nvme0n1p3</code></pre>
+      <p class="expect">Expect: <code>disk-init</code> asks you to <strong>type a new long recovery passphrase</strong>: generate it in the password manager (six or more random words) and also write it on the recovery sheet. After the reboot the box comes back <em>without</em> asking for a passphrase, and the last command lists two slots: <code>password</code> and <code>tpm2</code>. On this box the secrets directory lives on the encrypted partition too, so a pulled disk yields no secrets. If the reboot waits for a passphrase, the TPM slot did not bind: type the recovery passphrase to continue, then see <em>Troubleshooting</em> below. PCR 11 is deliberately not used (§3.5).</p></li>
+    <li><strong>Prove the disk stays locked when the machine is tampered with.</strong> Enter the firmware setup, turn <strong>Secure Boot off</strong>, save, and let it boot.
+      <p class="expect">Expect: Linux asks for the recovery passphrase instead of unlocking silently. That proves the key is tied to the Secure Boot state. Then go back into the firmware, turn Secure Boot <strong>on</strong>, save, reboot, and confirm it unlocks by itself again. If it unlocked silently with Secure Boot off, the TPM binding is not what it claims: do not store real data; re-run step 6 with <code>--tpm2-pcrs=7</code> and repeat.</p></li>
+    <li><strong>Harden the console.</strong> The script sets these and the check verifies them; in plain terms: no automatic console login; the emergency and single-user shells ask for a root password (set with <code>sudo passwd root</code>: long, random, saved in the password manager); the bootloader has a password and no editable or recovery entries. Now disable USB boot again in the firmware (the install is finished).
+      <pre class="cmd"><code>box$ sudo polycarpic-ops harden-console
+box$ sudo polycarpic-ops provision-check --console</code></pre>
+      <p class="expect">Expect: <code>ALL CHECKS PASSED</code>. As a hands-on test, power-cycle the box and at the boot menu press <code>e</code>: it must ask for the bootloader password.</p></li>
+    <li><strong>DNS and TLS: choose one mode and set it before first deploy.</strong> The mode is set by <code>TLS_MODE</code> in <code>/etc/polycarpic/host.env</code> and the app refuses to start on a mismatch. See 7.3 for each mode, then return here.</li>
+    <li><strong>Secrets, first deploy, keyring, outside-in check.</strong> Do §7.1 steps 12, 14, 15 (the keyring for prod), 16 and 17 with <code>--target home</code>. There is no staging on this box: run the process in staging on the Hetzner server first.
+      <p class="expect">Expect the same results, except the first-deploy check also prints <code>served certificate issuer matches TLS_MODE</code>.</p></li>
+    <li><strong>Outside-in scan of your home from outside.</strong> Use your phone on mobile data as a hotspot for the laptop (or a cloud shell). Find your home's public IPv4 address (visit any "what is my IP" page from home) and the box's IPv6 global address if it has one (<code>ip -6 addr</code> on the box; disabled means none).
+      <pre class="cmd"><code>laptop-off-LAN$ nmap -Pn -p- &lt;home-public-ipv4&gt;
+laptop-off-LAN$ nmap -Pn -6 -p- &lt;box-ipv6-if-any&gt;</code></pre>
+      <p class="expect">Expect: all ports <code>filtered</code> or <code>closed</code>, none open. Also try browsing to the box's name from mobile data: it must not resolve (real-domain mode) or not be found. Anything open: unplug the box's network cable, then fix the router or firewall (C-76).</p></li>
+    <li><strong>Outbound test.</strong>
+      <pre class="cmd"><code>box$ curl -sS --max-time 5 https://github.com -o /dev/null -w "%{http_code}\n"
+box$ curl -sS --max-time 5 http://example.com:8080 || echo blocked</code></pre>
+      <p class="expect">Expect: <code>200</code> (or a 3xx) for the first; <code>blocked</code> (a timeout) for the second.</p></li>
+  </ol>
+  <p><strong>Troubleshooting step 6.</strong> If the TPM slot will not bind: check <code>systemd-cryptenroll --tpm2-device=list</code> shows a device; confirm the firmware's TPM is enabled and in TPM 2.0 mode; confirm Secure Boot shows "enabled" in <code>mokutil --sb-state</code>. If it still fails, the machine's firmware is not suitable; the fallback is a passphrase at every boot, which needs a Principal decision because it changes P8 (question Q6).</p>
+
+  <h3 id="rb-tls">7.3 Home-box TLS, step by step</h3>
+  <h4>Mode A (default): real domain, DNS-01 wildcard</h4>
+  <ol>
+    <li>In the DNS host for your domain create an API token that can <strong>edit DNS records in this one zone only</strong> (for Cloudflare: My Profile → API Tokens → Create → "Edit zone DNS" template, Zone Resources → Include → Specific zone → your domain). Name it <code>polycarpic-home-caddy</code>.</li>
+    <li><code>box$ sudo polycarpic-ops set-secret dns_api_token</code> and paste it. Set <code>TLS_MODE=real-domain</code>, <code>PUBLIC_ORIGIN=https://polycarpic.home.example.com</code> in <code>/etc/polycarpic/host.env</code>.
+      <p class="expect">Expect: <code>list-secrets</code> shows the token, mounted only into <code>caddy</code> (<code>polycarpic-ops show-mounts</code>).</p></li>
+    <li><strong>Make the name resolve on your LAN only.</strong> Preferred: in the router's DNS settings add a local record <code>polycarpic.home.example.com → &lt;box address&gt;</code>. If your router cannot, add the line <code>192.168.1.20 polycarpic.home.example.com</code> to <code>/etc/hosts</code> (macOS/Linux) or <code>C:\Windows\System32\drivers\etc\hosts</code> on each device.
+      <pre class="cmd"><code>laptop-on-LAN$ dig +short polycarpic.home.example.com
+laptop-off-LAN$ dig +short polycarpic.home.example.com @1.1.1.1</code></pre>
+      <p class="expect">Expect: the first shows the box's address (or use <code>ping</code> if you used a hosts file); the second shows nothing. If the second shows an address, you published the box's name: delete that record at the DNS host.</p></li>
+    <li>First deploy requests the wildcard. Expect in <code>polycarpic-ops logs caddy</code>: <code>certificate obtained successfully</code> within about two minutes. Browse to the name from a LAN device: a normal padlock, issuer a public CA. If the order fails with <code>DNS problem</code>, the token's zone or permission is wrong; if with <code>rate limit</code>, wait an hour and do not retry in a loop.</li>
+    <li>Register your sign-in apps with Google, Apple and GitHub using the callback URL <code>https://polycarpic.home.example.com/api/auth/callback/&lt;provider&gt;</code>, then <code>set-secret</code> each client secret. GitHub asks for <code>read:user</code> and <code>user:email</code> only.</li>
+  </ol>
+  <h4>Mode B (fallback): <code>.local</code> with a private CA</h4>
+  <ol>
+    <li><strong>Make the CA on your laptop, not the box.</strong>
+      <pre class="cmd"><code>laptop$ infra/ca/ca.sh init --name polycarpic.local
+laptop$ infra/ca/ca.sh intermediate --out ./box-intermediate</code></pre>
+      <p class="expect">Expect: <code>root.crt</code> (public: this goes on devices), <code>root.key</code> (private: it must go into the password manager as a secure note, then be deleted from the laptop) and a folder with the intermediate cert and key. Running <code>ca.sh show root.crt</code> must print <code>Name Constraints: permitted DNS polycarpic.local</code>. If it does not, the CA is unconstrained: delete it and do not continue.</p></li>
+    <li>Copy only the intermediate to the box: <code>scp box-intermediate/* polyops@&lt;address&gt;:/tmp/</code>, then <code>box$ sudo polycarpic-ops install-intermediate /tmp/…</code>. Set <code>TLS_MODE=private-ca</code>, <code>PUBLIC_ORIGIN=https://polycarpic.local</code>. The root key never leaves the password manager.</li>
+    <li><strong>Install the root certificate on every device that will sign in:</strong>
+      <ul>
+        <li><em>macOS:</em> <code>sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain root.crt</code> (also needed in Firefox: Settings → Privacy &amp; Security → Certificates → Import, tick "trust to identify websites").</li>
+        <li><em>iPhone/iPad:</em> AirDrop <code>root.crt</code>, open it, install in Settings → Profile Downloaded; then Settings → General → About → Certificate Trust Settings → enable full trust.</li>
+        <li><em>Windows:</em> double-click, Install Certificate → Local Machine → "Trusted Root Certification Authorities".</li>
+        <li><em>Android:</em> Settings → Security → Encryption &amp; credentials → Install a certificate → CA certificate.</li>
+        <li><em>Linux:</em> copy to <code>/usr/local/share/ca-certificates/</code> and run <code>sudo update-ca-certificates</code>.</li>
+      </ul></li>
+    <li><strong>Gate item, once per browser and OS you use (R-20).</strong>
+      <pre class="cmd"><code>laptop$ infra/ca/ca.sh test-constraint
+   # issues a certificate for evil.example.com signed under the intermediate and serves it on https://127.0.0.1:8443 with a hosts-file line you add as it prints</code></pre>
+      <p class="expect">Expect: in each installed browser the page shows a certificate error (name constraint violated). If any browser loads it as trusted, that browser ignores the constraint: remove the root from that device and do not use that browser for this box, or move the box to Mode A. Record the result per browser in the ledger via the team-lead.</p></li>
+    <li>Make <code>polycarpic.local</code> resolve: most devices find it by themselves (mDNS). If not, add a router DNS record or a hosts-file line as in Mode A step 3. Open <code>https://polycarpic.local</code>: padlock, no warning. OAuth buttons are absent and OAuth routes return 404 by design; sign in with email, password and the second step. Passkeys on a <code>.local</code> name are unmeasured: use an authenticator app.</li>
+  </ol>
+  <h4>Moving a <code>.local</code> box to a real domain</h4>
+  <ol>
+    <li>Everyone who is an owner or manager must already have an authenticator app or backup codes (passkeys will not survive, because they are tied to the old name; every session ends). Check each member: <code>box$ polycarpic-ops cli user mfa-methods --all-owners</code> must show TOTP or backup codes for each. Anyone without: ask them to add one, or use <code>polycarpic-ops cli user reset-mfa &lt;email&gt;</code> on their behalf afterwards.</li>
+    <li>Tell the household first: everyone will be signed out once.</li>
+    <li>Do Mode A steps 1 to 4. Change <code>TLS_MODE</code> and <code>PUBLIC_ORIGIN</code>; <code>polycarpic-ops redeploy home</code>.
+      <p class="expect">Expect: the app starts and the served certificate chains to a public CA. If the app refuses to start with a mode message, the settings disagree: fix <code>host.env</code>.</p></li>
+    <li>Each person signs in with email, password and an authenticator code, then adds Google/Apple/GitHub from Settings while signed in. It is never linked automatically by matching email.</li>
+    <li><strong>Remove the old root from every device</strong> (reverse of the install steps), then delete the intermediate from the box (<code>polycarpic-ops remove-intermediate</code>). Keep the root key in the password manager for the record, or destroy it.</li>
+  </ol>
+
+  <h3 id="rb-vercel">7.4 Tertiary target: Vercel + Neon</h3>
+  <ol>
+    <li><strong>Neon.</strong> Create a project, same Postgres major as the other targets, nearest region. In the SQL editor create the login roles <code>poly_migrator</code>, <code>poly_app</code>, <code>poly_worker</code> (the first migration creates the NOLOGIN roles and grants). Copy two connection strings per role: the <strong>pooled</strong> one (host contains <code>-pooler</code>) and the <strong>direct</strong> one.
+      <p class="expect">Expect: <code>select version();</code> shows the pinned major. Record Neon's restore window for your plan from the plan page (§6.6).</p></li>
+    <li><strong>Vercel.</strong> Create the team with MFA on, then two projects from the repository: <code>polycarpic-web</code> and <code>polycarpic-jobs</code>, build command and output per <code>infra/vercel/README</code>. Set environment variables <strong>per project</strong> from the table in that file: <code>web</code> gets the public keys and <code>poly_app</code> pooled URL; <code>jobs</code> gets the keyring, <code>poly_worker</code> pooled URL and <code>CRON_SECRET</code>; the migrate step gets the <code>poly_migrator</code> <em>direct</em> URL as a build-only variable on <code>web</code> only. Set Production Branch to a branch nobody pushes to, so Vercel never deploys on its own.</li>
+    <li><strong>Deploy a verified release, by hand.</strong>
+      <pre class="cmd"><code>laptop$ git fetch --tags &amp;&amp; git tag -v v1.0.0
+laptop$ git checkout v1.0.0
+laptop$ infra/vercel/deploy.sh --tag v1.0.0</code></pre>
+      <p class="expect">Expect: <code>tag signature verified</code>, two builds, the migration running in the web build and ending <code>0 pending</code> on the next run, and two deployment URLs. Then attach your domain to <code>web</code>. If the migration step fails, the build fails and the previous deployment keeps serving.</p></li>
+    <li><strong>Confirm the split.</strong> <code>infra/vercel/check.sh</code> lists variable <em>names</em> per project and prints <code>keyring: jobs only</code>. A cron route requested without the secret must return 401; the same route on the web project must return 404.</li>
+    <li><strong>Backups.</strong> Add the weekly export to your calendar and run <code>polycarpic-ops neon-export</code> once now (§6.6). Daily imports are the platform ceiling on the Hobby plan; the unlink screen says provider revocation can lag up to a day.</li>
+  </ol>
+
+  <h3 id="rb-cli">7.5 The operator commands you will use</h3>
+  <p>Run on the box. <code>polycarpic-ops cli …</code> executes the application CLI inside the <code>worker</code> container as the operator; each command writes an <code>audit_event</code> (SECURITY C-01, C-35, §4.1).</p>
+  <table>
+    <thead><tr><th>Command</th><th>What it does</th><th>You should see</th></tr></thead>
+    <tbody>
+      <tr><td><code>polycarpic-ops cli user invite &lt;email&gt;</code></td><td>Invite a person who shares no entity with anyone yet. The only way in besides a membership invitation (there is no open sign-up).</td><td>"invitation recorded", an email to them</td></tr>
+      <tr><td><code>polycarpic-ops cli user reset-mfa &lt;email&gt;</code></td><td>Removes that person's second-step methods and ends their sessions; they re-enrol on next sign-in. Use after verifying who is asking, in person or by a call you place yourself.</td><td>"sessions revoked: N", an <code>audit_event</code>, and an email to the user</td></tr>
+      <tr><td><code>polycarpic-ops cli membership remove-owner &lt;entity&gt; &lt;email&gt;</code></td><td>The audited backstop for removing a co-owner who cannot or will not act (R-19). Notifies every owner, the target included.</td><td>"change.forced recorded", emails sent</td></tr>
+      <tr><td><code>polycarpic-ops cli entity set-founder &lt;entity&gt; &lt;email&gt;</code></td><td>Sets a new founding owner when the founder has vanished without transferring</td><td>As above</td></tr>
+      <tr><td><code>polycarpic-ops cli secrets rotate</code></td><td>Keyring rotation (§8.12)</td><td>"rows remaining under old key: 0"</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="ops-runbook" data-section="ops-runbook">
+  <h2>8. Operations Runbook</h2>
+  <p class="section-hint">Day-2. Same format: command, what you should see, what to do otherwise. After any step that changes the box, run <code>polycarpic-ops status</code> and confirm green before you close the laptop.</p>
+
+  <h3>8.1 Rotate a secret</h3>
+  <ul>
+    <li><strong>Provider key or token</strong> (Resend, price, BLS, OAuth client secret, Plaid secret, bucket put-key): create the new one at the provider, then <code>sudo polycarpic-ops set-secret &lt;name&gt;</code>, then <code>sudo polycarpic-ops restart web worker</code>, then revoke the old one at the provider. Expect <code>status</code> green and (for the bucket key) a successful backup within 5 minutes after <code>systemctl start polycarpic-backup</code>. Order matters: revoke last.</li>
+    <li><strong>Database role password:</strong> <code>sudo polycarpic-ops rotate-db-password app|worker|migrator</code>. It changes the role in Postgres and the file in one step and restarts the matching container. Expect <code>healthy</code>.</li>
+    <li><strong>BetterAuth secret (planned rotation, SECURITY A-33):</strong> <code>sudo polycarpic-ops auth-secret add</code> adds a new version that encrypts new data while older versions still decrypt; restart; run <code>polycarpic-ops cli auth rewrite-secrets</code> (re-encrypts TOTP seeds, backup codes and OAuth tokens under the newest version); when it reports <code>0 rows on old versions</code>, run <code>polycarpic-ops auth-secret retire &lt;version&gt;</code>. Expect that nobody is signed out. <strong>Never replace the secret outright</strong> outside an incident: it ends every session and makes every enrolled second step undecryptable (everyone would need <code>reset-mfa</code>).</li>
+    <li>Annual review: list every secret with <code>list-secrets</code> and rotate any that you cannot account for.</li>
+  </ul>
+
+  <h3>8.2 The monthly window (first Sunday, about 45 minutes)</h3>
+  <ol>
+    <li>Run the restore drill from the laptop (§6.7). Expect <code>DRILL PASSED</code>; a failure is SEV2 (RB-5).</li>
+    <li><code>box$ sudo apt update &amp;&amp; sudo apt full-upgrade</code>, then <code>sudo reboot</code> if it says so. Expect: after about two minutes <code>polycarpic-ops status</code> is green. The home box must come back without asking for a passphrase.</li>
+    <li>Docker: if <code>apt</code> held back Docker packages, upgrade them now; containers restart.</li>
+    <li>Check <code>polycarpic-ops status</code>: disk under 80 percent, certificate more than 14 days left, GitHub token more than 14 days left.</li>
+    <li>Read the month's alerts and any rolled-back deploys in <code>/opt/polycarpic/deploy.log</code>.</li>
+    <li>Check Renovate PRs waiting more than 7 days with the team-lead.</li>
+  </ol>
+
+  <h3>8.3 Rotate the DNS token (home, real-domain mode)</h3>
+  <ol>
+    <li>At the DNS host, create a new token with the same single-zone scope; <code>box$ sudo polycarpic-ops set-secret dns_api_token</code>; <code>sudo polycarpic-ops restart caddy</code>.</li>
+    <li>Force a renewal test: <code>sudo polycarpic-ops caddy-renew-test</code>. Expect: <code>staging ACME order succeeded</code> (it uses the issuer's test environment).</li>
+    <li>Delete the old token at the DNS host. Expect nothing else to change.</li>
+  </ol>
+
+  <h3>8.4 Renew the GitHub read token (every 90 days)</h3>
+  <p>GitHub → Settings → Developer settings → Fine-grained tokens → generate: this repository only; <code>Contents: read</code>, <code>Packages: read</code> (repository permissions: Metadata read is automatic); 90 days. <code>box$ sudo polycarpic-ops set-secret github_read_token</code>, then <code>sudo systemctl start polycarpic-deploy</code>. Expect: <code>deploy.log</code> shows a poll with "up to date". Then delete the old token. If the repository and package are public, remove the token (<code>polycarpic-ops remove-secret github_read_token</code>) and the reminder.</p>
+
+  <h3>8.5 Replace the private CA intermediate (60 days before expiry)</h3>
+  <ol>
+    <li>Laptop: fetch the root key from the password manager to a temporary folder, run <code>infra/ca/ca.sh intermediate --out ./new-intermediate</code>, then delete the root key file.</li>
+    <li>Copy and install: <code>box$ sudo polycarpic-ops install-intermediate /tmp/new-intermediate/…</code>. Caddy reissues leaves from it. Expect: browsers show no warning, and <code>polycarpic-ops status</code> shows the issuer chain. Devices need no change because they trust the root, not the intermediate.</li>
+    <li>If the <em>root</em> must be replaced (compromise or 10-year expiry), every device needs the new root installed and the old one removed (§7.3 Mode B step 3), so schedule it; or move to Mode A.</li>
+  </ol>
+
+  <h3>8.6 Roll back a release</h3>
+  <pre class="cmd"><code>box$ sudo polycarpic-ops rollback prod
+box$ sudo polycarpic-ops status</code></pre>
+  <p class="expect">Expect: <code>rolled back to sha256:… (previous)</code>, <code>healthy</code>, and the bad digest listed under <code>quarantined</code> so the poll does not redeploy it. Tell the team-lead; the fix ships as a new release, and quarantine clears when a newer digest appears. If the rollback itself is unhealthy, the schema may have moved in an incompatible way: do not change anything else; use the pre-migration backup (§4.5, §6.8) and ask.</p>
+
+  <h3>8.7 Update the operator tooling itself</h3>
+  <p><code>box$ sudo polycarpic-ops self-update</code> fetches the newest release's ops bundle, verifies the attestation and tag signature exactly as a deploy does, shows a diff of the deploy script and timer unit against what is installed, and waits for you to type <code>yes</code>. Read the diff; if you do not understand a change, answer no and ask. Expect: <code>self-update complete</code> and the next poll runs on the new script.</p>
+
+  <h3>8.8 Add or remove a laptop's SSH key</h3>
+  <ol>
+    <li>Add: on the new laptop make a key (§7.1 step 2). From a laptop that still works: <code>ssh polyops@box "sudo polycarpic-ops ssh-key add"</code> and paste the <code>.pub</code> line. Expect: the new laptop can log in. Test before removing anything.</li>
+    <li>Remove (lost laptop): <code>sudo polycarpic-ops ssh-key list</code>, then <code>ssh-key remove &lt;id&gt;</code>. A lost laptop also means: rotate the bucket read-key, treat its password manager as exposed if it was unlocked, and run SECURITY RB-2 if the laptop held an unlocked session.</li>
+  </ol>
+
+  <h3>8.9 Locked out, or lost a secret</h3>
+  <table>
+    <thead><tr><th>Situation</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>Lost every SSH key (Hetzner)</td><td>Hetzner console → server → Rescue → enable rescue system, reboot, mount the root disk, add a public key to <code>polyops</code>'s <code>authorized_keys</code>, disable rescue, reboot. Expect: SSH works with the new key. This is why the Hetzner account and its recovery codes are in the password manager.</td></tr>
+      <tr><td>Locked yourself out with a firewall rule</td><td>Hetzner console → Firewalls: edit the rule (the console is unaffected by the firewall).</td></tr>
+      <tr><td>Home box asks for a passphrase at boot</td><td>Type the recovery passphrase from the recovery sheet. Then find why the TPM no longer matches (firmware update? Secure Boot changed?), and re-bind: <code>sudo polycarpic-ops disk-rebind</code>. A passphrase prompt you did not cause (nothing changed) can mean the box was tampered with: run the checks in §8.11 before trusting it.</td></tr>
+      <tr><td>A household member lost their authenticator</td><td><code>polycarpic-ops cli user reset-mfa &lt;email&gt;</code> after verifying them by a channel you control.</td></tr>
+      <tr><td>Lost the keyring</td><td>RB-4: <code>polycarpic-ops cli secrets init --force</code>; every connection then shows "relink required"; the ledger is untouched.</td></tr>
+      <tr><td>Lost the age private key</td><td>Existing backups cannot be opened, ever. Generate a new keypair (§7.1 step 3), replace <code>/etc/polycarpic/backup.pub</code>, run a manual backup, and consider the old backups gone. This is why the key has two homes.</td></tr>
+      <tr><td>Lost the recovery passphrase of the home box's disk</td><td>While the box still unlocks by itself: add a new passphrase slot (<code>sudo cryptsetup luksAddKey</code>) and remove the old one. If the TPM no longer unlocks it and the passphrase is gone, restore from backup onto new disk (§8.10).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>8.10 Restore from backup and replace a box</h3>
+  <ol>
+    <li><strong>Get the keys in front of you:</strong> age private key, the keyring offline copy, the provider secrets from their consoles, the recovery sheet.</li>
+    <li><strong>Build the replacement</strong> by repeating §7.1 steps 6 to 12 (Hetzner) or §7.2 (home) <em>with a new, empty data volume</em>, but do not yet point DNS at it and do not run <code>first-deploy</code>.</li>
+    <li><strong>Restore the data</strong> on your laptop first (it needs the age private key, which must not touch the new box): <code>laptop$ infra/restore.sh --bucket … --to-file ./restore.tar.age-decrypted</code> decrypts the latest base backup and WAL into a directory; copy that directory (plain data) to the new box over SSH into <code>/srv/polycarpic/restore/</code>, then <code>box$ sudo polycarpic-ops restore-apply prod</code>. Expect: Postgres recovers to the latest WAL and reports <code>recovery complete</code>, then the verifier prints <code>trial balance: ok; hash chain: ok</code>. Delete the plain copy from the laptop when done (<code>rm -rf</code>) and from <code>/srv/polycarpic/restore/</code>.<p class="expect">The plain data exists on your laptop and then on the new box's encrypted volume only. If the laptop is shared or unencrypted, use a throwaway server for the decrypt step instead.</p></li>
+    <li><strong>Re-enter the secrets</strong> (§7.1 step 12), restore the keyring file from the offline copy (<code>polycarpic-ops restore-keyring</code>; <code>keyring-fingerprint</code> must match what you wrote down), or generate a new keyring and relink every connection (RB-4).</li>
+    <li><strong>Deploy the last release</strong> (<code>polycarpic-ops first-deploy prod</code>), open it, switch DNS to the new address, and confirm in the outside-in scan (§7.1 step 16).</li>
+    <li>Run a backup and the monitor check; run the restore drill once more within the week.</li>
+    <li>Time yourself. RTO is 4 hours on Hetzner; if you took longer, write down the slow step and tell the team-lead so §7 improves.</li>
+  </ol>
+  <p><strong>Temporary landing on Hetzner for a lost home box:</strong> do the same on a Hetzner server with <code>--target hetzner</code>, using a temporary DNS name. Household members use that name until the home box is rebuilt. Real-domain mode on the home box is unaffected by this.</p>
+  <p><strong>Neon:</strong> create a new Neon project, restore with <code>polycarpic-ops neon-restore</code> from the latest weekly export (decrypt on the laptop), update the Vercel variables, redeploy with <code>infra/vercel/deploy.sh</code>.</p>
+
+  <h3>8.11 Suspected compromise (commands for SECURITY RB-1, RB-2)</h3>
+  <ol>
+    <li><strong>Stop the bleeding.</strong> <code>box$ sudo polycarpic-ops lockdown</code>: Caddy serves the maintenance page and every other container stops. Expect: the outside scan shows only Caddy. If you cannot log in, disable the server's network in the provider console (Hetzner) or unplug the cable (home).</li>
+    <li><strong>Keep the evidence.</strong> Hetzner: take a server snapshot in the console. Home box: do not power off if you can avoid it; copy <code>deploy.log</code> and <code>docker logs</code> output to the laptop.</li>
+    <li><strong>If the worker or keyring may be exposed (RB-1):</strong> revoke every bank token at its provider (Plaid <code>/item/remove</code>, SimpleFIN, broker OAuth), then after the replacement is up, generate a new keyring and relink. If only the keyring leaked, <code>polycarpic-ops cli secrets rotate</code> (§8.12) is enough; if the database and the keyring may both have been exposed, rotation is not enough.</li>
+    <li><strong>Rotate every operator secret</strong> (§8.1), the BetterAuth secret by replacement this time (sessions all end), the bucket keys and the DNS token. Remove the SSH keys you cannot account for (§8.8).</li>
+    <li><strong>Rebuild</strong> from a clean attested image on a fresh host (§8.10), restoring the last backup taken before the compromise, and verify it against the hash chain and against the head of the last export an owner holds off the box (RB-2 step 6).</li>
+    <li>Postmortem within 5 business days (SECURITY §10).</li>
+  </ol>
+
+  <h3>8.12 Rotate the credential keyring</h3>
+  <p><code>box$ sudo polycarpic-ops cli secrets rotate</code>. Expect: it adds key <em>n+1</em>, re-seals every connection under it, and ends <code>rows remaining under old key: 0; removed key n; audit_event written</code>. Save the new keyring offline immediately: <code>polycarpic-ops keyring-show</code> prints it once; replace the password-manager note and the printed sheet, and confirm with <code>keyring-fingerprint</code>. If it stops midway it is safe to run again.</p>
+
+  <h3>8.13 Decommission</h3>
+  <ol>
+    <li>Export everything each household member wants to keep (app export carries the hash-chain head); run a final backup; wait for it to appear in the bucket.</li>
+    <li>Revoke every bank connection from the app (Settings → Connections → Unlink) and confirm each at its provider.</li>
+    <li>Hetzner: delete the server, the volume, the firewall, the SSH key and the project. Home box: remove the intermediate/DNS token, then securely erase the disk (<code>sudo cryptsetup erase /dev/…</code> then <code>blkdiscard</code>, or physically destroy it).</li>
+    <li>Delete the DNS records and the DNS token; remove the private CA root from every device; delete the Resend domain, OAuth apps, monitors and the GitHub token.</li>
+    <li>Backups: nothing to delete; they expire in 35 days and cannot be removed earlier. Destroy the age private key only after you are certain you will never restore (or after the last backup expires).</li>
+  </ol>
+</section>
