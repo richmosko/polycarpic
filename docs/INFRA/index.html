@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Infrastructure &amp; Operations — Polycarpic</title>
+  <link rel="stylesheet" href="../_assets/doc.css">
+  <link rel="stylesheet" href="../_assets/comments.css">
+  <style>
+    /* INFRA-local: let long identifiers wrap inside table cells; keep command blocks readable. */
+    td { overflow-wrap: anywhere; }
+    td code { white-space: normal; }
+    pre.cmd { overflow-x: auto; }
+    .expect { margin: 0.2rem 0 0.8rem; font-size: 0.92em; color: var(--doc-muted); }
+  </style>
+  <script defer src="../_assets/mermaid-init.js"></script>
+  <script defer src="../_assets/comments.js"></script>
+  <script defer src="../_assets/toc.js"></script>
+</head>
+<body>
+
+<header class="doc-header">
+  <h1>Infrastructure &amp; Operations</h1>
+  <p class="doc-subtitle">Polycarpic — a virtual Single Family Office</p>
+  <div class="doc-meta">
+    <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
+    <span><strong>Status:</strong> Draft v1.0 for the Plan gate. Decides the devops items ARCH §7 and SECURITY §12.3 left open (§9), answers OQ-26, and lists the ARCH and SECURITY lines to re-fold (§9.2). Seven questions for the Principal are in §10. Every command in §7 and §8 is <em>specified</em> here and built under POLY-M1; each is verified on first use and corrected in v1.1 (unmeasured until then).</span>
+    <span><strong>Traces to:</strong> <a href="../PRD/">PRD v1.4</a>, <a href="../ARCH/">ARCH v1.7</a>, <a href="../SECURITY/">SECURITY v1.2.3</a>, <a href="../../process/DECISIONS.md">DECISIONS</a> through 2026-11-08</span>
+    <span><strong>Last updated:</strong> 2026-11-08</span>
+  </div>
+  <details class="doc-changelog">
+    <summary>Changelog</summary>
+    <ul>
+      <li><strong>v1.0 (2026-11-08).</strong> First version. Three targets in the ruled order, resource allocation, keys and TLS, environments and CI/CD, patch schedule, disaster recovery, a deployment runbook for a novice operator, a day-2 runbook, and the rulings on the devops asks.</li>
+    </ul>
+  </details>
+</header>
+
+<nav class="toc">
+  <h2>Contents</h2>
+  <ol>
+    <li><a href="#targets">Targets &amp; Topology</a></li>
+    <li><a href="#resources">Resource Allocation</a></li>
+    <li><a href="#identity">Identity, Keys &amp; TLS</a></li>
+    <li><a href="#cicd">Environments &amp; CI/CD</a></li>
+    <li><a href="#patching">Update &amp; Patch Schedule</a></li>
+    <li><a href="#dr">Disaster Recovery &amp; Monitoring</a></li>
+    <li><a href="#deploy-runbook">Deployment Runbook</a></li>
+    <li><a href="#ops-runbook">Operations Runbook</a></li>
+    <li><a href="#rulings">Rulings &amp; Asks on Other Owners</a></li>
+    <li><a href="#open-questions">Open Questions</a></li>
+  </ol>
+</nav>
+
+<!-- ============================================================ -->
+<section id="targets" data-section="targets">
+  <h2>1. Targets &amp; Topology</h2>
+  <p class="section-hint">Ruled order (Principal, 2026-11-06): a Hetzner VPS, then a local-network box, then Vercel + Neon. ARCH §7 says what each is; SECURITY C-70 to C-77 say why it is built this way; this document says how to stand it up and run it. The three are deployment targets of one application, not three architectures.</p>
+
+  <h3>1.1 Reading this document as the operator</h3>
+  <ul>
+    <li>You are one person running one instance for your own household (PRD §3). Nothing here is written for hosting other people, and nothing here makes that safe (SECURITY R-6).</li>
+    <li>If you only read two sections, read <a href="#deploy-runbook">§7</a> (to stand it up) and <a href="#ops-runbook">§8</a> (to keep it alive). Everything else is the reasoning behind them.</li>
+    <li>Terms: the <strong>box</strong> is the machine running the containers; the <strong>operator</strong> is you; a <strong>digest</strong> is the exact fingerprint of one build of the app image (<code>sha256:…</code>); <strong>compose</strong> is the tool that starts the containers listed in <code>compose.yml</code>.</li>
+  </ul>
+
+  <h3>1.2 Primary: Hetzner VPS (Docker Compose)</h3>
+  <pre class="mermaid">
+flowchart TB
+  user(["Browser"]) -->|"443, 80 to 443"| fw
+  op(["Operator laptop"]) -->|"22, key only"| fw
+  subgraph hz["Hetzner Cloud"]
+    fw{{"Cloud Firewall: 22, 80, 443 in"}} --> vps
+    subgraph vps["VPS: Ubuntu 24.04, one Compose host"]
+      caddy["Caddy: TLS, only published ports"]
+      subgraph prodnet["prod project and network"]
+        webp["web"] --> pgp[("Postgres")]
+        wkp["worker"] --> pgp
+      end
+      subgraph stgnet["staging project and network"]
+        webs["web"] --> pgs[("Postgres")]
+        wks["worker"] --> pgs
+      end
+      caddy --> webp
+      caddy --> webs
+      timer["deploy timer: polls, verifies, deploys"]
+    end
+  end
+  timer -->|"HTTPS pull by digest"| gh["GitHub: GHCR, Releases, attestations"]
+  wkp -->|"HTTPS out"| ext["Plaid, SimpleFIN, brokers, prices, BLS"]
+  webp -->|"HTTPS out"| mail["Resend, Google, Apple, GitHub"]
+  vps -.->|"age-encrypted, put-only"| bk[("Object-lock backup bucket")]
+  vps -.->|"heartbeat"| hb["Outside monitor"]
+  </pre>
+  <table>
+    <thead><tr><th>Concern</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Machine</td><td>One Hetzner Cloud server, 4 vCPU / 8 GB / shared x86, Ubuntu Server 24.04 LTS (§2.1). IPv4 and IPv6 both enabled on the server; both are covered by the firewall rules.</td></tr>
+      <tr><td>Ports</td><td>The Cloud Firewall (outside the host, C-71) admits 22, 80 and 443 only. On the host only Caddy publishes ports; the compose-policy lint (C-70) and the post-deploy outside-in scan (§7.1 step 14) both enforce this.</td></tr>
+      <tr><td>SSH</td><td>Key-only, no root login, no password auth. Port 22 stays open to the world because a home connection's address changes. The key and the unattended-upgrade posture are the control (§3.1). Restricting 22 to your current address in the firewall is an option, not the default, and a mistake there locks you out (§8.9).</td></tr>
+      <tr><td>DNS</td><td>Two <code>A</code>/<code>AAAA</code> records: <code>app.&lt;domain&gt;</code> to prod, <code>staging.&lt;domain&gt;</code> to staging, both pointing at the one server. Public DNS is at the zone's DNS host (§10 Q1 recommends Cloudflare DNS-only, no proxy).</td></tr>
+      <tr><td>TLS</td><td>Caddy obtains and renews public certificates by ACME HTTP-01 (port 80). No operator action. Staging sits behind Caddy basic auth plus an IP allowlist (ARCH §7.1).</td></tr>
+      <tr><td>Third parties on this path</td><td>GitHub (image registry, release metadata, attestations; pulled by the box, §4.4); Resend (outbound mail); Plaid, SimpleFIN, direct broker APIs, the EOD price provider (OQ-5) and BLS (outbound, worker); Google, Apple and GitHub OAuth; the backup bucket; one outside monitor. Each is outbound-only from the box except the browser's own redirect.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>1.3 Secondary: local-network box (outbound-only)</h3>
+  <pre class="mermaid">
+flowchart TB
+  lan(["Browsers on the LAN"]) -->|"HTTPS 443"| nft
+  subgraph home["Home network"]
+    router{{"Router: no port forward, UPnP off"}}
+    dns["LAN DNS: name to box address"]
+    subgraph box["Linux box: LUKS2, TPM unlock, nftables default-deny"]
+      nft{{"nftables plus DOCKER-USER"}} --> caddyl["Caddy bound to the LAN address"]
+      caddyl --> webl["web"]
+      webl --> pgl[("Postgres")]
+      wkl["worker"] --> pgl
+      timerl["deploy timer"]
+    end
+  end
+  box -->|"outbound 443, DNS, NTP only"| router
+  router --> out["GitHub, Resend, providers, ACME DNS-01, heartbeat, backup bucket"]
+  caddyl -.->|"DNS-01 TXT, zone-scoped token"| zone["Public DNS zone"]
+  </pre>
+  <table>
+    <thead><tr><th>Concern</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Who may reach it</td><td>Browsers on the LAN only (C-76). No inbound path from the internet exists: the router forwards nothing, UPnP and NAT-PMP are off, the host drops inbound IPv6, and nftables allows 443 (80 redirects) and SSH from the LAN CIDR only. Away from home there is no access in v1.</td></tr>
+      <tr><td>Outbound allowlist</td><td>DNS, NTP and TCP 443 only (C-76). <strong>Consequence found here:</strong> an SFTP upload to a Hetzner Storage Box uses port 22 or 23 and is blocked, which is one reason §9 rules the backup destination to an S3-compatible bucket over 443 on every target.</td></tr>
+      <tr><td>DNS</td><td>Real-domain mode (default): the name is <code>polycarpic.home.&lt;domain&gt;</code>, defined only on the LAN (router DNS override, or one hosts-file line per device). There is no public <code>A</code> or <code>AAAA</code> record for it. The public zone holds only short-lived <code>_acme-challenge</code> TXT records written by Caddy. <code>.local</code> mode: the name is <code>polycarpic.local</code>, answered by mDNS or the same LAN DNS override.</td></tr>
+      <tr><td>TLS</td><td>Two modes selected by <code>TLS_MODE</code> (§3.4): <code>real-domain</code> (DNS-01 wildcard from a public ACME issuer) or <code>private-ca</code> (name-constrained operator CA). The app refuses to start on a mismatch (ARCH §7.8, SECURITY C-76).</td></tr>
+      <tr><td>Third parties</td><td>Same as §1.2 minus nothing; all are outbound over 443. OAuth sign-in works in real-domain mode and is disabled server-side in private-CA mode. A verification email link only opens from the LAN.</td></tr>
+      <tr><td>Hardware</td><td>Any x86-64 mini PC or small server with a TPM 2.0, UEFI Secure Boot, 8 GB RAM or more, a 256 GB or larger SSD, and wired Ethernet. Put it on a small UPS. Buying advice is in §7.2 step 1.</td></tr>
+    </tbody>
+  </table>
+
+  <h3>1.4 Tertiary: Vercel + Neon (serverless fallback)</h3>
+  <pre class="mermaid">
+flowchart TB
+  users(["Browsers"]) -->|"HTTPS, TLS at the edge"| webv["Vercel project: web"]
+  cron(["Vercel Cron, daily on Hobby"]) -->|"CRON_SECRET"| jobv["Vercel project: jobs"]
+  webv -->|"poly_app, pooled endpoint"| neon[("Neon Postgres")]
+  jobv -->|"poly_worker, pooled endpoint"| neon
+  build["Build step"] -->|"poly_migrator, direct endpoint"| neon
+  jobv -->|"egress"| ext["Providers"]
+  webv -->|"egress"| mail["Resend, sign-in providers"]
+  gha["GitHub Actions: topology checks"] -.->|"names only"| vapi["Vercel API"]
+  </pre>
+  <table>
+    <thead><tr><th>Concern</th><th>Decision</th></tr></thead>
+    <tbody>
+      <tr><td>Shape</td><td>Two Vercel projects from one repo, one Neon project (ARCH §7.6, SECURITY C-61). No Caddy, no worker container, no deploy timer: Vercel deploys on a Git push to the production branch/tag, and migrations run as a build step.</td></tr>
+      <tr><td>Connections</td><td>Runtime uses Neon's <strong>pooled</strong> endpoint (PgBouncer, transaction mode). The migrate build step uses the <strong>direct</strong> endpoint, because a migration that sets role or takes advisory locks must not run through a transaction-mode pooler (§9.1 ruling D-6).</td></tr>
+      <tr><td>Freshness</td><td>Hobby cron is once a day. Imports and period-end jobs run daily at best (ARCH §7.6, accepted).</td></tr>
+      <tr><td>Backups</td><td>OQ-26 answered in §6.6: Neon's restore window plus an operator-run weekly encrypted export; a nightly automated export is recommended before real data and needs a SecEng ruling.</td></tr>
+      <tr><td>When to use it</td><td>When you have no machine you trust to keep running, or as a temporary landing place while a primary is rebuilt. It is the weakest target for secrets (SECURITY R-3). Do not link real aggregators here until POLY-77 and the R-3 review.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="resources" data-section="resources">
+  <h2>2. Resource Allocation</h2>
+  <p class="section-hint">Compose layout, sizing, volumes and storage. Sizing numbers are starting values, <strong>unmeasured</strong> until POLY-M1 produces real metrics (ARCH §7.3); every number is one line in <code>compose.yml</code> or the provisioning file.</p>
+
+  <h3>2.1 Host</h3>
+  <table>
+    <thead><tr><th>Item</th><th>Hetzner VPS</th><th>Local box</th></tr></thead>
+    <tbody>
+      <tr><td>OS</td><td>Ubuntu Server 24.04 LTS</td><td>Ubuntu Server 24.04 LTS (same, so one set of instructions)</td></tr>
+      <tr><td>Size</td><td>4 vCPU, 8 GB RAM, the cost-optimised shared-x86 class (ARCH §7.3 names CX32; Hetzner renames its plans, so pick the 4 vCPU / 8 GB shared-x86 plan on the order page and record its name in the ledger). Downgrade to 2 vCPU / 4 GB is a one-line change if metrics allow.</td><td>8 GB RAM minimum, 16 GB comfortable</td></tr>
+      <tr><td>Root disk</td><td>Plan default (about 80 GB)</td><td>256 GB SSD or larger</td></tr>
+      <tr><td>Data volume</td><td>A separate Hetzner Cloud Volume of 20 GB, mounted at <code>/srv/polycarpic</code>, formatted LUKS2 (§3.2)</td><td>A LUKS2 partition on the SSD, mounted at <code>/srv/polycarpic</code>, TPM-unlocked (§7.2)</td></tr>
+      <tr><td>Docker</td><td colspan="2">Docker Engine and the Compose plugin from Docker's apt repository, <code>live-restore</code> on, <code>json-file</code> log driver with <code>max-size 10m</code> and <code>max-file 5</code>. Upgraded by hand in the monthly window (§5).</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.2 Compose layout</h3>
+  <p>Two compose projects on the Hetzner host, <code>polycarpic-prod</code> and <code>polycarpic-staging</code>, each with its own network, plus one shared <code>edge</code> project holding Caddy. The local box runs only <code>polycarpic-prod</code> and <code>edge</code>. Caddy joins each project's network through an external network named per project, so a staging container has no route to a prod container (TB-10, C-70).</p>
+  <table>
+    <thead><tr><th>Service</th><th>Project</th><th>Image</th><th>Entrypoint</th><th>Memory cap (start)</th><th>Secrets mounted</th></tr></thead>
+    <tbody>
+      <tr><td><code>caddy</code></td><td>edge</td><td>Custom Caddy build (DNS plugin on the local box), pinned by digest, built and scanned in CI</td><td>default</td><td>128 MB</td><td>Home real-domain mode: <code>dns_api_token</code>. Staging: <code>staging_basic_auth</code>. Nothing else.</td></tr>
+      <tr><td><code>postgres</code></td><td>prod</td><td>Official Postgres image at the pinned major, by digest</td><td>default</td><td>3 GB, <code>shared_buffers</code> 768 MB</td><td><code>db_superuser_password</code></td></tr>
+      <tr><td><code>web</code></td><td>prod</td><td>The app image, by digest</td><td><code>web</code></td><td>768 MB</td><td><code>db_password_app</code>, <code>auth_secret</code>, OAuth client secrets, <code>resend_api_key</code>, <code>plaid_secret</code> (token exchange). No keyring.</td></tr>
+      <tr><td><code>worker</code></td><td>prod</td><td>The same app image</td><td><code>worker</code></td><td>768 MB</td><td><code>db_password_worker</code>, <code>auth_secret</code>, <code>credential_keyring</code>, provider and price/BLS keys, <code>resend_api_key</code></td></tr>
+      <tr><td><code>migrate</code></td><td>prod</td><td>The same app image</td><td><code>migrate</code>, one-off</td><td>512 MB</td><td><code>db_password_migrator</code> only</td></tr>
+      <tr><td><code>postgres</code>, <code>web</code>, <code>worker</code>, <code>migrate</code></td><td>staging</td><td>Same images</td><td>same</td><td>1 GB / 384 MB / 384 MB / 512 MB</td><td>Distinct values from <code>/etc/polycarpic/staging-secrets/</code>, its own keyring, Plaid sandbox secret only (C-77)</td></tr>
+      <tr><td><code>backup</code></td><td>prod</td><td>The same app image, or a small tools image (<code>age</code>, <code>rclone</code>, <code>pg_basebackup</code>), by digest</td><td><code>backup</code>, run by a systemd timer</td><td>256 MB</td><td><code>backup_store_credential</code>; the age <em>public</em> key as config. Never the private key.</td></tr>
+    </tbody>
+  </table>
+  <p>Planned total caps are about 7.1 GB for a prod+staging host that is never fully busy at once; the host keeps the remainder. Unmeasured. If <code>docker stats</code> after POLY-M1 shows the caps are hit, raise the plan size before raising a cap.</p>
+  <ul>
+    <li>Only <code>caddy</code> has a <code>ports:</code> mapping. On the local box it is bound to the LAN address (<code>"192.168.1.20:443:443"</code>), never <code>0.0.0.0</code>.</li>
+    <li>Every container: non-root user, <code>read_only: true</code> with named <code>tmpfs</code> for writable paths, <code>cap_drop: [ALL]</code>, <code>security_opt: [no-new-privileges:true]</code>, <code>restart: unless-stopped</code>, a <code>healthcheck</code>. No Docker socket is mounted anywhere.</li>
+    <li>The compose-policy lint (C-70) is a CI job that parses the rendered config (<code>docker compose config</code>) and fails on any violation of the list above, any secret in <code>environment:</code>, any <code>ports:</code> outside <code>caddy</code>, or any service on both project networks.</li>
+    <li>Postgres runs with the C-75 settings from a mounted <code>postgresql.conf</code> fragment: <code>log_parameter_max_length = 0</code>, <code>log_parameter_max_length_on_error = 0</code>, <code>log_statement = 'ddl'</code>, plus <code>archive_mode = on</code>, <code>archive_timeout = 300</code> and <code>archive_command</code> pointing at the spool script (§6.2).</li>
+  </ul>
+
+  <h3>2.3 Volumes, storage and buckets</h3>
+  <table>
+    <thead><tr><th>Where</th><th>What</th><th>Notes</th></tr></thead>
+    <tbody>
+      <tr><td><code>/srv/polycarpic/pg-prod</code>, <code>/srv/polycarpic/pg-staging</code></td><td>Postgres data directories</td><td>On the LUKS volume (C-72).</td></tr>
+      <tr><td><code>/srv/polycarpic/spool</code></td><td>Encrypted-but-not-yet-uploaded backup files and WAL</td><td>Same LUKS volume. Pruned after a verified upload. A spool older than 2 hours alerts (§6.5).</td></tr>
+      <tr><td><code>/srv/polycarpic/caddy</code></td><td>Caddy's certificate and ACME account storage</td><td>Losing it only forces reissue, but keep it to stay inside Let's Encrypt rate limits.</td></tr>
+      <tr><td><code>/etc/polycarpic/secrets/</code>, <code>/etc/polycarpic/staging-secrets/</code></td><td>Secret files (§3.1)</td><td>root:root, directory 0700, files 0400. Not on the data volume and never in a backup.</td></tr>
+      <tr><td><code>/opt/polycarpic/</code></td><td>The deploy script, the timer unit, per-release ops bundles (<code>releases/&lt;digest&gt;/</code>), the <code>desired-digest</code> and <code>current-digest</code> files, <code>deploy.log</code></td><td>No secrets. The ops bundle (compose files, Caddyfile, scripts) is extracted from the verified image, so the same attestation covers it (§4.4).</td></tr>
+      <tr><td>Backup bucket</td><td>An S3-compatible bucket with Object Lock in compliance mode, retention 35 days (§6.1, ruling D-3)</td><td>One bucket per instance. Cost: cents per month at household data volume (unmeasured). Provider is Principal question Q3.</td></tr>
+      <tr><td>Off-box copies the operator holds</td><td>The age private key, the keyring offline copy, the LUKS recovery passphrase, the private CA root (if used), registrar and DNS logins</td><td>In the operator's password manager plus a printed recovery sheet in a safe place (§3.6).</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============================================================ -->
+<section id="identity" data-section="identity">
+  <h2>3. Identity, Keys &amp; TLS</h2>
+  <p class="section-hint">Who holds what, and what each holder can do with it. Implements SECURITY §6 (secrets), C-71/C-72/C-74/C-76. Compliance boundary: one operator, one household, no hosting for others (PRD §3, SECURITY §1, R-6).</p>
+
+  <h3>3.1 Who holds what</h3>
+  <table>
+    <thead><tr><th>Holder</th><th>Holds</th><th>Can do</th><th>Cannot do</th></tr></thead>
+    <tbody>
+      <tr><td>Operator (you)</td><td>SSH private key (one per laptop, passphrase-protected, hardware-backed if you own a security key); password manager vault; age <em>private</em> key; keyring offline copy; LUKS recovery passphrase; registrar, DNS, GitHub, Hetzner, bucket and Resend logins</td><td>Everything. You are the root of trust (SECURITY R-1).</td><td>—</td></tr>
+      <tr><td>The box (root)</td><td>Secret files; age <em>public</em> key; bucket <em>put-only</em> credential; read-only GitHub token (or none if the package is public)</td><td>Run the app; encrypt and upload backups; pull verified releases</td><td>Decrypt any backup; delete or overwrite any stored backup; deploy anything unverified</td></tr>
+      <tr><td><code>web</code> container</td><td>Its own secret files, public sealing keys</td><td>Seal credentials</td><td>Open credentials; read the keyring or the backup key</td></tr>
+      <tr><td><code>worker</code> container</td><td>The keyring and provider secrets</td><td>Open credentials, inside one call frame</td><td>Reach the internet beyond what the host firewall allows</td></tr>
+      <tr><td>Caddy container</td><td>Only the DNS-01 token (home) or the staging basic-auth hash</td><td>Terminate TLS</td><td>Read any app secret</td></tr>
+      <tr><td>GitHub Actions</td><td>Build and attest permissions; no credential that can reach any box</td><td>Publish an attested image</td><td>Log in to, or push to, a box (C-83)</td></tr>
+      <tr><td>Backup bucket credentials</td><td>Two, separate: <strong>put-only</strong> on the box; <strong>read and list</strong> on the operator's drill machine only</td><td>—</td><td>Neither can delete or shorten retention; Object Lock enforces that at the store</td></tr>
+    </tbody>
+  </table>
+
+  <h3>3.2 Secret files on the host</h3>
+  <p>Every operator secret is a file under <code>/etc/polycarpic/secrets/</code> (staging: <code>staging-secrets/</code>, different values, no shared file). Compose mounts each file as a <code>secrets:</code> entry at <code>/run/secrets/&lt;name&gt;</code> into only the containers listed in §2.2. The app reads them through the <code>*_FILE</code> convention and refuses to start if one is missing or if a secret-looking environment variable is set in production (SECURITY §6.2).</p>
+  <table>
+    <thead><tr><th>File</th><th>Contents</th><th>Created by</th></tr></thead>
+    <tbody>
+      <tr><td><code>db_superuser_password</code>, <code>db_password_app</code>, <code>db_password_worker</code>, <code>db_password_migrator</code></td><td>Random, 32 bytes base64 each</td><td><code>provision.sh</code> generates them on the box; you never type them</td></tr>
+      <tr><td><code>auth_secret</code></td><td>BetterAuth secret, random 32 bytes. Versioned (§8.1).</td><td><code>provision.sh</code></td></tr>
+      <tr><td><code>credential_keyring</code></td><td>X25519 private keys by <code>key_id</code></td><td><code>polycarpic secrets init</code>, run once in the worker; you then save the offline copy (§7.1 step 11)</td></tr>
+      <tr><td><code>oauth_google_secret</code>, <code>oauth_apple_key</code>, <code>oauth_github_secret</code>, <code>resend_api_key</code>, <code>plaid_secret</code>, broker client secrets, <code>price_api_key</code>, <code>bls_api_key</code></td><td>Provider-issued</td><td>You paste each with <code>polycarpic-ops set-secret &lt;name&gt;</code>, which reads from the terminal without echo and writes 0400</td></tr>
+      <tr><td><code>backup_store_credential</code></td><td>The put-only access key id and secret for the bucket</td><td>You, same command</td></tr>
+      <tr><td><code>heartbeat_url</code></td><td>The monitor's ping URL (anyone holding it can fake a heartbeat)</td><td>You, same command</td></tr>
+      <tr><td><code>dns_api_token</code> (home, real-domain mode)</td><td>DNS-edit token scoped to one zone</td><td>You (§3.4)</td></tr>
+      <tr><td><code>staging_basic_auth</code></td><td>A bcrypt hash, not the password</td><td><code>polycarpic-ops staging-auth</code></td></tr>
+    </tbody>
+  </table>
+  <p>The Hetzner data volume's LUKS key is a file on the root disk (<code>/etc/polycarpic/luks.key</code>, 0400). That protects against a detached or snapshotted volume only; it does not protect against someone who gets the running server or its root disk. Said plainly so nobody believes more than that. The home box does better (TPM, §3.5).</p>
+
+  <h3>3.3 SSH, GitHub token, signing</h3>
+  <ul>
+    <li><strong>Operator SSH.</strong> One <code>ed25519</code> key per laptop, listed in <code>~/.ssh/authorized_keys</code> of a non-root sudo user <code>polyops</code>. Root login and password auth are off. Adding or removing a laptop is §8.8. Hetzner's console is the break-glass path if you lose every key.</li>
+    <li><strong>The box's GitHub credential (ARCH §8.1).</strong> A fine-grained personal access token, this repository only, <code>contents:read</code> and <code>packages:read</code>, expiry 90 days, stored as <code>github_read_token</code> and used only by the deploy script. If the package and repository become public, delete it. Renewal is §8.4. A reminder is set 14 days before expiry by the same outside monitor (§6.5).</li>
+    <li><strong>Release signing.</strong> The prod tag is accepted only if its SSH signature verifies against <code>/etc/polycarpic/allowed_signers</code>. That file is <strong>installed at bootstrap from your own machine, not fetched from the repository</strong>: a copy pulled from the repo would be forgeable by whoever can push to it (ruling D-5, re-fold R-3).</li>
+    <li><strong>Image trust.</strong> <code>gh attestation verify</code> pins the repository and the signer workflow <code>.github/workflows/build.yml</code> (§4.4).</li>
+  </ul>
+
+  <h3>3.4 TLS</h3>
+  <table>
+    <thead><tr><th>Target / mode</th><th>How the certificate is made</th><th>Renewal</th><th>What the operator does</th></tr></thead>
+    <tbody>
+      <tr><td>Hetzner</td><td>Caddy, ACME HTTP-01 on port 80, public issuer (Let's Encrypt by default)</td><td>Automatic, about 30 days before expiry</td><td>Nothing. The health check alerts if the served certificate has under 14 days left.</td></tr>
+      <tr><td>Home, <code>real-domain</code></td><td>Caddy with the DNS provider's plugin, ACME DNS-01 for <code>*.home.&lt;domain&gt;</code>. Wildcard, so the box's own name never appears in public certificate-transparency logs. The token is scoped to the one zone (Edit DNS on that zone, nothing else) and mounted into Caddy only (R-18).</td><td>Automatic</td><td>Rotate the token at the DNS provider yearly or on suspicion (§8.3). Optional: watch the zone's CT-log feed.</td></tr>
+      <tr><td>Home, <code>private-ca</code></td><td>An operator CA. <strong>Root</strong>: generated on your laptop, X.509 name-constrained to <code>polycarpic.local</code>, key kept offline in the password manager, validity 10 years, never on the box. <strong>Intermediate</strong>: signed by the root, validity 2 years, on the box, issues leaves. Caddy's internal issuer uses the intermediate; leaf validity 7 days, renewed automatically.</td><td>Leaves automatic. Intermediate by hand before it expires (§8.5).</td><td>Install the root on every device (§7.3). Remove it from every device on decommission or a move to a real domain.</td></tr>
+      <tr><td>Vercel</td><td>Vercel terminates TLS</td><td>Automatic</td><td>Nothing</td></tr>
+    </tbody>
+  </table>
+  <p>Gate item (SECURITY R-20): before the first home-box deploy in private-CA mode, run the name-constraint test of §7.3 step 6 on each browser and OS you use. If any browser ignores the constraint, that browser must not have the root installed, and the box moves to real-domain mode.</p>
+  <p>Startup mode check: the app derives the required mode from its public origin and refuses to start on a mismatch (suffix test offline, then an SOA query for the zone; SECURITY C-76, ARCH §7.8). INFRA adds only that the deploy script runs <code>polycarpic check-config</code> in the <code>migrate</code> container before any migration, so a wrong <code>TLS_MODE</code> fails the deploy cleanly instead of crash-looping <code>web</code>.</p>
+
+  <h3>3.5 Home-box disk unlock (TPM)</h3>
+  <p>LUKS2 with two key slots: a TPM2 slot sealed to Secure Boot state (PCR 7), and a long recovery passphrase kept offline. <strong>Use PCR 7 only</strong> by default. Adding PCR 11 (the kernel image) makes every kernel update change the measurement and leave the box locked after the automatic reboot, unless the distribution ships signed PCR policies; whether Ubuntu 24.04 does is unmeasured and is a first-deploy measurement (SECURITY C-72 already marks PCR 11 per-distro). Firmware checklist, console hardening and verification are in §7.3 step 4.</p>
+
+  <h3>3.6 The recovery sheet</h3>
+  <p>One printed page, kept somewhere that survives a house fire, listing: where the password manager's emergency kit is; the age private key (as the <code>AGE-SECRET-KEY-…</code> line); the credential keyring offline copy; the LUKS recovery passphrase; the private CA root key (private-CA mode). <strong>The age key and the keyring are written on separate lines of separate sheets and never in the same file</strong>; a lost keyring costs a relink (RB-4), a lost age key costs every backup (§6.1). Nothing on the sheet is stored on the box or in a backup.</p>
+</section>
