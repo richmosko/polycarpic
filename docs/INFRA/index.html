@@ -276,3 +276,200 @@ flowchart TB
   <h3>3.6 The recovery sheet</h3>
   <p>One printed page, kept somewhere that survives a house fire, listing: where the password manager's emergency kit is; the age private key (as the <code>AGE-SECRET-KEY-…</code> line); the credential keyring offline copy; the LUKS recovery passphrase; the private CA root key (private-CA mode). <strong>The age key and the keyring are written on separate lines of separate sheets and never in the same file</strong>; a lost keyring costs a relink (RB-4), a lost age key costs every backup (§6.1). Nothing on the sheet is stored on the box or in a backup.</p>
 </section>
+
+<!-- ============================================================ -->
+<section id="cicd" data-section="cicd">
+  <h2>4. Environments &amp; CI/CD</h2>
+  <p class="section-hint">ARCH §7.1 and §8 give the shape; SECURITY §8 (C-80 to C-83) the controls. Budgets: inner loop under 5 minutes, full pipeline under 15. Docs and tracker-only changes never start the app jobs.</p>
+
+  <h3>4.1 Environments</h3>
+  <table>
+    <thead><tr><th>Environment</th><th>Where</th><th>Data and secrets</th><th>Deploys when</th></tr></thead>
+    <tbody>
+      <tr><td>dev</td><td>Laptop, local compose (Postgres, web, worker)</td><td><code>fake</code> provider. <code>.env.example</code> is the only env file in git; names and comments, no values.</td><td>By hand</td></tr>
+      <tr><td>CI</td><td>GitHub-hosted runner, fresh Postgres service per run</td><td>Throwaway secrets generated per run. No repository secret reaches a fork PR (C-81).</td><td>Every pull request</td></tr>
+      <tr><td>staging</td><td>The Hetzner VPS, project <code>polycarpic-staging</code>, its own database</td><td>Fake source plus Plaid Sandbox and the SimpleFIN demo token. Own keyring and own secret directory (C-77). Never real books.</td><td>Automatically, every merge to <code>main</code>, within about 10 minutes</td></tr>
+      <tr><td>prod (Hetzner)</td><td>Same VPS, project <code>polycarpic-prod</code></td><td>Real data from v1.0</td><td>A signed <code>v1.*</code> tag, within 5 minutes of the release being published. A <code>0.x</code> tag is staging-only and prod ignores it.</td></tr>
+      <tr><td>prod (home box)</td><td>Local box, project <code>polycarpic-prod</code></td><td>Real data</td><td>Same tag rule; the box polls outbound. No staging on the box: it runs releases that staging already proved.</td></tr>
+      <tr><td>prod (Vercel)</td><td>Two Vercel projects + Neon</td><td>Vercel env vars (R-3)</td><td>Vercel's own Git integration on the signed tag; migration runs in the build step</td></tr>
+    </tbody>
+  </table>
+
+  <h3>4.2 Pipeline</h3>
+  <pre class="mermaid">
+flowchart LR
+  pr["Pull request"] --> chg["Change detection"]
+  chg -->|"docs, process, tracker only"| skip["Skip app jobs"]
+  chg -->|"code or config"| lint["Lint, types, compose lint"]
+  lint --> unit["Unit tests, affected packages"]
+  unit --> db["DB battery, auth routing test"]
+  db --> build["Build: node image, vercel x2"]
+  build --> scan["Audit, gitleaks, CodeQL, Trivy"]
+  scan --> merge{{"Merge to main"}}
+  merge --> bimg["build.yml: image, SBOM, attestation, push GHCR"]
+  bimg --> stg["Staging box polls and deploys"]
+  stg --> smoke["Playwright smoke against staging"]
+  smoke --> tag{{"/merge-pr cuts signed v1.x tag"}}
+  tag --> rel["release.yml: records digest in GitHub Release"]
+  rel --> prod["Prod boxes poll, verify, deploy"]
+  </pre>
+
+  <h3>4.3 Which jobs run on which paths</h3>
+  <p>Workflows follow the pattern already proven in <code>.github/workflows/ci.yml</code>: <strong>no workflow-level <code>paths:</code> filter</strong> on anything that is a required check (a required check whose workflow never starts blocks the merge forever); the filter is a <code>changes</code> step inside the job and every later step is gated on it, failing closed. Inside the app, Turborepo's affected graph narrows the work to touched packages.</p>
+  <table>
+    <thead><tr><th>Changed paths</th><th>Jobs that run</th></tr></thead>
+    <tbody>
+      <tr><td><code>docs/**</code>, <code>process/**</code> except the two the tooling tests read, <code>*.md</code></td><td>Nothing in the app workflow. Doc lint only.</td></tr>
+      <tr><td><code>packages/*</code>, <code>apps/*</code></td><td>Lint and types; Vitest on affected packages and their dependents; build</td></tr>
+      <tr><td><code>packages/db/**</code>, any migration, any policy</td><td>The above, plus the DB battery on a fresh Postgres at the pinned major: apply every migration as <code>poly_migrator</code>, pgTAP RLS and trigger battery, the C-75 config assertion, the pooler-reuse assertion (§9.1 D-6)</td></tr>
+      <tr><td><code>packages/auth/**</code>, <code>packages/tenancy/**</code>, <code>better-auth</code> or <code>@better-auth/passkey</code> version</td><td>The BetterAuth routing-pool test (ARCH §8, SECURITY A-31, A-33). A dependency bot's bump of either package cannot merge without it.</td></tr>
+      <tr><td><code>compose*.yml</code>, <code>Caddyfile</code>, <code>infra/**</code>, <code>Dockerfile*</code></td><td>Compose-policy lint (C-70); image build; Trivy; provisioning-script <code>shellcheck</code> and a dry run in a container</td></tr>
+      <tr><td><code>apps/web/src/routes/**</code>, Vercel project config</td><td>Vercel topology check, three legs plus the env-name check (ARCH §7.6)</td></tr>
+      <tr><td><code>.github/workflows/**</code>, <code>scripts/cairn/**</code>, <code>.claude/**</code></td><td>The existing <code>cairn</code> job, unchanged. Workflow edits also run an action-pin check (every <code>uses:</code> pinned by commit SHA, C-81).</td></tr>
+      <tr><td>Merge to <code>main</code>, any code path</td><td><code>build.yml</code> (§4.4), then the staging smoke</td></tr>
+      <tr><td>Weekly schedule</td><td>Rebuild from <code>main</code> to pick up base-image patches, full scan, and a restore-drill reminder issue on the first of the month (§6.7)</td></tr>
+    </tbody>
+  </table>
+  <p>Required checks on <code>main</code> stay as they are (<code>cairn</code> plus the new <code>app</code> aggregate job, which is the single required check for all app jobs so that path-skipped jobs never leave a check "Expected"). Speed levers, in order: Turborepo remote cache off (no third party), pnpm store cached by lockfile hash, Playwright browsers cached, the DB battery on one Postgres service container shared by the packages that need it. If the inner loop passes 5 minutes, split the battery into a second parallel job before dropping a test.</p>
+
+  <h3>4.4 Build, scan, attest, deploy (pull-based)</h3>
+  <ol>
+    <li><strong>Build once.</strong> <code>build.yml</code> runs on every push to <code>main</code>: <code>pnpm install --frozen-lockfile</code> with lifecycle scripts blocked (C-80), build the one <code>adapter-node</code> image, push to GHCR tagged with the git sha, record the digest.</li>
+    <li><strong>Scan and attest.</strong> Trivy on the image (fail on fixable critical or high and on embedded secrets, C-82); CycloneDX SBOM; <code>actions/attest-build-provenance</code> for the digest. The same step builds and attests the custom Caddy image and the tools image.</li>
+    <li><strong>Release.</strong> When <code>/merge-pr</code> pushes a signed <code>v1.*</code> tag, <code>release.yml</code> looks up the digest already built for that commit (never rebuilds), checks that its attestation exists, and publishes a GitHub Release whose body is one line, <code>digest: sha256:…</code>. If no image exists for the tagged commit the workflow fails and nothing deploys.</li>
+    <li><strong>The box polls.</strong> A systemd timer runs <code>polycarpic-deploy</code> every 5 minutes (with 60 s jitter) under <code>flock</code>, so two runs never overlap. Staging: newest <code>main</code> digest from GHCR. Prod: newest <code>v1.*</code> release from the Releases API.</li>
+    <li><strong>Verify, then act.</strong> If the digest equals <code>current-digest</code>, exit. Otherwise: pull by digest; <code>gh attestation verify --repo richmosko/polycarpic --signer-workflow .github/workflows/build.yml</code>; <strong>for prod also</strong> <code>git verify-tag</code> against <code>/etc/polycarpic/allowed_signers</code> and a check that the tag's commit is the one the digest was built from (the image carries its commit as a label, also covered by the attestation). Any failure: log, alert, stop. The box never runs an unverified image.</li>
+    <li><strong>Extract the ops bundle</strong> (compose files, Caddyfile, scripts) from the verified image into <code>/opt/polycarpic/releases/&lt;digest&gt;/</code>, so the compose definitions are covered by the same attestation as the code.</li>
+    <li><strong>Pre-migration check</strong>, then the migration (§4.5), <code>docker compose up -d</code> for the project, then poll <code>/api/v1/health</code> for up to 120 seconds.</li>
+    <li><strong>Result.</strong> Healthy: write <code>current-digest</code>, log the deploy, ping the monitor. Unhealthy: automatic rollback (§4.6) and an alert.</li>
+  </ol>
+  <p>Not changing during a deploy: secrets (placed by you, never by CI), the deploy script itself and the timer unit. Those change by an operator step (<code>polycarpic-ops self-update</code>, §8.7) that runs the same verification on a newer release, because a script that rewrites itself from the network is the supply-chain path this design exists to close.</p>
+
+  <h3>4.5 Migration deployment mechanism</h3>
+  <p>The tool is the one the POLY-76 spike ratifies (Drizzle Kit recommended, ARCH §6.2). Whichever tool wins, the mechanism below is fixed because it follows from the spike's constraints.</p>
+  <ul>
+    <li><strong>One-off container, not app startup.</strong> The <code>migrate</code> service (same image, <code>migrate</code> entrypoint) connects as <code>poly_migrator</code>, the only login that may run DDL, and runs each file as <code>set role poly_owner … reset role</code> so objects are owned by the NOLOGIN owner and FORCE RLS holds. <code>web</code> and <code>worker</code> never get the migrator password and refuse to start if the schema version is behind the image.</li>
+    <li><strong>Definers and policies.</strong> SECURITY DEFINER functions are created owned by their role (<code>poly_authz</code>, <code>poly_purge</code>, and so on) and policies target roles with <code>to:</code>; the DB battery proves both through the same runner on every PR, so a migration that works only for a superuser cannot reach the box.</li>
+    <li><strong>Order.</strong> <code>check-config</code> (secrets present, <code>TLS_MODE</code>, <code>PLAID_ENV</code>) → <code>migrate --plan</code> (lists pending files, exits) → if any are pending, a <strong>pre-migration backup</strong> (a <code>pg_dump</code> encrypted to the age public key, uploaded like any backup, plus kept in the local spool for 7 days) → <code>migrate</code> under an advisory lock → <code>up -d</code>.</li>
+    <li><strong>Failure.</strong> Each file runs in a transaction, so a failed file leaves the schema as it was. The deploy stops, the old containers keep running on the old digest, and an alert is sent. Nothing is rolled forward by hand.</li>
+    <li><strong>Expand and contract.</strong> A release only ever adds (columns, tables, nullable fields, new functions). A removal ships at least one release after the code that used the thing is gone. Therefore the previous release's code always runs on the new schema, which is what makes rollback a one-file change.</li>
+    <li><strong>Vercel and Neon.</strong> The same <code>migrate</code> entrypoint runs in the Vercel build step against Neon's <strong>direct</strong> endpoint; the runtime uses the pooled one (§1.4, D-6).</li>
+  </ul>
+
+  <h3>4.6 Rollback</h3>
+  <ul>
+    <li><strong>Automatic.</strong> If health does not pass in 120 seconds after <code>up -d</code>, the script points <code>desired-digest</code> back at <code>current-digest</code>, restarts that release's containers from its own ops bundle, writes the failure to <code>deploy.log</code> and alerts. The failed digest is recorded in <code>/opt/polycarpic/quarantine</code> and skipped by the poll until a newer one appears.</li>
+    <li><strong>Manual, one command.</strong> <code>polycarpic-ops rollback</code> reverts to the previous digest recorded in <code>deploy.log</code> without contacting GitHub, then keeps the poll from re-deploying the newer release by quarantining it. §8.6 has the steps.</li>
+    <li><strong>Schema.</strong> A code rollback never needs a schema rollback (expand-contract). A schema-level undo is the restore path (§6.8), starting from the pre-migration backup.</li>
+    <li><strong>Brief interruption.</strong> <code>up -d</code> recreates <code>web</code>, so for a few seconds Caddy has no healthy upstream; Caddy retries for 10 seconds (<code>lb_try_duration</code>) which hides it for most requests. ARCH §8.1's "keeps routing to the last healthy containers" is not literally achievable with a plain recreate on one box; v1 accepts the few seconds (re-fold R-4).</li>
+  </ul>
+
+  <h3>4.7 Vercel path</h3>
+  <p>Vercel builds on the signed tag through its Git integration, with the topology checks of ARCH §7.6 run first in GitHub Actions on every PR touching routes or project config. The Vercel environment-variable names check uses a read-scoped Vercel token held as a GitHub environment secret with required reviewers; it reads names, never values. No deployment credential for Vercel lives in GitHub. A failed migration step fails the build and Vercel keeps serving the previous deployment.</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="patching" data-section="patching">
+  <h2>5. Update &amp; Patch Schedule</h2>
+  <p class="section-hint">Automatic where an unattended failure is cheap, manual in a fixed window where it is not. Times are the operator's local time.</p>
+  <table>
+    <thead><tr><th>What</th><th>How</th><th>When</th><th>Who</th></tr></thead>
+    <tbody>
+      <tr><td>Ubuntu security updates (kernel, libc, openssl, sshd)</td><td><code>unattended-upgrades</code>, security pocket only. Automatic reboot at 04:30 if a reboot is needed. Containers return on their own (<code>restart: unless-stopped</code>, <code>live-restore</code>). Home box: PCR 7 only keeps the TPM unlock valid across kernel updates (§3.5).</td><td>Daily check; reboot in the window</td><td>Automatic. The outside monitor alerts if the box is down for more than 15 minutes after 04:30.</td></tr>
+      <tr><td>Other apt packages, Docker Engine, Compose plugin</td><td><code>apt full-upgrade</code> by hand, in the window, one box at a time (§8.2)</td><td>First Sunday of the month</td><td>Operator</td></tr>
+      <tr><td>Application base images (Node, Postgres minor, Caddy), OS layers inside images</td><td>Weekly scheduled rebuild of <code>main</code> picks up patched base layers; Renovate proposes pinned-digest bumps. Staging deploys automatically.</td><td>Weekly rebuild Monday 03:00; Renovate weekly</td><td>CI. Merges are reviewed; minor and patch bumps may auto-merge only when CI is green and <code>minimumReleaseAge</code> of 3 days has passed (C-80). Majors never auto-merge.</td></tr>
+      <tr><td>A prod release</td><td>A signed tag cut by <code>/merge-pr</code> from a staging-proven <code>main</code></td><td>When a feature ships, and at least monthly while any base-image or dependency fix is pending</td><td>Team-lead via <code>/merge-pr</code>; the box deploys itself</td></tr>
+      <tr><td>Vulnerability response in a deployed dependency or image</td><td>Known-exploited or critical with a fix: patch release within 48 hours. High with a fix: within 7 days. Anything else: next monthly release. Compromised dependency: SECURITY RB-6.</td><td>As found by Trivy, audit, or advisories</td><td>Team-lead dispatches; the box deploys</td></tr>
+      <tr><td><code>better-auth</code>, <code>@better-auth/passkey</code></td><td>Exact version pins (no ranges). A bump is its own PR and must pass the routing-pool test and the pinned-option checks of SECURITY A-33.</td><td>Reviewed when Renovate proposes; at the latest each quarter</td><td>Backend lead with SecEng review</td></tr>
+      <tr><td>Postgres minor</td><td>Arrives with the image digest bump; runs the DB battery first</td><td>With the weekly rebuild</td><td>CI</td></tr>
+      <tr><td>Postgres major</td><td>Never in place. Dump and restore into a new volume as a drill (§6.7) on staging first; scheduled once a year or when the major nears end of life, and Neon's major is changed in step.</td><td>Evaluated each October</td><td>Operator with architect</td></tr>
+      <tr><td>Operator secrets</td><td>Rotation schedule in §8</td><td>Annual review; on suspicion immediately</td><td>Operator</td></tr>
+      <tr><td>GitHub read token</td><td>Expires every 90 days</td><td>Renew in week 11</td><td>Operator</td></tr>
+      <tr><td>Private CA intermediate (private-CA mode)</td><td>2-year validity</td><td>Replace 60 days before expiry</td><td>Operator</td></tr>
+    </tbody>
+  </table>
+  <p><strong>Restart-after-change pattern.</strong> The repository already has the rule for the tooling receiver: a merge changes what should be running, and whatever serves it is restarted by the merge process, not remembered by a person (CLAUDE.md, <code>/merge-pr</code>). The deploy script applies the same rule to the app: the poll compares what is running with what should be, and a deploy always ends with a health check, never with "the command returned".</p>
+</section>
+
+<!-- ============================================================ -->
+<section id="dr" data-section="dr">
+  <h2>6. Disaster Recovery &amp; Monitoring</h2>
+  <p class="section-hint">Resolves ARCH OQ-9 detail and OQ-26; ruled in §9 (D-1 to D-4). In plain terms: backups are locked with a key that never lives on the server, stored where the server cannot delete them, and proven by restoring them somewhere else once a month.</p>
+
+  <h3>6.1 What is backed up and how</h3>
+  <pre class="mermaid">
+flowchart LR
+  pg[("Postgres prod")] --> base["Nightly: pg_basebackup plus pg_dump plus globals"]
+  pg --> wal["Continuous: WAL segments, archive_timeout 5 min"]
+  base --> enc["age encrypt to public key"]
+  wal --> enc
+  enc --> spool["Local spool, LUKS volume"]
+  spool --> up["rclone put-only, HTTPS 443"]
+  up --> bucket[("Object-lock bucket, 35 days")]
+  bucket -.->|"read credential, operator laptop"| drill["Monthly restore drill"]
+  priv["age PRIVATE key: password manager and printed sheet"] -.-> drill
+  </pre>
+  <ul>
+    <li><strong>Nightly (02:15).</strong> Three artifacts, each encrypted on the box to the age recipient before it leaves: (1) a <code>pg_basebackup</code> tar of the cluster, the base for point-in-time recovery; (2) a <code>pg_dump --format=custom</code> of the database, the portable fallback that restores onto any Postgres of the same or a newer major; (3) <code>pg_dumpall --globals-only</code>, which carries the roles (<code>poly_owner</code>, <code>poly_app</code> and the rest) that a per-database dump omits. A restore without (3) comes up without its RLS roles, so the drill checks for it.</li>
+    <li><strong>Continuous.</strong> Postgres <code>archive_command</code> copies each WAL segment to the spool; a one-minute timer encrypts and uploads it; <code>archive_timeout = 300</code> forces a segment at least every 5 minutes, so the worst case loss is about 5 minutes plus upload delay, inside the 15-minute RPO.</li>
+    <li><strong>Correction to ARCH §7.2.</strong> WAL replay needs a physical base backup; a <code>pg_dump</code> alone cannot be the base for WAL. The nightly set above adds <code>pg_basebackup</code> (re-fold R-5). Physical restore needs the same Postgres major, so the image's major is pinned and recorded in each backup's name.</li>
+    <li><strong>Not backed up, by design:</strong> the credential keyring (SECURITY §6.4: losing it means relinking), the secrets directory, staging's database, the age private key. Anything in the secrets directory is recreated from the password manager and provider consoles (§8.9).</li>
+    <li><strong>Where.</strong> An S3-compatible bucket with Object Lock in compliance mode and a 35-day default retention, written by a put-only credential over HTTPS 443 (works on every target, including the home box's outbound allowlist). The store, not the box, enforces that nothing can be deleted or overwritten before 35 days. The box credential cannot shorten retention or delete versions. This replaces the Storage Box default (ruling D-3): a Storage Box "append-only" mode is unmeasured and its SFTP port is blocked on the home box. A Storage Box remains a documented fallback on the Hetzner target once its cannot-delete drill passes. Provider: Principal question Q3.</li>
+  </ul>
+
+  <h3>6.2 Naming and integrity</h3>
+  <p>Objects are named <code>&lt;instance&gt;/&lt;pgmajor&gt;/&lt;yyyy&gt;/&lt;mm&gt;/&lt;dd&gt;/&lt;kind&gt;-&lt;utc-timestamp&gt;.age</code> with a <code>.sha256</code> sibling written after the upload. The backup job fails, and alerts, if a listed object does not match its recorded checksum after upload. The age private key never appears in any path or log.</p>
+
+  <h3>6.3 Retention (SECURITY R-5)</h3>
+  <p>Everything in the bucket expires 35 days after it is written and the store allows nothing earlier. So a purged entity's data can remain in backups for at most <strong>35 days</strong> after the purge; the purge confirmation screen should say "up to 35 days" (re-fold S-3). There is no long-term archive tier in v1: if you need a yearly keepsake, export from the app (the export carries the hash-chain head) and keep it yourself. Lifecycle expiry is a bucket rule, so no deletion credential exists anywhere.</p>
+
+  <h3>6.4 RPO and RTO by target</h3>
+  <table>
+    <thead><tr><th>Target</th><th>RPO</th><th>RTO</th><th>How</th></tr></thead>
+    <tbody>
+      <tr><td>Hetzner VPS</td><td>15 minutes (WAL). Fallback: 24 hours (nightly dump).</td><td>4 hours for total loss of the server: provision from the same provisioning files, restore, redeploy the last release. 30 minutes for a bad migration with the box intact (§4.6, pre-migration backup).</td><td>§8.10, rehearsed monthly in part (§6.7)</td></tr>
+      <tr><td>Local box</td><td>15 minutes (same WAL path)</td><td>1 day to repair or replace the box if you hold spare hardware or can buy it; 4 hours to a <strong>temporary Hetzner VPS</strong> restored from the same bucket, then move back (§8.10). Because the box is the secondary target, rented capacity is the break-glass.</td><td>Restore drill identical to Hetzner</td></tr>
+      <tr><td>Vercel + Neon</td><td>Neon's restore window (unmeasured; plan-dependent) plus weekly export: worst case 7 days</td><td>4 hours: new Neon project, restore export, repoint env vars</td><td>§6.6</td></tr>
+    </tbody>
+  </table>
+
+  <h3>6.5 Monitoring, heartbeat and alert routing</h3>
+  <ul>
+    <li><strong>Two independent alert paths</strong>, so one failure never silences both. Path A: the app and host scripts email you through Resend (SECURITY §9 list, plus backup, deploy and certificate events). Path B: an outside monitor that does not depend on the box or Resend: a free-tier dead-man's-switch service (Principal question Q4; recommendation: Healthchecks.io). The box pings it, and silence past the grace period emails you.</li>
+    <li><strong>What pings Path B.</strong> (1) Every 5 minutes, only if local <code>/api/v1/health</code> is OK <em>and</em> the served certificate's issuer matches <code>TLS_MODE</code> (C-76); (2) after each successful backup upload; (3) after each successful deploy poll. Grace: 15 minutes, 26 hours and 20 minutes respectively. The ping carries no data. On the Hetzner target the same service also checks the public URL from outside.</li>
+    <li><strong>Health endpoint exposure (re-fold R-6).</strong> Public <code>/api/v1/health</code> returns only <code>ok</code> or not. The detailed fields ARCH §7.4 lists (last migration, last backup time) are served on the loopback-only admin listener and read by the host scripts, so a stranger learns nothing about backup cadence.</li>
+    <li><strong>Alerts that need no new service:</strong> spool older than 2 hours; backup older than 26 hours; certificate under 14 days; disk over 80 percent; deploy failed or rolled back; <code>unattended-upgrades</code> pending reboot for more than 3 days; GitHub token under 14 days; ledger hash-chain break (SEV1) or a verifier silent for 8 days. All thresholds are provisional and tuned after POLY-M1.</li>
+    <li><strong>Logs.</strong> JSON to stdout, Docker <code>json-file</code> rotation, 30 days on the box (SECURITY §9). The operator's query surface is <code>docker compose logs</code> and <code>journalctl</code>. No log service in v1.</li>
+    <li><strong>The dashboard the lead can point to:</strong> the monitor's check list (green or red per box) plus <code>polycarpic-ops status</code>, which prints the running digest, last deploy, last backup, certificate days left and disk use on one screen.</li>
+  </ul>
+
+  <h3>6.6 Vercel + Neon backups (answers OQ-26)</h3>
+  <ul>
+    <li>A cron function cannot run <code>pg_dump</code> or ship WAL, so the Compose mechanism does not apply.</li>
+    <li><strong>Default (v1.0, no new trust):</strong> rely on Neon's point-in-time restore for the plan in use (window unmeasured; read it on the plan page at deploy time and record it here), and run <code>polycarpic-ops neon-export</code> <strong>from the operator's laptop weekly</strong>: <code>pg_dump</code> through a read-only role, age-encrypted to the same public key, uploaded with the put-only credential to the same bucket. RPO is then up to 7 days beyond Neon's window, stated honestly.</li>
+    <li><strong>Recommended before real data lands on this target:</strong> a nightly GitHub Actions export. It needs a database role that can read every ledger row to live in a GitHub environment secret, which makes GitHub a holder of a ledger-read credential (TB-12). That is a SecEng ruling and a Principal acceptance, not a devops default. Until then the default stands. Recorded as OQ-INFRA-1.</li>
+    <li>Restore: create a Neon project, run <code>polycarpic-ops restore --dump</code> from the laptop (§8.10), repoint the Vercel variables, redeploy.</li>
+  </ul>
+
+  <h3>6.7 The restore drill (a GA gate)</h3>
+  <p>Monthly, scripted, and <strong>run off the box</strong>: your laptop or a throwaway server, never the VPS, because the age private key must never reach it (ARCH §7.2). The first passing drill against real backup objects is a gate for v1.0 (DECISIONS 2026-11-06); a drill that has not run in 45 days raises an issue and an email.</p>
+  <ol>
+    <li>List the bucket with the read credential; take the newest base backup and WAL.</li>
+    <li>Decrypt with the age private key from the password manager.</li>
+    <li>Start a scratch Postgres at the recorded major; restore the globals, then recover to the latest WAL; separately restore the <code>pg_dump</code> into a second scratch instance.</li>
+    <li>Assert: the trial balance of every entity sums to zero; the per-entity hash-chain verifier passes (C-24); the roles from the globals file exist; the latest journal entry is within 20 minutes of the drill's start for the WAL path.</li>
+    <li>Assert, using the box credential file copied for the drill, that <strong>deleting an existing object fails</strong> and so does shortening its retention (C-73's second test).</li>
+    <li>Record date, backup names, timings and pass or fail in <code>process/cairn/reviews/restore-drill-&lt;date&gt;.md</code> via the lead (not edited by hand on the box). Destroy the scratch instances.</li>
+  </ol>
+
+  <h3>6.8 Recovery procedures</h3>
+  <table>
+    <thead><tr><th>Event</th><th>Procedure</th></tr></thead>
+    <tbody>
+      <tr><td>Bad migration or bad release, box intact</td><td>§8.6 rollback. If data changed wrongly, restore the pre-migration backup into a scratch database, compare, and decide; do not overwrite prod without the drill checks.</td></tr>
+      <tr><td>Box lost (fire, failed disk, dead provider)</td><td>§8.10: new server from the same files, restore from the bucket, redeploy the last release, re-enter secrets from the password manager, verify, repoint DNS.</td></tr>
+      <tr><td>Suspected compromise of the box or of an operator secret</td><td>SECURITY RB-1 and RB-2. Commands in §8.11.</td></tr>
+      <tr><td>Stolen home box (RB-2 variant)</td><td>The disk stays locked only while the thief cannot boot it; assume it boots (R-21). Within the hour: (1) from the registrar/DNS console, revoke the zone token; (2) revoke every bank connection at its provider (Plaid <code>/item/remove</code>, SimpleFIN bridge, broker OAuth); (3) rotate the age keypair is <em>not</em> needed, but rotate the bucket put-credential at the provider and the Resend key; (4) rotate the BetterAuth secret and every OAuth client secret; (5) tell the household; (6) stand up a replacement (§8.10) from backups taken before the theft and relink every connection; (7) file the postmortem within 5 business days (SECURITY §10). The private CA root, if used, was never on the box; replace the intermediate.</td></tr>
+    </tbody>
+  </table>
+</section>
