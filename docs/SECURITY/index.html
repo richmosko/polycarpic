@@ -263,7 +263,7 @@ flowchart TB
     <tbody>
       <tr><td>T-70</td><td>A parent member with no membership on a child reads the child's rows (entries, lines, payees, memos, lots, positions) through a roll-up definer, the holdings popover, or a bug in a definer body.</td><td>I</td><td>M</td><td>H</td><td>C-25</td></tr>
       <tr><td>T-71</td><td>Structure enumeration: a non-member reads <code>entity_rollup</code> rows, or ancestor names, beyond the ruled grant (members of the parent; the child's owner sees parent names only).</td><td>I</td><td>M</td><td>L</td><td>C-19, C-25</td></tr>
-      <tr><td>T-72</td><td>Time-slicing: calling the roll-up, economic or allocated-income definer for one-day periods, or comparing balances on consecutive days, rebuilds near-transaction-level detail of an entity the caller is not a member of.</td><td>I</td><td>M</td><td>M</td><td><em>Pending Principal P2</em> (period bounds for non-member entities); R-17</td></tr>
+      <tr><td>T-72</td><td>Time-slicing: calling the roll-up, economic or allocated-income definer for one-day periods, or comparing balances on consecutive days, rebuilds near-transaction-level detail of an entity the caller is not a member of.</td><td>I</td><td>M</td><td>M</td><td>Consent disclosure (C-25): the inclusion step and the upward-consent notice state that any period is visible. No period guard, by the Principal's ruling (P2, 2026-11-07). R-17.</td></tr>
       <tr><td>T-73</td><td>The audience of an entity's totals grows without its owner knowing. It grows when the entity's parent is placed under another parent (consent travels upward), or when a member is added to an ancestor.</td><td>I</td><td>M</td><td>M</td><td>C-25 (placement notice through the <code>poly_graph</code> trigger, <code>app.parents_of</code>, pull-out); the notice on an ancestor grant is <em>pending Principal P5</em></td></tr>
       <tr><td>T-74</td><td>The cap-table candidate list, or the holder notification, leaks names of Persons or entities to someone with no relation to them.</td><td>I</td><td>L</td><td>M</td><td>C-27</td></tr>
       <tr><td>T-75</td><td>A holder's owners, who have no membership on the held entity, read other holders' rows or the held entity's books.</td><td>I</td><td>M</td><td>M</td><td>C-27</td></tr>
@@ -705,15 +705,23 @@ flowchart TB
               <li>Both triggers take the advisory lock.</li>
             </ul></li>
           <li><strong>Placement notice.</strong> A notice goes to every owner beneath, in the same transaction, with an <code>audit_event</code>. It names the new top-level parent and says what becomes visible.</li>
+          <li><strong>Consent disclosure (P2, 2026-11-07).</strong> The inclusion step (adding an entity to a parent) and the upward-consent notice both state plainly that:
+            <ul>
+              <li>parent members see class and category totals for <em>any</em> period;</li>
+              <li>for a small entity that effectively reveals individual amounts and their dates;</li>
+              <li>nothing else is shown: no payee, memo, account or counterparty.</li>
+            </ul>
+            The wording is a security requirement. Changing it needs a security-gate review. Any date range is allowed: there is no period guard.</li>
           <li><strong>Holdings popover on a parent.</strong> Positions come only through ordinary <code>poly_app</code> RLS, for the parent's own accounts and for entities where the viewer is a member. Any other entity shows its total and the boundary panel. No definer returns a position.</li>
           <li>All of these functions are on the definer allowlist (C-15) and in the role-hygiene set (C-10).</li>
         </ul><p class="ctl-meta"><strong>Lives at:</strong> <code>packages/db</code> SQL; <code>packages/tenancy</code><br><strong>Tested by:</strong> pgTAP (ARCH §3.3a–c tests, plus):
         <ul>
           <li>a parent viewer without child membership gets totals equal to the child owner's figures, and 0 rows from every tenant table and from the popover's position read for that child;</li>
           <li>a cycle through an entity invisible to both the inserter and <code>poly_rollup</code> is refused;</li>
+          <li>Playwright: the inclusion step and the placement notice render the consent-disclosure text;</li>
           <li>calling a <code>poly_graph</code> function directly fails;</li>
           <li>the result-column set of each <code>poly_rollup</code> function equals its pinned shape.</li>
-        </ul></p></td><td>T-70, T-71, T-73, T-77, T-78</td><td>Triggers with the junction (POLY-M1); definers and popover with POLY-1.1</td></tr>
+        </ul></p></td><td>T-70, T-71, T-72, T-73, T-77, T-78</td><td>Triggers with the junction (POLY-M1); definers and popover with POLY-1.1</td></tr>
       <tr><td>C-27</td><td>Cap table and allocated income, under the new <code>poly_stake</code> role (NOLOGIN, NOBYPASSRLS, owns no tables, SELECT only; OQ-25):
         <ul>
           <li><strong><code>app.cap_table_candidates(entity_id)</code></strong> is for an owner of <code>entity_id</code> only. It returns the id and display name of members' own Persons, and of Person, Trust and Business entities visible to the caller. Nothing else.</li>
@@ -722,7 +730,6 @@ flowchart TB
             <ul>
               <li>Its reads are confined by role-targeted policies to <code>app.held_entities()</code>: entities in which the caller's own Person, or an entity the caller owns, has ever held units, plus one link onward.</li>
               <li>Guard: the caller has a membership on the taxpayer entity.</li>
-              <li>Period bounds for non-member entities are pending Principal P2.</li>
             </ul></li>
           <li><strong>Holder notification</strong> is written by the <code>poly_graph</code> trigger (C-25).</li>
         </ul><p class="ctl-meta"><strong>Lives at:</strong> <code>packages/db</code> SQL; <code>packages/tax</code><br><strong>Tested by:</strong> pgTAP (ARCH §3.1a tests, plus):
@@ -954,7 +961,7 @@ flowchart TB
       <tr><td>R-14</td><td>Cross-root read access (PT-3, tooling). <code>cairn serve</code> reads directories named in a committed <code>roots:</code> config (or <code>--repos</code>), which can be outside the repo. A malicious <code>roots:</code> entry in a PR could point a reviewer's local board at a sibling directory, e.g. <code>../../.ssh</code>.</td><td>The server is read-only and localhost-only, with no write path to a secondary root. The <code>/api/board</code> payload carries only parsed cairn frontmatter, so there is no exfiltration channel. A directory without a <code>config.yml</code> is skipped before anything is read. Anyone who can commit a <code>roots:</code> entry already has a stronger vector, editing <code>cairn.py</code> or <code>board.js</code> directly, so a runtime path-jail would be theater.</td><td>When more than one root loads, a startup stderr banner logs each resolved absolute root path. It is a human tripwire against a stale or mistyped <code>roots:</code> entry silently serving the wrong tracker. Re-evaluate if cairn ever gains a write path to non-primary roots.</td><td>2027-02-21</td><td>Rich Mosko</td></tr>
       <tr><td>R-15</td><td>A parent-link or cap-table refusal ("would make an entity its own ancestor", "too deep") reveals that some link exists, possibly through entities the user cannot see (T-78).</td><td>The inserter must own both ends, so the bit is about paths between their own entities. The error names no entity, and naming nothing would make the refusal unexplainable.</td><td>Errors name no entity (C-25). Refusals are audited.</td><td>If links ever become insertable by a non-owner</td><td>pending</td></tr>
       <tr><td>R-16</td><td>A purge, including one inside an account deletion, runs immediately with no cancellable delay. A hijacked session that passes step-up can destroy an entity's books at once.</td><td>The Principal's ruling (OQ-23). A delay needs a background purge the design forbids, and would make the freshness guards stale.</td><td>Step-up within 5 minutes (C-03, with a second factor required for owners, P1). Typed entity name. A fresh export by the same user. Every member emailed immediately. Operator backups (C-73). R-5 bounds how long recovery is possible.</td><td>If a purge is ever reported as unwanted</td><td>Rich Mosko (2026-11-06, OQ-23)</td></tr>
-      <tr><td>R-17</td><td>Aggregate inference. Roll-up figures shown to a parent's members, the economic view, and allocated income shown to a holder's owners can be combined to infer things. Dividing economic by gross gives the viewer's own look-through stake. Allocated income divided by stake gives a pass-through entity's tagged income totals, as a K-1 tells a partner. Observing "today" figures every day accumulates detail over time.</td><td>Each figure is one the viewer is entitled to by the Principal's rulings. Persistent daily observation needs ongoing access and is visible in request logs.</td><td>The fixed aggregate shapes (C-25, C-27). Period bounds for non-member entities (pending Principal P2).</td><td>With POLY-1.1, and on any cross-parent "my net worth" proposal (OQ-29)</td><td>pending</td></tr>
+      <tr><td>R-17</td><td>Aggregate inference. Roll-up figures shown to a parent's members, the economic view, and allocated income shown to a holder's owners can be combined to infer things. Dividing economic by gross gives the viewer's own look-through stake. Allocated income divided by stake gives a pass-through entity's tagged income totals, as a K-1 tells a partner. Observing "today" figures every day accumulates detail over time. <em>Widened by P2:</em> a parent member may request roll-up totals for any date range. For a small entity, one-day periods and day-to-day balance differences reveal individual amounts and their dates, though never payee, memo, account or counterparty.</td><td>Each figure is one the viewer is entitled to by the Principal's rulings. Inclusion in a parent is an explicit grant by the entity's owner, so the exposure is consented, provided the consent is honest.</td><td>Consent disclosure at inclusion and in the upward-consent notice (C-25). The fixed aggregate shapes (C-25, C-27). Own and member entities are unaffected.</td><td>With POLY-1.1, and on any cross-parent "my net worth" proposal (OQ-29)</td><td>Rich Mosko (2026-11-07, P2)</td></tr>
     </tbody>
   </table>
 </section>
@@ -1059,8 +1066,8 @@ flowchart TB
     <li><strong>Principal (via team-lead), 2026-11-07 question set.</strong> Each question carries SecEng's recommendation. Q2 was withdrawn after OQ-23. Q1 and Q3 to Q5 are restated as P1, P3, P4 and P6.
       <ul>
         <li><strong>P1. Ruled 2026-11-07:</strong> a second factor is required for owners and managers, and optional for viewers. C-03 and R-7 are updated.</li>
-        <li><strong>P2.</strong> For entities the viewer is not a member of, limit past roll-up, economic and allocated-income figures to whole months, with today live? <em>Recommend yes</em> (T-72).</li>
-        <li><strong>P3.</strong> Approve the accepted risks: R-2 to R-5, R-8 to R-13, R-15 and R-17 (R-7 follows P1). Re-confirm R-1's corrected text. <em>Recommend approving all.</em></li>
+        <li><strong>P2. Ruled 2026-11-07:</strong> any date range, with honest consent. The inclusion step and the upward-consent notice carry the disclosure (C-25), and the residual is folded into R-17 and approved. There is no period guard in ARCH.</li>
+        <li><strong>P3.</strong> Approve the accepted risks: R-2 to R-5, R-8 to R-13 and R-15 (R-7 approved under P1, R-17 under P2). Re-confirm R-1's corrected text. <em>Recommend approving all.</em></li>
         <li><strong>P4.</strong> Build the ledger hash chain (C-24) in v1, or after GA? <em>Recommend v1</em> (revised from "after GA"). The gapless journal-counter lock already provides the ordering a chain needs, and no real books exist before GA.</li>
         <li><strong>P5.</strong> Notify the owners beneath when a member is added to an ancestor parent? <em>Recommend yes</em> (T-73).</li>
         <li><strong>P6.</strong> Drop the operator switch that would reopen public sign-up, in favour of a CLI invite that shares no entity? <em>Recommend drop</em> (revised).</li>
