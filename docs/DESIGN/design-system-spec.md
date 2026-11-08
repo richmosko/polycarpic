@@ -664,7 +664,7 @@ The moments where the app asks for more than a click: the second step, consent t
 
 One fixed block, `.consent-text` (muted panel with a `--ring` left rule), used verbatim wherever an entity joins a parent's audience: the Add to a parent confirmation, the placement notice and the new-member-above notice. `<parent>` is the only variable.
 
-> Members of <parent> see class and category totals for this entity for any period.
+> Members of <parent>, and of any parent above it, see class and category totals for this entity for any period.
 > For a small entity, that effectively reveals individual amounts and their dates.
 > Nothing else is shown: no payee, memo, account or counterparty.
 
