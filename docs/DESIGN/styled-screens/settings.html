@@ -100,7 +100,7 @@
     </div>
     <div class="card" id="second-step">
       <div class="card-head"><span class="card-title">Sign-in and second step</span><span class="card-sub">Just you, every entity</span></div>
-      <div class="kv-row"><span class="kv-label">Second step<span class="kv-help">Required while you are an owner or manager on any entity, so at least one method stays set up. Asked on a new device and before export, purge, granting access and linking a bank.</span></span><span class="badge badge-positive-soft"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>On</span></div>
+      <div class="kv-row"><span class="kv-label">Second step<span class="kv-help">Required while you own or manage any entity besides your own unshared Person, so at least one method stays set up. Asked on a new device and before export, purge, granting access and linking a bank.</span></span><span class="badge badge-positive-soft"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>On</span></div>
       <div class="kv-row"><span class="kv-label"><span><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span> Authenticator app</span><span class="kv-help">Added Oct 3, 2026</span></span><span class="kv-value"><button class="btn btn-ghost btn-sm" type="button">Remove</button></span></div>
       <div class="kv-row"><span class="kv-label"><span><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span> Passkey: MacBook Touch ID</span><span class="kv-help">Added Oct 3, 2026 · last used today</span></span><span class="kv-value"><button class="btn btn-ghost btn-sm" type="button">Remove</button><button class="btn btn-outline btn-sm" type="button">Add passkey</button></span></div>
       <div class="kv-row"><span class="kv-label">Backup codes<span class="kv-help">8 of 10 left. Each works once, for when your phone or passkey is not at hand.</span></span><button class="btn btn-outline btn-sm" type="button">Make new codes</button></div>
@@ -123,6 +123,14 @@
       </div></div>
     </div>
     <div class="card">
+      <span class="eyebrow">Export receipt — an entity with no posted entries (reference)</span>
+      <div class="receipt" aria-label="Last export" style="margin-top:12px;">
+        <div class="receipt-line"><span class="badge badge-positive-soft badge-sm"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>Exported</span><span>Nov 8, 2026, 09:40 by you · <span class="mono">mosko-holdings-2026-11-08.zip</span></span></div>
+        <div class="receipt-line"><span class="card-sub">Ledger fingerprint</span><span>none, no entries are posted yet</span></div>
+        <span class="card-sub">The file holds the entity's accounts and settings. The first export after an entry is posted carries a fingerprint.</span>
+      </div>
+    </div>
+    <div class="card">
       <span class="eyebrow">Delete account — your choices (reference)</span>
       <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Delete your account" style="max-width:640px;">
         <div class="je-modal-title">Delete your account</div>
@@ -134,7 +142,8 @@
         </div>
         <div class="plan-step">
           <div class="section-heading" style="font-size:14px;font-weight:600;">2. Entities only you own</div>
-          <div class="kv-row"><span class="kv-label">Mosko Consulting LLC<span class="kv-help">Transfer makes the member you pick its owner and founder.</span></span><select class="select select-inline" aria-label="Mosko Consulting LLC"><option>Choose…</option><option>Transfer to a member…</option><option>Purge, after an export</option></select></div>
+          <div class="kv-row"><span class="kv-label">Mosko Consulting LLC<span class="kv-help">Transfer makes the member you pick its owner and founder.</span></span><select class="select select-inline" aria-label="Mosko Consulting LLC"><option>Choose…</option><option selected>Transfer to a member…</option><option>Purge, after an export</option></select></div>
+          <div class="kv-row"><span class="kv-label">Transfer to<span class="kv-help">Only a member with a second step can take it over. Lee Mosko · needs a second step</span></span><select class="select select-inline" aria-label="Transfer Mosko Consulting LLC to"><option>Choose a member…</option><option>Sam Mosko · Manager</option><option disabled>Lee Mosko · Viewer · needs a second step</option></select></div>
           <div class="kv-row"><span class="kv-label">Mosko (Person)<span class="kv-help">Purge, after an export</span></span><span class="badge badge-positive-soft badge-sm"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>Export ready</span></div>
           <div class="receipt"><div class="receipt-line"><span class="card-sub">Ledger fingerprint</span><span class="fingerprint" title="9f3a1c2e 44b07d91 c2e8a6f0 13d5b7e2 0a9c4f68 e1b3d702 5c8f9a4e 26d17b04">JE-000214 · 9f3a1c2e…26d17b04</span></div></div>
         </div>
