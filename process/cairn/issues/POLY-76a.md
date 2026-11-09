@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-76
 blocked_by: []
 assignee: qa-engineer
-paths: [spikes/poly-76/checks/**]
+paths: [spikes/poly-76/checks/**, process/cairn/issues/POLY-76a.md]
 stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2

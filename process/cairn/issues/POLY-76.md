@@ -1,7 +1,7 @@
 ---
 id: POLY-76
 title: Spike: Drizzle Kit migration chain (RLS, triggers, BetterAuth, Neon)
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [spikes/poly-76/**, process/cairn/reviews/POLY-76/**]
 labels: [spike, db]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/98
 created: 2026-09-28
 updated: 2026-11-08
 ---
@@ -49,3 +49,7 @@ Spike built (POLY-76b). (a) PASS, (b) PASS, (c) PASS, (e) PASS; (b') behaviour P
 ### @architect — 2026-11-08
 
 Outcome (architect, POLY-76c): CONFIRM Drizzle Kit; ruling at process/cairn/reviews/POLY-76/ruling.md, ARCH v1.13 §6.2 updated to final. The decision-log half of 'Outcome recorded' is the lead's, so that item stays unticked until the ledger entry lands.
+
+### @team-lead — 2026-11-08
+
+PR opened: https://github.com/richmosko/polycarpic/pull/98. Awaiting Validate. Outcome: Drizzle Kit confirmed (ruling.md, ARCH v1.13 §6.2, DECISIONS 2026-11-09). Lead's correction: the 76a and 76b `paths:` omitted each agent's own issue file, which the dispatch told them to update, so guard-push failed on those files only; the lists are corrected and guard-push passes for all three.

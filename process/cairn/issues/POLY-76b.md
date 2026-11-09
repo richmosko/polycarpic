@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-76
 blocked_by: [POLY-76a]
 assignee: backend-lead
-paths: [spikes/poly-76/**, process/cairn/reviews/POLY-76/spike.md]
+paths: [spikes/poly-76/**, process/cairn/reviews/POLY-76/spike.md, process/cairn/issues/POLY-76.md, process/cairn/issues/POLY-76b.md]
 stage: execute
 estimate.cost_usd: "8.00"
 estimate.gate_cycles: 2

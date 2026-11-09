@@ -21,7 +21,7 @@ _In progress — first Implement session (gate approved 2026-11-09, POLY-127):_
 - **Issue:** POLY-76 (cairn) · **Milestone:** POLY-M1 · **Branch:** `feature/poly-76-migration-spike` · **Started:** 2026-11-09
 - **Roster:** backend-lead (POLY-76, 82, 83, 85) and qa-engineer (POLY-84, then the tests-red gate on each); architect on call for POLY-76's result and the ARCH §6.2 / ledger follow-up; devops-engineer only if an ops track (POLY-95–97) runs in parallel.
 - **Goal:** prove or disprove that Drizzle Kit carries the whole migration chain (policies, FORCE RLS, triggers, definer functions, BetterAuth's tables) as `poly_migrator`, so POLY-83 can write the first real migration.
-- **Status:** In Progress
+- **Status:** In Review — PR https://github.com/richmosko/polycarpic/pull/98. Result: Drizzle Kit confirmed (ARCH v1.13 §6.2).
 
 ## Releases
 
