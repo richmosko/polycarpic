@@ -4,7 +4,7 @@ title: Real-data import adapter for GA (SimpleFIN and/or CSV/OFX file import)
 status: backlog
 milestone: POLY-1.0
 parent: null
-blocked_by: [POLY-64]
+blocked_by: [POLY-64, POLY-130]
 assignee: null
 labels: [import]
 priority: null
