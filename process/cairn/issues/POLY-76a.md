@@ -1,7 +1,7 @@
 ---
 id: POLY-76a
 title: Spike checks, red
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-76
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [spikes/poly-76/checks/**]
 stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "0.9352"
+actual.tokens: 1131132
+actual.gate_cycles: 1
+actual.wall_clock: 13
+ratio: "0.23"
 labels: [spike, db]
 priority: null
 pr: null
