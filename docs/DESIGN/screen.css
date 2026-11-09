@@ -1518,6 +1518,10 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
 /* ---------- Entities: membership cards. ---------- */
 .entity-card .entity-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
 .entity-card .entity-name { font-size: 16px; font-weight: 600; }
+/* Two equal tracks that never grow past their share: a card's cap table
+   scrolls in its .table-wrap instead of widening the track. One track
+   under 1100px (see Narrow viewports). */
+.card-grid.entity-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .member-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--border); font-size: 14px; }
 .member-row .avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); font-size: 12px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .member-row .member-name { flex: 1; min-width: 0; }
@@ -1574,6 +1578,7 @@ table.data-table tr.opening td { color: var(--muted-foreground); font-style: ita
   table.data-table th, table.data-table td { padding-left: 12px; padding-right: 12px; }
   .alloc-row { grid-template-columns: 180px 1fr 120px 96px; gap: 12px; }
   .form-row { grid-template-columns: 1fr 160px auto; }
+  .card-grid.entity-grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---------- Balance-sheet treemap (PROTOTYPE on general-ledger.html).
@@ -1968,7 +1973,7 @@ table.data-table tr.je-muted .badge { color: var(--muted-foreground); }
 .entity-section { display: flex; flex-direction: column; gap: 4px; padding: 10px 0; border-top: 1px solid var(--border); }
 .incl-row { display: flex; align-items: center; gap: 8px; font-size: 14px; min-height: 32px; }
 .entity-tax { border-top: 1px solid var(--border); border-bottom: none; }
-.entity-tax .select { flex: none; width: 216px; }
+.entity-tax .select { flex: none; width: 232px; } /* the longest option, "Pass-through to members", clears the native arrow */
 .entity-section .kv-row:last-child { border-bottom: none; }
 
 /* Transactions: the cross-entity treatment choice and the security mapping form. */
