@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
   import { screens } from './screens';
 
   let { name } = $props();
@@ -8,6 +8,12 @@
   // The styled screens carry small inline scripts (hash states, tabs, copy,
   // expand). Run them on mount and undo their document/window listeners on leave.
   onMount(() => {
+    // Client-side navigation to /x#id does not update :target; redo it as a fragment navigation.
+    const h = location.hash;
+    if (h.length > 1) {
+      const t = setTimeout(() => { location.replace('#'); location.replace(h); }, 0);
+      onDestroy(() => clearTimeout(t));
+    }
     const added = [];
     const wrap = (t) => {
       const orig = t.addEventListener;

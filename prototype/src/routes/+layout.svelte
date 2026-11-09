@@ -43,20 +43,43 @@
 
   const aside = () => sidebarEl?.querySelector('.sidebar');
 
+  function setAvatar(open) {
+    aside()?.classList.toggle('menu-open', open);
+    aside()?.querySelector('.sidebar-avatar-trigger')?.setAttribute('aria-expanded', String(open));
+  }
+  function setMore(wrap, open) {
+    wrap.classList.toggle('open', open);
+    wrap.querySelector('.icon-btn')?.setAttribute('aria-expanded', String(open));
+  }
+  function closeMore() {
+    document.querySelectorAll('.more-menu-wrap.open').forEach((w) => setMore(w, false));
+  }
+  function onKey(e) {
+    if (e.key !== 'Escape') return;
+    setAvatar(false);
+    closeMore();
+  }
+
   function onShellClick(e) {
     const t = e.target;
-    if (t.closest('.sidebar-avatar-trigger')) { aside().classList.toggle('menu-open'); return; }
+    if (t.closest('.sidebar-avatar-trigger')) { setAvatar(!aside().classList.contains('menu-open')); return; }
     const item = t.closest('.avatar-popover .popover-item');
     if (item && /Theme/.test(item.textContent)) { toggleTheme(); return; }
-    if (item) { aside().classList.remove('menu-open'); return; }
+    if (item) { setAvatar(false); return; }
     const more = t.closest('.more-menu-wrap > .icon-btn');
-    if (more) { more.parentElement.classList.toggle('open'); return; }
-    if (!t.closest('.more-menu')) document.querySelectorAll('.more-menu-wrap.open').forEach((w) => w.classList.remove('open'));
-    if (!t.closest('.sidebar-bottom')) aside()?.classList.remove('menu-open');
+    if (more) {
+      const wrap = more.parentElement;
+      // Screens without page actions still open an (empty) menu, per the spec.
+      if (!wrap.querySelector('.more-menu')) wrap.insertAdjacentHTML('beforeend', '<div class="more-menu"></div>');
+      setMore(wrap, !wrap.classList.contains('open'));
+      return;
+    }
+    if (!t.closest('.more-menu')) closeMore();
+    if (!t.closest('.sidebar-bottom')) setAvatar(false);
   }
 </script>
 
-<svelte:window onclick={onShellClick} />
+<svelte:window onclick={onShellClick} onkeydown={onKey} />
 
 {#if shell}
   <div class="shell">
