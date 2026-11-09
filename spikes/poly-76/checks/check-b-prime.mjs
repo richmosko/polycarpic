@@ -17,6 +17,11 @@ for (const tbl of ['session', 'account', 'verification'])
   t.ok(['SELECT', 'INSERT', 'UPDATE', 'DELETE'].every((p) => has(tbl, p)), `poly_app lacks full SELECT/INSERT/UPDATE/DELETE on "${tbl}"`);
 t.ok(!has('session', 'TRUNCATE'), 'poly_app holds TRUNCATE on "session"');
 
+// Real column names from the catalog (casing/underscores are the spike's choice; (b) ignores them too).
+const col = (tbl, name) => q(`select attname from pg_attribute where attrelid = to_regclass('public."${tbl}"') and attnum > 0 and not attisdropped
+  and lower(replace(attname,'_','')) = '${name.toLowerCase()}'`).rows[0]?.[0];
+const ident = (tbl, name) => { const c = col(tbl, name); t.need(c, `public."${tbl}" has no column matching ${name}`); return `"${c}"`; };
+
 // BetterAuth itself
 process.env.BETTER_AUTH_SECRET = 'qa-secret-qa-secret-qa-secret-qa-secret-0123';
 let pool, auth;
@@ -34,13 +39,13 @@ try {
   t.ok(up?.user?.email === email, 'signUpEmail did not return the created user');
   const u = q(`select count(*) from public."user" where email='${email}'`).rows[0][0];
   t.ok(u === '1', `user row not found in "user" after signUpEmail (count ${u})`);
-  const a = q(`select count(*) from public.account where "providerId"='credential' and "userId" = (select id from public."user" where email='${email}')`);
+  const a = q(`select count(*) from public.account where ${ident('account', 'providerId')}='credential' and ${ident('account', 'userId')} = (select id from public."user" where email='${email}')`);
   t.ok(a.ok && a.rows[0][0] === '1', `credential account row missing or column names differ${a.ok ? '' : ': ' + a.err.split('\n')[0]}`);
   const si = await auth.api.signInEmail({ body: { email, password: 'qa-Password-123!' }, returnHeaders: true });
   const cookie = si.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
   t.ok(cookie.length > 0, 'signInEmail set no session cookie');
-  const sess = q(`select count(*) from public.session where "userId" = (select id from public."user" where email='${email}')`);
-  t.ok(sess.ok && sess.rows[0][0] === '1', `session row missing or column names differ${sess.ok ? '' : ': ' + sess.err.split('\n')[0]}`);
+  const sess = q(`select count(*) from public.session where ${ident('session', 'userId')} = (select id from public."user" where email='${email}')`);
+  t.ok(sess.ok && Number(sess.rows[0][0]) >= 1, `session row missing or column names differ${sess.ok ? '' : ': ' + sess.err.split('\n')[0]}`);
   const got = await auth.api.getSession({ headers: new Headers({ cookie }) });
   t.ok(got?.user?.email === email, 'getSession (read path) did not return the signed-in user');
 } catch (e) { t.ok(false, `BetterAuth call failed as poly_app: ${String(e.message ?? e).split('\n')[0]}`); }

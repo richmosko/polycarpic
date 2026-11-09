@@ -38,3 +38,14 @@ The POLY-76 checks written as executable assertions before the spike exists, so 
 Red run, no spike present (`node spikes/poly-76/checks/run.mjs`, exit 1): (a) (b) (b') (c) (e) FAIL, (f) UNMEASURED. Every item's reason: `bin/generate failed (exit 127): spikes/poly-76/bin/generate does not exist` (the chain cannot be built). (d) deferred to POLY-121.
 Harness proof: against a hand-built fake spike, (b) (c) (e) pass and (a) still fails (its anti-stub sentinel catches a no-op generate). (b') and (f) need BetterAuth and are unexercised; written to the documented API.
 Contract: checks/README.md (bin/generate, bin/migrate, auth.mjs, routing-pool.mjs, schema/**/*.ts, exact object names). Postgres is `postgres:17` (INFRA names no minor).
+
+### @qa-engineer — 2026-11-08
+
+Verdict on 50af326 + check fix (full run `checks/run.mjs`, exit 0 after `npm ci`):
+(a) PASS: generate/apply/generate byte-identical; policy in pg_policies; sentinel emitted CREATE POLICY.
+(b) PASS: 4 tables created by poly_migrator, owned by poly_owner, second generate clean.
+(b') PASS WITH A NAMED WORKAROUND. Two check defects were mine, now fixed: raw SQL assumed camelCase columns (now resolved from the catalog), and I asserted 1 session where sign-up + sign-in correctly make 2. Substance: the CLI-generated Drizzle schema (snake_case) does NOT work with BetterAuth's Kysely path unmodified (schema-mismatch error, per spike.md); it works only with a per-model `fields` camel->snake map in auth.mjs. The wording "no column mismatch" is met only with that map, so the package must carry it (or rename the columns) and keep it in step with the schema. Not a flip condition by itself; for the architect (POLY-76c).
+(c) PASS. (e) PASS: FORCE RLS comes from custom SQL (drizzle-kit has no FORCE); a catalog test must guard it.
+(f) REPORT: user.create.after does NOT share the user insert's transaction; our context-free transaction makes sign-up + provisioning atomic (commit, rollback and hook-throw cases all 1/1 or 0/0).
+(d) deferred to POLY-121.
+Notes on the spike (not mine to change): timestamps are `timestamp without time zone`; routing-pool.mjs is spike-grade (counter-only nesting guard); (b') and (f) cover Kysely/pg only on BetterAuth 1.7.18.
