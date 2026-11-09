@@ -4,16 +4,22 @@ title: Provider-agnostic import adapter interface + fake source
 status: backlog
 milestone: POLY-M2
 parent: null
-blocked_by: []
+blocked_by: [POLY-107, POLY-108]
 assignee: null
 labels: []
 priority: null
 pr: null
 created: 2026-09-27
-updated: 2026-10-10
+updated: 2026-11-08
 ---
 
 PRD §4 Story 2. Kickoff §2.6/§2.11: draft to confirm flow, DB-trigger-enforced immutability once posted. Source: docs/PRD/index.html
+
+## Acceptance criteria
+
+- [ ] Each raw row attaches to a custodial account through provider_account (POLY-108).
+- [ ] Transactions group into one entry only within a single bank date (G3).
+- [ ] Confirm enforces gates G1 to G6 (ARCH §3.2a); apps/worker runs the import poll as an idempotent job unit.
 
 ## Comments
 
@@ -32,3 +38,7 @@ Scope addition (team-lead ruling, 2026-10-02): the notification centre folds int
 ### @architect — 2026-10-10
 
 Correction (DESIGN pass 6, 2026-10-10): there is no header bell. Notifications are proposed to open from the avatar popover, with an unread badge on the avatar (ARCH §2.4). Everything else in the notification scope comment stands.
+
+### @architect — 2026-11-08
+
+Re-scoped 2026-11-08. The ledger core moves to POLY-107 and custodial accounts to POLY-108; POLY-64 posts into them. The notification and audit_event tables move to POLY-62; this issue keeps the notification centre UI and the link-health producers. Scope: ImportAdapter plus fake source, raw store and de-dup, drafts, rules, confirm with gates G1 to G6, and the worker's import poll. Data-source priority per custodial: files, then a direct free API, then Plaid, then SimpleFIN; implementation order fake, files, direct, Plaid, SimpleFIN. Before v1.0 the Plaid Sandbox feeds the real adapter on staging and no real books exist.
