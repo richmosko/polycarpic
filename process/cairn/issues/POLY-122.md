@@ -11,7 +11,7 @@ labels: [auth, post-ga-candidate]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-09
 ---
 
 Deferred to the native iOS milestone (Principal, 2026-11-08); web v1 ships Google and GitHub. Blocked by the native iOS work, which is not yet filed, so blocked_by stays empty until it is. Known requirements are listed below.
@@ -22,6 +22,7 @@ Deferred to the native iOS milestone (Principal, 2026-11-08); web v1 ships Googl
 - [ ] Works only on a real public domain; disabled in .local mode like the other providers.
 - [ ] Private-relay email: our sending domain registered with Apple's relay so mail reaches relay addresses.
 - [ ] Hide My Email vs the C-05 invite-match rule: a relay address never matches an invitation, so linking happens while signed in; SecEng rules on the flow.
+- [ ] C-05 Apple conditions (SECURITY v1.4 A-37): the ID token's `email_verified` is accepted as boolean `true` or the string `"true"`; a Hide My Email relay address matches no invitation and links only through an existing session; before this ships, the invite-acceptance flow for an invitee who hides their email is settled and Apple is added to C-05's tests.
 - [ ] Name and email arrive only on the first sign-in and are stored at that callback.
 - [ ] Apple tokens are revoked on account deletion.
 - [ ] ARCH §2.2 / §7.8 / A-27, PRD and DESIGN sign-in wording updated.
