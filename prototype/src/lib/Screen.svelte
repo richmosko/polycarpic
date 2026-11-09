@@ -21,9 +21,7 @@
       return () => { t.addEventListener = orig; };
     };
     const un = [wrap(document), wrap(window)];
-    try { new Function(screen.script)(); }
-    catch (e) { console.warn('[prototype] DESIGN inline script threw (reported to ux-designer):', e.message); }
-    finally { un.forEach((u) => u()); }
+    try { new Function(screen.script)(); } finally { un.forEach((u) => u()); }
     return () => {
       added.forEach(([t, type, fn, opts]) => t.removeEventListener(type, fn, opts));
       delete document.documentElement.dataset.state;
