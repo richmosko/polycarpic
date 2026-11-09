@@ -10,7 +10,7 @@ labels: []
 priority: null
 pr: null
 created: 2026-09-27
-updated: 2026-11-08
+updated: 2026-11-09
 ---
 
 PRD §4 Story 2. Kickoff §2.6/§2.11: draft to confirm flow, DB-trigger-enforced immutability once posted. Source: docs/PRD/index.html
@@ -20,6 +20,7 @@ PRD §4 Story 2. Kickoff §2.6/§2.11: draft to confirm flow, DB-trigger-enforce
 - [ ] Each raw row attaches to a custodial account through provider_account (POLY-108).
 - [ ] Transactions group into one entry only within a single bank date (G3).
 - [ ] Confirm enforces gates G1 to G6 (ARCH §3.2a); apps/worker runs the import poll as an idempotent job unit.
+- [ ] The import poll in apps/worker passes `ingest` an opener bound to the job's one connection (built from `secrets/open`), never `open()` itself. `ingest` and the adapters type it with the type-only `Opener` from `@poly/secrets`; the fake source accepts it and opens nothing (ARCH §2.2, SECURITY A-39).
 - [ ] Raw rows de-duplicate structurally (ARCH §3.1, §6.1, from mosko-fintech 021): a unique de-dup hash with INSERT … ON CONFLICT DO NOTHING; re-running the same batch inserts no row, and the skipped rows are counted as duplicates on import_batch (ARCH §2.4).
 
 ## Comments

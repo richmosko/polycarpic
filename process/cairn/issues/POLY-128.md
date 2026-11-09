@@ -22,4 +22,4 @@ Gap filed at POLY-126's trace: POLY-M1's definition of done says "the app shell 
 - [ ] The shell renders the seven sidebar items in DESIGN's order, the avatar popover at the foot, and the one-row top bar; there is no persistent header.
 - [ ] A Playwright smoke test loads the signed-in shell in light and dark mode and asserts token values on the sidebar and top row.
 - [ ] The shell meets DESIGN #accessibility for keyboard focus order and contrast on its own elements.
-- [ ] Lint refuses `{@html}` in every .svelte file under apps/ and packages/ (SECURITY C-41). The one sanitizing component is the only allowed exception; it is named in the rule when it lands, and until then there is none. A fixture using `{@html}` fails.
+- [ ] Lint refuses `{@html}` in every .svelte file under apps/ and packages/ (SECURITY C-41). The one sanitizing component is the only allowed exception; it is named in the rule when it lands, and until then there is none. A fixture using `{@html}` fails, and so does the same fixture with an inline `eslint-disable` for that rule (SECURITY A-39).
