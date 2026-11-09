@@ -21,7 +21,15 @@ The POLY-76 checks written as executable assertions before the spike exists, so 
 
 ## Acceptance criteria
 
-- [ ] One check per item (a), (b), (b′), (c), (e), (f), each asserting the issue's wording against the real database catalog or the real command output, never against a file's presence.
-- [ ] A single entry point runs them all and prints pass or fail per item; with no spike present every check fails for the stated reason (red), and that run's output is recorded in a comment on this issue.
-- [ ] (f) is a measurement, not a pass/fail on the tool: its check reports which of the two behaviours was observed.
-- [ ] `spikes/poly-76/checks/README.md` states the contract the spike must meet to be checked.
+- [x] One check per item (a), (b), (b′), (c), (e), (f), each asserting the issue's wording against the real database catalog or the real command output, never against a file's presence.
+- [x] A single entry point runs them all and prints pass or fail per item; with no spike present every check fails for the stated reason (red), and that run's output is recorded in a comment on this issue.
+- [x] (f) is a measurement, not a pass/fail on the tool: its check reports which of the two behaviours was observed.
+- [x] `spikes/poly-76/checks/README.md` states the contract the spike must meet to be checked.
+
+## Comments
+
+### @qa-engineer — 2026-11-08
+
+Red run, no spike present (`node spikes/poly-76/checks/run.mjs`, exit 1): (a) (b) (b') (c) (e) FAIL, (f) UNMEASURED. Every item's reason: `bin/generate failed (exit 127): spikes/poly-76/bin/generate does not exist` (the chain cannot be built). (d) deferred to POLY-121.
+Harness proof: against a hand-built fake spike, (b) (c) (e) pass and (a) still fails (its anti-stub sentinel catches a no-op generate). (b') and (f) need BetterAuth and are unexercised; written to the documented API.
+Contract: checks/README.md (bin/generate, bin/migrate, auth.mjs, routing-pool.mjs, schema/**/*.ts, exact object names). Postgres is `postgres:17` (INFRA names no minor).
