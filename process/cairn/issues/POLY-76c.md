@@ -1,7 +1,7 @@
 ---
 id: POLY-76c
 title: Spike ruling, ARCH 6.2
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-76
 blocked_by: [POLY-76b]
@@ -10,6 +10,11 @@ paths: [docs/ARCH/index.html, process/cairn/reviews/POLY-76/ruling.md, process/c
 stage: review
 estimate.cost_usd: "1.50"
 estimate.gate_cycles: 1
+actual.cost_usd: "1.7888"
+actual.tokens: 2271908
+actual.gate_cycles: 1
+actual.wall_clock: 27
+ratio: "1.19"
 labels: [spike, db]
 priority: null
 pr: null
