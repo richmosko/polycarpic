@@ -12,6 +12,6 @@ ga: false
 
 **Definition of done:** the fake persona 1 import lands raw rows (hash de-duped), and rules propose drafts. Confirming a draft posts a balanced entry, and posted rows reject UPDATE/DELETE at the DB. Corrections are reversal + new entry. Categories and tax-treatment tags apply. The per-entity dashboard renders the posted entries in under 2 s at single-household scale.
 
-**Stories:** POLY-64, POLY-65, POLY-63 (in that order: the dashboard needs posted entries to show). With POLY-M1 this is the first Implement slice (Principal, 2026-11-06).
+**Stories:** POLY-107 (ledger core), POLY-108 (custodial accounts), POLY-64, POLY-65, POLY-109 (hash chain + verifier), POLY-110 (export with ledger fingerprint), POLY-63 (in that order: the dashboard needs posted entries to show). With POLY-M1 this is the first Implement slice (Principal, 2026-11-06).
 
-**Hash chain (Principal, 2026-11-07):** the per-entity ledger hash chain and its weekly verifier ship with the ledger (SECURITY C-24, docs/ARCH §3.2.9); its story is filed at decomposition.
+**Hash chain (Principal, 2026-11-07):** the per-entity ledger hash chain and its weekly verifier ship with the ledger (SECURITY C-24, docs/ARCH §3.2.9); its issue is POLY-109, and the export that carries the head is POLY-110.

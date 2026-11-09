@@ -12,4 +12,4 @@ ga: false
 
 **Definition of done:** the declarative report engine renders the seeded read-only templates (Balance Sheet, Income Statement, Cash Flows, custodial NAV, NAV delta), with balance sheets by GL account and by custodial account. A user's clone survives a template upgrade.
 
-**Stories:** POLY-73, POLY-68.
+**Stories:** POLY-73, POLY-68. Statements render without the "estimated tax since last close" line until POLY-113 (POLY-1.0).

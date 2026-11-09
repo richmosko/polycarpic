@@ -12,4 +12,4 @@ ga: false
 
 **Definition of done:** persona 3 (buys, sells, dividends, return of capital) produces correct lots, lot matches and book value, and is valued at the daily EOD price. The allocation view compares holdings against targets. Any time-series chart toggles real vs nominal on CPI-U.
 
-**Stories:** POLY-67, POLY-69, POLY-75. ARCH OQ-5 (EOD price provider) must be answered at the start.
+**Stories:** POLY-67 (scoped to Option C: lots at custodial accounts, ARCH §3.6), POLY-69, POLY-75. ARCH OQ-5 (EOD price provider) must be answered at the start.
