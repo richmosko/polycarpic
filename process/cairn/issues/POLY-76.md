@@ -45,3 +45,7 @@ Feature started. Branch: `feature/poly-76-migration-spike`.
 ### @backend-lead — 2026-11-08
 
 Spike built (POLY-76b). (a) PASS, (b) PASS, (c) PASS, (e) PASS; (b') behaviour PASS but check-b-prime.mjs fails two raw-SQL assertions that assume camelCase columns (CLI schema is snake_case; BetterAuth needs a `fields` map to match, a workaround). (f): user.create.after does NOT share the user insert's transaction; our context-free tx makes sign-up + provisioning atomic. FORCE RLS is custom SQL only. Detail: process/cairn/reviews/POLY-76/spike.md
+
+### @architect — 2026-11-08
+
+Outcome (architect, POLY-76c): CONFIRM Drizzle Kit; ruling at process/cairn/reviews/POLY-76/ruling.md, ARCH v1.13 §6.2 updated to final. The decision-log half of 'Outcome recorded' is the lead's, so that item stays unticked until the ledger entry lands.

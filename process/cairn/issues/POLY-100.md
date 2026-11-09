@@ -11,7 +11,7 @@ labels: [ops, deploy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-09
 ---
 
 INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh attestation verify pinned to the repo and signer workflow, prod git verify-tag against operator-installed allowed_signers, the tag-to-digest label check, ops-bundle extraction, check-config then migrate --plan, a pre-migration encrypted backup via the backup container, migrate under advisory lock, up -d, a 120 s health poll, automatic rollback, quarantine and heartbeat. A bad migration is recovered off the box from the operator's laptop within 60 minutes; no plaintext dump is written on the box (Principal Q8, 2026-11-08).
@@ -23,3 +23,5 @@ INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh a
 - [ ] An unhealthy release rolls back within 120 s and is quarantined; a failing migration file leaves the old containers running.
 - [ ] The script never rewrites itself.
 - [ ] The bad-migration rollback runbook restores from the pre-migration backup on the operator's laptop within 60 minutes (measured in the restore drill).
+- [ ] A failing migration file leaves the tracking table and the schema exactly as before the run (one transaction).
+- [ ] Two migrate runs started together: the second waits on the advisory lock and then applies nothing.
