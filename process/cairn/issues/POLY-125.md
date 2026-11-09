@@ -22,3 +22,9 @@ ARCH §6.2 recommends Drizzle Kit with a dbmate + Kysely fallback confined to `p
 - [ ] `process/DECISIONS.md` carries the entry, marked provisional, naming POLY-76 as the confirming spike and its acceptance items (a) to (f) as the flip conditions. The architect drafts it; the team-lead lands it.
 - [ ] ARCH §6.2 states the decision as provisional pending POLY-76 and cites the entry.
 - [ ] POLY-76 stays first in POLY-M1's enabler order and keeps blocking POLY-83 (roles, migrate, withTenant), so no schema migration is written before the tool is confirmed; POLY-82 (monorepo) may run alongside it.
+
+## Comments
+
+### @team-lead — 2026-11-08
+
+Principal ruling (2026-11-09): POLY-C may close on the provisional migration-tool decision. POLY-76 runs first in POLY-M1 as the confirming spike and its result may flip the decision under the (a)–(f) conditions above.
