@@ -10,7 +10,13 @@ labels: []
 priority: null
 pr: null
 created: 2026-09-27
-updated: 2026-09-28
+updated: 2026-11-08
 ---
 
 PRD §5 FR. Kickoff §2.7. Source: docs/PRD/index.html
+
+## Comments
+
+### @architect — 2026-11-08
+
+Decomposition 2026-11-08: the seeded templates render without the 'estimated tax since last close' line until POLY-113 (POLY-1.0).

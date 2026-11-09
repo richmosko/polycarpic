@@ -10,7 +10,7 @@ labels: [spike, db]
 priority: null
 pr: null
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-11-08
 ---
 
 ARCH §6.2 / OQ-10. Confirms or flips the migration-tool decision (fallback: dbmate + Kysely codegen, confined to packages/db).
@@ -23,3 +23,11 @@ ARCH §6.2 / OQ-10. Confirms or flips the migration-tool decision (fallback: dbm
 - [ ] (d) The same runner applies against Neon from a Vercel-style build step.
 - [ ] (e) FORCE RLS, a role-targeted pgPolicy (`to:`), and a SECURITY DEFINER function owned by a non-owner NOLOGIN role (poly_authz / poly_purge) round-trip through generate and apply as poly_migrator (SECURITY A-13). Failure of (e) also triggers the fallback.
 - [ ] Outcome recorded as a comment; the architect updates ARCH §6.2 and the decision entry.
+- [ ] (b′) BetterAuth's Kysely path reads and writes the Drizzle-declared tables with no column mismatch, and the ARCH §3.1c grants hold when it runs as poly_app.
+- [ ] (f) OQ-16: whether user.create.after shares the user insert's transaction, and whether a context-free transaction of ours around invitation sign-up makes provisionPerson atomic.
+
+## Comments
+
+### @architect — 2026-11-08
+
+Decomposition 2026-11-08: (b′) and (f) added to match ARCH §6.2 and OQ-16 in v1.9.

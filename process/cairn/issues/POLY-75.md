@@ -10,7 +10,17 @@ labels: []
 priority: null
 pr: null
 created: 2026-09-27
-updated: 2026-09-28
+updated: 2026-11-08
 ---
 
 PRD §4 Story 9, §5 FRs. Ingest BLS series CUUR0000SA0 (monthly) via BLS API v2, same pattern as security price series; render any time-series chart nominal or inflation-adjusted with a selectable base period (default: latest available month); operate without a key on the v1 endpoint or accept manual CSV import as a fallback. Prerequisite: register a free BLS API v2 key (bls.gov/developers, 500 queries/day) before implementation starts; key is a low-tier secret, never logged, never in the repo. Source: docs/PRD/index.html
+
+## Acceptance criteria
+
+- [ ] The Allocation view shows no real/nominal toggle.
+
+## Comments
+
+### @architect — 2026-11-08
+
+Decomposition 2026-11-08: the toggle applies to time-series charts of net worth, spending and income. Allocation is contemporaneous.
