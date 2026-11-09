@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 are Approved at their versions; `POLY-C` closed and archived. The first session's issues are in `todo` (POLY-76, 82, 83, 84, 85); the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
+**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 were approved at the gate; ARCH is now v1.12.1 and SECURITY v1.5.1 (layer map and its enforcement, 2026-11-09). `POLY-C` closed and archived. The first session's issues are in `todo` (POLY-76, 82, 83, 84, 85); the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
 **Started:** 2026-11-09  
 **Driver agent:** backend-lead (qa-engineer drives Validate; architect on call for the POLY-76 result)  
 **Gate criteria:** _see [`WORKFLOW.md`](WORKFLOW.md)_
@@ -15,12 +15,13 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_Ready — first Implement session (gate approved 2026-11-09, POLY-127). Run `/start-feature POLY-76` to begin:_
+_In progress — first Implement session (gate approved 2026-11-09, POLY-127):_
 
 - **Feature:** POLY-76 — Spike: Drizzle Kit migration chain (RLS, triggers, BetterAuth, Neon). Confirms or flips the provisional migration-tool decision (POLY-125); POLY-82 runs alongside, then POLY-83 → POLY-84, POLY-85.
-- **Issue:** POLY-76 (cairn) · **Milestone:** POLY-M1 · **Branch:** `feature/poly-76-migration-spike` (to be created by `/start-feature`)
+- **Issue:** POLY-76 (cairn) · **Milestone:** POLY-M1 · **Branch:** `feature/poly-76-migration-spike` · **Started:** 2026-11-09
 - **Roster:** backend-lead (POLY-76, 82, 83, 85) and qa-engineer (POLY-84, then the tests-red gate on each); architect on call for POLY-76's result and the ARCH §6.2 / ledger follow-up; devops-engineer only if an ops track (POLY-95–97) runs in parallel.
-- **Status:** Ready to start
+- **Goal:** prove or disprove that Drizzle Kit carries the whole migration chain (policies, FORCE RLS, triggers, definer functions, BetterAuth's tables) as `poly_migrator`, so POLY-83 can write the first real migration.
+- **Status:** In Progress
 
 ## Releases
 

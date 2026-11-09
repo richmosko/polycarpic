@@ -1,7 +1,7 @@
 ---
 id: POLY-76
 title: Spike: Drizzle Kit migration chain (RLS, triggers, BetterAuth, Neon)
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -37,3 +37,7 @@ Decomposition 2026-11-08: (b′) and (f) added to match ARCH §6.2 and OQ-16 in 
 ### @team-lead — 2026-11-08
 
 Principal ruling (2026-11-09): check (d) is deferred to POLY-121 (Vercel + Neon target); the spike runs (a), (b), (c), (e), (f) against the local and CI Postgres. (f) returns to the Principal and the architect on failure rather than flipping the tool.
+
+### @team-lead — 2026-11-08
+
+Feature started. Branch: `feature/poly-76-migration-spike`.
