@@ -43,14 +43,14 @@
 
 <aside class="changelog" id="changelog">
   <h2>Changes in v1.12.1 (2026-11-09)</h2>
-  <p class="section-hint"><a href="../SECURITY/">SECURITY v1.5</a> A-39: SecEng concurred with v1.12's two design touches, with conditions. Built by POLY-82, POLY-128, POLY-64 and the secrets-seam issue.</p>
+  <p class="section-hint"><a href="../SECURITY/">SECURITY v1.5.1</a> A-39: SecEng concurred with v1.12's two design touches, with conditions. Built by POLY-82, POLY-128, POLY-64 and the secrets-seam issue.</p>
   <ul>
     <li><strong>§2.2:</strong> <code>import</code> receives an opener bound to the job's one connection, not <code>open()</code>. <code>Opener</code> is a type-only export of the secrets index.</li>
     <li><strong>§2.1:</strong>
       <ul>
         <li>The driver restriction names every specifier that yields a connection.</li>
-        <li>A cast to <code>SessionUserId</code> outside <code>db/session</code> is refused, and so are the <code>node:crypto</code> cipher functions outside <code>packages/secrets</code>.</li>
-        <li>Resolution does not guard the restricted subpaths, so lint is their only guard in the source. An inline <code>eslint-disable</code> of a boundaries or restricted-import rule fails lint.</li>
+        <li>A cast to <code>SessionUserId</code> outside <code>db/session</code> is refused, and so are the <code>node:crypto</code> cipher functions and WebCrypto's <code>encrypt</code>, <code>decrypt</code>, <code>wrapKey</code> and <code>unwrapKey</code> outside <code>packages/secrets</code>. Outside their owners, <code>crypto</code> and <code>kysely</code> allow named imports only, so a namespace import cannot slip past the ban.</li>
+        <li>Resolution does not guard the restricted subpaths, so lint is their only guard in the source. An inline <code>eslint-disable</code> of a boundaries, restricted-import, brand-cast or session-<code>SET</code> rule fails lint, and so does a blanket one.</li>
         <li>A module-graph check keeps the secrets index free of the open module and the keyring reader.</li>
       </ul></li>
   </ul>
@@ -194,8 +194,8 @@ flowchart LR
     <li><strong>Standing restrictions</strong>, in the same file:
       <ul>
         <li>Nothing under <code>packages/</code> imports SvelteKit (<code>@sveltejs/kit</code>, <code>$app/*</code>, <code>$env/*</code>); <code>packages/ui</code> may import <code>svelte</code>.</li>
-        <li>Only <code>packages/db</code> imports a Postgres driver, and it opens connections only through <code>withTenant()</code> / <code>withSystem()</code> (<a href="#rls">§3.3</a>). The restriction names every specifier that yields a connection: <code>pg</code>, <code>pg-pool</code>, <code>postgres</code>, <code>@neondatabase/serverless</code>, the <code>drizzle-orm</code> Postgres driver subpaths and Kysely's <code>PostgresDialect</code>. A driver type another package needs is re-exported by <code>db</code>. Session-level <code>SET</code> is refused everywhere.</li>
-        <li>Only <code>apps/worker</code> imports <code>secrets/open</code>. Only <code>packages/secrets</code> imports the HPKE library or calls <code>createCipheriv</code>, <code>createDecipheriv</code>, <code>publicEncrypt</code> or <code>privateDecrypt</code> from <code>node:crypto</code> (SECURITY §6.3, A-39).</li>
+        <li>Only <code>packages/db</code> imports a Postgres driver, and it opens connections only through <code>withTenant()</code> / <code>withSystem()</code> (<a href="#rls">§3.3</a>). The restriction names every specifier that yields a connection: <code>pg</code>, <code>pg-pool</code>, <code>postgres</code>, <code>@neondatabase/serverless</code>, the <code>drizzle-orm</code> Postgres driver subpaths and Kysely's <code>PostgresDialect</code>, however imported: outside <code>db</code>, <code>kysely</code> allows named imports only. A driver type another package needs is re-exported by <code>db</code>. Session-level <code>SET</code> is refused everywhere.</li>
+        <li>Only <code>apps/worker</code> imports <code>secrets/open</code>. Only <code>packages/secrets</code> imports the HPKE library or calls <code>createCipheriv</code>, <code>createDecipheriv</code>, <code>publicEncrypt</code> or <code>privateDecrypt</code>. Elsewhere, <code>crypto</code> and <code>node:crypto</code> allow named imports only, with <code>subtle</code> and <code>webcrypto</code> refused. The global <code>crypto.subtle</code> may <code>digest</code>, <code>sign</code> and <code>verify</code>, but not <code>encrypt</code>, <code>decrypt</code>, <code>wrapKey</code> or <code>unwrapKey</code> (SECURITY §6.3, A-39).</li>
         <li>Only <code>packages/auth</code> imports <code>db/session</code>, the constructor of the branded <code>SessionUserId</code> that <code>withTenant()</code> accepts. A cast to <code>SessionUserId</code> is refused outside <code>db/session</code> and test files, so the brand cannot be skipped.</li>
       </ul></li>
   </ul>
@@ -206,7 +206,7 @@ flowchart LR
       <ul>
         <li>Each <code>package.json</code> has an <code>exports</code> map listing only <code>.</code> and its declared subpaths. TypeScript resolves with <code>moduleResolution: "bundler"</code>, which honours <code>exports</code>, so a deep import past the index fails in <code>tsc</code>, Vite and Vitest alike. This is also what keeps the raw pool unreachable (§3.3).</li>
         <li>Each cross-package import is a declared <code>workspace:</code> dependency. Under pnpm's strict linking, an undeclared one does not resolve; <code>import-x/no-extraneous-dependencies</code> turns that into a readable lint error.</li>
-        <li>Resolution does not guard a restricted subpath. <code>web</code> declares <code>secrets</code>, and every <code>db</code> consumer declares <code>db</code>, so <code>secrets/open</code> and <code>db/session</code> resolve for them. Lint is the only source-side guard there. An inline <code>eslint-disable</code> of a boundaries or restricted-import rule therefore fails lint. Lint sees no import inside one package, so a module-graph check shows the secrets index reaches neither the open module nor the keyring reader (SECURITY A-39). The real boundary is the keyring mount, not these rules (SECURITY §6.3).</li>
+        <li>Resolution does not guard a restricted subpath. <code>web</code> declares <code>secrets</code>, and every <code>db</code> consumer declares <code>db</code>, so <code>secrets/open</code> and <code>db/session</code> resolve for them. Lint is the only source-side guard there. An inline <code>eslint-disable</code> of a boundaries, restricted-import, brand-cast or session-<code>SET</code> rule therefore fails lint, and so does a blanket <code>eslint-disable</code> that names no rule. Lint sees no import inside one package, so a module-graph check shows the secrets index reaches neither the open module nor the keyring reader (SECURITY A-39). The real boundary is the keyring mount, not these rules (SECURITY §6.3).</li>
       </ul></li>
     <li><strong>Checks on the file</strong> (CI):
       <ul>
