@@ -11,7 +11,7 @@ labels: [auth]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-09
 ---
 
 After the first (operator) user, an invitation is the only way into an instance; no setting reopens public sign-up (Principal P6, 2026-11-07). An invitee creates an account from the invite and lands on the invited entity, or on their own Person if invited with no entity. The operator can issue a standalone single-use, audited invitation from the box; that person gets only their own Person. PRD §4 invite story.
@@ -24,3 +24,7 @@ After the first (operator) user, an invitation is the only way into an instance;
 - [ ] An invitee with an entity invite lands on that entity; one without lands on their own Person.
 - [ ] polycarpic user invite <email> issues a single-use invitation sharing no entity and writes an audit event; that user sees only their own Person.
 - [ ] /sign-up/email without a live invitation is refused at the route allowlist (ARCH §3.1c).
+- [ ] Sign-up by invitation commits the user row, the Person, the owner membership and the seeded accounts together; after a forced rollback of our transaction none of them exists (ARCH v1.14 §3.1).
+- [ ] Inside the sign-up transaction the hook sets `app.user_id` with `is_local = true` through packages/db before provisionPerson, and provisionPerson's inserts succeed as poly_app under FORCE RLS; with the step removed, the same sign-up is refused by RLS and leaves no user row.
+- [ ] A throw inside provisionPerson fails the sign-up and leaves no user row, Person, membership or account.
+- [ ] After the sign-up transaction commits, `app.user_id` is unset on that pooled backend (a context-free query there sees zero tenant rows).

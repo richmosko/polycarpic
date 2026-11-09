@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
-paths: [package.json, pnpm-workspace.yaml, .npmrc, turbo.json, layers.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/src/index.ts, packages/db/src/session.ts, packages/secrets/src/open.ts, packages/*/src/*.test.ts, apps/*/src/**, scripts/layers/**, test/layers/**]
+paths: [package.json, pnpm-workspace.yaml, .npmrc, turbo.json, layers.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/src/index.ts, packages/db/src/session.ts, packages/db/src/auth.ts, packages/secrets/src/open.ts, packages/*/src/*.test.ts, apps/*/src/**, scripts/layers/**, test/layers/**]
 labels: [enabler]
 priority: P1
 pr: null
@@ -38,3 +38,5 @@ The pnpm + Turborepo workspace with every ARCH §2.2 package and app stubbed, ea
 - [ ] Check: a directory under packages/ or apps/ that is absent from `layers.json` fails, and so does an entry in the file with no directory.
 - [ ] Check: an allow-list entry pointing at a higher layer fails, and a cycle between two same-layer packages fails.
 - [ ] Check: `layers.json` and ARCH §2.2's `data-consumes` lists disagreeing (one entry added to either side) fails.
+- [ ] `layers.json` declares `db/auth` as a restricted subpath importable only by packages/auth: fixtures importing it from apps/web and packages/tenancy fail lint, packages/auth passes (ARCH §2.1, POLY-76 ruling §4.6).
+- [ ] `layers.json` names exactly one module exempt from the session-level SET ban, packages/db's migrate module: a fixture with `SET ROLE poly_owner` there passes, and the same statement in another packages/db file and in packages/auth each fails (ARCH §2.1, POLY-76 ruling §4.2).
