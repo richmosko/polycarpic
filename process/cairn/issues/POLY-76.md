@@ -1,7 +1,7 @@
 ---
 id: POLY-76
 title: Spike: Drizzle Kit migration chain (RLS, triggers, BetterAuth, Neon)
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -11,7 +11,7 @@ labels: [spike, db]
 priority: P1
 pr: https://github.com/richmosko/polycarpic/pull/98
 created: 2026-09-28
-updated: 2026-11-08
+updated: 2026-11-09
 ---
 
 ARCH §6.2 / OQ-10. Confirms or flips the migration-tool decision (fallback: dbmate + Kysely codegen, confined to packages/db).
@@ -53,3 +53,9 @@ Outcome (architect, POLY-76c): CONFIRM Drizzle Kit; ruling at process/cairn/revi
 ### @team-lead — 2026-11-08
 
 PR opened: https://github.com/richmosko/polycarpic/pull/98. Awaiting Validate. Outcome: Drizzle Kit confirmed (ruling.md, ARCH v1.13 §6.2, DECISIONS 2026-11-09). Lead's correction: the 76a and 76b `paths:` omitted each agent's own issue file, which the dispatch told them to update, so guard-push failed on those files only; the lists are corrected and guard-push passes for all three.
+
+### @team-lead — 2026-11-09
+
+Validate passed (qa-engineer: "validate green", PR #98 at 24b631b); merging via PR #98. Closing.
+
+The Principal answered the ruling's one question (§3) on 2026-11-09: yes, every user-creating sign-up route runs inside our own transaction, with the session-loader re-run as a backstop only. Logged in `process/DECISIONS.md`; ARCH §3.1 and POLY-87 follow in a doc update.
