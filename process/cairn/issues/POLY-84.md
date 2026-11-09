@@ -1,14 +1,14 @@
 ---
 id: POLY-84
 title: RLS battery harness
-status: backlog
+status: todo
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83]
 assignee: qa-engineer
 paths: [packages/db/test/**]
 labels: [qa, db, security]
-priority: null
+priority: P2
 pr: null
 created: 2026-11-08
 updated: 2026-11-08

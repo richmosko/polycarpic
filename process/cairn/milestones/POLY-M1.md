@@ -12,9 +12,9 @@ ga: false
 
 **Definition of done:** a user signs in (BetterAuth, one OAuth provider + email), creates an entity, and grants another user a viewer membership. The RLS battery is green in CI, including the inversion self-test and the pool-reuse test. Migrations apply in CI and on staging through the real runner as `poly_migrator`. The app shell renders DESIGN tokens. The second-step gate holds, with first enrolment anchored on the account email; a held raise promotes on enrolment; a two-owner entity's gated actions are refused until POLY-1.0 ships the approval flow (decomposition 2026-11-08).
 
-**Stories:** POLY-62, POLY-87 (invite-only sign-up), POLY-88 (Google + GitHub), POLY-89 (second step), POLY-91 (held raise), POLY-92 (.local sign-in), POLY-93 (cap table), POLY-94 (parent placement consent).
+**Stories:** POLY-62, POLY-87 (invite-only sign-up), POLY-88 (Google + GitHub), POLY-89 (second step), POLY-91 (held raise), POLY-92 (.local sign-in), POLY-93 (cap table), POLY-94 (parent placement consent), POLY-129 (Entities screen: create, members, invite; gap filed 2026-11-09).
 
-**Enablers:** POLY-76 (migration spike) first, then POLY-82 (monorepo + layer lint), POLY-83 (roles, migrate, withTenant), POLY-84 (RLS battery), POLY-85 (runtime config + ops hooks), POLY-86 (BetterAuth routing pool + allowlist), POLY-90 (multi-owner gate + founder).
+**Enablers:** POLY-76 (migration spike) first, then POLY-82 (monorepo + layer lint), POLY-83 (roles, migrate, withTenant), POLY-84 (RLS battery), POLY-85 (runtime config + ops hooks), POLY-86 (BetterAuth routing pool + allowlist), POLY-90 (multi-owner gate + founder), POLY-128 (app shell + DESIGN tokens; gap filed 2026-11-09).
 
 **Operations:** POLY-95 (compose + Postgres config), POLY-96 (CI build + attest), POLY-97 (provisioning), POLY-98 (ops CLI), POLY-99 (backup scripts), POLY-100 (deploy), POLY-101 (auth CI row), POLY-102 (freshness gate), POLY-103 (monitoring), POLY-104 (first staging deploy), POLY-105 (backup first-run checks).
 

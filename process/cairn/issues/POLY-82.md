@@ -1,14 +1,14 @@
 ---
 id: POLY-82
 title: Monorepo skeleton + layer lint
-status: backlog
+status: todo
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
 paths: [package.json, pnpm-workspace.yaml, turbo.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/src/index.ts, packages/*/src/*.test.ts, apps/*/src/**]
 labels: [enabler]
-priority: null
+priority: P1
 pr: null
 created: 2026-11-08
 updated: 2026-11-08

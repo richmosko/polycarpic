@@ -21,4 +21,5 @@ Unscheduled: nothing schedules the tertiary target yet (architect, 2026-11-08). 
 - [ ] deploy.sh refuses an unsigned tag; check.sh prints keyring: jobs only.
 - [ ] A cron route without the secret returns 401, and 404 on the web project.
 - [ ] An export restores into a fresh Neon project.
+- [ ] The migration runner applies against Neon from a Vercel build step (spike check (d), deferred here from POLY-76 by the Principal, 2026-11-09).
 - [ ] OQ-INFRA-6 (Neon restore window, Vercel Hobby limits) is recorded.
