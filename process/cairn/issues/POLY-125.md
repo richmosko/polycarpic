@@ -28,3 +28,7 @@ ARCH §6.2 recommends Drizzle Kit with a dbmate + Kysely fallback confined to `p
 ### @team-lead — 2026-11-08
 
 Principal ruling (2026-11-09): POLY-C may close on the provisional migration-tool decision. POLY-76 runs first in POLY-M1 as the confirming spike and its result may flip the decision under the (a)–(f) conditions above.
+
+### @team-lead — 2026-11-08
+
+Principal ruling (2026-11-09): Drizzle Kit is the provisional migration tool, dbmate + Kysely the fallback; POLY-76's acceptance items (a)–(f) are the flip conditions. The architect drafts the provisional DECISIONS entry and updates ARCH §6.2.
