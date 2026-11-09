@@ -1,20 +1,20 @@
 ---
 id: POLY-85
 title: Runtime config + ops hooks
-status: backlog
+status: todo
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-82]
 assignee: backend-lead
 paths: [packages/config/**, apps/web/src/lib/server/**, apps/worker/src/**, Dockerfile]
 labels: [enabler, infra]
-priority: null
+priority: P2
 pr: null
 created: 2026-11-08
 updated: 2026-11-08
 ---
 
-The app-side hooks the operations scripts depend on, from devops's not-filed list (INFRA §2.2, §7.5; ARCH §7.4, §8.1): the *_FILE secret loader, the loopback-only status listener inside web (until POLY-81 moves it to an admin service), the image label carrying the source commit that the deploy check reads, and the structured log schema.
+The app-side hooks the operations scripts depend on, from devops's not-filed list (INFRA §3.2, §6.5, §9.3; ARCH §7.4, §7.5, §8.1): the *_FILE secret loader, the loopback-only status listener inside web (until POLY-81 moves it to an admin service), the image label carrying the source commit that the deploy check reads, and the structured log schema.
 
 ## Acceptance criteria
 

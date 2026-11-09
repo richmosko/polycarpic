@@ -18,7 +18,7 @@ The gate needs "tracker issues populated for the first milestone" (WORKFLOW → 
 
 ## Acceptance criteria
 
-- [ ] Every clause of POLY-M1's definition of done traces to at least one M1 issue; a clause with none gets an issue filed.
-- [ ] The first session's issue set (POLY-76 first, then the enablers it unblocks) is moved to `todo` with priorities set, `paths` declared and `blocked_by` checked against the M1 enabler order.
-- [ ] Each `todo` issue has acceptance criteria a test can check, and its ARCH / SECURITY / INFRA section references resolve.
-- [ ] `process/STATE.md`'s Active Feature names the first feature and the Implement roster (leads and qa-engineer) is written down, ready to flip when POLY-127's gate is approved.
+- [x] Every clause of POLY-M1's definition of done traces to at least one M1 issue; a clause with none gets an issue filed.
+- [x] The first session's issue set (POLY-76 first, then the enablers it unblocks) is moved to `todo` with priorities set, `paths` declared and `blocked_by` checked against the M1 enabler order.
+- [x] Each `todo` issue has acceptance criteria a test can check, and its ARCH / SECURITY / INFRA section references resolve.
+- [x] `process/STATE.md`'s Active Feature names the first feature and the Implement roster (leads and qa-engineer) is written down, ready to flip when POLY-127's gate is approved.

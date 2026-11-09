@@ -15,7 +15,12 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None — Plan phase. Story-grain issues are filed into `POLY-M1`…`POLY-M5` / `POLY-1.0`; tooling follow-ups collect under `POLY-79`._
+_None yet — Plan phase (POLY-C gate in review, POLY-127). Prepared for the first Implement session, flips when the gate is approved:_
+
+- **Feature:** POLY-76 — Spike: Drizzle Kit migration chain (RLS, triggers, BetterAuth, Neon). Confirms or flips the provisional migration-tool decision (POLY-125); POLY-82 runs alongside, then POLY-83 → POLY-84, POLY-85.
+- **Issue:** POLY-76 (cairn) · **Milestone:** POLY-M1 · **Branch:** `feature/poly-76-migration-spike` (to be created by `/start-feature`)
+- **Roster:** backend-lead (POLY-76, 82, 83, 85) and qa-engineer (POLY-84, then the tests-red gate on each); architect on call for POLY-76's result and the ARCH §6.2 / ledger follow-up; devops-engineer only if an ops track (POLY-95–97) runs in parallel.
+- **Status:** Planned (POLY-126)
 
 ## Releases
 

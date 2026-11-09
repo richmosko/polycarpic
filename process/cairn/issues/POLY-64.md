@@ -20,6 +20,7 @@ PRD §4 Story 2. Kickoff §2.6/§2.11: draft to confirm flow, DB-trigger-enforce
 - [ ] Each raw row attaches to a custodial account through provider_account (POLY-108).
 - [ ] Transactions group into one entry only within a single bank date (G3).
 - [ ] Confirm enforces gates G1 to G6 (ARCH §3.2a); apps/worker runs the import poll as an idempotent job unit.
+- [ ] Raw rows de-duplicate structurally (ARCH §3.1, §6.1, from mosko-fintech 021): a unique de-dup hash with INSERT … ON CONFLICT DO NOTHING; re-running the same batch inserts no row, and the skipped rows are counted as duplicates on import_batch (ARCH §2.4).
 
 ## Comments
 
