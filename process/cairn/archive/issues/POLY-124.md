@@ -1,7 +1,7 @@
 ---
 id: POLY-124
 title: GL build-vs-adopt decision
-status: todo
+status: done
 milestone: POLY-C
 parent: null
 blocked_by: []

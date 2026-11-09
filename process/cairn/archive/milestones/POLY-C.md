@@ -3,7 +3,7 @@ id: POLY-C
 name: Plan
 kind: process
 major: POLY-V1
-status: in-progress
+status: done
 target_tag: null
 ga: false
 ---
