@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-76
 blocked_by: [POLY-76b]
 assignee: architect
-paths: [docs/ARCH/index.html, process/cairn/reviews/POLY-76/ruling.md]
+paths: [docs/ARCH/index.html, process/cairn/reviews/POLY-76/ruling.md, process/cairn/issues/POLY-76.md, process/cairn/issues/POLY-76c.md, process/cairn/issues/POLY-83.md, process/cairn/issues/POLY-86.md, process/cairn/issues/POLY-100.md]
 stage: review
 estimate.cost_usd: "1.50"
 estimate.gate_cycles: 1
