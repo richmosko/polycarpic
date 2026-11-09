@@ -41,3 +41,7 @@ Principal ruling (2026-11-09): check (d) is deferred to POLY-121 (Vercel + Neon 
 ### @team-lead — 2026-11-08
 
 Feature started. Branch: `feature/poly-76-migration-spike`.
+
+### @backend-lead — 2026-11-08
+
+Spike built (POLY-76b). (a) PASS, (b) PASS, (c) PASS, (e) PASS; (b') behaviour PASS but check-b-prime.mjs fails two raw-SQL assertions that assume camelCase columns (CLI schema is snake_case; BetterAuth needs a `fields` map to match, a workaround). (f): user.create.after does NOT share the user insert's transaction; our context-free tx makes sign-up + provisioning atomic. FORCE RLS is custom SQL only. Detail: process/cairn/reviews/POLY-76/spike.md

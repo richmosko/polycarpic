@@ -21,7 +21,7 @@ The throwaway spike under `spikes/poly-76/`: a Postgres in Docker with the ARCH 
 
 ## Acceptance criteria
 
-- [ ] The spike meets the contract in `spikes/poly-76/checks/README.md` and the checks run against it unmodified.
-- [ ] Each of (a), (b), (b′), (c), (e) passes or fails on its own evidence; (f) reports the observed behaviour.
-- [ ] `process/cairn/reviews/POLY-76/spike.md` records versions, exact commands, and pass or fail per item with the output that shows it.
-- [ ] Nothing in `packages/*` or `apps/*` imports the spike; no file outside `spikes/poly-76/` and the record is touched.
+- [x] The spike meets the contract in `spikes/poly-76/checks/README.md` and the checks run against it unmodified.
+- [x] Each of (a), (b), (b′), (c), (e) passes or fails on its own evidence; (f) reports the observed behaviour.
+- [x] `process/cairn/reviews/POLY-76/spike.md` records versions, exact commands, and pass or fail per item with the output that shows it.
+- [x] Nothing in `packages/*` or `apps/*` imports the spike; no file outside `spikes/poly-76/` and the record is touched.

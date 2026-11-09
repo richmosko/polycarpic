@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+// Applies drizzle/ with drizzle-orm's real migrator. Login: DATABASE_URL (poly_migrator) only.
+// Objects are owned by poly_owner via SET ROLE (membership granted to poly_migrator); session_user stays poly_migrator.
+import pg from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
+await client.connect();
+await client.query('SET ROLE poly_owner');
+const [schema, table] = (process.env.POLY76_TRACKING_TABLE ?? 'drizzle.__drizzle_migrations').split('.');
+try {
+  await migrate(drizzle(client), { migrationsFolder: path.join(root, 'drizzle'), migrationsSchema: schema, migrationsTable: table });
+  console.log('migrated');
+} finally { await client.end(); }

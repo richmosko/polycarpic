@@ -1,0 +1,14 @@
+{
+  "name": "poly-76-spike",
+  "private": true,
+  "type": "module",
+  "description": "Throwaway spike (POLY-76): Drizzle Kit migration chain. Not imported by packages/* or apps/*.",
+  "dependencies": {
+    "better-auth": "1.7.18",
+    "drizzle-kit": "0.31.11",
+    "drizzle-orm": "0.45.4",
+    "kysely": "0.29.8",
+    "pg": "8.23.1",
+    "tsx": "4.23.15"
+  }
+}
