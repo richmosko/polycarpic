@@ -579,7 +579,7 @@ document.addEventListener('click', (e) => {
   history.replaceState(null, '', '#' + tab.getAttribute('aria-controls'));
 });
 function selectFromHash() {
-  const panel = location.hash && document.getElementById(location.hash.slice(1));
+  const panel = location.hash ? document.getElementById(location.hash.slice(1)) : null;
   if (panel?.matches('[role="tabpanel"]')) selectTab(panel.id);
 }
 window.addEventListener('hashchange', selectFromHash);

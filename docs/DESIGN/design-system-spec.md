@@ -887,7 +887,7 @@ Every icon in use is named above. Add a row whenever a new control lands, rather
 | Settings on/off preferences | **Switch** | Direct reuse |
 | Settings theme picker (Light / Dark / Auto) | **Toggle Group** (single) | Rendered with the `.tabs` look; semantically a radio group, not tabs |
 | Brand app bar (Home, Get started, Admin) | `custom`, with **Button** / **Badge** / **Avatar** for the trailing items | One component for every shell-less page: a fixed bar with a lockup, trailing items and a fade; too small and too brand-specific to be a block. No sidebar because no entity exists (setup), none applies (operator), or the visitor is not signed in (Home) |
-| Register / any wide table | **Table** (its own overflow-x wrapper) | `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling |
+| Register / any wide table | **Table** (its own overflow-x wrapper) | `.table-wrap` mirrors shadcn Table's built-in scroll container, so a wide table scrolls inside its card at 960px instead of spilling. The card's grid track must be `minmax(0, 1fr)`, not `1fr`: a `1fr` track's minimum is the card's min-content, which is the table's full width, so the grid still spills |
 | Allocation actual-vs-target track | `custom` on **Progress** | A Progress track plus a target marker; shadcn Progress has no marker |
 | Allocation current-allocation map | **LayerChart** `Treemap` | The balance sheet map's component with a class header strip; tiling and label options unverified, as there |
 | Allocation holdings popover | **Popover** + **Collapsible** + **Badge** | Read-only; reuses the lots sub-card. `Dialog` below `md` |
