@@ -2,7 +2,7 @@
 id: POLY-122
 title: Sign in with Apple
 status: backlog
-milestone: null
+milestone: POLY-1.3
 parent: null
 blocked_by: []
 assignee: backend-lead
@@ -11,10 +11,10 @@ labels: [auth, post-ga-candidate]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-09
+updated: 2026-11-08
 ---
 
-Deferred to the native iOS milestone (Principal, 2026-11-08); web v1 ships Google and GitHub. Blocked by the native iOS work, which is not yet filed, so blocked_by stays empty until it is. Known requirements are listed below.
+Deferred to the native iOS milestone (Principal, 2026-11-08); web v1 ships Google and GitHub. Held in POLY-1.3 Native App Prep (Principal, 2026-11-09). Blocked by the native iOS work, which is not yet filed, so blocked_by stays empty until it is. Known requirements are listed below.
 
 ## Acceptance criteria
 

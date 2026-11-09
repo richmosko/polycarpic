@@ -2,7 +2,7 @@
 id: POLY-121
 title: Vercel + Neon target
 status: backlog
-milestone: null
+milestone: POLY-1.2
 parent: null
 blocked_by: [POLY-96, POLY-99]
 assignee: devops-engineer
@@ -14,7 +14,7 @@ created: 2026-11-08
 updated: 2026-11-08
 ---
 
-Unscheduled: nothing schedules the tertiary target yet (architect, 2026-11-08). INFRA §4.7, §6.6, §7.4, D-11/D-12: signature-verified tag deploy from the laptop, the per-project env-name check, the weekly encrypted Neon export with the put-only key, and restore. Needs the ARCH §7.6 two-project split built first (not yet filed). Records OQ-INFRA-6 at first stand-up.
+Post-GA, in POLY-1.2 (Principal, 2026-11-09); timing not yet set. INFRA §4.7, §6.6, §7.4, D-11/D-12: signature-verified tag deploy from the laptop, the per-project env-name check, the weekly encrypted Neon export with the put-only key, and restore. Needs the ARCH §7.6 two-project split built first (not yet filed). Records OQ-INFRA-6 at first stand-up.
 
 ## Acceptance criteria
 

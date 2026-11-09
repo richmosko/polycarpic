@@ -2,7 +2,7 @@
 id: POLY-81
 title: Admin view (SSH-only box/stack status)
 status: backlog
-milestone: null
+milestone: POLY-1.2
 parent: null
 blocked_by: []
 assignee: null
@@ -11,14 +11,14 @@ labels: [product, infra, security]
 priority: null
 pr: null
 created: 2026-10-02
-updated: 2026-10-20
+updated: 2026-11-08
 ---
 
 An operator-only Admin view, reachable only through an SSH tunnel to the box (never on the public listener), showing basic box and stack status with links to administrative functions still to be defined. Principal direction 2026-10-02 during the Plan-phase DESIGN review: "I want a placeholder for this in UX, pending definition in PRD/ARCH/SEC."
 
 ## Context
 
-Not a sidebar item and not part of the primary IA (DECISIONS 2026-10-02). It is a separate surface for the operator of a self-hosted instance. The DESIGN placeholder styled screen (`docs/DESIGN/styled-screens/admin.html`, pass 13) exists first; PRD, ARCH and SECURITY define it before it is scheduled into a milestone.
+Not a sidebar item and not part of the primary IA (DECISIONS 2026-10-02). It is a separate surface for the operator of a self-hosted instance. The DESIGN placeholder styled screen (`docs/DESIGN/styled-screens/admin.html`, pass 13) exists first; It sits in POLY-1.2 (Principal, 2026-11-09); PRD, ARCH and SECURITY define it before any build work starts.
 
 ## Acceptance criteria
 
@@ -26,4 +26,4 @@ Not a sidebar item and not part of the primary IA (DECISIONS 2026-10-02). It is 
 - [ ] ARCH: the surface's topology (loopback bind, separate route group or process, what it reads), and its place in §2.4 and §7.
 - [ ] SECURITY: trust boundary, authn (SSH as the gate, plus any in-app check), what it must never expose (credentials, raw provider payloads), audit of admin actions.
 - [ ] DESIGN: placeholder styled screen promoted to a defined screen once the above exist.
-- [ ] Milestone assigned by the architect once defined.
+- [ ] Milestone confirmed or moved by the architect once defined (placed in POLY-1.2 on 2026-11-09).
