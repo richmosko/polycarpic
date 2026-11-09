@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
-paths: [package.json, pnpm-workspace.yaml, .npmrc, turbo.json, layers.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/src/index.ts, packages/*/src/*.test.ts, apps/*/src/**, scripts/layers/**, test/layers/**]
+paths: [package.json, pnpm-workspace.yaml, .npmrc, turbo.json, layers.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/src/index.ts, packages/db/src/session.ts, packages/secrets/src/open.ts, packages/*/src/*.test.ts, apps/*/src/**, scripts/layers/**, test/layers/**]
 labels: [enabler]
 priority: P1
 pr: null
@@ -25,9 +25,13 @@ The pnpm + Turborepo workspace with every ARCH §2.2 package and app stubbed, ea
 - [ ] An upward `import type` fails lint exactly as a value import does.
 - [ ] Lint refuses a cross-package re-export of an unlisted package and a cross-package `import()` with a computed specifier.
 - [ ] Lint refuses `@sveltejs/kit`, `$app/*` and `$env/*` under packages/*. packages/ui importing `svelte` passes.
-- [ ] Lint refuses the Postgres driver imported outside packages/db, and any session-level SET (ARCH §3.3).
+- [ ] Lint refuses, outside packages/db, every specifier that yields a Postgres connection, with one fixture each: `pg`, `pg-pool`, `postgres`, `@neondatabase/serverless`, the `drizzle-orm` Postgres driver subpaths (`node-postgres`, `postgres-js`, `neon-serverless`, `neon-http`, `pg-proxy`) and `PostgresDialect` from `kysely`, whether a named import or reached through a default or namespace import (`kysely.PostgresDialect`). Outside packages/db, `kysely` allows named imports only, so a fixture of each form fails. Type imports count too; db re-exports any driver type another package needs. Lint also refuses any session-level SET (ARCH §3.3, SECURITY A-39).
 - [ ] Lint refuses `secrets/open` imported anywhere except apps/worker (apps/web fails; apps/worker passes), and the HPKE library imported outside packages/secrets. This passes trivially until the secrets code lands in M2.
+- [ ] Outside packages/secrets, `crypto` and `node:crypto` allow named imports only. A default or namespace import fails (fixture: `import * as c from 'node:crypto'; c.createCipheriv(...)`). So do the named imports `createCipheriv`, `createDecipheriv`, `publicEncrypt`, `privateDecrypt`, `subtle` and `webcrypto`, from either specifier. `createHash`, `randomBytes` and `timingSafeEqual` stay allowed everywhere (SECURITY A-39).
+- [ ] Outside packages/secrets, lint refuses `crypto.subtle.encrypt`, `decrypt`, `wrapKey` and `unwrapKey` on the global WebCrypto object, with one fixture each; `digest`, `sign` and `verify` stay allowed (SECURITY A-39).
 - [ ] Lint refuses `db/session` (the SessionUserId constructor) imported anywhere except packages/auth.
+- [ ] Lint refuses a cast to `SessionUserId` (`as SessionUserId`, `as unknown as SessionUserId`, `<SessionUserId>x`) outside db/session and test files. A type test shows the constructor is not exported from the `@poly/db` index (SECURITY A-39).
+- [ ] An inline `eslint-disable` comment naming any of these rules fails lint: boundaries, restricted import, the `SessionUserId` cast ban, and the session-level SET ban. So does a blanket `eslint-disable` naming no rule, enforced by `eslint-comments/no-unlimited-disable`. Fixtures: a disabled `secrets/open` import in apps/web, a disabled cast, a disabled SET, and a bare `/* eslint-disable */`, each still failing (SECURITY A-39).
 - [ ] Every package.json has an `exports` map listing only `.` and the subpaths `layers.json` declares. A deep import (`@poly/ledger/src/x`) fails `tsc`, which resolves with `moduleResolution: "bundler"`.
 - [ ] An undeclared cross-package import fails to resolve under pnpm's strict linking (no workspace hoisting in `.npmrc`), and `import-x/no-extraneous-dependencies` reports it by name.
 - [ ] Check: a declared `workspace:` dependency missing from the package's allow-list fails.
