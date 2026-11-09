@@ -1,7 +1,7 @@
 ---
 id: POLY-123
 title: Throwaway UX prototype
-status: in-progress
+status: done
 milestone: POLY-C
 parent: null
 blocked_by: []
@@ -46,3 +46,7 @@ Prototype defects (frontend-lead):
 4. After the DESIGN fix lands: run `npm run gen` (entities re-lays out) and remove the try/catch around the inline script in `Screen.svelte`.
 
 DESIGN defects (ux-designer, fixed on `worktree-ux-fixes`): entities overflowed by 283px at 960 (the `1fr` tracks' minimum was the cap table's width); transactions threw a TypeError on load with no hash; the entities tax select clipped "Pass-through to members". Flows: every link target in the screens resolves to a route; the click paths behave as in DESIGN apart from defect 1.
+
+### @team-lead — 2026-11-08
+
+Principal verdict (2026-11-09): look and feel approved as is, on the regenerated build @ 6ead8aa (15 routes, light and dark, 960 and 1280, smoke 0 failures). The ux-designer's fidelity review stands as "faithful with deltas"; the three prototype deltas are fixed (cc831bc) and the DESIGN deltas landed in PR #91. Merging via the feature PR; closing.
