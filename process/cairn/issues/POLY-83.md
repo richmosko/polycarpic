@@ -1,14 +1,14 @@
 ---
 id: POLY-83
 title: DB roles, migrate, withTenant
-status: backlog
+status: todo
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-76, POLY-82]
 assignee: backend-lead
 paths: [packages/db/**]
 labels: [db, security]
-priority: null
+priority: P1
 pr: null
 created: 2026-11-08
 updated: 2026-11-08

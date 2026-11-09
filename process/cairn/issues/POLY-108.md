@@ -24,3 +24,4 @@ A custodial account (institution, account type, number mask, provider link) is i
 - [ ] The Custodial Accounts screen groups by Institution or Account type; a card account shows owed as negative.
 - [ ] The import adapter attaches each raw row to a custodial account through provider_account.
 - [ ] custodial_account table; partial unique index (custodial_account_id, nature_class); the per-entity seeded chart (four nature classes, Cash in Transit, Suspense, Opening Balance Equity, realized gains by holding period); tax authorities as custodials with no provider link.
+- [ ] custodial_account stores the account-number mask (last 4), never the full number; every read path, the viewer's included, shows only the mask (ARCH §2.4, §3.1, §6.1, from mosko-fintech 002).

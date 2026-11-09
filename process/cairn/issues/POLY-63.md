@@ -18,6 +18,7 @@ PRD §4 Story 2. Depends on the entity/membership schema and on the GL existing 
 ## Acceptance criteria
 
 - [ ] A parent with its own accounts shows the ordinary dashboard for those accounts only; the consolidated view is POLY-118 (POLY-1.1).
+- [ ] The per-entity dashboard renders in under 2 s for the fake persona's data (PRD NFR). This is the guard for deferring the per-line running balance (ARCH §6.1); a miss reopens that row.
 
 ## Comments
 

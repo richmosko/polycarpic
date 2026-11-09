@@ -20,8 +20,8 @@ ARCH §6.1 recommends building the general ledger in our own Postgres schema ove
 
 - [ ] The Principal approves or overturns the ARCH §6.1 recommendation (build); the ruling is recorded as a comment here.
 - [ ] `process/DECISIONS.md` carries the entry: decision, why, alternatives considered (pgledger, Medici and other TS libraries, the external services ruled out in kickoff §2.5), approver and date. The architect drafts it; the team-lead lands it.
-- [ ] ARCH §6.1 reads "Decision" instead of "Recommendation" and cites the entry; the §5 stack row and the §10 trade-off row agree with it.
-- [ ] The borrow and leave-behind lists in §6.1 are traced to the M1 or M2 issues that build them (the immutability fence, the lot-match junction, the RLS inversion self-test, the migration ownership pattern), or a gap is filed.
+- [x] ARCH §6.1 reads "Decision" instead of "Recommendation" and cites the entry; the §5 stack row and the §10 trade-off row agree with it.
+- [x] The borrow and leave-behind lists in §6.1 are traced to the M1 or M2 issues that build them (the immutability fence, the lot-match junction, the RLS inversion self-test, the migration ownership pattern), or a gap is filed.
 
 ## Comments
 

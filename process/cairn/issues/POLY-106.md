@@ -4,7 +4,7 @@ title: M1 integration check
 status: backlog
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-62, POLY-90, POLY-86, POLY-87, POLY-89, POLY-91, POLY-93, POLY-94, POLY-104]
+blocked_by: [POLY-62, POLY-90, POLY-86, POLY-87, POLY-89, POLY-91, POLY-93, POLY-94, POLY-104, POLY-128, POLY-129]
 assignee: qa-engineer
 paths: [tests/integration/**, apps/web/tests/**]
 labels: [qa]

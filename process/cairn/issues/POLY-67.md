@@ -22,6 +22,8 @@ PRD §4 Story 5. Kickoff §2.5. Source: docs/PRD/index.html
 - [ ] An inter-custodial transfer closes the old lot with a lot_match of kind transfer and writes a successor with the original date and basis (transferred_from_lot_id).
 - [ ] Return of capital and amortization are lot_adjustment rows; gate G7 holds a securities line without its lot write or class mapping in Pending.
 - [ ] The lot-to-ledger tie (ARCH §3.2.8) is asserted by a periodic job that alerts, never repairs; security_allocation maps a security to a sub-category per entity.
+- [ ] lot_match is an append-only junction with match_seq; the latest batch per lot is current, and a re-match appends a new batch rather than updating (ARCH §3.1, §6.1, from mosko-fintech 032).
+- [ ] price_observation is unique on (security, date, source) and valuation reads the highest-priority source for a date; a better source arriving later replaces a stale fallback without deleting it (ARCH §3.1, §6.1, §9, from mosko-fintech 019).
 
 ## Comments
 
