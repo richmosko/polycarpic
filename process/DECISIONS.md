@@ -431,3 +431,21 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** SecEng found that PCR 7 binds the TPM unlock to the Secure Boot policy, not to the files that boot, and INFRA v1.0 left the root partition in the clear, so an attacker with the box for an hour could add a login to the unencrypted system, reboot, and have the TPM unlock the data for them. Encrypting root costs about an hour once and nothing day to day; a PIN at boot would reinstate the cost the 2026-11-07 TPM ruling rejected.
 **Alternatives considered:** keep the layout and accept that opening the case yields everything; a PIN at every boot.
 **Approved by:** richmosko (2026-11-08)
+
+### 2026-11-08 — Sign in with Apple is deferred to the native iOS milestone; web v1 ships Google and GitHub
+**Decision:** amends the 2026-11-08 "Login and Sign up offer Google, Apple and GitHub" entry. Web v1 offers Google and GitHub. Sign in with Apple ships with the native iOS milestone, where the App Store rule requires it, and its known requirements ride that issue: the paid Apple Developer Program, a Services ID and signing key with a secret regenerated at most every six months, a real public domain for return addresses (never `.local`), relay-email registration for Hide My Email addresses, the Hide My Email mismatch with the invite-match rule (SECURITY C-05), name and email delivered only on first sign-in, and token revocation on account deletion.
+**Why:** the Principal asked what Apple requires and whether the $99 program is needed to develop iOS at all (it is, for anything beyond a seven-day personal build). Paying earlier buys a third web button and the Hide My Email complication now; deferring costs nothing that iOS will not pay anyway.
+**Alternatives considered:** Google and GitHub in M1 with Apple before GA; all three in M1.
+**Approved by:** richmosko (2026-11-08)
+
+### 2026-11-08 — The economic view is unaffected by a parent's joint-filers classification
+**Decision:** the economic view (POLY-1.1) is a net-worth lens and shows cap-table-weighted figures on every parent, including one classified as joint filers. Only tax allocation ignores the cap table on a joint-filers parent (2026-11-06 ruling).
+**Why:** the PM could not settle whether the tax ruling also switched off the view. The two rulings answer different questions, and hiding the view would remove the separate-property case the cap table was introduced for.
+**Alternatives considered:** hide the economic view on joint-filers parents.
+**Approved by:** richmosko (2026-11-08)
+
+### 2026-11-08 — Bad-migration recovery runs off the box; RTO 60 minutes
+**Decision:** the pre-migration backup is encrypted to a key that never reaches the box, so the restore runs from the operator's laptop; INFRA's recovery time for a bad migration is 60 minutes, not 30. No plaintext dump is kept on the box.
+**Why:** devops found the 30-minute figure assumed an on-box decrypt. Keeping 30 minutes would mean a readable copy of the ledger on the box's disk, which defeats the backup-key design. A bad migration is rare and follows a watched deploy.
+**Alternatives considered:** a plaintext pre-migration dump on the encrypted spool (needs a SecEng ruling).
+**Approved by:** richmosko (2026-11-08)
