@@ -1,7 +1,7 @@
 ---
 id: POLY-125
 title: Migration-tool decision
-status: todo
+status: done
 milestone: POLY-C
 parent: null
 blocked_by: []
