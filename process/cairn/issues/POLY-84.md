@@ -19,7 +19,10 @@ The pgTAP battery's cross-cutting probes (SECURITY §12.3 qa-engineer block; ARC
 ## Acceptance criteria
 
 - [ ] Inversion self-test: an unprotected canary table leaks, proving the probe has teeth.
-- [ ] A per-table cross-tenant probe generated from pg_catalog (never a hand list); a table with RLS disabled or not FORCEd fails.
+- [ ] A per-table cross-tenant probe generated from pg_catalog (never a hand list); a table with RLS disabled or not FORCEd fails. Scope is every relation outside the schemas `pg_catalog`, `information_schema` and `pg_toast`: tables, partitions and partitioned parents (`pg_class` relkind `r` and `p`) are checked on `relrowsecurity` and `relforcerowsecurity`; a materialized view or foreign table (relkind `m` and `f`) fails the probe unless it is on the exemption list, since RLS never covers either (SECURITY C-13).
+- [ ] The FORCE probe's exemptions are one short list named in the test file itself: BetterAuth's tables (`user`, `session`, `account`, `verification`, plus the `twoFactor` and `passkey` tables when they land; no entity RLS, ARCH §3.1c) and `drizzle.__drizzle_migrations` (ruling `process/cairn/reviews/POLY-76/ruling.md` §4.1). Adding an entry is a reviewed diff; nothing is exempted by name pattern or schema.
+- [ ] Each exemption is asserted to still exist in the catalog, so a stale or misspelled entry fails the run instead of silently exempting nothing.
+- [ ] Canary for the FORCE probe: a table with RLS enabled but not FORCEd fails the probe (and, separately, a table with RLS disabled fails it); a canary on the exemption list passes it. Both canaries are created and dropped inside the test.
 - [ ] Pool reuse on a dirty backend (C-12): tenant A, then tenant B on the same physical connection sees zero A rows; a context-free query there sees zero rows.
 - [ ] WITH CHECK forgery probe; FOR ALL policies refused.
 - [ ] Definer allowlist (C-15): every SECURITY DEFINER function is listed, has search_path = '', and is owned by an allowed role; trigger functions fail when called directly.

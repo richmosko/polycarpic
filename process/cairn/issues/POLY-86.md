@@ -28,6 +28,8 @@ packages/auth per ARCH §2.2 and §3.1c, from the 2026-11-08 measurement on POLY
 - [ ] BetterAuth, with every installed plugin (twoFactor, passkey included), takes the `fields` map from `db/auth` and starts as poly_app with no schema mismatch; a test that drops one map entry sees BetterAuth refuse to start.
 - [ ] With every BetterAuth timestamp column declared timestamptz, signUpEmail, signInEmail and getSession succeed as poly_app (POLY-76 (b′) re-run).
 - [ ] The routing pool takes its pool and Kysely dialect from `db/auth`; packages/auth imports no Postgres driver or PostgresDialect.
+- [ ] The routes that can insert a `user` row (invitation sign-up `/sign-up/email`, OAuth first sign-in `/callback/:id`, magic link `/magic-link/verify`, and any other the pinned version has) are listed in `src/route-policy.ts`, and the handler runs each inside `withContextFreeTx`; a test drives each listed route to create a user and asserts it ran inside the wrapper (ARCH v1.14 §3.1c).
+- [ ] With no withContextFreeTx open (`currentClient()` is null), the sign-up hook throws and writes nothing; it never opens a transaction of its own. This is a test-time catch; the per-route tests above are the guard (SECURITY A-40).
 
 
 ## Comments
