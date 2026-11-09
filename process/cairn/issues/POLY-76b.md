@@ -1,7 +1,7 @@
 ---
 id: POLY-76b
 title: Spike build and record
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-76
 blocked_by: [POLY-76a]
@@ -10,6 +10,11 @@ paths: [spikes/poly-76/**, process/cairn/reviews/POLY-76/spike.md]
 stage: execute
 estimate.cost_usd: "8.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "0.6113"
+actual.tokens: 1266065
+actual.gate_cycles: 1
+actual.wall_clock: 18
+ratio: "0.08"
 labels: [spike, db]
 priority: null
 pr: null

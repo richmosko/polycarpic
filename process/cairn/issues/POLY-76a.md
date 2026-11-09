@@ -10,11 +10,11 @@ paths: [spikes/poly-76/checks/**]
 stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2
-actual.cost_usd: "0.9352"
-actual.tokens: 1131132
-actual.gate_cycles: 1
-actual.wall_clock: 13
-ratio: "0.23"
+actual.cost_usd: "1.1479"
+actual.tokens: 2350957
+actual.gate_cycles: 2
+actual.wall_clock: 20
+ratio: "0.29"
 labels: [spike, db]
 priority: null
 pr: null

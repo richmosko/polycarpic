@@ -1,7 +1,7 @@
 ---
 id: POLY-76c
 title: Spike ruling, ARCH 6.2
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-76
 blocked_by: [POLY-76b]
