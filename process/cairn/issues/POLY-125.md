@@ -32,3 +32,7 @@ Principal ruling (2026-11-09): POLY-C may close on the provisional migration-too
 ### @team-lead — 2026-11-08
 
 Principal ruling (2026-11-09): Drizzle Kit is the provisional migration tool, dbmate + Kysely the fallback; POLY-76's acceptance items (a)–(f) are the flip conditions. The architect drafts the provisional DECISIONS entry and updates ARCH §6.2.
+
+### @team-lead — 2026-11-08
+
+Principal ruling (2026-11-09) on spike check (f): a failure comes back to the Principal and the architect for a judgment, not an automatic flip; (a), (c), (e) flip outright; (b), (d), (f) return. ARCH §6.2 already reads this way.
