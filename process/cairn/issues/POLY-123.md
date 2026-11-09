@@ -1,7 +1,7 @@
 ---
 id: POLY-123
 title: Throwaway UX prototype
-status: todo
+status: in-progress
 milestone: POLY-C
 parent: null
 blocked_by: []
@@ -24,3 +24,9 @@ The Plan gate's "design system encoded" clause is judged on running pages, not s
 - [ ] One documented command (`prototype/README.md`) starts the dev server locally.
 - [ ] The ux-designer's fidelity review and the Principal's look-and-feel verdict are recorded as comments on this issue; any DESIGN delta is routed to the ux-designer, not patched in the prototype only.
 - [ ] The deletion trigger is written in `prototype/README.md`: removed once the real app's first screens ship; DESIGN keeps the screenshots as the durable record.
+
+## Comments
+
+### @team-lead — 2026-11-08
+
+Feature started. Branch: `feature/poly-123-ux-prototype`. frontend-lead builds in a worktree; ux-designer reviews fidelity; the Principal records the look-and-feel verdict here.
