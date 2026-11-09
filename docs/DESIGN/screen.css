@@ -1230,7 +1230,7 @@ html:has(.has-brand-bar) { scroll-padding-top: calc(var(--bar-h, 72px) + 16px); 
    its --border edge is 1.22:1 on the light page and ~1.17:1 on the dark
    one. This fill is 15.61:1 (light) / 17.92:1 (dark) against the page,
    and the label is the same against the fill. Used for the OAuth
-   "Continue with Google / Apple / GitHub" buttons on Login and Sign up. */
+   "Continue with Google / GitHub" buttons on Login and Sign up. */
 .btn-dark { background: var(--foreground); color: var(--background); }
 .btn-dark:hover { filter: none; background: color-mix(in srgb, var(--foreground) 88%, var(--background)); }
 .btn-dark .oauth-glyph { width: 18px; height: 18px; flex-shrink: 0; display: inline-flex; }
