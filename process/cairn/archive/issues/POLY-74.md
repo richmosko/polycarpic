@@ -2,7 +2,7 @@
 id: POLY-74
 title: CI change filter over-triggers
 status: done
-milestone: null
+milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: devops-engineer
@@ -11,7 +11,7 @@ labels: [ci, tooling]
 priority: P1
 pr: https://github.com/richmosko/polycarpic/pull/42
 created: 2026-09-27
-updated: 2026-09-28
+updated: 2026-11-08
 ---
 
 The required `cairn` CI job runs the full test suite for any change under `process/` or `docs/DESIGN/`, including files no test reads (the decision log, the state ledger, review records). Narrow the filter to the files tests actually read, keep it fail-closed, and drop `docs/DESIGN/` once POLY-78 lands.

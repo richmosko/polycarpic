@@ -2,7 +2,7 @@
 id: POLY-78
 title: Decouple cairn theme from docs/DESIGN
 status: done
-milestone: null
+milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: devops-engineer
@@ -11,7 +11,7 @@ labels: [tooling, ci, design]
 priority: P1
 pr: https://github.com/richmosko/polycarpic/pull/41
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-11-08
 ---
 
 Cairn's theme generator writes `docs/DESIGN/variants.css` and its CI-run parity test pins `docs/DESIGN/tokens.css` to the board's tokens, so the product design system cannot change its palette without failing the merge gate. Localize cairn's theme assets, tests and design reference under `scripts/cairn/` and prove the decoupling.

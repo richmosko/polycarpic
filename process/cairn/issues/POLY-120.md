@@ -2,7 +2,7 @@
 id: POLY-120
 title: Home box first deploy
 status: backlog
-milestone: null
+milestone: POLY-1.2
 parent: null
 blocked_by: [POLY-97, POLY-98]
 assignee: devops-engineer
@@ -14,7 +14,7 @@ created: 2026-11-08
 updated: 2026-11-08
 ---
 
-Unscheduled (lead ruling, 2026-11-08): GA runs on the Hetzner VPS; the Principal schedules the home box later. INFRA §3.5, §7.2, §7.3: the home-box scripts and the proofs needed before any real data there: OQ-INFRA-10 (TPM-unlocked encrypted root on Ubuntu 24.04, candidate A then B; SECURITY H1), OQ-INFRA-2 (signed PCR policies), and in private-CA mode OQ-INFRA-3 / R-20 (browser name-constraint enforcement).
+Post-GA, in POLY-1.2 (Principal, 2026-11-09); timing not yet set. GA runs on the Hetzner VPS (lead ruling, 2026-11-08). INFRA §3.5, §7.2, §7.3: the home-box scripts and the proofs needed before any real data there: OQ-INFRA-10 (TPM-unlocked encrypted root on Ubuntu 24.04, candidate A then B; SECURITY H1), OQ-INFRA-2 (signed PCR policies), and in private-CA mode OQ-INFRA-3 / R-20 (browser name-constraint enforcement).
 
 ## Acceptance criteria
 

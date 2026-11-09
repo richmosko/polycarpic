@@ -2,7 +2,7 @@
 id: POLY-79a
 title: Docs server restart and Mermaid line breaks
 status: done
-milestone: null
+milestone: POLY-A
 parent: POLY-79
 blocked_by: []
 assignee: devops-engineer
@@ -11,7 +11,7 @@ labels: [tooling]
 priority: P2
 pr: https://github.com/richmosko/polycarpic/pull/68
 created: 2026-10-31
-updated: 2026-10-31
+updated: 2026-11-08
 ---
 
 Two docs-tooling defects found 2026-10-31 while landing PR #67: the docs server cannot restart right after it is stopped, and Mermaid drops `<br/>` line breaks in node labels.

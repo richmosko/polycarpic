@@ -2,7 +2,7 @@
 id: POLY-80
 title: Retire process/reviews
 status: done
-milestone: null
+milestone: POLY-A
 parent: null
 blocked_by: []
 assignee: devops-engineer
@@ -11,7 +11,7 @@ labels: [tooling, ci, process]
 priority: P1
 pr: null
 created: 2026-09-28
-updated: 2026-09-28
+updated: 2026-11-08
 ---
 
 Rulings move from the free-floating `process/reviews/<ID>/` into the tracker record at `process/cairn/reviews/<ID>/`, hand-offs are never committed, and guard-push enforces it. Principal ruling of 2026-09-28: cairn's records self-contained under one parent, no unnecessary CI triggers, nothing that is a hand-off reaches GitHub.

@@ -2,7 +2,7 @@
 id: POLY-79
 title: Tracker and worktree tooling follow-ups
 status: backlog
-milestone: null
+milestone: POLY-D
 parent: null
 blocked_by: []
 assignee: devops-engineer
@@ -11,7 +11,7 @@ labels: [tooling]
 priority: null
 pr: null
 created: 2026-09-28
-updated: 2026-10-31
+updated: 2026-11-08
 ---
 
 Umbrella for tooling gaps found while running the Plan team in parallel worktrees on 2026-09-28: issue-ID collisions, the hand-off location rule, priority validation at creation, and guard-push counting add-then-remove as a touch. Add further items here rather than filing one issue each.
