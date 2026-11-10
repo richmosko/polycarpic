@@ -1,0 +1,3 @@
+[
+  { "function": "app.job_targets(text)", "owner": "poly_authz", "execute": ["poly_worker"] }
+]

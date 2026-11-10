@@ -61,7 +61,7 @@ describe('layers.json structural checks', () => {
   mutate('an entry in the file with no directory', 'missing-directory', { layers: clone(), dropDirs: ['tax'] });
   mutate('a declared workspace dependency not on the allow-list', 'workspace-dep-not-allowed', { layers: clone(), extraDeps: { ledger: ['posting'] } });
   mutate('a package.json with no exports map', 'exports-mismatch', { layers: clone(), noExports: ['ledger'] });
-  mutate('a stray ./migrate in db exports', 'exports-mismatch', { layers: clone(), extraExports: { db: ['./migrate'] } });
+  mutate('a stray ./stray in db exports', 'exports-mismatch', { layers: clone(), extraExports: { db: ['./stray'] } });
   mutate('an allow-list entry pointing at a higher layer', 'allow-up', (() => {
     const l = clone();
     l.packages.securities.allow.push('posting');

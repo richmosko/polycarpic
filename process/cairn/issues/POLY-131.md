@@ -21,3 +21,13 @@ Umbrella for the non-blocking findings from the architect's POLY-82 review (verd
 - [ ] **S4 — `set_config` false positive.** The session-SET rule's argument split stops at the first `)`, so `set_config('a', coalesce(x, ''), true)` fails although its third argument is the literal `true`. Fails closed today; fix the split (balanced parentheses) and add the pass fixture.
 - [ ] **S6 — comment stripping is not quote-aware.** A `--` inside an SQL string literal (`'a -- b'`) strips the rest of the line, hiding a later `SET ROLE` from the rule. Strip comments with a tokenizer that respects single-quoted strings and dollar-quoting; add the fail fixture.
 - [ ] **SecEng sign-off on the HPKE library.** ARCH v1.15 names `@hpke/core` + `@hpke/dhkem-x25519` (architect's pick, POLY-82 ruling). SecEng confirms or replaces it in the M2 secrets design; SECURITY §6.3 records the decision. The lint already bans `hpke-js` and `@hpke/*` outside packages/secrets, so the ban needs no change unless the pick does.
+
+## Comments
+
+### @team-lead — 2026-11-09
+
+Add to the batch: delete `spikes/poly-76/` once POLY-83 has merged. It is the throwaway migration-chain spike (25 files) kept as evidence behind the architect's POLY-76 ruling and as the runner's reference while POLY-83 builds; `process/cairn/reviews/POLY-76/ruling.md` is the durable record. Same treatment for `prototype/` when the first real screens ship (POLY-128).
+
+### @team-lead — 2026-11-09
+
+Add to the batch, from the POLY-83 reviews (architect review 1 N3; seceng verdict L-1, L-2 @ b126ce4): **N3** `configure()` on the `@poly/db` index lets any package re-point the pools — revisit when POLY-85 lands, consider moving it to the apps-only `db/startup` subpath. **L-1** the migration file check misses SQL hidden after a comment marker inside a `$tag$…$tag$` body or a `"quoted identifier"` (seceng reproduced it; the DB-side privilege backstop still rolls such a file back). **L-2** the runner's `release(err)` path when ROLLBACK itself fails. This umbrella now covers both the layer lint (POLY-82) and the db checks (POLY-83).

@@ -15,14 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Monorepo skeleton + layer lint
-- **Issue:** `POLY-82` (cairn)
-- **Milestone:** `POLY-M1` Foundations
-- **Branch:** `feature/poly-82-monorepo-skeleton-layer-lint`
-- **Started:** 2026-11-09
-- **Goal:** the pnpm + Turborepo workspace with every ARCH §2.2 package and app stubbed (one Vitest test each, runnable alone) and the ARCH §2.1 layer enforcement built — `layers.json`, generated boundaries lint, package-resolution guards, and the checks on the file, all with pass/fail fixtures under `test/layers/`.
-- **Status:** In Review — PR [#100](https://github.com/richmosko/polycarpic/pull/100); QA green @ 3fdd49e, architect approved @ 7c70152. Follow-ups: POLY-131.
-- **Next:** POLY-83 → POLY-84, POLY-85.
+_None. POLY-83 (DB roles, migrate, withTenant) merged 2026-11-10 via PR [#102](https://github.com/richmosko/polycarpic/pull/102) — ARCH v1.15.3, SECURITY v1.7; follow-ups on POLY-131, deploy-side requirements on POLY-100._
+
+- **Next:** `/start-feature POLY-84` (RLS battery harness), then POLY-85 (runtime config + ops hooks).
 
 ## Releases
 

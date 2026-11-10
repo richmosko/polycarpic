@@ -1,5 +1,10 @@
 {
   "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "erasableSyntaxOnly": true,
+    "resolveJsonModule": true,
+    "types": ["node"]
+  },
   "include": [
     "src"
   ]

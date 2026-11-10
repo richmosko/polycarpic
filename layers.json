@@ -2,7 +2,7 @@
   "version": 1,
   "layers": { "0": "Platform", "1": "Identity", "2": "Sources", "3": "Books", "4": "Posting", "5": "Insight", "6": "Delivery" },
   "packages": {
-    "db":         { "dir": "packages/db",         "name": "@poly/db",         "layer": 0, "subpaths": ["./session", "./auth"], "allow": [] },
+    "db":         { "dir": "packages/db",         "name": "@poly/db",         "layer": 0, "subpaths": ["./session", "./auth", "./migrate", "./startup"], "allow": [] },
     "config":     { "dir": "packages/config",     "name": "@poly/config",     "layer": 0, "subpaths": [], "allow": [] },
     "auth":       { "dir": "packages/auth",       "name": "@poly/auth",       "layer": 1, "subpaths": [], "allow": ["db", "db/auth", "db/session", "tenancy"] },
     "tenancy":    { "dir": "packages/tenancy",    "name": "@poly/tenancy",    "layer": 1, "subpaths": [], "allow": ["db"] },
@@ -16,8 +16,9 @@
     "tax":        { "dir": "packages/tax",        "name": "@poly/tax",        "layer": 5, "subpaths": [], "allow": ["db", "ledger", "refdata", "tenancy"] },
     "portfolio":  { "dir": "packages/portfolio",  "name": "@poly/portfolio",  "layer": 5, "subpaths": [], "allow": ["db", "ledger", "securities", "refdata"] },
     "ui":         { "dir": "packages/ui",         "name": "@poly/ui",         "layer": 6, "subpaths": [], "allow": [] },
-    "web":        { "dir": "apps/web",            "name": "@poly/web",        "layer": 6, "subpaths": [], "allow": ["config", "db", "auth", "tenancy", "secrets", "import", "refdata", "ledger", "securities", "posting", "reports", "tax", "portfolio", "ui"] },
-    "worker":     { "dir": "apps/worker",         "name": "@poly/worker",     "layer": 6, "subpaths": [], "allow": ["config", "db", "secrets", "secrets/open", "import", "refdata", "securities", "posting", "tax"] }
+    "web":        { "dir": "apps/web",            "name": "@poly/web",        "layer": 6, "subpaths": [], "allow": ["config", "db", "db/startup", "auth", "tenancy", "secrets", "import", "refdata", "ledger", "securities", "posting", "reports", "tax", "portfolio", "ui"] },
+    "worker":     { "dir": "apps/worker",         "name": "@poly/worker",     "layer": 6, "subpaths": [], "allow": ["config", "db", "db/startup", "secrets", "secrets/open", "import", "refdata", "securities", "posting", "tax"] },
+    "migrate":    { "dir": "apps/migrate",        "name": "@poly/migrate",    "layer": 6, "subpaths": [], "allow": ["config", "db", "db/migrate"] }
   },
   "sessionSetExempt": "packages/db/src/migrate.ts"
 }

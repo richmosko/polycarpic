@@ -6,11 +6,23 @@
   "exports": {
     ".": "./src/index.ts",
     "./session": "./src/session.ts",
-    "./auth": "./src/auth.ts"
+    "./auth": "./src/auth.ts",
+    "./migrate": "./src/migrate.ts",
+    "./startup": "./src/startup.ts"
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "check-migrations": "node scripts/check-migrations.ts"
   },
-  "dependencies": {}
+  "dependencies": {
+    "drizzle-orm": "0.45.4",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "drizzle-kit": "0.31.11",
+    "tsx": "4.23.15"
+  }
 }

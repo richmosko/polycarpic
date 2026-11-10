@@ -11,7 +11,7 @@ labels: [ops, vercel, post-ga-candidate]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-09
 ---
 
 Post-GA, in POLY-1.2 (Principal, 2026-11-09); timing not yet set. INFRA §4.7, §6.6, §7.4, D-11/D-12: signature-verified tag deploy from the laptop, the per-project env-name check, the weekly encrypted Neon export with the put-only key, and restore. Needs the ARCH §7.6 two-project split built first (not yet filed). Records OQ-INFRA-6 at first stand-up.
@@ -23,3 +23,9 @@ Post-GA, in POLY-1.2 (Principal, 2026-11-09); timing not yet set. INFRA §4.7, �
 - [ ] An export restores into a fresh Neon project.
 - [ ] The migration runner applies against Neon from a Vercel build step (spike check (d), deferred here from POLY-76 by the Principal, 2026-11-09).
 - [ ] OQ-INFRA-6 (Neon restore window, Vercel Hobby limits) is recorded.
+
+## Comments
+
+### @team-lead — 2026-11-09
+
+From the POLY-83 architect ruling, Addendum 1 (`process/cairn/reviews/POLY-83/ruling.md`): `packages/db/sql/roles.sql` must run as the Postgres superuser (poly_backup needs REPLICATION + BYPASSRLS; ALTER DEFAULT PRIVILEGES for the definer-owner roles). Neon exposes no superuser, so the file cannot run there as written. Decide here: a Neon-specific variant without poly_backup and with neon_superuser's grantable subset, or Neon is out of scope for self-hosters' parity. Not a POLY-83 blocker.
