@@ -71,3 +71,27 @@ Feature started. Branch: `feature/poly-82-monorepo-skeleton-layer-lint`.
    - §2.1 states the subpath rule and the SET rule above;
    - §2.2's secrets row names the library.
 6. **Scope note for the lead**: `packages/db/src/migrate.ts` is not in this issue's `paths:`. Add it, since the skeleton stubs it.
+
+### @architect — 2026-11-09
+
+**Architect review: approved at 7c70152.**
+
+| Axis | Result | Evidence |
+|---|---|---|
+| Lint generated from `layers.json`, nothing hand-copied | pass | `eslint.config.js` → `generateConfig(layers)`; the allow-lists, elements and subpath grants are derived from it. The fixture `03-generated/pass-after-allowlist-edit` passes. 7c70152 |
+| Owners hard-coded in the generator (db, secrets, packages/, db/session.ts) | accepted | Each fails closed if renamed (ARCH v1.15.1 §2.1). S5's comment covers `no-session-set` mode. b5ea81e |
+| Every subpath restricted; db/auth and db/session for auth only, secrets/open for worker only | pass | Fixtures 09, 12, 15 and 21, in static, `import()` and `require` forms. 030aa57 |
+| Session-SET ruling, plus addendum 1 | pass | 08- and 17-set-matrix, covering comment-prefix, interpolated third argument, prose, SET TRANSACTION/CONSTRAINTS and UPDATE…SET. Exemption: 22-migrate-set, glob probe included. b5ea81e |
+| Disable proofing: inline, blanket and config comments | pass | Fixtures 14, 16 and 23. 030aa57 |
+| Resolution guards: exports map exact, no hoisting, deep import fails tsc | pass | `structure.test.ts`, the `tsc/` probes, and the `exports-mismatch` mutations, with no map and a stray `./migrate`. 904a919 |
+| Checks on the file: completeness, upward, cycle, workspace deps, ARCH ↔ file | pass | `check.test.ts`: one mutation per check id, measured over the baseline. 030aa57 |
+| db index does not export the `SessionUserId` constructor | pass | `tsc/db-index.ts`, plus the non-vacuous control `db-session-control.ts`. 7c70152 |
+| Nothing pre-empts POLY-83/84/85 | pass | db is stubs only, with `session.ts` the brand alone. Migrate is a stub with no export. config is a stub; its contents are POLY-85's. |
+| Harness green | qa-engineer's measurement | 229/229 and `pnpm lint` clean, measured by qa-engineer before the rebase onto 7c70152 (not re-run by me). The gate owner re-runs at finish. |
+
+ARCH changes landed in this loop: v1.15 (subpath rule; auth `data-consumes`; web → ui; HPKE library; SET rule), v1.15.1 (where standing restrictions live; SET TRANSACTION passes), v1.15.2 (`packages/config` at L0).
+
+**Follow-ups, not blocking** (for an umbrella issue, not one issue each):
+- S4: `set_config` argument split stops at the first `)`. A false positive; it fails closed.
+- S6: comment stripping is not quote-aware. A `'--'` inside a SQL string literal hides a later `SET`. This needs deliberate intent in reviewed db/auth code.
+- SecEng signs off the HPKE library pick (`@hpke/core` + `@hpke/dhkem-x25519`) in the M2 secrets design. The lint ban already covers the whole family.
