@@ -87,3 +87,7 @@ Non-blocking (fold into POLY-100):
 - L-2 inTransaction: when ROLLBACK fails, call client.release(err) so a broken backend is destroyed, not pooled.
 
 Pass: roles.sql matches C-79 exactly, and every role is NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS. Default EXECUTE is revoked; the DB and public are owned by poly_owner, with PUBLIC revoked. The file check fails closed on quoted, unparseable, GUC-form and set_config targets. withContextFreeTx's first statement asserts app.user_id is empty (C-84). The nesting guard uses ALS. withSystem needs rowCount = 1 and a non-null principal. The runner preflights, locks, checks the (hash, created_at) prefix and asserts convergence and current_user (T-91). job_targets has search_path '', is poly_worker only and is allowlisted. Auth keys are uuid (l). No URL, no password env, and no secret in any log line: errors name the variable or path, never the value.
+
+### @seceng — 2026-11-09
+
+SecEng @ 00f3e87: M-1 and M-2 conditions lifted. connectionFrom now refuses an unset or unknown sslmode (fixture included), and the preflight refuses stray members of poly_owner and the seven and any poly_backup membership other than pg_read_all_data. L-2 is done too; L-1 stays non-blocking for POLY-100. SecEng approves.
