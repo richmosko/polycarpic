@@ -11,7 +11,7 @@ labels: [ledger, db]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-10
 ---
 
 packages/ledger and its database invariants (ARCH §3.2): journal_entry / journal_line, the balanced-entry deferred trigger, append-only and TRUNCATE triggers, the forced actor, the composite same-entity FK, the gapless journal number under poly_journal with the counter row created by an AFTER INSERT trigger on entity, and correctEntry(). POLY-64 posts into it. Custodial accounts and the chart by nature are POLY-108.
@@ -24,3 +24,9 @@ packages/ledger and its database invariants (ARCH §3.2): journal_entry / journa
 - [ ] correctEntry() writes reversal and replacement in one transaction; posting_date_allowed() returns true.
 - [ ] Property test: the trial balance is zero after random postings (G2).
 - [ ] Tests: ARCH §3.2 invariants and the C-24 counter items.
+
+## Comments
+
+### @architect — 2026-11-10
+
+Before this lands, rule the GL table name/schema: ARCH OQ-36 (v1.15.5). ARCH §3.2 calls it `account`, but BetterAuth already owns `public.account`. Also fix the two matrix rows in `packages/tenancy/permission-matrix.json` that name it (found in the POLY-84 review).

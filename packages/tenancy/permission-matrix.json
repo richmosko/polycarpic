@@ -1,0 +1,435 @@
+{
+  "source": "docs/SECURITY/index.html section 4.2.1 (permission matrix)",
+  "cellValues": [
+    "allow",
+    "deny",
+    "own"
+  ],
+  "rows": [
+    {
+      "id": "read-books",
+      "action": "Read dashboard, balances, posted entries, lots, reports, drafts",
+      "tables": [
+        "public.journal_entry",
+        "public.journal_line",
+        "public.account",
+        "public.lot",
+        "public.draft"
+      ],
+      "cells": {
+        "viewer": "allow",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: SELECT policy: entity_id = any ((select app.visible_entities()))"
+    },
+    {
+      "id": "read-linked-account",
+      "action": "Read linked-account name and last-4",
+      "tables": [],
+      "cells": {
+        "viewer": "allow",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "db": false,
+      "note": "enforced by: Full numbers are never stored (C-34), so there is nothing to mask per role."
+    },
+    {
+      "id": "read-raw-payload",
+      "action": "Read the raw provider payload (raw_transaction.payload)",
+      "tables": [
+        "public.raw_transaction"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: Policy or column grant through a manager+ view. The payload is the least-curated, most PII-dense field we hold."
+    },
+    {
+      "id": "read-membership-list",
+      "action": "Read the entity's membership list",
+      "tables": [
+        "public.membership"
+      ],
+      "cells": {
+        "viewer": "own",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "viewer: own row; enforced by: SELECT policy on membership"
+    },
+    {
+      "id": "draft-write",
+      "action": "Create, edit or delete a draft; confirm a draft (post); reverse an entry",
+      "tables": [
+        "public.draft"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: Per-command policies with WITH CHECK app.has_role(entity_id,'manager')"
+    },
+    {
+      "id": "chart-rules-edit",
+      "action": "Edit the chart of accounts; create or edit rules, including auto_post",
+      "tables": [
+        "public.account",
+        "public.rule"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: As above. auto_post creation writes an audit_event."
+    },
+    {
+      "id": "upload-csv-ofx",
+      "action": "Upload CSV / OFX",
+      "tables": [
+        "public.import_batch",
+        "public.raw_transaction"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: Insert policy on import_batch and raw_transaction"
+    },
+    {
+      "id": "link-connection",
+      "action": "Link a provider connection",
+      "tables": [
+        "public.provider_connection"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "manager: ✓ step-up; owner: ✓ step-up; enforced by: Insert policy on provider_connection. The linking user becomes linked_by_user_id."
+    },
+    {
+      "id": "unlink-connection",
+      "action": "Unlink a connection",
+      "tables": [
+        "public.provider_connection"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "own",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "manager: own links only; owner: any, step-up; enforced by: Policy compares linked_by_user_id. Revocation runs as a worker job (C-32)."
+    },
+    {
+      "id": "relink-token",
+      "action": "Refresh a provider token (relink)",
+      "tables": [
+        "public.provider_connection"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "own",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "manager: ✓ step-up, own links; owner: ✓ step-up; enforced by: A relink stores a new sealed credential, so it is treated like a link (C-30). The policy compares linked_by_user_id for managers. Writes an audit_event."
+    },
+    {
+      "id": "map-linked-account",
+      "action": "Map a linked account to a custodial GL account",
+      "tables": [
+        "public.linked_account"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: UPDATE policy on linked_account: manager+. The target account must belong to the same entity (composite FK). A mapping change writes an audit_event, because it redirects where bank data posts."
+    },
+    {
+      "id": "sync-now",
+      "action": "Sync now",
+      "tables": [],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "db": false,
+      "note": "enforced by: Enqueues a worker job and never opens the credential in web (TB-4). Rate-limited per connection (minimum interval set in INFRA) against provider quota and cost."
+    },
+    {
+      "id": "post-split-group-correct",
+      "action": "Post, Split, Group, + New entry, Correct entry",
+      "tables": [
+        "public.journal_entry",
+        "public.journal_line"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: G6: WITH CHECK app.has_role(entity_id,'manager') on journal_entry/journal_line, with the actor forced by trigger (C-23). Correct entry is a reversal plus a new entry and never an edit (C-21). G1, G2, G4 and G5 are re-checked by the database at commit."
+    },
+    {
+      "id": "rule-auto-post-opt-in",
+      "action": "Rule auto-post opt-in (opting in counts as confirmation)",
+      "tables": [
+        "public.rule"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: The opting-in user is recorded on the rule (auto_post_by_user_id) and is the principal for every auto-post, as in OQ-3. If that user drops below manager or is deleted, auto_post flips off and an audit_event is written, mirroring principal_invalid. Auto-posts pass G1–G6 like any post. Opt-in writes an audit_event and emails the owners."
+    },
+    {
+      "id": "import-schedule",
+      "action": "Per-entity import schedule",
+      "tables": [
+        "public.entity_import_settings"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: UPDATE policy on the entity's import settings: manager+. The interval is bounded below by the same INFRA minimum as Sync now."
+    },
+    {
+      "id": "entity-metadata",
+      "action": "Set entity metadata (name, tax classification)",
+      "tables": [
+        "public.entity"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: UPDATE policy on entity: owner"
+    },
+    {
+      "id": "parent-link-set",
+      "action": "Set a parent link",
+      "tables": [
+        "public.entity_rollup"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "owner: ✓ on child and parent; enforced by: C-19. The poly_graph trigger refuses cycles and links past depth 8, and notifies every owner beneath (C-25)."
+    },
+    {
+      "id": "parent-link-remove",
+      "action": "Remove a parent link",
+      "tables": [
+        "public.entity_rollup"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "owner: ✓ on child or parent; enforced by: DELETE policy on entity_rollup (Principal, 2026-11-06). Writes an audit_event."
+    },
+    {
+      "id": "parent-links-read",
+      "action": "Read parent links; see the parents above my entity",
+      "tables": [
+        "public.entity_rollup"
+      ],
+      "cells": {
+        "viewer": "own",
+        "manager": "own",
+        "owner": "own"
+      },
+      "probe": null,
+      "note": "viewer: links where a member of the parent; manager: as viewer; owner: as viewer, plus app.parents_of on an owned child; enforced by: SELECT policy on entity_rollup: any membership on the parent, or owner on the child. app.parents_of returns ancestor ids and names only (C-19)."
+    },
+    {
+      "id": "rollup-totals-read",
+      "action": "Read a parent's consolidated totals (POLY-1.1)",
+      "tables": [],
+      "cells": {
+        "viewer": "allow",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "db": false,
+      "note": "enforced by: app.rollup_totals / app.rollup_economic, guarded by viewer+ on the parent. Aggregates only, never rows (C-25)."
+    },
+    {
+      "id": "cap-table-read",
+      "action": "Read the cap table",
+      "tables": [
+        "public.equity_total",
+        "public.equity_holding"
+      ],
+      "cells": {
+        "viewer": "allow",
+        "manager": "allow",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: SELECT policy on equity_total / equity_holding by entity_id. A holder's owners who are not members use app.my_stakes() (C-27)."
+    },
+    {
+      "id": "cap-table-edit",
+      "action": "Edit the cap table; read holder candidates",
+      "tables": [
+        "public.equity_total",
+        "public.equity_holding"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "owner: ✓ step-up; co-owner approval if more than one owner; enforced by: INSERT policy on equity_*: sole owner only. With more than one owner, the edit is held and applied only through app.apply_change (§4.2.2, C-28). app.cap_table_candidates is owner-only (C-27)."
+    },
+    {
+      "id": "membership-invite-raise",
+      "action": "Invite a member, raise a role, add an owner",
+      "tables": [
+        "public.membership",
+        "public.invitation"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "owner: ✓ step-up; co-owner approval if more than one owner; enforced by: INSERT and UPDATE policies on membership (and invitation): sole owner only. Otherwise the change goes through §4.2.2. The invite email is sent only once the change applies (C-20, C-28)."
+    },
+    {
+      "id": "co-owner-remove-demote",
+      "action": "Remove or demote a co-owner",
+      "tables": [
+        "public.membership"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "owner: ✓ step-up; every other owner approves, the target included. After a decline or expiry, the founding owner may force it.; enforced by: Through §4.2.2 only (app.apply_change, or app.force_change for the founder). A last-owner trigger also applies (C-20). The founder cannot be removed or demoted this way."
+    },
+    {
+      "id": "founder-transfer",
+      "action": "Transfer the founding-owner role, or step down from it",
+      "tables": [
+        "public.entity"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "own"
+      },
+      "probe": null,
+      "note": "owner: founder only, step-up; enforced by: An UPDATE of entity.founding_owner_user_id through a poly_govern definer. The new founder must be a current owner. Every owner is notified, and an audit_event is written (§4.2.2)."
+    },
+    {
+      "id": "member-remove-demote-self",
+      "action": "Remove a viewer or manager; lower or give up one's own role",
+      "tables": [
+        "public.membership"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "owner: ✓ step-up (own role: self, any role); enforced by: A single-owner action (Principal, P5b). DELETE and UPDATE policies on membership, plus the last-owner trigger (C-20)."
+    },
+    {
+      "id": "export-books",
+      "action": "Export the entity's complete books",
+      "tables": [],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "allow"
+      },
+      "probe": null,
+      "db": false,
+      "note": "owner: ✓ step-up; enforced by: PRD §5 grants this to the owner. It is exfiltration-shaped, so it is audited (C-51). Revised: 8963efb allowed manager+."
+    },
+    {
+      "id": "purge-books",
+      "action": "Purge the entity's books",
+      "tables": [],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "own"
+      },
+      "probe": null,
+      "db": false,
+      "note": "owner: sole owner, step-up; enforced by: C-50 (§4.5)"
+    },
+    {
+      "id": "audit-event-read",
+      "action": "Read the entity's audit_event rows",
+      "tables": [
+        "public.audit_event"
+      ],
+      "cells": {
+        "viewer": "deny",
+        "manager": "deny",
+        "owner": "allow"
+      },
+      "probe": null,
+      "note": "enforced by: SELECT policy: owner, or actor_id = app.current_user_id()"
+    },
+    {
+      "id": "report-definitions-own",
+      "action": "Clone or edit own report definitions; export own personal data; delete own account",
+      "tables": [
+        "public.report_definition"
+      ],
+      "cells": {
+        "viewer": "own",
+        "manager": "own",
+        "owner": "own"
+      },
+      "probe": null,
+      "note": "viewer: self; manager: self; owner: self; enforced by: Owner-user policies. Account deletion resolves every solely-owned entity in the flow, by transfer or purge, or the user aborts. The user is the only invoker (§4.6, C-52). Revised in v1.1: deletion was refused for a sole owner."
+    }
+  ]
+}

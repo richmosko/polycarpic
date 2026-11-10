@@ -11,7 +11,7 @@ labels: [ci, supply-chain]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-09
+updated: 2026-11-10
 ---
 
 INFRA §4.2–§4.4: a changes step inside the job (no workflow-level paths:), one app aggregate required check, build.yml on push to main (one adapter-node image plus Caddy and tools images, Trivy, CycloneDX SBOM, provenance attestation, GHCR by digest), release.yml on a signed v1.* tag that never rebuilds, the action-pin check (C-81) and a weekly rebuild. Runs the RLS battery on packages/db changes.
@@ -25,3 +25,15 @@ INFRA §4.2–§4.4: a changes step inside the job (no workflow-level paths:), o
 - [ ] Each affected package's tests run from inside that package (`pnpm --filter <pkg> test`, via Turborepo), never from the root config, so a test relying on another package's setup or on root-only config fails.
 - [ ] The lint job runs POLY-82's layer-map checks (`layers.json` vs each package.json, vs ARCH §2.2 `data-consumes`, completeness, acyclic and never-upward). A change to `layers.json` or `docs/ARCH/index.html` runs them even on an otherwise docs-only PR.
 - [ ] Branch protection adds app (team-lead, user-approved).
+
+## Comments
+
+### @team-lead — 2026-11-10
+
+**Steer from the user at the POLY-83 merge (2026-11-10):** watch how the test suite grows for CI — it will be the longest item if it gets too large and not modular enough per component. Baseline today: the `cairn` check is the only required status and covers tooling alone (15 s path-gated, ~116 s full); the product suites (`tests/db` 93 tests ≈ 45 s on Docker Postgres 17 + pgTAP, `tests/layers`, `pnpm lint`, `pnpm -r typecheck`) run only on qa's machine — zero product coverage in CI until this issue lands.
+
+Add to the acceptance criteria when this is scoped:
+- Each CI job prints its wall-clock and the per-package test time (Turborepo `--summarize` or equivalent) into the GitHub step summary, so growth is visible per run without opening logs.
+- A soft budget per job (proposed: lint+types ≤ 2 min, per-package Vitest ≤ 2 min, DB battery ≤ 3 min); a job over budget posts a warning annotation, never a failure — the point is to see the curve, not to block on it.
+- The DB battery stays one job keyed to `packages/db/**` + `tests/db/**` only; POLY-84's RLS battery joins that job, not a new one — one Postgres container per run.
+- `cairn loop-stats` already has a `suite_seconds_added` row; wire the CI timings into `process/cairn/metrics/test-runs.jsonl` so the per-loop scorecard shows suite growth from CI, not only from local runs.
