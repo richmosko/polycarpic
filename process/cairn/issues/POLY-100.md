@@ -35,3 +35,7 @@ From the POLY-83 architect ruling (R1, R6, R7): three deploy-side requirements f
 ### @architect — 2026-11-09
 
 Architect, 2026-11-09 (supersedes POLY-83 ruling Addendum 2 (2), seceng's view): the poly_backup ACL check goes into the migrate runner's role preflight, not into provision-check. It runs on every deploy, so it catches drift that a one-time provisioning check would miss. Criterion: migrate and --plan exit 2, applying nothing, when (a) any aclitem in pg_database, pg_namespace, pg_class, pg_proc or pg_default_acl names poly_backup as grantee, except CONNECT on the database; or (b) poly_backup owns any object in pg_class, pg_proc, pg_namespace or pg_type (C-79: no other grant, owns nothing). Code in packages/db (assertRoles); qa adds the fixture GRANT CREATE ON SCHEMA public TO poly_backup and the runner refuses. POLY-97 gets no criterion for this. Not blocking POLY-83.
+
+### @team-lead — 2026-11-09
+
+seceng's refinements to the poly_backup preflight predicate (architect ruling above @ 686f0c3), relayed from POLY-83 @ a694b2a — seceng wrote them against the POLY-97 placement before the revision; they apply here unchanged: (a) also refuse EXECUTE on any `prosecdef` function (a definer grant is a write path) and TEMPORARY on the database; (b) "owns nothing" covers pg_type as well (the architect already added it). The POLY-97 criterion is withdrawn (5add6b5); this issue is the single home.
