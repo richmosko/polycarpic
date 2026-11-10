@@ -83,12 +83,14 @@ describe('app.job_targets', () => {
 
 describe('withContextFreeTx', () => {
   it('first statement asserts app.user_id is empty: a connection carrying a user id is refused', async () => {
+    await auth.close(); // drop pooled backends so the next one is fresh and picks up the role setting
     must(`ALTER ROLE poly_app IN DATABASE ${db} SET app.user_id = '${UID}'`);
     try {
       let ran = false;
       await expect(auth.withContextFreeTx(async () => { ran = true; })).rejects.toThrow(/app\.user_id/i);
       expect(ran).toBe(false);
     } finally {
+      await auth.close();
       must(`ALTER ROLE poly_app IN DATABASE ${db} RESET app.user_id`);
     }
   });

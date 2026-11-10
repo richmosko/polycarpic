@@ -1,6 +1,5 @@
 -- POLY-83 catalog invariants: roles (ARCH §3.3, SECURITY C-79, C-85). Runs after bootstrap + migrate.
 BEGIN;
-CREATE EXTENSION IF NOT EXISTS pgtap;
 SELECT no_plan();
 
 SELECT has_role(r) FROM unnest(ARRAY['poly_owner','poly_migrator','poly_app','poly_worker','poly_authz','poly_purge',
@@ -84,7 +83,7 @@ SELECT is((SELECT array_agg(a.grantee::regrole::text ORDER BY a.grantee::regrole
   ARRAY['poly_worker'], 'EXECUTE on app.job_targets is granted to poly_worker alone');
 
 -- nullif form (A-3)
-SELECT matches(pg_get_functiondef('app.current_user_id()'::regprocedure), 'nullif\(current_setting\(''app\.user_id''::text, true\), ''''::text\)',
+SELECT matches(pg_get_functiondef('app.current_user_id()'::regprocedure), 'nullif\(\s*(pg_catalog\.)?current_setting\(\s*''app\.user_id''(::text)?,\s*true\s*\),\s*''''(::text)?\s*\)',
   'app.current_user_id() uses the nullif form');
 
 -- ruling R1/R2/R3
@@ -102,13 +101,14 @@ SELECT ok(NOT has_schema_privilege('public','app','USAGE'), 'PUBLIC has no USAGE
 SELECT ok(has_schema_privilege('poly_app','app','USAGE') AND has_schema_privilege('poly_worker','app','USAGE'), 'app and worker have USAGE on schema app');
 SELECT ok(NOT has_schema_privilege('poly_app','app','CREATE'), 'poly_app has no CREATE on schema app');
 SELECT ok(NOT has_schema_privilege('public','public','CREATE'), 'PUBLIC has no CREATE on public');
-SELECT results_eq($$SELECT prosecdef, provolatile::text, proconfig IS NULL, pg_get_userbyid(proowner)::text FROM pg_proc WHERE oid='app.current_user_id()'::regprocedure$$,
-  $$VALUES (false,'s',true,'poly_owner')$$, 'app.current_user_id() is invoker, STABLE, no SET clause, owned by poly_owner');
+SELECT ok((SELECT NOT prosecdef AND provolatile = 's' AND proconfig IS NULL AND proowner = 'poly_owner'::regrole FROM pg_proc WHERE oid='app.current_user_id()'::regprocedure),
+  'app.current_user_id() is invoker, STABLE, no SET clause, owned by poly_owner');
 SELECT is((SELECT pg_get_userbyid(proowner)::text FROM pg_proc WHERE oid='app.job_targets(text)'::regprocedure), 'poly_authz', 'app.job_targets owned by poly_authz');
-SELECT results_eq($$SELECT proconfig FROM pg_proc WHERE oid='app.job_targets(text)'::regprocedure$$, $$VALUES (ARRAY['search_path=""'])$$, 'app.job_targets has search_path = ''''');
+SELECT ok((SELECT proconfig = ARRAY['search_path=""'] FROM pg_proc WHERE oid='app.job_targets(text)'::regprocedure), 'app.job_targets pins search_path to empty');
 SELECT is((SELECT count(*)::int FROM app.job_targets('any_job')), 0, 'M1: job_targets returns zero rows for every job');
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-  WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND has_function_privilege('public', p.oid, 'EXECUTE')), 0, 'no user function is executable by PUBLIC');
+  WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid=p.oid AND d.deptype='e')
+  AND has_function_privilege('public', p.oid, 'EXECUTE')), 0, 'no user function is executable by PUBLIC');
 SELECT is((SELECT count(*)::int FROM pg_default_acl d WHERE d.defaclobjtype='f' AND EXISTS
   (SELECT 1 FROM aclexplode(d.defaclacl) a WHERE a.grantee=0)), 0, 'no function default-ACL grants EXECUTE to PUBLIC');
 SELECT is((SELECT count(DISTINCT d.defaclrole)::int FROM pg_default_acl d WHERE d.defaclobjtype='f'

@@ -57,7 +57,9 @@ describe('refusals apply nothing', () => {
     const dir = writeMigrations([{ tag: '0000_a', sql: T('ta') }, { tag: '0001_b', sql: T('tb') }]);
     ok(migrateCli(db, dir));
     const j = journalOf(dir);
-    j.entries = [j.entries[1], j.entries[0]].map((e: any, i: number) => ({ ...e, idx: i }));
+    // swap the files behind the two applied entries, keeping `when` increasing: the journal-order check passes, the hashes diverge
+    const [e0, e1] = j.entries;
+    j.entries = [{ ...e0, tag: e1.tag }, { ...e1, tag: e0.tag }];
     setJournal(dir, j);
     rewrite(dir, '0002_c', T('tc'));
     j.entries.push({ idx: 2, version: '7', when: 1_700_000_009_000, tag: '0002_c', breakpoints: true });
@@ -191,6 +193,8 @@ describe('--plan', () => {
     const dir = writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
     const [c, o] = key!;
     const hold = psqlSession(`SELECT pg_advisory_lock((${c}::bigint << 32) | ${o}::bigint); SELECT pg_sleep(3600);`, db2);
+    // killing the docker-exec client would not end the in-container session: release by terminating the backend
+    const release = () => { psql(`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname='${db2}' AND query LIKE '%pg_sleep(3600)%' AND pid <> pg_backend_pid()`); hold.kill(); };
     try {
       for (let i = 0; i < 30; i++) {
         if (must(`SELECT count(*) FROM pg_locks WHERE locktype='advisory' AND granted`, db2).rows[0][0] === '1') break;
@@ -201,7 +205,7 @@ describe('--plan', () => {
       expect(plan.code, plan.err).toBe(3);
       expect(Date.now() - t0, '--plan must not wait on the lock').toBeLessThan(10_000);
       expect(tableExists(db2, 'public.ta')).toBe(false);
-      expect(must(`SELECT count(*) FROM drizzle.__drizzle_migrations`, db2).rows[0][0]).toBe('0');
+      expect(must(`SELECT to_regclass('drizzle.__drizzle_migrations') IS NULL`, db2).rows[0][0], '--plan must write nothing, not even the tracking table').toBe('t');
 
       const apply = spawn('node', ['--experimental-strip-types', MIGRATE_CLI], {
         env: { ...process.env, ...dbEnv('poly_migrator', db2), POLY_MIGRATIONS_DIR: dir },
@@ -211,11 +215,11 @@ describe('--plan', () => {
       await new Promise((r) => setTimeout(r, 3000));
       expect(done, 'apply must wait on the held advisory lock').toBe(false);
       expect(tableExists(db2, 'public.ta')).toBe(false);
-      hold.kill();
+      release();
       await new Promise((r) => apply.on('close', r));
       expect(tableExists(db2, 'public.ta')).toBe(true);
     } finally {
-      hold.kill();
+      release();
     }
   });
 });
