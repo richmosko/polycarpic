@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/richmosko/polycarpic/packages/config/log.schema.json",
+  "title": "polycarpic structured log line (POLY-85 R6, SECURITY C-33)",
+  "description": "One JSON object per line. Closed: a key that is not declared here is dropped by the logger and counted in `dropped`. There is no free-text field. Every string is bounded by an enum or a pattern and a maxLength.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ts", "level", "service", "event"],
+  "properties": {
+    "ts": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$", "maxLength": 24 },
+    "level": { "type": "string", "enum": ["debug", "info", "warn", "error", "fatal"] },
+    "service": { "type": "string", "enum": ["web", "worker", "migrate"] },
+    "event": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$", "maxLength": 64 },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{40}$", "maxLength": 40 },
+    "req_id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "maxLength": 36 },
+    "user_id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "maxLength": 36 },
+    "entity_id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "maxLength": 36 },
+    "run_id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "maxLength": 36 },
+    "route": { "type": "string", "pattern": "^/[A-Za-z0-9_./\\[\\]-]*$", "maxLength": 128 },
+    "method": { "type": "string", "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] },
+    "status": { "type": "integer", "minimum": 100, "maximum": 599 },
+    "outcome": { "type": "string", "enum": ["ok", "denied", "error", "refused"] },
+    "latency_ms": { "type": "number", "minimum": 0 },
+    "job": { "type": "string", "pattern": "^[a-z][a-z0-9_.-]*$", "maxLength": 64 },
+    "migration": { "type": "string", "pattern": "^[0-9]{4}_[a-z0-9_]+$", "maxLength": 128 },
+    "var": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$", "maxLength": 64 },
+    "fault": { "type": "string", "enum": ["not_set", "missing", "unreadable", "empty", "multiline", "whitespace", "forbidden", "unregistered", "secret_in_env", "invalid", "mismatch"] },
+    "count": { "type": "integer", "minimum": 0 },
+    "dropped": { "type": "integer", "minimum": 1 },
+    "err": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$", "maxLength": 64 },
+        "code": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "maxLength": 32 }
+      }
+    }
+  }
+}
