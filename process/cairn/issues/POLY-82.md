@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
-paths: [package.json, pnpm-workspace.yaml, .npmrc, turbo.json, layers.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/src/index.ts, packages/db/src/session.ts, packages/db/src/auth.ts, packages/secrets/src/open.ts, packages/*/src/*.test.ts, apps/*/src/**, scripts/layers/**, test/layers/**]
+paths: [package.json, pnpm-workspace.yaml, pnpm-lock.yaml, .npmrc, .gitignore, turbo.json, layers.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/tsconfig.json, apps/*/tsconfig.json, vitest.config.*, packages/*/vitest.config.*, apps/*/vitest.config.*, packages/*/src/index.ts, packages/db/src/session.ts, packages/db/src/auth.ts, packages/db/src/migrate.ts, packages/secrets/src/open.ts, packages/*/src/*.test.ts, apps/*/src/**, scripts/layers/**, test/layers/**]
 labels: [enabler]
 priority: P1
 pr: null
