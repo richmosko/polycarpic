@@ -69,3 +69,21 @@ Architect verdict @ 37db02c: APPROVED. Conditions: qa's tests/db gate goes green
 
 URL env ruling: none survives POLY-83. Non-blocking: N3 (configure() on the db index; revisit with POLY-85).
 For seceng: (1) C-10's "granted to none" read as "none but poly_migrator, INHERIT FALSE, SET TRUE"; (2) C-10/C-85's "role migrations" read as sql/roles.sql, run by a superuser outside the chain (ruling R1, Addendum 1).
+
+### @seceng — 2026-11-09
+
+SecEng verdict @ 37db02c (no code changed through 5e28ba3): CONCUR on both readings; CONDITIONAL on M-1 and M-2. SECURITY v1.7 (this commit) now says what the build does: C-10, C-85, TB-3.
+
+Readings. (1) C-10 "granted to none" now reads "to no role but poly_migrator, INHERIT FALSE, SET TRUE, no ADMIN". Concur. The DB enforces it: SET ROLE is checked against poly_migrator's memberships, so no file can reach a role outside the eight. (2) "Role migrations" now names sql/roles.sql: a superuser runs it outside the chain, it converges, and the runner preflights it (exit 2). Concur, with M-2.
+
+TLS. connection.ts gives the same ClientConfig to migrate and to both pools: require = {rejectUnauthorized:false} (encrypted, nothing verified), verify-full = ssl:true (chain and host name checked against the system CAs). That is the libpq meaning. On the box, disable or require is acceptable: Postgres is on the internal compose network and never leaves the host. Anything off-host (Neon/Vercel, POLY-121) must be verify-full; TB-3 v1.7 now says so. A CA-file setting for a pinned CA is POLY-85's.
+
+Must fix before merge:
+- M-1 Fail-open sslmode. connectionFrom maps an unset or unknown DATABASE_SSLMODE (a typo such as verify_full) to ssl:false. Only migrate runs checkConfig, so web and worker connect in plaintext without a word. Fix: connectionFrom throws unless the mode is disable, require or verify-full. Add a unit fixture.
+- M-2 Drift goes undetected on the live box. roles.sql only adds grants, and assertRoles checks only poly_migrator's side, so a stray GRANT poly_owner TO poly_app on prod passes every run (pgTAP covers CI only). Fix: the preflight also refuses (exit 2) when poly_owner or any of the seven has a member other than poly_migrator, or when poly_backup is a member of anything but pg_read_all_data. About 10 lines; C-10 v1.7 states it as a condition.
+
+Non-blocking (fold into POLY-100):
+- L-1 File-check lexer. stripComments does not track $tag$ bodies or "quoted identifiers". Measured: `SELECT $x$/*$x$;` followed by `SET ROLE poly_authz;` returns [] (block mode hides the rest of the file); the -- and "a--b" forms do too. The impact is bounded, because the DB refuses roles outside the eight and the tracking-insert backstop catches a file ending on another role. Fix: make the lexer aware of dollar quotes and identifiers.
+- L-2 inTransaction: when ROLLBACK fails, call client.release(err) so a broken backend is destroyed, not pooled.
+
+Pass: roles.sql matches C-79 exactly, and every role is NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS. Default EXECUTE is revoked; the DB and public are owned by poly_owner, with PUBLIC revoked. The file check fails closed on quoted, unparseable, GUC-form and set_config targets. withContextFreeTx's first statement asserts app.user_id is empty (C-84). The nesting guard uses ALS. withSystem needs rowCount = 1 and a non-null principal. The runner preflights, locks, checks the (hash, created_at) prefix and asserts convergence and current_user (T-91). job_targets has search_path '', is poly_worker only and is allowlisted. Auth keys are uuid (l). No URL, no password env, and no secret in any log line: errors name the variable or path, never the value.
