@@ -5,6 +5,7 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { SECRET_NAME_RE } from '../../packages/config/src/index.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const LABEL = 'org.opencontainers.image.revision';
@@ -61,12 +62,20 @@ describe('Dockerfile (static)', () => {
   it('ENV POLY_IMAGE_REVISION=$GIT_COMMIT in the final stage', () => {
     expect(last().body.some((l) => /^ENV\s/i.test(l) && /POLY_IMAGE_REVISION=("?)\$\{?GIT_COMMIT\}?\1/.test(l))).toBe(true);
   });
-  it('no ARG or ENV (any stage) has a secret-looking name', () => {
-    const bad = /PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|KEYRING|CREDENTIAL/i;
+  it('no ARG or ENV (any stage) has a secret-looking name (the one exported pattern, S-1)', () => {
     for (const l of lines().filter((x) => /^(ARG|ENV)\s/i.test(x))) {
       const names = l.replace(/^(ARG|ENV)\s+/i, '').split(/\s+/).map((t) => t.split('=')[0]!);
-      for (const nm of names) expect(nm, l).not.toMatch(bad);
+      for (const nm of names) expect(SECRET_NAME_RE.test(nm), `${l}`).toBe(false);
     }
+  });
+  it('S-9(c): every COPY in the final stage is --from= (nothing comes from the build context directly)', () => {
+    const copies = last().body.filter((l) => /^COPY\s/i.test(l));
+    expect(copies.length).toBeGreaterThan(0);
+    for (const c of copies) expect(c, c).toMatch(/^COPY\s+(--chown=\S+\s+)?--from=\S+/i);
+  });
+  it('S-9(c): no committed .npmrc carries _auth or _authToken', () => {
+    const files = spawnSync('git', ['ls-files', '*.npmrc', '.npmrc'], { encoding: 'utf8', cwd: ROOT }).stdout.split('\n').filter(Boolean);
+    for (const f of files) expect(readFileSync(join(ROOT, f), 'utf8'), f).not.toMatch(/_auth/i);
   });
   it('no COPY of an env file, key, or a secrets directory', () => {
     for (const l of lines().filter((x) => /^(COPY|ADD)\s/i.test(x))) expect(l, l).not.toMatch(/\.env|\.pem|\.key|secrets?\b/i);

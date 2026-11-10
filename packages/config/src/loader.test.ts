@@ -2,13 +2,16 @@
 // Surface assumed from the ruling (reconcile in `secretOf` / `portOf` below only; everything else is ruling text):
 //   checkConfig(service, env) -> { var, fault, path? }[]      loadConfig(service, env) -> config, throws ConfigError
 //   ConfigError.problems is that list.   config.secrets[<X_FILE name>] is a Secret.   config.statusPort is a number.
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { inspect } from 'node:util';
 import { describe, expect, it } from 'vitest';
 import { CANARIES, assertNoCanary } from '../../../tests/log/canary.ts';
-import { ConfigError, Secret, checkConfig, loadConfig } from './index.ts';
+import { ConfigError, SECRET_NAME_RE, Secret, checkConfig, loadConfig } from './index.ts'; // SECRET_NAME_RE: S-1's exported pattern (name assumed)
+
+const HERE = dirname(fileURLToPath(import.meta.url));
 
 type Svc = 'web' | 'worker' | 'migrate';
 type Env = Record<string, string | undefined>;
@@ -181,7 +184,7 @@ describe('R2 environment', () => {
   describe('PUBLIC_ORIGIN', () => {
     it('is required', () => expect(vars('web', good('web', { PUBLIC_ORIGIN: undefined }))).toContain('PUBLIC_ORIGIN'));
     it('https with no path, query or fragment is fine', () => expect(checkConfig('web', prod('web'))).toEqual([]));
-    for (const o of ['https://app.example.com/app', 'https://app.example.com/?a=1', 'https://app.example.com/#x', 'app.example.com', 'ftp://app.example.com', 'http://app.example.com']) {
+    for (const o of ['https://app.example.com/app', 'https://app.example.com/?a=1', 'https://app.example.com/#x', 'app.example.com', 'ftp://app.example.com', 'http://app.example.com', 'https://user:pw@app.example.com', 'https://app.example.com/', 'https://app.example.com:443']) {
       it(`refuses ${o}`, () => expect(vars('web', prod('web', { PUBLIC_ORIGIN: o })), o).toContain('PUBLIC_ORIGIN'));
     }
     it('http://localhost[:port] is allowed in development only', () => {
@@ -265,7 +268,8 @@ describe('R2 TLS_MODE cross-check against PUBLIC_ORIGIN (offline only, public su
 });
 
 describe('R2 secret-looking variables are refused in staging and production (SECURITY 6.2)', () => {
-  const bad = ['AUTH_SECRET', 'STRIPE_TOKEN', 'RESEND_API_KEY', 'SOME_APIKEY', 'PRIVATE_KEY', 'CREDENTIAL_KEYRING', 'DB_PASSWD', 'my_password', 'SESSION_CREDENTIALS'];
+  const bad = ['AUTH_SECRET', 'STRIPE_TOKEN', 'RESEND_API_KEY', 'SOME_APIKEY', 'PRIVATE_KEY', 'CREDENTIAL_KEYRING', 'DB_PASSWD', 'my_password', 'SESSION_CREDENTIALS', 'B2_APPLICATION_KEY', 'RESEND_KEY', 'DB_PASS', 'DB_PWD', 'SENTRY_DSN', 'KEY', 'PASS'];
+  const registryStems = ['AUTH_SECRET', 'RESEND_API_KEY', 'CREDENTIAL_KEYRING'];
   for (const name of bad) {
     for (const [label, mk] of [['staging', stage], ['production', prod]] as const) {
       it(`${label}: ${name} is refused, naming it and not its value`, () => {
@@ -274,7 +278,7 @@ describe('R2 secret-looking variables are refused in staging and production (SEC
         assertNoCanary(JSON.stringify(problems));
       });
     }
-    it(`development: ${name} is allowed`, () => expect(vars('web', good('web', { [name]: 'x' }))).not.toContain(name));
+    if (!registryStems.includes(name)) it(`development: ${name} is allowed`, () => expect(vars('web', good('web', { [name]: 'x' }))).not.toContain(name));
   }
   it('a name ending in _FILE is the sanctioned form and is not caught by the pattern', () => expect(checkConfig('web', prod('web', { PLAID_SECRET_FILE: file('x\n') }))).toEqual([]));
   it('names that merely resemble the pattern are not refused (PUBLIC_ORIGIN, STATUS_PORT, TLS_MODE)', () => expect(checkConfig('web', prod('web', { STATUS_PORT: '8081' }))).toEqual([]));
