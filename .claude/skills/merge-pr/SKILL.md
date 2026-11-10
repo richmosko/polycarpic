@@ -46,10 +46,12 @@ scripts/cairn/cairn set <ID> status=done
 scripts/cairn/cairn comment <ID> --author team-lead --body - <<'EOF'
 Validate passed; merging via PR #<n>. Closing.
 EOF
-git add process/cairn/issues/<ID>.md
+git add process/cairn/issues/<ID>.md process/STATE.md
 git commit -m "chore(<ID>): tracker → done"   # + standard trailer
 git push
 ```
+
+**The STATE.md clear rides this same commit.** Edit `## Active Feature` to `_None. <ID> (<title>) merged <date> via PR [#n](<url>) — <doc versions>; follow-ups on <IDs>._` plus one `- **Next:** …` line *before* committing, and `git add` it alongside the issue file. Step 4 below is then already done. Why here: after the merge `main` is protected, so a clear made afterwards has no branch to ride and ends up smuggled into the next feature's start commit (happened on POLY-82 → POLY-83).
 
 **If this merge closes the milestone** (this issue was its last open one — check `cairn ls --milestone <m>`), fold the milestone flip into the same commit: `scripts/cairn/cairn set <milestone-id> status=done` and `git add` the milestone file alongside the issue file. This is the only branch the flip can legally ride — after the merge there is no branch, and a direct push to `main` is forbidden.
 
@@ -90,7 +92,7 @@ Major-line completion isn't auto-tracked: when a line EOLs, the lead runs `scrip
 
 ### 4. Update process/STATE.md
 
-- Clear `## Active Feature`.
+- `## Active Feature` was already cleared in the step-2 commit; confirm it reads `_None. …_` on `main` after the pull. If it does not, the clear has to wait for the next branch — never push it to `main` directly.
 - Do **not** add session narrative to STATE.md — it keeps no history. Anything worth recording goes to the cairn issue as a comment (or the decision ledger).
 - **If this feature completed a milestone**: the milestone flip already rode the final branch commit (step 2). **Policy (Mosko, 2026-08-24): archive the shipped milestone at release close** — after tagging (step 5), run `scripts/cairn/cairn archive --milestone <id>` (moves its done/cancelled issues and the milestone file; preview with `--dry-run`) on the release-prep doc branch so the move rides a PR. An archived milestone (and its issues) then appears only behind the board's Show-archived toggle — the default view drops its lane entirely; a done-but-unarchived milestone keeps a ✓ Done lane in the default view. Archive when the milestone no longer needs default-view presence. `cairn archive --done-before <date>` remains available as broader hygiene — never a quota, there is no cap.
 

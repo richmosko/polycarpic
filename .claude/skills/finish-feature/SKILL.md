@@ -86,6 +86,28 @@ fi
 - Commit message format: `<type>(<issue-id>): <subject>` — e.g. `feat(PT-14): add login form`.
 - Trailer per global git instructions.
 
+### 1a. Acceptance criteria ticked, each with its proving test
+
+A closed issue must say which test proves each criterion; an unticked list reads as unverified (POLY-83 closed 17/17 unticked; caught at the POLY-84 pre-merge audit, POLY-79). Before the PR opens, the **assignee** (the teammate who measured green — usually qa-engineer) edits `process/cairn/issues/<ID>.md` so every criterion reads:
+
+```
+- [x] <criterion text, unchanged> — <file>: <test or assertion name>
+```
+
+One line per criterion, criterion text untouched, one chore commit (`chore(<ID>): acceptance criteria ticked with proving tests`), pushed per the worktree protocol. A criterion that is deliberately deferred stays `- [ ]` with ` — deferred to <ID>` and the reason in a comment; it cannot simply be left blank. The lead verifies `grep -c '^- \[ \]'` is zero (or matches the deferred count) before step 2.
+
+### 1b. Regenerate PDF artifacts for any doc this branch changed
+
+Doc PDFs (`docs/<DOC>/<DOC>.pdf`) are committed so they render inline on GitHub and travel with the PR. Feature loops bump ARCH/SECURITY too (rulings, versions), and until POLY-84 only `/finish-doc-update` regenerated them — three loops left stale PDFs on `main`. Same rule as that skill's step 2:
+
+```bash
+git diff --name-only main...HEAD | grep -E '^docs/(_assets/|DESIGN/tokens\.css|[A-Z]+/index\.html)'
+```
+
+- Any `docs/_assets/**` or `docs/DESIGN/tokens.css` → all docs (`PRD ARCH SECURITY DESIGN INFRA`); otherwise only the docs whose own `index.html` changed; nothing matched → skip and say so in the PR body.
+- Render: `DOCS_PORT=8768 ./scripts/export-pdf.sh <DOC ...>` — the port override keeps the exporter's temp server off 8765 when the user's `/serve-docs` is up (it would otherwise render `main`, not this branch). A trailing `Terminated: 15` line is the script stopping its own server, not an error. If the render fails, surface it; never fabricate a successful render.
+- Commit the PDFs alone — `docs(<ID>): regenerate PDF artifacts (<versions>)` — so the binary churn stays out of the source diff.
+
 ### 2. Push and open PR
 
 ```bash
