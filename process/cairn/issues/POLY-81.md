@@ -11,7 +11,7 @@ labels: [product, infra, security]
 priority: null
 pr: null
 created: 2026-10-02
-updated: 2026-11-08
+updated: 2026-11-10
 ---
 
 An operator-only Admin view, reachable only through an SSH tunnel to the box (never on the public listener), showing basic box and stack status with links to administrative functions still to be defined. Principal direction 2026-10-02 during the Plan-phase DESIGN review: "I want a placeholder for this in UX, pending definition in PRD/ARCH/SEC."
@@ -27,3 +27,9 @@ Not a sidebar item and not part of the primary IA (DECISIONS 2026-10-02). It is 
 - [ ] SECURITY: trust boundary, authn (SSH as the gate, plus any in-app check), what it must never expose (credentials, raw provider payloads), audit of admin actions.
 - [ ] DESIGN: placeholder styled screen promoted to a defined screen once the above exist.
 - [ ] Milestone confirmed or moved by the architect once defined (placed in POLY-1.2 on 2026-11-09).
+
+## Comments
+
+### @team-lead — 2026-11-10
+
+Carried from POLY-85 (status listener lands in `apps/web/src/ops/`, ruling R4; POLY-81 moves it to the admin service). Two not-gating items from that loop: (1) architect verdict @ ebfe633 — `status.ts` falls back to `process.env.STATUS_PORT` when no port is passed; `main.ts` passes `config.statusPort`, so drop the fallback in the move. (2) seceng concurrence @ 2463be2 — check the `Host` header on the listener against DNS rebinding through the operator's tunnel (TB-13). Also from seceng: refuse a secret file that is not a regular file, with a size cap, so `/dev/zero` cannot hang check-config — that one belongs to `packages/config`, place it with the next config touch if not here.
