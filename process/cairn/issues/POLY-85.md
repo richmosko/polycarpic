@@ -86,3 +86,19 @@ QA verification, build green @ 5344986 (independent run). Counts: packages/confi
 Suite time: new tests/db ops-status + ops-hardening add about 30 s (40 s standalone incl. container start; tests/db total 101 s); packages/config 0.3 s; tests/config+image+log 7 s (+4 s with real build, layer-cached). Python gate unchanged (69 s).
 Criteria→test: C1 loader.test.ts R3 block + check-config.test.ts; C2 ops-status.test.ts (bind, payload, health bytes); C3 dockerfile.test.ts incl. opt-in build; C4 log.test.ts + log-seceng.test.ts. S-1..S-9 each have a named describe (S-n in the title).
 Mutation sanity: 9 of 10 caught, 1 equivalent; table in process/cairn/reviews/POLY-85/mutation.md. One test bug of mine fixed (walker-teeth count, 25db015). Calling architect-85 (verdict) and seceng-85 (teeth review).
+
+### @architect — 2026-11-10
+
+Verdict (architect, gate 4): PASS @ 5344986. Read against ruling.md @ 332df39; I re-ran nothing, counts are qa's @ 12c3058.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| C1 *_FILE loader, refuses naming the variable (R2, R3) | pass | packages/config/src/{registry,check,secret}.ts @ 4c1b1c6; loader.test.ts + tests/config/check-config.test.ts @ 12c3058 |
+| C2 loopback status + two-body health (R4, R7) | pass | apps/web/src/ops/* + packages/db/src/startup.ts schemaStatus @ fcfe816; ops-status.test.ts; bind mutant caught (mutation.md) |
+| C3 image label POLY-100 reads (R5) | pass | Dockerfile org.opencontainers.image.revision + 40-hex guard, bin/polycarpic @ fcfe816; opt-in real build green @ 12c3058 |
+| C4 log schema + redaction (R6) | pass | packages/config/log.schema.json, src/log.ts @ 4c1b1c6; log + log-seceng tests, value-check mutant caught |
+| Layer map (R1) | pass | layers.json config subpaths [./log], web/worker allow config/log; ARCH §2.2 @ dfe62e6; check.mjs clean |
+| Arch drift | accepted, none gating | see below |
+
+Accepted drift: (1) migrate run and --plan check DATABASE_* only (checkDatabaseConfig); check-config stays the full deploy gate, so fine. (2) Workspace COPY in place of pnpm deploy; R5 allowed it. (3) Image sets NODE_ENV=production; nothing security-relevant reads it (R2). (4) SECRET_NAME_RE widened with PWD allow-listed, per seceng S-1.
+Follow-up, not gating: status.ts falls back to process.env.STATUS_PORT when no port is passed; main passes config.statusPort, so the fallback should go when POLY-81 moves the listener. Ruling Open 1 to 4 stand.
