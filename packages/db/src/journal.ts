@@ -49,6 +49,9 @@ export function checkJournalOrder(journal: readonly { tag: string; when: number 
   }
 }
 
+/** A tracking row matches a journal entry on (hash, created_at = when): the start-up guard compares `when`, so the runner must too. */
+export const sameEntry = (row: AppliedRow, e: JournalEntry): boolean => row.hash === e.hash && row.createdAt === e.when;
+
 /**
  * Throws unless the journal and the tracking rows agree hash for hash over their common length k. A database ahead of
  * the image (rollback to the previous release) is legal. Returns the pending entries (empty when T is as long as J).
@@ -57,10 +60,10 @@ export function pendingFrom(journal: readonly JournalEntry[], applied: readonly 
   checkJournalOrder(journal);
   const k = Math.min(journal.length, applied.length);
   for (let i = 0; i < k; i++) {
-    if (applied[i]!.hash !== journal[i]!.hash) {
+    if (!sameEntry(applied[i]!, journal[i]!)) {
       throw new MigrateRefusal(
         'not-a-prefix',
-        `applied migrations are not a hash-for-hash prefix of the journal: #${i + 1} ${journal[i]!.tag} hash mismatch (edited, reordered or inserted)`,
+        `applied migrations are not a hash-for-hash prefix of the journal: #${i + 1} ${journal[i]!.tag} hash or timestamp mismatch (edited, reordered or inserted)`,
       );
     }
   }

@@ -4,10 +4,11 @@
 import pg from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate as drizzleMigrate } from 'drizzle-orm/node-postgres/migrator';
-import { DEFAULT_FOLDER, MigrateRefusal, pendingFrom, readJournal, type AppliedRow, type JournalEntry } from './journal.ts';
+import { connectionFrom, type Env } from './connection.ts';
+import { DEFAULT_FOLDER, MigrateRefusal, pendingFrom, readJournal, sameEntry, type AppliedRow, type JournalEntry } from './journal.ts';
 
 export { MigrateRefusal, type JournalEntry } from './journal.ts';
-export { checkConfig, urlFromEnv, type ConfigProblem } from './migrate-config.ts';
+export { checkConfig, type ConfigProblem } from './migrate-config.ts';
 
 export const ROLES = [
   'poly_owner', 'poly_migrator', 'poly_app', 'poly_worker', 'poly_authz', 'poly_purge',
@@ -17,9 +18,9 @@ export const ROLES = [
 const MIGRATOR_MEMBERSHIPS = ['poly_owner', 'poly_authz', 'poly_purge', 'poly_rollup', 'poly_graph', 'poly_stake', 'poly_govern', 'poly_journal'];
 
 export interface MigrateOptions {
-  /** Login as poly_migrator. */
-  url: string;
-  /** Folder holding meta/_journal.json and the .sql files. Defaults to the package's migrations/. */
+  /** The DATABASE_* settings (user poly_migrator). */
+  env: Env;
+  /** Folder holding meta/_journal.json and the .sql files. Defaults to the package's migrations/; a test hook, not read in production. */
   folder?: string;
   /** How long to wait for the advisory lock before exiting 4. Defaults to 10 minutes (unmeasured). */
   lockTimeoutMs?: number;
@@ -56,7 +57,7 @@ async function assertRoles(client: pg.Client): Promise<void> {
 export async function migrate(opts: MigrateOptions): Promise<string[]> {
   const folder = opts.folder ?? DEFAULT_FOLDER;
   const journal = readJournal(folder);
-  const client = new pg.Client({ connectionString: opts.url });
+  const client = new pg.Client(connectionFrom(opts.env));
   await client.connect();
   try {
     await assertRoles(client);
@@ -77,7 +78,7 @@ export async function migrate(opts: MigrateOptions): Promise<string[]> {
     }
     // drizzle skips a migration silently when its timestamp is not later than the last applied: converge or fail loud.
     const after = await readApplied(client);
-    if (after.length !== journal.length || after.some((r, i) => r.hash !== journal[i]!.hash)) {
+    if (after.length !== journal.length || after.some((r, i) => !sameEntry(r, journal[i]!))) {
       throw new MigrateRefusal('not-converged', 'tracking rows do not equal the journal after migrate(); a migration was skipped');
     }
     return pending.map((e) => e.tag);
@@ -89,7 +90,7 @@ export async function migrate(opts: MigrateOptions): Promise<string[]> {
 /** Read-only: the pending files in order. Takes no lock and writes nothing. */
 export async function plan(opts: MigrateOptions): Promise<JournalEntry[]> {
   const journal = readJournal(opts.folder ?? DEFAULT_FOLDER);
-  const client = new pg.Client({ connectionString: opts.url });
+  const client = new pg.Client(connectionFrom(opts.env));
   await client.connect();
   try {
     await client.query('BEGIN READ ONLY');

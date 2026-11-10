@@ -15,7 +15,26 @@ export interface Problem {
   detail: string;
 }
 
-const stripComments = (sql: string) => sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+/** Removes comments but keeps single-quoted literals intact, so '--' inside a string cannot hide what follows (N1). */
+function stripComments(sql: string): string {
+  let out = '';
+  for (let i = 0; i < sql.length; ) {
+    if (sql[i] === "'") {
+      let j = i + 1;
+      while (j < sql.length && !(sql[j] === "'" && sql[j + 1] !== "'")) j += sql[j] === "'" ? 2 : 1;
+      out += sql.slice(i, j + 1);
+      i = j + 1;
+    } else if (sql.startsWith('--', i)) {
+      const j = sql.indexOf('\n', i);
+      i = j === -1 ? sql.length : j;
+    } else if (sql.startsWith('/*', i)) {
+      const j = sql.indexOf('*/', i + 2);
+      i = j === -1 ? sql.length : j + 2;
+      out += ' ';
+    } else out += sql[i++];
+  }
+  return out;
+}
 
 /** Dollar-quoted bodies are scanned too (fail closed). */
 export function checkSql(file: string, raw: string): Problem[] {
@@ -28,8 +47,14 @@ export function checkSql(file: string, raw: string): Problem[] {
   if (/set_config\s*\(\s*'role'/i.test(sql)) add('set-config-role', 'a role set through the settings function is banned');
   if (/\bSET\s+role\s*(=|\bTO\b)/i.test(sql)) add('function-role-clause', 'a function role clause is banned');
   let last: string | undefined;
-  for (const m of sql.matchAll(/\bSET\s+(?:SESSION\s+)?ROLE\s+(?:"([^"]+)"|([A-Za-z0-9_]+))/gi)) {
-    const role = (m[1] ?? m[2])!;
+  // Any such statement whose target does not parse is itself a problem (fail closed).
+  for (const m of sql.matchAll(/\bSET\s+(?:SESSION\s+)?ROLE\b(\s+(?:'([^']*)'|"([^"]*)"|([A-Za-z0-9_]+)))?/gi)) {
+    const role = m[2] ?? m[3] ?? m[4];
+    if (role === undefined) {
+      add('role-target', 'a role switch whose target cannot be read is banned');
+      last = '?';
+      continue;
+    }
     last = role;
     if (!ALLOWED.has(role)) add('role-target', `switching to ${role} is not poly_owner or a definer-owner role`);
   }

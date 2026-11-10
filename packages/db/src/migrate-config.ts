@@ -1,12 +1,11 @@
-// `migrate check-config` and the connection reader (ARCH §8.1; POLY-83 ruling addendum 1). Reads files and the
-// environment, connects nowhere. POLY-85 moves the parsing into packages/config under the same names.
+// `migrate check-config` (ARCH §8.1; POLY-83 ruling addendum 1). Reads files and the environment, connects nowhere.
+// POLY-85 moves the parsing into packages/config under the same names.
 import fs from 'node:fs';
+import type { Env } from './connection.ts';
 
 export interface ConfigProblem {
   what: string;
 }
-
-type Env = Record<string, string | undefined>;
 
 const SSLMODES = ['disable', 'require', 'verify-full'];
 
@@ -35,11 +34,4 @@ export function checkConfig(env: Env, expectedUser = 'poly_migrator'): ConfigPro
     }
   }
   return out;
-}
-
-/** A connection string from the DATABASE_* names. */
-export function urlFromEnv(env: Env): string {
-  const pw = fs.readFileSync(env.DATABASE_PASSWORD_FILE!, 'utf8').replace(/\n$/, '');
-  const q = env.DATABASE_SSLMODE && env.DATABASE_SSLMODE !== 'disable' ? `?sslmode=${env.DATABASE_SSLMODE}` : '';
-  return `postgres://${encodeURIComponent(env.DATABASE_USER!)}:${encodeURIComponent(pw)}@${env.DATABASE_HOST}:${env.DATABASE_PORT ?? '5432'}/${env.DATABASE_NAME}${q}`;
 }
