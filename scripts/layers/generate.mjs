@@ -46,9 +46,9 @@ export function generateConfig(layers, opts = {}) {
       rules: {
         'boundaries/dependencies': [2, { default: 'disallow', policies }],
         'poly/no-computed-import': 2,
-        'poly/no-session-set': 2,
         'poly/no-session-user-id-cast': 2,
         'eslint-comments/no-unlimited-disable': 2,
+        'eslint-comments/no-use': [2, { allow: ['eslint-disable', 'eslint-disable-line', 'eslint-disable-next-line', 'eslint-enable'] }],
         'eslint-comments/no-restricted-disable': [2, ...DISABLE_PROOFED],
       },
     },
@@ -87,7 +87,13 @@ export function generateConfig(layers, opts = {}) {
       message: 'Deep or restricted @poly subpath: not on this package\'s allow-list in layers.json.',
     });
 
-    const rules = { 'no-restricted-imports': [2, { paths, patterns }] };
+    // import() and require() bypass no-restricted-imports, so the subpath and SvelteKit bans repeat there.
+    banned.push('@poly/*/*', ...allowedSubs.map((x) => `!${x}`));
+    if (inPackages) banned.push(...SVELTEKIT);
+    const rules = {
+      'no-restricted-imports': [2, { paths, patterns }],
+      'poly/no-session-set': [2, { mode: n === 'db' || n === 'auth' ? 'all' : 'sql' }],
+    };
     const namedOnly = [...(isDb ? [] : ['kysely']), ...(isSecrets ? [] : ['crypto', 'node:crypto'])];
     if (namedOnly.length) rules['poly/named-imports-only'] = [2, { specifiers: namedOnly }];
     if (banned.length) rules['poly/no-banned-specifier'] = [2, { specifiers: banned, message: 'not allowed in this package (dynamic import or require).' }];

@@ -8,8 +8,25 @@ const staticValue = (node) => {
   return null;
 };
 
-const matches = (spec, list) =>
-  list.some((s) => (s.endsWith('*') ? spec.startsWith(s.slice(0, -1)) : spec === s));
+// gitignore-style: later entries win, a leading ! re-allows, a trailing * is a prefix, an inner * is one segment.
+const toRegex = (p) =>
+  new RegExp(
+    '^' +
+      p
+        .replace(/[.+?^${}()|[\]\\]/g, (c) => '\\' + c)
+        .replace(/\*$/, '\u0000')
+        .replace(/\*/g, '[^/]*')
+        .replace(/\u0000/, '.*') +
+      '$',
+  );
+const matches = (spec, list) => {
+  let hit = false;
+  for (const entry of list) {
+    const neg = entry.startsWith('!');
+    if (toRegex(neg ? entry.slice(1) : entry).test(spec)) hit = !neg;
+  }
+  return hit;
+};
 
 const namedImportsOnly = {
   meta: {
@@ -46,7 +63,8 @@ const namedImportsOnly = {
   },
 };
 
-// Specifiers that must not appear in any import form: dynamic import() and require() too.
+// Specifiers that must not appear in any import form. The static forms are covered by
+// no-restricted-imports (which ignores import() and require()); this rule closes those two.
 const noBannedSpecifier = {
   meta: {
     type: 'problem',
@@ -79,13 +97,20 @@ const noComputedImport = {
         if (staticValue(node.source) !== null || relative(node.source)) return;
         context.report({ node, message: 'import() with a computed specifier hides a cross-package edge from the layer lint.' });
       },
+      CallExpression(node) {
+        if (node.callee.type !== 'Identifier' || node.callee.name !== 'require' || !node.arguments[0]) return;
+        if (staticValue(node.arguments[0]) !== null || relative(node.arguments[0])) return;
+        context.report({ node, message: 'require() with a computed specifier hides a cross-package edge from the layer lint.' });
+      },
     };
   },
 };
 
-// Refused (architect ruling, POLY-82): SET, SET SESSION, RESET, SET LOCAL ROLE | SESSION AUTHORIZATION,
-// and set_config() unless its third argument is the literal true. Other SET LOCAL passes.
-const SESSION_SET = /(^|;)\s*(RESET\s+\S|SET\s+(?!LOCAL\b)\S|SET\s+LOCAL\s+(ROLE|SESSION\s+AUTHORIZATION)\b)/i;
+// Refused (architect ruling, POLY-82 + addendum 1): SET, SET SESSION (incl. CHARACTERISTICS), RESET,
+// SET LOCAL ROLE | SESSION AUTHORIZATION, and set_config() unless its third argument is the literal true.
+// Other SET LOCAL, SET TRANSACTION and SET CONSTRAINTS pass (transaction-scoped).
+const SLOT = '\u0000';
+const SESSION_SET = /(^|;)\s*(RESET\s+\S|SET\s+(?!LOCAL\b|TRANSACTION\b|CONSTRAINTS\b)\S|SET\s+LOCAL\s+(ROLE|SESSION\s+AUTHORIZATION)\b)/i;
 const setConfigNotLocal = (text) => {
   for (const m of text.matchAll(/set_config\s*\(([^)]*)\)/gi)) {
     const third = m[1].split(',').slice(2).join(',').trim();
@@ -93,21 +118,39 @@ const setConfigNotLocal = (text) => {
   }
   return false;
 };
+const sqlText = (node) =>
+  node.type === 'TemplateLiteral' ? node.quasis.map((q) => q.value.cooked ?? '').join(SLOT) : staticValue(node);
+const SQL_CALLS = new Set(['raw', 'query', 'execute', 'unsafe']);
+const calleeName = (c) => (c.type === 'Identifier' ? c.name : c.type === 'MemberExpression' && !c.computed ? c.property.name : null);
+const objectName = (c) => (c.type === 'MemberExpression' && c.object.type === 'Identifier' ? c.object.name : null);
 
+// mode 'all': every string and template literal (packages/db and packages/auth hold the connection and pool).
+// mode 'sql': sql-tagged templates and the first argument of sql.raw / .query / .execute / .unsafe only,
+// so UI copy such as "Set your password" does not trip it. Drivers are banned elsewhere, so nothing else sends SQL.
 const noSessionSet = {
-  meta: { type: 'problem', schema: [] },
+  meta: { type: 'problem', schema: [{ type: 'object', properties: { mode: { enum: ['all', 'sql'] } }, additionalProperties: false }] },
   create(context) {
+    const mode = context.options[0]?.mode ?? 'all';
     const test = (node, text) => {
-      if (SESSION_SET.test(text) || setConfigNotLocal(text)) {
+      if (text !== null && (SESSION_SET.test(text) || setConfigNotLocal(text))) {
         context.report({ node, message: 'Session-level SET is refused (ARCH §3.3, SECURITY A-39); use SET LOCAL inside the transaction.' });
       }
     };
+    if (mode === 'all') {
+      return {
+        Literal: (node) => typeof node.value === 'string' && test(node, node.value),
+        TemplateLiteral: (node) => test(node, sqlText(node)),
+      };
+    }
     return {
-      Literal(node) {
-        if (typeof node.value === 'string') test(node, node.value);
+      TaggedTemplateExpression(node) {
+        if (calleeName(node.tag) === 'sql' || objectName(node.tag) === 'sql') test(node, sqlText(node.quasi));
       },
-      TemplateLiteral(node) {
-        test(node, node.quasis.map((q) => q.value.cooked ?? '').join(' '));
+      CallExpression(node) {
+        const name = calleeName(node.callee);
+        if (!SQL_CALLS.has(name) || !node.arguments[0]) return;
+        const a = node.arguments[0];
+        if (a.type === 'Literal' || a.type === 'TemplateLiteral') test(a, sqlText(a));
       },
     };
   },

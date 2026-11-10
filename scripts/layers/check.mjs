@@ -68,7 +68,16 @@ export function checkLayers({ layers, archHtml, dirs, pkgJsons = {} }) {
   // declared workspace deps must be on the allow-list
   for (const [name, json] of Object.entries(pkgJsons)) {
     const key = Object.keys(pk).find((k) => pk[k].name === name || k === name);
-    if (!key) continue;
+    if (!key) {
+      if (json.__dir && byDir.has(json.__dir)) add('name-mismatch', json.__dir + ' is named ' + name + ', layers.json says ' + pk[byDir.get(json.__dir)].name);
+      continue;
+    }
+    if (json.exports) {
+      const want = new Set(['.', ...pk[key].subpaths]);
+      const have = new Set(Object.keys(json.exports));
+      for (const e of have) if (!want.has(e)) add('exports-mismatch', key + ' exports ' + e + ', layers.json does not declare it');
+      for (const e of want) if (!have.has(e)) add('exports-mismatch', key + ' does not export ' + e);
+    }
     const allowed = new Set(pk[key].allow.map(baseOf));
     for (const [dep, range] of Object.entries({ ...json.dependencies, ...json.devDependencies })) {
       if (!dep.startsWith('@poly/') || !String(range).startsWith('workspace:')) continue;
@@ -106,7 +115,10 @@ export function gather(root, { layersFile, archFile } = {}) {
   const pkgJsons = {};
   for (const [k, v] of Object.entries(layers.packages)) {
     const f = path.join(root, v.dir, 'package.json');
-    if (fs.existsSync(f)) pkgJsons[v.name] = JSON.parse(fs.readFileSync(f, 'utf8'));
+    if (fs.existsSync(f)) {
+      const json = JSON.parse(fs.readFileSync(f, 'utf8'));
+      pkgJsons[json.name ?? v.name] = { ...json, __dir: v.dir };
+    }
   }
   const arch = archFile ?? path.join(root, 'docs/ARCH/index.html');
   const archHtml = fs.existsSync(arch) ? fs.readFileSync(arch, 'utf8') : undefined;
