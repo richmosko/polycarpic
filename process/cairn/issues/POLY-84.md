@@ -55,3 +55,21 @@ Not gating, noted for POLY-62. A `USING (true)` policy passes `no_policy`. Polic
 ### @architect — 2026-11-10
 
 R6 TEMP ruling: **(a)**. Assert TEMP held by none of the twelve except `poly_owner`, with a comment citing this. Why not (b): `poly_owner` owns the database, so it can grant TEMP back to itself in any migration. A revoke in roles.sql would be cosmetic and add drift for the preflight to track (read: an owner can revoke and re-grant its own privileges; unmeasured). The carve-out is harmless to R1: `poly_owner` is NOLOGIN and reached only through the migrate client, which is never pooled and closes after the run, so its temp tables never outlive the session or reach a request. No packages/db change.
+
+### @seceng — 2026-11-10
+
+Teeth review @ 8a5f630 (mutation table @ 2b04dbb). **Approved with two conditions, M-1 and M-2.** Both are a few lines in tests; neither reopens the ruling. No SECURITY wording change is needed.
+
+Verified, with teeth:
+- **C-13 probe (02).** One function guards the chain and every canary. Exemptions are compared by oid via `to_regclass`, and each entry is checked to exist. A pattern, a bare schema and a name-prefix canary all exempt nothing. The partition child, a bare kind-`p` parent, foreign table, matview and view canaries each produce the exact expected gap set, and the positive control is clean. No schema or owner filter beyond the three schemas and temp.
+- **Inversion / C-12 / WITH CHECK (battery).** These run as `poly_app` through the real wrappers. The protected twin returning 0 rules out a superuser read. The pid-equality precondition fails, it never skips. `qa_canary_wc` isolates WITH CHECK (it was the mutation survivor, and is now killed).
+- **C-15.** Grantees come from `aclexplode` with `acldefault`, so a null ACL counts as PUBLIC. The exact `search_path=""` element is required, `DEFINER_OWNERS` comes from a single source, and there are canaries for an unlisted definer, a `poly_owner` owner, PUBLIC, a stray role and a ghost entry.
+- **R6 TEMP carve-out for `poly_owner`.** It is backed: 03 asserts `poly_owner` NOLOGIN, 01 asserts `poly_migrator` is its only member with INHERIT FALSE, and the TEMP canary bites. Every other role is checked through `has_database_privilege`, which counts PUBLIC.
+
+Conditions:
+- **M-1 (S-1 only half built).** `battery_gaps` takes `tgenabled <> 'D'`, so a replica-only trigger (`ENABLE REPLICA TRIGGER`, `'R'`) counts as present. In a normal session it never fires. Fix: `t.tgenabled IN ('O','A')`, plus a canary in `qa_canary_notrunc`: `CREATE TRIGGER t_rep BEFORE TRUNCATE … ; ALTER TABLE … ENABLE REPLICA TRIGGER t_rep;` The expected gap set is unchanged.
+- **M-2 (S-2 partly built).** (a) `validate` does not require a `note` on a `db: false` row. All 5 carry one today, but nothing keeps it that way. Add `if (r.db === false && !r.note) errs.push(...)` and a canary for it. (b) The matrix test prints only counts. Print each inactive row's id and its unresolved tables, so a misspelled table name that never activates is visible in the CI log.
+
+Waived (S-3): the pool is not `max: 1`. The hard pid-equality precondition means a wrong backend turns the test red and can never pass it green, so the residual is a possible flake, not a false pass. Accepted.
+
+For POLY-62, not gating: add reverse coverage. Every non-exempt r/p table must be named by a matrix row or by a short reviewed "no matrix row" list. Otherwise a JSON table name that doesn't match the real table keeps its row inactive forever, and M-2(b) only makes that visible.
