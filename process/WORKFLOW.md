@@ -527,6 +527,10 @@ docs/PRD/
 
 The `index.html` filename stays stable across the split, so external references (CLAUDE.md, README, skills) don't need updating.
 
+### Test-root convention
+
+One root, **`tests/`** (plural), for every cross-cutting test suite — one subdirectory per concern: `tests/workflow/` (the template's Python convention tests, discovered by `scripts/cairn/run_tests.py` as `test_*.py`), `tests/layers/` (the layer-lint harness and fixtures, Vitest), and so on. Per-package unit tests stay beside their code (`packages/*/src/*.test.ts`). There is no `test/` (singular): POLY-82 created one because its issue text said `test/layers/**`, and the team followed the wording; it was consolidated 2026-11-10. **Issue authors:** when a criterion or `paths:` entry names a test location, name it under `tests/<concern>/`.
+
 ### Doc header: version, status, last updated
 
 Every top-level HTML doc (PRD, ARCH, SECURITY, DESIGN) carries three hand-maintained header fields. Nothing reads them and no skill bumps them, so the rule is the only thing keeping them honest (ruled 2026-09-27, PRD v1 interview):

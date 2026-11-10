@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-82]
 assignee: backend-lead
-paths: [scripts/layers/**, test/layers/**, layers.json, docs/ARCH/index.html, docs/SECURITY/index.html]
+paths: [scripts/layers/**, tests/layers/**, layers.json, docs/ARCH/index.html, docs/SECURITY/index.html]
 labels: [enabler]
 priority: P3
 pr: null

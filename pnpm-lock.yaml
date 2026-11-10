@@ -388,7 +388,7 @@ importers:
 
   packages/ui: {}
 
-  test/layers/tsc:
+  tests/layers/tsc:
     dependencies:
       '@poly/auth':
         specifier: workspace:*

@@ -1,4 +1,4 @@
 packages:
   - packages/*
   - apps/*
-  - test/layers/tsc
+  - tests/layers/tsc
