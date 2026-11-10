@@ -44,3 +44,7 @@ Re-scoped at the 2026-11-08 decomposition (architect + PM drafts; lead rulings).
 ### @team-lead — 2026-11-10
 
 From POLY-84 (seceng, 2026-11-10): the catalog probe's `no_policy` check is satisfied by any policy, including a permissive `USING (true)`. Passing the battery is therefore not proof of tenant isolation. When the first tenant tables land here, each gets its own cross-tenant assertion using POLY-84's `crossTenantRows(db, table, as, other)` helper (ruling R4), and this issue decides the seeding helper and the permission-matrix `probe` shape (ruling R5, Open item 1).
+
+### @team-lead — 2026-11-10
+
+Also from POLY-84 (seceng, non-gating): add reverse coverage — every real table must be named by a permission-matrix row or by a short reviewed list, so a misspelled table name in `packages/tenancy/permission-matrix.json` cannot leave its row untested forever (M-2 only makes the gap visible).

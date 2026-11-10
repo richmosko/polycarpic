@@ -1,7 +1,7 @@
 ---
 id: POLY-84
 title: RLS battery harness
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83]
@@ -9,7 +9,7 @@ assignee: qa-engineer
 paths: [tests/db/**, packages/db/**, packages/tenancy/**, apps/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, layers.json, docs/SECURITY/**, docs/ARCH/**]
 labels: [qa, db, security]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/103
 created: 2026-11-08
 updated: 2026-11-10
 ---
@@ -120,3 +120,7 @@ qa Validate sign-off: PASS. Measured at 87f17b2 (tree at 49524ba).
 - Mutation sanity: every guard disabled alone is caught, bar one equivalent mutant; table in process/cairn/reviews/POLY-84/mutation.md.
 - R6 TEMP: asserted for all poly_* roles except poly_owner (architect ruling (a) @ 7f90f49).
 - M1 has no tenant table, so the catalog probes are vacuous on the real chain and the matrix is 30 rows, all inactive; the canaries prove the harness. Each tenant table's feature adds its own cross-tenant and matrix rows (POLY-62).
+
+### @team-lead — 2026-11-10
+
+PR opened: https://github.com/richmosko/polycarpic/pull/103. Validate signed off @ 8ce5dc5 (measured at 87f17b2); architect approved 49524ba, seceng approved 707623a. Suite growth: tests/db 54.4 s → ~60 s.

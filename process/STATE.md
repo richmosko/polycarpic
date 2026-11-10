@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-84-rls-battery-harness`
 - **Started:** 2026-11-10
 - **Goal:** the pgTAP battery's cross-cutting probes in `tests/db` — catalog-derived per-table RLS/FORCE probe with a named exemption list and canaries, inversion self-test, dirty-backend pool reuse (C-12), WITH CHECK forgery, definer allowlist (C-15), role hygiene (C-10), view/matview/TRUNCATE checks, and the SECURITY §4.2.1 permission matrix as a data-driven test — run through the real runner against a fresh Postgres.
-- **Status:** In Progress
+- **Status:** In Review — PR [#103](https://github.com/richmosko/polycarpic/pull/103); QA green @ 87f17b2, architect + seceng approved.
 - **Previous:** POLY-83 merged 2026-11-10 via PR #102 (ARCH v1.15.3, SECURITY v1.7; follow-ups on POLY-131, deploy-side on POLY-100).
 - **Next:** POLY-85 (runtime config + ops hooks).
 
