@@ -83,14 +83,22 @@ const noComputedImport = {
   },
 };
 
-const SESSION_SET = /(^|;)\s*SET\s+(?!LOCAL\b)\S/i;
-const SET_CONFIG_SESSION = /set_config\s*\([^)]*,\s*(false|'false')\s*\)/i;
+// Refused (architect ruling, POLY-82): SET, SET SESSION, RESET, SET LOCAL ROLE | SESSION AUTHORIZATION,
+// and set_config() unless its third argument is the literal true. Other SET LOCAL passes.
+const SESSION_SET = /(^|;)\s*(RESET\s+\S|SET\s+(?!LOCAL\b)\S|SET\s+LOCAL\s+(ROLE|SESSION\s+AUTHORIZATION)\b)/i;
+const setConfigNotLocal = (text) => {
+  for (const m of text.matchAll(/set_config\s*\(([^)]*)\)/gi)) {
+    const third = m[1].split(',').slice(2).join(',').trim();
+    if (!/^(true|'true')$/i.test(third)) return true;
+  }
+  return false;
+};
 
 const noSessionSet = {
   meta: { type: 'problem', schema: [] },
   create(context) {
     const test = (node, text) => {
-      if (SESSION_SET.test(text) || SET_CONFIG_SESSION.test(text)) {
+      if (SESSION_SET.test(text) || setConfigNotLocal(text)) {
         context.report({ node, message: 'Session-level SET is refused (ARCH §3.3, SECURITY A-39); use SET LOCAL inside the transaction.' });
       }
     };
