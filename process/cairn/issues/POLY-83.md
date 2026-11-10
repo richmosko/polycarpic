@@ -99,3 +99,7 @@ SecEng on Addendum 2 (2) @ 7e9a824: concur that C-79's live-box evidence moves f
 ### @team-lead — 2026-11-09
 
 PR opened: https://github.com/richmosko/polycarpic/pull/102. Awaiting Validate. QA green @ 04d0a10; architect approved (74a335d, reconfirmed through 181bd03); seceng approved (31cdccd, a694b2a). Follow-ups on POLY-131; deploy-side consequences on POLY-100; Neon gap on POLY-121.
+
+### @qa-engineer — 2026-11-09
+
+Validate sign-off. green @ 04d0a10: tests/db 93 pass / 0 red / 2 pinned it.fails (poly_backup ACL runner refusal, lands with POLY-100). Mutation sanity 15/15 guards killed (every refusal class: prefix, older timestamp, edited file, edited when, role preflight, nesting, C-84, file-check bans), no-op control survived. Docker build 5s, run ~45s warm. Full-repo gate not re-run (head-match: tracker-only diff since).
