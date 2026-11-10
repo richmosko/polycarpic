@@ -1,10 +1,10 @@
 // POLY-83 wrapper fixtures (ARCH §3.3, SECURITY C-84, A-3). Assumed surface, reconcile in helpers/api.ts `loadDb`:
 //   @poly/db            : withTenant(userId, sessionId, fn), withSystem(job, target, fn), close()
 //   @poly/db/auth       : withContextFreeTx(fn)
-//   fn receives a tx exposing `query(text, params?) => Promise<{ rows }>`; connection from DATABASE_URL (a poly_app URL).
+//   fn receives a tx exposing `query(text, params?) => Promise<{ rows }>`; connection from DATABASE_HOST/PORT/NAME/USER/SSLMODE/PASSWORD_FILE (poly_app).
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { REAL_MIGRATIONS, freshDb, migrateCli } from './helpers/api';
-import { must, psql, url } from './helpers/pg';
+import { REAL_MIGRATIONS, dbEnv, freshDb, migrateCli } from './helpers/api';
+import { must, psql } from './helpers/pg';
 
 const UID = '11111111-1111-4111-8111-111111111111';
 const SID = '22222222-2222-4222-8222-222222222222';
@@ -20,8 +20,7 @@ beforeAll(async () => {
   const r = migrateCli(db, REAL_MIGRATIONS);
   expect(r.code, r.err + r.out).toBe(0);
   vi.resetModules();
-  process.env.DATABASE_URL = url('poly_app', db);
-  process.env.WORKER_DATABASE_URL = url('poly_worker', db);
+  Object.assign(process.env, dbEnv('poly_app', db)); // web/worker use the same names with their own user (addendum 1)
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
   session = await import('../../packages/db/src/session.ts');

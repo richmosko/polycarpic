@@ -11,7 +11,15 @@ export const MIGRATE_CLI = process.env.POLY_DB_MIGRATE_CLI ?? join(DB_PKG, '..',
 export const REAL_MIGRATIONS = process.env.POLY_DB_MIGRATIONS ?? join(DB_PKG, 'migrations');
 export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-export const BOOTSTRAP = process.env.POLY_DB_BOOTSTRAP ?? join(DB_PKG, 'sql', 'bootstrap.sql');
+export const BOOTSTRAP = process.env.POLY_DB_BOOTSTRAP ?? join(DB_PKG, 'sql', 'roles.sql');
+
+/** The DB env contract (ruling addendum 1): HOST/PORT/NAME/USER/SSLMODE + PASSWORD_FILE, never DATABASE_URL. */
+export function dbEnv(role: string, db: string): Record<string, string> {
+  const f = join(mkdtempSync(join(tmpdir(), 'poly83-pw-')), `db_password_${role}`);
+  writeFileSync(f, `qa-${role}\n`);
+  const s = JSON.parse(process.env.POLY_TEST_SERVER!);
+  return { DATABASE_HOST: s.host, DATABASE_PORT: String(s.port), DATABASE_NAME: db, DATABASE_USER: role, DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f };
+}
 const LOGIN = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_backup'];
 
 /** Fresh database + the superuser bootstrap run inside it (ruling R1; it sets the DB owner). Passwords are the harness's. */
@@ -43,7 +51,7 @@ export type Run = { code: number; out: string; err: string };
 export function migrateCli(db: string, dir: string, args: string[] = [], env: Record<string, string> = {}): Run {
   const p = spawnSync('node', ['--experimental-strip-types', MIGRATE_CLI, ...args], {
     encoding: 'utf8', timeout: 120_000,
-    env: { ...process.env, DATABASE_URL: url('poly_migrator', db), POLY_MIGRATIONS_DIR: dir, ...env },
+    env: { ...process.env, ...dbEnv('poly_migrator', db), POLY_MIGRATIONS_DIR: dir, ...env },
   });
   return { code: p.status ?? 127, out: p.stdout ?? '', err: p.stderr ?? '' };
 }

@@ -3,8 +3,8 @@
 // Error tokens (E.*) are the contract with backend-lead's runner messages; reconcile in this table only.
 import { spawn } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
-import { MIGRATE_CLI, applied, freshDb, journalOf, migrateCli, rewrite, setJournal, tableExists, writeMigrations } from './helpers/api';
-import { must, psql, psqlSession, url } from './helpers/pg';
+import { MIGRATE_CLI, applied, dbEnv, freshDb, journalOf, migrateCli, rewrite, setJournal, tableExists, writeMigrations } from './helpers/api';
+import { must, psql, psqlSession } from './helpers/pg';
 
 export const E = {
   prefix: /prefix|not a hash-for-hash/i,
@@ -113,6 +113,29 @@ describe('refusals apply nothing', () => {
   });
 });
 
+describe('role preflight (addendum 1): roles and poly_migrator memberships must be exactly roles.sql\'s, before the lock', () => {
+  it('a missing membership: exit 2, nothing applied', () => {
+    const db = freshDb();
+    must('REVOKE poly_authz FROM poly_migrator');
+    try {
+      refused(migrateCli(db, writeMigrations([{ tag: '0000_a', sql: T('ta') }])), /role|member|poly_authz|roles\.sql/i);
+      expect(tableExists(db, 'public.ta')).toBe(false);
+    } finally {
+      must('GRANT poly_authz TO poly_migrator WITH INHERIT FALSE, SET TRUE');
+    }
+  });
+  it('a membership with INHERIT TRUE: exit 2, nothing applied', () => {
+    const db = freshDb();
+    must('GRANT poly_authz TO poly_migrator WITH INHERIT TRUE, SET TRUE');
+    try {
+      refused(migrateCli(db, writeMigrations([{ tag: '0000_a', sql: T('ta') }])), /inherit|member|poly_authz|roles\.sql/i);
+      expect(tableExists(db, 'public.ta')).toBe(false);
+    } finally {
+      must('GRANT poly_authz TO poly_migrator WITH INHERIT FALSE, SET TRUE');
+    }
+  });
+});
+
 describe('journal order inside the runner', () => {
   it('non-increasing `when` in the journal: exit 2, nothing applied', () => {
     const db = freshDb();
@@ -152,7 +175,7 @@ describe('--plan', () => {
     // discover the runner's lock key from pg_locks while a slow migration runs (no knowledge of the key constant needed)
     const slow = writeMigrations([{ tag: '0000_slow', sql: 'SELECT pg_sleep(4);\n' + T('ts') }]);
     const child = spawn('node', ['--experimental-strip-types', MIGRATE_CLI], {
-      env: { ...process.env, DATABASE_URL: url('poly_migrator', db), POLY_MIGRATIONS_DIR: slow },
+      env: { ...process.env, ...dbEnv('poly_migrator', db), POLY_MIGRATIONS_DIR: slow },
     });
     let key: string[] | null = null;
     for (let i = 0; i < 30 && !key; i++) {
@@ -181,7 +204,7 @@ describe('--plan', () => {
       expect(must(`SELECT count(*) FROM drizzle.__drizzle_migrations`, db2).rows[0][0]).toBe('0');
 
       const apply = spawn('node', ['--experimental-strip-types', MIGRATE_CLI], {
-        env: { ...process.env, DATABASE_URL: url('poly_migrator', db2), POLY_MIGRATIONS_DIR: dir },
+        env: { ...process.env, ...dbEnv('poly_migrator', db2), POLY_MIGRATIONS_DIR: dir },
       });
       let done = false;
       apply.on('close', () => (done = true));

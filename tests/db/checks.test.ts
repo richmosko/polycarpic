@@ -7,13 +7,15 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { DB_PKG, must, url } from './helpers/pg';
-import { MIGRATE_CLI, REAL_MIGRATIONS, freshDb, migrateCli, writeMigrations } from './helpers/api';
+import { DB_PKG, must } from './helpers/pg';
+import { MIGRATE_CLI, REAL_MIGRATIONS, dbEnv, freshDb, migrateCli, writeMigrations } from './helpers/api';
 
 const CHECK = process.env.POLY_DB_CHECK_CLI ?? join(DB_PKG, 'src', 'check-migrations-cli.ts');
 const check = (dir: string) => {
   const p = spawnSync('node', ['--experimental-strip-types', CHECK, dir], { encoding: 'utf8' });
-  return { code: p.status ?? 127, text: (p.stderr ?? '') + (p.stdout ?? '') };
+  const text = (p.stderr ?? '') + (p.stdout ?? '');
+  // a missing CLI exits 1 and its error text can match a loose regex: report it as "not runnable"
+  return { code: /Cannot find module|ERR_MODULE_NOT_FOUND/.test(text) ? 127 : (p.status ?? 127), text };
 };
 const T = (n: string) => `CREATE TABLE public.${n} (id int);\n`;
 
@@ -75,7 +77,7 @@ describe('startup guard (db/startup assertSchemaNotBehind): refuse when the appl
   // migrated with the real chain, then made behind / ahead / divergent by the superuser.
   const guard = async (db: string) => {
     vi.resetModules();
-    process.env.DATABASE_URL = url('poly_app', db);
+    Object.assign(process.env, dbEnv('poly_app', db));
     const g: any = await import('../../packages/db/src/startup.ts');
     return g.assertSchemaNotBehind();
   };
@@ -109,32 +111,41 @@ describe('startup guard (db/startup assertSchemaNotBehind): refuse when the appl
   });
 });
 
-describe('migrate check-config (R7): migrator secret + connection settings; exit 0 / 1 naming each fault; no connection', () => {
-  // Input names are assumptions: POLY_MIGRATOR_PASSWORD_FILE and DATABASE_URL.
-  const mk = (over: { omit?: boolean; empty?: boolean; noUrl?: boolean }) => {
-    const dir = mkdtempSync(join(tmpdir(), 'poly83-cfg-'));
-    const f = join(dir, 'poly_migrator_password');
-    if (!over.omit) writeFileSync(f, over.empty ? '' : 'x');
-    return { POLY_MIGRATOR_PASSWORD_FILE: f, DATABASE_URL: over.noUrl ? '' : 'postgres://poly_migrator@127.0.0.1:1/none' };
+describe('migrate check-config (addendum 1): DB side only, no connection; exit 0 / 1, one line per fault naming the variable', () => {
+  const good = (): Record<string, string> => {
+    const f = join(mkdtempSync(join(tmpdir(), 'poly83-cfg-')), 'db_password_migrator');
+    writeFileSync(f, 'secret\n');
+    return { DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '1', DATABASE_NAME: 'none', DATABASE_USER: 'poly_migrator', DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f };
   };
-  const run = (env: Record<string, string>) => {
-    const p = spawnSync('node', ['--experimental-strip-types', MIGRATE_CLI, 'check-config'], { encoding: 'utf8', env: { ...process.env, ...env } });
+  const run = (env: Record<string, string | undefined>) => {
+    const base: Record<string, string | undefined> = { ...process.env };
+    for (const k of Object.keys(base)) if (k.startsWith('DATABASE_')) delete base[k];
+    const p = spawnSync('node', ['--experimental-strip-types', MIGRATE_CLI, 'check-config'], { encoding: 'utf8', env: { ...base, ...env } as NodeJS.ProcessEnv });
     return { code: p.status ?? 127, text: (p.stderr ?? '') + (p.stdout ?? '') };
   };
-  it('0 on a good config, with an unreachable database (it connects nowhere)', () => expect(run(mk({})).code).toBe(0));
-  it('1 naming a missing secret file', () => {
-    const r = run(mk({ omit: true }));
-    expect(r.code, r.text).toBe(1);
-    expect(r.text).toMatch(/poly_migrator_password|POLY_MIGRATOR_PASSWORD_FILE/);
-  });
-  it('1 naming an empty secret file', () => {
-    const r = run(mk({ empty: true }));
-    expect(r.code, r.text).toBe(1);
-    expect(r.text).toMatch(/poly_migrator_password|empty/i);
-  });
-  it('1 naming missing connection settings', () => {
-    const r = run(mk({ noUrl: true }));
-    expect(r.code, r.text).toBe(1);
-    expect(r.text).toMatch(/DATABASE_URL|connection/i);
+  const fault = (name: string, mut: (e: Record<string, string>) => Record<string, string>, token: RegExp) =>
+    it(`1 naming ${name}`, () => {
+      const r = run(mut(good()));
+      expect(r.text).not.toMatch(/Cannot find module|ERR_MODULE_NOT_FOUND/);
+      expect(r.code, r.text).toBe(1);
+      expect(r.text).toMatch(token);
+    });
+  it('0 on a good config, with an unreachable database (it connects nowhere)', () => expect(run(good()).code).toBe(0));
+  for (const k of ['DATABASE_HOST', 'DATABASE_NAME', 'DATABASE_USER', 'DATABASE_SSLMODE', 'DATABASE_PASSWORD_FILE']) {
+    fault(`missing ${k}`, (e) => { delete e[k]; return e; }, new RegExp(k));
+  }
+  fault('DATABASE_PORT that is not an integer', (e) => ({ ...e, DATABASE_PORT: 'abc' }), /DATABASE_PORT/);
+  it('DATABASE_PORT defaults to 5432 when absent', () => { const e = good(); delete (e as any).DATABASE_PORT; expect(run(e).code).toBe(0); });
+  fault('DATABASE_USER that is not poly_migrator', (e) => ({ ...e, DATABASE_USER: 'poly_app' }), /DATABASE_USER/);
+  fault('DATABASE_SSLMODE outside disable|require|verify-full', (e) => ({ ...e, DATABASE_SSLMODE: 'prefer' }), /DATABASE_SSLMODE/);
+  fault('a missing password file', (e) => ({ ...e, DATABASE_PASSWORD_FILE: e.DATABASE_PASSWORD_FILE + '.nope' }), /DATABASE_PASSWORD_FILE/);
+  fault('an empty password file', (e) => { writeFileSync(e.DATABASE_PASSWORD_FILE, ''); return e; }, /DATABASE_PASSWORD_FILE/);
+  fault('a multi-line password file', (e) => { writeFileSync(e.DATABASE_PASSWORD_FILE, 'a\nb\n'); return e; }, /DATABASE_PASSWORD_FILE/);
+  fault('DATABASE_PASSWORD being set', (e) => ({ ...e, DATABASE_PASSWORD: 'x' }), /DATABASE_PASSWORD\b(?!_FILE)/);
+  fault('DATABASE_URL being set', (e) => ({ ...e, DATABASE_URL: 'postgres://x' }), /DATABASE_URL/);
+  it('reports every fault, one line each', () => {
+    const r = run({ DATABASE_USER: 'poly_app', DATABASE_SSLMODE: 'prefer' });
+    expect(r.code).toBe(1);
+    for (const k of ['DATABASE_HOST', 'DATABASE_NAME', 'DATABASE_USER', 'DATABASE_SSLMODE', 'DATABASE_PASSWORD_FILE']) expect(r.text).toMatch(new RegExp(k));
   });
 });
