@@ -32,7 +32,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.session, public.account, public.v
 -- A definer owner needs CREATE on its schema only for the duration of the file.
 GRANT CREATE ON SCHEMA app TO poly_authz;--> statement-breakpoint
 SET ROLE poly_authz;--> statement-breakpoint
-CREATE FUNCTION app.job_targets(job text)
+CREATE FUNCTION app.job_targets(text)
   RETURNS TABLE (entity_id uuid, principal_user_id uuid, connection_id uuid)
   LANGUAGE sql STABLE SECURITY DEFINER
   SET search_path = ''

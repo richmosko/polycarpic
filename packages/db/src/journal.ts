@@ -26,7 +26,7 @@ export class MigrateRefusal extends Error {
     super(message);
     this.name = 'MigrateRefusal';
     this.check = check;
-    this.exit = check === 'journal-order' || check === 'not-a-prefix' ? 2 : check === 'lock-timeout' ? 4 : 1;
+    this.exit = check === 'journal-order' || check === 'not-a-prefix' || check === 'roles-missing' ? 2 : check === 'lock-timeout' ? 4 : 1;
   }
 }
 

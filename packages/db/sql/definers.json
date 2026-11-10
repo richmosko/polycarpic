@@ -1,6 +1,3 @@
-{
-  "$comment": "The C-15 definer allowlist. pgTAP compares every prosecdef function to this list: owner, proconfig and the EXECUTE ACL. Each definer lands with its feature and adds its entry in the same PR.",
-  "definers": [
-    { "function": "app.job_targets(text)", "owner": "poly_authz", "execute": ["poly_worker"] }
-  ]
-}
+[
+  { "function": "app.job_targets(text)", "owner": "poly_authz", "execute": ["poly_worker"] }
+]

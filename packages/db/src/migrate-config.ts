@@ -1,32 +1,45 @@
-// `migrate check-config` (ARCH §8.1; POLY-83 ruling R7). Reads files and the environment, connects nowhere.
-// The TLS_MODE / PLAID_ENV / other-secret checks arrive with packages/config (POLY-85).
+// `migrate check-config` and the connection reader (ARCH §8.1; POLY-83 ruling addendum 1). Reads files and the
+// environment, connects nowhere. POLY-85 moves the parsing into packages/config under the same names.
 import fs from 'node:fs';
-import path from 'node:path';
 
 export interface ConfigProblem {
   what: string;
 }
 
-export interface ConfigInput {
-  secretsDir: string;
-  env: Record<string, string | undefined>;
-}
+type Env = Record<string, string | undefined>;
 
-/** Faults found, each naming what is wrong. Empty means ok. */
-export function checkConfig({ secretsDir, env }: ConfigInput): ConfigProblem[] {
-  const problems: ConfigProblem[] = [];
-  const file = path.join(secretsDir, 'db_password_migrator');
-  if (!env.POLY_MIGRATOR_DATABASE_URL && !env.DATABASE_URL) {
+const SSLMODES = ['disable', 'require', 'verify-full'];
+
+/** Faults found, one per variable. Empty means ok. */
+export function checkConfig(env: Env, expectedUser = 'poly_migrator'): ConfigProblem[] {
+  const out: ConfigProblem[] = [];
+  const bad = (what: string) => out.push({ what });
+  for (const k of ['DATABASE_URL', 'DATABASE_PASSWORD']) if (env[k]) bad(`${k} must not be set`);
+  if (!env.DATABASE_HOST) bad('DATABASE_HOST is not set');
+  if (!env.DATABASE_NAME) bad('DATABASE_NAME is not set');
+  if (env.DATABASE_PORT !== undefined && !/^\d+$/.test(env.DATABASE_PORT)) bad('DATABASE_PORT must be an integer');
+  if (env.DATABASE_USER !== expectedUser) bad(`DATABASE_USER must be ${expectedUser}`);
+  if (!env.DATABASE_SSLMODE || !SSLMODES.includes(env.DATABASE_SSLMODE)) bad(`DATABASE_SSLMODE must be one of ${SSLMODES.join(' | ')}`);
+  const f = env.DATABASE_PASSWORD_FILE;
+  if (!f) bad('DATABASE_PASSWORD_FILE is not set');
+  else {
     let text: string | undefined;
     try {
-      text = fs.readFileSync(file, 'utf8');
+      text = fs.readFileSync(f, 'utf8');
     } catch {
-      problems.push({ what: `secret file missing: ${file}` });
+      bad(`DATABASE_PASSWORD_FILE does not exist: ${f}`);
     }
-    if (text !== undefined && text.trim() === '') problems.push({ what: `secret file empty: ${file}` });
-    for (const k of ['PGHOST', 'PGDATABASE'] as const) {
-      if (!env[k]) problems.push({ what: `connection setting missing: ${k}` });
+    if (text !== undefined) {
+      if (text.trim() === '') bad(`DATABASE_PASSWORD_FILE is empty: ${f}`);
+      else if (text.replace(/\n$/, '').includes('\n')) bad(`DATABASE_PASSWORD_FILE must hold one line: ${f}`);
     }
   }
-  return problems;
+  return out;
+}
+
+/** A connection string from the DATABASE_* names. */
+export function urlFromEnv(env: Env): string {
+  const pw = fs.readFileSync(env.DATABASE_PASSWORD_FILE!, 'utf8').replace(/\n$/, '');
+  const q = env.DATABASE_SSLMODE && env.DATABASE_SSLMODE !== 'disable' ? `?sslmode=${env.DATABASE_SSLMODE}` : '';
+  return `postgres://${encodeURIComponent(env.DATABASE_USER!)}:${encodeURIComponent(pw)}@${env.DATABASE_HOST}:${env.DATABASE_PORT ?? '5432'}/${env.DATABASE_NAME}${q}`;
 }

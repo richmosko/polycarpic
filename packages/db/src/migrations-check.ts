@@ -23,7 +23,7 @@ export function checkSql(file: string, raw: string): Problem[] {
   const out: Problem[] = [];
   const add = (check: Problem['check'], detail: string) => out.push({ file, check, detail });
   if (/\bSESSION\s+AUTHORIZATION\b/i.test(sql)) add('session-authorization', 'a session authorization switch is banned');
-  if (/\bRESET\s+(ROLE|ALL|SESSION\s+AUTHORIZATION)\b/i.test(sql)) add('reset', 'a role or session reset is banned');
+  for (const m of sql.matchAll(/\bRESET\s+(ROLE|ALL|SESSION\s+AUTHORIZATION)\b/gi)) add('reset', `banned statement: ${m[0].replace(/\s+/g, ' ').toUpperCase()}`);
   if (/\bSET\s+LOCAL\s+ROLE\b/i.test(sql)) add('local-role', 'a transaction-local role switch is banned');
   if (/set_config\s*\(\s*'role'/i.test(sql)) add('set-config-role', 'a role set through the settings function is banned');
   if (/\bSET\s+role\s*(=|\bTO\b)/i.test(sql)) add('function-role-clause', 'a function role clause is banned');
