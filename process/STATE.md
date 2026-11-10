@@ -15,15 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** DB roles, migrate, withTenant
-- **Issue:** `POLY-83` (cairn)
-- **Milestone:** `POLY-M1` Foundations
-- **Branch:** `feature/poly-83-db-roles-migrate-withtenant`
-- **Started:** 2026-11-10
-- **Goal:** `packages/db` for real — the Drizzle Kit migration chain with its locked, prefix-checked runner; the full Postgres role set incl. `poly_backup` (C-79); the only connection path (`withTenant` / `withSystem` / `withContextFreeTx`, mutually non-nesting); the `db/auth` subpath for BetterAuth; the `migrate` subcommands the deploy script calls; and the pgTAP that proves the ownership and grant invariants (C-84, C-85, T-91).
-- **Status:** In Review — PR [#102](https://github.com/richmosko/polycarpic/pull/102); QA green @ 04d0a10, architect + seceng approved.
-- **Previous:** POLY-82 merged 2026-11-10 via PR #100 (ARCH v1.15.2; follow-ups in POLY-131).
-- **Next:** POLY-84 (RLS battery harness), POLY-85 (runtime config + ops hooks).
+_None. POLY-83 (DB roles, migrate, withTenant) merged 2026-11-10 via PR [#102](https://github.com/richmosko/polycarpic/pull/102) — ARCH v1.15.3, SECURITY v1.7; follow-ups on POLY-131, deploy-side requirements on POLY-100._
+
+- **Next:** `/start-feature POLY-84` (RLS battery harness), then POLY-85 (runtime config + ops hooks).
 
 ## Releases
 

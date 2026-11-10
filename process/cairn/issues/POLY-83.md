@@ -1,7 +1,7 @@
 ---
 id: POLY-83
 title: DB roles, migrate, withTenant
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-76, POLY-82]
@@ -11,7 +11,7 @@ labels: [db, security]
 priority: P1
 pr: https://github.com/richmosko/polycarpic/pull/102
 created: 2026-11-08
-updated: 2026-11-09
+updated: 2026-11-10
 ---
 
 packages/db: the migration chain (tool per POLY-76), the full Postgres role set, and the only connection path (ARCH §3.3). All roles are created here so role hygiene (C-10) and the definer allowlist (C-15) see the full set from the first migration; each definer function lands with its feature. Includes poly_backup with SECURITY C-79's attributes, and the migrate subcommands the deploy script calls (ARCH §8.1).
@@ -103,3 +103,7 @@ PR opened: https://github.com/richmosko/polycarpic/pull/102. Awaiting Validate. 
 ### @qa-engineer — 2026-11-09
 
 Validate sign-off. green @ 04d0a10: tests/db 93 pass / 0 red / 2 pinned it.fails (poly_backup ACL runner refusal, lands with POLY-100). Mutation sanity 15/15 guards killed (every refusal class: prefix, older timestamp, edited file, edited when, role preflight, nesting, C-84, file-check bans), no-op control survived. Docker build 5s, run ~45s warm. Full-repo gate not re-run (head-match: tracker-only diff since).
+
+### @team-lead — 2026-11-10
+
+Validate passed; merging via PR #102. Closing.
