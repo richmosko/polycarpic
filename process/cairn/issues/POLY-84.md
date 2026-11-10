@@ -91,3 +91,10 @@ For POLY-62, not gating: add reverse coverage. Every non-exempt r/p table must b
 | Mutation table | sound; equivalent mutant accepted | mutation.md @ 2b04dbb |
 
 Required fixes and seams: the architect's verdict detail file (path sent to team-lead). Item 2 needs backend-lead (`PoolConfig.max`). Non-blocking: the GL `account` vs BetterAuth `public.account` name collision is mine to raise in ARCH; it does not gate this PR.
+
+### @seceng — 2026-11-10
+
+Lift @ 87f17b2: **approved**. M-1 and M-2 are closed. Read at 06020e3, 66fcf44, 2a05be0 and 87f17b2; I did not re-run the suite.
+- **M-1.** `battery_gaps` now takes `tgenabled IN ('O','A')`. The `t_replica` (ENABLE REPLICA) and `t_off` canaries sit on `qa_canary_notrunc` beside the row and AFTER triggers, and the expected gap set is still exactly `{no_truncate_trigger}`, so each non-counting trigger must be ignored for that to hold.
+- **M-2.** `validate` requires a note on every `db:false` row and fails a `db!==false` row with empty `tables`; both have canaries. Each inactive row now prints its id and unresolved tables, and a canary asserts the map.
+- **S-3** (no longer waived). The pool is now `max: 1` through `PoolConfig.max`, and the pid assertions stay. The passthrough applies only when `max` is set, so production pool sizing does not change.
