@@ -10,6 +10,8 @@ export interface PoolConfig {
   app?: Env;
   /** DATABASE_* settings for withSystem's pool (default: process.env). */
   worker?: Env;
+  /** Max connections per pool (pg default when unset). */
+  max?: number;
 }
 
 let config: PoolConfig = {};
@@ -20,12 +22,16 @@ export function configure(next: PoolConfig): void {
   config = next;
 }
 
+function maxOpt(): { max?: number } {
+  return config.max === undefined ? {} : { max: config.max };
+}
+
 export function appPool(): pg.Pool {
-  return (app ??= new pg.Pool(connectionFrom(config.app ?? process.env)));
+  return (app ??= new pg.Pool({ ...connectionFrom(config.app ?? process.env), ...maxOpt() }));
 }
 
 export function workerPool(): pg.Pool {
-  return (worker ??= new pg.Pool(connectionFrom(config.worker ?? process.env)));
+  return (worker ??= new pg.Pool({ ...connectionFrom(config.worker ?? process.env), ...maxOpt() }));
 }
 
 export async function close(): Promise<void> {
