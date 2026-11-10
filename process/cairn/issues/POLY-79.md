@@ -11,7 +11,7 @@ labels: [tooling]
 priority: null
 pr: null
 created: 2026-09-28
-updated: 2026-11-08
+updated: 2026-11-10
 ---
 
 Umbrella for tooling gaps found while running the Plan team in parallel worktrees on 2026-09-28: issue-ID collisions, the hand-off location rule, priority validation at creation, and guard-push counting add-then-remove as a touch. Add further items here rather than filing one issue each.
@@ -37,3 +37,9 @@ Tooling gap (2026-10-20): `test_prices_table` fails locally whenever the metrics
 ### @team-lead — 2026-10-31
 
 Follow-ups from POLY-79a (2026-10-31): (1) `scripts/cairn/check_feature_branch_invariant.py` can't derive an issue ID from sub-issue branches like `feature/poly-79a-*`; it bails instead of checking. (2) `tests/workflow/test_docs_mermaid_linebreaks.py` skips on CI because the CDN-loaded Mermaid never renders on the ubuntu runner (cause unconfirmed). Point the test at the vendored bundle from `scripts/vendor-mermaid.sh` so the line-break check runs in CI.
+
+### @team-lead — 2026-11-10
+
+Two closing-completeness gaps found at the POLY-84 pre-merge audit (2026-11-10), both process, both for the skills:
+1. `/finish-feature` has no "regenerate PDF artifacts" step; `/finish-doc-update` does. Feature loops that bump ARCH/SECURITY (POLY-82, 83, 84) left `docs/*/*.pdf` stale on GitHub until 57a6f64. Port step 2 of finish-doc-update into finish-feature (affected docs only; own commit).
+2. Acceptance criteria were closed unticked (POLY-83: 17/17; POLY-84 fixed in ae0b415). Add to `/finish-feature` step 3 or `/merge-pr` pre-flight: the assignee ticks each criterion `- [x] … — <file>: <test>` naming the proving test, as one chore commit before the PR opens.
