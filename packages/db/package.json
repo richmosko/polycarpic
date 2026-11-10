@@ -12,7 +12,9 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "migrate": "node src/cli.ts",
+    "check:migrations": "node scripts/check-migrations.ts"
   },
   "dependencies": {
     "drizzle-orm": "0.45.4",
