@@ -12,7 +12,26 @@ $f$;
 
 -- One row per gap. Scope: every relation outside pg_catalog, information_schema, pg_toast, minus temporary relations
 -- (session-private; no poly_* role holds TEMP, asserted in 03). Exempt relations are compared by oid.
-CREATE FUNCTION pg_temp.battery_gaps(exempt text[]) RETURNS TABLE (rel regclass, reason text) LANGUAGE sql AS $f$ SELECT NULL::regclass, NULL::text WHERE false $f$;  -- RED stub
+CREATE FUNCTION pg_temp.battery_gaps(exempt text[]) RETURNS TABLE (rel regclass, reason text) LANGUAGE sql AS $f$
+  WITH ex AS (SELECT to_regclass(e)::oid AS oid FROM unnest(exempt) e),
+  scope AS (
+    SELECT c.* FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast') AND c.relpersistence <> 't'
+      AND NOT EXISTS (SELECT 1 FROM ex WHERE ex.oid = c.oid))
+  SELECT c.oid::regclass, g.reason FROM scope c CROSS JOIN LATERAL (VALUES
+    ('rls_disabled',  c.relkind IN ('r', 'p') AND NOT c.relrowsecurity),
+    ('not_forced',    c.relkind IN ('r', 'p') AND NOT c.relforcerowsecurity),
+    ('no_policy',     c.relkind IN ('r', 'p') AND NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)),
+    ('for_all_policy', c.relkind IN ('r', 'p') AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid AND p.polcmd = '*')),
+    ('no_truncate_trigger', c.relkind IN ('r', 'p') AND NOT EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = c.oid
+       AND NOT t.tgisinternal AND t.tgenabled <> 'D' AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2 AND (t.tgtype & 32) = 32)),
+    ('matview',       c.relkind = 'm'),
+    ('foreign_table', c.relkind = 'f'),
+    ('view_not_security_invoker', c.relkind = 'v'
+       AND NOT (coalesce(c.reloptions, '{}') && ARRAY['security_invoker=true', 'security_invoker=on'])
+       AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid AND d.deptype = 'e'))
+  ) g(reason, hit) WHERE g.hit
+$f$;
 CREATE FUNCTION pg_temp.gaps_of(rels text[], exempt text[]) RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(rel::text || ':' || reason ORDER BY rel::text COLLATE "C", reason COLLATE "C"), '{}')
   FROM pg_temp.battery_gaps(exempt) WHERE rel::text = ANY (rels)
@@ -64,6 +83,12 @@ ALTER TABLE public.qa_canary_part FORCE ROW LEVEL SECURITY;
 CREATE POLICY s ON public.qa_canary_part FOR SELECT USING (true);
 CREATE TRIGGER t BEFORE TRUNCATE ON public.qa_canary_part FOR EACH STATEMENT EXECUTE FUNCTION public.qa_canary_truncate_fn();
 CREATE TABLE public.qa_canary_part_child PARTITION OF public.qa_canary_part FOR VALUES IN (1);
+-- a bare partitioned parent (kind p) is in scope too
+CREATE TABLE public.qa_canary_part_bare (id int) PARTITION BY LIST (id);
+-- foreign table (needs a wrapper, no extension)
+CREATE FOREIGN DATA WRAPPER qa_canary_fdw;
+CREATE SERVER qa_canary_srv FOREIGN DATA WRAPPER qa_canary_fdw;
+CREATE FOREIGN TABLE public.qa_canary_foreign (id int) SERVER qa_canary_srv;
 -- matview, views
 CREATE MATERIALIZED VIEW public.qa_canary_mv AS SELECT 1 AS x;
 CREATE VIEW public.qa_canary_view AS SELECT 1 AS x;
@@ -81,6 +106,10 @@ SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_notrunc'], pg_temp.exemptions()), ARR
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_part', 'qa_canary_part_child'], pg_temp.exemptions()),
   ARRAY['qa_canary_part_child:no_policy', 'qa_canary_part_child:no_truncate_trigger', 'qa_canary_part_child:not_forced', 'qa_canary_part_child:rls_disabled'],
   'a partitioned parent passes, its bare partition fails');
+SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_part_bare'], pg_temp.exemptions()),
+  ARRAY['qa_canary_part_bare:no_policy', 'qa_canary_part_bare:no_truncate_trigger', 'qa_canary_part_bare:not_forced', 'qa_canary_part_bare:rls_disabled'],
+  'a bare partitioned parent (kind p) fails');
+SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_foreign'], pg_temp.exemptions()), ARRAY['qa_canary_foreign:foreign_table'], 'a foreign table fails unless exempted');
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_mv'], pg_temp.exemptions()), ARRAY['qa_canary_mv:matview'], 'a materialized view fails unless exempted');
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_view', 'qa_canary_view_inv', 'qa_canary_view_on'], pg_temp.exemptions()),
   ARRAY['qa_canary_view:view_not_security_invoker'], 'a view without security_invoker fails; true and on pass');
@@ -102,6 +131,10 @@ WHERE p.prorettype = 'pg_catalog.trigger'::regtype AND n.nspname NOT IN ('pg_cat
 -- cleanup, then the chain is clean again
 DROP TABLE public.qa_canary_part_child, public.qa_canary_part, public.qa_canary_ok, public.qa_canary_noforce, public.qa_canary_off,
   public.qa_canary_forall, public.qa_canary_notrunc;
+DROP TABLE public.qa_canary_part_bare;
+DROP FOREIGN TABLE public.qa_canary_foreign;
+DROP SERVER qa_canary_srv;
+DROP FOREIGN DATA WRAPPER qa_canary_fdw;
 DROP MATERIALIZED VIEW public.qa_canary_mv;
 DROP VIEW public.qa_canary_view, public.qa_canary_view_inv, public.qa_canary_view_on;
 DROP FUNCTION public.qa_canary_truncate_fn();

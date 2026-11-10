@@ -8,7 +8,6 @@ export type Query = (tx: Tx, text: string, params?: unknown[]) => Promise<Record
 export async function crossTenantRows(
   tenant: TenantRunner, q: Query, table: string, as: string, other: string, ownerColumn = 'owner_user_id',
 ): Promise<{ otherRows: number; ownRows: number }> {
-  if (as) return { otherRows: 0, ownRows: 0 }; // RED stub
   return tenant(as, async (tx) => {
     const o = await q(tx, `select count(*)::int n from ${table} where ${ownerColumn} = $1`, [other]);
     const w = await q(tx, `select count(*)::int n from ${table} where ${ownerColumn} = $1`, [as]);

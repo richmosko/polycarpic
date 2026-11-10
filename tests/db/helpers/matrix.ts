@@ -18,7 +18,6 @@ export const loadMatrix = (): Matrix => JSON.parse(readFileSync(MATRIX_FILE, 'ut
 
 /** Shape errors: unique kebab ids, complete and legal cells, qualified table names, tables empty exactly when db is false. */
 export function validate(rows: MatrixRow[]): string[] {
-  if (rows) return []; // RED stub
   const errs: string[] = [];
   const seen = new Set<string>();
   for (const r of rows) {
@@ -46,5 +45,5 @@ export function activeRows(db: string, rows: MatrixRow[]): { active: MatrixRow[]
 }
 
 /** A table landed without its probe: every active row with probe null. */
-export const missingProbes = (active: MatrixRow[]): string[] => active ? [] : // RED stub
+export const missingProbes = (active: MatrixRow[]): string[] =>
   active.filter((r) => r.probe === null).map((r) => `${r.id}: table landed without its matrix probe`);

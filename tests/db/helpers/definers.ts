@@ -20,7 +20,6 @@ const QUERY = `SELECT n.nspname||'.'||p.proname||'('||pg_get_function_identity_a
 
 /** Problems found by comparing the catalog to `allow`; `setupSql` runs first inside a transaction that is rolled back. */
 export function definerGaps(db: string, allow: Allowed[] = loadAllow(), setupSql = ''): string[] {
-  if (setupSql !== undefined) return []; // RED stub
   const r = psql(`BEGIN; ${setupSql}\n${QUERY}; ROLLBACK;`, db);
   if (!r.ok) return [`query failed: ${r.err}`];
   const got = r.rows.map(([fn, owner, pinned, exec]) => ({ fn, owner, pinned: pinned === 'true', execute: exec ? exec.split(',').sort() : [] }));

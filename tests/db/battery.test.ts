@@ -35,10 +35,19 @@ beforeAll(async () => {
     CREATE POLICY s ON public.qa_canary_rls FOR SELECT USING (owner_user_id = app.current_user_id());
     CREATE POLICY i ON public.qa_canary_rls FOR INSERT WITH CHECK (owner_user_id = app.current_user_id());
     CREATE POLICY u ON public.qa_canary_rls FOR UPDATE USING (owner_user_id = app.current_user_id()) WITH CHECK (owner_user_id = app.current_user_id());
-    GRANT SELECT, INSERT, UPDATE ON public.qa_canary_open, public.qa_canary_rls TO poly_app;
+    -- qa_canary_wc isolates WITH CHECK: its SELECT policy admits every row, so only WITH CHECK can refuse a forged write
+    CREATE TABLE public.qa_canary_wc (id serial PRIMARY KEY, owner_user_id uuid NOT NULL);
+    ALTER TABLE public.qa_canary_wc OWNER TO poly_owner;
+    ALTER TABLE public.qa_canary_wc ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE public.qa_canary_wc FORCE ROW LEVEL SECURITY;
+    CREATE POLICY s ON public.qa_canary_wc FOR SELECT USING (true);
+    CREATE POLICY i ON public.qa_canary_wc FOR INSERT WITH CHECK (owner_user_id = app.current_user_id());
+    CREATE POLICY u ON public.qa_canary_wc FOR UPDATE USING (owner_user_id = app.current_user_id()) WITH CHECK (owner_user_id = app.current_user_id());
+    GRANT SELECT, INSERT, UPDATE ON public.qa_canary_open, public.qa_canary_rls, public.qa_canary_wc TO poly_app;
     GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO poly_app;
     INSERT INTO public.qa_canary_open (owner_user_id) VALUES ('${A}'), ('${B}');
-    INSERT INTO public.qa_canary_rls (owner_user_id) VALUES ('${A}'), ('${B}');`, db);
+    INSERT INTO public.qa_canary_rls (owner_user_id) VALUES ('${A}'), ('${B}');
+    INSERT INTO public.qa_canary_wc (owner_user_id) VALUES ('${A}'), ('${B}');`, db);
   vi.resetModules();
   const m0 = await import('../../packages/db/src/index.ts');
   await m0.close();
@@ -59,7 +68,7 @@ describe('inversion self-test (criterion 1)', () => {
   });
 
   it('the canaries are what the catalog says they are: the leaker has no RLS, the twin is enabled and FORCEd', () => {
-    const r = must(`SELECT relname, relrowsecurity, relforcerowsecurity, pg_get_userbyid(relowner) FROM pg_class WHERE relname LIKE 'qa_canary_%' AND relkind = 'r' ORDER BY 1`, db).rows;
+    const r = must(`SELECT relname, relrowsecurity, relforcerowsecurity, pg_get_userbyid(relowner) FROM pg_class WHERE relname IN ('qa_canary_open', 'qa_canary_rls') AND relkind = 'r' ORDER BY 1`, db).rows;
     expect(r).toEqual([['qa_canary_open', 'f', 'f', 'poly_owner'], ['qa_canary_rls', 't', 't', 'poly_owner']]);
   });
 });
@@ -102,6 +111,12 @@ describe('WITH CHECK forgery (criterion 7)', () => {
     expect(await sqlstate(free((tx) => q(tx, 'insert into public.qa_canary_rls (owner_user_id) values ($1)', [A])))).toBe('42501');
     expect(await sqlstate(tenant(A, (tx) => q(tx, 'insert into public.qa_canary_rls (owner_user_id) values ($1)', [A])))).toBe('no error');
     expect(await tenant(A, async (tx) => (await q(tx, 'update public.qa_canary_rls set owner_user_id = owner_user_id where owner_user_id = $1', [B])).length)).toBe(0);
+  });
+
+  it('WITH CHECK alone refuses the forgery on a table whose SELECT policy admits every row', async () => {
+    expect(await sqlstate(tenant(A, (tx) => q(tx, 'insert into public.qa_canary_wc (owner_user_id) values ($1)', [B])))).toBe('42501');
+    expect(await sqlstate(tenant(A, (tx) => q(tx, 'update public.qa_canary_wc set owner_user_id = $1 where owner_user_id = $2', [B, A])))).toBe('42501');
+    expect(await sqlstate(tenant(A, (tx) => q(tx, 'update public.qa_canary_wc set owner_user_id = owner_user_id where owner_user_id = $1', [A])))).toBe('no error');
   });
 
   it('the open canary accepts the same forgery, so the refusals above come from the policy', async () => {
