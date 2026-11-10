@@ -138,6 +138,36 @@ describe('role preflight (addendum 1): roles and poly_migrator memberships must 
   });
 });
 
+describe('URL env is refused everywhere (review 1 R2)', () => {
+  for (const args of [[], ['--plan']]) {
+    it(`migrate ${args.join(' ') || '(apply)'} with DATABASE_URL set: exit 1 naming it, nothing applied`, () => {
+      const db = freshDb();
+      const r = migrateCli(db, writeMigrations([{ tag: '0000_a', sql: T('ta') }]), args, { DATABASE_URL: 'postgres://x@127.0.0.1:1/none' });
+      refused(r, /DATABASE_URL/, 1);
+      expect(tableExists(db, 'public.ta')).toBe(false);
+      expect(must(`SELECT to_regclass('drizzle.__drizzle_migrations') IS NULL`, db).rows[0][0]).toBe('t');
+    });
+  }
+});
+
+describe('journal when edited on an applied entry (review 1 R4)', () => {
+  it('hash unchanged, created_at differs: apply and --plan exit 2, nothing applied', () => {
+    const db = freshDb();
+    const dir = writeMigrations([{ tag: '0000_a', sql: T('ta') }, { tag: '0001_b', sql: T('tb') }]);
+    ok(migrateCli(db, dir));
+    const j = journalOf(dir);
+    j.entries[0].when += 1; // still strictly increasing; the file, hence its hash, is untouched
+    setJournal(dir, j);
+    rewrite(dir, '0002_c', T('tc'));
+    j.entries.push({ idx: 2, version: '7', when: j.entries[1].when + 5000, tag: '0002_c', breakpoints: true });
+    setJournal(dir, j);
+    refused(migrateCli(db, dir), /created_at|when|diverg|prefix|mismatch/i);
+    refused(migrateCli(db, dir, ['--plan']), /created_at|when|diverg|prefix|mismatch/i);
+    expect(applied(db)).toHaveLength(2);
+    expect(tableExists(db, 'public.tc')).toBe(false);
+  });
+});
+
 describe('journal order inside the runner', () => {
   it('non-increasing `when` in the journal: exit 2, nothing applied', () => {
     const db = freshDb();

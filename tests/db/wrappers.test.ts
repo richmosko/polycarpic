@@ -14,13 +14,16 @@ let db: string;
 let m: any;
 let auth: any;
 let session: any;
+let m0: any;
 
 beforeAll(async () => {
   db = freshDb();
   const r = migrateCli(db, REAL_MIGRATIONS);
   expect(r.code, r.err + r.out).toBe(0);
   vi.resetModules();
-  Object.assign(process.env, dbEnv('poly_app', db)); // web/worker use the same names with their own user (addendum 1)
+  m0 = await import('../../packages/db/src/index.ts');
+  await m0.close();
+  m0.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
   session = await import('../../packages/db/src/session.ts');
@@ -84,6 +87,7 @@ describe('app.job_targets', () => {
 describe('withContextFreeTx', () => {
   it('first statement asserts app.user_id is empty: a connection carrying a user id is refused', async () => {
     await auth.close(); // drop pooled backends so the next one is fresh and picks up the role setting
+    m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) }); // close() resets the config
     must(`ALTER ROLE poly_app IN DATABASE ${db} SET app.user_id = '${UID}'`);
     try {
       let ran = false;
@@ -91,6 +95,7 @@ describe('withContextFreeTx', () => {
       expect(ran).toBe(false);
     } finally {
       await auth.close();
+      m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
       must(`ALTER ROLE poly_app IN DATABASE ${db} RESET app.user_id`);
     }
   });

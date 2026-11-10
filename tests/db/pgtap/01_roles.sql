@@ -116,5 +116,13 @@ SELECT is((SELECT count(DISTINCT d.defaclrole)::int FROM pg_default_acl d WHERE 
   'all eight owner/definer roles carry the function default-ACL revoke');
 SELECT ok(EXISTS (SELECT 1 FROM pg_default_acl WHERE defaclrole = 'poly_owner'::regrole AND defaclobjtype='f'), 'poly_owner has a function default-ACL entry');
 
+-- review 1 R5: BetterAuth ids are uuid
+SELECT is((SELECT count(*)::int FROM information_schema.columns WHERE table_schema='public'
+  AND table_name IN ('user','session','account','verification') AND column_name IN ('id','user_id') AND data_type <> 'uuid'), 0,
+  'every BetterAuth id / user_id column is uuid');
+SELECT is((SELECT count(*)::int FROM information_schema.columns WHERE table_schema='public'
+  AND table_name IN ('user','session','account','verification') AND column_name IN ('id','user_id')), 6,
+  'the four BetterAuth tables have six id / user_id columns (user.id; session, account: id+user_id; verification.id)');
+
 SELECT * FROM finish();
 ROLLBACK;

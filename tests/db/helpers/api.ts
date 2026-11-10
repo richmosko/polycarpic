@@ -13,14 +13,12 @@ export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex'
 
 export const BOOTSTRAP = process.env.POLY_DB_BOOTSTRAP ?? [join(DB_PKG, 'sql', 'roles.sql'), join(DB_PKG, 'sql', 'bootstrap.sql')].find((f) => existsSync(f)) ?? join(DB_PKG, 'sql', 'roles.sql');
 
-/** The DB env contract (ruling addendum 1): HOST/PORT/NAME/USER/SSLMODE + PASSWORD_FILE, never DATABASE_URL. */
+/** The DB env contract (ruling addendum 1, review 1): HOST/PORT/NAME/USER/SSLMODE + a password file. No URL env anywhere. */
 export function dbEnv(role: string, db: string): Record<string, string> {
   const f = join(mkdtempSync(join(tmpdir(), 'poly83-pw-')), `db_password_${role}`);
   writeFileSync(f, `qa-${role}\n`);
   const s = JSON.parse(process.env.POLY_TEST_SERVER!);
-  return { DATABASE_HOST: s.host, DATABASE_PORT: String(s.port), DATABASE_NAME: db, DATABASE_USER: role, DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f,
-    // transitional: backend-lead-2's pools read URLs; check-config tests build their own env without these
-    DATABASE_URL: url(role, db), WORKER_DATABASE_URL: url('poly_worker', db) };
+  return { DATABASE_HOST: s.host, DATABASE_PORT: String(s.port), DATABASE_NAME: db, DATABASE_USER: role, DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f };
 }
 const LOGIN = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_backup'];
 

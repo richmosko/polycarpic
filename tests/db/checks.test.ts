@@ -44,6 +44,8 @@ describe('file check on custom migrations', () => {
     ['function with a SET role clause', 'CREATE FUNCTION public.g() RETURNS int LANGUAGE sql SET role = poly_authz AS $$select 1$$;\n', /role/i],
     ['dollar-quoted body is not exempt (fail closed)', 'DO $$ BEGIN RESET ROLE; END $$;\n', /RESET ROLE/i],
     ['SET ROLE to a role outside the closed list (poly_app)', 'SET ROLE poly_app;\nSET ROLE poly_owner;\n', /poly_app|outside|not allowed/i],
+    ["single-quoted last target: SET ROLE 'poly_purge' (R1)", "SET ROLE 'poly_purge';\n", /poly_owner|last SET ROLE/i],
+    ["SET SESSION ROLE 'evil' fails closed (R1)", "SET SESSION ROLE 'evil';\nSET ROLE poly_owner;\n", /evil|outside|not allowed/i],
     ['SET ROLE to postgres', 'SET ROLE postgres;\nSET ROLE poly_owner;\n', /postgres|outside|not allowed/i],
   ];
   for (const [name, sql, re] of bad) {
@@ -76,7 +78,7 @@ describe('startup guard (db/startup assertSchemaNotBehind): refuse when the appl
   // migrated with the real chain, then made behind / ahead / divergent by the superuser.
   const guard = async (db: string) => {
     vi.resetModules();
-    Object.assign(process.env, dbEnv('poly_app', db));
+    Object.assign(process.env, dbEnv('poly_app', db)); // startup reads process.env (unset => both pools read it)
     const g: any = await import('../../packages/db/src/startup.ts');
     return g.assertSchemaNotBehind('poly_app');
   };
