@@ -170,9 +170,8 @@ describe('journal when edited on an applied entry (review 1 R4)', () => {
 
 describe('role preflight, reverse direction (seceng M-2)', () => {
   const pre = (db: string) => writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
-  // FINDING (qa, 00f3e87): the preflight runs on apply only. --plan (ruling R6: "steps 3-4") reports pending (exit 3) over a
-  // stray membership, and neither path looks at privilege grants (GRANT CREATE ON SCHEMA public TO poly_backup applies).
-  // Those cases are `it.fails`: they pass while the gap exists and turn red the day it closes, so flip them to `it` then.
+  // Addendum 2: --plan runs the preflight too. Until backend-lead-2's fix lands the --plan cases are `it.fails` (they turn red
+  // when it lands: flip them to `it`). poly_backup's privilege grants are NOT a runner refusal; see pgTAP 01_roles.sql.
   for (const args of [[], ['--plan']]) {
     const t = args.length ? it.fails : it;
     t(`a stray member of a definer-owner role (GRANT poly_authz TO poly_app): ${args.join(' ') || 'apply'} exits 2 naming it`, () => {
@@ -194,12 +193,6 @@ describe('role preflight, reverse direction (seceng M-2)', () => {
       } finally {
         must('REVOKE poly_app FROM poly_backup');
       }
-    });
-    it.fails(`an extra privilege grant to poly_backup (GRANT CREATE ON SCHEMA public): ${args.join(' ') || 'apply'} exits 2 naming the role`, () => {
-      const db = freshDb();
-      must('GRANT CREATE ON SCHEMA public TO poly_backup', db);
-      refused(migrateCli(db, pre(db), args), /poly_backup/i);
-      expect(tableExists(db, 'public.ta')).toBe(false);
     });
   }
 });

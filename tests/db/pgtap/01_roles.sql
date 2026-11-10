@@ -116,6 +116,15 @@ SELECT is((SELECT count(DISTINCT d.defaclrole)::int FROM pg_default_acl d WHERE 
   'all eight owner/definer roles carry the function default-ACL revoke');
 SELECT ok(EXISTS (SELECT 1 FROM pg_default_acl WHERE defaclrole = 'poly_owner'::regrole AND defaclobjtype='f'), 'poly_owner has a function default-ACL entry');
 
+-- C-79 "no other grant" at rest (Addendum 2: asserted here and by POLY-97's provision-check, not by the runner)
+SELECT is((SELECT count(*)::int FROM pg_namespace n WHERE n.nspname !~ '^pg_' AND (has_schema_privilege('poly_backup', n.oid, 'CREATE'))), 0, 'poly_backup holds no CREATE on any schema');
+SELECT ok(NOT has_database_privilege('poly_backup', current_database(), 'CREATE') AND NOT has_database_privilege('poly_backup', current_database(), 'TEMPORARY'), 'poly_backup holds no CREATE or TEMP on the database');
+SELECT is((SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace, unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
+  WHERE c.relkind IN ('r','p','v','m','S') AND n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND has_table_privilege('poly_backup', c.oid, p)), 0, 'poly_backup holds no write privilege on any relation');
+SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid=p.oid AND d.deptype='e')
+  AND has_function_privilege('poly_backup', p.oid, 'EXECUTE')), 0, 'poly_backup can execute no user function');
+
 -- review 1 R5: BetterAuth ids are uuid
 SELECT is((SELECT count(*)::int FROM information_schema.columns WHERE table_schema='public'
   AND table_name IN ('user','session','account','verification') AND column_name IN ('id','user_id') AND data_type <> 'uuid'), 0,
