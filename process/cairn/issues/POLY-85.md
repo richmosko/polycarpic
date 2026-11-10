@@ -68,3 +68,14 @@ Tests red @ a469e48 (pushed). Right reason (module/export absent): packages/conf
 Map: R2/R3 loader.test.ts; S-1..S-4, S-9a/b seceng.test.ts; R6, S-5..S-7a log.test.ts + log-seceng.test.ts; R1/R3/R7 structure and start refusal tests/config/check-config.test.ts; S-7b/c seceng-static.test.ts + tests/db/ops-hardening.test.ts; R4 tests/db/ops-status.test.ts; S-8 ops-hardening; R5/S-9c tests/image/dockerfile.test.ts (POLY_IMAGE_BUILD=1 opt-in); harness tests/log/canary.ts.
 Assumed names, not in the ruling (reconcile in the test, one place each): SECRET_NAME_RE (S-1 export), config.secrets[VAR], config.statusPort, ConfigError.problems, createLogger({service,stream}), startStatusServer({port}), handleHealth(), main.ts for web/worker, schema key dropped.
 Runners: pnpm vitest run -c tests/config/vitest.config.ts; -c tests/db/vitest.config.ts; pnpm vitest run in packages/config.
+
+### @backend-lead — 2026-11-10
+
+Build green locally @ d5ba149 (not yet pushed: guard-push refuses eslint.config.js, outside POLY-85 paths; needs widening).
+Criteria -> files:
+1 *_FILE loader, refuses naming the variable: packages/config/src/{check,registry,secret,cli}.ts; web/worker main.ts refuse with config.refused lines; migrate check-config in apps/migrate/src/cli.ts
+2 loopback status + ok/not-ok health: apps/web/src/ops/{probe,status,health,cli-status}.ts; packages/db/src/startup.ts schemaStatus (R7)
+3 image commit label: Dockerfile (org.opencontainers.image.revision, 40-hex guard), .dockerignore, bin/polycarpic
+4 log schema + redaction: packages/config/log.schema.json, src/log.ts; eslint no-console for apps
+Runs: tests/config+image+log 94 pass incl. POLY_IMAGE_BUILD=1 real build; tests/db 147 pass; packages/config 297 pass, 1 fail = qa walker-teeth test expects 6 flags, the walker gives 7 (d flagged for enum/pattern AND maxLength); typecheck clean; eslint clean. pnpm lint fails only on arch-mismatch (ARCH 2.2 lacks config/log): asked architect-85.
+Decisions: layers.json web/worker allow config/log (R1); migrate run/--plan check DATABASE_* only via checkDatabaseConfig, since runner tests set no APP_ENV; tldts pinned 7.4.5 (7.4.21 trips minimumReleaseAge; no exclusion added); PWD on SECRET_NAME_ALLOW; docker COPY via workspace symlinks not pnpm deploy (node refuses type-stripping under node_modules).
