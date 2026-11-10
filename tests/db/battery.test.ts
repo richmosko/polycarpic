@@ -51,13 +51,11 @@ beforeAll(async () => {
   vi.resetModules();
   const m0 = await import('../../packages/db/src/index.ts');
   await m0.close();
-  m0.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
+  // S-3: a one-connection pool, so every checkout is the same dirty backend (the pid assertions stay as the second check)
+  m0.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), max: 1 });
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
   session = await import('../../packages/db/src/session.ts');
-  // S-3: a one-connection pool, so every checkout is the same dirty backend (the pid assertions below stay as the second check)
-  const pool = await import('../../packages/db/src/pool.ts');
-  (pool.appPool() as any).options.max = 1;
 });
 afterAll(async () => { await m?.close?.(); await auth?.close?.(); });
 
