@@ -199,6 +199,9 @@ importers:
       '@poly/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@poly/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@poly/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -238,6 +241,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@poly/config':
+        specifier: workspace:*
+        version: link:../../packages/config
       '@poly/db':
         specifier: workspace:*
         version: link:../../packages/db
@@ -268,6 +274,8 @@ importers:
       '@poly/tenancy':
         specifier: workspace:*
         version: link:../tenancy
+
+  packages/config: {}
 
   packages/db: {}
 
@@ -385,6 +393,9 @@ importers:
       '@poly/auth':
         specifier: workspace:*
         version: link:../../../packages/auth
+      '@poly/config':
+        specifier: workspace:*
+        version: link:../../../packages/config
       '@poly/db':
         specifier: workspace:*
         version: link:../../../packages/db

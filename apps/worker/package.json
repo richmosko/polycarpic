@@ -11,12 +11,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@poly/config": "workspace:*",
     "@poly/db": "workspace:*",
-    "@poly/secrets": "workspace:*",
     "@poly/import": "workspace:*",
-    "@poly/refdata": "workspace:*",
-    "@poly/securities": "workspace:*",
     "@poly/posting": "workspace:*",
+    "@poly/refdata": "workspace:*",
+    "@poly/secrets": "workspace:*",
+    "@poly/securities": "workspace:*",
     "@poly/tax": "workspace:*"
   }
 }
