@@ -69,3 +69,14 @@ Only what `01_roles.sql` lacks: the seven C-10 roles own no `pg_class` row (poly
 
 1. Tenant seeding helper and the matrix `probe` shape: POLY-62.
 2. Drift between §4.2.1 and the JSON is caught by review only; a row-count tie to the SECURITY HTML is brittle and not built.
+
+## Addendum 1 (2026-11-10): seceng's pre-ruling checklist folded in
+
+seceng-84's checklist items 1–6, 8, 9 and 11 are already in R1–R6. This addendum makes four of them explicit and fixes the two R7 points that weren't.
+- **Canaries are permanent tables** (`CREATE TABLE`, never `TEMP`), so R1's temporary-relation exclusion cannot hide one. Scope filters are exact schema names (`nspname NOT IN (…)`), never `~ '^pg_'`.
+- **The R1 probe has no hidden filter by schema or owner.** Any r/p relation outside the three schemas and temp is in scope, `app` and `public` included.
+- **Inversion (R4) connects as `poly_app`.** A superuser bypasses RLS, so a superuser read proves nothing. The protected twin returning zero rows is a required assertion, not an optional one.
+- **R7 amended — EXECUTE grantees:** the definer comparison takes grantees from `aclexplode(proacl)` over **all** grantees, PUBLIC (`grantee = 0`, reported as `PUBLIC`) included, minus the owner. It does not use `has_function_privilege` over `^poly_` roles. A PUBLIC or stray-role EXECUTE on any definer then fails generically, not only on `app.job_targets`. Canary: a listed-shape definer with `GRANT EXECUTE … TO PUBLIC` is reported.
+- **R7 amended — search_path:** `proconfig` must contain the exact element `search_path=""` (`'search_path=""' = ANY (proconfig)`), never a regex over the joined string.
+- **TRUNCATE triggers (checklist 10):** R1's `no_truncate_trigger` covers every non-exempt r/p relation, not just a list of append-only tables. It is therefore stricter than C-21, activates with each table with no list to maintain, and is what ARCH §6.1 states. A future non-append-only table that genuinely must allow TRUNCATE is a reviewed change to this ruling, not an exemption entry.
+- "No C-10 role holds CREATE on any schema at rest" is already asserted in `01_roles.sql`; R6 does not repeat it.
