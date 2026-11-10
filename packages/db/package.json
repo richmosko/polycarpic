@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./session": "./src/session.ts",
-    "./auth": "./src/auth.ts"
+    "./auth": "./src/auth.ts",
+    "./migrate": "./src/migrate.ts",
+    "./startup": "./src/startup.ts"
   },
   "scripts": {
     "test": "vitest run",
