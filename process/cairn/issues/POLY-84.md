@@ -110,3 +110,13 @@ Lift @ 87f17b2: **approved**. M-1 and M-2 are closed. Read at 06020e3, 66fcf44, 
 | R1–R7, Addendum 1, TEMP (a) | pass, unchanged since 8a5f630 | verdict @ 81221d3 |
 
 Non-blocking, carried: ARCH OQ-36 (the GL `account` name, before POLY-107) @ 187d7fe.
+
+### @qa-engineer — 2026-11-10
+
+qa Validate sign-off: PASS. Measured at 87f17b2 (tree at 49524ba).
+- tests/db: 7 files, 112 pass + 2 expected-fail (POLY-83), 0 fail. Wall-clock 59-60s vs 54.4s before POLY-84 (+~5s; +2 files, +19 tests).
+- pnpm lint clean. pnpm -r typecheck clean. packages/db unit tests (after 2a05be0): 3 files, 8 tests, all pass.
+- Criteria 1-10 each have a named test and a canary. Red 3acc4d0 (10 tests failed, probes stubbed blind), green 8a5f630, review fixes 06020e3 / 66fcf44 / 87f17b2.
+- Mutation sanity: every guard disabled alone is caught, bar one equivalent mutant; table in process/cairn/reviews/POLY-84/mutation.md.
+- R6 TEMP: asserted for all poly_* roles except poly_owner (architect ruling (a) @ 7f90f49).
+- M1 has no tenant table, so the catalog probes are vacuous on the real chain and the matrix is 30 rows, all inactive; the canaries prove the harness. Each tenant table's feature adds its own cross-tenant and matrix rows (POLY-62).
