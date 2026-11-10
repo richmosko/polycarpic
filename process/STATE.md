@@ -15,14 +15,15 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Monorepo skeleton + layer lint
-- **Issue:** `POLY-82` (cairn)
+- **Feature:** DB roles, migrate, withTenant
+- **Issue:** `POLY-83` (cairn)
 - **Milestone:** `POLY-M1` Foundations
-- **Branch:** `feature/poly-82-monorepo-skeleton-layer-lint`
-- **Started:** 2026-11-09
-- **Goal:** the pnpm + Turborepo workspace with every ARCH §2.2 package and app stubbed (one Vitest test each, runnable alone) and the ARCH §2.1 layer enforcement built — `layers.json`, generated boundaries lint, package-resolution guards, and the checks on the file, all with pass/fail fixtures under `test/layers/`.
-- **Status:** In Review — PR [#100](https://github.com/richmosko/polycarpic/pull/100); QA green @ 3fdd49e, architect approved @ 7c70152. Follow-ups: POLY-131.
-- **Next:** POLY-83 → POLY-84, POLY-85.
+- **Branch:** `feature/poly-83-db-roles-migrate-withtenant`
+- **Started:** 2026-11-10
+- **Goal:** `packages/db` for real — the Drizzle Kit migration chain with its locked, prefix-checked runner; the full Postgres role set incl. `poly_backup` (C-79); the only connection path (`withTenant` / `withSystem` / `withContextFreeTx`, mutually non-nesting); the `db/auth` subpath for BetterAuth; the `migrate` subcommands the deploy script calls; and the pgTAP that proves the ownership and grant invariants (C-84, C-85, T-91).
+- **Status:** In Progress
+- **Previous:** POLY-82 merged 2026-11-10 via PR #100 (ARCH v1.15.2; follow-ups in POLY-131).
+- **Next:** POLY-84 (RLS battery harness), POLY-85 (runtime config + ops hooks).
 
 ## Releases
 

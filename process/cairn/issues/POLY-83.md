@@ -1,7 +1,7 @@
 ---
 id: POLY-83
 title: DB roles, migrate, withTenant
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-76, POLY-82]
@@ -35,3 +35,9 @@ packages/db: the migration chain (tool per POLY-76), the full Postgres role set,
 - [ ] The file check fails a custom migration containing SET SESSION AUTHORIZATION, RESET ROLE, or SET ROLE to a role outside poly_owner and the C-10 definer-owner set. A fixture migration ending on SET ROLE poly_authz fails its tracking insert and rolls back the whole run. The runner asserts current_user = 'poly_owner' when migrate() returns (ARCH v1.14.2 §6.2).
 - [ ] The runner uses one pg client, never a pool, and closes it in finally. Two fixtures are refused with nothing applied: a migration with a timestamp older than the last applied, and an edited applied file (SECURITY T-91).
 - [ ] pgTAP: every grant to poly_migrator has inherit_option false, set_option true, admin_option false; a fixture file ending on SET ROLE poly_authz (file check bypassed) rolls the whole run back.
+
+## Comments
+
+### @team-lead — 2026-11-09
+
+Feature started. Branch: `feature/poly-83-db-roles-migrate-withtenant`.
