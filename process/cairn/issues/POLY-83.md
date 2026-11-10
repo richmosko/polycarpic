@@ -91,3 +91,7 @@ Pass: roles.sql matches C-79 exactly, and every role is NOSUPERUSER NOCREATEDB N
 ### @seceng — 2026-11-09
 
 SecEng @ 00f3e87: M-1 and M-2 conditions lifted. connectionFrom now refuses an unset or unknown sslmode (fixture included), and the preflight refuses stray members of poly_owner and the seven and any poly_backup membership other than pg_read_all_data. L-2 is done too; L-1 stays non-blocking for POLY-100. SecEng approves.
+
+### @seceng — 2026-11-09
+
+SecEng on Addendum 2 (2) @ 7e9a824: concur that C-79's live-box evidence moves from the runner to provision-check (POLY-97), with two amendments to the POLY-97 criterion: also refuse EXECUTE on any prosecdef function (a definer grant to poly_backup is a write path) and TEMPORARY on the database; and make 'owns nothing' cover pg_type as well. No SECURITY edit is needed, because C-79 already names provision-check as its evidence.
