@@ -1,0 +1,22 @@
+{
+  "name": "@poly/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@poly/db": "workspace:*",
+    "@poly/secrets": "workspace:*",
+    "@poly/import": "workspace:*",
+    "@poly/refdata": "workspace:*",
+    "@poly/securities": "workspace:*",
+    "@poly/posting": "workspace:*",
+    "@poly/tax": "workspace:*"
+  }
+}

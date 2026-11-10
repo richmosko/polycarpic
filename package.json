@@ -1,0 +1,17 @@
+{
+  "name": "polycarpic",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.18.0",
+  "scripts": {
+    "test": "turbo run test",
+    "typecheck": "turbo run typecheck",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "eslint": "latest",
+    "turbo": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
