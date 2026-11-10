@@ -1,5 +1,5 @@
 // POLY-83 static checks and guards (ruling R5-R8). Assumed invocation, reconcile in this header only:
-//   node --experimental-strip-types packages/db/src/check-migrations-cli.ts <dir>   (the `check-migrations` script of @poly/db)
+//   pnpm --filter @poly/db check-migrations <dir>   (backend-lead-2's surface)
 //   apps/migrate main with arg `check-config`: migrator secret file present + non-empty, connection settings present; 0 / 1
 //   @poly/db/startup  assertSchemaNotBehind(): journal `when` list must be a prefix of tracking created_at list (by id)
 import { spawnSync } from 'node:child_process';
@@ -7,15 +7,14 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { DB_PKG, must } from './helpers/pg';
+import { ROOT, must } from './helpers/pg';
 import { MIGRATE_CLI, REAL_MIGRATIONS, dbEnv, freshDb, migrateCli, writeMigrations } from './helpers/api';
 
-const CHECK = process.env.POLY_DB_CHECK_CLI ?? join(DB_PKG, 'src', 'check-migrations-cli.ts');
 const check = (dir: string) => {
-  const p = spawnSync('node', ['--experimental-strip-types', CHECK, dir], { encoding: 'utf8' });
+  const p = spawnSync('pnpm', ['--filter', '@poly/db', 'check-migrations', dir], { encoding: 'utf8', cwd: ROOT });
   const text = (p.stderr ?? '') + (p.stdout ?? '');
   // a missing CLI exits 1 and its error text can match a loose regex: report it as "not runnable"
-  return { code: /Cannot find module|ERR_MODULE_NOT_FOUND/.test(text) ? 127 : (p.status ?? 127), text };
+  return { code: /Cannot find module|ERR_MODULE_NOT_FOUND|ERR_PNPM_NO_SCRIPT|Missing script/.test(text) ? 127 : (p.status ?? 127), text };
 };
 const T = (n: string) => `CREATE TABLE public.${n} (id int);\n`;
 
@@ -79,7 +78,7 @@ describe('startup guard (db/startup assertSchemaNotBehind): refuse when the appl
     vi.resetModules();
     Object.assign(process.env, dbEnv('poly_app', db));
     const g: any = await import('../../packages/db/src/startup.ts');
-    return g.assertSchemaNotBehind();
+    return g.assertSchemaNotBehind('poly_app');
   };
   const migrated = () => {
     const db = freshDb();

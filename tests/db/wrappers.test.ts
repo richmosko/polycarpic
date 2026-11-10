@@ -27,7 +27,8 @@ beforeAll(async () => {
 });
 afterAll(async () => { await m?.close?.(); await auth?.close?.(); });
 
-const q = (tx: any, text: string, p?: unknown[]) => tx.query(text, p).then((r: any) => r.rows);
+// tx is a drizzle db; clientOf (db/auth) exposes its pg client
+const q = (tx: any, text: string, p?: unknown[]) => auth.clientOf(tx).query(text, p).then((r: any) => r.rows);
 
 describe('withTenant', () => {
   it('sets app.user_id and app.session_id transaction-locally (is_local = true)', async () => {

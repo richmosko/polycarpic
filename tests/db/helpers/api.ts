@@ -2,23 +2,25 @@
 // implementation differs, only this file changes. Everything else in tests/db goes through these helpers.
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DB_PKG, freshName, must, psql, url } from './pg';
 
-export const MIGRATE_CLI = process.env.POLY_DB_MIGRATE_CLI ?? join(DB_PKG, '..', '..', 'apps', 'migrate', 'src', 'main.ts');
+export const MIGRATE_CLI = process.env.POLY_DB_MIGRATE_CLI ?? join(DB_PKG, '..', '..', 'apps', 'migrate', 'src', 'cli.ts');
 export const REAL_MIGRATIONS = process.env.POLY_DB_MIGRATIONS ?? join(DB_PKG, 'migrations');
 export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-export const BOOTSTRAP = process.env.POLY_DB_BOOTSTRAP ?? join(DB_PKG, 'sql', 'roles.sql');
+export const BOOTSTRAP = process.env.POLY_DB_BOOTSTRAP ?? [join(DB_PKG, 'sql', 'roles.sql'), join(DB_PKG, 'sql', 'bootstrap.sql')].find((f) => existsSync(f)) ?? join(DB_PKG, 'sql', 'roles.sql');
 
 /** The DB env contract (ruling addendum 1): HOST/PORT/NAME/USER/SSLMODE + PASSWORD_FILE, never DATABASE_URL. */
 export function dbEnv(role: string, db: string): Record<string, string> {
   const f = join(mkdtempSync(join(tmpdir(), 'poly83-pw-')), `db_password_${role}`);
   writeFileSync(f, `qa-${role}\n`);
   const s = JSON.parse(process.env.POLY_TEST_SERVER!);
-  return { DATABASE_HOST: s.host, DATABASE_PORT: String(s.port), DATABASE_NAME: db, DATABASE_USER: role, DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f };
+  return { DATABASE_HOST: s.host, DATABASE_PORT: String(s.port), DATABASE_NAME: db, DATABASE_USER: role, DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f,
+    // transitional: backend-lead-2's pools read URLs; check-config tests build their own env without these
+    DATABASE_URL: url(role, db), WORKER_DATABASE_URL: url('poly_worker', db) };
 }
 const LOGIN = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_backup'];
 
