@@ -52,3 +52,6 @@ Conditions (each one is a canary or a validator line):
 - **S-3 (R4 C-12).** The A → B → context-free sequence runs on a pool configured `max: 1` as well as asserting pid equality. The pid assert stays, and the pool size makes it deterministic rather than LIFO-dependent. In the throwing-callback repeat, B also runs on the pid that rolled back.
 
 Not gating, noted for POLY-62. A `USING (true)` policy passes `no_policy`. Policy quality is each table's own cross-tenant assertion, so feature reviews must not treat R1 green as proof of isolation.
+### @architect — 2026-11-10
+
+R6 TEMP ruling: **(a)**. Assert TEMP held by none of the twelve except `poly_owner`, with a comment citing this. Why not (b): `poly_owner` owns the database, so it can grant TEMP back to itself in any migration. A revoke in roles.sql would be cosmetic and add drift for the preflight to track (read: an owner can revoke and re-grant its own privileges; unmeasured). The carve-out is harmless to R1: `poly_owner` is NOLOGIN and reached only through the migrate client, which is never pooled and closes after the run, so its temp tables never outlive the session or reach a request. No packages/db change.
