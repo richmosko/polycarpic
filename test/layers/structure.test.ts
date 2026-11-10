@@ -98,6 +98,10 @@ describe('tsc-resolved criteria (13, 15)', () => {
     expect(r.status).not.toBe(0);
     expect(r.stdout).toMatch(/TS(2307|2792)/);
   });
+  it('control: a declared subpath (@poly/db/auth) resolves and compiles clean', () => {
+    const r = tsc('tsconfig.declared-subpath.json');
+    expect(r.status, r.stdout).toBe(0);
+  });
   it('the @poly/db index does not export the SessionUserId constructor (type test compiles)', () => {
     const r = tsc('tsconfig.db-index.json');
     expect(r.status, r.stdout).toBe(0);
