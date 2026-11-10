@@ -16,7 +16,7 @@
     "user_id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "maxLength": 36 },
     "entity_id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "maxLength": 36 },
     "run_id": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", "maxLength": 36 },
-    "route": { "type": "string", "pattern": "^/[A-Za-z0-9_./\\[\\]-]*$", "maxLength": 128 },
+    "route": { "type": "string", "pattern": "^(?!.*\\d{4})/[A-Za-z0-9_./\\[\\]-]*$", "maxLength": 128 },
     "method": { "type": "string", "enum": ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"] },
     "status": { "type": "integer", "minimum": 100, "maximum": 599 },
     "outcome": { "type": "string", "enum": ["ok", "denied", "error", "refused"] },
@@ -33,7 +33,7 @@
       "required": ["type"],
       "properties": {
         "type": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*$", "maxLength": 64 },
-        "code": { "type": "string", "pattern": "^[A-Za-z0-9_.-]+$", "maxLength": 32 }
+        "code": { "type": "string", "pattern": "^[A-Z0-9_]{1,32}$", "maxLength": 32 }
       }
     }
   }

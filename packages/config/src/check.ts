@@ -1,7 +1,7 @@
 // checkConfig / loadConfig (POLY-85 ruling R2, R3). Reads the environment and the mounted secret files once; connects
 // nowhere. One validator for all three entrypoints (migrate, web, worker). A problem names the variable and, for a file
 // fault, the path. It never carries file content or the value of a refused variable (S-3).
-import { fstatSync, openSync, readSync, closeSync } from 'node:fs';
+import { constants, fstatSync, openSync, readSync, closeSync } from 'node:fs';
 import { parse as parseHost } from 'tldts';
 import { FORBIDDEN_PLAIN, REGISTRY, SECRET_NAME_ALLOW, SECRET_NAME_RE, stemOf, type Service } from './registry.ts';
 import { Secret } from './secret.ts';
@@ -59,7 +59,7 @@ type Read = { ok: true; value: string } | { ok: false; fault: Fault };
 function readSecretFile(path: string): Read {
   let fd: number;
   try {
-    fd = openSync(path, 'r');
+    fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK); // a FIFO must not block the check
   } catch (e) {
     return { ok: false, fault: (e as NodeJS.ErrnoException).code === 'ENOENT' ? 'missing' : 'unreadable' };
   }

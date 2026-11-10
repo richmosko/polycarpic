@@ -37,16 +37,21 @@ const RESERVED = new Set(['ts', 'level', 'service', 'event', 'dropped']);
 
 function passes(r: Rule, v: unknown): boolean {
   if (r.enum && !r.enum.includes(v)) return false;
+  // fail closed (M-1): a type this filter does not check, including a type array, accepts nothing
   if (r.type === 'string') {
     if (typeof v !== 'string') return false;
     if (r.maxLength !== undefined && v.length > r.maxLength) return false;
     if (r.pattern && !r.pattern.test(v)) return false;
-  } else if (r.type === 'integer' || r.type === 'number') {
+    return true;
+  }
+  if (r.type === 'integer' || r.type === 'number') {
     if (typeof v !== 'number' || !Number.isFinite(v) || (r.type === 'integer' && !Number.isInteger(v))) return false;
     if (r.minimum !== undefined && v < r.minimum) return false;
     if (r.maximum !== undefined && v > r.maximum) return false;
+    return true;
   }
-  return true;
+  if (r.type === 'boolean') return typeof v === 'boolean';
+  return false;
 }
 
 /** err -> { type, code } with each part checked; null when nothing survives (type is required). */
