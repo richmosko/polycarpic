@@ -6,7 +6,7 @@ Gating ruling for `packages/db` roles, the migrate runner and the connection pat
 
 Roles are cluster objects, and `poly_backup` needs `REPLICATION` + `BYPASSRLS`, which only a superuser can grant. Giving `poly_owner` `CREATEROLE` would widen what the migrate login reaches. So:
 
-- `packages/db/sql/bootstrap.sql` — idempotent, run **as the superuser** before the first migrate: by `provision.sh` on the box (INFRA, devops), by the test harness and CI before the battery. No passwords in it (provision.sh sets them). It:
+- `packages/db/sql/roles.sql` (named so by addendum 1) — idempotent, run **as the superuser** before the first migrate: by `provision.sh` on the box (INFRA, devops), by the test harness and CI before the battery. No passwords in it (provision.sh sets them). It:
   - creates (if missing) and then `ALTER ROLE`s to the exact attributes, every run: `poly_owner` NOLOGIN NOBYPASSRLS; `poly_migrator`, `poly_app`, `poly_worker` LOGIN NOBYPASSRLS NOCREATEDB NOCREATEROLE NOREPLICATION; the seven C-10 roles NOLOGIN NOBYPASSRLS; `poly_backup` per C-79 (LOGIN REPLICATION BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT 3, member of `pg_read_all_data`, `ALTER ROLE … SET default_transaction_read_only = on`).
   - `GRANT poly_owner, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal TO poly_migrator WITH INHERIT FALSE, SET TRUE` (no ADMIN). Postgres ≥ 16; the local Homebrew psql is 14, so run against the PG 17 image.
   - `ALTER DATABASE <current_database()> OWNER TO poly_owner`; `REVOKE ALL ON DATABASE … FROM PUBLIC`; `GRANT CONNECT` to the four login roles (+ `poly_backup`). No TEMP for anyone (unmeasured: nothing we run needs temp tables).
@@ -56,6 +56,13 @@ Schema `app` (owner `poly_owner`; USAGE to `poly_app`, `poly_worker`, the seven;
 ## R8. Journal order + role-switch file check: in `packages/db`, under `pnpm lint`
 
 Pure functions in `packages/db/src/migrations-check.ts` (journal order; role-switch scan), a CLI `packages/db` script `check-migrations`, and root `lint` gains `pnpm --filter @poly/db check-migrations`. CI wiring is POLY-96. Migrations folder: `packages/db/migrations`. The scan runs over **every** file, comments stripped, dollar-quoted bodies **not** exempt (fail closed). Refused: `SET SESSION AUTHORIZATION`, `RESET ROLE`, `RESET ALL`, `SET ROLE NONE`/`DEFAULT`, any `SET LOCAL ROLE`, `SET [SESSION] ROLE` to a target outside R2, `set_config('role'…)`, a function `SET role` clause; a file containing any `SET ROLE` must end on `SET ROLE poly_owner`.
+
+## Addendum 1 (2026-11-09): roles file, owner story, check-config inputs
+
+- **File name** `packages/db/sql/roles.sql` (backend-lead-2's name; same content as R1). Allowed `SET ROLE` targets and `poly_migrator`'s memberships: `poly_owner` **plus** the seven. backend-lead-2's list omitted `poly_owner`, so it is added here.
+- **Owner story.** Postgres roles have no owner; `roles.sql` is their definition of record, reviewed like a migration, and it converges on every run (create if missing, then `ALTER` to the exact attributes and grants). The runner preflights, before the lock: all 12 roles exist, and `poly_migrator`'s memberships in `pg_auth_members` are exactly R1's. Otherwise exit 2, nothing applied. pgTAP proves the rest. On Neon there is no superuser, so the file cannot run as written; that is POLY-121's problem. C-10 and C-85 say "role migrations"; read that as `roles.sql`. seceng concurs at review.
+- **check-config: option (a)**, the DB side only, with no connection. In POLY-83 it reads exactly `DATABASE_HOST`, `DATABASE_PORT` (integer, default 5432), `DATABASE_NAME`, `DATABASE_USER` (must be `poly_migrator`), `DATABASE_SSLMODE` (`disable` \| `require` \| `verify-full`, required, no default) and `DATABASE_PASSWORD_FILE` (on the box `/run/secrets/db_password_migrator`; the file must exist, be non-empty and hold one line). It also refuses when `DATABASE_PASSWORD` or `DATABASE_URL` is set. Exit 0 when all pass; otherwise exit 1 with one line per fault, naming the variable. web and worker use the same names with their own user (`poly_app`, `poly_worker`) and secret file.
+- **Not in POLY-83:** `host.env`, `TLS_MODE`, `PLAID_ENV`, the other secrets, any environment selector. qa drops `POLY_SECRETS_DIR`, `POLY_HOST_ENV` and `POLY_ENV`. POLY-85 moves the parsing into `packages/config` under these names and extends check-config. The reader lives in `apps/migrate` until then.
 
 ## Open (not gating)
 
