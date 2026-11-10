@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-85-runtime-config-ops-hooks`
 - **Started:** 2026-11-10
 - **Goal:** The app-side hooks devops's scripts depend on — `*_FILE` secret loader in `packages/config` (extending `apps/migrate check-config`), loopback-only status listener + ok/not-ok public health, image commit label, structured JSON log schema.
-- **Status:** In Progress
+- **Status:** In Review — PR [#105](https://github.com/richmosko/polycarpic/pull/105)
 
 _Previous: POLY-84 (RLS battery harness) merged 2026-11-10 via PR [#103](https://github.com/richmosko/polycarpic/pull/103); follow-ups on POLY-62, POLY-107 (OQ-36), POLY-79._
 

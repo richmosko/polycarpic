@@ -1,7 +1,7 @@
 ---
 id: POLY-85
 title: Runtime config + ops hooks
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-82]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [packages/config/**, apps/web/**, apps/worker/**, apps/migrate/**, Dockerfile, .dockerignore, bin/polycarpic, packages/db/src/startup.ts, packages/db/src/migrate.ts, packages/db/src/migrate-config.ts, packages/db/src/*.test.ts, tests/**, layers.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/INFRA/**, docs/SECURITY/**, eslint.config.js, process/cairn/issues/POLY-85.md]
 labels: [enabler, infra]
 priority: P2
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/105
 created: 2026-11-08
 updated: 2026-11-10
 ---
@@ -143,3 +143,7 @@ Lift @ 89aa134: **approved**. M-1 to M-3 are closed. I read af78ac3 and 89aa134,
 QA sign-off @ 89aa134 (re-verified from the tree after the M-1..M-3 lift). Counts: packages/config 303 pass; tests/config+image+log 94 pass with POLY_IMAGE_BUILD=1 (real build, none skipped); tests/db 147 pass (+2 expected fail, 9 files); python gate 1975 ok; typecheck 18/18; lint clean.
 Suite-time delta vs POLY-84 baseline: tests/db 99 s vs ~60 s = +~40 s (ops-status + ops-hardening, Postgres-backed, incl. fake-pg timeout waits); packages/config +0.3 s; tests/config+image+log +7 s (+4 s with the real build, layer-cached). Python gate unchanged (71 s). New suites join existing per-package jobs; no new top-level job.
 Criteria ticked above with proving tests. Mutation sanity: process/cairn/reviews/POLY-85/mutation.md (9 of 10 caught, 1 equivalent); seceng additionally caught single-flight and crash-handler mutants. M-1..M-3 canaries green. Sign-off: PASS.
+
+### @team-lead — 2026-11-10
+
+PR opened: https://github.com/richmosko/polycarpic/pull/105. Validate signed off @ b674686 (measured at 89aa134); architect PASS @ ebfe633, seceng approved @ 9330dec. Suite growth: tests/db ~60 s → 99 s (two Postgres-backed ops suites); the next Postgres-backed suite should share the container. Guard gap for the tooling umbrella: `guard-push` has no implicit allowance for the assignee's own issue file.
