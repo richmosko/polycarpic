@@ -32,3 +32,7 @@ From the POLY-83 architect ruling (R7, `process/cairn/reviews/POLY-83/ruling.md`
 ### @team-lead — 2026-11-10
 
 Feature started. Branch: `feature/poly-85-runtime-config-ops-hooks`.
+
+### @architect — 2026-11-10
+
+Gate-1 ruling: process/cairn/reviews/POLY-85/ruling.md @ 332df39 (ARCH v1.15.6 carries the doc parts). R1 config/secrets boundary and the @poly/config/log subpath; R2 env vars (APP_ENV, TLS_MODE offline cross-check, PLAID_ENV per C-77, secret-looking env refusal in staging+prod); R3 the *_FILE registry, semantics and messages, check-config on all three entrypoints; R4 loopback status listener and the two-body health; R5 root Dockerfile, label org.opencontainers.image.revision, bin/polycarpic dispatcher; R6 log schema at packages/config/log.schema.json, allowlist + redact backstop, C-33 canary harness; R7 additive packages/db change; R8 test layout. paths: widening needed: packages/db/src/startup.ts, packages/db/src/migrate.ts, packages/db/src/migrate-config.ts, packages/db/src/*.test.ts, bin/polycarpic.
