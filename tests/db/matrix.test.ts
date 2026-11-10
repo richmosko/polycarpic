@@ -24,8 +24,9 @@ describe('the §4.2.1 matrix data (criterion 10)', () => {
 
   it('rows activate as their tables land: none is active in M1, the inactive ones are counted, and none lacks a probe', () => {
     const { rows } = loadMatrix();
-    const { active, inactive } = activeRows(db, rows);
+    const { active, inactive, unresolved } = activeRows(db, rows);
     console.info(`permission matrix: ${active.length} active, ${inactive.length} inactive of ${rows.length}`);
+    for (const id of inactive) console.info(`  inactive ${id}: ${unresolved[id].join(', ')}`);
     expect(missingProbes(active)).toEqual([]);
     expect(active.length + inactive.length).toBe(rows.length);
     expect(active, 'M1 has no tenant table; the first one to land activates rows here').toEqual([]);
@@ -41,9 +42,10 @@ describe('the §4.2.1 matrix data (criterion 10)', () => {
         row({ id: 'no-db', tables: [], db: false }),
         row({ id: 'half-landed', tables: ['public.qa_canary_rls', 'public.qa_canary_missing'] }),
       ];
-      const { active, inactive } = activeRows(db, rows);
+      const { active, inactive, unresolved } = activeRows(db, rows);
       expect(active.map((r) => r.id)).toEqual(['landed-no-probe', 'landed-with-probe']);
       expect(inactive).toEqual(['not-yet', 'no-db', 'half-landed']);
+      expect(unresolved).toEqual({ 'not-yet': ['public.qa_canary_missing'], 'no-db': ['(db:false)'], 'half-landed': ['public.qa_canary_missing'] });
       expect(missingProbes(active)).toEqual(['landed-no-probe: table landed without its matrix probe']);
     } finally {
       must(`DROP TABLE public.qa_canary_rls`, db);

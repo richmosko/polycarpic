@@ -37,12 +37,14 @@ export function validate(rows: MatrixRow[]): string[] {
 }
 
 /** Active rows (every table exists) and the count/ids of inactive ones. */
-export function activeRows(db: string, rows: MatrixRow[]): { active: MatrixRow[]; inactive: string[] } {
+export function activeRows(db: string, rows: MatrixRow[]): { active: MatrixRow[]; inactive: string[]; unresolved: Record<string, string[]> } {
   const names = [...new Set(rows.flatMap((r) => r.tables))];
   const there = new Set<string>();
   for (const t of names) if (must(`SELECT to_regclass('${t}') IS NOT NULL`, db).rows[0][0] === 't') there.add(t);
   const active = rows.filter((r) => r.db !== false && r.tables.every((t) => there.has(t)));
-  return { active, inactive: rows.filter((r) => !active.includes(r)).map((r) => r.id) };
+  const off = rows.filter((r) => !active.includes(r));
+  const unresolved = Object.fromEntries(off.map((r) => [r.id, r.db === false ? ['(db:false)'] : r.tables.filter((t) => !there.has(t))]));
+  return { active, inactive: off.map((r) => r.id), unresolved };
 }
 
 /** A table landed without its probe: every active row with probe null. */
