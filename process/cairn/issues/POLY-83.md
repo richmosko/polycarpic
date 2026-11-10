@@ -45,3 +45,27 @@ Feature started. Branch: `feature/poly-83-db-roles-migrate-withtenant`.
 ### @architect — 2026-11-09
 
 Ruling @ 98a52e3: process/cairn/reviews/POLY-83/ruling.md (R1–R8) is the build contract. Superuser bootstrap file creates the roles; closed SET ROLE list = poly_owner + the seven C-10 roles; only poly_authz owns a definer in M1 (app.job_targets, zero rows); runner/--plan predicates and exit codes (R6); apps/migrate + restricted db/migrate and db/startup subpaths (R7); migrations check in packages/db under pnpm lint (R8). ARCH v1.15.3 carries the doc-level parts. seceng to concur at review on reading C-10 'granted to none' as 'none but poly_migrator, INHERIT FALSE, SET TRUE' (R1).
+
+### @architect — 2026-11-09
+
+Architect verdict @ 37db02c: APPROVED. Conditions: qa's tests/db gate goes green on the final sha, and seceng concurs on the two readings at the end of this comment.
+
+| axis | result | evidence |
+|---|---|---|
+| Roles (12; LOGIN/NOLOGIN, NOBYPASSRLS; poly_backup per C-79) | pass | packages/db/sql/roles.sql @ 37db02c |
+| Ownership: poly_owner owns the DB, public, app, drizzle; poly_migrator holds nothing, members INHERIT FALSE SET TRUE no ADMIN, preflight exit 2 | pass | roles.sql; migrate.ts assertRoles |
+| Definers: only app.job_targets, owned by poly_authz, poly_worker only, search_path '', zero rows; CREATE on app granted for the file only | pass | 0001_app_foundation.sql; sql/definers.json |
+| Scope: no RLS policy, no tenant table (POLY-84 / POLY-62) | pass | migrations/ @ 37db02c |
+| Runner: one client, lock, (hash, created_at) prefix, DB ahead = nothing pending, convergence + current_user asserts, exit 0/1/2/4 | pass | migrate.ts, journal.ts @ 37db02c (R4 fixed) |
+| --plan: no lock, READ ONLY, exit 0/3/2/1 | pass | migrate.ts plan() |
+| check-config: DATABASE_* only, run before every subcommand; no URL env, no URL string | pass | cli.ts, connection.ts @ 37db02c (R2, R3 fixed) |
+| File check: closed SET ROLE list; quoted and unparseable targets fail closed; comments stripped string-aware | pass | migrations-check.ts + test, db unit tests 6/6 run @ 37db02c (R1, N1 fixed) |
+| withTenant / withSystem / withContextFreeTx: AsyncLocalStorage non-nesting, set_config(…, true), principal resolved in the DB, C-84 first statement | pass | context.ts |
+| db/auth: plain pool, withContextFreeTx, fields map derived from Drizzle | pass | auth.ts |
+| Start-up guard: journal `when` is a prefix of created_at; web and worker exit non-zero | pass | startup.ts, apps/*/src/startup.ts |
+| Layer map: db/migrate only for apps/migrate, db/startup for web/worker; one SET-exempt file | pass | layers.json; pnpm lint exit 0 @ 37db02c |
+| uuid keys on BetterAuth tables (SECURITY (l)) | pass; BetterAuth accepting them is (unmeasured) | schema/auth.ts, 0000 @ 37db02c (R5); POLY-86 measures |
+| Integration (tests/db) | not verified at this sha | qa gate |
+
+URL env ruling: none survives POLY-83. Non-blocking: N3 (configure() on the db index; revisit with POLY-85).
+For seceng: (1) C-10's "granted to none" read as "none but poly_migrator, INHERIT FALSE, SET TRUE"; (2) C-10/C-85's "role migrations" read as sql/roles.sql, run by a superuser outside the chain (ruling R1, Addendum 1).
