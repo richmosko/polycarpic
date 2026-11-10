@@ -1,7 +1,7 @@
 ---
 id: POLY-82
 title: Monorepo skeleton + layer lint
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [package.json, scripts/cairn/package.json, pnpm-workspace.yaml, pnpm-lock.yaml, .npmrc, .gitignore, turbo.json, layers.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/tsconfig.json, apps/*/tsconfig.json, vitest.config.*, packages/*/vitest.config.*, apps/*/vitest.config.*, packages/*/src/index.ts, packages/db/src/session.ts, packages/db/src/auth.ts, packages/db/src/migrate.ts, packages/secrets/src/open.ts, packages/*/src/*.test.ts, apps/*/src/**, scripts/layers/**, test/layers/**]
 labels: [enabler]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/100
 created: 2026-11-08
 updated: 2026-11-09
 ---
@@ -95,3 +95,7 @@ ARCH changes landed in this loop: v1.15 (subpath rule; auth `data-consumes`; web
 - S4: `set_config` argument split stops at the first `)`. A false positive; it fails closed.
 - S6: comment stripping is not quote-aware. A `'--'` inside a SQL string literal hides a later `SET`. This needs deliberate intent in reviewed db/auth code.
 - SecEng signs off the HPKE library pick (`@hpke/core` + `@hpke/dhkem-x25519`) in the M2 secrets design. The lint ban already covers the whole family.
+
+### @team-lead — 2026-11-09
+
+PR opened: https://github.com/richmosko/polycarpic/pull/100. Awaiting Validate. Follow-ups batched in POLY-131.
