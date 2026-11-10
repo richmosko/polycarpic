@@ -8,7 +8,6 @@ import { connectionFrom, type Env } from './connection.ts';
 import { DEFAULT_FOLDER, MigrateRefusal, pendingFrom, readJournal, sameEntry, type AppliedRow, type JournalEntry } from './journal.ts';
 
 export { MigrateRefusal, type JournalEntry } from './journal.ts';
-export { checkConfig, type ConfigProblem } from './migrate-config.ts';
 
 export const ROLES = [
   'poly_owner', 'poly_migrator', 'poly_app', 'poly_worker', 'poly_authz', 'poly_purge',

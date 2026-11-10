@@ -1,0 +1,21 @@
+# The build context for the one app image (POLY-85 R5). Whatever is not listed here can reach the build stage, and only
+# the build stage reads the context; the runtime stage copies from it with --from.
+.git
+**/node_modules
+temp
+docs
+process
+prototype
+spikes
+scripts
+tests
+!tests/layers/tsc/package.json
+.claude
+**/*.test.ts
+.env*
+# a directory named secrets would match; packages/secrets is source, not a secret
+**/secrets
+!packages/secrets
+packages/secrets/**/*.test.ts
+**/.turbo
+*.pdf
