@@ -46,6 +46,7 @@ describe('file check on custom migrations', () => {
     ['SET ROLE to a role outside the closed list (poly_app)', 'SET ROLE poly_app;\nSET ROLE poly_owner;\n', /poly_app|outside|not allowed/i],
     ["single-quoted last target: SET ROLE 'poly_purge' (R1)", "SET ROLE 'poly_purge';\n", /poly_owner|last SET ROLE/i],
     ["SET SESSION ROLE 'evil' fails closed (R1)", "SET SESSION ROLE 'evil';\nSET ROLE poly_owner;\n", /evil|outside|not allowed/i],
+    ["N1: a '--' inside a string literal must not hide a SET ROLE", "SELECT '--'; SET ROLE poly_authz;\n", /poly_owner|last SET ROLE/i],
     ['SET ROLE to postgres', 'SET ROLE postgres;\nSET ROLE poly_owner;\n', /postgres|outside|not allowed/i],
   ];
   for (const [name, sql, re] of bad) {
