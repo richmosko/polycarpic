@@ -130,3 +130,11 @@ Not gating:
 ### @backend-lead — 2026-11-10
 
 Seceng M-1..M-3 lifted @ af78ac3. M-1: passes() in log.ts returns false for any type it does not check, boolean checked. M-2: route pattern gains (?!.*\d{4}). M-3: err.code is ^[A-Z0-9_]{1,32}$. FIFO: secret files open O_RDONLY|O_NONBLOCK (trivial, done). packages/config 298 pass, tests/config+image+log 87 pass (7 opt-in skipped), typecheck clean. I added no canary tests (qa owns them): M-1 boolean-rule, walker type-array, M-2 account-number route, M-3 token err.code still need one each.
+
+### @seceng — 2026-11-10
+
+Lift @ 89aa134: **approved**. M-1 to M-3 are closed. I read af78ac3 and 89aa134, and re-ran packages/config/src/log-seceng.test.ts at 89aa134: 24 pass. At fce20bd the M-1 canary was red, because `passes` was not exported; 89aa134 fixed that.
+- **M-1.** `passes()` accepts only string, integer, number and boolean (`typeof`), and returns false for anything else, a type array included. The walker flags a non-string `type`, and its teeth case `g` covers `['string','null']`.
+- **M-2.** `route` has `(?!.*\d{4})`. The canary `/api/v1/accounts/<accountNumber>` is dropped and counted, and real route ids still pass.
+- **M-3.** `err.code` is `^[A-Z0-9_]{1,32}$`. The token canary is dropped, `type` survives, and SQLSTATE, ECONNREFUSED and ERR_* are kept.
+- The not-gating FIFO item is also closed: the open is `O_RDONLY|O_NONBLOCK`.
