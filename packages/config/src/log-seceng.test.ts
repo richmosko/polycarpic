@@ -7,7 +7,7 @@ import Ajv2020 from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
 import { CANARIES, assertNoCanary } from '../../../tests/log/canary.ts';
-import { createLogger } from './log.ts';
+import { createLogger, passes } from './log.ts'; // M-1 needs `passes` exported (rule shape: the schema property object)
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const schema = () => JSON.parse(readFileSync(join(HERE, '..', 'log.schema.json'), 'utf8'));
@@ -96,6 +96,7 @@ describe('S-6 the schema is closed and every string is bounded', () => {
     for (const [k, p] of Object.entries(props)) {
       const at = `${path}${k}`;
       if (p.type === undefined) { out.push(`${at}: no type`); continue; }
+      if (typeof p.type !== 'string') { out.push(`${at}: non-string type (M-1)`); continue; }
       if (p.type === 'array') out.push(`${at}: array`);
       else if (p.type === 'object') {
         if (at !== 'err') out.push(`${at}: object`);
@@ -116,13 +117,51 @@ describe('S-6 the schema is closed and every string is bounded', () => {
   });
   it('the walker has teeth: it flags each kind of bad property', () => {
     const out: string[] = [];
-    walk({ a: {}, b: { type: 'object' }, c: { type: 'array' }, d: { type: 'string' }, e: { type: 'string', pattern: '^x$' }, f: { type: 'string', maxLength: 3 } }, '', out);
-    expect(out).toHaveLength(7); // d is flagged twice: no enum/pattern/format, and no maxLength
+    walk({ a: {}, b: { type: 'object' }, c: { type: 'array' }, d: { type: 'string' }, e: { type: 'string', pattern: '^x$' }, f: { type: 'string', maxLength: 3 }, g: { type: ['string', 'null'] } }, '', out);
+    expect(out).toHaveLength(8); // d is flagged twice: no enum/pattern/format, and no maxLength
   });
   it('err is closed and primitive-only', () => {
     const e = schema().properties.err;
     expect(e.additionalProperties).toBe(false);
     for (const p of Object.values<any>(e.properties)) expect(['string', 'integer', 'number', 'boolean']).toContain(p.type);
+  });
+});
+
+describe('M-1..M-3 (seceng teeth review of POLY-85)', () => {
+  it('M-1: passes() fails closed: a boolean rule given an object, and an unknown type, are refused; a boolean is kept', () => {
+    expect(passes({ type: 'boolean' } as any, { raw: CANARIES.token })).toBe(false);
+    expect(passes({ type: 'boolean' } as any, true)).toBe(true);
+    expect(passes({ type: 'boolean' } as any, 'true')).toBe(false);
+    expect(passes({ type: ['string', 'null'] } as any, { raw: CANARIES.token })).toBe(false);
+    expect(passes({ type: 'something-new' } as any, { raw: CANARIES.token })).toBe(false);
+  });
+  it('M-2: a route holding an account number is dropped and counted (route ids never hold four digits in a row)', () => {
+    const { log, json, out } = make();
+    log.info('http.request', { route: '/api/v1/accounts/' + CANARIES.accountNumber });
+    expect(json()[0]).not.toHaveProperty('route');
+    expect(json()[0].dropped).toBeGreaterThanOrEqual(1);
+    assertNoCanary(out());
+  });
+  it('M-2: real route ids still pass', () => {
+    const { log, json } = make();
+    log.info('http.request', { route: '/api/v1/accounts/[id]/transactions' });
+    expect(json()[0].route).toBe('/api/v1/accounts/[id]/transactions');
+  });
+  it('M-3: err.code = a token-shaped canary is dropped, type survives', () => {
+    const { log, json, out } = make();
+    const e: any = new Error('x'); e.code = CANARIES.token;
+    log.error('db.query_failed', { err: e });
+    expect(json()[0].err?.code).toBeUndefined();
+    expect(json()[0].err?.type).toBe('Error');
+    assertNoCanary(out());
+  });
+  it('M-3: a mixed-case code is dropped; SQLSTATE, ECONNREFUSED and ERR_* are kept', () => {
+    for (const [code, kept] of [['23505', true], ['ECONNREFUSED', true], ['ERR_INVALID_ARG_TYPE', true], ['abc', false], ['Tok_Live_x', false]] as const) {
+      const { log, json } = make();
+      const e: any = new Error('x'); e.code = code;
+      log.error('a.b', { err: e });
+      expect(json()[0].err?.code, code).toBe(kept ? code : undefined);
+    }
   });
 });
 
