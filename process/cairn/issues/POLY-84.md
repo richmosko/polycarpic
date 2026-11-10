@@ -98,3 +98,15 @@ Lift @ 87f17b2: **approved**. M-1 and M-2 are closed. Read at 06020e3, 66fcf44, 
 - **M-1.** `battery_gaps` now takes `tgenabled IN ('O','A')`. The `t_replica` (ENABLE REPLICA) and `t_off` canaries sit on `qa_canary_notrunc` beside the row and AFTER triggers, and the expected gap set is still exactly `{no_truncate_trigger}`, so each non-counting trigger must be ignored for that to hold.
 - **M-2.** `validate` requires a note on every `db:false` row and fails a `db!==false` row with empty `tables`; both have canaries. Each inactive row now prints its id and unresolved tables, and a canary asserts the map.
 - **S-3** (no longer waived). The pool is now `max: 1` through `PoolConfig.max`, and the pid assertions stay. The passthrough applies only when `max` is set, so production pool sizing does not change.
+### @architect — 2026-11-10
+
+**Verdict @ 87f17b2: approved.** I re-ran tests/db at 87f17b2: 112 pass + 2 expected-fail (POLY-100 pins), 59.3 s. The three required fixes from 81221d3 are closed:
+
+| Axis | Result | Evidence |
+|---|---|---|
+| S-1 TRUNCATE trigger enabled = O/A | pass: replica and disabled canaries | 06020e3 (02_rls_catalog.sql) |
+| S-3 C-12 one-connection pool | pass: `PoolConfig.max` passthrough, default unchanged; pid asserts kept | 2a05be0, 87f17b2 |
+| S-2 matrix validator + inactive print | pass: db:false needs a note, empty tables fail, unresolved tables printed, canary | 06020e3, 66fcf44 |
+| R1–R7, Addendum 1, TEMP (a) | pass, unchanged since 8a5f630 | verdict @ 81221d3 |
+
+Non-blocking, carried: ARCH OQ-36 (the GL `account` name, before POLY-107) @ 187d7fe.
