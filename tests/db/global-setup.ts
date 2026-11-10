@@ -4,7 +4,7 @@ import { DB_PKG, must, startServer } from './helpers/pg';
 
 // Bootstrap SQL = what provisioning (INFRA provision.sh) runs once per cluster as superuser: it creates the roles.
 // Default path is the agreed contract with backend-lead; POLY_DB_BOOTSTRAP overrides.
-export const BOOTSTRAP = process.env.POLY_DB_BOOTSTRAP ?? join(DB_PKG, 'sql', 'bootstrap.sql');
+export const BOOTSTRAP = process.env.POLY_DB_BOOTSTRAP ?? join(DB_PKG, 'sql', 'roles.sql');
 const LOGIN = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_backup'];
 
 export default function setup() {
