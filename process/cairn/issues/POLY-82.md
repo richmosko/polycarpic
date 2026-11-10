@@ -47,3 +47,27 @@ The pnpm + Turborepo workspace with every ARCH §2.2 package and app stubbed, ea
 ### @team-lead — 2026-11-09
 
 Feature started. Branch: `feature/poly-82-monorepo-skeleton-layer-lint`.
+
+### @architect — 2026-11-09
+
+**Ruling (architect): layers.json, the session-SET rule, the HPKE specifiers.** ARCH v1.15.
+
+1. **`layers.json` schema** (agreed with backend-lead). The keys of `packages` are exactly the `data-consumes` tokens of ARCH §2.2, and `dir` is the row's path. The ARCH check matches a row to its entry by `dir` and compares `allow` with `data-consumes` as sets. `layer` is an integer, 0 to 6. `subpaths` are the `exports` keys besides `.`. **Every subpath is restricted by construction**: the allow entry `db` grants the index only, and `db/auth` grants that subpath. So `db/auth` and `db/session` go to auth only, and `secrets/open` to worker only. There is no separate list of importers. File checks:
+   - an entry `x/y` needs `x` too, and `./y` in x's `subpaths`;
+   - `sessionSetExempt` is one string with no glob characters.
+2. **Migrate module**: `packages/db/src/migrate.ts`. It is not a subpath and nothing imports it, web and worker included (C-85). It runs as a package script of `@poly/db`; the entry itself is POLY-83's.
+3. **Session-level SET ban.** This applies to SQL in string literals, template literals and `sql` tags outside `sessionSetExempt`, matched case-insensitively per statement.
+   - **Fails:**
+     - `SET x …` and `SET SESSION x …`, any parameter, `ROLE` and `SESSION AUTHORIZATION` included;
+     - `RESET …`;
+     - `set_config(…, false)`, with the third argument anything but the literal `true`;
+     - `SET LOCAL ROLE` and `SET LOCAL SESSION AUTHORIZATION`, because only the migrate module switches roles.
+   - **Passes:** any other `SET LOCAL x …`, and `set_config(…, true)`.
+   - Why: `SET LOCAL` and `is_local = true` end at COMMIT or ROLLBACK (read: PostgreSQL docs, `SET`). That cannot leak across pooled requests, and that leak is the hazard A-39 bans. `withTenant` still uses `set_config` only (§3.3). ARCH ~1076's `set local role` is about the spike's migration files, not app code.
+4. **HPKE library**: `@hpke/core` + `@hpke/dhkem-x25519` (proposed; SecEng signs off in the M2 secrets design, SECURITY §6.3). Outside packages/secrets, lint refuses the specifiers `hpke-js` and `@hpke/*`, meaning every `@hpke/` scope package and its subpaths. The ban covers the whole family, so it does not depend on the final pick. Fixtures: `@hpke/core` and `hpke-js` imported in apps/worker both fail.
+5. **ARCH v1.15**, found while transcribing:
+   - auth's `data-consumes` gains `db/auth db/session`;
+   - §2.1's same-layer list gains `web → ui`;
+   - §2.1 states the subpath rule and the SET rule above;
+   - §2.2's secrets row names the library.
+6. **Scope note for the lead**: `packages/db/src/migrate.ts` is not in this issue's `paths:`. Add it, since the skeleton stubs it.
