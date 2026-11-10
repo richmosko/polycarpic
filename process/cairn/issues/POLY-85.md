@@ -79,3 +79,10 @@ Criteria -> files:
 4 log schema + redaction: packages/config/log.schema.json, src/log.ts; eslint no-console for apps
 Runs: tests/config+image+log 94 pass incl. POLY_IMAGE_BUILD=1 real build; tests/db 147 pass; packages/config 297 pass, 1 fail = qa walker-teeth test expects 6 flags, the walker gives 7 (d flagged for enum/pattern AND maxLength); typecheck clean; eslint clean. pnpm lint fails only on arch-mismatch (ARCH 2.2 lacks config/log): asked architect-85.
 Decisions: layers.json web/worker allow config/log (R1); migrate run/--plan check DATABASE_* only via checkDatabaseConfig, since runner tests set no APP_ENV; tldts pinned 7.4.5 (7.4.21 trips minimumReleaseAge; no exclusion added); PWD on SECRET_NAME_ALLOW; docker COPY via workspace symlinks not pnpm deploy (node refuses type-stripping under node_modules).
+
+### @qa-engineer — 2026-11-10
+
+QA verification, build green @ 5344986 (independent run). Counts: packages/config 298 pass; tests/config+image+log 87 pass (+7 skipped = real build); with POLY_IMAGE_BUILD=1 tests/image 39 pass, real build included (label equals sha, no-arg and bad-sha builds fail, check-config exits 1 in container); tests/db 147 pass (9 files); python gate green 1975; typecheck 18/18; lint clean.
+Suite time: new tests/db ops-status + ops-hardening add about 30 s (40 s standalone incl. container start; tests/db total 101 s); packages/config 0.3 s; tests/config+image+log 7 s (+4 s with real build, layer-cached). Python gate unchanged (69 s).
+Criteria→test: C1 loader.test.ts R3 block + check-config.test.ts; C2 ops-status.test.ts (bind, payload, health bytes); C3 dockerfile.test.ts incl. opt-in build; C4 log.test.ts + log-seceng.test.ts. S-1..S-9 each have a named describe (S-n in the title).
+Mutation sanity: 9 of 10 caught, 1 equivalent; table in process/cairn/reviews/POLY-85/mutation.md. One test bug of mine fixed (walker-teeth count, 25db015). Calling architect-85 (verdict) and seceng-85 (teeth review).
