@@ -1,7 +1,7 @@
 ---
 id: POLY-85
 title: Runtime config + ops hooks
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-82]
@@ -147,3 +147,7 @@ Criteria ticked above with proving tests. Mutation sanity: process/cairn/reviews
 ### @team-lead — 2026-11-10
 
 PR opened: https://github.com/richmosko/polycarpic/pull/105. Validate signed off @ b674686 (measured at 89aa134); architect PASS @ ebfe633, seceng approved @ 9330dec. Suite growth: tests/db ~60 s → 99 s (two Postgres-backed ops suites); the next Postgres-backed suite should share the container. Guard gap for the tooling umbrella: `guard-push` has no implicit allowance for the assignee's own issue file.
+
+### @team-lead — 2026-11-10
+
+Validate passed; merging via PR #105. Closing.

@@ -15,15 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Runtime config + ops hooks
-- **Issue:** `POLY-85` (cairn)
-- **Milestone:** `POLY-M1` Foundations (major `POLY-V1`)
-- **Branch:** `feature/poly-85-runtime-config-ops-hooks`
-- **Started:** 2026-11-10
-- **Goal:** The app-side hooks devops's scripts depend on — `*_FILE` secret loader in `packages/config` (extending `apps/migrate check-config`), loopback-only status listener + ok/not-ok public health, image commit label, structured JSON log schema.
-- **Status:** In Review — PR [#105](https://github.com/richmosko/polycarpic/pull/105)
+_None. POLY-85 (runtime config + ops hooks) merged 2026-11-10 via PR [#105](https://github.com/richmosko/polycarpic/pull/105) — ARCH v1.15.6, SECURITY v1.8; follow-ups on POLY-81 (status-listener port fallback, Host header), POLY-88 (C-76 SOA zone test, route pattern for `(group)` ids, `/status` 404 on the public listener), POLY-100 (three-container `check-config`, `env_file`, staging env for CI image runs), POLY-121 (Vercel env source); ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature._
 
-_Previous: POLY-84 (RLS battery harness) merged 2026-11-10 via PR [#103](https://github.com/richmosko/polycarpic/pull/103); follow-ups on POLY-62, POLY-107 (OQ-36), POLY-79._
+- **Next:** POLY-M1's first session is complete (POLY-76, 82, 83, 84, 85 done). Decide the second session's issues from `scripts/cairn/cairn ls --milestone POLY-M1 --status backlog` and promote them to `todo`.
 
 ## Releases
 
