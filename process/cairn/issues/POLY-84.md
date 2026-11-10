@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83]
 assignee: qa-engineer
-paths: [tests/db/**, packages/db/**, apps/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, layers.json, docs/SECURITY/**, docs/ARCH/**]
+paths: [tests/db/**, packages/db/**, packages/tenancy/**, apps/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, layers.json, docs/SECURITY/**, docs/ARCH/**]
 labels: [qa, db, security]
 priority: P2
 pr: null
