@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-83-db-roles-migrate-withtenant`
 - **Started:** 2026-11-10
 - **Goal:** `packages/db` for real — the Drizzle Kit migration chain with its locked, prefix-checked runner; the full Postgres role set incl. `poly_backup` (C-79); the only connection path (`withTenant` / `withSystem` / `withContextFreeTx`, mutually non-nesting); the `db/auth` subpath for BetterAuth; the `migrate` subcommands the deploy script calls; and the pgTAP that proves the ownership and grant invariants (C-84, C-85, T-91).
-- **Status:** In Progress
+- **Status:** In Review — PR [#102](https://github.com/richmosko/polycarpic/pull/102); QA green @ 04d0a10, architect + seceng approved.
 - **Previous:** POLY-82 merged 2026-11-10 via PR #100 (ARCH v1.15.2; follow-ups in POLY-131).
 - **Next:** POLY-84 (RLS battery harness), POLY-85 (runtime config + ops hooks).
 

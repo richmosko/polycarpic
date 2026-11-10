@@ -1,7 +1,7 @@
 ---
 id: POLY-83
 title: DB roles, migrate, withTenant
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-76, POLY-82]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [packages/db/**, tests/db/**, tests/layers/**, apps/migrate/**, apps/web/src/**, apps/worker/src/**, apps/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, scripts/db/**, layers.json]
 labels: [db, security]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/102
 created: 2026-11-08
 updated: 2026-11-09
 ---
@@ -95,3 +95,7 @@ SecEng @ 00f3e87: M-1 and M-2 conditions lifted. connectionFrom now refuses an u
 ### @seceng — 2026-11-09
 
 SecEng on Addendum 2 (2) @ 7e9a824: concur that C-79's live-box evidence moves from the runner to provision-check (POLY-97), with two amendments to the POLY-97 criterion: also refuse EXECUTE on any prosecdef function (a definer grant to poly_backup is a write path) and TEMPORARY on the database; and make 'owns nothing' cover pg_type as well. No SECURITY edit is needed, because C-79 already names provision-check as its evidence.
+
+### @team-lead — 2026-11-09
+
+PR opened: https://github.com/richmosko/polycarpic/pull/102. Awaiting Validate. QA green @ 04d0a10; architect approved (74a335d, reconfirmed through 181bd03); seceng approved (31cdccd, a694b2a). Follow-ups on POLY-131; deploy-side consequences on POLY-100; Neon gap on POLY-121.
