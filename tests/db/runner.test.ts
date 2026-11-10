@@ -170,11 +170,10 @@ describe('journal when edited on an applied entry (review 1 R4)', () => {
 
 describe('role preflight, reverse direction (seceng M-2)', () => {
   const pre = (db: string) => writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
-  // Addendum 2: --plan runs the preflight too. Until backend-lead-2's fix lands the --plan cases are `it.fails` (they turn red
-  // when it lands: flip them to `it`). poly_backup's privilege grants are NOT a runner refusal; see pgTAP 01_roles.sql.
+  // Addendum 2: --plan runs the preflight too. poly_backup's privilege grants are pgTAP-only in POLY-83 (01_roles.sql);
+  // the runner refusal below is pinned `it.fails` until POLY-100 adds the ACL check to the preflight: it turns red then, flip it.
   for (const args of [[], ['--plan']]) {
-    const t = args.length ? it.fails : it;
-    t(`a stray member of a definer-owner role (GRANT poly_authz TO poly_app): ${args.join(' ') || 'apply'} exits 2 naming it`, () => {
+    it(`a stray member of a definer-owner role (GRANT poly_authz TO poly_app): ${args.join(' ') || 'apply'} exits 2 naming it`, () => {
       const db = freshDb();
       must('GRANT poly_authz TO poly_app');
       try {
@@ -184,7 +183,7 @@ describe('role preflight, reverse direction (seceng M-2)', () => {
         must('REVOKE poly_authz FROM poly_app');
       }
     });
-    t(`poly_backup in anything but pg_read_all_data (GRANT poly_app TO poly_backup): ${args.join(' ') || 'apply'} exits 2 naming it`, () => {
+    it(`poly_backup in anything but pg_read_all_data (GRANT poly_app TO poly_backup): ${args.join(' ') || 'apply'} exits 2 naming it`, () => {
       const db = freshDb();
       must('GRANT poly_app TO poly_backup');
       try {
@@ -193,6 +192,12 @@ describe('role preflight, reverse direction (seceng M-2)', () => {
       } finally {
         must('REVOKE poly_app FROM poly_backup');
       }
+    });
+    it.fails(`POLY-100: an extra privilege grant to poly_backup (GRANT CREATE ON SCHEMA public): ${args.join(' ') || 'apply'} exits 2 naming the role`, () => {
+      const db = freshDb();
+      must('GRANT CREATE ON SCHEMA public TO poly_backup', db);
+      refused(migrateCli(db, pre(db), args), /poly_backup/i);
+      expect(tableExists(db, 'public.ta')).toBe(false);
     });
   }
 });
