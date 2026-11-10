@@ -380,6 +380,54 @@ importers:
 
   packages/ui: {}
 
+  test/layers/tsc:
+    dependencies:
+      '@poly/auth':
+        specifier: workspace:*
+        version: link:../../../packages/auth
+      '@poly/db':
+        specifier: workspace:*
+        version: link:../../../packages/db
+      '@poly/import':
+        specifier: workspace:*
+        version: link:../../../packages/import
+      '@poly/ledger':
+        specifier: workspace:*
+        version: link:../../../packages/ledger
+      '@poly/portfolio':
+        specifier: workspace:*
+        version: link:../../../packages/portfolio
+      '@poly/posting':
+        specifier: workspace:*
+        version: link:../../../packages/posting
+      '@poly/refdata':
+        specifier: workspace:*
+        version: link:../../../packages/refdata
+      '@poly/reports':
+        specifier: workspace:*
+        version: link:../../../packages/reports
+      '@poly/secrets':
+        specifier: workspace:*
+        version: link:../../../packages/secrets
+      '@poly/securities':
+        specifier: workspace:*
+        version: link:../../../packages/securities
+      '@poly/tax':
+        specifier: workspace:*
+        version: link:../../../packages/tax
+      '@poly/tenancy':
+        specifier: workspace:*
+        version: link:../../../packages/tenancy
+      '@poly/ui':
+        specifier: workspace:*
+        version: link:../../../packages/ui
+      '@poly/web':
+        specifier: workspace:*
+        version: link:../../../apps/web
+      '@poly/worker':
+        specifier: workspace:*
+        version: link:../../../apps/worker
+
 packages:
 
   '@boundaries/config@1.0.1':

@@ -1,0 +1,26 @@
+{
+  "name": "@poly-test/layers-tsc",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@poly/db": "workspace:*",
+    "@poly/auth": "workspace:*",
+    "@poly/tenancy": "workspace:*",
+    "@poly/secrets": "workspace:*",
+    "@poly/import": "workspace:*",
+    "@poly/refdata": "workspace:*",
+    "@poly/ledger": "workspace:*",
+    "@poly/securities": "workspace:*",
+    "@poly/posting": "workspace:*",
+    "@poly/reports": "workspace:*",
+    "@poly/tax": "workspace:*",
+    "@poly/portfolio": "workspace:*",
+    "@poly/ui": "workspace:*",
+    "@poly/web": "workspace:*",
+    "@poly/worker": "workspace:*"
+  }
+}
