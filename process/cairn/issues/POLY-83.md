@@ -41,3 +41,7 @@ packages/db: the migration chain (tool per POLY-76), the full Postgres role set,
 ### @team-lead — 2026-11-09
 
 Feature started. Branch: `feature/poly-83-db-roles-migrate-withtenant`.
+
+### @architect — 2026-11-09
+
+Ruling @ 66bf458: process/cairn/reviews/POLY-83/ruling.md (R1–R8) is the build contract. Superuser bootstrap file creates the roles; closed SET ROLE list = poly_owner + the seven C-10 roles; only poly_authz owns a definer in M1 (app.job_targets, zero rows); runner/--plan predicates and exit codes (R6); apps/migrate + restricted db/migrate and db/startup subpaths (R7); migrations check in packages/db under pnpm lint (R8). ARCH v1.15.3 carries the doc-level parts. seceng to concur at review on reading C-10 'granted to none' as 'none but poly_migrator, INHERIT FALSE, SET TRUE' (R1).
