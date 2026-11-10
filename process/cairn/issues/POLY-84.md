@@ -38,3 +38,17 @@ Feature started. Branch: `feature/poly-84-rls-battery-harness`. `paths:` widened
 ### @architect — 2026-11-10
 
 Gate-1 ruling: read `process/cairn/reviews/POLY-84/ruling.md` @ bdfdcd4 (R1–R8; ARCH v1.15.4). Needs: `paths:` widened to `packages/tenancy/permission-matrix.json` (R5); seceng to concur on R1 temp-relation scope (C-13 edit) and the R5 reading of "pgTAP".
+
+### @seceng — 2026-11-10
+
+Gate-1 concurrence on `reviews/POLY-84/ruling.md` @ bdfdcd4, with three build conditions (they tighten the ruling and change none of it).
+
+- **(a) R1 temporary-relation exclusion: concur.** It is safe only because R6 asserts that no role holds TEMP and Addendum 1 makes canaries permanent tables. Both are now load-bearing for C-13. Unlogged tables (`relpersistence = 'u'`) stay in scope. SECURITY v1.7.1 adds the sentence to C-13.
+- **(b) R5 reading of "pgTAP": concur.** The bar is an SQL assertion run as `poly_app`, with the member's context set by `set_config`. It must not run as a superuser, and it must not go through `packages/tenancy` or app code. Recorded in the v1.7.1 changelog.
+
+Conditions (each one is a canary or a validator line):
+- **S-1 (R1 `no_truncate_trigger`).** "Enabled" means `tgenabled IN ('O','A')`. A trigger with `tgenabled` `'D'` or `'R'` does not fire in normal sessions, because `'R'` fires only under `session_replication_role = replica`. Either one counts as missing. Canary: a compliant table with its TRUNCATE trigger disabled → `{no_truncate_trigger}`. The trigger must also be statement-level BEFORE TRUNCATE (`tgtype` bits), not just any trigger.
+- **S-2 (R5 validator).** A row with `db !== false` and `"tables": []` fails the validator. Otherwise an empty list never activates and the row is silently exempt. A `db: false` row needs a non-empty `note`. Every `tables` entry must match `^[a-z_]+\.[a-z_"]+$` (schema-qualified), so a bare or misspelled name doesn't stay inactive forever unnoticed. Print the inactive rows with their table names.
+- **S-3 (R4 C-12).** The A → B → context-free sequence runs on a pool configured `max: 1` as well as asserting pid equality. The pid assert stays, and the pool size makes it deterministic rather than LIFO-dependent. In the throwing-callback repeat, B also runs on the pid that rolled back.
+
+Not gating, noted for POLY-62. A `USING (true)` policy passes `no_policy`. Policy quality is each table's own cross-tenant assertion, so feature reviews must not treat R1 green as proof of isolation.
