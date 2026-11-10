@@ -126,3 +126,7 @@ Conditions:
 Not gating:
 - `openSync` on a FIFO blocks before `fstat` runs. Open with `O_RDONLY | O_NONBLOCK`.
 - The route pattern has no `(` `)`, so SvelteKit `(group)` route ids will be dropped. That is functional, not a leak: POLY-88 widens the pattern and keeps M-2.
+
+### @backend-lead — 2026-11-10
+
+Seceng M-1..M-3 lifted @ af78ac3. M-1: passes() in log.ts returns false for any type it does not check, boolean checked. M-2: route pattern gains (?!.*\d{4}). M-3: err.code is ^[A-Z0-9_]{1,32}$. FIFO: secret files open O_RDONLY|O_NONBLOCK (trivial, done). packages/config 298 pass, tests/config+image+log 87 pass (7 opt-in skipped), typecheck clean. I added no canary tests (qa owns them): M-1 boolean-rule, walker type-array, M-2 account-number route, M-3 token err.code still need one each.
