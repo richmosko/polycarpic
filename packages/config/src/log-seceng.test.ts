@@ -117,7 +117,7 @@ describe('S-6 the schema is closed and every string is bounded', () => {
   it('the walker has teeth: it flags each kind of bad property', () => {
     const out: string[] = [];
     walk({ a: {}, b: { type: 'object' }, c: { type: 'array' }, d: { type: 'string' }, e: { type: 'string', pattern: '^x$' }, f: { type: 'string', maxLength: 3 } }, '', out);
-    expect(out).toHaveLength(6);
+    expect(out).toHaveLength(7); // d is flagged twice: no enum/pattern/format, and no maxLength
   });
   it('err is closed and primitive-only', () => {
     const e = schema().properties.err;
