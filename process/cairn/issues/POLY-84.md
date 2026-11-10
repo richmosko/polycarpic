@@ -34,3 +34,7 @@ The pgTAP battery's cross-cutting probes (SECURITY §12.3 qa-engineer block; ARC
 ### @team-lead — 2026-11-10
 
 Feature started. Branch: `feature/poly-84-rls-battery-harness`. `paths:` widened from the stale `packages/db/test/**` to the consolidated test root `tests/db/**` plus the files a battery harness plausibly touches (POLY-83 needed four widenings; front-loading them).
+
+### @architect — 2026-11-10
+
+Gate-1 ruling: read `process/cairn/reviews/POLY-84/ruling.md` @ bdfdcd4 (R1–R8; ARCH v1.15.4). Needs: `paths:` widened to `packages/tenancy/permission-matrix.json` (R5); seceng to concur on R1 temp-relation scope (C-13 edit) and the R5 reading of "pgTAP".
