@@ -27,3 +27,7 @@ Umbrella for the non-blocking findings from the architect's POLY-82 review (verd
 ### @team-lead — 2026-11-09
 
 Add to the batch: delete `spikes/poly-76/` once POLY-83 has merged. It is the throwaway migration-chain spike (25 files) kept as evidence behind the architect's POLY-76 ruling and as the runner's reference while POLY-83 builds; `process/cairn/reviews/POLY-76/ruling.md` is the durable record. Same treatment for `prototype/` when the first real screens ship (POLY-128).
+
+### @team-lead — 2026-11-09
+
+Add to the batch, from the POLY-83 reviews (architect review 1 N3; seceng verdict L-1, L-2 @ b126ce4): **N3** `configure()` on the `@poly/db` index lets any package re-point the pools — revisit when POLY-85 lands, consider moving it to the apps-only `db/startup` subpath. **L-1** the migration file check misses SQL hidden after a comment marker inside a `$tag$…$tag$` body or a `"quoted identifier"` (seceng reproduced it; the DB-side privilege backstop still rolls such a file back). **L-2** the runner's `release(err)` path when ROLLBACK itself fails. This umbrella now covers both the layer lint (POLY-82) and the db checks (POLY-83).
