@@ -1,4 +1,4 @@
--- Role bootstrap (ARCH §3.3, SECURITY C-79, C-85). Run by a superuser against the target database, before `migrate`:
+-- Role bootstrap (ARCH §3.3, SECURITY C-79, C-85; POLY-83 ruling R1). Run by a superuser against the target database, before `migrate`:
 -- provision.sh in production, the test harness in CI. Idempotent: every statement converges to the same end state.
 -- Not part of the Drizzle chain, because poly_migrator holds no CREATEROLE (and must not).
 -- Passwords are not set here; provisioning sets LOGIN passwords with ALTER ROLE from the mounted secret files.
@@ -54,6 +54,10 @@ BEGIN
   EXECUTE format('GRANT CONNECT ON DATABASE %I TO poly_migrator, poly_app, poly_worker, poly_backup', current_database());
 END
 $db$;
+
+-- Every function starts unexecutable: grants are explicit (needs a superuser, since poly_owner is not a member of the definer roles).
+ALTER DEFAULT PRIVILEGES FOR ROLE poly_owner, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC;
 
 -- public: owned by poly_owner, no CREATE for anyone else (SecEng addition (b)).
 ALTER SCHEMA public OWNER TO poly_owner;

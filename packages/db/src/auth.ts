@@ -4,7 +4,7 @@ import { getTableColumns, type Table } from 'drizzle-orm';
 import * as schema from './schema/auth.ts';
 
 export { withContextFreeTx, clientOf, NestedContextError, ContextNotEmptyError, type Tx } from './context.ts';
-export { appPool as authPool } from './pool.ts';
+export { appPool as authPool, close } from './pool.ts';
 
 type Fields<T extends Table> = { [K in keyof T['_']['columns']]: string };
 
