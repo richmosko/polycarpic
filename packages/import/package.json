@@ -1,0 +1,17 @@
+{
+  "name": "@poly/import",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@poly/db": "workspace:*",
+    "@poly/secrets": "workspace:*"
+  }
+}

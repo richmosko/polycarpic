@@ -1,0 +1,19 @@
+{
+  "name": "@poly/portfolio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@poly/db": "workspace:*",
+    "@poly/ledger": "workspace:*",
+    "@poly/securities": "workspace:*",
+    "@poly/refdata": "workspace:*"
+  }
+}

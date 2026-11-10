@@ -1,0 +1,29 @@
+{
+  "name": "@poly/web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@poly/auth": "workspace:*",
+    "@poly/config": "workspace:*",
+    "@poly/db": "workspace:*",
+    "@poly/import": "workspace:*",
+    "@poly/ledger": "workspace:*",
+    "@poly/portfolio": "workspace:*",
+    "@poly/posting": "workspace:*",
+    "@poly/refdata": "workspace:*",
+    "@poly/reports": "workspace:*",
+    "@poly/secrets": "workspace:*",
+    "@poly/securities": "workspace:*",
+    "@poly/tax": "workspace:*",
+    "@poly/tenancy": "workspace:*",
+    "@poly/ui": "workspace:*"
+  }
+}

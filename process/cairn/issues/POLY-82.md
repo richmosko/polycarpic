@@ -1,15 +1,15 @@
 ---
 id: POLY-82
 title: Monorepo skeleton + layer lint
-status: todo
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
-paths: [package.json, pnpm-workspace.yaml, .npmrc, turbo.json, layers.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/src/index.ts, packages/db/src/session.ts, packages/db/src/auth.ts, packages/secrets/src/open.ts, packages/*/src/*.test.ts, apps/*/src/**, scripts/layers/**, test/layers/**]
+paths: [package.json, scripts/cairn/package.json, pnpm-workspace.yaml, pnpm-lock.yaml, .npmrc, .gitignore, turbo.json, layers.json, packages/*/package.json, apps/*/package.json, eslint.config.*, tsconfig*.json, packages/*/tsconfig.json, apps/*/tsconfig.json, vitest.config.*, packages/*/vitest.config.*, apps/*/vitest.config.*, packages/*/src/index.ts, packages/db/src/session.ts, packages/db/src/auth.ts, packages/db/src/migrate.ts, packages/secrets/src/open.ts, packages/*/src/*.test.ts, apps/*/src/**, scripts/layers/**, test/layers/**]
 labels: [enabler]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/100
 created: 2026-11-08
 updated: 2026-11-09
 ---
@@ -41,3 +41,69 @@ The pnpm + Turborepo workspace with every ARCH §2.2 package and app stubbed, ea
 - [ ] `layers.json` declares `db/auth` as a restricted subpath importable only by packages/auth: fixtures importing it from apps/web and packages/tenancy fail lint, packages/auth passes (ARCH §2.1, POLY-76 ruling §4.6).
 - [ ] `layers.json` names exactly one module exempt from the session-level SET ban, packages/db's migrate module: a fixture with `SET ROLE poly_owner` there passes, and the same statement in another packages/db file and in packages/auth each fails (ARCH §2.1, POLY-76 ruling §4.2).
 - [ ] `db/auth` is importable only by packages/auth, and the session-SET exemption is one file path in `layers.json`, not a glob. Each rule still fails under an inline or blanket `eslint-disable` (fixtures). A fixture importing the migrate module from apps/web or apps/worker fails (SECURITY C-84, C-85, A-40).
+
+## Comments
+
+### @team-lead — 2026-11-09
+
+Feature started. Branch: `feature/poly-82-monorepo-skeleton-layer-lint`.
+
+### @architect — 2026-11-09
+
+**Ruling (architect): layers.json, the session-SET rule, the HPKE specifiers.** ARCH v1.15.
+
+1. **`layers.json` schema** (agreed with backend-lead). The keys of `packages` are exactly the `data-consumes` tokens of ARCH §2.2, and `dir` is the row's path. The ARCH check matches a row to its entry by `dir` and compares `allow` with `data-consumes` as sets. `layer` is an integer, 0 to 6. `subpaths` are the `exports` keys besides `.`. **Every subpath is restricted by construction**: the allow entry `db` grants the index only, and `db/auth` grants that subpath. So `db/auth` and `db/session` go to auth only, and `secrets/open` to worker only. There is no separate list of importers. File checks:
+   - an entry `x/y` needs `x` too, and `./y` in x's `subpaths`;
+   - `sessionSetExempt` is one string with no glob characters.
+2. **Migrate module**: `packages/db/src/migrate.ts`. It is not a subpath and nothing imports it, web and worker included (C-85). It runs as a package script of `@poly/db`; the entry itself is POLY-83's.
+3. **Session-level SET ban.** This applies to SQL in string literals, template literals and `sql` tags outside `sessionSetExempt`, matched case-insensitively per statement.
+   - **Fails:**
+     - `SET x …` and `SET SESSION x …`, any parameter, `ROLE` and `SESSION AUTHORIZATION` included;
+     - `RESET …`;
+     - `set_config(…, false)`, with the third argument anything but the literal `true`;
+     - `SET LOCAL ROLE` and `SET LOCAL SESSION AUTHORIZATION`, because only the migrate module switches roles.
+   - **Passes:** any other `SET LOCAL x …`, and `set_config(…, true)`.
+   - Why: `SET LOCAL` and `is_local = true` end at COMMIT or ROLLBACK (read: PostgreSQL docs, `SET`). That cannot leak across pooled requests, and that leak is the hazard A-39 bans. `withTenant` still uses `set_config` only (§3.3). ARCH ~1076's `set local role` is about the spike's migration files, not app code.
+4. **HPKE library**: `@hpke/core` + `@hpke/dhkem-x25519` (proposed; SecEng signs off in the M2 secrets design, SECURITY §6.3). Outside packages/secrets, lint refuses the specifiers `hpke-js` and `@hpke/*`, meaning every `@hpke/` scope package and its subpaths. The ban covers the whole family, so it does not depend on the final pick. Fixtures: `@hpke/core` and `hpke-js` imported in apps/worker both fail.
+5. **ARCH v1.15**, found while transcribing:
+   - auth's `data-consumes` gains `db/auth db/session`;
+   - §2.1's same-layer list gains `web → ui`;
+   - §2.1 states the subpath rule and the SET rule above;
+   - §2.2's secrets row names the library.
+6. **Scope note for the lead**: `packages/db/src/migrate.ts` is not in this issue's `paths:`. Add it, since the skeleton stubs it.
+
+### @architect — 2026-11-09
+
+**Architect review: approved at 7c70152.**
+
+| Axis | Result | Evidence |
+|---|---|---|
+| Lint generated from `layers.json`, nothing hand-copied | pass | `eslint.config.js` → `generateConfig(layers)`; the allow-lists, elements and subpath grants are derived from it. The fixture `03-generated/pass-after-allowlist-edit` passes. 7c70152 |
+| Owners hard-coded in the generator (db, secrets, packages/, db/session.ts) | accepted | Each fails closed if renamed (ARCH v1.15.1 §2.1). S5's comment covers `no-session-set` mode. b5ea81e |
+| Every subpath restricted; db/auth and db/session for auth only, secrets/open for worker only | pass | Fixtures 09, 12, 15 and 21, in static, `import()` and `require` forms. 030aa57 |
+| Session-SET ruling, plus addendum 1 | pass | 08- and 17-set-matrix, covering comment-prefix, interpolated third argument, prose, SET TRANSACTION/CONSTRAINTS and UPDATE…SET. Exemption: 22-migrate-set, glob probe included. b5ea81e |
+| Disable proofing: inline, blanket and config comments | pass | Fixtures 14, 16 and 23. 030aa57 |
+| Resolution guards: exports map exact, no hoisting, deep import fails tsc | pass | `structure.test.ts`, the `tsc/` probes, and the `exports-mismatch` mutations, with no map and a stray `./migrate`. 904a919 |
+| Checks on the file: completeness, upward, cycle, workspace deps, ARCH ↔ file | pass | `check.test.ts`: one mutation per check id, measured over the baseline. 030aa57 |
+| db index does not export the `SessionUserId` constructor | pass | `tsc/db-index.ts`, plus the non-vacuous control `db-session-control.ts`. 7c70152 |
+| Nothing pre-empts POLY-83/84/85 | pass | db is stubs only, with `session.ts` the brand alone. Migrate is a stub with no export. config is a stub; its contents are POLY-85's. |
+| Harness green | qa-engineer's measurement | 229/229 and `pnpm lint` clean, measured by qa-engineer before the rebase onto 7c70152 (not re-run by me). The gate owner re-runs at finish. |
+
+ARCH changes landed in this loop: v1.15 (subpath rule; auth `data-consumes`; web → ui; HPKE library; SET rule), v1.15.1 (where standing restrictions live; SET TRANSACTION passes), v1.15.2 (`packages/config` at L0).
+
+**Follow-ups, not blocking** (for an umbrella issue, not one issue each):
+- S4: `set_config` argument split stops at the first `)`. A false positive; it fails closed.
+- S6: comment stripping is not quote-aware. A `'--'` inside a SQL string literal hides a later `SET`. This needs deliberate intent in reviewed db/auth code.
+- SecEng signs off the HPKE library pick (`@hpke/core` + `@hpke/dhkem-x25519`) in the M2 secrets design. The lint ban already covers the whole family.
+
+### @team-lead — 2026-11-09
+
+PR opened: https://github.com/richmosko/polycarpic/pull/100. Awaiting Validate. Follow-ups batched in POLY-131.
+
+### @qa-engineer — 2026-11-09
+
+Validate sign-off: green @ 49f9919 (PR #100 head), real pnpm install. test/layers 231/231 (178 lint fixtures, file-check mutations, structure + tsc probes; deep import fails TS2307, declared-subpath control compiles). turbo run test 16/16; pnpm --filter @poly/ledger test alone 1/1. pnpm lint exit 0. node --test scripts/cairn/tests/js 494/494. No skipped tests.
+
+### @team-lead — 2026-11-09
+
+Validate passed (QA green @ 49f9919, architect approved @ 7c70152); merging via PR #100. Closing. Follow-ups: POLY-131.
