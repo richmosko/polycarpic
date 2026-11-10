@@ -1,7 +1,7 @@
 ---
 id: POLY-82
 title: Monorepo skeleton + layer lint
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -103,3 +103,7 @@ PR opened: https://github.com/richmosko/polycarpic/pull/100. Awaiting Validate. 
 ### @qa-engineer — 2026-11-09
 
 Validate sign-off: green @ 49f9919 (PR #100 head), real pnpm install. test/layers 231/231 (178 lint fixtures, file-check mutations, structure + tsc probes; deep import fails TS2307, declared-subpath control compiles). turbo run test 16/16; pnpm --filter @poly/ledger test alone 1/1. pnpm lint exit 0. node --test scripts/cairn/tests/js 494/494. No skipped tests.
+
+### @team-lead — 2026-11-09
+
+Validate passed (QA green @ 49f9919, architect approved @ 7c70152); merging via PR #100. Closing. Follow-ups: POLY-131.
