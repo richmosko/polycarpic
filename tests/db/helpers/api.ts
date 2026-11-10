@@ -7,15 +7,19 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DB_PKG, freshName, must, psql, url } from './pg';
 
-export const MIGRATE_CLI = process.env.POLY_DB_MIGRATE_CLI ?? join(DB_PKG, 'bin', 'migrate.mjs');
-export const REAL_MIGRATIONS = process.env.POLY_DB_MIGRATIONS ?? join(DB_PKG, 'drizzle');
+export const MIGRATE_CLI = process.env.POLY_DB_MIGRATE_CLI ?? join(DB_PKG, '..', '..', 'apps', 'migrate', 'src', 'main.ts');
+export const REAL_MIGRATIONS = process.env.POLY_DB_MIGRATIONS ?? join(DB_PKG, 'migrations');
 export const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-/** CREATE DATABASE owned by poly_owner, as provisioning does. Roles already exist (global-setup). */
+export const BOOTSTRAP = process.env.POLY_DB_BOOTSTRAP ?? join(DB_PKG, 'sql', 'bootstrap.sql');
+const LOGIN = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_backup'];
+
+/** Fresh database + the superuser bootstrap run inside it (ruling R1; it sets the DB owner). Passwords are the harness's. */
 export function freshDb(): string {
   const db = freshName();
-  must(`CREATE DATABASE ${db} OWNER poly_owner; REVOKE ALL ON DATABASE ${db} FROM PUBLIC;
-        GRANT CONNECT ON DATABASE ${db} TO poly_migrator, poly_app, poly_worker;`);
+  must(`CREATE DATABASE ${db}`);
+  must(readFileSync(BOOTSTRAP, 'utf8'), db);
+  for (const r of LOGIN) must(`ALTER ROLE ${r} PASSWORD 'qa-${r}'`);
   return db;
 }
 

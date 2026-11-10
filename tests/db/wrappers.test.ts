@@ -8,8 +8,8 @@ import { must, psql, url } from './helpers/pg';
 
 const UID = '11111111-1111-4111-8111-111111111111';
 const SID = '22222222-2222-4222-8222-222222222222';
-const SEEDED_JOB = 'qa-job';
-const SEEDED_TARGET = UID;
+const SEEDED_JOB = 'qa_job';
+const SEEDED_TARGET = { entityId: '33333333-3333-4333-8333-333333333333', connectionId: null };
 let db: string;
 let m: any;
 let auth: any;
@@ -60,10 +60,16 @@ describe('withTenant', () => {
 });
 
 describe('withSystem', () => {
-  it('errors when no principal resolves (job has no targets)', async () => {
+  it('errors when no principal resolves (M1: job_targets returns zero rows for every job); callback never runs', async () => {
     let ran = false;
-    await expect(m.withSystem('no-such-job', undefined, async () => { ran = true; })).rejects.toThrow(/principal|no target|resolve/i);
+    await expect(m.withSystem('no_such_job', { entityId: UID, connectionId: null }, async () => { ran = true; })).rejects.toThrow(/principal|no target|resolve/i);
     expect(ran).toBe(false);
+  });
+});
+
+describe('withSystem job name', () => {
+  it.each(['Bad-Name', '1abc', '', 'a'.repeat(64)])('rejects job %j before touching the database', async (job) => {
+    await expect(m.withSystem(job, { entityId: UID, connectionId: null }, async () => {})).rejects.toThrow();
   });
 });
 
@@ -88,15 +94,21 @@ describe('withContextFreeTx', () => {
   });
 });
 
-describe('no nesting: the six ordered pairs, each refused with the callback never running', () => {
+describe('no nesting: all nine ordered pairs (self-nesting included), each refused with the inner callback never running', () => {
+  // M1's app.job_targets returns zero rows for every job (R4), so withSystem could never reach its callback. The
+  // superuser replaces the body in THIS test database only (owner stays poly_authz) so the outer-system pairs run.
+  beforeAll(() => {
+    must(`CREATE OR REPLACE FUNCTION app.job_targets(job text) RETURNS TABLE (entity_id uuid, principal_user_id uuid, connection_id uuid)
+          LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$ select '${SEEDED_TARGET.entityId}'::uuid, '${UID}'::uuid, null::uuid $$`, db);
+  });
   const w: Record<string, (fn: () => Promise<unknown>) => Promise<unknown>> = {
     tenant: (fn) => m.withTenant(session.sessionUserId(UID), SID, fn),
     system: (fn) => m.withSystem(SEEDED_JOB, SEEDED_TARGET, fn),
     ctxfree: (fn) => auth.withContextFreeTx(fn),
   };
   // withSystem needs a resolvable principal to reach its callback: a job target is seeded by the superuser (seed shape
-  // is the contract with backend-lead; SEEDED_* below). The error must say "nest", not "principal".
-  const pairs: [string, string][] = [['tenant', 'system'], ['tenant', 'ctxfree'], ['system', 'tenant'], ['system', 'ctxfree'], ['ctxfree', 'tenant'], ['ctxfree', 'system']];
+    const kinds = ['tenant', 'system', 'ctxfree'];
+  const pairs: [string, string][] = kinds.flatMap((o) => kinds.map((i) => [o, i] as [string, string]));
   for (const [outer, inner] of pairs) {
     it(`${inner} inside ${outer}`, async () => {
       let innerRan = false;

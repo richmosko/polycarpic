@@ -1,16 +1,16 @@
-// POLY-83 static checks and guards. Assumed surface (reconcile with backend-lead; names live in this header only):
-//   node packages/db/bin/check-migrations.mjs <migrations-dir>   file check + journal `when` ordering; exit 0 / non-zero + message
-//   node packages/db/bin/migrate.mjs check-config                reads POLY_SECRETS_DIR + POLY_HOST_ENV, connects nowhere
-//   @poly/db  assertSchemaCurrent(migrationsDir)                  the startup guard web and worker call; rejects when behind
+// POLY-83 static checks and guards (ruling R5-R8). Assumed invocation, reconcile in this header only:
+//   node --experimental-strip-types packages/db/src/check-migrations-cli.ts <dir>   (the `check-migrations` script of @poly/db)
+//   apps/migrate main with arg `check-config`: migrator secret file present + non-empty, connection settings present; 0 / 1
+//   @poly/db/startup  assertSchemaNotBehind(): journal `when` list must be a prefix of tracking created_at list (by id)
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { DB_PKG, must, url } from './helpers/pg';
-import { freshDb, journalOf, migrateCli, rewrite, setJournal, writeMigrations } from './helpers/api';
+import { MIGRATE_CLI, REAL_MIGRATIONS, freshDb, migrateCli, writeMigrations } from './helpers/api';
 
-const CHECK = process.env.POLY_DB_CHECK_CLI ?? join(DB_PKG, 'bin', 'check-migrations.mjs');
+const CHECK = process.env.POLY_DB_CHECK_CLI ?? join(DB_PKG, 'src', 'check-migrations-cli.ts');
 const check = (dir: string) => {
   const p = spawnSync('node', ['--experimental-strip-types', CHECK, dir], { encoding: 'utf8' });
   return { code: p.status ?? 127, text: (p.stderr ?? '') + (p.stdout ?? '') };
@@ -18,6 +18,9 @@ const check = (dir: string) => {
 const T = (n: string) => `CREATE TABLE public.${n} (id int);\n`;
 
 describe('file check on custom migrations', () => {
+  it('comments are stripped: a commented-out RESET ROLE passes', () => {
+    expect(check(writeMigrations([{ tag: '0000_a', sql: '-- RESET ROLE;\n/* SET SESSION AUTHORIZATION x; */\n' + T('ta') }])).code).toBe(0);
+  });
   it('passes plain DDL and a definer file that ends on SET ROLE poly_owner', () => {
     const dir = writeMigrations([
       { tag: '0000_a', sql: T('ta') },
@@ -28,11 +31,19 @@ describe('file check on custom migrations', () => {
 
   const bad: [string, string, RegExp][] = [
     ['last SET ROLE is a definer owner', 'SET ROLE poly_authz;\n' + T('tx'), /poly_owner|last SET ROLE/i],
+    ['SET ROLE hidden before a different last SET ROLE', 'SET ROLE poly_authz;\nSET ROLE poly_owner;\nSET ROLE poly_rollup;\n', /poly_owner|last SET ROLE/i],
     ['SET SESSION AUTHORIZATION', 'SET SESSION AUTHORIZATION poly_owner;\n', /SESSION AUTHORIZATION/i],
     ['RESET ROLE', 'RESET ROLE;\n', /RESET ROLE/i],
-    ['SET ROLE to a role outside poly_owner and the definer-owner set', 'SET ROLE poly_app;\nSET ROLE poly_owner;\n', /poly_app|outside|not allowed/i],
-    ['SET ROLE to postgres', 'SET ROLE postgres;\nSET ROLE poly_owner;\n', /postgres|outside|not allowed/i],
     ['lower-case / extra whitespace form', 'reset   role ;\n', /RESET ROLE/i],
+    ['RESET ALL', 'RESET ALL;\n', /RESET ALL/i],
+    ['SET ROLE NONE', 'SET ROLE NONE;\n', /NONE|SET ROLE/i],
+    ['SET ROLE DEFAULT', 'SET ROLE DEFAULT;\n', /DEFAULT|SET ROLE/i],
+    ['SET LOCAL ROLE', 'SET LOCAL ROLE poly_owner;\n', /LOCAL|SET ROLE/i],
+    ["set_config('role', ...)", "SELECT set_config('role', 'poly_authz', false);\n", /set_config|role/i],
+    ['function with a SET role clause', 'CREATE FUNCTION public.g() RETURNS int LANGUAGE sql SET role = poly_authz AS $$select 1$$;\n', /role/i],
+    ['dollar-quoted body is not exempt (fail closed)', 'DO $$ BEGIN RESET ROLE; END $$;\n', /RESET ROLE/i],
+    ['SET ROLE to a role outside the closed list (poly_app)', 'SET ROLE poly_app;\nSET ROLE poly_owner;\n', /poly_app|outside|not allowed/i],
+    ['SET ROLE to postgres', 'SET ROLE postgres;\nSET ROLE poly_owner;\n', /postgres|outside|not allowed/i],
   ];
   for (const [name, sql, re] of bad) {
     it(`refuses: ${name}`, () => {
@@ -45,7 +56,7 @@ describe('file check on custom migrations', () => {
 });
 
 describe('journal `when` ordering (CI)', () => {
-  it('refuses equal and decreasing timestamps naming the offending tags', () => {
+  it('refuses equal and decreasing timestamps naming the offending tag', () => {
     for (const whens of [[2000, 2000], [3000, 2000]]) {
       const dir = writeMigrations([{ tag: '0000_a', sql: T('ta'), when: whens[0] }, { tag: '0001_b', sql: T('tb'), when: whens[1] }]);
       const r = check(dir);
@@ -59,61 +70,71 @@ describe('journal `when` ordering (CI)', () => {
   });
 });
 
-describe('startup guard: web and worker refuse when the applied schema is behind the image', () => {
-  const guard = async (db: string, dir: string) => {
+describe('startup guard (db/startup assertSchemaNotBehind): refuse when the applied schema is behind the image', () => {
+  // The image's bundled journal is packages/db/migrations/meta/_journal.json, so the guard is exercised on a database
+  // migrated with the real chain, then made behind / ahead / divergent by the superuser.
+  const guard = async (db: string) => {
     vi.resetModules();
     process.env.DATABASE_URL = url('poly_app', db);
-    const m: any = await import('../../packages/db/src/index.ts');
-    try { return await m.assertSchemaCurrent(dir); } finally { await m.close?.(); }
+    const g: any = await import('../../packages/db/src/startup.ts');
+    return g.assertSchemaNotBehind();
   };
-  it('rejects when a journal entry is unapplied; resolves when current; resolves when the database is ahead', async () => {
+  const migrated = () => {
     const db = freshDb();
-    const dir = writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
-    expect(migrateCli(db, dir).code).toBe(0);
-    await expect(guard(db, dir)).resolves.not.toThrow();
-    const j = journalOf(dir);
-    rewrite(dir, '0001_b', T('tb'));
-    j.entries.push({ idx: 1, version: '7', when: j.entries[0].when + 9000, tag: '0001_b', breakpoints: true });
-    setJournal(dir, j);
-    await expect(guard(db, dir)).rejects.toThrow(/behind|pending|0001_b/i);
-    expect(migrateCli(db, dir).code).toBe(0);
-    // previous image on the new schema: database ahead of an older journal is allowed
-    const older = writeMigrations([{ tag: '0000_a', sql: T('ta') }]);
-    await expect(guard(db, older)).resolves.not.toThrow();
+    const r = migrateCli(db, REAL_MIGRATIONS);
+    expect(r.code, r.err + r.out).toBe(0);
+    return db;
+  };
+  it('starts when current', async () => {
+    await expect(guard(migrated())).resolves.not.toThrow();
+  });
+  it('starts when the database is ahead (previous release on the new schema)', async () => {
+    const db = migrated();
+    must(`INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ('ahead', 99999999999999)`, db);
+    await expect(guard(db)).resolves.not.toThrow();
+  });
+  it('refuses when a journal entry is unapplied (tracking row removed)', async () => {
+    const db = migrated();
+    must(`DELETE FROM drizzle.__drizzle_migrations WHERE id = (SELECT max(id) FROM drizzle.__drizzle_migrations)`, db);
+    await expect(guard(db)).rejects.toThrow(/behind|pending|mismatch|first/i);
+  });
+  it('refuses when a tracking timestamp diverges from the journal', async () => {
+    const db = migrated();
+    must(`UPDATE drizzle.__drizzle_migrations SET created_at = created_at + 1 WHERE id = (SELECT min(id) FROM drizzle.__drizzle_migrations)`, db);
+    await expect(guard(db)).rejects.toThrow(/behind|mismatch|first/i);
+  });
+  it('refuses when the tracking table is missing (never migrated)', async () => {
+    const db = freshDb();
+    await expect(guard(db)).rejects.toThrow(/behind|missing|tracking|drizzle/i);
   });
 });
 
-describe('migrate check-config (ARCH §8.1): exit 0 good, non-zero naming what is wrong, connects nowhere', () => {
-  const mk = (over: { omit?: string; empty?: string; host?: string }) => {
+describe('migrate check-config (R7): migrator secret + connection settings; exit 0 / 1 naming each fault; no connection', () => {
+  // Input names are assumptions: POLY_MIGRATOR_PASSWORD_FILE and DATABASE_URL.
+  const mk = (over: { omit?: boolean; empty?: boolean; noUrl?: boolean }) => {
     const dir = mkdtempSync(join(tmpdir(), 'poly83-cfg-'));
-    for (const f of ['poly_migrator_password', 'session_secret']) {
-      if (f !== over.omit) writeFileSync(join(dir, f), f === over.empty ? '' : 'x');
-    }
-    const host = join(dir, 'host.env');
-    writeFileSync(host, over.host ?? 'POLY_ENV=staging\nTLS_MODE=acme\nPLAID_ENV=sandbox\n');
-    return { POLY_SECRETS_DIR: dir, POLY_HOST_ENV: host, DATABASE_URL: 'postgres://nobody@127.0.0.1:1/none' };
+    const f = join(dir, 'poly_migrator_password');
+    if (!over.omit) writeFileSync(f, over.empty ? '' : 'x');
+    return { POLY_MIGRATOR_PASSWORD_FILE: f, DATABASE_URL: over.noUrl ? '' : 'postgres://poly_migrator@127.0.0.1:1/none' };
   };
   const run = (env: Record<string, string>) => {
-    const p = spawnSync('node', ['--experimental-strip-types', join(DB_PKG, 'bin', 'migrate.mjs'), 'check-config'], { encoding: 'utf8', env: { ...process.env, ...env } });
+    const p = spawnSync('node', ['--experimental-strip-types', MIGRATE_CLI, 'check-config'], { encoding: 'utf8', env: { ...process.env, ...env } });
     return { code: p.status ?? 127, text: (p.stderr ?? '') + (p.stdout ?? '') };
   };
   it('0 on a good config, with an unreachable database (it connects nowhere)', () => expect(run(mk({})).code).toBe(0));
-  it('non-zero naming a missing secret file', () => {
-    const r = run(mk({ omit: 'session_secret' }));
-    expect(r.code).not.toBe(0); expect(r.code).not.toBe(127); expect(r.text).toMatch(/session_secret/);
+  it('1 naming a missing secret file', () => {
+    const r = run(mk({ omit: true }));
+    expect(r.code, r.text).toBe(1);
+    expect(r.text).toMatch(/poly_migrator_password|POLY_MIGRATOR_PASSWORD_FILE/);
   });
-  it('non-zero naming an empty secret file', () => {
-    const r = run(mk({ empty: 'poly_migrator_password' }));
-    expect(r.code).not.toBe(0); expect(r.code).not.toBe(127); expect(r.text).toMatch(/poly_migrator_password/);
+  it('1 naming an empty secret file', () => {
+    const r = run(mk({ empty: true }));
+    expect(r.code, r.text).toBe(1);
+    expect(r.text).toMatch(/poly_migrator_password|empty/i);
   });
-  it('non-zero when PLAID_ENV is not sandbox on staging', () => {
-    const r = run(mk({ host: 'POLY_ENV=staging\nTLS_MODE=acme\nPLAID_ENV=production\n' }));
-    expect(r.code).not.toBe(0); expect(r.code).not.toBe(127); expect(r.text).toMatch(/PLAID_ENV/);
-  });
-  it('non-zero when TLS_MODE fails the §7.8 cross-check', () => {
-    const r = run(mk({ host: 'POLY_ENV=prod\nTLS_MODE=bogus\nPLAID_ENV=production\n' }));
-    expect(r.code).not.toBe(0); expect(r.code).not.toBe(127); expect(r.text).toMatch(/TLS_MODE/);
+  it('1 naming missing connection settings', () => {
+    const r = run(mk({ noUrl: true }));
+    expect(r.code, r.text).toBe(1);
+    expect(r.text).toMatch(/DATABASE_URL|connection/i);
   });
 });
-
-void must;

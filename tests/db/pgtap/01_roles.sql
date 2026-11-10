@@ -87,5 +87,34 @@ SELECT is((SELECT array_agg(a.grantee::regrole::text ORDER BY a.grantee::regrole
 SELECT matches(pg_get_functiondef('app.current_user_id()'::regprocedure), 'nullif\(current_setting\(''app\.user_id''::text, true\), ''''::text\)',
   'app.current_user_id() uses the nullif form');
 
+-- ruling R1/R2/R3
+SELECT is((SELECT count(*)::int FROM pg_auth_members m JOIN pg_roles u ON u.oid=m.member
+  WHERE u.rolname IN ('poly_owner','poly_authz','poly_purge','poly_rollup','poly_graph','poly_stake','poly_govern','poly_journal')), 0,
+  'poly_owner and the seven definer-owner roles are members of nothing');
+SELECT is((SELECT pg_get_userbyid(datdba)::text FROM pg_database WHERE datname=current_database()), 'poly_owner', 'poly_owner owns the database');
+SELECT ok(NOT has_database_privilege('public', current_database(), 'CONNECT'), 'PUBLIC cannot CONNECT');
+SELECT ok(has_database_privilege('poly_app', current_database(), 'CONNECT') AND has_database_privilege('poly_worker', current_database(), 'CONNECT')
+  AND has_database_privilege('poly_migrator', current_database(), 'CONNECT') AND has_database_privilege('poly_backup', current_database(), 'CONNECT'), 'login roles can CONNECT');
+SELECT is((SELECT count(*)::int FROM pg_namespace n, unnest(ARRAY['poly_authz','poly_purge','poly_rollup','poly_graph','poly_stake','poly_govern','poly_journal']) r
+  WHERE has_schema_privilege(r, n.oid, 'CREATE') AND n.nspname !~ '^pg_'), 0, 'no definer-owner role holds CREATE on any schema at rest');
+SELECT is((SELECT pg_get_userbyid(nspowner)::text FROM pg_namespace WHERE nspname='app'), 'poly_owner', 'schema app owned by poly_owner');
+SELECT ok(NOT has_schema_privilege('public','app','USAGE'), 'PUBLIC has no USAGE on app');
+SELECT ok(has_schema_privilege('poly_app','app','USAGE') AND has_schema_privilege('poly_worker','app','USAGE'), 'app and worker have USAGE on schema app');
+SELECT ok(NOT has_schema_privilege('poly_app','app','CREATE'), 'poly_app has no CREATE on schema app');
+SELECT ok(NOT has_schema_privilege('public','public','CREATE'), 'PUBLIC has no CREATE on public');
+SELECT results_eq($$SELECT prosecdef, provolatile::text, proconfig IS NULL, pg_get_userbyid(proowner)::text FROM pg_proc WHERE oid='app.current_user_id()'::regprocedure$$,
+  $$VALUES (false,'s',true,'poly_owner')$$, 'app.current_user_id() is invoker, STABLE, no SET clause, owned by poly_owner');
+SELECT is((SELECT pg_get_userbyid(proowner)::text FROM pg_proc WHERE oid='app.job_targets(text)'::regprocedure), 'poly_authz', 'app.job_targets owned by poly_authz');
+SELECT results_eq($$SELECT proconfig FROM pg_proc WHERE oid='app.job_targets(text)'::regprocedure$$, $$VALUES (ARRAY['search_path=""'])$$, 'app.job_targets has search_path = ''''');
+SELECT is((SELECT count(*)::int FROM app.job_targets('any_job')), 0, 'M1: job_targets returns zero rows for every job');
+SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+  WHERE n.nspname NOT IN ('pg_catalog','information_schema') AND has_function_privilege('public', p.oid, 'EXECUTE')), 0, 'no user function is executable by PUBLIC');
+SELECT is((SELECT count(*)::int FROM pg_default_acl d WHERE d.defaclobjtype='f' AND EXISTS
+  (SELECT 1 FROM aclexplode(d.defaclacl) a WHERE a.grantee=0)), 0, 'no function default-ACL grants EXECUTE to PUBLIC');
+SELECT is((SELECT count(DISTINCT d.defaclrole)::int FROM pg_default_acl d WHERE d.defaclobjtype='f'
+  AND d.defaclrole IN ('poly_owner'::regrole,'poly_authz'::regrole,'poly_purge'::regrole,'poly_rollup'::regrole,'poly_graph'::regrole,'poly_stake'::regrole,'poly_govern'::regrole,'poly_journal'::regrole)), 8,
+  'all eight owner/definer roles carry the function default-ACL revoke');
+SELECT ok(EXISTS (SELECT 1 FROM pg_default_acl WHERE defaclrole = 'poly_owner'::regrole AND defaclobjtype='f'), 'poly_owner has a function default-ACL entry');
+
 SELECT * FROM finish();
 ROLLBACK;

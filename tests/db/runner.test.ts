@@ -8,15 +8,16 @@ import { must, psql, psqlSession, url } from './helpers/pg';
 
 export const E = {
   prefix: /prefix|not a hash-for-hash/i,
-  older: /older|not strictly (later|after|increasing)|timestamp/i,
+  older: /older|not strictly|increasing|\bwhen\b|timestamp|order/i,
   edited: /edited|hash mismatch|modified|changed after/i,
   fileCheck: /SET ROLE|SESSION AUTHORIZATION|RESET ROLE/i,
   notOwner: /current_user|poly_owner/i,
 };
 const ok = (r: { code: number; err: string; out: string }) => expect(r.code, r.err + r.out).toBe(0);
-const refused = (r: { code: number; err: string; out: string }, re: RegExp) => {
-  expect(r.code, 'must exit non-zero').not.toBe(0);
-  expect(r.code, 'exit 3 is reserved for "pending" in --plan').not.toBe(127);
+// ruling R6 exit codes: apply 0 / 2 divergence / 4 lock timeout / 1 other; --plan 0 / 3 pending / 2 divergence / 1 other
+const refused = (r: { code: number; err: string; out: string }, re: RegExp, code = 2) => {
+  expect(r.err + r.out).not.toMatch(/Cannot find module|ERR_MODULE_NOT_FOUND/); // a missing CLI also exits 1
+  expect(r.code, r.err + r.out).toBe(code);
   expect(r.err + r.out).toMatch(re);
 };
 const T = (n: string) => `CREATE TABLE public.${n} (id int);\n`;
@@ -44,8 +45,7 @@ describe('apply', () => {
     const db = freshDb();
     const dir = writeMigrations([{ tag: '0000_a', sql: T('ta') }, { tag: '0001_bad', sql: T('tb') + 'SELECT 1/0;\n' }]);
     const r = migrateCli(db, dir);
-    expect(r.code).not.toBe(0);
-    expect(r.err + r.out).toMatch(/division by zero/i);
+    refused(r, /division by zero/i, 1);
     expect(tableExists(db, 'public.ta')).toBe(false);
     expect(psql(`SELECT 1 FROM drizzle.__drizzle_migrations`, db).out.trim() === '' ).toBe(true);
   });
@@ -64,6 +64,7 @@ describe('refusals apply nothing', () => {
     setJournal(dir, j);
     const r = migrateCli(db, dir);
     refused(r, E.prefix);
+    refused(migrateCli(db, dir, ['--plan']), E.prefix); // --plan reports divergence with the same code
     expect(applied(db)).toHaveLength(2);
     expect(tableExists(db, 'public.tc')).toBe(false);
   });
@@ -104,12 +105,26 @@ describe('refusals apply nothing', () => {
       { tag: '0000_a', sql: T('ta') },
       { tag: '0001_evil', sql: T('tb') + 'SET ROLE poly_authz;\n' },
     ]);
-    const r = migrateCli(db, dir, [], { POLY_MIGRATE_SKIP_FILE_CHECK: '1' });
-    expect(r.code).not.toBe(0);
-    expect(r.err + r.out).toMatch(/permission denied|poly_owner|__drizzle_migrations/i);
+    // the runner does not run the role-switch scan (R8), so the privilege backstop is tested on its own
+    refused(migrateCli(db, dir), /permission denied|poly_owner|__drizzle_migrations/i, 1);
     expect(tableExists(db, 'public.ta')).toBe(false);
     expect(tableExists(db, 'public.tb')).toBe(false);
     expect(psql(`SELECT count(*) FROM drizzle.__drizzle_migrations`, db).out.trim()).toBe('0');
+  });
+});
+
+describe('journal order inside the runner', () => {
+  it('non-increasing `when` in the journal: exit 2, nothing applied', () => {
+    const db = freshDb();
+    const dir = writeMigrations([{ tag: '0000_a', sql: T('ta'), when: 5000 }, { tag: '0001_b', sql: T('tb'), when: 4000 }]);
+    refused(migrateCli(db, dir), /when|strictly|increasing|order/i);
+    expect(tableExists(db, 'public.ta')).toBe(false);
+  });
+  it('database ahead of the journal (previous image): exit 0, nothing applied or removed', () => {
+    const db = freshDb();
+    ok(migrateCli(db, writeMigrations([{ tag: '0000_a', sql: T('ta') }, { tag: '0001_b', sql: T('tb') }])));
+    ok(migrateCli(db, writeMigrations([{ tag: '0000_a', sql: T('ta') }])));
+    expect(applied(db)).toHaveLength(2);
   });
 });
 
@@ -128,7 +143,8 @@ describe('--plan', () => {
 
   it('other exit code on error (unreachable database)', () => {
     const r = migrateCli('does_not_exist', writeMigrations([{ tag: '0000_a', sql: T('ta') }]), ['--plan']);
-    expect([0, 3]).not.toContain(r.code);
+    expect(r.code, r.err).toBe(1);
+    expect(r.err + r.out).toMatch(/does not exist|database|connect/i);
   });
 
   it('takes no advisory lock and writes nothing; the apply path does take one', async () => {
