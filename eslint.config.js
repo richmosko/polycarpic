@@ -9,4 +9,11 @@ const layers = JSON.parse(fs.readFileSync(new URL('./layers.json', import.meta.u
 export default [
   { ignores: ['**/node_modules/**', '**/.turbo/**', 'prototype/**', 'spikes/**', 'temp/**', 'tests/layers/fixtures/**', 'docs/**'] },
   ...generateConfig(layers, { root: new URL('.', import.meta.url).pathname.replace(/\/$/, '') }),
+  // POLY-85 S-7(c): app sources log through @poly/config/log; console is for the CLI and check-config output alone
+  {
+    name: 'poly/no-console',
+    files: ['apps/web/src/**/*.ts', 'apps/worker/src/**/*.ts'],
+    ignores: ['**/cli*.ts', '**/check-config*.ts', '**/*.test.ts'],
+    rules: { 'no-console': 2 },
+  },
 ];

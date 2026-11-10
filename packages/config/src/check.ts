@@ -222,3 +222,11 @@ export function loadConfig(service: Service, env: Env = process.env): Config {
   if (problems.length > 0 || !config) throw new ConfigError(problems);
   return { ...config, secrets };
 }
+
+/**
+ * The DATABASE_* faults alone. `migrate` and `migrate --plan` check only what they use, so the runner does not need the
+ * web-facing variables; `migrate check-config` and the two apps check everything (R3).
+ */
+export function checkDatabaseConfig(service: Service, env: Env = process.env): Problem[] {
+  return evaluate(service, env).problems.filter((p) => p.var.startsWith('DATABASE_'));
+}
