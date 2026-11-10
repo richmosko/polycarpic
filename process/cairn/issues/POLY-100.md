@@ -43,3 +43,7 @@ seceng's refinements to the poly_backup preflight predicate (architect ruling ab
 ### @team-lead — 2026-11-10
 
 Bubble-up from the POLY-85 architect ruling (`process/cairn/reviews/POLY-85/ruling.md` R3, R5): the deploy runs `check-config` in all three containers (`polycarpic migrate|web|worker check-config`), since each container sees only its own secret mounts; compose gives every service `env_file: host.env` (INFRA §2.2, §4.5, §3.2 — devops). The label the tag-to-digest check reads is `org.opencontainers.image.revision` (full 40-hex), via `docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' <image>@<digest>`; build.yml passes `--build-arg GIT_COMMIT=${{ github.sha }}`. Hetzner sets `TLS_MODE=real-domain` (devops to confirm).
+
+### @team-lead — 2026-11-10
+
+From the POLY-85 seceng concurrence S-9(b) (`process/cairn/issues/POLY-85.md` @ 2463be2): the release image refuses `APP_ENV=development` whenever `POLY_IMAGE_REVISION` is set, so any CI run of the built image (smoke, `check-config`) uses `APP_ENV=staging` with a staging-shaped env; `check-config` is offline, so the `https` `PUBLIC_ORIGIN` is only a string there.
