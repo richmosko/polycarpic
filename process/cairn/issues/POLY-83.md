@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-76, POLY-82]
 assignee: backend-lead
-paths: [packages/db/**, tests/db/**, apps/web/src/**, apps/worker/src/**, apps/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, scripts/db/**, layers.json]
+paths: [packages/db/**, tests/db/**, tests/layers/**, apps/migrate/**, apps/web/src/**, apps/worker/src/**, apps/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, scripts/db/**, layers.json]
 labels: [db, security]
 priority: P1
 pr: null
