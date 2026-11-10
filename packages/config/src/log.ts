@@ -14,10 +14,10 @@ export type Level = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
 export type LogService = 'web' | 'worker' | 'migrate';
 export type Fields = Record<string, unknown>;
 
-interface Rule {
+export interface Rule {
   type?: string;
   enum?: readonly unknown[];
-  pattern?: RegExp;
+  pattern?: RegExp | string;
   maxLength?: number;
   minimum?: number;
   maximum?: number;
@@ -35,13 +35,13 @@ const ERR_RULES = new Map<string, Rule>(Object.entries(schema.properties.err.pro
 /** Set by the logger, never by a caller. */
 const RESERVED = new Set(['ts', 'level', 'service', 'event', 'dropped']);
 
-function passes(r: Rule, v: unknown): boolean {
+export function passes(r: Rule, v: unknown): boolean {
   if (r.enum && !r.enum.includes(v)) return false;
   // fail closed (M-1): a type this filter does not check, including a type array, accepts nothing
   if (r.type === 'string') {
     if (typeof v !== 'string') return false;
     if (r.maxLength !== undefined && v.length > r.maxLength) return false;
-    if (r.pattern && !r.pattern.test(v)) return false;
+    if (r.pattern && !new RegExp(r.pattern).test(v)) return false;
     return true;
   }
   if (r.type === 'integer' || r.type === 'number') {
