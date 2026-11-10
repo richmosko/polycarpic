@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-82]
 assignee: backend-lead
-paths: [packages/config/**, apps/web/**, apps/worker/**, apps/migrate/**, Dockerfile, .dockerignore, tests/**, layers.json, apps/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/INFRA/**, docs/SECURITY/**]
+paths: [packages/config/**, apps/web/**, apps/worker/**, apps/migrate/**, Dockerfile, .dockerignore, bin/polycarpic, packages/db/src/startup.ts, packages/db/src/migrate.ts, packages/db/src/migrate-config.ts, packages/db/src/*.test.ts, tests/**, layers.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/INFRA/**, docs/SECURITY/**]
 labels: [enabler, infra]
 priority: P2
 pr: null

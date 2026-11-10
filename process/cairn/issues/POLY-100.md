@@ -11,7 +11,7 @@ labels: [ops, deploy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-09
+updated: 2026-11-10
 ---
 
 INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh attestation verify pinned to the repo and signer workflow, prod git verify-tag against operator-installed allowed_signers, the tag-to-digest label check, ops-bundle extraction, check-config then migrate --plan, a pre-migration encrypted backup via the backup container, migrate under advisory lock, up -d, a 120 s health poll, automatic rollback, quarantine and heartbeat. A bad migration is recovered off the box from the operator's laptop within 60 minutes; no plaintext dump is written on the box (Principal Q8, 2026-11-08).
@@ -39,3 +39,7 @@ Architect, 2026-11-09 (supersedes POLY-83 ruling Addendum 2 (2), seceng's view):
 ### @team-lead — 2026-11-09
 
 seceng's refinements to the poly_backup preflight predicate (architect ruling above @ 686f0c3), relayed from POLY-83 @ a694b2a — seceng wrote them against the POLY-97 placement before the revision; they apply here unchanged: (a) also refuse EXECUTE on any `prosecdef` function (a definer grant is a write path) and TEMPORARY on the database; (b) "owns nothing" covers pg_type as well (the architect already added it). The POLY-97 criterion is withdrawn (5add6b5); this issue is the single home.
+
+### @team-lead — 2026-11-10
+
+Bubble-up from the POLY-85 architect ruling (`process/cairn/reviews/POLY-85/ruling.md` R3, R5): the deploy runs `check-config` in all three containers (`polycarpic migrate|web|worker check-config`), since each container sees only its own secret mounts; compose gives every service `env_file: host.env` (INFRA §2.2, §4.5, §3.2 — devops). The label the tag-to-digest check reads is `org.opencontainers.image.revision` (full 40-hex), via `docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' <image>@<digest>`; build.yml passes `--build-arg GIT_COMMIT=${{ github.sha }}`. Hetzner sets `TLS_MODE=real-domain` (devops to confirm).
