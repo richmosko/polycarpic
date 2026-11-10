@@ -105,6 +105,8 @@ export async function plan(opts: MigrateOptions): Promise<JournalEntry[]> {
   const client = new pg.Client(connectionFrom(opts.env));
   await client.connect();
   try {
+    // Same preflight as apply (Addendum 2): --plan must predict apply, so drift exits 2 here too. Catalog reads only.
+    await assertRoles(client);
     await client.query('BEGIN READ ONLY');
     await client.query('SET LOCAL ROLE poly_owner');
     const pending = pendingFrom(journal, await readApplied(client));
