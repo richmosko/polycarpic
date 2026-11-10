@@ -15,15 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** RLS battery harness
-- **Issue:** `POLY-84` (cairn)
-- **Milestone:** `POLY-M1` Foundations
-- **Branch:** `feature/poly-84-rls-battery-harness`
-- **Started:** 2026-11-10
-- **Goal:** the pgTAP battery's cross-cutting probes in `tests/db` — catalog-derived per-table RLS/FORCE probe with a named exemption list and canaries, inversion self-test, dirty-backend pool reuse (C-12), WITH CHECK forgery, definer allowlist (C-15), role hygiene (C-10), view/matview/TRUNCATE checks, and the SECURITY §4.2.1 permission matrix as a data-driven test — run through the real runner against a fresh Postgres.
-- **Status:** In Review — PR [#103](https://github.com/richmosko/polycarpic/pull/103); QA green @ 87f17b2, architect + seceng approved.
-- **Previous:** POLY-83 merged 2026-11-10 via PR #102 (ARCH v1.15.3, SECURITY v1.7; follow-ups on POLY-131, deploy-side on POLY-100).
-- **Next:** POLY-85 (runtime config + ops hooks).
+_None. POLY-84 (RLS battery harness) merged 2026-11-10 via PR [#103](https://github.com/richmosko/polycarpic/pull/103) — ARCH v1.15.5, SECURITY v1.7.1; follow-ups on POLY-62 (per-table probes, seeding, reverse coverage), POLY-107 (OQ-36 GL `account` name), POLY-79 (finish-feature PDF/criteria steps)._
+
+- **Next:** `/start-feature POLY-85` (runtime config + ops hooks) — the last `todo` in POLY-M1's first session.
 
 ## Releases
 

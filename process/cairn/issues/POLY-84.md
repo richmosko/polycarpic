@@ -1,7 +1,7 @@
 ---
 id: POLY-84
 title: RLS battery harness
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83]
@@ -124,3 +124,7 @@ qa Validate sign-off: PASS. Measured at 87f17b2 (tree at 49524ba).
 ### @team-lead — 2026-11-10
 
 PR opened: https://github.com/richmosko/polycarpic/pull/103. Validate signed off @ 8ce5dc5 (measured at 87f17b2); architect approved 49524ba, seceng approved 707623a. Suite growth: tests/db 54.4 s → ~60 s.
+
+### @team-lead — 2026-11-10
+
+Validate passed; merging via PR #103. Closing.
