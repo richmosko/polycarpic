@@ -15,7 +15,7 @@ const all = () => [...names].sort();
 const dirOf = (n: string) => join(root, layers.packages[n].dir);
 const arch = readFileSync(join(root, 'docs/ARCH/index.html'), 'utf8');
 
-const SPEC_PKGS = ['db', 'auth', 'tenancy', 'secrets', 'import', 'refdata', 'ledger', 'securities', 'posting', 'reports', 'tax', 'portfolio', 'ui', 'web', 'worker'];
+const SPEC_PKGS = ['config', 'db', 'auth', 'tenancy', 'secrets', 'import', 'refdata', 'ledger', 'securities', 'posting', 'reports', 'tax', 'portfolio', 'ui', 'web', 'worker'];
 
 describe('workspace (criterion 1)', () => {
   it('holds exactly the ARCH 2.2 packages and apps', () => {
