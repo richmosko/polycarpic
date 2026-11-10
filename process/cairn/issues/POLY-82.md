@@ -99,3 +99,7 @@ ARCH changes landed in this loop: v1.15 (subpath rule; auth `data-consumes`; web
 ### @team-lead — 2026-11-09
 
 PR opened: https://github.com/richmosko/polycarpic/pull/100. Awaiting Validate. Follow-ups batched in POLY-131.
+
+### @qa-engineer — 2026-11-09
+
+Validate sign-off: green @ 49f9919 (PR #100 head), real pnpm install. test/layers 231/231 (178 lint fixtures, file-check mutations, structure + tsc probes; deep import fails TS2307, declared-subpath control compiles). turbo run test 16/16; pnpm --filter @poly/ledger test alone 1/1. pnpm lint exit 0. node --test scripts/cairn/tests/js 494/494. No skipped tests.
