@@ -15,9 +15,15 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-84 (RLS battery harness) merged 2026-11-10 via PR [#103](https://github.com/richmosko/polycarpic/pull/103) — ARCH v1.15.5, SECURITY v1.7.1; follow-ups on POLY-62 (per-table probes, seeding, reverse coverage), POLY-107 (OQ-36 GL `account` name), POLY-79 (finish-feature PDF/criteria steps)._
+- **Feature:** Runtime config + ops hooks
+- **Issue:** `POLY-85` (cairn)
+- **Milestone:** `POLY-M1` Foundations (major `POLY-V1`)
+- **Branch:** `feature/poly-85-runtime-config-ops-hooks`
+- **Started:** 2026-11-10
+- **Goal:** The app-side hooks devops's scripts depend on — `*_FILE` secret loader in `packages/config` (extending `apps/migrate check-config`), loopback-only status listener + ok/not-ok public health, image commit label, structured JSON log schema.
+- **Status:** In Progress
 
-- **Next:** `/start-feature POLY-85` (runtime config + ops hooks) — the last `todo` in POLY-M1's first session.
+_Previous: POLY-84 (RLS battery harness) merged 2026-11-10 via PR [#103](https://github.com/richmosko/polycarpic/pull/103); follow-ups on POLY-62, POLY-107 (OQ-36), POLY-79._
 
 ## Releases
 

@@ -1,17 +1,17 @@
 ---
 id: POLY-85
 title: Runtime config + ops hooks
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-82]
 assignee: backend-lead
-paths: [packages/config/**, apps/web/src/lib/server/**, apps/worker/src/**, Dockerfile]
+paths: [packages/config/**, apps/web/**, apps/worker/**, apps/migrate/**, Dockerfile, .dockerignore, tests/**, layers.json, apps/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/INFRA/**, docs/SECURITY/**]
 labels: [enabler, infra]
 priority: P2
 pr: null
 created: 2026-11-08
-updated: 2026-11-09
+updated: 2026-11-10
 ---
 
 The app-side hooks the operations scripts depend on, from devops's not-filed list (INFRA §3.2, §6.5, §9.3; ARCH §7.4, §7.5, §8.1): the *_FILE secret loader, the loopback-only status listener inside web (until POLY-81 moves it to an admin service), the image label carrying the source commit that the deploy check reads, and the structured log schema.
@@ -28,3 +28,7 @@ The app-side hooks the operations scripts depend on, from devops's not-filed lis
 ### @team-lead — 2026-11-09
 
 From the POLY-83 architect ruling (R7, `process/cairn/reviews/POLY-83/ruling.md`): `migrate check-config` lands in POLY-83 checking only the DB-side inputs (migrator secret file present and non-empty, connection settings present; exit 0/1, no connection). The TLS_MODE, PLAID_ENV and other-secret checks land here with `packages/config` — extend `apps/migrate`'s check-config, do not duplicate it. `packages/config` is L0 in layers.json (ARCH v1.15.2); `apps/migrate` already allow-lists it.
+
+### @team-lead — 2026-11-10
+
+Feature started. Branch: `feature/poly-85-runtime-config-ops-hooks`.
