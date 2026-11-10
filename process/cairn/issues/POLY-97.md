@@ -22,4 +22,3 @@ The committed, idempotent scripts INFRA §7.1 steps 7–11 call (D-7): create.sh
 - [ ] On a real Hetzner project create.sh run twice is a no-op the second time and never opens a port other than 22/80/443.
 - [ ] provision-check ends ALL CHECKS PASSED, and each FAIL line names its fix.
 - [ ] No secret is printed or logged.
-- [ ] `provision-check` asserts on the live box that `poly_backup` holds no CREATE, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES or TRIGGER privilege anywhere — `aclexplode` over pg_database, pg_namespace, pg_class, pg_proc plus pg_default_acl — and owns no object; non-zero on any hit. SECURITY C-79 "no other grant; owns nothing" checked outside the migration chain (POLY-83 ruling Addendum 2: the runner guards only what its own safety depends on; CI's pgTAP catches grants that come through the chain; this catches a hand-made grant on the box).
