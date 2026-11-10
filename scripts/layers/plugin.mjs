@@ -132,6 +132,9 @@ const noSessionSet = {
   create(context) {
     const mode = context.options[0]?.mode ?? 'all';
     const test = (node, text) => {
+      // Comments are stripped first so a leading "-- note" or "/* c */" cannot hide the statement. No /m flag:
+      // a line that merely starts with SET inside UPDATE ... SET must not match.
+      if (text !== null) text = text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
       if (text !== null && (SESSION_SET.test(text) || setConfigNotLocal(text))) {
         context.report({ node, message: 'Session-level SET is refused (ARCH §3.3, SECURITY A-39); use SET LOCAL inside the transaction.' });
       }

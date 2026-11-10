@@ -72,7 +72,10 @@ export function checkLayers({ layers, archHtml, dirs, pkgJsons = {} }) {
       if (json.__dir && byDir.has(json.__dir)) add('name-mismatch', json.__dir + ' is named ' + name + ', layers.json says ' + pk[byDir.get(json.__dir)].name);
       continue;
     }
-    if (json.exports) {
+    if (!json.exports || typeof json.exports !== 'object' || Array.isArray(json.exports)) {
+      // No map, or the string form: every deep import resolves, which is the case the map exists to stop.
+      add('exports-mismatch', key + ' has no exports map (or a string-form one); it must list "." and its declared subpaths');
+    } else {
       const want = new Set(['.', ...pk[key].subpaths]);
       const have = new Set(Object.keys(json.exports));
       for (const e of have) if (!want.has(e)) add('exports-mismatch', key + ' exports ' + e + ', layers.json does not declare it');

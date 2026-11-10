@@ -92,6 +92,7 @@ export function generateConfig(layers, opts = {}) {
     if (inPackages) banned.push(...SVELTEKIT);
     const rules = {
       'no-restricted-imports': [2, { paths, patterns }],
+      // 'all' is keyed on the names db and auth: a rename would weaken it to 'sql' rather than fail closed.
       'poly/no-session-set': [2, { mode: n === 'db' || n === 'auth' ? 'all' : 'sql' }],
     };
     const namedOnly = [...(isDb ? [] : ['kysely']), ...(isSecrets ? [] : ['crypto', 'node:crypto'])];
