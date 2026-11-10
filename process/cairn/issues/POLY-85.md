@@ -102,3 +102,27 @@ Verdict (architect, gate 4): PASS @ 5344986. Read against ruling.md @ 332df39; I
 
 Accepted drift: (1) migrate run and --plan check DATABASE_* only (checkDatabaseConfig); check-config stays the full deploy gate, so fine. (2) Workspace COPY in place of pnpm deploy; R5 allowed it. (3) Image sets NODE_ENV=production; nothing security-relevant reads it (R2). (4) SECRET_NAME_RE widened with PWD allow-listed, per seceng S-1.
 Follow-up, not gating: status.ts falls back to process.env.STATUS_PORT when no port is passed; main passes config.statusPort, so the fallback should go when POLY-81 moves the listener. Ruling Open 1 to 4 stand.
+### @seceng — 2026-11-10
+
+Teeth review @ 5344986 (mutation table @ 12c3058). **Approved with three conditions, M-1 to M-3.** Each is a line in `log.ts` or `log.schema.json` plus a canary; none reopens the ruling. No SECURITY wording change is needed (v1.8 stands).
+
+I ran the two mutants qa left open, on tests/db/ops-hardening (baseline 4/4 green). Both were caught:
+- Single-flight removed (`??=` → `=`): S-8(a) goes red.
+- Crash handlers removed from web `main.ts`: the dynamic S-7(b) test goes red.
+
+Verified, with teeth:
+- **S-1, S-2.** The pattern has one source, and the Dockerfile test imports it. The stem of every registry row and `BETTER_AUTH_SECRET` are refused in every APP_ENV; the allowlist is `PWD` alone.
+- **S-3.** One read path, `open`+`fstat`, regular file only, 64 KiB cap. Messages carry the variable and the path, `ConfigError` carries only the variable and the fault, and `config.refused` drops the path. The canary is absent for every fault.
+- **S-4.** `#private`, with the spread, `structuredClone` and `inspect(showHidden)` canaries.
+- **S-8.** One shared in-flight promise, a 4 s race, and a catch-all that returns false; byte-equal bodies.
+- **S-9.** `origin` equality, the dev-in-image refusal, final-stage `COPY --from` / `USER node`, and the `.npmrc` check.
+- **Bind.** `127.0.0.1` is a constant. The test checks the non-loopback refusal and requires at least one non-loopback address.
+
+Conditions:
+- **M-1 (S-5/S-6, fail-open default).** `passes()` returns true for any `type` other than string, integer or number. A `boolean` field, or a `type: ["string","null"]` array, then accepts an object carrying a payload, and the walker allows both. Fix: `passes` returns false unless the type is one it checks, and `boolean` gets `typeof v === 'boolean'`. The walker also rejects any non-string `type`. Canaries: a test rule `{type:'boolean'}` given `{raw: CANARY}` → false; a walker case `{type:['string','null']}` → flagged.
+- **M-2 (S-5, route).** The `route` pattern admits a raw path with an account number. `/api/v1/accounts/9876543210QACANARY` passes (measured, node). Fix: add `(?!.*\d{4})` to the pattern; route ids never hold a run of four digits. Canary: `route: '/api/v1/accounts/' + CANARIES.accountNumber` is dropped and counted.
+- **M-3 (S-5, err.code).** `^[A-Za-z0-9_.-]+$` with a 32-character cap admits `CANARIES.token` (`tok_live_QACANARY9f3a7c1d5e`, measured). The existing test only used the memo, which has spaces. Fix: `^[A-Z0-9_]{1,32}$`. This covers SQLSTATE, `ECONNREFUSED` and `ERR_*`. A mixed-case code is dropped, and `type` survives. Canary: `err.code = CANARIES.token` is dropped.
+
+Not gating:
+- `openSync` on a FIFO blocks before `fstat` runs. Open with `O_RDONLY | O_NONBLOCK`.
+- The route pattern has no `(` `)`, so SvelteKit `(group)` route ids will be dropped. That is functional, not a leak: POLY-88 widens the pattern and keeps M-2.
