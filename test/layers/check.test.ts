@@ -12,7 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const realLayers = () => JSON.parse(readFileSync(join(root, 'layers.json'), 'utf8'));
 const realArch = join(root, 'docs/ARCH/index.html');
 
-type Mini = { layers: any; arch?: string; extraDirs?: string[]; dropDirs?: string[]; extraDeps?: Record<string, string[]>; extraExports?: Record<string, string[]> };
+type Mini = { layers: any; arch?: string; extraDirs?: string[]; dropDirs?: string[]; extraDeps?: Record<string, string[]>; extraExports?: Record<string, string[]>; noExports?: string[] };
 
 function run(m: Mini) {
   const dir = mkdtempSync(join(tmpdir(), 'poly-layers-'));
@@ -24,7 +24,7 @@ function run(m: Mini) {
     const deps: Record<string, string> = {};
     // dependencies come from the UNMUTATED allow-list, so a mutated allow-list does not move them
     for (const a of [...(base[key]?.allow ?? []), ...(m.extraDeps?.[key] ?? [])]) deps[`@poly/${a.split('/')[0]}`] = 'workspace:*';
-    writeFileSync(join(d, 'package.json'), JSON.stringify({ name: e.name, dependencies: deps, exports: Object.fromEntries(['.', ...e.subpaths, ...(m.extraExports?.[key] ?? [])].map((x: string) => [x, './src/index.ts'])) }));
+    writeFileSync(join(d, 'package.json'), JSON.stringify({ name: e.name, dependencies: deps, exports: m.noExports?.includes(key) ? undefined : Object.fromEntries(['.', ...e.subpaths, ...(m.extraExports?.[key] ?? [])].map((x: string) => [x, './src/index.ts'])) }));
   }
   for (const d of m.extraDirs ?? []) mkdirSync(join(dir, d), { recursive: true });
   const archPath = join(dir, 'arch.html');
@@ -60,6 +60,7 @@ describe('layers.json structural checks', () => {
   mutate('a directory missing from the file', 'missing-from-file', { layers: clone(), extraDirs: ['packages/stray'] });
   mutate('an entry in the file with no directory', 'missing-directory', { layers: clone(), dropDirs: ['tax'] });
   mutate('a declared workspace dependency not on the allow-list', 'workspace-dep-not-allowed', { layers: clone(), extraDeps: { ledger: ['posting'] } });
+  mutate('a package.json with no exports map', 'exports-mismatch', { layers: clone(), noExports: ['ledger'] });
   mutate('a stray ./migrate in db exports', 'exports-mismatch', { layers: clone(), extraExports: { db: ['./migrate'] } });
   mutate('an allow-list entry pointing at a higher layer', 'allow-up', (() => {
     const l = clone();
