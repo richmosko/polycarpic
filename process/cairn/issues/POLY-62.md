@@ -10,7 +10,7 @@ labels: [tenancy, db]
 priority: null
 pr: null
 created: 2026-09-27
-updated: 2026-11-08
+updated: 2026-11-10
 ---
 
 PRD §4 Story 1 (foundational); ARCH §3.1. The tenancy core: entity, entity_type (base and parent kinds, user-defined types), membership (role in force), invitation (row shape), the poly_authz functions app.has_role, app.visible_entities and app.owner_count, the permission matrix as data (SECURITY §4.2.1), and the notification and audit_event tables, which move here from POLY-64 because the M1 triggers write them. Every user owns a default Person from sign-up through provisionPerson. Each entity carries a settable tax classification. Split out (2026-11-08 decomposition): roll-up link POLY-94, multi-owner gate and founder POLY-90, second step POLY-89, held raise POLY-91, cap table POLY-93, BetterAuth POLY-86.
@@ -40,3 +40,7 @@ BetterAuth measurement spike (2026-11-08). better-auth 1.7.18 + @better-auth/pas
 ### @architect — 2026-11-08
 
 Re-scoped at the 2026-11-08 decomposition (architect + PM drafts; lead rulings). The description now lists what stays and the split-out issues. The seceng BetterAuth measurement comment above stays as the record; POLY-86 and POLY-89 build on it. The founding-owner and parent-cycle criteria the PM drafted live in POLY-90 and POLY-94.
+
+### @team-lead — 2026-11-10
+
+From POLY-84 (seceng, 2026-11-10): the catalog probe's `no_policy` check is satisfied by any policy, including a permissive `USING (true)`. Passing the battery is therefore not proof of tenant isolation. When the first tenant tables land here, each gets its own cross-tenant assertion using POLY-84's `crossTenantRows(db, table, as, other)` helper (ruling R4), and this issue decides the seeding helper and the permission-matrix `probe` shape (ruling R5, Open item 1).
