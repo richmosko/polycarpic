@@ -18,10 +18,10 @@ The app-side hooks the operations scripts depend on, from devops's not-filed lis
 
 ## Acceptance criteria
 
-- [ ] Every secret is read from a mounted file named by a *_FILE variable; a missing or empty file refuses start, naming the variable.
-- [ ] The status listener binds 127.0.0.1 only and returns migration and app status; the public /api/v1/health returns ok or not only (R-6).
-- [ ] The image carries the commit label the attestation covers, and POLY-100's tag-to-digest check reads it.
-- [ ] Logs are structured JSON to a committed schema; no secret, token or raw provider payload field is logged.
+- [x] Every secret is read from a mounted file named by a *_FILE variable; a missing or empty file refuses start, naming the variable. — loader.test.ts: 'R3 *_FILE semantics' (missing/empty/whitespace per variable, 'there is no env-var fallback'); check-config.test.ts: '<svc>: exit 1 on a missing DATABASE_PASSWORD_FILE ...' (migrate, web, worker), 'start refuses before any pool exists'
+- [x] The status listener binds 127.0.0.1 only and returns migration and app status; the public /api/v1/health returns ok or not only (R-6). — ops-status.test.ts: 'server.address().address is exactly 127.0.0.1', 'not reachable on any non-internal IPv4', 'GET /status ... exactly the v1 payload', 'current: 200 and the body is byte-equal to {"ok":true}', 'behind/diverged: 503 ... {"ok":false}'; ops-hardening.test.ts S-8 (a)(b)(c)
+- [x] The image carries the commit label the attestation covers, and POLY-100's tag-to-digest check reads it. — dockerfile.test.ts: 'the final stage LABELs org.opencontainers.image.revision=$GIT_COMMIT', 'a RUN fails the build unless GIT_COMMIT is a full 40-hex sha'; opt-in (POLY_IMAGE_BUILD=1, run green): 'building with the sha: the label equals it, read the way POLY-100 reads it'
+- [x] Logs are structured JSON to a committed schema; no secret, token or raw provider payload field is logged. — log.test.ts: 'every line validates against the schema', 'C-33 allowlist' planted-canary cases; log-seceng.test.ts: S-5 value checks, S-6 schema walker, M-1..M-3
 
 ## Comments
 
@@ -138,3 +138,8 @@ Lift @ 89aa134: **approved**. M-1 to M-3 are closed. I read af78ac3 and 89aa134,
 - **M-2.** `route` has `(?!.*\d{4})`. The canary `/api/v1/accounts/<accountNumber>` is dropped and counted, and real route ids still pass.
 - **M-3.** `err.code` is `^[A-Z0-9_]{1,32}$`. The token canary is dropped, `type` survives, and SQLSTATE, ECONNREFUSED and ERR_* are kept.
 - The not-gating FIFO item is also closed: the open is `O_RDONLY|O_NONBLOCK`.
+### @qa-engineer — 2026-11-10
+
+QA sign-off @ 89aa134 (re-verified from the tree after the M-1..M-3 lift). Counts: packages/config 303 pass; tests/config+image+log 94 pass with POLY_IMAGE_BUILD=1 (real build, none skipped); tests/db 147 pass (+2 expected fail, 9 files); python gate 1975 ok; typecheck 18/18; lint clean.
+Suite-time delta vs POLY-84 baseline: tests/db 99 s vs ~60 s = +~40 s (ops-status + ops-hardening, Postgres-backed, incl. fake-pg timeout waits); packages/config +0.3 s; tests/config+image+log +7 s (+4 s with the real build, layer-cached). Python gate unchanged (71 s). New suites join existing per-package jobs; no new top-level job.
+Criteria ticked above with proving tests. Mutation sanity: process/cairn/reviews/POLY-85/mutation.md (9 of 10 caught, 1 equivalent); seceng additionally caught single-flight and crash-handler mutants. M-1..M-3 canaries green. Sign-off: PASS.
