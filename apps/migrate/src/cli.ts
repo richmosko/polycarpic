@@ -5,14 +5,14 @@ import { checkConfig, MigrateRefusal, migrate, plan, urlFromEnv } from '@poly/db
 
 const FOLDER = process.env.POLY_MIGRATIONS_DIR;
 
-// Transitional: a bare DATABASE_URL is accepted for apply and --plan only (never by check-config).
-const url = () => (process.env.DATABASE_HOST ? urlFromEnv(process.env) : process.env.DATABASE_URL!);
+const url = () => urlFromEnv(process.env);
 const opts = () => ({ url: url(), ...(FOLDER ? { folder: FOLDER } : {}) });
 
 async function main(argv: string[]): Promise<number> {
   const [cmd] = argv;
   if (cmd === 'check-config') {
     const problems = checkConfig(process.env);
+    // apply and --plan also refuse a URL form: the DATABASE_* names are the only input
     for (const p of problems) console.error(`check-config: ${p.what}`);
     return problems.length ? 1 : 0;
   }
