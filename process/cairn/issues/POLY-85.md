@@ -61,3 +61,10 @@ Not gating:
 - **Secret file reads.** Refuse anything that is not a regular file, with a size cap, so `/dev/zero` cannot hang check-config.
 - **POLY-88.** The public listener returns 404 on `/status`.
 - **Open 1.** Route `connection.ts` through the loaded `Secret` when db is next touched, so the empty-file check covers the pool read too.
+
+### @qa-engineer — 2026-11-10
+
+Tests red @ a469e48 (pushed). Right reason (module/export absent): packages/config 252 + 2 files unloadable (ajv not yet a dev dep); tests/config+image+log 67; tests/db 35 (ops-status, ops-hardening) = 354 failing. Baseline green: python gate 1975 ok; tests/db/checks.test.ts with amended good() 42 pass.
+Map: R2/R3 loader.test.ts; S-1..S-4, S-9a/b seceng.test.ts; R6, S-5..S-7a log.test.ts + log-seceng.test.ts; R1/R3/R7 structure and start refusal tests/config/check-config.test.ts; S-7b/c seceng-static.test.ts + tests/db/ops-hardening.test.ts; R4 tests/db/ops-status.test.ts; S-8 ops-hardening; R5/S-9c tests/image/dockerfile.test.ts (POLY_IMAGE_BUILD=1 opt-in); harness tests/log/canary.ts.
+Assumed names, not in the ruling (reconcile in the test, one place each): SECRET_NAME_RE (S-1 export), config.secrets[VAR], config.statusPort, ConfigError.problems, createLogger({service,stream}), startStatusServer({port}), handleHealth(), main.ts for web/worker, schema key dropped.
+Runners: pnpm vitest run -c tests/config/vitest.config.ts; -c tests/db/vitest.config.ts; pnpm vitest run in packages/config.
