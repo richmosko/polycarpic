@@ -73,3 +73,21 @@ Conditions:
 Waived (S-3): the pool is not `max: 1`. The hard pid-equality precondition means a wrong backend turns the test red and can never pass it green, so the residual is a possible flake, not a false pass. Accepted.
 
 For POLY-62, not gating: add reverse coverage. Every non-exempt r/p table must be named by a matrix row or by a short reviewed "no matrix row" list. Otherwise a JSON table name that doesn't match the real table keeps its row inactive forever, and M-2(b) only makes that visible.
+### @architect — 2026-11-10
+
+**Verdict @ 2b04dbb: changes required (3 small).** tests/db re-run here: 112 pass + 2 expected-fail (POLY-100 pins), 60.5 s.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| R1 catalog probe, one shared query, reasons, temp scope | pass except S-1 | 02_rls_catalog.sql @ 8a5f630 |
+| R2 exemption list, existence, by-oid, no pattern | pass | 02 @ 8a5f630 |
+| R3 layout, permanent canaries, rollback | pass | 02/03/battery/matrix @ 8a5f630 |
+| R4 inversion as poly_app + twin; WITH CHECK (qa_canary_wc) | pass | battery.test.ts @ 8a5f630 |
+| R4/S-3 C-12 pool reuse | **pid asserted, `max: 1` missing** | battery.test.ts |
+| R5/S-2 matrix data + activation | **db:false note check and inactive-row print missing** | helpers/matrix.ts, matrix.test.ts |
+| R6 + TEMP ruling (a) | pass | 03_role_hygiene.sql |
+| R7 + Addendum 1 definers (aclexplode, exact search_path, owner set) | pass | helpers/definers.ts, pgtap.test.ts |
+| S-1 TRUNCATE trigger enabled = O/A | **accepts 'R'** | 02 `tgenabled <> 'D'` |
+| Mutation table | sound; equivalent mutant accepted | mutation.md @ 2b04dbb |
+
+Required fixes and seams: the architect's verdict detail file (path sent to team-lead). Item 2 needs backend-lead (`PoolConfig.max`). Non-blocking: the GL `account` vs BetterAuth `public.account` name collision is mine to raise in ARCH; it does not gate this PR.
