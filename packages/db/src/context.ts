@@ -44,6 +44,7 @@ async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (clie
   const outer = active.getStore();
   if (outer) throw new NestedContextError(kind, outer);
   const client = await getPool().connect();
+  let broken = false;
   try {
     return await active.run(kind, async () => {
       await client.query('BEGIN');
@@ -55,12 +56,13 @@ async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (clie
         await client.query('COMMIT');
         return out;
       } catch (e) {
-        await client.query('ROLLBACK').catch(() => undefined);
+        // a backend that cannot roll back is destroyed, not returned to the pool
+        await client.query('ROLLBACK').catch(() => { broken = true; });
         throw e;
       }
     });
   } finally {
-    client.release();
+    client.release(broken ? new Error('rollback failed') : undefined);
   }
 }
 

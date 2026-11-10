@@ -51,6 +51,18 @@ async function assertRoles(client: pg.Client): Promise<void> {
   if (got.join() !== want.join()) {
     throw new MigrateRefusal('roles-missing', `poly_migrator memberships are not exactly [${MIGRATOR_MEMBERSHIPS.join(', ')}] with INHERIT FALSE, SET TRUE, no ADMIN: got [${got.join(', ')}]`);
   }
+  // The reverse direction (SecEng M-2): poly_owner and the seven have no member but poly_migrator, and poly_backup
+  // belongs to nothing but pg_read_all_data. roles.sql only adds grants, so drift on a live box is caught here.
+  const stray = await client.query(
+    `SELECT u.rolname AS member, r.rolname AS role FROM pg_auth_members m
+       JOIN pg_roles r ON r.oid = m.roleid JOIN pg_roles u ON u.oid = m.member
+      WHERE (r.rolname = ANY($1) AND u.rolname <> 'poly_migrator')
+         OR (u.rolname = 'poly_backup' AND r.rolname <> 'pg_read_all_data')`,
+    [MIGRATOR_MEMBERSHIPS],
+  );
+  if (stray.rowCount) {
+    throw new MigrateRefusal('roles-missing', `unexpected role memberships: ${stray.rows.map((r) => `${r.member} in ${r.role}`).join(', ')}`);
+  }
 }
 
 /** Applies every pending migration in one transaction under an advisory lock. Returns the tags applied. */

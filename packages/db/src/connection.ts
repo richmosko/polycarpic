@@ -10,6 +10,10 @@ export function connectionFrom(env: Env): pg.ClientConfig {
     if (!env[k]) throw new Error(`${k} is not set`);
   }
   const mode = env.DATABASE_SSLMODE;
+  // fail closed: an unset or mistyped mode must not fall through to plaintext (SecEng M-1)
+  if (mode !== 'disable' && mode !== 'require' && mode !== 'verify-full') {
+    throw new Error('DATABASE_SSLMODE must be one of disable | require | verify-full');
+  }
   return {
     host: env.DATABASE_HOST,
     port: Number(env.DATABASE_PORT ?? 5432),
