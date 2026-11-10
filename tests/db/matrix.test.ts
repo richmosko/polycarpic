@@ -54,7 +54,9 @@ describe('the §4.2.1 matrix data (criterion 10)', () => {
     expect(validate([row({ id: 'a' }), row({ id: 'a' })])).toEqual(['a: duplicate id']);
     expect(validate([row({ cells: { viewer: 'deny', manager: 'allow' } as MatrixRow['cells'] })])).toEqual(['canary: cell owner is missing or illegal']);
     expect(validate([row({ cells: { viewer: 'maybe', manager: 'allow', owner: 'allow' } as unknown as MatrixRow['cells'] })])).toEqual(['canary: cell viewer is missing or illegal']);
-    expect(validate([row({ db: false })])).toEqual(['canary: tables is empty exactly when db is false']);
+    expect(validate([row({ db: false, note: 'n' })])).toEqual(['canary: tables is empty exactly when db is false']);
+    expect(validate([row({ tables: [] })])).toEqual(['canary: tables is empty exactly when db is false']);
+    expect(validate([row({ tables: [], db: false })])).toEqual(['canary: a db:false row needs a note saying why']);
     expect(validate([row({ id: 'Bad_Id' })])).toEqual(['Bad_Id: id is not kebab-case']);
   });
 });

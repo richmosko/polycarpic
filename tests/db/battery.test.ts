@@ -55,6 +55,9 @@ beforeAll(async () => {
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
   session = await import('../../packages/db/src/session.ts');
+  // S-3: a one-connection pool, so every checkout is the same dirty backend (the pid assertions below stay as the second check)
+  const pool = await import('../../packages/db/src/pool.ts');
+  (pool.appPool() as any).options.max = 1;
 });
 afterAll(async () => { await m?.close?.(); await auth?.close?.(); });
 

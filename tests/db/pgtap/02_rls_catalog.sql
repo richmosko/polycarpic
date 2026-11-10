@@ -24,7 +24,7 @@ CREATE FUNCTION pg_temp.battery_gaps(exempt text[]) RETURNS TABLE (rel regclass,
     ('no_policy',     c.relkind IN ('r', 'p') AND NOT EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid)),
     ('for_all_policy', c.relkind IN ('r', 'p') AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid AND p.polcmd = '*')),
     ('no_truncate_trigger', c.relkind IN ('r', 'p') AND NOT EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = c.oid
-       AND NOT t.tgisinternal AND t.tgenabled <> 'D' AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2 AND (t.tgtype & 32) = 32)),
+       AND NOT t.tgisinternal AND t.tgenabled IN ('O', 'A') AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2 AND (t.tgtype & 32) = 32)),
     ('matview',       c.relkind = 'm'),
     ('foreign_table', c.relkind = 'f'),
     ('view_not_security_invoker', c.relkind = 'v'
@@ -67,7 +67,7 @@ ALTER TABLE public.qa_canary_forall ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.qa_canary_forall FORCE ROW LEVEL SECURITY;
 CREATE POLICY p ON public.qa_canary_forall FOR ALL USING (true) WITH CHECK (true);
 CREATE TRIGGER t BEFORE TRUNCATE ON public.qa_canary_forall FOR EACH STATEMENT EXECUTE FUNCTION public.qa_canary_truncate_fn();
--- compliant but for TRUNCATE: a row trigger, an AFTER trigger and a disabled trigger do not count
+-- compliant but for TRUNCATE: a row trigger, an AFTER trigger, a disabled and a replica-only trigger do not count
 CREATE TABLE public.qa_canary_notrunc (id int);
 ALTER TABLE public.qa_canary_notrunc ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.qa_canary_notrunc FORCE ROW LEVEL SECURITY;
@@ -76,6 +76,8 @@ CREATE TRIGGER t_row BEFORE DELETE ON public.qa_canary_notrunc FOR EACH ROW EXEC
 CREATE TRIGGER t_after AFTER TRUNCATE ON public.qa_canary_notrunc FOR EACH STATEMENT EXECUTE FUNCTION public.qa_canary_truncate_fn();
 CREATE TRIGGER t_off BEFORE TRUNCATE ON public.qa_canary_notrunc FOR EACH STATEMENT EXECUTE FUNCTION public.qa_canary_truncate_fn();
 ALTER TABLE public.qa_canary_notrunc DISABLE TRIGGER t_off;
+CREATE TRIGGER t_replica BEFORE TRUNCATE ON public.qa_canary_notrunc FOR EACH STATEMENT EXECUTE FUNCTION public.qa_canary_truncate_fn();
+ALTER TABLE public.qa_canary_notrunc ENABLE REPLICA TRIGGER t_replica;
 -- partitioned parent compliant, partition child bare (a policy on the parent does not cover a direct query on a child)
 CREATE TABLE public.qa_canary_part (id int) PARTITION BY LIST (id);
 ALTER TABLE public.qa_canary_part ENABLE ROW LEVEL SECURITY;

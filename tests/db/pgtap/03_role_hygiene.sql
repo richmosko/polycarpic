@@ -19,7 +19,7 @@ SELECT is(pg_temp.login_priv_gaps(), '{}'::text[], 'no login role holds TRUNCATE
 
 -- no poly_* role holds TEMP on the database (R1's temp-relation exclusion rests on this), except poly_owner: it owns
 -- the database (roles.sql), so it holds every database privilege implicitly. It is NOLOGIN and reached only by
--- poly_migrator's SET ROLE inside a migration. Measured against the ruling's "none of the twelve"; reported to the architect.
+-- poly_migrator's SET ROLE inside a migration. Measured against the ruling's "none of the twelve"; ruled (a) by the architect, POLY-84 comment @ 7f90f49.
 CREATE FUNCTION pg_temp.temp_holders() RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(rolname::text ORDER BY rolname), '{}') FROM pg_roles
   WHERE rolname ~ '^poly_' AND rolname <> 'poly_owner' AND has_database_privilege(oid, current_database(), 'TEMPORARY')

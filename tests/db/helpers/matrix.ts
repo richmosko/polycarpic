@@ -30,6 +30,7 @@ export function validate(rows: MatrixRow[]): string[] {
     }
     if (!Array.isArray(r.tables) || r.tables.some((t) => !/^[a-z_]+\.[a-z_]+$/.test(t))) errs.push(`${r.id}: tables must be schema.table names`);
     else if ((r.tables.length === 0) !== (r.db === false)) errs.push(`${r.id}: tables is empty exactly when db is false`);
+    if (r.db === false && !r.note) errs.push(`${r.id}: a db:false row needs a note saying why`);
     if (r.probe === undefined) errs.push(`${r.id}: probe must be null or an object`);
   }
   return errs;
