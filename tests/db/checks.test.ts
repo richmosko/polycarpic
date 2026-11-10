@@ -117,7 +117,8 @@ describe('migrate check-config (addendum 1): DB side only, no connection; exit 0
   const good = (): Record<string, string> => {
     const f = join(mkdtempSync(join(tmpdir(), 'poly83-cfg-')), 'db_password_migrator');
     writeFileSync(f, 'secret\n');
-    return { DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '1', DATABASE_NAME: 'none', DATABASE_USER: 'poly_migrator', DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f };
+    // POLY-85 R8: check-config now also covers the non-DB inputs, so a good config carries them too
+    return { APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173', DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '1', DATABASE_NAME: 'none', DATABASE_USER: 'poly_migrator', DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f };
   };
   const run = (env: Record<string, string | undefined>) => {
     const base: Record<string, string | undefined> = { ...process.env };
