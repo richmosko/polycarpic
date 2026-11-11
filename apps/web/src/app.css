@@ -1,0 +1,349 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/space-grotesk';
+
+@custom-variant dark (&:is(.dark *));
+
+:root`/`.dark`, shadcn-svelte's standard
+ * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
+ * the swatches.
+ *
+ * Two brand hues: a neon green (`--brand`) and a sky blue (`--brand-2`).
+ * Both fail AA as text or fills on a light surface, so each is used
+ * literally only on dark surfaces and decoratively. A darkened same-hue
+ * value does its job on light surfaces (`--primary` for the green,
+ * `--secondary-foreground` for the blue). Neutrals carry a faint tint of
+ * the blue hue; the light page canvas is a near-neutral warm off-white.
+ * Every hover/active fill is `--accent`. `--muted` equals `--background`
+ * and serves in-card wells, tracks and placeholders, never hovers.
+ * design-system-spec.md § Foundations and § Financial semantics hold the
+ * derivations and every contrast figure.
+ *
+ * Plain sRGB hex, not OKLCH — this system doesn't vendor a shadcn preset
+ * and doesn't need OKLCH's multi-preset precision.
+ *
+ * CI note: scripts/cairn/tests/test_board_tokens_parity.py once asserted
+ * this file shares values with cairn's board tokens; that assertion was
+ * removed (POLY-78). If it reappears, do not re-add cairn's values to
+ * satisfy it — diverging from cairn is deliberate.
+ *
+ * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
+ */
+
+/* Space Grotesk is self-hosted (Fontsource variable woff2, SIL OFL); the path is
+   relative to this file, so every page that links tokens.css gets the face. */
+@font-face {
+  font-family: 'Space Grotesk Variable';
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url('../_assets/fonts/space-grotesk-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+:root {
+  /* Surfaces & text. The page canvas is a subtle warm grey (L 0.97), not
+     white, so pure-white cards and popovers float on it (1.06:1 step plus
+     a hairline). A tint at L ~0.996 is indistinguishable from white; this
+     is the lightest value that still reads as a canvas.
+     --muted = --background: it serves in-card wells, tab/progress tracks
+     and placeholder blocks, where it reads at 1.06:1 against white. It is
+     never a hover fill. Every hover/active fill is --accent (screen.css),
+     which stays visible on both page (1.05:1) and card (1.12:1).
+     --border/--input are warm (30°), a step darker than the page. */
+  --background: #F9F8F8;
+  --foreground: #1D1F20; /* near-black, barely blue, flat rather than tinted */
+  --card: #FFFFFF;
+  --card-foreground: #1D1F20;
+  --popover: #FFFFFF;
+  --popover-foreground: #1D1F20;
+
+  /* Primary: a darkened neon green (hue 110.6°, same hue as --brand, L 0.253
+     vs the brand's L 0.51). See --brand below for why the raw brand hex
+     can't be primary on a light surface. */
+  --primary: #148100; /* 4.52:1 on --accent (hovered rows); one notch lighter would drop under AA there */
+  --primary-foreground: #FFFFFF;
+
+  /* Secondary/accent: the blue hue (200.6°). It gives the blue brand a
+     real surface job (secondary buttons, info-weight badges,
+     selected/non-primary states) distinct from primary's green "main
+     action" role. See design-system-spec.md § Secondary accent for the
+     full job definition. One derived ink (#096FA5) serves both the
+     fill-with-text role (4.72:1 on --secondary) and the plain-text-on-card
+     role (5.48:1). */
+  --secondary: #E3F0F7;
+  --secondary-foreground: #096FA5;
+  --muted: #F9F8F8; /* = --background. Wells/tracks/placeholders on cards (1.06:1 vs white); NOT a hover fill — hovers use --accent */
+  --muted-foreground: #5E5A55; /* warm 33°, 6.45:1 on --background/--muted, 6.14:1 on --accent */
+  --accent: #EBF4F9; /* THE hover/active fill — 1.05:1 vs page, 1.12:1 vs card */
+  --accent-foreground: #096FA5;
+
+  /* --brand: the literal, undarkened neon green — logo, chart accent
+     call-outs, decorative highlights, anywhere a dark surface sits
+     underneath. Do not use for text or a light-surface fill; use
+     --primary for that.
+     --brand-2: the literal, undarkened sky blue (#05A9FF). Same rule:
+     dark-surface/decorative use only (2.44:1 against this light
+     --background, far below AA). Used for the sidebar focus ring (it reads
+     against the sidebar's dark-in-light-mode surface), and as the series-2
+     color in two-series comparison charts (nominal vs. inflation-adjusted,
+     actual vs. target) against the green --chart-3 as series 1, on dark
+     surfaces. On light surfaces that same series-2 job uses the derived
+     --secondary-foreground ink (#096FA5) instead: the same
+     "literal-on-dark, derived-on-light" split every brand hue follows. */
+  --brand: #2CFF05;
+  --brand-2: #05A9FF;
+
+  --destructive: #DE0404; /* 4.57:1 on --accent; a notch lighter falls under AA on hovered rows */
+  --destructive-foreground: #FFFFFF;
+
+  --border: #E6E2DE; /* warm, a step darker than the page — 1.29:1 on --card, 1.22:1 on --background */
+  --input: #DCD8D4; /* one step stronger than --border, 1.42:1 on --card */
+  --ring: #148100;
+
+  /* Chart ramp: a gradient of --brand-2's sky blue (200.6°, S=0.90),
+     ordered light→dark, chart-1 brightest / chart-5 darkest, the same
+     direction in both modes so no chart-N meaning flips between them.
+     L steps 0.46→0.30 (step -0.04). Every step clears the 3:1 non-text
+     floor against --background and --card (chart-1, the tightest: 3.07:1
+     vs --background, 3.26:1 vs --card), and the same 3.07:1 holds in a
+     --muted well. Not on --accent (2.92:1): no chart sits inside a hover
+     fill. Adjacent steps sit ~1.18-1.21:1 apart, modest but perceptible.
+     Semantic --positive/--destructive/--warning are separate hues; the
+     ramp is chart-only. design-system-spec.md § Chart ramp has all ten
+     contrast figures. */
+  --chart-1: #0C96DF;
+  --chart-2: #0B89CB;
+  --chart-3: #0A7CB8;
+  --chart-4: #096FA5;
+  --chart-5: #086291;
+
+  /* Categorical palette: identity, not magnitude (the --chart ramp stays
+     the magnitude ramp). Seven hues in a fixed order plus a neutral
+     Other; colour follows the entity, never its rank. Principal ruling:
+     the brand colours themselves, and five more at their brightness and
+     intensity. cat-1 and cat-2 ARE --brand and --brand-2; the other five
+     sit at OKLCH L 0.71-0.84, C 0.14-0.26, each at or near the sRGB limit
+     for its hue (the brand pair measures L 0.87/0.71, C 0.29/0.17), and
+     skip the status arcs (red ~29, orange ~48, positive green ~150-162).
+     Same values in both modes; only the label ink changes, in the dark
+     block below. Validated with the dataviz skill's validate_palette.js:
+     adjacent (7) worst CVD dE 12.0, normal-vision 16.3; all-pairs over
+     cat-1..5 CVD 8.3, normal 17.1. WAIVED by the same ruling: the 3:1
+     surface contrast on light surfaces (tightest 1.29:1, neon on
+     --background) and the mode lightness band. Compensated on every
+     mark: a label or legend, a 1px --cat-edge hairline and a 2px surface
+     gap, and the dark label ink on the line (AA on the fill).
+     design-system-spec.md § Categorical palette has the full method. */
+  --cat-1: var(--brand);   --cat-1-foreground: #1D1F20; /* neon green, 12.15:1 */
+  --cat-2: var(--brand-2); --cat-2-foreground: #1D1F20; /* sky,         6.40:1 */
+  --cat-3: #E2B003;        --cat-3-foreground: #1D1F20; /* gold,        8.23:1 */
+  --cat-4: #FF49D8;        --cat-4-foreground: #1D1F20; /* magenta,     5.67:1 */
+  --cat-5: #06E5F7;        --cat-5-foreground: #1D1F20; /* cyan,       10.68:1 */
+  --cat-6: #C67EFF;        --cat-6-foreground: #1D1F20; /* violet,      6.17:1 */
+  --cat-7: #FF67A4;        --cat-7-foreground: #1D1F20; /* rose,        6.09:1 */
+  /* Other: the 8th+ series folded together. Neutral (warm, like
+     --muted-foreground), at the set's brightness but with no chroma, so
+     it never reads as an eighth hue. */
+  --cat-other: #A8A39D;    --cat-other-foreground: #1D1F20; /* 6.61:1 */
+  /* The 1px edge on a categorical mark: --foreground at 35%, translucent so
+     it reads as a darker step of whatever it sits on. Inset on a fill:
+     neon 2.09:1 against the fill and 2.68:1 against --background, cyan
+     2.04 / 2.98, gold 1.94 / 3.69. Outset on a surface: 2.14:1 against
+     --background, 2.15:1 against --card. --border is 1.06:1 on the neon,
+     too faint to edge the brightest slots. */
+  --cat-edge: rgba(29, 31, 32, 0.35);
+
+  /* Sidebar: inverted relative to the page (a dark card on the light page)
+     and tinted with the same blue as the neutral scale, so the whole
+     system carries one consistent cast rather than a third, truly-neutral
+     grey. The focus ring is --brand-2, so no green cast reaches this
+     component. */
+  --sidebar: #1F2528;
+  --sidebar-foreground: #F2F2F3;
+  --sidebar-accent: #303B40;
+  --sidebar-accent-foreground: #F2F2F3;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #05A9FF;
+  /* Stroke of the seedling brand mark in the sidebar brand row: the
+     literal neon brand, 11.39:1 on this dark card. */
+  --sidebar-brand: #2CFF05;
+
+  /* Financial semantics.
+     --warning: a true vivid orange (H=25.7°, close to Monarch's measured
+     orange hue of 22°, see Inspiration). Orange can't clear 4.5:1 with
+     WHITE text without darkening until it reads brown (destructive and
+     positive can take that route; orange can't and keep its hue). So it
+     pairs with a dark orange-black ink instead. One literal value does
+     both jobs: 5.54:1 for fill-with-text, 3.20:1 against --card for
+     border/icon use. Used for: aged Cash-in-Transit exceptions, a stale
+     provider link, a safe-harbor due date >14 days out (Financial
+     semantics § Status tiers). */
+  --positive: #147F3C; /* 4.56:1 on --accent (hovered table rows); a hair lighter falls under AA there */
+  --positive-foreground: #FFFFFF;
+  --warning: #EA6A0A;
+  --warning-foreground: #2A1200;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 20px;
+
+  --font-sans: 'Space Grotesk Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.dark {
+  /* The same blue-hue tint on a near-black base. */
+  --background: #070808;
+  --foreground: #F2F2F3;
+  --card: #0D0E0F;
+  --card-foreground: #F2F2F3;
+  --popover: #0D0E0F;
+  --popover-foreground: #F2F2F3;
+
+  /* Dark-mode --primary IS the raw brand green: it clears AA comfortably
+     here, where a light base can't use it at all. */
+  --primary: #2CFF05;
+  --primary-foreground: #070808;
+
+  --secondary: #173C4F;
+  --secondary-foreground: #68C3F3;
+  --muted: #0F1112;
+  --muted-foreground: #A0A7AB;
+  --accent: #194257;
+  --accent-foreground: #68C3F3;
+
+  --brand: #2CFF05; /* same literal value both modes — a fixed brand reference, not themed */
+  --brand-2: #05A9FF; /* same literal value both modes */
+
+  --destructive: #FC4F4F;
+  --destructive-foreground: #2A0507;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #2CFF05;
+
+  /* Chart ramp: the same --brand-2 hue (200.6°, S=0.90) as :root,
+     lightened for the dark surface. L steps 0.88→0.42 (step -0.12).
+     chart-5 (#0B89CB) is the same hex as light mode's chart-2 by
+     coincidence: both ramps sample one hue/saturation function, not a
+     themed link. Every step clears 3:1 by a wide margin (chart-5, the
+     tightest: 5.23:1 vs --background, 5.04:1 vs --card); light mode sets
+     the floor. */
+  --chart-1: #C5E9FC;
+  --chart-2: #8BD3F9;
+  --chart-3: #51BDF6;
+  --chart-4: #16A7F3;
+  --chart-5: #0B89CB;
+
+  /* Categorical palette: the --cat-N fills are the :root values, unthemed
+     like --brand itself. Every slot >= 6.62:1 on --card here, so the
+     surface checks pass in dark mode; only the label ink changes, to the
+     dark page colour (ratio on the line). */
+  --cat-1-foreground: #070808;     /* 14.72:1 */
+  --cat-2-foreground: #070808;     /*  7.76:1 */
+  --cat-3-foreground: #070808;     /*  9.97:1 */
+  --cat-4-foreground: #070808;     /*  6.87:1 */
+  --cat-5-foreground: #070808;     /* 12.95:1 */
+  --cat-6-foreground: #070808;     /*  7.48:1 */
+  --cat-7-foreground: #070808;     /*  7.38:1 */
+  --cat-other-foreground: #070808; /*  8.01:1 */
+  /* --foreground at 25%. The fills already clear the surface here, so the
+     edge only has to show, not to separate: outset 2.08:1 on --card and
+     2.00:1 on --background, a soft ring rather than a halo. Inset it barely
+     registers on a fill this bright (neon 1.00:1, cyan 1.04, gold 1.15). */
+  --cat-edge: rgba(242, 242, 243, 0.25);
+
+  /* Sidebar: inverted the other way in dark mode, a LIGHT card on the dark
+     page, close to the light canvas tone. The ring uses a derived blue
+     ink (#0078B8, not the raw --brand-2), because the raw blue reads too
+     close to this near-white surface to register as a focus indicator. */
+  --sidebar: #F7F8F8;
+  --sidebar-foreground: #1D1F20;
+  --sidebar-accent: #E3F0F7;
+  --sidebar-accent-foreground: #096FA5;
+  --sidebar-border: #E7E8E9;
+  --sidebar-ring: #0078B8;
+  /* On this light card the raw neon is 1.28:1, so the mark takes the
+     light-mode primary green instead: 4.73:1 (>= 3:1 non-text). */
+  --sidebar-brand: #148100;
+
+  --positive: #52E0A4;
+  --positive-foreground: #052E13;
+  /* --warning: the light-mode orange hue (H≈23–26°), lightened for a dark
+     surface. A warm hue pulled toward yellow to stay bright reads as
+     mustard, not orange, so the hue is held and only L moves. It pairs
+     with the same dark orange-black ink as light mode, not a white/dark
+     flip like --destructive: orange never pairs AA-safely with white text
+     at a saturation that still reads as orange, in either mode. */
+  --warning: #FF9452;
+  --warning-foreground: #2A1200;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-brand-2: var(--brand-2);
+  --color-brand: var(--brand);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-cat-1: var(--cat-1);
+  --color-cat-2: var(--cat-2);
+  --color-cat-3: var(--cat-3);
+  --color-cat-4: var(--cat-4);
+  --color-cat-5: var(--cat-5);
+  --color-cat-6: var(--cat-6);
+  --color-cat-7: var(--cat-7);
+  --color-cat-other: var(--cat-other);
+  --color-cat-edge: var(--cat-edge);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-brand: var(--sidebar-brand);
+  --color-warning: var(--warning);
+  --color-positive: var(--positive);
+  --color-positive-foreground: var(--positive-foreground);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-cat-1-foreground: var(--cat-1-foreground);
+  --color-cat-2-foreground: var(--cat-2-foreground);
+  --color-cat-3-foreground: var(--cat-3-foreground);
+  --color-cat-4-foreground: var(--cat-4-foreground);
+  --color-cat-5-foreground: var(--cat-5-foreground);
+  --color-cat-6-foreground: var(--cat-6-foreground);
+  --color-cat-7-foreground: var(--cat-7-foreground);
+  --color-cat-other-foreground: var(--cat-other-foreground);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+}
