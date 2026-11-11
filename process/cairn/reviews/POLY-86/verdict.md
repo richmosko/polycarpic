@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: pass on two conditions, F1 and F2.** Both are small, and neither changes the seam. Once the builder lands them, I confirm the fix sha against this file. There is no re-review.
+**Result: pass.** Both conditions are met. F1 at 385ef78: `routing-pool.test.ts`, with `AuthUnderSystemJob` raised on `connect()` and `query()`. F2 at f6cde68: `userCreateBefore` asserts the wrapper and calls `claimInvitation` on every call, and the image rule is the pure `stripImage`.
 
 | Axis | Result | Evidence |
 |---|---|---|
