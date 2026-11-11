@@ -172,6 +172,19 @@ class RegenerateModeTests(_Base):
         code, out = self.run_check(repo2, "--pair", "gen")
         self.assertEqual(code, 1, "generated-only file: " + out)
 
+    def test_addendum_1_add_only_generator_does_not_see_a_committed_only_stray(self):
+        """POLY-102 ruling Addendum 1 pins an accepted limit: the copy starts from the committed output, so for a
+        generator that only adds files (drizzle-kit never deletes) a committed-only stray is in both trees and the pair
+        reads fresh. red if: the comparator starts flagging it (then the addendum and ARCH 8 need re-ruling) or the pair
+        fails to run."""
+        add_only = "import os; os.makedirs('out', exist_ok=True); open('out/result.txt', 'w').write('built:v1:dep1\\n')"
+        repo = make_repo(self, [regen_pair(name="addonly", command=[PY, "-c", add_only])])
+        (repo / "pkg" / "out" / "stray.txt").write_text("committed, never generated\n", encoding="utf-8")
+        _commit(repo, "stray committed output file", when="2026-08-21T10:00:00")
+        code, out = self.run_check(repo, "--pair", "addonly")
+        self.assertEqual(code, 0, out)
+        self.line(out, "addonly", "fresh")
+
     def test_a_doc_only_commit_never_flips_fresh_to_stale(self):
         """red if: any commit after the output's makes a regenerate pair stale."""
         repo = make_repo(self)
