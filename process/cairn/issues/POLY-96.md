@@ -1,12 +1,12 @@
 ---
 id: POLY-96
 title: CI: change filter, build, attest
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [.github/workflows/ci.yml, .github/workflows/build.yml, .github/workflows/release.yml, infra/ci/**]
+paths: [.github/workflows/ci.yml, .github/workflows/build.yml, .github/workflows/release.yml, infra/ci/**, process/cairn/issues/POLY-96.md, tests/**, turbo.json, Dockerfile, package.json, pnpm-lock.yaml, apps/*/package.json, packages/*/package.json, eslint.config.js, layers.json, docs/INFRA/**]
 labels: [ci, supply-chain]
 priority: null
 pr: null
@@ -37,3 +37,7 @@ Add to the acceptance criteria when this is scoped:
 - A soft budget per job (proposed: lint+types ≤ 2 min, per-package Vitest ≤ 2 min, DB battery ≤ 3 min); a job over budget posts a warning annotation, never a failure — the point is to see the curve, not to block on it.
 - The DB battery stays one job keyed to `packages/db/**` + `tests/db/**` only; POLY-84's RLS battery joins that job, not a new one — one Postgres container per run.
 - `cairn loop-stats` already has a `suite_seconds_added` row; wire the CI timings into `process/cairn/metrics/test-runs.jsonl` so the per-loop scorecard shows suite growth from CI, not only from local runs.
+
+### @team-lead — 2026-11-10
+
+Feature started. Branch: `feature/poly-96-ci-change-filter-build-attest`. First commit also carries the second-session promotion (POLY-62, 86, 95, 96, 97, 128 → todo; user-approved 2026-11-11).

@@ -15,9 +15,15 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-85 (runtime config + ops hooks) merged 2026-11-10 via PR [#105](https://github.com/richmosko/polycarpic/pull/105) — ARCH v1.15.6, SECURITY v1.8; follow-ups on POLY-81 (status-listener port fallback, Host header), POLY-88 (C-76 SOA zone test, route pattern for `(group)` ids, `/status` 404 on the public listener), POLY-100 (three-container `check-config`, `env_file`, staging env for CI image runs), POLY-121 (Vercel env source); ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature._
-
-- **Next:** POLY-M1's first session is complete (POLY-76, 82, 83, 84, 85 done). Decide the second session's issues from `scripts/cairn/cairn ls --milestone POLY-M1 --status backlog` and promote them to `todo`.
+- **Feature:** CI: change filter, build, attest
+- **Issue:** `POLY-96` (cairn)
+- **Milestone:** `POLY-M1`
+- **Branch:** `feature/poly-96-ci-change-filter-build-attest`
+- **Started:** 2026-11-11
+- **Goal:** put the product suites (lint, types, Vitest, DB battery) and the image build, scan and attestation into CI behind one required `app` check.
+- **Status:** In Progress
+- **Carried from POLY-85:** follow-ups on POLY-81, POLY-88, POLY-100, POLY-121; ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature.
+- **Next:** second session is in `todo` (promoted 2026-11-11): POLY-62 and POLY-86 (identity roots), POLY-128 (app shell), then POLY-97 and POLY-95 (infra). POLY-131 held (P3).
 
 ## Releases
 
