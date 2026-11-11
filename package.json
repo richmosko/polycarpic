@@ -17,6 +17,7 @@
     "turbo": "latest",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1",
-    "vitest": "latest"
+    "vitest": "latest",
+    "yaml": "^2.9.1"
   }
 }
