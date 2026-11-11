@@ -32,14 +32,15 @@ export async function provisionPerson(tx: Tx): Promise<{ personId: string; creat
     tx.execute<{ id: string }>(sql`SELECT id FROM public.entity WHERE self_user_id = app.current_user_id()`);
   const existing = await find();
   if (existing.rows[0]) return { personId: existing.rows[0].id, created: false };
-  const ins = await tx.execute(sql`
+  // No ON CONFLICT: its arbiter makes the INSERT also check the SELECT policy, which cannot see the AFTER trigger's
+  // membership. Two concurrent first calls for one user hit the unique self_user_id; the loser fails and retries.
+  await tx.execute(sql`
     INSERT INTO public.entity (type_id, name, self_user_id)
     SELECT t.id,
            coalesce((SELECT u.name FROM public."user" u WHERE u.id = app.current_user_id()), 'Person'),
            app.current_user_id()
-    FROM public.entity_type t WHERE t.system_key = 'person'
-    ON CONFLICT (self_user_id) DO NOTHING`);
+    FROM public.entity_type t WHERE t.system_key = 'person'`);
   const row = (await find()).rows[0];
   if (!row) throw new Error('provisionPerson: the Person is not visible after insert');
-  return { personId: row.id, created: (ins.rowCount ?? 0) > 0 };
+  return { personId: row.id, created: true };
 }

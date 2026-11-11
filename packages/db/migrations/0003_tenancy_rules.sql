@@ -163,6 +163,7 @@ CREATE FUNCTION app.gate_owner_changes() RETURNS trigger
   DECLARE
     v_entity uuid;
     n int;
+    v_refuse boolean := false;
     rk text[] := ARRAY['viewer', 'manager', 'owner'];
   BEGIN
     IF current_user IN ('poly_govern', 'poly_purge')
@@ -178,10 +179,15 @@ CREATE FUNCTION app.gate_owner_changes() RETURNS trigger
     END IF;
     n := app.owner_count(v_entity);
     IF n IS DISTINCT FROM 1 THEN
-      IF TG_TABLE_NAME = 'invitation'
-         OR (TG_OP = 'UPDATE' AND array_position(rk, NEW.role) > array_position(rk, OLD.role))
-         OR (OLD.role = 'owner' AND OLD.user_id IS DISTINCT FROM app.current_user_id())
-      THEN
+      -- OLD does not exist on an invitation INSERT, so each branch is its own statement.
+      IF TG_TABLE_NAME = 'invitation' THEN
+        v_refuse := true;
+      ELSIF TG_OP = 'UPDATE' AND array_position(rk, NEW.role) > array_position(rk, OLD.role) THEN
+        v_refuse := true;
+      ELSIF OLD.role = 'owner' AND OLD.user_id IS DISTINCT FROM app.current_user_id() THEN
+        v_refuse := true;
+      END IF;
+      IF v_refuse THEN
         RAISE EXCEPTION 'owners and invitations change through the governance path while an entity has several owners'
           USING ERRCODE = '42501';
       END IF;
