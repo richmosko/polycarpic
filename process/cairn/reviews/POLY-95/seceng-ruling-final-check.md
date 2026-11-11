@@ -15,3 +15,9 @@ Result: **no veto**. The final ruling folds in checklist #1–#11. Four points f
    - Caddy adapt test: no `trusted_proxies`; `admin` absent or loopback-only.
 
 Once A1 lands, seceng writes SECURITY §6.2 to item 3's rule. Until then §6.2 stays as it is.
+
+## Re-issued ruling @ 9e59e9b
+
+**Approved. The build may start.** S1–S9 and A1 items 2–4 are met. Item 1 applies in its fail-on-exists form, with one line to add:
+
+- **R6 step 4:** after `ln`, `sync` the `spool/wal/` directory before exiting 0. Without it, a power loss after Postgres records success can lose the link itself: the segment is marked archived but is missing from the spool, a silent WAL gap. The builder applies this; it is not a re-issue.
