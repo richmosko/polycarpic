@@ -6,12 +6,12 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83, POLY-76]
 assignee: backend-lead
-paths: [packages/auth/**, packages/db/**, packages/tenancy/**, apps/web/src/**, apps/web/tests/**, apps/web/playwright.config.ts, infra/ci/**, .github/workflows/**, process/cairn/issues/POLY-86.md, process/cairn/reviews/POLY-86/**, tests/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/SECURITY/**]
+paths: [packages/auth/**, packages/db/**, packages/tenancy/**, apps/web/src/**, apps/web/tests/**, apps/web/playwright.config.ts, infra/ci/**, .github/workflows/**, .gitignore, scripts/layers/**, process/cairn/issues/POLY-86.md, process/cairn/reviews/POLY-86/**, tests/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/SECURITY/**]
 labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 packages/auth per ARCH §2.2 and §3.1c, from the 2026-11-08 measurement on POLY-62 (SECURITY A-31, A-33, A-34): BetterAuth on its Kysely path over the routing pool, the pinned options, the /api/auth/* route allowlist and step-up. better-auth and @better-auth/passkey are pinned to one exact version. This is the enabler under the sign-up, providers and second-step stories (POLY-87, POLY-88, POLY-89); POLY-101 wires its tests into CI.
