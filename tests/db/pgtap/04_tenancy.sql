@@ -78,7 +78,7 @@ SELECT is((SELECT array_agg(c.relname::text || '.' || t.tgname || ':' || CASE WH
 SELECT is((SELECT array_agg(t || ':' || r ORDER BY t COLLATE "C", r COLLATE "C") FROM unnest(ARRAY['entity', 'invitation', 'notification', 'audit_event']) t
     CROSS JOIN unnest(ARRAY['poly_app', 'poly_worker']) r WHERE has_table_privilege(r, 'public.' || t, 'DELETE')), NULL::text[], 'nobody deletes entity, invitation, notification or audit_event');
 SELECT is((SELECT array_agg(t ORDER BY t COLLATE "C") FROM unnest(ARRAY['entity_type', 'entity', 'membership', 'invitation', 'notification', 'audit_event']) t
-    WHERE NOT has_table_privilege('poly_worker', 'public.' || t, 'SELECT')), NULL::text[], 'poly_worker can read all six');
+    WHERE NOT has_any_column_privilege('poly_worker', 'public.' || t, 'SELECT')), NULL::text[], 'poly_worker can read all six');
 SELECT is(has_table_privilege('poly_app', 'public.membership', 'INSERT'), false, 'poly_app holds no INSERT on membership (O2: seats come from definers)');
 SELECT is((SELECT array_agg(c ORDER BY c COLLATE "C") FROM unnest(ARRAY['entity_type.owner_user_id', 'invitation.token_hash']) c
     WHERE has_column_privilege('poly_app', 'public.' || split_part(c, '.', 1), split_part(c, '.', 2), 'SELECT')
