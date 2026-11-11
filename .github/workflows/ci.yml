@@ -147,6 +147,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # shellcheck disable=SC2046  # the file list is meant to word-split
           node --test $(find scripts/cairn/tests/js -name '*.test.js' ! -name 'token-chart-logic.test.js')
 
   changes:
