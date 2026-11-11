@@ -69,3 +69,29 @@ Addendum 1 (c739d20 apt upgrade): `process/cairn/reviews/POLY-96/ruling.md` → 
 ### @devops-engineer — 2026-11-10
 
 Build green, all three stages, final code head 5c5ffff (tests/ci 150/150). Real runs on 5c5ffff: fail-closed base=40 zeros 42953489577 (changes red; guard, cairn green; app red); full 42953687382 all 8 jobs green (changes 27s, guard 9s, unit 31s, image 32s, lint 59s, db 146s of 180, cairn 102s; no budget warning). Docs-only run follows on the next head. bash 3.2 fix for image.sh scan in 5c5ffff. Post-merge per ruling 6: build.yml run, sha-<commit>-<run_id> in GHCR, gh attestation verify, release.yml dry run; RELEASE_SIGNERS variable needed before a real v1.* tag.
+
+### @architect — 2026-11-10
+
+**Gate 4 — verdict: PASS (merge-ready), with post-merge confirmations per ruling §6.** Reviewed @ cbcb54e (code 5c5ffff) against ruling.md + Addendum 1. `tests/ci` 150/150 locally (`pnpm exec vitest run -c tests/ci/vitest.config.ts`).
+
+| axis | result | evidence |
+|---|---|---|
+| C1 docs-only → app green, filter fail → app red | pass | dispatch base=5c5ffff on cbcb54e (issue-file-only diff): run 42954075715, lint/unit/db/image skipped, app green; base=40 zeros: 42953489577, changes red → app red |
+| C2 path → job routing | pass | `infra/ci/changes.mjs` table = ruling §2; `if:` per §1; full run 42953687382 all 8 jobs green |
+| C3 release digest from digest.txt, never rebuilds | pass pre-merge; real run post-merge | release.yml: no build/push/install, no `packages: write`, `publish` push-only; `release-lookup.sh` reads the newest successful main run, label check, verify with `--source-ref refs/heads/main --deny-self-hosted-runners`; tests/ci/release.test.ts |
+| C4 pins + Trivy | pass | `guard` always on (pins, S96-7 run-expr, gitleaks sha256-pinned); Trivy pinned + sha256, `vuln,secret` CRITICAL/HIGH `--ignore-unfixed --exit-code 1`, `.trivyignore` expiry enforced; image job green on the real image after c739d20 |
+| C5 per-package tests | pass | `turbo run test [--affected]` → each package `vitest run` in its own dir; cross-package suites only by their own `-c` config |
+| C6 layer-map checks | pass | lint step on `layers \|\| node`; `layers` keyed to layers.json, docs/ARCH/index.html, scripts/layers, package.json files |
+| C7 branch protection | open | lead + user (D3) |
+| C8/C9 timings, soft budget | pass | `job-report.mjs` summary + `::warning title=budget::`, exit 0; budgets.json lint 120 / db 180 / per-package 120; report.test.ts |
+| C10 one DB job | pass | `db` keyed to `db` only; one harness container; db 146 s of 180 |
+| C11 (amended) artifact only, CI writes nothing | pass | `ci-test-runs-<job>` uploads; no `contents: write` in ci.yml; ingest → POLY-79 |
+| Addendum 1 (A1–A5) | pass | build.yml: unique `sha-<commit>-<run_id>` tag, no shared tag, push → image check → Trivy → SBOM → both attests on one `steps.build.outputs.digest`; no cache; `release-scan` schedule-only; tests/image/apt-and-pm.test.ts |
+| Seam / permissions (S96-3..6) | pass | per-job `contents: read`; `persist-credentials: false` on every checkout; build/release jobs scoped as ruled |
+
+Post-merge (lead, ruling §6): build.yml green on the merge commit; `sha-<commit>-<run_id>` in GHCR; `gh attestation verify … --source-ref refs/heads/main --deny-self-hosted-runners`; `gh workflow run release.yml -f commit=<merge>` prints the same digest; the PR's own `pull_request` run green (no PR exists yet).
+
+Advisory, non-blocking (follow-ups at the lead's discretion):
+- A-1 `db` at 146 s is 81 % of its 180 s budget on day one (45 s locally); the gap is likely the pgTAP image build per run (unmeasured). Measure before the battery grows.
+- A-2 `aggregate.mjs` cross-checks one job per output (node→unit, image→image, …); a mis-wired `lint` `if:` for node/image is caught only by the static ci-workflow test, not at run time.
+- A-3 `image-<commit>` artifacts keep 90 days; a tag cut more than 90 days after a commit's last main build finds no digest and publishes nothing (fails closed). Weekly rebuilds refresh only the main tip.
