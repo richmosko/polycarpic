@@ -15,7 +15,7 @@ export const TABLE = {
   // POLY-102 R5: every path a job executes or imports, transitively, triggers that job.
   db: [
     /^packages\/db\//, /^tests\/db\//, /^packages\/config\//, /^packages\/tenancy\//, /^apps\/migrate\//,
-    /^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^tests\/log\//, /^pnpm-lock\.yaml$/,
+    /^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//, /^pnpm-lock\.yaml$/,
   ],
   image: [/^Dockerfile/, /^\.dockerignore$/, /^compose[^/]*\.yml$/, /^Caddyfile/, /^infra\/(?!ci\/)/, /^bin\//,
     /^infra\/ci\/(image|install-trivy)\.sh$/, /^\.trivyignore$/, /^tests\/layers\/tsc\/package\.json$/,
