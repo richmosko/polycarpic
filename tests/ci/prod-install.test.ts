@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { ROOT } from './helpers.ts';
 
-const BUILD_TOOLS = /^(esbuild|@esbuild\+|drizzle-kit|vite@|vitest|tsx@)/;
+const BUILD_TOOLS = /^(esbuild|@esbuild[+-]|drizzle-kit|vite@|vitest|tsx@|@sveltejs\+kit@|@better-auth\+drizzle-adapter@)/;
 const scratch = mkdtempSync(join(tmpdir(), 'poly-prod-install-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
@@ -40,7 +40,7 @@ describe('the production install carries no build tooling', () => {
 
   it('pnpm-workspace.yaml removes every optional peer of better-auth  [red if: an override is dropped]', () => {
     const text = readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8');
-    for (const peer of ['drizzle-kit', 'vitest', 'svelte', '@sveltejs/kit', 'drizzle-orm', 'pg']) {
+    for (const peer of ['drizzle-kit', 'vitest', 'svelte', '@sveltejs/kit', 'drizzle-orm', 'pg', '@better-auth/drizzle-adapter']) {
       expect(text, peer).toContain(`'better-auth>${peer}': '-'`);
     }
   });

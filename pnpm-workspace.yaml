@@ -6,7 +6,8 @@ packages:
 # better-auth lists drizzle-kit, vitest, svelte, @sveltejs/kit, drizzle-orm and pg as OPTIONAL peers, and pnpm resolves each
 # from the workspace into better-auth's snapshot. In the production install that put two esbuild Go binaries (fixable
 # CRITICAL/HIGH findings), drizzle-kit, vite and vitest into the image, none of which the app runs. Removing them here keeps
-# the prod install to what packages/auth imports; drizzle-orm and pg stay as packages/db's own dependencies.
+# the prod install to what packages/auth imports; @better-auth/drizzle-adapter goes too (packages/auth refuses drizzleAdapter by lint). drizzle-orm and pg stay as
+# packages/db's own dependencies.
 # tests/ci/prod-install.test.ts holds the line.
 overrides:
   'better-auth>drizzle-kit': '-'
@@ -15,3 +16,4 @@ overrides:
   'better-auth>svelte': '-'
   'better-auth>vitest': '-'
   'better-auth>@sveltejs/kit': '-'
+  'better-auth>@better-auth/drizzle-adapter': '-'
