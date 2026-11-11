@@ -560,24 +560,29 @@ jobs:
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
       - name: Set up Node
+        if: needs.changes.outputs.image == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "26"
 
       - name: Install pnpm
+        if: needs.changes.outputs.image == 'true'
         run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
 
       - name: Locate pnpm store
+        if: needs.changes.outputs.image == 'true'
         id: store
         run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
 
       - name: Cache pnpm store
+        if: needs.changes.outputs.image == 'true'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.store.outputs.path }}
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
+        if: needs.changes.outputs.image == 'true'
         env:
           pnpm_config_strict_dep_builds: "false"
         run: pnpm install --frozen-lockfile

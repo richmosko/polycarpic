@@ -1,11 +1,12 @@
 {
   "renderEnv": {
     "POLY_DOMAIN": "lint.test",
-    "POLY_STAGING_ALLOW": "192.0.2.0/24"
+    "POLY_STAGING_ALLOW": "192.0.2.0/24",
+    "POLY_TLS": "ops@lint.test"
   },
   "allowedVars": [
     "POLY_POSTGRES_IMAGE", "POLY_APP_IMAGE", "POLY_TOOLS_IMAGE", "POLY_CADDY_IMAGE",
-    "POLY_BIND_ADDR", "POLY_DOMAIN", "POLY_STAGING_ALLOW"
+    "POLY_BIND_ADDR", "POLY_DOMAIN", "POLY_STAGING_ALLOW", "POLY_TLS"
   ],
   "secretMatrix": {
     "prod": {

@@ -14,6 +14,7 @@ services:
     environment:
       POLY_DOMAIN: ${POLY_DOMAIN:?}
       POLY_STAGING_ALLOW: ${POLY_STAGING_ALLOW:?}
+      POLY_TLS: ${POLY_TLS:?}
     ports:
       - ${POLY_BIND_ADDR:?}:80:8080
       - ${POLY_BIND_ADDR:?}:443:8443
