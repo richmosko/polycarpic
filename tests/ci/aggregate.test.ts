@@ -65,7 +65,7 @@ describe('aggregate.mjs', () => {
 // POLY-136 item 2 (ruling): one output can gate several jobs; the aggregate checks every one of them.
 describe('aggregate.mjs: every job an output gates (POLY-136 item 2)', () => {
   const allOk = (on: string[]) => { let n = base(on); for (const j of ['lint', 'unit', 'db', 'image']) n = set(n, j, 'success'); return n; };
-  for (const [out, job] of [['node', 'lint'], ['image', 'lint'], ['image', 'unit']] as const) {
+  for (const [out, job] of [['node', 'lint'], ['node', 'image'], ['image', 'lint'], ['image', 'unit']] as const) {
     it(`output ${out}=true but ${job} skipped (the other jobs ran) -> red  [red if: REQUIRED maps ${out} to fewer jobs than ci.yml wires]`, () => {
       expect(agg(set(allOk([out]), job, 'skipped'))).not.toBe(0);
     });
