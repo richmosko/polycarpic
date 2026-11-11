@@ -1,11 +1,12 @@
 ---
 id: POLY-62
 title: Entity + membership schema
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83]
-assignee: null
+assignee: backend-lead
+paths: [packages/tenancy/**, packages/db/**, tests/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, docs/ARCH/**, docs/SECURITY/**, process/cairn/issues/POLY-62.md, process/cairn/reviews/POLY-62/**]
 labels: [tenancy, db]
 priority: null
 pr: null
@@ -48,3 +49,7 @@ From POLY-84 (seceng, 2026-11-10): the catalog probe's `no_policy` check is sati
 ### @team-lead — 2026-11-10
 
 Also from POLY-84 (seceng, non-gating): add reverse coverage — every real table must be named by a permission-matrix row or by a short reviewed list, so a misspelled table name in `packages/tenancy/permission-matrix.json` cannot leave its row untested forever (M-2 only makes the gap visible).
+
+### @team-lead — 2026-11-10
+
+Feature started. Branch: `feature/poly-62-entity-membership-schema`. Runs in parallel with POLY-128 (app shell); the two share only config files (`eslint.config.js`, `package.json`, `pnpm-lock.yaml`), so the second PR to merge takes main first.
