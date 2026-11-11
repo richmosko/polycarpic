@@ -1,7 +1,7 @@
 ---
 id: POLY-132
 title: build.yml first-run fixes
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [.github/workflows/build.yml, .github/workflows/release.yml, .github/workflows/ci.yml, infra/ci/**, tests/**, Dockerfile, docs/INFRA/**, docs/SECURITY/**, process/cairn/issues/POLY-132.md, process/cairn/reviews/POLY-132/**, package.json, pnpm-lock.yaml]
 labels: [ci, bug, supply-chain]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/107
 created: 2026-11-10
 updated: 2026-11-10
 ---
@@ -62,3 +62,7 @@ Scope note: the check-container isolation criterion was added after the architec
 ### @devops-engineer — 2026-11-10
 
 image.sh check now runs the container with --network none --cap-drop ALL --security-opt no-new-privileges; no -e, -v, --mount or --privileged (it never had any). tests/ci 169/169. Re-run after the change: check against the pushed digest sha256:16dcd635...b97a exit 0; check against a fresh local polycarpic:ci build exit 0.
+
+### @team-lead — 2026-11-10
+
+PR opened: https://github.com/richmosko/polycarpic/pull/107. Awaiting Validate. Finish gate green at d031282 (cairn suite 1975 OK); qa verified 91db139 (tests/ci 169/169, tests/image 52/52).

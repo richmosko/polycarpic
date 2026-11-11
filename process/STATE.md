@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-132-build-yml-first-run-fixes`
 - **Started:** 2026-11-11
 - **Goal:** get the first build.yml run on `main` green end to end and close POLY-96's post-merge confirmations (attestation verify, SBOM attestation, release dry run).
-- **Status:** In Progress
+- **Status:** In Review — PR [#107](https://github.com/richmosko/polycarpic/pull/107). After merge the lead confirms on `main`: build.yml green end to end, attestation verify with `--source-ref`, SBOM attestation, release.yml dry run (POLY-132 criteria 1, 4–6).
 - **Last merged:** POLY-96 (CI: change filter, build, attest), 2026-11-11, PR [#106](https://github.com/richmosko/polycarpic/pull/106); `app` is a required check on `main` since 2026-11-11. Follow-ups on POLY-79, POLY-100, POLY-102.
 - **Carried from POLY-85:** follow-ups on POLY-81, POLY-88, POLY-100, POLY-121; ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature.
 - **Next:** (1) Doc-update: strip status history, "Changes" blocks and body narration from all five design docs and write the rule into the doc owners' definitions (user directive 2026-11-11). (2) Second session continues from `todo`: POLY-62 and POLY-86 (identity roots), POLY-128 (app shell), POLY-97 and POLY-95 (infra). POLY-131 held (P3).
