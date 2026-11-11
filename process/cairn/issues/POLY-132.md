@@ -18,14 +18,14 @@ Fix-forward for POLY-96 (ruling `process/cairn/reviews/POLY-96/ruling.md` §6: a
 
 ## Acceptance criteria
 
-- [ ] build.yml's built-image check runs against the pushed digest on a real run on `main` and passes; the check, the scan, the SBOM and both attestations all refer to the one digest from the build step (A5).
-- [ ] A `tests/ci` test turns red if the built-image check in build.yml can run without the pushed digest being available to it.
-- [ ] Before the PR, every build.yml step after the push that can run outside `main` (check, scan, SBOM) has been run against the already-pushed digest `sha256:16dcd6359bcde68498b5d83e583e3aad8d96525155b2906316bcf8ecb524b97a`, with commands and results recorded, so the next run on `main` is not their first.
-- [ ] A build.yml run on `main` is green end to end; `sha-<commit>-<run_id>` exists in GHCR.
-- [ ] `gh attestation verify oci://ghcr.io/richmosko/polycarpic@<digest> --repo richmosko/polycarpic --signer-workflow richmosko/polycarpic/.github/workflows/build.yml --source-ref refs/heads/main --deny-self-hosted-runners` passes from the lead's machine, and the SBOM attestation is present on the same digest.
-- [ ] `gh workflow run release.yml -f commit=<that commit>` (dry run) prints the same digest as build.yml's summary (POLY-96 criterion 3, real-run half).
-- [ ] The container that `infra/ci/image.sh check` starts has no network and receives no environment, volume, added capability or host namespace, for a local tag and for a registry digest alike (seceng review of d9be8c0: the check runs a shell inside a not-yet-scanned image, in the job that can mint attestation tokens).
-- [ ] The design docs gain no status, changelog or "Changes in" text from this issue (user rule, 2026-11-11).
+- [ ] build.yml's built-image check runs against the pushed digest on a real run on `main` and passes; the check, the scan, the SBOM and both attestations all refer to the one digest from the build step (A5). — confirmed by the lead after merge
+- [x] A `tests/ci` test turns red if the built-image check in build.yml can run without the pushed digest being available to it. — tests/ci/build-main-only.test.ts: availability: a digest pull sits between push and check, or image.sh check pulls the digest itself (red until d9be8c0 added the pull); plus the same file's digest-form, Trivy-credential, SBOM-name and attestation-order pins
+- [x] Before the PR, every build.yml step after the push that can run outside `main` (check, scan, SBOM) has been run against the already-pushed digest `sha256:16dcd6359bcde68498b5d83e583e3aad8d96525155b2906316bcf8ecb524b97a`, with commands and results recorded, so the next run on `main` is not their first. — @devops-engineer comment of 2026-11-10 ("Criterion 3, run off main against the pushed digest sha256:16dcd635..."): check, scan and SBOM run against it; re-run after the isolation change recorded in the second @devops-engineer comment
+- [ ] A build.yml run on `main` is green end to end; `sha-<commit>-<run_id>` exists in GHCR. — confirmed by the lead after merge
+- [ ] `gh attestation verify oci://ghcr.io/richmosko/polycarpic@<digest> --repo richmosko/polycarpic --signer-workflow richmosko/polycarpic/.github/workflows/build.yml --source-ref refs/heads/main --deny-self-hosted-runners` passes from the lead's machine, and the SBOM attestation is present on the same digest. — confirmed by the lead after merge
+- [ ] `gh workflow run release.yml -f commit=<that commit>` (dry run) prints the same digest as build.yml's summary (POLY-96 criterion 3, real-run half). — confirmed by the lead after merge
+- [x] The container that `infra/ci/image.sh check` starts has no network and receives no environment, volume, added capability or host namespace, for a local tag and for a registry digest alike (seceng review of d9be8c0: the check runs a shell inside a not-yet-scanned image, in the job that can mint attestation tokens). — tests/ci/image-check-isolation.test.ts: no network: --network none; no environment and no volume reaches the container; no privilege escalation (mutation: adding -e/-v turned it red)
+- [x] The design docs gain no status, changelog or "Changes in" text from this issue (user rule, 2026-11-11). — diff check: `git diff main...HEAD --name-only` lists no path under docs/ (branch changes only image.sh, tests/ci, the issue files, review notes and STATE)
 
 ## Comments
 
