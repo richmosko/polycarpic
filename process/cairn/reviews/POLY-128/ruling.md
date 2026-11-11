@@ -97,3 +97,12 @@ This addendum supersedes R6. The lead ruled three choices (DESIGN design-system-
 - The Theme item is a three-way radio group (Light, Dark, Auto). It writes the cookie and sets the class on the client the same way.
 - The smoke adds: cookie `auto` with `colorScheme: 'dark'` gives `dark` and the dark token values; with `'light'`, no `dark`; `page.emulateMedia` flipping the scheme flips the class without a reload. The CSP assertion still finds no `'unsafe-inline'` in `script-src`.
 - ARCH §2.4 now places the collapse control in the brand row, with the top-row toggle on narrow screens only (matches R3).
+
+## Record: SvelteKit 3 deviations accepted at build-green
+
+This records what the build measured on Kit 3.1.1. It is not a new ruling, and the seam does not change.
+- R1 and R8: Kit 3 has no `svelte.config.js`. The adapter and `kit.csp` are passed to `sveltekit()` in `apps/web/vite.config.ts`, which is now C-07's home.
+- R1: `tsconfig.json` extends `["../../tsconfig.base.json", "$app/tsconfig"]`. svelte-check runs on the TypeScript 6 pin (measured).
+- R1: imports inside `apps/web` are relative; `$lib` is not used.
+- R6 / Addendum 2: `Handle` is typed from `@sveltejs/kit/hooks`.
+- R1: no shadcn-svelte `components/ui` directory. The shell's components are in `src/lib/shell`, on `bits-ui` primitives.

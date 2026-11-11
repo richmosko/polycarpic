@@ -53,7 +53,7 @@ Feature started. Branch: `feature/poly-128-app-shell-design-tokens`. Runs in par
 
 ### @architect — 2026-11-10
 
-**Verdict (gate 4): PASS, on two conditions.** (1) In the first CI run, the e2e step adds ≤ 150 s to `unit` and the `image` job (Trivy) is green; both are unmeasured until then. (2) The sidebar-fidelity follow-up below is filed before POLY-88 serves the shell.
+**Verdict (gate 4): HELD.** The lead's visual leg (V1–V4) goes back through tests-red and build-green first; this table is re-issued whole after that. The text as first written follows: PASS, on two conditions. (1) In the first CI run, the e2e step adds ≤ 150 s to `unit` and the `image` job (Trivy) is green; both are unmeasured until then. (2) The sidebar-fidelity follow-up below is filed before POLY-88 serves the shell.
 
 | Axis | Result | Evidence |
 |---|---|---|

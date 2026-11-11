@@ -18,7 +18,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>architect</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.15.11</span>
+    <span><strong>Version:</strong> 1.15.12</span>
     <span><strong>Last updated:</strong> 2026-11-11</span>
   </div>
 </header>
@@ -865,7 +865,7 @@ sequenceDiagram
     <thead><tr><th>Layer</th><th>Choice</th><th>Why</th><th>Alternatives considered</th></tr></thead>
     <tbody>
       <tr><td>Language</td><td>TypeScript (strict) end to end, Node LTS</td><td>One language across UI, API, jobs and schema; the Principal's prior project (mosko-fintech) is TS/SvelteKit.</td><td>Go / Python backend (a second language for no gain at this scale)</td></tr>
-      <tr><td>Frontend framework</td><td>SvelteKit + shadcn-svelte + Tailwind; LayerChart</td><td>Kickoff §2.9: owned component source, headless primitives; shadcn-svelte charts are LayerChart. Monarch/Origin feel from dashboard-01.</td><td>Flowbite Svelte (rejected: fixed look, ApexCharts)</td></tr>
+      <tr><td>Frontend framework</td><td>SvelteKit 3 + Tailwind 4 + <code>bits-ui</code> (the headless primitives under shadcn-svelte; components are owned source in <code>apps/web</code>); LayerChart. Kit 3 has no <code>svelte.config.js</code>: the kit options, <code>kit.csp</code> among them (SECURITY C-07), are passed to <code>sveltekit()</code> in <code>apps/web/vite.config.ts</code>. Imports inside <code>apps/web</code> are relative, not <code>$lib</code>, so the layer resolver (§2.1) sees every path.</td><td>Kickoff §2.9: owned component source, headless primitives; shadcn-svelte charts are LayerChart. Monarch/Origin feel from dashboard-01.</td><td>Flowbite Svelte (rejected: fixed look, ApexCharts)</td></tr>
       <tr><td>API</td><td>SvelteKit <code>/api/v1</code> routes, Zod schemas, OpenAPI generated and committed (CI fails if stale)</td><td>Thin wrappers over packages; one contract for native clients and a future MCP server.</td><td>Separate API server (tRPC / Fastify): a second deployable for no gain</td></tr>
       <tr><td>Data store</td><td>PostgreSQL, latest GA major (18 at Plan time; bump deliberately)</td><td>RLS, deferred constraint triggers, <code>numeric</code>, SECURITY DEFINER — the whole integrity story lives here.</td><td>SQLite (no RLS), external ledger services (excluded by kickoff §2.5)</td></tr>
       <tr><td>ORM / query layer</td><td>Drizzle ORM</td><td>TS schema as the single source; RLS policies and roles declared in schema; BetterAuth's tables are declared in the Drizzle schema, so auth tables share one migration chain. Decision, see §6.2.</td><td>Kysely + generated types; Prisma (weak RLS / raw-SQL story, heavy engine)</td></tr>
