@@ -46,7 +46,6 @@
         <Icon name="panelOpen" class="size-6" />
       </span>
       <span
-        aria-hidden="true"
         role="tooltip"
         data-testid="rail-expand-tooltip"
         class="bg-foreground text-background absolute top-1/2 left-full z-30 ml-3 hidden -translate-y-1/2 rounded-md px-2 py-1 text-xs whitespace-nowrap rail:group-focus-visible:block rail:group-hover:block"
