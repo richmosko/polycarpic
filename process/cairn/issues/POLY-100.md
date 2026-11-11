@@ -54,3 +54,7 @@ From POLY-96 (ruling `process/cairn/reviews/POLY-96/ruling.md` §5 and Addendum 
 - The box's attestation check adds `--source-ref refs/heads/main --deny-self-hosted-runners`; without it an image built from a branch that edited build.yml passes (T-92).
 - The staging poll takes the digest from the newest successful build.yml run's `digest.txt` on `main`, never from a tag. Push tags are per run (`sha-<commit>-<run_id>`), and a commit can carry several attested digests (weekly rebuild).
 - Prod's digest is frozen at the release tag; a patch reaches prod only through a new tag.
+
+### @team-lead — 2026-11-10
+
+Before the first `v1.*` tag (user action, from POLY-96): set the repository variable `RELEASE_SIGNERS` to the `allowed_signers` content for the key that signs release tags; release.yml refuses to publish while it is empty. No tag signing is configured in git on the lead's machine as of 2026-11-11, so choosing and configuring the SSH signing key comes first. Also from the seceng verdict: `release-lookup.sh` verifies provenance only; confirm the SBOM attestation by hand on the first build, and consider adding it to the box check.
