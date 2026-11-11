@@ -18,7 +18,7 @@ PRD §4 Story 1 (foundational); ARCH §3.1. The tenancy core: entity, entity_typ
 
 ## Acceptance criteria
 
-- [ ] A new user has a Person with an owner membership; no signed-in user is ever without one (provisionPerson is idempotent and the session loader re-runs it until POLY-76 (f) settles OQ-16).
+- [ ] A new user has a Person with an owner membership: provisionPerson is idempotent, and an entity never commits without an owner. The session loader that re-runs it, so that no signed-in user is ever without one, is wired and tested by POLY-86.
 - [ ] A tax classification can be set per entity: individual; trust grantor / non-grantor; business pass-through / C-corp; for a parent, joint filers or pass-through to members (default for a new Household and Holding).
 - [ ] entity.self_user_id (unique, nullable) marks the own Person; entity.purged_at exists for the tombstone; tenancy and actor columns are not updatable; keys are UUIDs.
 - [ ] app.has_role / app.visible_entities / app.owner_count are STABLE SECURITY DEFINER owned by poly_authz, reading membership through a role-targeted policy; policies use the nullif context form.
@@ -53,3 +53,14 @@ Also from POLY-84 (seceng, non-gating): add reverse coverage — every real tabl
 ### @team-lead — 2026-11-10
 
 Feature started. Branch: `feature/poly-62-entity-membership-schema`. Runs in parallel with POLY-128 (app shell); the two share only config files (`eslint.config.js`, `package.json`, `pnpm-lock.yaml`), so the second PR to merge takes main first.
+
+### @architect — 2026-11-10
+
+Gating ruling (gate 1): process/cairn/reviews/POLY-62/ruling.md, with ARCH 1.15.8 §3.1. Summary of what it settles:
+- Seam: Drizzle tables in 0002 (generated), and functions, policies, FORCE and grants in 0003 (custom). `@poly/db` re-exports `sql`. `provisionPerson(tx)` acts for the transaction's user.
+- The first owner membership is written only by the `app.seat_creator()` trigger (poly_govern). `app.keep_an_owner()` locks the entity row and refuses removing the last owner (C-20).
+- Matrix probe shape and the `seedTenancy` fixture (POLY-84 Open 1). The outsider is a fourth actor on every probe. A new `requires` field holds founder-transfer and co-owner-remove-demote inactive. Five rows activate.
+- Reverse coverage through an `unlisted` list. `battery_gaps` gains pk_not_uuid, raw_context_read and tenancy_column_updatable.
+- Criterion 1 is amended: the session-loader call moves to POLY-86.
+- db job measured: the CLI-spawning files take 105 of the 114 s of file time, and setup is at most 14.5 s. Guard: this loop adds at most 15 s. No ci.yml change.
+- POLY-85 Open 1 is deferred to the next issue that edits connection.ts. Open 3 stays with the first worker-job feature.
