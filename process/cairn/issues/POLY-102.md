@@ -61,3 +61,10 @@ Scope confirmed by the Principal at feature start (2026-11-11):
 - Out: CodeQL (S96-13) — splits to its own issue, filed in the post-merge follow-ups PR. Its per-PR cost is unmeasured.
 - Out: A-2 (aggregate blind spot) and A-3 (90-day digest artifacts) — stay as comments for a later CI batch; A-3 may become a runbook line on POLY-100.
 - The 30 s `db` headroom figure stands as the lead's proposal; the ruling confirms or replaces it.
+
+### @team-lead — 2026-11-10
+
+Scope widened by the Principal (2026-11-11), on seceng-102's pre-ruling finding (verified against `infra/ci/changes.mjs` @ d2f8c0c: `db: [/^packages\/db\//, /^tests\/db\//]`):
+- Decided, in scope: the `db` filter gap. A PR touching only `packages/tenancy`, `apps/migrate`, `apps/web/src/ops`, `tests/log/canary.ts` or the lockfile skips the database battery. The rule: every path a job imports or executes triggers that job. The `db` list is derived from the battery's imports, with a static test that fails when a `tests/db` file imports from an unmatched path.
+- Decided, in scope: `.trivyignore` and `tests/layers/tsc/package.json` → `image`, with the `image.sh` / `install-trivy.sh` lines already scoped.
+- The architect rules the §2 table and the exact patterns. The `db` job now runs on more PRs; the headroom criterion accounts for that.
