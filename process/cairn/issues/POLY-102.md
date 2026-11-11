@@ -75,3 +75,27 @@ Scope widened by the Principal (2026-11-11), on seceng-102's pre-ruling finding 
 ### @architect — 2026-11-10
 
 Gate 1 ruling: `process/cairn/reviews/POLY-102/ruling.md`. Freshness is a content check (regenerate in an isolated copy, byte compare) for the Drizzle migrations, the one generated output that reaches the image; ancestry is measured false-fresh there (R1). No ops-bundle manifest exists yet; the feature that adds one registers its pair. `db`: 30 s confirmed, budget unchanged, cost cut by template databases and a cheaper `freshDb` (R4). Filter: R5 widens `image` and `db` (closes POLY-96 O2). Criteria amended in place; verdict checklist R7.
+
+### @architect — 2026-11-10
+
+Gate 4 verdict against frozen `4a3800f` (ruling `process/cairn/reviews/POLY-102/ruling.md` @ 15f9ba2 + Addendum 1 @ f8feb8b): **PASS**.
+
+| # | Axis | Result | Evidence |
+|---|---|---|---|
+| V1 | Stale fails, regenerate passes | pass | `test_generated_freshness.py` (touch/regenerate/hand-edit/extra-file); `tests/ci/generated-freshness.test.ts` on real drizzle-kit: schema edit → 1, R1 `--custom` sequence → 1, after `generate` → 0 |
+| V2 | Doc-only never flips | pass | both modes, Python + `tests/ci` fixtures |
+| V3 | Same-second, cross-timezone | pass | ancestry fixtures through the generic core; regenerate is history-free (tested) |
+| V4 | Fail closed | pass | one case per R2 exit-2 row, a prompting generator among them; tree and linked `node_modules` unchanged |
+| V5 | Old contract | pass | `test_dist_freshness.py` unchanged and green (local, unittest, 20.5 s with the new suite) |
+| V6 | CI wiring | pass | `lint` step with the R3 `if:`, asserted in `ci-workflow.test.ts`; both runs log `db-migrations: fresh` |
+| V7 | `db` headroom | pass | full dispatch runs 42975920810 / 42976214364: `db` 110 s / 93 s (≤ 150 s; was 160 s); 11 files green incl. `template-clone.test.ts`; `tests/db` cases removed 0, added 4 (`git diff 15f9ba2 4a3800f -- tests/db`) |
+| V8 | Filter | pass | `changes.test.ts` rows; mutation: dropping `packages/config/**` turns `db-filter-imports.test.ts` red |
+| V9 | Suites | pass | `tests/ci` 4 touched files 5.3 s local; `lint` 59/60 s of 120; `cairn` 111/83 s; no new top-level job |
+| V10 | Registry pin | pass | mutation: `ci: false` turns both pin cases red |
+
+Rulings on the builder's findings:
+- `apps/web/src/startup.ts` in `db`: correct, found by the closure test, as R5 intends.
+- The `svelte-kit sync` step in `db`: accepted. It repairs a break that has been on `main` since POLY-128 and was hidden by the old `db` filter. That is R5's rule doing its job.
+- An ancestry pair whose rebuild cannot run stays `stale` (exit 1), not 2: accepted. The rebuild only rescues a verdict that is already stale, so failing to run it never maps to fresh, and V5 pins this. R2's exit-2 generator row applies to `regenerate` pairs.
+
+Advisories (non-gating): R4's before/after case counts were not written into the build-green commit (measured above instead). Addendum 1's journal ↔ file bijection check is the lead's follow-up.
