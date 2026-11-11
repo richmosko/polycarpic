@@ -30,3 +30,13 @@ Once A1 lands, seceng writes SECURITY §6.2 to item 3's rule. Until then §6.2 s
 - Removing it also fails closed: a container started as root dies at `exec gosu`, so it cannot run Postgres as root.
 - The image job adds `test ! -e /usr/local/bin/gosu` next to the `age --version` check.
 - A `.trivyignore` entry, or a severity or `--ignore-unfixed` change, for this path is refused.
+
+## Sign-off on 017715a (Trivy-clean derivatives)
+
+**Both accepted. No ignore entries.**
+- **Postgres:** gosu is removed as ruled above.
+  - Still missing at this sha: the image job's `test ! -e /usr/local/bin/gosu` and the S8 `age --version` check (grep finds neither in `infra/ci`, `tests/infra` or `.github`). Both are required before build-green.
+- **Caddy, xcaddy rebuild with `golang.org/x/net` v0.62.0:** accepted. The builder and runtime images are pinned by digest, and the module versions are pinned and checked against `sum.golang.org`.
+  - Condition: no `GOFLAGS=-insecure`, `GONOSUMDB`, `GONOSUMCHECK`, `GOSUMDB=off` or `GOPROXY=direct` override anywhere in the build.
+  - Condition: drop the `--replace` once a Caddy release ships a fixed x/net (F4's Renovate rule covers the tag).
+- **Placeholder `staging_basic_auth` in the image:** accepted. It is a bcrypt hash of a random password nobody holds, so with the mount missing the staging route denies everyone: it fails closed and grants nothing. The real hash is never in the image or the repo.
