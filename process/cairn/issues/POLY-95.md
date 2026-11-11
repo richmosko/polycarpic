@@ -1,12 +1,12 @@
 ---
 id: POLY-95
 title: Compose, Postgres config + lint
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [infra/compose/**, infra/postgres/**, infra/lint/**]
+paths: [infra/compose/**, infra/postgres/**, infra/lint/**, infra/caddy/**, infra/ci/**, .github/workflows/**, process/cairn/issues/POLY-95.md, tests/**, package.json, pnpm-lock.yaml, docs/INFRA/**, docs/SECURITY/**]
 labels: [ops, ci, security]
 priority: null
 pr: null
@@ -29,3 +29,7 @@ INFRA §2.2: prod and staging compose projects, backup-net (internal, fixed subn
 ### @team-lead — 2026-11-10
 
 From the POLY-128 loop (architect, gate-1 hand-off, 2026-11-11): the SvelteKit CSP (SECURITY C-07) now lives in `apps/web/vite.config.ts`, and the ruling left HSTS, `nosniff` and `Referrer-Policy` "at Caddy", which no issue owns. This issue touches the Caddy config; its ruling either takes those three headers or names the issue that does.
+
+### @team-lead — 2026-11-10
+
+Feature started. Branch: `feature/poly-95-compose-postgres-config-lint`. Runs in parallel with POLY-86 (team suffix `-95`).
