@@ -23,12 +23,13 @@ const variants: Record<string, (l: any) => any> = {
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {
     const p = join(dir, f);
-    return statSync(p).isDirectory() ? walk(p) : p.endsWith('.ts') ? [p] : [];
+    return statSync(p).isDirectory() ? walk(p) : (p.endsWith('.ts') || p.endsWith('.svelte')) ? [p] : [];
   });
 }
 
 function header(src: string, key: string): string | undefined {
-  return src.match(new RegExp(`^// @${key}: (.+)$`, 'm'))?.[1].trim();
+  // `// @key: v` in .ts fixtures; `<!-- @key: v -->` in .svelte fixtures (POLY-128)
+  return (src.match(new RegExp(`^// @${key}: (.+)$`, 'm')) ?? src.match(new RegExp(`^<!-- @${key}: (.+?) -->$`, 'm')))?.[1].trim();
 }
 
 async function eslintFor(variant?: string): Promise<ESLint> {

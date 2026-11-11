@@ -36,6 +36,10 @@ const CASES: [string[], string[], string][] = [
   [['.github/workflows/build.yml'], ['ci'], '.github/workflows dropped from `ci`'],
   [['tests/ci/a.test.ts'], ['ci'], 'tests/ci dropped from `ci`'],
   [['packages-old/x.ts', 'docs/packages/x.md', 'xapps/a.ts'], [], 'unanchored match (substring instead of prefix)'],
+  [['docs/DESIGN/tokens.css'], ['node'], 'docs/DESIGN/tokens.css dropped from `node` (POLY-128 R2: the web token-parity test reads it)'],
+  [['docs/DESIGN/index.html', 'docs/DESIGN/tokens.html'], [], 'all of docs/DESIGN made to set `node` instead of the one tokens.css file'],
+  [['docs/DESIGN/tokens.css'], ['node'], 'docs/DESIGN/tokens.css dropped from `node` (POLY-128 R2: the web token-parity test reads it)'],
+  [['docs/DESIGN/index.html', 'docs/DESIGN/tokens.html'], [], 'all of docs/DESIGN made to set `node` instead of the one tokens.css file'],
   [['docs/PRD/index.html', 'packages/ledger/src/a.ts'], ['node'], 'a docs path anywhere in the list suppressing the code path'],
 ];
 
