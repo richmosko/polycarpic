@@ -23,3 +23,4 @@ The ARCH §11 POLY-M1 close check, run end to end on staging through the real de
 - [ ] On a two-owner entity, a direct invite, a role raise and a co-owner removal are refused, and the founder cannot drop owner (ARCH §3.1b).
 - [ ] An owner raise of an unenrolled viewer is held, and promoted on enrolment (ARCH §3.1c).
 - [ ] Migrations apply in CI and on staging through the real runner as poly_migrator; the app shell renders DESIGN tokens.
+- [ ] Release condition: POLY-91 (held raise) and POLY-90 (the 1 → 2 revocation) have landed before any release with real users. Until then a sole owner can raise an existing member to manager or owner with no second step (seceng F3, POLY-62 review).

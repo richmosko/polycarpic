@@ -32,3 +32,5 @@ After the first (operator) user, an invitation is the only way into an instance;
 - [ ] A throw after the new-user step leaves no user, entity or membership row. After both a commit and a rollback, the next checkout of that backend reads app.user_id empty.
 - [ ] The invitation is checked and consumed in the sign-up transaction. Two sign-ups racing on one invitation yield exactly one user, and the loser leaves no user row.
 - [ ] The step refuses a provisioned user's id planted in the setting by set_config; a rollback to the savepoint clears the recorded id.
+- [ ] A membership on an invited entity is written only by the invitation-accept definer: `poly_app` holds no INSERT on `membership` (POLY-62 ruling R4). The definer seats `app.current_user_id()` against a matching live invitation, and for manager or owner only after the second step is enrolled.
+- [ ] Operator invitations with no entity have their own definer path: `invitation` rows with `entity_id IS NULL` pass no `poly_app` policy, and `app.gate_owner_changes()` refuses them today (POLY-62 verdict).

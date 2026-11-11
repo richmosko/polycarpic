@@ -51,3 +51,7 @@ From POLY-96 (ruling `process/cairn/reviews/POLY-96/ruling.md` §3, O1; user-app
 To build here:
 - At `/finish-feature`, `gh run download` the artifacts for the branch's CI runs into the metrics worktree and append them to `process/cairn/metrics/test-runs.jsonl`.
 - `cairn loop-stats` computes `suite_seconds_added` per `runner`, so a CI full run is compared with CI full runs and never with a local one.
+
+### @team-lead — 2026-11-10
+
+`cairn guard-commit` has no merge-commit exemption (found 2026-11-11, merging `main` into `feature/poly-128-*` after PR #109). A merge of `main` stages the incoming `process/cairn/issues/POLY-62.md`, whose already-merged comments are by two authors, and the pre-commit hook refuses it as a foreign uncommitted hunk. `guard-push` already skips merges (`--no-merges`); `guard-commit` does not look at `MERGE_HEAD`. That one merge (`e58f509`) was committed with `--no-verify`, approved by the Principal for that commit. A fix must let a merge commit through without opening the pathspec-commit case the guard exists for. Batch it with the `guard-push` issue-file allowance.
