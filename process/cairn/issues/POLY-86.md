@@ -30,6 +30,9 @@ packages/auth per ARCH §2.2 and §3.1c, from the 2026-11-08 measurement on POLY
 - [ ] The routing pool takes its pool and Kysely dialect from `db/auth`; packages/auth imports no Postgres driver or PostgresDialect.
 - [ ] The routes that can insert a `user` row (invitation sign-up `/sign-up/email`, OAuth first sign-in `/callback/:id`, magic link `/magic-link/verify`, and any other the pinned version has) are listed in `src/route-policy.ts`, and the handler runs each inside `withContextFreeTx`; a test drives each listed route to create a user and asserts it ran inside the wrapper (ARCH v1.14 §3.1c).
 - [ ] With no withContextFreeTx open (`currentClient()` is null), the sign-up hook throws and writes nothing; it never opens a transaction of its own. This is a test-time catch; the per-route tests above are the guard (SECURITY A-40).
+- [ ] The session loader calls `provisionPerson` inside `withTenant` and retries the whole transaction once, in a fresh transaction, on 23505 naming `entity_self_user_id_unique`; the retry returns the existing Person with `created: false`. A second 23505, or any other error, fails the request with a logged error and is never swallowed; there is no loop, and no retry on the sign-up path. Test: two concurrent first loads for one new user end with one Person and one owner membership, and both requests succeed (POLY-62 verdict, criterion 1; seceng `reviewed @ 8779392`).
+- [ ] `hooks.server.ts` sets `locals.session` as POLY-128's `ShellSession` projection (no token) and redirects a signed-out request. The Playwright smoke loads the shell signed in and asserts the user's name and avatar at the sidebar foot (the half of POLY-128's criterion 3 that moved here).
+- [ ] The avatar shown at the sidebar foot is served from our own origin; a remote provider image is blocked by the CSP's `img-src 'self' data:`, and the fix is not to allow remote images (seceng, POLY-128 review).
 
 
 ## Comments
@@ -37,3 +40,11 @@ packages/auth per ARCH §2.2 and §3.1c, from the 2026-11-08 measurement on POLY
 ### @team-lead — 2026-11-08
 
 Heads-up from the layer-map work (ARCH v1.12.1 §2.1, POLY-82): only packages/db may import a Postgres driver, type imports included, and `PostgresDialect` from kysely is on the banned list. The routing pool must take its pool and dialect types from db. If BetterAuth needs packages/auth itself to construct a `PostgresDialect`, measure that here and bring it back to the architect before working around the rule.
+
+### @team-lead — 2026-11-10
+
+Placed from the POLY-62 and POLY-128 loops (2026-11-11): three criteria added in place (the `provisionPerson` retry, `locals.session` with the signed-in smoke, own-origin avatars).
+
+Also placed here: POLY-85 ruling Open 1 (pass the loaded `Secret` to the pool). The POLY-62 ruling (R9) deferred it to "the next issue that edits `connection.ts`", and this issue builds the routing pool on that code. The architect's gate-1 ruling for this issue decides whether it lands here or names a later owner. Open 3 (`jobs` in the status payload) stays with the first worker-job feature.
+
+The `db` CI job is at 160 s of its 180 s budget after POLY-62; POLY-102 (P1) restores headroom and comes before this issue.

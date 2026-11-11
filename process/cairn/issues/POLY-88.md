@@ -24,6 +24,8 @@ Login and Sign up offer Continue with Google and Continue with GitHub beside ema
 - [ ] OAuth access and refresh tokens are stored encrypted and the ID token is not persisted.
 - [ ] Linking a provider to an existing account requires a signed-in session and the same verified email.
 - [ ] C-05: Google uses email_verified; GitHub reads /user/emails (primary and verified) with read:user and user:email; a test per provider.
+- [ ] No SvelteKit route is served by the image before POLY-86's signed-out guard is in (POLY-128 ruling R4).
+- [ ] The image build stage runs `vite build` with dev dependencies and copies only `apps/web/build` forward; `.dockerignore` gains `**/.svelte-kit`, `apps/web/build` and `apps/web/tests` (POLY-128 ruling R11).
 
 ## Comments
 

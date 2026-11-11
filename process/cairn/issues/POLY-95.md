@@ -23,3 +23,9 @@ INFRA §2.2: prod and staging compose projects, backup-net (internal, fixed subn
 - [ ] archive_command encrypts with age and fails closed when the target exists.
 - [ ] The Postgres tag and digest are written once, on the `FROM postgres:17.N@sha256:…` line of the postgres derivative image (INFRA §6.1a); compose, the CI Postgres service and the backup container read it from there, and a fixture with a retyped tag fails the lint.
 - [ ] A lint check fails when the major on that `FROM` line differs from `infra/postgres-major` (pass and fail fixtures). It runs in the infra lint job, so POLY-96 only needs to run that job on `infra/**` changes, which its criteria already require.
+
+## Comments
+
+### @team-lead — 2026-11-10
+
+From the POLY-128 loop (architect, gate-1 hand-off, 2026-11-11): the SvelteKit CSP (SECURITY C-07) now lives in `apps/web/vite.config.ts`, and the ruling left HSTS, `nosniff` and `Referrer-Policy` "at Caddy", which no issue owns. This issue touches the Caddy config; its ruling either takes those three headers or names the issue that does.

@@ -540,3 +540,33 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** removing an attribution from a doc must not remove the only record of who decided it.
 **Alternatives considered:** leaving these seven attributions in the docs as exceptions (the rule would then have exceptions nobody could list from memory).
 **Approved by:** as attributed on each line; recorded by team-lead (2026-11-11).
+
+### 2026-11-11 — The chart-of-accounts table is `ledger_account`
+**Decision:** the ledger's chart table is named `public.ledger_account`. ARCH §3.1 and the permission-matrix rows `read-books` and `chart-rules-edit` use that name.
+**Why:** BetterAuth owns `public.account`, which is on the RLS exemption list; a second table of that name cannot exist, and a matrix row naming an exempt table now fails the battery.
+**Alternatives considered:** moving BetterAuth's tables to their own schema (a change to the pinned BetterAuth setup measured on POLY-76, for a naming gain only).
+**Approved by:** architect (POLY-62 ruling R6, PR #109); recorded by team-lead.
+
+### 2026-11-11 — Custom entity types are not shareable by use
+**Decision:** an entity may use only a system type or a custom type its creator owns (`app.check_entity()`). A co-member can read a custom type's label and kind so the entity renders, never its creator, and cannot create an entity of it.
+**Why:** the kickoff makes a type readable by co-members and says nothing about reuse; reuse let a user keep reading another user's type after leaving the entity (seceng O3). Refusing is the fail-closed reading, and opening it later is one predicate plus SECURITY R-9 wording.
+**Alternatives considered:** types shareable by use (needs R-9 reworded to accept the longer-lived read).
+**Approved by:** architect (POLY-62 ruling R2), with seceng's concurrence (SECURITY 1.9.3). The Principal was told on 2026-11-11 and has not overruled it.
+
+### 2026-11-11 — A multi-owner entity cannot change its owners by direct write until POLY-90 and POLY-112
+**Decision:** once an entity has more than one owner, a direct invite, a role raise and any change to another owner's row are refused (`app.gate_owner_changes()`, default-deny). The approval path that will allow them ships with POLY-90 and POLY-112; until then those changes are blocked.
+**Why:** as first ruled, either of two owners could remove or demote the other, and the one matrix row that would catch it was inactive (seceng O1). Blocked is safe on staging; open was not.
+**Alternatives considered:** leaving the gate in POLY-90 as planned (ships the hole in between).
+**Approved by:** team-lead, on seceng's objection; built in POLY-62 (PR #109).
+
+### 2026-11-11 — The sidebar has eight items; DESIGN owns the sidebar's information architecture
+**Decision:** the shell renders eight nav items in DESIGN §5.10 order, with Tax after Allocation. Where ARCH, the PRD or an issue disagrees with DESIGN on the sidebar, DESIGN wins and the other is corrected.
+**Why:** DESIGN added Tax as the eighth item on purpose, and ARCH §2.4 cites DESIGN as its source; ARCH, the PRD and POLY-128 still said seven. ARCH and the issue were corrected in POLY-128 (PR #110); the PRD line is on POLY-134.
+**Alternatives considered:** building seven as the issue said and filing the difference (one of three docs would stay wrong, and the shell would not match DESIGN).
+**Approved by:** team-lead; the Principal was told on 2026-11-11 and has not overruled it.
+
+### 2026-11-11 — POLY-128's sidebar defects were fixed inside the loop, not in a follow-up issue
+**Decision:** the seven findings from the lead's visual leg (V1–V7: no navigation when collapsed, not a floating card, no mark or icons, popover side, state not remembered, the rail's expand cue, the current-theme marker) went back through tests-red and build-green inside POLY-128.
+**Why:** a follow-up issue costs a full loop and CI run; the collapse control would have landed on `main` broken; two of the items were ruling text that was not built. The cost was a scorecard over two soft caps (30 commits, 5 ruling sections).
+**Alternatives considered:** the architect's first verdict proposed a follow-up issue before POLY-88 serves the shell, since the findings sat outside the written criteria and no user can reach the shell yet.
+**Approved by:** team-lead; the Principal was told of the disagreement on 2026-11-11 and has not overruled it.
