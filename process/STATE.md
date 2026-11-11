@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-102-ci-generated-output-freshness`
 - **Started:** 2026-11-11
 - **Goal:** A stale generated file cannot reach the attested ops bundle, and the `db` CI job has headroom again before POLY-86 adds to the battery.
-- **Status:** In Progress
+- **Status:** In Review — PR [#113](https://github.com/richmosko/polycarpic/pull/113)
 
 _Last merged: POLY-128 (App shell + DESIGN tokens) merged 2026-11-11 via PR [#110](https://github.com/richmosko/polycarpic/pull/110), after POLY-62 (Entity + membership schema) via PR [#109](https://github.com/richmosko/polycarpic/pull/109) — ARCH 1.15.12, SECURITY 1.9.5. The shell is not served by the image until POLY-88, and shows no session until POLY-86. Follow-ups on POLY-86 (session loader calls `provisionPerson`, one retry on 23505; `locals.session`), POLY-87 (operator-invitation definer), POLY-88 (no route before POLY-86's guard; image build stage), POLY-90 (gate trigger landed in POLY-62; self-Person owner row), POLY-102 (the `db` job is at 160 s of 180 s; now `todo`, P1). New from these loops: POLY-133 (shell entity selector) and POLY-134 (shell security follow-ups); POLY-85's Open 1 is placed on POLY-86; the Caddy security headers are raised on POLY-95; the `guard-commit` merge exemption is on POLY-79._
 

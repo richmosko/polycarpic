@@ -1,7 +1,7 @@
 ---
 id: POLY-102
 title: CI: generated-output freshness
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-96]
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-102.md, process/cairn/reviews/POLY-102/**, scripts/cairn/check_dist_freshness.py, scripts/cairn/tests/**, .github/workflows/ci.yml, infra/ci/**, tests/ci/**, tests/db/**, package.json, eslint.config.js, docs/INFRA/index.html, docs/ARCH/index.html, docs/SECURITY/index.html]
 labels: [ci, tooling]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/113
 created: 2026-11-08
 updated: 2026-11-10
 ---
@@ -99,3 +99,7 @@ Rulings on the builder's findings:
 - An ancestry pair whose rebuild cannot run stays `stale` (exit 1), not 2: accepted. The rebuild only rescues a verdict that is already stale, so failing to run it never maps to fresh, and V5 pins this. R2's exit-2 generator row applies to `regenerate` pairs.
 
 Advisories (non-gating): R4's before/after case counts were not written into the build-green commit (measured above instead). Addendum 1's journal ↔ file bijection check is the lead's follow-up.
+
+### @team-lead — 2026-11-10
+
+PR opened: https://github.com/richmosko/polycarpic/pull/113. Awaiting Validate.
