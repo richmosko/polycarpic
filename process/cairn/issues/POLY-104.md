@@ -11,7 +11,7 @@ labels: [ops, verification]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-11
 ---
 
 Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fake data), verbatim as a novice would, and record every command that differs; INFRA v1.2 lands the fixes. Folds in OQ-INFRA-7 (plan, firewall counts, IPv6), OQ-INFRA-8, OQ-INFRA-9 (Healthchecks limits), the outside-in scan and C-78 token deletion. Record in process/cairn/reviews/<this ID>/staging-deploy.md.
@@ -22,3 +22,9 @@ Run INFRA §7.1 steps 1–13 and 18 on a real Hetzner project, staging only (fak
 - [ ] provision-check passes.
 - [ ] OQ-INFRA-7, -8 and -9 each have a recorded answer.
 - [ ] The review file lists every doc correction, and INFRA v1.2 lands them.
+
+## Comments
+
+### @team-lead — 2026-11-11
+
+Gated by POLY-138's first item: Caddy must overwrite `X-Forwarded-For` with `{remote_host}` before the first deploy, or every `/api/auth/*` request answers 503 (POLY-86 seceng S19). Also gated by POLY-97's uploader ACLs for the first backup (POLY-95 verdict F12).
