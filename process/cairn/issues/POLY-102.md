@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-96]
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-102.md, docs/ARCH/index.html, process/cairn/reviews/POLY-102/**, scripts/cairn/check_dist_freshness.py, scripts/cairn/tests/**, .github/workflows/ci.yml, infra/ci/**, tests/ci/**, tests/db/**, package.json, eslint.config.js]
+paths: [process/cairn/issues/POLY-102.md, docs/ARCH/index.html, docs/SECURITY/index.html, process/cairn/reviews/POLY-102/**, scripts/cairn/check_dist_freshness.py, scripts/cairn/tests/**, .github/workflows/ci.yml, infra/ci/**, tests/ci/**, tests/db/**, package.json, eslint.config.js]
 labels: [ci, tooling]
 priority: P1
 pr: null
