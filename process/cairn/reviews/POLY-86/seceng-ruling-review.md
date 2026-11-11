@@ -124,3 +124,49 @@ Tests:
 1. POLY-122: the ID-token sign-in under its own review (S8).
 2. Avatar upload: bring back the same-origin path rule with URL parsing (S16b).
 3. SECURITY C-02 text: whether it changes depends on S17's measurement. SecEng edits it at the verdict if needed.
+
+## Build review: reviewed @ 182d054, **pass**
+
+Read from `git diff main...182d054`, covering:
+- `packages/db/src/context.ts`;
+- `packages/auth/src/{routing-pool,handler,route-policy,second-step,user-hooks,recent-auth,session,options,index}.ts`;
+- `apps/web/src/hooks.server.ts` and `lib/server/auth.ts`, the Sessions page, the sign-in redirect and the root layout projection;
+- migrations 0004 and 0005;
+- the test titles of the `tests/db/auth-*` suites.
+
+I did not run the suites; the gate owner does.
+
+**Met:**
+- **S1:** a failed BetterAuth response (status ≥ 400, or a redirect to its error page or an `?error=` query) rolls back, and its `Set-Cookie` is dropped.
+- **S2:** a COMMIT that reports `ROLLBACK` throws `TransactionAborted`.
+- **S3:** the store is marked dead in `finally` before release, `currentClient()` throws `TransactionEnded`, and `backgroundTasks` is unset.
+- **S4:** the grammar is closed, `ROLLBACK TO` passes through, and a ROLLBACK decrements the depth.
+- **S5:** `AuthClient` exposes `query` only, `pool.query` shares the lease queue, and a timed-out waiter is cancelled.
+- **S6:** rate-limit storage is memory.
+- **S7:** the handle and the handler answer 404 to unlisted and blocked paths after normalising the path; the variants are tested.
+- **S8:** an `idToken` on `/sign-in/social` is refused with a 400.
+- **S10:** the hook is found by behaviour, the original matcher is wrapped, and start-up throws unless exactly one hook matches.
+- **S11:** the invitation claim is in `user.create.before`, behind the wrapper assertion.
+- **S12:** `trustedOrigins` is our origin only, redirect keys are checked, a cross-origin POST is refused, and `next` is safe on both the server and the client.
+- **S13:** revoking another session calls `requireRecentAuth`.
+- **S14:** the window is measured on the database's `now()`, with 7 days idle, `updateAge` 1 day and our own 30-day cap that deletes the row.
+- **S15:** the pg error is found by walking `.cause`, the retry runs once, the log has no token or email, and the projection is built field by field.
+- **S16:**
+  - (a) column-level INSERT and UPDATE grants leave out `second_step_at` and `recent_auth_at`;
+  - (b) `image` is always null;
+  - (c) enrolment answers 403 with no `second_step_at`.
+- **S17:** the `__Host-` cookie, measured.
+- **S18:** no switch in the app relaxes the invitation check.
+- **S19:** a single-entry `X-Forwarded-For` limited to address characters, `requireClientIp` required, and the limits at 5 a minute.
+
+**Not met, deferred (judgment call): S9's enumeration test.** The suites have no test that greps the pinned dist for `createSession`, `setSessionCookie`, `createUser` and `createOAuthUser` call sites. On 1.7.18 the lists were set by code-read (ruling U1, M1), and the hold and wrapper tests cover every path on those lists. So the gap opens only on a version bump. Condition: no change to the `better-auth` or `@better-auth/passkey` pin merges before that test exists (follow-up 1).
+
+## Follow-ups for the lead (from the build review)
+
+1. **Auth upgrade guards, before any better-auth bump:**
+   - (a) S9's dist enumeration test for the session- and user-creating call sites;
+   - (b) `Lease.query` must refuse or rewrite a transaction-control statement passed as a query-config object. Today an object form with the text `BEGIN` or `COMMIT` would pass through unrewritten. Kysely 0.29.8 sends strings, so this is unreachable on the pin.
+2. `/change-password`: force `revokeOtherSessions: true` in the before-hook (C-02: all sessions are revoked on a password change). Today only the caller decides. No password-change UI exists yet.
+3. POLY-89: `two_factor.verified` defaults to `true` in 0004 (BetterAuth's schema default). Make it `false`, so a write that leaves it out never marks a factor verified.
+4. Settings → Sessions: a revoke with an `id` that is not a uuid answers 500 (22P02). It should answer 404.
+5. Carried from earlier: POLY-95's Caddy `header_up` line (S19), the per-email limit, the Vercel client IP and limiter storage, POLY-122's ID-token sign-in, and avatar upload with the same-origin rule.
