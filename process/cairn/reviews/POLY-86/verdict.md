@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: reopened by the lead's visual leg (below). F3–F8 must be met; I confirm the fix sha against this file.** F1 and F2 are met. F1 at 385ef78: `routing-pool.test.ts`, with `AuthUnderSystemJob` raised on `connect()` and `query()`. F2 at f6cde68: `userCreateBefore` asserts the wrapper and calls `claimInvitation` on every call, and the image rule is the pure `stripImage`.
+**Result: reopened by the lead's visual leg (below). F3–F9 and addendum 2's CI-time guard must be met; I confirm the fix sha against this file.** F1 and F2 are met. F1 at 385ef78: `routing-pool.test.ts`, with `AuthUnderSystemJob` raised on `connect()` and `query()`. F2 at f6cde68: `userCreateBefore` asserts the wrapper and calls `claimInvitation` on every call, and the image rule is the pure `stripImage`.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -32,6 +32,7 @@ Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. 
 ## Follow-ups (lead to file after the merge, in addition to the ruling's 1–8)
 
 9. The handle's `/api/auth` tree test runs on the raw pathname. `/API/AUTH/...` falls through to the page routes and gets SvelteKit's 404. That is safe today, and worth one test once routes exist under `/api`.
+11. POLY-95: Caddy's `header_up X-Forwarded-For {remote_host}` and no `trusted_proxies` (S19 point 2).
 10. Providers (Google, GitHub) are not wired in apps/web: config has no client-id variable yet. Goes to POLY-88 with Open 1.
 
 ## Reopened: the lead's visual leg @ f99b888
@@ -44,6 +45,6 @@ Source: `temp/2026-11-11-lead-poly86-visual-leg.md` in the lead checkout. The co
 - **F6 (lead item 5). Ruled: blocks.** A signed-out page shows no app chrome. The root layout renders the shell only when `data.session` is set; otherwise it renders a bare page. `/sign-in` is that bare page. No route moves.
 - **F7 (lead item 6). Ruled: blocks, minimally.** The account menu's **Settings** entry links to `/settings/sessions`, so criterion 4 is reachable from the UI. Profile, Notifications, Preferences and Shortcuts stay disabled placeholders and join follow-up 1 (ux-designer). `/settings` itself stays 404.
 - **F8. e2e coverage of the four.** Add to `shell-signed-in.spec.ts`, or a sibling spec: `/settings/sessions` lists the current session and revokes another (after a step-up stamp seeded by the setup); a wrong password and then the right one signs in; Log out lands on `/sign-in` and the next `/dashboard` load redirects; `/sign-in` has no navigation landmark.
-- **Lead item 4 (one shared rate-limit bucket): seceng-86 rules it.** Architecturally, Caddy is the only hop that can set the client IP. If seceng keeps it in this issue, the app trusts the one header Caddy sets (`advanced.ipAddress.ipAddressHeaders`) and nothing else. Otherwise it is a named follow-up on POLY-95 (Caddy).
+- **F9 (lead item 4): seceng S19 (`seceng-client-ip.md` @ a7a22c3) binds the build.** The app trusts only a single-entry `X-Forwarded-For`, with no `trustedProxies`. An unresolved IP answers 503 outside dev and is never pooled. Caddy's overwrite of the header goes to POLY-95 (follow-up 11). F9 is a verdict axis: confirmed against S19's tests at the fix sha.
 - **`AuthUnderSystemJob`:** met at 385ef78 (F1). The builder's earlier line predates that commit.
 
