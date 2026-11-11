@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: pass.** Both conditions are met. F1 at 385ef78: `routing-pool.test.ts`, with `AuthUnderSystemJob` raised on `connect()` and `query()`. F2 at f6cde68: `userCreateBefore` asserts the wrapper and calls `claimInvitation` on every call, and the image rule is the pure `stripImage`.
+**Result: reopened by the lead's visual leg (below). F3–F8 must be met; I confirm the fix sha against this file.** F1 and F2 are met. F1 at 385ef78: `routing-pool.test.ts`, with `AuthUnderSystemJob` raised on `connect()` and `query()`. F2 at f6cde68: `userCreateBefore` asserts the wrapper and calls `claimInvitation` on every call, and the image rule is the pure `stripImage`.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -33,3 +33,17 @@ Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. 
 
 9. The handle's `/api/auth` tree test runs on the raw pathname. `/API/AUTH/...` falls through to the page routes and gets SvelteKit's 404. That is safe today, and worth one test once routes exist under `/api`.
 10. Providers (Google, GitHub) are not wired in apps/web: config has no client-id variable yet. Goes to POLY-88 with Open 1.
+
+## Reopened: the lead's visual leg @ f99b888
+
+Source: `temp/2026-11-11-lead-poly86-visual-leg.md` in the lead checkout. The code-read verdict missed these because no test drives the pages through the running server. F3–F5 are its defects 1–3. F8 is the test gap that let them through.
+
+- **F3. `/settings/sessions` 500s** (`createdAt.toISOString` on a value that is not a Date). This blocks: criterion 4. Normalise the fields in `listSessions` (`new Date(...)`) or in the load function.
+- **F4. The sign-in form is dead after one failure.** This blocks: criterion 14 rests on signing in. A failed attempt must leave the form able to submit again.
+- **F5. "Log out" is disabled.** This blocks: a signed-in user must be able to end their session. The menu item posts to `/api/auth/sign-out`, then the page goes to `/sign-in`.
+- **F6 (lead item 5). Ruled: blocks.** A signed-out page shows no app chrome. The root layout renders the shell only when `data.session` is set; otherwise it renders a bare page. `/sign-in` is that bare page. No route moves.
+- **F7 (lead item 6). Ruled: blocks, minimally.** The account menu's **Settings** entry links to `/settings/sessions`, so criterion 4 is reachable from the UI. Profile, Notifications, Preferences and Shortcuts stay disabled placeholders and join follow-up 1 (ux-designer). `/settings` itself stays 404.
+- **F8. e2e coverage of the four.** Add to `shell-signed-in.spec.ts`, or a sibling spec: `/settings/sessions` lists the current session and revokes another (after a step-up stamp seeded by the setup); a wrong password and then the right one signs in; Log out lands on `/sign-in` and the next `/dashboard` load redirects; `/sign-in` has no navigation landmark.
+- **Lead item 4 (one shared rate-limit bucket): seceng-86 rules it.** Architecturally, Caddy is the only hop that can set the client IP. If seceng keeps it in this issue, the app trusts the one header Caddy sets (`advanced.ipAddress.ipAddressHeaders`) and nothing else. Otherwise it is a named follow-up on POLY-95 (Caddy).
+- **`AuthUnderSystemJob`:** met at 385ef78 (F1). The builder's earlier line predates that commit.
+
