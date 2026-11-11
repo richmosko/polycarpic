@@ -25,6 +25,10 @@ INFRA §4.2–§4.4: a changes step inside the job (no workflow-level paths:), o
 - [ ] Each affected package's tests run from inside that package (`pnpm --filter <pkg> test`, via Turborepo), never from the root config, so a test relying on another package's setup or on root-only config fails.
 - [ ] The lint job runs POLY-82's layer-map checks (`layers.json` vs each package.json, vs ARCH §2.2 `data-consumes`, completeness, acyclic and never-upward). A change to `layers.json` or `docs/ARCH/index.html` runs them even on an otherwise docs-only PR.
 - [ ] Branch protection adds app (team-lead, user-approved).
+- [ ] Each CI job prints its wall-clock and the per-package test time (Turborepo `--summarize` or equivalent) into the GitHub step summary.
+- [ ] Soft budget per job (lint + types ≤ 2 min, per-package Vitest ≤ 2 min, DB battery ≤ 3 min): a job over budget posts a warning annotation, never a failure.
+- [ ] The DB battery is one job keyed to `packages/db/**` + `tests/db/**` only, with one Postgres container per run; POLY-84's RLS battery runs inside it, not in a job of its own.
+- [ ] CI timings land in `process/cairn/metrics/test-runs.jsonl` so `cairn loop-stats` shows `suite_seconds_added` from CI runs, not only local ones.
 
 ## Comments
 
