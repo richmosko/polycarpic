@@ -1,0 +1,15 @@
+{
+  "pairs": [
+    {
+      "name": "db-migrations",
+      "mode": "regenerate",
+      "root": "packages/db",
+      "output": "migrations",
+      "link": ["node_modules"],
+      "skip": [".turbo"],
+      "command": ["./node_modules/.bin/drizzle-kit", "generate"],
+      "timeout": 120,
+      "ci": true
+    }
+  ]
+}
