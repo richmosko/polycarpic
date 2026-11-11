@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83, POLY-76]
 assignee: backend-lead
-paths: [packages/auth/**, apps/web/src/**, apps/web/tests/**, process/cairn/issues/POLY-86.md, tests/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/SECURITY/**]
+paths: [packages/auth/**, packages/db/**, packages/tenancy/**, apps/web/src/**, apps/web/tests/**, apps/web/playwright.config.ts, infra/ci/**, .github/workflows/**, process/cairn/issues/POLY-86.md, process/cairn/reviews/POLY-86/**, tests/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/SECURITY/**]
 labels: [auth, security]
 priority: null
 pr: null
