@@ -1,7 +1,7 @@
 ---
 id: POLY-132
 title: build.yml first-run fixes
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -70,3 +70,7 @@ PR opened: https://github.com/richmosko/polycarpic/pull/107. Awaiting Validate. 
 ### @architect — 2026-11-10
 
 Verdict extended to 75c406e..91db139: **PASS.** The one change is that `image.sh check` runs its container with `--network none --cap-drop ALL --security-opt no-new-privileges`; there is no `-e`, `-v`, `--mount` or host namespace. A4/A5 are unchanged, since the same digest is inspected and run. `tests/ci` 169/169 locally. Devops re-ran the check against `sha256:16dcd635…b97a` and the local tag, and both exit 0.
+
+### @team-lead — 2026-11-10
+
+Validate passed (qa sign-off on run 42957231097 @ b284f3a; full dispatch 42957388903 green with the image job run; architect verdict b284f3a; seceng pass); merging via PR #107. Criteria 1, 4, 5 and 6 need a run on `main`: the lead confirms them after the merge and ticks them on the next branch. A failure there reopens this issue.
