@@ -154,3 +154,10 @@ This issue adds `currentClient()` to `context.ts` and does not edit `connection.
 6. POLY-87: the real `claimInvitation`, the new-user step and `provisionPerson` at sign-up.
 7. POLY-122: ID-token sign-in under its own review (S8).
 8. SECURITY C-02 text, depending on S17's `__Host-` cookie measurement; seceng edits it at the verdict if needed.
+
+## Addendum 1 (gate 2, qa-engineer-86 @ bfb3b84)
+
+1. **R4's `xmin` assertion is replaced.** BetterAuth inserts the user inside a savepoint (R2), so `xmin` holds the subtransaction id, never the wrapper's top-level xid. `txid_current()` inside a subtransaction returns the top-level id. So the test's AFTER INSERT trigger records `txid_current()`, and the test compares it with the `txid_current()` seen inside the wrapper. Criterion 11 is amended to match.
+2. **`AuthUnderSystemJob` (P4) gets a pure unit test** in `packages/auth/src/routing-pool.test.ts`, with `currentClient` from `@poly/db/auth` mocked to report `kind: 'withSystem'`. `connect()` and `query()` must both throw. A database test waits for the first job target (POLY-85 Open 3); this is not a gap at the verdict.
+3. The calling conventions in `tests/db/helpers/auth.ts` (the optional `auth` instance as the second argument, and `authOptions` reading `authFields` at call time) are the seam's shape. The builder conforms to them, or changes the helper header and reports the change at gate 3.
+
