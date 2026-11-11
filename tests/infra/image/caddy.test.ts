@@ -3,6 +3,7 @@
 // the upstream's CSP passes through; the :80 redirect carries nosniff. Runs in the `image` job.
 //
 // CONTRACT pinned here (the ruling names the file, not the hooks):
+//  - Caddy listens on 8080/8443 inside the container (ruling R1 [S2]); the test publishes those.
 //  - build context infra/caddy/ -> the Caddy image; it runs the Caddyfile at /etc/caddy/Caddyfile (copied in or mounted).
 //  - env the Caddyfile reads: POLY_DOMAIN (sites app.$POLY_DOMAIN, staging.$POLY_DOMAIN), POLY_STAGING_ALLOW
 //    (space-separated remote_ip ranges for staging), and the TLS mode: the test sets POLY_TLS=internal; the Caddyfile
@@ -36,7 +37,7 @@ const curl = (host: string, path: string, extra: string[] = []) => {
 };
 const startCaddy = (allow: string) => {
   sh('docker', ['rm', '-f', CADDY]);
-  const r = sh('docker', ['run', '-d', '--name', CADDY, '--network', NET, '-p', `127.0.0.1:${PORT}:443`, '-p', `127.0.0.1:${PORT + 1000}:80`,
+  const r = sh('docker', ['run', '-d', '--name', CADDY, '--network', NET, '-p', `127.0.0.1:${PORT}:8443`, '-p', `127.0.0.1:${PORT + 1000}:8080`,
     '-e', `POLY_DOMAIN=${DOMAIN}`, '-e', 'POLY_TLS=internal', '-e', `POLY_STAGING_ALLOW=${allow}`,
     '-v', `${dir}/staging_basic_auth:/run/secrets/staging_basic_auth:ro`, IMG]);
   if (r.code !== 0) throw new Error(r.err);
@@ -51,7 +52,7 @@ beforeAll(() => {
   mkdirSync(dir, { recursive: true });
   const hash = sh('docker', ['run', '--rm', IMG, 'caddy', 'hash-password', '--plaintext', 'pw']).out;
   writeFileSync(join(dir, 'staging_basic_auth'), `qa ${hash}\n`, { mode: 0o644 });
-  writeFileSync(join(dir, 'Stub'), `{\n\tauto_https off\n}\n:3000 {\n\theader Referrer-Policy "no-referrer"\n\theader Content-Security-Policy "default-src 'none'"\n\t@missing path /missing\n\trespond @missing 404\n\trespond "ok" 200\n}\n`);
+  writeFileSync(join(dir, 'Stub'), `{\n\tauto_https off\n}\n:3000 {\n\theader Referrer-Policy "no-referrer"\n\theader Content-Security-Policy "default-src 'none'"\n\t@missing path /missing\n\trespond @missing 404\n\t@nocsp path /nocsp\n\theader @nocsp -Content-Security-Policy\n\trespond @nocsp "nocsp" 200\n\trespond "ok" 200\n}\n`);
   sh('docker', ['network', 'create', NET]);
   const s = sh('docker', ['run', '-d', '--name', STUB, '--network', NET, '--network-alias', 'prod-web', '--network-alias', 'staging-web',
     '-v', `${dir}/Stub:/etc/caddy/Caddyfile:ro`, IMG]);
@@ -70,6 +71,19 @@ describe('Caddy security headers on every response class (R1)', () => {
     expect(r.status).toBe(200);
     expectHeaders(r.h); // red: snippet missing, or no `defer` so the upstream's no-referrer wins / duplicates
     expect(r.h['content-security-policy']).toEqual(["default-src 'none'"]); // red: Caddy strips or rewrites the CSP
+  });
+  it('no CSP is added when the upstream sends none', () => {
+    const r = curl(`app.${DOMAIN}`, '/nocsp');
+    expect(r.status).toBe(200);
+    expectHeaders(r.h);
+    expect(r.h['content-security-policy']).toBeUndefined(); // red: Caddy injects a CSP (it is Kit's)
+  });
+  it('caddy adapt: no trusted_proxies anywhere, admin disabled or loopback-only', () => {
+    const r = sh('docker', ['run', '--rm', '-e', `POLY_DOMAIN=${DOMAIN}`, '-e', 'POLY_TLS=internal', '-e', 'POLY_STAGING_ALLOW=0.0.0.0/0', IMG, 'caddy', 'adapt', '--config', '/etc/caddy/Caddyfile']);
+    expect(r.code, r.err).toBe(0);
+    expect(r.out).not.toMatch(/trusted_proxies/); // red: edge trusts forwarded headers it should not
+    const adm = JSON.parse(r.out).admin as { disabled?: boolean; listen?: string } | undefined;
+    expect(adm === undefined || adm.disabled === true || /^(localhost|127\.0\.0\.1|\[::1\]):\d+$/.test(adm.listen ?? '')).toBe(true); // red: admin API on 0.0.0.0
   });
   it('upstream 404 carries them too', () => {
     const r = curl(`app.${DOMAIN}`, '/missing');

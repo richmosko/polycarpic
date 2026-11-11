@@ -2,7 +2,7 @@
 //
 // CLI CONTRACT (the seam these tests pin; the ruling names the file, not the flags):
 //   node infra/lint/compose-policy.mjs --root <dir> [--policy <file>]
-//   env POLY_POSTGRES_IMAGE is passed through to `docker compose config` (the files use ${POLY_POSTGRES_IMAGE:?}).
+//   env POLY_POSTGRES_IMAGE and POLY_BIND_ADDR are passed through to `docker compose config` (the files use ${POLY_POSTGRES_IMAGE:?}).
 //   <dir> mirrors the repo: infra/compose/{edge,prod,staging}.yml, infra/postgres/{Dockerfile,pg_hba.*.conf,
 //   postgresql.*.conf}, infra/postgres-major, infra/caddy/Caddyfile, .github/workflows/*.yml, tests/db/docker/Dockerfile.
 //   Each of edge/prod/staging.yml is rendered on its own (`docker compose -f <file> --profile '*' config --format json`);
@@ -16,7 +16,7 @@ import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
-import { baseline, materialise, PG_DIGEST, PG_IMAGE_ENV, type FxSet } from './baseline.ts';
+import { baseline, giveSecret, materialise, PG_DIGEST, PG_IMAGE_ENV, secretFile, type FxSet } from './baseline.ts';
 
 const ROOT = join(dirname(new URL(import.meta.url).pathname), '..', '..');
 const LINT = join(ROOT, 'infra', 'lint', 'compose-policy.mjs');
@@ -26,7 +26,7 @@ afterAll(() => { for (const d of made) rmSync(d, { recursive: true, force: true 
 function lint(root: string) {
   if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');
   const r = spawnSync('node', [LINT, '--root', root], {
-    encoding: 'utf8', env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', POLY_POSTGRES_IMAGE: PG_IMAGE_ENV },
+    encoding: 'utf8', env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', POLY_POSTGRES_IMAGE: PG_IMAGE_ENV, POLY_BIND_ADDR: '192.168.1.20' },
   });
   return { code: r.status, err: r.stderr ?? '', out: r.stdout ?? '' };
 }
@@ -89,31 +89,48 @@ const ROWS: Row[] = [
   ['env_file', (s) => { svc(s, 'prod', 'worker').env_file = ['/etc/polycarpic/host.env']; }, 'env-file', 'env_file not checked'],
   ['secret-looking environment key', (s) => { svc(s, 'prod', 'web').environment = { DB_PASSWORD: 'x' }; }, 'env-secret', 'secret-looking env not checked'],
   ['API key in environment', (s) => { svc(s, 'prod', 'web').environment = { RESEND_API_KEY: 'x' }; }, 'env-secret', 'only PASSWORD matched'],
-  ['secret with environment source', (s) => { s.prod.secrets.auth_secret = { environment: 'AUTH' }; }, 'secret-source', 'environment-sourced secret accepted'],
+  ['secret with environment source', (s) => { s.prod.secrets.auth_secret__web = { environment: 'AUTH' }; }, 'secret-source', 'environment-sourced secret accepted'],
   ['config with inline content', (s) => { s.prod.configs = { c: { content: 'k=v' } }; svc(s, 'prod', 'web').configs = ['c']; }, 'config-inline', 'inline config content accepted'],
   ['${VAR} in ports', (s) => { svc(s, 'edge', 'caddy').ports = ['${BIND:-0.0.0.0}:443:443']; }, 'raw-interpolation', 'interpolation in ports allowed'],
   ['${VAR} in volumes', (s) => { svc(s, 'prod', 'web').volumes = ['${DATA}:/data']; }, 'raw-interpolation', 'interpolation in volumes allowed'],
-  ['${VAR} in networks', (s) => { s.prod.networks.edge.name = '${EDGE}'; }, 'raw-interpolation', 'interpolation in networks allowed'],
-  ['${VAR} in secrets', (s) => { s.prod.secrets.auth_secret.file = '${DIR}/auth_secret'; }, 'raw-interpolation', 'interpolation in secrets allowed'],
+  ['${VAR} in networks', (s) => { s.prod.networks.default.name = '${EDGE}'; }, 'raw-interpolation', 'interpolation in networks allowed'],
+  ['${VAR} in secrets', (s) => { s.prod.secrets.auth_secret__web.file = '${DIR}/auth_secret'; }, 'raw-interpolation', 'interpolation in secrets allowed'],
   ['compose.override.yml present', (s) => { s.text['infra/compose/compose.override.yml'] = 'services: {}\n'; }, 'override-file', 'override file tolerated'],
   ['extra -c flag on postgres', (s) => { svc(s, 'prod', 'postgres').command.push('-c', "log_statement='all'"); }, 'extra-c-flag', 'any -c accepted, bypassing the config file'],
   // ports, networks, edge
+  ['sysctls', (s) => { svc(s, 'prod', 'worker').sysctls = { 'net.ipv4.ip_forward': '1' }; }, 'sysctls', 'sysctls not checked'],
+  ['extra_hosts', (s) => { svc(s, 'prod', 'worker').extra_hosts = ['x:10.0.0.1']; }, 'extra-hosts', 'extra_hosts not checked'],
+  ['links', (s) => { svc(s, 'prod', 'worker').links = ['postgres']; }, 'links', 'links not checked'],
+  ['external_links', (s) => { svc(s, 'prod', 'worker').external_links = ['x:y']; }, 'links', 'external_links not checked'],
+  ['network_mode: bridge (any value)', (s) => { svc(s, 'prod', 'worker').network_mode = 'bridge'; }, 'network-mode', 'only host/service: rejected'],
+  ['/var/run mounted', (s) => { svc(s, 'prod', 'worker').volumes = ['/var/run:/r']; }, 'mount-forbidden', '/var/run not on the forbidden list'],
+  ['/run mounted', (s) => { svc(s, 'prod', 'worker').volumes = ['/run:/r']; }, 'mount-forbidden', '/run not on the forbidden list'],
+  ['/ mounted', (s) => { svc(s, 'prod', 'worker').volumes = ['/:/host:ro']; }, 'mount-forbidden', 'root mount accepted'],
+  ['bind not in the service allowlist', (s) => { svc(s, 'prod', 'web').volumes = ['/srv/polycarpic/pg-prod:/data:ro']; }, 'mount-allowlist', 'default allow instead of default deny'],
+  ['allowlisted config bind made writable', (s) => { svc(s, 'prod', 'postgres').volumes[1] = '../postgres/postgresql.prod.conf:/etc/postgresql/postgresql.conf'; }, 'mount-allowlist', ':ro not required'],
+  ['POLY_BIND_ADDR with a default value', (s) => { svc(s, 'edge', 'caddy').ports = ['${POLY_BIND_ADDR:-0.0.0.0}:443:8443']; }, 'raw-interpolation', 'a default value allowed (a missing address binds 0.0.0.0)'],
+  ['${VAR} in user', (s) => { svc(s, 'prod', 'web').user = '${UID}:10001'; }, 'raw-interpolation', 'interpolation allowed outside images/bind addr'],
+  ['${VAR} in healthcheck', (s) => { svc(s, 'prod', 'web').healthcheck.test = ['CMD', '${X}']; }, 'raw-interpolation', 'healthcheck not scanned'],
+  ['DATABASE_URL in environment', (s) => { svc(s, 'prod', 'web').environment = { DATABASE_URL: 'x' }; }, 'env-secret', 'DSN/DATABASE_URL not matched'],
+  ['_FILE env pointing outside /run/secrets', (s) => { svc(s, 'prod', 'web').environment = { DB_PASSWORD_FILE: '/etc/passwd' }; }, 'env-secret', 'any *_FILE value accepted'],
   ['ports: on web', (s) => { svc(s, 'prod', 'web').ports = ['3000:3000']; }, 'ports-caddy-only', 'ports allowed outside caddy'],
   ['ports: on postgres', (s) => { svc(s, 'staging', 'postgres').ports = ['5432:5432']; }, 'ports-caddy-only', 'staging not scanned'],
-  ['service on both project networks', (s) => {
-    s.prod.networks['staging-edge'] = { name: 'polycarpic-staging-edge', external: true };
-    svc(s, 'prod', 'web').networks.push('staging-edge');
-  }, 'cross-project', 'cross-project network membership not checked'],
-  ['staging service on the prod default network', (s) => {
-    s.staging.networks.prodnet = { name: 'polycarpic-prod_default', external: true };
-    svc(s, 'staging', 'web').networks.push('prodnet');
-  }, 'cross-project', 'only the edge network compared'],
   ['caddy on a project default network', (s) => {
     s.edge.networks.d = { name: 'polycarpic-prod_default', external: true };
     svc(s, 'edge', 'caddy').networks.push('d');
   }, 'edge-network', 'caddy allowed on _default'],
-  ['postgres on the edge network', (s) => { svc(s, 'prod', 'postgres').networks.push('edge'); }, 'edge-network', 'edge membership not limited to caddy+web'],
-  ['worker on the edge network', (s) => { svc(s, 'prod', 'worker').networks.push('edge'); }, 'edge-network', 'edge membership not limited to caddy+web'],
+  ['postgres on the edge network', (s) => { svc(s, 'prod', 'postgres').networks.push('edge-prod'); }, 'edge-network', 'edge membership not limited to caddy+web'],
+  ['worker on the edge network', (s) => { svc(s, 'prod', 'worker').networks.push('edge-prod'); }, 'edge-network', 'edge membership not limited to caddy+web'],
+  ['web (not caddy) on both projects\' edge networks', (s) => {
+    s.prod.networks['edge-staging'] = { name: 'polycarpic-edge-staging', external: true };
+    svc(s, 'prod', 'web').networks.push('edge-staging');
+  }, 'cross-project', 'cross-project membership allowed for services other than caddy'],
+  ['staging service on the prod default network', (s) => {
+    s.staging.networks.prodnet = { name: 'polycarpic-prod_default', external: true };
+    svc(s, 'staging', 'web').networks.push('prodnet');
+  }, 'cross-project', 'only the edge network compared'],
+  ['edge subnet overlaps a pg_hba allow CIDR', (s) => { s.edge.networks['edge-prod'].ipam.config[0].subnet = '10.201.1.0/28'; }, 'edge-overlap', 'edge subnets not compared with pg_hba allow lines'],
+  ['edge network without a fixed subnet', (s) => { delete s.edge.networks['edge-staging'].ipam; }, 'edge-overlap', 'unfixed edge subnet accepted'],
   // C-79
   ['backup-net not internal', (s) => { s.prod.networks['backup-net'].internal = false; }, 'backup-net-internal', 'internal: true not required'],
   ['backup-net without a fixed subnet', (s) => { delete s.prod.networks['backup-net'].ipam; }, 'backup-net-subnet', 'missing subnet accepted'],
@@ -124,17 +141,27 @@ const ROWS: Row[] = [
   ['web on backup-net', (s) => { svc(s, 'prod', 'web').networks.push('backup-net'); }, 'backup-net-members', 'membership not limited to postgres+backup'],
   ['backup missing from backup-net', (s) => { svc(s, 'prod', 'backup').networks = ['upload-net']; }, 'backup-net-members', 'only extra members checked'],
   ['backup on the default network', (s) => { svc(s, 'prod', 'backup').networks.push('default'); }, 'backup-net-members', 'backup allowed on the app network'],
-  ['db_password_backup in a second service', (s) => { svc(s, 'prod', 'worker').secrets.push('db_password_backup'); }, 'secret-matrix', 'second consumer of db_password_backup accepted'],
-  ['backup_store_credential in backup', (s) => { svc(s, 'prod', 'backup').secrets.push('backup_store_credential'); }, 'secret-matrix', 'second consumer of the bucket pair accepted'],
-  ['backup also holds a DB-superuser secret', (s) => { svc(s, 'prod', 'backup').secrets.push('db_superuser_password'); }, 'secret-matrix', 'per-service allowlist not enforced, only per-secret'],
   ['uploader on the default network', (s) => { svc(s, 'prod', 'uploader').networks.push('default'); }, 'uploader-isolation', 'uploader sharing a network with postgres allowed'],
   ['uploader on backup-net', (s) => { svc(s, 'prod', 'uploader').networks.push('backup-net'); }, 'uploader-isolation', 'uploader sharing backup-net with postgres allowed'],
-  // secret matrix and paths
-  ['credential_keyring in web', (s) => { svc(s, 'prod', 'web').secrets.push('credential_keyring'); }, 'secret-matrix', 'web may open credentials'],
-  ['unknown secret not on the allowlist', (s) => { s.prod.secrets.extra = { file: '/etc/polycarpic/secrets/extra' }; svc(s, 'prod', 'web').secrets.push('extra'); }, 'secret-matrix', 'unlisted secrets pass'],
-  ['prod secret under staging-secrets', (s) => { s.prod.secrets.auth_secret.file = '/etc/polycarpic/staging-secrets/auth_secret'; }, 'secret-path', 'prod path prefix not checked'],
-  ['staging secret under secrets', (s) => { s.staging.secrets.auth_secret.file = '/etc/polycarpic/secrets/auth_secret'; }, 'secret-path', 'staging path prefix not checked'],
-  ['secret path outside /etc/polycarpic', (s) => { s.prod.secrets.auth_secret.file = '/tmp/auth_secret'; }, 'secret-path', 'any absolute path accepted'],
+  // secret matrix and per-service paths (ruling A1)
+  ['db_password_backup in a second service', (s) => { giveSecret(s.prod, true, 'worker', 'db_password_backup'); }, 'secret-matrix', 'second consumer of db_password_backup accepted'],
+  ['backup_store_credential in backup', (s) => { giveSecret(s.prod, true, 'backup', 'backup_store_credential'); }, 'secret-matrix', 'second consumer of the bucket pair accepted'],
+  ['backup also holds the superuser secret', (s) => { giveSecret(s.prod, true, 'backup', 'db_superuser_password'); }, 'secret-matrix', 'per-service allowlist not enforced, only per-secret'],
+  ['credential_keyring in web', (s) => { giveSecret(s.prod, true, 'web', 'credential_keyring'); }, 'secret-matrix', 'web may open credentials'],
+  ['unknown secret not in the matrix', (s) => { giveSecret(s.prod, true, 'web', 'extra'); }, 'secret-matrix', 'unlisted secrets pass'],
+  ['staging secret not in the staging matrix', (s) => { giveSecret(s.staging, false, 'web', 'db_password_backup'); }, 'secret-matrix', 'staging matrix not applied'],
+  ['web secret sourced from worker\'s directory', (s) => { s.prod.secrets.db_password_app__web.file = secretFile(true, 'worker', 'db_password_app'); }, 'secret-path', 'service-own directory not enforced'],
+  ['flat secret path (no service directory)', (s) => { s.prod.secrets.auth_secret__web.file = '/etc/polycarpic/secrets/auth_secret'; }, 'secret-path', 'flat layout accepted'],
+  ['prod secret under staging-secrets', (s) => { s.prod.secrets.auth_secret__web.file = secretFile(false, 'web', 'auth_secret'); }, 'secret-path', 'prod path prefix not checked'],
+  ['staging secret under secrets', (s) => { s.staging.secrets.auth_secret__web.file = secretFile(true, 'web', 'auth_secret'); }, 'secret-path', 'staging path prefix not checked'],
+  ['secret path outside /etc/polycarpic', (s) => { s.prod.secrets.auth_secret__web.file = '/tmp/web/auth_secret'; }, 'secret-path', 'any absolute path accepted'],
+  ['caddy secret from another service\'s directory', (s) => { s.edge.secrets.staging_basic_auth__caddy.file = secretFile(true, 'web', 'staging_basic_auth'); }, 'secret-path', 'edge project not checked'],
+  // per-service identities
+  ['two services share a uid', (s) => { svc(s, 'prod', 'worker').user = '10001:10002'; }, 'user-distinct', 'uid uniqueness not checked'],
+  ['two services share a gid', (s) => { svc(s, 'prod', 'worker').user = '10002:10001'; }, 'user-distinct', 'gid uniqueness not checked'],
+  ['non-numeric user', (s) => { svc(s, 'prod', 'web').user = 'node'; }, 'user-nonroot', 'a user name accepted (image defaults not trusted)'],
+  ['uid without gid', (s) => { svc(s, 'prod', 'web').user = '10001'; }, 'user-nonroot', 'bare uid accepted'],
+  ['group_add', (s) => { svc(s, 'prod', 'web').group_add = ['10002']; }, 'group-add', 'group_add lets a service read another\'s files'],
   // R4: one place for tag + digest
   ['compose retypes the postgres tag', (s) => { svc(s, 'prod', 'postgres').image = 'postgres:17.10'; }, 'postgres-tag-literal', 'literal postgres:<digit> in compose accepted'],
   ['compose retypes tag+digest on staging', (s) => { svc(s, 'staging', 'postgres').image = `postgres:17.10@${PG_DIGEST}`; }, 'postgres-tag-literal', 'only prod scanned, or only tag-only matched'],
@@ -163,7 +190,7 @@ const ROWS: Row[] = [
 ];
 
 describe('compose-policy lint: fail fixtures (pass baseline + one mutation each)', () => {
-  it.each(ROWS)('%s -> [%s]-style rule fires', (name, mut, id) => {
+  it.each(ROWS)('%s -> rule fires', (name, mut, id) => {
     const r = runSet(mut);
     expect(r.code, `${name}: ${r.err}`).not.toBe(0);
     expect(r.err).toMatch(rule(id));
@@ -196,6 +223,31 @@ describe('compose-policy lint: fail closed', () => {
     if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');
     const r = spawnSync('node', [LINT, '--root', root], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' } });
     expect(r.status).not.toBe(0);
+  });
+  it('docker compose not on PATH -> non-zero [no-docker]', () => {
+    const root = mkdtempSync(join(tmpdir(), 'poly95-lint-'));
+    made.push(root);
+    materialise(root, baseline());
+    if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');
+    const r = spawnSync(process.execPath, [LINT, '--root', root], { encoding: 'utf8', env: { PATH: '/nonexistent', POLY_POSTGRES_IMAGE: PG_IMAGE_ENV, POLY_BIND_ADDR: '192.168.1.20' } });
+    expect(r.status).not.toBe(0);
+    expect(r.stderr).toMatch(rule('no-docker')); // red: a missing docker is a pass
+  });
+  it('a project that renders zero services -> non-zero', () => {
+    expect(runSet((s) => { s.staging.services = {}; }).code).not.toBe(0); // red: empty render treated as clean
+  });
+  it('policy.json missing or invalid -> non-zero [policy]', () => {
+    const root = mkdtempSync(join(tmpdir(), 'poly95-lint-'));
+    made.push(root);
+    materialise(root, baseline());
+    writeFileSync(join(root, 'bad.json'), '{');
+    if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');
+    const env = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', POLY_POSTGRES_IMAGE: PG_IMAGE_ENV, POLY_BIND_ADDR: '192.168.1.20' };
+    for (const pol of ['bad.json', 'missing.json']) {
+      const r = spawnSync('node', [LINT, '--root', root, '--policy', join(root, pol)], { encoding: 'utf8', env });
+      expect(r.status, pol).not.toBe(0);
+      expect(r.stderr).toMatch(rule('policy'));
+    }
   });
   it('a missing --root argument -> non-zero', () => {
     if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');

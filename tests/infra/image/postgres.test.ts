@@ -42,6 +42,19 @@ describe('Postgres settings on the compose-run container (criterion 2, R5)', () 
     const n = s.psql(`SELECT count(*) FROM pg_db_role_setting, unnest(setconfig) c WHERE split_part(c,'=',1) IN (${SETTINGS.map(([n]) => `'${n}'`).join(',')})`);
     expect(n).toBe('0');
   });
+  it('hba_file is the mounted pg_hba and every rule parses; the first four rows are the C-79 lines', () => {
+    const mount = s.cfg.services.postgres.volumes.find((v: any) => /pg_hba\.prod\.conf$/.test(v.source));
+    expect(mount, 'prod.yml mounts pg_hba.prod.conf').toBeDefined();
+    expect(s.psql('SHOW hba_file')).toBe(mount.target); // red: initdb's $PGDATA/pg_hba.conf (host all all all scram) in force
+    expect(s.psql('SELECT count(*) FROM pg_hba_file_rules WHERE error IS NOT NULL')).toBe('0');
+    const rows = s.psql("SELECT type||' '||database||' '||user_name||' '||coalesce(address,'')||' '||coalesce(netmask,'')||' '||auth_method FROM pg_hba_file_rules ORDER BY rule_number LIMIT 4").split('\n');
+    expect(rows).toEqual([
+      'host {replication} {poly_backup} 10.201.10.0 255.255.255.248 scram-sha-256',
+      'host {polycarpic} {poly_backup} 10.201.10.0 255.255.255.248 scram-sha-256',
+      'host {all} {poly_backup} all  reject',
+      'host {replication} {all} all  reject',
+    ]); // red: order changed, a line dropped, or a different file
+  });
   it('ALTER SYSTEM is refused (allow_alter_system = off)', () => {
     const r = s.exec('psql', '-U', 'postgres', '-d', 'postgres', '-X', '-c', "ALTER SYSTEM SET log_statement='all'");
     expect(r.code).not.toBe(0);
@@ -53,20 +66,41 @@ describe('Postgres settings on the compose-run container (criterion 2, R5)', () 
   });
 });
 
-describe('secret files under a non-root uid (R8)', () => {
-  it('the host fixture is root:999 mode 0440', () => {
-    const r = s.root('stat -c "%u:%g %a" /w/etc/polycarpic/secrets/db_superuser_password');
-    expect(r.out).toBe('0:999 440'); // red: harness precondition (provisioning rule) not met
+describe('secret files under per-service directories (R8, ruling A1)', () => {
+  const dirOf = (svc: string) => `/w/etc/polycarpic/secrets/${svc}`;
+  const gidOf = (svc: string) => String(s.cfg.services[svc].user).split(':')[1]!;
+  it('each service directory is root:<its gid> 0750 and its files 0440; every service has its own uid and gid', () => {
+    const svcs = Object.keys(s.cfg.services);
+    const ids = svcs.map((n) => String(s.cfg.services[n].user));
+    expect(new Set(ids.map((i) => i.split(':')[0])).size).toBe(svcs.length); // red: shared uid
+    expect(new Set(ids.map((i) => i.split(':')[1])).size).toBe(svcs.length); // red: shared gid
+    for (const n of svcs) {
+      const d = s.root(`stat -c "%u:%g %a" ${dirOf(n)}`).out;
+      expect(d, n).toBe(`0:${gidOf(n)} 750`);
+      expect(s.root(`stat -c "%a" ${dirOf(n)}/* | sort -u`).out, n).toBe('440');
+    }
   });
-  it('uid 999 reads db_superuser_password at /run/secrets', () => {
+  it('postgres (999) reads db_superuser_password in its own directory, at /run/secrets', () => {
     const r = s.exec('cat', '/run/secrets/db_superuser_password');
     expect(r.code).toBe(0);
-    expect(r.out).toMatch(/^qa-db_superuser_password-fixture$/); // red: secret not mounted there, or mode/owner rule broken
+    expect(r.out).toMatch(/^qa-db_superuser_password__postgres-fixture$/); // red: secret not mounted there / wrong source file
   });
-  it('another uid cannot read it', () => {
+  it('web (10001) can read a file in its own directory', () => {
+    const r = sh('docker', ['run', '--rm', '-v', `${s.dir}:/w:ro`, '--user', s.cfg.services.web.user, '--entrypoint', 'cat', IMG, `${dirOf('web')}/db_password_app`]);
+    expect(r.code, r.err).toBe(0); // red: harness/ownership precondition (own dir 0750 root:gid, file 0440)
+  });
+  it('web is refused a file in postgres\'s directory, and postgres in web\'s (0440 root:gid is not world-readable)', () => {
+    const a = sh('docker', ['run', '--rm', '-v', `${s.dir}:/w:ro`, '--user', s.cfg.services.web.user, '--entrypoint', 'cat', IMG, `${dirOf('postgres')}/db_superuser_password`]);
+    expect(a.code).not.toBe(0);
+    expect(a.err).toMatch(/Permission denied/i); // red: directory 0755 or file 0444
+    const b = sh('docker', ['run', '--rm', '-v', `${s.dir}:/w:ro`, '--user', s.cfg.services.postgres.user, '--entrypoint', 'cat', IMG, `${dirOf('web')}/db_password_app`]);
+    expect(b.code).not.toBe(0);
+    expect(b.err).toMatch(/Permission denied/i);
+  });
+  it('a 0440 file in a service directory is refused to an unrelated uid', () => {
     const r = s.compose('exec', '-T', '-u', '4242:4242', 'postgres', 'cat', '/run/secrets/db_superuser_password');
     expect(r.code).not.toBe(0);
-    expect(r.err).toMatch(/Permission denied/i); // red: the file is world-readable (0444 / 0644)
+    expect(r.err).toMatch(/Permission denied/i); // red: world-readable bit set
   });
 });
 
@@ -105,20 +139,21 @@ describe('archive_command: age, fail closed (criterion 3, R6)', () => {
     expect(r.code).not.toBe(0); // red: the script overwrites (cp/mv/redirect instead of ln no-clobber)
     expect(s.root(`sha256sum ${walDir()}/${f}.age`).out).toBe(before);
   });
-  it('the IDENTICAL segment already archived (target + sum present) -> 0, nothing rewritten', () => {
+  it('the IDENTICAL segment re-archived (target exists) -> non-zero too, target unchanged, no .sums directory (A1: no liveness path)', () => {
     const f = '000000010000000000000044';
     expect(mkSeg('/tmp/seg3', 4096, 'C').code).toBe(0);
     expect(runArchive('/tmp/seg3', f).code).toBe(0);
     const before = s.root(`sha256sum ${walDir()}/${f}.age`).out;
-    expect(runArchive('/tmp/seg3', f).code).toBe(0); // red: fails closed on the liveness case (crash between link and record)
+    expect(runArchive('/tmp/seg3', f).code).not.toBe(0); // red: a sum-match shortcut returns 0 on an existing target
     expect(s.root(`sha256sum ${walDir()}/${f}.age`).out).toBe(before);
+    expect(s.root(`ls -A ${walDir()}`).out).not.toMatch(/\.sums/); // red: plaintext hashes written beside the spool
   });
-  it('a different segment under an already-archived name -> non-zero, target unchanged', () => {
-    const f = '000000010000000000000044';
-    expect(mkSeg('/tmp/seg3b', 4096, 'D').code).toBe(0);
-    const before = s.root(`sha256sum ${walDir()}/${f}.age`).out;
-    expect(runArchive('/tmp/seg3b', f).code).not.toBe(0); // red: sum compare missing, the name alone is trusted
-    expect(s.root(`sha256sum ${walDir()}/${f}.age`).out).toBe(before);
+  it('a stale temp from an earlier failed attempt on the same segment is removed by the next attempt', () => {
+    const f = '000000010000000000000046';
+    expect(mkSeg('/tmp/seg5', 4096, 'F').code).toBe(0);
+    s.root(`mkdir -p ${walDir()}/.inflight && printf stale > ${walDir()}/.inflight/${f}.age.99999 && chown -R 999:999 ${walDir()}/.inflight`);
+    expect(runArchive('/tmp/seg5', f).code).toBe(0);
+    expect(s.root(`ls -A ${walDir()}/.inflight | wc -l`).out).toBe('0'); // red: stale temp never cleaned
   });
   it('an age failure (unreadable recipients file) -> non-zero, no .age, .inflight empty', () => {
     const f = '000000010000000000000045';
@@ -129,6 +164,9 @@ describe('archive_command: age, fail closed (criterion 3, R6)', () => {
     s.root(`chmod 0644 /w/etc/polycarpic/${rec}`);
     expect(r.code).not.toBe(0); // red: set -e / pipefail missing, age error swallowed
     expect(s.root(`ls ${walDir()}/${f}.age 2>&1; ls -A ${walDir()}/.inflight | wc -l`).out).toMatch(/No such file[\s\S]*0$/); // red: temp left or target created
+    s.root(`printf stale > ${walDir()}/.inflight/${f}.age.77777 && chown 999:999 ${walDir()}/.inflight/${f}.age.77777`);
+    expect(runArchive('/tmp/seg4', f).code).toBe(0); // the recipients file is readable again
+    expect(s.root(`ls -A ${walDir()}/.inflight | wc -l`).out).toBe('0'); // red: failed attempt leaves residue the next one keeps
   });
   it('PostgreSQL itself hits the guard: a differing pre-existing target for the next segment raises pg_stat_archiver.failed_count', () => {
     const name = s.psql('SELECT pg_walfile_name(pg_current_wal_lsn())');

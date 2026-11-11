@@ -24,7 +24,7 @@ export function sh(cmd: string, args: string[], o: { input?: string; env?: Recor
 }
 
 export type Stack = {
-  dir: string; spool: string; secretsDir: string; identity: string; recipient: string;
+  dir: string; spool: string; secretsDir: string; identity: string; recipient: string; cfg: any;
   compose: (...a: string[]) => ReturnType<typeof sh>;
   psql: (sql: string) => string;
   exec: (...a: string[]) => ReturnType<typeof sh>;
@@ -37,7 +37,7 @@ export function up(): Stack {
   if (b.code !== 0) throw new Error(`docker build infra/postgres failed: ${b.err.slice(-500)}`);
   const dir = mkdtempSync(join(tmpdir(), 'poly95-stack-'));
   chmodSync(dir, 0o755);
-  const env = { POLY_POSTGRES_IMAGE: IMG };
+  const env = { POLY_POSTGRES_IMAGE: IMG, POLY_BIND_ADDR: '127.0.0.1' };
   const base = join(ROOT, 'infra', 'compose', 'prod.yml');
   const cfg = JSON.parse(sh('docker', ['compose', '-f', base, 'config', '--format', 'json'], { env }).out) as any;
   const pg = cfg.services.postgres;
@@ -58,18 +58,26 @@ export function up(): Stack {
     ov.services.postgres.volumes.push({ type: 'bind', source: src, target: v.target, read_only: !!v.read_only });
   }
   const secretsDir = join(dir, 'etc', 'polycarpic', 'secrets');
-  mkdirSync(secretsDir, { recursive: true });
-  for (const [name, def] of Object.entries<any>(cfg.secrets ?? {})) {
+  // Ruling A1: /etc/polycarpic/secrets/<service>/<name>, dir root:<service gid> 0750, files 0440.
+  const chowns: string[] = [];
+  const seen = new Set<string>();
+  for (const [key, def] of Object.entries<any>(cfg.secrets ?? {})) {
     if (!def.file) continue;
     const f = redirect(def.file);
     mkdirSync(dirname(f), { recursive: true });
-    writeFileSync(f, `qa-${name}-fixture\n`);
-    ov.secrets[name] = { file: f };
+    writeFileSync(f, `qa-${key}-fixture\n`);
+    ov.secrets[key] = { file: f };
+    const svc = def.file.split('/').slice(-2)[0] as string;
+    const gid = String(cfg.services[svc]?.user ?? '').split(':')[1];
+    if (gid && !seen.has(svc)) {
+      seen.add(svc);
+      const d = `/w/etc/polycarpic/secrets/${svc}`;
+      chowns.push(`chown -R 0:${gid} ${d} && chmod 0750 ${d} && chmod 0440 ${d}/*`);
+    }
   }
   const ovFile = join(dir, 'override.yml');
   writeFileSync(ovFile, stringify(ov));
-  // data + spool owned by the server uid; secret files root:999 0440 (R8)
-  rootRun(`chown -R 999:999 /w/srv && chmod -R u+rwX /w/srv && chown -R 0:999 /w/etc/polycarpic/secrets && chmod 0750 /w/etc/polycarpic/secrets && chmod 0440 /w/etc/polycarpic/secrets/*`);
+  rootRun(['chown -R 999:999 /w/srv && chmod -R u+rwX /w/srv', ...chowns].join(' && '));
   const compose = (...a: string[]) => sh('docker', ['compose', '-p', PROJECT, '-f', base, '-f', ovFile, ...a], { env });
   const u = compose('up', '-d', '--wait', '--wait-timeout', '120', 'postgres');
   if (u.code !== 0) throw new Error(`compose up postgres failed: ${u.err.slice(-800)}`);
@@ -80,7 +88,7 @@ export function up(): Stack {
     return r.out;
   };
   return {
-    dir, spool: join(dir, 'srv', 'polycarpic', 'spool'), secretsDir, identity, recipient, compose, psql, exec, root: rootRun,
+    dir, spool: join(dir, 'srv', 'polycarpic', 'spool'), secretsDir, identity, recipient, cfg, compose, psql, exec, root: rootRun,
     down: () => { compose('down', '-v', '--remove-orphans'); rootRun('rm -rf /w/* 2>/dev/null; true'); },
   };
 }
