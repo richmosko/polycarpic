@@ -510,7 +510,13 @@
         "manager": "deny",
         "owner": "allow"
       },
-      "probe": null,
+      "probe": [
+        {
+          "op": "select",
+          "table": "public.audit_event",
+          "sql": "select id from public.audit_event where entity_id = :entity"
+        }
+      ],
       "note": "enforced by: SELECT policy: owner, or actor_id = app.current_user_id()"
     },
     {

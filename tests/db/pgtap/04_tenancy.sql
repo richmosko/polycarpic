@@ -28,7 +28,7 @@ SELECT is((SELECT attnotnull FROM pg_attribute WHERE attrelid = 'public.entity':
 SELECT has_column('public', 'entity', 'purged_at', 'entity.purged_at exists for the tombstone');
 
 -- authz functions: STABLE SECURITY DEFINER, owned by poly_authz, search_path pinned (criterion 4)
-SELECT is((SELECT array_agg(p.proname::text || ':' || p.provolatile || ':' || p.prosecdef || ':' || pg_get_userbyid(p.proowner) || ':' || ('search_path=""' = ANY (p.proconfig)) ORDER BY p.proname COLLATE "C")
+SELECT is((SELECT array_agg(p.proname::text || ':' || p.provolatile::text || ':' || p.prosecdef || ':' || pg_get_userbyid(p.proowner) || ':' || ('search_path=""' = ANY (p.proconfig)) ORDER BY p.proname COLLATE "C")
     FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname IN ('has_role', 'visible_entities', 'owner_count')),
   ARRAY['has_role:s:true:poly_authz:true', 'owner_count:s:true:poly_authz:true', 'visible_entities:s:true:poly_authz:true'],
   'has_role / visible_entities / owner_count: STABLE, SECURITY DEFINER, poly_authz, search_path pinned (mutation: VOLATILE)');
