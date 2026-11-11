@@ -57,3 +57,7 @@ Feature started. Branch: `feature/poly-96-ci-change-filter-build-attest`. First 
 - Criterion 11: CI emits an artifact in the test-runs schema; the ingest half needs a lead decision (§3, O1).
 - paths: add `process/cairn/reviews/POLY-96/**`, `docs/SECURITY/**`, `.trivyignore`, `.dockerignore`, `.gitleaks.toml` if needed (§8).
 - Open for the lead: O1 ingest, O2 lockfile → battery, O4 CodeQL follow-up id.
+
+### @devops-engineer — 2026-11-10
+
+Stage 1 built @ cd6372e..0183eb1 (ci.yml app family, infra/ci). Dispatch evidence: base=40 zeros -> run 42949055722 changes red, app red. Full run 42949984469: cairn/guard/changes/unit/db/image green, lint red only on the not-yet-built build/release tests in tests/ci. Timings: lint 39s, unit 35s, db 118s, image 22s. Two stale tests fixed on the way: tests/workflow cairn-boundary (one job) and tests/layers structure (one test file per package).
