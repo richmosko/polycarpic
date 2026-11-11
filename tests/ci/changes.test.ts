@@ -55,6 +55,11 @@ const CASES: [string[], string[], string][] = [
   [['apps/web/src/main.ts'], ['node', 'db'], 'apps/web/src/main.ts dropped from `db` (ops-hardening crash handler)'],
   [['apps/web/src/routes/+page.svelte'], ['node'], '`db` widened to all of apps/web'],
   [['tests/log/canary.ts'], ['node', 'db'], 'tests/log dropped from `db` (the canaries are imported by two db files)'],
+  // POLY-95 R3: the infra suite and the Postgres FROM line are inputs of the jobs that read them.
+  [['tests/infra/lint.test.ts'], ['image'], 'tests/infra dropped from `image` (the lint job and the container tests both read it)'],
+  [['infra/postgres/Dockerfile'], ['image', 'db'], 'infra/postgres/Dockerfile dropped from `db` (the battery builds from its FROM line)'],
+  [['infra/postgres-major'], ['image', 'db'], 'infra/postgres-major dropped from `db`'],
+  [['infra/postgres/postgresql.prod.conf', 'infra/compose/prod.yml', 'infra/lint/policy.json'], ['image'], '`db` widened to all of infra/postgres, or infra/lint/compose dropped from `image`'],
   [['docs/PRD/index.html', 'packages/ledger/src/a.ts'], ['node'], 'a docs path anywhere in the list suppressing the code path'],
 ];
 

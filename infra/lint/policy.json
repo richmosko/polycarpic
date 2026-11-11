@@ -1,0 +1,169 @@
+{
+  "renderEnv": {
+    "POLY_DOMAIN": "lint.test",
+    "POLY_STAGING_ALLOW": "192.0.2.0/24",
+    "POLY_TLS": "ops@lint.test"
+  },
+  "allowedVars": [
+    "POLY_POSTGRES_IMAGE",
+    "POLY_APP_IMAGE",
+    "POLY_TOOLS_IMAGE",
+    "POLY_CADDY_IMAGE",
+    "POLY_BIND_ADDR",
+    "POLY_DOMAIN",
+    "POLY_STAGING_ALLOW",
+    "POLY_TLS"
+  ],
+  "secretMatrix": {
+    "prod": {
+      "postgres": [
+        "db_superuser_password"
+      ],
+      "web": [
+        "db_password_app",
+        "auth_secret",
+        "resend_api_key",
+        "plaid_secret"
+      ],
+      "worker": [
+        "db_password_worker",
+        "auth_secret",
+        "credential_keyring",
+        "resend_api_key"
+      ],
+      "migrate": [
+        "db_password_migrator"
+      ],
+      "backup": [
+        "db_password_backup"
+      ],
+      "uploader": [
+        "backup_store_credential",
+        "heartbeat_url"
+      ]
+    },
+    "staging": {
+      "postgres": [
+        "db_superuser_password"
+      ],
+      "web": [
+        "db_password_app",
+        "auth_secret",
+        "resend_api_key",
+        "plaid_secret"
+      ],
+      "worker": [
+        "db_password_worker",
+        "auth_secret",
+        "credential_keyring",
+        "resend_api_key"
+      ],
+      "migrate": [
+        "db_password_migrator"
+      ]
+    },
+    "edge": {
+      "caddy": [
+        "staging_basic_auth"
+      ]
+    }
+  },
+  "secretPrefix": {
+    "prod": "/etc/polycarpic/secrets/",
+    "staging": "/etc/polycarpic/staging-secrets/",
+    "edge": "/etc/polycarpic/secrets/"
+  },
+  "binds": {
+    "prod.postgres": [
+      {
+        "source": "/srv/polycarpic/pg-prod",
+        "target": "/var/lib/postgresql/data",
+        "rw": true
+      },
+      {
+        "source": "../postgres/postgresql.prod.conf",
+        "target": "/etc/postgresql/postgresql.conf"
+      },
+      {
+        "source": "../postgres/pg_hba.prod.conf",
+        "target": "/etc/postgresql/pg_hba.conf"
+      },
+      {
+        "source": "../postgres/archive-wal.sh",
+        "target": "/usr/local/bin/archive-wal.sh"
+      },
+      {
+        "source": "/etc/polycarpic/age-recipients.txt",
+        "target": "/etc/postgresql/age-recipients.txt"
+      },
+      {
+        "source": "/srv/polycarpic/spool/wal",
+        "target": "/spool/wal",
+        "rw": true
+      }
+    ],
+    "staging.postgres": [
+      {
+        "source": "/srv/polycarpic/pg-staging",
+        "target": "/var/lib/postgresql/data",
+        "rw": true
+      },
+      {
+        "source": "../postgres/postgresql.staging.conf",
+        "target": "/etc/postgresql/postgresql.conf"
+      },
+      {
+        "source": "../postgres/pg_hba.staging.conf",
+        "target": "/etc/postgresql/pg_hba.conf"
+      },
+      {
+        "source": "../postgres/archive-wal.sh",
+        "target": "/usr/local/bin/archive-wal.sh"
+      }
+    ],
+    "prod.backup": [
+      {
+        "source": "/srv/polycarpic/spool/dump",
+        "target": "/spool/dump",
+        "rw": true
+      },
+      {
+        "source": "/srv/polycarpic/spool/premigration",
+        "target": "/spool/premigration",
+        "rw": true
+      },
+      {
+        "source": "/etc/polycarpic/age-recipients.txt",
+        "target": "/etc/backup/age-recipients.txt"
+      }
+    ],
+    "prod.uploader": [
+      {
+        "source": "/srv/polycarpic/spool",
+        "target": "/spool",
+        "rw": true
+      },
+      {
+        "source": "/srv/polycarpic/uploader-state",
+        "target": "/state",
+        "rw": true
+      }
+    ],
+    "edge.caddy": [
+      {
+        "source": "/srv/polycarpic/caddy",
+        "target": "/data",
+        "rw": true
+      },
+      {
+        "source": "/srv/polycarpic/caddy-config",
+        "target": "/config",
+        "rw": true
+      },
+      {
+        "source": "../caddy/Caddyfile",
+        "target": "/etc/caddy/Caddyfile"
+      }
+    ]
+  }
+}
