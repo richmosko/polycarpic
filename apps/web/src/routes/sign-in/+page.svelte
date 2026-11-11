@@ -18,7 +18,8 @@
         body: JSON.stringify({ email, password }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) error = 'Could not sign in.';
+      if (res.status === 429) error = 'Too many attempts. Wait a minute and try again.';
+      else if (!res.ok) error = 'Could not sign in.';
       else if (body.twoFactorRedirect || body.secondStepRequired) location.assign('/sign-in/second-step');
       else {
         const next = new URLSearchParams(location.search).get('next') ?? '/';
