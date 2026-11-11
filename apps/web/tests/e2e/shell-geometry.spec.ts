@@ -133,3 +133,31 @@ test.describe('V4 avatar popover opens to the right', () => {
     });
   }
 });
+
+test.describe('V5 remembered sidebar state (R3, sidebar-flow.md l.26)', () => {
+  const width = async (page: Page) => (await box(page, '[data-testid="sidebar"]')).width;
+  test('collapsed survives a reload and a screen change  [red if: state held only in component memory]', async ({ page }) => {
+    await collapse(page);
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    expect(await width(page), 'after reload').toBeLessThan(90);
+    await sidebar(page).getByRole('link', { name: 'Reports', exact: true }).click();
+    await expect(page).toHaveURL(/\/reports$/);
+    expect(await width(page), 'after navigation').toBeLessThan(90);
+  });
+  test('expanded survives a reload after collapse then expand  [red if: the cookie is written only on collapse]', async ({ page }) => {
+    await collapse(page);
+    await page.getByTestId('sidebar-toggle').click();
+    await expect.poll(() => width(page)).toBeGreaterThan(200);
+    await page.reload();
+    await page.waitForLoadState('networkidle');
+    expect(await width(page)).toBeGreaterThan(200);
+  });
+  test('first paint already matches: the server renders the remembered width  [red if: applied only after hydration]', async ({ page, context }) => {
+    await collapse(page);
+    const p2 = await context.newPage();
+    await p2.route('**/*.js', (r) => r.abort()); // no client script: only server HTML can carry the state
+    await p2.goto(`${base}/dashboard`);
+    expect(await width(p2)).toBeLessThan(90);
+  });
+});
