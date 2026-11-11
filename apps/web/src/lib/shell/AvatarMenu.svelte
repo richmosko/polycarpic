@@ -1,5 +1,6 @@
 <script lang="ts">
   import { DropdownMenu } from 'bits-ui';
+  import Icon from './Icon.svelte';
   import type { ShellSession } from './session';
   import { applyTheme, readTheme, type Theme } from './theme';
 
@@ -57,7 +58,12 @@
               closeOnSelect={false}
               class="data-highlighted:bg-accent rounded px-3 py-1.5 text-sm data-[state=checked]:font-semibold"
             >
-              {text}
+              {#snippet children({ checked })}
+                <span class="inline-flex w-4 shrink-0 items-center" data-testid="theme-check">
+                  {#if checked}<Icon name="check" class="size-4" />{/if}
+                </span>
+                {text}
+              {/snippet}
             </DropdownMenu.RadioItem>
           {/each}
         </DropdownMenu.RadioGroup>
