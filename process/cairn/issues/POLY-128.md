@@ -53,23 +53,35 @@ Feature started. Branch: `feature/poly-128-app-shell-design-tokens`. Runs in par
 
 ### @architect — 2026-11-10
 
-**Verdict (gate 4): HELD.** The lead's visual leg (V1–V4) goes back through tests-red and build-green first; this table is re-issued whole after that. The text as first written follows: PASS, on two conditions. (1) In the first CI run, the e2e step adds ≤ 150 s to `unit` and the `image` job (Trivy) is green; both are unmeasured until then. (2) The sidebar-fidelity follow-up below is filed before POLY-88 serves the shell.
+**Verdict (gate 4), first issue: superseded** by the re-issued verdict below. The visual leg (V1–V5) went back through tests-red and build-green.
+
+### @architect — 2026-11-10
+
+**Verdict (gate 4), re-issued at `daac457`: PASS, on one condition.** In the first CI run, the e2e group must add ≤ 150 s to `unit` (R9) and the `image` job (Trivy) must be green. Neither can be measured before that run. The earlier condition 2 is superseded: the sidebar was fixed in this loop (lead).
 
 | Axis | Result | Evidence |
 |---|---|---|
-| C1 tokens: one file, DESIGN parity, colour-literal scan | pass | `958804d` `src/tokens.test.ts`; a grep re-run at `5229d9b` finds no hex outside `app.css` |
-| C1 drift trigger (turbo inputs, CI `node` filter) | pass | `6c160f5` `apps/web/turbo.json`, `infra/ci/changes.mjs` + `tests/ci/changes.test.ts` |
-| C2 eight items in DESIGN order, popover at the foot, one top row | pass | `a75ff93` `nav.ts`, `nav.test.ts`; e2e |
-| C3 smoke, Light / Dark / Auto, token values | pass (12/12 as the builder reported) | `5229d9b` `tests/e2e/shell.spec.ts` |
-| C4 axe A/AA + contrast, Tab order, Esc returns focus | pass | `5229d9b` e2e |
-| C5 `{@html}` refused, inline disable inert, `.svelte` under the layer rules | pass | `6c160f5` `generate.mjs` `poly/svelte`; fixtures `24-svelte-html` |
-| R4 session projection, no token | pass | `958804d` `layout.server.test.ts` |
-| R5 entity selector empty, no tenancy import | pass | `a75ff93` `EntitySelector.svelte` |
-| R8 CSP | pass; it lives in `vite.config.ts` (Kit 3 has no `svelte.config.js`) | `958804d`; e2e CSP test |
-| R9 e2e in `unit`, affected-gated | pass; added time unmeasured | `6c160f5` `ci.yml`, `tests/ci/ci-e2e.test.ts` |
-| R11 Dockerfile and `layers.json` unchanged; no `@poly/*` import | pass; Trivy pending | diff `53fd538..5229d9b` |
-| ARCH drift | fixed in this commit: the `packages/ui` row now names `src/lib/shell` on bits-ui, not shadcn `components/ui` | this commit |
+| C1: tokens in one file, equal to DESIGN; colour-literal scan; drift trigger | pass | `958804d` `src/tokens.test.ts`; `6c160f5` `apps/web/turbo.json`, `infra/ci/changes.mjs` + test; icons are path data with `stroke="currentColor"`, no hex |
+| C2: eight items in DESIGN order, with icons, all from `NAV` | pass | `49e29b3` `nav.ts` (`icon` per entry), `icons.ts`, `Icon.svelte` |
+| C2: popover at the foot, opening to the right; one top row; no other header | pass | `49e29b3`; `f21665a` `shell-geometry.spec.ts` |
+| V1: collapsed icon rail, eight named, clickable, keyboard-reachable icons | pass | `f21665a` red, `49e29b3` green |
+| V2: floating card (gutter, four rounded corners) | pass | `shell-geometry.spec.ts` |
+| V3: brand mark (DESIGN brand-mark-24, `currentColor`) and nav icons | pass | `49e29b3` `icons.ts` `mark` |
+| V4: popover to the right of the trigger | pass | `shell-geometry.spec.ts` |
+| V5 / R3: collapse state remembered (`sidebar:state` cookie, server-set `data-sidebar`) | pass | `717356e` red, `49e29b3` `hooks.server.ts`, `sidebar-state.ts` |
+| C3: smoke in Light / Dark / Auto, token values | pass (e2e 26/26, as the builder reported) | `daac457` |
+| C4: axe A/AA and contrast, Tab order, Esc returns focus | pass | `daac457` (sr-only names fix label-content-name-mismatch) |
+| C5: `{@html}` refused, inline disable inert, `.svelte` under the layer rules | pass | `6c160f5` `generate.mjs` `poly/svelte`; fixtures `24-svelte-html`. The icons render without `{@html}` |
+| R4: session projection carries no token | pass | `958804d` `layout.server.test.ts` |
+| R5: entity selector empty, no tenancy import | pass | `a75ff93` |
+| R8 / C-07: CSP in `vite.config.ts`; no inline script | pass | `958804d`; e2e CSP test; SECURITY C-06/C-07 "Lives at" fixed by `fcdefae` |
+| R9: e2e in `unit`, affected-gated | pass; added time unmeasured | `6c160f5` `ci.yml`, `tests/ci/ci-e2e.test.ts` |
+| R11: Dockerfile and `layers.json` unchanged; no `@poly/*` import | pass; Trivy pending | diff `53fd538..daac457` |
+| ARCH drift | none open: the `packages/ui` and frontend-framework rows match the build | `7a0837f`, `7a8c81b` |
 
-Deviations accepted: Kit 3 layout (config in `vite.config.ts`, `$app/tsconfig`, relative imports, `Handle` from `@sveltejs/kit/hooks`); the Playwright cache keyed on the lockfile rather than the Playwright version; duplicate `e2e`/`test:e2e` scripts (cosmetic).
-
-Not met, outside the criteria, carried to a follow-up: the sidebar is hand-built rather than DESIGN's sidebar-07 floating card. When collapsed it hides the nav instead of showing an icon rail, so a collapsed sidebar has no navigation. R3's remembered collapse state is not implemented. None of this is user-facing until POLY-88 mounts the shell.
+Accepted deviations:
+- The SvelteKit 3 layout (ruling.md → Record).
+- The Playwright browser cache is keyed on the lockfile hash.
+- Duplicate `e2e` and `test:e2e` scripts.
+- sr-only names on the collapse toggle and the avatar trigger.
+- **Not built:** DESIGN's swap of the collapsed rail's mark to `panel-left-open` on hover or focus (spec § Sidebar). In the rail the mark is still the expand control and carries the name "Expand sidebar"; only the hover icon is missing. It is cosmetic and goes to the lead to rule on, not a condition here.
