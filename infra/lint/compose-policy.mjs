@@ -5,7 +5,7 @@
 // the rendered and the raw files against the rules, and checks the Postgres tag/digest/major, pg_hba, and Caddyfile
 // files. Prints one `[rule-id] file: message` per violation to stderr; exit 1 on any. Fails closed: a missing compose
 // file, a render error, a missing/invalid policy, or a missing `docker compose` is a violation, never a skip.
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -78,6 +78,27 @@ const varsIn = (s) => [...String(s).matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)].m
 const hasVar = (x) => /\$\{|\$[A-Za-z_]/.test(JSON.stringify(x ?? ''));
 
 const rendered = {};
+const pending = [];
+// The three renders run concurrently; each reports its own violations.
+function render(kind, path, rel) {
+  return new Promise((done) => {
+    const c = spawn('docker', ['compose', '-f', path, '--profile', '*', 'config', '--format', 'json'], { env: renderEnv });
+    let out = '', err = '';
+    c.stdout.on('data', (d) => { out += d; });
+    c.stderr.on('data', (d) => { err += d; });
+    c.on('error', (e) => {
+      if (e.code === 'ENOENT') v('no-docker', rel, '`docker compose` is not available');
+      else v('render-error', rel, String(e));
+      done();
+    });
+    c.on('close', (code) => {
+      if (code !== 0) { v('render-error', rel, err.trim().split('\n').slice(-2).join(' | ')); return done(); }
+      try { rendered[kind] = JSON.parse(out); } catch (e) { v('render-error', rel, `unparsable config output: ${e.message}`); return done(); }
+      if (!Object.keys(rendered[kind].services ?? {}).length) v('no-services', rel, 'renders zero services');
+      done();
+    });
+  });
+}
 for (const [kind, path] of Object.entries(files)) {
   const rel = `infra/compose/${kind}.yml`;
   // raw checks run even when the render fails
@@ -100,12 +121,9 @@ for (const [kind, path] of Object.entries(files)) {
   }
   for (const key of ['networks', 'secrets', 'configs', 'volumes']) if (hasVar(raw[key])) v('raw-interpolation', rel, `\${…} in top-level ${key}`);
 
-  const r = spawnSync('docker', ['compose', '-f', path, '--profile', '*', 'config', '--format', 'json'], { encoding: 'utf8', env: renderEnv, maxBuffer: 16 << 20 });
-  if (r.error?.code === 'ENOENT') { v('no-docker', rel, '`docker compose` is not available'); continue; }
-  if (r.error || r.status !== 0) { v('render-error', rel, (r.error ? String(r.error) : r.stderr).trim().split('\n').slice(-2).join(' | ')); continue; }
-  try { rendered[kind] = JSON.parse(r.stdout); } catch (e) { v('render-error', rel, `unparsable config output: ${e.message}`); continue; }
-  if (!Object.keys(rendered[kind].services ?? {}).length) v('no-services', rel, 'renders zero services');
+  pending.push(render(kind, path, rel));
 }
+await Promise.all(pending);
 
 // ---- pg_hba
 const hbaProd = read('infra/postgres/pg_hba.prod.conf');
