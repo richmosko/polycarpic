@@ -1,3 +1,9 @@
 [
-  { "function": "app.job_targets(text)", "owner": "poly_authz", "execute": ["poly_worker"] }
+  { "function": "app.job_targets(text)", "owner": "poly_authz", "execute": ["poly_worker"] },
+  { "function": "app.has_role(uuid, text)", "owner": "poly_authz", "execute": ["poly_app", "poly_worker"] },
+  { "function": "app.visible_entities()", "owner": "poly_authz", "execute": ["poly_app", "poly_worker"] },
+  { "function": "app.owner_count(uuid)", "owner": "poly_authz", "execute": ["poly_app", "poly_worker"] },
+  { "function": "app.check_entity()", "owner": "poly_authz", "execute": [] },
+  { "function": "app.seat_creator()", "owner": "poly_govern", "execute": [] },
+  { "function": "app.audit_membership()", "owner": "poly_govern", "execute": [] }
 ]
