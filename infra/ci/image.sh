@@ -43,9 +43,11 @@ case "$cmd" in
     ;;
   check)
     ref="${2:-polycarpic:ci}"
+    # build.yml pushes straight to the registry and keeps no local copy, so fetch the pushed digest (never a tag)
+    case "$ref" in *@sha256:*) docker pull -q "$ref" >/dev/null ;; esac
     user="$(docker image inspect --format '{{.Config.User}}' "$ref")"
     if [ "$user" != "node" ]; then echo "image check: Config.User is '${user}', want node" >&2; exit 1; fi
-    docker run --rm --entrypoint sh "$ref" -c '
+    docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges --entrypoint sh "$ref" -c '
       bad=0
       for c in npm npx corepack pnpm yarn; do
         if command -v "$c" >/dev/null 2>&1; then echo "image check: $c resolves on PATH" >&2; bad=1; fi

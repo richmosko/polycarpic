@@ -34,3 +34,7 @@ CI follow-ups from the POLY-96 gate-4 verdict (architect advisories, non-blockin
 - A-1: the `db` job ran 146 s of its 180 s budget on its first day (99 s locally at 149 tests). The gap is likely the pgTAP image built on every run (unmeasured). Measure it, and decide between a prebuilt image and a larger budget, before POLY-62 adds tenant tables to the battery.
 - A-2: `infra/ci/aggregate.mjs` cross-checks one job per filter output. A mis-wired `lint` `if:` for `node`/`image` is caught only by the static ci-workflow test, not at run time.
 - A-3: `image-<commit>` artifacts are kept 90 days. A tag cut more than 90 days after a commit's last `main` build finds no digest and publishes nothing (fails closed). Document it in the release runbook or look the digest up from the attestation instead.
+
+### @team-lead — 2026-11-10
+
+Filter gap found on POLY-132 (PR #107): a change to `infra/ci/image.sh` did not run the `image` job on its own PR, because `infra/ci/**` sets only the `ci` output (POLY-96 ruling §2). The scripts a job runs should trigger that job: `infra/ci/image.sh` and `infra/ci/install-trivy.sh` → `image`. PR #107 needed a manual full dispatch (42957388903) to exercise its own change. Needs a line in `infra/ci/changes.mjs` and its test; a ruling §2 table change, so the architect rules it.
