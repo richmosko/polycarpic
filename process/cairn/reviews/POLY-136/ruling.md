@@ -89,3 +89,12 @@ devops-engineer-136 pushes `scratch/poly-136-e2e-fallback` (from the branch head
 ## Addendum 1: REQUIRED for `node`
 
 Item 2's map was wrong for `node`. In ci.yml the `image` job's `if:` is `image == 'true' || node == 'true'`, so `REQUIRED.node` is `['lint','unit','image']`. The rule is the one item 2 states: REQUIRED is whatever the job-level `if:`s in ci.yml say, and the drift test settles any difference. The aggregate tests also cover node→image (red when `image` is skipped and node=true). AC 2 is corrected in place.
+
+## Addendum 2: seceng conditions (process/cairn/reviews/POLY-136/seceng-ruling-review.md)
+
+Both parts are accepted with conditions. Every condition below is binding and is a gate-2 test unless it says otherwise; qa adds them on top of a2b904d.
+
+- Item 7: S1 to S4 as written. S1: YAML-parsed `allowBuilds`, every value `=== false`. S2: no allow-all or allowlist key in the workspace file, `package.json#pnpm` or `.npmrc`, in any spelling. S3: strict-dep-builds is set nowhere, which replaces the "ci.yml may relax it" case. S4: a clean install with `--reporter=append-only` shows no lifecycle-script line, and the `image` job is green on the same head; both are recorded on the issue at build-green. If S4 fails, the README fallback applies and S1 to S3 do not land.
+- Item 7: when item 7 lands, seceng edits SECURITY §8 (C-80) to the wording in the review. `docs/SECURITY/**` is added to paths for that edit only.
+- Item 4 C1: conditions C1 to C6 as written. They replace the ruling's single env test. `run.ts` holds no `process.env` token and no `process.exit`, `process.on(` or `process.once(`; it passes `env` explicitly to `runCheckConfig`, `checkDatabaseConfig`, `migrate` and `plan`; env isolation is tested in both directions for all three commands; `@poly/migrate`'s exports and `index.ts` are unchanged; the layer lint refuses `run.ts` from anywhere except `cli.ts`, tests and `tests/**`, by package path and by relative path; the capture helper restores `console` and `process.stderr.write` in a `finally`.
+- Reproduced by the architect, and outside this loop except where C5 covers `run.ts`: with node_modules installed, relative imports across packages pass the layer lint (`apps/web/src` → `../../migrate/src/index.ts` and `packages/auth/src` → `../../ledger/src/index.ts` give no error, while `@poly/migrate` from `apps/web/src` gives a `boundaries/dependencies` error). This goes to the lead as a follow-up issue.

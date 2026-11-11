@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-136.md, process/cairn/reviews/POLY-136/**, apps/migrate/src/**, packages/db/**, packages/auth/**, infra/ci/**, .github/workflows/**, tests/**, README.md, docs/INFRA/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, pnpm-workspace.yaml, .gitignore, scripts/layers/**]
+paths: [process/cairn/issues/POLY-136.md, process/cairn/reviews/POLY-136/**, apps/migrate/src/**, docs/SECURITY/**, packages/db/**, packages/auth/**, infra/ci/**, .github/workflows/**, tests/**, README.md, docs/INFRA/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, pnpm-workspace.yaml, .gitignore, scripts/layers/**]
 labels: [ci, tooling]
 priority: null
 pr: null
