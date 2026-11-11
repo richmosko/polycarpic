@@ -21,6 +21,7 @@ test.beforeEach(async ({ page }) => {
 async function collapse(page: Page) {
   await page.getByTestId('sidebar-toggle').click();
   await expect.poll(async () => (await box(page, '[data-testid="sidebar"]')).width).toBeLessThan(90);
+  await page.mouse.move(700, 400); // park the pointer: rail asserts are at rest (the V6 hover cue hides the mark)
 }
 
 test.describe('V1 collapsed icon rail', () => {
