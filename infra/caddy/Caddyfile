@@ -33,10 +33,14 @@ staging.{$POLY_DOMAIN} {
 	handle_errors {
 		import security_headers
 	}
-	basic_auth {
-		import /run/secrets/staging_basic_auth
+	# route keeps this order literal: the allowlist answers before basic_auth is consulted, so a client outside it
+	# learns nothing from a password guess
+	route {
+		@denied not remote_ip {$POLY_STAGING_ALLOW}
+		respond @denied 403
+		basic_auth {
+			import /run/secrets/staging_basic_auth
+		}
+		reverse_proxy staging-web:3000
 	}
-	@denied not remote_ip {$POLY_STAGING_ALLOW}
-	respond @denied 403
-	reverse_proxy staging-web:3000
 }

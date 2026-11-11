@@ -107,6 +107,16 @@ describe('Caddy security headers on every response class (R1)', () => {
     expectHeaders(r.h);
     startCaddy('0.0.0.0/0 ::/0');
   });
+  it('outside the allowlist, no credentials and wrong credentials both get 403 (no password-guessing oracle, SC3), headers present', () => {
+    startCaddy('192.0.2.0/24');
+    try {
+      for (const extra of [[], ['-u', 'qa:wrong'], ['-u', 'qa:pw']]) {
+        const r = curl(`staging.${DOMAIN}`, '/', extra);
+        expect(r.status, extra.join(' ')).toBe(403); // red: basic_auth runs before the allowlist (401 for wrong, 403 for right)
+        expectHeaders(r.h);
+      }
+    } finally { startCaddy('0.0.0.0/0 ::/0'); }
+  });
   it('Caddy-generated 502 (upstream stopped) carries them', () => {
     sh('docker', ['stop', STUB]);
     try {

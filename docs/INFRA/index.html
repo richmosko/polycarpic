@@ -590,7 +590,7 @@ box$ cloud-init status --wait</code></pre>
       <pre class="cmd"><code>laptop$ scp -i ~/.ssh/polycarpic_ed25519 \
           ~/.config/polycarpic/allowed_signers \
           polyops@app.example.com:/tmp/allowed_signers
-laptop$ ssh polyops@app.example.com "echo 'age1...yourpublickey' | sudo tee /etc/polycarpic/backup.pub"</code></pre>
+laptop$ ssh polyops@app.example.com "echo 'age1...yourpublickey' | sudo tee /etc/polycarpic/age-recipients.txt"</code></pre>
       <p class="expect">Expect: the file copy shows 100 percent. <code>allowed_signers</code> is your own copy of the release-signing public keys (make it from the key <code>/merge-pr</code> signs with, once; keep it in the password manager). It must not come from the repository (§3.3).</p></li>
     <li><strong>Provision the box.</strong>
       <pre class="cmd"><code>box$ sudo polycarpic-ops provision --target hetzner --domain example.com
@@ -836,7 +836,7 @@ box$ sudo polycarpic-ops status</code></pre>
       <tr><td>Home box does not come back after a reboot (it asks for a passphrase at the console)</td><td>With root encrypted the box has no network until unlocked, so SSH will not answer: attach a keyboard and monitor and type the recovery passphrase from the recovery sheet. Then find why the TPM no longer matches (firmware update? Secure Boot changed?), and re-bind: <code>sudo polycarpic-ops disk-rebind</code>. A passphrase prompt you did not cause (nothing changed) can mean the box was tampered with: run the checks in §8.11 before trusting it.</td></tr>
       <tr><td>A household member lost their authenticator</td><td><code>polycarpic-ops cli user reset-mfa &lt;email&gt;</code> after verifying them by a channel you control.</td></tr>
       <tr><td>Lost the keyring</td><td>RB-4: <code>polycarpic-ops cli secrets init --force</code>; every connection then shows "relink required"; the ledger is untouched.</td></tr>
-      <tr><td>Lost the age private key</td><td>Existing backups cannot be opened, ever. Generate a new keypair (§7.1 step 3), replace <code>/etc/polycarpic/backup.pub</code>, run a manual backup, and consider the old backups gone. This is why the key has two homes.</td></tr>
+      <tr><td>Lost the age private key</td><td>Existing backups cannot be opened, ever. Generate a new keypair (§7.1 step 3), replace <code>/etc/polycarpic/age-recipients.txt</code>, run a manual backup, and consider the old backups gone. This is why the key has two homes.</td></tr>
       <tr><td>Lost the recovery passphrase of the home box's disk</td><td>While the box still unlocks by itself: add a new passphrase slot (<code>sudo cryptsetup luksAddKey</code>) and remove the old one. If the TPM no longer unlocks it and the passphrase is gone, restore from backup onto new disk (§8.10).</td></tr>
     </tbody>
   </table>

@@ -119,6 +119,7 @@ for (const [kind, path] of Object.entries(files)) {
     for (const [ek, ev] of Object.entries(s.environment && !Array.isArray(s.environment) ? s.environment : {}))
       for (const name of varsIn(ev)) if (!policy.allowedVars.includes(name)) v('raw-interpolation', rel, `${sn}: environment ${ek} uses \${${name}}`);
   }
+  if (raw.volumes && Object.keys(raw.volumes).length) v('top-level-volumes', rel, 'top-level volumes: are not used');
   for (const key of ['networks', 'secrets', 'configs', 'volumes']) if (hasVar(raw[key])) v('raw-interpolation', rel, `\${…} in top-level ${key}`);
 
   pending.push(render(kind, path, rel));
@@ -180,11 +181,12 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     for (const vol of s.volumes ?? []) {
       const src = vol.source ?? '';
       const base = src.split('/').pop();
+      if (vol.type !== 'bind' && vol.type !== 'tmpfs') v('volume-type', rel, `${at}: volume ${src || vol.target} has type ${vol.type}; only bind and tmpfs`);
       if (vol.type === 'bind' && /docker\.sock|containerd\.sock/.test(base)) v('docker-sock', rel, `${at}: mounts ${src}`);
       if (vol.type === 'bind' && (src === '/' || src === '/var/run' || src === '/run' || src.startsWith('/var/run/') || src.startsWith('/run/'))) v('mount-forbidden', rel, `${at}: mounts ${src}`);
       if (vol.type === 'bind') {
         const norm = src.startsWith(ROOT + sep) ? relative(resolve(composeDir), src) : src;
-        const hit = (policy.binds[sn] ?? []).find((b) => b.source === norm && b.target === vol.target);
+        const hit = (policy.binds[`${kind}.${sn}`] ?? []).find((b) => b.source === norm && b.target === vol.target);
         if (!hit) v('mount-allowlist', rel, `${at}: bind ${norm}:${vol.target} is not in the allowlist`);
         else if (!hit.rw && !vol.read_only) v('mount-allowlist', rel, `${at}: bind ${norm}:${vol.target} must be :ro`);
       }
@@ -228,6 +230,7 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     if (!f.startsWith(pre) || f.includes('..')) v('secret-path', rel, `secret ${key}: file ${f} must be under ${pre}`);
     if (!Object.values(svcs).some((x) => (x.secrets ?? []).some((q) => (typeof q === 'string' ? q : q.source) === key))) v('secret-path', rel, `secret ${key} is mounted by no service`);
   }
+  if (Object.keys(cfg.volumes ?? {}).length) v('top-level-volumes', rel, 'top-level volumes: are not used');
   for (const [key, c] of Object.entries(cfg.configs ?? {})) if (c.content) v('config-inline', rel, `config ${key}: inline content`);
 
   if (kind === 'edge') {

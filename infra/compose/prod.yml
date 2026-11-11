@@ -115,7 +115,8 @@ services:
     mem_limit: 256m
     tmpfs: [/tmp]
     volumes:
-      - /srv/polycarpic/spool:/spool
+      - /srv/polycarpic/spool/dump:/spool/dump
+      - /srv/polycarpic/spool/premigration:/spool/premigration
       - /etc/polycarpic/age-recipients.txt:/etc/backup/age-recipients.txt:ro
     healthcheck:
       test: ["CMD", "pg_isready", "-h", "postgres"]
