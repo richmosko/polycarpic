@@ -4,7 +4,7 @@
 // the pure check lives with the builder's unit test of routing-pool.ts; flagged to the architect for the verdict.
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { boot, teardown, type Env } from './helpers/auth';
-import { must } from './helpers/pg';
+import { must } from './helpers/sql';
 
 const U1 = '11111111-1111-4111-8111-111111111111';
 const U2 = '22222222-2222-4222-8222-222222222222';

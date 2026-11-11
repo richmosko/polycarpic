@@ -5,7 +5,7 @@
 // Titles end with [red if: <mutation>].
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { BASE, PW, boot, get, post, teardown, type Env } from './helpers/auth';
-import { must } from './helpers/pg';
+import { must } from './helpers/sql';
 
 vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o as any));
 

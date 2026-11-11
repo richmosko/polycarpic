@@ -14,7 +14,7 @@
 import { createHmac } from 'node:crypto';
 import { vi } from 'vitest';
 import { cloneMigrated, dbEnv } from './api';
-import { must } from './pg';
+import { closeSql, must } from './sql.ts';
 
 export const BASE = 'https://app.qa.test';
 export const SECRET = 'qa-auth-secret-0123456789abcdef0123456789abcdef';
@@ -125,4 +125,5 @@ export async function boot() {
 export async function teardown(e?: Env) {
   await e?.dbm?.close?.();
   await e?.dba?.close?.();
+  await closeSql();
 }
