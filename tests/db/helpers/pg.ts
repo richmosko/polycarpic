@@ -3,12 +3,17 @@
 // POLY_TEST_PG_URL (a superuser URL to a server that already has pgtap, e.g. a CI service container) skips Docker.
 import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const DB_PKG = join(ROOT, 'packages', 'db');
-export const IMAGE = 'polycarpic-pg17-pgtap:test';
+// The Postgres base is the ONE FROM line of infra/postgres/Dockerfile (INFRA §6.1a); the cached image is named after
+// its digest, so a bump never reuses a stale build.
+const PG_BASE = (readFileSync(join(ROOT, 'infra', 'postgres', 'Dockerfile'), 'utf8').split('\n').find((l) => l.startsWith('FROM ')) ?? '').slice(5).trim();
+if (!/^postgres:\d+\.\d+@sha256:[0-9a-f]{64}$/.test(PG_BASE)) throw new Error(`infra/postgres/Dockerfile: no pinned FROM line (${PG_BASE})`);
+export const IMAGE = `polycarpic-pgtap:${PG_BASE.split('@sha256:')[1]!.slice(0, 12)}`;
 const SEP = '\u001f';
 
 export type Server = { host: string; port: number; container: string | null; superUrl: string };
@@ -34,7 +39,7 @@ export function startServer(): { server: Server; stop: () => void } {
   }
   const have = sh('docker', ['image', 'inspect', IMAGE]);
   if (have.code !== 0) {
-    const b = sh('docker', ['build', '-t', IMAGE, join(ROOT, 'tests', 'db', 'docker')]);
+    const b = sh('docker', ['build', '--build-arg', `PG_BASE=${PG_BASE}`, '-t', IMAGE, join(ROOT, 'tests', 'db', 'docker')]);
     if (b.code !== 0) throw new Error(`docker build failed: ${b.err.slice(-600)}`);
   }
   const name = `poly83-qa-${randomBytes(4).toString('hex')}`;

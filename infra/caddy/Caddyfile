@@ -1,0 +1,46 @@
+{
+	admin off
+	http_port 8080
+	https_port 8443
+}
+
+(security_headers) {
+	header {
+		defer
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+}
+
+http://app.{$POLY_DOMAIN}, http://staging.{$POLY_DOMAIN} {
+	import security_headers
+	redir https://{host}{uri} permanent
+}
+
+app.{$POLY_DOMAIN} {
+	tls {$POLY_TLS}
+	import security_headers
+	handle_errors {
+		import security_headers
+	}
+	reverse_proxy prod-web:3000
+}
+
+staging.{$POLY_DOMAIN} {
+	tls {$POLY_TLS}
+	import security_headers
+	handle_errors {
+		import security_headers
+	}
+	# route keeps this order literal: the allowlist answers before basic_auth is consulted, so a client outside it
+	# learns nothing from a password guess
+	route {
+		@denied not remote_ip {$POLY_STAGING_ALLOW}
+		respond @denied 403
+		basic_auth {
+			import /run/secrets/staging_basic_auth
+		}
+		reverse_proxy staging-web:3000
+	}
+}
