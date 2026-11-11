@@ -62,7 +62,7 @@ export async function boot() {
   const A: any = await import('../../../packages/auth/src/index.ts');
   const mails: { email: string; token: string; url: string }[] = [];
   const input = (tlsMode: Mode = 'real-domain', extra: Record<string, unknown> = {}) => ({
-    secret: SECRET, baseURL: BASE, tlsMode,
+    secret: SECRET, baseURL: BASE, tlsMode, requireClientIp: false,
     google: { clientId: 'qa-google', clientSecret: 'qa-google-secret' },
     sendMagicLink: async (m: { email: string; token: string; url: string }) => { mails.push(m); },
     ...extra,

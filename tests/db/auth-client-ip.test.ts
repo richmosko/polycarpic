@@ -38,7 +38,7 @@ describe('limits per IP (C-04: 5 a minute)', () => {
 });
 
 describe('requireClientIp', () => {
-  for (const [label, value] of [['no header', undefined], ['two entries', '198.51.100.1, 203.0.113.5'], ['not an IP', 'not-an-ip']] as const)
+  for (const [label, value] of [['no header', undefined], ['two entries', '198.51.100.1, 203.0.113.5'], ['not an IP', 'not-an-ip'], ['a zone id', 'fe80::1%eth0']] as const)
     it(`${label}: 503, no row, auth.handler not reached  [red if: an unresolved IP is pooled or served]`, async () => {
       const u = e.seedUser();
       const before = e.count('SELECT 1 FROM public.session');
@@ -50,6 +50,13 @@ describe('requireClientIp', () => {
       } finally { log.mockRestore(); }
       expect(e.count('SELECT 1 FROM public.session')).toBe(before);
     });
+
+  it('IPv4, IPv6 and IPv4-mapped single entries pass  [red if: the check is stricter than BetterAuth and refuses a good client]', async () => {
+    for (const ip of ['203.0.113.5', '2001:db8::1', '::ffff:192.0.2.1']) {
+      const u = e.seedUser();
+      expect((await e.handle(signIn(u.email, PW, ip), strict)).status, ip).toBe(200);
+    }
+  });
 
   it('one valid entry passes  [red if: the check refuses a good header]', async () => {
     const u = e.seedUser();

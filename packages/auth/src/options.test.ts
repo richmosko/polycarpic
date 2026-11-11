@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { authOptions } from './options.ts';
 import { stripImage, userUpdateBefore } from './user-hooks.ts';
 
-const input = { secret: 'x'.repeat(48), baseURL: 'https://app.qa.test/some/path', tlsMode: 'real-domain' as const, sendMagicLink: async () => {} };
+const input = { secret: 'x'.repeat(48), baseURL: 'https://app.qa.test/some/path', tlsMode: 'real-domain' as const, requireClientIp: true, sendMagicLink: async () => {} };
 const o: any = authOptions(input);
 const plugin = (id: string) => (o.plugins ?? []).find((p: any) => p.id === id);
 const hook = async (model: 'user' | 'account', when: 'create' | 'update', data: Record<string, unknown>) => {

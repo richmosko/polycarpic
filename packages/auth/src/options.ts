@@ -24,7 +24,7 @@ export interface AuthInput {
   google?: Provider;
   github?: Provider;
   /** S19: refuse an /api/auth/* request whose client IP does not resolve (true outside development). */
-  requireClientIp?: boolean;
+  requireClientIp: boolean;
   sendMagicLink: (m: { email: string; token: string; url: string }) => Promise<void>;
 }
 
@@ -106,7 +106,7 @@ export function authOptions(input: AuthInput) {
       },
     },
     rateLimit: { enabled: true, storage: 'memory' as const, customRules },
-    requireClientIp: input.requireClientIp ?? false,
+    requireClientIp: input.requireClientIp,
     advanced: {
       // __Host-: Secure, Path=/, no Domain. BetterAuth's own secure prefix is __Secure-, so the secure prefix is turned off
       // and Secure forced on, with the prefix carried in the cookie name.

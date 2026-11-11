@@ -37,7 +37,7 @@ Object.assign(process.env, appEnv);
 // In-process sign-in through the same exported configuration the app uses.
 const { authOptions, createAuth } = await import('@poly/auth');
 const { close } = await import('@poly/db');
-const auth = await createAuth(authOptions({ secret: 'e2e-auth-secret-0123456789abcdef0123456789abcdef', baseURL: origin, tlsMode: 'private-ca', sendMagicLink: async () => {} }));
+const auth = await createAuth(authOptions({ secret: 'e2e-auth-secret-0123456789abcdef0123456789abcdef', baseURL: origin, tlsMode: 'private-ca', requireClientIp: false, sendMagicLink: async () => {} }));
 const hash = await (await auth.$context).password.hash(PASSWORD);
 const id = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('${NAME}', '${EMAIL}', true) RETURNING id`, db).rows[0]![0];
 must(`INSERT INTO public.account (account_id, provider_id, user_id, password) VALUES ('${id}', 'credential', '${id}', '${hash}')`, db);

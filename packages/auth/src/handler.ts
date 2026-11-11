@@ -63,7 +63,8 @@ async function inTransaction(request: Request, auth: AnyAuth, run: <T>(fn: () =>
 /** S19: exactly one X-Forwarded-For entry and it is an IP; anything else never reaches the limiter's shared bucket. */
 const clientIpResolved = (request: Request): boolean => {
   const v = request.headers.get('x-forwarded-for');
-  return v !== null && !v.includes(',') && isIP(v.trim()) !== 0;
+  // BetterAuth's check is zod's; node's isIP also takes a zone id (fe80::1%eth0). Only address characters pass, so ours is never looser.
+  return v !== null && /^[0-9a-fA-F:.]+$/.test(v.trim()) && isIP(v.trim()) !== 0;
 };
 
 const notFound = () => new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
