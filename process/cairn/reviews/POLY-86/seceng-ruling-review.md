@@ -205,3 +205,15 @@ The mechanism is accepted. Removing better-auth's optional peers with `overrides
 - **Open, 3b:** add `@esbuild-kit` to `BUILD_TOOLS`. drizzle-kit pulls it in, and it pulls in esbuild 0.18.
 
 Re-review: the next sha, for 3a and 3b and a green CI with the image scan passing.
+
+### S20 reviewed @ 1e83bae: **pass**
+
+- **The fix:**
+  - `overrides` remove better-auth's optional peers and `@better-auth/drizzle-adapter`.
+  - The `image.sh check`, in the existing image job before Trivy, finds no build tooling, adapter or `esbuild` file in `/app`.
+  - `createAuth` starts from the built image, with no network and the tooling gone.
+  - The scratch `--prod` test covers `@esbuild-kit`, `@sveltejs/kit` and the adapter.
+  - There are no Trivy ignores or skips.
+- **CI run 42992370983:** the `image` job succeeds (the check and the Trivy scan), and `db`, `lint`, `guard` and `cairn` succeed.
+- **The startup smoke replaces S20 point 2's served sign-in,** because the image does not serve the app until POLY-88. Follow-up: POLY-88 adds a served `/healthz` and a sign-in against the built image.
+- **Not S20, but it blocks the merge:** `unit` fails on `packages/auth/src/boundaries.test.ts`, "refuses drizzleAdapter in packages/auth", with a 5000 ms timeout. That test is the A-31 lint guard, so the merge waits for it to pass. A longer timeout is acceptable; skipping the test or removing it is not.
