@@ -15,7 +15,10 @@ function files(p) {
 export function runBodies(text) {
   const lines = text.split('\n');
   const out = [];
+  let job = '?';
   for (let i = 0; i < lines.length; i++) {
+    const jm = /^  ([A-Za-z0-9_-]+):\s*$/.exec(lines[i]);
+    if (jm) job = jm[1];
     const m = /^(\s*)(?:-\s+)?run:\s*(.*)$/.exec(lines[i]);
     if (!m) continue;
     const indent = m[1].length;
@@ -29,7 +32,7 @@ export function runBodies(text) {
         body += l + '\n';
       }
     }
-    out.push({ line: i + 1, body });
+    out.push({ line: i + 1, job, body });
   }
   return out;
 }
@@ -40,7 +43,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const bad = [];
   try {
     for (const a of args) for (const f of files(a)) for (const r of runBodies(readFileSync(f, 'utf8'))) {
-      if (BAD.test(r.body)) bad.push(`${f}:${r.line}: run: interpolates event data (move it to env:)`);
+      if (BAD.test(r.body)) bad.push(`${f}:${r.line}: job ${r.job}: run: interpolates event data (move it to env:)`);
     }
   } catch (e) { console.error(`check-run-expr: ${e.message}`); process.exit(2); }
   if (bad.length) { console.error(bad.join('\n')); process.exit(1); }

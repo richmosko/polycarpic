@@ -522,6 +522,12 @@ jobs:
           GIT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: bash infra/ci/image.sh build
 
+      - name: Install Trivy
+        run: bash infra/ci/install-trivy.sh
+
+      - name: Trivy scan of the local image (fixable critical/high, secrets)
+        run: bash infra/ci/image.sh scan polycarpic:ci
+
       - name: Record timing
         if: always()
         run: node infra/ci/job-report.mjs
