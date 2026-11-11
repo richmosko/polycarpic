@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CANARIES, assertNoCanary } from '../log/canary.ts';
 import { ROOT, must } from './helpers/pg';
-import { REAL_MIGRATIONS, dbEnv, freshDb, migrateCli } from './helpers/api';
+import { REAL_MIGRATIONS, cloneMigrated, dbEnv, freshDb } from './helpers/api';
 
 const TAGS: string[] = JSON.parse(readFileSync(join(REAL_MIGRATIONS, 'meta', '_journal.json'), 'utf8')).entries.map((e: any) => e.tag);
 const EXPECTED = TAGS[TAGS.length - 1]!;
@@ -24,7 +24,7 @@ const load = async (env: Record<string, string>) => {
   return { status, health };
 };
 const freePort = () => new Promise<number>((res, rej) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = (s.address() as net.AddressInfo).port; s.close(() => res(p)); }); s.on('error', rej); });
-const migrated = () => { const db = freshDb(); const r = migrateCli(db, REAL_MIGRATIONS); expect(r.code, r.err + r.out).toBe(0); return db; };
+const migrated = cloneMigrated;
 const get = async (port: number, path = '/status', method = 'GET', host = '127.0.0.1') => {
   const r = await fetch(`http://${host}:${port}${path}`, { method });
   return { res: r, text: await r.text() };

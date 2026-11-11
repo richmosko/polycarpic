@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ROOT, must } from './helpers/pg';
-import { MIGRATE_CLI, REAL_MIGRATIONS, dbEnv, freshDb, migrateCli, writeMigrations } from './helpers/api';
+import { MIGRATE_CLI, cloneMigrated, dbEnv, freshDb, writeMigrations } from './helpers/api';
 
 const check = (dir: string) => {
   const p = spawnSync('pnpm', ['--filter', '@poly/db', 'check-migrations', dir], { encoding: 'utf8', cwd: ROOT });
@@ -83,12 +83,7 @@ describe('startup guard (db/startup assertSchemaNotBehind): refuse when the appl
     const g: any = await import('../../packages/db/src/startup.ts');
     return g.assertSchemaNotBehind('poly_app');
   };
-  const migrated = () => {
-    const db = freshDb();
-    const r = migrateCli(db, REAL_MIGRATIONS);
-    expect(r.code, r.err + r.out).toBe(0);
-    return db;
-  };
+  const migrated = cloneMigrated;
   it('starts when current', async () => {
     await expect(guard(migrated())).resolves.not.toThrow();
   });

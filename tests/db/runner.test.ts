@@ -239,7 +239,7 @@ describe('--plan', () => {
   it('takes no advisory lock and writes nothing; the apply path does take one', async () => {
     const db = freshDb();
     // discover the runner's lock key from pg_locks while a slow migration runs (no knowledge of the key constant needed)
-    const slow = writeMigrations([{ tag: '0000_slow', sql: 'SELECT pg_sleep(4);\n' + T('ts') }]);
+    const slow = writeMigrations([{ tag: '0000_slow', sql: 'SELECT pg_sleep(1.5);\n' + T('ts') }]);
     const child = spawn('node', ['--experimental-strip-types', MIGRATE_CLI], {
       env: { ...process.env, ...dbEnv('poly_migrator', db), POLY_MIGRATIONS_DIR: slow },
     });
@@ -276,7 +276,13 @@ describe('--plan', () => {
       });
       let done = false;
       apply.on('close', () => (done = true));
-      await new Promise((r) => setTimeout(r, 3000));
+      // the apply backend is seen waiting on the advisory lock (stronger than a fixed sleep: it proves the wait, not the delay)
+      let waiting = false;
+      for (let i = 0; i < 50 && !waiting; i++) {
+        waiting = must(`SELECT count(*) FROM pg_stat_activity WHERE datname='${db2}' AND wait_event_type='Lock' AND wait_event='advisory'`).rows[0][0] === '1';
+        if (!waiting) await new Promise((r) => setTimeout(r, 100));
+      }
+      expect(waiting, 'apply backend must be waiting on the advisory lock (wait_event Lock/advisory)').toBe(true);
       expect(done, 'apply must wait on the held advisory lock').toBe(false);
       expect(tableExists(db2, 'public.ta')).toBe(false);
       release();

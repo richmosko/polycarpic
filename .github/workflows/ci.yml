@@ -287,6 +287,10 @@ jobs:
           pnpm exec eslint packages apps scripts/layers
           pnpm --filter @poly/db check-migrations
 
+      - name: Generated-output freshness
+        if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true' || needs.changes.outputs.ci == 'true'
+        run: python3 scripts/cairn/check_dist_freshness.py --ci
+
       - name: Types
         if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true'
         run: |
@@ -492,6 +496,9 @@ jobs:
         env:
           pnpm_config_strict_dep_builds: "false"
         run: pnpm install --frozen-lockfile
+
+      - name: Generate SvelteKit types (the battery imports apps/web/src/ops, whose tsconfig extends the generated one)
+        run: pnpm --filter @poly/web exec svelte-kit sync
 
       - name: DB battery (one Postgres container, RLS battery included)
         run: pnpm exec vitest run -c tests/db/vitest.config.ts

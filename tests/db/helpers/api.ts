@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DB_PKG, freshName, must, psql, url } from './pg';
+import { DB_PKG, freshName, must, psql } from './pg';
 
 export const MIGRATE_CLI = process.env.POLY_DB_MIGRATE_CLI ?? join(DB_PKG, '..', '..', 'apps', 'migrate', 'src', 'cli.ts');
 export const REAL_MIGRATIONS = process.env.POLY_DB_MIGRATIONS ?? join(DB_PKG, 'migrations');
@@ -20,14 +20,39 @@ export function dbEnv(role: string, db: string): Record<string, string> {
   const s = JSON.parse(process.env.POLY_TEST_SERVER!);
   return { DATABASE_HOST: s.host, DATABASE_PORT: String(s.port), DATABASE_NAME: db, DATABASE_USER: role, DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f };
 }
-const LOGIN = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_backup'];
+export const LOGIN = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_backup'];
 
-/** Fresh database + the superuser bootstrap run inside it (ruling R1; it sets the DB owner). Passwords are the harness's. */
-export function freshDb(): string {
+/** Global setup, once per run: the roles are cluster-global, so their harness passwords are set here and freshDb() never does. */
+export function setRolePasswords(): void {
   const db = freshName();
   must(`CREATE DATABASE ${db}`);
-  must(readFileSync(BOOTSTRAP, 'utf8'), db);
-  for (const r of LOGIN) must(`ALTER ROLE ${r} PASSWORD 'qa-${r}'`);
+  must(readFileSync(BOOTSTRAP, 'utf8'), db); // creates the roles (idempotent)
+  must(LOGIN.map((r) => `ALTER ROLE ${r} PASSWORD 'qa-${r}';`).join('\n'), db);
+  must(`DROP DATABASE ${db}`);
+}
+
+/** Fresh database + the superuser bootstrap run inside it (ruling R1; it sets the DB owner), in one psql session. */
+export function freshDb(): string {
+  const db = freshName();
+  must(`CREATE DATABASE ${db};\n\\connect ${db}\n${readFileSync(BOOTSTRAP, 'utf8')}`);
+  return db;
+}
+
+let template: string | null = null;
+/**
+ * A database migrated with the real chain, cloned from a per-file template (built once, on first use) instead of being
+ * built again. A clone keeps neither the owner's database ACL nor anything the bootstrap sets at database level, so it is
+ * created OWNER poly_owner and the (idempotent) bootstrap runs in it again, in the same psql session.
+ */
+export function cloneMigrated(): string {
+  if (template === null) {
+    const t = freshDb();
+    const r = migrateCli(t, REAL_MIGRATIONS);
+    if (r.code !== 0) throw new Error(`template migrate failed: ${r.err}${r.out}`);
+    template = t;
+  }
+  const db = freshName();
+  must(`CREATE DATABASE ${db} TEMPLATE ${template} OWNER poly_owner;\n\\connect ${db}\n${readFileSync(BOOTSTRAP, 'utf8')}`);
   return db;
 }
 

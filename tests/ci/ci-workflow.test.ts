@@ -125,6 +125,17 @@ describe('ci.yml: the work jobs (criteria 2, 5, 6, 10)', () => {
     const s = steps(w.jobs.lint!).find((x) => /scripts\/layers\/check\.mjs/.test(x.run ?? ''))!;
     expect(s.if ?? '').toMatch(/outputs\.layers/);
   });
+  it('lint has "Generated-output freshness" directly after "ESLint and migration check", gated on node/image/ci, running --ci (POLY-102 R3)  [red if: step missing, moved, `--ci` dropped, or gated on layers/db only]', () => {
+    const ss = steps(w.jobs.lint!);
+    const i = ss.findIndex((s) => s.name === 'ESLint and migration check');
+    expect(i).toBeGreaterThanOrEqual(0);
+    const s = ss[i + 1]!;
+    expect(s.name).toBe('Generated-output freshness');
+    for (const k of ['node', 'image', 'ci']) expect(s.if ?? '', k).toContain(`needs.changes.outputs.${k} == 'true'`);
+    expect(s.if ?? '').not.toMatch(/outputs\.(layers|db)/);
+    expect((s.run ?? '').trim()).toBe('python3 scripts/cairn/check_dist_freshness.py --ci');
+    expect(Object.keys(w.jobs).sort()).toEqual(['app', 'cairn', ...NEW].sort()); // no new top-level job
+  });
   it('unit runs turbo test --affected --summarize from each package, then the root cross-package suite (criterion 5)', () => {
     const b = runOf(w.jobs.unit!);
     expect(b).toMatch(/turbo run test[^\n]*--affected/);

@@ -8,9 +8,9 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CANARIES, assertNoCanary } from '../log/canary.ts';
 import { ROOT } from './helpers/pg';
-import { REAL_MIGRATIONS, dbEnv, freshDb, migrateCli } from './helpers/api';
+import { cloneMigrated, dbEnv } from './helpers/api';
 
-const migrated = () => { const db = freshDb(); const r = migrateCli(db, REAL_MIGRATIONS); expect(r.code, r.err + r.out).toBe(0); return db; };
+const migrated = cloneMigrated;
 const freePort = () => new Promise<number>((res, rej) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = (s.address() as net.AddressInfo).port; s.close(() => res(p)); }); s.on('error', rej); });
 const load = async (env: Record<string, string>) => {
   vi.resetModules();
@@ -89,7 +89,7 @@ describe('S-7(b) web crash handler (dynamic)', () => {
   it('an uncaught error whose message and detail are canaries yields one process.crash line {type, code} and exit 1; no canary on stdout/stderr', async () => {
     const d = mkdtempSync(join(tmpdir(), 'poly85-crash-'));
     const pre = join(d, 'crash.mjs');
-    writeFileSync(pre, `setTimeout(() => { const e = new Error(${JSON.stringify(CANARIES.memo)}); e.detail = ${JSON.stringify(CANARIES.token)}; e.code = '23505'; throw e; }, 2500);\n`);
+    writeFileSync(pre, `setTimeout(() => { const e = new Error(${JSON.stringify(CANARIES.memo)}); e.detail = ${JSON.stringify(CANARIES.token)}; e.code = '23505'; throw e; }, 500);\n`);
     const auth = join(d, 'auth'); writeFileSync(auth, 'auth-secret\n');
     const db = dbEnv('poly_app', migrated());
     const port = await freePort();
