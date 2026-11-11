@@ -57,7 +57,7 @@ Feature started. Branch: `feature/poly-128-app-shell-design-tokens`. Runs in par
 
 ### @architect — 2026-11-10
 
-**Verdict (gate 4), re-issued at `daac457`: PASS, on one condition.** In the first CI run, the e2e group must add ≤ 150 s to `unit` (R9) and the `image` job (Trivy) must be green. Neither can be measured before that run. The earlier condition 2 is superseded: the sidebar was fixed in this loop (lead).
+**Verdict (gate 4) at `daac457`: HELD** until V6 and V7 (below) pass tests-red and build-green, qa-engineer-128 has issued its gate-3 line and seceng-62 has posted `reviewed`; this table is then re-issued at the new sha. As drafted at `daac457`: PASS, on one condition. In the first CI run, the e2e group must add ≤ 150 s to `unit` (R9) and the `image` job (Trivy) must be green. Neither can be measured before that run. The earlier condition 2 is superseded: the sidebar was fixed in this loop (lead).
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -84,4 +84,7 @@ Accepted deviations:
 - The Playwright browser cache is keyed on the lockfile hash.
 - Duplicate `e2e` and `test:e2e` scripts.
 - sr-only names on the collapse toggle and the avatar trigger.
-- **Not built:** DESIGN's swap of the collapsed rail's mark to `panel-left-open` on hover or focus (spec § Sidebar). In the rail the mark is still the expand control and carries the name "Expand sidebar"; only the hover icon is missing. It is cosmetic and goes to the lead to rule on, not a condition here.
+
+Two items to build, ruled here:
+- **V6, rail expand cue** (sidebar-flow.md line 25, spec § Sidebar). In the rail, while the brand button is hovered or has keyboard focus, the mark is hidden and Lucide `panel-left-open` (path data in `icons.ts`) is shown in its place on a `--sidebar-accent` fill. A tooltip reading "Expand sidebar" opens to the right, with a `--foreground` fill and `--background` ink. At rest the mark shows, so the brand-mark visibility test holds; it asserts at rest only. The test, collapsed, in both modes: hover shows the open icon and hides `brand-mark`; Tab focus does the same; moving away restores the mark; the tooltip is visible to the right of the button.
+- **V7, current theme visible.** Each Theme radio item shows a check indicator (Lucide `check`, `currentColor`) only when it is checked; the bold weight alone is not enough (DESIGN #accessibility: never signal by one weak cue). bits-ui already sets `aria-checked`. The test, for cookies unset / `dark` / `auto`: exactly one item has `aria-checked="true"` (Light / Dark / Auto respectively), and only that item's indicator has a non-zero box.
