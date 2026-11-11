@@ -25,7 +25,7 @@ Ruling: `process/cairn/reviews/POLY-102/ruling.md` (R1–R7).
 - [ ] Same-second and cross-timezone commits behave (fixtures from the PT-58 tests) for `ancestry` pairs; the existing `check_dist_freshness` contract and its tests are unchanged.
 - [ ] The check fails closed (exit 2) on every R2 row and runs as a `lint` step feeding `app` (R3).
 - [ ] The `db` CI job has headroom again before POLY-86 adds to the battery: two full-battery CI runs each finish the `db` job in ≤ 150 s of its 180 s budget (`infra/ci/budgets.json` unchanged), by cutting the measured cost without dropping a case (R4).
-- [ ] The change filter follows "every path a job runs or imports triggers that job": the R5 rows for `image` and `db`, with a static test over the battery's imports.
+- [ ] The change filter follows "every path a job runs or imports triggers that job": the R5 rows for `image` and `db`, a transitive import-closure test, and a static pin on the `db-migrations` pair (R5).
 
 ## Comments
 
