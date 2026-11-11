@@ -7,6 +7,8 @@ description: Generates or refines `docs/SECURITY/index.html` — the Security Re
 
 You are populating `docs/SECURITY/index.html`. This is owned by the `seceng` agent and produced jointly with the `architect`.
 
+**Current state only.** The doc holds no changelog, no per-version Status run and no narration of who decided what and when; edit the body in place and put the what and why in the commit message and the issue comment (`process/WORKFLOW.md` → Decision logging → What goes where).
+
 ## Pre-flight
 
 - Read `docs/PRD/index.html` (especially the Non-Functional Requirements → regulatory regime).

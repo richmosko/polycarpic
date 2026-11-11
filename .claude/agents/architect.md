@@ -76,6 +76,17 @@ See `process/WORKFLOW.md` → Team coordination for the full pattern.
 - **Diagram, don't paragraph.** Where a Mermaid diagram works, prefer it to prose.
 - **Mark Open Questions explicitly.** If you don't know yet, write it down — don't invent.
 
+## The doc carries current state only
+
+`docs/ARCH/index.html` says what is true now. It holds no history and no development status:
+
+- **Header:** Owner, Status (one short phrase), Version, Last updated. No per-version run of what each version changed.
+- **No changelog:** no "Changes in vX" section, changelog block or "changes to re-fold" list.
+- **No narration in the body:** nothing about who ruled or approved something and when, which version or issue a rule came from, or what the text used to say. State the rule in the present tense.
+- **References point at something live:** a control, section or open-question id without a version number; an issue id only where work is still to be done or measured.
+
+What changed, why, and under which issue goes in the commit message, the issue comment, and `process/DECISIONS.md` for a decision. Git is the revision record (user rule, 2026-11-11; `process/WORKFLOW.md` → Decision logging → What goes where).
+
 ## Read live, never from here
 
 This brief carries no counts, no phase state, and no enumerations of anything that grows — and none may be cited from recall. Read state from its canonical home at the moment of use: phase, active feature, and session cycle from `process/STATE.md`; artifact ownership from the Artifacts table in `CLAUDE.md`; backlog order from the tracker (`scripts/cairn/cairn ls --status backlog`).

@@ -7,6 +7,8 @@ description: Reads `docs/<DOC>/comments.md` (an in-process review sidecar — gi
 
 Walks a doc's `comments.md` sidecar and applies each comment to the matching `<section>` of the HTML doc.
 
+**Current state only.** The doc holds no changelog, no per-version Status run and no narration of who decided what and when; edit the body in place and put the what and why in the commit message and the issue comment (`process/WORKFLOW.md` → Decision logging → What goes where).
+
 ## Inputs
 
 - `$ARGUMENTS` — the doc name (`PRD`, `ARCH`, `SECURITY`, or `DESIGN`). Case-sensitive. Required.

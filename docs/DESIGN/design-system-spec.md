@@ -145,7 +145,7 @@ Contrast figures are computed via the standard WCAG relative-luminance formula a
 
 The `--chart` ramp encodes **how much**. Treemaps, Pack, Sankey and grouped or stacked bars need colour that says **which thing**, and a one-hue ramp cannot do that (its steps sit ~1.2:1 apart). `--cat-1`…`--cat-7` plus `--cat-other` are the identity palette. Method: the dataviz skill's colour formula (four colour jobs, six checks), computed with its `validate_palette.js`, never by eye.
 
-**Hues: the brand colours, and five more at their brightness and intensity.** A Principal ruling sets this. Slots 1 and 2 are `--brand` and `--brand-2` themselves, literal and unthemed, and the other five match them: the brand pair measures OKLCH L 0.87 / 0.71, C 0.29 / 0.17, and every slot sits inside L 0.71–0.87. Chroma is the most sRGB allows at each hue's lightness, which is C 0.14–0.26: at their steps gold and cyan stop just short of the sky blue's 0.17. Fill values are the same in both modes. The hues skip the status arcs (red ~29°, orange ~48°, gain green ~150–162°). Seven hues, not eight: an eighth can pass the adjacent checks at the end of the order, but the only in-band candidates at least 15 ΔE from every slot in normal vision are pale pinks, off the brand's intensity and 2.1 ΔE from an existing slot under colour-blindness, so an eighth would be a near-repeat of a colour already in the set.
+**Hues: the brand colours, and five more at their brightness and intensity.** Slots 1 and 2 are `--brand` and `--brand-2` themselves, literal and unthemed, and the other five match them: the brand pair measures OKLCH L 0.87 / 0.71, C 0.29 / 0.17, and every slot sits inside L 0.71–0.87. Chroma is the most sRGB allows at each hue's lightness, which is C 0.14–0.26: at their steps gold and cyan stop just short of the sky blue's 0.17. Fill values are the same in both modes. The hues skip the status arcs (red ~29°, orange ~48°, gain green ~150–162°). Seven hues, not eight: an eighth can pass the adjacent checks at the end of the order, but the only in-band candidates at least 15 ΔE from every slot in normal vision are pale pinks, off the brand's intensity and 2.1 ΔE from an existing slot under colour-blindness, so an eighth would be a near-repeat of a colour already in the set.
 
 | Slot | Hue (OKLCH) | Fill, both modes | L / C | Contrast on `--background` / `--card` (light) | Label ink (light) | Label ink (dark) |
 |---|---|---|---|---|---|---|
@@ -171,7 +171,7 @@ The `--chart` ramp encodes **how much**. Treemaps, Pack, Sankey and grouped or s
 | Contrast vs surface (≥ 3:1) | **WARN, light; waived.** 1.29–2.92:1 on `--background`/`--card`. Dark: PASS, ≥ 6.62:1 |
 | Lightness band | **FAIL, both modes; waived.** Light band 0.43–0.77: neon, gold 0.78, cyan out. Dark band 0.48–0.67: all seven out |
 
-**The waiver, and what pays for it.** By Principal ruling the light-mode 3:1 surface rule and the lightness band do not apply to categorical fills: the brand colours are the palette, and darkening them is exactly what the ruling rejected. Distinctness is not waived; the separation runs above still gate. Every categorical mark pays three ways, in every mode:
+**The waiver, and what pays for it.** The light-mode 3:1 surface rule and the lightness band do not apply to categorical fills: the brand colours are the palette, and darkening them would make a different brand. Distinctness is not waived; the separation runs above still gate. Every categorical mark pays three ways, in every mode:
 
 1. **A visible label or legend.** Colour is never alone; a chart that cannot label a mark shows it in its table view.
 2. **An edge.** A 1px `--cat-edge` hairline on the fill, and a 2px surface gap between touching fills. `--cat-edge` is the page ink at partial alpha, so it reads as a darker step of whatever it sits on: `--foreground` at 35% in light mode, where an inset edge clears about 2:1 against the brightest fills and more against the page (neon 2.09:1 / 2.68:1, cyan 2.04 / 2.98, gold 1.94 / 3.69), and an outset edge is 2.14:1 on `--background`, 2.15:1 on `--card`. In dark mode it is `--foreground` at 25%, because the fills already clear the surface and the edge only has to show: outset 2.08:1 on `--card` and 2.00:1 on `--background`, a soft ring with no halo; inset it barely registers on the brightest fills (neon 1.00:1, cyan 1.04, gold 1.15) and needs to do no more. `--border` is not the edge: at 1.06:1 on the neon it disappears.
@@ -1026,7 +1026,7 @@ See `styled-screens/login.html`.
 
 ## Screen data contract
 
-For architect's Screen DTO work (ARCH §2.4, OQ-11 resolved in outline). Model constraints: amounts are signed per line with Dr/Cr derived for display; drafts are separate from posted entries and posted entries are immutable; Cash-in-Transit open items get an exceptions view; access comes from membership only (no parent/child inheritance); `import_batch` holds new/duplicate/needs-category counts.
+For architect's Screen DTO work (ARCH §2.4). Model constraints: amounts are signed per line with Dr/Cr derived for display; drafts are separate from posted entries and posted entries are immutable; Cash-in-Transit open items get an exceptions view; access comes from membership only (no parent/child inheritance); `import_batch` holds new/duplicate/needs-category counts.
 
 This mirrors ARCH §2.4's screen→DTO table exactly — the DESIGN-owned half of that same contract, not a second source of truth.
 
@@ -1053,7 +1053,7 @@ This mirrors ARCH §2.4's screen→DTO table exactly — the DESIGN-owned half o
 
 ## Provenance & shared tooling
 
-polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte app with its own vendored preset and its own generated theme-variant pipeline. **This product's palette does not inherit cairn's tokens** — it's a fully separate identity derived from Monarch/Origin measurements. A CI assertion of token parity with cairn's board (`scripts/cairn/tests/test_board_tokens_parity.py`) was removed (POLY-78); cairn's generated `variants.css` belongs to cairn's generator, not to `docs/DESIGN/`.
+polycarpic's own `cairn` tracker (`scripts/cairn/`) is a separate shadcn-svelte app with its own vendored preset and its own generated theme-variant pipeline. **This product's palette does not inherit cairn's tokens** — it's a fully separate identity derived from Monarch/Origin measurements. No CI check pins `tokens.css` to cairn's board tokens; cairn's generated `variants.css` belongs to cairn's generator, not to `docs/DESIGN/`.
 
 ---
 

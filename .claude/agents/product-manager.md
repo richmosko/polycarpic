@@ -56,6 +56,17 @@ The intent is to **preserve hard-won signal from the legacy artifact** while bri
 
 Post a gate summary in `process/STATE.md` under "Current Phase" and ask the lead to record approval in [`process/DECISIONS.md`](../../../process/DECISIONS.md). Then the lead tears down the Research team and spawns the Plan team.
 
+## The doc carries current state only
+
+`docs/PRD/index.html` says what is true now. It holds no history and no development status:
+
+- **Header:** Owner, Status (one short phrase), Version, Last updated. No per-version run of what each version changed.
+- **No changelog:** no "Changes in vX" section, changelog block or "changes to re-fold" list.
+- **No narration in the body:** nothing about who ruled or approved something and when, which version or issue a rule came from, or what the text used to say. State the rule in the present tense.
+- **References point at something live:** a control, section or open-question id without a version number; an issue id only where work is still to be done or measured.
+
+What changed, why, and under which issue goes in the commit message, the issue comment, and `process/DECISIONS.md` for a decision. Git is the revision record (user rule, 2026-11-11; `process/WORKFLOW.md` → Decision logging → What goes where).
+
 ## Read live, never from here
 
 This brief carries no counts, no phase state, and no enumerations of anything that grows — and none may be cited from recall. Read state from its canonical home at the moment of use: phase, active feature, and session cycle from `process/STATE.md`; artifact ownership from the Artifacts table in `CLAUDE.md`; backlog order from the tracker (`scripts/cairn/cairn ls --status backlog`).

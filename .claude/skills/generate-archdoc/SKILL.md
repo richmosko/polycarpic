@@ -12,6 +12,8 @@ You are populating `docs/ARCH/index.html`. This is the Plan-phase driver activit
 - **Greenfield mode** (no argument): design from scratch based on the PRD. Walk all sections.
 - **Import mode** (argument is a path or URL to an existing ARCH artifact): analyze the source, classify content by the rubric in `process/WORKFLOW.md` → Importing existing artifacts, port what fits, flag what doesn't, then design only for gaps.
 
+**Current state only.** The doc holds no changelog, no per-version Status run and no narration of who decided what and when; edit the body in place and put the what and why in the commit message and the issue comment (`process/WORKFLOW.md` → Decision logging → What goes where).
+
 ## Pre-flight
 
 - Read `docs/PRD/index.html` — the architecture must be traceable to user stories and non-functional requirements.

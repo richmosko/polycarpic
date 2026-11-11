@@ -9,6 +9,8 @@ You are populating `docs/DESIGN/` — the in-repo, code-level home for the desig
 
 Figma stays the high-fidelity design tool (via the `ux-designer`'s `figma:*` skills). `docs/DESIGN/` is the in-repo contract that ships with the project and that `frontend-lead` consumes directly — keep the two in sync (export tokens/specs here; pull frames via Code Connect there).
 
+**Current state only.** The doc holds no changelog, no per-version Status run and no narration of who decided what and when; edit the body in place and put the what and why in the commit message and the issue comment (`process/WORKFLOW.md` → Decision logging → What goes where).
+
 ## Pre-flight
 
 - Read `docs/PRD/index.html` — especially **User Stories** (flows follow the highest-traffic stories) and **Non-Functional Requirements → Accessibility**.

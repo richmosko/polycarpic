@@ -12,6 +12,8 @@ You are running an interview to populate `docs/PRD/index.html`. This is the Rese
 - **Greenfield mode** (no argument): interview from a blank slate. Walk all sections.
 - **Import mode** (argument is a path or URL to an existing PRD artifact): analyze the source, classify content by the rubric in `process/WORKFLOW.md` → Importing existing artifacts, port what fits, flag what doesn't, then run the interview only for gaps.
 
+**Current state only.** The doc holds no changelog, no per-version Status run and no narration of who decided what and when; edit the body in place and put the what and why in the commit message and the issue comment (`process/WORKFLOW.md` → Decision logging → What goes where).
+
 ## Operating mode
 
 - **One section at a time.** Don't ask all questions in a wall of text. Walk the user through Problem → Goals → Stories → Requirements, asking a small batch per section.
