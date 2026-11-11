@@ -269,10 +269,7 @@ jobs:
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
-        # Scripts stay blocked (C-80). pnpm 12 on CI turns "ignored build scripts" (esbuild) into an exit 1; the
-        # variable keeps the refusal and drops only the error.
-        env:
-          pnpm_config_strict_dep_builds: "false"
+        # Scripts stay blocked (C-80); esbuild's build is declined by name in pnpm-workspace.yaml.
         run: pnpm install --frozen-lockfile
 
       - name: Layer map checks (criterion 6)
@@ -399,10 +396,7 @@ jobs:
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
-        # Scripts stay blocked (C-80). pnpm 12 on CI turns "ignored build scripts" (esbuild) into an exit 1; the
-        # variable keeps the refusal and drops only the error.
-        env:
-          pnpm_config_strict_dep_builds: "false"
+        # Scripts stay blocked (C-80); esbuild's build is declined by name in pnpm-workspace.yaml.
         run: pnpm install --frozen-lockfile
 
       - name: Per-package tests (each from its own directory)
@@ -513,10 +507,7 @@ jobs:
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
-        # Scripts stay blocked (C-80). pnpm 12 on CI turns "ignored build scripts" (esbuild) into an exit 1; the
-        # variable keeps the refusal and drops only the error.
-        env:
-          pnpm_config_strict_dep_builds: "false"
+        # Scripts stay blocked (C-80); esbuild's build is declined by name in pnpm-workspace.yaml.
         run: pnpm install --frozen-lockfile
 
       - name: Generate SvelteKit types (the battery imports apps/web/src/ops, whose tsconfig extends the generated one)
@@ -593,8 +584,6 @@ jobs:
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
         if: needs.changes.outputs.image == 'true'
-        env:
-          pnpm_config_strict_dep_builds: "false"
         run: pnpm install --frozen-lockfile
 
       - name: Build the image (local, no push)

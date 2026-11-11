@@ -13,6 +13,10 @@
 
 Product docs (PRD, ARCH, SECURITY, DESIGN) live under [`docs/`](docs/) and are written phase by phase.
 
+## Local install
+
+Node 26 and pnpm 12 (there is no corepack on Node 26; install pnpm with `npm i -g --allow-scripts=pnpm`). Then `pnpm install --frozen-lockfile`, the same command CI and the image build run. Dependency build scripts stay blocked; `allowBuilds` in `pnpm-workspace.yaml` declines esbuild's by name.
+
 ## Provenance
 
 Bootstrapped 2026-09-23 from [`project_template`](https://github.com/richmosko/project_template) v0.12.2. Template mechanics (skills under `.claude/skills/`, agents under `.claude/agents/`, the cairn engine under `scripts/cairn/`) cite template issues as `PT-nn`; those are pointers into the template repo, kept so its updates can be ported.
