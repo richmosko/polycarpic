@@ -156,7 +156,7 @@ CREATE FUNCTION app.refuse_truncate() RETURNS trigger
 -- Both membership guards lock the entity row first, so the owner count they read is serialised; no row means 42501, never
 -- an unlocked continue. They are VOLATILE (plpgsql), and each count is read by a statement after the lock.
 -- gate_owner_changes: while an entity has more than one owner (or the caller cannot count them), poly_app cannot change
--- owners or invite directly (SECURITY §4.2.2, C-28). Fires before keep_an_owner (alphabetical).
+-- owners or invite directly (SECURITY §4.2.2, C-28). Fires before keep_an_owner (trigger names carry the order).
 CREATE FUNCTION app.gate_owner_changes() RETURNS trigger
   LANGUAGE plpgsql
   AS $$
@@ -165,7 +165,8 @@ CREATE FUNCTION app.gate_owner_changes() RETURNS trigger
     n int;
     rk text[] := ARRAY['viewer', 'manager', 'owner'];
   BEGIN
-    IF current_user <> 'poly_app' THEN
+    IF current_user IN ('poly_govern', 'poly_purge')
+       OR (SELECT r.rolsuper FROM pg_catalog.pg_roles r WHERE r.rolname = current_user) THEN
       IF TG_OP = 'DELETE' THEN RETURN OLD; END IF;
       RETURN NEW;
     END IF;
@@ -215,13 +216,13 @@ CREATE TRIGGER entity_check BEFORE INSERT OR UPDATE ON public.entity
   FOR EACH ROW EXECUTE FUNCTION app.check_entity();--> statement-breakpoint
 CREATE TRIGGER entity_seat_creator AFTER INSERT ON public.entity
   FOR EACH ROW EXECUTE FUNCTION app.seat_creator();--> statement-breakpoint
-CREATE TRIGGER membership_gate_owner_changes BEFORE UPDATE OR DELETE ON public.membership
+CREATE TRIGGER membership_10_gate_owner_changes BEFORE UPDATE OR DELETE ON public.membership
   FOR EACH ROW EXECUTE FUNCTION app.gate_owner_changes();--> statement-breakpoint
-CREATE TRIGGER invitation_gate_owner_changes BEFORE INSERT ON public.invitation
+CREATE TRIGGER invitation_10_gate_owner_changes BEFORE INSERT ON public.invitation
   FOR EACH ROW EXECUTE FUNCTION app.gate_owner_changes();--> statement-breakpoint
-CREATE TRIGGER membership_keep_an_owner BEFORE UPDATE OR DELETE ON public.membership
+CREATE TRIGGER membership_20_keep_an_owner BEFORE UPDATE OR DELETE ON public.membership
   FOR EACH ROW EXECUTE FUNCTION app.keep_an_owner();--> statement-breakpoint
-CREATE TRIGGER membership_audit AFTER INSERT OR UPDATE OR DELETE ON public.membership
+CREATE TRIGGER membership_90_audit AFTER INSERT OR UPDATE OR DELETE ON public.membership
   FOR EACH ROW EXECUTE FUNCTION app.audit_membership();--> statement-breakpoint
 CREATE TRIGGER audit_event_append_only BEFORE UPDATE OR DELETE ON public.audit_event
   FOR EACH ROW EXECUTE FUNCTION app.refuse_change();--> statement-breakpoint
