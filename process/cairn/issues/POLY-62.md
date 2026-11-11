@@ -78,3 +78,27 @@ N1–N4 are folded in:
 - `requires` works at row and entry level; an active row with no runnable entry fails.
 - co-owner-remove-demote activates (six rows active).
 - The lock guards refuse when the lock returns no row.
+
+### @architect — 2026-11-10
+
+Verdict (gate 4): **pass**. Build 8779392 against the ruling (40f61ca + addendum 1 at 81f0010).
+
+| Axis | Result | Evidence |
+|---|---|---|
+| Seam R1 | conforms. Tables are generated in 0002; rules are custom in 0003; `@poly/db` re-exports `sql`; pnpm-lock is untouched. | 8779392 |
+| Tables and tombstone R2 | conforms. UUID PKs; the tombstone CHECK; the tax CHECK plus `app.check_entity()`; no FK cascades. | 0002, 0003 @ 8779392 |
+| Definers R3 | conforms. Seven definers.json rows; `search_path=`; file-scoped CREATE and EXECUTE revoked by their grantors. | definers.json @ 8779392 |
+| Gate and lock (O1, N3, addendum 1) | conforms. The gate is default-deny (definer roles and superuser exempt). Both guards lock the entity FOR UPDATE and refuse when no row is returned. Trigger names order the guards. | 0003; 04_tenancy.sql tgname assertion |
+| Policies and grants R4 (O2–O4) | conforms. No membership INSERT. The entity_type read is label-only. token_hash is unreadable. INSERT grants are column-level. | 0003 @ 8779392 |
+| Matrix R6 | conforms. Six rows are active, pinned by equality. Entry-level requires. The harness canary. No `public.account` left. | matrix.test.ts, permission-matrix.json |
+| Catalog R7 | conforms. Five new battery_gaps reasons, each with a canary. `unlisted` reverse coverage. | 02_rls_catalog.sql |
+| Behaviour | pass. Measured: `vitest run -c tests/db/vitest.config.ts` on tenancy, matrix, pgtap and battery gave 66/66 in 18.05 s locally (architect). backend-lead reports the full tests/db at 192 passed. | 8779392 |
+| CI time R8 | Pending: the guard (≤ +15 s file time) is read from the PR's db job at finish. | lead at finish |
+
+Measured deviations, both accepted:
+- provisionPerson does a find, then an INSERT without ON CONFLICT, because the arbiter applies the SELECT policy. A concurrent first call fails with 23505. POLY-86's session loader must retry once on 23505. ARCH §3.1 is corrected to match in this commit.
+- The gate's branches are split so that OLD is never read on an invitation INSERT.
+
+Carried forward:
+- A null-entity (operator) invitation is refused by the gate's lock (42501). POLY-87 needs its definer path.
+- The poly_govern `audit_event` INSERT policy is `WITH CHECK (true)`. That is acceptable only while every poly_govern definer is allowlisted (C-15).
