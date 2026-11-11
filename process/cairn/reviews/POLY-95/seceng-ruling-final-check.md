@@ -21,3 +21,12 @@ Once A1 lands, seceng writes SECURITY §6.2 to item 3's rule. Until then §6.2 s
 **Approved. The build may start.** S1–S9 and A1 items 2–4 are met. Item 1 applies in its fail-on-exists form, with one line to add:
 
 - **R6 step 4:** after `ln`, `sync` the `spool/wal/` directory before exiting 0. Without it, a power loss after Postgres records success can lose the link itself: the segment is marked archived but is missing from the spool, a silent WAL gap. The builder applies this; it is not a re-issue.
+
+## Trivy finding on gosu (CI run 42984439494 @ 22f192b)
+
+**Ruling: remove gosu from the image. No accepted risk, no ignore entry.**
+- Postgres runs as `999:999` (R5), so the entrypoint never calls gosu. Its one gosu call (`docker-entrypoint.sh` line 343, measured in the base image) runs only when the uid is 0. The backup container is also non-root. The binary is dead weight carrying 26 fixable CVEs.
+- `infra/postgres/Dockerfile`: add `rm -f /usr/local/bin/gosu` to the existing `RUN`. Trivy applies layer whiteouts, so it does not report a file a later layer deletes (unmeasured; the next scan shows it).
+- Removing it also fails closed: a container started as root dies at `exec gosu`, so it cannot run Postgres as root.
+- The image job adds `test ! -e /usr/local/bin/gosu` next to the `age --version` check.
+- A `.trivyignore` entry, or a severity or `--ignore-unfixed` change, for this path is refused.
