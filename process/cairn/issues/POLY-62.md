@@ -1,7 +1,7 @@
 ---
 id: POLY-62
 title: Entity + membership schema
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83]
@@ -108,3 +108,7 @@ Carried forward:
 ### @team-lead — 2026-11-10
 
 PR opened: https://github.com/richmosko/polycarpic/pull/109. Awaiting Validate. Verified build `8779392` (qa gate 3, architect verdict `ff53ec9`, seceng `reviewed @ 8779392`); `cairn gate --head 8779392` PASS. Open: the CI-time guard (at most +15 s on the `db` job), read from the PR's run.
+
+### @team-lead — 2026-11-10
+
+Validate passed; merging via PR #109. Closing. qa-engineer: gate 3 green at `8779392`, CI-time axis PASS on run 42967381790 (file time +3.4 s against the +15 s cap; `db` job 160 s of 180 s). Principal approved the merge 2026-11-11.
