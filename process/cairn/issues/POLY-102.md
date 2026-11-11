@@ -1,12 +1,12 @@
 ---
 id: POLY-102
 title: CI: generated-output freshness
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-96]
 assignee: devops-engineer
-paths: [scripts/cairn/check_dist_freshness.py, .github/workflows/ci.yml, infra/ci/**]
+paths: [process/cairn/issues/POLY-102.md, process/cairn/reviews/POLY-102/**, scripts/cairn/check_dist_freshness.py, scripts/cairn/tests/**, .github/workflows/ci.yml, infra/ci/**, tests/ci/**, tests/db/**, package.json, eslint.config.js]
 labels: [ci, tooling]
 priority: P1
 pr: null
@@ -49,3 +49,7 @@ A-1's suspect was wrong. The architect measured it in the POLY-62 ruling (`proce
 Where the job stands after POLY-62 (qa-engineer, PR #109 run 42967381790, one run): `db` job 160 s of its 180 s budget (was 146 s); battery step 139 s (was 130 s); vitest file lines 117.4 s (was 114.0 s). The new files cost `tenancy` 9.7 s, `matrix` 3.3 s, `pgtap` 2.5 s; `runner` came in at 39.1 s, which reads as run-to-run noise and flatters the delta.
 
 The budget warns and never fails (`infra/ci/job-report.mjs` always exits 0), so nothing blocks a merge when it is exceeded. POLY-86 is the next feature that grows the battery; this issue's `db` criterion lands before it.
+
+### @team-lead — 2026-11-10
+
+Feature started. Branch: `feature/poly-102-ci-generated-output-freshness`.
