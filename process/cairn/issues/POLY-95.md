@@ -1,7 +1,7 @@
 ---
 id: POLY-95
 title: Compose, Postgres config + lint
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -41,3 +41,7 @@ Gate 1 ruling issued for seceng review: process/cairn/reviews/POLY-95/ruling.md 
 ### @team-lead — 2026-11-11
 
 PR opened: https://github.com/richmosko/polycarpic/pull/115. Verdict pass @ 492242d, seceng pass @ 1b29e1a, CI run 42987963075 green @ c4c1ae3.
+
+### @team-lead — 2026-11-11
+
+Validate passed; merging via PR #115. Closing.
