@@ -27,9 +27,9 @@
   <p class="doc-subtitle">polycarpic — personal budgeting &amp; wealth management (virtual Single Family Office)</p>
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
-    <span><strong>Status:</strong> Approved v0.17 at the Plan gate (Principal, 2026-11-09; POLY-127) — matures alongside Implement</span>
-    <span><strong>Version:</strong> 0.17</span>
-    <span><strong>Last updated:</strong> 2026-11-08</span>
+    <span><strong>Status:</strong> Approved</span>
+    <span><strong>Version:</strong> 0.17.1</span>
+    <span><strong>Last updated:</strong> 2026-11-11</span>
   </div>
 </header>
 
@@ -527,7 +527,7 @@ flowchart TD
     <li><strong>A register line expands to its full journal entry</strong> in the same block as the Journal entries card: every leg, not just the one that hit this account, plus the correction trail where one exists, with actor attribution and the Correct entry action (flow 5.3). Its Journal ID links to the GL card.</li>
     <li><strong>Balance sheet map (prototype):</strong> a nested treemap on its own tab, Assets | Liabilities + Equity as equal halves, each element in its fixed categorical slot; each tile opens its register. Allocation's current-allocation map is the second instance of the pattern. Recommendation and limits: design-system-spec.md § General Ledger → Treemap prototype.</li>
     <li><strong>A leg always names its account by full path,</strong> root to leaf, in the expanded entry on the register and on the Journal entries card: Assets › Marketable securities › Schwab brokerage. The tree and the treemap show the leaf alone.</li>
-    <li><strong>Journal entries card:</strong> on its own tab, every posted entry header for the entity, newest first, with page size, date range (default This month, by ruling) and sort. A chevron opens the legs in the same block as Transactions' Posted tab. It lists a correction's three entries as three rows; the Posted tab rolls them into one.</li>
+    <li><strong>Journal entries card:</strong> on its own tab, every posted entry header for the entity, newest first, with page size, date range (default This month) and sort. A chevron opens the legs in the same block as Transactions' Posted tab. It lists a correction's three entries as three rows; the Posted tab rolls them into one.</li>
     <li><strong>Journal ID:</strong> a short per-entity display number, <code>JE-000214</code>, assigned at posting and distinct from the UUID key: gapless, serialized per entity, never reused. It leads the Journal entries card, the Posted tab and the register, copied on hover, so any entry can be cited exactly.</li>
     <li><strong>Journal ID links:</strong> on the register the ID links to the entry's row on the Journal entries card (<code>general-ledger.html#je-000212</code>), and on the Posted tab the ID opens a popover whose Open in General Ledger link goes to the same row (flow 5.3). Arriving selects the tab, highlights the row and opens its legs, widening the date range if needed. An exact ID in search resolves to the same row within the active entity; no search surface is drawn yet (design-system-spec.md § Header).</li>
     <li><strong>Reversed entries stay listed, muted:</strong> no filter hides them. A Reversed original and its reversal render in muted ink, the original's description struck through; the Journal ID keeps full ink because it is the reference.</li>
@@ -741,9 +741,7 @@ flowchart TD
   <p class="section-hint">Unresolved design decisions and assumptions that could be wrong. Batched to team-lead for relay to the Principal — not blocking.</p>
   <ul>
     <li><strong>Avatar cluster overflow:</strong> the "+N" fold for 4th+ members is specified but not yet shown live in either reference screen (both currently have ≤2 members) — worth a quick visual check once a real multi-member entity exists.</li>
-    <li>No CVD (color-vision-deficiency) simulation run on the palette yet — high priority given how central the brand hues are (recommended before lock, design-system-spec.md § Accessibility).</li>
     <li>Native iOS/macOS token export format (kickoff §2.10) — not yet decided, non-blocking for web.</li>
-    <li><code>prototype/</code> throwaway UX prototype (kickoff §2.9) not yet built — confirm ownership/timing with team-lead.</li>
   </ul>
 </section>
 
@@ -760,8 +758,6 @@ flowchart TD
     <dd>A: Hand-edit <code>docs/DESIGN/comments.md</code> with <code>## §&lt;section-id&gt;</code> blocks, or run <code>/serve-docs DESIGN</code> and use the inline <code>+ Comment</code> widget. Then run <code>/refine-doc DESIGN</code>. See <a href="../../process/WORKFLOW.md">process/WORKFLOW.md</a> → Doc review loop.</dd>
     <dt>Q: Why is the design system in <code>docs/DESIGN/</code> and not in the app's source?</dt>
     <dd>A: It's the design <em>deliverable</em> — the contract. During Implement, <code>frontend-lead</code> imports or derives the app's real stylesheets from <code>tokens.css</code>/<code>screen.css</code>.</dd>
-    <dt>Q: Where did <code>variants.css</code> go?</dt>
-    <dd>A: It was generated infrastructure for the <code>cairn</code> tracker tool's own theme switcher, never part of the product — removed from this directory (POLY-78 relocates its generator target the same way). See design-system-spec.md § Provenance &amp; shared tooling.</dd>
   </dl>
 </section>
 
