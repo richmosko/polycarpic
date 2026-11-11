@@ -140,6 +140,15 @@ describe('ci.yml: the work jobs (criteria 2, 5, 6, 10)', () => {
     const others = ['lint', 'unit', 'image', 'cairn'].map((id) => runOf(w.jobs[id]!)).join('\n');
     expect(others).not.toMatch(/tests\/db\/vitest/);
   });
+  it('image job: A4 built-image check sits between build and scan  [red if: removed or moved after scan]', () => {
+    const ss = steps(w.jobs.image!).map((x) => `${x.uses ?? ''} ${x.run ?? ''}`);
+    const b = ss.findIndex((x) => /image\.sh build/.test(x));
+    const c = ss.findIndex((x) => /image\.sh check|usr\/local\/lib\/node_modules/.test(x));
+    const sc = ss.findIndex((x) => /image\.sh scan/.test(x));
+    expect(b).toBeGreaterThanOrEqual(0);
+    expect(c).toBeGreaterThan(b);
+    expect(c).toBeLessThan(sc);
+  });
   it('image builds locally via image.sh, no push (S96-8)', () => {
     const b = runOf(w.jobs.image!);
     expect(b).toMatch(/infra\/ci\/image\.sh build/);
