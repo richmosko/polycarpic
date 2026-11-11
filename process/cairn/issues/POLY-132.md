@@ -24,6 +24,7 @@ Fix-forward for POLY-96 (ruling `process/cairn/reviews/POLY-96/ruling.md` §6: a
 - [ ] A build.yml run on `main` is green end to end; `sha-<commit>-<run_id>` exists in GHCR.
 - [ ] `gh attestation verify oci://ghcr.io/richmosko/polycarpic@<digest> --repo richmosko/polycarpic --signer-workflow richmosko/polycarpic/.github/workflows/build.yml --source-ref refs/heads/main --deny-self-hosted-runners` passes from the lead's machine, and the SBOM attestation is present on the same digest.
 - [ ] `gh workflow run release.yml -f commit=<that commit>` (dry run) prints the same digest as build.yml's summary (POLY-96 criterion 3, real-run half).
+- [ ] The container that `infra/ci/image.sh check` starts has no network and receives no environment, volume, added capability or host namespace, for a local tag and for a registry digest alike (seceng review of d9be8c0: the check runs a shell inside a not-yet-scanned image, in the job that can mint attestation tokens).
 - [ ] The design docs gain no status, changelog or "Changes in" text from this issue (user rule, 2026-11-11).
 
 ## Comments
@@ -54,3 +55,7 @@ NOT exercised (main only): the GHCR push itself, TRIVY_USERNAME/PASSWORD registr
 Side effect, benign: after the check's pull, Trivy (`image.sh scan`, then `sbom`) can read the daemon copy of the same digest before going to the registry, so the scan does not depend on `TRIVY_USERNAME`/`TRIVY_PASSWORD` working on the runner `(unmeasured)`. The subject is identical either way.
 
 Post-merge (lead; criteria 1, 4–6): build.yml green on `main` end to end, `gh attestation verify … --source-ref refs/heads/main --deny-self-hosted-runners`, the SBOM attestation present, and the release.yml dry run printing the same digest. Seceng-96's section has not reached me; it lands beside this verdict as `process/cairn/reviews/POLY-132/seceng.md` when it does.
+
+### @team-lead — 2026-11-10
+
+Scope note: the check-container isolation criterion was added after the architect's verdict at af04897, from seceng's review of d9be8c0 (`process/cairn/reviews/POLY-132/seceng.md`). It rides this issue because every build.yml change needs its own merge to prove on `main`. Also noted from the architect: once the check has pulled the digest, Trivy may scan the local copy, so a green run on `main` does not prove Trivy's own registry login; it matters only if the pull is ever removed.
