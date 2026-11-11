@@ -37,3 +37,7 @@ Build reviewed at d5b6d84 against ruling 9e59e9b + A1 (703fa9b) + A2 (905b929). 
 - F9: drop the xcaddy rebuild and its `--replace` when a Caddy release carries golang.org/x/net ≥ 0.62.0; the image guard then returns to +150 s.
 - F10: `POLY_APP_IMAGE`, `POLY_TOOLS_IMAGE` and `POLY_CADDY_IMAGE` default to an all-zero digest (`:-…@sha256:000…`), which fails closed at pull, but `${…:?}` like `POLY_POSTGRES_IMAGE` fails at render, earlier and with a named reason. Change with POLY-100, which sets all four.
 - F11, F12: as in `seceng-build-review.md` (edge alias rule; uploader access to `.age` files by default POSIX ACL for uid 10005). F12 is a design gap, not a nicety: as provisioned today the uploader cannot read or delete what it must ship, so it gates the first real backup.
+
+## Conditions met
+
+C1, C2 and SC1–SC5 are in the tree at c4c1ae3 (seceng pass, 1b29e1a). CI run 42987963075 @ c4c1ae3 is green: lint 83 s, db 108 s, image 202 s, all inside the guards above. **The verdict is pass; POLY-95 may merge.**
