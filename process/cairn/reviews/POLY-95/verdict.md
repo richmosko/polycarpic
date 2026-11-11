@@ -24,6 +24,8 @@ Build reviewed at d5b6d84 against ruling 9e59e9b + A1 (703fa9b) + A2 (905b929). 
 - **C1.** `edge.yml` passes `POLY_TLS: ${POLY_TLS:?}` to caddy (the ACME account email on a real host; `internal` only in tests); `policy.json` `allowedVars` gains it; INFRA §2.2 or §7.1 names it as an operator value. Test: `caddy adapt` on the Caddyfile with exactly the environment the lint renders for `edge.yml` exits 0 **and** prints no `"level":"error"` line (adapt can log the error yet still exit 0, so check both).
 - **C2.** Gate the image job's Node/pnpm setup steps on `needs.changes.outputs.image == 'true'`, like the steps they serve. `tests/ci` structure test asserts it.
 
+- **SC1–SC5** (seceng build review, `seceng-build-review.md` @ 65b44fd) are pre-merge conditions of this verdict too, as written there: binds keyed by `<project>.<service>`; non-bind/tmpfs service volumes and any top-level `volumes:` fail; the staging allowlist runs before `basic_auth` in a literal `route` (403 for outside clients with or without credentials); backup binds `spool/dump` and `spool/premigration` only; the recipient file is `/etc/polycarpic/age-recipients.txt` everywhere (INFRA's two mentions are the builder's).
+
 ## Accepted as built
 
 - `archive-wal.sh` is POSIX `sh` with `set -eu` and no pipeline, so `pipefail` has nothing to guard.
@@ -34,3 +36,4 @@ Build reviewed at d5b6d84 against ruling 9e59e9b + A1 (703fa9b) + A2 (905b929). 
 
 - F9: drop the xcaddy rebuild and its `--replace` when a Caddy release carries golang.org/x/net ≥ 0.62.0; the image guard then returns to +150 s.
 - F10: `POLY_APP_IMAGE`, `POLY_TOOLS_IMAGE` and `POLY_CADDY_IMAGE` default to an all-zero digest (`:-…@sha256:000…`), which fails closed at pull, but `${…:?}` like `POLY_POSTGRES_IMAGE` fails at render, earlier and with a named reason. Change with POLY-100, which sets all four.
+- F11, F12: as in `seceng-build-review.md` (edge alias rule; uploader access to `.age` files by default POSIX ACL for uid 10005). F12 is a design gap, not a nicety: as provisioned today the uploader cannot read or delete what it must ship, so it gates the first real backup.
