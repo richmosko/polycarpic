@@ -18,11 +18,11 @@ INFRA §2.2: prod and staging compose projects, backup-net (internal, fixed subn
 
 ## Acceptance criteria
 
-- [ ] The lint has pass and fail fixtures for every INFRA §2.2 rule, including a service on both project networks, ports: outside caddy, db_password_backup in a second service, backup-net not internal, and a subnet differing from pg_hba.
-- [ ] A CI container runs SHOW on each Postgres setting (max_replication_slots=2, max_wal_senders=3, max_slot_wal_keep_size=2GB, log_connections).
-- [ ] archive_command encrypts with age and fails closed when the target exists.
-- [ ] The Postgres tag and digest are written once, on the `FROM postgres:17.N@sha256:…` line of the postgres derivative image (INFRA §6.1a); compose, the CI Postgres service and the backup container read it from there, and a fixture with a retyped tag fails the lint.
-- [ ] A lint check fails when the major on that `FROM` line differs from `infra/postgres-major` (pass and fail fixtures). It runs in the infra lint job, so POLY-96 only needs to run that job on `infra/**` changes, which its criteria already require.
+- [x] The lint has pass and fail fixtures for every INFRA §2.2 rule, including a service on both project networks, ports: outside caddy, db_password_backup in a second service, backup-net not internal, and a subnet differing from pg_hba. — tests/infra/lint.test.ts: pass fixtures plus the fail table (`web (not caddy) on both projects' edge networks`, `ports: on web`, `db_password_backup in a second service`, `backup-net not internal`, `backup-net subnet differs from pg_hba`)
+- [x] A CI container runs SHOW on each Postgres setting (max_replication_slots=2, max_wal_senders=3, max_slot_wal_keep_size=2GB, log_connections). — tests/infra/image/postgres.test.ts: `SHOW %s = %s` for every setting, plus the sourcefile check
+- [x] archive_command encrypts with age and fails closed when the target exists. — tests/infra/image/postgres.test.ts: `archive_command` block (`one segment -> <f>.age` decrypts byte-identical; `a DIFFERENT target already exists -> non-zero`; `the IDENTICAL segment re-archived -> non-zero`)
+- [x] The Postgres tag and digest are written once, on the `FROM postgres:17.N@sha256:…` line of the postgres derivative image (INFRA §6.1a); compose, the CI Postgres service and the backup container read it from there, and a fixture with a retyped tag fails the lint. — tests/infra/lint.test.ts: `compose retypes the postgres tag`, `compose retypes tag+digest on staging`, `FROM line without a digest`; tests/infra/wiring.test.ts: `one place for the Postgres tag and digest`
+- [x] A lint check fails when the major on that `FROM` line differs from `infra/postgres-major` (pass and fail fixtures). It runs in the infra lint job, so POLY-96 only needs to run that job on `infra/**` changes, which its criteria already require. — tests/infra/lint.test.ts: `FROM major 18, infra/postgres-major 17`, `infra/postgres-major 18, FROM major 17`, pass fixture `a different major is clean (18 / 18.1)`; tests/infra/wiring.test.ts: lint job runs the lint
 
 ## Comments
 
