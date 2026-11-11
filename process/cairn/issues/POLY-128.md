@@ -1,7 +1,7 @@
 ---
 id: POLY-128
 title: App shell + DESIGN tokens
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-82]
@@ -9,7 +9,7 @@ assignee: frontend-lead
 paths: [apps/web/**, tests/**, layers.json, eslint.config.js, turbo.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, docs/DESIGN/**, docs/ARCH/**, docs/SECURITY/**, process/cairn/issues/POLY-128.md, process/cairn/reviews/POLY-128/**, scripts/layers/**, infra/ci/changes.mjs, .github/workflows/ci.yml]
 labels: [enabler, frontend]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/110
 created: 2026-11-08
 updated: 2026-11-10
 ---
@@ -83,3 +83,7 @@ Accepted deviations:
 - The Playwright browser cache is keyed on the lockfile hash.
 - Duplicate `e2e` and `test:e2e` scripts.
 - sr-only names on the collapse toggle and the avatar trigger.
+
+### @team-lead — 2026-11-10
+
+PR opened: https://github.com/richmosko/polycarpic/pull/110. Awaiting Validate. Verified build `89f020a` (qa gate 3, architect verdict `71d16a3`, seceng `reviewed @ 89f020a`, lead's visual leg V1–V7); `cairn gate --head 89f020a` PASS. Open: the verdict's CI condition (e2e adds at most 150 s to `unit`; `image` green) and the `lint` job, both read from the PR's run.
