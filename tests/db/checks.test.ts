@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { ROOT, must } from './helpers/pg';
-import { MIGRATE_CLI, applied, captureRun, cloneMigrated, dbEnv, freshDb, writeMigrations } from './helpers/api';
+import { MIGRATE_CLI, applied, captureRun, tableExists, cloneMigrated, dbEnv, freshDb, writeMigrations } from './helpers/api';
 
 const checkPnpm = (dir: string) => {
   const p = spawnSync('pnpm', ['--filter', '@poly/db', 'check-migrations', dir], { encoding: 'utf8', cwd: ROOT });
@@ -227,6 +227,7 @@ describe('migrate run() reads only the env it is given (POLY-136 item 4, cut C1)
   const load = () => import('../../apps/migrate/src/run.ts') as Promise<{ run: (argv: string[], env: NodeJS.ProcessEnv) => Promise<number> }>;
   // C2 (seceng, ruling addendum 2): both directions for each of the three commands.
   const full = (db: string, dir: string): Record<string, string> => ({ ...cfg(), ...dbEnv('poly_migrator', db), POLY_MIGRATIONS_DIR: dir });
+  const tracked = (db: string) => (tableExists(db, 'drizzle.__drizzle_migrations') ? applied(db) : []);
   const COMMANDS: [string, string[], number][] = [['no argument', [], 0], ['--plan', ['--plan'], 3], ['check-config', ['check-config'], 0]];
   for (const [name, argv, normal] of COMMANDS) {
     it(`${name}: (a) env lacks DATABASE_* while process.env holds a valid set -> exit 1  [red if: run falls back to or merges process.env]`, async () => {
@@ -236,7 +237,7 @@ describe('migrate run() reads only the env it is given (POLY-136 item 4, cut C1)
       for (const [k, v] of Object.entries(full(db, dir))) vi.stubEnv(k, v);
       try {
         expect(await run(argv, {})).toBe(1);
-        expect(applied(db)).toEqual([]);
+        expect(tracked(db)).toEqual([]);
       } finally { vi.unstubAllEnvs(); }
     });
     it(`${name}: (b) a valid env with a stray DATABASE_URL and a bogus POLY_MIGRATIONS_DIR in process.env -> the normal result, from the env-named folder  [red if: process.env overrides or is merged over env]`, async () => {
@@ -247,7 +248,7 @@ describe('migrate run() reads only the env it is given (POLY-136 item 4, cut C1)
       vi.stubEnv('POLY_MIGRATIONS_DIR', '/nonexistent/poly136');
       try {
         expect(await run(argv, full(db, dir))).toBe(normal);
-        expect(applied(db).length).toBe(argv[0] === undefined ? 1 : 0);
+        expect(tracked(db).length).toBe(argv[0] === undefined ? 1 : 0);
       } finally { vi.unstubAllEnvs(); }
     });
   }
