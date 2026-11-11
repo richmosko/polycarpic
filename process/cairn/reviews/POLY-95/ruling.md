@@ -97,3 +97,9 @@ Test (image job, the measurement S9 asks for): a `user: <uid>` service reads a `
 - F6: POLY-97 provision.sh sets each secret file `0400` owned by its consuming uid, directories `0700`, and the Postgres data dirs to uid 999; provision-check asserts them and that no file is world-readable.
 - F7: the monitoring issue (INFRA §6.5) alerts on `pg_stat_archiver.failed_count` rising, beside the 2-hour spool alert.
 - F8: POLY-100's deploy uses explicit `-f` files from the verified bundle only, never a working-directory compose file, and runs the compose-policy lint (or checks the bundle digest) before `up`.
+
+## Addendum A1 — seceng final check (`seceng-ruling-final-check.md`)
+
+Seceng's points 2 and 4 are already in R1, R5 and R7 above; point 1's sum-match path no longer exists (R6 has no `.sums/`). Two changes:
+- **R6 step 4:** after `ln`, `sync` the `spool/wal/` directory as well, so a power loss leaves either no `<f>.age` or a complete one.
+- **R8 and R7's secret-path rule are replaced:** secrets live in per-service directories `/etc/polycarpic/{secrets,staging-secrets}/<service>/<name>`; each directory is `root:<service gid>` `0750`, each file `0440`. Every service has a distinct uid **and** gid; none uses `group_add`. A secret with two consumers (`auth_secret`, `resend_api_key`, `plaid_secret`, …) is two files, one per service directory. Lint: a service's `file:` sources lie under its own directory only (prod under `secrets/`, staging under `staging-secrets/`). R8's test becomes: a service reads `0440` files in its own directory, and is refused a file in another service's directory. F6 reads the same way (POLY-97 provisions directories `root:<gid> 0750`, files `0440`). seceng-95 writes SECURITY §6.2 to this rule.
