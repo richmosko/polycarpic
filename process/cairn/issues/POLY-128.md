@@ -20,7 +20,7 @@ Gap filed at POLY-126's trace: POLY-M1's definition of done says "the app shell 
 
 - [ ] Every DESIGN token (surfaces, actions, financial, lines, charts, categorical, sidebar) is defined once as a CSS variable in apps/web, and a lint or test refuses a raw hex colour in apps/web/src outside that file.
 - [ ] The shell renders the seven sidebar items in DESIGN's order, the avatar popover at the foot, and the one-row top bar; there is no persistent header.
-- [ ] A Playwright smoke test loads the signed-in shell in light and dark mode and asserts token values on the sidebar and top row.
+- [ ] A Playwright smoke test loads the shell, with no session, in light and dark mode and asserts token values on the sidebar and top row. Loading it signed in, with the user's name and avatar at the foot, is POLY-86's.
 - [ ] The shell meets DESIGN #accessibility for keyboard focus order and contrast on its own elements.
 - [ ] Lint refuses `{@html}` in every .svelte file under apps/ and packages/ (SECURITY C-41). The one sanitizing component is the only allowed exception; it is named in the rule when it lands, and until then there is none. A fixture using `{@html}` fails, and so does the same fixture with an inline `eslint-disable` for that rule (SECURITY A-39).
 
@@ -29,3 +29,16 @@ Gap filed at POLY-126's trace: POLY-M1's definition of done says "the app shell 
 ### @team-lead — 2026-11-10
 
 Feature started. Branch: `feature/poly-128-app-shell-design-tokens`. Runs in parallel with POLY-62 (tenancy schema); the two share only config files (`eslint.config.js`, `package.json`, `pnpm-lock.yaml`), so the second PR to merge takes main first. `paths` widened from the shell files to `apps/web/**`: `apps/web` has no SvelteKit scaffold yet, so this loop adds it.
+
+### @architect — 2026-11-10
+
+**Ruling (gate 1):** `process/cairn/reviews/POLY-128/ruling.md`. Seam and guards in brief:
+- SvelteKit (adapter-node) rooted at `apps/web`; POLY-85's `main.ts`, `startup.ts`, `ops/` untouched; the image does not serve the shell (POLY-88 mounts it). Dockerfile and `layers.json` unchanged.
+- Tokens: `apps/web/src/app.css` is the one colour-literal file, `:root`/`.dark` copied from DESIGN `tokens.css`; a parity test holds them equal and a hex/colour-function scan refuses literals elsewhere in `apps/web/src`. DESIGN's token file joins the turbo inputs and the CI `node` filter.
+- Seven nav items from one `NAV` list (DESIGN says eight with Tax: open with the lead).
+- No session stand-in in the app: the layout returns `{ session: locals.session ?? null }` (`ShellSession`, no token); criterion 3 amended in place, the signed-in half moves to POLY-86.
+- Entity selector takes `[]`; no `@poly/tenancy` import.
+- Theme by the `poly-theme` cookie, set server-side; `kit.csp` per SECURITY C-07.
+- Lint in `scripts/layers/generate.mjs`: `.svelte` joins the layer rules; `svelte/no-at-html-tags` with `noInlineConfig` on `.svelte` files (C-41, A-39).
+- Playwright + axe in the `unit` job behind `turbo run e2e --affected`; ≤ 150 s added (unmeasured, reported at build-green).
+- Needs paths: `scripts/layers/**`, `infra/ci/changes.mjs`, `.github/workflows/ci.yml`.
