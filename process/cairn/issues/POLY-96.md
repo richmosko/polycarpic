@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [.github/workflows/ci.yml, .github/workflows/build.yml, .github/workflows/release.yml, infra/ci/**, process/cairn/issues/POLY-96.md, tests/**, turbo.json, Dockerfile, package.json, pnpm-lock.yaml, apps/*/package.json, packages/*/package.json, eslint.config.js, layers.json, docs/INFRA/**, docs/SECURITY/**]
+paths: [.github/workflows/ci.yml, .github/workflows/build.yml, .github/workflows/release.yml, infra/ci/**, process/cairn/issues/POLY-96.md, process/cairn/reviews/POLY-96/**, tests/**, turbo.json, Dockerfile, .dockerignore, .trivyignore, .gitleaks.toml, package.json, pnpm-lock.yaml, apps/*/package.json, packages/*/package.json, eslint.config.js, layers.json, docs/INFRA/**, docs/SECURITY/**]
 labels: [ci, supply-chain]
 priority: null
 pr: null
