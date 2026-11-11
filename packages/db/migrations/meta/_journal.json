@@ -15,6 +15,20 @@
       "when": 1794294098532,
       "tag": "0001_app_foundation",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794374055416,
+      "tag": "0002_tenancy_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794374060702,
+      "tag": "0003_tenancy_rules",
+      "breakpoints": true
     }
   ]
 }
