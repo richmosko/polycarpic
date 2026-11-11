@@ -45,3 +45,15 @@ Add to the acceptance criteria when this is scoped:
 ### @team-lead — 2026-11-10
 
 Feature started. Branch: `feature/poly-96-ci-change-filter-build-attest`. First commit also carries the second-session promotion (POLY-62, 86, 95, 96, 97, 128 → todo; user-approved 2026-11-11).
+
+### @architect — 2026-11-10
+
+**Gate 1 — ruling.** `process/cairn/reviews/POLY-96/ruling.md` (this commit) is the gating ruling; seceng-96 S96-1..22 folded (§7).
+
+- Seam (§1–2): ci.yml jobs `changes`, `guard` (pins + S96-7 + gitleaks, always on), `lint`, `unit`, `db`, `image`, aggregate `app` (`if: always()`, fails closed, including a skipped job whose output said run). `cairn` keeps id/name/filter; only S96-7 env moves + `persist-credentials: false`.
+- Filter outputs `node`, `layers`, `db`, `image`, `ci`; mapping in `infra/ci/changes.mjs`; dispatch input `base` for real-run probes.
+- Tests: `tests/ci/` (own vitest config), run by `lint` on `ci`. Local vs real-run evidence and post-merge confirmation: §6.
+- build.yml: push → scan pushed digest → SBOM → attest, no cache, main-ref only; weekly = scan-only. release.yml: `verify` / `publish` split, never builds, `--source-ref refs/heads/main`.
+- Criterion 11: CI emits an artifact in the test-runs schema; the ingest half needs a lead decision (§3, O1).
+- paths: add `process/cairn/reviews/POLY-96/**`, `docs/SECURITY/**`, `.trivyignore`, `.dockerignore`, `.gitleaks.toml` if needed (§8).
+- Open for the lead: O1 ingest, O2 lockfile → battery, O4 CodeQL follow-up id.
