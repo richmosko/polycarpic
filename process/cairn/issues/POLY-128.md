@@ -1,7 +1,7 @@
 ---
 id: POLY-128
 title: App shell + DESIGN tokens
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-82]
@@ -87,3 +87,7 @@ Accepted deviations:
 ### @team-lead — 2026-11-10
 
 PR opened: https://github.com/richmosko/polycarpic/pull/110. Awaiting Validate. Verified build `89f020a` (qa gate 3, architect verdict `71d16a3`, seceng `reviewed @ 89f020a`, lead's visual leg V1–V7); `cairn gate --head 89f020a` PASS. Open: the verdict's CI condition (e2e adds at most 150 s to `unit`; `image` green) and the `lint` job, both read from the PR's run.
+
+### @team-lead — 2026-11-10
+
+Validate passed; merging via PR #110. Closing. qa-engineer: gate 3 green at `7c77f8b` from a tree with `.svelte-kit/` deleted, lint read; PR run on the merged head `bb16fb3` all green (`unit` 1m21s, `image` pass). Architect verdict PASS, holding at `7c77f8b`; merged ARCH and SECURITY confirmed at `bb16fb3`. Principal approved the merge 2026-11-11.
