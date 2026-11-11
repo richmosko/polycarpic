@@ -21,9 +21,9 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-96-ci-change-filter-build-attest`
 - **Started:** 2026-11-11
 - **Goal:** put the product suites (lint, types, Vitest, DB battery) and the image build, scan and attestation into CI behind one required `app` check.
-- **Status:** In Progress
+- **Status:** In Review — PR [#106](https://github.com/richmosko/polycarpic/pull/106); gate 4 passed (architect + seceng). After merge: ruling §6 confirmations (first build on `main`, attestation verify, release dry run) and `app` into branch protection with the user.
 - **Carried from POLY-85:** follow-ups on POLY-81, POLY-88, POLY-100, POLY-121; ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature.
-- **Next:** second session is in `todo` (promoted 2026-11-11): POLY-62 and POLY-86 (identity roots), POLY-128 (app shell), then POLY-97 and POLY-95 (infra). POLY-131 held (P3).
+- **Next:** second session is in `todo` (promoted 2026-11-11): POLY-62 and POLY-86 (identity roots), POLY-128 (app shell), then POLY-97 and POLY-95 (infra). POLY-131 held (P3). Queued doc-update right after this merge: strip status history, "Changes" blocks and body narration from all five design docs (user directive 2026-11-11).
 
 ## Releases
 

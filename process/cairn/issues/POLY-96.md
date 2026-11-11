@@ -1,7 +1,7 @@
 ---
 id: POLY-96
 title: CI: change filter, build, attest
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [.github/workflows/ci.yml, .github/workflows/build.yml, .github/workflows/release.yml, infra/ci/**, process/cairn/issues/POLY-96.md, process/cairn/reviews/POLY-96/**, tests/**, turbo.json, Dockerfile, .dockerignore, .trivyignore, .gitleaks.toml, package.json, pnpm-lock.yaml, apps/*/package.json, packages/*/package.json, eslint.config.js, layers.json, docs/INFRA/**, docs/SECURITY/**, scripts/cairn/prices.json]
 labels: [ci, supply-chain]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/106
 created: 2026-11-08
 updated: 2026-11-10
 ---
@@ -95,3 +95,7 @@ Advisory, non-blocking (follow-ups at the lead's discretion):
 - A-1 `db` at 146 s is 81 % of its 180 s budget on day one (45 s locally); the gap is likely the pgTAP image build per run (unmeasured). Measure before the battery grows.
 - A-2 `aggregate.mjs` cross-checks one job per output (node→unit, image→image, …); a mis-wired `lint` `if:` for node/image is caught only by the static ci-workflow test, not at run time.
 - A-3 `image-<commit>` artifacts keep 90 days; a tag cut more than 90 days after a commit's last main build finds no digest and publishes nothing (fails closed). Weekly rebuilds refresh only the main tip.
+
+### @team-lead — 2026-11-10
+
+PR opened: https://github.com/richmosko/polycarpic/pull/106. Awaiting Validate. Finish gate green at 14b48ca (cairn suite 1975 OK) after 6029b61 priced `claude-fable-5-2` in `scripts/cairn/prices.json` — the only non-docs, non-tracker change since qa's green at cbcb54e.
