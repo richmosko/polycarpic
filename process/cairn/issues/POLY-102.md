@@ -1,14 +1,14 @@
 ---
 id: POLY-102
 title: CI: generated-output freshness
-status: backlog
+status: todo
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-96]
 assignee: devops-engineer
 paths: [scripts/cairn/check_dist_freshness.py, .github/workflows/ci.yml, infra/ci/**]
 labels: [ci, tooling]
-priority: null
+priority: P1
 pr: null
 created: 2026-11-08
 updated: 2026-11-10
@@ -21,6 +21,7 @@ Generalise the PT-58 freshness pattern (ancestry-based, exclude-list) to the com
 - [ ] Touching a source without regenerating fails; regenerating passes.
 - [ ] A doc-only PR never flips fresh to stale.
 - [ ] Same-second and cross-timezone commits behave (fixtures from the PT-58 tests).
+- [ ] The `db` CI job has headroom again before POLY-86 adds to the battery: a full-battery run finishes at least 30 s under its budget in `infra/ci/budgets.json`, by cutting the measured cost (the four CLI-spawning test files) or by a re-set budget with the measurement recorded. The 30 s figure is the lead's proposal; the ruling confirms or replaces it.
 
 ## Comments
 
@@ -38,3 +39,13 @@ CI follow-ups from the POLY-96 gate-4 verdict (architect advisories, non-blockin
 ### @team-lead — 2026-11-10
 
 Filter gap found on POLY-132 (PR #107): a change to `infra/ci/image.sh` did not run the `image` job on its own PR, because `infra/ci/**` sets only the `ci` output (POLY-96 ruling §2). The scripts a job runs should trigger that job: `infra/ci/image.sh` and `infra/ci/install-trivy.sh` → `image`. PR #107 needed a manual full dispatch (42957388903) to exercise its own change. Needs a line in `infra/ci/changes.mjs` and its test; a ruling §2 table change, so the architect rules it.
+
+### @team-lead — 2026-11-10
+
+Correction to A-1 above, and why this issue moves to `todo` at P1 (Principal's instruction, 2026-11-11).
+
+A-1's suspect was wrong. The architect measured it in the POLY-62 ruling (`process/cairn/reviews/POLY-62/ruling.md` R8, db job of run 42953687382, via `gh run view --log`): "The global setup (image build plus container start) is therefore ≤ 14.5 s. POLY-102 A-1's suspect is not the cost; the CLI-spawning files are." The file lines: `runner` 42.9 s, `ops-status` 34.1 s, `checks` 17.0 s, `ops-hardening` 11.1 s, together 105.1 s of 114.0 s. `battery`, `matrix`, `pgtap` and `wrappers` are 1.8–2.9 s each. A prebuilt pgTAP image would save at most about 14 s.
+
+Where the job stands after POLY-62 (qa-engineer, PR #109 run 42967381790, one run): `db` job 160 s of its 180 s budget (was 146 s); battery step 139 s (was 130 s); vitest file lines 117.4 s (was 114.0 s). The new files cost `tenancy` 9.7 s, `matrix` 3.3 s, `pgtap` 2.5 s; `runner` came in at 39.1 s, which reads as run-to-run noise and flatters the delta.
+
+The budget warns and never fails (`infra/ci/job-report.mjs` always exits 0), so nothing blocks a merge when it is exceeded. POLY-86 is the next feature that grows the battery; this issue's `db` criterion lands before it.
