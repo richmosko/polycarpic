@@ -28,7 +28,11 @@ const urlFor = (db: string) => server().superUrl.replace(/\/[^/]*$/, `/${db}`);
 export function must(sql: string, db = 'postgres'): { ok: true; rows: string[][] } {
   const id = ++seq;
   start().postMessage({ id, url: urlFor(db), sql });
-  while (Atomics.load(signal, 0) !== id) Atomics.wait(signal, 0, Atomics.load(signal, 0), 1000);
+  const deadline = Date.now() + 60_000;
+  while (Atomics.load(signal, 0) !== id) {
+    if (Date.now() > deadline) throw new Error('sql worker: no reply in 60 s');
+    Atomics.wait(signal, 0, Atomics.load(signal, 0), 1000);
+  }
   const msg = receiveMessageOnPort(port1)?.message as Reply | undefined;
   if (!msg || msg.id !== id) throw new Error('sql worker: no reply');
   if (!msg.ok) throw new Error(`psql failed: ${msg.err}\n--sql--\n${sql.slice(0, 400)}`);

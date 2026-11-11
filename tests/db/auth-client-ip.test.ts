@@ -71,8 +71,7 @@ describe('requireClientIp', () => {
   it('a session created with X-Forwarded-For lists that address in Settings → Sessions  [red if: session.ip_address is not filled from the header]', async () => {
     const u = e.seedUser();
     expect((await e.handle(signIn(u.email, PW, '203.0.113.5'), strict)).status).toBe(200);
-    const sid = e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`);
-    expect(sid).toBe(1);
+    expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`)).toBe(1);
     const list = await e.dbm.withTenant(e.dbs.sessionUserId(u.id), (await e.sessionRow(u.email)).id ?? '', (tx: any) => e.A.listSessions(tx));
     expect(list[0].ipAddress).toBe('203.0.113.5');
   });
