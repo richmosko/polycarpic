@@ -96,7 +96,9 @@ Verdict (gate 4): **pass**. Build 8779392 against the ruling (40f61ca + addendum
 | CI time R8 | Pending: the guard (≤ +15 s file time) is read from the PR's db job at finish. | lead at finish |
 
 Measured deviations, both accepted:
-- provisionPerson does a find, then an INSERT without ON CONFLICT, because the arbiter applies the SELECT policy. A concurrent first call fails with 23505. POLY-86's session loader must retry once on 23505. ARCH §3.1 is corrected to match in this commit.
+- provisionPerson does a find, then an INSERT without ON CONFLICT, because the arbiter applies the SELECT policy. ARCH §3.1 is corrected to match in this commit.
+  - **Criterion 1 is met as written.** Repeated calls return the same Person and create nothing new. Two concurrent first calls never leave a second Person or an ownerless entity: the unique self_user_id refuses the loser with 23505, and its transaction rolls back whole. Idempotent here means no duplicate state, not that a racing call never fails.
+  - **The POLY-86 criterion:** the session loader calls provisionPerson inside withTenant. On 23505 it retries the whole transaction once, and that retry returns `created: false` with the winner's Person. A second 23505, or any other error, fails the request and is never swallowed. Test: two concurrent first loads for one new user end with exactly one Person, one owner membership, and both requests succeeding.
 - The gate's branches are split so that OLD is never read on an invitation INSERT.
 
 Carried forward:
