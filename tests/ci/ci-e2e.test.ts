@@ -25,11 +25,12 @@ describe('ci.yml: web e2e in the unit job (POLY-128 R9)', () => {
   });
   // POLY-86: a live apt download must not be a precondition of the required check.
   const e2e = () => steps(w.jobs.unit!).find((s) => s.name?.startsWith('Web e2e'))!;
-  it('Chromium install is split from system deps, both bounded, deps non-fatal  [red if: `install --with-deps` returns, or the deps line loses `timeout` or `|| ...`]', () => {
+  it('Chromium install is split from system deps, both bounded, deps non-fatal  [red if: `install --with-deps` returns, or the deps line loses `timeout` or `|| ...`, or install-deps runs without the launch probe]', () => {
     const r = e2e().run ?? '';
     expect(r).not.toMatch(/--with-deps/);
     expect(r).toMatch(/timeout \d+ [^\n]*playwright install chromium/);
     expect(r).toMatch(/timeout \d+ [^\n]*playwright install-deps chromium[^\n]*\\?\n?[^\n]*\|\|/);
+    expect(r).toMatch(/if ! timeout \d+ [^\n]*node -e[^\n]*; then\n\s*timeout \d+ [^\n]*install-deps/);
   });
   it('the e2e step has its own timeout and still runs turbo e2e with no skip  [red if: timeout-minutes removed, or e2e made conditional on deps]', () => {
     expect(e2e()['timeout-minutes']).toBeLessThanOrEqual(10);
