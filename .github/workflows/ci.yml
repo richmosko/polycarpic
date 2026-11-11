@@ -429,14 +429,15 @@ jobs:
             pnpm exec turbo ls > affected.txt
           fi
           if ! grep -q '@poly/web' affected.txt; then echo "no e2e task affected"; exit 0; fi
-          # Browser download comes from the Playwright CDN (bounded). System libraries are used as the runner image has
-          # them; apt runs only when a launch probe fails, bounded and non-fatal. A browser that still cannot launch
-          # fails the e2e run below.
-          timeout 180 pnpm --filter @poly/web exec playwright install chromium
+          # Browser download comes from the Playwright CDN (a cache hit is a no-op), bounded. System libraries are used as
+          # the runner image has them: apt runs only when a launch probe fails, bounded and non-fatal, then the probe
+          # runs again and a second failure fails the step.
+          timeout -k 10 180 pnpm --filter @poly/web exec playwright install chromium
           probe='require("@playwright/test").chromium.launch().then((b) => b.close())'
-          if ! timeout 60 pnpm --filter @poly/web exec node -e "$probe" >/dev/null 2>&1; then
-            timeout 120 pnpm --filter @poly/web exec playwright install-deps chromium \
-              || echo "::warning::playwright install-deps failed or timed out; launching Chromium without it"
+          if ! timeout -k 10 60 pnpm --filter @poly/web exec node -e "$probe" >/dev/null 2>&1; then
+            timeout -k 10 120 pnpm --filter @poly/web exec playwright install-deps chromium \
+              || echo "::warning::playwright install-deps failed or timed out"
+            timeout -k 10 60 pnpm --filter @poly/web exec node -e "$probe" || { echo "::error::Chromium cannot launch"; exit 1; }
           fi
           if [ -n "$TURBO_SCM_BASE" ]; then
             pnpm exec turbo run e2e --affected
