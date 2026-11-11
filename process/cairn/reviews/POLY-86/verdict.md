@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: PASS at d100466 on the code; F12 is reopened (below).** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
+**Result: PASS at d100466 on the code; F12 is confirmed at 4daac16 (below).** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -106,3 +106,13 @@ The verdict re-closes on the confirmed fix sha plus a green PR check.
 - **Measured at the fix sha on a full run:** the e2e step time is within 10 s of the run before the fix, about 60 s, whether apt is reachable or not.
 
 The verdict re-closes on the confirmed fix sha, that measurement, and a green PR #116 check.
+
+**F12 confirmed at 4daac16 (supersedes 2bf29a3):**
+- The probe is a bounded headless Chromium launch (`timeout 60`). `install-deps` runs only when the probe fails, under `timeout 120`, and is non-fatal.
+- The browser install runs under `timeout 180`, and the step has `timeout-minutes: 8`.
+- There is no second probe. `turbo run e2e` takes its place: a Chromium that still cannot launch fails every spec, and so the step. I accept that as equivalent: it fails closed, and nothing is skipped.
+- `tests/ci/ci-e2e.test.ts` asserts the shape. There is no new job.
+- **Measured:** dispatched run 43060691103 is green. The e2e step took 46 s and the probe passed, so no apt ran. That is within the pass line (about 60 s or less, without the 120 s wait).
+
+**Result: PASS.** It closes on a green PR #116 check at 4daac16 or later.
+
