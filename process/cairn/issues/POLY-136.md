@@ -21,7 +21,7 @@ A batch of small follow-ups from the POLY-96 and POLY-102 loops. None gates a fe
 Ruling: `process/cairn/reviews/POLY-136/ruling.md`. Item 4 lands and is proven first.
 
 - [ ] 1. Journal ↔ file check in `packages/db/src/migrations-check.ts`: `checkJournalFiles`, called from `checkFolder`, fails on any `.sql` or `meta/*_snapshot.json` without a journal entry and on any entry missing either file. Each problem prints `journal-files: <file>: <detail>`; the script exits 1. A stray migration outside the journal never runs, but it misleads review.
-- [ ] 2. `infra/ci/aggregate.mjs` checks every job each filter output gates (`REQUIRED`: node→lint+unit, layers→lint, ci→lint, image→lint+unit+image, db→db), and a test ties `REQUIRED` to the job-level `if:`s in ci.yml.
+- [ ] 2. `infra/ci/aggregate.mjs` checks every job each filter output gates (`REQUIRED`: node→lint+unit+image, layers→lint, ci→lint, image→lint+unit+image, db→db), and a test ties `REQUIRED` to the job-level `if:`s in ci.yml.
 - [ ] 3. `image-<commit>` artifacts are kept 90 days (the public-repo ceiling). The INFRA release runbook states the window and what to do past it; a test ties the runbook's number to build.yml's `retention-days`.
 - [ ] 4. `db` CI job: median ≤ 130 s over five sequential full dispatch runs, none ≥ 150 s, with no fewer `db` tests (≥ 335). Cuts C1 to C3 in the ruling.
 - [ ] 5. `tests/ci/ci-e2e.test.ts` allows exactly one `exit 0` (the not-affected branch, before the browser install); any other zero, bare or variable exit in the e2e step is red.

@@ -85,3 +85,7 @@ devops-engineer-136 pushes `scratch/poly-136-e2e-fallback` (from the branch head
 | Item 6 | scratch run result on the issue; scratch branch deleted; no scratch commit in the PR |
 | Item 7 | strict CI install green, or README fallback with the reason recorded |
 | Scope | changes within paths; `guard-push` clean; no prod behaviour change beyond the `cli.ts` → `run.ts` split (same exit codes and messages) |
+
+## Addendum 1: REQUIRED for `node`
+
+Item 2's map was wrong for `node`. In ci.yml the `image` job's `if:` is `image == 'true' || node == 'true'`, so `REQUIRED.node` is `['lint','unit','image']`. The rule is the one item 2 states: REQUIRED is whatever the job-level `if:`s in ci.yml say, and the drift test settles any difference. The aggregate tests also cover node→image (red when `image` is skipped and node=true). AC 2 is corrected in place.
