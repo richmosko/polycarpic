@@ -55,3 +55,9 @@ To build here:
 ### @team-lead — 2026-11-10
 
 `cairn guard-commit` has no merge-commit exemption (found 2026-11-11, merging `main` into `feature/poly-128-*` after PR #109). A merge of `main` stages the incoming `process/cairn/issues/POLY-62.md`, whose already-merged comments are by two authors, and the pre-commit hook refuses it as a foreign uncommitted hunk. `guard-push` already skips merges (`--no-merges`); `guard-commit` does not look at `MERGE_HEAD`. That one merge (`e58f509`) was committed with `--no-verify`, approved by the Principal for that commit. A fix must let a merge commit through without opening the pathspec-commit case the guard exists for. Batch it with the `guard-push` issue-file allowance.
+
+### @team-lead — 2026-11-10
+
+Two tooling follow-ups from the POLY-102 loop, confirmed by the Principal (2026-11-11):
+- No writes to a bare `/tmp` path. A teammate wrote two world-readable files straight to `/private/tmp` (deleted). Add one line to the shared worktree-protocol block in every `.claude/agents/*.md`: scratch goes to the session scratchpad or the worktree's `temp/`.
+- `scripts/export-pdf.sh` never removes its temporary Chrome profile (`TMP_PROFILE="$(mktemp -d)"`); 55 `print-pdf-*` folders sat in `/private/tmp`. Remove it on exit with a `trap`, check `scripts/print-pdf.mjs` for the same, and clear the existing folders.

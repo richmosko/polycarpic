@@ -570,3 +570,21 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** a follow-up issue costs a full loop and CI run; the collapse control would have landed on `main` broken; two of the items were ruling text that was not built. The cost was a scorecard over two soft caps (30 commits, 5 ruling sections).
 **Alternatives considered:** the architect's first verdict proposed a follow-up issue before POLY-88 serves the shell, since the findings sat outside the written criteria and no user can reach the shell yet.
 **Approved by:** team-lead; the Principal was told of the disagreement on 2026-11-11 and has not overruled it.
+
+### 2026-11-11 — Generated-output freshness is a content check; commit order is not evidence
+**Decision:** every committed generated output that reaches the image is a pair in `infra/ci/generated.json`, and the `lint` job regenerates it in an isolated copy and compares bytes (`scripts/cairn/check_dist_freshness.py --ci`). The Drizzle migrations are the first pair. A feature that commits a generated file registers its pair in the same PR. The check proves the schema matches the latest snapshot; a stray committed file outside the journal is not seen, and that limit is accepted.
+**Why:** measured on POLY-102 (ruling R1): a hand-written migration committed after an ungenerated schema edit reads fresh by commit order while the schema change never ships (T-91). A stray file never runs, since the migrator applies only journal entries.
+**Alternatives considered:** the issue's original ancestry-based pattern from PT-58, kept only for the dashboard `dist/`, which never reaches the image; a second copy of the check in `build.yml`, dropped because `main` takes no direct push and requires `app` in strict mode.
+**Approved by:** architect (ruling `process/cairn/reviews/POLY-102/ruling.md`, R1–R3 and Addendum 1), reviewed by seceng; the Principal confirmed the scope (2026-11-11).
+
+### 2026-11-11 — A CI job runs on every path it executes or imports, transitively
+**Decision:** the change filter (`infra/ci/changes.mjs`) follows that rule. The `db` job also runs on `packages/config`, `packages/tenancy`, `apps/migrate`, the web ops and startup code, `tests/log` and the lockfile; `image` on its own scripts, `.trivyignore` and `tests/layers/tsc/package.json`. A static test walks the database battery's import closure and fails on a file the filter does not match. This amends the POLY-96 ruling §2 table.
+**Why:** a PR touching only the tenancy or config package skipped the row-level-security battery. The `db` job had been broken on `main` since POLY-128 and nobody saw it, because that PR never ran the job.
+**Alternatives considered:** the one-line `image.sh` fix first scoped for POLY-102, with the `db` gap as a separate issue; the Principal chose to fix it in the same loop.
+**Approved by:** the Principal (2026-11-11), on seceng's finding; patterns ruled by the architect (R5).
+
+### 2026-11-11 — No guard forcing new database tests onto the shared template, for now
+**Decision:** `cloneMigrated()` in `tests/db/helpers/api.ts` stays a convention. No static test, run-wide template or agent-definition line is added.
+**Why:** the `db` job is at 93–120 s of a 180 s budget after POLY-102; the Principal chose to skip the additions for now.
+**Alternatives considered:** a `tests/ci` case failing on a direct real-chain migrate outside an allowlist, and building the template once in global setup. Raise again if the `db` job time climbs.
+**Approved by:** the Principal (2026-11-11).
