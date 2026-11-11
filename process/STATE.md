@@ -15,15 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** CI: change filter, build, attest
-- **Issue:** `POLY-96` (cairn)
-- **Milestone:** `POLY-M1`
-- **Branch:** `feature/poly-96-ci-change-filter-build-attest`
-- **Started:** 2026-11-11
-- **Goal:** put the product suites (lint, types, Vitest, DB battery) and the image build, scan and attestation into CI behind one required `app` check.
-- **Status:** In Review — PR [#106](https://github.com/richmosko/polycarpic/pull/106); gate 4 passed (architect + seceng). After merge: ruling §6 confirmations (first build on `main`, attestation verify, release dry run) and `app` into branch protection with the user.
-- **Carried from POLY-85:** follow-ups on POLY-81, POLY-88, POLY-100, POLY-121; ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature.
-- **Next:** second session is in `todo` (promoted 2026-11-11): POLY-62 and POLY-86 (identity roots), POLY-128 (app shell), then POLY-97 and POLY-95 (infra). POLY-131 held (P3). Queued doc-update right after this merge: strip status history, "Changes" blocks and body narration from all five design docs (user directive 2026-11-11).
+_None. POLY-96 (CI: change filter, build, attest) merged 2026-11-11 via PR [#106](https://github.com/richmosko/polycarpic/pull/106) — SECURITY v1.9, INFRA v1.3.1; follow-ups on POLY-79 (CI timing ingest), POLY-100 (deploy-side `--source-ref`, digest from `digest.txt`, `RELEASE_SIGNERS`), POLY-102 (CodeQL, DB job budget, aggregate blind spot, 90-day digest artifacts). Carried from POLY-85: follow-ups on POLY-81, POLY-88, POLY-100, POLY-121; ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature._
+
+- **Next:** (1) POLY-96 post-merge confirmations per `process/cairn/reviews/POLY-96/ruling.md` §6: first build.yml run on `main`, attestation verify with `--source-ref`, SBOM attestation, release.yml dry run; then `app` into branch protection with the user (POLY-96 criterion 7, still unticked). (2) Doc-update: strip status history, "Changes" blocks and body narration from all five design docs and write the rule into the doc owners' definitions (user directive 2026-11-11). (3) Second session continues from `todo`: POLY-62 and POLY-86 (identity roots), POLY-128 (app shell), POLY-97 and POLY-95 (infra). POLY-131 held (P3).
 
 ## Releases
 

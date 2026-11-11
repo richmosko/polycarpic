@@ -1,7 +1,7 @@
 ---
 id: POLY-96
 title: CI: change filter, build, attest
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -99,3 +99,7 @@ Advisory, non-blocking (follow-ups at the lead's discretion):
 ### @team-lead — 2026-11-10
 
 PR opened: https://github.com/richmosko/polycarpic/pull/106. Awaiting Validate. Finish gate green at 14b48ca (cairn suite 1975 OK) after 6029b61 priced `claude-fable-5-2` in `scripts/cairn/prices.json` — the only non-docs, non-tracker change since qa's green at cbcb54e.
+
+### @team-lead — 2026-11-10
+
+Validate passed (qa sign-off on run 42955290074 @ 4cddae4; architect and seceng gate 4 pass); merging via PR #106. Closing. Criterion 7 and the ruling §6 confirmations follow the merge and are tracked in STATE.md.
