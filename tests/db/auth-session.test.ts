@@ -72,6 +72,7 @@ describe('Settings → Sessions', () => {
     const token = must(`SELECT token FROM public.session WHERE user_id = '${u.id}' ORDER BY created_at LIMIT 1`, e.db).rows[0][0];
     const list = await tenant(u.id, rows[0], (tx) => e.A.listSessions(tx));
     expect(list).toHaveLength(2);
+    for (const s of list) expect([s.createdAt, s.updatedAt].every((d: unknown) => d instanceof Date), 'timestamps are Dates [red if: raw driver strings reach the page load, 500 in the app]').toBe(true);
     for (const s of list) expect(Object.keys(s).sort()).toEqual(['createdAt', 'current', 'id', 'ipAddress', 'updatedAt', 'userAgent']);
     expect(list.filter((s: any) => s.current).map((s: any) => s.id)).toEqual([rows[0]]);
     expect(JSON.stringify(list)).not.toContain(token);

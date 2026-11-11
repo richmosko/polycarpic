@@ -101,11 +101,11 @@ export interface SessionRow {
 
 /** The caller's sessions: never the token. The session table has no RLS, so the filter is explicit. */
 export async function listSessions(tx: Tx): Promise<SessionRow[]> {
-  const res = await tx.execute<{ id: string; user_agent: string | null; ip_address: string | null; created_at: Date; updated_at: Date; current: boolean }>(sql`
+  const res = await tx.execute<{ id: string; user_agent: string | null; ip_address: string | null; created_at: Date | string; updated_at: Date | string; current: boolean }>(sql`
     SELECT id, user_agent, ip_address, created_at, updated_at,
            (id::text = coalesce(pg_catalog.current_setting('app.session_id', true), '')) AS current
     FROM public.session WHERE user_id = app.current_user_id() ORDER BY created_at`);
-  return res.rows.map((r) => ({ id: r.id, userAgent: r.user_agent, ipAddress: r.ip_address, createdAt: r.created_at, updatedAt: r.updated_at, current: r.current }));
+  return res.rows.map((r) => ({ id: r.id, userAgent: r.user_agent, ipAddress: r.ip_address, createdAt: new Date(r.created_at), updatedAt: new Date(r.updated_at), current: r.current }));
 }
 
 /** Revokes by id for the caller. Another session than the current one is a step-up action; the current one is sign-out. */

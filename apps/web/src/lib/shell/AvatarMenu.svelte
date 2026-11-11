@@ -12,6 +12,11 @@
 
   const pending = ['Profile', 'Settings', 'Notifications', 'Preferences'];
 
+  async function logOut() {
+    await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    location.assign('/sign-in');
+  }
+
   function setTheme(value: string) {
     theme = value as Theme;
     applyTheme(theme);
@@ -74,11 +79,9 @@
         aria-disabled="true"
         class="text-muted-foreground rounded px-3 py-1.5 text-sm">Shortcuts</DropdownMenu.Item
       >
-      <DropdownMenu.Item
-        disabled
-        aria-disabled="true"
-        class="text-destructive rounded px-3 py-1.5 text-sm opacity-60">Log out</DropdownMenu.Item
-      >
+      {#if session}
+        <DropdownMenu.Item onSelect={logOut} class="text-destructive rounded px-3 py-1.5 text-sm">Log out</DropdownMenu.Item>
+      {/if}
     </DropdownMenu.Content>
   </DropdownMenu.Portal>
 </DropdownMenu.Root>
