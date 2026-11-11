@@ -15,7 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-Two loops run in parallel (started 2026-11-11, both milestone `POLY-M1`, both In Progress):
+Two loops run in parallel (started 2026-11-11, both milestone `POLY-M1`). POLY-62 is In Review as PR [#109](https://github.com/richmosko/polycarpic/pull/109); POLY-128 is In Progress:
 
 | Feature | Issue | Branch | Driver | Goal |
 |---|---|---|---|---|

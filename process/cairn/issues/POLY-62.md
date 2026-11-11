@@ -1,7 +1,7 @@
 ---
 id: POLY-62
 title: Entity + membership schema
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [packages/tenancy/**, packages/db/**, tests/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, docs/ARCH/**, docs/SECURITY/**, process/cairn/issues/POLY-62.md, process/cairn/reviews/POLY-62/**]
 labels: [tenancy, db]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/109
 created: 2026-09-27
 updated: 2026-11-10
 ---
@@ -104,3 +104,7 @@ Measured deviations, both accepted:
 Carried forward:
 - A null-entity (operator) invitation is refused by the gate's lock (42501). POLY-87 needs its definer path.
 - The poly_govern `audit_event` INSERT policy is `WITH CHECK (true)`. That is acceptable only while every poly_govern definer is allowlisted (C-15).
+
+### @team-lead — 2026-11-10
+
+PR opened: https://github.com/richmosko/polycarpic/pull/109. Awaiting Validate. Verified build `8779392` (qa gate 3, architect verdict `ff53ec9`, seceng `reviewed @ 8779392`); `cairn gate --head 8779392` PASS. Open: the CI-time guard (at most +15 s on the `db` job), read from the PR's run.
