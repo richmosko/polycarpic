@@ -18,7 +18,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 Two loops run in parallel, each with its own suffixed team; both started 2026-11-11, both In Progress.
 
 - **POLY-86** — BetterAuth: routing pool + allowlist. Milestone `POLY-M1`. Branch `feature/poly-86-betterauth-routing-pool`. Goal: `packages/auth` on the routing pool with the pinned options, the `/api/auth/*` allowlist, step-up, and the session loader behind the app shell.
-- **POLY-95** — Compose, Postgres config + lint. Milestone `POLY-M1`. Branch `feature/poly-95-compose-postgres-config-lint`. Goal: the prod and staging compose projects, the Postgres image and settings, and the compose-policy lint.
+- **POLY-95** — Compose, Postgres config + lint. Milestone `POLY-M1`. Branch `feature/poly-95-compose-postgres-config-lint`. **In Review**, PR [#115](https://github.com/richmosko/polycarpic/pull/115). Goal: the prod and staging compose projects, the Postgres image and settings, and the compose-policy lint.
 
 _Before these: POLY-102 (CI: generated-output freshness) merged 2026-11-11 via PR [#113](https://github.com/richmosko/polycarpic/pull/113) — ARCH 1.15.13, INFRA 1.3.3, SECURITY 1.9.6. The `lint` job regenerates the migrations and compares bytes; the `db` job is at 93–113 s of its 180 s budget (target ≤ 150 s) and now runs on everything the battery imports; a feature that commits a generated file registers its pair in `infra/ci/generated.json` in the same PR. Follow-ups: POLY-135 (CodeQL scanning), POLY-136 (journal ↔ file check for migrations; POLY-96 A-2 and A-3), POLY-79 (no bare `/tmp` writes in the agent definitions; the PDF export's leftover Chrome profiles)._
 

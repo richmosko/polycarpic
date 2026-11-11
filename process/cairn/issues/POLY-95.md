@@ -1,7 +1,7 @@
 ---
 id: POLY-95
 title: Compose, Postgres config + lint
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,9 +9,9 @@ assignee: devops-engineer
 paths: [infra/compose/**, infra/postgres/**, infra/lint/**, infra/caddy/**, infra/ci/**, infra/postgres-major, .github/workflows/**, process/cairn/issues/POLY-95.md, process/cairn/reviews/POLY-95/**, tests/**, package.json, pnpm-lock.yaml, docs/INFRA/**, docs/SECURITY/**]
 labels: [ops, ci, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/115
 created: 2026-11-08
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 INFRA §2.2: prod and staging compose projects, backup-net (internal, fixed subnet), upload-net, per-container secrets, the Postgres image with age, the C-75 and C-79 settings, archive_command with age, the first four pg_hba lines, and the compose-policy lint (C-70).
@@ -37,3 +37,7 @@ Feature started. Branch: `feature/poly-95-compose-postgres-config-lint`. Runs in
 ### @architect — 2026-11-10
 
 Gate 1 ruling issued for seceng review: process/cairn/reviews/POLY-95/ruling.md (R1 Caddy headers owned here; R2 this loop creates infra/postgres-major; R3 lint + image jobs, no new top-level job; widen paths by infra/postgres-major and process/cairn/reviews/POLY-95/**).
+
+### @team-lead — 2026-11-11
+
+PR opened: https://github.com/richmosko/polycarpic/pull/115. Verdict pass @ 492242d, seceng pass @ 1b29e1a, CI run 42987963075 green @ c4c1ae3.
