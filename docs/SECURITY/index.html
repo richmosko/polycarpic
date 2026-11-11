@@ -26,7 +26,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.9.7</span>
+    <span><strong>Version:</strong> 1.9.8</span>
     <span><strong>Last updated:</strong> 2026-11-11</span>
   </div>
 </header>
@@ -773,7 +773,7 @@ flowchart TB
       <tr><td>BetterAuth secret</td><td>Host secrets directory</td><td><code>web</code></td><td>On compromise. Rotating it invalidates every session, which is the intended effect in an incident. It also encrypts TOTP seeds, backup codes and OAuth tokens (measured, 1.7.18). So rotate through BetterAuth's versioned <code>secrets</code> option: the new version encrypts, and old versions still decrypt until each row is rewritten (code-read). Replacing the secret outright would lock out every enrolled user.</td></tr>
       <tr><td>OAuth IdP client secrets, Resend key</td><td>Host secrets directory</td><td><code>web</code></td><td>At the provider, on suspicion</td></tr>
       <tr><td>Plaid client secret, broker OAuth clients, price-provider key, BLS key</td><td>Host secrets directory</td><td><code>worker</code>, plus <code>web</code> for the Plaid token exchange</td><td>At the provider, on suspicion</td></tr>
-      <tr><td>Backup encryption key (age)</td><td>The public half (recipient) at <code>/etc/polycarpic/backup.pub</code>. The private half only in the operator's password manager and on the printed recovery sheet, on a different sheet from the keyring. Never on any box, never in a backup (§6.6).</td><td>Host backup job (public half only)</td><td>On a change of operator. Keep the old private key until its last backup expires (35 days).</td></tr>
+      <tr><td>Backup encryption key (age)</td><td>The public half (recipient) at <code>/etc/polycarpic/age-recipients.txt</code>. The private half only in the operator's password manager and on the printed recovery sheet, on a different sheet from the keyring. Never on any box, never in a backup (§6.6).</td><td>Host backup job (public half only)</td><td>On a change of operator. Keep the old private key until its last backup expires (35 days).</td></tr>
       <tr><td>Backup store keys (B2, split)</td><td><strong>Put-only</strong> key <code>backup_store_credential</code>: host secrets directory, and the operator's laptop for the weekly Neon export. <strong>Read</strong> key: password manager, used only on the drill machine, never on a box. The B2 master key: password manager only, never used for backups.</td><td>Host backup job only; no container</td><td>At B2, on suspicion or a change of operator. Neither key can delete or shorten retention (§6.6).</td></tr>
       <tr><td><code>github_read_token</code></td><td>Host secrets directory. Fine-grained, this repository only, <code>contents:read</code> and <code>packages:read</code>.</td><td>Host deploy script only; no container</td><td>Expires after 90 days; a monitor check fires 14 days ahead (INFRA §8.4). Deleted if the repository and package become public.</td></tr>
       <tr><td><code>heartbeat_url</code></td><td>Host secrets directory. Carries the Healthchecks.io ping key: whoever holds it can fake a heartbeat and mask an outage.</td><td>Host scripts only; no container</td><td>Regenerate the ping key on suspicion.</td></tr>
