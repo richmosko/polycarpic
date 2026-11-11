@@ -32,6 +32,7 @@ for (const mode of ['light', 'dark'] as const) {
     test.beforeEach(async ({ context, page }) => {
       if (mode === 'dark') await context.addCookies([{ name: 'poly-theme', value: 'dark', url: base }]);
       await page.goto(`${base}/dashboard`);
+      await page.waitForLoadState('networkidle'); // handlers attach after hydration
     });
 
     test(`html class and token values on sidebar and top row  [red if: tokens unwired, wrong mode, or a raw colour used]`, async ({ page }) => {
@@ -102,6 +103,7 @@ test('CSP headers (C-07) and root redirect  [red if: script-src gains unsafe-inl
 
 test('Theme is a Light/Dark/Auto radio group that writes the cookie and class  [red if: a choice missing, cookie not written, class not set]', async ({ page, context }) => {
   await page.goto(`${base}/dashboard`);
+  await page.waitForLoadState('networkidle'); // handlers attach after hydration
   for (const [choice, cls] of [['Dark', /(^|\s)dark(\s|$)/], ['Light', /^(?!.*\bdark\b)/], ['Auto', /(^|\s)(auto|dark)(\s|$)/]] as const) {
     await page.getByTestId('sidebar').getByRole('button', { name: 'Account' }).click();
     await expect(page.getByRole('menuitemradio')).toHaveText(['Light', 'Dark', 'Auto']);
@@ -119,6 +121,7 @@ test.describe('auto follows the OS scheme without inline script', () => {
       await ctx.addCookies([{ name: 'poly-theme', value: 'auto', url: base }]);
       const page = await ctx.newPage();
       await page.goto(`${base}/dashboard`);
+      await page.waitForLoadState('networkidle'); // handlers attach after hydration
       const dark = scheme === 'dark';
       await expect(page.locator('html')).toHaveClass(dark ? /(^|\s)dark(\s|$)/ : /^(?!.*\bdark\b)/);
       expect(await bg(page, 'sidebar')).toBe(token(dark ? 'dark' : 'light', '--sidebar'));
