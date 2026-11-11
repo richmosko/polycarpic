@@ -18,6 +18,13 @@ RUN pnpm install --frozen-lockfile --prod
 FROM node:26.12.0-slim@sha256:e556a144463cc8dc53afe8de6d2fa0db5c132fd39ffa232c17641bd40df2bf11
 ARG GIT_COMMIT
 RUN echo "$GIT_COMMIT" | grep -Eq '^[0-9a-f]{40}$'
+# POLY-96 (C-82): fixable HIGH findings fail the build. Debian security fixes land between base-image digests, so
+# upgrade in place; and drop the node package manager tree, which the entrypoint never uses and which ships its own
+# vulnerable copies of brace-expansion and undici.
+RUN apt-get update \
+ && apt-get -y --no-install-recommends upgrade \
+ && rm -rf /var/lib/apt/lists/* /usr/local/lib/node_modules \
+ && find /usr/local/bin -xtype l -delete
 LABEL org.opencontainers.image.revision=$GIT_COMMIT \
       org.opencontainers.image.source=https://github.com/richmosko/polycarpic
 ENV POLY_IMAGE_REVISION=$GIT_COMMIT NODE_ENV=production
