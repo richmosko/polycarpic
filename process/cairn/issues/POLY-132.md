@@ -37,3 +37,20 @@ Feature started. Branch: `feature/poly-132-build-yml-first-run-fixes`. No new ru
 Fix: image.sh check <repo>@sha256:... now runs docker pull -q on the digest first (never a tag), because build.yml pushes without a local copy. tests/ci 161/161.
 Criterion 3, run off main against the pushed digest sha256:16dcd635...b97a (pulled with the lead's gh token): (1) removed it from the local daemon, then bash infra/ci/image.sh check <ref>: exit 0 from empty (pull + User=node + no npm/npx/corepack/pnpm/yarn on PATH + no /usr/local/lib/node_modules); (2) image.sh scan <ref> with the pinned Trivy 0.76.2 container as the trivy binary: exit 0, no fixable CRITICAL/HIGH, no secrets; (3) image.sh sbom <ref>: exit 0, CycloneDX file 241 KB; (4) actionlint 1.7.12 over all workflows: clean.
 NOT exercised (main only): the GHCR push itself, TRIVY_USERNAME/PASSWORD registry auth on the runner (locally Trivy read the daemon copy), actions/attest-build-provenance and actions/attest-sbom, upload of digest.txt+sbom artifact, release.yml dry run (needs a successful build run to exist).
+
+### @architect — 2026-11-10
+
+**Verdict (architect) on the diff 75c406e..d9be8c0: PASS. No ruling change.** POLY-96 ruling, Addendum 1, S96-1..22 and A1–A5 stand. `tests/ci` 161/161 locally (`pnpm exec vitest run -c tests/ci/vitest.config.ts`).
+
+| axis | result | evidence |
+|---|---|---|
+| A4 checked on the built image | pass | `image.sh check` runs `docker pull -q` only for a `*@sha256:*` ref, then inspects and runs that ref; never pulls a tag. build.yml passes `"${IMAGE}@${DIGEST}"` with `DIGEST` = `steps.build.outputs.digest`. The PR `image` job (`polycarpic:ci`, a local tag) does not pull. |
+| A5 one digest | pass | the pull is content-addressed by the build-step digest, so it fetches the same subject and resolves nothing new; check, scan, SBOM and both attests take that one env value; `build-main-only.test.ts` pins this order and the absence of any other digest lookup |
+| Registry credentials for the pull | pass (structural); real run after merge | `docker/login-action` runs before the build step and writes the runner's Docker config for the rest of the job, so the later `docker pull` is authenticated; test "login precedes every registry step" |
+| S96-20 no cache | pass | a pull by digest is a fetch of the attested subject, not a build cache: no `cache-from`, no `actions/cache`; buildx stays `no-cache: true`, `pull: true` |
+| Criterion 2 (red test) | pass | e6d350a red, d9be8c0 green; the docker stub refuses a pull by tag and an inspect before the pull |
+| Criterion 3 (off-main rehearsal) | pass | devops comment: check, scan and SBOM run on `sha256:16dcd635…b97a` from an empty daemon, all exit 0; actionlint clean |
+
+Side effect, benign: after the check's pull, Trivy (`image.sh scan`, then `sbom`) can read the daemon copy of the same digest before going to the registry, so the scan does not depend on `TRIVY_USERNAME`/`TRIVY_PASSWORD` working on the runner `(unmeasured)`. The subject is identical either way.
+
+Post-merge (lead; criteria 1, 4–6): build.yml green on `main` end to end, `gh attestation verify … --source-ref refs/heads/main --deny-self-hosted-runners`, the SBOM attestation present, and the release.yml dry run printing the same digest. Seceng-96's section has not reached me; it lands beside this verdict as `process/cairn/reviews/POLY-132/seceng.md` when it does.
