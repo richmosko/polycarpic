@@ -170,3 +170,23 @@ I did not run the suites; the gate owner does.
 3. POLY-89: `two_factor.verified` defaults to `true` in 0004 (BetterAuth's schema default). Make it `false`, so a write that leaves it out never marks a factor verified.
 4. Settings → Sessions: a revoke with an `id` that is not a uuid answers 500 (22P02). It should answer 404.
 5. Carried from earlier: POLY-95's Caddy `header_up` line (S19), the per-email limit, the Vercel client IP and limiter storage, POLY-122's ID-token sign-in, and avatar upload with the same-origin rule.
+
+## Delta: the prod image ships esbuild (S20)
+
+**Trigger.** Trivy fails on the app image at 495dc11 and 0b04cea. The image carries the `@esbuild/linux-x64` 0.18.20 and 0.25.12 binaries, with 3 CRITICAL findings among them, and `@better-auth/drizzle-adapter`.
+
+**Cause.** This is a resolution problem; the build-script setting is a separate matter. The workspace already holds better-auth's optional peers (drizzle-kit, vite, vitest, @sveltejs/kit) as dev dependencies, and pnpm resolves those peers into better-auth's snapshot. `--prod` then installs them along with esbuild, which they pull in. `allowBuilds: { esbuild: false }` only stops the postinstall script from running; the binaries still land on disk. My pass @ 182d054 should not have accepted it as the fix for the image.
+
+**S20, binding on the fix:**
+1. **The prod dependency graph carries no build tooling.** The graph that `pnpm install --frozen-lockfile --prod` installs holds none of `esbuild`, `@esbuild/*`, `drizzle-kit`, `@esbuild-kit/*`, `vite`, `vitest`, `@sveltejs/kit` or `@better-auth/drizzle-adapter`.
+   - The fix is at resolution, in this order of preference:
+     - (a) pnpm settings that keep better-auth's optional peers out of its snapshot (for example `resolvePeersFromWorkspaceRoot: false`, or `peerDependencyRules`);
+     - (b) an `overrides` entry that removes the package (`"better-auth>@better-auth/drizzle-adapter": "-"`, and the same for each peer).
+   - The builder measures which works and reports the measurement.
+   - Last resort: a build-stage `rm` of named store directories. It is allowed only if (a) and (b) both fail on the measurement, and then the next point applies all the more.
+2. **The app still runs without them.** `createAuth` starts, and the container smoke test serves `/healthz` and a sign-in from the built image. A removed package that better-auth imports at load must fail here, not in production. Our lint already refuses `drizzleAdapter` in `packages/auth`.
+3. **CI asserts the image's contents.** After the build, the image job runs a `find` over `/app/node_modules` inside the image, covering both the `.pnpm` store and the links, for the names in point 1 and for any ELF binary named `esbuild`. It fails on any hit. The assertion lives in the existing image job; it adds no new top-level job.
+4. **No exceptions.** No `.trivyignore` entry, no `--skip-files` or `--skip-dirs`, and no change to the Trivy severity or the fixable-only flag.
+5. **Dev and CI are unchanged.** The dev and test installs still resolve vite, vitest, drizzle-kit and esbuild, so tooling such as `tests/ci strict-builds` still passes. The `allowBuilds` deny may stay.
+
+Re-review: the fix sha, against points 1–5.
