@@ -1,4 +1,4 @@
-import type { ShellSession } from '$lib/shell/session';
+import type { ShellSession } from './lib/shell/session';
 
 declare global {
   namespace App {

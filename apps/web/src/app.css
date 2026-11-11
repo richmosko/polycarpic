@@ -3,42 +3,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-:root`/`.dark`, shadcn-svelte's standard
- * Tailwind v4 `@theme inline` wiring). `index.html` links it to live-preview
- * the swatches.
- *
- * Two brand hues: a neon green (`--brand`) and a sky blue (`--brand-2`).
- * Both fail AA as text or fills on a light surface, so each is used
- * literally only on dark surfaces and decoratively. A darkened same-hue
- * value does its job on light surfaces (`--primary` for the green,
- * `--secondary-foreground` for the blue). Neutrals carry a faint tint of
- * the blue hue; the light page canvas is a near-neutral warm off-white.
- * Every hover/active fill is `--accent`. `--muted` equals `--background`
- * and serves in-card wells, tracks and placeholders, never hovers.
- * design-system-spec.md § Foundations and § Financial semantics hold the
- * derivations and every contrast figure.
- *
- * Plain sRGB hex, not OKLCH — this system doesn't vendor a shadcn preset
- * and doesn't need OKLCH's multi-preset precision.
- *
- * CI note: scripts/cairn/tests/test_board_tokens_parity.py once asserted
- * this file shares values with cairn's board tokens; that assertion was
- * removed (POLY-78). If it reappears, do not re-add cairn's values to
- * satisfy it — diverging from cairn is deliberate.
- *
- * Owned by the ux-designer agent. Generate/refine with /generate-designdoc.
- */
-
-/* Space Grotesk is self-hosted (Fontsource variable woff2, SIL OFL); the path is
-   relative to this file, so every page that links tokens.css gets the face. */
-@font-face {
-  font-family: 'Space Grotesk Variable';
-  font-style: normal;
-  font-weight: 300 700;
-  font-display: swap;
-  src: url('../_assets/fonts/space-grotesk-latin-wght-normal.woff2') format('woff2-variations');
-}
-
 :root {
   /* Surfaces & text. The page canvas is a subtle warm grey (L 0.97), not
      white, so pure-white cards and popovers float on it (1.06:1 step plus
@@ -335,6 +299,9 @@
   --color-cat-6-foreground: var(--cat-6-foreground);
   --color-cat-7-foreground: var(--cat-7-foreground);
   --color-cat-other-foreground: var(--cat-other-foreground);
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-heading);
+  --font-mono: var(--font-mono);
 }
 
 @layer base {

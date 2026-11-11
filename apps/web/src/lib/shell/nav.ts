@@ -4,6 +4,7 @@ export const NAV = [
   { label: 'General Ledger', href: '/general-ledger' },
   { label: 'Custodial Accounts', href: '/custodial-accounts' },
   { label: 'Allocation', href: '/allocation' },
+  { label: 'Tax', href: '/tax' },
   { label: 'Reports', href: '/reports' },
   { label: 'Entities', href: '/entities' },
 ] as const;
