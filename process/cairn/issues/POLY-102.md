@@ -20,12 +20,12 @@ Generalise the PT-58 freshness pattern (ancestry-based, exclude-list) to the com
 
 Ruling: `process/cairn/reviews/POLY-102/ruling.md` (R1–R7).
 
-- [ ] Touching a source without regenerating fails; regenerating passes: for every registered pair in `infra/ci/generated.json`, and on the real drizzle-kit, including a custom migration committed after an ungenerated schema edit (R1, R2).
-- [ ] A doc-only PR never flips fresh to stale.
-- [ ] Same-second and cross-timezone commits behave (fixtures from the PT-58 tests) for `ancestry` pairs; the existing `check_dist_freshness` contract and its tests are unchanged.
-- [ ] The check fails closed (exit 2) on every R2 row and runs as a `lint` step feeding `app` (R3).
-- [ ] The `db` CI job has headroom again before POLY-86 adds to the battery: two full-battery CI runs each finish the `db` job in ≤ 150 s of its 180 s budget (`infra/ci/budgets.json` unchanged), by cutting the measured cost without dropping a case (R4).
-- [ ] The change filter follows "every path a job runs or imports triggers that job": the R5 rows for `image` and `db`, a transitive import-closure test, and a static pin on the `db-migrations` pair (R5).
+- [x] Touching a source without regenerating fails; regenerating passes: for every registered pair in `infra/ci/generated.json`, and on the real drizzle-kit, including a custom migration committed after an ungenerated schema edit (R1, R2). — scripts/cairn/tests/test_generated_freshness.py: `test_touching_a_source_without_regenerating_fails`, `test_regenerating_passes`; tests/ci/generated-freshness.test.ts: the real drizzle-kit cases (schema edit, the `--custom` sequence, after `generate`).
+- [x] A doc-only PR never flips fresh to stale. — test_generated_freshness.py: `test_a_doc_only_commit_never_flips_fresh_to_stale` (in both `RegenerateModeTests` and `AncestryModeTests`); tests/ci/generated-freshness.test.ts: the doc-only real-drizzle case.
+- [x] Same-second and cross-timezone commits behave (fixtures from the PT-58 tests) for `ancestry` pairs; the existing `check_dist_freshness` contract and its tests are unchanged. — test_generated_freshness.py `AncestryModeTests`: `test_same_second_commits_resolve_toward_stale`, `test_cross_timezone_stamps_do_not_invert_the_order`; scripts/cairn/tests/test_dist_freshness.py passes unchanged.
+- [x] The check fails closed (exit 2) on every R2 row and runs as a `lint` step feeding `app` (R3). — test_generated_freshness.py `FailClosedTests` (one test per exit-2 row, plus the prompting generator); tests/ci/ci-workflow.test.ts: the `Generated-output freshness` lint step case.
+- [x] The `db` CI job has headroom again before POLY-86 adds to the battery: two full-battery CI runs each finish the `db` job in ≤ 150 s of its 180 s budget (`infra/ci/budgets.json` unchanged), by cutting the measured cost without dropping a case (R4). — CI runs 42975920810 (`db` 110 s) and 42976214364 (`db` 93 s) on 4a3800f; tests/db/template-clone.test.ts: clone equivalence and once-only role passwords.
+- [x] The change filter follows "every path a job runs or imports triggers that job": the R5 rows for `image` and `db`, a transitive import-closure test, and a static pin on the `db-migrations` pair (R5). — tests/ci/changes.test.ts (the R5 rows); tests/ci/db-filter-imports.test.ts (transitive closure); tests/ci/generated-freshness.test.ts: the registry pin case.
 
 ## Comments
 
