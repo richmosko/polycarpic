@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: PASS at d100466 on the code; F12 is confirmed at 2bf29a3 (below).** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
+**Result: PASS at d100466 on the code; F12 is reopened (below).** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -97,13 +97,12 @@ Pass line, which I confirm at the fix sha:
 
 The verdict re-closes on the confirmed fix sha plus a green PR check.
 
-**F12 confirmed at 2bf29a3 (code-read):**
-- The browser download is fatal and bounded (`timeout 180`).
-- `install-deps` is bounded (`timeout 120`) and non-fatal, ending with `|| echo ::warning::`. The apt fetch is no longer a precondition.
-- The step has `timeout-minutes: 8`. `turbo run e2e` runs with no skip and no `continue-on-error`, so a Chromium that cannot launch still fails the step.
-- `tests/ci/ci-e2e.test.ts` holds that shape.
-- No new job.
-- Dispatched run 43059584727 was green while the apt outage was live.
+**F12 at 2bf29a3: rejected by the Principal.** During the outage, every run waits out the 120 s `install-deps` timeout: the step took about 250 s against about 60 s. Run 43059584727 shows the runner image already carries the libraries.
 
-**Result: PASS.** It closes on a green PR #116 check at 2bf29a3 or later.
+**F12 pass line, amended:**
+- **No time spent on system packages when Chromium already launches.** A launch probe runs first: a headless Chromium launch, bounded.
+- **`install-deps` runs only if the probe fails.** It is bounded and non-fatal, and the probe then runs again. If the second probe also fails, the step fails, so a browser that cannot launch is never skipped.
+- **The other F12 points stand:** no live apt download as a precondition, a bounded browser install, the specs run for real, a `tests/ci` assertion (which now also asserts that `install-deps` is conditional on the probe), and no new job.
+- **Measured at the fix sha on a full run:** the e2e step time is within 10 s of the run before the fix, about 60 s, whether apt is reachable or not.
 
+The verdict re-closes on the confirmed fix sha, that measurement, and a green PR #116 check.
