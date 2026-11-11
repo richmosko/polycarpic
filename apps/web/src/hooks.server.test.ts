@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { handle } from './hooks.server.ts';
 
 async function themed(cookie: string | undefined): Promise<string> {
-  const event = { cookies: { get: (n: string) => (n === 'poly-theme' ? cookie : undefined) } };
+  const url = new URL('https://app.qa.test/sign-in');
+  const event = { url, request: new Request(url), locals: {}, cookies: { get: (n: string) => (n === 'poly-theme' ? cookie : undefined) } };
   const resolve = async (_e: unknown, opts?: { transformPageChunk?: (a: { html: string; done: boolean }) => string }) =>
     new Response(opts?.transformPageChunk?.({ html: '<html class="%poly.theme%">', done: true }) ?? '');
   const res = await (handle as (a: unknown) => Promise<Response>)({ event, resolve });

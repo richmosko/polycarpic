@@ -87,7 +87,8 @@ describe('S10: the matcher patch finds its hook by behaviour', () => {
   });
 
   it('the plugin\'s matcher is a function that answers true for each of SIGN_IN_PATHS and false for a sentinel  [red if: the plugin\'s internal shape changed and the patch silently stopped matching]', async () => {
-    const hooks = (auth.options.hooks?.after ?? []) as { matcher: (c: any) => boolean }[];
+    // BetterAuth keeps options.hooks.after as one function (ours); the plugins' after-hooks are the array under each plugin.
+    const hooks = (auth.options.plugins ?? []).flatMap((p: any) => p.hooks?.after ?? []) as { matcher: (c: any) => boolean }[];
     const hits = hooks.filter((h) => typeof h.matcher === 'function' && h.matcher({ path: '/sign-in/email' }) && !h.matcher({ path: '/__sentinel__' }));
     expect(hits).toHaveLength(1);
     for (const p of SIGN_IN_PATHS) expect(hits[0].matcher({ path: p }), p).toBe(true);

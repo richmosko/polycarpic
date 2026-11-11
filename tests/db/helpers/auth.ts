@@ -25,7 +25,9 @@ export type Env = Awaited<ReturnType<typeof boot>>;
 
 /** Switch for the one mocked export: claimInvitation. `impl` null = the ruling's real stub (throws InvitationRequired).
  *  A test file declares: vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o)) */
-export const claim = { impl: null as null | ((tx: unknown, a: { email: string; token: string | null }) => Promise<unknown>) };
+// One object on globalThis: boot() calls vi.resetModules(), which would otherwise give the mock factory a second copy of this module.
+type Claim = { impl: null | ((tx: unknown, a: { email: string; token: string | null }) => Promise<unknown>) };
+export const claim: Claim = ((globalThis as { __polyClaim?: Claim }).__polyClaim ??= { impl: null });
 export async function claimFactory(orig: () => Promise<unknown>) {
   const real = (await orig()) as Record<string, any>;
   return { ...real, claimInvitation: (tx: unknown, a: any) => (claim.impl ? claim.impl(tx, a) : real.claimInvitation(tx, a)) };
@@ -77,7 +79,7 @@ export async function boot() {
   function seedUser(o: { email?: string; name?: string; secondStepAt?: boolean; twoFactor?: boolean; password?: boolean } = {}) {
     const email = o.email ?? `u${++n}-${Math.random().toString(36).slice(2, 7)}@qa.test`;
     const id = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('${o.name ?? 'QA User'}', '${email}', true) RETURNING id`, db).rows[0][0];
-    if (o.password !== false) must(`INSERT INTO public.account (account_id, provider_id, user_id, password) VALUES ('${id}', 'credential', '${id}', '${hash}')`, db);
+    if (o.password !== false) must(`INSERT INTO public.account (account_id, provider_id, user_id, password, updated_at) VALUES ('${id}', 'credential', '${id}', '${hash}', now())`, db);
     if (o.twoFactor) must(`UPDATE public."user" SET two_factor_enabled = true, second_step_at = now() WHERE id = '${id}'`, db);
     else if (o.secondStepAt) must(`UPDATE public."user" SET second_step_at = now() WHERE id = '${id}'`, db);
     return { id, email };

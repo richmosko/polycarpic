@@ -1,7 +1,7 @@
 // BetterAuth's four core tables, from `@better-auth/cli generate` (better-auth 1.7.18, drizzle/pg), edited: every id is a
 // uuid with a database default (SECURITY §4.3(l)), every timestamp is timestamptz (ARCH §6.2), columns stay snake_case
 // (§3.1c). Whether BetterAuth accepts uuid ids is measured on POLY-86. Grants live in the custom migration.
-import { boolean, index, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 const tstz = (name: string) => timestamp(name, { withTimezone: true });
 const id = () => uuid('id').primaryKey().defaultRandom();
@@ -12,6 +12,9 @@ export const user = pgTable('user', {
   email: text('email').notNull().unique(),
   emailVerified: boolean('email_verified').default(false).notNull(),
   image: text('image'),
+  // POLY-86 (0004): written only by POLY-89's definers; poly_app can neither insert nor update either column.
+  twoFactorEnabled: boolean('two_factor_enabled').default(false).notNull(),
+  secondStepAt: tstz('second_step_at'),
   createdAt: tstz('created_at').defaultNow().notNull(),
   updatedAt: tstz('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
 });
@@ -23,9 +26,10 @@ export const session = pgTable(
     expiresAt: tstz('expires_at').notNull(),
     token: text('token').notNull().unique(),
     createdAt: tstz('created_at').defaultNow().notNull(),
-    updatedAt: tstz('updated_at').$onUpdate(() => new Date()).notNull(),
+    updatedAt: tstz('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
     ipAddress: text('ip_address'),
     userAgent: text('user_agent'),
+    recentAuthAt: tstz('recent_auth_at'),
     userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
   },
   (t) => [index('session_userId_idx').on(t.userId)],
@@ -46,7 +50,7 @@ export const account = pgTable(
     scope: text('scope'),
     password: text('password'),
     createdAt: tstz('created_at').defaultNow().notNull(),
-    updatedAt: tstz('updated_at').$onUpdate(() => new Date()).notNull(),
+    updatedAt: tstz('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
   },
   (t) => [index('account_userId_idx').on(t.userId)],
 );
@@ -62,4 +66,36 @@ export const verification = pgTable(
     updatedAt: tstz('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
   },
   (t) => [index('verification_identifier_idx').on(t.identifier)],
+);
+
+export const twoFactor = pgTable(
+  'two_factor',
+  {
+    id: id(),
+    secret: text('secret').notNull(),
+    backupCodes: text('backup_codes').notNull(),
+    userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+    verified: boolean('verified').default(true),
+    failedVerificationCount: integer('failed_verification_count').default(0),
+    lockedUntil: tstz('locked_until'),
+  },
+  (t) => [index('two_factor_secret_idx').on(t.secret), index('two_factor_user_id_idx').on(t.userId)],
+);
+
+export const passkey = pgTable(
+  'passkey',
+  {
+    id: id(),
+    name: text('name'),
+    publicKey: text('public_key').notNull(),
+    userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+    credentialID: text('credential_id').notNull(),
+    counter: integer('counter').notNull(),
+    deviceType: text('device_type').notNull(),
+    backedUp: boolean('backed_up').notNull(),
+    transports: text('transports'),
+    createdAt: tstz('created_at').defaultNow(),
+    aaguid: text('aaguid'),
+  },
+  (t) => [index('passkey_user_id_idx').on(t.userId), index('passkey_credential_id_idx').on(t.credentialID)],
 );

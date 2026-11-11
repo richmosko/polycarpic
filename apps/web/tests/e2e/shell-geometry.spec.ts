@@ -55,12 +55,12 @@ test.describe('V1 collapsed icon rail', () => {
       seen.push(await page.evaluate(() => (document.activeElement as HTMLElement).getAttribute('aria-label') ?? document.activeElement?.textContent?.trim() ?? ''));
     }
     expect(seen.slice(0, 8)).toEqual(NAMES);
-    expect(seen[8]).toMatch(/Account/);
+    expect(seen[8]).toMatch(/Ada Lovelace/);
   });
 
   test('foot shows the avatar alone, not clipped text  [red if: the Account trigger shows overflowing text in the rail]', async ({ page }) => {
     await collapse(page);
-    const trigger = sidebar(page).getByRole('button', { name: 'Account' });
+    const trigger = sidebar(page).getByRole('button', { name: 'Ada Lovelace' });
     await expect(trigger).toBeVisible();
     const m = await trigger.evaluate((e) => {
       const s = (e as HTMLElement).getBoundingClientRect();
@@ -121,7 +121,7 @@ test.describe('V4 avatar popover opens to the right', () => {
   for (const state of ['expanded', 'collapsed'] as const) {
     test(`${state}: the menu starts at or beyond the trigger's right edge  [red if: the menu opens above or below inside the sidebar column]`, async ({ page }) => {
       if (state === 'collapsed') await collapse(page);
-      const trigger = sidebar(page).getByRole('button', { name: 'Account' });
+      const trigger = sidebar(page).getByRole('button', { name: 'Ada Lovelace' });
       await trigger.click();
       const menu = page.getByRole('menu');
       await expect(menu).toBeVisible();

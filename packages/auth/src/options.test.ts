@@ -36,7 +36,7 @@ describe('pinned options (criterion 2)', () => {
     expect((o.plugins ?? []).map((p: any) => p.id).sort()).toEqual(['magic-link', 'passkey', 'two-factor']);
   });
 
-  it('deleteUser is off; sign-in with password on; reset revokes sessions; autoSignInAfterVerification unset  [red if: deleteUser enabled, revokeSessionsOnPasswordReset false, or auto sign-in on verify (H2)]', () => {
+  it('deleteUser is off; sign-in with password on; a password reset revokes sessions; autoSignInAfterVerification unset  [red if: deleteUser enabled, revokeSessionsOnPasswordReset false, or auto sign-in on verify (H2)]', () => {
     expect(o.user?.deleteUser?.enabled ?? false).toBe(false);
     expect(o.emailAndPassword.enabled).toBe(true);
     expect(o.emailAndPassword.revokeSessionsOnPasswordReset).toBe(true);
