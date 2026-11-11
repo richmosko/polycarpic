@@ -421,6 +421,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Web e2e (Chromium, affected only)
+        timeout-minutes: 8
         run: |
           if [ -n "$TURBO_SCM_BASE" ]; then
             pnpm exec turbo ls --affected > affected.txt
@@ -428,7 +429,11 @@ jobs:
             pnpm exec turbo ls > affected.txt
           fi
           if ! grep -q '@poly/web' affected.txt; then echo "no e2e task affected"; exit 0; fi
-          pnpm --filter @poly/web exec playwright install --with-deps chromium
+          # Browser download comes from the Playwright CDN (bounded). System libraries come from apt, which can be
+          # unreachable: that fetch is bounded and non-fatal. A browser that cannot launch still fails the e2e run below.
+          timeout 180 pnpm --filter @poly/web exec playwright install chromium
+          timeout 120 pnpm --filter @poly/web exec playwright install-deps chromium \
+            || echo "::warning::playwright install-deps failed or timed out; launching Chromium without it"
           if [ -n "$TURBO_SCM_BASE" ]; then
             pnpm exec turbo run e2e --affected
           else
