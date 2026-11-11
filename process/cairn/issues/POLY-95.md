@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [infra/compose/**, infra/postgres/**, infra/lint/**, infra/caddy/**, infra/ci/**, .github/workflows/**, process/cairn/issues/POLY-95.md, tests/**, package.json, pnpm-lock.yaml, docs/INFRA/**, docs/SECURITY/**]
+paths: [infra/compose/**, infra/postgres/**, infra/lint/**, infra/caddy/**, infra/ci/**, infra/postgres-major, .github/workflows/**, process/cairn/issues/POLY-95.md, process/cairn/reviews/POLY-95/**, tests/**, package.json, pnpm-lock.yaml, docs/INFRA/**, docs/SECURITY/**]
 labels: [ops, ci, security]
 priority: null
 pr: null
