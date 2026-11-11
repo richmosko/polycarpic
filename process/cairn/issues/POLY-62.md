@@ -64,3 +64,17 @@ Gating ruling (gate 1): process/cairn/reviews/POLY-62/ruling.md, with ARCH 1.15.
 - Criterion 1 is amended: the session-loader call moves to POLY-86.
 - db job measured: the CLI-spawning files take 105 of the 114 s of file time, and setup is at most 14.5 s. Guard: this loop adds at most 15 s. No ci.yml change.
 - POLY-85 Open 1 is deferred to the next issue that edits connection.ts. Open 3 stays with the first worker-job feature.
+
+### @architect — 2026-11-10
+
+Ruling re-issued whole on seceng-62's objection batch: process/cairn/reviews/POLY-62/ruling.md. ARCH 1.15.8 §3.1 is updated to match. O1–O4 are accepted:
+- `app.gate_owner_changes()` refuses direct multi-owner changes. POLY-90's first criterion lands here.
+- poly_app gets no membership INSERT.
+- The entity_type read is label-only, and an entity may use only a system type or one its creator owns (`app.check_entity()`, a poly_authz definer).
+- INSERT grants are column-level, and invitation.token_hash is unreadable.
+- The battery reason is an allowlist, `column_grant_not_allowlisted`.
+N1–N4 are folded in:
+- policy_public and policy_trivial_for_app, plus a harness canary that proves the matrix can fail.
+- `requires` works at row and entry level; an active row with no runnable entry fails.
+- co-owner-remove-demote activates (six rows active).
+- The lock guards refuse when the lock returns no row.
