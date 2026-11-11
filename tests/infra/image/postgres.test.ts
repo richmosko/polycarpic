@@ -32,9 +32,11 @@ describe('Postgres settings on the compose-run container (criterion 2, R5)', () 
   });
   it('every setting comes from the mounted fragment (pg_settings.sourcefile = config_file), none from -c / env / ALTER', () => {
     const cf = s.psql('SHOW config_file');
-    const names = SETTINGS.map(([n]) => `'${n}'`).join(',');
+    // hba_file is excluded: PG17 forces its source to "override" with no sourcefile (SelectConfigFiles); the SHOW hba_file test covers it.
+    const listed = SETTINGS.filter(([n]) => n !== 'hba_file');
+    const names = listed.map(([n]) => `'${n}'`).join(',');
     const rows = s.psql(`SELECT name||'|'||source||'|'||coalesce(sourcefile,'') FROM pg_settings WHERE name IN (${names})`).split('\n');
-    expect(rows).toHaveLength(SETTINGS.length);
+    expect(rows).toHaveLength(listed.length);
     for (const r of rows) {
       const [name, source, file] = r.split('|');
       expect({ name, source, file }).toEqual({ name, source: 'configuration file', file: cf }); // red: a -c flag, env var or command-line override
@@ -49,7 +51,7 @@ describe('Postgres settings on the compose-run container (criterion 2, R5)', () 
     expect(mount, 'prod.yml mounts pg_hba.prod.conf').toBeDefined();
     expect(s.psql('SHOW hba_file')).toBe(mount.target); // red: initdb's $PGDATA/pg_hba.conf (host all all all scram) in force
     expect(s.psql('SELECT count(*) FROM pg_hba_file_rules WHERE error IS NOT NULL')).toBe('0');
-    const rows = s.psql("SELECT type||' '||database||' '||user_name||' '||coalesce(address,'')||' '||coalesce(netmask,'')||' '||auth_method FROM pg_hba_file_rules ORDER BY rule_number LIMIT 4").split('\n');
+    const rows = s.psql("SELECT type||' '||database::text||' '||user_name::text||' '||coalesce(address,'')||' '||coalesce(netmask,'')||' '||auth_method FROM pg_hba_file_rules ORDER BY rule_number LIMIT 4").split('\n');
     expect(rows).toEqual([
       'host {replication} {poly_backup} 10.201.10.0 255.255.255.248 scram-sha-256',
       'host {polycarpic} {poly_backup} 10.201.10.0 255.255.255.248 scram-sha-256',
