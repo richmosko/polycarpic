@@ -268,6 +268,10 @@ jobs:
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
+        # Scripts stay blocked (C-80). pnpm 12 on CI turns "ignored build scripts" (esbuild) into an exit 1; the
+        # variable keeps the refusal and drops only the error.
+        env:
+          pnpm_config_strict_dep_builds: "false"
         run: pnpm install --frozen-lockfile
 
       - name: Layer map checks (criterion 6)
@@ -378,6 +382,10 @@ jobs:
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
+        # Scripts stay blocked (C-80). pnpm 12 on CI turns "ignored build scripts" (esbuild) into an exit 1; the
+        # variable keeps the refusal and drops only the error.
+        env:
+          pnpm_config_strict_dep_builds: "false"
         run: pnpm install --frozen-lockfile
 
       - name: Per-package tests (each from its own directory)
@@ -456,6 +464,10 @@ jobs:
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install (lockfile frozen, lifecycle scripts blocked)
+        # Scripts stay blocked (C-80). pnpm 12 on CI turns "ignored build scripts" (esbuild) into an exit 1; the
+        # variable keeps the refusal and drops only the error.
+        env:
+          pnpm_config_strict_dep_builds: "false"
         run: pnpm install --frozen-lockfile
 
       - name: DB battery (one Postgres container, RLS battery included)
