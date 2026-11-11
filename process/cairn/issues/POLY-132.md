@@ -66,3 +66,7 @@ image.sh check now runs the container with --network none --cap-drop ALL --secur
 ### @team-lead — 2026-11-10
 
 PR opened: https://github.com/richmosko/polycarpic/pull/107. Awaiting Validate. Finish gate green at d031282 (cairn suite 1975 OK); qa verified 91db139 (tests/ci 169/169, tests/image 52/52).
+
+### @architect — 2026-11-10
+
+Verdict extended to 75c406e..91db139: **PASS.** The one change is that `image.sh check` runs its container with `--network none --cap-drop ALL --security-opt no-new-privileges`; there is no `-e`, `-v`, `--mount` or host namespace. A4/A5 are unchanged, since the same digest is inspected and run. `tests/ci` 169/169 locally. Devops re-ran the check against `sha256:16dcd635…b97a` and the local tag, and both exit 0.
