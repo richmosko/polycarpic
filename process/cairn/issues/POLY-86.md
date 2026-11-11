@@ -1,7 +1,7 @@
 ---
 id: POLY-86
 title: BetterAuth: routing pool + allowlist
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83, POLY-76]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [packages/auth/**, packages/db/**, packages/tenancy/**, apps/web/src/**, apps/web/tests/**, apps/web/playwright.config.ts, infra/ci/**, .github/workflows/**, .gitignore, pnpm-workspace.yaml, scripts/layers/**, process/cairn/issues/POLY-86.md, process/cairn/reviews/POLY-86/**, tests/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/SECURITY/**]
 labels: [auth, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/116
 created: 2026-11-08
 updated: 2026-11-11
 ---
@@ -58,3 +58,7 @@ Feature started. Branch: `feature/poly-86-betterauth-routing-pool`. Runs in para
 Gate 1 ruling: process/cairn/reviews/POLY-86/ruling.md (seceng review pending; re-issued whole if their conditions change it).
 
 Criterion 6 measured on better-auth 1.7.18 (process/cairn/reviews/POLY-86/measure-twofactor.mjs): twoFactor's after-hook matcher covers /sign-in/email, /sign-in/username and /sign-in/phone-number only, and only for twoFactorEnabled. For an enrolled user, /magic-link/verify returned 302 with a new session row and a full getSession, so it was not held. With the matcher widened to /magic-link/verify and /callback/:id, the same call left no session and set the two_factor cookie. A passkey-only enrolled user is held on no path. The hold is added (ruling M1) and folded into ARCH §3.1c. Criteria 6, 7, 10 and 11 are amended in place.
+
+### @team-lead — 2026-11-11
+
+PR opened: https://github.com/richmosko/polycarpic/pull/116. Verdict PASS @ d100466 (verdict.md @ 0cf381e); seceng pass @ 182d054 and S20 @ 1e83bae; CI run 42993078860 green. Validate passed; merging via PR #116 once its check is green on the head merged with main. Closing.
