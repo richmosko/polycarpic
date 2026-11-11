@@ -18,7 +18,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>architect</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.15.12</span>
+    <span><strong>Version:</strong> 1.15.13</span>
     <span><strong>Last updated:</strong> 2026-11-11</span>
   </div>
 </header>
@@ -1144,13 +1144,13 @@ flowchart TB
   <table>
     <thead><tr><th>Stage</th><th>Tool</th><th>Gate</th></tr></thead>
     <tbody>
-      <tr><td>Change detection</td><td>Turborepo affected graph; docs-only changes skip test jobs, except that a change to <code>docs/ARCH/index.html</code> or <code>layers.json</code> runs the layer-map checks (§2.1)</td><td>—</td></tr>
+      <tr><td>Change detection</td><td>Turborepo affected graph; docs-only changes skip test jobs, except that a change to <code>docs/ARCH/index.html</code> or <code>layers.json</code> runs the layer-map checks (§2.1). Every path a job runs or imports triggers that job.</td><td>—</td></tr>
       <tr><td>Lint + types</td><td>ESLint with <code>eslint-plugin-boundaries</code>, generated from <code>layers.json</code>; the layer-map checks (§2.1); <code>svelte-check</code>, <code>tsc</code> resolving through <code>exports</code></td><td>Must pass</td></tr>
       <tr><td>Unit / package tests</td><td>Vitest, affected packages only</td><td>Must pass</td></tr>
       <tr><td>DB battery</td><td>Apply all migrations to a fresh Postgres as <code>poly_migrator</code>; pgTAP RLS + trigger battery (incl. inversion self-test, pool-reuse test)</td><td>Must pass when <code>packages/db</code> or any schema changes</td></tr>
       <tr><td>BetterAuth routing-pool test</td><td>Vitest against a real Postgres, as <code>poly_app</code>, on the pinned <code>better-auth</code> and <code>@better-auth/passkey</code>: the trigger sees <code>app.session_id</code> on our backend and txid; rollback removes BetterAuth's rows; nested transactions become savepoints; a factor write outside <code>withTenant</code> is refused; the first TOTP verify runs in one transaction in the measured order (§3.1c; SECURITY A-31)</td><td>Must pass when <code>packages/auth</code>, <code>packages/tenancy</code> or either BetterAuth version changes; a dependency bot's BetterAuth bump cannot merge without it</td></tr>
       <tr><td>BetterAuth route-policy test</td><td>Vitest, on the same pinned versions, BetterAuth built from the exported app configuration: every HTTP route of the instance is in <code>AUTH_ROUTES</code> and every entry is a live route; the per-class checks of §3.1c (SECURITY A-34, A-38), run in real-domain and private-CA mode. Lint refuses <code>drizzleAdapter</code> in <code>packages/auth</code>.</td><td>Must pass when <code>packages/auth</code> or a <code>better-auth</code> version changes</td></tr>
-      <tr><td>OpenAPI freshness</td><td>Regenerate and diff against the committed spec</td><td>No diff</td></tr>
+      <tr><td>Generated-output freshness</td><td>Every committed generated output is a pair in <code>infra/ci/generated.json</code>: the Drizzle migrations today, the OpenAPI spec and the ops bundle when they exist. The <code>lint</code> job regenerates each into an isolated copy and compares it byte for byte (<code>scripts/cairn/check_dist_freshness.py --ci</code>); commit order is not evidence, because a custom migration can follow a schema edit that was never generated. A feature that commits a generated file registers its pair in the same PR.</td><td>No diff; a generator that is absent or fails, or a registry error, fails the job</td></tr>
       <tr><td>Build</td><td><code>adapter-node</code> image; <code>adapter-vercel</code> build (both Vercel projects, §7.6)</td><td>Both must build</td></tr>
       <tr><td>Vercel topology check</td><td>Route manifest vs. allowlist per project; no keyring reference in the <code>web</code> build; node build 404s job routes; env-name check via the Vercel API with a read-scoped token in a reviewer-gated GitHub environment (§7.6)</td><td>Must pass when <code>apps/web</code> routes or Vercel project config change</td></tr>
       <tr><td>Smoke (integration milestones)</td><td>Playwright: login, import a batch, confirm a draft, view a statement</td><td>Must pass</td></tr>

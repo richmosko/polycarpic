@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-96]
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-102.md, process/cairn/reviews/POLY-102/**, scripts/cairn/check_dist_freshness.py, scripts/cairn/tests/**, .github/workflows/ci.yml, infra/ci/**, tests/ci/**, tests/db/**, package.json, eslint.config.js]
+paths: [process/cairn/issues/POLY-102.md, docs/ARCH/index.html, process/cairn/reviews/POLY-102/**, scripts/cairn/check_dist_freshness.py, scripts/cairn/tests/**, .github/workflows/ci.yml, infra/ci/**, tests/ci/**, tests/db/**, package.json, eslint.config.js]
 labels: [ci, tooling]
 priority: P1
 pr: null
@@ -18,10 +18,14 @@ Generalise the PT-58 freshness pattern (ancestry-based, exclude-list) to the com
 
 ## Acceptance criteria
 
-- [ ] Touching a source without regenerating fails; regenerating passes.
+Ruling: `process/cairn/reviews/POLY-102/ruling.md` (R1–R7).
+
+- [ ] Touching a source without regenerating fails; regenerating passes: for every registered pair in `infra/ci/generated.json`, and on the real drizzle-kit, including a custom migration committed after an ungenerated schema edit (R1, R2).
 - [ ] A doc-only PR never flips fresh to stale.
-- [ ] Same-second and cross-timezone commits behave (fixtures from the PT-58 tests).
-- [ ] The `db` CI job has headroom again before POLY-86 adds to the battery: a full-battery run finishes at least 30 s under its budget in `infra/ci/budgets.json`, by cutting the measured cost (the four CLI-spawning test files) or by a re-set budget with the measurement recorded. The 30 s figure is the lead's proposal; the ruling confirms or replaces it.
+- [ ] Same-second and cross-timezone commits behave (fixtures from the PT-58 tests) for `ancestry` pairs; the existing `check_dist_freshness` contract and its tests are unchanged.
+- [ ] The check fails closed (exit 2) on every R2 row and runs as a `lint` step feeding `app` (R3).
+- [ ] The `db` CI job has headroom again before POLY-86 adds to the battery: two full-battery CI runs each finish the `db` job in ≤ 150 s of its 180 s budget (`infra/ci/budgets.json` unchanged), by cutting the measured cost without dropping a case (R4).
+- [ ] The change filter follows "every path a job runs or imports triggers that job": the R5 rows for `image` and `db`, with a static test over the battery's imports.
 
 ## Comments
 
@@ -68,3 +72,6 @@ Scope widened by the Principal (2026-11-11), on seceng-102's pre-ruling finding 
 - Decided, in scope: the `db` filter gap. A PR touching only `packages/tenancy`, `apps/migrate`, `apps/web/src/ops`, `tests/log/canary.ts` or the lockfile skips the database battery. The rule: every path a job imports or executes triggers that job. The `db` list is derived from the battery's imports, with a static test that fails when a `tests/db` file imports from an unmatched path.
 - Decided, in scope: `.trivyignore` and `tests/layers/tsc/package.json` → `image`, with the `image.sh` / `install-trivy.sh` lines already scoped.
 - The architect rules the §2 table and the exact patterns. The `db` job now runs on more PRs; the headroom criterion accounts for that.
+### @architect — 2026-11-10
+
+Gate 1 ruling: `process/cairn/reviews/POLY-102/ruling.md`. Freshness is a content check (regenerate in an isolated copy, byte compare) for the Drizzle migrations, the one generated output that reaches the image; ancestry is measured false-fresh there (R1). No ops-bundle manifest exists yet; the feature that adds one registers its pair. `db`: 30 s confirmed, budget unchanged, cost cut by template databases and a cheaper `freshDb` (R4). Filter: R5 widens `image` and `db` (closes POLY-96 O2). Criteria amended in place; verdict checklist R7.
