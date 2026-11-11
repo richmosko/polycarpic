@@ -27,7 +27,6 @@
     <button
       type="button"
       onclick={ontoggle}
-      aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       aria-expanded={!collapsed}
       data-testid="sidebar-toggle"
       class="hover:bg-sidebar-accent focus-visible:ring-sidebar-ring group flex w-full items-center gap-2 rounded-md p-2 text-left focus-visible:ring-2 focus-visible:outline-none"
@@ -35,6 +34,7 @@
       <span data-testid="brand-mark" class="text-sidebar-brand shrink-0">
         <Icon name="mark" class="size-6" stroke={1.5} />
       </span>
+      <span class="sr-only">{collapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>
       <span aria-hidden="true" class="font-heading flex-1 truncate text-lg font-semibold rail:hidden">polycarpic</span>
       <Icon name="panelClose" class="size-5 shrink-0 rail:hidden" />
     </button>

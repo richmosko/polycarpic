@@ -19,7 +19,6 @@
 
 <DropdownMenu.Root>
   <DropdownMenu.Trigger
-    aria-label={name}
     class="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring flex w-full items-center gap-3 rounded-md p-2 text-left text-sm focus-visible:ring-2 focus-visible:outline-none"
   >
     <span
@@ -27,7 +26,8 @@
       class="bg-sidebar-border flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium"
       >{initial}</span
     >
-    <span class="truncate rail:hidden">{name}</span>
+    <span class="sr-only">{name}</span>
+    <span aria-hidden="true" class="truncate rail:hidden">{name}</span>
   </DropdownMenu.Trigger>
   <DropdownMenu.Portal>
     <DropdownMenu.Content
