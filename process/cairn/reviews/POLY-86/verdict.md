@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: PASS at d100466 on the code, reopened on one CI axis (F12, below).** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
+**Result: PASS at d100466 on the code; F12 is confirmed at 2bf29a3 (below).** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -96,4 +96,14 @@ Pass line, which I confirm at the fix sha:
 - **No new top-level job** (POLY-96).
 
 The verdict re-closes on the confirmed fix sha plus a green PR check.
+
+**F12 confirmed at 2bf29a3 (code-read):**
+- The browser download is fatal and bounded (`timeout 180`).
+- `install-deps` is bounded (`timeout 120`) and non-fatal, ending with `|| echo ::warning::`. The apt fetch is no longer a precondition.
+- The step has `timeout-minutes: 8`. `turbo run e2e` runs with no skip and no `continue-on-error`, so a Chromium that cannot launch still fails the step.
+- `tests/ci/ci-e2e.test.ts` holds that shape.
+- No new job.
+- Dispatched run 43059584727 was green while the apt outage was live.
+
+**Result: PASS.** It closes on a green PR #116 check at 2bf29a3 or later.
 
