@@ -12,15 +12,14 @@ services:
     security_opt: ["no-new-privileges:true"]
     restart: unless-stopped
     environment:
-      POLY_HTTP_PORT: "8080"
-      POLY_HTTPS_PORT: "8443"
       POLY_DOMAIN: ${POLY_DOMAIN:?}
       POLY_STAGING_ALLOW: ${POLY_STAGING_ALLOW:?}
     ports:
       - ${POLY_BIND_ADDR:?}:80:8080
       - ${POLY_BIND_ADDR:?}:443:8443
-    networks: [prod-edge, staging-edge]
-    secrets: [staging_basic_auth]
+    networks: [edge-prod, edge-staging]
+    secrets:
+      - {source: staging_basic_auth__caddy, target: staging_basic_auth}
     mem_limit: 128m
     tmpfs: [/tmp]
     volumes:
@@ -32,14 +31,14 @@ services:
       timeout: 5s
 
 networks:
-  prod-edge:
-    name: polycarpic-prod-edge
+  edge-prod:
+    name: polycarpic-edge-prod
     ipam:
       config: [{subnet: 10.201.30.0/28}]
-  staging-edge:
-    name: polycarpic-staging-edge
+  edge-staging:
+    name: polycarpic-edge-staging
     ipam:
       config: [{subnet: 10.202.30.0/28}]
 
 secrets:
-  staging_basic_auth: {file: /etc/polycarpic/secrets/staging_basic_auth}
+  staging_basic_auth__caddy: {file: /etc/polycarpic/secrets/caddy/staging_basic_auth}

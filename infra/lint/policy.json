@@ -1,6 +1,5 @@
 {
   "renderEnv": {
-    "POLY_BIND_ADDR": "192.0.2.1",
     "POLY_DOMAIN": "lint.test",
     "POLY_STAGING_ALLOW": "192.0.2.0/24"
   },
@@ -10,30 +9,21 @@
   ],
   "secretMatrix": {
     "prod": {
-      "db_superuser_password": ["postgres"],
-      "db_password_app": ["web"],
-      "db_password_worker": ["worker"],
-      "db_password_migrator": ["migrate"],
-      "db_password_backup": ["backup"],
-      "auth_secret": ["web", "worker"],
-      "resend_api_key": ["web", "worker"],
-      "plaid_secret": ["web"],
-      "credential_keyring": ["worker"],
-      "backup_store_credential": ["uploader"],
-      "heartbeat_url": ["uploader"]
+      "postgres": ["db_superuser_password"],
+      "web": ["db_password_app", "auth_secret", "resend_api_key", "plaid_secret"],
+      "worker": ["db_password_worker", "auth_secret", "credential_keyring", "resend_api_key"],
+      "migrate": ["db_password_migrator"],
+      "backup": ["db_password_backup"],
+      "uploader": ["backup_store_credential", "heartbeat_url"]
     },
     "staging": {
-      "db_superuser_password": ["postgres"],
-      "db_password_app": ["web"],
-      "db_password_worker": ["worker"],
-      "db_password_migrator": ["migrate"],
-      "auth_secret": ["web", "worker"],
-      "resend_api_key": ["web", "worker"],
-      "plaid_secret": ["web"],
-      "credential_keyring": ["worker"]
+      "postgres": ["db_superuser_password"],
+      "web": ["db_password_app", "auth_secret", "resend_api_key", "plaid_secret"],
+      "worker": ["db_password_worker", "auth_secret", "credential_keyring", "resend_api_key"],
+      "migrate": ["db_password_migrator"]
     },
     "edge": {
-      "staging_basic_auth": ["caddy"]
+      "caddy": ["staging_basic_auth"]
     }
   },
   "secretPrefix": {

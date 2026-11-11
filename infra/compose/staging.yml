@@ -17,7 +17,8 @@ services:
     command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
     environment:
       POSTGRES_PASSWORD_FILE: /run/secrets/db_superuser_password
-    secrets: [db_superuser_password]
+    secrets:
+      - {source: db_superuser_password__postgres, target: db_superuser_password}
     networks: [default]
     mem_limit: 1g
     tmpfs:
@@ -41,10 +42,14 @@ services:
     environment:
       DB_PASSWORD_FILE: /run/secrets/db_password_app
       AUTH_SECRET_FILE: /run/secrets/auth_secret
-    secrets: [db_password_app, auth_secret, resend_api_key, plaid_secret]
+    secrets:
+      - {source: db_password_app__web, target: db_password_app}
+      - {source: auth_secret__web, target: auth_secret}
+      - {source: resend_api_key__web, target: resend_api_key}
+      - {source: plaid_secret__web, target: plaid_secret}
     networks:
       default: {}
-      edge:
+      edge-staging:
         aliases: [staging-web]
     mem_limit: 384m
     tmpfs: [/tmp]
@@ -60,7 +65,11 @@ services:
     environment:
       DB_PASSWORD_FILE: /run/secrets/db_password_worker
       AUTH_SECRET_FILE: /run/secrets/auth_secret
-    secrets: [db_password_worker, auth_secret, credential_keyring, resend_api_key]
+    secrets:
+      - {source: db_password_worker__worker, target: db_password_worker}
+      - {source: auth_secret__worker, target: auth_secret}
+      - {source: credential_keyring__worker, target: credential_keyring}
+      - {source: resend_api_key__worker, target: resend_api_key}
     networks: [default]
     mem_limit: 384m
     tmpfs: [/tmp]
@@ -77,7 +86,8 @@ services:
     profiles: [migrate]
     environment:
       DB_PASSWORD_FILE: /run/secrets/db_password_migrator
-    secrets: [db_password_migrator]
+    secrets:
+      - {source: db_password_migrator__migrate, target: db_password_migrator}
     networks: [default]
     mem_limit: 512m
     tmpfs: [/tmp]
@@ -91,16 +101,18 @@ networks:
     name: polycarpic-staging_default
     ipam:
       config: [{subnet: 10.202.1.0/24}]
-  edge:
-    name: polycarpic-staging-edge
+  edge-staging:
+    name: polycarpic-edge-staging
     external: true
 
 secrets:
-  db_superuser_password: {file: /etc/polycarpic/staging-secrets/db_superuser_password}
-  db_password_app: {file: /etc/polycarpic/staging-secrets/db_password_app}
-  db_password_worker: {file: /etc/polycarpic/staging-secrets/db_password_worker}
-  db_password_migrator: {file: /etc/polycarpic/staging-secrets/db_password_migrator}
-  auth_secret: {file: /etc/polycarpic/staging-secrets/auth_secret}
-  resend_api_key: {file: /etc/polycarpic/staging-secrets/resend_api_key}
-  plaid_secret: {file: /etc/polycarpic/staging-secrets/plaid_secret}
-  credential_keyring: {file: /etc/polycarpic/staging-secrets/credential_keyring}
+  db_superuser_password__postgres: {file: /etc/polycarpic/staging-secrets/postgres/db_superuser_password}
+  db_password_app__web: {file: /etc/polycarpic/staging-secrets/web/db_password_app}
+  auth_secret__web: {file: /etc/polycarpic/staging-secrets/web/auth_secret}
+  resend_api_key__web: {file: /etc/polycarpic/staging-secrets/web/resend_api_key}
+  plaid_secret__web: {file: /etc/polycarpic/staging-secrets/web/plaid_secret}
+  db_password_worker__worker: {file: /etc/polycarpic/staging-secrets/worker/db_password_worker}
+  auth_secret__worker: {file: /etc/polycarpic/staging-secrets/worker/auth_secret}
+  credential_keyring__worker: {file: /etc/polycarpic/staging-secrets/worker/credential_keyring}
+  resend_api_key__worker: {file: /etc/polycarpic/staging-secrets/worker/resend_api_key}
+  db_password_migrator__migrate: {file: /etc/polycarpic/staging-secrets/migrate/db_password_migrator}

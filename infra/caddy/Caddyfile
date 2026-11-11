@@ -1,7 +1,7 @@
 {
 	admin off
-	http_port {$POLY_HTTP_PORT:80}
-	https_port {$POLY_HTTPS_PORT:443}
+	http_port 8080
+	https_port 8443
 }
 
 (security_headers) {
@@ -21,14 +21,20 @@ http://app.{$POLY_DOMAIN}, http://staging.{$POLY_DOMAIN} {
 app.{$POLY_DOMAIN} {
 	tls {$POLY_TLS}
 	import security_headers
+	handle_errors {
+		import security_headers
+	}
 	reverse_proxy prod-web:3000
 }
 
 staging.{$POLY_DOMAIN} {
 	tls {$POLY_TLS}
 	import security_headers
+	handle_errors {
+		import security_headers
+	}
 	basic_auth {
-		{file./run/secrets/staging_basic_auth}
+		import /run/secrets/staging_basic_auth
 	}
 	@denied not remote_ip {$POLY_STAGING_ALLOW}
 	respond @denied 403

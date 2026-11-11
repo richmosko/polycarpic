@@ -47,7 +47,8 @@ function cidr(c) {
 }
 const overlap = (a, b) => { const x = cidr(a), y = cidr(b); return x && y && x[0] <= y[1] && y[0] <= x[1]; };
 const list = (x) => (Array.isArray(x) ? x : x == null ? [] : [x]);
-const projectOf = (netName) => /^polycarpic-(prod|staging)(?=[-_])/.exec(netName)?.[1] ?? null;
+const projectOf = (netName) => /^polycarpic-(?:edge-)?(prod|staging)(?=[-_]|$)/.exec(netName)?.[1] ?? null;
+const EDGE_NET = /^polycarpic-edge-(prod|staging)$/;
 
 function hbaRules(text) {
   return text.split('\n').map((l) => l.replace(/#.*/, '').trim()).filter(Boolean).map((l) => l.split(/\s+/));
@@ -67,10 +68,11 @@ if (Object.keys(files).length === 0) v('no-files', 'infra/compose', 'no compose 
 for (const k of KINDS) if (!files[k] && Object.keys(files).length) v('missing-file', `infra/compose/${k}.yml`, 'required compose file is missing');
 
 const renderEnv = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', ...policy.renderEnv };
-if (process.env.POLY_POSTGRES_IMAGE) renderEnv.POLY_POSTGRES_IMAGE = process.env.POLY_POSTGRES_IMAGE;
+// POLY_POSTGRES_IMAGE and POLY_BIND_ADDR have no default anywhere: unset fails the render (fail closed).
+for (const k of ['POLY_POSTGRES_IMAGE', 'POLY_BIND_ADDR']) if (process.env[k]) renderEnv[k] = process.env[k];
 for (const k of ['DOCKER_HOST', 'DOCKER_CONFIG', 'DOCKER_CONTEXT', 'XDG_RUNTIME_DIR']) if (process.env[k]) renderEnv[k] = process.env[k];
 
-const BYPASS_KEYS = ['network_mode', 'privileged', 'cap_add', 'devices', 'sysctls', 'env_file', 'extra_hosts', 'links', 'external_links', 'build', 'extends'];
+const BYPASS = { network_mode: 'network-mode', privileged: 'privileged', cap_add: 'cap-add', devices: 'devices', sysctls: 'sysctls', env_file: 'env-file', extra_hosts: 'extra-hosts', links: 'links', external_links: 'links', group_add: 'group-add', build: 'no-build', extends: 'bypass' };
 const SECRETISH = /(SECRET|PASSWORD|PASSWD|TOKEN|KEY|CREDENTIAL|DSN|DATABASE_URL)/;
 const varsIn = (s) => [...String(s).matchAll(/\$\{([A-Za-z_][A-Za-z0-9_]*)/g)].map((m) => m[1]);
 const hasVar = (x) => /\$\{|\$[A-Za-z_]/.test(JSON.stringify(x ?? ''));
@@ -83,7 +85,7 @@ for (const [kind, path] of Object.entries(files)) {
   try { raw = parse(readFileSync(path, 'utf8'), { merge: true }) ?? {}; } catch (e) { v('render-error', rel, `YAML: ${e.message}`); continue; }
   if (raw.include) v('bypass', rel, 'include is not allowed');
   for (const [sn, s] of Object.entries(raw.services ?? {})) {
-    for (const key of BYPASS_KEYS) if (s[key] !== undefined) v(key === 'network_mode' ? 'network-mode' : key === 'cap_add' ? 'cap-add' : key === 'env_file' ? 'env-file' : key === 'build' ? 'no-build' : key === 'privileged' ? 'privileged' : key === 'devices' ? 'devices' : 'bypass', rel, `${sn}: ${key} is not allowed`);
+    for (const [key, id] of Object.entries(BYPASS)) if (s[key] !== undefined) v(id, rel, `${sn}: ${key} is not allowed`);
     for (const key of ['pid', 'ipc', 'userns_mode']) if (s[key] === 'host') v('host-namespace', rel, `${sn}: ${key}: host`);
     if (typeof s.image === 'string') for (const name of varsIn(s.image)) if (!policy.allowedVars.includes(name)) v('raw-interpolation', rel, `${sn}: image uses \${${name}}`);
     for (const key of ['networks', 'secrets', 'volumes', 'user', 'cap_drop', 'cap_add', 'security_opt', 'healthcheck', 'command', 'tmpfs'])
@@ -91,6 +93,7 @@ for (const [kind, path] of Object.entries(files)) {
     for (const p of list(s.ports)) {
       const t = typeof p === 'string' ? p : JSON.stringify(p);
       if (/\$/.test(t) && !/^\$\{POLY_BIND_ADDR:\?\}:\d+:\d+$/.test(t)) v('raw-interpolation', rel, `${sn}: ports entry ${t}`);
+      else if (!/^\$\{POLY_BIND_ADDR:\?\}:\d+:\d+$/.test(t)) v('ports-bind', rel, `${sn}: ports entry ${t} must be \${POLY_BIND_ADDR:?}:host:container`);
     }
     for (const [ek, ev] of Object.entries(s.environment && !Array.isArray(s.environment) ? s.environment : {}))
       for (const name of varsIn(ev)) if (!policy.allowedVars.includes(name)) v('raw-interpolation', rel, `${sn}: environment ${ek} uses \${${name}}`);
@@ -98,6 +101,7 @@ for (const [kind, path] of Object.entries(files)) {
   for (const key of ['networks', 'secrets', 'configs', 'volumes']) if (hasVar(raw[key])) v('raw-interpolation', rel, `\${…} in top-level ${key}`);
 
   const r = spawnSync('docker', ['compose', '-f', path, '--profile', '*', 'config', '--format', 'json'], { encoding: 'utf8', env: renderEnv, maxBuffer: 16 << 20 });
+  if (r.error?.code === 'ENOENT') { v('no-docker', rel, '`docker compose` is not available'); continue; }
   if (r.error || r.status !== 0) { v('render-error', rel, (r.error ? String(r.error) : r.stderr).trim().split('\n').slice(-2).join(' | ')); continue; }
   try { rendered[kind] = JSON.parse(r.stdout); } catch (e) { v('render-error', rel, `unparsable config output: ${e.message}`); continue; }
   if (!Object.keys(rendered[kind].services ?? {}).length) v('no-services', rel, 'renders zero services');
@@ -147,39 +151,56 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     if (list(s.cap_add).length) v('cap-add', rel, `${at}: cap_add`);
     if (list(s.devices).length) v('devices', rel, `${at}: devices`);
     if (list(s.security_opt).some((o) => /unconfined/.test(o))) v('unconfined', rel, `${at}: unconfined security_opt`);
-    if (s.sysctls && Object.keys(s.sysctls).length) v('bypass', rel, `${at}: sysctls`);
+    if (s.sysctls && Object.keys(s.sysctls).length) v('sysctls', rel, `${at}: sysctls`);
     if (list(s.env_file).length) v('env-file', rel, `${at}: env_file`);
     for (const [ek, ev] of Object.entries(s.environment ?? {})) {
-      if (SECRETISH.test(ek.toUpperCase()) && !(ek.endsWith('_FILE') && String(ev ?? '').startsWith('/run/secrets/'))) v('env-secret', rel, `${at}: environment ${ek} looks like a secret; use a secret file`);
+      const fileOk = ek.endsWith('_FILE') && String(ev ?? '').startsWith('/run/secrets/');
+      if ((SECRETISH.test(ek.toUpperCase()) || ek.endsWith('_FILE')) && !fileOk) v('env-secret', rel, `${at}: environment ${ek} must be a *_FILE pointing under /run/secrets/`);
     }
     if (s.ports?.length && sn !== 'caddy') v('ports-caddy-only', rel, `${at}: ports: only caddy publishes a port`);
     // mounts
     for (const vol of s.volumes ?? []) {
       const src = vol.source ?? '';
       const base = src.split('/').pop();
-      if (vol.type === 'bind' && (src === '/' || src === '/var/run' || src === '/run' || src.startsWith('/var/run/') || src.startsWith('/run/') || /docker\.sock|containerd\.sock/.test(base))) v('docker-sock', rel, `${at}: mounts ${src}`);
+      if (vol.type === 'bind' && /docker\.sock|containerd\.sock/.test(base)) v('docker-sock', rel, `${at}: mounts ${src}`);
+      if (vol.type === 'bind' && (src === '/' || src === '/var/run' || src === '/run' || src.startsWith('/var/run/') || src.startsWith('/run/'))) v('mount-forbidden', rel, `${at}: mounts ${src}`);
       if (vol.type === 'bind') {
         const norm = src.startsWith(ROOT + sep) ? relative(resolve(composeDir), src) : src;
         const hit = (policy.binds[sn] ?? []).find((b) => b.source === norm && b.target === vol.target);
-        if (!hit) v('bind-allow', rel, `${at}: bind ${norm}:${vol.target} is not in the allowlist`);
-        else if (!hit.rw && !vol.read_only) v('bind-allow', rel, `${at}: bind ${norm}:${vol.target} must be :ro`);
+        if (!hit) v('mount-allowlist', rel, `${at}: bind ${norm}:${vol.target} is not in the allowlist`);
+        else if (!hit.rw && !vol.read_only) v('mount-allowlist', rel, `${at}: bind ${norm}:${vol.target} must be :ro`);
       }
     }
-    // secrets
+    // secrets: one top-level secret per (service, name), sourced from the service's own directory (ruling A1)
+    const allowed = matrix[sn] ?? [];
+    const seenTargets = new Set();
     for (const sec of s.secrets ?? []) {
-      const name = typeof sec === 'string' ? sec : sec.source;
-      if (!matrix[name]) v('secret-matrix', rel, `${at}: secret ${name} is not in the matrix for ${kind}`);
-      else if (!matrix[name].includes(sn)) v('secret-matrix', rel, `${at}: secret ${name} may only be mounted by ${matrix[name].join(', ')}`);
+      const key = typeof sec === 'string' ? sec : sec.source;
+      const target = (typeof sec === 'string' ? sec : sec.target) ?? key;
+      if (!allowed.includes(target)) v('secret-matrix', rel, `${at}: secret ${target} is not allowed for this service (${kind})`);
+      if (seenTargets.has(target)) v('secret-matrix', rel, `${at}: secret ${target} mounted twice`);
+      seenTargets.add(target);
+      const file = cfg.secrets?.[key]?.file ?? '';
+      const want = `${policy.secretPrefix[kind]}${sn}/${target}`;
+      if (file !== want) v('secret-path', rel, `${at}: secret ${target} must come from ${want} (got ${file || 'none'})`);
     }
     // networks
     const sNets = Object.keys(s.networks ?? {});
     const names = sNets.map(netName);
+    if (s.group_add?.length) v('group-add', rel, `${at}: group_add`);
     const projects = new Set(names.map(projectOf).filter(Boolean));
     if (kind === 'edge') {
-      if (sn === 'caddy') for (const n of names) if (!/^polycarpic-(prod|staging)-edge$/.test(n)) v('edge-network', rel, `caddy joins ${n}; only the edge networks`);
+      if (sn === 'caddy') for (const n of names) if (!EDGE_NET.test(n)) v('edge-network', rel, `caddy joins ${n}; only the edge networks`);
     } else {
       if (projects.size > 1 || [...projects].some((p) => p !== kind)) v('cross-project', rel, `${at}: on networks of another project (${names.join(', ')})`);
-      for (const n of names) if (/^polycarpic-(prod|staging)-edge$/.test(n) && sn !== 'web') v('edge-network', rel, `${at}: only web joins ${n}`);
+      for (const n of names) if (EDGE_NET.test(n) && sn !== 'web') v('edge-network', rel, `${at}: only web joins ${n}`);
+    }
+  }
+  {
+    const ids = Object.entries(svcs).map(([n, x]) => [n, ...String(x.user ?? '').split(':')]);
+    for (const i of [1, 2]) {
+      const seen = new Map();
+      for (const r of ids) { if (seen.has(r[i])) v('user-distinct', rel, `${r[0]} and ${seen.get(r[i])} share ${i === 1 ? 'uid' : 'gid'} ${r[i]}`); else seen.set(r[i], r[0]); }
     }
   }
   for (const [key, sec] of Object.entries(cfg.secrets ?? {})) {
@@ -187,11 +208,16 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     const f = sec.file ?? '';
     const pre = policy.secretPrefix[kind];
     if (!f.startsWith(pre) || f.includes('..')) v('secret-path', rel, `secret ${key}: file ${f} must be under ${pre}`);
+    if (!Object.values(svcs).some((x) => (x.secrets ?? []).some((q) => (typeof q === 'string' ? q : q.source) === key))) v('secret-path', rel, `secret ${key} is mounted by no service`);
   }
   for (const [key, c] of Object.entries(cfg.configs ?? {})) if (c.content) v('config-inline', rel, `config ${key}: inline content`);
 
   if (kind === 'edge') {
-    for (const [key, n] of Object.entries(nets)) for (const c of n.ipam?.config ?? []) for (const a of allowCidrs) if (c.subnet && overlap(c.subnet, a)) v('edge-subnet', rel, `network ${key} ${c.subnet} overlaps pg_hba allow ${a}`);
+    for (const [key, n] of Object.entries(nets)) {
+      const subs = (n.ipam?.config ?? []).map((c) => c.subnet).filter(Boolean);
+      if (!subs.length) v('edge-overlap', rel, `network ${key} needs a fixed subnet`);
+      for (const sub of subs) for (const a of allowCidrs) if (overlap(sub, a)) v('edge-overlap', rel, `network ${key} ${sub} overlaps pg_hba allow ${a}`);
+    }
     const caddy = svcs.caddy;
     if (caddy) for (const other of Object.keys(svcs)) if (other !== 'caddy') v('edge-network', rel, `unexpected service ${other} in the edge project`);
   }

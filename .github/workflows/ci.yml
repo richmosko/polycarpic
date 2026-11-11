@@ -313,6 +313,7 @@ jobs:
         # The image reference only has to be a digest-pinned value; the files take it from the environment (INFRA §6.1a).
         env:
           POLY_POSTGRES_IMAGE: ghcr.io/richmosko/polycarpic-postgres@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          POLY_BIND_ADDR: 192.0.2.1
         run: node infra/lint/compose-policy.mjs --root .
 
       - name: Infra lint fixtures
