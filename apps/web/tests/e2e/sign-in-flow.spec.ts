@@ -24,6 +24,16 @@ test.describe('sign-in form', () => {
   });
 });
 
+test.describe('signed out chrome', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test('/sign-in has no navigation landmark and no account chip  [red if: the app shell renders for a signed-out visitor]', async ({ page }) => {
+    await page.goto(`${base}/sign-in`);
+    await expect(page.getByRole('navigation')).toHaveCount(0);
+    await expect(page.getByTestId('sidebar')).toHaveCount(0);
+  });
+});
+
 test.describe('signed in', () => {
   test('Settings → Sessions renders the list with this device and no token  [red if: the load throws on a non-Date column or the page leaks the token]', async ({ page, request }) => {
     const res = await request.get(`${base}/settings/sessions`);
@@ -31,6 +41,20 @@ test.describe('signed in', () => {
     await page.goto(`${base}/settings/sessions`);
     await expect(page.getByRole('heading', { name: 'Sessions' })).toBeVisible();
     await expect(page.getByText('(this device)')).toBeVisible();
+  });
+
+  test('Settings links to Sessions, which revokes another session after a step-up  [red if: the menu has no route to Sessions, or revoke-by-id does not delete]', async ({ page }) => {
+    await page.goto(`${base}/dashboard`);
+    await page.waitForLoadState('networkidle');
+    await page.getByTestId('sidebar').getByRole('button', { name: 'Ada Lovelace' }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await page.waitForURL('**/settings/sessions');
+    const rows = page.locator('tbody tr');
+    const before = await rows.count(); // other specs may have left a session of their own
+    expect(before).toBeGreaterThanOrEqual(2);
+    await rows.filter({ hasNotText: '(this device)' }).first().getByRole('button', { name: 'Revoke' }).click();
+    await expect(rows).toHaveCount(before - 1);
+    await expect(rows.filter({ hasText: '(this device)' })).toHaveCount(1);
   });
 
   test('Log out is enabled in the account menu and ends the session  [red if: the item is disabled or does not reach /sign-out]', async ({ browser }) => {

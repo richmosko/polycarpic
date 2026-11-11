@@ -47,6 +47,9 @@ const cookies = signed.headers.getSetCookie().map((c: string) => {
   const eq = pair.indexOf('=');
   return { name: pair.slice(0, eq), value: pair.slice(eq + 1), domain: 'localhost', path: '/', expires: -1, httpOnly: true, secure: true, sameSite: 'Lax' as const };
 });
+// A second session and a step-up stamp (what POLY-89's definers will write), so the Sessions spec can revoke another session.
+await auth.api.signInEmail({ body: { email: EMAIL, password: PASSWORD } });
+must(`UPDATE public.session SET recent_auth_at = now() WHERE user_id = '${id}'`, db);
 mkdirSync(join(here, '.auth'), { recursive: true });
 writeFileSync(join(here, '.auth', 'user.json'), JSON.stringify({ cookies, origins: [] }));
 await close();

@@ -9,6 +9,9 @@ import { createRoutingPool } from './routing-pool.ts';
 import { accountDropIdToken, userCreateBefore, userUpdateBefore } from './user-hooks.ts';
 
 const DAY = 86400;
+/** C-04: five a minute per IP on the credential and verification paths (S19). */
+const LIMITED = ['/sign-in/email', '/sign-in/magic-link', '/sign-up/email', '/request-password-reset', '/two-factor/verify-totp', '/two-factor/verify-backup-code', '/passkey/verify-authentication'];
+const customRules = Object.fromEntries(LIMITED.map((p) => [p, { window: 60, max: 5 }]));
 
 export interface Provider {
   clientId: string;
@@ -20,6 +23,8 @@ export interface AuthInput {
   tlsMode: TlsMode;
   google?: Provider;
   github?: Provider;
+  /** S19: refuse an /api/auth/* request whose client IP does not resolve (true outside development). */
+  requireClientIp?: boolean;
   sendMagicLink: (m: { email: string; token: string; url: string }) => Promise<void>;
 }
 
@@ -100,7 +105,8 @@ export function authOptions(input: AuthInput) {
         updatedAt: f.verification.fields.updatedAt,
       },
     },
-    rateLimit: { enabled: true, storage: 'memory' as const },
+    rateLimit: { enabled: true, storage: 'memory' as const, customRules },
+    requireClientIp: input.requireClientIp ?? false,
     advanced: {
       // __Host-: Secure, Path=/, no Domain. BetterAuth's own secure prefix is __Secure-, so the secure prefix is turned off
       // and Secure forced on, with the prefix carried in the cookie name.
@@ -108,6 +114,8 @@ export function authOptions(input: AuthInput) {
       cookiePrefix: '__Host-better-auth',
       defaultCookieAttributes: { secure: true, sameSite: 'lax' as const, path: '/', httpOnly: true },
       database: { generateId: 'uuid' as const },
+      // S19: one header, as Caddy writes it, one entry; no trustedProxies so BetterAuth's single-entry rule applies.
+      ipAddress: { ipAddressHeaders: ['x-forwarded-for'], ipv6Subnet: 64 },
     },
     databaseHooks: {
       user: { create: { before: userCreateBefore }, update: { before: userUpdateBefore } },

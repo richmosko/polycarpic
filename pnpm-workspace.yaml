@@ -2,3 +2,8 @@ packages:
   - packages/*
   - apps/*
   - tests/layers/tsc
+
+# esbuild arrives in the prod install through better-auth's optional peers (drizzle-kit, vite); its postinstall is only a
+# binary check, so it is denied explicitly and `pnpm install --prod` in the image build stays free of lifecycle scripts.
+allowBuilds:
+  esbuild: false

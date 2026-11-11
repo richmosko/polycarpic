@@ -1,5 +1,6 @@
 // handleAuthRequest (POLY-86 ruling R4; seceng S1, S14): runs BetterAuth for one /api/auth/* request inside the right
 // transaction of ours, and commits only when BetterAuth's answer is a success.
+import { isIP } from 'node:net';
 import { withContextFreeTx } from '@poly/db/auth';
 import { withTenant } from '@poly/db';
 import { sessionUserId } from '@poly/db/session';
@@ -59,15 +60,25 @@ async function inTransaction(request: Request, auth: AnyAuth, run: <T>(fn: () =>
   }
 }
 
+/** S19: exactly one X-Forwarded-For entry and it is an IP; anything else never reaches the limiter's shared bucket. */
+const clientIpResolved = (request: Request): boolean => {
+  const v = request.headers.get('x-forwarded-for');
+  return v !== null && !v.includes(',') && isIP(v.trim()) !== 0;
+};
+
 const notFound = () => new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
 
 export async function handleAuthRequest(request: Request, given: Promise<AnyAuth> | AnyAuth = defaultAuth()): Promise<Response> {
   const route = matchAuthPath(new URL(request.url).pathname);
   if (!route || route.rule.class === 'blocked') return notFound(); // the same answer for an unlisted and a blocked path
   const auth = await given;
+  const ctx = await auth.$context;
+  if ((ctx.options as { requireClientIp?: boolean }).requireClientIp && !clientIpResolved(request)) {
+    console.error(JSON.stringify({ event: 'client_ip_unresolved', path: route.template }));
+    return new Response(JSON.stringify({ message: 'Service unavailable' }), { status: 503, headers: { 'content-type': 'application/json' } });
+  }
   const got = await auth.api.getSession({ headers: request.headers });
   let session = got as null | { session: { id: string; token: string; createdAt: Date }; user: { id: string } };
-  const ctx = await auth.$context;
   if (session && cappedOut(session.session.createdAt)) {
     await ctx.internalAdapter.deleteSession(session.session.token);
     session = null;

@@ -5,7 +5,8 @@ import { loadConfig } from '@poly/config';
 
 let started = false;
 
-export function startAuth(): void {
+export async function startAuth(): Promise<void> {
+  const { dev } = await import('$app/env'); // dynamic: unit tests load this module without Kit's runtime
   if (started) return;
   started = true;
   const config = loadConfig('web');
@@ -17,6 +18,7 @@ export function startAuth(): void {
         secret: secret.reveal(),
         baseURL: config.publicOrigin,
         tlsMode: config.tlsMode,
+        requireClientIp: !dev,
         // Providers arrive with POLY-88; the mailer with the Resend follow-up. Until then a magic link answers 503.
         sendMagicLink: async () => {
           throw new Error('mailer not configured');
