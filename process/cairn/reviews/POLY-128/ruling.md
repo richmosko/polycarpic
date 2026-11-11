@@ -88,3 +88,12 @@ This addendum supersedes R3's "Seven, not eight" bullet and the "seven" in R3's 
 - `NAV` has eight items, in DESIGN §5.10 order: Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, **Tax `/tax`**, Reports, Entities. `/tax` gets a stub page like the others.
 - R10's Tab order visits all eight nav items. The smoke asserts the count (8) and this order.
 - Criterion 2 and the description are amended in place. ARCH §2.4 now lists eight and carries a Tax screen row (`TaxPosition` → tax, POLY-1.0).
+
+## Addendum 2: Light / Dark / Auto
+
+This addendum supersedes R6. The lead ruled three choices (DESIGN design-system-spec.md § Theme); with no stored choice the page is light.
+- Cookie `poly-theme` holds `light`, `dark` or `auto`; any other value counts as `light`. `hooks.server.ts` maps it to the `<html>` class: `dark` gives `dark`, `auto` gives `auto`, anything else gives no class. Only those literals reach `%poly.theme%`.
+- Auto is met by **one external, same-origin script**, `apps/web/static/theme.js`, loaded from `app.html` `<head>` with a plain `<script src="/theme.js">` (no `defer`, so it runs before first paint). When `<html>` has `auto`, it sets `dark` from `matchMedia('(prefers-color-scheme: dark)')` and follows that query's `change` event. R8's `script-src 'self'` admits it, and no inline script or hash is needed. The tokens stay in a single `.dark` block: no `@media` copy, so the parity test is unchanged.
+- The Theme item is a three-way radio group (Light, Dark, Auto). It writes the cookie and sets the class on the client the same way.
+- The smoke adds: cookie `auto` with `colorScheme: 'dark'` gives `dark` and the dark token values; with `'light'`, no `dark`; `page.emulateMedia` flipping the scheme flips the class without a reload. The CSP assertion still finds no `'unsafe-inline'` in `script-src`.
+- ARCH §2.4 now places the collapse control in the brand row, with the top-row toggle on narrow screens only (matches R3).

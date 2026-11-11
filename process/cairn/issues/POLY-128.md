@@ -46,3 +46,7 @@ Feature started. Branch: `feature/poly-128-app-shell-design-tokens`. Runs in par
 ### @architect — 2026-11-10
 
 **Ruling addendum 1:** eight sidebar items, with Tax after Allocation (lead ruling: DESIGN owns the sidebar IA). See ruling.md → Addendum 1. Criterion 2 and the description are amended in place, and ARCH §2.4 is corrected.
+
+### @architect — 2026-11-10
+
+**Ruling addendum 2:** theme choices Light / Dark / Auto, defaulting to light. Auto works through one same-origin `static/theme.js` under R8's CSP; this supersedes R6. See ruling.md → Addendum 2. ARCH §2.4 collapse-control wording aligned with R3. This is the last addendum within the ruling budget.
