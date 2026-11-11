@@ -11,7 +11,7 @@ labels: [tooling]
 priority: null
 pr: null
 created: 2026-09-28
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 Umbrella for tooling gaps found while running the Plan team in parallel worktrees on 2026-09-28: issue-ID collisions, the hand-off location rule, priority validation at creation, and guard-push counting add-then-remove as a touch. Add further items here rather than filing one issue each.
@@ -61,3 +61,7 @@ To build here:
 Two tooling follow-ups from the POLY-102 loop, confirmed by the Principal (2026-11-11):
 - No writes to a bare `/tmp` path. A teammate wrote two world-readable files straight to `/private/tmp` (deleted). Add one line to the shared worktree-protocol block in every `.claude/agents/*.md`: scratch goes to the session scratchpad or the worktree's `temp/`.
 - `scripts/export-pdf.sh` never removes its temporary Chrome profile (`TMP_PROFILE="$(mktemp -d)"`); 55 `print-pdf-*` folders sat in `/private/tmp`. Remove it on exit with a `trap`, check `scripts/print-pdf.mjs` for the same, and clear the existing folders.
+
+### @team-lead — 2026-11-11
+
+From the POLY-86 and POLY-95 loops (2026-11-11), add to the umbrella. (1) `guard-commit` blocked a second conflicted merge of `main` (cfe676c, into `feature/poly-86-*`; committed with `--no-verify`, approved by the Principal for that commit only). (2) A fresh worktree has no `apps/web/.svelte-kit/`, so 33 `db` tests fail locally until `svelte-kit sync` runs; two teammates hit it. Run the sync in the worktree protocol or in the db test setup. (3) A worktree-bound teammate cannot write its agent memory (architect-86's lesson was lost: a code-read verdict missed four defects the running app showed, and its CI-time estimate came in low).

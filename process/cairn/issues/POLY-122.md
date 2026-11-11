@@ -11,7 +11,7 @@ labels: [auth, post-ga-candidate]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-11
 ---
 
 Deferred to the native iOS milestone (Principal, 2026-11-08); web v1 ships Google and GitHub. Held in POLY-1.3 Native App Prep (Principal, 2026-11-09). Blocked by the native iOS work, which is not yet filed, so blocked_by stays empty until it is. Known requirements are listed below.
@@ -26,3 +26,9 @@ Deferred to the native iOS milestone (Principal, 2026-11-08); web v1 ships Googl
 - [ ] Name and email arrive only on the first sign-in and are stored at that callback.
 - [ ] Apple tokens are revoked on account deletion.
 - [ ] ARCH §2.2 / §7.8 / A-27, PRD and DESIGN sign-in wording updated.
+
+## Comments
+
+### @team-lead — 2026-11-11
+
+From the POLY-86 loop (seceng S8; ruling follow-up 7): `/sign-in/social` with an `idToken` body is refused with 400 because it skips state and PKCE. Native sign-in reopens it under its own security review.

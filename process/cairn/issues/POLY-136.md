@@ -10,7 +10,7 @@ labels: [ci, tooling]
 priority: null
 pr: null
 created: 2026-11-10
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
 A batch of small follow-ups from the POLY-96 and POLY-102 loops. None gates a feature.
@@ -20,3 +20,9 @@ A batch of small follow-ups from the POLY-96 and POLY-102 loops. None gates a fe
 - [ ] Journal ↔ file check in `packages/db/src/migrations-check.ts` (`checkFolder`): every `.sql` and `meta/*_snapshot.json` has its journal entry and the reverse. Today a stray migration file outside the journal is caught by nothing; it never runs, but it misleads review (POLY-102 ruling, Addendum 1).
 - [ ] `infra/ci/aggregate.mjs` cross-checks one job per filter output; a mis-wired `lint` `if:` for `node`/`image` is caught only by the static ci-workflow test, not at run time (POLY-96 verdict, A-2).
 - [ ] `image-<commit>` artifacts are kept 90 days; a tag cut later finds no digest and publishes nothing. Document it in the release runbook or look the digest up from the attestation (POLY-96 verdict, A-3; may land as one line on POLY-100).
+
+## Comments
+
+### @team-lead — 2026-11-11
+
+From the POLY-86 and POLY-95 loops, add to this batch. **(1) db job headroom, before any new suite joins `db`** (POLY-86 verdict follow-up 15, owner qa-engineer): runs of 149, 128, 131, 144, 152 s against the 150 s guard; share one auth instance per file across the two TLS modes and look at `runner.test.ts` (about 30 s alone); target a 130 s median. (2) `tests/ci/ci-e2e.test.ts`: the `exit 0\s*$` guard catches only a trailing early exit in the e2e step (qa review @ 2bf29a3). (3) The e2e step's fallback branch (probe fails, `install-deps`, second probe) has never run in CI; one scratch run with the probe forced to fail would show it. (4) `pnpm install --frozen-lockfile` exits 1 locally with ERR_PNPM_IGNORED_BUILDS on esbuild while CI's install passes; state the local install command in the README or align the two.

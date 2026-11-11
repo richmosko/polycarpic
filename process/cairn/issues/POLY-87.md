@@ -11,7 +11,7 @@ labels: [auth]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-09
+updated: 2026-11-11
 ---
 
 After the first (operator) user, an invitation is the only way into an instance; no setting reopens public sign-up (Principal P6, 2026-11-07). An invitee creates an account from the invite and lands on the invited entity, or on their own Person if invited with no entity. The operator can issue a standalone single-use, audited invitation from the box; that person gets only their own Person. PRD §4 invite story.
@@ -34,3 +34,9 @@ After the first (operator) user, an invitation is the only way into an instance;
 - [ ] The step refuses a provisioned user's id planted in the setting by set_config; a rollback to the savepoint clears the recorded id.
 - [ ] A membership on an invited entity is written only by the invitation-accept definer: `poly_app` holds no INSERT on `membership` (POLY-62 ruling R4). The definer seats `app.current_user_id()` against a matching live invitation, and for manager or owner only after the second step is enrolled.
 - [ ] Operator invitations with no entity have their own definer path: `invitation` rows with `entity_id IS NULL` pass no `poly_app` policy, and `app.gate_owner_changes()` refuses them today (POLY-62 verdict).
+
+## Comments
+
+### @team-lead — 2026-11-11
+
+From the POLY-86 loop (ruling follow-up 6): this issue builds the real `claimInvitation`, the new-user step and `provisionPerson` at sign-up. Until then `packages/auth` passes a stub that refuses every sign-up, and the check runs in `user.create.before` inside `withContextFreeTx` on every user-creating route.
