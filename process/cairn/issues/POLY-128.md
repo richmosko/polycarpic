@@ -1,12 +1,12 @@
 ---
 id: POLY-128
 title: App shell + DESIGN tokens
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-82]
 assignee: frontend-lead
-paths: [apps/web/src/app.css, apps/web/src/app.html, apps/web/src/routes/+layout.svelte, apps/web/src/routes/+layout.server.ts, apps/web/src/lib/components/shell/**, apps/web/src/lib/styles/**, apps/web/tailwind.config.*]
+paths: [apps/web/**, tests/**, layers.json, eslint.config.js, turbo.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, package.json, docs/DESIGN/**, docs/ARCH/**, process/cairn/issues/POLY-128.md, process/cairn/reviews/POLY-128/**]
 labels: [enabler, frontend]
 priority: null
 pr: null
@@ -23,3 +23,9 @@ Gap filed at POLY-126's trace: POLY-M1's definition of done says "the app shell 
 - [ ] A Playwright smoke test loads the signed-in shell in light and dark mode and asserts token values on the sidebar and top row.
 - [ ] The shell meets DESIGN #accessibility for keyboard focus order and contrast on its own elements.
 - [ ] Lint refuses `{@html}` in every .svelte file under apps/ and packages/ (SECURITY C-41). The one sanitizing component is the only allowed exception; it is named in the rule when it lands, and until then there is none. A fixture using `{@html}` fails, and so does the same fixture with an inline `eslint-disable` for that rule (SECURITY A-39).
+
+## Comments
+
+### @team-lead — 2026-11-10
+
+Feature started. Branch: `feature/poly-128-app-shell-design-tokens`. Runs in parallel with POLY-62 (tenancy schema); the two share only config files (`eslint.config.js`, `package.json`, `pnpm-lock.yaml`), so the second PR to merge takes main first. `paths` widened from the shell files to `apps/web/**`: `apps/web` has no SvelteKit scaffold yet, so this loop adds it.
