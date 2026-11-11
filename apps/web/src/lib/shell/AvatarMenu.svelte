@@ -19,19 +19,21 @@
 
 <DropdownMenu.Root>
   <DropdownMenu.Trigger
+    aria-label={name}
     class="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring flex w-full items-center gap-3 rounded-md p-2 text-left text-sm focus-visible:ring-2 focus-visible:outline-none"
   >
     <span
       aria-hidden="true"
-      class="bg-sidebar-border flex size-8 items-center justify-center rounded-full text-xs font-medium"
+      class="bg-sidebar-border flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-medium"
       >{initial}</span
     >
-    <span class="truncate">{name}</span>
+    <span class="truncate rail:hidden">{name}</span>
   </DropdownMenu.Trigger>
   <DropdownMenu.Portal>
     <DropdownMenu.Content
-      side="top"
-      align="start"
+      side="right"
+      align="end"
+      sideOffset={12}
       class="bg-popover text-popover-foreground border-border min-w-48 rounded-md border p-1 shadow-md"
     >
       {#each pending as item (item)}

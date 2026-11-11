@@ -1,9 +1,12 @@
 <script lang="ts">
   import { page } from '$app/state';
   import AvatarMenu from './AvatarMenu.svelte';
+  import Icon from './Icon.svelte';
   import { NAV } from './nav';
   import type { ShellSession } from './session';
 
+  // `rail:` variants (app.css) key on <html data-sidebar="collapsed">, set by hooks.server.ts from the
+  // `sidebar:state` cookie, so the first paint is right with no script.
   let {
     session,
     collapsed,
@@ -16,44 +19,46 @@
 <aside
   data-testid="sidebar"
   aria-label="Sidebar"
-  class="bg-sidebar text-sidebar-foreground border-sidebar-border fixed inset-y-0 left-0 z-20 flex w-64 flex-col border-r md:static md:z-auto
-    {open ? 'flex' : 'hidden md:flex'} {collapsed ? 'md:w-16' : ''}"
+  class="bg-sidebar text-sidebar-foreground border-sidebar-border fixed top-4 bottom-4 left-4 z-20 w-60 flex-col overflow-hidden rounded-xl border
+    md:sticky md:z-auto md:m-4 md:mr-0 md:flex md:h-[calc(100svh-2rem)] md:shrink-0 rail:w-16
+    {open ? 'flex' : 'hidden md:flex'}"
 >
-  <div class="flex items-center justify-between gap-2 p-3">
-    <span class="text-sidebar-brand font-heading px-2 text-lg font-semibold" class:md:hidden={collapsed}
-      >polycarpic</span
-    >
+  <div class="flex p-2">
     <button
       type="button"
       onclick={ontoggle}
       aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       aria-expanded={!collapsed}
       data-testid="sidebar-toggle"
-      class="hover:bg-sidebar-accent focus-visible:ring-sidebar-ring rounded-md p-2 focus-visible:ring-2 focus-visible:outline-none"
+      class="hover:bg-sidebar-accent focus-visible:ring-sidebar-ring group flex w-full items-center gap-2 rounded-md p-2 text-left focus-visible:ring-2 focus-visible:outline-none"
     >
-      <svg aria-hidden="true" viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2">
-        <rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" />
-      </svg>
+      <span data-testid="brand-mark" class="text-sidebar-brand shrink-0">
+        <Icon name="mark" class="size-6" stroke={1.5} />
+      </span>
+      <span aria-hidden="true" class="font-heading flex-1 truncate text-lg font-semibold rail:hidden">polycarpic</span>
+      <Icon name="panelClose" class="size-5 shrink-0 rail:hidden" />
     </button>
   </div>
-  <nav aria-label="Main" class="flex-1 p-2 {collapsed ? 'md:hidden' : ''}">
+  <nav aria-label="Main" class="flex-1 overflow-y-auto p-2">
     <ul class="flex flex-col gap-1">
       {#each NAV as item (item.href)}
         {@const current = page.url.pathname === item.href}
         <li>
           <a
             href={item.href}
+            aria-label={item.label}
             aria-current={current ? 'page' : undefined}
-            class="hover:bg-sidebar-accent focus-visible:ring-sidebar-ring block rounded-md px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none
+            class="hover:bg-sidebar-accent focus-visible:ring-sidebar-ring flex items-center gap-3 rounded-md p-2 text-sm focus-visible:ring-2 focus-visible:outline-none
               {current ? 'bg-sidebar-accent font-semibold' : ''}"
           >
-            {item.label}
+            <Icon name={item.icon} class="size-5 shrink-0" />
+            <span class="truncate rail:hidden">{item.label}</span>
           </a>
         </li>
       {/each}
     </ul>
   </nav>
-  <div class="border-sidebar-border mt-auto border-t p-2">
+  <div class="border-sidebar-border border-t p-2">
     <AvatarMenu {session} />
   </div>
 </aside>
