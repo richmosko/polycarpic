@@ -23,3 +23,15 @@
 - **F12 (POLY-97, uploader issue):** Postgres runs `archive_command` under umask 0077, so `.age` files are `999:999 0600` and backup's output is `10004:10004`. The uploader (`10005`, no `group_add`) can neither read nor delete them.
   - Rule: default POSIX ACLs on `spool/{wal,dump,premigration}` grant uid 10005 `rwX`. Never chmod 0644 or 0777, never a shared gid.
   - provision-check asserts the ACL and that nothing in the spool is world-readable.
+
+## reviewed @ c4c1ae3: pass
+
+C1, C2 and SC1–SC5 are present in the tree:
+- SC1: binds are keyed by `<project>.<service>`.
+- SC2: only `bind` and `tmpfs` volumes, and no top-level `volumes:` (raw and rendered).
+- SC3: the staging `route` runs the allowlist before `basic_auth`. The test sends no, wrong and right credentials from outside the allowlist and expects 403 each time.
+- SC4: backup binds `spool/dump` and `spool/premigration` only.
+- SC5: `age-recipients.txt` is the one name in code, INFRA and SECURITY.
+- C1: `POLY_TLS` is `${…:?}` and in `allowedVars`.
+
+The fail fixtures are in `tests/infra/lint-sc.test.ts`. Seceng's security gate is satisfied once CI is green on this sha (run 42987963075 was queued at review). Follow-ups F11 and F12 stand.
