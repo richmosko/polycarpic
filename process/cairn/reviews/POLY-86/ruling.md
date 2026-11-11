@@ -161,3 +161,10 @@ This issue adds `currentClient()` to `context.ts` and does not edit `connection.
 2. **`AuthUnderSystemJob` (P4) gets a pure unit test** in `packages/auth/src/routing-pool.test.ts`, with `currentClient` from `@poly/db/auth` mocked to report `kind: 'withSystem'`. `connect()` and `query()` must both throw. A database test waits for the first job target (POLY-85 Open 3); this is not a gap at the verdict.
 3. The calling conventions in `tests/db/helpers/auth.ts` (the optional `auth` instance as the second argument, and `authOptions` reading `authFields` at call time) are the seam's shape. The builder conforms to them, or changes the helper header and reports the change at gate 3.
 
+## Addendum 2 (CI time, run 42986745660 @ f99b888)
+
+Measured: the `db` job takes 165 s and the battery step 147 s. The six auth files add 48.6 s in series: route-policy 13.1, session 11.5, routing-pool 9.5, second-step 6.0, signup-wrap 4.7, fields 3.8. Each `must()`/`psql()` in those files and in `tests/db/helpers/auth.ts` is a synchronous `docker exec psql` spawn: about 44 call sites, run per test and per seed. The ruling's first remedy (one `cloneMigrated()` per file) is already in place, so this is the next cost to cut.
+
+1. **Remedy:** the auth helpers and the six auth files seed and assert through one in-process superuser `pg.Client` per file, connected to the file's clone (`tests/db/helpers/sql.ts`, `q(db)`, closed in `afterAll`). `psql` stays only where a test needs psql itself. Expected saving: 20 to 30 s (unmeasured). A test's assertions do not change, and qa-engineer-86 reviews that.
+2. **The guard is not re-ruled.** The `db` job must run at or under 150 s on the median of three PR runs. If it is still over after (1), the builder reports per-file times, and I rule the next cut (sharing one auth instance per file across the TLS modes). New suites still join the existing job (POLY-96).
+
