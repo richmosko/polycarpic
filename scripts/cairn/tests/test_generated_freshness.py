@@ -27,7 +27,8 @@ SCRIPT = helpers.CAIRN_DIR / "check_dist_freshness.py"
 PY = sys.executable
 
 _GEN = """\
-import os
+import os, shutil
+shutil.rmtree('out', ignore_errors=True)  # this generator owns out/; an add-only one (drizzle-kit) cannot expose a committed stray
 src = open('src.txt').read().strip()
 dep = open('node_modules/dep.txt').read().strip()
 os.makedirs('out', exist_ok=True)
