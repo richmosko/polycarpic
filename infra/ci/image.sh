@@ -34,9 +34,12 @@ case "$cmd" in
   scan)
     ref="${2:-polycarpic:ci}"
     check_ignorefile
-    ignore=()
-    [ -f .trivyignore ] && ignore=(--ignorefile .trivyignore)
-    trivy image --scanners vuln,secret --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 "${ignore[@]}" "$ref"
+    # bash 3.2 (macOS) treats an empty array as unset under set -u, so branch instead of expanding one
+    if [ -f .trivyignore ]; then
+      trivy image --scanners vuln,secret --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 --ignorefile .trivyignore "$ref"
+    else
+      trivy image --scanners vuln,secret --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 "$ref"
+    fi
     ;;
   check)
     ref="${2:-polycarpic:ci}"
