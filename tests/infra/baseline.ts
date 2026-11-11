@@ -1,5 +1,5 @@
 // POLY-95 R7: the pass fixture, built in code so every fail fixture is "the pass fixture plus ONE mutation".
-// The shape follows INFRA §2.2 and the gate-1 ruling (process/cairn/reviews/POLY-95/ruling.md @ 2669725).
+// The shape follows INFRA §2.2 and the gate-1 ruling (process/cairn/reviews/POLY-95/ruling.md @ 9e59e9b + A1 703fa9b).
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { stringify } from 'yaml';

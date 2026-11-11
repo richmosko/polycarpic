@@ -22,10 +22,12 @@ const SETTINGS: [string, string, string][] = [
   ['password_encryption', 'scram-sha-256', 'md5'],
   ['allow_alter_system', 'off', 'left on'],
   ['shared_buffers', '768MB', 'default 128MB'],
+  ['hba_file', '', 'not in the fragment'],
+  ['listen_addresses', '', 'not in the fragment'],
 ];
 
 describe('Postgres settings on the compose-run container (criterion 2, R5)', () => {
-  it.each(SETTINGS)('SHOW %s = %s', (name, want) => {
+  it.each(SETTINGS.filter(([, v]) => v))('SHOW %s = %s', (name, want) => {
     expect(s.psql(`SHOW ${name}`)).toBe(want);
   });
   it('every setting comes from the mounted fragment (pg_settings.sourcefile = config_file), none from -c / env / ALTER', () => {
@@ -38,8 +40,8 @@ describe('Postgres settings on the compose-run container (criterion 2, R5)', () 
       expect({ name, source, file }).toEqual({ name, source: 'configuration file', file: cf }); // red: a -c flag, env var or command-line override
     }
   });
-  it('no role or database setting overrides them (pg_db_role_setting is empty of these names)', () => {
-    const n = s.psql(`SELECT count(*) FROM pg_db_role_setting, unnest(setconfig) c WHERE split_part(c,'=',1) IN (${SETTINGS.map(([n]) => `'${n}'`).join(',')})`);
+  it('no role or database setting overrides anything (pg_db_role_setting is empty)', () => {
+    const n = s.psql(`SELECT count(*) FROM pg_db_role_setting`);
     expect(n).toBe('0');
   });
   it('hba_file is the mounted pg_hba and every rule parses; the first four rows are the C-79 lines', () => {
@@ -59,6 +61,9 @@ describe('Postgres settings on the compose-run container (criterion 2, R5)', () 
     const r = s.exec('psql', '-U', 'postgres', '-d', 'postgres', '-X', '-c', "ALTER SYSTEM SET log_statement='all'");
     expect(r.code).not.toBe(0);
     expect(r.err).toMatch(/ALTER SYSTEM is not allowed/i);
+  });
+  it('prod.yml adds no capability back (no cap_add on postgres)', () => {
+    expect(s.cfg.services.postgres.cap_add ?? []).toEqual([]);
   });
   it('the server runs as uid 999 with a read-only root filesystem', () => {
     expect(s.exec('id', '-u').out).toBe('999');
