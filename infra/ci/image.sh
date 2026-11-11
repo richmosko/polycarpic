@@ -43,6 +43,8 @@ case "$cmd" in
     ;;
   check)
     ref="${2:-polycarpic:ci}"
+    # build.yml pushes straight to the registry and keeps no local copy, so fetch the pushed digest (never a tag)
+    case "$ref" in *@sha256:*) docker pull -q "$ref" >/dev/null ;; esac
     user="$(docker image inspect --format '{{.Config.User}}' "$ref")"
     if [ "$user" != "node" ]; then echo "image check: Config.User is '${user}', want node" >&2; exit 1; fi
     docker run --rm --entrypoint sh "$ref" -c '

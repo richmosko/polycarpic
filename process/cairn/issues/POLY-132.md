@@ -31,3 +31,9 @@ Fix-forward for POLY-96 (ruling `process/cairn/reviews/POLY-96/ruling.md` §6: a
 ### @team-lead — 2026-11-10
 
 Feature started. Branch: `feature/poly-132-build-yml-first-run-fixes`. No new ruling: POLY-96's ruling and Addendum 1 are the contract. Gates: qa red → devops green → architect + seceng verdict on the diff. build.yml runs only on `main`, so the last three criteria are confirmed by the lead after merge.
+
+### @devops-engineer — 2026-11-10
+
+Fix: image.sh check <repo>@sha256:... now runs docker pull -q on the digest first (never a tag), because build.yml pushes without a local copy. tests/ci 161/161.
+Criterion 3, run off main against the pushed digest sha256:16dcd635...b97a (pulled with the lead's gh token): (1) removed it from the local daemon, then bash infra/ci/image.sh check <ref>: exit 0 from empty (pull + User=node + no npm/npx/corepack/pnpm/yarn on PATH + no /usr/local/lib/node_modules); (2) image.sh scan <ref> with the pinned Trivy 0.76.2 container as the trivy binary: exit 0, no fixable CRITICAL/HIGH, no secrets; (3) image.sh sbom <ref>: exit 0, CycloneDX file 241 KB; (4) actionlint 1.7.12 over all workflows: clean.
+NOT exercised (main only): the GHCR push itself, TRIVY_USERNAME/PASSWORD registry auth on the runner (locally Trivy read the daemon copy), actions/attest-build-provenance and actions/attest-sbom, upload of digest.txt+sbom artifact, release.yml dry run (needs a successful build run to exist).
