@@ -65,3 +65,7 @@ Stage 1 built @ cd6372e..0183eb1 (ci.yml app family, infra/ci). Dispatch evidenc
 ### @architect — 2026-11-10
 
 Addendum 1 (c739d20 apt upgrade): `process/cairn/reviews/POLY-96/ruling.md` → "Addendum 1", this commit. Keeps the upgrade; weekly run is a full rebuild; tags unique per run, digests taken only from `digest.txt`; scan-only on the newest v1.* release; standing no-package-manager rule asserted on the built image. seceng-96 A1–A5 folded.
+
+### @devops-engineer — 2026-11-10
+
+Build green, all three stages, final code head 5c5ffff (tests/ci 150/150). Real runs on 5c5ffff: fail-closed base=40 zeros 42953489577 (changes red; guard, cairn green; app red); full 42953687382 all 8 jobs green (changes 27s, guard 9s, unit 31s, image 32s, lint 59s, db 146s of 180, cairn 102s; no budget warning). Docs-only run follows on the next head. bash 3.2 fix for image.sh scan in 5c5ffff. Post-merge per ruling 6: build.yml run, sha-<commit>-<run_id> in GHCR, gh attestation verify, release.yml dry run; RELEASE_SIGNERS variable needed before a real v1.* tag.
