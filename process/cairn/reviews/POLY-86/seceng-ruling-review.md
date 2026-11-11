@@ -3,6 +3,13 @@
 Reviewer: seceng-86. Ruling under review: `process/cairn/reviews/POLY-86/ruling.md` @ 0b987df.
 Result: **approved on conditions S1–S18**. Each one is a requirement for the re-issued ruling, with the test that proves it. There is no veto. Items marked (unmeasured) are code-reads against 1.7.18 that the builder confirms; where a measurement says otherwise, the builder reports it at gate 3 and the condition is re-issued once.
 
+**Against the re-issue @ 64b3eb0**, which folded the pre-ruling notes:
+- **Already met:** S1, S2, S11 and S15.
+- **Met except one point:** S3 (`backgroundTasks` must stay unset) and S7 (the handle must also 404 *unlisted* paths, not only blocked ones).
+- **Still open:** S4–S6, S8–S10, S12–S14 and S16–S18.
+  - S8 supersedes the re-issue's choice to hold `/sign-in/social` with an `idToken`: refuse it.
+  - S14 settles the re-issue's open point on the clock: use the database's `now()`.
+
 M1, R2, R3 (the flat enrolment refusal), R4, R8 and R11 are accepted as written, apart from the conditions below.
 
 ## Routing pool and transaction (R2, R4)
