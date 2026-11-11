@@ -397,6 +397,28 @@ jobs:
             pnpm exec turbo run test --summarize
           fi
 
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Web e2e (Chromium, affected only)
+        run: |
+          if [ -n "$TURBO_SCM_BASE" ]; then
+            pnpm exec turbo ls --affected > affected.txt
+          else
+            pnpm exec turbo ls > affected.txt
+          fi
+          if ! grep -q '@poly/web' affected.txt; then echo "no e2e task affected"; exit 0; fi
+          pnpm --filter @poly/web exec playwright install --with-deps chromium
+          if [ -n "$TURBO_SCM_BASE" ]; then
+            pnpm exec turbo run e2e --affected
+          else
+            pnpm exec turbo run e2e
+          fi
+
       - name: Cross-package suite (config, image, log)
         run: pnpm exec vitest run -c tests/config/vitest.config.ts
 
