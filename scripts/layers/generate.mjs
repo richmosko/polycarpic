@@ -72,6 +72,11 @@ export function generateConfig(layers, opts = {}) {
       paths.push({ name: 'kysely', importNames: ['PostgresDialect'], message: 'PostgresDialect is for packages/db only (ARCH §2.1).' });
       banned.push(...PG_DRIVERS, ...DRIZZLE_PG);
     }
+    if (n === 'auth') {
+      // POLY-86 criterion 2: BetterAuth runs on its Kysely path over the routing pool, never a Drizzle adapter (ARCH §2.2).
+      paths.push({ name: 'better-auth/adapters/drizzle', message: 'drizzleAdapter is refused in packages/auth: BetterAuth uses its Kysely path (ARCH §2.2).' });
+      banned.push('better-auth/adapters/drizzle');
+    }
     if (!isSecrets) {
       for (const c of ['crypto', 'node:crypto']) {
         paths.push({ name: c, importNames: CRYPTO_NAMES, message: `Sealing primitives are for packages/secrets only (SECURITY A-39).` });

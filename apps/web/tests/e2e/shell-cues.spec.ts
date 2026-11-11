@@ -82,7 +82,7 @@ test.describe('V7 current Theme choice is visible', () => {
       if (cookie) await context.addCookies([{ name: 'poly-theme', value: cookie, url: base }]);
       await page.goto(`${base}/dashboard`);
       await page.waitForLoadState('networkidle');
-      await page.getByTestId('sidebar').getByRole('button', { name: 'Account' }).click();
+      await page.getByTestId('sidebar').getByRole('button', { name: 'Ada Lovelace' }).click();
       const items = page.getByRole('menuitemradio');
       await expect(items).toHaveText(['Light', 'Dark', 'Auto']);
       const rows = await items.evaluateAll((els) =>

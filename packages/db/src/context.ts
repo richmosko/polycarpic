@@ -28,10 +28,61 @@ export class ContextNotEmptyError extends Error {
   }
 }
 
+export class TransactionAborted extends Error {
+  constructor() {
+    super('TransactionAborted: the transaction was aborted and rolled back, COMMIT reported ROLLBACK');
+    this.name = 'TransactionAborted';
+  }
+}
+export class TransactionEnded extends Error {
+  constructor() {
+    super('TransactionEnded: the transaction this context belongs to has ended');
+    this.name = 'TransactionEnded';
+  }
+}
+
+/** The opaque handle BetterAuth's routing pool uses: query only, never release (seceng S5). */
+export interface AuthClient {
+  query: pg.PoolClient['query'];
+}
+export class TransactionClosed extends Error {
+  constructor() {
+    super('TransactionClosed: the transaction this client belongs to has closed');
+    this.name = 'TransactionClosed';
+  }
+}
+interface Store {
+  kind: Kind;
+  client: pg.PoolClient;
+  live: boolean;
+  /** One stable handle per transaction; it refuses queries once the transaction has ended (S3). */
+  handle: AuthClient;
+  tx?: Tx;
+}
+
 const JOB_NAME = /^[a-z][a-z0-9_]{0,62}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const active = new AsyncLocalStorage<Kind>();
+const active = new AsyncLocalStorage<Store>();
 const clients = new WeakMap<object, pg.PoolClient>();
+
+/**
+ * The transaction this async context runs in, for the routing pool (db/auth). Null outside any transaction. A store whose
+ * transaction has ended throws TransactionEnded: a late task must never fall through to the plain pool (S3).
+ */
+export function currentClient(): { kind: Kind; client: AuthClient } | null {
+  const store = active.getStore();
+  if (!store) return null;
+  if (!store.live) throw new TransactionEnded();
+  return { kind: store.kind, client: store.handle };
+}
+
+/** The drizzle handle of the transaction this async context runs in, for hooks that call tenancy code inside it (db/auth). */
+export function currentTx(): Tx | null {
+  const store = active.getStore();
+  if (!store) return null;
+  if (!store.live) throw new TransactionEnded();
+  return store.tx ?? null;
+}
 
 /** The raw client behind a Tx, for the BetterAuth routing pool in packages/auth (exported on db/auth only). */
 export function clientOf(tx: Tx): pg.PoolClient {
@@ -42,18 +93,32 @@ export function clientOf(tx: Tx): pg.PoolClient {
 
 async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (client: pg.PoolClient) => Promise<void>, fn: (tx: Tx) => Promise<T>): Promise<T> {
   const outer = active.getStore();
-  if (outer) throw new NestedContextError(kind, outer);
+  if (outer?.live) throw new NestedContextError(kind, outer.kind);
   const client = await getPool().connect();
+  const store: Store = {
+    kind,
+    client,
+    live: true,
+    handle: {
+      query: (async (...args: unknown[]) => {
+        if (!store.live) throw new TransactionClosed();
+        return (client.query as (...a: unknown[]) => Promise<unknown>)(...args);
+      }) as AuthClient['query'],
+    },
+  };
   let broken = false;
   try {
-    return await active.run(kind, async () => {
+    return await active.run(store, async () => {
       await client.query('BEGIN');
       try {
         const tx = drizzle(client);
         clients.set(tx, client);
+        store.tx = tx;
         await setup(client);
         const out = await fn(tx);
-        await client.query('COMMIT');
+        const done = await client.query('COMMIT');
+        // COMMIT on an aborted transaction succeeds as a statement and rolls back; node-pg reports the command (S2)
+        if (done.command !== 'COMMIT') throw new TransactionAborted();
         return out;
       } catch (e) {
         // a backend that cannot roll back is destroyed, not returned to the pool
@@ -62,6 +127,7 @@ async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (clie
       }
     });
   } finally {
+    store.live = false;
     client.release(broken ? new Error('rollback failed') : undefined);
   }
 }

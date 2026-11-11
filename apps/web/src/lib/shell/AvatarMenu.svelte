@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from '$app/navigation';
   import { DropdownMenu } from 'bits-ui';
   import Icon from './Icon.svelte';
   import type { ShellSession } from './session';
@@ -10,7 +11,13 @@
   const name = $derived(session?.user.name ?? 'Account');
   const initial = $derived(name.slice(0, 1).toUpperCase());
 
-  const pending = ['Profile', 'Settings', 'Notifications', 'Preferences'];
+  const before = ['Profile'];
+  const after = ['Notifications', 'Preferences'];
+
+  async function logOut() {
+    await fetch('/api/auth/sign-out', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' });
+    location.assign('/sign-in');
+  }
 
   function setTheme(value: string) {
     theme = value as Theme;
@@ -37,12 +44,14 @@
       sideOffset={12}
       class="bg-popover text-popover-foreground border-border min-w-48 rounded-md border p-1 shadow-md"
     >
-      {#each pending as item (item)}
-        <DropdownMenu.Item
-          disabled
-          aria-disabled="true"
-          class="text-muted-foreground rounded px-3 py-1.5 text-sm"
-        >
+      {#each before as item (item)}
+        <DropdownMenu.Item disabled aria-disabled="true" class="text-muted-foreground rounded px-3 py-1.5 text-sm">
+          {item}
+        </DropdownMenu.Item>
+      {/each}
+      <DropdownMenu.Item onSelect={() => goto('/settings/sessions')} class="rounded px-3 py-1.5 text-sm">Settings</DropdownMenu.Item>
+      {#each after as item (item)}
+        <DropdownMenu.Item disabled aria-disabled="true" class="text-muted-foreground rounded px-3 py-1.5 text-sm">
           {item}
         </DropdownMenu.Item>
       {/each}
@@ -74,11 +83,9 @@
         aria-disabled="true"
         class="text-muted-foreground rounded px-3 py-1.5 text-sm">Shortcuts</DropdownMenu.Item
       >
-      <DropdownMenu.Item
-        disabled
-        aria-disabled="true"
-        class="text-destructive rounded px-3 py-1.5 text-sm opacity-60">Log out</DropdownMenu.Item
-      >
+      {#if session}
+        <DropdownMenu.Item onSelect={logOut} class="text-destructive rounded px-3 py-1.5 text-sm">Log out</DropdownMenu.Item>
+      {/if}
     </DropdownMenu.Content>
   </DropdownMenu.Portal>
 </DropdownMenu.Root>

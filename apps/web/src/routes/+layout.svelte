@@ -21,12 +21,19 @@
   }
 </script>
 
-<div class="bg-background text-foreground flex min-h-screen">
-  <Sidebar session={data.session} {collapsed} {open} ontoggle={toggleCollapsed} />
-  <main id="main" class="flex min-w-0 flex-1 flex-col">
-    <TopBar ontoggle={() => (open = !open)} />
-    <div class="flex-1 p-6">
-      {@render children()}
-    </div>
+{#if data.session}
+  <div class="bg-background text-foreground flex min-h-screen">
+    <Sidebar session={data.session} {collapsed} {open} ontoggle={toggleCollapsed} />
+    <main id="main" class="flex min-w-0 flex-1 flex-col">
+      <TopBar ontoggle={() => (open = !open)} />
+      <div class="flex-1 p-6">
+        {@render children()}
+      </div>
+    </main>
+  </div>
+{:else}
+  <!-- Signed out: no app chrome, only the page (sign-in). -->
+  <main id="main" class="bg-background text-foreground min-h-screen p-6">
+    {@render children()}
   </main>
-</div>
+{/if}

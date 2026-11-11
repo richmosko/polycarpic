@@ -14,6 +14,9 @@ temp/
 # Agent memory: session-derived working memory, per-machine — not ratified project state
 **/.claude/agent-memory/
 
+# Playwright signed-in browser state, written by apps/web/tests/e2e/serve.ts
+apps/web/tests/e2e/.auth/
+
 # OS noise
 .DS_Store
 Thumbs.db

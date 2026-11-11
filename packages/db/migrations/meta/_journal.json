@@ -29,6 +29,20 @@
       "when": 1794374060702,
       "tag": "0003_tenancy_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1794384308797,
+      "tag": "0004_auth_second_step",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794384309146,
+      "tag": "0005_auth_second_step_grants",
+      "breakpoints": true
     }
   ]
 }

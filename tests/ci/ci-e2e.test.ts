@@ -23,4 +23,32 @@ describe('ci.yml: web e2e in the unit job (POLY-128 R9)', () => {
   it('unit keeps its 15-minute timeout  [red if: raised to absorb e2e]', () => {
     expect(w.jobs.unit!['timeout-minutes']).toBe(15);
   });
+  // POLY-86: a live apt download must not be a precondition of the required check.
+  const e2e = () => steps(w.jobs.unit!).find((s) => s.name?.startsWith('Web e2e'))!;
+  it('Chromium install is split from system deps, both bounded, deps non-fatal  [red if: `install --with-deps` returns, or the deps line loses `timeout` or `|| ...`, or install-deps runs without the launch probe, or a plain `timeout` loses `-k`]', () => {
+    const r = e2e().run ?? '';
+    expect(r).not.toMatch(/--with-deps/);
+    expect(r).toMatch(/timeout -k \d+ \d+ [^\n]*playwright install chromium/);
+    expect(r).toMatch(/timeout -k \d+ \d+ [^\n]*playwright install-deps chromium[^\n]*\\?\n?[^\n]*\|\|/);
+    expect(r).toMatch(/if ! timeout -k \d+ \d+ [^\n]*node -e[^\n]*; then\n\s*timeout -k \d+ \d+ [^\n]*install-deps/);
+  });
+  it('a second probe after install-deps fails the step  [red if: the post-install-deps probe or its `exit 1` is removed]', () => {
+    const r = e2e().run ?? '';
+    expect(r).toMatch(/install-deps[\s\S]*?\n\s*timeout -k \d+ \d+ [^\n]*node -e[^\n]*\|\| \{[^\n]*exit 1; \}\n\s*fi/);
+  });
+  it('no early exit between the install and the e2e run  [red if: an `exit 0` is added after the browser install]', () => {
+    const r = e2e().run ?? '';
+    expect(r.slice(r.indexOf('playwright install chromium'))).not.toMatch(/exit 0/);
+  });
+  it('the e2e step has its own timeout and still runs turbo e2e with no skip  [red if: timeout-minutes removed, or e2e made conditional on deps]', () => {
+    expect(e2e()['timeout-minutes']).toBeLessThanOrEqual(10);
+    expect(e2e()['timeout-minutes']).toBeGreaterThan(0);
+    expect(e2e().run).toMatch(/turbo run e2e --affected/);
+    expect(e2e().run).not.toMatch(/--grep|--skip|test\.skip|exit 0\s*$/m);
+  });
+  it('the Playwright browser cache step precedes the e2e step  [red if: cache step removed or moved after]', () => {
+    const names = steps(w.jobs.unit!).map((s) => s.name ?? '');
+    expect(names.indexOf('Cache Playwright browsers')).toBeGreaterThanOrEqual(0);
+    expect(names.indexOf('Cache Playwright browsers')).toBeLessThan(names.findIndex((n) => n.startsWith('Web e2e')));
+  });
 });

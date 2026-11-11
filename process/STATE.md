@@ -15,9 +15,8 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-One loop is in progress, started 2026-11-11.
+_None. POLY-86 (BetterAuth: routing pool + allowlist) merged 2026-11-11 via PR [#116](https://github.com/richmosko/polycarpic/pull/116) — ARCH 1.15.15, SECURITY 1.9.9. `packages/auth` runs BetterAuth 1.7.18 on the routing pool behind the `/api/auth/*` allowlist; the shell shows the session, with a bare `/sign-in`, Settings → Sessions and Log out. Sign-up stays closed until POLY-87 and second-factor enrolment until POLY-89. The `db` job runs at a 144 s median against its 150 s guard, so the cut in verdict follow-up 15 lands before any new suite joins it. No better-auth or passkey pin change merges before the S9 dist-enumeration test exists. Follow-ups are in `process/cairn/reviews/POLY-86/` (ruling 1–7, verdict 9–15, seceng lists) and are filed with POLY-95's in one docs PR._
 
-- **POLY-86** — BetterAuth: routing pool + allowlist. Milestone `POLY-M1`. Branch `feature/poly-86-betterauth-routing-pool`. Goal: `packages/auth` on the routing pool with the pinned options, the `/api/auth/*` allowlist, step-up, and the session loader behind the app shell.
 
 _Before this: POLY-95 (Compose, Postgres config + lint) merged 2026-11-11 via PR [#115](https://github.com/richmosko/polycarpic/pull/115) — INFRA 1.3.4, SECURITY 1.9.8. The `edge`, `prod` and `staging` compose projects, the Postgres and Caddy derivative images and the compose-policy lint are in; nothing is deployed. Follow-ups F1–F12 are in `process/cairn/reviews/POLY-95/` (ruling, verdict, seceng build review) and are filed after POLY-86 merges; F12 (uploader access to the backup spool, POLY-97) gates the first real backup, and Caddy must overwrite `X-Forwarded-For` before the first deploy (POLY-86 S19)._
 
@@ -25,7 +24,7 @@ _Earlier: POLY-102 (CI: generated-output freshness) merged 2026-11-11 via PR [#1
 
 _Before this: POLY-128 (App shell + DESIGN tokens) via PR [#110](https://github.com/richmosko/polycarpic/pull/110) and POLY-62 (Entity + membership schema) via PR [#109](https://github.com/richmosko/polycarpic/pull/109), both 2026-11-11. The shell is not served by the image until POLY-88, and shows no session until POLY-86. Follow-ups on POLY-86 (session loader calls `provisionPerson`, one retry on 23505; `locals.session`; POLY-85's Open 1), POLY-87 (operator-invitation definer), POLY-88 (no route before POLY-86's guard; image build stage), POLY-90 (self-Person owner row), POLY-95 (Caddy security headers), POLY-79 (`guard-commit` merge exemption; CI timing ingest), POLY-100 (deploy-side `--source-ref`, digest from `digest.txt`, `RELEASE_SIGNERS`), POLY-133 (shell entity selector), POLY-134 (shell security follow-ups)._
 
-- **Next:** POLY-97 (infra scaffolding) after POLY-95; it needs a real Hetzner project. POLY-87, POLY-88 and POLY-89 open once POLY-86 merges. POLY-131 held (P3).
+- **Next:** file the POLY-86 and POLY-95 follow-ups (one docs PR), then POLY-87 (invitation sign-up) with POLY-97 (infra scaffolding; needs a real Hetzner project) alongside. Caddy must overwrite `X-Forwarded-For` before the first deploy (POLY-104). POLY-131 held (P3).
 
 ## Releases
 

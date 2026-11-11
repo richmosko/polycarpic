@@ -5,7 +5,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { DB_PKG, freshName, must, psql } from './pg';
+import { DB_PKG, freshName, must, psql } from './pg.ts';
 
 export const MIGRATE_CLI = process.env.POLY_DB_MIGRATE_CLI ?? join(DB_PKG, '..', '..', 'apps', 'migrate', 'src', 'cli.ts');
 export const REAL_MIGRATIONS = process.env.POLY_DB_MIGRATIONS ?? join(DB_PKG, 'migrations');

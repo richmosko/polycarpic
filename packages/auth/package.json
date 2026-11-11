@@ -11,7 +11,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@better-auth/passkey": "1.7.18",
     "@poly/db": "workspace:*",
-    "@poly/tenancy": "workspace:*"
+    "@poly/tenancy": "workspace:*",
+    "better-auth": "1.7.18",
+    "kysely": "0.29.8"
   }
 }

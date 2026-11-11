@@ -51,7 +51,7 @@ for (const mode of ['light', 'dark'] as const) {
       await expect(page.getByTestId('top-row')).toHaveCount(1);
       expect(await page.locator('header').count()).toBeLessThanOrEqual(1);
       await expect(page.locator('main > :first-child')).toHaveAttribute('data-testid', 'top-row');
-      const trigger = page.getByTestId('sidebar').getByRole('button', { name: 'Account' });
+      const trigger = page.getByTestId('sidebar').getByRole('button', { name: 'Ada Lovelace' });
       await trigger.click();
       await expect(page.getByRole('menuitem')).toHaveText(['Profile', 'Settings', 'Notifications', 'Preferences', 'Shortcuts', 'Log out']);
     });
@@ -79,12 +79,12 @@ for (const mode of ['light', 'dark'] as const) {
         expect(s.outline !== 'none' || s.shadow !== 'none', `focus ring on ${s.id}`).toBe(true);
       }
       expect(order.slice(0, 9)).toEqual(['sidebar-toggle', 'Dashboard', 'Transactions', 'General Ledger', 'Custodial Accounts', 'Allocation', 'Tax', 'Reports', 'Entities']);
-      expect(order[9]).toMatch(/Account/);
+      expect(order[9]).toMatch(/Ada Lovelace/);
       await page.keyboard.press('Enter');
       await expect(page.getByRole('menu')).toBeVisible();
       await page.keyboard.press('Escape');
       await expect(page.getByRole('menu')).toBeHidden();
-      await expect(page.getByTestId('sidebar').getByRole('button', { name: 'Account' })).toBeFocused();
+      await expect(page.getByTestId('sidebar').getByRole('button', { name: 'Ada Lovelace' })).toBeFocused();
     });
   });
 }
@@ -105,7 +105,7 @@ test('Theme is a Light/Dark/Auto radio group that writes the cookie and class  [
   await page.goto(`${base}/dashboard`);
   await page.waitForLoadState('networkidle'); // handlers attach after hydration
   for (const [choice, cls] of [['Dark', /(^|\s)dark(\s|$)/], ['Light', /^(?!.*\bdark\b)/], ['Auto', /(^|\s)(auto|dark)(\s|$)/]] as const) {
-    await page.getByTestId('sidebar').getByRole('button', { name: 'Account' }).click();
+    await page.getByTestId('sidebar').getByRole('button', { name: 'Ada Lovelace' }).click();
     await expect(page.getByRole('menuitemradio')).toHaveText(['Light', 'Dark', 'Auto']);
     await page.getByRole('menuitemradio', { name: choice }).click();
     await expect(page.locator('html')).toHaveClass(cls);

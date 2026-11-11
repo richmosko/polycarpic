@@ -44,3 +44,18 @@ export async function provisionPerson(tx: Tx): Promise<{ personId: string; creat
   if (!row) throw new Error('provisionPerson: the Person is not visible after insert');
   return { personId: row.id, created: true };
 }
+
+export class InvitationRequired extends Error {
+  constructor() {
+    super('sign-up requires an invitation');
+    this.name = 'InvitationRequired';
+  }
+}
+
+/**
+ * Claims the invitation for a new user's email inside the sign-up transaction (SECURITY C-01, ARCH §3.1c). A stub until
+ * POLY-87: it refuses every sign-up, so production creates no user before the real check lands.
+ */
+export async function claimInvitation(_tx: Tx, _args: { email: string; token: string | null }): Promise<{ accepted: true }> {
+  throw new InvitationRequired();
+}

@@ -421,6 +421,7 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Web e2e (Chromium, affected only)
+        timeout-minutes: 8
         run: |
           if [ -n "$TURBO_SCM_BASE" ]; then
             pnpm exec turbo ls --affected > affected.txt
@@ -428,7 +429,16 @@ jobs:
             pnpm exec turbo ls > affected.txt
           fi
           if ! grep -q '@poly/web' affected.txt; then echo "no e2e task affected"; exit 0; fi
-          pnpm --filter @poly/web exec playwright install --with-deps chromium
+          # Browser download comes from the Playwright CDN (a cache hit is a no-op), bounded. System libraries are used as
+          # the runner image has them: apt runs only when a launch probe fails, bounded and non-fatal, then the probe
+          # runs again and a second failure fails the step.
+          timeout -k 10 180 pnpm --filter @poly/web exec playwright install chromium
+          probe='require("@playwright/test").chromium.launch().then((b) => b.close())'
+          if ! timeout -k 10 60 pnpm --filter @poly/web exec node -e "$probe" >/dev/null 2>&1; then
+            timeout -k 10 120 pnpm --filter @poly/web exec playwright install-deps chromium \
+              || echo "::warning::playwright install-deps failed or timed out"
+            timeout -k 10 60 pnpm --filter @poly/web exec node -e "$probe" || { echo "::error::Chromium cannot launch"; exit 1; }
+          fi
           if [ -n "$TURBO_SCM_BASE" ]; then
             pnpm exec turbo run e2e --affected
           else

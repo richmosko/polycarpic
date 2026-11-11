@@ -5,9 +5,9 @@ BEGIN;
 SELECT no_plan();
 
 -- THE EXEMPTION LIST (SECURITY C-13). Adding an entry needs SecEng review of the diff. Nothing is exempted by pattern
--- or schema. twoFactor and passkey join when their migrations land (POLY-86); a listed-but-absent entry fails below.
+-- or schema. two_factor and passkey joined with migration 0004 (POLY-86); a listed-but-absent entry fails below.
 CREATE FUNCTION pg_temp.exemptions() RETURNS text[] LANGUAGE sql AS $f$
-  SELECT ARRAY['public."user"', 'public.session', 'public.account', 'public.verification', 'drizzle.__drizzle_migrations']
+  SELECT ARRAY['public."user"', 'public.session', 'public.account', 'public.verification', 'public.two_factor', 'public.passkey', 'drizzle.__drizzle_migrations']
 $f$;
 
 -- One row per gap. Scope: every relation outside pg_catalog, information_schema, pg_toast, minus temporary relations
@@ -66,7 +66,7 @@ $f$;
 
 -- R2: each exemption exists, so a stale or misspelled entry fails instead of exempting nothing
 SELECT ok(to_regclass(e) IS NOT NULL, 'exemption exists: ' || e) FROM unnest(pg_temp.exemptions()) e;
-SELECT is(cardinality(pg_temp.exemptions()), 5, 'the exemption list is the five M1 entries');
+SELECT is(cardinality(pg_temp.exemptions()), 7, 'the exemption list is the seven entries: BetterAuth''s six tables and the migrations ledger');
 
 -- the real chain: zero gaps (every M1 relation is exempt), and without the list the exempt tables do show up
 SELECT is((SELECT coalesce(array_agg(rel::text || ':' || reason), '{}') FROM pg_temp.battery_gaps(pg_temp.exemptions())), '{}'::text[],
