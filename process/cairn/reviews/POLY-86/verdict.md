@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: pass on the code at 7a0d5fe, pending one measurement.** F1 is met at 385ef78, F2 at f6cde68, and F3–F9 at 7a0d5fe (section below). Still open: addendum 2's guard, a `db` job at or under 150 s on the median of three PR runs. The lead measures it at finish. The battery runs 87 s locally, down from 101 s.
+**Result: pass on the code at 495dc11, except one blocking axis: the `image` job is red.** F1 is met at 385ef78, F2 at f6cde68, F3–F9 at 7a0d5fe. Addendum 2's guard is met: the db job median is 128 s (below). The verdict closes when the lead's CI re-run is green on the image fix sha.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -20,7 +20,8 @@ Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. 
 | A test branch in production code | **fail (F2)**. `userCreateBefore` runs the wrapper assertion and the invitation claim only `if (typeof data.email === 'string')`. The branch exists so that a pure test can call the hook. It is an unguarded path through the A-40 / C-01 check. | f99b888 `user-hooks.ts` |
 | SecEng build review | pass. S1–S8 and S10–S19 are met. S9's dist enumeration test is deferred, on condition that no better-auth or @better-auth/passkey pin change merges before it exists (follow-up 13). | `seceng-ruling-review.md` @ 04bd75b, section "Build review", reviewed @ 182d054 |
 | Lead visual leg, re-check | pass. Sessions page, bare `/sign-in`, wrong-then-right sign-in, Log out, the per-IP limit, 503 on a bad `X-Forwarded-For`, 400 on an idToken. F4 closes through S19 and the 429 message, not a form fix. | lead's `temp/2026-11-11-lead-poly86-visual-leg.md`, "Re-check" @ 7a0d5fe |
-| CI time | open. The db battery takes 101 s locally. The PR run's db-job time is reported at finish against R10's 150 s guard. | gate-3 report |
+| CI time (addendum 2) | pass. The `db` job took 118, 149 and 128 s, median 128 s against 150 s; the battery step took 101, 130 and 107 s. The 149 s run leaves no headroom: the next suite added to `db` brings its own cut. | runs 42989973126 @ 7a0d5fe, 42990359638 @ 495dc11, 42990790271 @ 0b04cea |
+| `image` scan | **fail (F10)**. Trivy finds two esbuild Go binaries (0.18.20 and 0.25.12) in the prod image: 3 CRITICAL and 54 HIGH, all fixable. They arrive through better-auth's optional peers (drizzle-kit, vite) resolving into the prod install. | the same three runs |
 
 ## Conditions
 
@@ -64,4 +65,12 @@ Source: `temp/2026-11-11-lead-poly86-visual-leg.md` in the lead checkout. The co
 - F9: `handleAuthRequest` answers 503 unless there is exactly one valid `x-forwarded-for` entry, when `requireClientIp` is set. apps/web passes `!dev`. `advanced.ipAddress` reads only that header and sets no `trustedProxies`. `tests/db/auth-client-ip.test.ts` has six cases.
 - The image build: `pnpm-workspace.yaml` sets `allowBuilds: { esbuild: false }`, so the prod install runs no lifecycle scripts.
 - Not blocking (follow-up 12, qa): `serve.ts` writes the step-up stamp before `vite build`. If the e2e run reaches the revoke spec more than 5 minutes later, that spec fails. The stamp belongs in the spec itself, just before the revoke.
+
+### F10. The prod image carries no build tooling
+
+- **Ruled:** the fix removes esbuild from the prod image. It never suppresses the finding: no `.trivyignore` entry, and no lowered severity.
+- **The constraint:** web and worker need better-auth's Kysely path only. drizzle-kit, vite and esbuild are build-time tools and do not ship. The mechanism is the builder's: peer resolution in `pnpm-workspace.yaml`, or a prod-only install filter in the image's build stage.
+- **The measurement:** `infra/ci/image.sh check` asserts that the image has no `node_modules/esbuild`, `@esbuild/*`, `drizzle-kit` or `vite`. That check fails before Trivy runs, so a return of the problem names the package rather than a CVE.
+- **Closing:** I confirm the fix sha against this list, and the verdict closes on the lead's green CI re-run. If the fix needs a peer that web or worker load at runtime, the builder reports it and I rule again. seceng-86 owns any CVE judgement.
+- Follow-up 14 also covers the Sessions page breadcrumb, which reads "polycarpic".
 
