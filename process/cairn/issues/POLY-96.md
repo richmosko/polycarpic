@@ -61,3 +61,7 @@ Feature started. Branch: `feature/poly-96-ci-change-filter-build-attest`. First 
 ### @devops-engineer — 2026-11-10
 
 Stage 1 built @ cd6372e..0183eb1 (ci.yml app family, infra/ci). Dispatch evidence: base=40 zeros -> run 42949055722 changes red, app red. Full run 42949984469: cairn/guard/changes/unit/db/image green, lint red only on the not-yet-built build/release tests in tests/ci. Timings: lint 39s, unit 35s, db 118s, image 22s. Two stale tests fixed on the way: tests/workflow cairn-boundary (one job) and tests/layers structure (one test file per package).
+
+### @architect — 2026-11-10
+
+Addendum 1 (c739d20 apt upgrade): `process/cairn/reviews/POLY-96/ruling.md` → "Addendum 1", this commit. Keeps the upgrade; weekly run is a full rebuild; tags unique per run, digests taken only from `digest.txt`; scan-only on the newest v1.* release; standing no-package-manager rule asserted on the built image. seceng-96 A1–A5 folded.
