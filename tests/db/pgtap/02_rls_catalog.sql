@@ -25,6 +25,17 @@ CREATE FUNCTION pg_temp.battery_gaps(exempt text[]) RETURNS TABLE (rel regclass,
     ('for_all_policy', c.relkind IN ('r', 'p') AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid AND p.polcmd = '*')),
     ('no_truncate_trigger', c.relkind IN ('r', 'p') AND NOT EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = c.oid
        AND NOT t.tgisinternal AND t.tgenabled IN ('O', 'A') AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2 AND (t.tgtype & 32) = 32)),
+    -- POLY-62 R7. pk_not_uuid: C-18, keys are UUIDs.
+    ('pk_not_uuid',   c.relkind IN ('r', 'p') AND EXISTS (SELECT 1 FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey)
+       WHERE i.indrelid = c.oid AND i.indisprimary AND a.atttypid <> 'uuid'::regtype)),
+    -- raw_context_read: the nullif context form lives only in app.current_user_id(); a policy may not read the setting itself.
+    ('raw_context_read', c.relkind IN ('r', 'p') AND EXISTS (SELECT 1 FROM pg_policy p WHERE p.polrelid = c.oid
+       AND (pg_get_expr(p.polqual, p.polrelid) ILIKE '%current_setting%' OR pg_get_expr(p.polwithcheck, p.polrelid) ILIKE '%current_setting%'))),
+    -- tenancy_column_updatable: no app or worker UPDATE on a tenancy / actor / key column.
+    ('tenancy_column_updatable', c.relkind IN ('r', 'p') AND EXISTS (SELECT 1 FROM pg_attribute a CROSS JOIN unnest(ARRAY['poly_app', 'poly_worker']) r
+       WHERE a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+         AND a.attname = ANY (ARRAY['id', 'entity_id', 'user_id', 'self_user_id', 'owner_user_id', 'recipient_user_id', 'actor_user_id', 'inviter_user_id', 'created_at', 'type_id'])
+         AND has_column_privilege(r, c.oid, a.attnum, 'UPDATE'))),
     ('matview',       c.relkind = 'm'),
     ('foreign_table', c.relkind = 'f'),
     ('view_not_security_invoker', c.relkind = 'v'
@@ -98,6 +109,25 @@ CREATE VIEW public.qa_canary_view_inv WITH (security_invoker = true) AS SELECT 1
 CREATE VIEW public.qa_canary_view_on WITH (security_invoker = on) AS SELECT 1 AS x;
 -- a temporary relation is out of scope
 CREATE TEMP TABLE qa_canary_temp (id int);
+-- POLY-62 canaries: each is compliant but for the one reason under test
+CREATE TABLE public.qa_canary_pkint (id int PRIMARY KEY);
+CREATE TABLE public.qa_canary_pkuuid (id uuid PRIMARY KEY);
+CREATE TABLE public.qa_canary_rawctx (id uuid PRIMARY KEY, owner_user_id uuid);
+CREATE TABLE public.qa_canary_updcol (id uuid PRIMARY KEY, owner_user_id uuid, note text);
+CREATE TABLE public.qa_canary_updok (id uuid PRIMARY KEY, owner_user_id uuid, note text);
+DO $$ DECLARE t text; BEGIN
+  FOREACH t IN ARRAY ARRAY['qa_canary_pkint', 'qa_canary_pkuuid', 'qa_canary_rawctx', 'qa_canary_updcol', 'qa_canary_updok'] LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('ALTER TABLE public.%I FORCE ROW LEVEL SECURITY', t);
+    EXECUTE format('CREATE TRIGGER t BEFORE TRUNCATE ON public.%I FOR EACH STATEMENT EXECUTE FUNCTION public.qa_canary_truncate_fn()', t);
+    IF t <> 'qa_canary_rawctx' THEN
+      EXECUTE format('CREATE POLICY s ON public.%I FOR SELECT USING (app.current_user_id() IS NOT NULL)', t);
+    END IF;
+  END LOOP;
+END $$;
+CREATE POLICY s ON public.qa_canary_rawctx FOR SELECT USING (owner_user_id = nullif(current_setting('app.user_id', true), '')::uuid);
+GRANT UPDATE (owner_user_id) ON public.qa_canary_updcol TO poly_app;
+GRANT UPDATE (note) ON public.qa_canary_updok TO poly_worker;
 
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_ok'], pg_temp.exemptions()), '{}'::text[], 'positive control: ENABLE + FORCE + SELECT policy + BEFORE TRUNCATE has no gap');
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_noforce'], pg_temp.exemptions()), ARRAY['qa_canary_noforce:not_forced'], 'RLS on but not FORCEd: exactly not_forced');
@@ -116,6 +146,12 @@ SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_mv'], pg_temp.exemptions()), ARRAY['q
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_view', 'qa_canary_view_inv', 'qa_canary_view_on'], pg_temp.exemptions()),
   ARRAY['qa_canary_view:view_not_security_invoker'], 'a view without security_invoker fails; true and on pass');
 SELECT is((SELECT count(*)::int FROM pg_temp.battery_gaps(pg_temp.exemptions()) WHERE rel::text LIKE '%qa_canary_temp'), 0, 'a temporary relation is out of scope');
+-- POLY-62 R7 reasons. Mutation for each: delete its VALUES line from battery_gaps and the canary goes unreported.
+SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_pkint'], pg_temp.exemptions()), ARRAY['qa_canary_pkint:pk_not_uuid'], 'an integer primary key: exactly pk_not_uuid (C-18)');
+SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_pkuuid'], pg_temp.exemptions()), '{}'::text[], 'a uuid primary key has no gap');
+SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_rawctx'], pg_temp.exemptions()), ARRAY['qa_canary_rawctx:raw_context_read'], 'a policy reading current_setting itself: exactly raw_context_read');
+SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_updcol'], pg_temp.exemptions()), ARRAY['qa_canary_updcol:tenancy_column_updatable'], 'poly_app holding UPDATE on owner_user_id: exactly tenancy_column_updatable');
+SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_updok'], pg_temp.exemptions()), '{}'::text[], 'UPDATE on an ordinary column is not a gap');
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_off', 'qa_canary_noforce', 'qa_canary_mv'],
   pg_temp.exemptions() || ARRAY['public.qa_canary_off', 'public.qa_canary_noforce', 'public.qa_canary_mv']), '{}'::text[],
   'a canary passed in an extended exempt array has no gap');
@@ -133,6 +169,7 @@ WHERE p.prorettype = 'pg_catalog.trigger'::regtype AND n.nspname NOT IN ('pg_cat
 -- cleanup, then the chain is clean again
 DROP TABLE public.qa_canary_part_child, public.qa_canary_part, public.qa_canary_ok, public.qa_canary_noforce, public.qa_canary_off,
   public.qa_canary_forall, public.qa_canary_notrunc;
+DROP TABLE public.qa_canary_pkint, public.qa_canary_pkuuid, public.qa_canary_rawctx, public.qa_canary_updcol, public.qa_canary_updok;
 DROP TABLE public.qa_canary_part_bare;
 DROP FOREIGN TABLE public.qa_canary_foreign;
 DROP SERVER qa_canary_srv;
