@@ -3,7 +3,7 @@
 //   apps/migrate main with arg `check-config`: migrator secret file present + non-empty, connection settings present; 0 / 1
 //   @poly/db/startup  assertSchemaNotBehind(): journal `when` list must be a prefix of tracking created_at list (by id)
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
@@ -15,6 +15,12 @@ const check = (dir: string) => {
   const text = (p.stderr ?? '') + (p.stdout ?? '');
   // a missing CLI exits 1 and its error text can match a loose regex: report it as "not runnable"
   return { code: /Cannot find module|ERR_MODULE_NOT_FOUND|ERR_PNPM_NO_SCRIPT|Missing script/.test(text) ? 127 : (p.status ?? 127), text };
+};
+// POLY-136 item 1: spawned through `node` directly (ruling cut C3) so the new cases cost 100 ms, not 200.
+const SCRIPT = join(ROOT, 'packages', 'db', 'scripts', 'check-migrations.ts');
+const checkNode = (dir: string) => {
+  const p = spawnSync('node', ['--experimental-strip-types', SCRIPT, dir], { encoding: 'utf8', cwd: ROOT });
+  return { code: p.status ?? 127, text: (p.stderr ?? '') + (p.stdout ?? '') };
 };
 const T = (n: string) => `CREATE TABLE public.${n} (id int);\n`;
 
@@ -145,5 +151,85 @@ describe('migrate check-config (addendum 1): DB side only, no connection; exit 0
     const r = run({ DATABASE_USER: 'poly_app', DATABASE_SSLMODE: 'prefer' });
     expect(r.code).toBe(1);
     for (const k of ['DATABASE_HOST', 'DATABASE_NAME', 'DATABASE_USER', 'DATABASE_SSLMODE', 'DATABASE_PASSWORD_FILE']) expect(r.text).toMatch(new RegExp(k));
+  });
+});
+
+describe('journal-to-file check (POLY-136 item 1): every .sql and snapshot has its journal entry, and the reverse', () => {
+  const two = () => writeMigrations([{ tag: '0000_a', sql: T('ta') }, { tag: '0001_b', sql: T('tb') }]);
+  it('the real migration folder passes', () => {
+    const r = checkNode(join(ROOT, 'packages', 'db', 'migrations'));
+    expect(r.code, r.text).toBe(0);
+  });
+  it('a consistent fixture passes', () => {
+    const r = checkNode(two());
+    expect(r.code, r.text).toBe(0);
+  });
+  it('a stray .sql outside the journal is refused, by name  [red if: the .sql-to-entry direction is dropped]', () => {
+    const dir = two();
+    writeFileSync(join(dir, '0002_stray.sql'), T('tz'));
+    const r = checkNode(dir);
+    expect(r.code, r.text).toBe(1);
+    expect(r.text).toContain('journal-files: 0002_stray.sql: not in meta/_journal.json');
+  });
+  it('a stray snapshot outside the journal is refused, by name  [red if: the snapshot-to-entry direction is dropped]', () => {
+    const dir = two();
+    writeFileSync(join(dir, 'meta', '0007_snapshot.json'), '{}');
+    const r = checkNode(dir);
+    expect(r.code, r.text).toBe(1);
+    expect(r.text).toContain('journal-files: meta/0007_snapshot.json: not in meta/_journal.json');
+  });
+  it('an entry whose .sql is missing is refused  [red if: the entry-to-.sql direction is dropped]', () => {
+    const dir = two();
+    rmSync(join(dir, '0001_b.sql'));
+    const r = checkNode(dir);
+    expect(r.code, r.text).toBe(1);
+    expect(r.text).toContain('journal-files: 0001_b.sql: journal entry 0001_b has no 0001_b.sql');
+  });
+  it('an entry whose snapshot is missing is refused  [red if: the entry-to-snapshot direction is dropped, or idx is not padded to 4]', () => {
+    const dir = two();
+    rmSync(join(dir, 'meta', '0001_snapshot.json'));
+    const r = checkNode(dir);
+    expect(r.code, r.text).toBe(1);
+    expect(r.text).toContain('journal-files: meta/0001_snapshot.json: journal entry 0001_b has no meta/0001_snapshot.json');
+  });
+  it('_journal.json is not read as a snapshot  [red if: the meta scan matches every .json]', () => {
+    expect(checkNode(two()).text).not.toMatch(/_journal\.json: not in/);
+  });
+  it('a stray .sql is still scanned by the file rules (fail closed)  [red if: the stray file is skipped after the journal problem]', () => {
+    const dir = two();
+    writeFileSync(join(dir, '0002_stray.sql'), 'RESET ROLE;\n');
+    const r = checkNode(dir);
+    expect(r.text).toContain('journal-files: 0002_stray.sql');
+    expect(r.text).toMatch(/reset: 0002_stray\.sql/);
+  });
+  it('the package script still reaches the same check through pnpm (the one case that keeps the wiring)', () => {
+    const dir = two();
+    writeFileSync(join(dir, '0002_stray.sql'), T('tz'));
+    const r = check(dir);
+    expect(r.code, r.text).toBe(1);
+    expect(r.text).toContain('journal-files: 0002_stray.sql');
+  });
+});
+
+describe('migrate run() reads only the env it is given (POLY-136 item 4, cut C1)', () => {
+  const cfg = (): Record<string, string> => {
+    const f = join(mkdtempSync(join(tmpdir(), 'poly136-cfg-')), 'db_password_migrator');
+    writeFileSync(f, 'secret\n');
+    return { APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173', DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '1', DATABASE_NAME: 'none', DATABASE_USER: 'poly_migrator', DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f };
+  };
+  const load = () => import('../../apps/migrate/src/run.ts') as Promise<{ run: (argv: string[], env: NodeJS.ProcessEnv) => Promise<number> }>;
+  it('an env without DATABASE_* exits 1 while process.env has a good config  [red if: run reads process.env]', async () => {
+    const { run } = await load();
+    for (const [k, v] of Object.entries(cfg())) vi.stubEnv(k, v);
+    try {
+      expect(await run(['check-config'], {})).toBe(1);
+    } finally { vi.unstubAllEnvs(); }
+  });
+  it('a good env exits 0 while process.env has none of it  [red if: run reads process.env]', async () => {
+    const { run } = await load();
+    for (const k of Object.keys(cfg())) vi.stubEnv(k, '');
+    try {
+      expect(await run(['check-config'], cfg())).toBe(0);
+    } finally { vi.unstubAllEnvs(); }
   });
 });

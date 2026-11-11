@@ -65,6 +65,8 @@ export function writeMigrations(migs: Mig[], dir = mkdtempSync(join(tmpdir(), 'p
   const entries = migs.map((m, i) => ({ idx: i, version: '7', when: m.when ?? base + i * 1000, tag: m.tag, breakpoints: true }));
   writeFileSync(join(dir, 'meta', '_journal.json'), JSON.stringify({ version: '7', dialect: 'postgresql', entries }, null, 2));
   for (const m of migs) writeFileSync(join(dir, `${m.tag}.sql`), m.sql);
+  // POLY-136: the journal-to-file check wants a snapshot per entry; a stub is enough, nothing reads its content.
+  migs.forEach((_, i) => writeFileSync(join(dir, 'meta', `${String(i).padStart(4, '0')}_snapshot.json`), '{}'));
   return dir;
 }
 export const rewrite = (dir: string, tag: string, sql: string) => writeFileSync(join(dir, `${tag}.sql`), sql);
