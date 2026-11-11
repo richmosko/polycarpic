@@ -18,11 +18,11 @@ Gap filed at POLY-126's trace: POLY-M1's definition of done says "the app shell 
 
 ## Acceptance criteria
 
-- [ ] Every DESIGN token (surfaces, actions, financial, lines, charts, categorical, sidebar) is defined once as a CSS variable in apps/web, and a lint or test refuses a raw hex colour in apps/web/src outside that file.
-- [ ] The shell renders the eight sidebar items in DESIGN's order (§5.10, Tax after Allocation), the avatar popover at the foot, and the one-row top bar; there is no persistent header.
-- [ ] A Playwright smoke test loads the shell, with no session, in light and dark mode and asserts token values on the sidebar and top row. Loading it signed in, with the user's name and avatar at the foot, is POLY-86's.
-- [ ] The shell meets DESIGN #accessibility for keyboard focus order and contrast on its own elements.
-- [ ] Lint refuses `{@html}` in every .svelte file under apps/ and packages/ (SECURITY C-41). The one sanitizing component is the only allowed exception; it is named in the rule when it lands, and until then there is none. A fixture using `{@html}` fails, and so does the same fixture with an inline `eslint-disable` for that rule (SECURITY A-39).
+- [x] Every DESIGN token (surfaces, actions, financial, lines, charts, categorical, sidebar) is defined once as a CSS variable in apps/web, and a lint or test refuses a raw hex colour in apps/web/src outside that file. — apps/web/src/tokens.test.ts: `:root block equals DESIGN…`, `.dark block equals DESIGN…`, `no raw colour literal outside app.css and *.test.ts`
+- [x] The shell renders the eight sidebar items in DESIGN's order (§5.10, Tax after Allocation), the avatar popover at the foot, and the one-row top bar; there is no persistent header. — apps/web/src/lib/shell/nav.test.ts: `lists the eight items in order`; apps/web/tests/e2e/shell.spec.ts: `eight nav items in order, current marked, popover at the foot, one top row, no other header` (both modes)
+- [x] A Playwright smoke test loads the shell, with no session, in light and dark mode and asserts token values on the sidebar and top row. Loading it signed in, with the user's name and avatar at the foot, is POLY-86's. — apps/web/tests/e2e/shell.spec.ts: `html class and token values on sidebar and top row` (light and dark), `auto follows the OS scheme…`
+- [x] The shell meets DESIGN #accessibility for keyboard focus order and contrast on its own elements. — apps/web/tests/e2e/shell.spec.ts: `axe: zero A/AA violations on sidebar and top row incl. contrast`, `Tab order: brand control, eight items, avatar trigger…`; apps/web/tests/e2e/shell-geometry.spec.ts: `rail is keyboard reachable`
+- [x] Lint refuses `{@html}` in every .svelte file under apps/ and packages/ (SECURITY C-41). The one sanitizing component is the only allowed exception; it is named in the rule when it lands, and until then there is none. A fixture using `{@html}` fails, and so does the same fixture with an inline `eslint-disable` for that rule (SECURITY A-39). — tests/layers/lint.test.ts over tests/layers/fixtures/24-svelte-html: `fail-html-bare`, `fail-html-disable-next-line`, `fail-html-disable-block`, `fail-html-script-disable`, `fail-html-in-packages`
 
 ## Comments
 
