@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: PASS at d100466.** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
+**Result: PASS at d100466 on the code, reopened on one CI axis (F12, below).** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -83,4 +83,17 @@ Source: `temp/2026-11-11-lead-poly86-visual-leg.md` in the lead checkout. The co
 The `db` job on the five runs from 495dc11 on: 149, 128, 131, 144 and 152 s. The median of all five is 144 s, and of the last three also 144 s, so addendum 2's pass line (a three-run median at or under 150 s) holds. The 152 s run is recorded here: one run over the guard with no change to the `db` suites since 7a0d5fe, so it is runner variance on a job with 6 s of headroom.
 
 15. **The next `db` cut** (owner: qa-engineer, before any new suite joins the `db` job). Share one auth instance per file across the TLS modes (addendum 2, point 2). Also look at `runner.test.ts`, the largest file at about 30 s. Target: a median at or under 130 s, so the job has headroom again. It stays in the existing job (POLY-96).
+
+### F12. The e2e step does not depend on a live apt download (reopened after the merge of main, head 607297c)
+
+PR #116's required check failed in run 43052475191. On all three attempts the `unit` job's "Web e2e" step ran `playwright install --with-deps`, and the runner could not resolve Ubuntu's package hosts. Every other job at 607297c is green: lint 71 s, db 151 s, image 209 s. The Principal approved fixing the step in this PR. devops-engineer-86 owns the fix.
+
+Pass line, which I confirm at the fix sha:
+- **No live apt download as a precondition.** The browser's system libraries come from the runner image or a cache, not a fresh `apt-get` each run.
+- **A bounded install.** Any remaining install step has a timeout and fails with a clear message. It never retries indefinitely.
+- **The specs still run for real.** A missing browser fails the step. No skip, and no `continue-on-error`.
+- **A `tests/ci` assertion** holds that shape in `ci.yml`.
+- **No new top-level job** (POLY-96).
+
+The verdict re-closes on the confirmed fix sha plus a green PR check.
 
