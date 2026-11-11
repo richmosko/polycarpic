@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: PASS at d100466 on the code; F12 is confirmed at 4daac16 (below).** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
+**Result: PASS at d100466 on the code; F12 is confirmed at 9e17bc6 (below).** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -115,4 +115,11 @@ The verdict re-closes on the confirmed fix sha, that measurement, and a green PR
 - **Measured:** dispatched run 43060691103 is green. The e2e step took 46 s and the probe passed, so no apt ran. That is within the pass line (about 60 s or less, without the 120 s wait).
 
 **Result: PASS.** It closes on a green PR #116 check at 4daac16 or later.
+
+**F12 at 9e17bc6 (supersedes 4daac16):**
+- The second probe is added. After a fallback `install-deps`, a bounded relaunch (`timeout -k 10 60`) fails the step with `::error::Chromium cannot launch`. The shape now meets the amended line exactly, so the 4daac16 deviation no longer applies.
+- Every bound uses `-k 10`. `tests/ci/ci-e2e.test.ts` covers the conditional and the second probe, and 9 mutations ran red.
+- **Measured:** dispatched run 43061555112 is green, with the e2e step at 46 s.
+
+**Result: PASS.** It closes on a green PR #116 check at 9e17bc6 or later.
 
