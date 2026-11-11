@@ -132,7 +132,9 @@ describe('structure (R1, R7)', () => {
     expect(readFileSync(join(ROOT, 'packages/db/src/migrate.ts'), 'utf8')).not.toMatch(/checkConfig|migrate-config/);
   });
   it('apps/migrate calls @poly/config\'s checkConfig, not its own', () => {
-    expect(readFileSync(join(ROOT, 'apps/migrate/src/run.ts'), 'utf8')).toMatch(/from '@poly\/config'/);
+    const run = readFileSync(join(ROOT, 'apps/migrate/src/run.ts'), 'utf8').replace(/\/\/.*$/gm, '');
+    expect(run).toMatch(/from '@poly\/config'/);
+    expect(run).toMatch(/\brunCheckConfig\(\s*'migrate'/); // imported and called, so an unused import does not satisfy it
   });
   it('the schemaStatus export exists on @poly/db/startup and assertSchemaNotBehind is built on it (R7)', () => {
     const s = readFileSync(join(ROOT, 'packages/db/src/startup.ts'), 'utf8');
