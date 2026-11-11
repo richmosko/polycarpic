@@ -57,34 +57,29 @@ Feature started. Branch: `feature/poly-128-app-shell-design-tokens`. Runs in par
 
 ### @architect — 2026-11-10
 
-**Verdict (gate 4) at `daac457`: HELD** until V6 and V7 (below) pass tests-red and build-green, qa-engineer-128 has issued its gate-3 line and seceng-62 has posted `reviewed`; this table is then re-issued at the new sha. As drafted at `daac457`: PASS, on one condition. In the first CI run, the e2e group must add ≤ 150 s to `unit` (R9) and the `image` job (Trivy) must be green. Neither can be measured before that run. The earlier condition 2 is superseded: the sidebar was fixed in this loop (lead).
+**Verdict (gate 4) at `89f020a`: PASS, on one condition.** In the first CI run, the e2e group must add ≤ 150 s to `unit` (R9; e2e measured about 16 s locally) and the `image` job (Trivy) must be green. Lint-clean rests on frontend-lead-128's report and the PR's `lint` job: qa ran lint but did not read the result.
+
+Gate inputs: qa-engineer-128 gate 3 @ `89f020a` (turbo test+typecheck 35/35; tests/layers+ci+workflow 418/418; tests/config+image+log 92; e2e 37/37; tests/db not run, untouched). seceng-62 reviewed @ `89f020a` (nothing blocks). Lead visual leg chrome-passed @ `89f020a` (V1–V7).
 
 | Axis | Result | Evidence |
 |---|---|---|
-| C1: tokens in one file, equal to DESIGN; colour-literal scan; drift trigger | pass | `958804d` `src/tokens.test.ts`; `6c160f5` `apps/web/turbo.json`, `infra/ci/changes.mjs` + test; icons are path data with `stroke="currentColor"`, no hex |
-| C2: eight items in DESIGN order, with icons, all from `NAV` | pass | `49e29b3` `nav.ts` (`icon` per entry), `icons.ts`, `Icon.svelte` |
-| C2: popover at the foot, opening to the right; one top row; no other header | pass | `49e29b3`; `f21665a` `shell-geometry.spec.ts` |
-| V1: collapsed icon rail, eight named, clickable, keyboard-reachable icons | pass | `f21665a` red, `49e29b3` green |
-| V2: floating card (gutter, four rounded corners) | pass | `shell-geometry.spec.ts` |
-| V3: brand mark (DESIGN brand-mark-24, `currentColor`) and nav icons | pass | `49e29b3` `icons.ts` `mark` |
-| V4: popover to the right of the trigger | pass | `shell-geometry.spec.ts` |
-| V5 / R3: collapse state remembered (`sidebar:state` cookie, server-set `data-sidebar`) | pass | `717356e` red, `49e29b3` `hooks.server.ts`, `sidebar-state.ts` |
-| C3: smoke in Light / Dark / Auto, token values | pass (e2e 26/26, as the builder reported) | `daac457` |
-| C4: axe A/AA and contrast, Tab order, Esc returns focus | pass | `daac457` (sr-only names fix label-content-name-mismatch) |
-| C5: `{@html}` refused, inline disable inert, `.svelte` under the layer rules | pass | `6c160f5` `generate.mjs` `poly/svelte`; fixtures `24-svelte-html`. The icons render without `{@html}` |
+| C1: tokens in one file, equal to DESIGN; colour-literal scan; drift trigger | pass | `958804d` `src/tokens.test.ts`; `6c160f5` `apps/web/turbo.json`, `infra/ci/changes.mjs` + test |
+| C2: eight items in DESIGN order with icons, from `NAV`; popover at the foot opening right; one top row | pass | `49e29b3` `nav.ts`, `icons.ts`; `shell-geometry.spec.ts` |
+| V1–V5: icon rail, floating card, mark and icons, popover side, remembered state | pass | `f21665a`, `717356e` red → `49e29b3` green; visual leg |
+| V6: rail expand cue (mark swaps to `panel-left-open` on hover or focus, with a tooltip) | pass | `d20ec1a` red → `93a8a5f`, `89f020a` green; `shell-cues.spec.ts` |
+| V7: current theme shown by a check indicator | pass | `d20ec1a` red → `93a8a5f` green |
+| C3: smoke in Light / Dark / Auto, token values | pass | e2e 37/37 @ `89f020a` (qa) |
+| C4: axe A/AA and contrast, Tab order, Esc returns focus | pass | e2e @ `89f020a` |
+| C5: `{@html}` refused, inline disable inert, `.svelte` under the layer rules | pass | `6c160f5` `generate.mjs` `poly/svelte`; fixtures `24-svelte-html`; icons are data, not `{@html}` |
 | R4: session projection carries no token | pass | `958804d` `layout.server.test.ts` |
 | R5: entity selector empty, no tenancy import | pass | `a75ff93` |
-| R8 / C-07: CSP in `vite.config.ts`; no inline script | pass | `958804d`; e2e CSP test; SECURITY C-06/C-07 "Lives at" fixed by `fcdefae` |
-| R9: e2e in `unit`, affected-gated | pass; added time unmeasured | `6c160f5` `ci.yml`, `tests/ci/ci-e2e.test.ts` |
-| R11: Dockerfile and `layers.json` unchanged; no `@poly/*` import | pass; Trivy pending | diff `53fd538..daac457` |
-| ARCH drift | none open: the `packages/ui` and frontend-framework rows match the build | `7a0837f`, `7a8c81b` |
+| R8 / C-07: CSP in `vite.config.ts`; no inline script | pass | e2e CSP test; SECURITY 1.9.5 (`674fc88`) |
+| R9: e2e in the `unit` job, affected-gated | pass; CI time pending | `6c160f5` `ci.yml`, `tests/ci/ci-e2e.test.ts` |
+| R11: Dockerfile and `layers.json` unchanged; no `@poly/*` import | pass; Trivy pending | diff `53fd538..89f020a` |
+| ARCH drift | none open (ARCH 1.15.12, PDF regenerated in `23c91e3`) | `7a0837f`, `7a8c81b` |
 
 Accepted deviations:
 - The SvelteKit 3 layout (ruling.md → Record).
 - The Playwright browser cache is keyed on the lockfile hash.
 - Duplicate `e2e` and `test:e2e` scripts.
 - sr-only names on the collapse toggle and the avatar trigger.
-
-Two items to build, ruled here:
-- **V6, rail expand cue** (sidebar-flow.md line 25, spec § Sidebar). In the rail, while the brand button is hovered or has keyboard focus, the mark is hidden and Lucide `panel-left-open` (path data in `icons.ts`) is shown in its place on a `--sidebar-accent` fill. A tooltip reading "Expand sidebar" opens to the right, with a `--foreground` fill and `--background` ink. At rest the mark shows, so the brand-mark visibility test holds; it asserts at rest only. The test, collapsed, in both modes: hover shows the open icon and hides `brand-mark`; Tab focus does the same; moving away restores the mark; the tooltip is visible to the right of the button.
-- **V7, current theme visible.** Each Theme radio item shows a check indicator (Lucide `check`, `currentColor`) only when it is checked; the bold weight alone is not enough (DESIGN #accessibility: never signal by one weak cue). bits-ui already sets `aria-checked`. The test, for cookies unset / `dark` / `auto`: exactly one item has `aria-checked="true"` (Light / Dark / Auto respectively), and only that item's indicator has a non-zero box.
