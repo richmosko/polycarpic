@@ -93,3 +93,11 @@ Add `docs/ARCH/index.html` (the §8 row, architect). Everything else the build t
 | V8 | Filter | every R5 row is a `changes.test.ts` case with its mutation; the closure test fails when a `db` pattern (`packages/config/**` among them) is removed |
 | V10 | Registry pin | the pin case fails when `db-migrations` is removed, set `ci: false`, or set `mode: ancestry` |
 | V9 | Suites | each touched suite's time delta reported; no new top-level CI job |
+
+## Addendum 1 — stray committed files under an add-only generator (on 53dae72)
+
+R2's "files only-in-one count" is true of the comparator, not of the check: the copy starts from the committed `output`, so for a generator that only adds (drizzle-kit never deletes or rewrites) a committed-only file is in both trees and passes. **The limit is accepted.** It is inside A2's predicate (the schema matches the latest snapshot) and is a statement of what `regenerate` proves, not a gap in it.
+- Why it is acceptable: the migrator applies only journal entries (`readMigrationFiles` iterates `meta/_journal.json` and opens `<tag>.sql`), so a stray `.sql` or snapshot outside the journal never runs. `check-migrations` still scans every `.sql` in the folder for the role and `RESET` hazards. A journal entry whose file is missing fails at migrate, and the battery applies the real chain on every `db` run.
+- What nothing catches today: a stray file outside the journal, which is inert at runtime but misleading in review. A journal ↔ file bijection in `checkFolder` (every `.sql` and `meta/*_snapshot.json` has its journal entry and the reverse) would close it. That is `packages/db/src/migrations-check.ts`, outside this issue's paths: **routed to the lead as a follow-up, non-gating.**
+- Tests: qa's full-rewrite fake generator stands, as it exercises the comparator's only-in-committed branch. Add one fixture pinning the stated limit: an add-only fake generator with a committed-only stray file reports `fresh`, with a comment naming this addendum.
+- R2 is read with "for a generator that only adds, files only in the committed output are not seen". ARCH §8 does not overstate this and is unchanged.
