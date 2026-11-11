@@ -43,3 +43,11 @@ Follow-ups from POLY-79a (2026-10-31): (1) `scripts/cairn/check_feature_branch_i
 Two closing-completeness gaps found at the POLY-84 pre-merge audit (2026-11-10), both process, both for the skills:
 1. `/finish-feature` has no "regenerate PDF artifacts" step; `/finish-doc-update` does. Feature loops that bump ARCH/SECURITY (POLY-82, 83, 84) left `docs/*/*.pdf` stale on GitHub until 57a6f64. Port step 2 of finish-doc-update into finish-feature (affected docs only; own commit).
 2. Acceptance criteria were closed unticked (POLY-83: 17/17; POLY-84 fixed in ae0b415). Add to `/finish-feature` step 3 or `/merge-pr` pre-flight: the assignee ticks each criterion `- [x] … — <file>: <test>` naming the proving test, as one chore commit before the PR opens.
+
+### @team-lead — 2026-11-10
+
+From POLY-96 (ruling `process/cairn/reviews/POLY-96/ruling.md` §3, O1; user-approved 2026-11-11): the ingest half of CI timings moves here. POLY-96's CI jobs upload `ci-test-runs-<job>` artifacts in the `test-runs.jsonl` schema (`who: "ci"`, `runner: "ci:<job>"`); CI never writes the repo (SECURITY S96-14).
+
+To build here:
+- At `/finish-feature`, `gh run download` the artifacts for the branch's CI runs into the metrics worktree and append them to `process/cairn/metrics/test-runs.jsonl`.
+- `cairn loop-stats` computes `suite_seconds_added` per `runner`, so a CI full run is compared with CI full runs and never with a local one.

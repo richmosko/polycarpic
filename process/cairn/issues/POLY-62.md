@@ -1,7 +1,7 @@
 ---
 id: POLY-62
 title: Entity + membership schema
-status: backlog
+status: todo
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83]

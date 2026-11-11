@@ -10,6 +10,11 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      base:
+        description: 'Optional 40-hex base sha: filter base..HEAD (empty = full run, every output true)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -29,22 +34,24 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Detect path changes
         id: changes
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             echo "run=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          BASE_SHA="${{ github.event.pull_request.base.sha }}"
-          PR_HEAD="${{ github.event.pull_request.head.sha }}"
-          REPO="${{ github.repository }}"
-          HEAD_REF="${{ github.event.pull_request.head.ref }}"
           # Fail closed: if the diff itself errors, `set -e` aborts this step and
           # the job goes red -- it must never fall through to a silent `run=false`.
           CHANGED="$(git diff --name-only "$BASE_SHA" HEAD)"
@@ -140,4 +147,433 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # shellcheck disable=SC2046  # the file list is meant to word-split
           node --test $(find scripts/cairn/tests/js -name '*.test.js' ! -name 'token-chart-logic.test.js')
+
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      node: ${{ steps.filter.outputs.node }}
+      layers: ${{ steps.filter.outputs.layers }}
+      db: ${{ steps.filter.outputs.db }}
+      image: ${{ steps.filter.outputs.image }}
+      ci: ${{ steps.filter.outputs.ci }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Filter changed paths
+        id: filter
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          DISPATCH_BASE: ${{ inputs.base }}
+        run: |
+          set -euo pipefail
+          # Fail closed: a git or filter error is a red job, never an all-false output (criterion 1).
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ -z "$DISPATCH_BASE" ]; then
+              printf '%s\n' node=true layers=true db=true image=true ci=true >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "$DISPATCH_BASE" | grep -Eq '^[0-9a-f]{40}$'
+            BASE="$DISPATCH_BASE"
+          else
+            BASE="$PR_BASE"
+          fi
+          git diff --name-only "$BASE" HEAD | node infra/ci/changes.mjs | tee -a "$GITHUB_OUTPUT"
+
+  guard:
+    name: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Action pins (C-81) and run-body expressions (S96-7)
+        run: |
+          node infra/ci/check-pins.mjs .github infra/ci
+          node infra/ci/check-run-expr.mjs .github
+
+      - name: gitleaks over the PR range (C-82)
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          DISPATCH_BASE: ${{ inputs.base }}
+        run: |
+          set -euo pipefail
+          BASE="origin/main"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            BASE="$PR_BASE"
+          elif [ -n "$DISPATCH_BASE" ]; then
+            echo "$DISPATCH_BASE" | grep -Eq '^[0-9a-f]{40}$'
+            BASE="$DISPATCH_BASE"
+          fi
+          V=8.30.1
+          curl -fsSL -o gitleaks.tgz "https://github.com/gitleaks/gitleaks/releases/download/v${V}/gitleaks_${V}_linux_x64.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/gl"
+          tar -xzf gitleaks.tgz -C "$RUNNER_TEMP/gl" gitleaks
+          "$RUNNER_TEMP/gl/gitleaks" git --redact --no-banner --log-opts "${BASE}..HEAD" .
+
+  lint:
+    name: lint
+    needs: changes
+    if: needs.changes.outputs.node == 'true' || needs.changes.outputs.layers == 'true' || needs.changes.outputs.image == 'true' || needs.changes.outputs.ci == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || inputs.base }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Start clock
+        run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - name: Install pnpm
+        run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
+
+      - name: Locate pnpm store
+        id: store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install (lockfile frozen, lifecycle scripts blocked)
+        # Scripts stay blocked (C-80). pnpm 12 on CI turns "ignored build scripts" (esbuild) into an exit 1; the
+        # variable keeps the refusal and drops only the error.
+        env:
+          pnpm_config_strict_dep_builds: "false"
+        run: pnpm install --frozen-lockfile
+
+      - name: Layer map checks (criterion 6)
+        if: needs.changes.outputs.layers == 'true' || needs.changes.outputs.node == 'true'
+        run: |
+          node scripts/layers/check.mjs
+          pnpm exec vitest run tests/layers
+
+      - name: ESLint and migration check
+        if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true'
+        run: |
+          pnpm exec eslint packages apps scripts/layers
+          pnpm --filter @poly/db check-migrations
+
+      - name: Types
+        if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true'
+        run: |
+          if [ -n "$TURBO_SCM_BASE" ]; then
+            pnpm exec turbo run typecheck --affected --summarize
+          else
+            pnpm exec turbo run typecheck --summarize
+          fi
+
+      - name: Dependency audit (S96-12)
+        if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true'
+        run: pnpm audit --audit-level high
+
+      - name: CI scripts and workflow-structure suite
+        if: needs.changes.outputs.ci == 'true'
+        run: pnpm exec vitest run -c tests/ci/vitest.config.ts
+
+      - name: actionlint
+        if: needs.changes.outputs.ci == 'true'
+        run: |
+          set -euo pipefail
+          V=1.7.12
+          curl -fsSL -o actionlint.tgz "https://github.com/rhysd/actionlint/releases/download/v${V}/actionlint_${V}_linux_amd64.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tgz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/al"
+          tar -xzf actionlint.tgz -C "$RUNNER_TEMP/al" actionlint
+          "$RUNNER_TEMP/al/actionlint"
+
+      - name: Record timing
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: jsonl
+          JOB_NAME: lint
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+          TURBO_RUNS_DIR: ${{ github.workspace }}/.turbo/runs
+
+      - name: Upload CI timing
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-test-runs-lint
+          path: ${{ runner.temp }}/ci-test-runs.jsonl
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Job report
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: summary
+          JOB_NAME: lint
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+          TURBO_RUNS_DIR: ${{ github.workspace }}/.turbo/runs
+
+  unit:
+    name: unit
+    needs: changes
+    if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || inputs.base }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Start clock
+        run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - name: Install pnpm
+        run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
+
+      - name: Locate pnpm store
+        id: store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install (lockfile frozen, lifecycle scripts blocked)
+        # Scripts stay blocked (C-80). pnpm 12 on CI turns "ignored build scripts" (esbuild) into an exit 1; the
+        # variable keeps the refusal and drops only the error.
+        env:
+          pnpm_config_strict_dep_builds: "false"
+        run: pnpm install --frozen-lockfile
+
+      - name: Per-package tests (each from its own directory)
+        run: |
+          if [ -n "$TURBO_SCM_BASE" ]; then
+            pnpm exec turbo run test --affected --summarize
+          else
+            pnpm exec turbo run test --summarize
+          fi
+
+      - name: Cross-package suite (config, image, log)
+        run: pnpm exec vitest run -c tests/config/vitest.config.ts
+
+      - name: Record timing
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: jsonl
+          JOB_NAME: unit
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+          TURBO_RUNS_DIR: ${{ github.workspace }}/.turbo/runs
+
+      - name: Upload CI timing
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-test-runs-unit
+          path: ${{ runner.temp }}/ci-test-runs.jsonl
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Job report
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: summary
+          JOB_NAME: unit
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+          TURBO_RUNS_DIR: ${{ github.workspace }}/.turbo/runs
+
+  db:
+    name: db
+    needs: changes
+    if: needs.changes.outputs.db == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Start clock
+        run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - name: Install pnpm
+        run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
+
+      - name: Locate pnpm store
+        id: store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install (lockfile frozen, lifecycle scripts blocked)
+        # Scripts stay blocked (C-80). pnpm 12 on CI turns "ignored build scripts" (esbuild) into an exit 1; the
+        # variable keeps the refusal and drops only the error.
+        env:
+          pnpm_config_strict_dep_builds: "false"
+        run: pnpm install --frozen-lockfile
+
+      - name: DB battery (one Postgres container, RLS battery included)
+        run: pnpm exec vitest run -c tests/db/vitest.config.ts
+
+      - name: Record timing
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: jsonl
+          JOB_NAME: db
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+
+      - name: Upload CI timing
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-test-runs-db
+          path: ${{ runner.temp }}/ci-test-runs.jsonl
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Job report
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: summary
+          JOB_NAME: db
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+
+  image:
+    name: image
+    needs: changes
+    if: needs.changes.outputs.image == 'true' || needs.changes.outputs.node == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Start clock
+        run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Build the image (local, no push)
+        env:
+          GIT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash infra/ci/image.sh build
+
+      - name: Built-image check (no package manager, non-root)
+        run: bash infra/ci/image.sh check polycarpic:ci
+
+      - name: Install Trivy
+        run: bash infra/ci/install-trivy.sh
+
+      - name: Trivy scan of the local image (fixable critical/high, secrets)
+        run: bash infra/ci/image.sh scan polycarpic:ci
+
+      - name: Record timing
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: jsonl
+          JOB_NAME: image
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+
+      - name: Upload CI timing
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-test-runs-image
+          path: ${{ runner.temp }}/ci-test-runs.jsonl
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Job report
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: summary
+          JOB_NAME: image
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+
+  app:
+    name: app
+    needs: [changes, guard, lint, unit, db, image]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Aggregate
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: node infra/ci/aggregate.mjs

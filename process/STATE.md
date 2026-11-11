@@ -15,9 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-85 (runtime config + ops hooks) merged 2026-11-10 via PR [#105](https://github.com/richmosko/polycarpic/pull/105) — ARCH v1.15.6, SECURITY v1.8; follow-ups on POLY-81 (status-listener port fallback, Host header), POLY-88 (C-76 SOA zone test, route pattern for `(group)` ids, `/status` 404 on the public listener), POLY-100 (three-container `check-config`, `env_file`, staging env for CI image runs), POLY-121 (Vercel env source); ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature._
+_None. POLY-96 (CI: change filter, build, attest) merged 2026-11-11 via PR [#106](https://github.com/richmosko/polycarpic/pull/106) — SECURITY v1.9, INFRA v1.3.1; follow-ups on POLY-79 (CI timing ingest), POLY-100 (deploy-side `--source-ref`, digest from `digest.txt`, `RELEASE_SIGNERS`), POLY-102 (CodeQL, DB job budget, aggregate blind spot, 90-day digest artifacts). Carried from POLY-85: follow-ups on POLY-81, POLY-88, POLY-100, POLY-121; ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature._
 
-- **Next:** POLY-M1's first session is complete (POLY-76, 82, 83, 84, 85 done). Decide the second session's issues from `scripts/cairn/cairn ls --milestone POLY-M1 --status backlog` and promote them to `todo`.
+- **Next:** (1) POLY-96 post-merge confirmations per `process/cairn/reviews/POLY-96/ruling.md` §6: first build.yml run on `main`, attestation verify with `--source-ref`, SBOM attestation, release.yml dry run; then `app` into branch protection with the user (POLY-96 criterion 7, still unticked). (2) Doc-update: strip status history, "Changes" blocks and body narration from all five design docs and write the rule into the doc owners' definitions (user directive 2026-11-11). (3) Second session continues from `todo`: POLY-62 and POLY-86 (identity roots), POLY-128 (app shell), POLY-97 and POLY-95 (infra). POLY-131 held (P3).
 
 ## Releases
 

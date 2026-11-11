@@ -124,7 +124,8 @@ class CiWorkflowShapeTests(unittest.TestCase):
             for m in [re.match(r"^  ([A-Za-z0-9_-]+):\s*$", l)]
             if m
         ]
-        self.assertEqual(job_ids, ["cairn"], f"expected exactly one job `cairn`, got {job_ids!r}")
+        # POLY-96: the app check family sits beside `cairn` in this file; `cairn` stays exactly one job.
+        self.assertEqual(job_ids.count("cairn"), 1, f"expected exactly one job `cairn`, got {job_ids!r}")
 
     def test_no_top_level_on_paths_filter(self):
         on_idx = next((i for i, l in enumerate(self.lines) if l.strip() == "on:" or l.startswith("on:")), None)

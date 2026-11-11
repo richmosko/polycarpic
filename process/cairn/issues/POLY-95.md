@@ -1,7 +1,7 @@
 ---
 id: POLY-95
 title: Compose, Postgres config + lint
-status: backlog
+status: todo
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -11,7 +11,7 @@ labels: [ops, ci, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-10
 ---
 
 INFRA §2.2: prod and staging compose projects, backup-net (internal, fixed subnet), upload-net, per-container secrets, the Postgres image with age, the C-75 and C-79 settings, archive_command with age, the first four pg_hba lines, and the compose-policy lint (C-70).

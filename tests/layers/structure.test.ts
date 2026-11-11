@@ -23,11 +23,11 @@ describe('workspace (criterion 1)', () => {
     expect(real).toEqual([...SPEC_PKGS].sort());
   });
   for (const n of SPEC_PKGS) {
-    it(`${n}: one vitest test that runs alone`, () => {
+    it(`${n}: its vitest tests run alone`, () => {
       const d = dirOf(n);
       expect(existsSync(join(d, 'package.json'))).toBe(true);
       const tests = readdirSync(join(d, 'src')).filter((f) => f.endsWith('.test.ts'));
-      expect(tests.length).toBe(1);
+      expect(tests.length).toBeGreaterThanOrEqual(1); // POLY-96: config and db have grown past the one scaffold test
       const r = spawnSync('node', [join(root, 'node_modules/vitest/vitest.mjs'), 'run'], { cwd: d, encoding: 'utf8' });
       expect(r.status, r.stdout + r.stderr).toBe(0);
     }, 60_000);
