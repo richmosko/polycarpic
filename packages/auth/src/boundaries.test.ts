@@ -4,7 +4,7 @@ import { ESLint } from 'eslint';
 import { readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..', '..');
@@ -49,14 +49,20 @@ describe('dependency pins', () => {
 });
 
 describe('lint', () => {
+  // One ESLint instance, warmed once: the first lint loads the whole flat config (the cold start), which on a loaded runner can
+  // outlast vitest's 5 s default. The hook and the cases carry explicit timeouts instead of racing the default.
+  const eslint = new ESLint({ cwd: root });
   const lint = async (filePath: string, text: string) => {
-    const [r] = await new ESLint({ cwd: root }).lintText(text, { filePath: join(root, filePath) });
+    const [r] = await eslint.lintText(text, { filePath: join(root, filePath) });
     return r.messages.filter((m) => m.severity === 2);
   };
+  beforeAll(async () => {
+    await lint('packages/auth/src/options.ts', 'export const warm = 1;\n');
+  }, 120_000);
   it('refuses drizzleAdapter in packages/auth  [red if: the restriction rule is absent for this package]', async () => {
     expect((await lint('packages/auth/src/options.ts', `import { drizzleAdapter } from 'better-auth/adapters/drizzle';\nexport const a = drizzleAdapter;\n`)).length).toBeGreaterThan(0);
-  });
+  }, 60_000);
   it('refuses a pg import in packages/auth  [red if: the layers rule does not cover auth]', async () => {
     expect((await lint('packages/auth/src/routing-pool.ts', `import pg from 'pg';\nexport const a = pg;\n`)).length).toBeGreaterThan(0);
-  });
+  }, 60_000);
 });
