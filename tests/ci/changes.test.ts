@@ -23,7 +23,7 @@ const CASES: [string[], string[], string][] = [
   [['apps/web/src/a.ts'], ['node'], 'apps/** dropped from `node`'],
   [['apps/web/package.json'], ['node', 'layers'], 'apps/*/package.json dropped from `layers`'],
   [['tests/db/a.test.ts'], ['db'], '`db` widened to node, or tests/db dropped from `db`'],
-  [['pnpm-lock.yaml'], ['node'], '`db` widened to the lockfile (O2) or lockfile dropped from `node`'],
+  [['pnpm-lock.yaml'], ['node', 'db'], 'pnpm-lock.yaml dropped from `db` (POLY-102 R5 closes POLY-96 O2) or from `node`'],
   [['turbo.json'], ['node'], 'turbo.json dropped'],
   [['eslint.config.js'], ['node', 'layers'], 'eslint.config.js dropped from either key'],
   [['Dockerfile'], ['image'], 'Dockerfile dropped from `image`'],
@@ -40,6 +40,19 @@ const CASES: [string[], string[], string][] = [
   [['docs/DESIGN/index.html', 'docs/DESIGN/tokens.html'], [], 'all of docs/DESIGN made to set `node` instead of the one tokens.css file'],
   [['docs/DESIGN/tokens.css'], ['node'], 'docs/DESIGN/tokens.css dropped from `node` (POLY-128 R2: the web token-parity test reads it)'],
   [['docs/DESIGN/index.html', 'docs/DESIGN/tokens.html'], [], 'all of docs/DESIGN made to set `node` instead of the one tokens.css file'],
+  // POLY-102 R5: every path a job executes or imports triggers that job.
+  [['infra/ci/image.sh'], ['ci', 'image'], 'infra/ci/image.sh dropped from `image` (the POLY-132 gap), or dropped from `ci`'],
+  [['infra/ci/install-trivy.sh'], ['ci', 'image'], 'infra/ci/install-trivy.sh dropped from `image`'],
+  [['infra/ci/changes.mjs', 'infra/ci/aggregate.mjs'], ['ci'], 'the image entries widened to all of infra/ci/ (the §2 exception lost)'],
+  [['.trivyignore'], ['image'], '.trivyignore dropped from `image` (the scan reads it)'],
+  [['tests/layers/tsc/package.json'], ['layers', 'image'], 'tests/layers/tsc/package.json dropped from `image` (it enters the image context)'],
+  [['packages/tenancy/src/index.ts'], ['node', 'db'], 'packages/tenancy dropped from `db` (tests/db imports it)'],
+  [['packages/tenancy/permission-matrix.json'], ['node', 'db'], 'permission-matrix.json dropped from `db` (matrix.test reads it by join(ROOT, ...))'],
+  [['apps/migrate/src/cli.ts'], ['node', 'db'], 'apps/migrate dropped from `db` (MIGRATE_CLI)'],
+  [['apps/web/src/ops/status.ts', 'apps/web/src/ops/health.ts'], ['node', 'db'], 'apps/web/src/ops dropped from `db` (ops-status and ops-hardening import them)'],
+  [['apps/web/src/main.ts'], ['node', 'db'], 'apps/web/src/main.ts dropped from `db` (ops-hardening crash handler)'],
+  [['apps/web/src/routes/+page.svelte'], ['node'], '`db` widened to all of apps/web'],
+  [['tests/log/canary.ts'], ['node', 'db'], 'tests/log dropped from `db` (the canaries are imported by two db files)'],
   [['docs/PRD/index.html', 'packages/ledger/src/a.ts'], ['node'], 'a docs path anywhere in the list suppressing the code path'],
 ];
 
