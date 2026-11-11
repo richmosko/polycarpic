@@ -521,3 +521,22 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** writing the metrics branch from CI needs `contents: write` on a PR-triggered workflow, which SECURITY C-81 refuses; the ingest touches tracker tooling outside the issue's files. Neither extra image has a Dockerfile yet. CodeQL's cost per PR is unmeasured and it is outside the issue's criteria.
 **Alternatives considered:** keeping POLY-96 open until the ingest lands (blocks the required `app` check on tooling work); placeholder Dockerfiles for Caddy and tools (attests images nothing runs).
 **Approved by:** richmosko (2026-11-11) for criterion 11; team-lead (2026-11-11) for the images and CodeQL, surfaced to richmosko with no objection raised.
+
+### 2026-11-11 — The design docs carry current state only; history lives in git, the PR, the issue and this ledger
+**Decision:** `docs/{PRD,ARCH,SECURITY,INFRA,DESIGN}/index.html` describe the system as it is now. A header holds Owner, a one-phrase Status, Version and Last updated. A doc has no changelog section, no per-version status run, no "changes to re-fold" list, and no body text about who ruled something, when, or which version it came from. Cross-references name a control, section or open-question id without a version number; an issue id appears only where work is still to be done. The rule is in `process/WORKFLOW.md` (Decision logging → What goes where), the five doc owners' definitions and the doc skills.
+**Why:** the header and changelog blocks alone had grown to about 35 KB of ARCH and 18 KB of SECURITY, and every loop added more; a reader had to get through the history to find the design. The principal's words: "This is EXACTLY what git revisions are for! Do not put them in the docs themselves."
+**Alternatives considered:** remove only the headers and "Changes" blocks and leave attributions in the body (the same history, spread thinner); keep a collapsed changelog (still maintained by hand, still out of step with git).
+**Approved by:** richmosko (2026-11-11)
+
+### 2026-11-11 — Decisions that were recorded only in a design doc, moved here when the docs lost their attributions
+**Decision:** each rule below stays in its doc as present-tense text; this entry keeps who decided it and when, as the doc recorded it before the cleanup (`git show 241c0f9:docs/ARCH/index.html`, `…:docs/DESIGN/index.html`).
+- **Entity types (ARCH §3.1; Principal, 2026-11-02):** five system types in two kinds. Base (Person, Trust, Business) never have children; parent (Household, Holding) roll up whole entities.
+- **Posting gates (ARCH §3.2a; Principal, 2026-10-02):** an item whose entry is not correct stays in the Pending queue; a draft leaves Pending only by passing every gate.
+- **Second step for a later-created Person (ARCH §3.1c; lead ruling, 2026-11-08):** a newly created Person is a new owned entity like the rest and needs the second step first; only the sign-up Person is exempt.
+- **Deleting a roll-up link (ARCH §3.1; Principal, 2026-11-06):** delete requires owner on the parent or on the child; insert requires owner on both.
+- **Who accrues tax (ARCH §4.5; Principal, 2026-11-06):** a taxpayer entity accrues its own tax at each close (an individual, a non-grantor trust, a C-corp, or a parent classified joint filers); a grantor trust, a pass-through business or a pass-through parent accrues nothing and allocates to its holders by the cap table.
+- **Held-raise notices (ARCH §3.1c; ux-designer, 2026-11-08):** on cancel, the member's "Role raise waiting" notice is replaced; on the one-owner to two-owner transition, both the raiser and the member are notified.
+- **Journal entries default range (DESIGN §5; recorded in DESIGN as "by ruling", author and date not recorded):** the General Ledger's Journal entries card defaults its date range to This month.
+**Why:** removing an attribution from a doc must not remove the only record of who decided it.
+**Alternatives considered:** leaving these seven attributions in the docs as exceptions (the rule would then have exceptions nobody could list from memory).
+**Approved by:** as attributed on each line; recorded by team-lead (2026-11-11).
