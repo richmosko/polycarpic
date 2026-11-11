@@ -4,6 +4,7 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { inspect } from 'node:util';
 import { join } from 'node:path';
 import { DB_PKG, freshName, must, psql } from './pg.ts';
 
@@ -82,6 +83,29 @@ export function migrateCli(db: string, dir: string, args: string[] = [], env: Re
   });
   return { code: p.status ?? 127, out: p.stdout ?? '', err: p.stderr ?? '' };
 }
+
+/** Runs `run` (apps/migrate/src/run.ts) in this process with exactly `env`. Captures console and stderr, restored in `finally`. */
+export async function captureRun(args: string[], env: NodeJS.ProcessEnv): Promise<Run> {
+  const { run } = await import('../../../apps/migrate/src/run.ts');
+  let out = '';
+  let err = '';
+  const text = (a: unknown[]) => a.map((x) => (typeof x === 'string' ? x : inspect(x))).join(' ') + '\n';
+  const saved = { log: console.log, error: console.error, warn: console.warn, write: process.stderr.write };
+  console.log = (...a: unknown[]) => { out += text(a); };
+  console.error = (...a: unknown[]) => { err += text(a); };
+  console.warn = console.error;
+  process.stderr.write = ((c: string | Uint8Array) => { err += String(c); return true; }) as typeof process.stderr.write;
+  try {
+    const code = await run(args, env);
+    return { code, out, err };
+  } finally {
+    console.log = saved.log; console.error = saved.error; console.warn = saved.warn; process.stderr.write = saved.write;
+  }
+}
+
+/** Same as migrateCli, in this process: no spawn. */
+export const migrateRun = (db: string, dir: string, args: string[] = [], env: Record<string, string> = {}): Promise<Run> =>
+  captureRun(args, { ...process.env, ...dbEnv('poly_migrator', db), POLY_MIGRATIONS_DIR: dir, ...env });
 
 export const applied = (db: string) =>
   must(`SELECT hash, created_at FROM drizzle.__drizzle_migrations ORDER BY id`, db).rows;
