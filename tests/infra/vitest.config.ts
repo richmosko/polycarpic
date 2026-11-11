@@ -7,5 +7,6 @@ export default defineConfig({
   test: {
     include: ['tests/infra/*.test.ts'],
     testTimeout: 30_000,
+    maxConcurrency: 4, // POLY-95 A2: the runner's vCPUs; the lint fixtures run concurrently
   },
 });

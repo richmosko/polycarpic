@@ -11,7 +11,7 @@
 //   Fail closed: a render error, or no compose file under <root>/infra/compose/, exits non-zero.
 // Every fail fixture is the pass fixture (baseline.ts) with ONE mutation. The last column names what, if the lint
 // regressed that way, turns the test red; the test itself is red now because the script does not exist.
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -20,17 +20,30 @@ import { baseline, giveSecret, materialise, PG_DIGEST, PG_IMAGE_ENV, secretFile,
 
 const ROOT = join(dirname(new URL(import.meta.url).pathname), '..', '..');
 const LINT = join(ROOT, 'infra', 'lint', 'compose-policy.mjs');
+
+/** POLY-95 A2: async spawn so cases run concurrently (describe.concurrent, maxConcurrency 4); every case still runs the CLI end to end. */
+type Out = { status: number | null; stdout: string; stderr: string };
+function spawnAsync(cmd: string, args: string[], o: { encoding?: string; env?: Record<string, string> } = {}): Promise<Out> {
+  return new Promise((resolve) => {
+    const c = spawn(cmd, args, { env: o.env ?? { PATH: process.env.PATH ?? '' } });
+    let stdout = '', stderr = '';
+    c.stdout.on('data', (d) => { stdout += d; });
+    c.stderr.on('data', (d) => { stderr += d; });
+    c.on('error', (e) => resolve({ status: 127, stdout, stderr: stderr + String(e) }));
+    c.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
+}
 const made: string[] = [];
 afterAll(() => { for (const d of made) rmSync(d, { recursive: true, force: true }); });
 
-function lint(root: string) {
+async function lint(root: string) {
   if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');
-  const r = spawnSync('node', [LINT, '--root', root], {
+  const r = await spawnAsync('node', [LINT, '--root', root], {
     encoding: 'utf8', env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', POLY_POSTGRES_IMAGE: PG_IMAGE_ENV, POLY_BIND_ADDR: '192.168.1.20' },
   });
   return { code: r.status, err: r.stderr ?? '', out: r.stdout ?? '' };
 }
-function runSet(mut: (s: FxSet) => void, opts: { skipCompose?: string[] } = {}) {
+async function runSet(mut: (s: FxSet) => void, opts: { skipCompose?: string[] } = {}) {
   const s = baseline();
   mut(s);
   const root = mkdtempSync(join(tmpdir(), 'poly95-lint-'));
@@ -41,20 +54,20 @@ function runSet(mut: (s: FxSet) => void, opts: { skipCompose?: string[] } = {}) 
 const svc = (s: FxSet, p: 'prod' | 'staging' | 'edge', n: string) => s[p].services[n];
 const rule = (id: string) => new RegExp(`\\[${id}\\]`);
 
-describe('compose-policy lint: pass fixtures', () => {
-  it('the baseline set (edge + prod + staging + pg files + Caddyfile) is clean', () => {
-    const r = runSet(() => {});
+describe.concurrent('compose-policy lint: pass fixtures', () => {
+  it('the baseline set (edge + prod + staging + pg files + Caddyfile) is clean', async () => {
+    const r = await runSet(() => {});
     expect({ code: r.code, err: r.err }).toEqual({ code: 0, err: '' });
   });
-  it('a different major is clean when infra/postgres-major and the FROM line agree (18 / 18.1)', () => {
-    const r = runSet((s) => {
+  it('a different major is clean when infra/postgres-major and the FROM line agree (18 / 18.1)', async () => {
+    const r = await runSet((s) => {
       s.text['infra/postgres-major'] = '18\n';
       s.text['infra/postgres/Dockerfile'] = s.text['infra/postgres/Dockerfile']!.replace('postgres:17.10', 'postgres:18.1');
     });
     expect(r.code).toBe(0); // red if the lint hardcodes 17
   });
-  it('the repo itself is clean (the builder\'s real files satisfy the rules the fixtures pin)', () => {
-    expect(lint(ROOT)).toMatchObject({ code: 0 }); // red until infra/compose etc. exist and comply
+  it('the repo itself is clean (the builder\'s real files satisfy the rules the fixtures pin)', async () => {
+    expect(await lint(ROOT)).toMatchObject({ code: 0 }); // red until infra/compose etc. exist and comply
   });
 });
 
@@ -197,54 +210,54 @@ const ROWS: Row[] = [
   ['Caddy sets a CSP', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\t\tdefer\n', '\t\tdefer\n\t\tContent-Security-Policy "default-src *"\n'); }, 'caddy-csp', 'Caddy allowed to set or strip the CSP (it is Kit\'s)'],
 ];
 
-describe('compose-policy lint: fail fixtures (pass baseline + one mutation each)', () => {
-  it.each(ROWS)('%s -> rule fires', (name, mut, id) => {
-    const r = runSet(mut);
+describe.concurrent('compose-policy lint: fail fixtures (pass baseline + one mutation each)', () => {
+  it.each(ROWS)('%s -> rule fires', async (name, mut, id) => {
+    const r = await runSet(mut);
     expect(r.code, `${name}: ${r.err}`).not.toBe(0);
     expect(r.err).toMatch(rule(id));
   });
   // The "turns red when" column, kept machine-readable so the table above is the single source.
-  it('every row documents the mutation that turns it red', () => {
+  it('every row documents the mutation that turns it red', async () => {
     for (const row of ROWS) expect(row[3].length).toBeGreaterThan(8);
   });
 });
 
-describe('compose-policy lint: fail closed', () => {
-  it('no compose files under infra/compose -> non-zero [no-files]', () => {
-    const r = runSet(() => {}, { skipCompose: ['edge', 'prod', 'staging'] });
+describe.concurrent('compose-policy lint: fail closed', () => {
+  it('no compose files under infra/compose -> non-zero [no-files]', async () => {
+    const r = await runSet(() => {}, { skipCompose: ['edge', 'prod', 'staging'] });
     expect(r.code).not.toBe(0);
     expect(r.err).toMatch(rule('no-files')); // red if zero files renders as a pass
   });
-  it('one of the three files missing -> non-zero', () => {
-    expect(runSet(() => {}, { skipCompose: ['staging'] }).code).not.toBe(0); // red if only existing files are checked
+  it('one of the three files missing -> non-zero', async () => {
+    expect((await runSet(() => {}, { skipCompose: ['staging'] })).code).not.toBe(0); // red if only existing files are checked
   });
-  it('a file docker compose cannot render -> non-zero [render-error], never skipped', () => {
-    const r = runSet((s) => { svc(s, 'prod', 'web').networks = ['nonexistent']; });
+  it('a file docker compose cannot render -> non-zero [render-error], never skipped', async () => {
+    const r = await runSet((s) => { svc(s, 'prod', 'web').networks = ['nonexistent']; });
     expect(r.code).not.toBe(0);
     expect(r.err).toMatch(rule('render-error')); // red if render errors are swallowed
   });
-  it('POLY_POSTGRES_IMAGE unset -> non-zero (the :? guard fires, the lint does not default it)', () => {
+  it('POLY_POSTGRES_IMAGE unset -> non-zero (the :? guard fires, the lint does not default it)', async () => {
     const s = baseline();
     const root = mkdtempSync(join(tmpdir(), 'poly95-lint-'));
     made.push(root);
     materialise(root, s);
     if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');
-    const r = spawnSync('node', [LINT, '--root', root], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' } });
+    const r = await spawnAsync('node', [LINT, '--root', root], { encoding: 'utf8', env: { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '' } });
     expect(r.status).not.toBe(0);
   });
-  it('docker compose not on PATH -> non-zero [no-docker]', () => {
+  it('docker compose not on PATH -> non-zero [no-docker]', async () => {
     const root = mkdtempSync(join(tmpdir(), 'poly95-lint-'));
     made.push(root);
     materialise(root, baseline());
     if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');
-    const r = spawnSync(process.execPath, [LINT, '--root', root], { encoding: 'utf8', env: { PATH: '/nonexistent', POLY_POSTGRES_IMAGE: PG_IMAGE_ENV, POLY_BIND_ADDR: '192.168.1.20' } });
+    const r = await spawnAsync(process.execPath, [LINT, '--root', root], { encoding: 'utf8', env: { PATH: '/nonexistent', POLY_POSTGRES_IMAGE: PG_IMAGE_ENV, POLY_BIND_ADDR: '192.168.1.20' } });
     expect(r.status).not.toBe(0);
     expect(r.stderr).toMatch(rule('no-docker')); // red: a missing docker is a pass
   });
-  it('a project that renders zero services -> non-zero', () => {
-    expect(runSet((s) => { s.staging.services = {}; }).code).not.toBe(0); // red: empty render treated as clean
+  it('a project that renders zero services -> non-zero', async () => {
+    expect((await runSet((s) => { s.staging.services = {}; })).code).not.toBe(0); // red: empty render treated as clean
   });
-  it('policy.json missing or invalid -> non-zero [policy]', () => {
+  it('policy.json missing or invalid -> non-zero [policy]', async () => {
     const root = mkdtempSync(join(tmpdir(), 'poly95-lint-'));
     made.push(root);
     materialise(root, baseline());
@@ -252,16 +265,16 @@ describe('compose-policy lint: fail closed', () => {
     if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');
     const env = { PATH: process.env.PATH ?? '', HOME: process.env.HOME ?? '', POLY_POSTGRES_IMAGE: PG_IMAGE_ENV, POLY_BIND_ADDR: '192.168.1.20' };
     for (const pol of ['bad.json', 'missing.json']) {
-      const r = spawnSync('node', [LINT, '--root', root, '--policy', join(root, pol)], { encoding: 'utf8', env });
+      const r = await spawnAsync('node', [LINT, '--root', root, '--policy', join(root, pol)], { encoding: 'utf8', env });
       expect(r.status, pol).not.toBe(0);
       expect(r.stderr).toMatch(rule('policy'));
     }
   });
-  it('a missing --root argument -> non-zero', () => {
+  it('a missing --root argument -> non-zero', async () => {
     if (!existsSync(LINT)) throw new Error('infra/lint/compose-policy.mjs does not exist');
-    expect(spawnSync('node', [LINT], { encoding: 'utf8' }).status).not.toBe(0);
+    expect((await spawnAsync('node', [LINT], { encoding: 'utf8' })).status).not.toBe(0);
   });
 });
 
 // keep helpers referenced for the type checker
-void mkdirSync; void writeFileSync;
+void mkdirSync;
