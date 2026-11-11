@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: reopened by the lead's visual leg (below). F3–F9 and addendum 2's CI-time guard must be met; I confirm the fix sha against this file.** F1 and F2 are met. F1 at 385ef78: `routing-pool.test.ts`, with `AuthUnderSystemJob` raised on `connect()` and `query()`. F2 at f6cde68: `userCreateBefore` asserts the wrapper and calls `claimInvitation` on every call, and the image rule is the pure `stripImage`.
+**Result: pass on the code at 7a0d5fe, pending one measurement.** F1 is met at 385ef78, F2 at f6cde68, and F3–F9 at 7a0d5fe (section below). Still open: addendum 2's guard, a `db` job at or under 150 s on the median of three PR runs. The lead measures it at finish. The battery runs 87 s locally, down from 101 s.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -47,4 +47,16 @@ Source: `temp/2026-11-11-lead-poly86-visual-leg.md` in the lead checkout. The co
 - **F8. e2e coverage of the four.** Add to `shell-signed-in.spec.ts`, or a sibling spec: `/settings/sessions` lists the current session and revokes another (after a step-up stamp seeded by the setup); a wrong password and then the right one signs in; Log out lands on `/sign-in` and the next `/dashboard` load redirects; `/sign-in` has no navigation landmark.
 - **F9 (lead item 4): seceng S19 (`seceng-client-ip.md` @ a7a22c3) binds the build.** The app trusts only a single-entry `X-Forwarded-For`, with no `trustedProxies`. An unresolved IP answers 503 outside dev and is never pooled. Caddy's overwrite of the header goes to POLY-95 (follow-up 11). F9 is a verdict axis: confirmed against S19's tests at the fix sha.
 - **`AuthUnderSystemJob`:** met at 385ef78 (F1). The builder's earlier line predates that commit.
+
+### Confirmed at 7a0d5fe (code-read)
+
+- F3: `listSessions` turns `created_at` and `updated_at` into `Date`s, and `sign-in-flow.spec.ts` renders the page.
+- F4: the form posts again after a 401, and the spec checks a wrong password followed by the right one. The root cause was the shared rate-limit bucket (F9).
+- F5: Log out posts `/api/auth/sign-out`, then goes to `/sign-in`.
+- F6: the root layout renders the shell only when there is a session.
+- F7: Settings goes to `/settings/sessions`, and the other menu entries stay disabled.
+- F8: five specs.
+- F9: `handleAuthRequest` answers 503 unless there is exactly one valid `x-forwarded-for` entry, when `requireClientIp` is set. apps/web passes `!dev`. `advanced.ipAddress` reads only that header and sets no `trustedProxies`. `tests/db/auth-client-ip.test.ts` has six cases.
+- The image build: `pnpm-workspace.yaml` sets `allowBuilds: { esbuild: false }`, so the prod install runs no lifecycle scripts.
+- Not blocking (follow-up 12, qa): `serve.ts` writes the step-up stamp before `vite build`. If the e2e run reaches the revoke spec more than 5 minutes later, that spec fails. The stamp belongs in the spec itself, just before the revoke.
 
