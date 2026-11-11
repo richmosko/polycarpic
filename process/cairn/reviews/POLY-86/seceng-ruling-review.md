@@ -190,3 +190,18 @@ I did not run the suites; the gate owner does.
 5. **Dev and CI are unchanged.** The dev and test installs still resolve vite, vitest, drizzle-kit and esbuild, so tooling such as `tests/ci strict-builds` still passes. The `allowBuilds` deny may stay.
 
 Re-review: the fix sha, against points 1–5.
+
+### S20 re-review @ beb0fee: two conditions open
+
+The mechanism is accepted. Removing better-auth's optional peers with `overrides: { 'better-auth>…': '-' }` is option (b). The overrides apply to every install, so the CI suites at beb0fee run against the same graph that ships. Points 2 and 5 are therefore proven when CI at that sha goes green, and point 4 is met: there is no ignore entry or skip.
+
+- **Point 1 is amended for `@better-auth/drizzle-adapter`, which may stay.**
+  - It is a hard `dependency` of better-auth 1.7.18, not a peer.
+  - It is imported only from the `better-auth/adapters/drizzle` subpath, which lint refuses in `packages/auth` (A-31), and it carries no binary and no finding.
+  - Removing a hard dependency would diverge from upstream for no reduction in risk. The rest of point 1 is met by the frozen `--prod` install.
+- **Open, 3a:** `tests/ci/prod-install.test.ts` asserts on a scratch install that repeats the Dockerfile's command. It does not assert on the image. A later Dockerfile change, such as dropping `--prod` or copying a dev `node_modules`, would pass the test. Trivy would catch it only if the copied tooling happened to carry a fixable finding.
+  - Add the image-level check to the existing image job, after the build and before Trivy. List `/app/node_modules/.pnpm` inside the built image, with `--entrypoint sh` running `ls`, and fail on any match of the test's `BUILD_TOOLS` pattern.
+  - Keep the scratch test as the fast guard.
+- **Open, 3b:** add `@esbuild-kit` to `BUILD_TOOLS`. drizzle-kit pulls it in, and it pulls in esbuild 0.18.
+
+Re-review: the next sha, for 3a and 3b and a green CI with the image scan passing.
