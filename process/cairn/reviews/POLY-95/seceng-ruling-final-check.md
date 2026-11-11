@@ -1,0 +1,17 @@
+# POLY-95 — seceng check of the final ruling @ 2669725
+
+Result: **no veto**. The final ruling folds in checklist #1–#11. Four points from S1–S9 (@ 519d815) are still open, and three of them would break or weaken the build. Requested as **addendum A1** (≤ 15 lines):
+
+1. **R6 crash safety (new hole, caused by the step-1 liveness fix).** Step 1 returns 0 when the plaintext sum matches, and that trusts the `.age` file to be complete. After a power loss, a linked but unflushed `.age` can be truncated, and the retry would then accept it: a silent WAL gap that only the restore drill finds. Rule: `sync` the temp file and the `.sums` file before `ln`, then `sync` the `spool/wal/` directory. Before step 2, remove any stale `.inflight/<f>.age.*`.
+2. **Caddy vs `cap_drop: [ALL]` + no `cap_add` (S2).** A non-root Caddy can't bind 80/443 without a capability. Rule: Caddy listens on `:8080`/`:8443` in the container and `ports:` maps 80→8080 and 443→8443.
+   - R7 bans `${…}` in raw `ports`. The local box still needs its LAN bind, so allow exactly one variable, `${POLY_BIND_ADDR:?}` (no default), as the host IP of caddy's ports. Any other interpolation in `ports` fails.
+3. **R8 with more than one consumer.** `auth_secret`, `resend_api_key` and `plaid_secret` each have two consumers (web and worker), which "one consumer group per file" can't express.
+   - Rule: per-service directories `/etc/polycarpic/{secrets,staging-secrets}/<service>/<name>`, dir `root:<service gid> 0750`, file `0440`.
+   - A secret with two consumers is two files. A service's `file:` sources lie under its own directory only (lint), which replaces R7's path rule.
+   - Every service has a distinct gid. None uses `group_add`.
+4. **Small adds (S3, S5, S7).**
+   - Lint fails on `sysctls`, `extra_hosts`, `links`/`external_links`, and a volume source of `/`, `/run` or `/var/run` (a socket by its directory).
+   - Image job: `pg_hba_file_rules` has no `error` and its first four rows are the C-79 lines.
+   - Caddy adapt test: no `trusted_proxies`; `admin` absent or loopback-only.
+
+Once A1 lands, seceng writes SECURITY §6.2 to item 3's rule. Until then §6.2 stays as it is.
