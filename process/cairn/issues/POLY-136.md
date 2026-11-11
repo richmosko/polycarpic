@@ -1,11 +1,12 @@
 ---
 id: POLY-136
 title: CI and migration-check follow-ups
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
+paths: [process/cairn/issues/POLY-136.md, process/cairn/reviews/POLY-136/**, packages/db/**, packages/auth/**, infra/ci/**, .github/workflows/**, tests/**, README.md, docs/INFRA/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, pnpm-workspace.yaml, .gitignore, scripts/layers/**]
 labels: [ci, tooling]
 priority: null
 pr: null
@@ -30,3 +31,7 @@ From the POLY-86 and POLY-95 loops, add to this batch. **(1) db job headroom, be
 ### @team-lead — 2026-11-11
 
 For item (1), the db-job cut: qa-engineer-102's profile of the `db` battery (2026-11-10, one local run; CI ≈ 1.29 × local) listed five cuts. POLY-102 took the template database per file, the leaner `freshDb()` and the runner lock test's `pg_stat_activity` poll. Two are unused: the crash-preload timer in ops-hardening, 2500 ms → 500 ms (about 2.5 s on CI); and calling the check script with `node` directly in `checks`, keeping one case through `pnpm --filter` for the script wiring (about 5 s on CI). Measured unit costs then: one docker-exec psql 60 ms, a migrate CLI spawn about 385 ms, `pnpm --filter … check-migrations` 200 ms. Not safe, per the same profile: file parallelism or concurrency in `runner` and `ops-status` (cluster-global role GRANT/REVOKE, global `pg_locks`, `vi.resetModules` with `process.env`); the 4.8 s ops-hardening case is the production hard timeout.
+
+### @team-lead — 2026-11-11
+
+Feature started. Branch: `feature/poly-136-ci-migration-followups`.

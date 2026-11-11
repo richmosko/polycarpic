@@ -15,9 +15,17 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-86 (BetterAuth: routing pool + allowlist) merged 2026-11-11 via PR [#116](https://github.com/richmosko/polycarpic/pull/116) — ARCH 1.15.15, SECURITY 1.9.9 — and POLY-95 (Compose, Postgres config + lint) via PR [#115](https://github.com/richmosko/polycarpic/pull/115) — INFRA 1.3.4. `packages/auth` runs BetterAuth 1.7.18 on the routing pool behind the `/api/auth/*` allowlist; the shell shows the session, with a bare `/sign-in`, Settings → Sessions and Log out. The `edge`, `prod` and `staging` compose projects, the Postgres and Caddy images and the compose-policy lint are in; nothing is deployed. Sign-up stays closed until POLY-87 and second-factor enrolment until POLY-89. Three standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job runs at a 144 s median against its 150 s guard, so the cut on POLY-136 lands before any new suite joins it; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. Follow-ups: POLY-137 (auth), POLY-138 (Caddy and edge), POLY-139 (sign-in and sessions screens), and comments on POLY-79, 87, 88, 89, 97, 99, 100, 103, 104, 121, 122 and 136; POLY-97 carries the uploader access that gates the first backup._
+- **Feature:** CI and migration-check follow-ups
+- **Issue:** `POLY-136` (cairn)
+- **Milestone:** `POLY-M1`
+- **Branch:** `feature/poly-136-ci-migration-followups`
+- **Started:** 2026-11-11
+- **Goal:** Bring the `db` CI job to a 130 s median so new suites can join it, and close the batch of small CI and migration-check follow-ups.
+- **Status:** In Progress
 
-- **Next:** POLY-87 (invite-only sign-up) is unblocked, with POLY-97 (infra scaffolding; needs a real Hetzner project) alongside. POLY-136's db-job cut goes first if the next loop adds a `db` suite. POLY-131 held (P3).
+_Last merged: POLY-86 (BetterAuth: routing pool + allowlist) merged 2026-11-11 via PR [#116](https://github.com/richmosko/polycarpic/pull/116) — ARCH 1.15.15, SECURITY 1.9.9 — and POLY-95 (Compose, Postgres config + lint) via PR [#115](https://github.com/richmosko/polycarpic/pull/115) — INFRA 1.3.4. `packages/auth` runs BetterAuth 1.7.18 on the routing pool behind the `/api/auth/*` allowlist; the shell shows the session, with a bare `/sign-in`, Settings → Sessions and Log out. The `edge`, `prod` and `staging` compose projects, the Postgres and Caddy images and the compose-policy lint are in; nothing is deployed. Sign-up stays closed until POLY-87 and second-factor enrolment until POLY-89. Three standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job runs at a 144 s median against its 150 s guard, so the cut on POLY-136 lands before any new suite joins it; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. Follow-ups: POLY-137 (auth), POLY-138 (Caddy and edge), POLY-139 (sign-in and sessions screens), and comments on POLY-79, 87, 88, 89, 97, 99, 100, 103, 104, 121, 122 and 136; POLY-97 carries the uploader access that gates the first backup._
+
+- **Next:** POLY-87 (invite-only sign-up) follows POLY-136, with POLY-97 (infra scaffolding; needs a real Hetzner project) alongside. POLY-131 held (P3).
 
 ## Releases
 
