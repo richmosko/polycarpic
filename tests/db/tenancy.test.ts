@@ -1,10 +1,11 @@
-// POLY-62 (ruling R8): behaviour of the tenancy core as the real login role (poly_app) through the real wrappers. One
-// freshDb and one seed per file. Each test names the mutation that turns it red. Roles: O owner, M manager, V viewer of
-// entity E; X is an outsider whose own Person is F.
+// POLY-62 (ruling R8, re-issued): behaviour of the tenancy core as the real login role (poly_app) through the real wrappers.
+// One freshDb and one seed per file. Each test names the mutation that turns it red. Roles: O owner, M manager, V viewer of
+// entity E; X is an outsider whose own Person is F. poly_app holds no membership INSERT and cannot supply an entity id, so
+// extra members are seated as superuser and ids are read back by name.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { REAL_MIGRATIONS, dbEnv, freshDb, migrateCli } from './helpers/api';
 import { crossTenantRows } from './helpers/cross-tenant';
-import { checkProbe, activeRows, loadMatrix, runAs, type Actor, type Fixture } from './helpers/matrix';
+import { activeRows, checkProbe, loadMatrix, runAs, runnableEntries, type Actor, type Fixture } from './helpers/matrix';
 import { must, psql } from './helpers/pg';
 import { ID, seedTenancy, type Seed } from './helpers/tenancy';
 
@@ -22,22 +23,25 @@ const tenant = (uid: string, fn: (tx: any) => Promise<any>) => m.withTenant(sess
 const free = (fn: (tx: any) => Promise<any>) => auth.withContextFreeTx(fn);
 const code = (e: any): string => e?.code ?? e?.cause?.code ?? String(e);
 const sqlstate = async (p: Promise<unknown>) => p.then(() => 'no error', code);
-const O = ID.owner, M = ID.manager, V = ID.viewer, X = ID.outsider, E = ID.entity;
+const O = ID.owner, M = ID.manager, V = ID.viewer, X = ID.outsider, O2 = ID.owner2;
+let E: string;
 let F: string;
 let n = 0;
-const uuid = (tag: number) => `00000000-0000-4000-8000-${String(tag).padStart(12, '0')}`;
+const count = (sql: string) => Number(must(sql, db).rows[0][0]);
+const ownersOf = (e: string) => count(`SELECT count(*) FROM public.membership WHERE entity_id = '${e}' AND role = 'owner'`);
 
-/** A scratch Business owned by `owner`, plus optional extra members. Returns its id. */
+/** A scratch Business created by `owner` through poly_app (name read back, as ids cannot be supplied); `members` are seated as superuser. */
 async function scratch(owner: string, members: [string, string][] = []): Promise<string> {
-  const id = uuid(900_000 + ++n);
-  await tenant(owner, async (tx) => {
-    await q(tx, `INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES ($1, (SELECT id FROM public.entity_type WHERE system_key = 'business'), 'S', 'business_c_corp')`, [id]);
-    for (const [u, role] of members) await q(tx, `INSERT INTO public.membership (entity_id, user_id, role) VALUES ($1, $2, $3)`, [id, u, role]);
+  const name = `qa-scratch-${++n}`;
+  const id = await tenant(owner, async (tx) => {
+    await q(tx, `INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), $1, 'business_c_corp')`, [name]);
+    return (await q(tx, `SELECT id FROM public.entity WHERE name = $1`, [name]))[0].id as string;
   });
+  for (const [u, role] of members) must(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ('${id}', '${u}', '${role}')`, db);
   return id;
 }
 const newUser = (tag: number) => {
-  const id = uuid(800_000 + tag);
+  const id = `00000000-0000-4000-8000-${String(800_000 + tag).padStart(12, '0')}`;
   must(`INSERT INTO public."user" (id, name, email) VALUES ('${id}', 'u${tag}', 'u${tag}@qa.test')`, db);
   return id;
 };
@@ -55,24 +59,26 @@ beforeAll(async () => {
   session = await import('../../packages/db/src/session.ts');
   ({ provisionPerson } = await import('../../packages/tenancy/src/index.ts'));
   S = await seedTenancy({ db, tenant, q, provisionPerson });
+  E = S.entity;
   F = S.otherEntity;
 });
 afterAll(async () => { await m?.close?.(); await auth?.close?.(); });
 
-describe('cross-tenant isolation on every tenancy table (R4 of POLY-84, per tenant table)', () => {
+describe('cross-tenant isolation on every tenancy table (POLY-84 R4, one assertion per tenant table)', () => {
   // Mutation per table: replace that table's SELECT policy with USING (true) and otherRows becomes > 0.
-  const cases: [string, string, { own: string; other: string } | undefined, string, string][] = [
-    ['public.entity', 'id', undefined, 'F', 'E'],
-    ['public.membership', 'entity_id', undefined, 'F', 'E'],
-    ['public.invitation', 'entity_id', undefined, 'F', 'E'],
-    ['public.audit_event', 'entity_id', undefined, 'F', 'E'],
-    ['public.notification', 'recipient_user_id', { own: X, other: O }, '', ''],
-    ['public.entity_type', 'owner_user_id', { own: X, other: O }, '', ''],
+  // entity_type keys on id, not owner_user_id: poly_app cannot read that column (O3).
+  const cases: [string, string, { own: string; other: string }, string?][] = [
+    ['public.entity', 'id', { own: 'F', other: 'E' }],
+    ['public.membership', 'entity_id', { own: 'F', other: 'E' }],
+    ['public.invitation', 'entity_id', { own: 'F', other: 'E' }],
+    ['public.audit_event', 'entity_id', { own: 'F', other: 'E' }],
+    ['public.notification', 'recipient_user_id', { own: 'X', other: 'O' }],
+    ['public.entity_type', 'id', { own: 'TX', other: 'TO' }],
   ];
-  for (const [table, col, keys] of cases) {
+  for (const [table, col, k] of cases) {
     it(`${table}: X reads none of O's rows and, as a positive control, all of its own`, async () => {
-      const k = keys ?? { own: F, other: E };
-      const r = await crossTenantRows(tenant, q, table, X, O, col, k);
+      const val = (s: string) => ({ F, E, X, O, TX: S.types.outsider, TO: S.types.owner } as Record<string, string>)[s];
+      const r = await crossTenantRows(tenant, q, table, X, O, col, { own: val(k.own), other: val(k.other) });
       expect(r.otherRows, `${table} leaks across tenants`).toBe(0);
       expect(r.ownRows, `positive control on ${table}`).toBeGreaterThan(0);
     });
@@ -81,8 +87,10 @@ describe('cross-tenant isolation on every tenancy table (R4 of POLY-84, per tena
   it('the superuser sees the other side too, so the zeros above are policy, not an empty seed', () => {
     for (const t of ['entity', 'membership', 'invitation', 'audit_event']) {
       const col = t === 'entity' ? 'id' : 'entity_id';
-      expect(Number(must(`SELECT count(*) FROM public.${t} WHERE ${col} = '${E}'`, db).rows[0][0]), t).toBeGreaterThan(0);
+      expect(count(`SELECT count(*) FROM public.${t} WHERE ${col} = '${E}'`), t).toBeGreaterThan(0);
     }
+    expect(count(`SELECT count(*) FROM public.notification WHERE recipient_user_id = '${O}'`)).toBeGreaterThan(0);
+    expect(count(`SELECT count(*) FROM public.entity_type WHERE id = '${S.types.owner}'`)).toBe(1);
   });
 });
 
@@ -98,7 +106,7 @@ describe('the authz functions (criterion 4)', () => {
     expect(await vis(M)).toContain(E);
     expect(await vis(M)).not.toContain(F);
     expect(await vis(X)).toEqual([F]);
-    expect(await free(async (tx: any) => (await q(tx, `select app.visible_entities() v`))[0].v), 'no user, no entities').toEqual([]);
+    expect(await free(async (tx: any) => (await q(tx, `select cardinality(app.visible_entities()) c`))[0].c), 'no user, no entities').toBe(0);
   });
 
   // Mutation: owner_count counts for non-members (a membership-count oracle), or returns 0 instead of null.
@@ -108,7 +116,7 @@ describe('the authz functions (criterion 4)', () => {
     expect(await tenant(X, async (tx) => (await q(tx, `select app.owner_count($1) c`, [E]))[0].c)).toBeNull();
   });
 
-  // Mutation: grant EXECUTE on them to PUBLIC, or call them without a user and see them answer.
+  // Mutation: let has_role / owner_count answer without a user in context.
   it('an unauthenticated transaction gets false from has_role and null from owner_count', async () => {
     expect(await free(async (tx: any) => (await q(tx, `select app.has_role($1, 'viewer') h, app.owner_count($1) c`, [E]))[0])).toEqual({ h: false, c: null });
   });
@@ -129,30 +137,29 @@ describe('provisionPerson (criterion 1, as amended by ruling R5)', () => {
 
   // Mutation: remove the 42501 raise in seat_creator, or let provisionPerson pass a user id of its own.
   it('with no user set it rejects with 42501 and leaves no entity behind', async () => {
-    const before = must(`SELECT count(*) FROM public.entity`, db).rows[0][0];
+    const before = count(`SELECT count(*) FROM public.entity`);
     expect(await sqlstate(free((tx: any) => provisionPerson(tx)))).toBe('42501');
-    expect(must(`SELECT count(*) FROM public.entity`, db).rows[0][0]).toBe(before);
+    expect(count(`SELECT count(*) FROM public.entity`)).toBe(before);
   });
 
   // Mutation: weaken the entity INSERT WITH CHECK so self_user_id may name another user.
   it('a user cannot forge another user\'s Person (self_user_id = someone else) or a second Person of their own', async () => {
-    expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.entity (type_id, name, tax_classification, self_user_id)
-      VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'person'), 'forged', 'individual', $1)`, [X])))).toBe('42501');
-    expect(await sqlstate(tenant(X, (tx) => q(tx, `INSERT INTO public.entity (type_id, name, tax_classification, self_user_id)
-      VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'person'), 'second', 'individual', $1)`, [X])))).toBe('23505');
+    const person = `(SELECT id FROM public.entity_type WHERE system_key = 'person')`;
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.entity (type_id, name, tax_classification, self_user_id) VALUES (${person}, 'forged', 'individual', $1)`, [X])))).toBe('42501');
+    expect(await sqlstate(tenant(X, (tx) => q(tx, `INSERT INTO public.entity (type_id, name, tax_classification, self_user_id) VALUES (${person}, 'second', 'individual', $1)`, [X])))).toBe('23505');
   });
 });
 
-describe('tax classification (criterion 2)', () => {
+describe('check_entity: types and tax classification (criteria 2 and 3, ruling R2)', () => {
   const insert = (uid: string, typeKey: string, tax: string | null) => sqlstate(tenant(uid, (tx) => q(tx,
     `INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = $1), 'T', $2)`, [typeKey, tax])));
   const defaulted = (uid: string, typeKey: string) => tenant(uid, async (tx) => {
-    const id = uuid(700_000 + ++n);
-    await q(tx, `INSERT INTO public.entity (id, type_id, name) VALUES ($1, (SELECT id FROM public.entity_type WHERE system_key = $2), 'D')`, [id, typeKey]);
-    return (await q(tx, `SELECT tax_classification t FROM public.entity WHERE id = $1`, [id]))[0].t;
+    const name = `qa-default-${++n}`;
+    await q(tx, `INSERT INTO public.entity (type_id, name) VALUES ((SELECT id FROM public.entity_type WHERE system_key = $1), $2)`, [typeKey, name]);
+    return (await q(tx, `SELECT tax_classification t FROM public.entity WHERE name = $1`, [name]))[0].t;
   });
 
-  // Mutation: drop the default branch for parents in check_tax_classification.
+  // Mutation: drop the default branch for parents in check_entity.
   it('a Household and a Holding default to parent_pass_through; a Trust or a Business with no value is refused (23514)', async () => {
     expect(await defaulted(O, 'household')).toBe('parent_pass_through');
     expect(await defaulted(O, 'holding')).toBe('parent_pass_through');
@@ -179,7 +186,15 @@ describe('tax classification (criterion 2)', () => {
       VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), 'B', 'business_c_corp', $1)`, [O])))).toBe('23514');
   });
 
-  // Mutation: change the entity UPDATE policy to has_role(id, 'manager').
+  // Mutation: drop the ownership test on type_id in check_entity (types become shareable by use).
+  it('an entity of another user\'s custom type is refused (42501); of one\'s own custom type it is accepted', async () => {
+    const withType = (uid: string, typeId: string) => sqlstate(tenant(uid, (tx) => q(tx, `INSERT INTO public.entity (type_id, name, tax_classification) VALUES ($1, 'custom', 'business_c_corp')`, [typeId])));
+    expect(await withType(X, S.types.owner)).toBe('42501');
+    expect(await withType(O, S.types.outsider)).toBe('42501');
+    expect(await withType(O, S.types.owner)).toBe('no error');
+  });
+
+  // Mutation: change the entity UPDATE policy to has_role(id, 'manager'), or skip the value check on UPDATE.
   it('only an owner may change the classification, and the new value is checked against the family on update too', async () => {
     const e = await scratch(O, [[M, 'manager'], [V, 'viewer']]);
     const upd = (uid: string, v: string) => tenant(uid, async (tx) => (await q(tx, `UPDATE public.entity SET tax_classification = $2 WHERE id = $1 RETURNING id`, [e, v])).length);
@@ -191,8 +206,8 @@ describe('tax classification (criterion 2)', () => {
   });
 });
 
-describe('tombstone, immutability and keys (criterion 3)', () => {
-  // Mutation: drop entity_purged_check, or allow purged_at on a row that still has a name.
+describe('tombstone, column grants and keys (criterion 3, ruling O3/O4)', () => {
+  // Mutation: drop the purged-check constraint, or allow purged_at on a row that still has a name.
   it('purged_at is all-or-nothing with the nulled columns: a named row cannot be purged, a fully nulled row can', () => {
     expect(psql(`UPDATE public.entity SET purged_at = now() WHERE id = '${E}'`, db).sqlstate).toBe('23514');
     const ok = psql(`BEGIN; UPDATE public.entity SET name = NULL, type_id = NULL, tax_classification = NULL, self_user_id = NULL, purged_at = now() WHERE id = '${F}'; ROLLBACK;`, db);
@@ -202,60 +217,94 @@ describe('tombstone, immutability and keys (criterion 3)', () => {
 
   // Mutation: GRANT UPDATE on the whole table (or on any listed column) to poly_app.
   it('tenancy and actor columns are not updatable by poly_app, even by an owner of the row (42501)', async () => {
-    const attempts: [string, string, unknown[]][] = [
-      ['entity', `UPDATE public.entity SET id = gen_random_uuid() WHERE id = $1`, [E]],
-      ['entity', `UPDATE public.entity SET type_id = (SELECT id FROM public.entity_type WHERE system_key = 'trust') WHERE id = $1`, [E]],
-      ['entity', `UPDATE public.entity SET self_user_id = $2 WHERE id = $1`, [E, O]],
-      ['entity', `UPDATE public.entity SET purged_at = now() WHERE id = $1`, [E]],
-      ['membership', `UPDATE public.membership SET user_id = $2 WHERE entity_id = $1 AND user_id = $3`, [E, X, V]],
-      ['membership', `UPDATE public.membership SET entity_id = $2 WHERE entity_id = $1 AND user_id = $3`, [E, F, V]],
-      ['invitation', `UPDATE public.invitation SET inviter_user_id = $2 WHERE entity_id = $1`, [E, X]],
-      ['invitation', `UPDATE public.invitation SET entity_id = $2 WHERE entity_id = $1`, [E, F]],
-      ['notification', `UPDATE public.notification SET recipient_user_id = $2 WHERE recipient_user_id = $1`, [O, X]],
-      ['entity_type', `UPDATE public.entity_type SET owner_user_id = $2 WHERE owner_user_id = $1`, [O, X]],
+    const attempts: [string, unknown[]][] = [
+      [`UPDATE public.entity SET id = gen_random_uuid() WHERE id = $1`, [E]],
+      [`UPDATE public.entity SET type_id = (SELECT id FROM public.entity_type WHERE system_key = 'trust') WHERE id = $1`, [E]],
+      [`UPDATE public.entity SET self_user_id = $2 WHERE id = $1`, [E, O]],
+      [`UPDATE public.entity SET purged_at = now() WHERE id = $1`, [E]],
+      [`UPDATE public.membership SET user_id = $2 WHERE entity_id = $1 AND user_id = $3`, [E, X, V]],
+      [`UPDATE public.membership SET entity_id = $2 WHERE entity_id = $1 AND user_id = $3`, [E, F, V]],
+      [`UPDATE public.invitation SET inviter_user_id = $2 WHERE entity_id = $1`, [E, X]],
+      [`UPDATE public.invitation SET entity_id = $2 WHERE entity_id = $1`, [E, F]],
+      [`UPDATE public.notification SET recipient_user_id = $2 WHERE recipient_user_id = $1`, [O, X]],
+      [`UPDATE public.entity_type SET name = 'x' WHERE owner_user_id = $1`, [O]],
     ];
-    for (const [t, text, p] of attempts) expect(await sqlstate(tenant(O, (tx) => q(tx, text, p))), `${t}: ${text}`).toBe('42501');
+    for (const [text, p] of attempts) expect(await sqlstate(tenant(O, (tx) => q(tx, text, p))), text).toBe('42501');
+  });
+
+  // Mutation: widen the entity INSERT grant to all columns.
+  it('an entity INSERT may not supply purged_at, created_at or id (42501)', async () => {
+    const biz = `(SELECT id FROM public.entity_type WHERE system_key = 'business')`;
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.entity (type_id, name, tax_classification, purged_at) VALUES (${biz}, 'p', 'business_c_corp', now())`)))).toBe('42501');
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.entity (type_id, name, tax_classification, created_at) VALUES (${biz}, 'p', 'business_c_corp', now())`)))).toBe('42501');
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES (gen_random_uuid(), ${biz}, 'p', 'business_c_corp')`)))).toBe('42501');
+  });
+
+  // Mutation: grant SELECT on entity_type.owner_user_id or invitation.token_hash (R-9: label-only type read; the token hash never leaves the database).
+  it('poly_app cannot read entity_type.owner_user_id or invitation.token_hash, even its own (42501); the other columns read fine', async () => {
+    expect(await sqlstate(tenant(V, (tx) => q(tx, `SELECT owner_user_id FROM public.entity_type`)))).toBe('42501');
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `SELECT token_hash FROM public.invitation WHERE entity_id = $1`, [E])))).toBe('42501');
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `SELECT * FROM public.entity_type`)))).toBe('42501');
+    expect(await tenant(V, async (tx) => (await q(tx, `SELECT id, name, kind, system_key, created_at FROM public.entity_type WHERE system_key IS NOT NULL`)).length)).toBe(5);
+    expect(await tenant(O, async (tx) => (await q(tx, `SELECT id, entity_id, email, role, inviter_user_id, expires_at, accepted_at, revoked_at, created_at FROM public.invitation WHERE entity_id = $1`, [E])).length)).toBe(1);
   });
 });
 
-describe('owners and membership writes (criterion 4, matrix rows)', () => {
+describe('membership writes and the owner gates (criterion 4, ruling O1/O2)', () => {
+  // Mutation: GRANT INSERT on membership to poly_app, or add an INSERT policy for it. A direct insert bypasses the invitee's consent.
+  it('poly_app has no membership INSERT: not even an owner may seat someone (42501)', async () => {
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.membership (entity_id, user_id, role) VALUES ($1, $2, 'viewer')`, [E, X])))).toBe('42501');
+    expect(await sqlstate(tenant(M, (tx) => q(tx, `INSERT INTO public.membership (entity_id, user_id, role) VALUES ($1, $2, 'viewer')`, [E, X])))).toBe('42501');
+    expect(await sqlstate(tenant(X, (tx) => q(tx, `INSERT INTO public.membership (entity_id, user_id, role) VALUES ($1, $2, 'owner')`, [F, O])))).toBe('42501');
+  });
+
   // Mutation: delete the keep_an_owner trigger, or make it count only when role is lowered but not on DELETE.
-  it('the last owner can neither be demoted nor removed (23514), by themselves or by anyone else', async () => {
+  it('the last owner can neither be demoted nor removed (23514), by themselves', async () => {
     const e = await scratch(O, [[M, 'manager']]);
     expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.membership SET role = 'manager' WHERE entity_id = $1 AND user_id = $2`, [e, O])))).toBe('23514');
     expect(await sqlstate(tenant(O, (tx) => q(tx, `DELETE FROM public.membership WHERE entity_id = $1 AND user_id = $2`, [e, O])))).toBe('23514');
-    expect(Number(must(`SELECT count(*) FROM public.membership WHERE entity_id = '${e}' AND role = 'owner'`, db).rows[0][0])).toBe(1);
+    expect(ownersOf(e)).toBe(1);
   });
 
-  // Mutation: have keep_an_owner refuse every owner demotion, or skip the owner_count check.
-  it('an owner may lower their own role while a second owner exists', async () => {
-    const e = await scratch(O, [[M, 'owner']]);
+  // Mutation: delete the gate_owner_changes trigger, or let it skip the owner_count = null case.
+  it('on a two-owner entity a direct write cannot touch the owners: O deleting or demoting O2, raising V, inviting are refused (42501)', async () => {
+    const e = await scratch(O, [[O2, 'owner'], [V, 'viewer']]);
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `DELETE FROM public.membership WHERE entity_id = $1 AND user_id = $2`, [e, O2])))).toBe('42501');
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`, [e, O2])))).toBe('42501');
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.membership SET role = 'manager' WHERE entity_id = $1 AND user_id = $2`, [e, V])))).toBe('42501');
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at)
+      VALUES ($1, 'g@qa.test', 'viewer', $2, decode('cc33', 'hex'), now() + interval '1 day')`, [e, O])))).toBe('42501');
+    expect(ownersOf(e)).toBe(2);
+  });
+
+  // Mutation: make the gate refuse everything on a multi-owner entity, including lowering and removal of non-owners.
+  it('on a two-owner entity an owner may still remove a viewer, lower their own role and revoke an invitation', async () => {
+    const e = await scratch(O, [[O2, 'owner'], [V, 'viewer']]);
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `DELETE FROM public.membership WHERE entity_id = $1 AND user_id = $2`, [e, V])))).toBe('no error');
     expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`, [e, O])))).toBe('no error');
-    expect(Number(must(`SELECT count(*) FROM public.membership WHERE entity_id = '${e}' AND role = 'owner'`, db).rows[0][0])).toBe(1);
+    expect(ownersOf(e)).toBe(1);
   });
 
-  // Mutation: drop the `FOR UPDATE` entity row lock from keep_an_owner; both demotions then succeed and the entity has no owner.
-  it('two owners demoting each other on two connections at once leave exactly one owner (the entity row lock serialises them)', async () => {
-    const e = await scratch(O, [[M, 'owner']]);
+  // Mutation: have the gate refuse when owner_count = 1 (it must open at exactly one owner).
+  it('a sole owner may raise a member and invite (owner_count = 1 opens the gate)', async () => {
+    const e = await scratch(O, [[V, 'viewer']]);
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.membership SET role = 'manager' WHERE entity_id = $1 AND user_id = $2`, [e, V])))).toBe('no error');
+    expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at)
+      VALUES ($1, 'ok@qa.test', 'viewer', $2, decode('dd44', 'hex'), now() + interval '1 day')`, [e, O])))).toBe('no error');
+  });
+
+  // Mutation: drop the entity row lock (FOR UPDATE) from keep_an_owner / gate_owner_changes; both self-demotions then succeed and the entity has no owner.
+  it('two owners lowering their own role on two connections at once leave exactly one owner (the entity row lock serialises them)', async () => {
+    const e = await scratch(O, [[O2, 'owner']]);
     let release!: () => void;
     const started = new Promise<void>((res) => { release = res; });
-    const demote = (uid: string, target: string) => tenant(uid, (tx) => q(tx, `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`, [e, target]));
-    const first = tenant(O, async (tx) => {
-      await q(tx, `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`, [e, M]);
-      release();
-      await new Promise((r) => setTimeout(r, 1500));
-    }).then(() => 'ok', code);
+    const lower = (tx: any, who: string) => q(tx, `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`, [e, who]);
+    const first = tenant(O, async (tx) => { await lower(tx, O); release(); await new Promise((r) => setTimeout(r, 1500)); }).then(() => 'ok', code);
     await started;
-    const second = demote(M, O).then(() => 'ok', code);
+    const second = tenant(O2, (tx) => lower(tx, O2)).then(() => 'ok', code);
     const results = await Promise.all([first, second]);
-    expect(Number(must(`SELECT count(*) FROM public.membership WHERE entity_id = '${e}' AND role = 'owner'`, db).rows[0][0]), `results ${results}`).toBe(1);
-  });
-
-  // Mutation: widen the membership INSERT policy to has_role(entity_id, 'manager').
-  it('a manager cannot add a member, raise a role or remove anyone; a viewer cannot either (42501 or zero rows)', async () => {
-    expect(await sqlstate(tenant(M, (tx) => q(tx, `INSERT INTO public.membership (entity_id, user_id, role) VALUES ($1, $2, 'viewer')`, [E, X])))).toBe('42501');
-    expect(await tenant(M, async (tx) => (await q(tx, `UPDATE public.membership SET role = 'manager' WHERE entity_id = $1 AND user_id = $2 RETURNING 1`, [E, V])).length)).toBe(0);
-    expect(await tenant(V, async (tx) => (await q(tx, `DELETE FROM public.membership WHERE entity_id = $1 AND user_id = $2 RETURNING 1`, [E, V])).length)).toBe(0);
+    expect(ownersOf(e), `results ${results}`).toBe(1);
+    expect(results.filter((r) => r === '23514'), 'the loser is refused by the last-owner guard').toHaveLength(1);
   });
 
   // Mutation: let the membership SELECT policy read `entity_id = any(visible_entities())` alone (a viewer then lists everyone).
@@ -264,26 +313,24 @@ describe('owners and membership writes (criterion 4, matrix rows)', () => {
     expect(await tenant(M, async (tx) => (await q(tx, `SELECT user_id FROM public.membership WHERE entity_id = $1`, [E])).length)).toBe(3);
   });
 
-  // Mutation: remove the audit_membership trigger or write the wrong kind.
-  it('membership changes write membership.created / role_changed / removed audit events attributed to the actor', async () => {
+  // Mutation: remove the audit_membership trigger, write the wrong kind, or drop the 'none' branch of the actor expression.
+  it('membership changes write membership.created / role_changed / removed audit events: actor user for poly_app acts, none for a seat made with no user', async () => {
     const e = await scratch(O, [[V, 'viewer']]);
     await tenant(O, async (tx) => {
       await q(tx, `UPDATE public.membership SET role = 'manager' WHERE entity_id = $1 AND user_id = $2`, [e, V]);
       await q(tx, `DELETE FROM public.membership WHERE entity_id = $1 AND user_id = $2`, [e, V]);
     });
-    const kinds = must(`SELECT kind, actor_user_id, subject_user_id, actor FROM public.audit_event WHERE entity_id = '${e}' ORDER BY created_at, kind`, db).rows;
-    const k = kinds.map((r) => r[0]);
-    expect(k.filter((x) => x === 'membership.created')).toHaveLength(2);
-    expect(k).toContain('membership.role_changed');
-    expect(k).toContain('membership.removed');
-    for (const r of kinds) { expect(r[1]).toBe(O); expect(r[3]).toBe('user'); }
-    expect(kinds.find((r) => r[0] === 'membership.removed')![2]).toBe(V);
+    const rows = must(`SELECT kind, actor, coalesce(actor_user_id::text, ''), subject_user_id FROM public.audit_event WHERE entity_id = '${e}' ORDER BY kind, actor`, db).rows;
+    expect(rows).toEqual([
+      ['membership.created', 'none', '', V],
+      ['membership.created', 'user', O, O],
+      ['membership.removed', 'user', O, V],
+      ['membership.role_changed', 'user', O, V],
+    ]);
   });
 });
 
 describe('append-only and insert-only tables (criterion 5)', () => {
-  const owners = (t: string) => Number(must(`SELECT count(*) FROM public.${t}`, db).rows[0][0]);
-
   // Mutation: GRANT UPDATE or DELETE on audit_event to poly_app, or drop the refuse_change trigger.
   it('audit_event cannot be updated or deleted: poly_app gets 42501 from the grant, a superuser gets 42501 from the trigger', async () => {
     expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.audit_event SET kind = 'x' WHERE entity_id = $1`, [E])))).toBe('42501');
@@ -305,7 +352,7 @@ describe('append-only and insert-only tables (criterion 5)', () => {
   });
 
   // Mutation: grant UPDATE on the whole notification table, or a DELETE policy.
-  it('a notification is insert-only except read_at: the recipient may mark it read, nothing else changes, nobody deletes (42501)', async () => {
+  it('a notification is insert-only except read_at: the recipient may mark it read, nothing else changes, nobody deletes or inserts (42501)', async () => {
     expect(await tenant(O, async (tx) => (await q(tx, `UPDATE public.notification SET read_at = now() WHERE recipient_user_id = $1 RETURNING 1`, [O])).length)).toBe(1);
     expect(await tenant(M, async (tx) => (await q(tx, `UPDATE public.notification SET read_at = now() WHERE recipient_user_id = $1 RETURNING 1`, [O])).length), 'another recipient\'s').toBe(0);
     expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.notification SET kind = 'x' WHERE recipient_user_id = $1`, [O])))).toBe('42501');
@@ -314,19 +361,19 @@ describe('append-only and insert-only tables (criterion 5)', () => {
     expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.notification (entity_id, recipient_user_id, kind) VALUES ($1, $2, 'forged')`, [E, M])))).toBe('42501');
   });
 
-  // Mutation: GRANT UPDATE (accepted_at) to poly_app. Acceptance is a definer's job (POLY-89/90).
+  // Mutation: GRANT UPDATE (accepted_at) to poly_app. Acceptance is a definer's job (POLY-87/90).
   it('an invitation can be revoked by an owner but not accepted or changed by poly_app (42501)', async () => {
     expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.invitation SET accepted_at = now() WHERE entity_id = $1`, [E])))).toBe('42501');
     expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.invitation SET role = 'owner' WHERE entity_id = $1`, [E])))).toBe('42501');
-    expect(await tenant(O, async (tx) => (await q(tx, `UPDATE public.invitation SET revoked_at = now() WHERE entity_id = $1 RETURNING 1`, [E])).length)).toBe(1);
     expect(await tenant(M, async (tx) => (await q(tx, `UPDATE public.invitation SET revoked_at = now() WHERE entity_id = $1 RETURNING 1`, [E])).length), 'a manager').toBe(0);
+    expect(await tenant(O, async (tx) => (await q(tx, `UPDATE public.invitation SET revoked_at = now() WHERE entity_id = $1 RETURNING 1`, [E])).length)).toBe(1);
   });
 
   // Mutation: GRANT DELETE on entity to poly_app (the purge keeps the row as a tombstone).
   it('no one deletes an entity (42501), and the entity table keeps its rows', async () => {
-    const before = owners('entity');
+    const before = count(`SELECT count(*) FROM public.entity`);
     expect(await sqlstate(tenant(O, (tx) => q(tx, `DELETE FROM public.entity WHERE id = $1`, [E])))).toBe('42501');
-    expect(owners('entity')).toBe(before);
+    expect(count(`SELECT count(*) FROM public.entity`)).toBe(before);
   });
 
   // Mutation: add ON DELETE CASCADE to an audit_event / notification foreign key.
@@ -337,8 +384,8 @@ describe('append-only and insert-only tables (criterion 5)', () => {
     expect(r.rows).toEqual([]);
   });
 
-  // Mutation: owners-only read becomes members-only (drop the has_role owner branch's strictness).
-  it('audit_event is readable by an owner, not by a manager or viewer of the entity, and a user always reads their own acts', async () => {
+  // Mutation: owners-only read becomes members-only (drop the owner strictness of the has_role branch).
+  it('audit_event is readable by an owner, not by a manager, a viewer or an outsider of the entity', async () => {
     const cnt = (u: string, ent: string) => tenant(u, async (tx) => (await q(tx, `SELECT 1 FROM public.audit_event WHERE entity_id = $1`, [ent])).length);
     expect(await cnt(O, E)).toBeGreaterThan(0);
     expect(await cnt(M, E)).toBe(0);
@@ -348,36 +395,53 @@ describe('append-only and insert-only tables (criterion 5)', () => {
 });
 
 describe('workers (ruling R4)', () => {
-  // Mutation: GRANT INSERT/UPDATE/DELETE on any of the six to poly_worker, or omit its SELECT policy role.
+  // Mutation: GRANT INSERT/UPDATE/DELETE on any of the six to poly_worker.
   it('poly_worker holds SELECT on all six and no write privilege on any', () => {
     for (const t of ['entity_type', 'entity', 'membership', 'invitation', 'notification', 'audit_event']) {
       const p = must(`SELECT ${['SELECT', 'INSERT', 'UPDATE', 'DELETE'].map((x) => `has_table_privilege('poly_worker', 'public.${t}', '${x}')`).join(', ')}`, db).rows[0];
-      expect(p, t).toEqual(['t', 'f', 'f', 'f']);
+      expect(p[1] + p[2] + p[3], `${t} write privileges`).toBe('fff');
     }
   });
 });
 
 describe('the §4.2.1 matrix rows for these tables (criterion 6), probed as four actors each', () => {
-  // Mutation: any policy that lets a viewer, a manager or the outsider do what the row's cell denies, or denies the owner what it allows.
-  it('every active row\'s probes give viewer, manager, owner their cell and the outsider a denial', async () => {
+  const fx = (): Fixture => ({ users: S.users, entity: S.entity, otherEntity: S.otherEntity });
+  const probeAll = async () => {
     const { rows } = loadMatrix();
     const { active } = activeRows(db, rows);
-    expect(active.length).toBeGreaterThan(0);
-    const fx: Fixture = { users: S.users, entity: S.entity, otherEntity: S.otherEntity };
     const bad: string[] = [];
     for (const r of active) {
-      expect(r.probe, r.id).not.toBeNull();
-      for (const p of r.probe!) bad.push(...(await checkProbe(db, r, p, fx, (a: Actor, sql: string) => runAs(tenant, raw, fx, a, sql))));
+      const entries = runnableEntries(db, r);
+      if (entries.length === 0) bad.push(`${r.id}: active and empty`);
+      for (const p of entries) bad.push(...(await checkProbe(db, r, p, fx(), (a: Actor, sql: string) => runAs(tenant, raw, fx(), a, sql))));
     }
+    return { active, bad };
+  };
+
+  // Mutation: any policy that lets a viewer, a manager or the outsider do what the row's cell denies, or denies the owner what it allows.
+  it('every active row\'s runnable probes give viewer, manager, owner their cell and the outsider a denial', async () => {
+    const { active, bad } = await probeAll();
+    expect(active.length).toBeGreaterThan(0);
     expect(bad).toEqual([]);
   });
 
+  // Ruling N1: the matrix can fail. A permissive USING (true) policy for poly_app on membership must turn the outsider probe red.
+  it('harness canary: with a USING (true) SELECT policy on membership, the read-membership-list probe reports the outsider', async () => {
+    must(`CREATE POLICY qa_canary ON public.membership FOR SELECT TO poly_app USING (true)`, db);
+    try {
+      const row = loadMatrix().rows.find((r) => r.id === 'read-membership-list')!;
+      const bad = await checkProbe(db, row, row.probe![0], fx(), (a: Actor, sql: string) => runAs(tenant, raw, fx(), a, sql));
+      expect(bad.join('\n')).toMatch(/read-membership-list select public.membership as outsider/);
+    } finally {
+      must(`DROP POLICY qa_canary ON public.membership`, db);
+    }
+  });
+
   it('the fixture is what the probes assume: E has an owner, a manager, a viewer, an invitation, audit events and notifications; the outsider\'s Person is another entity', () => {
-    const c = (sql: string) => Number(must(sql, db).rows[0][0]);
-    expect(c(`SELECT count(*) FROM public.membership WHERE entity_id = '${E}'`)).toBe(3);
-    expect(c(`SELECT count(*) FROM public.invitation WHERE entity_id = '${E}'`)).toBeGreaterThan(0);
-    expect(c(`SELECT count(*) FROM public.audit_event WHERE entity_id = '${E}'`)).toBeGreaterThan(0);
-    expect(c(`SELECT count(*) FROM public.notification WHERE entity_id = '${E}'`)).toBe(3);
+    expect(count(`SELECT count(*) FROM public.membership WHERE entity_id = '${E}'`)).toBe(3);
+    expect(count(`SELECT count(*) FROM public.invitation WHERE entity_id = '${E}'`)).toBeGreaterThan(0);
+    expect(count(`SELECT count(*) FROM public.audit_event WHERE entity_id = '${E}'`)).toBeGreaterThan(0);
+    expect(count(`SELECT count(*) FROM public.notification WHERE entity_id = '${E}'`)).toBe(3);
     expect(F).not.toBe(E);
   });
 });

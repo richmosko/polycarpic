@@ -1,17 +1,19 @@
 // POLY-84 criterion 10 (ruling R5) and POLY-62 ruling R6/R7: the SECURITY §4.2.1 permission matrix as data. Rows activate as
-// their tables (and required functions) land; after POLY-62 exactly five are active, pinned by id. The probes run in
+// their tables (and required functions) land; after POLY-62 exactly six are active, pinned by id. The probes run in
 // tenancy.test.ts, which owns the seeded fixture. A table that lands without a probe fails here; a table no row names and
 // no reviewed list covers fails here too (reverse coverage).
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { REAL_MIGRATIONS, freshDb, migrateCli } from './helpers/api';
 import { activeRows, coverageGaps, exemptions, loadMatrix, missingProbes, validate, type MatrixRow } from './helpers/matrix';
-import { must } from './helpers/pg';
+import { ROOT, must } from './helpers/pg';
 
 let db: string;
 const row = (over: Partial<MatrixRow>): MatrixRow => ({
   id: 'canary', action: 'canary action', tables: ['public.qa_canary_rls'], cells: { viewer: 'deny', manager: 'allow', owner: 'allow' }, probe: null, ...over,
 });
-const ACTIVE_AFTER_POLY_62 = ['audit-event-read', 'entity-metadata', 'member-remove-demote-self', 'membership-invite-raise', 'read-membership-list'];
+const ACTIVE_AFTER_POLY_62 = ['audit-event-read', 'co-owner-remove-demote', 'entity-metadata', 'member-remove-demote-self', 'membership-invite-raise', 'read-membership-list'];
 
 beforeAll(() => {
   db = freshDb();
@@ -26,7 +28,7 @@ describe('the §4.2.1 matrix data (criterion 10)', () => {
   });
 
   // Mutation: any of the five rows' probe set back to null, or a typo in one of its table names, turns this red.
-  it('exactly the five POLY-62 rows are active, and none lacks a probe; founder-transfer and co-owner-remove-demote wait for their functions', () => {
+  it('exactly the six POLY-62 rows are active, and none lacks a probe; founder-transfer waits for its function (its column does not exist yet)', () => {
     const { rows } = loadMatrix();
     const { active, inactive, unresolved } = activeRows(db, rows);
     console.info(`permission matrix: ${active.length} active, ${inactive.length} inactive of ${rows.length}`);
@@ -34,7 +36,6 @@ describe('the §4.2.1 matrix data (criterion 10)', () => {
     expect(missingProbes(active)).toEqual([]);
     expect(active.map((r) => r.id).sort()).toEqual(ACTIVE_AFTER_POLY_62);
     expect(unresolved['founder-transfer']).toEqual(['app.transfer_founder']);
-    expect(unresolved['co-owner-remove-demote']).toEqual(['app.apply_change']);
     expect(unresolved['read-books'], 'read-books names ledger_account, not BetterAuth\'s public.account').not.toContain('public.account');
   });
 
@@ -43,6 +44,9 @@ describe('the §4.2.1 matrix data (criterion 10)', () => {
     const m = loadMatrix();
     expect(coverageGaps(db, m.rows, m.unlisted ?? [], exemptions())).toEqual([]);
     expect(m.unlisted?.map((u) => u.table).sort()).toEqual(['public.entity_type', 'public.notification']);
+    // ruling N4: the cover for an unlisted table is its per-table cross-tenant test in tenancy.test.ts
+    const cover = readFileSync(join(ROOT, 'tests', 'db', 'tenancy.test.ts'), 'utf8');
+    for (const u of m.unlisted ?? []) expect(cover, `${u.table} needs a cross-tenant case in tenancy.test.ts`).toContain(`['${u.table}',`);
   });
 
   it('canary: an uncovered table, a misspelled row table, a stale unlisted entry and a matrix table on the exemption list are each reported', () => {

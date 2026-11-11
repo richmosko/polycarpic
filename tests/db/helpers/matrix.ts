@@ -10,12 +10,15 @@
 //           own = `ownSql` (with :actor) as superuser gives N > 0, and `sql` as the actor returns exactly N, fewer than all.
 //   write : allow = no error and rowCount >= 1; deny = 42501, 23514 or rowCount 0;
 //           own = `ownSql` must allow and `sql` must deny.
+// An entry may limit itself with `actors` (default all four) and gate itself with `requires` (functions that must exist;
+// the row's other entries still run). An active row with no runnable entry fails (ruling N2).
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, must, psql } from './pg';
 
 export type Cell = 'allow' | 'deny' | 'own';
-export type ProbeEntry = { op: 'select' | 'insert' | 'update' | 'delete'; table: string; sql: string; ownSql?: string };
+export type Actor = 'viewer' | 'manager' | 'owner' | 'outsider';
+export type ProbeEntry = { op: 'select' | 'insert' | 'update' | 'delete'; table: string; sql: string; ownSql?: string; actors?: Actor[]; requires?: string[] };
 export type MatrixRow = {
   id: string; action: string; tables: string[]; cells: { viewer: Cell; manager: Cell; owner: Cell };
   probe: ProbeEntry[] | null; note?: string; db?: boolean; requires?: string[];
@@ -47,6 +50,8 @@ export function validate(rows: MatrixRow[]): string[] {
       r.probe.forEach((p, i) => {
         if (!['select', 'insert', 'update', 'delete'].includes(p?.op)) errs.push(`${r.id}: probe ${i} has an illegal op`);
         if (!p?.sql) errs.push(`${r.id}: probe ${i} has no sql`);
+        if (p?.actors !== undefined && (!Array.isArray(p.actors) || p.actors.length === 0 || p.actors.some((a) => !['viewer', 'manager', 'owner', 'outsider'].includes(a)))) errs.push(`${r.id}: probe ${i} has illegal actors`);
+        if (p?.requires !== undefined && (!Array.isArray(p.requires) || p.requires.some((f) => !/^[a-z_]+\.[a-z_0-9]+$/.test(f)))) errs.push(`${r.id}: probe ${i} requires must list schema.function names`);
         if (needsOwn && !p?.ownSql) errs.push(`${r.id}: probe ${i} needs ownSql, the row has an own cell`);
       });
       for (const t of r.tables ?? []) if (!r.probe.some((p) => p.table === t)) errs.push(`${r.id}: table ${t} is named by no probe entry`);
@@ -70,6 +75,14 @@ export function activeRows(db: string, rows: MatrixRow[]): { active: MatrixRow[]
   const off = rows.filter((r) => !active.includes(r));
   const unresolved = Object.fromEntries(off.map((r) => [r.id, r.db === false ? ['(db:false)'] : [...r.tables.filter((t) => !tables.has(t)), ...(r.requires ?? []).filter((f) => !fns.has(f))]]));
   return { active, inactive: off.map((r) => r.id), unresolved };
+}
+
+/** Entry-level `requires` (ruling N2): the entries of an active row whose functions exist. An active row with none is "active and empty". */
+export function runnableEntries(db: string, row: MatrixRow): ProbeEntry[] {
+  return (row.probe ?? []).filter((p) => (p.requires ?? []).every((f) => {
+    const [s, n] = f.split('.');
+    return exists(db, `SELECT EXISTS (SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = '${s}' AND p.proname = '${n}')`);
+  }));
 }
 
 /** A table landed without its probe: every active row with probe null. */
@@ -105,7 +118,6 @@ export function coverageGaps(db: string, rows: MatrixRow[], unlisted: { table: s
 }
 
 // ---- probe runner ------------------------------------------------------------------------------------------------
-export type Actor = 'viewer' | 'manager' | 'owner' | 'outsider';
 export type Fixture = { users: Record<Actor, string>; entity: string; otherEntity: string };
 const NAMES = ['entity', 'other_entity', 'actor', 'owner', 'manager', 'viewer', 'outsider'] as const;
 
@@ -157,7 +169,7 @@ export async function checkProbe(
   const tag = (a: Actor) => `${row.id} ${p.op} ${p.table} as ${a}`;
   const denied = (o: Outcome, select: boolean) => (select ? o.error === null && o.rows === 0 : (o.error !== null && DENY_ERRORS.includes(o.error)) || (o.error === null && o.rows === 0));
   const isSelect = p.op === 'select';
-  for (const a of ['viewer', 'manager', 'owner', 'outsider'] as Actor[]) {
+  for (const a of (p.actors ?? ['viewer', 'manager', 'owner', 'outsider']) as Actor[]) {
     const cell: Cell = a === 'outsider' ? 'deny' : row.cells[a];
     const o = await run(a, p.sql);
     if (isSelect) {
