@@ -13,6 +13,7 @@
 </script>
 
 <header
+  data-testid="top-row"
   class="bg-background text-foreground border-border flex h-14 items-center gap-3 border-b px-4"
 >
   <button

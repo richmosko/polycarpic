@@ -17,10 +17,10 @@
 
 <div class="bg-background text-foreground flex min-h-screen">
   <Sidebar session={data.session} {collapsed} {open} ontoggle={toggle} />
-  <div class="flex min-w-0 flex-1 flex-col">
+  <main id="main" class="flex min-w-0 flex-1 flex-col">
     <TopBar ontoggle={toggle} />
-    <main id="main" class="flex-1 p-6">
+    <div class="flex-1 p-6">
       {@render children()}
-    </main>
-  </div>
+    </div>
+  </main>
 </div>

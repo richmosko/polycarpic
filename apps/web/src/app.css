@@ -1,7 +1,11 @@
 @import 'tailwindcss';
 @import '@fontsource-variable/space-grotesk';
 
-@custom-variant dark (&:is(.dark *));
+@custom-variant dark {
+  &:where(.dark, .dark *) {
+    @slot;
+  }
+}
 
 :root {
   /* Surfaces & text. The page canvas is a subtle warm grey (L 0.97), not

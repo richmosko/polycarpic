@@ -49,15 +49,13 @@
           >Theme</DropdownMenu.GroupHeading
         >
         <DropdownMenu.RadioGroup value={theme} onValueChange={setTheme}>
-          {#each ['light', 'dark', 'auto'] as const as option (option)}
+          {#each [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']] as const as [option, text] (option)}
             <DropdownMenu.RadioItem
               value={option}
               closeOnSelect={false}
-              class="data-highlighted:bg-accent rounded px-3 py-1.5 text-sm capitalize"
+              class="data-highlighted:bg-accent rounded px-3 py-1.5 text-sm data-[state=checked]:font-semibold"
             >
-              {#snippet children({ checked })}
-                <span aria-hidden="true" class="inline-block w-4">{checked ? '✓' : ''}</span>{option}
-              {/snippet}
+              {text}
             </DropdownMenu.RadioItem>
           {/each}
         </DropdownMenu.RadioGroup>

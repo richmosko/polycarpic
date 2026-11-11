@@ -7,6 +7,9 @@ import { generateConfig } from './scripts/layers/generate.mjs';
 const layers = JSON.parse(fs.readFileSync(new URL('./layers.json', import.meta.url), 'utf8'));
 
 export default [
+  {
+    ignores: ['**/.svelte-kit/**', 'apps/web/build/**', 'apps/web/playwright-report/**', 'apps/web/test-results/**'],
+  },
   { ignores: ['**/node_modules/**', '**/.turbo/**', 'prototype/**', 'spikes/**', 'temp/**', 'tests/layers/fixtures/**', 'docs/**'] },
   ...generateConfig(layers, { root: new URL('.', import.meta.url).pathname.replace(/\/$/, '') }),
   // POLY-85 S-7(c): app sources log through @poly/config/log; console is for the CLI and check-config output alone

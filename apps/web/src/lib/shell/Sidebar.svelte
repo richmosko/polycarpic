@@ -14,6 +14,7 @@
 </script>
 
 <aside
+  data-testid="sidebar"
   aria-label="Sidebar"
   class="bg-sidebar text-sidebar-foreground border-sidebar-border fixed inset-y-0 left-0 z-20 flex w-64 flex-col border-r md:static md:z-auto
     {open ? 'flex' : 'hidden md:flex'} {collapsed ? 'md:w-16' : ''}"
@@ -27,6 +28,7 @@
       onclick={ontoggle}
       aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       aria-expanded={!collapsed}
+      data-testid="sidebar-toggle"
       class="hover:bg-sidebar-accent focus-visible:ring-sidebar-ring rounded-md p-2 focus-visible:ring-2 focus-visible:outline-none"
     >
       <svg aria-hidden="true" viewBox="0 0 24 24" class="size-5 fill-none stroke-current stroke-2">
@@ -42,8 +44,8 @@
           <a
             href={item.href}
             aria-current={current ? 'page' : undefined}
-            class="hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring block rounded-md px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none
-              {current ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium' : ''}"
+            class="hover:bg-sidebar-accent focus-visible:ring-sidebar-ring block rounded-md px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none
+              {current ? 'bg-sidebar-accent font-semibold' : ''}"
           >
             {item.label}
           </a>

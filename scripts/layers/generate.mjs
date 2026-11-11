@@ -4,12 +4,14 @@ import boundaries from 'eslint-plugin-boundaries';
 import importX from 'eslint-plugin-import-x';
 import comments from '@eslint-community/eslint-plugin-eslint-comments';
 import tseslint from 'typescript-eslint';
+import svelte from 'eslint-plugin-svelte';
+import svelteParser from 'svelte-eslint-parser';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import poly from './plugin.mjs';
 
 const RESOLVER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'resolver.cjs');
-const SRC = '**/*.{ts,tsx,js,mjs,cjs}';
+const SRC = '**/*.{ts,tsx,js,mjs,cjs,svelte}';
 const TESTS = ['**/*.test.{ts,tsx,js,mjs}', '**/*.spec.{ts,tsx,js,mjs}'];
 
 const PG_DRIVERS = ['pg', 'pg-pool', 'postgres', '@neondatabase/serverless'];
@@ -102,6 +104,18 @@ export function generateConfig(layers, opts = {}) {
     rules['import-x/no-extraneous-dependencies'] = [2, { packageDir: [path.join(root, e.dir), root], devDependencies: true }];
     cfg.push({ name: `poly/restrictions/${n}`, files: [base(n)], plugins: { poly }, rules });
   }
+
+  // POLY-128 R7 (SECURITY C-41, A-39): {@html} is refused in every .svelte file. noInlineConfig makes every inline
+  // directive inert in these files, so no eslint-disable comment can lift it. The one sanitizing component, when it
+  // lands, is exempted by a block that names its single path; there is none now.
+  cfg.push({
+    name: 'poly/svelte',
+    files: ['**/*.svelte'],
+    languageOptions: { parser: svelteParser, parserOptions: { parser: tseslint.parser } },
+    plugins: { svelte },
+    linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: 'off' },
+    rules: { 'svelte/no-at-html-tags': 2 },
+  });
 
   // Exceptions, each one named in layers.json or fixed by the rule itself.
   cfg.push({ name: 'poly/cast-exempt', files: [`${layers.packages.db.dir}/src/session.ts`, ...TESTS], plugins: { poly }, rules: { 'poly/no-session-user-id-cast': 0 } });
