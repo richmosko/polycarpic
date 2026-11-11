@@ -15,19 +15,11 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** CI: generated-output freshness
-- **Issue:** `POLY-102` (cairn)
-- **Milestone:** `POLY-M1`
-- **Branch:** `feature/poly-102-ci-generated-output-freshness`
-- **Started:** 2026-11-11
-- **Goal:** A stale generated file cannot reach the attested ops bundle, and the `db` CI job has headroom again before POLY-86 adds to the battery.
-- **Status:** In Review — PR [#113](https://github.com/richmosko/polycarpic/pull/113)
+_None. POLY-102 (CI: generated-output freshness) merged 2026-11-11 via PR [#113](https://github.com/richmosko/polycarpic/pull/113) — ARCH 1.15.13, INFRA 1.3.3, SECURITY 1.9.6. The `lint` job regenerates the migrations and compares bytes; the `db` job is at 93–113 s of its 180 s budget (target ≤ 150 s) and now runs on everything the battery imports; a feature that commits a generated file registers its pair in `infra/ci/generated.json` in the same PR. Follow-ups held for one docs PR (`temp/2026-11-11-lead-poly102-followups.md`): CodeQL as its own issue, a journal ↔ file check for migrations, no bare `/tmp` writes in the agent definitions, the PDF export's leftover Chrome profiles, POLY-96 A-2 and A-3._
 
-_Last merged: POLY-128 (App shell + DESIGN tokens) merged 2026-11-11 via PR [#110](https://github.com/richmosko/polycarpic/pull/110), after POLY-62 (Entity + membership schema) via PR [#109](https://github.com/richmosko/polycarpic/pull/109) — ARCH 1.15.12, SECURITY 1.9.5. The shell is not served by the image until POLY-88, and shows no session until POLY-86. Follow-ups on POLY-86 (session loader calls `provisionPerson`, one retry on 23505; `locals.session`), POLY-87 (operator-invitation definer), POLY-88 (no route before POLY-86's guard; image build stage), POLY-90 (gate trigger landed in POLY-62; self-Person owner row), POLY-102 (the `db` job is at 160 s of 180 s; now `todo`, P1). New from these loops: POLY-133 (shell entity selector) and POLY-134 (shell security follow-ups); POLY-85's Open 1 is placed on POLY-86; the Caddy security headers are raised on POLY-95; the `guard-commit` merge exemption is on POLY-79._
+_Before this: POLY-128 (App shell + DESIGN tokens) via PR [#110](https://github.com/richmosko/polycarpic/pull/110) and POLY-62 (Entity + membership schema) via PR [#109](https://github.com/richmosko/polycarpic/pull/109), both 2026-11-11. The shell is not served by the image until POLY-88, and shows no session until POLY-86. Follow-ups on POLY-86 (session loader calls `provisionPerson`, one retry on 23505; `locals.session`; POLY-85's Open 1), POLY-87 (operator-invitation definer), POLY-88 (no route before POLY-86's guard; image build stage), POLY-90 (self-Person owner row), POLY-95 (Caddy security headers), POLY-79 (`guard-commit` merge exemption; CI timing ingest), POLY-100 (deploy-side `--source-ref`, digest from `digest.txt`, `RELEASE_SIGNERS`), POLY-133 (shell entity selector), POLY-134 (shell security follow-ups)._
 
-_Before these: POLY-132 (build.yml first-run fixes) merged 2026-11-11 via PR [#107](https://github.com/richmosko/polycarpic/pull/107), after POLY-96 (CI: change filter, build, attest) via PR [#106](https://github.com/richmosko/polycarpic/pull/106) ; `app` is a required check on `main`. The design docs carry current state only since 2026-11-11 (PR [#108](https://github.com/richmosko/polycarpic/pull/108); rule in `WORKFLOW.md` → Decision logging). Follow-ups on POLY-79 (CI timing ingest), POLY-100 (deploy-side `--source-ref`, digest from `digest.txt`, `RELEASE_SIGNERS`), POLY-102 (CodeQL, DB job budget, aggregate blind spot, 90-day digest artifacts, image-script filter gap). Carried from POLY-85: follow-ups on POLY-81, POLY-88, POLY-100, POLY-121; ruling Open 3 (`jobs` in the status payload) attaches to the first worker-job feature._
-
-- **Next:** POLY-102 (CI, P1) before POLY-86 (BetterAuth), since the next DB-heavy feature tips the `db` job over its budget; POLY-97 and POLY-95 (infra). POLY-131 held (P3).
+- **Next:** POLY-86 (BetterAuth) is unblocked; POLY-95 and POLY-97 (infra) can run alongside it. POLY-131 held (P3).
 
 ## Releases
 

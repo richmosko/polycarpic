@@ -1,7 +1,7 @@
 ---
 id: POLY-102
 title: CI: generated-output freshness
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-96]
@@ -103,3 +103,7 @@ Advisories (non-gating): R4's before/after case counts were not written into the
 ### @team-lead — 2026-11-10
 
 PR opened: https://github.com/richmosko/polycarpic/pull/113. Awaiting Validate.
+
+### @team-lead — 2026-11-10
+
+Validate passed; merging via PR #113. Closing.
