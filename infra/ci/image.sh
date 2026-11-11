@@ -67,7 +67,7 @@ case "$cmd" in
     smoke="const m = await import('/app/apps/web/node_modules/@poly/auth/src/index.ts');
       const a = await m.createAuth(m.authOptions({ secret: 'smoke-'.repeat(8), baseURL: 'https://smoke.invalid', tlsMode: 'real-domain', requireClientIp: true, sendMagicLink: async () => {} }));
       if (typeof a.handler !== 'function' || Object.keys(m.AUTH_ROUTES).length !== 47) process.exit(1);"
-    docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges --entrypoint node "$ref" --input-type=module -e "$smoke" >/dev/null 2>&1 \
+    docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges --entrypoint node "$ref" --input-type=module --eval "$smoke" >/dev/null 2>&1 \
       || { echo "image check: @poly/auth does not start in the built image" >&2; exit 1; }
     ;;
   sbom)
