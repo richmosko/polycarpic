@@ -18,6 +18,8 @@ Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. 
 | Layers | pass. packages/auth imports no `pg` and no `PostgresDialect`, enforced by `boundaries.test.ts`. `changes.mjs` triggers the db job on `packages/auth`. | f99b888 |
 | Addendum 1 item 2 | **fail (F1)**. There is no unit test for `AuthUnderSystemJob`. Only a "not covered" note in `tests/db/auth-routing-pool.test.ts`. | f99b888 |
 | A test branch in production code | **fail (F2)**. `userCreateBefore` runs the wrapper assertion and the invitation claim only `if (typeof data.email === 'string')`. The branch exists so that a pure test can call the hook. It is an unguarded path through the A-40 / C-01 check. | f99b888 `user-hooks.ts` |
+| SecEng build review | pass. S1–S8 and S10–S19 are met. S9's dist enumeration test is deferred, on condition that no better-auth or @better-auth/passkey pin change merges before it exists (follow-up 13). | `seceng-ruling-review.md` @ 04bd75b, section "Build review", reviewed @ 182d054 |
+| Lead visual leg, re-check | pass. Sessions page, bare `/sign-in`, wrong-then-right sign-in, Log out, the per-IP limit, 503 on a bad `X-Forwarded-For`, 400 on an idToken. F4 closes through S19 and the 429 message, not a form fix. | lead's `temp/2026-11-11-lead-poly86-visual-leg.md`, "Re-check" @ 7a0d5fe |
 | CI time | open. The db battery takes 101 s locally. The PR run's db-job time is reported at finish against R10's 150 s guard. | gate-3 report |
 
 ## Conditions
@@ -32,6 +34,9 @@ Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. 
 ## Follow-ups (lead to file after the merge, in addition to the ruling's 1–8)
 
 9. The handle's `/api/auth` tree test runs on the raw pathname. `/API/AUTH/...` falls through to the page routes and gets SvelteKit's 404. That is safe today, and worth one test once routes exist under `/api`.
+12. qa: write the e2e step-up stamp inside the revoke spec, not in `serve.ts` before `vite build`.
+13. The S9 enumeration test (grep the pinned dist for `createUser`, `createOAuthUser`, `createSession` and `setSessionCookie`, and classify each path). It must exist before any better-auth pin change merges.
+14. Follow-up 1 also covers the Sessions table: readable timestamps and a device label.
 11. POLY-95: Caddy's `header_up X-Forwarded-For {remote_host}` and no `trusted_proxies` (S19 point 2).
 10. Providers (Google, GitHub) are not wired in apps/web: config has no client-id variable yet. Goes to POLY-88 with Open 1.
 
