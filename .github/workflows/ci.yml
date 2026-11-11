@@ -601,6 +601,7 @@ jobs:
         run: |
           docker build -t polycarpic-postgres:ci infra/postgres
           docker build -t polycarpic-caddy:ci infra/caddy
+          docker run --rm --entrypoint sh polycarpic-postgres:ci -c 'age --version && test ! -e /usr/local/bin/gosu'
 
       - name: Trivy scan of the Postgres and Caddy derivatives
         if: needs.changes.outputs.image == 'true'
