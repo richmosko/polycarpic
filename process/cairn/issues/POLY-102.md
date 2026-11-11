@@ -53,3 +53,11 @@ The budget warns and never fails (`infra/ci/job-report.mjs` always exits 0), so 
 ### @team-lead — 2026-11-10
 
 Feature started. Branch: `feature/poly-102-ci-generated-output-freshness`.
+
+### @team-lead — 2026-11-10
+
+Scope confirmed by the Principal at feature start (2026-11-11):
+- In: the four acceptance criteria, plus the filter gap (`infra/ci/image.sh` and `infra/ci/install-trivy.sh` → `image` job; one line in `infra/ci/changes.mjs` and its test). The architect rules the filter-table change (POLY-96 ruling §2).
+- Out: CodeQL (S96-13) — splits to its own issue, filed in the post-merge follow-ups PR. Its per-PR cost is unmeasured.
+- Out: A-2 (aggregate blind spot) and A-3 (90-day digest artifacts) — stay as comments for a later CI batch; A-3 may become a runbook line on POLY-100.
+- The 30 s `db` headroom figure stands as the lead's proposal; the ruling confirms or replaces it.
