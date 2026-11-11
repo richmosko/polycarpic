@@ -918,6 +918,8 @@ Don't accumulate per-PR narrative inside this file or `WORKFLOW.md`. Each log sh
 
 The template intentionally **does not ship a `CHANGELOG.md`**. Git log + GitHub Releases cover the same need with no upkeep cost. If a downstream project wants an in-repo file (e.g. for editor-local grepping), add one — but it's not a default.
 
+**The design docs follow the same rule.** `docs/{PRD,ARCH,SECURITY,INFRA,DESIGN}/index.html` describe the system as it is now. A doc's header holds Owner, a one-phrase Status, Version and Last updated; it holds no per-version history. A doc has no changelog section and no "changes to re-fold" list. Body text states a rule in the present tense, without who ruled it, when, or which version it came from. A cross-reference names a control, section or open-question id without a version number, and an issue id appears only where work is still to be done. The record of what changed lives in git, the PR, the issue comment and `process/DECISIONS.md` (user rule, 2026-11-11).
+
 ## Release process
 
 Releases are **human decisions**, never automatic. The `/merge-pr` skill prompts at the right moment.
