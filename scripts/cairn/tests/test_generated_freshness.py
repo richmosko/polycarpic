@@ -32,6 +32,7 @@ src = open('src.txt').read().strip()
 dep = open('node_modules/dep.txt').read().strip()
 os.makedirs('out', exist_ok=True)
 leak = '|skip-leaked' if os.path.exists('.skipme') and not os.environ.get('POLY_QA_FIXTURE') else ''
+leak += '|env-leaked' if 'POLY_QA_SECRET' in os.environ else ''
 open('out/result.txt', 'w').write(f'built:{src}:{dep}{leak}\\n')
 """
 _BUILD = """\
@@ -103,7 +104,12 @@ class _Base(unittest.TestCase):
         e.update(env or {})
         before = status(repo) if (repo / ".git").exists() else None
         t0 = time.time()
-        p = subprocess.run([python, str(SCRIPT), *flags, str(repo)], capture_output=True, text=True, env=e)
+        r, w = os.pipe()  # an open, silent stdin: a child that inherits it and reads would hang until its timeout
+        try:
+            p = subprocess.run([python, str(SCRIPT), *flags, str(repo)], capture_output=True, text=True, env=e, stdin=r)
+        finally:
+            os.close(r)
+            os.close(w)
         self.elapsed = time.time() - t0
         if before is not None and (repo / ".git").exists() and shutil.which("git"):
             self.assertEqual(status(repo), before, "the check must never write to the tree (V4)")
@@ -221,6 +227,13 @@ class RegenerateModeTests(_Base):
         code, out = self.run_check(repo, "--pair", "gen")
         self.assertEqual(code, 1, "the generator must see the live dep (committed output says dep1): " + out)
         self.line(out, "gen", "stale")
+
+    def test_the_generator_runs_with_a_minimal_environment(self):
+        """red if: the parent environment is passed through. The generator marks its output when POLY_QA_SECRET
+        (standing for a token or DATABASE_*) is visible; only PATH, HOME, LANG, TMPDIR may reach it."""
+        repo = make_repo(self)
+        code, out = self.run_check(repo, "--pair", "gen", env={"POLY_QA_SECRET": "s3cret", "DATABASE_PASSWORD": "x"})
+        self.assertEqual(code, 0, out)
 
     def test_the_committed_output_is_never_written(self):
         """red if: the generator runs in the repo instead of a copy. run_check asserts `git status --ignored` is
@@ -393,6 +406,14 @@ class FailClosedTests(_Base):
             self.two(*self.run_check(repo, "--pair", "gen"), why)
             if why == "timeout":
                 self.assertLess(self.elapsed, 20, "the timeout must actually kill the generator")
+
+    def test_a_prompting_generator_exits_2_at_once_not_at_the_timeout(self):
+        """red if: the generator inherits a terminal or a pipe on stdin (a drizzle-kit rename prompt would hang to
+        `timeout`). stdin must be /dev/null; the generator reads one line, gets EOF and fails."""
+        repo = make_repo(self, [regen_pair(command=[PY, "-c", "import sys; sys.exit(0 if sys.stdin.readline() else 4)"], timeout=60)])
+        code, out = self.run_check(repo, "--pair", "gen")
+        self.two(code, out, "prompting generator")
+        self.assertLess(self.elapsed, 15, "must exit well inside the 60 s timeout")
 
     def test_tmp_copy_failure(self):
         """red if: an unreadable file under root is skipped silently. (Skipped as root: chmod does not bind.)"""

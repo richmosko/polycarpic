@@ -2,7 +2,7 @@
 // (ruling R1, R2). The generic fixtures (fake generators, both modes, exit-2 rows) are scripts/cairn/tests/test_generated_freshness.py.
 // Needs python3, git, and the workspace install (drizzle-kit under packages/db/node_modules); no Docker, no database.
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -51,6 +51,13 @@ const kit = (repo: string, ...args: string[]) => {
 const probe = (repo: string) => writeFileSync(join(repo, 'packages', 'db', 'src', 'schema', 'qa_probe.ts'),
   "import { integer, pgTable } from 'drizzle-orm/pg-core';\nexport const qaProbe = pgTable('qa_probe', { id: integer('id') });\n");
 
+/** Every path under `d` with its mtime: the linked node_modules must come out of a real-generator run exactly as it went in. */
+const listing = (d: string): string[] => readdirSync(d, { withFileTypes: true }).flatMap((e) => {
+  const p = join(d, e.name);
+  if (e.isSymbolicLink()) return [`${p}@`];
+  return e.isDirectory() ? [`${p}/ ${statSync(p).mtimeMs}`, ...listing(p)] : [`${p} ${statSync(p).mtimeMs}`];
+}).sort();
+
 describe('infra/ci/generated.json (R2)', () => {
   it('registers db-migrations exactly as ruled, and nothing named like a built-in  [red if: file missing, a key differs, or `dashboard-dist` is repeated]', () => {
     const f = join(ROOT, 'infra', 'ci', 'generated.json');
@@ -59,6 +66,15 @@ describe('infra/ci/generated.json (R2)', () => {
     expect(Object.keys(reg)).toEqual(['pairs']);
     expect(reg.pairs.find((p: { name: string }) => p.name === 'db-migrations')).toEqual(DB_PAIR);
     expect(reg.pairs.map((p: { name: string }) => p.name)).not.toContain('dashboard-dist');
+  });
+});
+
+describe('registry pin (V10)', () => {
+  it('db-migrations is registered with mode regenerate, ci true, root packages/db, output migrations  [red if: the pair is removed, set ci:false, or set mode:ancestry]', () => {
+    const f = join(ROOT, 'infra', 'ci', 'generated.json');
+    const p = existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')).pairs?.find((x: { name: string }) => x.name === 'db-migrations') : undefined;
+    expect(p, 'db-migrations pair missing').toBeDefined();
+    expect(p).toMatchObject({ mode: 'regenerate', ci: true, root: 'packages/db', output: 'migrations' });
   });
 });
 
@@ -106,6 +122,20 @@ describe('db-migrations through the real drizzle-kit (V1)', () => {
     const before = git(repo, 'status', '--porcelain', '--ignored');
     const r = check(repo);
     expect(r.code, r.text).toBe(0);
+    expect(r.text).toMatch(/^db-migrations: fresh: /m);
     expect(git(repo, 'status', '--porcelain', '--ignored')).toBe(before);
+  });
+
+  it('a real-generator run leaves the linked node_modules unchanged (file list and mtimes) and the repo clean (V4)  [red if: the generator runs against the real tree, or the link is copied and written]', () => {
+    const repo = dbRepo();
+    probe(repo);
+    commit(repo, 'schema edit, no generate'); // forces drizzle-kit to write its output in the copy
+    const nm = join(ROOT, 'packages', 'db', 'node_modules');
+    const before = listing(nm);
+    const status = git(repo, 'status', '--porcelain', '--ignored');
+    const r = check(repo);
+    expect(r.code, r.text).toBe(1);
+    expect(listing(nm)).toEqual(before);
+    expect(git(repo, 'status', '--porcelain', '--ignored')).toBe(status);
   });
 });

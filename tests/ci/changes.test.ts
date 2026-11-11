@@ -46,6 +46,8 @@ const CASES: [string[], string[], string][] = [
   [['infra/ci/changes.mjs', 'infra/ci/aggregate.mjs'], ['ci'], 'the image entries widened to all of infra/ci/ (the §2 exception lost)'],
   [['.trivyignore'], ['image'], '.trivyignore dropped from `image` (the scan reads it)'],
   [['tests/layers/tsc/package.json'], ['layers', 'image'], 'tests/layers/tsc/package.json dropped from `image` (it enters the image context)'],
+  [['packages/config/src/index.ts', 'packages/config/log.schema.json'], ['node', 'db'], 'packages/config dropped from `db` (the closure of tests/db and of the spawned entrypoints reaches @poly/config)'],
+  [['packages/db/sql/roles.sql'], ['node', 'db'], 'packages/db/sql dropped from `db` (bootstrap reads it by join(DB_PKG, ...))'],
   [['packages/tenancy/src/index.ts'], ['node', 'db'], 'packages/tenancy dropped from `db` (tests/db imports it)'],
   [['packages/tenancy/permission-matrix.json'], ['node', 'db'], 'permission-matrix.json dropped from `db` (matrix.test reads it by join(ROOT, ...))'],
   [['apps/migrate/src/cli.ts'], ['node', 'db'], 'apps/migrate dropped from `db` (MIGRATE_CLI)'],
