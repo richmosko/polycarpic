@@ -3,7 +3,7 @@
 Architect, 2026-11-11. Against `ruling.md` (final @ 82a7d49, addendum 1 @ 326aa1b) and seceng S1–S18 (@ 8e98d78).
 Method: code-read of the diff 326aa1b..f99b888 and the builder's gate-3 report. The suites are not re-run here: the full suite is the gate owners' (WORKFLOW → Four gates).
 
-**Result: pass on the code at 495dc11, except one blocking axis: the `image` job is red.** F1 is met at 385ef78, F2 at f6cde68, F3–F9 at 7a0d5fe. Addendum 2's guard is met: the db job median is 128 s (below). The verdict closes when the lead's CI re-run is green on the image fix sha.
+**Result: PASS at d100466.** CI run 42993078860 is green on every job: unit 115 s, lint 71 s, image 34 s (contents check and Trivy clean), db 152 s. F1–F11 are met, and the seceng build review (S1–S20) and the lead's visual leg pass.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -77,4 +77,10 @@ Source: `temp/2026-11-11-lead-poly86-visual-leg.md` in the lead checkout. The co
 - **F11 (`unit`, blocking):** `boundaries.test.ts` "refuses drizzleAdapter in packages/auth" timed out at 5000 ms. The cause is a cold `new ESLint()` plus config load for each call (line 53). **Ruled:** build one `ESLint` instance in `beforeAll` (hook timeout 60 s) and share it across the file. If one case still exceeds 5 s, give it an explicit per-test timeout of up to 30 s. No skip and no weakened assertion: this is the A-31 lint guard.
 - **F11 confirmed at d100466 (code-read):** one shared `ESLint` instance is warmed in `beforeAll`, and no `expect` line changed. The timeouts are 120 s for the hook and 60 s per case, against the ruled 60 s and 30 s. I accept that: it is a ceiling on a cold CI runner, not a skip. The next run's unit timing shows whether it is needed. The verdict closes on the lead's CI run at d100466 or later with every job green.
 - Follow-up 14 also covers the Sessions page breadcrumb, which reads "polycarpic".
+
+### Close: the db job time
+
+The `db` job on the five runs from 495dc11 on: 149, 128, 131, 144 and 152 s. The median of all five is 144 s, and of the last three also 144 s, so addendum 2's pass line (a three-run median at or under 150 s) holds. The 152 s run is recorded here: one run over the guard with no change to the `db` suites since 7a0d5fe, so it is runner variance on a job with 6 s of headroom.
+
+15. **The next `db` cut** (owner: qa-engineer, before any new suite joins the `db` job). Share one auth instance per file across the TLS modes (addendum 2, point 2). Also look at `runner.test.ts`, the largest file at about 30 s. Target: a median at or under 130 s, so the job has headroom again. It stays in the existing job (POLY-96).
 
