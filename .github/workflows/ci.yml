@@ -523,6 +523,9 @@ jobs:
           GIT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: bash infra/ci/image.sh build
 
+      - name: Built-image check (no package manager, non-root)
+        run: bash infra/ci/image.sh check polycarpic:ci
+
       - name: Install Trivy
         run: bash infra/ci/install-trivy.sh
 

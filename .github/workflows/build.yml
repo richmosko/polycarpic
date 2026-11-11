@@ -23,7 +23,7 @@ env:
 jobs:
   build:
     name: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'schedule'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -53,13 +53,18 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}
+          tags: ${{ env.IMAGE }}:sha-${{ github.sha }}-${{ github.run_id }}
           build-args: |
             GIT_COMMIT=${{ github.sha }}
           no-cache: true
           pull: true
           provenance: false
           sbom: false
+
+      - name: Built-image check of the pushed digest (no package manager, non-root)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: bash infra/ci/image.sh check "${IMAGE}@${DIGEST}"
 
       - name: Install Trivy
         run: bash infra/ci/install-trivy.sh
@@ -112,15 +117,14 @@ jobs:
           retention-days: 90
           if-no-files-found: error
 
-  weekly-scan:
-    name: weekly-scan
+  release-scan:
+    name: release-scan
     if: github.ref == 'refs/heads/main' && github.event_name == 'schedule'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
       packages: read
-      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -130,16 +134,17 @@ jobs:
       - name: Install Trivy
         run: bash infra/ci/install-trivy.sh
 
-      - name: Scan the newest main digest, scan only (no rebuild, no push)
+      - name: Scan the digest of the newest v1.* Release (scan only; prod is frozen at its tag)
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ github.token }}
         run: |
           set -euo pipefail
-          read -r RUN SHA < <(gh run list --workflow build.yml --branch main --status success --event push --limit 1 --json databaseId,headSha --jq '.[0] | "\(.databaseId) \(.headSha)"')
-          gh run download "$RUN" -n "image-${SHA}"
-          DIGEST="$(cat digest.txt)"
+          TAG="$(gh release list --limit 50 --json tagName --jq '[.[] | select(.tagName | startswith("v1."))][0].tagName // empty')"
+          if [ -z "$TAG" ]; then echo "no v1.* Release yet: nothing to scan" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          DIGEST="$(gh release view "$TAG" --json body --jq .body | sed -n 's/^digest: //p' | head -n1)"
           echo "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
-          echo "weekly scan of ${DIGEST} (commit ${SHA})" >> "$GITHUB_STEP_SUMMARY"
+          echo "scan of ${TAG}: ${DIGEST}" >> "$GITHUB_STEP_SUMMARY"
           bash infra/ci/image.sh scan "${IMAGE}@${DIGEST}"
