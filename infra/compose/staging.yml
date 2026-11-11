@@ -1,0 +1,106 @@
+# polycarpic-staging (INFRA §2.2): its own database, own secret directory, no backup or upload network.
+name: polycarpic-staging
+
+x-hardened: &hardened
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  restart: unless-stopped
+
+x-app-image: &app-image ${POLY_APP_IMAGE:-ghcr.io/richmosko/polycarpic@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+
+services:
+  postgres:
+    <<: *hardened
+    image: ${POLY_POSTGRES_IMAGE:?}
+    user: "999:999"
+    command: ["postgres", "-c", "config_file=/etc/postgresql/postgresql.conf"]
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_superuser_password
+    secrets: [db_superuser_password]
+    networks: [default]
+    mem_limit: 1g
+    tmpfs:
+      - /tmp
+      - /var/run/postgresql:uid=999,gid=999,mode=0755
+    volumes:
+      - /srv/polycarpic/pg-staging:/var/lib/postgresql/data
+      - ../postgres/postgresql.staging.conf:/etc/postgresql/postgresql.conf:ro
+      - ../postgres/pg_hba.staging.conf:/etc/postgresql/pg_hba.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h /var/run/postgresql"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  web:
+    <<: *hardened
+    image: *app-image
+    user: "10101:10101"
+    environment:
+      DB_PASSWORD_FILE: /run/secrets/db_password_app
+      AUTH_SECRET_FILE: /run/secrets/auth_secret
+    secrets: [db_password_app, auth_secret, resend_api_key, plaid_secret]
+    networks:
+      default: {}
+      edge:
+        aliases: [staging-web]
+    mem_limit: 384m
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+
+  worker:
+    <<: *hardened
+    image: *app-image
+    user: "10102:10102"
+    environment:
+      DB_PASSWORD_FILE: /run/secrets/db_password_worker
+      AUTH_SECRET_FILE: /run/secrets/auth_secret
+    secrets: [db_password_worker, auth_secret, credential_keyring, resend_api_key]
+    networks: [default]
+    mem_limit: 384m
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 60s
+      timeout: 5s
+
+  migrate:
+    <<: *hardened
+    image: *app-image
+    user: "10103:10103"
+    restart: "no"
+    profiles: [migrate]
+    environment:
+      DB_PASSWORD_FILE: /run/secrets/db_password_migrator
+    secrets: [db_password_migrator]
+    networks: [default]
+    mem_limit: 512m
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 60s
+      timeout: 5s
+
+networks:
+  default:
+    name: polycarpic-staging_default
+    ipam:
+      config: [{subnet: 10.202.1.0/24}]
+  edge:
+    name: polycarpic-staging-edge
+    external: true
+
+secrets:
+  db_superuser_password: {file: /etc/polycarpic/staging-secrets/db_superuser_password}
+  db_password_app: {file: /etc/polycarpic/staging-secrets/db_password_app}
+  db_password_worker: {file: /etc/polycarpic/staging-secrets/db_password_worker}
+  db_password_migrator: {file: /etc/polycarpic/staging-secrets/db_password_migrator}
+  auth_secret: {file: /etc/polycarpic/staging-secrets/auth_secret}
+  resend_api_key: {file: /etc/polycarpic/staging-secrets/resend_api_key}
+  plaid_secret: {file: /etc/polycarpic/staging-secrets/plaid_secret}
+  credential_keyring: {file: /etc/polycarpic/staging-secrets/credential_keyring}

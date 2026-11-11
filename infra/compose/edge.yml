@@ -1,0 +1,45 @@
+# The shared edge project (INFRA §2.2): Caddy, and the two edge networks it shares with each project's web.
+# Caddy listens on 8080/8443 inside the container (no NET_BIND_SERVICE under cap_drop ALL); POLY_BIND_ADDR has no
+# default, so a missing value fails the render instead of binding 0.0.0.0.
+name: polycarpic-edge
+
+services:
+  caddy:
+    image: ${POLY_CADDY_IMAGE:-ghcr.io/richmosko/polycarpic-caddy@sha256:0000000000000000000000000000000000000000000000000000000000000000}
+    user: "10010:10010"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+    environment:
+      POLY_HTTP_PORT: "8080"
+      POLY_HTTPS_PORT: "8443"
+      POLY_DOMAIN: ${POLY_DOMAIN:?}
+      POLY_STAGING_ALLOW: ${POLY_STAGING_ALLOW:?}
+    ports:
+      - ${POLY_BIND_ADDR:?}:80:8080
+      - ${POLY_BIND_ADDR:?}:443:8443
+    networks: [prod-edge, staging-edge]
+    secrets: [staging_basic_auth]
+    mem_limit: 128m
+    tmpfs: [/tmp]
+    volumes:
+      - /srv/polycarpic/caddy:/data
+      - /srv/polycarpic/caddy-config:/config
+    healthcheck:
+      test: ["CMD", "caddy", "version"]
+      interval: 60s
+      timeout: 5s
+
+networks:
+  prod-edge:
+    name: polycarpic-prod-edge
+    ipam:
+      config: [{subnet: 10.201.30.0/28}]
+  staging-edge:
+    name: polycarpic-staging-edge
+    ipam:
+      config: [{subnet: 10.202.30.0/28}]
+
+secrets:
+  staging_basic_auth: {file: /etc/polycarpic/secrets/staging_basic_auth}

@@ -308,6 +308,17 @@ jobs:
         if: needs.changes.outputs.ci == 'true'
         run: pnpm exec vitest run -c tests/ci/vitest.config.ts
 
+      - name: Compose-policy lint (C-70, C-79)
+        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.ci == 'true'
+        # The image reference only has to be a digest-pinned value; the files take it from the environment (INFRA §6.1a).
+        env:
+          POLY_POSTGRES_IMAGE: ghcr.io/richmosko/polycarpic-postgres@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        run: node infra/lint/compose-policy.mjs --root .
+
+      - name: Infra lint fixtures
+        if: needs.changes.outputs.image == 'true' || needs.changes.outputs.ci == 'true'
+        run: pnpm exec vitest run -c tests/infra/vitest.config.ts
+
       - name: actionlint
         if: needs.changes.outputs.ci == 'true'
         run: |
@@ -547,6 +558,29 @@ jobs:
       - name: Start clock
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - name: Install pnpm
+        run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
+
+      - name: Locate pnpm store
+        id: store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install (lockfile frozen, lifecycle scripts blocked)
+        env:
+          pnpm_config_strict_dep_builds: "false"
+        run: pnpm install --frozen-lockfile
+
       - name: Build the image (local, no push)
         env:
           GIT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -560,6 +594,22 @@ jobs:
 
       - name: Trivy scan of the local image (fixable critical/high, secrets)
         run: bash infra/ci/image.sh scan polycarpic:ci
+
+      - name: Build the Postgres and Caddy derivatives
+        if: needs.changes.outputs.image == 'true'
+        run: |
+          docker build -t polycarpic-postgres:ci infra/postgres
+          docker build -t polycarpic-caddy:ci infra/caddy
+
+      - name: Trivy scan of the Postgres and Caddy derivatives
+        if: needs.changes.outputs.image == 'true'
+        run: |
+          bash infra/ci/image.sh scan polycarpic-postgres:ci
+          bash infra/ci/image.sh scan polycarpic-caddy:ci
+
+      - name: Container tests (SHOW, archive_command, secret modes, Caddy headers)
+        if: needs.changes.outputs.image == 'true'
+        run: pnpm exec vitest run -c tests/infra/vitest.image.config.ts
 
       - name: Record timing
         if: always()
