@@ -88,6 +88,8 @@ export function generateConfig(layers, opts = {}) {
       for (const s of SVELTEKIT.filter((x) => !x.endsWith('*'))) paths.push({ name: s, message: 'Nothing under packages/ imports SvelteKit (ARCH §2.1).' });
       patterns.push({ group: SVELTEKIT.filter((x) => x.endsWith('*')), message: 'Nothing under packages/ imports SvelteKit (ARCH §2.1).' });
     }
+    // POLY-136 C5 (seceng): apps/migrate/src/run.ts is reached only from cli.ts (a './run.ts' import), its tests and tests/**.
+    patterns.push({ regex: 'migrate/(src/)?run(\\.[tj]s)?$', message: 'apps/migrate/src/run.ts is imported only by cli.ts and tests (POLY-136 C5).' });
     // Every subpath is restricted by construction: only an explicit allow entry (db/auth) grants it.
     patterns.push({
       group: ['@poly/*/*', ...allowedSubs.map((s) => `!${s}`)],
