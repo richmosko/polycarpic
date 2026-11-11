@@ -42,9 +42,9 @@ for (const mode of ['light', 'dark'] as const) {
       expect(await fg(page, '[data-testid="top-row"] h1, [data-testid="top-row"] [data-testid="title"]')).toBe(token(mode, '--foreground'));
     });
 
-    test(`seven nav items in order, current marked, popover at the foot, one top row, no other header  [red if: item missing/reordered, no aria-current, second <header>]`, async ({ page }) => {
+    test(`eight nav items in order, current marked, popover at the foot, one top row, no other header  [red if: item missing/reordered, no aria-current, second <header>]`, async ({ page }) => {
       const links = page.getByTestId('sidebar').getByRole('link');
-      const names = ['Dashboard', 'Transactions', 'General Ledger', 'Custodial Accounts', 'Allocation', 'Reports', 'Entities'];
+      const names = ['Dashboard', 'Transactions', 'General Ledger', 'Custodial Accounts', 'Allocation', 'Tax', 'Reports', 'Entities'];
       await expect(links).toHaveText(names);
       await expect(page.getByTestId('sidebar').locator('[aria-current="page"]')).toHaveText('Dashboard');
       await expect(page.getByTestId('top-row')).toHaveCount(1);
@@ -52,7 +52,7 @@ for (const mode of ['light', 'dark'] as const) {
       await expect(page.locator('main > :first-child')).toHaveAttribute('data-testid', 'top-row');
       const trigger = page.getByTestId('sidebar').getByRole('button', { name: 'Account' });
       await trigger.click();
-      await expect(page.getByRole('menuitem')).toHaveText(['Profile', 'Settings', 'Notifications', 'Preferences', 'Theme', 'Shortcuts', 'Log out']);
+      await expect(page.getByRole('menuitem')).toHaveText(['Profile', 'Settings', 'Notifications', 'Preferences', 'Shortcuts', 'Log out']);
     });
 
     test(`axe: zero A/AA violations on sidebar and top row incl. contrast  [red if: a token pair fails 4.5:1/3:1 or a control lacks a name]`, async ({ page }) => {
@@ -64,21 +64,21 @@ for (const mode of ['light', 'dark'] as const) {
       expect(r.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target).join(' ')}`)).toEqual([]);
     });
 
-    test(`Tab order: brand control, seven items, avatar trigger, then top row; focus ring visible; Esc returns focus  [red if: order changes, outline none, focus lost on Esc]`, async ({ page }) => {
+    test(`Tab order: brand control, eight items, avatar trigger, then top row; focus ring visible; Esc returns focus  [red if: order changes, outline none, focus lost on Esc]`, async ({ page }) => {
       const order: string[] = [];
       const seen = async () =>
         page.evaluate(() => {
           const e = document.activeElement as HTMLElement;
           return { id: e.getAttribute('data-testid') ?? e.textContent?.trim() ?? '', outline: getComputedStyle(e).outlineStyle, ow: getComputedStyle(e).outlineWidth, shadow: getComputedStyle(e).boxShadow };
         });
-      for (let i = 0; i < 9; i++) {
+      for (let i = 0; i < 10; i++) {
         await page.keyboard.press('Tab');
         const s = await seen();
         order.push(s.id);
         expect(s.outline !== 'none' || s.shadow !== 'none', `focus ring on ${s.id}`).toBe(true);
       }
-      expect(order.slice(0, 8)).toEqual(['sidebar-toggle', 'Dashboard', 'Transactions', 'General Ledger', 'Custodial Accounts', 'Allocation', 'Reports', 'Entities']);
-      expect(order[8]).toMatch(/Account/);
+      expect(order.slice(0, 9)).toEqual(['sidebar-toggle', 'Dashboard', 'Transactions', 'General Ledger', 'Custodial Accounts', 'Allocation', 'Tax', 'Reports', 'Entities']);
+      expect(order[9]).toMatch(/Account/);
       await page.keyboard.press('Enter');
       await expect(page.getByRole('menu')).toBeVisible();
       await page.keyboard.press('Escape');
@@ -100,10 +100,31 @@ test('CSP headers (C-07) and root redirect  [red if: script-src gains unsafe-inl
   expect(root.headers()['location']).toMatch(/\/dashboard$/);
 });
 
-test('theme item flips the class and writes the cookie  [red if: class not toggled or cookie not set]', async ({ page, context }) => {
+test('Theme is a Light/Dark/Auto radio group that writes the cookie and class  [red if: a choice missing, cookie not written, class not set]', async ({ page, context }) => {
   await page.goto(`${base}/dashboard`);
-  await page.getByTestId('sidebar').getByRole('button', { name: 'Account' }).click();
-  await page.getByRole('menuitem', { name: 'Theme' }).click();
-  await expect(page.locator('html')).toHaveClass(/(^|\s)dark(\s|$)/);
-  expect((await context.cookies(base)).find((c) => c.name === 'poly-theme')?.value).toBe('dark');
+  for (const [choice, cls] of [['Dark', /(^|\s)dark(\s|$)/], ['Light', /^(?!.*\bdark\b)/], ['Auto', /(^|\s)(auto|dark)(\s|$)/]] as const) {
+    await page.getByTestId('sidebar').getByRole('button', { name: 'Account' }).click();
+    await expect(page.getByRole('menuitemradio')).toHaveText(['Light', 'Dark', 'Auto']);
+    await page.getByRole('menuitemradio', { name: choice }).click();
+    await expect(page.locator('html')).toHaveClass(cls);
+    expect((await context.cookies(base)).find((c) => c.name === 'poly-theme')?.value).toBe(choice.toLowerCase());
+    await page.keyboard.press('Escape');
+  }
+});
+
+test.describe('auto follows the OS scheme without inline script', () => {
+  for (const scheme of ['dark', 'light'] as const) {
+    test(`cookie auto + colorScheme ${scheme}  [red if: theme.js missing or not loaded before paint]`, async ({ browser }) => {
+      const ctx = await browser.newContext({ colorScheme: scheme });
+      await ctx.addCookies([{ name: 'poly-theme', value: 'auto', url: base }]);
+      const page = await ctx.newPage();
+      await page.goto(`${base}/dashboard`);
+      const dark = scheme === 'dark';
+      await expect(page.locator('html')).toHaveClass(dark ? /(^|\s)dark(\s|$)/ : /^(?!.*\bdark\b)/);
+      expect(await bg(page, 'sidebar')).toBe(token(dark ? 'dark' : 'light', '--sidebar'));
+      await page.emulateMedia({ colorScheme: dark ? 'light' : 'dark' });
+      await expect(page.locator('html')).toHaveClass(dark ? /^(?!.*\bdark\b)/ : /(^|\s)dark(\s|$)/);
+      await ctx.close();
+    });
+  }
 });

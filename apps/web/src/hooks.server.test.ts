@@ -14,12 +14,10 @@ describe('hooks.server handle: theme', () => {
   it('cookie dark -> class dark  [red if: cookie ignored]', async () => {
     expect(await themed('dark')).toBe('<html class="dark">');
   });
-  it('no cookie -> light  [red if: default flips or placeholder left in]', async () => {
-    expect(await themed(undefined)).toBe('<html class="light">');
+  it('cookie auto -> class auto  [red if: auto not passed through]', async () => {
+    expect(await themed('auto')).toBe('<html class="auto">');
   });
-  it('anything else -> light, never echoed  [red if: the cookie value is reflected: attribute injection]', async () => {
-    expect(await themed('Dark')).toBe('<html class="light">');
-    expect(await themed('dark" onload="x')).toBe('<html class="light">');
-    expect(await themed('')).toBe('<html class="light">');
+  it('light, none, or anything else -> no class, value never echoed  [red if: reflected: attribute injection, or placeholder left in]', async () => {
+    for (const c of ['light', undefined, 'Dark', '', 'dark" onload="x', 'auto dark']) expect(await themed(c), String(c)).toBe('<html class="">');
   });
 });
