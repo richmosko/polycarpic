@@ -1,12 +1,12 @@
 ---
 id: POLY-86
 title: BetterAuth: routing pool + allowlist
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-83, POLY-76]
 assignee: backend-lead
-paths: [packages/auth/**, apps/web/src/routes/api/auth/**]
+paths: [packages/auth/**, apps/web/src/**, apps/web/tests/**, process/cairn/issues/POLY-86.md, tests/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, docs/ARCH/**, docs/SECURITY/**]
 labels: [auth, security]
 priority: null
 pr: null
@@ -48,3 +48,7 @@ Placed from the POLY-62 and POLY-128 loops (2026-11-11): three criteria added in
 Also placed here: POLY-85 ruling Open 1 (pass the loaded `Secret` to the pool). The POLY-62 ruling (R9) deferred it to "the next issue that edits `connection.ts`", and this issue builds the routing pool on that code. The architect's gate-1 ruling for this issue decides whether it lands here or names a later owner. Open 3 (`jobs` in the status payload) stays with the first worker-job feature.
 
 The `db` CI job is at 160 s of its 180 s budget after POLY-62; POLY-102 (P1) restores headroom and comes before this issue.
+
+### @team-lead — 2026-11-10
+
+Feature started. Branch: `feature/poly-86-betterauth-routing-pool`. Runs in parallel with POLY-95 (team suffix `-86`).
