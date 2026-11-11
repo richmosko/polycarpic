@@ -59,3 +59,6 @@ Post-merge (lead; criteria 1, 4–6): build.yml green on `main` end to end, `gh 
 ### @team-lead — 2026-11-10
 
 Scope note: the check-container isolation criterion was added after the architect's verdict at af04897, from seceng's review of d9be8c0 (`process/cairn/reviews/POLY-132/seceng.md`). It rides this issue because every build.yml change needs its own merge to prove on `main`. Also noted from the architect: once the check has pulled the digest, Trivy may scan the local copy, so a green run on `main` does not prove Trivy's own registry login; it matters only if the pull is ever removed.
+### @devops-engineer — 2026-11-10
+
+image.sh check now runs the container with --network none --cap-drop ALL --security-opt no-new-privileges; no -e, -v, --mount or --privileged (it never had any). tests/ci 169/169. Re-run after the change: check against the pushed digest sha256:16dcd635...b97a exit 0; check against a fresh local polycarpic:ci build exit 0.
