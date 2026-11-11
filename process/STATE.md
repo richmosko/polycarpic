@@ -15,18 +15,19 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-Two loops run in parallel (started 2026-11-11, both milestone `POLY-M1`). Both are In Review: POLY-62 as PR [#109](https://github.com/richmosko/polycarpic/pull/109), POLY-128 as PR [#110](https://github.com/richmosko/polycarpic/pull/110):
+One loop is in flight (milestone `POLY-M1`), In Review as PR [#110](https://github.com/richmosko/polycarpic/pull/110):
 
 | Feature | Issue | Branch | Driver | Goal |
 |---|---|---|---|---|
-| Entity + membership schema | POLY-62 | `feature/poly-62-entity-membership-schema` | backend-lead | The tenancy core under RLS: entity, membership, the authz functions, notification and audit tables, and a default Person for every user. |
 | App shell + DESIGN tokens | POLY-128 | `feature/poly-128-app-shell-design-tokens` | frontend-lead | The SvelteKit root layout (sidebar, one-row top bar) with DESIGN's tokens as the only source of colour, type and spacing. |
 
-The two share only config files (`eslint.config.js`, `package.json`, `pnpm-lock.yaml`); the second PR to merge takes `main` first.
+It takes `main` in before it merges, and reconciles the ARCH and SECURITY version lines and PDFs.
+
+_POLY-62 (Entity + membership schema) merged 2026-11-11 via PR [#109](https://github.com/richmosko/polycarpic/pull/109) — ARCH 1.15.8, SECURITY 1.9.3; follow-ups on POLY-86 (session loader calls `provisionPerson`, one retry on 23505), POLY-87 (operator-invitation definer), POLY-90 (gate trigger landed here; self-Person owner row), POLY-102 (the `db` job is at 160 s of 180 s). The held filings are in `temp/2026-11-11-lead-finish-filings.md` until the follow-up docs PR._
 
 _Before these: POLY-132 (build.yml first-run fixes) merged 2026-11-11 via PR [#107](https://github.com/richmosko/polycarpic/pull/107), after POLY-96 (CI: change filter, build, attest) via PR [#106](https://github.com/richmosko/polycarpic/pull/106) ; `app` is a required check on `main`. The design docs carry current state only since 2026-11-11 (PR [#108](https://github.com/richmosko/polycarpic/pull/108); rule in `WORKFLOW.md` → Decision logging). Follow-ups on POLY-79 (CI timing ingest), POLY-100 (deploy-side `--source-ref`, digest from `digest.txt`, `RELEASE_SIGNERS`), POLY-102 (CodeQL, DB job budget, aggregate blind spot, 90-day digest artifacts, image-script filter gap). Carried from POLY-85: follow-ups on POLY-81, POLY-88, POLY-100, POLY-121; ruling Open 1 (pass the loaded `Secret` to the pool) and Open 3 (`jobs` in the status payload) attach to the next db / first worker-job feature._
 
-- **Next:** the rest of the second session's `todo`: POLY-86 (BetterAuth), POLY-97 and POLY-95 (infra). POLY-131 held (P3). POLY-62 grows the DB battery while the `db` CI job runs at about 150 s of its 180 s budget (POLY-102).
+- **Next:** merge POLY-128; then the follow-up docs PR for the held filings; then the rest of the second session's `todo`: POLY-86 (BetterAuth), POLY-97 and POLY-95 (infra). POLY-102 comes before POLY-86: the next DB-heavy feature tips the `db` job over its budget. POLY-131 held (P3).
 
 ## Releases
 
