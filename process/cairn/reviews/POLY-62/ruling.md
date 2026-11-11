@@ -155,3 +155,12 @@ None. Everything above sits under `packages/db/**`, `packages/tenancy/**`, `test
 
 1. SECURITY wording (seceng, N1–N4): C-20's bootstrap exception; `owner_count` null to non-members, refused by every consumer; the `unlisted` tables; the two-level `requires`; the audit actor read; R-9 label-only type read; poly_app holds no membership INSERT.
 2. The ledger feature extends `provisionPerson` with the seeded accounts named in ARCH §3.1. Nothing seeds them here, because `ledger_account` does not exist yet.
+
+## Addendum 1 (2026-11-11): gate scope and trigger order (seceng-62, non-gating, accepted)
+
+- **The gate is default-deny.** `gate_owner_changes` applies to every `current_user` except two: the named definer roles (`poly_govern`, `poly_purge`) and a superuser (`rolsuper`, so the test fixture can seat members). It no longer applies only to `current_user = 'poly_app'`, so a future login role that inherits poly_app cannot skip it. Where ARCH and SECURITY say "for poly_app", they describe the effect today.
+- **Trigger order is set by trigger names**, not function names:
+  - on `membership`: `membership_10_gate_owner_changes`, `membership_20_keep_an_owner`, and `membership_90_audit` (AFTER);
+  - on `invitation`: `invitation_10_gate_owner_changes`.
+
+  Add one assertion on `pg_trigger` for the BEFORE triggers' `tgname` order. The tests-red commit 3caa90d predates this addendum, so qa adds the assertion.
