@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "svelte-kit sync && vitest run",
     "typecheck": "svelte-kit sync && svelte-check --fail-on-warnings",
     "build": "vite build",
     "test:e2e": "playwright test",
