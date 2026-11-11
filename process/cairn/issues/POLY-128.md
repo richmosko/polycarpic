@@ -50,3 +50,26 @@ Feature started. Branch: `feature/poly-128-app-shell-design-tokens`. Runs in par
 ### @architect — 2026-11-10
 
 **Ruling addendum 2:** theme choices Light / Dark / Auto, defaulting to light. Auto works through one same-origin `static/theme.js` under R8's CSP; this supersedes R6. See ruling.md → Addendum 2. ARCH §2.4 collapse-control wording aligned with R3. This is the last addendum within the ruling budget.
+
+### @architect — 2026-11-10
+
+**Verdict (gate 4): PASS, on two conditions.** (1) In the first CI run, the e2e step adds ≤ 150 s to `unit` and the `image` job (Trivy) is green; both are unmeasured until then. (2) The sidebar-fidelity follow-up below is filed before POLY-88 serves the shell.
+
+| Axis | Result | Evidence |
+|---|---|---|
+| C1 tokens: one file, DESIGN parity, colour-literal scan | pass | `958804d` `src/tokens.test.ts`; a grep re-run at `5229d9b` finds no hex outside `app.css` |
+| C1 drift trigger (turbo inputs, CI `node` filter) | pass | `6c160f5` `apps/web/turbo.json`, `infra/ci/changes.mjs` + `tests/ci/changes.test.ts` |
+| C2 eight items in DESIGN order, popover at the foot, one top row | pass | `a75ff93` `nav.ts`, `nav.test.ts`; e2e |
+| C3 smoke, Light / Dark / Auto, token values | pass (12/12 as the builder reported) | `5229d9b` `tests/e2e/shell.spec.ts` |
+| C4 axe A/AA + contrast, Tab order, Esc returns focus | pass | `5229d9b` e2e |
+| C5 `{@html}` refused, inline disable inert, `.svelte` under the layer rules | pass | `6c160f5` `generate.mjs` `poly/svelte`; fixtures `24-svelte-html` |
+| R4 session projection, no token | pass | `958804d` `layout.server.test.ts` |
+| R5 entity selector empty, no tenancy import | pass | `a75ff93` `EntitySelector.svelte` |
+| R8 CSP | pass; it lives in `vite.config.ts` (Kit 3 has no `svelte.config.js`) | `958804d`; e2e CSP test |
+| R9 e2e in `unit`, affected-gated | pass; added time unmeasured | `6c160f5` `ci.yml`, `tests/ci/ci-e2e.test.ts` |
+| R11 Dockerfile and `layers.json` unchanged; no `@poly/*` import | pass; Trivy pending | diff `53fd538..5229d9b` |
+| ARCH drift | fixed in this commit: the `packages/ui` row now names `src/lib/shell` on bits-ui, not shadcn `components/ui` | this commit |
+
+Deviations accepted: Kit 3 layout (config in `vite.config.ts`, `$app/tsconfig`, relative imports, `Handle` from `@sveltejs/kit/hooks`); the Playwright cache keyed on the lockfile rather than the Playwright version; duplicate `e2e`/`test:e2e` scripts (cosmetic).
+
+Not met, outside the criteria, carried to a follow-up: the sidebar is hand-built rather than DESIGN's sidebar-07 floating card. When collapsed it hides the nav instead of showing an icon rail, so a collapsed sidebar has no navigation. R3's remembered collapse state is not implemented. None of this is user-facing until POLY-88 mounts the shell.
