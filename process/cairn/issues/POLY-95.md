@@ -33,3 +33,7 @@ From the POLY-128 loop (architect, gate-1 hand-off, 2026-11-11): the SvelteKit C
 ### @team-lead — 2026-11-10
 
 Feature started. Branch: `feature/poly-95-compose-postgres-config-lint`. Runs in parallel with POLY-86 (team suffix `-95`).
+
+### @architect — 2026-11-10
+
+Gate 1 ruling issued for seceng review: process/cairn/reviews/POLY-95/ruling.md (R1 Caddy headers owned here; R2 this loop creates infra/postgres-major; R3 lint + image jobs, no new top-level job; widen paths by infra/postgres-major and process/cairn/reviews/POLY-95/**).
