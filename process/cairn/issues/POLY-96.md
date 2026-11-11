@@ -28,7 +28,7 @@ INFRA §4.2–§4.4: a changes step inside the job (no workflow-level paths:), o
 - [ ] Each CI job prints its wall-clock and the per-package test time (Turborepo `--summarize` or equivalent) into the GitHub step summary.
 - [ ] Soft budget per job (lint + types ≤ 2 min, per-package Vitest ≤ 2 min, DB battery ≤ 3 min): a job over budget posts a warning annotation, never a failure.
 - [ ] The DB battery is one job keyed to `packages/db/**` + `tests/db/**` only, with one Postgres container per run; POLY-84's RLS battery runs inside it, not in a job of its own.
-- [ ] CI timings land in `process/cairn/metrics/test-runs.jsonl` so `cairn loop-stats` shows `suite_seconds_added` from CI runs, not only local ones.
+- [ ] Each timed CI job uploads its timings as an artifact (`ci-test-runs-<job>`) in the `test-runs.jsonl` schema; CI itself writes nothing to the repository. Ingesting those artifacts into `process/cairn/metrics/test-runs.jsonl` and the per-runner `suite_seconds_added` are on POLY-79 (ruling §3, O1; user-approved 2026-11-11).
 
 ## Comments
 
