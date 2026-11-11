@@ -81,3 +81,10 @@ All in `scripts/layers/generate.mjs`; `eslint.config.js` gains only a separate i
 ## Paths this ruling needs beyond the issue's current `paths`
 
 `scripts/layers/**` (R7), `infra/ci/changes.mjs` (R2), `.github/workflows/ci.yml` (R9).
+
+## Addendum 1: eight sidebar items
+
+This addendum supersedes R3's "Seven, not eight" bullet and the "seven" in R3's `NAV` bullet and in R10. The lead ruled that DESIGN owns the sidebar IA.
+- `NAV` has eight items, in DESIGN §5.10 order: Dashboard, Transactions, General Ledger, Custodial Accounts, Allocation, **Tax `/tax`**, Reports, Entities. `/tax` gets a stub page like the others.
+- R10's Tab order visits all eight nav items. The smoke asserts the count (8) and this order.
+- Criterion 2 and the description are amended in place. ARCH §2.4 now lists eight and carries a Tax screen row (`TaxPosition` → tax, POLY-1.0).

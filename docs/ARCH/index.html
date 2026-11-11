@@ -18,7 +18,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>architect</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.15.8</span>
+    <span><strong>Version:</strong> 1.15.9</span>
     <span><strong>Last updated:</strong> 2026-11-11</span>
   </div>
 </header>
@@ -152,7 +152,7 @@ block-beta
   </ul>
 
   <h3 id="screen-dtos">2.4 Screen → DTO ownership</h3>
-  <p>The sidebar has seven items (DESIGN): <strong>Dashboard</strong>, <strong>Transactions</strong>, <strong>General Ledger</strong>, <strong>Custodial Accounts</strong>, <strong>Allocation</strong>, <strong>Reports</strong>, <strong>Entities</strong>.</p>
+  <p>The sidebar has eight items (DESIGN §5.10): <strong>Dashboard</strong>, <strong>Transactions</strong>, <strong>General Ledger</strong>, <strong>Custodial Accounts</strong>, <strong>Allocation</strong>, <strong>Tax</strong>, <strong>Reports</strong>, <strong>Entities</strong>.</p>
   <ul>
     <li><strong>No persistent header</strong> (DESIGN). The top of the scroll area is one row: sidebar toggle, page title and breadcrumbs, the entity selector, and a per-page "more" menu holding that page's global actions. Settings, Search and Notifications remain surfaces with <em>proposed</em> entry points (rows below). The AI/agent placeholder has no v1 affordance.</li>
     <li><strong>Sidebar foot:</strong> the avatar opens the user popover (profile, MFA, Log out; proposed: Settings and Notifications).</li>
@@ -173,6 +173,7 @@ block-beta
       <tr><td>Provider-item modal ("+ New" on Custodial Accounts)</td><td><code>ProviderItem</code>: source type (aggregator / broker API / file / manual), discovered accounts with a mapping to custodial accounts, token refresh, unlink with the revocation-lag note → import</td><td>M2 (fake + file); direct, Plaid and SimpleFIN follow per §9</td></tr>
       <tr><td>Sync commands (Transactions, Custodial Accounts) and "Import file"</td><td><code>SyncRequest</code> → a job in import; on Custodial Accounts it also pulls balances and positions</td><td>M2</td></tr>
       <tr><td>Allocation: treemap, Actual vs. target card, target editor, in-place holdings popover</td><td><code>AllocationVsTarget</code>, <code>AllocationTree</code>, <code>TargetEdit</code> (two levels; sub-targets are whole-portfolio percent and must sum to their class) and <code>HoldingsByClass</code> (one class or sub-category across every custodial account, grouped by account, with lots and a total) → portfolio. The top level reads the nature accounts across custodials (book) or lots by class (market); sub-categories come from <code>security_allocation</code> (§3.6). One <code>withTenant</code> query serves a class spanning accounts.</td><td>M4</td></tr>
+      <tr><td>Tax: pending liability, required payment to date, the gap, and "post your payment" (DESIGN)</td><td><code>TaxPosition</code> (§4.5) → tax; empty state until then</td><td>POLY-1.0</td></tr>
       <tr><td>Reports</td><td><code>ReportTable</code> (Balance Sheet, Income Statement, Cash Flow; NAV and NAV delta), trade blotter and Form 8949 view (§3.6) → reports; <code>TaxCloseStatus</code> ("last closed through <em>date</em>") → tax; empty state until then</td><td>M5</td></tr>
       <tr><td>Entities</td><td><code>EntityList</code>, <code>MembershipList</code> (each member's role in force, <code>is_founder</code>, and any held raise with <code>pending_role</code> and <code>pending_since</code>, §3.1c; for owners only, the pending <code>change_request</code> rows as members-list lines with invitee email, role, requester, awaited approvers and expiry, and the count, §3.1b), invite command, <code>ChangeDecision</code> and <code>TransferFounder</code> commands → tenancy</td><td>M1 (pending requests at POLY-1.0)</td></tr>
       <tr><td>Entities: cap table, beside the membership list</td><td><code>CapTable</code> (total units and holder rows as of a date, each with its access role or none, the outside-owners remainder, and the dated history), <code>HolderCandidates</code> (owner-access members first, then the editing user's other Persons, Trusts and Businesses) and <code>CapTableChange</code> in (one effective date, a new total and/or holder units; a holder with no access carries an optional viewer invite) → tenancy (§3.1a)</td><td>M1 (pass-through allocation reads it at POLY-1.0)</td></tr>

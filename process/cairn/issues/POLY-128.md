@@ -14,12 +14,12 @@ created: 2026-11-08
 updated: 2026-11-10
 ---
 
-Gap filed at POLY-126's trace: POLY-M1's definition of done says "the app shell renders DESIGN tokens" and POLY-106 checks it, but no issue built it. The SvelteKit root layout per ARCH §2.4: the seven-item sidebar with its avatar foot, the single top row (sidebar toggle, title and breadcrumbs, entity selector, per-page more menu), no persistent header, and DESIGN's tokens (docs/DESIGN #tokens, #flow-sidebar) as the only source of colour, type and spacing. The entity selector reads EntityList from packages/tenancy once POLY-62 lands; until then it renders empty. The root layout's session projection carries no token (ARCH §3.1c, POLY-86).
+Gap filed at POLY-126's trace: POLY-M1's definition of done says "the app shell renders DESIGN tokens" and POLY-106 checks it, but no issue built it. The SvelteKit root layout per ARCH §2.4: the eight-item sidebar with its avatar foot, the single top row (sidebar toggle, title and breadcrumbs, entity selector, per-page more menu), no persistent header, and DESIGN's tokens (docs/DESIGN #tokens, #flow-sidebar) as the only source of colour, type and spacing. The entity selector reads EntityList from packages/tenancy once POLY-62 lands; until then it renders empty. The root layout's session projection carries no token (ARCH §3.1c, POLY-86).
 
 ## Acceptance criteria
 
 - [ ] Every DESIGN token (surfaces, actions, financial, lines, charts, categorical, sidebar) is defined once as a CSS variable in apps/web, and a lint or test refuses a raw hex colour in apps/web/src outside that file.
-- [ ] The shell renders the seven sidebar items in DESIGN's order, the avatar popover at the foot, and the one-row top bar; there is no persistent header.
+- [ ] The shell renders the eight sidebar items in DESIGN's order (§5.10, Tax after Allocation), the avatar popover at the foot, and the one-row top bar; there is no persistent header.
 - [ ] A Playwright smoke test loads the shell, with no session, in light and dark mode and asserts token values on the sidebar and top row. Loading it signed in, with the user's name and avatar at the foot, is POLY-86's.
 - [ ] The shell meets DESIGN #accessibility for keyboard focus order and contrast on its own elements.
 - [ ] Lint refuses `{@html}` in every .svelte file under apps/ and packages/ (SECURITY C-41). The one sanitizing component is the only allowed exception; it is named in the rule when it lands, and until then there is none. A fixture using `{@html}` fails, and so does the same fixture with an inline `eslint-disable` for that rule (SECURITY A-39).
@@ -42,3 +42,7 @@ Feature started. Branch: `feature/poly-128-app-shell-design-tokens`. Runs in par
 - Lint in `scripts/layers/generate.mjs`: `.svelte` joins the layer rules; `svelte/no-at-html-tags` with `noInlineConfig` on `.svelte` files (C-41, A-39).
 - Playwright + axe in the `unit` job behind `turbo run e2e --affected`; ≤ 150 s added (unmeasured, reported at build-green).
 - Needs paths: `scripts/layers/**`, `infra/ci/changes.mjs`, `.github/workflows/ci.yml`.
+
+### @architect — 2026-11-10
+
+**Ruling addendum 1:** eight sidebar items, with Tax after Allocation (lead ruling: DESIGN owns the sidebar IA). See ruling.md → Addendum 1. Criterion 2 and the description are amended in place, and ARCH §2.4 is corrected.
