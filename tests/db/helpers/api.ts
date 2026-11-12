@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { inspect } from 'node:util';
 import { join } from 'node:path';
+import { withBootstrapLock } from './bootstrap-lock.ts';
 import { DB_PKG, freshName, must, psql } from './pg.ts';
 
 export const MIGRATE_CLI = process.env.POLY_DB_MIGRATE_CLI ?? join(DB_PKG, '..', '..', 'apps', 'migrate', 'src', 'cli.ts');
@@ -35,7 +36,8 @@ export function setRolePasswords(): void {
 /** Fresh database + the superuser bootstrap run inside it (ruling R1; it sets the DB owner), in one psql session. */
 export function freshDb(): string {
   const db = freshName();
-  must(`CREATE DATABASE ${db};\n\\connect ${db}\n${readFileSync(BOOTSTRAP, 'utf8')}`);
+  // The bootstrap ALTERs cluster-global roles: one session at a time across workers (POLY-141).
+  withBootstrapLock(() => must(`CREATE DATABASE ${db};\n\\connect ${db}\n${readFileSync(BOOTSTRAP, 'utf8')}`));
   return db;
 }
 
@@ -53,7 +55,7 @@ export function cloneMigrated(): string {
     template = t;
   }
   const db = freshName();
-  must(`CREATE DATABASE ${db} TEMPLATE ${template} OWNER poly_owner;\n\\connect ${db}\n${readFileSync(BOOTSTRAP, 'utf8')}`);
+  withBootstrapLock(() => must(`CREATE DATABASE ${db} TEMPLATE ${template} OWNER poly_owner;\n\\connect ${db}\n${readFileSync(BOOTSTRAP, 'utf8')}`));
   return db;
 }
 
