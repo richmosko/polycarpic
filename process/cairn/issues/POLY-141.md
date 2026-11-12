@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/workflow/test_cairn_test_boundary.py, docs/INFRA/**]
+paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/aggregate.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/workflow/test_cairn_test_boundary.py, docs/INFRA/**, docs/SECURITY/**]
 labels: [ci, tooling]
 priority: null
 pr: null
@@ -82,3 +82,7 @@ Feature started. Branch: `feature/poly-141-ci-test-time-cuts`. Retitled from "db
 ### @team-lead — 2026-11-12
 
 Gate 1: ruling at a38584a (`process/cairn/reviews/POLY-141/ruling.md`, conditions C1–C19). Paths: `tests/workflow/test_cairn_test_boundary.py` added (it pins the anchor shell text the ruling moves); `scripts/cairn/run_tests.py` removed, since the ruling leaves it unchanged. seceng reviews R4 and C14–C19 before build green.
+
+### @team-lead — 2026-11-12
+
+seceng review at 16ab3d9: pass with S1–S8; ruling addendum 1 at 5d84714 accepts all eight in this loop (conditions C20–C23 plus amendments). Paths: `infra/ci/aggregate.mjs` and `docs/SECURITY/**` added.
