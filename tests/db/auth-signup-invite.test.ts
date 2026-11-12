@@ -270,3 +270,54 @@ describe('condition 11: the pooled backend carries no identity after a sign-up',
     }
   });
 });
+
+// ---------------------------------------------------------------- step 3: the step's refusals (conditions 12, 32)
+// ASSUMED (R3 step 4): the after-hook runs enterNewUser(created.id), provisionPerson(tx), acceptInvitations(tx, { token }) in
+// that order, with acceptInvitations exported by @poly/tenancy. A variant swaps databaseHooks.user.create.after for one that
+// leaves a step out; the real before-hook (claim) stays.
+describe('conditions 12, 32: a sign-up missing a step is refused and leaves no user row', () => {
+  const variant = (steps: { enter: boolean; provision: boolean; accept: boolean }) => async () => {
+    const T: any = await import('../../packages/tenancy/src/index.ts');
+    return e.mk('real-domain', (o: any) => ({
+      ...o,
+      databaseHooks: {
+        ...o.databaseHooks,
+        user: {
+          ...o.databaseHooks.user,
+          create: {
+            ...o.databaseHooks.user.create,
+            after: async (user: { id: string }, ctx: { body?: { invitationToken?: string } } | null) => {
+              const tx: any = e.dba.currentTx();
+              if (steps.enter) await tx.enterNewUser(user.id);
+              if (steps.provision) await T.provisionPerson(tx);
+              if (steps.accept) await T.acceptInvitations(tx, { token: ctx?.body?.invitationToken ?? null });
+            },
+          },
+        },
+      },
+    }));
+  };
+  const run = async (a: any) => {
+    const o = seedOwnerEntity(e.db);
+    const email = `var-${stamp()}@qa.test`;
+    const t = seedInvitation({ db: e.db, email, role: 'viewer', entityId: o.entityId, as: o.ownerId });
+    return { email, t, r: await signUp(email, t, a) };
+  };
+  it('control: all three steps, in order, sign up  [red if: the variant mechanism itself is broken]', async () => {
+    const { email, r } = await run(await variant({ enter: true, provision: true, accept: true })());
+    expect(r.status, await r.clone().text()).toBe(200);
+    expect(users(email)).toBe(1);
+  });
+  it('C12: with enterNewUser removed the same sign-up fails from RLS (42501) and leaves no user row  [red if: provisionPerson runs without the step, or the failure commits]', async () => {
+    const { email, t, r } = await run(await variant({ enter: false, provision: true, accept: true })());
+    expect(r.status).toBeGreaterThanOrEqual(400);
+    expect(users(email)).toBe(0);
+    expect(inviteRow(e.db, t)).toEqual(['', '', '']);
+  });
+  it('C32: with acceptInvitations skipped the sign-up fails at commit (deferred stamp check) and leaves no user row  [red if: a stamped row can commit]', async () => {
+    const { email, t, r } = await run(await variant({ enter: true, provision: true, accept: false })());
+    expect(r.status).toBeGreaterThanOrEqual(400);
+    expect(users(email)).toBe(0);
+    expect(inviteRow(e.db, t)).toEqual(['', '', '']);
+  });
+});
