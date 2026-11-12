@@ -217,8 +217,8 @@ describe('condition 30 (S4): claim_invitations from a signed-in transaction take
     must(ins(user), e.db);
     const holder = psqlSession(`BEGIN; SELECT 1 FROM public.invitation WHERE token_hash = decode('${hex}', 'hex') FOR UPDATE; SELECT pg_sleep(12);`, e.db);
     try {
-      for (let i = 0; i < 40; i++) {
-        if (must(`SELECT count(*) FROM pg_stat_activity WHERE datname = '${e.db}' AND query LIKE '%pg_sleep(12)%' AND state = 'active'`, e.db).rows[0]![0] !== '0') break;
+      for (let i = 0; i < 60; i++) { // wait until the holder owns the row: a NOWAIT probe is refused (55P03)
+        if (psql(`SELECT 1 FROM public.invitation WHERE token_hash = decode('${hex}', 'hex') FOR UPDATE NOWAIT`, e.db).sqlstate === '55P03') break;
         await new Promise((r) => setTimeout(r, 100));
       }
       const t0 = Date.now();
