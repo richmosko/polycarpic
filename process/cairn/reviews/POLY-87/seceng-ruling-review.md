@@ -253,4 +253,4 @@ The architect is right about the xmin test I proposed in P5: an UPDATE in the sa
     - after a committed sign-up, every `user.signup_txid` is null;
     - a row given a future `signup_txid` by a superuser (a restored row) passes neither `enter_new_user` nor `accept_invitations` in any later transaction, and stays null-or-refused.
   - If the architect prefers, a restore-runbook step that nulls the column is the fallback, but the in-transaction clear is the stronger choice.
-  - Either way, `accept_invitations` must also refuse when the stamped user already has a membership other than their Person's owner row. That is a second, independent proof that the user is new.
+  - Optional and partial, not a substitute: `accept_invitations` can also refuse when the stamped user already has a membership other than their Person's owner row. An existing user who holds only their own Person passes that check, so S13's clear remains the control.
