@@ -58,6 +58,9 @@ export const TABLE = {
     /^infra\/ci\/(image|install-trivy)\.sh$/, /^tests\/infra\//, /^\.trivyignore$/, /^tests\/layers\/tsc\/package\.json$/,
   ],
   ci: [/^\.github\/workflows\//, /^infra\/ci\//, /^tests\/ci\//],
+  // POLY-141 E1: what the web e2e server imports or reads that turbo cannot see (it follows workspace packages only):
+  // the db harness helpers and image build, apps/migrate, and the Postgres pin. Runs only the `unit` job's e2e step.
+  e2e: [/^tests\/db\/helpers\//, /^tests\/db\/docker\//, /^apps\/migrate\//, /^infra\/postgres\/Dockerfile$/, /^infra\/postgres-major$/],
 };
 
 // One key per db sub-battery. `db` is always the OR of these.

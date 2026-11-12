@@ -155,6 +155,7 @@ jobs:
       db: ${{ steps.filter.outputs.db }}
       image: ${{ steps.filter.outputs.image }}
       ci: ${{ steps.filter.outputs.ci }}
+      e2e: ${{ steps.filter.outputs.e2e }}
       db_auth: ${{ steps.filter.outputs.db_auth }}
       db_tenancy: ${{ steps.filter.outputs.db_tenancy }}
       db_migrate: ${{ steps.filter.outputs.db_migrate }}
@@ -182,7 +183,7 @@ jobs:
           # Fail closed: a git or filter error is a red job, never an all-false output (criterion 1).
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$DISPATCH_BASE" ]; then
-              printf '%s\n' node=true layers=true db=true image=true ci=true db_auth=true db_tenancy=true db_migrate=true db_ops=true >> "$GITHUB_OUTPUT"
+              printf '%s\n' node=true layers=true db=true image=true ci=true e2e=true db_auth=true db_tenancy=true db_migrate=true db_ops=true >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "$DISPATCH_BASE" | grep -Eq '^[0-9a-f]{40}$'
@@ -368,7 +369,7 @@ jobs:
   unit:
     name: unit
     needs: changes
-    if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true'
+    if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true' || needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -422,15 +423,18 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Web e2e (Chromium, affected only)
+      - name: Web e2e (Chromium, affected only, or forced by the e2e key)
         timeout-minutes: 8
+        # E2E_FORCE: the db harness and apps/migrate are not workspace dependencies of @poly/web, so turbo cannot see them.
+        env:
+          E2E_FORCE: ${{ needs.changes.outputs.e2e }}
         run: |
           if [ -n "$TURBO_SCM_BASE" ]; then
             pnpm exec turbo ls --affected > affected.txt
           else
             pnpm exec turbo ls > affected.txt
           fi
-          if ! grep -q '@poly/web' affected.txt; then echo "no e2e task affected"; exit 0; fi
+          if ! grep -q '@poly/web' affected.txt && [ "$E2E_FORCE" != "true" ]; then echo "no e2e task affected"; exit 0; fi
           # Browser download comes from the Playwright CDN (a cache hit is a no-op), bounded. System libraries are used as
           # the runner image has them: apt runs only when a launch probe fails, bounded and non-fatal, then the probe
           # runs again and a second failure fails the step.
@@ -441,7 +445,7 @@ jobs:
               || echo "::warning::playwright install-deps failed or timed out"
             timeout -k 10 60 pnpm --filter @poly/web exec node -e "$probe" || { echo "::error::Chromium cannot launch"; exit 1; }
           fi
-          if [ -n "$TURBO_SCM_BASE" ]; then
+          if [ -n "$TURBO_SCM_BASE" ] && [ "$E2E_FORCE" != "true" ]; then
             pnpm exec turbo run e2e --affected
           else
             pnpm exec turbo run e2e
