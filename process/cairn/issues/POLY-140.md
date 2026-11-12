@@ -1,12 +1,12 @@
 ---
 id: POLY-140
 title: Layer lint relative imports
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
-paths: [tests/layers/**, scripts/layers/**, eslint.config.js, layers.json, infra/ci/generated.json, docs/ARCH/**]
+paths: [tests/layers/**, scripts/layers/**, eslint.config.js, layers.json, infra/ci/generated.json, docs/ARCH/**, package.json, pnpm-lock.yaml, process/cairn/issues/POLY-140.md, process/cairn/reviews/POLY-140/**]
 labels: [lint, security]
 priority: null
 pr: null
@@ -23,3 +23,9 @@ The layer lint enforces the layer map only for imports written by package name. 
 - [ ] No existing source file trips the rule, or each one that does is fixed in this loop. (A text search at 8d2173e found no non-test file under `apps/*/src` or `packages/*/src` with an import climbing two or more directories; unconfirmed by the lint itself.)
 - [ ] The rule is generated from the layer map by `scripts/layers/generate.mjs`, not hand-written in `eslint.config.js`, and the generated-freshness test covers it.
 - [ ] ARCH's layer-enforcement section states that both import forms are refused (present tense, no history).
+
+## Comments
+
+### @team-lead — 2026-11-11
+
+Feature started. Branch: `feature/poly-140-layer-lint-relative-imports`.
