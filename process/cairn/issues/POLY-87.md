@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-62, POLY-86, POLY-140, POLY-141]
 assignee: backend-lead
-paths: [process/cairn/issues/POLY-87.md, process/cairn/reviews/POLY-87/**, packages/auth/**, packages/tenancy/**, packages/db/**, apps/web/src/routes/**, tests/db/**, tests/ci/**, tests/layers/**, scripts/layers/**, infra/ci/changes.mjs, layers.json, eslint.config.js, package.json, pnpm-lock.yaml, docs/ARCH/**, docs/SECURITY/**]
+paths: [process/cairn/issues/POLY-87.md, process/cairn/reviews/POLY-87/**, packages/auth/**, packages/tenancy/**, packages/db/**, apps/web/src/routes/**, apps/web/tests/e2e/**, tests/db/**, tests/ci/**, tests/layers/**, scripts/layers/**, infra/ci/changes.mjs, layers.json, eslint.config.js, package.json, pnpm-lock.yaml, docs/ARCH/**, docs/SECURITY/**]
 labels: [auth]
 priority: null
 pr: null
@@ -50,3 +50,7 @@ Feature started. Branch: `feature/poly-87-invite-only-sign-up`. POLY-140 and POL
 ### @team-lead — 2026-11-12
 
 Gate 1: ruling at 319a22d (`process/cairn/reviews/POLY-87/ruling.md`, 22 conditions in five build steps; ARCH 1.15.17). Split accepted by the Principal (2026-11-12): this issue keeps the sign-up transaction; the two CLI criteria (first user by `--bootstrap`; `polycarpic user invite` with an audit event) moved to POLY-142, which is blocked by this issue. Paths: `scripts/layers/**` and `tests/layers/**` added; `apps/cli/**` removed (POLY-142 takes it as `apps/worker/**`). seceng reviews the ruling before the tests are written.
+
+### @team-lead — 2026-11-12
+
+seceng review at fcc376b: pass with conditions S1–S12, two of them holes (a forged sign-up setting seating an existing user; an unverified provider email claiming invitations). Ruling addendum 1 at 9fbc2ec: 31 conditions; S12 amended after the architect's probe showed the xmin test also passes for an updated row, so the proof is a `user.signup_txid` column stamped by a BEFORE INSERT trigger, and the `app.signup_user_id` setting is gone; S2 built in this loop; S6 seats viewers only. ARCH 1.15.18. Path `apps/web/tests/e2e/**` added (C29). seceng checks the amended S12, S7 and S2 before the tests are written.
