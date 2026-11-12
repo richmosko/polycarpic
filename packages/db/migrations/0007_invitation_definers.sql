@@ -1,6 +1,6 @@
 -- Custom migration (generate --custom). Runs as session_user poly_migrator with SET ROLE poly_owner active (src/migrate.ts).
 -- POLY-87 (ruling R2): the sign-up stamp, the set-once rule, the new-user step and the invitation claim/accept definers.
--- app.signup_stamp_cleared (S13, C32) lands with its tests. Ends on poly_owner.
+-- Ends on poly_owner.
 
 -- Table privileges the definer owners need (nothing is granted to PUBLIC). poly_app gets no write on any of it.
 GRANT SELECT (claimed_user_id, claimed_at) ON public.invitation TO poly_app;--> statement-breakpoint
@@ -138,9 +138,10 @@ CREATE FUNCTION app.stamp_signup_user() RETURNS trigger
   DECLARE
     v_tx pg_catalog.int8 := pg_catalog.pg_current_xact_id()::pg_catalog.text::pg_catalog.int8;
   BEGIN
-    -- A superuser (seed scripts, restores, the operator on the box) is outside the sign-up path: left unstamped, as
-    -- gate_owner_changes leaves it ungated. poly_app and every other role are stamped and held to one user per transaction.
-    IF (SELECT r.rolsuper FROM pg_catalog.pg_roles r WHERE r.rolname = current_user) THEN
+    -- Only a poly_app insert is a sign-up. Any other role (superuser seeds, poly_worker, restores) gets a NULL stamp, so
+    -- it neither counts toward one user per transaction nor trips signup_stamp_cleared at commit.
+    IF current_user <> 'poly_app' THEN
+      NEW.signup_txid := NULL;
       RETURN NEW;
     END IF;
     IF EXISTS (SELECT 1 FROM public."user" u WHERE u.signup_txid = v_tx) THEN
@@ -165,7 +166,21 @@ CREATE FUNCTION app.invitation_set_once() RETURNS trigger
     RETURN NEW;
   END
   $$;--> statement-breakpoint
+-- S13 (C32): no committed user row carries a stamp. Re-reads the row at commit, for every role.
+CREATE FUNCTION app.signup_stamp_cleared() RETURNS trigger
+  LANGUAGE plpgsql
+  SET search_path = ''
+  AS $$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM public."user" u WHERE u.id = NEW.id AND u.signup_txid IS NOT NULL) THEN
+      RAISE EXCEPTION 'a sign-up must end by accepting its invitation' USING ERRCODE = '42501';
+    END IF;
+    RETURN NULL;
+  END
+  $$;--> statement-breakpoint
 CREATE TRIGGER user_10_stamp_signup BEFORE INSERT ON public."user"
   FOR EACH ROW EXECUTE FUNCTION app.stamp_signup_user();--> statement-breakpoint
 CREATE TRIGGER invitation_20_set_once BEFORE UPDATE ON public.invitation
-  FOR EACH ROW EXECUTE FUNCTION app.invitation_set_once();
+  FOR EACH ROW EXECUTE FUNCTION app.invitation_set_once();--> statement-breakpoint
+CREATE CONSTRAINT TRIGGER user_90_stamp_cleared AFTER INSERT OR UPDATE ON public."user"
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION app.signup_stamp_cleared();

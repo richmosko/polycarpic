@@ -56,6 +56,10 @@ async function inTransaction(request: Request, auth: AnyAuth, run: <T>(fn: () =>
     });
   } catch (e) {
     if (e instanceof RollbackWith) return withoutCookies(e.response);
+    // A refusal the database raises at COMMIT (the stamp check, C32) surfaces after BetterAuth answered 200: the same 403.
+    if ((e as { code?: string }).code === '42501') {
+      return new Response(JSON.stringify({ code: 'invitation_required', message: 'invitation_required' }), { status: 403, headers: { 'content-type': 'application/json' } });
+    }
     throw e;
   }
 }
