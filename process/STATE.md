@@ -15,9 +15,17 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-141 (CI test-time cuts) merged 2026-11-12 via PR [#122](https://github.com/richmosko/polycarpic/pull/122) — INFRA 1.3.8, SECURITY 1.9.12. The `db` CI job runs at an 86 s median (was 124 s): its files run in parallel behind a harness lock, split into four areas (auth, tenancy, migrate, ops) so a PR runs only the areas it touches, and a push that changes only tracker and ledger files skips the heavy suites. A package is left only by its `@poly/<name>` import (lint-enforced). `packages/auth` runs BetterAuth 1.7.18 on the routing pool behind the `/api/auth/*` allowlist; nothing is deployed. Sign-up stays closed until POLY-87 and second-factor enrolment until POLY-89. Three standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job's budget is 100 s and only warns, so a loop that pushes the median past it brings its own cut; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. Follow-ups: POLY-137 (auth), POLY-138 (Caddy and edge), POLY-139 (sign-in and sessions screens); POLY-97 carries the uploader access that gates the first backup._
+- **Feature:** Invite-only sign-up
+- **Issue:** POLY-87 (cairn)
+- **Milestone:** POLY-M1
+- **Branch:** `feature/poly-87-invite-only-sign-up`
+- **Started:** 2026-11-12
+- **Goal:** after the first operator user, an invitation is the only way into an instance, and sign-up commits the user, their Person, membership and accounts together.
+- **Status:** In Progress
 
-- **Next:** POLY-87 (invite-only sign-up); POLY-97 (infra scaffolding; needs a real Hetzner project) alongside. POLY-131 held (P3).
+Standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job's budget is 100 s and only warns (86 s median), so a loop that pushes the median past it brings its own cut; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. A package is left only by its `@poly/<name>` import (lint-enforced). Nothing is deployed; second-factor enrolment stays closed until POLY-89.
+
+- **Next:** POLY-97 (infra scaffolding; needs a real Hetzner project) alongside. POLY-131 held (P3).
 
 ## Releases
 

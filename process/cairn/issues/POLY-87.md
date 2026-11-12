@@ -1,17 +1,17 @@
 ---
 id: POLY-87
 title: Invite-only sign-up
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-62, POLY-86, POLY-140, POLY-141]
-assignee: null
-paths: [packages/auth/**, packages/tenancy/**, apps/web/src/routes/**, apps/cli/**]
+assignee: backend-lead
+paths: [process/cairn/issues/POLY-87.md, process/cairn/reviews/POLY-87/**, packages/auth/**, packages/tenancy/**, packages/db/**, apps/web/src/routes/**, apps/cli/**, tests/db/**, tests/ci/**, infra/ci/changes.mjs, layers.json, eslint.config.js, package.json, pnpm-lock.yaml, docs/ARCH/**, docs/SECURITY/**]
 labels: [auth]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 After the first (operator) user, an invitation is the only way into an instance; no setting reopens public sign-up (Principal P6, 2026-11-07). An invitee creates an account from the invite and lands on the invited entity, or on their own Person if invited with no entity. The operator can issue a standalone single-use, audited invitation from the box; that person gets only their own Person. PRD §4 invite story.
@@ -44,3 +44,7 @@ From the POLY-86 loop (ruling follow-up 6): this issue builds the real `claimInv
 ### @team-lead — 2026-11-11
 
 From the POLY-136 loop. **Order:** POLY-140 (layer lint, relative imports) and POLY-141 (db battery parallel and area-split) run first (Principal, 2026-11-12). **Room in the `db` job:** about 5 s of CI time at the median (125 s against the 130 s target; `process/cairn/reviews/POLY-136/ruling.md`, addendum 3). The bound is two-part: median ≤ 130 s and the fastest three of five runs averaging ≤ 120 s; POLY-141 resets it. The configured budget is 180 s and only warns (`infra/ci/budgets.json`). **New-user step:** `apps/migrate/src/run.ts` shows the pattern POLY-140 generalises: a file importable only from named callers, by package path and by relative path.
+
+### @team-lead — 2026-11-12
+
+Feature started. Branch: `feature/poly-87-invite-only-sign-up`. POLY-140 and POLY-141 are done, so the earlier note on `db` room is superseded: the `db` job runs at an 86 s median against a 100 s warning budget (INFRA 1.3.8), and every new `tests/db/*.test.ts` must be placed in exactly one area in `infra/ci/changes.mjs` (POLY-141 C7). Paths front-loaded with the issue record, `packages/db/**`, `tests/db/**`, `tests/ci/**`, the area map, the layer files and the two docs; the architect names any other at the ruling.
