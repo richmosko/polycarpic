@@ -26,8 +26,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.9.9</span>
-    <span><strong>Last updated:</strong> 2026-11-11</span>
+    <span><strong>Version:</strong> 1.9.10</span>
+    <span><strong>Last updated:</strong> 2026-11-12</span>
   </div>
 </header>
 
@@ -1257,12 +1257,12 @@ host  replication  all          all                reject</code></pre></li>
     <li><strong>C-80 Dependencies.</strong>
       <ul>
         <li>Installs use <code>pnpm install --frozen-lockfile</code>.</li>
-        <li>pnpm lifecycle scripts are blocked, with an explicit <code>onlyBuiltDependencies</code> allowlist.</li>
+        <li>pnpm lifecycle scripts are blocked: every install runs in pnpm's strict dependency-build mode, so a dependency with a build script that no entry covers fails the install. <code>allowBuilds</code> in <code>pnpm-workspace.yaml</code> holds only boolean <code>false</code> entries, which decline a package's build by name. Allowing a build (a <code>true</code> entry, <code>onlyBuiltDependencies</code> or <code>dangerouslyAllowAllBuilds</code>, in the workspace file, <code>package.json</code> or <code>.npmrc</code>) is a C-80 change and needs SecEng review.</li>
         <li><code>minimumReleaseAge</code> is at least 3 days in both pnpm and Renovate, so a freshly compromised release has time to be yanked before we pick it up.</li>
         <li>Renovate never auto-merges major versions.</li>
         <li>The image's <code>apt-get</code> step uses only the base image's own signed Debian sources. It adds no source or key, and uses none of <code>--allow-unauthenticated</code>, <code>--allow-insecure-repositories</code>, <code>--allow-downgrades</code> or <code>[trusted=yes]</code>, nor their <code>Acquire::</code> or <code>APT::Get::</code> equivalents. It may upgrade only. <code>dist-upgrade</code>, <code>full-upgrade</code> or a new package needs its own ruling. A static test in <code>tests/image</code> checks this.</li>
         <li>The runtime image carries no package manager. <code>npm</code>, <code>npx</code>, <code>corepack</code>, <code>pnpm</code> and <code>yarn</code> do not resolve on <code>PATH</code>, <code>/usr/local/lib/node_modules</code> is absent, and the image's <code>User</code> is non-root (<code>node</code>). apt and dpkg stay only because the process is not root. This is checked on the built image, in the PR <code>image</code> job and in <code>build.yml</code> before the scan, not on the Dockerfile text.</li>
-        <li>A CI install may set <code>pnpm_config_strict_dep_builds=false</code> on its own <code>pnpm install</code> step in <code>ci.yml</code>. That turns the refusal into a warning, and no script runs (measured on pnpm 12.18.0). The setting never appears in <code>build.yml</code> or a Dockerfile, where strict mode is the alarm for a new production dependency with a build script. A real need is met by a reviewed <code>onlyBuiltDependencies</code> or <code>allowBuilds</code> entry.</li>
+        <li>Strict mode is never relaxed. <code>strict-dep-builds</code> (any spelling, including the <code>pnpm_config_strict_dep_builds</code> environment variable) is set nowhere: not in a workflow, a Dockerfile, <code>.npmrc</code> or <code>pnpm-workspace.yaml</code>. The local install, every <code>ci.yml</code> job, <code>build.yml</code> and the image all run the same strict <code>pnpm install --frozen-lockfile</code>, so a new dependency with a build script fails the pull request. <code>tests/ci/strict-builds.test.ts</code> checks both rules.</li>
         <li><code>pnpm audit --audit-level high</code> gates the build.</li>
       </ul></li>
     <li><strong>C-81 Workflow hardening.</strong>

@@ -50,3 +50,13 @@ Conditions.
 |---|---|---|
 | Item 7 (C-80, T-63) | accept with conditions | S1–S4; SECURITY §8 wording as above on landing |
 | Item 4 C1 (`run.ts`) | accept with conditions | C1–C6 |
+
+## S4 judgement (CI run 43124687609, workflow_dispatch at 0e00993, all jobs success): MET
+
+Read from `gh run view 43124687609 --log`, install steps "Install (lockfile frozen, lifecycle scripts blocked)" in image, unit, db and lint.
+
+- Strict in CI: each step's `env:` block holds only `JOB_START` (plus `TURBO_SCM_BASE` in unit and lint); the log has 0 matches for `strict[_-]dep`. Each step runs `pnpm install --frozen-lockfile` and ends `Done in 1.9–2.4s using pnpm v12.18.0`. Strict without a covering entry is exit 1 (M5), so exit 0 here shows `allowBuilds` is what lets the install through.
+- No script ran: no `postinstall`/`preinstall`/`install` run line, no ignored-build warning and no `esbuild` line in any of the four install steps.
+- Image: the Dockerfile's `pnpm install --frozen-lockfile --prod` ends `Packages: +108` and `Done in 2.3s`; the job is success.
+- Deviation, judged immaterial: the store was warm (`Cache hit for: pnpm-store-Linux-ea0f…`, `downloaded 0`), and `--reporter=append-only` was not passed. node_modules was empty on each runner (`added 338`), and pnpm decides on build scripts as it links packages into node_modules, so a warm store changes the fetch and nothing else. No build has ever been allowed here, so the store holds no side-effects cache for a warm store to replay. The non-TTY default reporter prints lifecycle lines the same way.
+- Residual: the first lockfile change misses the cache and gives a cold-store install for free. Nothing further is required.
