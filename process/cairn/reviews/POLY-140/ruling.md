@@ -80,3 +80,15 @@ Both edits are accepted. They amend conditions 15 and 16 in place; no new number
 Tree at 07b72f2, all 0: imports of `module` or `node:module` under `apps`/`packages` (the only hits for a `module` string are `"type": "module"` in package.json); `.cjs` or `.cts` files under any `src`; tracked pnpmfile files; a `resolutions` key in root `package.json`; a pnpmfile key in `.npmrc`, `pnpm-workspace.yaml` or `package.json`.
 
 Anything further is a follow-up, not this loop.
+
+## Addendum 3: two builder choices (build at 8ebe007)
+
+1. **`noInlineConfig: true` on `poly/layers`: accepted.** It meets condition 6 more strongly. With a disable comment, the target rule still reports, so a reviewer sees the real violation as well as the `eslint-comments` error; the original mechanism showed only the comment error. No narrower mechanism exists, because ESLint has no per-rule `noInlineConfig`. The `.svelte` block already works this way. Measured at 1a37268:
+   - `git grep` finds 0 inline ESLint directives under `apps`/`packages`.
+   - `// eslint-disable-next-line no-console` in `apps/web/src` is inert, so `no-console` still errors, plus an ESLint severity-1 "has no effect" warning. `pnpm lint` sets no `--max-warnings`, so the warning alone fails nothing.
+
+   Consequences, which now bind:
+   - Inline directives are inert for every rule in all package and app source, not only the layer rules. An exemption is a named block in `generate.mjs`, as the existing exceptions are.
+   - `14-disable-proofing/pass-disable-unrelated-rule.ts` now passes vacuously (`no-console` is off in `packages/ledger`). qa adds one fixture: `apps/web/src`, a `no-console` disable followed by `console.log`, `@expect: no-console`. It records that inline directives are inert there.
+   - The `eslint-comments/no-use` allow-list stays. It is harmless and keeps the comment errors readable.
+2. **`poly/no-computed-import` no longer exempts relative specifiers: confirmed.** Condition 3 refuses computed relative specifiers, and two rules reporting the same node is fine. The lint passes on the tree at 1a37268, so no source uses one. The code comment "is no longer exempt" narrates history. Reword it to the present tense ("a computed specifier is refused, relative or not") when the fixture above lands.
