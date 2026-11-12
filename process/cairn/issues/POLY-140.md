@@ -1,7 +1,7 @@
 ---
 id: POLY-140
 title: Layer lint relative imports
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [tests/layers/**, scripts/layers/**, eslint.config.js, layers.json, infra/ci/generated.json, docs/ARCH/**, docs/SECURITY/**, package.json, pnpm-lock.yaml, process/cairn/issues/POLY-140.md, process/cairn/reviews/POLY-140/**]
 labels: [lint, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/121
 created: 2026-11-11
 updated: 2026-11-11
 ---
@@ -33,3 +33,7 @@ Feature started. Branch: `feature/poly-140-layer-lint-relative-imports`.
 ### @team-lead — 2026-11-11
 
 Gates 1 to 3 at 8ebe007. Ruling: `process/cairn/reviews/POLY-140/ruling.md` (17 conditions, addenda 1 and 2), seceng review pass with S1–S6 folded in. Tests red at 8acedb1: 133 failed, 318 passed of 451 in `tests/layers`. Build at 8ebe007: `tests/layers`, `tests/ci`, `tests/config` 740 of 740, `pnpm lint` clean (lead's own runs). `docs/SECURITY/**` added to paths for the import-boundary lines seceng named. Open: the architect rules on two builder choices (`noInlineConfig` on the layers block; `poly/no-computed-import` no longer exempting relative specifiers); condition 4 awaits the Principal.
+
+### @team-lead — 2026-11-11
+
+PR opened: https://github.com/richmosko/polycarpic/pull/121. Verdict PASS at 8d8bd56 (`process/cairn/reviews/POLY-140/verdict.md`); head-match PASS. Awaiting CI. Condition 4 (non-test source never leaves its package by path) is built and awaits the Principal's yes; its fixtures sit in `tests/layers/fixtures/26-condition-4-droppable/`.

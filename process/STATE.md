@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-140-layer-lint-relative-imports`
 - **Started:** 2026-11-12
 - **Goal:** a relative import that reaches into another workspace package is a lint error, generated from the layer map.
-- **Status:** In Progress
+- **Status:** In Review — PR [#121](https://github.com/richmosko/polycarpic/pull/121)
 
 Standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job has about 5 s of room against its 130 s median target (the configured budget is 180 s and only warns), so a loop that adds more brings its own cut; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. Nothing is deployed; sign-up stays closed until POLY-87 and second-factor enrolment until POLY-89.
 
