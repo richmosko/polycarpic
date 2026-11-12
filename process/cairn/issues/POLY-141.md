@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, scripts/cairn/run_tests.py, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, docs/INFRA/**]
+paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/workflow/test_cairn_test_boundary.py, docs/INFRA/**]
 labels: [ci, tooling]
 priority: null
 pr: null
@@ -78,3 +78,7 @@ qa-engineer-136's two source files are kept beside this issue: `process/cairn/re
 ### @team-lead — 2026-11-12
 
 Feature started. Branch: `feature/poly-141-ci-test-time-cuts`. Retitled from "db battery parallel and area-split" (architect-136's suggestion; the scope also covers the bookkeeping-push skip). Carried in from POLY-140: qa saw `tests/infra/image/postgres.test.ts` fail and `caddy.test.ts` flake under local parallel load, unmeasured on `main`; worth one measurement in this loop, not a fix.
+
+### @team-lead — 2026-11-12
+
+Gate 1: ruling at a38584a (`process/cairn/reviews/POLY-141/ruling.md`, conditions C1–C19). Paths: `tests/workflow/test_cairn_test_boundary.py` added (it pins the anchor shell text the ruling moves); `scripts/cairn/run_tests.py` removed, since the ruling leaves it unchanged. seceng reviews R4 and C14–C19 before build green.
