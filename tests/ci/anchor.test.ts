@@ -56,9 +56,9 @@ describe('anchor.mjs: constants (C19)', () => {
     expect((PINNED_RULINGS as RegExp).test('process/cairn/reviews/POLY-57/ruling.md')).toBe(false);
     expect((PINNED_RULINGS as RegExp).test('process/cairn/reviews/POLY-6/notes.md')).toBe(false);
   });
-  it('LEDGER_TESTS is exactly the two ledger-reading cairn tests, and both exist on disk', async () => {
+  it('LEDGER_TESTS is exactly the four ledger-dependent cairn tests (ruling addendum 2), and both exist on disk', async () => {
     const { LEDGER_TESTS } = await mod();
-    expect([...LEDGER_TESTS].sort()).toEqual(['test_ruling_archive_records.py', 'test_state_releases_bound.py']);
+    expect([...LEDGER_TESTS].sort()).toEqual(['test_check_budgets.py', 'test_dashboard_roster.py', 'test_ruling_archive_records.py', 'test_state_releases_bound.py']);
     for (const t of LEDGER_TESTS) expect(existsSync(join(ROOT, 'tests', 'workflow', t)) || existsSync(join(ROOT, 'scripts', 'cairn', 'tests', t)), t).toBe(true);
   });
   it('the tracker leg of LEDGER and PINNED_RULINGS equal the EXCLUDE and PINNED_RULINGS literals kept in ci.yml  [red if: either drifts]', async () => {
@@ -296,7 +296,7 @@ describe('anchor.mjs CLI: real repo, fake gh (criterion 9, C14, C16)', () => {
   it('--ledger-tests prints LEDGER_TESTS one per line', () => {
     const r = node('anchor.mjs', { args: ['--ledger-tests'] });
     expect(r.code).toBe(0);
-    expect(lines(r.stdout).sort()).toEqual(['test_ruling_archive_records.py', 'test_state_releases_bound.py']);
+    expect(lines(r.stdout).sort()).toEqual(['test_check_budgets.py', 'test_dashboard_roster.py', 'test_ruling_archive_records.py', 'test_state_releases_bound.py']);
   });
 });
 

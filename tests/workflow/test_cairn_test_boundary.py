@@ -481,6 +481,83 @@ class CiAnchoredSkipTests(unittest.TestCase):
 
 
 
+class LedgerReaderGuardTests(unittest.TestCase):
+    """POLY-141 C17(b) (ruling addendum 2, item 8): a test whose result depends on real ledger content must be in
+    LEDGER_TESTS (read from infra/ci/anchor.mjs), because the cairn job's `run=ledger` leg runs only those. Any file
+    under tests/workflow or scripts/cairn/tests whose source (comments stripped) names a real-root constant together
+    with STATE.md, DECISIONS.md, a quoted tracker directory name, `git grep` or `ls-files` must be in LEDGER_TESTS or
+    in PASS_THROUGH, or this test is red. The first eleven entries are the architect's; the last six are flagged by the
+    same rule and were not among the audit's readers (ledger-audit.md @ f4c43c0: no open of a real ledger file, so
+    fixture-only), added by qa-141 and reported to the lead."""
+
+    ANCHOR = REPO_ROOT / "infra" / "ci" / "anchor.mjs"
+    ROOT_CONST = re.compile(r"\bREPO_ROOT\b|CAIRN_DIR\.parent\.parent")
+    LEDGER_NAME = re.compile(
+        r"STATE\.md|DECISIONS\.md|[\"'](?:issues|milestones|majors|archive|reviews)[\"']|git grep|ls-files"
+    )
+    PASS_THROUGH = {
+        # architect, addendum 2 items 3 and 4
+        "test_backfill_tokens.py": "reads milestones only via cairn.milestone_windows; assertions are on feature-branch fixtures",
+        "test_agent_setting_role.py": "same milestone read through backfill_tokens.py; fixture assertions",
+        "test_milestone_overhead.py": "lists issues/ only; assertions on fixture records",
+        "test_run_tests.py": "lists issues/ only; assertions on fixture records",
+        "test_test_run_hooks.py": "lists issues/ only; assertions on fixture records",
+        "test_receiver_flush_drop.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver_engine_staleness.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver_self_stop.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver_watchdog_attribution.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver_windows_root.py": "lists issues/ only; assertions on fixture records",
+        # qa-141: flagged by the rule, no real-ledger read in the audit
+        "test_archived_milestone_paths.py": "builds its own archive tree under a temp dir",
+        "test_comment_guard.py": "tracker names appear in fixture repos only",
+        "test_dashboard.py": "fixture tracker; the audit saw no real-ledger open",
+        "test_loop_stats.py": "fixture records only",
+        "test_skill_id_literals.py": "scans skill text, names tracker directories as literals",
+        "test_tokens_endpoint.py": "fixture tracker; the audit saw no real-ledger open",
+    }
+
+    def _ledger_tests(self):
+        self.assertTrue(self.ANCHOR.is_file(), "infra/ci/anchor.mjs does not exist yet (POLY-141 C17b reads LEDGER_TESTS from it)")
+        m = re.search(r"LEDGER_TESTS\s*=\s*\[([^\]]*)\]", self.ANCHOR.read_text(encoding="utf-8"))
+        self.assertIsNotNone(m, "anchor.mjs has no LEDGER_TESTS = [...] literal")
+        return set(re.findall(r"['\"]([^'\"]+\.py)['\"]", m.group(1)))
+
+    def _flagged(self):
+        flagged = set()
+        for d in (WORKFLOW_TESTS_DIR, CAIRN_TESTS_DIR):
+            for path in sorted(d.glob("test_*.py")):
+                if path.name == Path(__file__).name:
+                    continue
+                code = "\n".join(l for l in path.read_text(encoding="utf-8").splitlines() if not l.lstrip().startswith("#"))
+                if self.ROOT_CONST.search(code) and self.LEDGER_NAME.search(code):
+                    flagged.add(path.name)
+        return flagged
+
+    def test_ledger_tests_is_exactly_the_four_ruled_files(self):
+        self.assertEqual(
+            self._ledger_tests(),
+            {"test_state_releases_bound.py", "test_ruling_archive_records.py", "test_check_budgets.py", "test_dashboard_roster.py"},
+        )
+
+    def test_all_four_ledger_tests_are_flagged_by_the_rule(self):
+        # sanity: the heuristic can see the files it exists to protect
+        self.assertTrue(self._ledger_tests() <= self._flagged(), f"not flagged: {sorted(self._ledger_tests() - self._flagged())}")
+
+    def test_every_flagged_file_is_in_ledger_tests_or_pass_through(self):
+        unaccounted = sorted(self._flagged() - self._ledger_tests() - set(self.PASS_THROUGH))
+        self.assertEqual(
+            unaccounted, [],
+            f"these tests name a real-root constant with a ledger name; add each to anchor.mjs LEDGER_TESTS or to PASS_THROUGH "
+            f"with a reason: {unaccounted!r}",
+        )
+
+    def test_pass_through_names_only_existing_files_outside_ledger_tests(self):
+        existing = {p.name for d in (WORKFLOW_TESTS_DIR, CAIRN_TESTS_DIR) for p in d.glob("test_*.py")}
+        self.assertEqual(sorted(set(self.PASS_THROUGH) - existing), [], "PASS_THROUGH lists a file that does not exist")
+        self.assertEqual(sorted(set(self.PASS_THROUGH) & self._ledger_tests()), [], "a file is in both LEDGER_TESTS and PASS_THROUGH")
+
+
 class WorkflowMdSpinOffCleanSentenceTests(unittest.TestCase):
     """(f)7: WORKFLOW.md contains the (e) sentence's first bold clause."""
 

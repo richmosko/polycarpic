@@ -260,6 +260,17 @@ describe('ci.yml: the anchor skip (POLY-141 C15, C16, C18)', () => {
     expect(led.run).toMatch(/-p\b/);
     expect(led.run).not.toContain('${{');
   });
+  it('C24: the cairn job runs `scripts/cairn/cairn check` on both run=true and run=ledger  [red while absent]', () => {
+    const chk = steps(w.jobs.cairn!).filter((s) => /scripts\/cairn\/cairn check\b/.test(s.run ?? ''));
+    expect(chk.length, 'a cairn check step').toBeGreaterThan(0);
+    for (const s of chk) {
+      const cond = s.if ?? '';
+      expect(cond, s.name).toMatch(/'true'/);
+      expect(cond, s.name).toMatch(/'ledger'/);
+    }
+    const py = steps(w.jobs.cairn!).findIndex((s) => /^actions\/setup-python@/.test(s.uses ?? ''));
+    expect(steps(w.jobs.cairn!).indexOf(chk[0]!), 'after Python is set up').toBeGreaterThan(py);
+  });
   it('cairn: a BASE..HEAD of ledger paths only gives run=ledger  [red while the leg is absent]', () => {
     expect(runOf(w.jobs.cairn!)).toMatch(/run=ledger/);
     expect(runOf(w.jobs.cairn!)).toMatch(/LEDGER/);
