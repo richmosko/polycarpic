@@ -51,3 +51,7 @@ Gate 1 ruling: process/cairn/reviews/POLY-136/ruling.md. The acceptance criteria
 Item 6 (scratch run 43125303397 on scratch/poly-136-e2e-fallback, first probe forced to fail): the fallback ran. install-deps ran for about 3 s and did not time out; no ::warning appeared; the second probe passed (no 'Chromium cannot launch'); e2e 48 passed (42.6 s); step total 59 s, success. lint failed on that branch as expected (the static workflow test sees the edited probe); db, image and unit were green. Scratch branch deleted from origin and locally; nothing merged.
 
 Item 7 / S4: clean install with --reporter=append-only (node_modules removed, store warm) exits 0 with no lifecycle-script line, and the image job was green on the same head in run 43124687609 at 0e00993 (all eight jobs green).
+
+### @architect — 2026-11-11
+
+Gate 4 verdict at 66ed997: PASS, one delta before the PR (regenerate INFRA.pdf). Table: process/cairn/reviews/POLY-136/verdict.md. db tests: 352 executed in run 43126411997 (350 passed + 2 it.fails for POLY-100) against 335 at baseline; db job 124 s on the final head.
