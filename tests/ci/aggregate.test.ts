@@ -2,7 +2,11 @@
 // Contract: env NEEDS = toJSON(needs) = {<job>: {result, outputs}}; exit 0 = green, non-zero = red.
 // Output -> keyed job: node->unit, layers->lint, ci->lint, image->image, db->db.
 import { describe, expect, it } from 'vitest';
-import { node } from './helpers.ts';
+import { node, wf } from './helpers.ts';
+
+// The jobs ci.yml gates on each filter output, read from the job-level `if:` (the contract REQUIRED must mirror).
+const ifOf = (job: string) => `${wf('ci.yml').jobs[job]?.if ?? ''}`;
+const wired = (out: string) => ['lint', 'unit', 'db', 'image'].filter((j) => new RegExp(`needs\\.changes\\.outputs\\.${out}\\b`).test(ifOf(j))).sort();
 
 type Needs = Record<string, { result: string; outputs: Record<string, string> }>;
 const OUT = ['node', 'layers', 'db', 'image', 'ci'];
@@ -39,8 +43,10 @@ describe('aggregate.mjs', () => {
     it(`output ${out}=true but ${job} skipped -> red (mis-wired if:)  [red if: output->job check removed or mapped wrong]`, () => {
       expect(agg(base([out]))).not.toBe(0);
     });
-    it(`output ${out}=true and ${job} success -> green`, () => {
-      expect(agg(set(base([out]), job, 'success'))).toBe(0);
+    it(`output ${out}=true and ${job} success, the other jobs it gates also success -> green`, () => {
+      let n = base([out]);
+      for (const j of wired(out)) n = set(n, j, 'success');
+      expect(agg(set(n, job, 'success'))).toBe(0);
     });
   }
   it('unknown result string -> red', () => { expect(agg(set(base(), 'lint', 'weird'))).not.toBe(0); });
@@ -53,5 +59,28 @@ describe('aggregate.mjs', () => {
     expect(node('aggregate.mjs', { env: {} }).code).not.toBe(0);
     expect(agg(null, '')).not.toBe(0);
     expect(agg(null, '{not json')).not.toBe(0);
+  });
+});
+
+// POLY-136 item 2 (ruling): one output can gate several jobs; the aggregate checks every one of them.
+describe('aggregate.mjs: every job an output gates (POLY-136 item 2)', () => {
+  const allOk = (on: string[]) => { let n = base(on); for (const j of ['lint', 'unit', 'db', 'image']) n = set(n, j, 'success'); return n; };
+  for (const [out, job] of [['node', 'lint'], ['node', 'image'], ['image', 'lint'], ['image', 'unit']] as const) {
+    it(`output ${out}=true but ${job} skipped (the other jobs ran) -> red  [red if: REQUIRED maps ${out} to fewer jobs than ci.yml wires]`, () => {
+      expect(agg(set(allOk([out]), job, 'skipped'))).not.toBe(0);
+    });
+  }
+  for (const out of OUT) {
+    it(`${out}=true, each job ci.yml wires to it skipped in turn -> red; all success -> green  [red if: a job in the ci.yml if: is missing from REQUIRED]`, () => {
+      const jobs = wired(out);
+      expect(jobs.length).toBeGreaterThan(0);
+      expect(agg(allOk([out]))).toBe(0);
+      for (const j of jobs) expect(agg(set(allOk([out]), j, 'skipped')), `${out} -> ${j}`).not.toBe(0);
+    });
+  }
+  it('REQUIRED equals, per output, the jobs whose if: in ci.yml names it  [red if: ci.yml or REQUIRED changes alone]', async () => {
+    const { REQUIRED } = (await import('../../infra/ci/aggregate.mjs')) as { REQUIRED?: Record<string, string[]> };
+    expect(REQUIRED, 'aggregate.mjs must export REQUIRED').toBeDefined();
+    for (const out of OUT) expect([...(REQUIRED![out] ?? [])].sort(), out).toEqual(wired(out));
   });
 });

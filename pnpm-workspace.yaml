@@ -17,3 +17,7 @@ overrides:
   'better-auth>vitest': '-'
   'better-auth>@sveltejs/kit': '-'
   'better-auth>@better-auth/drizzle-adapter': '-'
+
+# Install build scripts are declined by name. An allowed build is a C-80 change; tests/ci/strict-builds.test.ts holds every value at false.
+allowBuilds:
+  esbuild: false

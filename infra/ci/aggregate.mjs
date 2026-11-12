@@ -1,5 +1,6 @@
 // POLY-96 `app` aggregate (ruling §1). env NEEDS = toJSON(needs). Exit 0 = green. Anything unexpected is red.
-const KEYED = { node: 'unit', layers: 'lint', ci: 'lint', image: 'image', db: 'db' };
+// Every job whose job-level `if:` names the filter output; tests/ci ties this to ci.yml.
+export const REQUIRED = { node: ['lint', 'unit', 'image'], layers: ['lint'], ci: ['lint'], image: ['lint', 'unit', 'image'], db: ['db'] };
 const OK = new Set(['success', 'skipped']);
 
 export function evaluate(raw) {
@@ -14,8 +15,9 @@ export function evaluate(raw) {
     else if (!OK.has(r)) bad.push(`${j}: ${r}`);
   }
   const outs = needs.changes?.outputs ?? {};
-  for (const [out, job] of Object.entries(KEYED)) {
-    if (outs[out] === 'true' && needs[job]?.result !== 'success') bad.push(`output ${out}=true but ${job} is ${needs[job]?.result}`);
+  for (const [out, jobs] of Object.entries(REQUIRED)) {
+    if (outs[out] !== 'true') continue;
+    for (const job of jobs) if (needs[job]?.result !== 'success') bad.push(`output ${out}=true but ${job} is ${needs[job]?.result}`);
   }
   return bad;
 }

@@ -11,7 +11,7 @@ const ALLOWED = new Set<string>(['poly_owner', ...DEFINER_OWNERS]);
 
 export interface Problem {
   file: string;
-  check: 'session-authorization' | 'reset' | 'local-role' | 'role-target' | 'set-config-role' | 'function-role-clause' | 'last-role-not-owner' | 'journal-order';
+  check: 'session-authorization' | 'reset' | 'local-role' | 'role-target' | 'set-config-role' | 'function-role-clause' | 'last-role-not-owner' | 'journal-order' | 'journal-files';
   detail: string;
 }
 
@@ -62,15 +62,36 @@ export function checkSql(file: string, raw: string): Problem[] {
   return out;
 }
 
+/** Journal ↔ file, both directions: each entry has its .sql and meta snapshot, and each .sql / snapshot has its entry (POLY-136). */
+export function checkJournalFiles(folder: string, entries: { idx: number; tag: string }[]): Problem[] {
+  const out: Problem[] = [];
+  const add = (file: string, detail: string) => out.push({ file, check: 'journal-files', detail });
+  const snap = (idx: number) => `meta/${String(idx).padStart(4, '0')}_snapshot.json`;
+  const tags = new Set(entries.map((e) => e.tag));
+  const snaps = new Set(entries.map((e) => snap(e.idx)));
+  for (const e of entries) {
+    if (!fs.existsSync(path.join(folder, `${e.tag}.sql`))) add(`${e.tag}.sql`, `journal entry ${e.tag} has no ${e.tag}.sql`);
+    if (!fs.existsSync(path.join(folder, snap(e.idx)))) add(snap(e.idx), `journal entry ${e.tag} has no ${snap(e.idx)}`);
+  }
+  for (const f of fs.readdirSync(folder).filter((n) => n.endsWith('.sql')).sort()) {
+    if (!tags.has(f.slice(0, -4))) add(f, 'not in meta/_journal.json');
+  }
+  for (const f of fs.readdirSync(path.join(folder, 'meta')).filter((n) => n.endsWith('_snapshot.json')).sort()) {
+    if (!snaps.has(`meta/${f}`)) add(`meta/${f}`, 'not in meta/_journal.json');
+  }
+  return out;
+}
+
 export function checkFolder(folder: string): Problem[] {
   const problems: Problem[] = [];
-  const entries = (JSON.parse(fs.readFileSync(path.join(folder, 'meta', '_journal.json'), 'utf8')) as { entries: { tag: string; when: number }[] }).entries;
+  const entries = (JSON.parse(fs.readFileSync(path.join(folder, 'meta', '_journal.json'), 'utf8')) as { entries: { idx: number; tag: string; when: number }[] }).entries;
   try {
     checkJournalOrder(entries);
   } catch (e) {
     if (!(e instanceof MigrateRefusal)) throw e;
     problems.push({ file: 'meta/_journal.json', check: 'journal-order', detail: e.message });
   }
+  problems.push(...checkJournalFiles(folder, entries));
   for (const f of fs.readdirSync(folder).filter((n) => n.endsWith('.sql')).sort()) {
     problems.push(...checkSql(f, fs.readFileSync(path.join(folder, f), 'utf8')));
   }

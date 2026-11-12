@@ -1,8 +1,9 @@
 // POLY-96 stage 2 -- .github/workflows/build.yml and infra/ci/image.sh (ruling §4): criteria 2 (image build), 4 (Trivy).
 // Real GHCR push, attestation and Trivy against a real image are post-merge / manual evidence (ruling §6).
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ci, steps, wf, wfText, type Job } from './helpers.ts';
+import { ROOT, ci, steps, wf, wfText, type Job } from './helpers.ts';
 
 const w = wf('build.yml');
 const text = wfText('build.yml');
@@ -132,5 +133,18 @@ describe('infra/ci/image.sh (criterion 4: Trivy)', () => {
   it('build passes GIT_COMMIT and forbids cache reuse; bash syntax valid', () => {
     expect(sh()).toMatch(/GIT_COMMIT/);
     expect(sh()).toMatch(/--no-cache|--pull/);
+  });
+});
+
+// POLY-136 item 3: the INFRA runbook states the retention that build.yml sets.
+describe('image artifact retention is documented (POLY-136 item 3)', () => {
+  const days = () => {
+    const up = Object.values(w.jobs).flatMap((j) => steps(j)).find((s) => s.uses?.startsWith('actions/upload-artifact') && String(s.with?.name ?? '').startsWith('image-'));
+    return Number(up?.with?.['retention-days']);
+  };
+  const infra = () => readFileSync(join(ROOT, 'docs', 'INFRA', 'index.html'), 'utf8').replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  it('the runbook names image-<commit> and the same day count build.yml sets  [red if: the runbook statement is absent, or retention-days or the runbook changes alone]', () => {
+    expect(days()).toBeGreaterThan(0);
+    expect(infra()).toMatch(new RegExp(`image-<commit>[^.]*\\b${days()} days`));
   });
 });
