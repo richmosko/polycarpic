@@ -35,12 +35,23 @@ export function withBootstrapLock<T>(fn: () => T): T {
   }
 }
 
+let created: string | null = null;
+
 /**
- * The entry point of a run (vitest globalSetup, the e2e web server) makes the per-run lock directory with this and exports it
- * as POLY_TEST_LOCK_DIR before any worker or helper call starts; children inherit it. The returned function removes it.
+ * The entry point of a run (vitest globalSetup, the e2e web server) calls this before any helper that bootstraps a database.
+ * With POLY_TEST_LOCK_DIR unset it makes the per-run lock directory and exports it, so children inherit it; with it set it
+ * returns the existing value unchanged. withBootstrapLock still throws when the variable is unset.
  */
-export function createBootstrapLockDir(): () => void {
-  const dir = mkdtempSync(join(tmpdir(), 'poly-test-lock-'));
-  process.env.POLY_TEST_LOCK_DIR = dir;
-  return () => rmSync(dir, { recursive: true, force: true });
+export function ensureBootstrapLockDir(): string {
+  const set = process.env.POLY_TEST_LOCK_DIR;
+  if (set) return set;
+  created = mkdtempSync(join(tmpdir(), 'poly-test-lock-'));
+  process.env.POLY_TEST_LOCK_DIR = created;
+  return created;
+}
+
+/** Removes the directory ensureBootstrapLockDir made in this process; a preset directory is left alone. */
+export function releaseBootstrapLockDir(): void {
+  if (created) rmSync(created, { recursive: true, force: true });
+  created = null;
 }
