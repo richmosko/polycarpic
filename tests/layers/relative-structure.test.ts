@@ -119,6 +119,22 @@ describe('no path alias reaches out of a package (condition 11)', () => {
   });
 });
 
+// Condition 15(d): .cjs and .cts have a real module.require whatever the package type, so none may sit under a src dir.
+describe('no .cjs or .cts file under apps/*/src or packages/*/src (condition 15d)', () => {
+  const offenders = (files: string[]) => files.filter((f) => /^(apps|packages)\/[^/]+\/src\/.*\.c(js|ts)$/.test(f));
+  it('the tree has none', () => {
+    const files = tracked('apps', 'packages');
+    expect(files.length).toBeGreaterThan(100);
+    expect(offenders(files)).toEqual([]);
+  });
+  for (const f of ['packages/auth/src/x.cjs', 'packages/auth/src/x.cts', 'apps/web/src/lib/deep/x.cjs']) {
+    it(`red on: ${f}`, () => expect(offenders([...tracked('apps', 'packages'), f])).toEqual([f]));
+  }
+  it('green on: a .cjs outside src (it is still linted, condition 12)', () => {
+    expect(offenders(['packages/auth/scripts/x.cjs', 'apps/web/tests/x.cts'])).toEqual([]);
+  });
+});
+
 describe('no package-level indirection (condition 16)', () => {
   type Pkg = { path: string; json: Record<string, any> };
   const DEP_FIELDS = ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies'];
@@ -177,6 +193,7 @@ describe('no package-level indirection (condition 16)', () => {
     ['a workspace package under a key that is not its @poly name', (p) => ((auth(p).dependencies ??= {})['ledger-alias'] = 'workspace:*')],
     ['root package.json pnpm.overrides to "link:"', (_p, r) => ((r.pnpm ??= {}).overrides = { '@poly/db': 'link:../ledger' })],
     ['root package.json overrides to "file:"', (_p, r) => (r.overrides = { x: 'file:../ledger' })],
+    ['root package.json resolutions to "link:"', (_p, r) => (r.resolutions = { x: 'link:../ledger' })],
     ['pnpm-workspace.yaml overrides to "npm:"', (_p, _r, ws) => ((ws.overrides ??= {})['better-auth>pg'] = 'npm:@poly/ledger@*')],
     ['pnpm-workspace.yaml overrides to "workspace:"', (_p, _r, ws) => ((ws.overrides ??= {})['better-auth>pg'] = 'workspace:*')],
   ];
@@ -190,5 +207,40 @@ describe('no package-level indirection (condition 16)', () => {
   });
   it('every package declares itself as @poly/<its dir name>', () => {
     for (const p of realPkgs()) expect(p.json.name, p.path).toBe(`@poly/${basename(p.path.replace(/\/package\.json$/, ''))}`);
+  });
+});
+
+// Condition 16 (addendum 2): a readPackage hook can rewrite a dependency to link: with no package.json change.
+describe('no pnpmfile hook (condition 16, addendum 2)', () => {
+  const OK_KEY = /^(ignore-pnpmfile|ignorePnpmfile)$/;
+  const fileViolations = (files: string[]) => files.filter((f) => /pnpmfile/i.test(f));
+  const npmrcViolations = (text: string) =>
+    text.split('\n').map((l) => l.match(/^\s*([^#;=\s][^=]*?)\s*=/)?.[1] ?? '').filter((k) => /pnpmfile/i.test(k) && !OK_KEY.test(k));
+  const keyViolations = (o: Record<string, unknown> | undefined) => Object.keys(o ?? {}).filter((k) => /pnpmfile/i.test(k) && !OK_KEY.test(k));
+  const all = () => spawnSync('git', ['ls-files'], { cwd: root, encoding: 'utf8' }).stdout.split('\n').filter(Boolean);
+  it('no tracked file is named like a pnpmfile', () => {
+    expect(all().length).toBeGreaterThan(500);
+    expect(fileViolations(all())).toEqual([]);
+  });
+  it('.npmrc, pnpm-workspace.yaml and package.json#pnpm hold no pnpmfile key', () => {
+    expect(npmrcViolations(read('.npmrc'))).toEqual([]);
+    expect(keyViolations(parseYaml(read('pnpm-workspace.yaml')))).toEqual([]);
+    expect(keyViolations(JSON.parse(read('package.json')).pnpm)).toEqual([]);
+  });
+  it('red on: a tracked .pnpmfile.cjs, and a nested *pnpmfile* file', () => {
+    expect(fileViolations([...all(), '.pnpmfile.cjs']).length).toBe(1);
+    expect(fileViolations([...all(), 'tools/x/custom-pnpmfile.mjs']).length).toBe(1);
+  });
+  it('red on: pnpmfile= and global-pnpmfile= in .npmrc', () => {
+    expect(npmrcViolations('pnpmfile=.pnpmfile.cjs\n')).toEqual(['pnpmfile']);
+    expect(npmrcViolations('# c\nglobal-pnpmfile = ../x.cjs\n')).toEqual(['global-pnpmfile']);
+  });
+  it('red on: a pnpmfile key in pnpm-workspace.yaml and in package.json#pnpm', () => {
+    expect(keyViolations(parseYaml('pnpmfile: .pnpmfile.cjs\npackages: []\n'))).toEqual(['pnpmfile']);
+    expect(keyViolations({ globalPnpmfile: '../x.cjs' })).toEqual(['globalPnpmfile']);
+  });
+  it('green on: ignore-pnpmfile and ignorePnpmfile', () => {
+    expect(npmrcViolations('ignore-pnpmfile=true\n')).toEqual([]);
+    expect(keyViolations({ ignorePnpmfile: true })).toEqual([]);
   });
 });
