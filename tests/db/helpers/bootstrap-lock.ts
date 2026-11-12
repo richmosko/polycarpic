@@ -1,4 +1,5 @@
-import { mkdirSync, rmdirSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /**
@@ -32,4 +33,14 @@ export function withBootstrapLock<T>(fn: () => T): T {
   } finally {
     rmdirSync(lock);
   }
+}
+
+/**
+ * The entry point of a run (vitest globalSetup, the e2e web server) makes the per-run lock directory with this and exports it
+ * as POLY_TEST_LOCK_DIR before any worker or helper call starts; children inherit it. The returned function removes it.
+ */
+export function createBootstrapLockDir(): () => void {
+  const dir = mkdtempSync(join(tmpdir(), 'poly-test-lock-'));
+  process.env.POLY_TEST_LOCK_DIR = dir;
+  return () => rmSync(dir, { recursive: true, force: true });
 }

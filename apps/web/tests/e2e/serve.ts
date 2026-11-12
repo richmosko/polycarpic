@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cloneMigrated, dbEnv, setRolePasswords } from '../../../../tests/db/helpers/api.ts';
+import { createBootstrapLockDir } from '../../../../tests/db/helpers/bootstrap-lock.ts';
 import { must, startServer } from '../../../../tests/db/helpers/pg.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -18,8 +19,11 @@ const NAME = 'Ada Lovelace';
 const EMAIL = 'ada@e2e.test';
 const PASSWORD = 'e2e correct horse battery staple';
 
-const { server, stop } = startServer();
+const { server, stop: stopServer } = startServer();
 process.env.POLY_TEST_SERVER = JSON.stringify(server);
+// Outside vitest's globalSetup, so this entry point makes the bootstrap lock directory itself (the lock throws when it is unset).
+const removeLockDir = createBootstrapLockDir();
+const stop = () => { stopServer(); removeLockDir(); };
 setRolePasswords();
 const db = cloneMigrated();
 
