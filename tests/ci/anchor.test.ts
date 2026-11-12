@@ -8,7 +8,8 @@
 //            lookup(): object            // parsed `gh api` JSON; throws on exit!=0, timeout or bad JSON
 //            hasCommit(sha): boolean, isAncestor(a, b): boolean,
 //            diff(a, b): string[]        // `git diff --no-renames -z --name-only a b` split on NUL; throws on error
-//            modes(a, b): string[]       // every old and new mode from `git diff --raw -z --no-renames a b`; throws on error }
+//            modes(a, b): string[]       // every old and new mode from `git diff --raw -z --no-renames a b`: exactly 2 per diff path;
+//                                        // any other count (e.g. empty) is false (C22 tightening); throws on error }
 //   decide() is false if any mode is 120000 (symlink) or 160000 (gitlink) (C22), or modes() throws.
 //   CLI: env EVENT_NAME REPO HEAD_REF PR_HEAD PR_BASE (+ GH_TOKEN for gh); prints exactly one line
 //        `ledger_only=true|false` to stdout, the reason to stderr, exit 0 (non-zero only on an internal crash).
@@ -38,7 +39,7 @@ function fakeIo(over: Record<string, unknown> = {}) {
     hasCommit: () => true,
     isAncestor: () => true,
     diff: () => ['process/STATE.md', 'process/cairn/issues/POLY-141.md'],
-    modes: () => ['100644', '100644'],
+    modes: () => ['100644', '100644', '100644', '100644'],   // two per diff path (old, new); the default diff has two paths
     ...over,
   };
 }
@@ -154,10 +155,15 @@ describe('decide(): fails closed (C14)', () => {
     ['base not an ancestor of the anchor (merge from main / rebase)', { isAncestor: (a: string) => a !== BASE }],
     ['an ancestry check that throws', { isAncestor: throws }],
     ['a diff error', { diff: throws }],
-    ['a symlink in the diff (mode 120000, new side)', { modes: () => ['000000', '120000'] }],
-    ['a symlink in the diff (mode 120000, old side)', { modes: () => ['120000', '100644'] }],
-    ['a gitlink in the diff (mode 160000)', { modes: () => ['000000', '160000'] }],
+    ['a symlink in the diff (mode 120000, new side)', { modes: () => ['000000', '120000', '100644', '100644'] }],
+    ['a symlink in the diff (mode 120000, old side)', { modes: () => ['120000', '100644', '100644', '100644'] }],
+    ['a gitlink in the diff (mode 160000)', { modes: () => ['000000', '160000', '100644', '100644'] }],
     ['a modes lookup that throws', { modes: throws }],
+    ['an empty modes list for a non-empty diff (a blinded symlink check)', { modes: () => [] }],
+    ['fewer than two modes per path (3 for 2 paths)', { modes: () => ['100644', '100644', '100644'] }],
+    ['one mode per path (2 for 2 paths)', { modes: () => ['100644', '100644'] }],
+    ['more than two modes per path (5 for 2 paths)', { modes: () => ['100644', '100644', '100644', '100644', '100644'] }],
+    ['a non-array modes result', { modes: () => null }],
     ['an empty diff', { diff: () => [] }],
     ['a path outside the ledger', { diff: () => ['process/STATE.md', 'packages/db/src/x.ts'] }],
     ['a WORKFLOW.md path', { diff: () => ['process/WORKFLOW.md'] }],
