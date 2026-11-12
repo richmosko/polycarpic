@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
-paths: [tests/layers/**, scripts/layers/**, eslint.config.js, layers.json, infra/ci/generated.json, docs/ARCH/**, package.json, pnpm-lock.yaml, process/cairn/issues/POLY-140.md, process/cairn/reviews/POLY-140/**]
+paths: [tests/layers/**, scripts/layers/**, eslint.config.js, layers.json, infra/ci/generated.json, docs/ARCH/**, docs/SECURITY/**, package.json, pnpm-lock.yaml, process/cairn/issues/POLY-140.md, process/cairn/reviews/POLY-140/**]
 labels: [lint, security]
 priority: null
 pr: null
@@ -29,3 +29,7 @@ The layer lint enforces the layer map only for imports written by package name. 
 ### @team-lead — 2026-11-11
 
 Feature started. Branch: `feature/poly-140-layer-lint-relative-imports`.
+
+### @team-lead — 2026-11-11
+
+Gates 1 to 3 at 8ebe007. Ruling: `process/cairn/reviews/POLY-140/ruling.md` (17 conditions, addenda 1 and 2), seceng review pass with S1–S6 folded in. Tests red at 8acedb1: 133 failed, 318 passed of 451 in `tests/layers`. Build at 8ebe007: `tests/layers`, `tests/ci`, `tests/config` 740 of 740, `pnpm lint` clean (lead's own runs). `docs/SECURITY/**` added to paths for the import-boundary lines seceng named. Open: the architect rules on two builder choices (`noInlineConfig` on the layers block; `poly/no-computed-import` no longer exempting relative specifiers); condition 4 awaits the Principal.
