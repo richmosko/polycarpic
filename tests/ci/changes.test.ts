@@ -24,7 +24,7 @@ const CASES: [string[], string[], string][] = [
   [['packages/db/src/x.ts'], ['node', 'db'], '`db` dropped, or `layers` keyed to all of packages/**'],
   [['packages/db/package.json'], ['node', 'db', 'layers'], 'package.json files dropped from `layers`'],
   [['apps/web/src/a.ts'], ['node'], 'apps/** dropped from `node`'],
-  [['apps/web/package.json'], ['node', 'layers'], 'apps/*/package.json dropped from `layers`'],
+  [['apps/web/package.json'], ['node', 'layers', 'db'], 'apps/*/package.json dropped from `layers`'],
   [['tests/db/a.test.ts'], ['db'], '`db` widened to node, or tests/db dropped from `db`'],
   [['pnpm-lock.yaml'], ['node', 'db'], 'pnpm-lock.yaml dropped from `db` (POLY-102 R5 closes POLY-96 O2) or from `node`'],
   [['turbo.json'], ['node'], 'turbo.json dropped'],

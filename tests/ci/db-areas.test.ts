@@ -98,7 +98,7 @@ describe('C8 classify', () => {
   for (const p of ['tests/db/new.test.ts', 'tests/db/x.sql', 'tests/db/helpers/new-helper.ts', 'tests/db/pgtap-new/x.sql']) {
     it(`a db path in no area (${p}) -> all four (fail closed)`, async () => { expect(await on([p])).toEqual(ALL); });
   }
-  for (const p of ['docs/PRD/index.html', 'process/STATE.md', 'apps/web/src/routes/+page.svelte', 'infra/ci/changes.mjs', 'Dockerfile']) {
+  for (const p of ['docs/PRD/index.html', 'process/STATE.md', 'apps/web/src/routes/+page.svelte', 'infra/ci/anchor.mjs', 'Dockerfile']) {
     it(`a non-db path (${p}) -> none  [red if: db_* keys widened beyond TABLE.db]`, async () => { expect(await on([p])).toEqual([]); });
   }
   it('db equals the OR of the four area keys for every fixture above and for the empty list', async () => {
