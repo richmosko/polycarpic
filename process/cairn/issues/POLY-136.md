@@ -1,7 +1,7 @@
 ---
 id: POLY-136
 title: CI and migration-check follow-ups
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-136.md, process/cairn/reviews/POLY-136/**, apps/migrate/src/**, docs/SECURITY/**, packages/db/**, packages/auth/**, infra/ci/**, .github/workflows/**, tests/**, README.md, docs/INFRA/**, layers.json, eslint.config.js, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, package.json, pnpm-workspace.yaml, .gitignore, scripts/layers/**]
 labels: [ci, tooling]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/119
 created: 2026-11-10
 updated: 2026-11-11
 ---
@@ -55,3 +55,7 @@ Item 7 / S4: clean install with --reporter=append-only (node_modules removed, st
 ### @architect — 2026-11-11
 
 Gate 4 verdict at 66ed997: PASS, one delta before the PR (regenerate INFRA.pdf). Table: process/cairn/reviews/POLY-136/verdict.md. db tests: 352 executed in run 43126411997 (350 passed + 2 it.fails for POLY-100) against 335 at baseline; db job 124 s on the final head.
+
+### @team-lead — 2026-11-11
+
+PR opened: https://github.com/richmosko/polycarpic/pull/119. Awaiting Validate.
