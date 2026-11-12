@@ -69,3 +69,7 @@ The cairn job's about 120 s is its Python suite (110 s in run 43126411997; check
 ### @team-lead — 2026-11-11
 
 Scoped by architect-136 with qa-engineer-136's measurements after POLY-136 merged (2026-11-12); direction set by the Principal: parallel group plus area split now, a failing per-file ratchet later, no PR/nightly tiering, sharding as the fallback only. Criterion 9 (bookkeeping pushes) was added at the Principal's direction: on PR #119 the "in review" and "done" commits each reran cairn (120 s, 119 s) and db (113 s, 107 s) with no code change since 66ed997. The source measurements were throwaway local runs and are summarised in the Measured section; nothing from them is committed.
+
+### @team-lead — 2026-11-11
+
+qa-engineer-136's two source files are kept beside this issue: `process/cairn/reviews/POLY-141/qa-split-measurements.md` (per-file CI and local seconds, cluster-global flags, the four-area split) and `qa-parallel-measurements.md` (the unlocked parallel failure and the valid timings). Local machine had 10 CPUs; nothing in them was run on CI in parallel.
