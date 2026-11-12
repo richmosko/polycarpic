@@ -439,9 +439,14 @@ class CiAnchoredSkipTests(unittest.TestCase):
         next_step = re.search(r"\n\s*- name:", rest)
         return rest[: next_step.start()] if next_step else rest
 
-    def test_anchor_lookup_asks_for_successful_pull_request_runs(self):
-        self.assertIn("event=pull_request", self.block, "anchor lookup must filter event=pull_request")
-        self.assertIn("status=success", self.block, "anchor lookup must filter status=success")
+    # POLY-141 C18/C19: the lookup, ancestry and ANCHOR_DIFF/PINNED_RULINGS decision moved out of this shell
+    # block into infra/ci/anchor.mjs. The pins that checked their shape (event=pull_request, status=success,
+    # the two ancestry checks, PINNED_RULINGS consulted against ANCHOR_DIFF) now live, as behaviour, in
+    # tests/ci/anchor.test.ts; this class keeps only what is still shell text.
+
+    def test_anchor_comes_from_anchor_mjs_not_shell(self):
+        self.assertIn("infra/ci/anchor.mjs", self.block, "the changes step must call the one anchor implementation")
+        self.assertNotIn("gh api", self.block, "the lookup lives in anchor.mjs, not in the shell")
 
     def test_workflow_grants_actions_read(self):
         self.assertIn(
@@ -449,19 +454,24 @@ class CiAnchoredSkipTests(unittest.TestCase):
             "permissions must add actions: read for the anchor lookup (addendum 1)",
         )
 
-    def test_both_ancestry_checks_appear(self):
+    def test_no_ancestry_check_in_shell(self):
         self.assertEqual(
-            self.block.count("merge-base --is-ancestor"), 2,
-            "expected both ancestry checks (anchor -> PR head, base -> anchor) "
-            "in the changes step (addendum 1)",
+            self.block.count("merge-base --is-ancestor"), 0,
+            "POLY-141 C19: both ancestry checks live in infra/ci/anchor.mjs only",
         )
 
-    def test_run_false_write_appears_exactly_twice(self):
+    def test_run_false_write_appears_exactly_once(self):
         self.assertEqual(
-            len(re.findall(r'echo\s+"run=false"', self.block)), 2,
-            "expected exactly two run=false writes: the §0.7 no-match case "
-            "and the addendum-1 anchor skip",
+            len(re.findall(r'echo\s+"run=false"', self.block)), 1,
+            "POLY-141 C18: the anchor skip no longer writes run=false; only the §0.7 no-match case does",
         )
+
+    def test_every_git_diff_passes_no_renames(self):
+        diffs = [l for l in self.block.splitlines() if re.search(r"\bgit diff\b", l) and not l.lstrip().startswith("#")]
+        self.assertTrue(diffs, "the changes step has a git diff")
+        for l in diffs:
+            with self.subTest(line=l.strip()):
+                self.assertIn("--no-renames", l, "POLY-141 C16: a rename must not hide its source path from the filter")
 
     def test_step_still_has_no_bare_or_true(self):
         self.assertNotRegex(
@@ -469,28 +479,6 @@ class CiAnchoredSkipTests(unittest.TestCase):
             "the anchor path may only ever add a false -- never a swallowed exit status",
         )
 
-    def test_anchor_skip_decision_also_checks_pinned_rulings(self):
-        # POLY-80: the anchor-skip path filters ANCHOR_DIFF through EXCLUDE
-        # same as the main §0.7 path -- it must also consult PINNED_RULINGS
-        # against the unfiltered ANCHOR_DIFF, or a PR touching only a
-        # blob-pinned ruling file could get skipped via this shortcut
-        # before ever reaching the PATTERN_HIT/PINNED_HIT check below it.
-        # Scoped to the span between computing ANCHOR_RELEVANT and deciding
-        # SKIP=true -- PINNED_RULINGS also appears earlier, in its own
-        # variable definition, which doesn't prove the anchor path uses it.
-        anchor_idx = self.block.index("ANCHOR_RELEVANT")
-        skip_true_idx = self.block.index("SKIP=true")
-        self.assertLess(anchor_idx, skip_true_idx, "expected ANCHOR_RELEVANT before SKIP=true in source order")
-        anchor_span = self.block[anchor_idx:skip_true_idx]
-        self.assertIn(
-            "PINNED_RULINGS", anchor_span,
-            "the anchor-skip decision must consult PINNED_RULINGS between computing "
-            "ANCHOR_RELEVANT and deciding SKIP=true, not just EXCLUDE",
-        )
-        self.assertIn(
-            "ANCHOR_DIFF", anchor_span[anchor_span.index("PINNED_RULINGS"):],
-            "PINNED_RULINGS must be checked against the unfiltered ANCHOR_DIFF",
-        )
 
 
 class WorkflowMdSpinOffCleanSentenceTests(unittest.TestCase):

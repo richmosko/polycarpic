@@ -199,3 +199,72 @@ describe('ci.yml: the app aggregate (criterion 1, 7 name)', () => {
     expect(s.env?.NEEDS).toMatch(/toJSON\(needs\)/);
   });
 });
+
+// POLY-141 criterion 9, C15, C16, C18, C19: the anchor skip is wired into both `changes` and `cairn`.
+describe('ci.yml: the anchor skip (POLY-141 C15, C16, C18)', () => {
+  const gitDiffLines = (body: string) => body.split('\n').filter((l) => /\bgit diff\b/.test(l) && !/^\s*#/.test(l));
+
+  it('changes: calls anchor.mjs, compares its output exactly, and takes `--none` on ledger_only=true  [red while the shell is absent]', () => {
+    const j = w.jobs.changes!;
+    const body = runOf(j);
+    expect(body).toMatch(/infra\/ci\/anchor\.mjs/);
+    expect(body).toContain('= "ledger_only=true"');
+    expect(body).toMatch(/infra\/ci\/changes\.mjs --none/);
+    expect(body).toMatch(/infra\/ci\/changes\.mjs/);
+  });
+  it('changes: has actions: read and the GH_TOKEN, REPO, HEAD_REF, PR_HEAD environment, with no ${{ }} in run  [red if: a variable is missing]', () => {
+    const j = w.jobs.changes!;
+    expect(j.permissions?.actions).toBe('read');
+    expect(j.permissions?.contents).toBe('read');
+    const env = Object.assign({}, ...steps(j).map((s) => s.env ?? {}));
+    for (const k of ['GH_TOKEN', 'REPO', 'HEAD_REF', 'PR_HEAD']) expect(Object.keys(env), k).toContain(k);
+    expect(runOf(j)).not.toContain('${{');
+  });
+  it('every git diff that feeds a filter passes --no-renames: changes, and both diffs in the cairn job (C16)  [red if: one lacks it]', () => {
+    for (const id of ['changes', 'cairn']) {
+      const ls = gitDiffLines(runOf(w.jobs[id]!));
+      expect(ls.length, `${id} has a git diff`).toBeGreaterThan(0);
+      for (const l of ls) expect(l, `${id}: ${l}`).toContain('--no-renames');
+    }
+  });
+  it('cairn: no shell ancestry check remains; the anchor comes from anchor.mjs (C19)', () => {
+    const body = runOf(w.jobs.cairn!);
+    expect(body).not.toContain('merge-base');
+    expect(body).not.toContain('ANCHOR_RELEVANT');
+    expect(body).toMatch(/infra\/ci\/anchor\.mjs/);
+    expect(body).toContain('= "ledger_only=true"');
+  });
+  it('cairn: writes run=true, run=ledger and run=false; run=false once (C18)', () => {
+    const body = runOf(w.jobs.cairn!);
+    expect(body.match(/echo\s+"run=false"/g) ?? []).toHaveLength(1);
+    expect(body.match(/echo\s+"run=ledger"/g) ?? []).not.toHaveLength(0);
+    expect(body.match(/echo\s+"run=true"/g) ?? []).not.toHaveLength(0);
+  });
+  it('cairn: run=ledger sets up Python and runs exactly the ledger tests with -p; Node and the JS suite stay on run=true only; run=true is unchanged (C18)', () => {
+    const j = w.jobs.cairn!;
+    const bySetup = (re: RegExp) => steps(j).find((s) => re.test(s.uses ?? ''))!;
+    expect(bySetup(/^actions\/setup-node@/).if).toMatch(/^\s*(\$\{\{\s*)?steps\.changes\.outputs\.run == 'true'\s*(\}\})?\s*$/);
+    const js = steps(j).find((s) => /node --test/.test(s.run ?? ''))!;
+    expect(js.if).toMatch(/^\s*(\$\{\{\s*)?steps\.changes\.outputs\.run == 'true'\s*(\}\})?\s*$/);
+    const py = bySetup(/^actions\/setup-python@/);
+    expect(py.if).toContain("'ledger'");
+    expect(py.if).toContain("'true'");
+    const full = steps(j).find((s) => /^\s*python3 scripts\/cairn\/run_tests\.py\s*$/.test(s.run ?? ''))!;
+    expect(full, 'the full-suite step is unchanged').toBeDefined();
+    expect(full.if).toMatch(/steps\.changes\.outputs\.run == 'true'/);
+    const led = steps(j).find((s) => /--ledger-tests/.test(s.run ?? ''))!;
+    expect(led, 'a ledger step that reads node infra/ci/anchor.mjs --ledger-tests').toBeDefined();
+    expect(led.if).toMatch(/steps\.changes\.outputs\.run == 'ledger'/);
+    expect(led.run).toMatch(/infra\/ci\/anchor\.mjs --ledger-tests/);
+    expect(led.run).toMatch(/run_tests\.py/);
+    expect(led.run).toMatch(/-p\b/);
+    expect(led.run).not.toContain('${{');
+  });
+  it('cairn: a BASE..HEAD of ledger paths only gives run=ledger  [red while the leg is absent]', () => {
+    expect(runOf(w.jobs.cairn!)).toMatch(/run=ledger/);
+    expect(runOf(w.jobs.cairn!)).toMatch(/LEDGER/);
+  });
+  it('anchor.mjs is the only place the lookup is written: no `actions/workflows/ci.yml/runs` in ci.yml', () => {
+    expect(wfText('ci.yml')).not.toContain('actions/workflows/ci.yml/runs');
+  });
+});
