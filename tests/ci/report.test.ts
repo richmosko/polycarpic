@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { ci, node } from './helpers.ts';
+import { ci, node, ROOT } from './helpers.ts';
 
 function scene(opts: { job: string; secs: number; tasks?: { pkg: string; secs: number; task?: string }[]; full?: boolean; status?: string; budgets?: object }) {
   const d = mkdtempSync(join(tmpdir(), 'report-'));
@@ -98,12 +98,76 @@ describe('job-report.mjs', () => {
 });
 
 describe('budgets.json', () => {
-  it('holds the ruled budgets: lint 120, db 180, package test 120; unit and image have none', () => {
+  it('holds the ruled budgets: lint 120, db 100 (POLY-141 C13: still a warning, no failing ratchet), package test 120; unit and image have none', () => {
     const b = JSON.parse(readFileSync(ci('budgets.json'), 'utf8')) as { jobs: Record<string, number>; packageTest: number };
     expect(b.jobs.lint).toBe(120);
-    expect(b.jobs.db).toBe(180);
+    expect(b.jobs.db).toBe(100);
     expect(b.packageTest).toBe(120);
     expect(b.jobs.unit).toBeUndefined();
     expect(b.jobs.image).toBeUndefined();
+  });
+});
+
+// POLY-141 C13 (criterion 7): per-file seconds for the db battery. With VITEST_JSON (path to vitest's json reporter output)
+// set and JOB_NAME=db, REPORT_ONLY=jsonl writes one `ci:db:file` line per test file next to the job line.
+// Line: {...common job-line fields, runner:'ci:db:file', file:'tests/db/x.test.ts', project:'db-parallel'|'db-serial', area, seconds, ok}.
+// Vitest json: {testResults:[{name: <absolute path>, startTime: ms, endTime: ms, status: 'passed'|'failed'}]}.
+describe('job-report.mjs: per-file timing for the db battery (POLY-141 C13)', () => {
+  const FILES: [string, number, string][] = [
+    ['tests/db/auth-session.test.ts', 4.5, 'passed'], ['tests/db/tenancy.test.ts', 3.25, 'passed'],
+    ['tests/db/runner.test.ts', 12, 'failed'], ['tests/db/ops-status.test.ts', 1, 'passed'],
+  ];
+  function dbScene(o: { json?: string | null; job?: string; only?: string }) {
+    const d = mkdtempSync(join(tmpdir(), 'report-file-'));
+    const jsonPath = join(d, 'vitest.json');
+    const body = o.json === undefined ? JSON.stringify({ testResults: FILES.map(([f, sec, status], i) => ({ name: join(ROOT, f), startTime: 1_000 + i * 50, endTime: 1_000 + i * 50 + sec * 1000, status, assertionResults: [] })) }) : o.json;
+    if (body !== null) writeFileSync(jsonPath, body);
+    const summary = join(d, 's.md'); writeFileSync(summary, '');
+    const r = node('job-report.mjs', {
+      env: { JOB_NAME: o.job ?? 'db', JOB_START: '100', NOW: '160', JOB_STATUS: 'success', GITHUB_STEP_SUMMARY: summary, RUNNER_TEMP: d, GITHUB_SHA: 'a'.repeat(40), GITHUB_REF_NAME: 'b', GITHUB_RUN_ID: '1', CI_FULL_RUN: 'false', REPORT_ONLY: o.only ?? 'jsonl', VITEST_JSON: jsonPath, TURBO_RUNS_DIR: join(d, 'none') },
+    });
+    const jl = join(d, 'ci-test-runs.jsonl');
+    const lines = existsSync(jl) ? readFileSync(jl, 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l) as Record<string, any>) : [];
+    return { r, lines, files: lines.filter((l) => l.runner === 'ci:db:file'), jobLines: lines.filter((l) => l.runner === 'ci:db') };
+  }
+
+  it('one ci:db:file line per test file, next to exactly one ci:db job line, exit 0  [red while the JSON is ignored]', () => {
+    const { r, files, jobLines } = dbScene({});
+    expect(r.code, r.stderr).toBe(0);
+    expect(jobLines).toHaveLength(1);
+    expect(files.map((l) => l.file).sort()).toEqual(FILES.map((f) => f[0]).sort());
+  });
+  it('each line carries file, project, area, seconds and ok from the JSON, the SERIAL list and the area map', () => {
+    const { files } = dbScene({});
+    const by = Object.fromEntries(files.map((l) => [l.file, l]));
+    expect(by['tests/db/auth-session.test.ts']).toMatchObject({ project: 'db-parallel', area: 'auth', seconds: 4.5, ok: true, who: 'ci' });
+    expect(by['tests/db/tenancy.test.ts']).toMatchObject({ project: 'db-parallel', area: 'tenancy', seconds: 3.25, ok: true });
+    expect(by['tests/db/runner.test.ts']).toMatchObject({ project: 'db-serial', area: 'migrate', seconds: 12, ok: false });
+    expect(by['tests/db/ops-status.test.ts']).toMatchObject({ project: 'db-parallel', area: 'ops', seconds: 1, ok: true });
+  });
+  it('the file lines share the job line\'s sha, branch and session, and carry no env dump', () => {
+    const { files } = dbScene({});
+    for (const l of files) {
+      expect(l).toMatchObject({ sha: 'a'.repeat(40), branch: 'b', session: '1', runner: 'ci:db:file' });
+      expect(JSON.stringify(l)).not.toMatch(/GITHUB_|TOKEN|PATH|VITEST_JSON/);
+    }
+  });
+  it('REPORT_ONLY=summary writes no file lines (they belong to the jsonl step)', () => {
+    expect(dbScene({ only: 'summary' }).files).toEqual([]);
+  });
+  it('another job (unit) with VITEST_JSON set writes no file lines', () => {
+    expect(dbScene({ job: 'unit' }).files).toEqual([]);
+  });
+  for (const [name, json] of [['a missing file', null], ['unparseable JSON', '{not json'], ['JSON with no testResults', '{}'], ['an empty file', '']] as [string, string | null][]) {
+    it(`${name} -> only the job line, exit 0  [red if: a missing or broken report fails the step]`, () => {
+      const { r, files, jobLines } = dbScene({ json });
+      expect(r.code, r.stderr).toBe(0);
+      expect(files).toEqual([]);
+      expect(jobLines).toHaveLength(1);
+    });
+  }
+  it('the ratchet stays a warning: a file over any number never makes the report exit non-zero', () => {
+    const slow = JSON.stringify({ testResults: [{ name: join(ROOT, 'tests/db/runner.test.ts'), startTime: 0, endTime: 900_000, status: 'passed' }] });
+    expect(dbScene({ json: slow }).r.code).toBe(0);
   });
 });

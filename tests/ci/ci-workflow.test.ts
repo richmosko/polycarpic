@@ -336,4 +336,13 @@ describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
     expect(run).toContain('all');                                       // `all` runs with no file filter
     expect(runOf(dbj())).not.toContain('passWithNoTests');
   });
+  it('C13: the battery writes vitest\'s json report to $VITEST_JSON (default reporter kept) and the timing step reads the same path  [red while absent]', () => {
+    const st = battery();
+    expect(st.run).toContain('--reporter=json');
+    expect(st.run).toContain('--reporter=default');
+    expect(st.run).toMatch(/--outputFile[= ]"?\$VITEST_JSON"?/);
+    const rec = steps(dbj()).find((s) => /job-report\.mjs/.test(s.run ?? '') && s.env?.REPORT_ONLY === 'jsonl')!;
+    expect(rec.env?.VITEST_JSON, 'Record timing sets VITEST_JSON').toBeDefined();
+    expect(rec.env?.VITEST_JSON).toBe(st.env?.VITEST_JSON);
+  });
 });
