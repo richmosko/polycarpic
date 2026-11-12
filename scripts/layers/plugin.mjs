@@ -89,7 +89,7 @@ const noBannedSpecifier = {
 const noComputedImport = {
   meta: { type: 'problem', schema: [] },
   create(context) {
-    // POLY-140: a computed relative specifier is no longer exempt; no-relative-cross-package reports it too.
+    // Every non-static specifier is reported, relative or not (no-relative-cross-package also reports the relative ones).
     return {
       ImportExpression(node) {
         if (staticValue(node.source) !== null) return;
