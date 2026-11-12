@@ -1,7 +1,7 @@
 ---
 id: POLY-136
 title: CI and migration-check follow-ups
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -59,3 +59,7 @@ Gate 4 verdict at 66ed997: PASS, one delta before the PR (regenerate INFRA.pdf).
 ### @team-lead — 2026-11-11
 
 PR opened: https://github.com/richmosko/polycarpic/pull/119. Awaiting Validate.
+
+### @team-lead — 2026-11-11
+
+Validate passed; merging via PR #119. Closing.
