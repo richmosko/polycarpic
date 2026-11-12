@@ -18,11 +18,11 @@ The layer lint enforces the layer map only for imports written by package name. 
 
 ## Acceptance criteria
 
-- [ ] A relative import that resolves into another workspace package's folder is a lint error from any file under `apps/*/src` or `packages/*/src`, whatever the layer map says about the two packages.
-- [ ] `tests/layers` fixtures show it red for the two reproduced cases (`apps/web/src` → `../../migrate/src/index.ts`, `packages/auth/src` → `../../ledger/src/index.ts`) and green for a relative import inside one package.
-- [ ] No existing source file trips the rule, or each one that does is fixed in this loop. (A text search at 8d2173e found no non-test file under `apps/*/src` or `packages/*/src` with an import climbing two or more directories; unconfirmed by the lint itself.)
-- [ ] The rule is generated from the layer map by `scripts/layers/generate.mjs`, not hand-written in `eslint.config.js`, and the generated-freshness test covers it.
-- [ ] ARCH's layer-enforcement section states that both import forms are refused (present tense, no history).
+- [x] A relative import that resolves into another workspace package's folder is a lint error from any file under `apps/*/src` or `packages/*/src`, whatever the layer map says about the two packages. Proof: `fixtures/25-relative-cross-package/fail-*`, incl. `fail-auth-to-db-allowed-edge` (map allows, still red).
+- [x] `tests/layers` fixtures show it red for the two reproduced cases (`apps/web/src` → `../../migrate/src/index.ts`, `packages/auth/src` → `../../ledger/src/index.ts`) and green for a relative import inside one package. Proof: `fail-web-to-migrate-index`, `fail-auth-to-ledger-index`; green `pass-same-dir`, `pass-parent-from-subdir`, `pass-package-json`.
+- [x] No existing source file trips the rule, or each one that does is fixed in this loop. (A text search at 8d2173e found no non-test file under `apps/*/src` or `packages/*/src` with an import climbing two or more directories; unconfirmed by the lint itself.) Proof: `pnpm lint` exit 0 at 8d8bd56 with the rule on.
+- [x] The rule is generated from the layer map by `scripts/layers/generate.mjs`, not hand-written in `eslint.config.js`, and the generated-freshness test covers it. Proof: `tests/layers/relative-structure.test.ts` (generated blocks per package) and `tests/ci/generated-freshness.test.ts`.
+- [x] ARCH's layer-enforcement section states that both import forms are refused (present tense, no history). Proof: ARCH 1.15.16 §2.1, read against `plugin.mjs`; see `process/cairn/reviews/POLY-140/verdict.md`.
 
 ## Comments
 
