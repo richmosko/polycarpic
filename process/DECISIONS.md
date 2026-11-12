@@ -618,3 +618,15 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** a path import skips the target's `exports` map, and a list of forbidden destinations grows with every shared folder; the loader route bypassed every layer rule. No source file tripped any of it.
 **Alternatives considered:** refusing only a path that lands in another package (the issue as filed); extending the resolver so the layer map's allow-list covers path imports.
 **Approved by:** the Principal (2026-11-12), on the architect's ruling with seceng's review.
+
+### 2026-11-12 — A CI job skips only when nothing it reads has changed since a green state
+**Decision:** three rules hold the merge gate while CI runs less (POLY-141). The `db` battery is split into four areas proven by import closure, and a `db` path in no area runs all four. A push whose changes since the last green `pull_request` run on the branch are tracker and ledger files only skips lint, unit, db and image, and runs the four ledger-reading cairn tests plus `cairn check`; any failed lookup, ancestry check or diff gives the full run. Every file a job executes triggers that job, including the workflow file and filter for `db` and the harness for the web e2e. The aggregate is red on a missing or malformed filter output.
+**Why:** the `db` job grew with every feature and each loop's closing commits reran every suite. Measured: full `db` job 124 s to an 86 s median, an auth-only change 48 s, a bookkeeping push about 450 s to about 50 s of summed job time.
+**Alternatives considered:** PR/nightly tiering; sharding across runners; a fourth worker (the 4-vCPU runner is already saturated at three).
+**Approved by:** the Principal (direction 2026-11-12; merge 2026-11-12), on the architect's ruling with seceng's review.
+
+### 2026-11-12 — Area-only CI timings are measured with dispatch runs, not scratch pull requests
+**Decision:** POLY-141 criterion 6 was measured with four `workflow_dispatch` runs carrying a `base` sha on scratch branches of one comment-line commit each, deleted afterwards.
+**Why:** they go through the same filter code as a pull request and leave no throwaway PRs in the history.
+**Alternatives considered:** one scratch pull request per area, as the criterion was written.
+**Approved by:** the Principal (2026-11-12), on the architect's ruling.

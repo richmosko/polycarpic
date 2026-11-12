@@ -1,7 +1,7 @@
 ---
 id: POLY-141
 title: CI test-time cuts
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -106,3 +106,7 @@ Criterion 6, measured by the lead: four dispatch runs with `base` = 3b3242a on s
 ### @team-lead — 2026-11-12
 
 PR https://github.com/richmosko/polycarpic/pull/122 marked ready. Verdict PASS at 5c37510 (`process/cairn/reviews/POLY-141/verdict.md`, cd6d8d5); head-match PASS. Finish gate at ae2319d: cairn Python suite 2017 OK, board JS suite 494, dashboard type check 0 errors, dist fresh.
+
+### @team-lead — 2026-11-12
+
+Validate passed; merging via PR #122. Closing. Follow-ups to file in one docs PR: a second Postgres cluster so the serial group runs beside the parallel one (only if the `db` job grows back toward 100 s); dispatch runs always run the full cairn suite; the `ci:db` timing record reads about 9 s under the job's wall time because its clock starts after checkout. Carried, unmeasured: the image tests that misbehaved locally under parallel load in POLY-140 ran green in every full CI run of this loop.

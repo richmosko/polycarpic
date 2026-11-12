@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 were approved at the gate; ARCH is now v1.15.16 (layer map and its enforcement; Drizzle Kit confirmed by the POLY-76 spike, §6.2; sign-up inside our own transaction, §3.1), SECURITY v1.9.11 and INFRA v1.3.5. `POLY-C` closed and archived. The first session's issues (POLY-76, 82, 83, 84, 85) are done; the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
+**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 were approved at the gate; ARCH is now v1.15.16 (layer map and its enforcement; Drizzle Kit confirmed by the POLY-76 spike, §6.2; sign-up inside our own transaction, §3.1), SECURITY v1.9.12 and INFRA v1.3.8. `POLY-C` closed and archived. The first session's issues (POLY-76, 82, 83, 84, 85) are done; the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
 **Started:** 2026-11-09  
 **Driver agent:** backend-lead (qa-engineer drives Validate)  
 **Gate criteria:** _see [`WORKFLOW.md`](WORKFLOW.md)_
@@ -15,15 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** CI test-time cuts
-- **Issue:** POLY-141 (cairn)
-- **Milestone:** POLY-M1
-- **Branch:** `feature/poly-141-ci-test-time-cuts`
-- **Started:** 2026-11-12
-- **Goal:** the `db` battery runs in parallel and by area, and bookkeeping pushes skip the heavy suites.
-- **Status:** In Review — PR [#122](https://github.com/richmosko/polycarpic/pull/122)
-
-Standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job has about 5 s of room against its 130 s median target (the configured budget is 180 s and only warns) until this issue lands; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. A package is left only by its `@poly/<name>` import (lint-enforced). Nothing is deployed; sign-up stays closed until POLY-87 and second-factor enrolment until POLY-89.
+_None. POLY-141 (CI test-time cuts) merged 2026-11-12 via PR [#122](https://github.com/richmosko/polycarpic/pull/122) — INFRA 1.3.8, SECURITY 1.9.12. The `db` CI job runs at an 86 s median (was 124 s): its files run in parallel behind a harness lock, split into four areas (auth, tenancy, migrate, ops) so a PR runs only the areas it touches, and a push that changes only tracker and ledger files skips the heavy suites. A package is left only by its `@poly/<name>` import (lint-enforced). `packages/auth` runs BetterAuth 1.7.18 on the routing pool behind the `/api/auth/*` allowlist; nothing is deployed. Sign-up stays closed until POLY-87 and second-factor enrolment until POLY-89. Three standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job's budget is 100 s and only warns, so a loop that pushes the median past it brings its own cut; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. Follow-ups: POLY-137 (auth), POLY-138 (Caddy and edge), POLY-139 (sign-in and sessions screens); POLY-97 carries the uploader access that gates the first backup._
 
 - **Next:** POLY-87 (invite-only sign-up); POLY-97 (infra scaffolding; needs a real Hetzner project) alongside. POLY-131 held (P3).
 
