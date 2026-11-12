@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/aggregate.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/infra/wiring.test.ts, tests/workflow/test_cairn_test_boundary.py, apps/web/tests/e2e/serve.ts, docs/INFRA/**, docs/SECURITY/**, tests/db/auth-session.test.ts, tests/db/tenancy.test.ts, tests/db/checks.test.ts, tests/db/ops-status.test.ts]
+paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/aggregate.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/infra/wiring.test.ts, tests/workflow/test_cairn_test_boundary.py, apps/web/tests/e2e/serve.ts, docs/INFRA/**, docs/SECURITY/**]
 labels: [ci, tooling]
 priority: null
 pr: null
@@ -98,3 +98,7 @@ Criterion 1 and the CI half of criterion 2, measured by the lead on head 5c37510
 ### @team-lead — 2026-11-12
 
 Criterion 9, first bookkeeping push (7445dc6, run 43298446115): anchor "ledger-only since 5c37510"; lint, unit, db and image skipped; cairn 12 s (70 tests in 4 files plus `cairn check`); summed job time 54 s against 90 s. Criterion 6: the Principal accepted dispatch-with-base runs on scratch branches in place of scratch PRs (2026-11-12). Four test files are added to `paths` for the scratch branches only (auth-session, tenancy, checks, ops-status); they come out again once the runs are measured, and no `tests/db/*.test.ts` changes on the feature branch.
+
+### @team-lead — 2026-11-12
+
+Criterion 6, measured by the lead: four dispatch runs with `base` = 3b3242a on scratch branches of one comment-line commit each (diffs checked: one file, +1 line). Each selected `db` plus its own area key only; lint, unit and image skipped. `db` job: auth 48 s, 137 passed (run 43312152200; target 65 s); tenancy 53 s, 85 passed (43312506787); migrate 65 s, 93 passed (43312849525); ops 54 s, 35 passed (43313139798). The four passed counts sum to 350, the full run's passed count. Scratch branches deleted from origin; the four test files are out of `paths` again. Criterion 9, second bookkeeping push (3b3242a, run on the PR): cairn 15 s, summed 43 s, heavy jobs skipped.
