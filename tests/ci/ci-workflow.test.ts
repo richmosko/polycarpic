@@ -75,7 +75,7 @@ describe('ci.yml: hardening every job (S96-3..7)', () => {
 });
 
 describe('ci.yml: changes + guard (criteria 1, 4)', () => {
-  it('changes runs always, fails closed (set -euo pipefail), full history, feeds changes.mjs, exposes five outputs', () => {
+  it('changes runs always, fails closed (set -euo pipefail), full history, feeds changes.mjs, exposes nine outputs', () => {
     const j = w.jobs.changes!;
     expect(j.if).toBeUndefined();
     expect(needsOf(j)).toEqual([]);
@@ -84,7 +84,7 @@ describe('ci.yml: changes + guard (criteria 1, 4)', () => {
     expect(runOf(j)).toMatch(/set -euo pipefail/);
     expect(runOf(j)).toMatch(/infra\/ci\/changes\.mjs/);
     expect(runOf(j)).toMatch(/\^\[0-9a-f\]\{40\}\$/); // dispatch base validated as 40-hex
-    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['ci', 'db', 'image', 'layers', 'node']);
+    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'image', 'layers', 'node']); // POLY-141: the five keys and the four areas
   });
   it('guard runs always (no if), pin check over .github and infra/ci, and gitleaks  [red if: guard gated on changes]', () => {
     const j = w.jobs.guard!;
@@ -291,5 +291,49 @@ describe('ci.yml: the anchor skip (POLY-141 C15, C16, C18)', () => {
   });
   it('anchor.mjs is the only place the lookup is written: no `actions/workflows/ci.yml/runs` in ci.yml', () => {
     expect(wfText('ci.yml')).not.toContain('actions/workflows/ci.yml/runs');
+  });
+});
+
+// POLY-141 C4/C11 (+ S7): the area keys reach the `db` job, which preflights the proofs and runs only the selected files.
+describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
+  const AREA_KEYS = ['db_auth', 'db_tenancy', 'db_migrate', 'db_ops'];
+  const dbj = () => w.jobs.db!;
+  const idx = (re: RegExp) => steps(dbj()).findIndex((s) => re.test(s.run ?? ''));
+  const battery = () => steps(dbj())[idx(/tests\/db\/vitest\.config\.ts/)]!;
+
+  it('changes exposes the nine outputs: the five keys and db_auth, db_tenancy, db_migrate, db_ops  [red while the area keys are absent]', () => {
+    expect(Object.keys(w.jobs.changes!.outputs ?? {}).sort()).toEqual(['ci', 'db', ...AREA_KEYS, 'image', 'layers', 'node'].sort());
+  });
+  it('a dispatch with no base sets every key true: the printf names all nine', () => {
+    const body = runOf(w.jobs.changes!);
+    for (const k of ['node', 'layers', 'db', 'image', 'ci', ...AREA_KEYS]) expect(body, k).toContain(`${k}=true`);
+  });
+  it('the db job is still gated on `db` alone (db is the OR of the areas)', () => {
+    expect(dbj().if).toContain('needs.changes.outputs.db');
+    expect(dbj().if).not.toContain('db_');
+  });
+  it('the preflight runs the three tests/ci files before the battery step  [red while absent]', () => {
+    const pre = idx(/vitest run -c tests\/ci\/vitest\.config\.ts[^\n]*db-filter-imports\.test\.ts[^\n]*db-areas\.test\.ts[^\n]*db-harness\.test\.ts/);
+    expect(pre, 'a preflight step').toBeGreaterThan(-1);
+    expect(pre).toBeLessThan(idx(/tests\/db\/vitest\.config\.ts/));
+    expect(pre, 'after the install').toBeGreaterThan(idx(/pnpm install/));
+  });
+  it('the battery step selects with --db-select, the area values come through env:, and run: has no ${{ }}  [red while absent]', () => {
+    const st = battery();
+    expect(st.run).toMatch(/infra\/ci\/changes\.mjs --db-select/);
+    for (const [k, out] of [['DB_AUTH', 'db_auth'], ['DB_TENANCY', 'db_tenancy'], ['DB_MIGRATE', 'db_migrate'], ['DB_OPS', 'db_ops']]) {
+      expect(st.env?.[k as string], k).toMatch(new RegExp(`needs\\.changes\\.outputs\\.${out}\\b`));
+    }
+    expect(st.run).not.toContain('${{');
+  });
+  it('S7: the file list goes into a bash array, never through $GITHUB_OUTPUT; every line is checked; no --passWithNoTests', () => {
+    const run = battery().run ?? '';
+    expect(run).toMatch(/mapfile|readarray|=\(\s*\$\(/);
+    expect(run).not.toContain('GITHUB_OUTPUT');
+    expect(run).toContain('^tests/db/[a-z0-9-]+\\.test\\.ts$');
+    expect(run).not.toContain('passWithNoTests');
+    expect(run).toMatch(/"\$\{[A-Za-z_]+\[@\]\}"/);                  // the array is expanded quoted
+    expect(run).toContain('all');                                       // `all` runs with no file filter
+    expect(runOf(dbj())).not.toContain('passWithNoTests');
   });
 });
