@@ -99,7 +99,10 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
    - `acceptInvitations(tx, { token })`.
 5. **Commit or rollback.** Any throw, or any BetterAuth failure response, rolls back through `RollbackWith` (read, `handler.ts`), which also strips the cookies. The user, Person, membership, invitation claim and session go together.
    - `app.user_id` is local, so it ends with the transaction (C11). `signup_txid` stays on the row; it never matches a later transaction.
-6. **Landing.** `@poly/tenancy` exports `landingEntity(tx)`: the newest entity seated by an accepted invitation, or else the user's own Person.
+6. **Landing** (corrected in place). `@poly/tenancy` exports `landingEntity(tx)`. It reads `membership`, never `invitation`: it returns the user's newest membership (by `created_at DESC, entity_id DESC`) on an entity other than their own Person, or else their own Person.
+   - This uses the existing `poly_app` SELECT policy on membership (`user_id = app.current_user_id()`). No invitation policy is added for claimants, and `invitation_claimant_read` is not built.
+   - What a claimant can read: their own membership rows, and the invited entity through `visible_entities()`. What a claimant cannot read: any `invitation` row, their own included. That covers the inviter, the role offered, the expiry and the email. Only the entity's owners read those, under `invitation_select`.
+   - At sign-up, the newest such membership is the one `accept_invitations` just seated, so the landing is the same as reading the invitation.
    - `apps/web/src/routes/+page.server.ts` redirects a signed-in user to `/dashboard?entity=<id>`, using `withTenant` from `locals.identity`.
    - The `entity` parameter is the seam for the entity selector, which does not exist yet.
    - A new `/sign-up` page (`+page.svelte`, the `/sign-in` pattern) reads `?invitation=`, posts it as `invitationToken`, offers Google and GitHub, and goes to `/` on success. It answers with `Referrer-Policy: no-referrer` and `Cache-Control: no-store`, and it removes `invitation` from the address bar with `history.replaceState` once the token has been read (S9).
@@ -196,7 +199,7 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
 
 **Step 4: catalog (pgTAP)**
 15. `poly_app` has no INSERT on `membership`. `accept_invitations` seats `app.current_user_id()` only against a matching live invitation, and only as viewer. With `second_step_at` set by a superuser, an owner invitation is claimed and not seated. A body scan shows that only `seat_creator` and `accept_invitations` insert into `membership`, and the `poly_govern` INSERT policies on `membership` are exactly `seat_creator`'s and R2's (S6).
-16. A no-entity invitation is visible to no `poly_app` SELECT or UPDATE policy. A `poly_app` INSERT of one is refused with 42501 (`gate_owner_changes`). `claim_invitations` and `accept_invitations` handle it.
+16. A no-entity invitation is visible to no `poly_app` SELECT or UPDATE policy. A viewer seated by an invitation selects 0 rows from `invitation`, their own claimed row included. `pg_policies` for `invitation` and `poly_app` lists exactly `invitation_select`, `invitation_insert` and `invitation_update`. A `poly_app` INSERT of one is refused with 42501 (`gate_owner_changes`). `claim_invitations` and `accept_invitations` handle it.
 17. `accept_invitations` called outside a sign-up transaction refuses with 42501, and no membership is written. This covers:
     - a signed-in user;
     - `app.user_id` forged to an existing, provisioned user who holds a live viewer invitation;
