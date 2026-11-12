@@ -122,3 +122,21 @@ that emits nothing would look exactly like a ledger-only skip (S2).
 
 C-81 needs one line in the loop's doc step: the anchor skip rule and its invariant (only `LEDGER` paths differ from a commit
 whose whole workflow passed and which contains the base), filter diffs use `--no-renames -z`, and `actions: read` is granted per job.
+
+## Build check (head c2dde89)
+
+All eight are met. Read against `.github/workflows/ci.yml`, `infra/ci/anchor.mjs`, `changes.mjs` and `aggregate.mjs`.
+
+| S | Met | Evidence |
+|---|---|---|
+| S1 | yes | ci.yml 61 (cairn) and 200 (`changes`) run `git diff --no-renames -z --name-only`; anchor.mjs 84 does too and rejects output that is not NUL-terminated (85); changes.mjs 113–117 splits on `\0` and exits 1 on non-NUL input (C26). |
+| S2 | yes | aggregate.mjs 20 is red on any `ALL_KEYS` value other than exactly `true`/`false`; line 21 is red when `db` is not the OR of the area keys. |
+| S3 | yes | anchor.mjs 76 `encodeURIComponent(HEAD_REF)`; 57–58 `spawnSync` with an argv array and no shell; 67–69 and 81–89 put every sha through `needSha`; `HEAD_REF` is never a git argument; 26–31 re-check conclusion, event, branch, repository and sha. |
+| S4 | yes | ci.yml 19–20 workflow `permissions` is `contents: read` only; `actions: read` only at 33 (`cairn`) and 151 (`changes`); `GH_TOKEN` only at 45 and 173, the steps that run `anchor.mjs`. Pinned by `ci-workflow.test.ts` (C21). |
+| S5 | yes | anchor.mjs 88–90 read modes with `git diff --raw -z --no-renames`; 45 returns false on 120000/160000; `anchor.test.ts` 303–336 hold the fixture and the real-tree check. |
+| S6 | yes | `anchor.test.ts` 343 onward (C23). |
+| S7 | yes | ci.yml 537–546: `mapfile` into a bash array in the battery step, a per-line regex check, exit 1; no `--passWithNoTests` in ci.yml or `tests/db/vitest.config.ts`. changes.mjs 87 checks the same pattern. |
+| S8 | yes | changes.mjs 15 adds the six paths to `DB_SHARED`, which `TABLE.db` spreads; the fixture is in `db-areas.test.ts` at 92. |
+
+Minor, not a condition: anchor.mjs 44 accepts an empty `modes` list when the diff has paths. If git's `--raw` format ever changed,
+S5 would stop seeing links without failing. Requiring two modes per diff path would make that case fail closed.
