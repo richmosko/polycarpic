@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/aggregate.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/workflow/test_cairn_test_boundary.py, docs/INFRA/**, docs/SECURITY/**]
+paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/aggregate.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/infra/wiring.test.ts, tests/workflow/test_cairn_test_boundary.py, docs/INFRA/**, docs/SECURITY/**]
 labels: [ci, tooling]
 priority: null
 pr: null
@@ -86,3 +86,7 @@ Gate 1: ruling at a38584a (`process/cairn/reviews/POLY-141/ruling.md`, condition
 ### @team-lead — 2026-11-12
 
 seceng review at 16ab3d9: pass with S1–S8; ruling addendum 1 at 5d84714 accepts all eight in this loop (conditions C20–C23 plus amendments). Paths: `infra/ci/aggregate.mjs` and `docs/SECURITY/**` added.
+
+### @team-lead — 2026-11-12
+
+Gates 2 and 3 in progress. Tests red complete at 0939d30 (C1–C26, T1–T4; `red-gate.md`, `ledger-audit.md`). Build at 0ed5568: `tests/ci` 506 of 506 and `pnpm lint` clean on the lead's runs. CI on PR #122: run 43273670958 (c2dde89, before the background image build) db job 103 s, vitest 79.3 s; run 43275349541 (0ed5568, with it) db job 90 s, vitest 51.5 s, 352 tests, image build rc=0 after 9 s of waiting. That run's lint job failed on `tests/infra/wiring.test.ts`, which pins `pg.ts` reading the FROM line; the read moved to `tests/db/helpers/pgtap-image.mjs` (T1). Path `tests/infra/wiring.test.ts` added so qa can move the pin. Ruling: addenda 1–3 and criterion-1 tuning; seceng review pass, S1–S8 met at c2dde89; SECURITY 1.9.12.
