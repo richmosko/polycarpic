@@ -3,7 +3,9 @@
 // layered on top of the definer and the definer decides. Titles end with [red if: <mutation>].
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { boot, teardown, type Env } from './helpers/auth';
-import { must, psql } from './helpers/pg';
+import { loadAllow } from './helpers/definers';
+import { seedInvitation, tokenHash } from './helpers/invitation';
+import { must, psql, psqlSession } from './helpers/pg';
 
 let e: Env;
 beforeAll(async () => { e = await boot(); });
@@ -175,5 +177,54 @@ describe('condition 14: the step is not on the db index, db/auth or db/session, 
     let ctlHas = false;
     await inCtxFree(async (tx) => { ctlHas = typeof tx.enterNewUser === 'function'; });
     expect(ctlHas).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------- step 4 (TypeScript side): allowlist, commit-time stamp, S4 lock
+describe('condition 18: the new definers are on packages/db/sql/definers.json with the ruled owner and EXECUTE', () => {
+  it('enter_new_user (poly_authz), claim_invitations and accept_invitations (poly_govern) each execute for poly_app alone  [red if: a definer is added without its allowlist entry]', () => {
+    const got = Object.fromEntries(loadAllow().map((a) => [a.function, [a.owner, ...a.execute].join('>')]));
+    expect(got['app.enter_new_user(uuid)']).toBe('poly_authz>poly_app');
+    expect(got['app.claim_invitations(bytea, text)']).toBe('poly_govern>poly_app');
+    expect(got['app.accept_invitations(bytea)']).toBe('poly_govern>poly_app');
+  });
+});
+
+describe('condition 32 (S13): a stamp does not survive its transaction', () => {
+  it('a poly_app user INSERT that commits without accept_invitations fails at commit with 42501 and leaves no row  [red if: the deferred signup_stamp_cleared trigger is missing]', () => {
+    const id = uid();
+    expect(app(ins(id)).sqlstate).toBe('42501');
+    expect(must(`SELECT count(*) FROM public."user" WHERE id = '${id}'`, e.db).rows[0]![0]).toBe('0');
+  });
+  it('a superuser user INSERT (fixtures, restores) is unstamped and commits  [red if: the stamp is applied to every role, which breaks every fixture]', () => {
+    const id = uid();
+    must(ins(id), e.db);
+    expect(must(`SELECT count(*), count(signup_txid) FROM public."user" WHERE id = '${id}'`, e.db).rows[0]).toEqual(['1', '0']);
+  });
+  it('a poly_app INSERT is stamped with the transaction id  [red if: stamp_signup_user is absent]', () => {
+    const id = uid();
+    const r = app(`BEGIN; ${ins(id)} SELECT signup_txid = pg_current_xact_id()::text::bigint FROM public."user" WHERE id = '${id}'; ROLLBACK;`);
+    expect(r.ok, r.err).toBe(true);
+    expect(r.rows.flat()).toContain('t');
+  });
+});
+
+describe('condition 30 (S4): claim_invitations from a signed-in transaction takes no lock', () => {
+  it('while another session holds the row, a claim with app.user_id set answers 42501 at once instead of waiting out lock_timeout  [red if: the setting check comes after the row lock]', async () => {
+    const t = seedInvitation({ db: e.db, email: 'lock@qa.test', role: 'viewer' });
+    const hex = tokenHash(t).toString('hex');
+    const user = uid();
+    must(ins(user), e.db);
+    const holder = psqlSession(`BEGIN; SELECT 1 FROM public.invitation WHERE token_hash = decode('${hex}', 'hex') FOR UPDATE; SELECT pg_sleep(12);`, e.db);
+    try {
+      for (let i = 0; i < 40; i++) {
+        if (must(`SELECT count(*) FROM pg_stat_activity WHERE datname = '${e.db}' AND query LIKE '%pg_sleep(12)%' AND state = 'active'`, e.db).rows[0]![0] !== '0') break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const t0 = Date.now();
+      const r = app(`BEGIN; SELECT set_config('app.user_id', '${user}', true); SELECT app.claim_invitations(decode('${hex}', 'hex'), 'lock@qa.test'); ROLLBACK;`);
+      expect(r.sqlstate).toBe('42501');
+      expect(Date.now() - t0).toBeLessThan(3500);
+    } finally { holder.kill(); }
   });
 });
