@@ -5,7 +5,7 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
 ## R0. Size: two loops
 
 - **POLY-87 (this loop): the sign-up transaction.** It covers criteria 1, 3, 4 and 6–16.
-- **New issue, blocked by POLY-87: the operator CLI.** It covers criteria 2 and 5, and R7 sets its seam.
+- **New issue, blocked by POLY-87: the operator CLI.** It covers criteria 2 and 5. Its text is under "Part B seam" below.
 - After either loop ships, sign-up is still closed:
   - After A alone, a fresh instance has no user, so nobody can issue an invitation.
   - After B, the only new way in is a link the operator issues on the box.
@@ -135,19 +135,18 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
 
 - **Guard:** the `db` job median stays ≤ 100 s. qa states the summed CI file time of the new files at gate 2 and the job median at gate 3. If the median is above 92 s, the loop brings its own cut.
 
-## R7. Seam for loop B (the CLI)
+## R7. How A's tests create invitations, and why A opens no way in
 
-The CLI is a command in the worker container. INFRA §7.5 already runs `polycarpic-ops cli …` inside the worker as the operator.
-
-- **Entry point.** `apps/worker/src/cli.ts`, with the body in `apps/worker/src/cli/` (the migrate `run.ts` split).
-- **Database.** A new `@poly/db/operator` subpath exports `withOperatorTx(fn)`: `workerPool` (`poly_worker`), context-free, `app.actor = 'operator:cli'` local, nesting refused. It is confined to `apps/worker/src/cli/**`.
-- **Issuing.** `@poly/tenancy` gains `issueOperatorInvitation(tx, { email, bootstrap })`, which calls `app.issue_operator_invitation(text, bytea, boolean)` (owner `poly_govern`, EXECUTE `poly_worker`). That definer:
-  - takes `pg_advisory_xact_lock`;
-  - with `--bootstrap`, refuses if any `user` row exists, and revokes every earlier unclaimed no-entity row;
-  - without it, refuses if no `user` row exists;
-  - writes `audit_event` `invitation.issued` with `entity_id` null.
-- **Claiming.** B's migration adds `issued_via`. `claim_invitations` then refuses a `bootstrap` row once any user exists.
-- **Delivery.** The CLI prints the link once to stdout. Emailing it is a follow-up.
+- **Fixture.** A new helper, `tests/db/helpers/invitation.ts`, exports `seedInvitation({ entityId?, email, role, expiresAt?, as })` and returns the plaintext token. The helper hashes the token with the same `hashInvitationToken` that `@poly/tenancy` exports.
+  - **Entity rows** go in as `poly_app` under `withTenant` for an owner who has signed up through a seeded no-entity row. They use the existing owner policy and `gate_owner_changes` (a sole owner is allowed), so the fixture uses the production grant.
+  - **No-entity rows** go in as superuser through `must()`. A has no path that writes them, and that is the point.
+  - **Expired, revoked and claimed rows** are set up as superuser afterwards.
+- **A opens no way in** (read; condition 23 measures it).
+  - Every user-creating route in `USER_INSERTING` must claim a live invitation row.
+  - In A, an invitation row is written only by a `poly_app` INSERT under the owner policy, and that needs an existing user who owns an entity.
+  - The definers A adds only UPDATE `invitation`. `poly_govern` gets no INSERT on it, and no function in `app` inserts into it.
+  - On a fresh instance there is no user, so no owner and no row. Every sign-up is refused, and only B's bootstrap changes that.
+  - The session-loader backstop provisions a Person for an existing user only. It never creates a user.
 
 ## Conditions (each one becomes a red test for qa and a build target for backend-lead)
 
@@ -203,9 +202,15 @@ The CLI is a command in the worker container. INFRA §7.5 already runs `polycarp
 21. The literal `app.signup_user_id` is red in a `.ts` or `.svelte` source file. A `.sql` migration is not linted.
 22. `tx.enterNewUser(...)`, and `const { enterNewUser } = tx`, are red in `packages/auth/src/handler.ts` and green in `user-hooks.ts`. A bare or inline disable is red.
 
+**Step 6: closure**
+23. On a freshly migrated database with no user:
+    - every `USER_INSERTING` route, and `/sign-up/email` with any token, is refused, and no `user` row exists afterwards;
+    - pgTAP shows no INSERT on `invitation` for any role but `poly_app`;
+    - no function in schema `app` whose body inserts into `invitation` exists (a `pg_proc` source scan).
+
 ## Paths outside the issue's current `paths`
 
-`scripts/layers/**` and `tests/layers/**`, both for R5. Remove `apps/cli/**`; it goes to loop B as `apps/worker/**`.
+`scripts/layers/**` and `tests/layers/**` (R5). The fixture helper in R7 is under `tests/db/**`. Remove `apps/cli/**`; it goes to loop B as `apps/worker/**`.
 
 ## For seceng (plainly)
 
@@ -220,3 +225,32 @@ The CLI is a command in the worker container. INFRA §7.5 already runs `polycarp
   - the 1 → 2 revocation on acceptance (POLY-90; unreachable now, since no owner seats at sign-up);
   - `/change-email` (step-up) could later point an account at an invited address, so any future existing-user acceptance must not match by email alone;
   - loop B adds a second context-free path, `db/operator`, which changes the wording of SECURITY C-84 (the only context-free path is `db/auth`).
+
+## Part B seam (file verbatim as the new issue)
+
+**Title:** Operator invite CLI
+
+**Description.** The operator's command on the box: `polycarpic user invite <email> [--bootstrap]`. Without the flag, it issues a single-use, audited invitation that shares no entity. With `--bootstrap`, it creates the first user's invitation on an empty instance, and only once. It runs in the worker container: INFRA §7.5 has `polycarpic-ops cli …` execute it there. It reaches the database as `poly_worker`, through a context-free operator transaction that never sets `app.user_id`. It builds on POLY-87's claim and accept definers (`process/cairn/reviews/POLY-87/ruling.md`). PRD §4 invite story; SECURITY C-01; INFRA S-1.
+
+**Acceptance criteria**
+- [ ] The first user on an empty instance is created only by `polycarpic user invite <email> --bootstrap`, once. With any `user` row present it exits non-zero and writes nothing. An empty instance accepts no other first sign-up (INFRA S-1).
+- [ ] `polycarpic user invite <email>` issues a single-use invitation that shares no entity, and writes an `audit_event` of kind `invitation.issued` (`entity_id` null, `actor` `operator:cli`). The invitee sees only their own Person.
+- [ ] Without `--bootstrap`, the command refuses on an empty instance, so it cannot create the first user.
+- [ ] A second `--bootstrap` on an empty instance revokes the earlier unclaimed bootstrap invitation. Two concurrent runs leave exactly one live one, because the issuing definer serialises them on an advisory lock.
+- [ ] `claim_invitations` refuses a bootstrap invitation once any user exists (`issued_via = 'bootstrap'`).
+- [ ] `withOperatorTx` (subpath `@poly/db/operator`) runs on the `poly_worker` pool and sets only `app.actor`, locally. It refuses to nest with the other three wrappers. Lint refuses to import it from anywhere but `apps/worker/src/cli/**`.
+- [ ] The invitation is written only by `app.issue_operator_invitation` (owner `poly_govern`, EXECUTE `poly_worker` alone), and `poly_worker` holds no INSERT on `invitation`.
+- [ ] The link is printed once to stdout. The plaintext token is never logged or stored, and the expiry is 7 days.
+- [ ] Exit codes: 0 issued, 2 refused (instance state), 1 anything else. `check-config` validates the worker's `DATABASE_*` first.
+
+**Proposed paths:** `process/cairn/issues/<ID>.md`, `process/cairn/reviews/<ID>/**`, `apps/worker/**`, `packages/db/**`, `packages/tenancy/**`, `tests/db/**`, `tests/layers/**`, `scripts/layers/**`, `infra/ci/changes.mjs`, `layers.json`, `eslint.config.js`, `package.json`, `pnpm-lock.yaml`, `docs/ARCH/**`, `docs/SECURITY/**`, `docs/INFRA/**`. Its tests go in a new `db` area, `operator`, with paths `^apps/worker/src/cli/`, added to `TABLE.db`.
+
+**What A leaves in place for B:**
+- the `invitation` claim columns and `claim_invitations` / `accept_invitations`;
+- no-entity acceptance, which gives the invitee their own Person only;
+- `hashInvitationToken` exported from `@poly/tenancy`;
+- the `confined` key in `layers.json` and the `poly/confined-module` rule, which B reuses for `db/operator`;
+- `seedInvitation` in the test helpers;
+- condition 23's closure test.
+
+B changes condition 23 to "only `issue_operator_invitation` and the `poly_app` owner policy insert". seceng re-words C-84 in B: `db/auth` and `db/operator` are the two context-free paths, and only `db/auth` sets `app.user_id`.
