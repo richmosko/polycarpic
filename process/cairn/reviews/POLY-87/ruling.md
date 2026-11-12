@@ -36,6 +36,7 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
 |---|---|---|
 | `app.stamp_signup_user()`: BEFORE INSERT ON `public."user"`, invoker | — | — |
 | `app.invitation_set_once()`: BEFORE UPDATE ON `invitation`, invoker | — | — |
+| `app.signup_stamp_cleared()`: deferred constraint trigger AFTER INSERT OR UPDATE ON `user`, invoker | — | — |
 | `app.enter_new_user(uuid)` | `poly_authz` | `poly_app` |
 | `app.claim_invitations(bytea, text) → void` | `poly_govern` | `poly_app` |
 | `app.accept_invitations(bytea) → uuid` | `poly_govern` | `poly_app` |
@@ -73,7 +74,7 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
   - on `invitation`: `SELECT`, plus `UPDATE (claimed_user_id, claimed_at, accepted_at)`;
   - the policies `FOR SELECT TO poly_govern USING (true)` and `FOR UPDATE TO poly_govern USING (true) WITH CHECK (claimed_user_id = app.current_user_id())`;
   - on `membership`: `FOR INSERT TO poly_govern WITH CHECK (user_id = app.current_user_id() AND role = 'viewer')`, beside `seat_creator`'s policy (S6);
-  - on `user`: `SELECT (id, email, email_verified, signup_txid)`.
+  - on `user`: `SELECT (id, email, email_verified, signup_txid)`, and `UPDATE (signup_txid)` (C32).
 - **Grants for `poly_app`:** `SELECT (claimed_user_id, claimed_at)` on `invitation`. `token_hash` stays unselectable, and `poly_app` still has no `INSERT` on `membership` (POLY-62 R4).
 - **Migrations are forward-only.** 0006 is generated (the claim columns, `user.signup_txid`, checks and indexes) and 0007 is custom, the 0003 pattern. `poly_owner` writes the tracking row, and each definer owner gets `CREATE ON SCHEMA app` for that file only.
 
@@ -200,7 +201,7 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
     - `app.user_id` forged to an existing, provisioned user who holds a live viewer invitation;
     - the same forgery after this transaction UPDATEd that user's row;
     - a user inserted in an earlier transaction (S12).
-18. Calling `stamp_signup_user()` or `invitation_set_once()` directly fails. Each new definer appears in `definers.json` with its owner and EXECUTE list, and `search_path = ''` (C-15 check).
+18. Calling `stamp_signup_user()`, `invitation_set_once()` or `signup_stamp_cleared()` directly fails. Each new definer appears in `definers.json` with its owner and EXECUTE list, and `search_path = ''` (C-15 check).
 19. `poly_app` selecting `invitation.token_hash` is refused with 42501, and inserting a `token_hash` of 31 bytes fails `23514`.
 
 **Step 5: lint**
@@ -215,7 +216,7 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
     - `` sql`SELECT app.enter_new_user(…)` `` in `packages/auth/src/x.ts`;
     - `'enter\x5fnew_user'`;
     - `claim_invitations` outside `packages/tenancy/src/invitation.ts`;
-    - `eval(…)` and `new Function(…)`.
+    - `eval(…)`, `new Function(…)`, and `setTimeout('x', 0)`, all under the repo's real `languageOptions.globals`, so `no-implied-eval` is shown to fire.
 
     Each reserved name in its own file is green. A `.sql` migration is not linted (S7).
 22. `tx.enterNewUser(...)`, `tx['enterNewUser']` and `const { enterNewUser } = tx` are red in `packages/auth/src/handler.ts` and green in `user-hooks.ts`. A bare or inline disable is red.
@@ -230,7 +231,8 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
 24. **(S1)** With invitations A and B both live for one email, a `/sign-up/email` with A's token claims A only, and B stays live. A `/sign-up/email` that reaches the user hook with no token is refused, and no user row exists.
 25. **(S2)** Token-less sign-up:
     - A mocked Google callback with `email_verified=false` for an invited address leaves no user, and the invitation stays unclaimed.
-    - `options.ts` overrides GitHub's `getUserInfo`: the email is the `/user/emails` entry that is both primary and verified, never the profile email.
+    - `options.ts` sets GitHub's `getUserInfo` override (not `mapProfileToUser`, which cannot do this on 1.7.18). The email is the `/user/emails` entry that is both primary and verified, never the profile email. With no such entry it returns null and the sign-in is refused. This is measured with a mocked fetch.
+    - The fallback is tested too: with the override removed, `authOptions` refuses a `github` input.
     - A GitHub callback whose profile email is invited but unverified claims nothing.
     - A GitHub callback whose primary verified email is invited claims it.
 26. **(S3)** After `/sign-up/email`, `email_verified` is false. A Google callback for the same address then fails as account-not-linked and adds no `account` row.
@@ -243,6 +245,14 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
     - An e2e check in `apps/web/tests/e2e/` shows the address bar without `invitation` after load.
 30. **(S4, pgTAP)** `claim_invitations` under `withTenant` (`app.user_id` set) raises 42501 and takes no lock, so a concurrent claim on the same row is not blocked. Its return type is void.
 31. **(S10, pgTAP)** Once `revoked_at`, `claimed_user_id`, `claimed_at` or `accepted_at` is non-null, a `poly_app` or `poly_govern` UPDATE that changes it is refused with 42501.
+
+32. **(S13)** No committed `user` row carries a sign-up stamp.
+    - `accept_invitations` sets `signup_txid = NULL` on the new user before it returns. `poly_govern` gets `UPDATE (signup_txid)` on `user`, and no other role does.
+    - A deferred constraint trigger, `app.signup_stamp_cleared()` (`AFTER INSERT OR UPDATE ON user`, `DEFERRABLE INITIALLY DEFERRED`, invoker), re-reads the row at commit and raises `42501` if its stamp is non-null.
+    - Tests:
+      - after a committed sign-up on each of the three `USER_INSERTING` routes, `signup_txid` is null;
+      - a hook variant that skips `acceptInvitations` fails at commit and leaves no user row;
+      - pgTAP: a row given a stamp by a superuser passes neither `enter_new_user` nor `accept_invitations` in a later transaction.
 
 ## Paths outside the issue's current `paths`
 
@@ -305,3 +315,12 @@ B changes condition 23 to "only `issue_operator_invitation` and the `poly_app` o
 | S12 | Amended. The marker is `user.signup_txid`, stamped by a BEFORE INSERT trigger, not the xmin test. My probe on `postgres:17.10` reproduced P5, and also found that an UPDATE of an existing row in the same transaction passes the xmin test, so a forger could UPDATE user U and then pass as U. With the stamp, an old row gives f, a released savepoint gives t, the next transaction gives f, an updated old row gives f, `poly_app` writing the column is denied, and a second insert is refused. The setting is gone. | R2; C13, C17 |
 
 Follow-ups: POLY-89 seats claimed manager and owner rows (seceng §6). POLY-90 requires the token plus consent for existing users, the 1 → 2 revocation, and the stamp rule. POLY-142 takes the bootstrap refusal, the C-84 wording and the token printed once. INFRA: Caddy drops the query from its log. The lead decides on a limit for `/callback/:id` and `/magic-link/verify`, and on `idle_in_transaction_session_timeout` for `poly_app` (a POLY-86 residual).
+
+## Addendum 2: seceng S13 and two amendments (`seceng-ruling-review.md` @ 6578fd1)
+
+- **S13: accepted, and enforced at commit (C32).** The fix is seceng's: `accept_invitations` clears the stamp, and `poly_govern` gets `UPDATE (signup_txid)` alone.
+  - Is there a path that leaves a stamp because it has nothing to accept? No. Every route in `USER_INSERTING` ends in `acceptInvitations`, which raises when nothing is claimed, so the transaction rolls back and the row goes with it.
+  - The deferred trigger turns that fact into an enforced invariant: whatever path a future change adds, a committed row never holds a stamp. A logical restore therefore carries only nulls, and no restore-runbook step is needed.
+- **S7:** C21 gains the `setTimeout('x', 0)` fixture under the real globals.
+- **S2:** C25 names the `getUserInfo` override, and tests the null return and the `github` fallback.
+- **Totals:** 32 conditions. R2's table gains `app.signup_stamp_cleared()`, and C18's direct-call check covers it. The ruling is closed.
