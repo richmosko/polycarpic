@@ -205,3 +205,52 @@ S7 closes the first three cheaply. The rest stay as residual, which S12 (databas
 - **C-05's GitHub rule is documented as a control but is not in the code.** It predates this loop; S2 makes this loop implement it. If the architect would rather split it out, the token-less claim must not ship without it.
 - **S6 and S12 change the ruling's text** (the C15 clause, the `poly_govern` policy, the C-84 residual). That needs an architect addendum before qa writes tests.
 - **`/callback/:id` holds a pool connection across outbound provider HTTP, and neither `/callback/:id` nor `/magic-link/verify` is rate-limited.** This is a POLY-86-era residual. Suggest `idle_in_transaction_session_timeout` on `poly_app` and a limit on `/callback/:id`; it is the lead's call where that is filed.
+
+## Addendum 1 check (ruling @ 9fbc2ec)
+
+**Verdict: pass. S12, S7 and S2 are confirmed as amended. One new condition, S13, is cheap, and qa can write it with the rest.**
+
+The architect is right about the xmin test I proposed in P5: an UPDATE in the same transaction rewrites xmin, so that test is unsound. The stamp replaces it.
+
+**Probes.** I ran them on a scratch `postgres:17.10` container with an invoker BEFORE INSERT stamp trigger and a role holding 0005's column grants (`INSERT (id, name)`, `UPDATE (name)`), then removed the container.
+
+- **P6. The stamp holds against a forger in one cluster.**
+  - A row inserted inside a released savepoint matches `pg_current_xact_id()`: `true`.
+  - An old row the same transaction UPDATEd: `false`.
+  - An `INSERT … ON CONFLICT (id) DO UPDATE` on an old row, in a clean transaction: `false`. The stamp only exists on the discarded new tuple, and the role cannot SET the column.
+  - Supplying `signup_txid` on INSERT, or on UPDATE: `permission denied`.
+  - A second insert in one transaction, and an upsert after a first insert: `one user per transaction` (42501).
+- **P7. A stale stamp matches again once a fresh xid counter reaches it.**
+  - I set a row's stamp to the current xid plus 50, the way a row carried over by a logical restore (`pg_dump` into a new cluster) would look. Then I committed empty transactions as the plain role.
+  - The equality hit at xid 801.
+  - Inside one cluster this cannot happen: every stored stamp is below the counter, and xid8 never wraps.
+  - After a logical restore, or a move to a new box by dump, every user's stamp is a future xid. A SQL-level forger (R-2) can burn transactions until one matches, then pass `accept_invitations` as that user, which is S12's attack again.
+  - `enter_new_user` still refuses that user, because they have a Person. `accept_invitations` does not.
+- **P8. Lint (eslint 10.14.0, core rules).** Flagged: `eval(…)`, `globalThis.eval(…)`, `(0, eval)(…)`, `new Function`, `Function(…)` and `Function.call(…)`.
+  - Not flagged: `globalThis['ev' + 'al']`, `globalThis[k]`, and `setTimeout('…')`.
+  - `no-implied-eval` only fires when `setTimeout` is a declared global, and my scratch config declared none.
+- **P9. GitHub (read, `@better-auth/core` 1.7.18, `github.mjs:65–88`).**
+  - `options.getUserInfo`, when given, replaces the whole lookup, so the C-05 mapping can be built and measured on the pin with a mocked fetch.
+  - `mapProfileToUser` cannot do it: it sees only the profile, and `emailVerified` is computed beforehand for `profile.email`.
+
+**Rulings.**
+
+- **S12 (stamp): confirmed, with S13.**
+- **S7: confirmed.**
+  - Per-file reserved names and cooked matching close the forms that matter.
+  - Computed global access (`globalThis[k]`) stays residual. With S12 and S13 the database refuses whatever it reaches.
+  - C21's `eval` fixture must run under the repo's real `languageOptions.globals`. Add a red `setTimeout('x', 0)` fixture, so `no-implied-eval` is shown to fire and not merely enabled.
+- **S2: confirmed, including the fallback that refuses a `github` input.**
+  - The mapping must be a `getUserInfo` override, not `mapProfileToUser`.
+  - It returns null, which refuses the sign-in, when no entry is both primary and verified.
+  - C25 covers both the override and the fallback.
+
+**New condition**
+
+- **S13.** The stamp does not outlive its transaction.
+  - `accept_invitations`, the last step of every sign-up, sets `signup_txid = NULL` on the new user before it returns. It runs as `poly_govern`, which gets `UPDATE (signup_txid)` on `user`; nobody else does.
+  - pgTAP:
+    - after a committed sign-up, every `user.signup_txid` is null;
+    - a row given a future `signup_txid` by a superuser (a restored row) passes neither `enter_new_user` nor `accept_invitations` in any later transaction, and stays null-or-refused.
+  - If the architect prefers, a restore-runbook step that nulls the column is the fallback, but the in-transaction clear is the stronger choice.
+  - Either way, `accept_invitations` must also refuse when the stamped user already has a membership other than their Person's owner row. That is a second, independent proof that the user is new.
