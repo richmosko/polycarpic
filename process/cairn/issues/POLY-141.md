@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/aggregate.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/infra/wiring.test.ts, tests/workflow/test_cairn_test_boundary.py, apps/web/tests/e2e/serve.ts, docs/INFRA/**, docs/SECURITY/**]
+paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/aggregate.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/infra/wiring.test.ts, tests/workflow/test_cairn_test_boundary.py, apps/web/tests/e2e/serve.ts, docs/INFRA/**, docs/SECURITY/**, tests/db/auth-session.test.ts, tests/db/tenancy.test.ts, tests/db/checks.test.ts, tests/db/ops-status.test.ts]
 labels: [ci, tooling]
 priority: null
 pr: null
@@ -94,3 +94,7 @@ Gates 2 and 3 in progress. Tests red complete at 0939d30 (C1–C26, T1–T4; `re
 ### @team-lead — 2026-11-12
 
 Criterion 1 and the CI half of criterion 2, measured by the lead on head 5c37510: five sequential full dispatch runs, all green, 350 passed and 2 expected fail each. `db` job seconds: 95, 85, 82, 86, 88 (runs 43294745993, 43295358871, 43296120938, 43296867300, 43297562146). Median 86 s against 100 s; fastest three average 84.3 s against 90 s. Battery step 71, 62, 58, 59, 63 s; the background image build returned rc=0 each time, with 2 to 10 s of waiting. Base before this issue: 124 s. First fully green PR run on the complete build: 43293920356 (5c37510), db 96 s, actionlint and the web e2e step (48 s) green. Earlier full runs on d8b53e9 failed on actionlint SC2016 and on the e2e server missing the lock dir; both fixed (e7df37b, 5f4aeb0), and the filter gap that hid the e2e break from the PR run is closed by the `e2e` key (ruling § Filter gap, 5c37510). INFRA 1.3.8.
+
+### @team-lead — 2026-11-12
+
+Criterion 9, first bookkeeping push (7445dc6, run 43298446115): anchor "ledger-only since 5c37510"; lint, unit, db and image skipped; cairn 12 s (70 tests in 4 files plus `cairn check`); summed job time 54 s against 90 s. Criterion 6: the Principal accepted dispatch-with-base runs on scratch branches in place of scratch PRs (2026-11-12). Four test files are added to `paths` for the scratch branches only (auth-session, tenancy, checks, ops-status); they come out again once the runs are measured, and no `tests/db/*.test.ts` changes on the feature branch.
