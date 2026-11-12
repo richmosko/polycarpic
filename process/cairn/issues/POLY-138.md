@@ -11,7 +11,7 @@ labels: [ops, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 Umbrella for the Caddy and edge-network findings from the POLY-95 and POLY-86 loops (`process/cairn/reviews/POLY-95/`, `process/cairn/reviews/POLY-86/seceng-client-ip.md`). The first item gates the first deploy.
@@ -22,3 +22,9 @@ Umbrella for the Caddy and edge-network findings from the POLY-95 and POLY-86 lo
 - [ ] Drop the xcaddy rebuild and its `--replace golang.org/x/net` when a Caddy release carries x/net ≥ 0.62.0; the image guard then returns to +150 s (POLY-95 verdict F9; seceng @ 0e54cb0: nothing in the build may disable Go checksum verification meanwhile).
 - [ ] A lint rule so a staging container cannot take prod's alias on the edge networks (POLY-95 seceng build review F11).
 - [ ] A Renovate rule for the single Postgres `FROM` line and the pinned `age` version (INFRA §6.1a, §5), if no issue owns Renovate config (POLY-95 ruling F4).
+
+## Comments
+
+### @team-lead — 2026-11-12
+
+From seceng on POLY-140 (2026-11-12): `.dockerignore` excludes `**/*.test.ts` and root `tests`, but not the other names the lint counts as tests (`.spec.*`, `.test.mjs`, `.test.mts` and the like). No such file exists today. Add the exclusions with this issue's edge work.

@@ -1,16 +1,17 @@
 ---
 id: POLY-141
-title: db battery parallel and area-split
-status: todo
+title: CI test-time cuts
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
+paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, scripts/cairn/run_tests.py, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, docs/INFRA/**]
 labels: [ci, tooling]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 The `db` job is the only test job that grows with every feature, and it runs in full on any change under its filter. Two levers keep it flat as suites join it. First, run the battery's files in parallel. Four files stay in a serial group that runs after the parallel group: `runner` (cluster-role GRANT/REVOKE and `pg_locks`), `ops-status` (reads `pg_locks` cluster-wide), `template-clone` (asserts the login roles' stored password hashes) and `ops-hardening` (a 4.8 s production timeout that is timing-sensitive under contention). For parallelism to be safe, the harness must serialise the cluster-wide `roles.sql` step that every fresh or cloned database reruns; unserialised, it fails with `tuple concurrently updated` on every parallel run. Second, split the battery into area sub-batteries (auth, tenancy/RLS, migrate, ops), so that on a pull request each one runs only when a path its tests execute or import changes. A path every area shares (migrations, `packages/db/sql`, the harness, the Postgres image, the lockfile) runs all of them, and a full dispatch run always runs all of them. Both levers stay inside the existing `db` job; no new top-level job. A failing per-file budget ratchet comes later, once the per-file numbers this issue starts recording have settled. PR/nightly tiering is out of scope, and sharding across runners is the fallback only if parallelism inside one runner falls short of criterion 1. Third, a push whose changes since the last green run on the branch are tracker and ledger files only reruns no heavy suite. Today the `changes` job diffs the whole PR (BASE..HEAD) on every push. The cairn job's anchor skip requires every anchor-diff path to be in EXCLUDE, and `process/STATE.md` is not, so the `/finish-feature` and `/merge-pr` bookkeeping commits rerun everything.
@@ -73,3 +74,7 @@ Scoped by architect-136 with qa-engineer-136's measurements after POLY-136 merge
 ### @team-lead — 2026-11-11
 
 qa-engineer-136's two source files are kept beside this issue: `process/cairn/reviews/POLY-141/qa-split-measurements.md` (per-file CI and local seconds, cluster-global flags, the four-area split) and `qa-parallel-measurements.md` (the unlocked parallel failure and the valid timings). Local machine had 10 CPUs; nothing in them was run on CI in parallel.
+
+### @team-lead — 2026-11-12
+
+Feature started. Branch: `feature/poly-141-ci-test-time-cuts`. Retitled from "db battery parallel and area-split" (architect-136's suggestion; the scope also covers the bookkeeping-push skip). Carried in from POLY-140: qa saw `tests/infra/image/postgres.test.ts` fail and `caddy.test.ts` flake under local parallel load, unmeasured on `main`; worth one measurement in this loop, not a fix.
