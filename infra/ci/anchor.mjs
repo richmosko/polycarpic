@@ -41,7 +41,8 @@ async function explain(io) {
     modes = await io.modes(a, io.prHead);
   } catch (e) { return { ok: false, reason: `diff failed: ${e?.message ?? e}` }; }
   if (!Array.isArray(paths) || paths.length === 0) return { ok: false, reason: 'empty anchor diff' };
-  if (!Array.isArray(modes)) return { ok: false, reason: 'no modes' };
+  // Two modes (old, new) per path: a short or long list means the raw diff and the name list disagree.
+  if (!Array.isArray(modes) || modes.length !== paths.length * 2) return { ok: false, reason: 'modes do not match the diff paths' };
   if (modes.some((m) => m === '120000' || m === '160000')) return { ok: false, reason: 'symlink or gitlink in the anchor diff' };
   for (const p of paths) {
     if (PINNED_RULINGS.test(p)) return { ok: false, reason: `pinned ruling changed: ${p}` };
