@@ -228,3 +228,45 @@ describe('C6 the vitest config shape', () => {
     expect(parallel.length + SERIAL.length).toBe(FILES.length);
   });
 });
+
+// POLY-141 T1/T4: one owner for the image tag and the build arguments.
+describe('T1 pgtap-image.mjs owns PG_BASE, IMAGE and the build argv; pg.ts keeps no copy', () => {
+  const HELPER = join(ROOT, 'tests/db/helpers/pgtap-image.mjs');
+  const PG = join(ROOT, 'tests/db/helpers/pg.ts');
+  it('pg.ts imports IMAGE, PG_BASE and buildArgv from ./pgtap-image.mjs  [red while pg.ts parses the FROM line itself]', () => {
+    const src = read(PG);
+    for (const name of ['IMAGE', 'PG_BASE', 'buildArgv']) {
+      expect(src, name).toMatch(new RegExp(`import\\s*\\{[^}]*\\b${name}\\b[^}]*\\}\\s*from\\s*['"]\\./pgtap-image\\.mjs['"]`));
+    }
+  });
+  it('pg.ts has no FROM-line parsing, no Dockerfile read and no docker build argv of its own', () => {
+    const src = read(PG).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n');
+    expect(src).not.toMatch(/startsWith\(['"]FROM /);
+    expect(src).not.toContain('infra/postgres/Dockerfile');
+    expect(src).not.toMatch(/'infra',\s*'postgres'/);
+    expect(src).not.toMatch(/\['build'/);
+    expect(src).not.toContain('--build-arg');
+    expect(src).not.toMatch(/polycarpic-pgtap:/);
+  });
+  it('the helper is plain JS on node built-ins only, has a --build mode, and exports IMAGE, PG_BASE and buildArgv', async () => {
+    expect(existsSync(HELPER), 'tests/db/helpers/pgtap-image.mjs').toBe(true);
+    const src = read(HELPER);
+    for (const m of src.matchAll(/\bfrom\s+['"]([^'"]+)['"]/g)) expect(m[1], m[1]).toMatch(/^node:/);
+    expect(src).toContain('--build');
+    const m: any = await import(pathToFileURL(HELPER).href);
+    expect(m.PG_BASE).toMatch(/^postgres:\d+\.\d+@sha256:[0-9a-f]{64}$/);
+    expect(m.IMAGE).toBe(`polycarpic-pgtap:${m.PG_BASE.split('@sha256:')[1].slice(0, 12)}`);
+    const argv: string[] = m.buildArgv();
+    expect(Array.isArray(argv)).toBe(true);
+    expect(argv).toContain('build');
+    expect(argv).toContain(`PG_BASE=${m.PG_BASE}`);
+    expect(argv).toContain(m.IMAGE);
+    expect(argv[argv.length - 1]).toBe(join(ROOT, 'tests', 'db', 'docker'));
+  });
+  it('the helper reads the FROM line of infra/postgres/Dockerfile and checks the pin', () => {
+    const src = read(HELPER);
+    expect(src).toContain('infra');
+    expect(src).toMatch(/FROM /);
+    expect(src).toMatch(/sha256/);
+  });
+});

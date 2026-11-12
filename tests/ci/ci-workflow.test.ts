@@ -356,4 +356,36 @@ describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
     expect(rec.env?.VITEST_JSON, 'Record timing sets VITEST_JSON').toBeDefined();
     expect(rec.env?.VITEST_JSON).toBe(st.env?.VITEST_JSON);
   });
+
+  // POLY-141 criterion-1 tuning T1-T4 (ruling): the pgtap image builds in the background while Node, pnpm and the install run.
+  it('T4: a background step before Set up Node runs `setsid nohup node tests/db/helpers/pgtap-image.mjs --build`, logging to pgtap-build.log and writing pgtap-build.rc  [red while absent]', () => {
+    const ss = steps(dbj());
+    const bg = ss.findIndex((s) => /pgtap-image\.mjs --build/.test(s.run ?? ''));
+    expect(bg, 'a background build step').toBeGreaterThan(-1);
+    const node = ss.findIndex((s) => /^actions\/setup-node@/.test(s.uses ?? ''));
+    expect(bg).toBeLessThan(node);
+    expect(bg, 'after the checkout').toBeGreaterThan(ss.findIndex((s) => /^actions\/checkout@/.test(s.uses ?? '')));
+    const run = ss[bg]!.run!;
+    expect(run).toMatch(/setsid nohup node tests\/db\/helpers\/pgtap-image\.mjs --build/);
+    expect(run).toContain('pgtap-build.log');
+    expect(run).toContain('pgtap-build.rc');
+    expect(run).toMatch(/&\s*$/m); // the whole build-and-record runs in the background
+    expect(run).not.toMatch(/\bexit\s+[1-9]/); // the step itself never fails the job
+    expect(run).not.toContain('${{');
+  });
+  it('T4: no `docker build` in the db job and no PG_BASE literal anywhere in ci.yml (the helper owns both)', () => {
+    expect(runOf(dbj())).not.toMatch(/docker\s+build/);
+    expect(wfText('ci.yml')).not.toContain('PG_BASE');
+  });
+  it('T4: the battery step waits for pgtap-build.rc with a bound before vitest, prints the log, and has no `|| true`', () => {
+    const run = battery().run ?? '';
+    expect(run).toContain('pgtap-build.rc');
+    expect(run).toMatch(/\b300\b/); // the bound, the same as pg.ts's sh() timeout
+    expect(run).toMatch(/while|until|for |timeout/); // a loop or timeout, not a bare read
+    expect(run.indexOf('pgtap-build.rc')).toBeLessThan(run.indexOf('vitest'));
+    expect(run).not.toMatch(/\|\|\s*true/);
+    expect(run).toContain('pgtap-build.log');
+    const ss = steps(dbj());
+    expect(ss.indexOf(battery())).toBeGreaterThan(ss.findIndex((s) => /pgtap-image\.mjs --build/.test(s.run ?? '')));
+  });
 });
