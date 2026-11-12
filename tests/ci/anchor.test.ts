@@ -375,6 +375,6 @@ describe('changes.mjs --none (C15)', () => {
   it('prints every key false: TABLE keys plus the four area keys, nothing else, exit 0  [red while --none is absent]', () => {
     const r = node('changes.mjs', { args: ['--none'] });
     expect(r.code).toBe(0);
-    expect(lines(r.stdout).sort()).toEqual(['ci=false', 'db=false', 'db_auth=false', 'db_migrate=false', 'db_ops=false', 'db_tenancy=false', 'image=false', 'layers=false', 'node=false']);
+    expect(lines(r.stdout).sort()).toEqual(['ci=false', 'db=false', 'e2e=false', 'db_auth=false', 'db_migrate=false', 'db_ops=false', 'db_tenancy=false', 'image=false', 'layers=false', 'node=false']);
   });
 });

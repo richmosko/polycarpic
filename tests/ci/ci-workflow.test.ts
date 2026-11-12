@@ -84,7 +84,7 @@ describe('ci.yml: changes + guard (criteria 1, 4)', () => {
     expect(runOf(j)).toMatch(/set -euo pipefail/);
     expect(runOf(j)).toMatch(/infra\/ci\/changes\.mjs/);
     expect(runOf(j)).toMatch(/\^\[0-9a-f\]\{40\}\$/); // dispatch base validated as 40-hex
-    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'image', 'layers', 'node']); // POLY-141: the five keys and the four areas
+    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'e2e', 'image', 'layers', 'node']); // POLY-141: the five keys, e2e and the four areas
   });
   it('guard runs always (no if), pin check over .github and infra/ci, and gitleaks  [red if: guard gated on changes]', () => {
     const j = w.jobs.guard!;
@@ -313,11 +313,11 @@ describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
   const battery = () => steps(dbj())[idx(/tests\/db\/vitest\.config\.ts/)]!;
 
   it('changes exposes the nine outputs: the five keys and db_auth, db_tenancy, db_migrate, db_ops  [red while the area keys are absent]', () => {
-    expect(Object.keys(w.jobs.changes!.outputs ?? {}).sort()).toEqual(['ci', 'db', ...AREA_KEYS, 'image', 'layers', 'node'].sort());
+    expect(Object.keys(w.jobs.changes!.outputs ?? {}).sort()).toEqual(['ci', 'db', ...AREA_KEYS, 'e2e', 'image', 'layers', 'node'].sort());
   });
   it('a dispatch with no base sets every key true: the printf names all nine', () => {
     const body = runOf(w.jobs.changes!);
-    for (const k of ['node', 'layers', 'db', 'image', 'ci', ...AREA_KEYS]) expect(body, k).toContain(`${k}=true`);
+    for (const k of ['node', 'layers', 'db', 'image', 'ci', 'e2e', ...AREA_KEYS]) expect(body, k).toContain(`${k}=true`);
   });
   it('the db job is still gated on `db` alone (db is the OR of the areas)', () => {
     expect(dbj().if).toContain('needs.changes.outputs.db');
@@ -395,5 +395,16 @@ describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
     const noComments = (bg.run ?? '').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
     expect(noComments).not.toMatch(/'[^'\n]*\$(?:[A-Za-z_]|\{|\()[^'\n]*'/);
     expect(noComments).toContain('pgtap-build.rc');
+  });
+
+  // POLY-141 E1: the web e2e step is keyed to `e2e`, which the db harness and apps/migrate set.
+  it('E1: the unit job runs on the e2e key too, and the e2e step reads E2E_FORCE (from that output) through env: with no ${{ }} in run  [red while absent]', () => {
+    expect(w.jobs.unit!.if ?? '').toContain("needs.changes.outputs.e2e == 'true'");
+    const st = steps(w.jobs.unit!).find((s) => /playwright|turbo run e2e/.test(s.run ?? ''))!;
+    expect(st.name).toMatch(/e2e/i);
+    expect(st.env?.E2E_FORCE ?? '').toMatch(/needs\.changes\.outputs\.e2e/);
+    expect(st.run).toContain('E2E_FORCE');
+    expect(st.run).toMatch(/@poly\/web/);
+    expect(st.run).not.toContain('${{');
   });
 });

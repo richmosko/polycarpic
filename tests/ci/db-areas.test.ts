@@ -19,7 +19,7 @@ import { ci, node, ROOT } from './helpers.ts';
 
 type Area = { tests: string[]; paths: RegExp[] };
 const AREAS = ['auth', 'tenancy', 'migrate', 'ops'] as const;
-const KEYS9 = ['ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'image', 'layers', 'node'];
+const KEYS9 = ['ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'e2e', 'image', 'layers', 'node']; // ten since POLY-141 E1
 const ch = async (): Promise<{ classify: (p: string[]) => Record<string, boolean>; DB_AREAS: Record<string, Area>; DB_SHARED: RegExp[] }> => {
   const m: any = await import(pathToFileURL(ci('changes.mjs')).href);
   if (!m.DB_AREAS || !m.DB_SHARED) throw new Error('infra/ci/changes.mjs does not export DB_AREAS and DB_SHARED');

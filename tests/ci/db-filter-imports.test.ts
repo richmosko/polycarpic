@@ -133,3 +133,41 @@ describe('each db area\'s import closure lies inside its own paths or the shared
     }
   });
 });
+
+// POLY-141 E2 (ruling § Filter gap): the web e2e step imports the db harness. Every file the e2e files reach outside apps/web/
+// must be in a workspace package apps/web/package.json lists (turbo sees those) or match TABLE.e2e.
+export function e2eViolations(rel: string[], listedPackageDirs: string[], e2eRes: RegExp[]): string[] {
+  return rel.filter((p) => !p.startsWith('apps/web/') && !listedPackageDirs.some((d) => p.startsWith(`${d}/`)) && !e2eRes.some((re) => re.test(p)));
+}
+describe('the web e2e import closure is covered by turbo packages or TABLE.e2e (POLY-141 E2)', () => {
+  const e2eFiles = () => readdirSync(join(ROOT, 'apps/web/tests/e2e')).filter((f) => f.endsWith('.ts')).map((f) => `apps/web/tests/e2e/${f}`);
+  const listedDirs = () => {
+    const deps = JSON.parse(readFileSync(join(ROOT, 'apps/web/package.json'), 'utf8')) as Record<string, Record<string, string>>;
+    const names = Object.keys({ ...deps.dependencies, ...deps.devDependencies }).filter((n) => n.startsWith('@poly/'));
+    return names.map((n) => relative(ROOT, pkgs.get(n)?.dir ?? join(ROOT, 'packages', 'MISSING', n)));
+  };
+  const tableE2e = () => {
+    const re = (changes as unknown as { TABLE: Record<string, RegExp[]> }).TABLE.e2e;
+    if (!re) throw new Error('infra/ci/changes.mjs TABLE has no e2e key');
+    return re;
+  };
+  it('the walk reaches serve.ts and the harness it imports (not vacuous)', () => {
+    const rel = [...areaClosure(e2eFiles())].map((f) => relative(ROOT, f));
+    expect(rel).toContain('apps/web/tests/e2e/serve.ts');
+    expect(rel).toContain('tests/db/helpers/api.ts');
+    expect(rel).toContain('tests/db/helpers/pg.ts');
+    expect(rel).toContain('apps/migrate/src/cli.ts');
+  });
+  it('every file outside apps/web/ in the closure is in a listed workspace package or matched by TABLE.e2e  [red if: serve.ts imports a file the key does not cover]', () => {
+    const rel = [...areaClosure(e2eFiles())].map((f) => relative(ROOT, f)).sort();
+    expect(e2eViolations(rel, listedDirs(), tableE2e())).toEqual([]);
+  });
+  it('the data files the harness reads are matched by TABLE.e2e: pgtap-image.mjs, the Postgres Dockerfile and major, tests/db/docker', () => {
+    const re = tableE2e();
+    for (const p of ['tests/db/helpers/pgtap-image.mjs', 'infra/postgres/Dockerfile', 'infra/postgres-major', 'tests/db/docker/Dockerfile', 'apps/migrate/src/cli.ts']) expect(re.some((r) => r.test(p)), p).toBe(true);
+  });
+  it('the check can fail: a fixture closure with an uncovered tests/db/new-thing.ts is reported', () => {
+    const closure = ['apps/web/tests/e2e/serve.ts', 'packages/db/src/x.ts', 'tests/db/helpers/api.ts', 'tests/db/new-thing.ts'];
+    expect(e2eViolations(closure, ['packages/db'], [/^tests\/db\/helpers\//])).toEqual(['tests/db/new-thing.ts']);
+  });
+});

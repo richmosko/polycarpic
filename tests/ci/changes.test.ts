@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { ci, node } from './helpers.ts';
 
-const KEYS = ['node', 'layers', 'db', 'image', 'ci'] as const;
+const KEYS = ['node', 'layers', 'db', 'image', 'ci', 'e2e'] as const;
 const run = (paths: string[]) => {
   const r = node('changes.mjs', { input: paths.join('\0') + '\0' });
   const out: Record<string, string> = {};
@@ -53,16 +53,21 @@ const CASES: [string[], string[], string][] = [
   [['packages/db/sql/roles.sql'], ['node', 'db'], 'packages/db/sql dropped from `db` (bootstrap reads it by join(DB_PKG, ...))'],
   [['packages/tenancy/src/index.ts'], ['node', 'db'], 'packages/tenancy dropped from `db` (tests/db imports it)'],
   [['packages/tenancy/permission-matrix.json'], ['node', 'db'], 'permission-matrix.json dropped from `db` (matrix.test reads it by join(ROOT, ...))'],
-  [['apps/migrate/src/cli.ts'], ['node', 'db'], 'apps/migrate dropped from `db` (MIGRATE_CLI)'],
+  [['apps/migrate/src/cli.ts'], ['node', 'db', 'e2e'], 'apps/migrate dropped from `db` (MIGRATE_CLI)'],
   [['apps/web/src/ops/status.ts', 'apps/web/src/ops/health.ts'], ['node', 'db'], 'apps/web/src/ops dropped from `db` (ops-status and ops-hardening import them)'],
   [['apps/web/src/main.ts'], ['node', 'db'], 'apps/web/src/main.ts dropped from `db` (ops-hardening crash handler)'],
   [['apps/web/src/routes/+page.svelte'], ['node'], '`db` widened to all of apps/web'],
   [['tests/log/canary.ts'], ['node', 'db'], 'tests/log dropped from `db` (the canaries are imported by two db files)'],
   // POLY-95 R3: the infra suite and the Postgres FROM line are inputs of the jobs that read them.
   [['tests/infra/lint.test.ts'], ['image'], 'tests/infra dropped from `image` (the lint job and the container tests both read it)'],
-  [['infra/postgres/Dockerfile'], ['image', 'db'], 'infra/postgres/Dockerfile dropped from `db` (the battery builds from its FROM line)'],
-  [['infra/postgres-major'], ['image', 'db'], 'infra/postgres-major dropped from `db`'],
+  [['infra/postgres/Dockerfile'], ['image', 'db', 'e2e'], 'infra/postgres/Dockerfile dropped from `db` (the battery builds from its FROM line)'],
+  [['infra/postgres-major'], ['image', 'db', 'e2e'], 'infra/postgres-major dropped from `db`'],
   [['infra/postgres/postgresql.prod.conf', 'infra/compose/prod.yml', 'infra/lint/policy.json'], ['image'], '`db` widened to all of infra/postgres, or infra/lint/compose dropped from `image`'],
+  // POLY-141 E1: the web e2e step imports the db harness and apps/migrate
+  [['tests/db/helpers/x.ts'], ['db', 'e2e'], 'tests/db/helpers dropped from `e2e`'],
+  [['tests/db/docker/Dockerfile'], ['db', 'e2e'], 'tests/db/docker dropped from `e2e`'],
+  [['apps/migrate/x.ts'], ['node', 'db', 'e2e'], 'apps/migrate dropped from `e2e`'],
+  [['tests/db/a.test.ts'], ['db'], '`e2e` widened to all of tests/db'],
   [['docs/PRD/index.html', 'packages/ledger/src/a.ts'], ['node'], 'a docs path anywhere in the list suppressing the code path'],
 ];
 
@@ -71,7 +76,7 @@ describe('changes.mjs filter table', () => {
     it(`${paths.join(' + ')} -> {${expected.join(',')}}  [red if: ${mutation}]`, () => {
       const { r, out, trueKeys } = run(paths);
       expect(r.code, r.stderr).toBe(0);
-      expect(Object.keys(out)).toEqual(expect.arrayContaining([...KEYS])); // the five keys are always printed (area keys: db-areas.test.ts)
+      expect(Object.keys(out)).toEqual(expect.arrayContaining(['node', 'layers', 'db', 'image', 'ci'])); // the five keys are always printed (area keys: db-areas.test.ts)
       expect(trueKeys).toEqual(KEYS.filter((k) => expected.includes(k)));
     });
   }
