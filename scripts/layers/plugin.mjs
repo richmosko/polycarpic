@@ -1,3 +1,5 @@
+import path from 'node:path';
+
 // Custom rules the boundaries plugin cannot express (ARCH §2.1, SECURITY A-39, A-40).
 // All of them are enabled from generate.mjs; none is configured by hand.
 
@@ -87,19 +89,15 @@ const noBannedSpecifier = {
 const noComputedImport = {
   meta: { type: 'problem', schema: [] },
   create(context) {
-    const relative = (node) => {
-      if (node.type === 'TemplateLiteral') return /^\.\.?\//.test(node.quasis[0].value.cooked ?? '');
-      if (node.type === 'BinaryExpression' && node.operator === '+') return relative(node.left);
-      return node.type === 'Literal' && /^\.\.?\//.test(String(node.value));
-    };
+    // POLY-140: a computed relative specifier is no longer exempt; no-relative-cross-package reports it too.
     return {
       ImportExpression(node) {
-        if (staticValue(node.source) !== null || relative(node.source)) return;
+        if (staticValue(node.source) !== null) return;
         context.report({ node, message: 'import() with a computed specifier hides a cross-package edge from the layer lint.' });
       },
       CallExpression(node) {
         if (node.callee.type !== 'Identifier' || node.callee.name !== 'require' || !node.arguments[0]) return;
-        if (staticValue(node.arguments[0]) !== null || relative(node.arguments[0])) return;
+        if (staticValue(node.arguments[0]) !== null) return;
         context.report({ node, message: 'require() with a computed specifier hides a cross-package edge from the layer lint.' });
       },
     };
@@ -206,8 +204,150 @@ const noWebcryptoMembers = {
   },
 };
 
+// ---- POLY-140: relative path imports ---------------------------------------------------------------------------------
+// Path arithmetic over the layer map: no resolver, no filesystem, so a target that does not exist yet is still refused.
+// A path import skips a package's `exports` and the subpath allow-list; the only legal cross-package edge is `@poly/<name>`.
+const TEST_FILE = /\.(test|spec)\.[cm]?[jt]sx?$/;
+const isPathSpec = (s) => /^(\.\.?\/|\/|file:)/.test(s) || s === '.' || s === '..';
+const segMatch = (pat, seg) =>
+  pat.includes('*') ? new RegExp('^' + pat.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*+/g, '[^/]*') + '$').test(seg) : pat === seg;
+// Does a (possibly glob) target cover or sit inside the directory `dir`?
+const reaches = (targetSegs, dir) => {
+  const d = dir.split('/');
+  for (let i = 0; i < Math.min(targetSegs.length, d.length); i++) {
+    if (targetSegs[i] === '**') return true;
+    if (!segMatch(targetSegs[i], d[i])) return false;
+  }
+  return true;
+};
+// Static prefix of a computed specifier: a template with expressions or a `+` chain.
+const computedPrefix = (n) => {
+  if (n.type === 'TemplateLiteral' && n.expressions.length > 0) return n.quasis[0].value.cooked ?? '';
+  if (n.type === 'BinaryExpression' && n.operator === '+') {
+    let l = n.left;
+    while (l.type === 'BinaryExpression' && l.operator === '+') l = l.left;
+    return staticValue(l);
+  }
+  return null;
+};
+
+// Condition 4, one separable branch: a non-test file under <dir>/src never leaves its package by path.
+const srcStaysInPackage = ({ isSrc, isTest, inside }) => isSrc && !isTest && !inside;
+
+const noRelativeCrossPackage = {
+  meta: {
+    type: 'problem',
+    schema: [{
+      type: 'object',
+      properties: { root: { type: 'string' }, dir: { type: 'string' }, packages: { type: 'object', additionalProperties: { type: 'string' } }, outsideRoots: { type: 'array', items: { type: 'string' } } },
+      required: ['root', 'dir', 'packages'],
+      additionalProperties: false,
+    }],
+  },
+  create(context) {
+    const { root, dir, packages, outsideRoots = [] } = context.options[0];
+    const rel = path.relative(root, context.filename).split(path.sep).join('/');
+    if (rel.startsWith('..')) return {};
+    const fileDir = path.posix.dirname(rel);
+    const isSrc = rel.startsWith(`${dir}/src/`);
+    const isTest = TEST_FILE.test(rel);
+    const others = Object.entries(packages).filter(([, d]) => d !== dir);
+    const within = (t, d) => t === d || t.startsWith(d + '/');
+    const refuse = (node, why) => context.report({ node, message: `Relative import refused: ${why}. Import another package by its @poly name (ARCH §2.1).` });
+
+    const checkSpec = (node, raw, computed) => {
+      const spec = raw.split(/[?#]/)[0];
+      if (!isPathSpec(spec)) return;
+      if (computed) return refuse(node, 'a computed relative specifier hides its target');
+      if (spec.startsWith('/') || spec.startsWith('file:')) return refuse(node, 'an absolute path specifier');
+      const t = path.posix.normalize(path.posix.join(fileDir, spec)).replace(/\/$/, '');
+      const segs = t.split('/');
+      if (segs.includes('node_modules')) return refuse(node, 'the path reaches into node_modules');
+      for (const [n, d] of others) {
+        if (reaches(segs, d)) return refuse(node, `the path reaches into package '${n}' (${d})`);
+      }
+      const inside = within(t, dir);
+      if (srcStaysInPackage({ isSrc, isTest, inside })) return refuse(node, `the path leaves this package (${dir})`);
+      if (!inside && !outsideRoots.some((r) => within(t, r))) return refuse(node, `the path leaves this package (${dir})`);
+      if (isSrc && !isTest && (TEST_FILE.test(t) || within(t, `${dir}/tests`))) return refuse(node, 'non-test source imports test code');
+    };
+    const check = (node, arg) => {
+      if (!arg) return;
+      const s = staticValue(arg);
+      if (s !== null) return checkSpec(node, s, false);
+      const p = computedPrefix(arg);
+      if (p !== null && isPathSpec(p.split(/[?#]/)[0])) checkSpec(node, p, true);
+    };
+    const isImportMeta = (n, prop) =>
+      n?.type === 'MemberExpression' && !n.computed && n.object.type === 'MetaProperty' && n.object.meta.name === 'import' && n.property.name === prop;
+
+    return {
+      ImportDeclaration: (node) => check(node, node.source),
+      ExportNamedDeclaration: (node) => node.source && check(node, node.source),
+      ExportAllDeclaration: (node) => check(node, node.source),
+      ImportExpression: (node) => check(node, node.source),
+      TSImportEqualsDeclaration(node) {
+        if (node.moduleReference.type === 'TSExternalModuleReference') check(node, node.moduleReference.expression);
+      },
+      TSImportType(node) {
+        const a = node.argument ?? node.source;
+        check(node, a?.type === 'TSLiteralType' ? a.literal : a);
+      },
+      CallExpression(node) {
+        if (node.callee.type === 'Identifier' && node.callee.name === 'require') return check(node, node.arguments[0]);
+        if (isImportMeta(node.callee, 'glob') || isImportMeta(node.callee, 'globEager')) {
+          const a = node.arguments[0];
+          const list = a?.type === 'ArrayExpression' ? a.elements : [a];
+          for (const e of list) {
+            if (!e) continue;
+            const s = staticValue(e);
+            if (s !== null) checkSpec(e, s.replace(/^!/, ''), false);
+            else check(e, e);
+          }
+        }
+      },
+      NewExpression(node) {
+        if (node.callee.type === 'Identifier' && node.callee.name === 'URL' && isImportMeta(node.arguments[1], 'url')) check(node, node.arguments[0]);
+      },
+      Program() {
+        for (const c of context.sourceCode.getAllComments()) {
+          const m = c.type === 'Line' && c.value.match(/^\/\s*<reference\s+path\s*=\s*["']([^"']+)["']/);
+          if (m) checkSpec(c, m[1], false);
+        }
+      },
+    };
+  },
+};
+
+// POLY-140 condition 15(a), (c): nothing mints a require function or reaches a builtin through a computed key.
+const FACTORY = new Set(['createRequire', 'getBuiltinModule']);
+const GLOBAL_OBJECTS = new Set(['process', 'globalThis', 'global']);
+const noRequireFactory = {
+  meta: { type: 'problem', schema: [] },
+  create(context) {
+    const report = (node, what) => context.report({ node, message: `${what}: a require factory hides an import from the layer lint (POLY-140).` });
+    return {
+      Identifier: (node) => FACTORY.has(node.name) && report(node, `'${node.name}' is refused`),
+      Literal: (node) => typeof node.value === 'string' && FACTORY.has(node.value) && report(node, `'${node.value}' is refused`),
+      TemplateLiteral(node) {
+        const v = staticValue(node);
+        if (v !== null && FACTORY.has(v)) report(node, `'${v}' is refused`);
+      },
+      MemberExpression(node) {
+        let o = node.object;
+        while (['TSAsExpression', 'TSNonNullExpression', 'TSTypeAssertion', 'TSSatisfiesExpression'].includes(o.type)) o = o.expression;
+        if (!node.computed || o.type !== 'Identifier' || !GLOBAL_OBJECTS.has(o.name)) return;
+        if (node.property.type === 'Literal' || staticValue(node.property) !== null) return;
+        report(node, `computed member access on '${o.name}'`);
+      },
+    };
+  },
+};
+
 export default {
   rules: {
+    'no-relative-cross-package': noRelativeCrossPackage,
+    'no-require-factory': noRequireFactory,
     'named-imports-only': namedImportsOnly,
     'no-banned-specifier': noBannedSpecifier,
     'no-computed-import': noComputedImport,
