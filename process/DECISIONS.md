@@ -588,3 +588,27 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the `db` job is at 93–120 s of a 180 s budget after POLY-102; the Principal chose to skip the additions for now.
 **Alternatives considered:** a `tests/ci` case failing on a direct real-chain migrate outside an allowlist, and building the template once in global setup. Raise again if the `db` job time climbs.
 **Approved by:** the Principal (2026-11-11).
+
+### 2026-11-12 — The layer-lint relative-import gap is its own issue, ahead of POLY-87
+**Decision:** POLY-140 closes the gap where a relative import across packages passes the layer lint. It runs before POLY-87 and is not folded into POLY-131.
+**Why:** POLY-87 builds the new-user step on a boundary the lint is meant to hold, and POLY-131 cannot close until the M2 secrets design (its HPKE sign-off).
+**Alternatives considered:** adding it to POLY-131 and running that umbrella's ready items first; leaving it at P3 and relying on review.
+**Approved by:** the Principal (2026-11-12), on the lead's recommendation.
+
+### 2026-11-12 — Installs run strict everywhere; `allowBuilds` holds only `false` entries
+**Decision:** every `pnpm install` (local, each `ci.yml` job, `build.yml`, the image) runs in strict dependency-build mode. `allowBuilds: { esbuild: false }` declines esbuild's build script by name, and the four strict-off lines are gone from `ci.yml`. Allowing a build is a C-80 change that needs seceng review.
+**Why:** local and CI installs disagreed (local exit 1, CI exit 0), and a new dev dependency with a build script merged with only a warning.
+**Alternatives considered:** stating a CI-equivalent local command in the README and leaving `ci.yml` relaxed.
+**Approved by:** architect ruling with seceng conditions S1–S4 (POLY-136, `process/cairn/reviews/POLY-136/`); SECURITY 1.9.10.
+
+### 2026-11-12 — `db` job headroom is judged by a median and a fastest-three mean
+**Decision:** a timing campaign is five sequential dispatch runs; it passes at a median ≤ 130 s with the fastest three averaging ≤ 120 s. A run over 150 s is recorded with a per-file comparison against the fastest run. The 180 s budget in `infra/ci/budgets.json` stays a warning.
+**Why:** one of five runs on POLY-136 took 157 s on a slow runner (every file 1.06–1.83× slower, the timer-bound files barely moved), which a "no run over 150 s" rule reads as a regression.
+**Alternatives considered:** a sixth run; landing the reserve cut (one auth instance per file).
+**Approved by:** architect ruling addendum 3 (POLY-136), requested by the lead.
+
+### 2026-11-12 — CI test time is held down by parallel files, an area split and a bookkeeping-push skip
+**Decision:** POLY-141 runs the `db` battery's safe files in parallel, splits it into area sub-batteries keyed in the change filter, and stops tracker-only pushes rerunning the heavy suites. A failing per-file budget ratchet follows once per-file numbers settle.
+**Why:** the `db` job grows with every feature and POLY-136's cuts left about 5 s of room; the last two pushes of every loop rerun every suite with no code change.
+**Alternatives considered:** PR/nightly tiering (gives up the "every issue must not break `main`" gate); sharding across runners (kept as the fallback).
+**Approved by:** the Principal (2026-11-12), on the lead's recommendation.

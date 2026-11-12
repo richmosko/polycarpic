@@ -4,7 +4,7 @@ title: Invite-only sign-up
 status: backlog
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-62, POLY-86]
+blocked_by: [POLY-62, POLY-86, POLY-140, POLY-141]
 assignee: null
 paths: [packages/auth/**, packages/tenancy/**, apps/web/src/routes/**, apps/cli/**]
 labels: [auth]
@@ -40,3 +40,7 @@ After the first (operator) user, an invitation is the only way into an instance;
 ### @team-lead — 2026-11-11
 
 From the POLY-86 loop (ruling follow-up 6): this issue builds the real `claimInvitation`, the new-user step and `provisionPerson` at sign-up. Until then `packages/auth` passes a stub that refuses every sign-up, and the check runs in `user.create.before` inside `withContextFreeTx` on every user-creating route.
+
+### @team-lead — 2026-11-11
+
+From the POLY-136 loop. **Order:** POLY-140 (layer lint, relative imports) and POLY-141 (db battery parallel and area-split) run first (Principal, 2026-11-12). **Room in the `db` job:** about 5 s of CI time at the median (125 s against the 130 s target; `process/cairn/reviews/POLY-136/ruling.md`, addendum 3). The bound is two-part: median ≤ 130 s and the fastest three of five runs averaging ≤ 120 s; POLY-141 resets it. The configured budget is 180 s and only warns (`infra/ci/budgets.json`). **New-user step:** `apps/migrate/src/run.ts` shows the pattern POLY-140 generalises: a file importable only from named callers, by package path and by relative path.
