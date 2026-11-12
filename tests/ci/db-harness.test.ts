@@ -149,11 +149,18 @@ describe('C3 every psql call that sends the bootstrap text is inside the lock, e
 });
 
 describe('C4 globalSetup creates the lock directory before any worker starts', () => {
-  it('mkdtemp, then POLY_TEST_LOCK_DIR exported, in global-setup.ts  [red while absent]', () => {
+  it('global-setup.ts imports ensureBootstrapLockDir from ./helpers/bootstrap-lock.ts and calls it before returning  [red while absent]', () => {
     const src = read(GLOBAL_SETUP);
+    expect(src).toMatch(/import\s*\{[^}]*\bensureBootstrapLockDir\b[^}]*\}\s*from\s*['"]\.\/helpers\/bootstrap-lock(?:\.ts)?['"]/);
+    const call = src.search(/\bensureBootstrapLockDir\s*\(/);
+    expect(call, 'a call to ensureBootstrapLockDir()').toBeGreaterThan(-1);
+    expect(call).toBeLessThan(src.indexOf('return stop'));
+    expect(call, 'before setRolePasswords, which runs the bootstrap').toBeLessThan(src.search(/\bsetRolePasswords\s*\(\)/));
+  });
+  it('the shared helper does the mkdtemp and the export (one implementation)', () => {
+    const src = read(LOCK_MOD);
     expect(src).toMatch(/mkdtempSync\(/);
     expect(src).toMatch(/process\.env\.POLY_TEST_LOCK_DIR\s*=/);
-    expect(src.indexOf('POLY_TEST_LOCK_DIR')).toBeLessThan(src.indexOf('return stop'));
   });
 });
 
