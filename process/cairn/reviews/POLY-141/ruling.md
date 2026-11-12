@@ -323,3 +323,21 @@ devops-141's proposal is accepted, with amendments T1–T4. It starts the pgtap 
   - The overlap window is the about 13 s of steps before the battery (devops-141), and the build is most of the 21.8 s. That gives a saving of about 10–15 s and a job of about 88–93 s, which leaves the median of at most 100 s safe.
   - If the five-run set misses "fastest three ≤ 90 s", the number to take to the Principal is **95 s**, with the median kept at 100 s. Do not relax anything before the runs.
   - The next lever is not for this loop. A second Postgres cluster would let the serial group run alongside the parallel group, since the serial group's conflicts are cluster-wide. That needs project-scoped server injection in place of the `POLY_TEST_SERVER` env, and it re-opens the contention question for ops-hardening. It would be a follow-up issue, and only if 95 s also misses.
+
+## Filter gap: the web e2e step and the db harness (team-lead's request after the d8b53e9 dispatch failure)
+
+The rule is POLY-102 R5 again: every path a job executes or imports triggers that job. `apps/web/tests/e2e/serve.ts` imports `tests/db/helpers/{api,pg}.ts`. The step is blind to them twice over:
+- the `unit` job's `if:` needs `node` or `image`, and `tests/db/` is in neither;
+- the e2e step runs only when `turbo ls --affected` lists `@poly/web`, and turbo sees workspace packages only.
+
+Measured closure of `apps/web/tests/e2e/*.ts`, outside `apps/web`: `tests/db/helpers/**` and `apps/migrate/**` (through `captureRun`), plus `packages/{auth,config,db,tenancy}`. Those four packages are `@poly/web` dependencies, so turbo already covers them. The harness also reads `infra/postgres/Dockerfile` and `infra/postgres-major` (via `pgtap-image.mjs`) and builds from `tests/db/docker/`.
+
+- **E1 New filter key `e2e`** in `changes.mjs` `TABLE`: `^tests/db/helpers/`, `^tests/db/docker/`, `^apps/migrate/`, `^infra/postgres/Dockerfile$`, `^infra/postgres-major$`.
+  - The `unit` job's `if:` adds `|| needs.changes.outputs.e2e == 'true'`.
+  - The e2e step gets `E2E_FORCE` through `env:` and runs when `@poly/web` is affected or `E2E_FORCE` is `true`.
+  - `REQUIRED` gains `e2e: ['unit']`.
+  - C15's `--none` and C20's key checks pick the key up from `TABLE` with no further change. The dispatch printf adds `e2e=true`.
+- **E2 Proof.** A `tests/ci` closure case with roots `apps/web/tests/e2e/*.ts`. Every file in the closure outside `apps/web/` must be either in a workspace package that `apps/web/package.json` lists, or matched by `TABLE.e2e`. Red when `serve.ts` imports a new non-package file the key does not cover. The data reads are explicit `changes.test.ts` cases: `infra/postgres/Dockerfile` gives `e2e=true`.
+- **Not added to `node`.** `node` also runs lint and image; `e2e` runs only `unit`.
+- **Cost, measured on main's history.** Of 53 first-parent merges since 2026-11-01, 8 touched these paths. 6 of those already touched `apps/web/`, `packages/` or a root turbo input, so the e2e step ran anyway. 2 (#113, #115) would add one `unit` run with the e2e step. The step's own time is not measured here; read it from any run with `@poly/web` affected.
+- **This loop: yes.** This loop caused the break, and the fix is about ten lines across `changes.mjs`, `ci.yml` and `aggregate.mjs` (all in paths) plus tests. E1 and E2 join build step 1's filter work.
