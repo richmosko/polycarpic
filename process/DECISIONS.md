@@ -612,3 +612,9 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** the `db` job grows with every feature and POLY-136's cuts left about 5 s of room; the last two pushes of every loop rerun every suite with no code change.
 **Alternatives considered:** PR/nightly tiering (gives up the "every issue must not break `main`" gate); sharding across runners (kept as the fallback).
 **Approved by:** the Principal (2026-11-12), on the lead's recommendation.
+
+### 2026-11-12 — A package is left only by its `@poly/<name>` import
+**Decision:** a non-test source file never leaves its own package by path, and never imports test code; a path import into another package is refused even where the layer map allows the edge. Test files inside a package may reach only repo-root `tests/`. Inline ESLint directives are inert in package source, so any exemption is a named block in `scripts/layers/generate.mjs`. `module` / `node:module`, `createRequire` and `getBuiltinModule` are refused (POLY-140 ruling, conditions 4, 6, 14, 15).
+**Why:** a path import skips the target's `exports` map, and a list of forbidden destinations grows with every shared folder; the loader route bypassed every layer rule. No source file tripped any of it.
+**Alternatives considered:** refusing only a path that lands in another package (the issue as filed); extending the resolver so the layer map's allow-list covers path imports.
+**Approved by:** the Principal (2026-11-12), on the architect's ruling with seceng's review.
