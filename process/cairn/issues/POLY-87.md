@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-62, POLY-86, POLY-140, POLY-141]
 assignee: backend-lead
-paths: [process/cairn/issues/POLY-87.md, process/cairn/reviews/POLY-87/**, packages/auth/**, packages/tenancy/**, packages/db/**, apps/web/src/routes/**, apps/cli/**, tests/db/**, tests/ci/**, infra/ci/changes.mjs, layers.json, eslint.config.js, package.json, pnpm-lock.yaml, docs/ARCH/**, docs/SECURITY/**]
+paths: [process/cairn/issues/POLY-87.md, process/cairn/reviews/POLY-87/**, packages/auth/**, packages/tenancy/**, packages/db/**, apps/web/src/routes/**, tests/db/**, tests/ci/**, tests/layers/**, scripts/layers/**, infra/ci/changes.mjs, layers.json, eslint.config.js, package.json, pnpm-lock.yaml, docs/ARCH/**, docs/SECURITY/**]
 labels: [auth]
 priority: null
 pr: null
@@ -19,10 +19,8 @@ After the first (operator) user, an invitation is the only way into an instance;
 ## Acceptance criteria
 
 - [ ] With no invitation, the sign-up route refuses account creation; no config flag, env var or admin setting changes that.
-- [ ] The first user on an empty instance is created only by polycarpic user invite <email> --bootstrap, once; an empty instance accepts no other first sign-up (INFRA S-1).
 - [ ] An invitation link works once and expires; an accepted, revoked or expired link cannot be replayed.
 - [ ] An invitee with an entity invite lands on that entity; one without lands on their own Person.
-- [ ] polycarpic user invite <email> issues a single-use invitation sharing no entity and writes an audit event; that user sees only their own Person.
 - [ ] /sign-up/email without a live invitation is refused at the route allowlist (ARCH §3.1c).
 - [ ] Sign-up by invitation commits the user row, the Person, the owner membership and the seeded accounts together; after a forced rollback of our transaction none of them exists (ARCH v1.14 §3.1).
 - [ ] Inside the sign-up transaction the hook sets `app.user_id` with `is_local = true` through packages/db before provisionPerson, and provisionPerson's inserts succeed as poly_app under FORCE RLS; with the step removed, the same sign-up is refused by RLS and leaves no user row.
@@ -48,3 +46,7 @@ From the POLY-136 loop. **Order:** POLY-140 (layer lint, relative imports) and P
 ### @team-lead — 2026-11-12
 
 Feature started. Branch: `feature/poly-87-invite-only-sign-up`. POLY-140 and POLY-141 are done, so the earlier note on `db` room is superseded: the `db` job runs at an 86 s median against a 100 s warning budget (INFRA 1.3.8), and every new `tests/db/*.test.ts` must be placed in exactly one area in `infra/ci/changes.mjs` (POLY-141 C7). Paths front-loaded with the issue record, `packages/db/**`, `tests/db/**`, `tests/ci/**`, the area map, the layer files and the two docs; the architect names any other at the ruling.
+
+### @team-lead — 2026-11-12
+
+Gate 1: ruling at 319a22d (`process/cairn/reviews/POLY-87/ruling.md`, 22 conditions in five build steps; ARCH 1.15.17). Split accepted by the Principal (2026-11-12): this issue keeps the sign-up transaction; the two CLI criteria (first user by `--bootstrap`; `polycarpic user invite` with an audit event) moved to POLY-142, which is blocked by this issue. Paths: `scripts/layers/**` and `tests/layers/**` added; `apps/cli/**` removed (POLY-142 takes it as `apps/worker/**`). seceng reviews the ruling before the tests are written.
