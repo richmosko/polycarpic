@@ -26,7 +26,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.9.10</span>
+    <span><strong>Version:</strong> 1.9.11</span>
     <span><strong>Last updated:</strong> 2026-11-12</span>
   </div>
 </header>
@@ -617,7 +617,7 @@ flowchart TB
     <li>The deploy checklist asserts the pooler mode on both targets (DevOps).</li>
     <li><code>withTenant()</code> refuses to nest (AsyncLocalStorage guard).</li>
     <li><code>withTenant()</code> accepts only a branded <code>SessionUserId</code>. The type is exported from <code>packages/db</code>; its constructor is on the <code>db/session</code> subpath, which only <code>packages/auth</code> may import (ARCH §2.1, <code>layers.json</code>). A brand is a compile-time check only, so lint also refuses a cast to <code>SessionUserId</code> outside that module and test files (A-39).</li>
-    <li>The raw pool is not exported. Two things keep it out of reach: the <code>exports</code> map, so a deep import fails to resolve, and the layer map, under which only <code>packages/db</code> may import the Postgres driver (ARCH §2.1).</li>
+    <li>The raw pool is not exported. Two things keep it out of reach: the <code>exports</code> map, so a deep import fails to resolve, and the layer map, under which only <code>packages/db</code> may import the Postgres driver (ARCH §2.1). A path import would skip the <code>exports</code> map, so lint refuses every relative or absolute import that leaves a package (Import boundary, §6.3).</li>
     <li>Session-level <code>SET</code> is banned by lint. There is one exemption, by file path: the migrate module's <code>SET ROLE poly_owner</code>. It runs on its own client, which is never a pool, and is closed after the run (C-85, A-40).</li>
     <li>There is one context-free connection path, <code>db/auth</code>, which only <code>packages/auth</code> may import. It is BetterAuth's plain <code>poly_app</code> pool plus <code>withContextFreeTx</code>, and it is the only place outside <code>withTenant</code> that sets <code>app.user_id</code>. It does so once, local to the transaction, and only for the user row inserted in that transaction (C-84). It is not a third way into tenant data: it starts with no context, so RLS returns nothing until that step runs.</li>
   </ul>
@@ -830,6 +830,10 @@ flowchart TB
     <li><strong>Errors.</strong> Provider errors are re-thrown with the credential stripped. A raw provider exception never reaches a response or a log without passing through the scrubber.</li>
     <li><strong>Import boundary</strong> (ARCH §2.1 layer map, <code>layers.json</code>; built by POLY-82, run in CI by POLY-96).
       <ul>
+        <li>Both import forms are refused across a package edge. An import by package name is checked against the layer map's allow-list. An import by path is refused wherever it reaches another package's folder, even where the map allows the edge, because a path import skips the target's <code>exports</code> map. Lint covers every import form: <code>import</code>, re-export, <code>import()</code>, <code>require()</code>, <code>import x = require()</code>, type imports, <code>import.meta.glob</code>, <code>new URL(…, import.meta.url)</code> and <code>/// &lt;reference path&gt;</code>. It runs over every source file type under <code>apps/*</code> and <code>packages/*</code>, Svelte included. Lint rule: <code>poly/no-relative-cross-package</code>, generated from <code>layers.json</code>.</li>
+        <li>A non-test source file never leaves its own package by path, and never imports test code. Test files may reach out only to the repo-root <code>tests/</code>, which is excluded from the image build context.</li>
+        <li>Nothing in a package builds a require function. <code>module</code> / <code>node:module</code> are not imported in any form, and <code>createRequire</code> and <code>getBuiltinModule</code> are refused as names (<code>poly/no-require-factory</code>). No <code>.cjs</code> or <code>.cts</code> file sits under a <code>src</code> folder. Residual: a key computed through an aliased global object is not caught.</li>
+        <li>No package-level indirection. Structure tests refuse the following: a <code>package.json</code> <code>imports</code> field; a <code>link:</code>, <code>file:</code>, <code>npm:</code> or aliased <code>workspace:</code> dependency or override; a workspace package declared under any name but its own <code>@poly/&lt;name&gt;</code>; a pnpmfile; a tracked symlink; and a path alias in a tsconfig or the Vite/Svelte config.</li>
         <li>Only <code>packages/secrets</code> imports the HPKE library.</li>
         <li><code>open()</code> is the <code>secrets/open</code> subpath. Only <code>apps/worker</code> may import it. <code>web</code> and <code>import</code> may import only the index, which seals.</li>
         <li>The index never imports the open module internally. Lint cannot see an import inside a package, so a check on the index's module graph holds this (A-39). The bundle scan of the <code>web</code> build (ARCH §7.6) is the second check.</li>
