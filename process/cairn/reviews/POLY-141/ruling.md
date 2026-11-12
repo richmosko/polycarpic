@@ -295,3 +295,31 @@ same time adds CPU load and may make the Caddy flake more likely (unmeasured). S
 4. **Cost, measured on main's history.** Of 53 first-parent merges since 2026-11-01, 6 touched these paths and all 6 already set `db`. So C25 adds no `db` runs on that history. It adds a full `db` run (≤ 100 s by criterion 1) to a PR that edits only CI wiring.
 5. **C26, a fail-open found while measuring.** At 21bc731, `changes.mjs` splits stdin on `\0` only. Newline-separated input (`git diff --name-only` without `-z`) is read as one path. The full #116 diff (`packages/auth/...`) then gives `db=false` and `node=false`, against `true` for both with `-z`. The ci.yml callers use `-z` today, so CI is not affected. C26: `changes.mjs` exits 1 when stdin is non-empty and does not end in `\0` (git's `-z` output always does). Fixture: newline input → exit 1. `anchor.mjs`'s own diff parsing follows the same rule. Conditions: 26.
 6. **C17(b): qa's six extra PASS_THROUGH files are confirmed (team-lead's follow-up).** archived_milestone_paths, comment_guard, dashboard, loop_stats, skill_id_literals and tokens_endpoint all stay in PASS_THROUGH. Each one's real-root constant points outside `LEDGER` (`scripts/cairn` source, `.githooks`, `.claude/hooks`, `.claude/skills`, `process/cairn/metrics`). Its ledger names appear in temp fixtures or as literals, and the audit saw no real-ledger open from any of them. The flag rule stays at file level, as qa built it. I tried tightening it to pair the constant and the ledger name on one line: that flags only 2 of the 4 `LEDGER_TESTS`, because `check_budgets` and `dashboard_roster` build their paths across several lines, so it fails the guard's own sanity check. Over-flagging only forces a written reason, which is the guard's purpose.
+
+## Criterion-1 tuning: the pgtap image build (team-lead's request after run 43273670958, c2dde89: db job 103 s, vitest 79.3 s)
+
+devops-141's proposal is accepted, with amendments T1–T4. It starts the pgtap image build in the background early in the job, so the build overlaps Node, pnpm, install, preflight and `svelte-kit sync`. The breakdown is devops-141's temp file: 21.8 s globalSetup, 32.4 s parallel, 25.0 s serial. I agree 4 workers is not the lever: the 3 workers are CPU-saturated.
+
+- **T1 One owner for the tag and the build arguments.** A new `tests/db/helpers/pgtap-image.mjs`, plain JS using node built-ins only, owns three things: the `PG_BASE` derivation (the FROM line of `infra/postgres/Dockerfile`, the same pin check), `IMAGE` (`polycarpic-pgtap:<12 hex of the digest>`), and `buildArgv()`.
+  - `pg.ts` imports all three and keeps no copy of its own.
+  - `node tests/db/helpers/pgtap-image.mjs --build` runs that same `docker build` argv. ci.yml calls this and does not recompute anything in shell.
+  - The file must run on the runner's preinstalled node, because the step that calls it comes before Set up Node.
+  - It sits under `tests/db/helpers/**`, so it is already shared (all four areas).
+- **T2 Wait, never race.** The background step starts before Set up Node: `setsid nohup node tests/db/helpers/pgtap-image.mjs --build > "$RUNNER_TEMP/pgtap-build.log" 2>&1; echo $? > "$RUNNER_TEMP/pgtap-build.rc"`, run in the background, and the step exits 0.
+  - Before vitest, the battery step waits for `pgtap-build.rc`, for at most 300 s (the same bound as `pg.ts`'s `sh` timeout). It then prints the log and the exit code.
+  - The exit code is only reported, never acted on. `pg.ts`'s own `docker image inspect` decides whether to use the image or build it.
+  - Waiting removes the case of two builds of one tag fighting for the 4 vCPU.
+- **T3 No fail-open.**
+  - Docker tags an image only when its build succeeds, so a failed, partial or timed-out background build leaves no tag. `pg.ts` then builds the image itself, and its error turns the job red as it does today.
+  - The background build and `pg.ts` read the same inputs from one module (T1), so a tagged image always matches what `pg.ts` would build.
+  - A fresh runner holds no stale tag.
+  - The background step never contributes a pass: its success saves time and nothing else.
+- **T4 Tests** (qa; `tests/ci` text tests, plus one `db-harness` case):
+  - the background step comes before Set up Node and calls the helper with `--build`;
+  - no `docker build` or `PG_BASE` literal appears anywhere else in ci.yml;
+  - the battery step waits on the `.rc` file with a bound and has no `|| true`;
+  - `pg.ts` has no FROM-line parsing of its own and imports `IMAGE`, `PG_BASE` and the build argv from the helper.
+- **Is "fastest three ≤ 90 s" reachable? Possibly, not proven (unmeasured).**
+  - The overlap window is the about 13 s of steps before the battery (devops-141), and the build is most of the 21.8 s. That gives a saving of about 10–15 s and a job of about 88–93 s, which leaves the median of at most 100 s safe.
+  - If the five-run set misses "fastest three ≤ 90 s", the number to take to the Principal is **95 s**, with the median kept at 100 s. Do not relax anything before the runs.
+  - The next lever is not for this loop. A second Postgres cluster would let the serial group run alongside the parallel group, since the serial group's conflicts are cluster-wide. That needs project-scoped server injection in place of the `POLY_TEST_SERVER` env, and it re-opens the contention question for ops-hardening. It would be a follow-up issue, and only if 95 s also misses.
