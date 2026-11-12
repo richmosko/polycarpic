@@ -388,4 +388,12 @@ describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
     const ss = steps(dbj());
     expect(ss.indexOf(battery())).toBeGreaterThan(ss.findIndex((s) => /pgtap-image\.mjs --build/.test(s.run ?? '')));
   });
+
+  it('SC2016 shape: no single-quoted string in the db job holds a shell variable expansion ($NAME, ${...}, $(...)); the background step uses double quotes or a file  [red while the bash -c \'...$RUNNER_TEMP...\' form remains]', () => {
+    // Narrow on purpose: actionlint (the lint job) owns the full rule. This pins the one shape that failed at ci.yml:501.
+    const bg = steps(dbj()).find((s) => /pgtap-image\.mjs --build/.test(s.run ?? ''))!;
+    const noComments = (bg.run ?? '').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+    expect(noComments).not.toMatch(/'[^'\n]*\$(?:[A-Za-z_]|\{|\()[^'\n]*'/);
+    expect(noComments).toContain('pgtap-build.rc');
+  });
 });

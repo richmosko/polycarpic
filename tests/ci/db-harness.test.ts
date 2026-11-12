@@ -5,7 +5,7 @@
 //       `bootstrap lock timeout`, fn never runs; acquire = mkdirSync(<dir>/bootstrap.lock), release = rmdirSync in finally.
 //   tests/db/global-setup.ts            mkdtemp's a per-run directory and sets process.env.POLY_TEST_LOCK_DIR before returning
 //   tests/db/vitest.config.ts           `export const SERIAL: string[]` (repo-relative paths) + projects db-parallel / db-serial
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -268,5 +268,42 @@ describe('T1 pgtap-image.mjs owns PG_BASE, IMAGE and the build argv; pg.ts keeps
     expect(src).toContain('infra');
     expect(src).toMatch(/FROM /);
     expect(src).toMatch(/sha256/);
+  });
+});
+
+// Callers of the bootstrap outside vitest's globalSetup (the Web e2e server) have no POLY_TEST_LOCK_DIR unless they set it.
+describe('every harness caller outside tests/db/*.test.ts sets the lock dir through ensureBootstrapLockDir() first', () => {
+  const tracked = () => spawnSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 << 20 }).stdout.split('\0').filter(Boolean);
+  const callers = () => tracked().filter((f) =>
+    /\.(ts|mjs|js|svelte)$/.test(f)
+    && !f.startsWith('tests/db/') && !f.startsWith('tests/ci/') && !f.startsWith('.claude/')
+    && /\b(?:freshDb|cloneMigrated)\s*\(/.test(read(join(ROOT, f)).split('\n').filter((l) => !/^\s*\/\//.test(l)).join('\n')));
+
+  it('the search finds the e2e server (not vacuous)', () => {
+    expect(callers()).toContain('apps/web/tests/e2e/serve.ts');
+  });
+  it('each caller imports ensureBootstrapLockDir from tests/db/helpers/bootstrap-lock.ts and calls it before the first freshDb/cloneMigrated call  [red while serve.ts leaves the dir unset]', () => {
+    for (const f of callers()) {
+      const src = read(join(ROOT, f));
+      expect(src, f).toMatch(/import\s*\{[^}]*\bensureBootstrapLockDir\b[^}]*\}\s*from\s*['"][./]*tests\/db\/helpers\/bootstrap-lock\.ts['"]/);
+      const ensure = src.search(/\bensureBootstrapLockDir\s*\(/);
+      const first = src.search(/\b(?:freshDb|cloneMigrated)\s*\(/);
+      expect(ensure, `${f}: a call to ensureBootstrapLockDir()`).toBeGreaterThan(-1);
+      expect(ensure, `${f}: before the first bootstrap call`).toBeLessThan(first);
+    }
+  });
+  it('ensureBootstrapLockDir() creates and exports a directory when unset, and keeps an existing value', async () => {
+    if (!existsSync(LOCK_MOD)) throw new Error('tests/db/helpers/bootstrap-lock.ts does not exist');
+    const m: any = await import(pathToFileURL(LOCK_MOD).href);
+    expect(typeof m.ensureBootstrapLockDir, 'ensureBootstrapLockDir exported').toBe('function');
+    withEnv({ POLY_TEST_LOCK_DIR: undefined }, () => {
+      const d = m.ensureBootstrapLockDir();
+      expect(existsSync(d)).toBe(true);
+      expect(process.env.POLY_TEST_LOCK_DIR).toBe(d);
+      expect(m.ensureBootstrapLockDir()).toBe(d);
+      expect(m.withBootstrapLock(() => 3)).toBe(3);
+    });
+    const keep = scratchDir();
+    withEnv({ POLY_TEST_LOCK_DIR: keep }, () => expect(m.ensureBootstrapLockDir()).toBe(keep));
   });
 });
