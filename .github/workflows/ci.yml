@@ -518,11 +518,31 @@ jobs:
         # Scripts stay blocked (C-80); esbuild's build is declined by name in pnpm-workspace.yaml.
         run: pnpm install --frozen-lockfile
 
+      - name: Preflight (area map, import closure and harness proofs, before any container starts)
+        run: pnpm exec vitest run -c tests/ci/vitest.config.ts tests/ci/db-filter-imports.test.ts tests/ci/db-areas.test.ts tests/ci/db-harness.test.ts
+
       - name: Generate SvelteKit types (the battery imports apps/web/src/ops, whose tsconfig extends the generated one)
         run: pnpm --filter @poly/web exec svelte-kit sync
 
       - name: DB battery (one Postgres container, RLS battery included)
-        run: pnpm exec vitest run -c tests/db/vitest.config.ts
+        env:
+          DB_AUTH: ${{ needs.changes.outputs.db_auth }}
+          DB_TENANCY: ${{ needs.changes.outputs.db_tenancy }}
+          DB_MIGRATE: ${{ needs.changes.outputs.db_migrate }}
+          DB_OPS: ${{ needs.changes.outputs.db_ops }}
+          VITEST_JSON: ${{ runner.temp }}/vitest-db.json
+        run: |
+          set -euo pipefail
+          # The selected files go into a bash array (never a step output). `all` runs with no file filter.
+          SEL="$(node infra/ci/changes.mjs --db-select)"
+          FILES=()
+          if [ "$SEL" != "all" ]; then
+            mapfile -t FILES <<< "$SEL"
+            for f in "${FILES[@]}"; do
+              [[ "$f" =~ ^tests/db/[a-z0-9-]+\.test\.ts$ ]] || { echo "unexpected test path: $f" >&2; exit 1; }
+            done
+          fi
+          pnpm exec vitest run -c tests/db/vitest.config.ts --reporter=default --reporter=json --outputFile="$VITEST_JSON" "${FILES[@]}"
 
       - name: Record timing
         if: always()
@@ -532,6 +552,7 @@ jobs:
           JOB_NAME: db
           JOB_STATUS: ${{ job.status }}
           CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+          VITEST_JSON: ${{ runner.temp }}/vitest-db.json
 
       - name: Upload CI timing
         if: always()

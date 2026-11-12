@@ -46,3 +46,26 @@ if (doJsonl && e.RUNNER_TEMP) {
   };
   appendFileSync(join(e.RUNNER_TEMP, 'ci-test-runs.jsonl'), JSON.stringify(line) + '\n');
 }
+
+// POLY-141 C13: per-file seconds for the db battery, from vitest's json report. A missing or unreadable report writes
+// only the job line above and never fails the step.
+if (doJsonl && e.RUNNER_TEMP && job === 'db' && e.VITEST_JSON) {
+  try {
+    const root = fileURLToPath(new URL('../../', import.meta.url));
+    const report = JSON.parse(readFileSync(e.VITEST_JSON, 'utf8'));
+    const { DB_AREAS } = await import('./changes.mjs');
+    const { SERIAL } = await import('../../tests/db/vitest.config.ts');
+    const out = [];
+    for (const r of report.testResults ?? []) {
+      const file = String(r.name).startsWith(root) ? String(r.name).slice(root.length) : String(r.name);
+      out.push(JSON.stringify({
+        ts: new Date(now * 1000).toISOString(), who: 'ci', full: e.CI_FULL_RUN === 'true', runner: 'ci:db:file',
+        sha: e.GITHUB_SHA, branch: e.GITHUB_REF_NAME, session: e.GITHUB_RUN_ID, file,
+        project: SERIAL.includes(file) ? 'db-serial' : 'db-parallel',
+        area: Object.keys(DB_AREAS).find((a) => DB_AREAS[a].tests.includes(file)) ?? null,
+        seconds: Math.round(r.endTime - r.startTime) / 1000, ok: r.status === 'passed',
+      }));
+    }
+    if (out.length) appendFileSync(join(e.RUNNER_TEMP, 'ci-test-runs.jsonl'), out.join('\n') + '\n');
+  } catch { /* no per-file lines */ }
+}
