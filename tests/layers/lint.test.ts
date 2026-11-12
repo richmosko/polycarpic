@@ -18,12 +18,18 @@ const variants: Record<string, (l: any) => any> = {
     c.packages.ledger.allow.push('posting');
     return c;
   },
+  // POLY-140 cond 7b: a package the real map does not have, so a rule that names it proves its package list comes from the map.
+  newpkg: (l) => {
+    const c = structuredClone(l);
+    c.packages.newpkg = { dir: 'packages/newpkg', name: '@poly/newpkg', layer: 3, subpaths: [], allow: [] };
+    return c;
+  },
 };
 
 function walk(dir: string): string[] {
   return readdirSync(dir).flatMap((f) => {
     const p = join(dir, f);
-    return statSync(p).isDirectory() ? walk(p) : (p.endsWith('.ts') || p.endsWith('.svelte')) ? [p] : [];
+    return statSync(p).isDirectory() ? walk(p) : /\.(ts|mts|cts|tsx|jsx|js|mjs|cjs|svelte)$/.test(p) ? [p] : [];
   });
 }
 
@@ -70,12 +76,20 @@ describe('layer lint fixtures', () => {
       const [res] = await eslint.lintText(src, { filePath: join(root, vpath) });
       // `// @ignore: id` drops one rule from the result (e.g. the variant adds an edge package.json does not declare).
       const ignored = header(src, 'ignore')?.split(',').map((x) => x.trim()) ?? [];
-      const errors = res.messages.filter((m) => m.severity === 2 && !ignored.includes(m.ruleId ?? ''));
+      // POLY-140: an inline `eslint-disable-next-line poly/not-yet-written` makes ESLint report "Definition for rule ... not found"
+      // under that very rule id, which would satisfy an @expect of the missing rule. It is not the rule firing.
+      const errors = res.messages.filter((m) => m.severity === 2 && !ignored.includes(m.ruleId ?? '') && !/^Definition for rule /.test(m.message));
       const ids = errors.map((m) => m.ruleId ?? `parse:${m.message}`);
       if (!expected) {
         expect(ids, 'pass fixture must report no errors').toEqual([]);
       } else {
         for (const id of expected) expect(ids, `expected rule ${id}`).toContain(id);
+        // POLY-140: `// @message: text` (a substring of some expected rule's message); `// @message-not: text` (none contains it).
+        const msgs = errors.filter((m) => expected.includes(m.ruleId ?? '')).map((m) => m.message);
+        const want = header(src, 'message');
+        if (want) expect(msgs.some((m) => m.includes(want)), `a message names "${want}"; got ${JSON.stringify(msgs)}`).toBe(true);
+        const not = header(src, 'message-not');
+        if (not) expect(msgs.some((m) => m.includes(not)), `no message names "${not}"; got ${JSON.stringify(msgs)}`).toBe(false);
       }
     });
   }
