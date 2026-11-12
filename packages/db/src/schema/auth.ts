@@ -1,7 +1,7 @@
 // BetterAuth's four core tables, from `@better-auth/cli generate` (better-auth 1.7.18, drizzle/pg), edited: every id is a
 // uuid with a database default (SECURITY §4.3(l)), every timestamp is timestamptz (ARCH §6.2), columns stay snake_case
 // (§3.1c). Whether BetterAuth accepts uuid ids is measured on POLY-86. Grants live in the custom migration.
-import { boolean, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, index, integer, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 const tstz = (name: string) => timestamp(name, { withTimezone: true });
 const id = () => uuid('id').primaryKey().defaultRandom();
@@ -15,9 +15,12 @@ export const user = pgTable('user', {
   // POLY-86 (0004): written only by POLY-89's definers; poly_app can neither insert nor update either column.
   twoFactorEnabled: boolean('two_factor_enabled').default(false).notNull(),
   secondStepAt: tstz('second_step_at'),
+  // POLY-87 (0006): the sign-up marker. Written only by app.stamp_signup_user (BEFORE INSERT) and cleared by
+  // app.accept_invitations; no poly_app grant. "Inserted by this transaction" means signup_txid = pg_current_xact_id().
+  signupTxid: bigint('signup_txid', { mode: 'number' }),
   createdAt: tstz('created_at').defaultNow().notNull(),
   updatedAt: tstz('updated_at').defaultNow().$onUpdate(() => new Date()).notNull(),
-});
+}, (t) => [index('user_signup_txid_idx').on(t.signupTxid)]);
 
 export const session = pgTable(
   'session',

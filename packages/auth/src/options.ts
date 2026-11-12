@@ -6,7 +6,7 @@ import { magicLink, twoFactor } from 'better-auth/plugins';
 import { passkeyOnlyHold } from './second-step.ts';
 import { routePolicyHook, type TlsMode } from './route-policy.ts';
 import { createRoutingPool } from './routing-pool.ts';
-import { accountDropIdToken, userCreateBefore, userUpdateBefore } from './user-hooks.ts';
+import { accountDropIdToken, userCreateAfter, userCreateBefore, userUpdateBefore } from './user-hooks.ts';
 
 const DAY = 86400;
 /** C-04: five a minute per IP on the credential and verification paths (S19). */
@@ -118,7 +118,7 @@ export function authOptions(input: AuthInput) {
       ipAddress: { ipAddressHeaders: ['x-forwarded-for'], ipv6Subnet: 64 },
     },
     databaseHooks: {
-      user: { create: { before: userCreateBefore }, update: { before: userUpdateBefore } },
+      user: { create: { before: userCreateBefore, after: userCreateAfter }, update: { before: userUpdateBefore } },
       account: { create: { before: accountDropIdToken }, update: { before: accountDropIdToken } },
     },
     hooks: { before: routePolicyHook(input.tlsMode), after: passkeyOnlyHold },

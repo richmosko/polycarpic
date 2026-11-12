@@ -45,17 +45,4 @@ export async function provisionPerson(tx: Tx): Promise<{ personId: string; creat
   return { personId: row.id, created: true };
 }
 
-export class InvitationRequired extends Error {
-  constructor() {
-    super('sign-up requires an invitation');
-    this.name = 'InvitationRequired';
-  }
-}
-
-/**
- * Claims the invitation for a new user's email inside the sign-up transaction (SECURITY C-01, ARCH §3.1c). A stub until
- * POLY-87: it refuses every sign-up, so production creates no user before the real check lands.
- */
-export async function claimInvitation(_tx: Tx, _args: { email: string; token: string | null }): Promise<{ accepted: true }> {
-  throw new InvitationRequired();
-}
+export { InvitationRequired, claimInvitation, acceptInvitations, landingEntity, hashInvitationToken, decodeInvitationToken } from './invitation.ts';

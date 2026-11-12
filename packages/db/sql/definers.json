@@ -5,5 +5,8 @@
   { "function": "app.owner_count(uuid)", "owner": "poly_authz", "execute": ["poly_app", "poly_worker"] },
   { "function": "app.check_entity()", "owner": "poly_authz", "execute": [] },
   { "function": "app.seat_creator()", "owner": "poly_govern", "execute": [] },
-  { "function": "app.audit_membership()", "owner": "poly_govern", "execute": [] }
+  { "function": "app.audit_membership()", "owner": "poly_govern", "execute": [] },
+  { "function": "app.enter_new_user(uuid)", "owner": "poly_authz", "execute": ["poly_app"] },
+  { "function": "app.claim_invitations(bytea, text)", "owner": "poly_govern", "execute": ["poly_app"] },
+  { "function": "app.accept_invitations(bytea)", "owner": "poly_govern", "execute": ["poly_app"] }
 ]

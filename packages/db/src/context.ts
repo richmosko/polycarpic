@@ -4,9 +4,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type pg from 'pg';
 import { appPool, workerPool } from './pool.ts';
+import { enterNewUserOn } from './new-user.ts';
 import type { SessionUserId } from './session.ts';
 
 export type Tx = NodePgDatabase;
+/** The handle withContextFreeTx passes: the one transaction kind that can enter a user it just inserted (R4). */
+export type ContextFreeTx = Tx & { enterNewUser(id: string): Promise<void> };
 type Kind = 'withTenant' | 'withSystem' | 'withContextFreeTx';
 
 export class NestedContextError extends Error {
@@ -44,6 +47,12 @@ export class TransactionEnded extends Error {
 /** The opaque handle BetterAuth's routing pool uses: query only, never release (seceng S5). */
 export interface AuthClient {
   query: pg.PoolClient['query'];
+}
+export class NewUserStepRefused extends Error {
+  constructor(why: string) {
+    super(`NewUserStepRefused: ${why}`);
+    this.name = 'NewUserStepRefused';
+  }
 }
 export class TransactionClosed extends Error {
   constructor() {
@@ -112,6 +121,18 @@ async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (clie
       await client.query('BEGIN');
       try {
         const tx = drizzle(client);
+        if (kind === 'withContextFreeTx') {
+          let used = false;
+          Object.defineProperty(tx, 'enterNewUser', {
+            enumerable: false,
+            value: async (id: string): Promise<void> => {
+              if (!store.live) throw new TransactionClosed();
+              if (used) throw new NewUserStepRefused('the step runs once per transaction');
+              used = true;
+              await enterNewUserOn(client, id);
+            },
+          });
+        }
         clients.set(tx, client);
         store.tx = tx;
         await setup(client);
@@ -160,9 +181,9 @@ export async function withSystem<T>(job: string, target: JobTarget, fn: (tx: Tx)
 }
 
 /** Sign-up and other pre-identity work. Exported to packages/auth alone (db/auth). C-84: asserts first that no identity is set. */
-export async function withContextFreeTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+export async function withContextFreeTx<T>(fn: (tx: ContextFreeTx) => Promise<T>): Promise<T> {
   return inTransaction('withContextFreeTx', appPool, async (c) => {
     const res = await c.query(`SELECT coalesce(pg_catalog.current_setting('app.user_id', true), '') AS v`);
     if (res.rows[0].v !== '') throw new ContextNotEmptyError();
-  }, fn);
+  }, fn as (tx: Tx) => Promise<T>);
 }
