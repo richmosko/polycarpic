@@ -15,7 +15,7 @@ C20–C23), fe62c47 (C1–C6), 83e9457 (C7–C11, S7, S8), and the C13 commit th
 | db-filter-imports.test.ts | 5/9 | per-area closure needs `DB_AREAS`/`DB_SHARED` |
 | db-harness.test.ts | 14/17 | `bootstrap-lock.ts`, the wrapper in `freshDb`/`cloneMigrated`, globalSetup lock dir, config projects/`SERIAL` absent. 3 pass: setRolePasswords unwrapped, detector control, "no other file reads BOOTSTRAP" |
 | report.test.ts | 3/21 | `budgets.json` db 180→100; the JSON reporter output is ignored. The "missing/broken JSON → only the job line" cases pass today (guards) |
-| 12 other files | 0 | unchanged and green |
+| 11 other files | 0 | unchanged and green |
 
 `tests/workflow/test_cairn_test_boundary.py`: 5 red (anchor from anchor.mjs, ancestry count 0, `run=false` once, every `git diff`
 `--no-renames -z`). The full cairn suite otherwise stays green (2013 tests before the pin edits).
