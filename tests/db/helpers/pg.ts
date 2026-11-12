@@ -5,12 +5,12 @@ import { spawn, spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildArgv, IMAGE } from './pgtap-image.mjs';
+import { buildArgv, IMAGE, PG_BASE } from './pgtap-image.mjs';
 
 export const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 export const DB_PKG = join(ROOT, 'packages', 'db');
 // The Postgres base pin, the image tag and the build argv are owned by pgtap-image.mjs (ci.yml starts the same build early).
-export { IMAGE };
+export { IMAGE, PG_BASE };
 const SEP = '\u001f';
 
 export type Server = { host: string; port: number; container: string | null; superUrl: string };

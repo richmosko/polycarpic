@@ -500,7 +500,7 @@ jobs:
         shell: bash
         run: |
           # The helper owns the base pin, the tag and the build arguments. A failed build leaves no tag, so the harness builds it itself.
-          setsid nohup bash -c 'node tests/db/helpers/pgtap-image.mjs --build; echo $? > "$RUNNER_TEMP/pgtap-build.rc"' > "$RUNNER_TEMP/pgtap-build.log" 2>&1 < /dev/null &
+          setsid bash -c 'setsid nohup node tests/db/helpers/pgtap-image.mjs --build > "$RUNNER_TEMP/pgtap-build.log" 2>&1; echo $? > "$RUNNER_TEMP/pgtap-build.rc"' < /dev/null > /dev/null 2>&1 &
 
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
