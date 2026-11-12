@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-141-ci-test-time-cuts`
 - **Started:** 2026-11-12
 - **Goal:** the `db` battery runs in parallel and by area, and bookkeeping pushes skip the heavy suites.
-- **Status:** In Progress
+- **Status:** In Review — PR [#122](https://github.com/richmosko/polycarpic/pull/122)
 
 Standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job has about 5 s of room against its 130 s median target (the configured budget is 180 s and only warns) until this issue lands; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. A package is left only by its `@poly/<name>` import (lint-enforced). Nothing is deployed; sign-up stays closed until POLY-87 and second-factor enrolment until POLY-89.
 

@@ -1,7 +1,7 @@
 ---
 id: POLY-141
 title: CI test-time cuts
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-141.md, process/cairn/reviews/POLY-141/**, .github/workflows/ci.yml, infra/ci/changes.mjs, infra/ci/anchor.mjs, infra/ci/aggregate.mjs, infra/ci/job-report.mjs, infra/ci/budgets.json, tests/db/vitest.config.ts, tests/db/global-setup.ts, tests/db/helpers/**, tests/ci/**, tests/infra/wiring.test.ts, tests/workflow/test_cairn_test_boundary.py, apps/web/tests/e2e/serve.ts, docs/INFRA/**, docs/SECURITY/**]
 labels: [ci, tooling]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/122
 created: 2026-11-11
 updated: 2026-11-12
 ---
@@ -102,3 +102,7 @@ Criterion 9, first bookkeeping push (7445dc6, run 43298446115): anchor "ledger-o
 ### @team-lead — 2026-11-12
 
 Criterion 6, measured by the lead: four dispatch runs with `base` = 3b3242a on scratch branches of one comment-line commit each (diffs checked: one file, +1 line). Each selected `db` plus its own area key only; lint, unit and image skipped. `db` job: auth 48 s, 137 passed (run 43312152200; target 65 s); tenancy 53 s, 85 passed (43312506787); migrate 65 s, 93 passed (43312849525); ops 54 s, 35 passed (43313139798). The four passed counts sum to 350, the full run's passed count. Scratch branches deleted from origin; the four test files are out of `paths` again. Criterion 9, second bookkeeping push (3b3242a, run on the PR): cairn 15 s, summed 43 s, heavy jobs skipped.
+
+### @team-lead — 2026-11-12
+
+PR https://github.com/richmosko/polycarpic/pull/122 marked ready. Verdict PASS at 5c37510 (`process/cairn/reviews/POLY-141/verdict.md`, cd6d8d5); head-match PASS. Finish gate at ae2319d: cairn Python suite 2017 OK, board JS suite 494, dashboard type check 0 errors, dist fresh.
