@@ -1,12 +1,15 @@
 // POLY-96 criteria 1, 2, 6, 10 -- the change filter, infra/ci/changes.mjs (ruling §2).
 // Contract: changed paths on stdin, one per line; stdout is `key=true|false` for ALL FIVE keys
-// (node, layers, db, image, ci); exit non-zero on empty/blank stdin (fail closed, never all-false).
+// (node, layers, db, image, ci) -- and, from POLY-141, the four db_* area keys; exit non-zero on empty/blank stdin (fail closed, never all-false).
+// POLY-141 C16 (seceng S1): stdin is NUL-separated (`git diff --no-renames -z --name-only`), so a name with a newline, tab or
+// non-ASCII byte arrives literal. The five original keys are checked here; the area keys are in db-areas.test.ts.
 import { describe, expect, it } from 'vitest';
-import { node } from './helpers.ts';
+import { readFileSync } from 'node:fs';
+import { ci, node } from './helpers.ts';
 
 const KEYS = ['node', 'layers', 'db', 'image', 'ci'] as const;
 const run = (paths: string[]) => {
-  const r = node('changes.mjs', { input: paths.join('\n') + '\n' });
+  const r = node('changes.mjs', { input: paths.join('\0') + '\0' });
   const out: Record<string, string> = {};
   for (const l of r.stdout.split('\n')) { const m = /^(\w+)=(true|false)$/.exec(l.trim()); if (m) out[m[1]!] = m[2]!; }
   return { r, out, trueKeys: KEYS.filter((k) => out[k] === 'true') };
@@ -68,16 +71,37 @@ describe('changes.mjs filter table', () => {
     it(`${paths.join(' + ')} -> {${expected.join(',')}}  [red if: ${mutation}]`, () => {
       const { r, out, trueKeys } = run(paths);
       expect(r.code, r.stderr).toBe(0);
-      expect(Object.keys(out).sort()).toEqual([...KEYS].sort()); // all five keys always printed
+      expect(Object.keys(out)).toEqual(expect.arrayContaining([...KEYS])); // the five keys are always printed (area keys: db-areas.test.ts)
       expect(trueKeys).toEqual(KEYS.filter((k) => expected.includes(k)));
     });
   }
 
   it('empty input fails closed (non-zero, no all-false output)  [red if: empty list maps to all-false]', () => {
-    for (const input of ['', '\n', '  \n\n']) {
+    for (const input of ['', '\n', '  \n\n', '\0', ' \0\0']) {
       const r = node('changes.mjs', { input });
       expect(r.code).not.toBe(0);
       expect(r.stdout).not.toMatch(/=false/);
     }
+  });
+});
+
+// POLY-141 C16 / S1: NUL-separated input. Each of these is red while changes.mjs splits on newlines.
+describe('changes.mjs: NUL-separated input (POLY-141 C16, seceng S1)', () => {
+  const keysOn = (paths: string[]) => run(paths).trueKeys;
+  it('a later path is classified: README.md then packages/db/x.ts -> db  [red if: stdin is split on newlines, so the whole string is one path]', () => {
+    expect(keysOn(['README.md', 'packages/db/x.ts'])).toEqual(['node', 'db']);
+  });
+  it('non-ASCII name packages/db/sql/café.sql -> db', () => { expect(keysOn(['README.md', 'packages/db/sql/café.sql'])).toContain('db'); });
+  it('a tab in a name stays one path: packages/db/sql/a\tb.sql -> db', () => { expect(keysOn(['README.md', 'packages/db/sql/a\tb.sql'])).toContain('db'); });
+  it('a newline in a name stays one path and does not split into a second one: docs/a\npackages/db/x.ts -> nothing', () => {
+    expect(keysOn(['docs/a\npackages/db/x.ts'])).toEqual([]);
+  });
+  it('a literal newline-only list is not accepted as several paths  [red if: both separators are honoured]', () => {
+    const r = node('changes.mjs', { input: 'README.md\npackages/db/x.ts\n' });
+    expect(r.stdout).toContain('db=false');
+  });
+  it('the source reads stdin split on \\0', () => {
+    const src = readFileSync(ci('changes.mjs'), 'utf8');
+    expect(src).toMatch(/split\((['"])\\0\1\)/);
   });
 });

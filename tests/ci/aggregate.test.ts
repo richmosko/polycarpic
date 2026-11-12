@@ -2,7 +2,9 @@
 // Contract: env NEEDS = toJSON(needs) = {<job>: {result, outputs}}; exit 0 = green, non-zero = red.
 // Output -> keyed job: node->unit, layers->lint, ci->lint, image->image, db->db.
 import { describe, expect, it } from 'vitest';
-import { node, wf } from './helpers.ts';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { node, ROOT, wf } from './helpers.ts';
 
 // The jobs ci.yml gates on each filter output, read from the job-level `if:` (the contract REQUIRED must mirror).
 const ifOf = (job: string) => `${wf('ci.yml').jobs[job]?.if ?? ''}`;
@@ -10,8 +12,14 @@ const wired = (out: string) => ['lint', 'unit', 'db', 'image'].filter((j) => new
 
 type Needs = Record<string, { result: string; outputs: Record<string, string> }>;
 const OUT = ['node', 'layers', 'db', 'image', 'ci'];
+// POLY-141 C20: the aggregate also reads the four area keys; `db` is their OR, so asking for `db` turns all four on.
+const AREAS = ['db_auth', 'db_tenancy', 'db_migrate', 'db_ops'];
+const outputsFor = (on: string[]): Record<string, string> => {
+  const areaOn = (a: string) => on.includes(a) || on.includes('db');
+  return Object.fromEntries([...OUT.filter((k) => k !== 'db').map((k) => [k, String(on.includes(k))]), ...AREAS.map((a) => [a, String(areaOn(a))]), ['db', String(AREAS.some(areaOn))]]);
+};
 const base = (on: string[] = []): Needs => ({
-  changes: { result: 'success', outputs: Object.fromEntries(OUT.map((k) => [k, String(on.includes(k))])) },
+  changes: { result: 'success', outputs: outputsFor(on) },
   guard: { result: 'success', outputs: {} },
   lint: { result: 'skipped', outputs: {} }, unit: { result: 'skipped', outputs: {} },
   db: { result: 'skipped', outputs: {} }, image: { result: 'skipped', outputs: {} },
@@ -82,5 +90,26 @@ describe('aggregate.mjs: every job an output gates (POLY-136 item 2)', () => {
     const { REQUIRED } = (await import('../../infra/ci/aggregate.mjs')) as { REQUIRED?: Record<string, string[]> };
     expect(REQUIRED, 'aggregate.mjs must export REQUIRED').toBeDefined();
     for (const out of OUT) expect([...(REQUIRED![out] ?? [])].sort(), out).toEqual(wired(out));
+  });
+});
+
+// POLY-141 C20 (seceng S2): a changes job that emits a malformed or incomplete output set is red, never green.
+describe('aggregate.mjs: the changes outputs are validated (POLY-141 C20)', () => {
+  const KEYS = [...OUT, ...AREAS];
+  const withOut = (outputs: Record<string, string>): Needs => ({ ...base(), changes: { result: 'success', outputs } });
+  const allFalse = () => Object.fromEntries(KEYS.map((k) => [k, 'false']));
+  it('every key present and false -> green (control)', () => { expect(agg(withOut(allFalse()))).toBe(0); });
+  it('empty outputs -> red  [red if: missing keys read as false]', () => { expect(agg(withOut({}))).not.toBe(0); });
+  for (const k of KEYS) {
+    it(`${k} missing -> red`, () => { const o = allFalse(); delete o[k]; expect(agg(withOut(o))).not.toBe(0); });
+    for (const bad of ['TRUE', 'yes', '', '1']) {
+      it(`${k}='${bad}' -> red  [red if: only the exact string 'true' is read, anything else counts as false]`, () => { expect(agg(withOut({ ...allFalse(), [k]: bad }))).not.toBe(0); });
+    }
+  }
+  it('db=true with every area false -> red even when the db job succeeded (db must be the OR of the areas)', () => { expect(agg(set(withOut({ ...allFalse(), db: 'true' }), 'db', 'success'))).not.toBe(0); });
+  it('an area true with db=false -> red', () => { expect(agg(withOut({ ...allFalse(), db_ops: 'true' }))).not.toBe(0); });
+  it('imports its key list from changes.mjs: TABLE keys and the four areas are all named there', () => {
+    const src = readFileSync(join(ROOT, 'infra/ci/aggregate.mjs'), 'utf8');
+    expect(src).toMatch(/from ['"]\.\/changes\.mjs['"]/);
   });
 });

@@ -264,6 +264,31 @@ describe('ci.yml: the anchor skip (POLY-141 C15, C16, C18)', () => {
     expect(runOf(w.jobs.cairn!)).toMatch(/run=ledger/);
     expect(runOf(w.jobs.cairn!)).toMatch(/LEDGER/);
   });
+  it('C21: workflow permissions are exactly {contents: read}; actions: read only on the cairn and changes jobs  [red while it is workflow-level]', () => {
+    expect(w.permissions).toEqual({ contents: 'read' });
+    for (const [id, j] of Object.entries(w.jobs)) {
+      if (id === 'cairn' || id === 'changes') expect(j.permissions, id).toEqual({ contents: 'read', actions: 'read' });
+      else expect(j.permissions?.actions, id).toBeUndefined();
+    }
+  });
+  it('C21: GH_TOKEN is set only as step env on the step that runs anchor.mjs, and nowhere else', () => {
+    expect(JSON.stringify(w.permissions ?? {})).not.toContain('GH_TOKEN');
+    const holders: string[] = [];
+    for (const [id, j] of Object.entries(w.jobs)) {
+      expect(JSON.stringify({ ...j, steps: undefined }), `${id} job-level`).not.toContain('GH_TOKEN');
+      for (const s of steps(j)) if (s.env && 'GH_TOKEN' in s.env) {
+        expect(s.run ?? '', `${id}: ${s.name}`).toMatch(/infra\/ci\/anchor\.mjs/);
+        holders.push(id);
+      }
+    }
+    expect(holders.sort()).toEqual(['cairn', 'changes']);
+  });
+  it('C16: the filter diffs are NUL-separated: --no-renames -z, and the cairn shell converts with tr  [red while newline output is read]', () => {
+    for (const id of ['changes', 'cairn']) {
+      for (const l of gitDiffLines(runOf(w.jobs[id]!))) expect(l, `${id}: ${l}`).toMatch(/--no-renames\s+-z/);
+    }
+    expect(runOf(w.jobs.cairn!)).toMatch(/tr '\\0' '\\n'/);
+  });
   it('anchor.mjs is the only place the lookup is written: no `actions/workflows/ci.yml/runs` in ci.yml', () => {
     expect(wfText('ci.yml')).not.toContain('actions/workflows/ci.yml/runs');
   });

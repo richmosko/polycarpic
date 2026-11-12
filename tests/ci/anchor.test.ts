@@ -7,13 +7,15 @@
 //     io = { eventName, repo, headRef, prHead, prBase,            // strings
 //            lookup(): object            // parsed `gh api` JSON; throws on exit!=0, timeout or bad JSON
 //            hasCommit(sha): boolean, isAncestor(a, b): boolean,
-//            diff(a, b): string[]        // `git diff --no-renames --name-only a b`; throws on error }
+//            diff(a, b): string[]        // `git diff --no-renames -z --name-only a b` split on NUL; throws on error
+//            modes(a, b): string[]       // every old and new mode from `git diff --raw -z --no-renames a b`; throws on error }
+//   decide() is false if any mode is 120000 (symlink) or 160000 (gitlink) (C22), or modes() throws.
 //   CLI: env EVENT_NAME REPO HEAD_REF PR_HEAD PR_BASE (+ GH_TOKEN for gh); prints exactly one line
 //        `ledger_only=true|false` to stdout, the reason to stderr, exit 0 (non-zero only on an internal crash).
 //        `--ledger-tests` prints LEDGER_TESTS one per line.
 // The CLI is run here against a real scratch git repo with a fake `gh` first on PATH.
 import { spawnSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -36,6 +38,7 @@ function fakeIo(over: Record<string, unknown> = {}) {
     hasCommit: () => true,
     isAncestor: () => true,
     diff: () => ['process/STATE.md', 'process/cairn/issues/POLY-141.md'],
+    modes: () => ['100644', '100644'],
     ...over,
   };
 }
@@ -73,7 +76,25 @@ describe('anchor.mjs: constants (C19)', () => {
   });
 });
 
-describe('anchor.mjs: source pins (R4 algorithm, C16)', () => {
+describe('anchor.mjs: source pins (R4 algorithm, C16, C14 S3)', () => {
+  it('lists paths NUL-separated: `--no-renames -z` and a split on \\0 (S1); modes from `--raw -z` (S5)', () => {
+    const s = src();
+    expect(s).toMatch(/--no-renames['"`, ]+-z/);
+    expect(s).toMatch(/split\((['"])\\0\1\)/);
+    expect(s).toContain('--raw');
+    expect(s).toContain('120000');
+    expect(s).toContain('160000');
+  });
+  it('builds the query with encodeURIComponent(HEAD_REF), runs gh/git through spawnSync argv arrays, never a shell (S3)', () => {
+    const s = src();
+    expect(s).toContain('encodeURIComponent');
+    expect(s).toContain('spawnSync');
+    expect(s).not.toMatch(/\bexecSync\b|\bexec\(|shell:\s*true|\bexecFileSync\b.*shell/);
+    expect(s).not.toMatch(/`[^`]*\$\{[^}]*(headRef|HEAD_REF)[^}]*\}[^`]*`\s*,\s*\{[^}]*shell/);
+  });
+  it('checks every sha against ^[0-9a-f]{40}$ before git sees it (S3)', () => {
+    expect(src()).toContain('[0-9a-f]{40}');
+  });
   it('asks for successful pull_request runs of ci.yml on the branch, one run, 30 s timeout, --no-renames diff', () => {
     const s = src();
     expect(s).toContain('actions/workflows/ci.yml/runs');
@@ -133,6 +154,10 @@ describe('decide(): fails closed (C14)', () => {
     ['base not an ancestor of the anchor (merge from main / rebase)', { isAncestor: (a: string) => a !== BASE }],
     ['an ancestry check that throws', { isAncestor: throws }],
     ['a diff error', { diff: throws }],
+    ['a symlink in the diff (mode 120000, new side)', { modes: () => ['000000', '120000'] }],
+    ['a symlink in the diff (mode 120000, old side)', { modes: () => ['120000', '100644'] }],
+    ['a gitlink in the diff (mode 160000)', { modes: () => ['000000', '160000'] }],
+    ['a modes lookup that throws', { modes: throws }],
     ['an empty diff', { diff: () => [] }],
     ['a path outside the ledger', { diff: () => ['process/STATE.md', 'packages/db/src/x.ts'] }],
     ['a WORKFLOW.md path', { diff: () => ['process/WORKFLOW.md'] }],
@@ -272,6 +297,71 @@ describe('anchor.mjs CLI: real repo, fake gh (criterion 9, C14, C16)', () => {
     const r = node('anchor.mjs', { args: ['--ledger-tests'] });
     expect(r.code).toBe(0);
     expect(lines(r.stdout).sort()).toEqual(['test_ruling_archive_records.py', 'test_state_releases_bound.py']);
+  });
+});
+
+describe('anchor.mjs CLI: hostile names, symlinks and gitlinks (C16 S1, C22 S5)', () => {
+  it('a ledger-only diff plus a code path with a non-ASCII name (quoted by default git) is false', () => {
+    const s = scratch();
+    const a = commit(s.dir, { 'packages/db/y.ts': 'export {};\n' }, 'code');
+    const head = commit(s.dir, { 'process/STATE.md': 's', 'packages/db/sql/café.sql': 'select 1;\n' }, 'mixed');
+    s.gate(a);
+    expect(lines(s.cli(head, s.base).stdout)).toEqual(['ledger_only=false']);
+  });
+  it('a ledger-only diff with a non-ASCII ledger name is still true: names reach the matcher literal, not quoted  [red if: git quotePath output is matched]', () => {
+    const s = scratch();
+    const a = commit(s.dir, { 'packages/db/y.ts': 'export {};\n' }, 'code');
+    const head = commit(s.dir, { 'process/cairn/issues/café.md': 'i' }, 'ledger');
+    s.gate(a);
+    expect(lines(s.cli(head, s.base).stdout)).toEqual(['ledger_only=true']);
+  });
+  it('a symlink under the ledger is false (mode 120000)  [red if: modes are not checked]', () => {
+    const s = scratch();
+    const a = commit(s.dir, { 'packages/db/y.ts': 'export {};\n' }, 'code');
+    mkdirSync(join(s.dir, 'process/cairn/issues'), { recursive: true });
+    symlinkSync('../../../packages/db/y.ts', join(s.dir, 'process/cairn/issues/link.md'));
+    git(s.dir, 'add', 'process/cairn/issues/link.md');
+    git(s.dir, 'commit', '-q', '-m', 'symlink');
+    s.gate(a);
+    expect(lines(s.cli(git(s.dir, 'rev-parse', 'HEAD'), s.base).stdout)).toEqual(['ledger_only=false']);
+  });
+  it('a gitlink under the ledger is false (mode 160000)', () => {
+    const s = scratch();
+    const a = commit(s.dir, { 'packages/db/y.ts': 'export {};\n' }, 'code');
+    git(s.dir, 'update-index', '--add', '--cacheinfo', `160000,${a},process/cairn/issues/sub`);
+    git(s.dir, 'commit', '-q', '-m', 'gitlink');
+    s.gate(a);
+    expect(lines(s.cli(git(s.dir, 'rev-parse', 'HEAD'), s.base).stdout)).toEqual(['ledger_only=false']);
+  });
+  it('the real tree holds no symlink or gitlink (so the C22 rule never changes a real decision today)', () => {
+    const r = spawnSync('git', ['ls-files', '-s'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 64 << 20 });
+    expect(r.status).toBe(0);
+    expect(r.stdout.split('\n').filter((l) => /^(120000|160000) /.test(l))).toEqual([]);
+  });
+});
+
+// C23 (seceng S6): nothing a runner executes is discovered under a LEDGER path.
+describe('C23: no test discovery reaches a ledger path', () => {
+  const globRe = (g: string) => new RegExp('^' + g.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\//g, '\u0001').replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*').replace(/\u0001/g, '(?:.*/)?') + '$');
+  const PROBES = ['process/cairn/issues/x.test.ts', 'process/cairn/reviews/POLY-1/x.test.ts', 'process/STATE.test.ts', 'process/cairn/issues/test_x.py'];
+  it('the matcher can fail: **/*.test.ts matches a ledger-directory probe (control)', () => {
+    expect(PROBES.some((p) => globRe('**/*.test.ts').test(p))).toBe(true);
+    expect(PROBES.some((p) => globRe('tests/ci/**/*.test.ts').test(p))).toBe(false);
+  });
+  it('no vitest include in the repo matches a ledger probe', () => {
+    const files = ['apps/web/vitest.config.ts', 'tests/ci/vitest.config.ts', 'tests/config/vitest.config.ts', 'tests/db/vitest.config.ts', 'tests/infra/vitest.config.ts', 'tests/infra/vitest.image.config.ts'];
+    const globs = files.flatMap((f) => [...readFileSync(join(ROOT, f), 'utf8').matchAll(/include:\s*\[([^\]]*)\]/g)].flatMap((m) => [...m[1]!.matchAll(/['"]([^'"]+)['"]/g)].map((x) => x[1]!)));
+    expect(globs.length).toBeGreaterThan(0);
+    for (const g of globs) for (const p of PROBES) expect(globRe(g).test(p), `${g} vs ${p}`).toBe(false);
+  });
+  it('run_tests.py discovers only scripts/cairn/tests and tests/workflow; pnpm-workspace.yaml globs stay out of process/', () => {
+    const rt = readFileSync(join(ROOT, 'scripts/cairn/run_tests.py'), 'utf8');
+    expect(rt).toMatch(/^TESTS_DIR = SCRIPT_DIR \/ "tests"$/m);
+    expect(rt).toMatch(/^WORKFLOW_TESTS_DIR = SCRIPT_DIR\.parent\.parent \/ "tests" \/ "workflow"$/m);
+    const roots = /def _discovery_roots\(\)[\s\S]*?return roots/.exec(rt)?.[0] ?? '';
+    expect(roots).not.toMatch(/process/);
+    const ws = readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8').split('\n').filter((l) => /^\s+-\s+\S/.test(l) && !l.includes(':'));
+    for (const l of ws) expect(l, l).not.toMatch(/process\//);
   });
 });
 

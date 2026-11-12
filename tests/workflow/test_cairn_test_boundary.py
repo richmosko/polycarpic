@@ -471,7 +471,7 @@ class CiAnchoredSkipTests(unittest.TestCase):
         self.assertTrue(diffs, "the changes step has a git diff")
         for l in diffs:
             with self.subTest(line=l.strip()):
-                self.assertIn("--no-renames", l, "POLY-141 C16: a rename must not hide its source path from the filter")
+                self.assertRegex(l, r"--no-renames\s+-z", "POLY-141 C16/S1: no renames, and NUL-separated so a name is never quoted or split")
 
     def test_step_still_has_no_bare_or_true(self):
         self.assertNotRegex(
