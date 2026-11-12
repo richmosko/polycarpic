@@ -11,8 +11,10 @@ import { fileURLToPath } from 'node:url';
 import poly from './plugin.mjs';
 
 const RESOLVER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'resolver.cjs');
-const SRC = '**/*.{ts,tsx,js,mjs,cjs,svelte}';
-const TESTS = ['**/*.test.{ts,tsx,js,mjs}', '**/*.spec.{ts,tsx,js,mjs}'];
+const SRC = '**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,svelte}';
+const TESTS = ['**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}', '**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}'];
+// Repo-root test code a colocated test or a package's tests/ dir may import by path (POLY-140 condition 5).
+const OUTSIDE_ROOTS = ['tests'];
 
 const PG_DRIVERS = ['pg', 'pg-pool', 'postgres', '@neondatabase/serverless'];
 const DRIZZLE_PG = ['node-postgres', 'postgres-js', 'neon-serverless', 'neon-http', 'pg-proxy'].map((s) => `drizzle-orm/${s}`);
@@ -44,7 +46,8 @@ export function generateConfig(layers, opts = {}) {
         'import/resolver': { [RESOLVER]: { root, layers: opts.layersFile } },
         'import-x/resolver': { [RESOLVER]: { root, layers: opts.layersFile } },
       },
-      linterOptions: { reportUnusedDisableDirectives: 'off' },
+      // noInlineConfig: an inline disable cannot silence a layer rule; the eslint-comments rules still report the comment.
+      linterOptions: { noInlineConfig: true, reportUnusedDisableDirectives: 'off' },
       rules: {
         'boundaries/dependencies': [2, { default: 'disallow', policies }],
         'poly/no-computed-import': 2,
@@ -88,8 +91,9 @@ export function generateConfig(layers, opts = {}) {
       for (const s of SVELTEKIT.filter((x) => !x.endsWith('*'))) paths.push({ name: s, message: 'Nothing under packages/ imports SvelteKit (ARCH §2.1).' });
       patterns.push({ group: SVELTEKIT.filter((x) => x.endsWith('*')), message: 'Nothing under packages/ imports SvelteKit (ARCH §2.1).' });
     }
-    // POLY-136 C5 (seceng): apps/migrate/src/run.ts is reached only from cli.ts (a './run.ts' import), its tests and tests/**.
-    patterns.push({ regex: 'migrate/(src/)?run(\\.[tj]s)?$', message: 'apps/migrate/src/run.ts is imported only by cli.ts and tests (POLY-136 C5).' });
+    // POLY-140 condition 15(b): nothing builds a require function, so `module` is imported nowhere.
+    for (const m of ['module', 'node:module']) paths.push({ name: m, message: 'node:module builds require functions that hide imports from the layer lint (POLY-140).' });
+    banned.push('module', 'node:module');
     // Every subpath is restricted by construction: only an explicit allow entry (db/auth) grants it.
     patterns.push({
       group: ['@poly/*/*', ...allowedSubs.map((s) => `!${s}`)],
@@ -108,6 +112,14 @@ export function generateConfig(layers, opts = {}) {
     if (namedOnly.length) rules['poly/named-imports-only'] = [2, { specifiers: namedOnly }];
     if (banned.length) rules['poly/no-banned-specifier'] = [2, { specifiers: banned, message: 'not allowed in this package (dynamic import or require).' }];
     if (!isSecrets) rules['poly/no-webcrypto-members'] = 2;
+    // POLY-140: relative path imports never reach another package; derived from layers.json only.
+    rules['poly/no-relative-cross-package'] = [2, {
+      root,
+      dir: e.dir,
+      packages: Object.fromEntries(names.map((x) => [x, pk[x].dir])),
+      outsideRoots: OUTSIDE_ROOTS,
+    }];
+    rules['poly/no-require-factory'] = 2;
     rules['import-x/no-extraneous-dependencies'] = [2, { packageDir: [path.join(root, e.dir), root], devDependencies: true }];
     cfg.push({ name: `poly/restrictions/${n}`, files: [base(n)], plugins: { poly }, rules });
   }
