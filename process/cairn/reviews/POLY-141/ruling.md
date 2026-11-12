@@ -1,0 +1,343 @@
+# POLY-141 gate-1 ruling (architect)
+
+Base fb9cb9b. The criteria stand; this settles what the issue left open. Local measurements: macOS arm64, 10 cores, Docker 29.9.3,
+vitest 5.1.0, prototype edits to `tests/db/` reverted. Nothing is committed but this file.
+
+## Measured this session
+
+- **M1 One invocation works.** `test.projects` with `db-parallel` (`sequence.groupOrder: 0`, `fileParallelism: true`) and `db-serial`
+  (`groupOrder: 1`, `fileParallelism: false`), a file lock around the bootstrap, `maxWorkers: 3`: 352 tests, 352 passed. That is the
+  base count. In every run the serial project's first file started after the parallel project's last file ended (JSON reporter times).
+- **M2 globalSetup.** Listed per project, it runs once per project (two containers, +2.7 s). Listed at the root, it runs once.
+- **M3 Wall time** (first file start to last file end; every locked run passed): 3 workers with the serial four, 39.8 and 40.6 s;
+  3 workers with ops-status in the parallel group, 36.8 to 37.7 s over 7 runs; 2 workers, 44.3 s (1 run); 4 workers, 33.3 and 41.4 s.
+  qa-136's serial baseline is 72 s.
+- **M4 Lock removed.** Same config, 3 workers: 2 of 3 runs fail, each with `tuple concurrently updated` on `ALTER ROLE poly_owner`
+  in `roles.sql`, and auth-routing-pool's 40 tests skip. The failure is probabilistic, so a runtime canary cannot be a reliable red.
+- **M5 ops-status.** No `pg_locks`, `pg_stat_activity` or role write in `ops-status.test.ts` or `apps/web/src/ops/*` (grep). Ran
+  5 of 5 green in the parallel group. `runner.test.ts` does read `pg_locks` across all databases (lines 249 and 264).
+- **M6 template-clone.** Ran 3 of 3 green in the parallel group and saved about 1.5 s. Not taken (R2).
+- **M7 Cluster writes, by file** (grep for CREATE/ALTER/DROP ROLE, role-membership GRANT/REVOKE, PASSWORD, `pg_locks`): only runner
+  (membership GRANT/REVOKE, `pg_locks`, `pg_terminate_backend`) and the harness's `setRolePasswords` (globalSetup, which runs
+  before any worker). The one `ALTER ROLE … IN DATABASE` is in `wrappers.test.ts`, not tenancy.
+- **M8 Connections.** Peak sampled client backends on the run's own container: 20 at 3 workers, 16 at 4. Sampling was every
+  0.45 s, so these are lower bounds. `max_connections` is 100.
+- **M9 Area-only run.** The 7 auth files through both projects (the serial project is empty, which vitest accepts): 137 tests,
+  12.1 s wall against 37 s for the full run.
+- **M10 Ledger readers** (grep of `tests/workflow` and `scripts/cairn/tests` for paths built from the real repo root):
+  `test_state_releases_bound.py` reads `process/STATE.md`. `test_ruling_archive_records.py` runs `git grep` over the whole tree
+  except `process/cairn/reviews` and POLY-57, so it reads STATE.md, DECISIONS.md and every tracker record, plus the five
+  pinned rulings. Every other hit builds its paths in a temp fixture. The two files together take 0.46 s locally
+  (`run_tests.py -p … -p …`). A grep cannot prove nothing else reads them; C17 covers that.
+- **M11 Renames hide paths.** With git's default rename detection, `git diff --name-only` lists only a rename's destination: in a
+  scratch repo, `packages/db/x.ts → process/cairn/issues/x.md` listed only the issue file. With `--no-renames` both paths appear.
+  Today's `changes` diff and both cairn diffs have this hole.
+
+## R1 Bootstrap serialisation (criterion 2): a harness file lock
+
+- **Where.** A new module, `tests/db/helpers/bootstrap-lock.ts`, exports `withBootstrapLock(fn)`. globalSetup creates a per-run
+  directory with `mkdtemp` and exports `POLY_TEST_LOCK_DIR` before any worker starts; workers inherit it the same way they inherit
+  `POLY_TEST_SERVER`.
+- **How it locks.** Acquire is `mkdirSync(<dir>/bootstrap.lock)`, which is atomic across processes. On EEXIST it waits 10 ms
+  (`Atomics.wait`) and retries. After 120 s it throws `bootstrap lock timeout`; it never runs unlocked. Release is `rmdirSync` in
+  `finally`. If `POLY_TEST_LOCK_DIR` is unset, it throws.
+- **What it covers.** The whole psql session in `freshDb()` and the clone session in `cloneMigrated()` (CREATE DATABASE plus
+  `roles.sql`), which is what was measured. `setRolePasswords` runs once, in globalSetup, and is not wrapped. `roles.sql` is
+  unchanged, so `packages/db/sql/**` stays out of the paths.
+- **Not once in globalSetup.** The database half of `roles.sql` (owner, CONNECT grants, default privileges, schema `public`) has to
+  run in every database. Running only that half would mean the harness runs text that `provision.sh` never runs.
+- **Not `pg_advisory_lock`.** An advisory lock is keyed by database, and the session `\connect`s into the new database, so holding
+  the lock would need a second long-lived session per call.
+- **Stale locks.** The directory is per run, so no stale lock carries into the next run. A worker that dies holding the lock
+  already fails the run, and the 120 s timeout bounds the wait.
+- **Why `wrappers`' `ALTER ROLE poly_app IN DATABASE <db>` is safe unlocked.** It writes the `pg_db_role_setting` row keyed by
+  (its own database, poly_app). `roles.sql`'s only write to that catalog is the row (database 0, poly_backup), and its other cluster
+  writes are `pg_authid` role rows. `tuple concurrently updated` needs two updates of the same tuple; these are different tuples.
+  13 locked runs here and 6 by architect-136 had no failures. C5 keeps it that way: outside the serial project, no test writes a
+  cluster-wide row.
+- **Canary.** C1 to C3 are static and deterministic; the unlocked runtime failure is 2 in 3 (M4).
+
+## R2 Projects and workers (criterion 1)
+
+- **One invocation.** `tests/db/vitest.config.ts` declares the two projects as in M1, with `globalSetup` at the root only. Two
+  invocations would cost a second container start and buy nothing.
+- **Workers.** `maxWorkers: 3`, pinned at the root: 4 vCPU less one for Postgres. Pinning also makes local runs use the CI shape.
+- **Groups.** The serial project is runner, template-clone and ops-hardening, exported as `SERIAL` from the config. The parallel
+  project is `include` minus `SERIAL`.
+  - ops-status leaves the serial group (M5).
+  - template-clone stays serial: what it checks is cluster-wide role state, and 1.5 s does not justify widening C5.
+  - ops-hardening stays serial: its 4.8 s production timeout has not been measured under contention on 4 vCPU.
+- **`max_connections`** 100 against a sampled peak of at least 20: no change.
+- **If criterion 1 misses at 3 workers,** run one more five-run set at 4. Sharding comes only after that.
+- **CI projection (unmeasured).** Parallel group is about 56 s of CI file time spread over 3 workers, plus contention; serial group
+  22.5 s. That puts vitest at 55 to 70 s and the job at 75 to 90 s.
+
+## R3 Area map (criteria 3–5)
+
+The single source is `infra/ci/changes.mjs`. It exports `DB_SHARED` (regexes) and
+`DB_AREAS = { auth|tenancy|migrate|ops: { tests: [exact files], paths: [regexes] } }`. Each area's paths include its own test
+files, matched exactly. The table below covers all 19 files.
+
+| area | parallel project | serial project | paths beyond its test files |
+|---|---|---|---|
+| auth | auth-client-ip, auth-fields, auth-route-policy, auth-routing-pool, auth-second-step, auth-session, auth-signup-wrap | | `packages/auth/`, `packages/tenancy/` |
+| tenancy | tenancy, matrix, wrappers, battery, pgtap | | `packages/tenancy/`, `tests/db/pgtap/` |
+| migrate | checks, connection, migrate-run-helper | runner, template-clone | |
+| ops | ops-status | ops-hardening | `apps/web/src/ops/`, `apps/web/src/main.ts`, `apps/web/src/startup.ts`, `tests/log/` |
+
+- **`DB_SHARED`:** `packages/db/` (src, migrations, sql), `apps/migrate/`, `packages/config/`, `tests/db/helpers/`,
+  `tests/db/global-setup.ts`, `tests/db/vitest.config.ts`, `tests/db/docker/`, `infra/postgres/Dockerfile`, `infra/postgres-major`,
+  `pnpm-lock.yaml`.
+  - Why these: every test file reaches `packages/db/src/{connection,journal,migrate}`, `apps/migrate` and `packages/config` through
+    `helpers/api.ts` (measured closure), and every `cloneMigrated()` reads the migrations and `roles.sql` as data.
+  - The helpers count as shared as a whole. Narrowing the helpers that only one area uses (sql/auth for auth; matrix, cross-tenant,
+    tenancy and definers for tenancy) can come later.
+- **Classify.** The `db` key keeps its existing rule (`TABLE.db`). For each changed path that sets `db`:
+  - a shared path turns on all four areas;
+  - otherwise, every area whose paths match turns on;
+  - if none match, all four turn on (fail closed).
+  - Invariant: `db` equals the OR of the four area keys.
+  - A dispatch run with no base sets every key true.
+- **Selection.** `node infra/ci/changes.mjs --db-select` reads `DB_AUTH`, `DB_TENANCY`, `DB_MIGRATE` and `DB_OPS` from the
+  environment.
+  - It prints `all` when every area is on; otherwise it prints the selected files, one per line.
+  - It exits 1 when the map is wrong against the disk (a `tests/db/*.test.ts` in no area or in two, or a listed file that does not
+    exist), when no area is on, or when a value is not exactly `true` or `false`.
+  - On `all`, the battery step runs with no file filter, so even a stray file still runs.
+- **Preflight in the `db` job, before Docker:**
+  `pnpm exec vitest run -c tests/ci/vitest.config.ts tests/ci/db-filter-imports.test.ts tests/ci/db-areas.test.ts tests/ci/db-harness.test.ts`.
+  - Today these proofs run only when `ci` changes (the lint job), so a PR that adds an import from one area's tests into another
+    area's code would not run them.
+  - Any edit to an import line is itself a `db`-filter path, so with the preflight the proof runs on the very PR that could break it.
+
+## R4 Anchor rule (criterion 9): `infra/ci/anchor.mjs`
+
+Node built-ins only, like `changes.mjs`, so it runs on the runner's own node without setup-node (the `changes` job already relies on
+this). The pure core is `decide(io)`: `io` supplies `lookup()`, `hasCommit(sha)`, `isAncestor(a, b)` and `diff(a, b)`, so tests can
+inject fakes. The CLI wraps those with `spawnSync`, prints exactly one line, `ledger_only=true` or `ledger_only=false`, writes the
+reason to stderr, and exits 0. It exits non-zero only on an internal crash, which turns the step red. The calling shell compares the
+output with `= "ledger_only=true"`; any other output counts as false.
+
+**Algorithm:**
+
+1. `EVENT_NAME` is not `pull_request` → false.
+2. `gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=pull_request&status=success&branch=$HEAD_REF&per_page=1"`, with a
+   30 s timeout.
+   - Non-zero exit, timeout, unparseable JSON or no run → false.
+   - `workflow_runs[0]` must have `conclusion` success, `event` pull_request, `head_branch === HEAD_REF`,
+     `head_repository.full_name === REPO` (no fork runs) and `head_sha` matching `^[0-9a-f]{40}$`; otherwise false.
+3. `git cat-file -e <A>^{commit}` fails → false.
+4. `git merge-base --is-ancestor A PR_HEAD` and `git merge-base --is-ancestor PR_BASE A`: either non-zero → false.
+5. `git diff --no-renames --name-only A PR_HEAD`: non-zero exit → false; empty output → false.
+6. True only if every path matches `LEDGER` and none matches `PINNED_RULINGS`.
+
+**Constants:**
+
+- `LEDGER` = `^process/cairn/(issues|milestones|majors|archive|reviews)/`, `^process/STATE\.md$`, `^process/DECISIONS\.md$`.
+- `PINNED_RULINGS` = today's regex, unchanged.
+- `LEDGER_TESTS` = `test_state_releases_bound.py`, `test_ruling_archive_records.py`.
+
+**`changes` job:**
+
+- On `ledger_only=true` it runs `node infra/ci/changes.mjs --none`, which prints every key false: `TABLE`'s keys plus the four area
+  keys.
+- Otherwise it keeps today's path, with `--no-renames` added.
+- The job gains `actions: read`, plus `GH_TOKEN`, `REPO`, `HEAD_REF` and `PR_HEAD` in the environment.
+
+**`cairn` job:** the shell anchor block (from `rc=0; ANCHOR=` to the first `SKIP=true`) is replaced by the `anchor.mjs` call. The
+output becomes `run=true|ledger|false`:
+
+- `ledger_only=true` → `ledger`.
+- Otherwise the job looks at BASE..HEAD (now with `--no-renames`): a PATTERN or PINNED hit → `true`; else any path in `LEDGER` →
+  `ledger`; else `false`.
+  - The `ledger` result on BASE..HEAD is new. Today a PR that touches only STATE.md or a tracker record runs no cairn test, although
+    both ledger tests read those files (M10). That is a skip that can let a red change merge; closing it costs about 15 s per such
+    PR (unmeasured).
+- On `ledger`: Set up Python, then `python3 scripts/cairn/run_tests.py` with one `-p <name>` for each line of
+  `node infra/ci/anchor.mjs --ledger-tests` (a bash array). No Node setup, no JS suite.
+  - `scripts/cairn/run_tests.py` is unchanged: `-p` is repeatable and searches both roots.
+  - Cairn target estimate: about 7 s checkout, Python setup, and under 1 s of tests (unmeasured on CI).
+
+## Merge gate
+
+A job skips only when nothing it reads has changed since a state in which it was green.
+
+- **Area skip.**
+  - Each area runs on every path in its import closure (C9) and on the shared set; a `db` path in no area runs all four (C8).
+  - The proof runs on every `db` run, through the preflight. An edit that widens a closure is therefore checked on the same PR.
+  - Runtime data reads are shared by rule (`packages/db/` as a whole), and string-literal paths are followed as edges (C9).
+  - Residual risk: a file read through a computed path string. Reviewers watch for one.
+- **Anchor skip.**
+  - The anchor is a commit whose whole workflow passed on this branch, contains the current base, and is contained in the head.
+  - Only `LEDGER` files differ from it. No job reads those except the ledger tests (C17), and those run.
+  - Every lookup or git failure gives today's behaviour (C14). A merge from `main` or a rebase disqualifies the anchor (step 4).
+  - `--no-renames` stops a rename from hiding a path (C16). That hole exists in today's filters and is fixed here.
+- **What never changes.** `guard` (gitleaks, pins) never skips, `app`'s REQUIRED is unchanged, and under the strict check the head
+  that merges has its own run.
+- **seceng** should review R4 and C14 to C19 before build green, because they change what the required checks verify on a given head.
+  That review does not hold up the start of the build.
+
+## Build order and CI-only measurements
+
+1. Criterion 9, plus C16 (`--no-renames`). Files: `anchor.mjs`, `tests/ci/anchor.test.ts`, the ci.yml `cairn` and `changes` steps,
+   `changes.mjs --none`, `test_cairn_test_boundary.py`. This shares `ci.yml` (other jobs) and `changes.mjs` (a CLI flag, not the
+   table) with the harness work only textually, so build it first and push it. This loop's own bookkeeping pushes then use it.
+2. The lock (C1 to C4), the projects and `SERIAL` (C5, C6, C12).
+3. The area map, `--db-select` and the preflight (C7 to C11).
+4. Per-file timing (C13).
+5. INFRA (criterion 8, devops-engineer).
+
+Only CI runs can judge these:
+
+- **Criterion 1, and the CI half of criterion 2:** five sequential full dispatch runs (base empty) on the final head.
+- **Criterion 6:** four dispatch runs, each with `base` set to the feature head sha, on a scratch branch made of the feature head
+  plus one commit that touches only that area's paths (for example, a comment in `tests/db/auth-session.test.ts`). None of them
+  merges. These go through the same filter code as a PR (`changes.mjs` on base..HEAD), and I rule that they satisfy "one scratch
+  pull request per area".
+- **Criterion 9 target:** this needs `pull_request` events. Use this issue's own PR: once it is green, the in-review commit and one
+  more ledger-only commit (an issue comment) are the two bookkeeping pushes. No scratch PR is needed.
+
+## Conditions
+
+1. **C1 Lock excludes.** Two processes contend for the lock; the second acquires only after the first releases (timestamps).
+   Lives in `tests/ci/db-harness.test.ts`, no Docker. Red if the lock is a no-op.
+2. **C2 Lock fails loudly.** It throws when `POLY_TEST_LOCK_DIR` is unset. Held past the timeout (injectable via
+   `POLY_TEST_LOCK_TIMEOUT_MS`), it throws `bootstrap lock timeout`. `fn` never runs unlocked.
+3. **C3 Static wrap.** In `tests/db/**`, every psql call that sends `BOOTSTRAP` text is inside `withBootstrapLock`, except
+   `setRolePasswords`, and no other file reads `roles.sql` or `BOOTSTRAP`. Red if the wrapper is removed from `freshDb` or
+   `cloneMigrated`.
+4. **C4 Lock directory.** globalSetup creates `POLY_TEST_LOCK_DIR` with `mkdtemp` and exports it before workers start.
+5. **C5 No cluster writes in parallel.** No parallel-project file contains CREATE ROLE, DROP ROLE, ALTER ROLE not followed by
+   `<name> IN DATABASE`, a GRANT or REVOKE without `ON` (role membership), ALTER SYSTEM, `pg_locks`, `pg_stat_activity` or
+   `pg_terminate_backend`. Red if runner moves to the parallel project.
+6. **C6 Config shape.** Projects `db-parallel` (groupOrder 0, fileParallelism true) and `db-serial` (groupOrder 1, fileParallelism
+   false); `globalSetup` at the root only; `maxWorkers: 3`; `SERIAL` exported and equal to exactly
+   `[runner, template-clone, ops-hardening]`.
+7. **C7 One area, one project.** Every `tests/db/*.test.ts` on disk is in exactly one `DB_AREAS[*].tests` and in exactly one project,
+   and every listed file exists. Red for a file in none, in two, or missing.
+8. **C8 Classify.** Area-only cases select only that area. Shared paths select all four. A `db` path in no area (a new
+   `tests/db/new.test.ts`, `tests/db/x.sql`) selects all four. A non-`db` path selects none. `db` equals the OR of the areas over the
+   fixtures. A dispatch with no base sets every key true (the ci.yml printf).
+9. **C9 Closure per area** (criterion 5). Walk relative, `@poly/*` and `join(ROOT, '<literal>')` edges. Red with a fixture in which an
+   auth test imports a file covered only by ops paths.
+10. **C10 `--db-select`.** Prints `all` if and only if all four areas are on; otherwise the union of the selected areas' tests. Exits 1
+    on an invalid map, on no area on, or on a value that is not `true`/`false`.
+11. **C11 `db` job.** The preflight runs the three `tests/ci` files before Docker; the battery step uses `--db-select`; the area
+    values arrive through `env:`, with no `${{ }}` in `run:` (check-run-expr).
+12. **C12 Same tests.** A full run executes 352 tests, the base count, locally and on CI (build-green evidence).
+13. **C13 Per-file timing.** With `VITEST_JSON` set, `job-report.mjs` writes one jsonl line per file
+    (`runner: 'ci:db:file'`, file, project, area, seconds, ok) alongside the job line. If the JSON is missing or unreadable it writes
+    only the job line and exits 0. The `budgets.json` `db` budget becomes 100 and stays a warning.
+14. **C14 Anchor fails closed.** `decide()` returns false for each of: a non-PR event, a lookup error, a timeout, bad JSON, no run, a
+    fork run, a branch mismatch, a malformed sha, a missing commit, either ancestry check failing, a diff error, an empty diff, a path
+    outside `LEDGER`, a pinned ruling. A ledger-only diff returns true. Red if any failure branch returns true.
+15. **C15 `changes` step.** Ledger-only gives every key false through `--none`, with the keys equal to `TABLE`'s plus the areas;
+    otherwise the path is unchanged; the comparison is exact (`ci-workflow.test.ts`).
+16. **C16 No renames.** Every diff that feeds a filter (the `changes` job, and the cairn job's BASE..HEAD and anchor diffs) passes
+    `--no-renames`. Covered by a text test and a rename fixture.
+17. **C17 Ledger readers.**
+    - (a) At tests-red, qa runs the full cairn suite once under a Python audit hook (`sitecustomize` on `PYTHONPATH`) that logs opens
+      of real-repo `LEDGER` paths and subprocess argv containing `git grep` or `ls-files`. The set of readers must equal
+      `LEDGER_TESTS`. Record the result in `reviews/POLY-141/`.
+    - (b) A permanent guard in `test_cairn_test_boundary.py`: any file under `tests/workflow` or `scripts/cairn/tests` that joins a
+      repo-root constant with STATE.md, DECISIONS.md or a tracker directory name, or that runs `git grep` or `ls-files`, must be in
+      `LEDGER_TESTS` (read from `anchor.mjs`).
+18. **C18 Cairn step.**
+    - `run=ledger` runs exactly `LEDGER_TESTS`, with Node setup and the JS suite skipped. `run=true` is unchanged. A BASE..HEAD with
+      only ledger paths gives `ledger`.
+    - The pins in `test_cairn_test_boundary.py` change with it: the anchor shape checks move to `tests/ci/anchor.test.ts`, and
+      `run=false` is written once.
+19. **C19 One anchor implementation.** `ci.yml` contains no `merge-base --is-ancestor`. In `anchor.mjs`, `PINNED_RULINGS` and the
+    tracker leg of `LEDGER` equal ci.yml's `PINNED_RULINGS` and `EXCLUDE` literals (a `tests/ci` text test).
+
+## Paths
+
+- **Added:** `tests/workflow/test_cairn_test_boundary.py`. It pins the anchor shell text this ruling moves (C17b, C18). Because
+  `tests/workflow/` is in PATTERN, this PR runs the full cairn job.
+- **Not needed:** `scripts/cairn/run_tests.py` and `packages/db/sql/**` stay untouched.
+
+## Not affected
+
+`tests/infra/image/postgres.test.ts` and `caddy.test.ts` run in the `image` job on their own runner, and nothing here touches that job
+or those files. Locally the battery now keeps 3 workers plus Postgres busy instead of 1, so running the db and image suites at the
+same time adds CPU load and may make the Caddy flake more likely (unmeasured). Separately, five stale `poly83-qa-*` containers
+(image `polycarpic-pg17-pgtap:test`, not from this session) were running on this machine during the measurements.
+
+## Addendum 1: seceng S1–S8 (review @ 16ab3d9). All accepted, all in this loop.
+
+1. **S1, accepted; C16 amended.** Probed myself: under the default `core.quotePath`, `git diff --name-only` prints `packages/db/sql/café.sql` as `"packages/db/sql/caf\303\251.sql"`, a tab in a name prints as `\t`, and `changes.mjs` gives `db=false`. With `-z` the path is literal. C16 now reads: every filter diff runs `git diff --no-renames -z --name-only`; `changes.mjs` and `anchor.mjs` split stdin on `\0`; the cairn shell pipes through `tr '\0' '\n'` (safe for its ^-anchored regexes: a split can only add fragments, and the first keeps the real prefix). Fixtures: rename, `café.sql` and a tab name each give `db=true`.
+2. **S2, accepted as C20.** Probed: `evaluate()` returns green for `outputs: {}` and for `{node:'TRUE', db:'yes'}`. C20: `evaluate()` is red when any `TABLE` key or area key is missing from `changes.outputs` or is not exactly `true`/`false`, or when `db` is not the OR of the area keys; it imports the keys from `changes.mjs`. Fixtures: `{}` red, `{node:'TRUE'}` red, every key present and false green. Adds path `infra/ci/aggregate.mjs` (tests in `tests/ci/aggregate.test.ts`).
+3. **S3, accepted; C14 amended.** Build the query with `encodeURIComponent(HEAD_REF)`. Call `gh`/`git` via `spawnSync` with an argv array and no `shell`. `HEAD_REF` is never a git argument. Every sha must match `^[0-9a-f]{40}$` before git sees it. Extra C14 case: a run whose `head_branch` is another branch → false.
+4. **S4, accepted as C21.** Confirmed: ci.yml grants `actions: read` at workflow level. C21: workflow-level `permissions` is exactly `{contents: read}`; `actions: read` is granted only on the `cairn` and `changes` jobs; `GH_TOKEN` is set only as step `env:` on the step that runs `anchor.mjs` (`ci-workflow.test.ts`). R4's "in the environment" means that step.
+5. **S5, accepted as C22.** The anchor returns false if any anchor-diff path has mode 120000 or 160000 on either side (`git diff --raw -z --no-renames`). A `tests/ci` test is red when the tree holds a symlink or gitlink (none today), and red on a P5-style fixture.
+6. **S6, accepted as C23.** A `tests/ci` text test: no vitest `include`, `run_tests.py` root, or `pnpm-workspace.yaml` glob matches a `LEDGER` path.
+7. **S7, accepted; C10/C11 amended.** The list goes into a bash array in the battery step, never through `$GITHUB_OUTPUT`. Every line must match `^tests/db/[a-z0-9-]+\.test\.ts$`, else exit 1. No `--passWithNoTests`.
+8. **S8, accepted; R3 and C8 amended.** `TABLE.db` and `DB_SHARED` add `^package\.json$`, `^pnpm-workspace\.yaml$`, `^\.npmrc$`, `^tsconfig[^/]*\.json$`, `^apps/web/package\.json$`, `^apps/web/tsconfig\.json$`; a C8 fixture shows each selects all four areas. Cost, measured on main's history: of 53 first-parent merges since 2026-11-01, 7 touched these paths and all 7 already set `db`. So S8 adds no `db` runs on that history; such PRs run all four areas instead of a subset (at most about criterion 1's 100 s against an area run).
+9. **SECURITY C-81:** seceng writes the line (anchor invariant, `--no-renames -z`, per-job `actions: read`). Adds path `docs/SECURITY/**`. Build order: C20 and C21 go with step 1 (criterion 9); C22 and C23 with step 1; S7/S8 with step 3. Conditions: 23.
+
+## Addendum 2: the final `LEDGER_TESTS` (qa's C17(a) audit, `ledger-audit.md` @ f4c43c0)
+
+1. **The rule.** A test is in if its result depends on real ledger content: it asserts on that content, or on a value derived from it. A test is out if it only passes through the ledger: it lists the directories or reads files to build state, and every assertion is on fixture data.
+2. **In (four):** `test_state_releases_bound` (asserts on STATE.md), `test_ruling_archive_records` (`git grep` over the tree), `test_check_budgets` (`LiveTrackerTitleAndDescriptionLintTests` asserts zero lint warnings on the live tracker) and `test_dashboard_roster` (builds the live roster payload and asserts 11 agents and legal presence values).
+3. **Out, pass-through (two):** `test_backfill_tokens` and `test_agent_setting_role`. They read the real milestones only through `cairn.milestone_windows` (`cairnlib/attribution.py`), which sets the windows for main-branch records, and every real-root test (lines 1132, 1174 and the CLI children) uses feature-branch fixtures. A milestone edit can therefore change their result only through a file that does not parse. That case is covered by item 5, not by 158 s of tests (measured locally: 119.0 s and 39.5 s).
+4. **Out, listing only (nine):** milestone_overhead, run_tests, test_run_hooks, receiver_flush_drop and the five otel_receiver files. The audit shows `scandir` of `issues/` and `archive/issues/` and no open. Their assertions are on fixture records, and an archive move keeps an id listed. Residual: deleting a tracker record, which the workflow never does (it archives). Cost if included: up to 72 s (watchdog_attribution 72.1 s, otel_receiver 29.9 s, measured).
+5. **New C24: `cairn check` on the real tracker.** Whenever the cairn job runs anything (`run=true` or `ledger`), it runs `scripts/cairn/cairn check` (0.2 s locally, exit 0 at f4c43c0). Today no CI job parses ledger records at all, so this closes the parse case for items 3 and 4.
+6. **Measured locally** (10 cores, `run_tests.py -p` with the four files): 2.7, 2.9 and 2.7 s at 8 workers; 2.9 s at 2 workers; 70 tests. With `cairn check`, the ledger branch spends about 3 s in tests.
+7. **Targets stand (unmeasured on CI).** cairn job ≈ checkout 7 s + setup-python + about 3 s ≈ 15–20 s, within 25 s. Summed run ≈ cairn 20 + changes 10 + guard + app ≈ 55–65 s, within 90 s. Nothing goes to the Principal.
+8. **C17(b) amended.** `test_cairn_test_boundary.py` holds `PASS_THROUGH` (the eleven files above, each with its one-line reason). It flags any file under `tests/workflow` or `scripts/cairn/tests` whose source names a real-root constant (`REPO_ROOT`, `workflow_helpers.REPO_ROOT`, `CAIRN_DIR.parent.parent`) together with `STATE.md`, `DECISIONS.md`, `"process" / "cairn"`, a tracker directory name, `git grep` or `ls-files`. Every flagged file must be in `LEDGER_TESTS` (read from `anchor.mjs`) or in `PASS_THROUGH`, or the test is red. Sanity check: all four `LEDGER_TESTS` are flagged. C17(a) is satisfied by the audit plus this ruling.
+9. **`LEDGER_TESTS`** in `anchor.mjs` = `test_state_releases_bound.py`, `test_ruling_archive_records.py`, `test_check_budgets.py`, `test_dashboard_roster.py`. Conditions: 24.
+
+## Addendum 3: the db job's own files trigger it (team-lead's request, from PR #122's first run; over the two-addendum budget)
+
+1. **Ruling: yes, by the existing rule.** POLY-102 R5 says every path a job executes or imports triggers that job. The `db` job executes `.github/workflows/ci.yml` (its steps), `infra/ci/changes.mjs` (`--db-select`), `infra/ci/job-report.mjs` and `infra/ci/budgets.json`, and through the preflight `tests/ci/db-filter-imports.test.ts`, `db-areas.test.ts`, `db-harness.test.ts`, `tests/ci/helpers.ts` and `tests/ci/vitest.config.ts`.
+2. **Lint is not enough.** The `tests/ci` tests prove `changes.mjs` against fixtures and pin ci.yml's text. They never run the `db` job's wiring: env names, the bash array, the preflight's file list, or a step deleted outright. A wiring break there goes red only on the next PR that sets `db`, which is someone else's PR.
+3. **C25.** `TABLE.db` and `DB_SHARED` add exactly the paths in item 1, so each selects all four areas. They do not add all of `infra/ci/`: `anchor.mjs`, `aggregate.mjs`, `check-pins.mjs`, `image.sh` and the rest run in other jobs and are covered there. A `tests/ci` case lists the files the `db` job runs (parsed from ci.yml's `db` job: every `node infra/ci/*.mjs` call and every preflight test path) and requires each to select all four areas. Red if a new step calls a file outside the set.
+4. **Cost, measured on main's history.** Of 53 first-parent merges since 2026-11-01, 6 touched these paths and all 6 already set `db`. So C25 adds no `db` runs on that history. It adds a full `db` run (≤ 100 s by criterion 1) to a PR that edits only CI wiring.
+5. **C26, a fail-open found while measuring.** At 21bc731, `changes.mjs` splits stdin on `\0` only. Newline-separated input (`git diff --name-only` without `-z`) is read as one path. The full #116 diff (`packages/auth/...`) then gives `db=false` and `node=false`, against `true` for both with `-z`. The ci.yml callers use `-z` today, so CI is not affected. C26: `changes.mjs` exits 1 when stdin is non-empty and does not end in `\0` (git's `-z` output always does). Fixture: newline input → exit 1. `anchor.mjs`'s own diff parsing follows the same rule. Conditions: 26.
+6. **C17(b): qa's six extra PASS_THROUGH files are confirmed (team-lead's follow-up).** archived_milestone_paths, comment_guard, dashboard, loop_stats, skill_id_literals and tokens_endpoint all stay in PASS_THROUGH. Each one's real-root constant points outside `LEDGER` (`scripts/cairn` source, `.githooks`, `.claude/hooks`, `.claude/skills`, `process/cairn/metrics`). Its ledger names appear in temp fixtures or as literals, and the audit saw no real-ledger open from any of them. The flag rule stays at file level, as qa built it. I tried tightening it to pair the constant and the ledger name on one line: that flags only 2 of the 4 `LEDGER_TESTS`, because `check_budgets` and `dashboard_roster` build their paths across several lines, so it fails the guard's own sanity check. Over-flagging only forces a written reason, which is the guard's purpose.
+
+## Criterion-1 tuning: the pgtap image build (team-lead's request after run 43273670958, c2dde89: db job 103 s, vitest 79.3 s)
+
+devops-141's proposal is accepted, with amendments T1–T4. It starts the pgtap image build in the background early in the job, so the build overlaps Node, pnpm, install, preflight and `svelte-kit sync`. The breakdown is devops-141's temp file: 21.8 s globalSetup, 32.4 s parallel, 25.0 s serial. I agree 4 workers is not the lever: the 3 workers are CPU-saturated.
+
+- **T1 One owner for the tag and the build arguments.** A new `tests/db/helpers/pgtap-image.mjs`, plain JS using node built-ins only, owns three things: the `PG_BASE` derivation (the FROM line of `infra/postgres/Dockerfile`, the same pin check), `IMAGE` (`polycarpic-pgtap:<12 hex of the digest>`), and `buildArgv()`.
+  - `pg.ts` imports all three and keeps no copy of its own.
+  - `node tests/db/helpers/pgtap-image.mjs --build` runs that same `docker build` argv. ci.yml calls this and does not recompute anything in shell.
+  - The file must run on the runner's preinstalled node, because the step that calls it comes before Set up Node.
+  - It sits under `tests/db/helpers/**`, so it is already shared (all four areas).
+- **T2 Wait, never race.** The background step starts before Set up Node: `setsid nohup node tests/db/helpers/pgtap-image.mjs --build > "$RUNNER_TEMP/pgtap-build.log" 2>&1; echo $? > "$RUNNER_TEMP/pgtap-build.rc"`, run in the background, and the step exits 0.
+  - Before vitest, the battery step waits for `pgtap-build.rc`, for at most 300 s (the same bound as `pg.ts`'s `sh` timeout). It then prints the log and the exit code.
+  - The exit code is only reported, never acted on. `pg.ts`'s own `docker image inspect` decides whether to use the image or build it.
+  - Waiting removes the case of two builds of one tag fighting for the 4 vCPU.
+- **T3 No fail-open.**
+  - Docker tags an image only when its build succeeds, so a failed, partial or timed-out background build leaves no tag. `pg.ts` then builds the image itself, and its error turns the job red as it does today.
+  - The background build and `pg.ts` read the same inputs from one module (T1), so a tagged image always matches what `pg.ts` would build.
+  - A fresh runner holds no stale tag.
+  - The background step never contributes a pass: its success saves time and nothing else.
+- **T4 Tests** (qa; `tests/ci` text tests, plus one `db-harness` case):
+  - the background step comes before Set up Node and calls the helper with `--build`;
+  - no `docker build` or `PG_BASE` literal appears anywhere else in ci.yml;
+  - the battery step waits on the `.rc` file with a bound and has no `|| true`;
+  - `pg.ts` has no FROM-line parsing of its own and imports `IMAGE`, `PG_BASE` and the build argv from the helper.
+- **Is "fastest three ≤ 90 s" reachable? Possibly, not proven (unmeasured).**
+  - The overlap window is the about 13 s of steps before the battery (devops-141), and the build is most of the 21.8 s. That gives a saving of about 10–15 s and a job of about 88–93 s, which leaves the median of at most 100 s safe.
+  - If the five-run set misses "fastest three ≤ 90 s", the number to take to the Principal is **95 s**, with the median kept at 100 s. Do not relax anything before the runs.
+  - The next lever is not for this loop. A second Postgres cluster would let the serial group run alongside the parallel group, since the serial group's conflicts are cluster-wide. That needs project-scoped server injection in place of the `POLY_TEST_SERVER` env, and it re-opens the contention question for ops-hardening. It would be a follow-up issue, and only if 95 s also misses.
+
+## Filter gap: the web e2e step and the db harness (team-lead's request after the d8b53e9 dispatch failure)
+
+The rule is POLY-102 R5 again: every path a job executes or imports triggers that job. `apps/web/tests/e2e/serve.ts` imports `tests/db/helpers/{api,pg}.ts`. The step is blind to them twice over:
+- the `unit` job's `if:` needs `node` or `image`, and `tests/db/` is in neither;
+- the e2e step runs only when `turbo ls --affected` lists `@poly/web`, and turbo sees workspace packages only.
+
+Measured closure of `apps/web/tests/e2e/*.ts`, outside `apps/web`: `tests/db/helpers/**` and `apps/migrate/**` (through `captureRun`), plus `packages/{auth,config,db,tenancy}`. Those four packages are `@poly/web` dependencies, so turbo already covers them. The harness also reads `infra/postgres/Dockerfile` and `infra/postgres-major` (via `pgtap-image.mjs`) and builds from `tests/db/docker/`.
+
+- **E1 New filter key `e2e`** in `changes.mjs` `TABLE`: `^tests/db/helpers/`, `^tests/db/docker/`, `^apps/migrate/`, `^infra/postgres/Dockerfile$`, `^infra/postgres-major$`.
+  - The `unit` job's `if:` adds `|| needs.changes.outputs.e2e == 'true'`.
+  - The e2e step gets `E2E_FORCE` through `env:` and runs when `@poly/web` is affected or `E2E_FORCE` is `true`.
+  - `REQUIRED` gains `e2e: ['unit']`.
+  - C15's `--none` and C20's key checks pick the key up from `TABLE` with no further change. The dispatch printf adds `e2e=true`.
+- **E2 Proof.** A `tests/ci` closure case with roots `apps/web/tests/e2e/*.ts`. Every file in the closure outside `apps/web/` must be either in a workspace package that `apps/web/package.json` lists, or matched by `TABLE.e2e`. Red when `serve.ts` imports a new non-package file the key does not cover. The data reads are explicit `changes.test.ts` cases: `infra/postgres/Dockerfile` gives `e2e=true`.
+- **Not added to `node`.** `node` also runs lint and image; `e2e` runs only `unit`.
+- **Cost, measured on main's history.** Of 53 first-parent merges since 2026-11-01, 8 touched these paths. 6 of those already touched `apps/web/`, `packages/` or a root turbo input, so the e2e step ran anyway. 2 (#113, #115) would add one `unit` run with the e2e step. The step's own time is not measured here; read it from any run with `@poly/web` affected.
+- **This loop: yes.** This loop caused the break, and the fix is about ten lines across `changes.mjs`, `ci.yml` and `aggregate.mjs` (all in paths) plus tests. E1 and E2 join build step 1's filter work.

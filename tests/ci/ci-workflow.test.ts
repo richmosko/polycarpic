@@ -75,7 +75,7 @@ describe('ci.yml: hardening every job (S96-3..7)', () => {
 });
 
 describe('ci.yml: changes + guard (criteria 1, 4)', () => {
-  it('changes runs always, fails closed (set -euo pipefail), full history, feeds changes.mjs, exposes five outputs', () => {
+  it('changes runs always, fails closed (set -euo pipefail), full history, feeds changes.mjs, exposes nine outputs', () => {
     const j = w.jobs.changes!;
     expect(j.if).toBeUndefined();
     expect(needsOf(j)).toEqual([]);
@@ -84,7 +84,7 @@ describe('ci.yml: changes + guard (criteria 1, 4)', () => {
     expect(runOf(j)).toMatch(/set -euo pipefail/);
     expect(runOf(j)).toMatch(/infra\/ci\/changes\.mjs/);
     expect(runOf(j)).toMatch(/\^\[0-9a-f\]\{40\}\$/); // dispatch base validated as 40-hex
-    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['ci', 'db', 'image', 'layers', 'node']);
+    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'e2e', 'image', 'layers', 'node']); // POLY-141: the five keys, e2e and the four areas
   });
   it('guard runs always (no if), pin check over .github and infra/ci, and gitleaks  [red if: guard gated on changes]', () => {
     const j = w.jobs.guard!;
@@ -197,5 +197,214 @@ describe('ci.yml: the app aggregate (criterion 1, 7 name)', () => {
   it('NEEDS comes from toJSON(needs) through env, not interpolated into the script', () => {
     const s = steps(j).find((x) => /aggregate\.mjs/.test(x.run ?? ''))!;
     expect(s.env?.NEEDS).toMatch(/toJSON\(needs\)/);
+  });
+});
+
+// POLY-141 criterion 9, C15, C16, C18, C19: the anchor skip is wired into both `changes` and `cairn`.
+describe('ci.yml: the anchor skip (POLY-141 C15, C16, C18)', () => {
+  const gitDiffLines = (body: string) => body.split('\n').filter((l) => /\bgit diff\b/.test(l) && !/^\s*#/.test(l));
+
+  it('changes: calls anchor.mjs, compares its output exactly, and takes `--none` on ledger_only=true  [red while the shell is absent]', () => {
+    const j = w.jobs.changes!;
+    const body = runOf(j);
+    expect(body).toMatch(/infra\/ci\/anchor\.mjs/);
+    expect(body).toContain('= "ledger_only=true"');
+    expect(body).toMatch(/infra\/ci\/changes\.mjs --none/);
+    expect(body).toMatch(/infra\/ci\/changes\.mjs/);
+  });
+  it('changes: has actions: read and the GH_TOKEN, REPO, HEAD_REF, PR_HEAD environment, with no ${{ }} in run  [red if: a variable is missing]', () => {
+    const j = w.jobs.changes!;
+    expect(j.permissions?.actions).toBe('read');
+    expect(j.permissions?.contents).toBe('read');
+    const env = Object.assign({}, ...steps(j).map((s) => s.env ?? {}));
+    for (const k of ['GH_TOKEN', 'REPO', 'HEAD_REF', 'PR_HEAD']) expect(Object.keys(env), k).toContain(k);
+    expect(runOf(j)).not.toContain('${{');
+  });
+  it('every git diff that feeds a filter passes --no-renames: changes, and both diffs in the cairn job (C16)  [red if: one lacks it]', () => {
+    for (const id of ['changes', 'cairn']) {
+      const ls = gitDiffLines(runOf(w.jobs[id]!));
+      expect(ls.length, `${id} has a git diff`).toBeGreaterThan(0);
+      for (const l of ls) expect(l, `${id}: ${l}`).toContain('--no-renames');
+    }
+  });
+  it('cairn: no shell ancestry check remains; the anchor comes from anchor.mjs (C19)', () => {
+    const body = runOf(w.jobs.cairn!);
+    expect(body).not.toContain('merge-base');
+    expect(body).not.toContain('ANCHOR_RELEVANT');
+    expect(body).toMatch(/infra\/ci\/anchor\.mjs/);
+    expect(body).toContain('= "ledger_only=true"');
+  });
+  it('cairn: writes run=true, run=ledger and run=false; run=false once (C18)', () => {
+    const body = runOf(w.jobs.cairn!);
+    expect(body.match(/echo\s+"run=false"/g) ?? []).toHaveLength(1);
+    expect(body.match(/echo\s+"run=ledger"/g) ?? []).not.toHaveLength(0);
+    expect(body.match(/echo\s+"run=true"/g) ?? []).not.toHaveLength(0);
+  });
+  it('cairn: run=ledger sets up Python and runs exactly the ledger tests with -p; Node and the JS suite stay on run=true only; run=true is unchanged (C18)', () => {
+    const j = w.jobs.cairn!;
+    const bySetup = (re: RegExp) => steps(j).find((s) => re.test(s.uses ?? ''))!;
+    expect(bySetup(/^actions\/setup-node@/).if).toMatch(/^\s*(\$\{\{\s*)?steps\.changes\.outputs\.run == 'true'\s*(\}\})?\s*$/);
+    const js = steps(j).find((s) => /node --test/.test(s.run ?? ''))!;
+    expect(js.if).toMatch(/^\s*(\$\{\{\s*)?steps\.changes\.outputs\.run == 'true'\s*(\}\})?\s*$/);
+    const py = bySetup(/^actions\/setup-python@/);
+    expect(py.if).toContain("'ledger'");
+    expect(py.if).toContain("'true'");
+    const full = steps(j).find((s) => /^\s*python3 scripts\/cairn\/run_tests\.py\s*$/.test(s.run ?? ''))!;
+    expect(full, 'the full-suite step is unchanged').toBeDefined();
+    expect(full.if).toMatch(/steps\.changes\.outputs\.run == 'true'/);
+    const led = steps(j).find((s) => /--ledger-tests/.test(s.run ?? ''))!;
+    expect(led, 'a ledger step that reads node infra/ci/anchor.mjs --ledger-tests').toBeDefined();
+    expect(led.if).toMatch(/steps\.changes\.outputs\.run == 'ledger'/);
+    expect(led.run).toMatch(/infra\/ci\/anchor\.mjs --ledger-tests/);
+    expect(led.run).toMatch(/run_tests\.py/);
+    expect(led.run).toMatch(/-p\b/);
+    expect(led.run).not.toContain('${{');
+  });
+  it('C24: the cairn job runs `scripts/cairn/cairn check` on both run=true and run=ledger  [red while absent]', () => {
+    const chk = steps(w.jobs.cairn!).filter((s) => /scripts\/cairn\/cairn check\b/.test(s.run ?? ''));
+    expect(chk.length, 'a cairn check step').toBeGreaterThan(0);
+    for (const s of chk) {
+      const cond = s.if ?? '';
+      expect(cond, s.name).toMatch(/'true'/);
+      expect(cond, s.name).toMatch(/'ledger'/);
+    }
+    const py = steps(w.jobs.cairn!).findIndex((s) => /^actions\/setup-python@/.test(s.uses ?? ''));
+    expect(steps(w.jobs.cairn!).indexOf(chk[0]!), 'after Python is set up').toBeGreaterThan(py);
+  });
+  it('cairn: a BASE..HEAD of ledger paths only gives run=ledger  [red while the leg is absent]', () => {
+    expect(runOf(w.jobs.cairn!)).toMatch(/run=ledger/);
+    expect(runOf(w.jobs.cairn!)).toMatch(/LEDGER/);
+  });
+  it('C21: workflow permissions are exactly {contents: read}; actions: read only on the cairn and changes jobs  [red while it is workflow-level]', () => {
+    expect(w.permissions).toEqual({ contents: 'read' });
+    for (const [id, j] of Object.entries(w.jobs)) {
+      if (id === 'cairn' || id === 'changes') expect(j.permissions, id).toEqual({ contents: 'read', actions: 'read' });
+      else expect(j.permissions?.actions, id).toBeUndefined();
+    }
+  });
+  it('C21: GH_TOKEN is set only as step env on the step that runs anchor.mjs, and nowhere else', () => {
+    expect(JSON.stringify(w.permissions ?? {})).not.toContain('GH_TOKEN');
+    const holders: string[] = [];
+    for (const [id, j] of Object.entries(w.jobs)) {
+      expect(JSON.stringify({ ...j, steps: undefined }), `${id} job-level`).not.toContain('GH_TOKEN');
+      for (const s of steps(j)) if (s.env && 'GH_TOKEN' in s.env) {
+        expect(s.run ?? '', `${id}: ${s.name}`).toMatch(/infra\/ci\/anchor\.mjs/);
+        holders.push(id);
+      }
+    }
+    expect(holders.sort()).toEqual(['cairn', 'changes']);
+  });
+  it('C16: the filter diffs are NUL-separated: --no-renames -z, and the cairn shell converts with tr  [red while newline output is read]', () => {
+    for (const id of ['changes', 'cairn']) {
+      for (const l of gitDiffLines(runOf(w.jobs[id]!))) expect(l, `${id}: ${l}`).toMatch(/--no-renames\s+-z/);
+    }
+    expect(runOf(w.jobs.cairn!)).toMatch(/tr '\\0' '\\n'/);
+  });
+  it('anchor.mjs is the only place the lookup is written: no `actions/workflows/ci.yml/runs` in ci.yml', () => {
+    expect(wfText('ci.yml')).not.toContain('actions/workflows/ci.yml/runs');
+  });
+});
+
+// POLY-141 C4/C11 (+ S7): the area keys reach the `db` job, which preflights the proofs and runs only the selected files.
+describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
+  const AREA_KEYS = ['db_auth', 'db_tenancy', 'db_migrate', 'db_ops'];
+  const dbj = () => w.jobs.db!;
+  const idx = (re: RegExp) => steps(dbj()).findIndex((s) => re.test(s.run ?? ''));
+  const battery = () => steps(dbj())[idx(/tests\/db\/vitest\.config\.ts/)]!;
+
+  it('changes exposes the nine outputs: the five keys and db_auth, db_tenancy, db_migrate, db_ops  [red while the area keys are absent]', () => {
+    expect(Object.keys(w.jobs.changes!.outputs ?? {}).sort()).toEqual(['ci', 'db', ...AREA_KEYS, 'e2e', 'image', 'layers', 'node'].sort());
+  });
+  it('a dispatch with no base sets every key true: the printf names all nine', () => {
+    const body = runOf(w.jobs.changes!);
+    for (const k of ['node', 'layers', 'db', 'image', 'ci', 'e2e', ...AREA_KEYS]) expect(body, k).toContain(`${k}=true`);
+  });
+  it('the db job is still gated on `db` alone (db is the OR of the areas)', () => {
+    expect(dbj().if).toContain('needs.changes.outputs.db');
+    expect(dbj().if).not.toContain('db_');
+  });
+  it('the preflight runs the three tests/ci files before the battery step  [red while absent]', () => {
+    const pre = idx(/vitest run -c tests\/ci\/vitest\.config\.ts[^\n]*db-filter-imports\.test\.ts[^\n]*db-areas\.test\.ts[^\n]*db-harness\.test\.ts/);
+    expect(pre, 'a preflight step').toBeGreaterThan(-1);
+    expect(pre).toBeLessThan(idx(/tests\/db\/vitest\.config\.ts/));
+    expect(pre, 'after the install').toBeGreaterThan(idx(/pnpm install/));
+  });
+  it('the battery step selects with --db-select, the area values come through env:, and run: has no ${{ }}  [red while absent]', () => {
+    const st = battery();
+    expect(st.run).toMatch(/infra\/ci\/changes\.mjs --db-select/);
+    for (const [k, out] of [['DB_AUTH', 'db_auth'], ['DB_TENANCY', 'db_tenancy'], ['DB_MIGRATE', 'db_migrate'], ['DB_OPS', 'db_ops']]) {
+      expect(st.env?.[k as string], k).toMatch(new RegExp(`needs\\.changes\\.outputs\\.${out}\\b`));
+    }
+    expect(st.run).not.toContain('${{');
+  });
+  it('S7: the file list goes into a bash array, never through $GITHUB_OUTPUT; every line is checked; no --passWithNoTests', () => {
+    const run = battery().run ?? '';
+    expect(run).toMatch(/mapfile|readarray|=\(\s*\$\(/);
+    expect(run).not.toContain('GITHUB_OUTPUT');
+    expect(run).toContain('^tests/db/[a-z0-9-]+\\.test\\.ts$');
+    expect(run).not.toContain('passWithNoTests');
+    expect(run).toMatch(/"\$\{[A-Za-z_]+\[@\]\}"/);                  // the array is expanded quoted
+    expect(run).toContain('all');                                       // `all` runs with no file filter
+    expect(runOf(dbj())).not.toContain('passWithNoTests');
+  });
+  it('C13: the battery writes vitest\'s json report to $VITEST_JSON (default reporter kept) and the timing step reads the same path  [red while absent]', () => {
+    const st = battery();
+    expect(st.run).toContain('--reporter=json');
+    expect(st.run).toContain('--reporter=default');
+    expect(st.run).toMatch(/--outputFile[= ]"?\$VITEST_JSON"?/);
+    const rec = steps(dbj()).find((s) => /job-report\.mjs/.test(s.run ?? '') && s.env?.REPORT_ONLY === 'jsonl')!;
+    expect(rec.env?.VITEST_JSON, 'Record timing sets VITEST_JSON').toBeDefined();
+    expect(rec.env?.VITEST_JSON).toBe(st.env?.VITEST_JSON);
+  });
+
+  // POLY-141 criterion-1 tuning T1-T4 (ruling): the pgtap image builds in the background while Node, pnpm and the install run.
+  it('T4: a background step before Set up Node runs `setsid nohup node tests/db/helpers/pgtap-image.mjs --build`, logging to pgtap-build.log and writing pgtap-build.rc  [red while absent]', () => {
+    const ss = steps(dbj());
+    const bg = ss.findIndex((s) => /pgtap-image\.mjs --build/.test(s.run ?? ''));
+    expect(bg, 'a background build step').toBeGreaterThan(-1);
+    const node = ss.findIndex((s) => /^actions\/setup-node@/.test(s.uses ?? ''));
+    expect(bg).toBeLessThan(node);
+    expect(bg, 'after the checkout').toBeGreaterThan(ss.findIndex((s) => /^actions\/checkout@/.test(s.uses ?? '')));
+    const run = ss[bg]!.run!;
+    expect(run).toMatch(/setsid nohup node tests\/db\/helpers\/pgtap-image\.mjs --build/);
+    expect(run).toContain('pgtap-build.log');
+    expect(run).toContain('pgtap-build.rc');
+    expect(run).toMatch(/&\s*$/m); // the whole build-and-record runs in the background
+    expect(run).not.toMatch(/\bexit\s+[1-9]/); // the step itself never fails the job
+    expect(run).not.toContain('${{');
+  });
+  it('T4: no `docker build` in the db job and no PG_BASE literal anywhere in ci.yml (the helper owns both)', () => {
+    expect(runOf(dbj())).not.toMatch(/docker\s+build/);
+    expect(wfText('ci.yml')).not.toContain('PG_BASE');
+  });
+  it('T4: the battery step waits for pgtap-build.rc with a bound before vitest, prints the log, and has no `|| true`', () => {
+    const run = battery().run ?? '';
+    expect(run).toContain('pgtap-build.rc');
+    expect(run).toMatch(/\b300\b/); // the bound, the same as pg.ts's sh() timeout
+    expect(run).toMatch(/while|until|for |timeout/); // a loop or timeout, not a bare read
+    expect(run.indexOf('pgtap-build.rc')).toBeLessThan(run.indexOf('vitest'));
+    expect(run).not.toMatch(/\|\|\s*true/);
+    expect(run).toContain('pgtap-build.log');
+    const ss = steps(dbj());
+    expect(ss.indexOf(battery())).toBeGreaterThan(ss.findIndex((s) => /pgtap-image\.mjs --build/.test(s.run ?? '')));
+  });
+
+  it('SC2016 shape: no single-quoted string in the db job holds a shell variable expansion ($NAME, ${...}, $(...)); the background step uses double quotes or a file  [red while the bash -c \'...$RUNNER_TEMP...\' form remains]', () => {
+    // Narrow on purpose: actionlint (the lint job) owns the full rule. This pins the one shape that failed at ci.yml:501.
+    const bg = steps(dbj()).find((s) => /pgtap-image\.mjs --build/.test(s.run ?? ''))!;
+    const noComments = (bg.run ?? '').split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
+    expect(noComments).not.toMatch(/'[^'\n]*\$(?:[A-Za-z_]|\{|\()[^'\n]*'/);
+    expect(noComments).toContain('pgtap-build.rc');
+  });
+
+  // POLY-141 E1: the web e2e step is keyed to `e2e`, which the db harness and apps/migrate set.
+  it('E1: the unit job runs on the e2e key too, and the e2e step reads E2E_FORCE (from that output) through env: with no ${{ }} in run  [red while absent]', () => {
+    expect(w.jobs.unit!.if ?? '').toContain("needs.changes.outputs.e2e == 'true'");
+    const st = steps(w.jobs.unit!).find((s) => /playwright|turbo run e2e/.test(s.run ?? ''))!;
+    expect(st.name).toMatch(/e2e/i);
+    expect(st.env?.E2E_FORCE ?? '').toMatch(/needs\.changes\.outputs\.e2e/);
+    expect(st.run).toContain('E2E_FORCE');
+    expect(st.run).toMatch(/@poly\/web/);
+    expect(st.run).not.toContain('${{');
   });
 });

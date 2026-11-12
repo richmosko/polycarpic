@@ -59,11 +59,18 @@ describe('one place for the Postgres tag and digest (R4, criterion 4)', () => {
     expect(d).toMatch(/^FROM \$\{PG_BASE\}$/m);
     expect(d).not.toMatch(/postgres:\d/);
   });
-  it('tests/db/helpers/pg.ts reads the FROM line, passes --build-arg, and names the cached image after the digest', () => {
-    const h = text('tests/db/helpers/pg.ts');
+  // POLY-141 T1: the FROM-line read, the --build-arg and the digest-named tag live in pgtap-image.mjs; pg.ts takes them from it.
+  it('tests/db/helpers/pgtap-image.mjs reads the FROM line, passes --build-arg, and names the cached image after the digest', () => {
+    const h = text('tests/db/helpers/pgtap-image.mjs');
     expect(h).toMatch(/infra[\s\S]{0,40}postgres[\s\S]{0,40}Dockerfile/); // red: still builds from a literal tag
     expect(h).toMatch(/--build-arg/);
     expect(h).toMatch(/PG_BASE=/);
+    expect(h).toMatch(/sha256/);
     expect(h).not.toMatch(/export const IMAGE = 'polycarpic-pg17-pgtap:test'/); // a fixed tag reuses a stale build after a bump
+  });
+  it('tests/db/helpers/pg.ts takes IMAGE, PG_BASE and buildArgv from pgtap-image.mjs and keeps no literal tag', () => {
+    const h = text('tests/db/helpers/pg.ts');
+    for (const n of ['IMAGE', 'PG_BASE', 'buildArgv']) expect(h, n).toMatch(new RegExp(`import\\s*\\{[^}]*\\b${n}\\b[^}]*\\}\\s*from\\s*['"]\\./pgtap-image\\.mjs['"]`));
+    expect(h).not.toMatch(/'polycarpic-pg17-pgtap:test'/);
   });
 });

@@ -439,9 +439,14 @@ class CiAnchoredSkipTests(unittest.TestCase):
         next_step = re.search(r"\n\s*- name:", rest)
         return rest[: next_step.start()] if next_step else rest
 
-    def test_anchor_lookup_asks_for_successful_pull_request_runs(self):
-        self.assertIn("event=pull_request", self.block, "anchor lookup must filter event=pull_request")
-        self.assertIn("status=success", self.block, "anchor lookup must filter status=success")
+    # POLY-141 C18/C19: the lookup, ancestry and ANCHOR_DIFF/PINNED_RULINGS decision moved out of this shell
+    # block into infra/ci/anchor.mjs. The pins that checked their shape (event=pull_request, status=success,
+    # the two ancestry checks, PINNED_RULINGS consulted against ANCHOR_DIFF) now live, as behaviour, in
+    # tests/ci/anchor.test.ts; this class keeps only what is still shell text.
+
+    def test_anchor_comes_from_anchor_mjs_not_shell(self):
+        self.assertIn("infra/ci/anchor.mjs", self.block, "the changes step must call the one anchor implementation")
+        self.assertNotIn("gh api", self.block, "the lookup lives in anchor.mjs, not in the shell")
 
     def test_workflow_grants_actions_read(self):
         self.assertIn(
@@ -449,19 +454,24 @@ class CiAnchoredSkipTests(unittest.TestCase):
             "permissions must add actions: read for the anchor lookup (addendum 1)",
         )
 
-    def test_both_ancestry_checks_appear(self):
+    def test_no_ancestry_check_in_shell(self):
         self.assertEqual(
-            self.block.count("merge-base --is-ancestor"), 2,
-            "expected both ancestry checks (anchor -> PR head, base -> anchor) "
-            "in the changes step (addendum 1)",
+            self.block.count("merge-base --is-ancestor"), 0,
+            "POLY-141 C19: both ancestry checks live in infra/ci/anchor.mjs only",
         )
 
-    def test_run_false_write_appears_exactly_twice(self):
+    def test_run_false_write_appears_exactly_once(self):
         self.assertEqual(
-            len(re.findall(r'echo\s+"run=false"', self.block)), 2,
-            "expected exactly two run=false writes: the §0.7 no-match case "
-            "and the addendum-1 anchor skip",
+            len(re.findall(r'echo\s+"run=false"', self.block)), 1,
+            "POLY-141 C18: the anchor skip no longer writes run=false; only the §0.7 no-match case does",
         )
+
+    def test_every_git_diff_passes_no_renames(self):
+        diffs = [l for l in self.block.splitlines() if re.search(r"\bgit diff\b", l) and not l.lstrip().startswith("#")]
+        self.assertTrue(diffs, "the changes step has a git diff")
+        for l in diffs:
+            with self.subTest(line=l.strip()):
+                self.assertRegex(l, r"--no-renames\s+-z", "POLY-141 C16/S1: no renames, and NUL-separated so a name is never quoted or split")
 
     def test_step_still_has_no_bare_or_true(self):
         self.assertNotRegex(
@@ -469,28 +479,83 @@ class CiAnchoredSkipTests(unittest.TestCase):
             "the anchor path may only ever add a false -- never a swallowed exit status",
         )
 
-    def test_anchor_skip_decision_also_checks_pinned_rulings(self):
-        # POLY-80: the anchor-skip path filters ANCHOR_DIFF through EXCLUDE
-        # same as the main §0.7 path -- it must also consult PINNED_RULINGS
-        # against the unfiltered ANCHOR_DIFF, or a PR touching only a
-        # blob-pinned ruling file could get skipped via this shortcut
-        # before ever reaching the PATTERN_HIT/PINNED_HIT check below it.
-        # Scoped to the span between computing ANCHOR_RELEVANT and deciding
-        # SKIP=true -- PINNED_RULINGS also appears earlier, in its own
-        # variable definition, which doesn't prove the anchor path uses it.
-        anchor_idx = self.block.index("ANCHOR_RELEVANT")
-        skip_true_idx = self.block.index("SKIP=true")
-        self.assertLess(anchor_idx, skip_true_idx, "expected ANCHOR_RELEVANT before SKIP=true in source order")
-        anchor_span = self.block[anchor_idx:skip_true_idx]
-        self.assertIn(
-            "PINNED_RULINGS", anchor_span,
-            "the anchor-skip decision must consult PINNED_RULINGS between computing "
-            "ANCHOR_RELEVANT and deciding SKIP=true, not just EXCLUDE",
+
+
+class LedgerReaderGuardTests(unittest.TestCase):
+    """POLY-141 C17(b) (ruling addendum 2, item 8): a test whose result depends on real ledger content must be in
+    LEDGER_TESTS (read from infra/ci/anchor.mjs), because the cairn job's `run=ledger` leg runs only those. Any file
+    under tests/workflow or scripts/cairn/tests whose source (comments stripped) names a real-root constant together
+    with STATE.md, DECISIONS.md, a quoted tracker directory name, `git grep` or `ls-files` must be in LEDGER_TESTS or
+    in PASS_THROUGH, or this test is red. The first eleven entries are the architect's; the last six are flagged by the
+    same rule and were not among the audit's readers (ledger-audit.md @ f4c43c0: no open of a real ledger file, so
+    fixture-only), added by qa-141 and reported to the lead."""
+
+    ANCHOR = REPO_ROOT / "infra" / "ci" / "anchor.mjs"
+    ROOT_CONST = re.compile(r"\bREPO_ROOT\b|CAIRN_DIR\.parent\.parent")
+    LEDGER_NAME = re.compile(
+        r"STATE\.md|DECISIONS\.md|[\"'](?:issues|milestones|majors|archive|reviews)[\"']|git grep|ls-files"
+    )
+    PASS_THROUGH = {
+        # architect, addendum 2 items 3 and 4
+        "test_backfill_tokens.py": "reads milestones only via cairn.milestone_windows; assertions are on feature-branch fixtures",
+        "test_agent_setting_role.py": "same milestone read through backfill_tokens.py; fixture assertions",
+        "test_milestone_overhead.py": "lists issues/ only; assertions on fixture records",
+        "test_run_tests.py": "lists issues/ only; assertions on fixture records",
+        "test_test_run_hooks.py": "lists issues/ only; assertions on fixture records",
+        "test_receiver_flush_drop.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver_engine_staleness.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver_self_stop.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver_watchdog_attribution.py": "lists issues/ only; assertions on fixture records",
+        "test_otel_receiver_windows_root.py": "lists issues/ only; assertions on fixture records",
+        # qa-141: flagged by the rule, no real-ledger read in the audit
+        "test_archived_milestone_paths.py": "builds its own archive tree under a temp dir",
+        "test_comment_guard.py": "tracker names appear in fixture repos only",
+        "test_dashboard.py": "fixture tracker; the audit saw no real-ledger open",
+        "test_loop_stats.py": "fixture records only",
+        "test_skill_id_literals.py": "scans skill text, names tracker directories as literals",
+        "test_tokens_endpoint.py": "fixture tracker; the audit saw no real-ledger open",
+    }
+
+    def _ledger_tests(self):
+        self.assertTrue(self.ANCHOR.is_file(), "infra/ci/anchor.mjs does not exist yet (POLY-141 C17b reads LEDGER_TESTS from it)")
+        m = re.search(r"LEDGER_TESTS\s*=\s*\[([^\]]*)\]", self.ANCHOR.read_text(encoding="utf-8"))
+        self.assertIsNotNone(m, "anchor.mjs has no LEDGER_TESTS = [...] literal")
+        return set(re.findall(r"['\"]([^'\"]+\.py)['\"]", m.group(1)))
+
+    def _flagged(self):
+        flagged = set()
+        for d in (WORKFLOW_TESTS_DIR, CAIRN_TESTS_DIR):
+            for path in sorted(d.glob("test_*.py")):
+                if path.name == Path(__file__).name:
+                    continue
+                code = "\n".join(l for l in path.read_text(encoding="utf-8").splitlines() if not l.lstrip().startswith("#"))
+                if self.ROOT_CONST.search(code) and self.LEDGER_NAME.search(code):
+                    flagged.add(path.name)
+        return flagged
+
+    def test_ledger_tests_is_exactly_the_four_ruled_files(self):
+        self.assertEqual(
+            self._ledger_tests(),
+            {"test_state_releases_bound.py", "test_ruling_archive_records.py", "test_check_budgets.py", "test_dashboard_roster.py"},
         )
-        self.assertIn(
-            "ANCHOR_DIFF", anchor_span[anchor_span.index("PINNED_RULINGS"):],
-            "PINNED_RULINGS must be checked against the unfiltered ANCHOR_DIFF",
+
+    def test_all_four_ledger_tests_are_flagged_by_the_rule(self):
+        # sanity: the heuristic can see the files it exists to protect
+        self.assertTrue(self._ledger_tests() <= self._flagged(), f"not flagged: {sorted(self._ledger_tests() - self._flagged())}")
+
+    def test_every_flagged_file_is_in_ledger_tests_or_pass_through(self):
+        unaccounted = sorted(self._flagged() - self._ledger_tests() - set(self.PASS_THROUGH))
+        self.assertEqual(
+            unaccounted, [],
+            f"these tests name a real-root constant with a ledger name; add each to anchor.mjs LEDGER_TESTS or to PASS_THROUGH "
+            f"with a reason: {unaccounted!r}",
         )
+
+    def test_pass_through_names_only_existing_files_outside_ledger_tests(self):
+        existing = {p.name for d in (WORKFLOW_TESTS_DIR, CAIRN_TESTS_DIR) for p in d.glob("test_*.py")}
+        self.assertEqual(sorted(set(self.PASS_THROUGH) - existing), [], "PASS_THROUGH lists a file that does not exist")
+        self.assertEqual(sorted(set(self.PASS_THROUGH) & self._ledger_tests()), [], "a file is in both LEDGER_TESTS and PASS_THROUGH")
 
 
 class WorkflowMdSpinOffCleanSentenceTests(unittest.TestCase):

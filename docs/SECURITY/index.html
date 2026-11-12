@@ -26,7 +26,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>seceng</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.9.11</span>
+    <span><strong>Version:</strong> 1.9.12</span>
     <span><strong>Last updated:</strong> 2026-11-12</span>
   </div>
 </header>
@@ -1272,12 +1272,12 @@ host  replication  all          all                reject</code></pre></li>
     <li><strong>C-81 Workflow hardening.</strong>
       <ul>
         <li>Actions are pinned by commit SHA.</li>
-        <li>Workflows default to <code>permissions: contents: read</code>, and widen per job only.</li>
+        <li>Workflows default to <code>permissions: contents: read</code>, and widen per job only. In <code>ci.yml</code> only the <code>cairn</code> and <code>changes</code> jobs hold <code>actions: read</code>, and <code>GH_TOKEN</code> is set only on the step in each that runs <code>infra/ci/anchor.mjs</code>.</li>
         <li>No <code>pull_request_target</code> that runs untrusted code.</li>
         <li>No secrets are exposed to fork PRs.</li>
         <li>Pull-request event data (<code>github.event.*</code>, <code>github.head_ref</code>) never appears as a <code>${{ }}</code> expression inside a <code>run:</code> body. It reaches scripts only through <code>env:</code> (T-93).</li>
         <li><code>actions/checkout</code> sets <code>persist-credentials: false</code>. No CI job commits or pushes to the repository; CI timings leave as an artifact or a step summary.</li>
-        <li>GitHub-hosted runners only, never <code>self-hosted</code>. Tools fetched in a <code>run:</code> step are pinned by version and checked against a sha256 before they run. No third-party path-filter action; the change filter is in-house <code>git diff</code>. A job runs on every path it executes or imports, transitively. The patterns live in <code>infra/ci/changes.mjs</code> and nowhere else. A static test in <code>tests/ci</code> walks the battery's imports and fails on a file the <code>db</code> filter does not match. The pin check fails on a tag, a branch, a short sha, or a <code>uses:</code> it cannot parse.</li>
+        <li>GitHub-hosted runners only, never <code>self-hosted</code>. Tools fetched in a <code>run:</code> step are pinned by version and checked against a sha256 before they run. No third-party path-filter action; the change filter is in-house <code>git diff</code>. A job runs on every path it executes or imports, transitively. The patterns live in <code>infra/ci/changes.mjs</code> and nowhere else. Every diff that feeds a filter runs <code>git diff --no-renames -z</code>, so a rename lists both of its paths, and a name with a non-ASCII byte, a tab or a quote is read literally, never C-quoted. <code>changes.mjs</code> exits 1 on input that is not NUL-terminated. The anchor skip (<code>infra/ci/anchor.mjs</code>, the one implementation): a pull-request push skips the heavy suites only when the head differs from an anchor in tracker and ledger files alone (<code>process/cairn/{issues,milestones,majors,archive,reviews}/</code> other than the pinned rulings, <code>process/STATE.md</code>, <code>process/DECISIONS.md</code>). The anchor is the head of a successful <code>pull_request</code> run of <code>ci.yml</code> from this repository on the same branch. It must be present in the clone, be an ancestor of the head, and contain the current base. No symlink or gitlink may appear in that diff. The tests that read ledger content and <code>cairn check</code> still run. Any lookup, ancestry, diff or mode failure falls back to the full base-to-head filter. The aggregate is red when a filter output is missing or is not exactly <code>true</code> or <code>false</code>. A static test in <code>tests/ci</code> walks the battery's imports and fails on a file the <code>db</code> filter does not match. The pin check fails on a tag, a branch, a short sha, or a <code>uses:</code> it cannot parse.</li>
         <li>The attested build restores no cache: buildx <code>no-cache</code> and <code>pull</code>, no <code>type=gha</code>, no <code>actions/cache</code> restore. PR jobs may cache the pnpm store, keyed by the lockfile hash only (T-94).</li>
       </ul></li>
     <li><strong>C-82 Scanning.</strong>

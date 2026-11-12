@@ -18,7 +18,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
 
 concurrency:
   group: ci-${{ github.event.pull_request.number || github.ref }}
@@ -29,6 +28,9 @@ jobs:
     name: cairn
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -42,7 +44,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
           PR_HEAD: ${{ github.event.pull_request.head.sha }}
           REPO: ${{ github.repository }}
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
@@ -54,79 +56,60 @@ jobs:
           fi
           # Fail closed: if the diff itself errors, `set -e` aborts this step and
           # the job goes red -- it must never fall through to a silent `run=false`.
-          CHANGED="$(git diff --name-only "$BASE_SHA" HEAD)"
-          # POLY-74 (Principal: a bare `process/` prefix runs the full suite for
-          # process/reviews/**, process/DECISIONS.md and process/STATE.md, which no
-          # test reads -- supersedes POLY-39's "PATTERN stays byte-identical" pin).
-          # Only the process/ paths a test actually reads stay in PATTERN:
-          # WORKFLOW.md/TRACKER.md (test_ratified_text_scanners.py) and process/cairn/
-          # (config.yml, metrics/ -- carved back down to non-tracker-record files by
-          # EXCLUDE below, which now also covers reviews/, POLY-80's new tracker-
-          # record home for a ruling once it outgrows the comment budget). POLY-78
-          # removed cairn's last read of docs/DESIGN/, so it leaves PATTERN too.
+          # `-z` lists every name literal (never C-quoted), `tr` makes the lines the ^-anchored regexes below read;
+          # `--no-renames` lists both ends of a rename.
+          CHANGED="$(git diff --no-renames -z --name-only "$PR_BASE" HEAD | tr '\0' '\n')"
+          # POLY-74: only the process/ paths a test actually reads stay in PATTERN
+          # (WORKFLOW.md/TRACKER.md, process/cairn/ minus the tracker records in EXCLUDE).
           PATTERN='^(scripts/cairn/|\.claude/|process/WORKFLOW\.md$|process/TRACKER\.md$|process/cairn/|tests/workflow/|\.github/workflows/|\.githooks/)'
           EXCLUDE='^process/cairn/(issues|milestones|majors|archive|reviews)/'
-          # PINNED_RULINGS is a carve-out from EXCLUDE, not from PATTERN: EXCLUDE
-          # runs first (`grep -vE "$EXCLUDE"`), so a ruling.md under the now-excluded
-          # process/cairn/reviews/ never reaches the PATTERN check at all -- putting
-          # these five paths in PATTERN instead of here would be dead code. Checked
-          # against the FULL, unfiltered $CHANGED (never $RELEVANT) below. Exactly
-          # the five ruling.md files test_ruling_archive_records.py's RULING_BLOBS
-          # pins by git blob sha (POLY-6/10/26/48/51) -- keep this list and that
-          # dict's keys in sync; test_cairn_test_boundary.py's
-          # PinnedRulingFilesSurviveExcludeTests fails if they drift.
+          # PINNED_RULINGS is a carve-out from EXCLUDE: a ruling.md under the excluded
+          # process/cairn/reviews/ never reaches the PATTERN check, so it is checked
+          # against the FULL, unfiltered $CHANGED below. Exactly the five ruling.md files
+          # test_ruling_archive_records.py's RULING_BLOBS pins by git blob sha (POLY-6/10/26/48/51);
+          # test_cairn_test_boundary.py's PinnedRulingFilesSurviveExcludeTests fails if they drift.
           PINNED_RULINGS='^process/cairn/reviews/(POLY-6|POLY-10|POLY-26|POLY-48|POLY-51)/ruling\.md$'
+          # The ledger set is EXCLUDE plus the two ledger files; infra/ci/anchor.mjs holds the same set (tests/ci ties them).
+          LEDGER_FILES='^process/(STATE|DECISIONS)\.md$'
 
-          # Skip only when every change since the last successful run on this branch is tracker-only; any gh/API/git failure here falls through to the plain diff test below, never adding a skip on its own (POLY-39).
-          rc=0; ANCHOR="$(gh api "repos/$REPO/actions/workflows/ci.yml/runs?event=pull_request&status=success&branch=$HEAD_REF&per_page=1" --jq '.workflow_runs[0].head_sha // empty')" || rc=$?
-          if [ "$rc" -ne 0 ]; then
-            ANCHOR=""
-          fi
-          ANCESTRY_OK=false
-          if [ -n "$ANCHOR" ] \
-             && git cat-file -e "$ANCHOR" 2>/dev/null \
-             && git merge-base --is-ancestor "$ANCHOR" "$PR_HEAD" 2>/dev/null \
-             && git merge-base --is-ancestor "$BASE_SHA" "$ANCHOR" 2>/dev/null; then
-            ANCESTRY_OK=true
-          fi
-          SKIP=false
-          if [ "$ANCESTRY_OK" = "true" ]; then
-            if ANCHOR_DIFF="$(git diff --name-only "$ANCHOR" "$PR_HEAD")"; then
-              rc=0; ANCHOR_RELEVANT="$(grep -vE "$EXCLUDE" <<<"$ANCHOR_DIFF")" || rc=$?
-              if [ "$rc" -gt 1 ]; then exit "$rc"; fi   # 1 = every line excluded; >1 = grep error
-              rc=0; grep -qE "$PINNED_RULINGS" <<<"$ANCHOR_DIFF" || rc=$?
-              if [ "$rc" -gt 1 ]; then exit "$rc"; fi   # 1 = no match; >1 = grep error
-              if [ -z "$ANCHOR_RELEVANT" ] && [ "$rc" -eq 1 ]; then
-                SKIP=true
-              fi
-            fi
+          # One anchor rule (POLY-141): infra/ci/anchor.mjs. Anything but an exact ledger_only=true is false.
+          LEDGER_ONLY="$(node infra/ci/anchor.mjs)"
+          if [ "$LEDGER_ONLY" = "ledger_only=true" ]; then
+            echo "run=ledger" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
-          if [ "$SKIP" = "true" ]; then
-            echo "run=false" >> "$GITHUB_OUTPUT"
+          rc=0; RELEVANT="$(grep -vE "$EXCLUDE" <<<"$CHANGED")" || rc=$?
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi   # 1 = every line excluded; >1 = grep error
+          PATTERN_HIT=false
+          rc=0; grep -qE "$PATTERN" <<<"$RELEVANT" || rc=$?
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+          if [ "$rc" -eq 0 ]; then PATTERN_HIT=true; fi
+          PINNED_HIT=false
+          rc=0; grep -qE "$PINNED_RULINGS" <<<"$CHANGED" || rc=$?
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+          if [ "$rc" -eq 0 ]; then PINNED_HIT=true; fi
+          LEDGER_HIT=false
+          rc=0; grep -qE "$EXCLUDE|$LEDGER_FILES" <<<"$CHANGED" || rc=$?
+          if [ "$rc" -gt 1 ]; then exit "$rc"; fi
+          if [ "$rc" -eq 0 ]; then LEDGER_HIT=true; fi
+          if [ "$PATTERN_HIT" = "true" ] || [ "$PINNED_HIT" = "true" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          elif [ "$LEDGER_HIT" = "true" ]; then
+            echo "run=ledger" >> "$GITHUB_OUTPUT"
           else
-            rc=0; RELEVANT="$(grep -vE "$EXCLUDE" <<<"$CHANGED")" || rc=$?
-            if [ "$rc" -gt 1 ]; then exit "$rc"; fi   # 1 = every line excluded; >1 = grep error
-            PATTERN_HIT=false
-            rc=0; grep -qE "$PATTERN" <<<"$RELEVANT" || rc=$?
-            if [ "$rc" -gt 1 ]; then exit "$rc"; fi
-            if [ "$rc" -eq 0 ]; then PATTERN_HIT=true; fi
-            PINNED_HIT=false
-            rc=0; grep -qE "$PINNED_RULINGS" <<<"$CHANGED" || rc=$?
-            if [ "$rc" -gt 1 ]; then exit "$rc"; fi
-            if [ "$rc" -eq 0 ]; then PINNED_HIT=true; fi
-            if [ "$PATTERN_HIT" = "true" ] || [ "$PINNED_HIT" = "true" ]; then
-              echo "run=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "run=false" >> "$GITHUB_OUTPUT"
-            fi
+            echo "run=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Python
-        if: steps.changes.outputs.run == 'true'
+        if: steps.changes.outputs.run == 'true' || steps.changes.outputs.run == 'ledger'
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.14"
+
+      - name: Parse the real tracker (cairn check)
+        if: steps.changes.outputs.run == 'true' || steps.changes.outputs.run == 'ledger'
+        run: scripts/cairn/cairn check
 
       - name: Set up Node
         if: steps.changes.outputs.run == 'true'
@@ -139,6 +122,15 @@ jobs:
         env:
           CAIRN_TEST_RUNS_FILE: ${{ runner.temp }}/test-runs.jsonl
         run: python3 scripts/cairn/run_tests.py
+
+      - name: Run the ledger-reading cairn tests only
+        if: steps.changes.outputs.run == 'ledger'
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=()
+          while IFS= read -r t; do ARGS+=(-p "$t"); done < <(node infra/ci/anchor.mjs --ledger-tests)
+          python3 scripts/cairn/run_tests.py "${ARGS[@]}"
 
       - name: Run JS suite
         if: steps.changes.outputs.run == 'true'
@@ -156,12 +148,18 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
+      actions: read
     outputs:
       node: ${{ steps.filter.outputs.node }}
       layers: ${{ steps.filter.outputs.layers }}
       db: ${{ steps.filter.outputs.db }}
       image: ${{ steps.filter.outputs.image }}
       ci: ${{ steps.filter.outputs.ci }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+      db_auth: ${{ steps.filter.outputs.db_auth }}
+      db_tenancy: ${{ steps.filter.outputs.db_tenancy }}
+      db_migrate: ${{ steps.filter.outputs.db_migrate }}
+      db_ops: ${{ steps.filter.outputs.db_ops }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -173,23 +171,34 @@ jobs:
         id: filter
         shell: bash
         env:
+          GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
           PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
           DISPATCH_BASE: ${{ inputs.base }}
         run: |
           set -euo pipefail
           # Fail closed: a git or filter error is a red job, never an all-false output (criterion 1).
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$DISPATCH_BASE" ]; then
-              printf '%s\n' node=true layers=true db=true image=true ci=true >> "$GITHUB_OUTPUT"
+              printf '%s\n' node=true layers=true db=true image=true ci=true e2e=true db_auth=true db_tenancy=true db_migrate=true db_ops=true >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "$DISPATCH_BASE" | grep -Eq '^[0-9a-f]{40}$'
             BASE="$DISPATCH_BASE"
           else
             BASE="$PR_BASE"
+            # One anchor rule (POLY-141): a push that changed ledger files only since the last green run reruns nothing heavy.
+            # Anything but an exact ledger_only=true is false.
+            LEDGER_ONLY="$(node infra/ci/anchor.mjs)"
+            if [ "$LEDGER_ONLY" = "ledger_only=true" ]; then
+              node infra/ci/changes.mjs --none | tee -a "$GITHUB_OUTPUT"
+              exit 0
+            fi
           fi
-          git diff --name-only "$BASE" HEAD | node infra/ci/changes.mjs | tee -a "$GITHUB_OUTPUT"
+          git diff --no-renames -z --name-only "$BASE" HEAD | node infra/ci/changes.mjs | tee -a "$GITHUB_OUTPUT"
 
   guard:
     name: guard
@@ -360,7 +369,7 @@ jobs:
   unit:
     name: unit
     needs: changes
-    if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true'
+    if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true' || needs.changes.outputs.e2e == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -414,15 +423,18 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
 
-      - name: Web e2e (Chromium, affected only)
+      - name: Web e2e (Chromium, affected only, or forced by the e2e key)
         timeout-minutes: 8
+        # E2E_FORCE: the db harness and apps/migrate are not workspace dependencies of @poly/web, so turbo cannot see them.
+        env:
+          E2E_FORCE: ${{ needs.changes.outputs.e2e }}
         run: |
           if [ -n "$TURBO_SCM_BASE" ]; then
             pnpm exec turbo ls --affected > affected.txt
           else
             pnpm exec turbo ls > affected.txt
           fi
-          if ! grep -q '@poly/web' affected.txt; then echo "no e2e task affected"; exit 0; fi
+          if ! grep -q '@poly/web' affected.txt && [ "$E2E_FORCE" != "true" ]; then echo "no e2e task affected"; exit 0; fi
           # Browser download comes from the Playwright CDN (a cache hit is a no-op), bounded. System libraries are used as
           # the runner image has them: apt runs only when a launch probe fails, bounded and non-fatal, then the probe
           # runs again and a second failure fails the step.
@@ -433,7 +445,7 @@ jobs:
               || echo "::warning::playwright install-deps failed or timed out"
             timeout -k 10 60 pnpm --filter @poly/web exec node -e "$probe" || { echo "::error::Chromium cannot launch"; exit 1; }
           fi
-          if [ -n "$TURBO_SCM_BASE" ]; then
+          if [ -n "$TURBO_SCM_BASE" ] && [ "$E2E_FORCE" != "true" ]; then
             pnpm exec turbo run e2e --affected
           else
             pnpm exec turbo run e2e
@@ -488,6 +500,12 @@ jobs:
       - name: Start clock
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
+      - name: Build the pgtap test image in the background (overlaps the setup steps; the battery step waits for it)
+        shell: bash
+        run: |
+          # The helper owns the base pin, the tag and the build arguments. A failed build leaves no tag, so the harness builds it itself.
+          setsid bash -c "setsid nohup node tests/db/helpers/pgtap-image.mjs --build > $RUNNER_TEMP/pgtap-build.log 2>&1; echo \$? > $RUNNER_TEMP/pgtap-build.rc" < /dev/null > /dev/null 2>&1 &
+
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -510,11 +528,37 @@ jobs:
         # Scripts stay blocked (C-80); esbuild's build is declined by name in pnpm-workspace.yaml.
         run: pnpm install --frozen-lockfile
 
+      - name: Preflight (area map, import closure and harness proofs, before any container starts)
+        run: pnpm exec vitest run -c tests/ci/vitest.config.ts tests/ci/db-filter-imports.test.ts tests/ci/db-areas.test.ts tests/ci/db-harness.test.ts
+
       - name: Generate SvelteKit types (the battery imports apps/web/src/ops, whose tsconfig extends the generated one)
         run: pnpm --filter @poly/web exec svelte-kit sync
 
       - name: DB battery (one Postgres container, RLS battery included)
-        run: pnpm exec vitest run -c tests/db/vitest.config.ts
+        env:
+          DB_AUTH: ${{ needs.changes.outputs.db_auth }}
+          DB_TENANCY: ${{ needs.changes.outputs.db_tenancy }}
+          DB_MIGRATE: ${{ needs.changes.outputs.db_migrate }}
+          DB_OPS: ${{ needs.changes.outputs.db_ops }}
+          VITEST_JSON: ${{ runner.temp }}/vitest-db.json
+        run: |
+          set -euo pipefail
+          # Wait for the background image build (at most 300 s). Its exit code is reported, never acted on: the harness's
+          # own `docker image inspect` decides whether the image exists, and builds it when it does not.
+          waited=0
+          while [ ! -f "$RUNNER_TEMP/pgtap-build.rc" ] && [ "$waited" -lt 300 ]; do sleep 1; waited=$((waited + 1)); done
+          echo "pgtap image build: rc=$(cat "$RUNNER_TEMP/pgtap-build.rc" 2>/dev/null || echo missing) after ${waited}s of waiting"
+          cat "$RUNNER_TEMP/pgtap-build.log" 2>/dev/null || echo "(no build log)"
+          # The selected files go into a bash array (never a step output). `all` runs with no file filter.
+          SEL="$(node infra/ci/changes.mjs --db-select)"
+          FILES=()
+          if [ "$SEL" != "all" ]; then
+            mapfile -t FILES <<< "$SEL"
+            for f in "${FILES[@]}"; do
+              [[ "$f" =~ ^tests/db/[a-z0-9-]+\.test\.ts$ ]] || { echo "unexpected test path: $f" >&2; exit 1; }
+            done
+          fi
+          pnpm exec vitest run -c tests/db/vitest.config.ts --reporter=default --reporter=json --outputFile="$VITEST_JSON" "${FILES[@]}"
 
       - name: Record timing
         if: always()
@@ -524,6 +568,7 @@ jobs:
           JOB_NAME: db
           JOB_STATUS: ${{ job.status }}
           CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+          VITEST_JSON: ${{ runner.temp }}/vitest-db.json
 
       - name: Upload CI timing
         if: always()
