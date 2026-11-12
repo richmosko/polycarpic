@@ -107,6 +107,10 @@ jobs:
         with:
           python-version: "3.14"
 
+      - name: Parse the real tracker (cairn check)
+        if: steps.changes.outputs.run == 'true' || steps.changes.outputs.run == 'ledger'
+        run: scripts/cairn/cairn check
+
       - name: Set up Node
         if: steps.changes.outputs.run == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

@@ -16,6 +16,9 @@ export const TABLE = {
   db: [
     /^packages\/db\//, /^tests\/db\//, /^infra\/postgres\/Dockerfile$/, /^infra\/postgres-major$/, /^packages\/config\//, /^packages\/tenancy\//, /^packages\/auth\//, /^apps\/migrate\//,
     /^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//, /^pnpm-lock\.yaml$/,
+    // POLY-141 C25: the files the db job itself executes (its steps, the area selector, the timing report, the preflight).
+    /^\.github\/workflows\/ci\.yml$/, /^infra\/ci\/(changes\.mjs|job-report\.mjs|budgets\.json)$/,
+    /^tests\/ci\/(db-filter-imports\.test\.ts|db-areas\.test\.ts|db-harness\.test\.ts|helpers\.ts|vitest\.config\.ts)$/,
   ],
   image: [/^Dockerfile/, /^\.dockerignore$/, /^compose[^/]*\.yml$/, /^Caddyfile/, /^infra\/(?!ci\/)/, /^bin\//,
     /^infra\/ci\/(image|install-trivy)\.sh$/, /^tests\/infra\//, /^\.trivyignore$/, /^tests\/layers\/tsc\/package\.json$/,
@@ -40,7 +43,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     for (const k of ALL_KEYS) console.log(`${k}=false`);
   } else {
     // stdin is NUL-separated (`git diff --no-renames -z --name-only`): a name is never quoted or split.
-    const paths = readFileSync(0, 'utf8').split('\0').filter((p) => p.trim() !== '');
+    const raw = readFileSync(0, 'utf8');
+    // C26: git's `-z` output always ends in NUL. Anything else (newline-separated paths) would be read as one path and fail open.
+    if (raw.trim() !== '' && !raw.endsWith('\0')) {
+      console.error('changes.mjs: stdin is not NUL-terminated (use `git diff --no-renames -z --name-only`); failing closed');
+      process.exit(1);
+    }
+    const paths = raw.split('\0').filter((p) => p.trim() !== '');
     if (paths.length === 0) {
       console.error('changes.mjs: no changed paths on stdin; failing closed');
       process.exit(1);

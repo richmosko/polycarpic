@@ -9,8 +9,8 @@ import { spawnSync } from 'node:child_process';
 export const LEDGER = [/^process\/cairn\/(issues|milestones|majors|archive|reviews)\//, /^process\/STATE\.md$/, /^process\/DECISIONS\.md$/];
 // The five rulings test_ruling_archive_records.py pins by blob sha; equals ci.yml's PINNED_RULINGS literal.
 export const PINNED_RULINGS = /^process\/cairn\/reviews\/(POLY-6|POLY-10|POLY-26|POLY-48|POLY-51)\/ruling\.md$/;
-// Cairn test files that read a ledger file at run time (ruling C17; the list is final only after addendum 2).
-export const LEDGER_TESTS = ['test_state_releases_bound.py', 'test_ruling_archive_records.py'];
+// Cairn test files whose result depends on real ledger content (ruling C17, addendum 2).
+export const LEDGER_TESTS = ['test_state_releases_bound.py', 'test_ruling_archive_records.py', 'test_check_budgets.py', 'test_dashboard_roster.py'];
 
 const SHA = /^[0-9a-f]{40}$/;
 const TIMEOUT_MS = 30000;
@@ -80,7 +80,11 @@ function realIo(env) {
     },
     hasCommit(s) { return sh('git', ['cat-file', '-e', `${needSha(s)}^{commit}`]).status === 0; },
     isAncestor(a, b) { return sh('git', ['merge-base', '--is-ancestor', needSha(a), needSha(b)]).status === 0; },
-    diff(a, b) { return git(['diff', '--no-renames', '-z', '--name-only', needSha(a), needSha(b)]).split('\0').filter((p) => p !== ''); },
+    diff(a, b) {
+      const out = git(['diff', '--no-renames', '-z', '--name-only', needSha(a), needSha(b)]);
+      if (out !== '' && !out.endsWith('\0')) throw new Error('diff output is not NUL-terminated');
+      return out.split('\0').filter((p) => p !== '');
+    },
     modes(a, b) {
       const out = git(['diff', '--raw', '-z', '--no-renames', needSha(a), needSha(b)]);
       return out.split('\0').flatMap((f) => { const m = f.match(/^:(\d{6}) (\d{6}) /); return m ? [m[1], m[2]] : []; });
