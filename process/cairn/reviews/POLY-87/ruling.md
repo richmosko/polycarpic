@@ -43,7 +43,8 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
 
 - **The sign-up marker** (measured; the probe is in addendum 1).
   - A new column on the user table: `user.signup_txid bigint`, added in 0006 with an index.
-  - `stamp_signup_user` overwrites it with `pg_current_xact_id()::text::bigint`. That is the top-level transaction id, including inside BetterAuth's savepoint.
+  - `stamp_signup_user` stamps only an insert made by `poly_app`, the sign-up role (`current_user = 'poly_app'`). It overwrites the column with `pg_current_xact_id()::text::bigint`, the top-level transaction id even inside BetterAuth's savepoint.
+  - An insert by any other role (superuser fixtures, `poly_owner`, `poly_worker`, a restore) has the column forced to NULL, whatever was supplied.
   - It raises `42501` if this transaction has already stamped a user: one user per transaction.
   - `poly_app` gets no INSERT or UPDATE on the column. The column grants in 0005 already leave it out.
   - "The user `p` was inserted by this transaction" means `signup_txid = pg_current_xact_id()`. A setting cannot forge this, and an UPDATE does not change it.
@@ -246,13 +247,22 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
 30. **(S4, pgTAP)** `claim_invitations` under `withTenant` (`app.user_id` set) raises 42501 and takes no lock, so a concurrent claim on the same row is not blocked. Its return type is void.
 31. **(S10, pgTAP)** Once `revoked_at`, `claimed_user_id`, `claimed_at` or `accepted_at` is non-null, a `poly_app` or `poly_govern` UPDATE that changes it is refused with 42501.
 
-32. **(S13)** No committed `user` row carries a sign-up stamp.
-    - `accept_invitations` sets `signup_txid = NULL` on the new user before it returns. `poly_govern` gets `UPDATE (signup_txid)` on `user`, and no other role does.
-    - A deferred constraint trigger, `app.signup_stamp_cleared()` (`AFTER INSERT OR UPDATE ON user`, `DEFERRABLE INITIALLY DEFERRED`, invoker), re-reads the row at commit and raises `42501` if its stamp is non-null.
+32. **(S13; corrected in place, probed on postgres:17.10)** No committed `user` row carries a sign-up stamp.
+    - Stamping is in R2: only `poly_app` inserts are stamped, and every other role's insert is forced to NULL.
+    - `accept_invitations` sets the stamp to NULL on the new user before it returns. `poly_govern` gets `UPDATE (signup_txid)` on `user`, and no other role does.
+    - A deferred constraint trigger, `app.signup_stamp_cleared()` (`AFTER INSERT OR UPDATE ON user`, `DEFERRABLE INITIALLY DEFERRED`, invoker), re-reads the row by id at commit. It raises `42501` if the stamp is non-null, for every role.
+    - Probe results:
+      - a committed superuser fixture insert that supplies 42 reads null;
+      - a `poly_worker` insert reads null;
+      - a `poly_app` sign-up with accept commits with null;
+      - a `poly_app` insert without accept is refused at commit, and no row is left;
+      - a superuser-planted stamp is refused at commit.
     - Tests:
-      - after a committed sign-up on each of the three `USER_INSERTING` routes, `signup_txid` is null;
+      - after a committed sign-up on each of the three `USER_INSERTING` routes, the stamp is null;
       - a hook variant that skips `acceptInvitations` fails at commit and leaves no user row;
-      - pgTAP: a row given a stamp by a superuser passes neither `enter_new_user` nor `accept_invitations` in a later transaction.
+      - a superuser `INSERT … signup_txid` commits with null;
+      - pgTAP: inside one transaction, a superuser-planted stamp that differs from the current xid passes neither `enter_new_user` nor `accept_invitations`, and the commit is refused.
+    - **Test impact:** any test that creates a user through BetterAuth (as `poly_app`) must now go through a real invitation (`seedInvitation`), not the `claimInvitation` mock alone. Otherwise its commit is refused. Superuser fixtures (`seedUser`, `seedTenancy`) are unaffected.
 
 ## Paths outside the issue's current `paths`
 
