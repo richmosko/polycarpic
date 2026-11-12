@@ -68,3 +68,15 @@ All six are accepted; S4 and S5 are amended. They are conditions 12–17 and bin
 17. **(S6, accepted) Static template literals are strings.** Every form in condition 1 checks a template with no expressions exactly as it checks a string literal. Measured with the prototype: `` import(`../../ledger/src/index.ts`) `` is red and `` import(`./index.ts`) `` passes. Fixture as written.
 
 Condition 4 stays in force while the Principal rules on Q1; seceng supports it.
+
+## Addendum 2: seceng's check of addendum 1 (end of seceng-ruling-review.md)
+
+Both edits are accepted. They amend conditions 15 and 16 in place; no new numbers.
+
+- **15 (b) now reads:** every import of `module` and `node:module` is refused from every package block. This covers static imports in any form (named, default and namespace), `export … from`, `import()` and `require()`. `module` and `node:module` join the `poly/no-banned-specifier` list and `no-restricted-imports` `paths`; they are not added to `named-imports-only`. A named `Module` gives `Module._load`, which carries no banned token.
+- **15 (d), added:** `.cjs` and `.cts` files are refused under `apps/*/src` and `packages/*/src`. A structure test over `git ls-files` checks this; it is not a lint rule. Those files have a real `module.require` whatever the package `type` is, and refusing the file closes that more simply than parsing `module.require(spec)`. Condition 12 still adds `cjs` and `cts` to `SRC`, so such a file outside `src` is still linted. Red: a test input that lists `packages/auth/src/x.cjs` and one that lists `x.cts`.
+- **16, extended:** the override-value check also covers root `package.json#resolutions`. The structure test also refuses a tracked file named `.pnpmfile.cjs` (or any `*pnpmfile*` file) anywhere in the repo. It also refuses any key matching `/pnpmfile/i` in `.npmrc`, in `pnpm-workspace.yaml` and in root `package.json#pnpm`, other than `ignore-pnpmfile` and `ignorePnpmfile`. A `readPackage` hook can rewrite a dependency to `link:` without any package.json change. `.npmrc` is read, not edited. Red: one test input for each.
+
+Tree at 07b72f2, all 0: imports of `module` or `node:module` under `apps`/`packages` (the only hits for a `module` string are `"type": "module"` in package.json); `.cjs` or `.cts` files under any `src`; tracked pnpmfile files; a `resolutions` key in root `package.json`; a pnpmfile key in `.npmrc`, `pnpm-workspace.yaml` or `package.json`.
+
+Anything further is a follow-up, not this loop.
