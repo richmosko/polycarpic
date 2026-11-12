@@ -2,7 +2,7 @@
 // The lint fixtures for conditions 1-5, 7a/b, 8, 13, 14, 15, 17 are tests/layers/fixtures/25..29-*; this file holds what a fixture
 // cannot say. Each guard is a pure function over file text, shown green on the real tree and red on a mutant input, so the
 // guard is not vacuous and no tracked file is edited. Condition 4 (non-test src never leaves its package) is fixtures only,
-// all in fixtures/26-condition-4-droppable/: dropping it is `git rm -r` of that directory.
+// all in fixtures/26-src-stays-in-package/.
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';

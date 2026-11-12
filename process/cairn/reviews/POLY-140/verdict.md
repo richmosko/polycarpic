@@ -33,7 +33,7 @@ Red-first record (gate 2, a5df7e8 / 8acedb1): 133 of 192 new tests were red for 
 | 1 forms, all extensions | fixtures `fail-form-*` (import type, export from, export *, import(), require, import=, TS import type, glob string/array/negated, `/// reference`, svelte), `fail-ext-{tsx,js,mjs,cjs}` |
 | 2 specifier syntax | `fail-suffix-query-raw`, `fail-suffix-hash`, `fail-root-relative-path`, `fail-directory-specifier`, `fail-nonexistent-target`; `pass-sveltekit-lib-alias`, `pass-new-url-http` |
 | 3 refused from every file | `fail-absolute-path`, `fail-file-url`, `fail-node-modules-segment(-in-test)`, `fail-computed-{template,concat,relative-inside-own-package}`; message names the package (`@message:`) on 8 fixtures |
-| 4 src never leaves its package (**awaiting the Principal; judged as built**) | `fixtures/26-condition-4-droppable/*` (5 red) plus `pass-*` for tests in 25; built and green. Dropping it is `git rm -r` of that directory. Note `fail-src-to-newpkg-real-map-names-none` asserts the real-map message names no `newpkg` |
+| 4 src never leaves its package (**accepted by the Principal**) | `fixtures/26-src-stays-in-package/*` (5 red) plus `pass-*` for tests in 25; built and green.  Note `fail-src-to-newpkg-real-map-names-none` asserts the real-map message names no `newpkg` |
 | 5 tests may reach only root `tests/` | `pass-colocated-test-to-root-tests`, `pass-colocated-spec-…`, `pass-package-tests-dir-to-root-tests`; `fail-colocated-test-to-{ledger,scripts}`, `fail-package-tests-dir-to-{migrate,scripts}` |
 | 6 generated, not disableable | structure test (above); `fail-bare-disable`, `fail-inline-disable` in 25 and 27. Harness note: ESLint reports "Definition for rule not found" under the missing rule's id; lint.test.ts now ignores that message so these cannot pass falsely |
 | 7 freshness (a)(b)(c) | (a) `fail-map-allows-posting-still-refused`; (b) `fail-new-package-named-from-map` + cond-4 real-map twin; (c) structure test per package |
@@ -57,5 +57,5 @@ Red-first record (gate 2, a5df7e8 / 8acedb1): 133 of 192 new tests were red for 
 ## Deltas
 
 1. `tests/infra/image/postgres.test.ts` fails and `caddy.test.ts` flakes under parallel load in my run (Docker-dependent). Unrelated to this loop; not measured on main.
-2. Condition 4 still awaits the Principal. As built it passes its 5 fixtures; removing it means deleting `fixtures/26-condition-4-droppable/` and, if the rule is changed, the cond 4 branch in `plugin.mjs`.
+2. Condition 4 was accepted by the Principal; its 5 fixtures are permanent.
 3. Residuals are as the ruling states them (computed key via an aliased global object; `vi.mock` in colocated tests); no new ones found.
