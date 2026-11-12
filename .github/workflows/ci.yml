@@ -496,6 +496,12 @@ jobs:
       - name: Start clock
         run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
 
+      - name: Build the pgtap test image in the background (overlaps the setup steps; the battery step waits for it)
+        shell: bash
+        run: |
+          # The helper owns the base pin, the tag and the build arguments. A failed build leaves no tag, so the harness builds it itself.
+          setsid nohup bash -c 'node tests/db/helpers/pgtap-image.mjs --build; echo $? > "$RUNNER_TEMP/pgtap-build.rc"' > "$RUNNER_TEMP/pgtap-build.log" 2>&1 < /dev/null &
+
       - name: Set up Node
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -533,6 +539,12 @@ jobs:
           VITEST_JSON: ${{ runner.temp }}/vitest-db.json
         run: |
           set -euo pipefail
+          # Wait for the background image build (at most 300 s). Its exit code is reported, never acted on: the harness's
+          # own `docker image inspect` decides whether the image exists, and builds it when it does not.
+          waited=0
+          while [ ! -f "$RUNNER_TEMP/pgtap-build.rc" ] && [ "$waited" -lt 300 ]; do sleep 1; waited=$((waited + 1)); done
+          echo "pgtap image build: rc=$(cat "$RUNNER_TEMP/pgtap-build.rc" 2>/dev/null || echo missing) after ${waited}s of waiting"
+          cat "$RUNNER_TEMP/pgtap-build.log" 2>/dev/null || echo "(no build log)"
           # The selected files go into a bash array (never a step output). `all` runs with no file filter.
           SEL="$(node infra/ci/changes.mjs --db-select)"
           FILES=()
