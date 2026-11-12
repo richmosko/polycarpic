@@ -45,3 +45,9 @@ Feature started. Branch: `feature/poly-136-ci-migration-followups`.
 ### @architect — 2026-11-11
 
 Gate 1 ruling: process/cairn/reviews/POLY-136/ruling.md. The acceptance criteria are amended in place to seven items, and apps/migrate/src/** is added to paths for cut C1. Item 4 lands first: C1 (runner in-process via apps/migrate/src/run.ts), then C2 and C3; five dispatch runs, db median ≤ 130 s. Item 7 is ruled as align (allowBuilds esbuild:false, strict CI), with the README as fallback.
+
+### @devops-engineer — 2026-11-11
+
+Item 6 (scratch run 43125303397 on scratch/poly-136-e2e-fallback, first probe forced to fail): the fallback ran. install-deps ran for about 3 s and did not time out; no ::warning appeared; the second probe passed (no 'Chromium cannot launch'); e2e 48 passed (42.6 s); step total 59 s, success. lint failed on that branch as expected (the static workflow test sees the edited probe); db, image and unit were green. Scratch branch deleted from origin and locally; nothing merged.
+
+Item 7 / S4: clean install with --reporter=append-only (node_modules removed, store warm) exits 0 with no lifecycle-script line, and the image job was green on the same head in run 43124687609 at 0e00993 (all eight jobs green).
