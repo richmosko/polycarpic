@@ -197,3 +197,42 @@ describe('C10 --db-select', () => {
     expect(r.stdout).toBe('');
   });
 });
+
+// POLY-141 C25 (ruling addendum 3): the db job's own files trigger it, each selecting all four areas.
+describe('C25 the files the db job runs set every area', () => {
+  const ALL = ['db_auth', 'db_tenancy', 'db_migrate', 'db_ops'];
+  const OWN = ['.github/workflows/ci.yml', 'infra/ci/changes.mjs', 'infra/ci/job-report.mjs', 'infra/ci/budgets.json',
+    'tests/ci/db-filter-imports.test.ts', 'tests/ci/db-areas.test.ts', 'tests/ci/db-harness.test.ts', 'tests/ci/helpers.ts', 'tests/ci/vitest.config.ts'];
+  for (const p of OWN) {
+    it(`${p} -> db and all four areas  [red if: it is dropped from TABLE.db / DB_SHARED]`, async () => {
+      const { classify } = await ch();
+      const o = classify([p]);
+      expect(o.db, p).toBe(true);
+      for (const k of ALL) expect(o[k], `${p} ${k}`).toBe(true);
+    });
+  }
+  for (const p of ['infra/ci/anchor.mjs', 'infra/ci/aggregate.mjs', 'infra/ci/check-pins.mjs', 'infra/ci/check-run-expr.mjs', 'infra/ci/image.sh', 'tests/ci/anchor.test.ts', 'tests/ci/changes.test.ts', '.github/workflows/build.yml']) {
+    it(`${p} does not set db (it runs in another job)  [red if: all of infra/ci or tests/ci was added]`, async () => {
+      const { classify } = await ch();
+      expect(classify([p]).db, p).toBe(false);
+    });
+  }
+  it('every `node infra/ci/*.mjs` call and every preflight test path in the db job selects all four areas  [red if: a new step calls a file outside the set]', async () => {
+    const { classify } = await ch();
+    const { wf, steps } = await import('./helpers.ts');
+    const body = steps(wf('ci.yml').jobs.db!).map((s) => s.run ?? '').join('\n');
+    const paths = [
+      ...[...body.matchAll(/\bnode\s+(infra\/ci\/[\w.-]+\.mjs)/g)].map((m) => m[1]!),
+      ...[...body.matchAll(/(?<![\w/])(tests\/ci\/[\w.-]+\.(?:ts|json))/g)].map((m) => m[1]!),
+      ...[...body.matchAll(/\.github\/workflows\/[\w.-]+\.yml/g)].map((m) => m[0]),
+    ];
+    expect(paths, 'the db job calls infra/ci scripts and the preflight').toEqual(expect.arrayContaining(['infra/ci/changes.mjs', 'infra/ci/job-report.mjs', 'tests/ci/vitest.config.ts', 'tests/ci/db-areas.test.ts']));
+    for (const p of new Set(paths)) {
+      const o = classify([p]);
+      expect(o.db, p).toBe(true);
+      for (const k of ALL) expect(o[k], `${p} ${k}`).toBe(true);
+    }
+    const budgets = body.includes('job-report.mjs') ? ['infra/ci/budgets.json'] : [];
+    for (const p of budgets) expect(classify([p]).db_auth, p).toBe(true);
+  });
+});

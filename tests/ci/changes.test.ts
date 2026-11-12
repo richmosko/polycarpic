@@ -35,7 +35,7 @@ const CASES: [string[], string[], string][] = [
   [['infra/caddy/Caddyfile'], ['image'], 'infra/** dropped from `image`'],
   [['infra/ci-other/x.sh'], ['image'], 'the infra/ci exception matched as a bare prefix instead of `infra/ci/`'],
   [['bin/polycarpic-ops'], ['image'], 'bin/** dropped'],
-  [['infra/ci/changes.mjs'], ['ci'], 'infra/ci counted as `image`, or dropped from `ci`'],
+  [['infra/ci/changes.mjs'], ['ci', 'db'], 'infra/ci counted as `image`, or dropped from `ci`; changes.mjs runs in the db job (POLY-141 C25)'],
   [['.github/workflows/build.yml'], ['ci'], '.github/workflows dropped from `ci`'],
   [['tests/ci/a.test.ts'], ['ci'], 'tests/ci dropped from `ci`'],
   [['packages-old/x.ts', 'docs/packages/x.md', 'xapps/a.ts'], [], 'unanchored match (substring instead of prefix)'],
@@ -46,7 +46,7 @@ const CASES: [string[], string[], string][] = [
   // POLY-102 R5: every path a job executes or imports triggers that job.
   [['infra/ci/image.sh'], ['ci', 'image'], 'infra/ci/image.sh dropped from `image` (the POLY-132 gap), or dropped from `ci`'],
   [['infra/ci/install-trivy.sh'], ['ci', 'image'], 'infra/ci/install-trivy.sh dropped from `image`'],
-  [['infra/ci/changes.mjs', 'infra/ci/aggregate.mjs'], ['ci'], 'the image entries widened to all of infra/ci/ (the §2 exception lost)'],
+  [['infra/ci/aggregate.mjs', 'infra/ci/anchor.mjs'], ['ci'], 'the image entries widened to all of infra/ci/ (the §2 exception lost)'],
   [['.trivyignore'], ['image'], '.trivyignore dropped from `image` (the scan reads it)'],
   [['tests/layers/tsc/package.json'], ['layers', 'image'], 'tests/layers/tsc/package.json dropped from `image` (it enters the image context)'],
   [['packages/config/src/index.ts', 'packages/config/log.schema.json'], ['node', 'db'], 'packages/config dropped from `db` (the closure of tests/db and of the spawned entrypoints reaches @poly/config)'],
@@ -96,9 +96,16 @@ describe('changes.mjs: NUL-separated input (POLY-141 C16, seceng S1)', () => {
   it('a newline in a name stays one path and does not split into a second one: docs/a\npackages/db/x.ts -> nothing', () => {
     expect(keysOn(['docs/a\npackages/db/x.ts'])).toEqual([]);
   });
-  it('a literal newline-only list is not accepted as several paths  [red if: both separators are honoured]', () => {
-    const r = node('changes.mjs', { input: 'README.md\npackages/db/x.ts\n' });
-    expect(r.stdout).toContain('db=false');
+  it('C26: non-empty input that does not end in NUL exits 1 with nothing on stdout (newline-separated is a fail-open otherwise)  [red while newline input is read as one path]', () => {
+    for (const input of ['README.md\npackages/db/x.ts\n', 'packages/auth/src/x.ts\n', 'README.md\0packages/db/x.ts']) {
+      const r = node('changes.mjs', { input });
+      expect(r.code, JSON.stringify(input)).toBe(1);
+      expect(r.stdout, JSON.stringify(input)).toBe('');
+      expect(r.stderr).toMatch(/\S/);
+    }
+  });
+  it('C26: NUL-terminated input still works (control)', () => {
+    expect(node('changes.mjs', { input: 'README.md\0packages/db/x.ts\0' }).code).toBe(0);
   });
   it('the source reads stdin split on \\0', () => {
     const src = readFileSync(ci('changes.mjs'), 'utf8');
