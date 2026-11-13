@@ -1,7 +1,7 @@
 ---
 id: POLY-142
 title: Operator invite CLI
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-87]
@@ -116,3 +116,7 @@ Principal, 2026-11-13: **approved** widening accepted risk R-2 to name `poly_wor
 ### @team-lead — 2026-11-12
 
 PR opened: https://github.com/richmosko/polycarpic/pull/124. Awaiting Validate.
+
+### @team-lead — 2026-11-12
+
+Validate passed; merging via PR #124. Closing. CI on 84362d1: all eight jobs green; `db` job 95 s on this one run against 87, 93 and 94 s on main the same day (100 s warning budget).
