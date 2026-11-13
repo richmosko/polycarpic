@@ -1095,7 +1095,7 @@ flowchart TB
           <li><code>app.apply_change</code> is owned by <code>poly_govern</code>. It recomputes the approvers at apply time and re-validates the payload.</li>
           <li>Requests expire after 14 days. Step-up on request, approve and decline. An audit event at every step.</li>
           <li>The invite email is sent only on apply.</li>
-          <li>At the 1 → 2 owner transition, every outstanding direct-path invitation is revoked in the same transaction, under a lock on the entity row (OQ-31, §4.2.2).</li>
+          <li>At the 1 → 2 owner transition, every outstanding direct-path invitation is revoked in the same transaction, under a lock on the entity row (OQ-31, §4.2.2). A direct-path invitation is one with <code>issued_via = 'owner'</code> and no <code>change_request_id</code> (ARCH A-24). Operator and bootstrap rows carry no entity, so the transition never touches them.</li>
           <li>The founding owner, with <code>app.force_change</code>, can force only co-owner removal or demotion, after a decline or expiry. Transfer is founder-only, and the founder must hold owner.</li>
         </ul><p class="ctl-meta"><strong>Lives at:</strong> <code>packages/tenancy</code>; <code>packages/db</code> SQL<br><strong>Tested by:</strong> pgTAP:
         <ul>
