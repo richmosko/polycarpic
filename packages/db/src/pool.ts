@@ -21,7 +21,10 @@ let app: pg.Pool | undefined;
 let worker: pg.Pool | undefined;
 let operator: pg.Pool | undefined;
 
-/** The operator pool refuses before any connection unless the configured user is poly_operator (POLY-146 R1). */
+/**
+ * The operator pool refuses before any connection unless the configured user is poly_operator (POLY-146 R1). This is a seatbelt,
+ * not the boundary: the boundary is that no process but the `operator` service holds poly_operator's password.
+ */
 export class OperatorPoolRefused extends Error {
   constructor() {
     super('the operator pool requires DATABASE_USER=poly_operator');
