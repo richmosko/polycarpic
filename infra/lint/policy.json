@@ -27,12 +27,14 @@
       ],
       "worker": [
         "db_password_worker",
-        "auth_secret",
         "credential_keyring",
         "resend_api_key"
       ],
       "migrate": [
         "db_password_migrator"
+      ],
+      "operator": [
+        "db_password_operator"
       ],
       "backup": [
         "db_password_backup"
@@ -54,12 +56,14 @@
       ],
       "worker": [
         "db_password_worker",
-        "auth_secret",
         "credential_keyring",
         "resend_api_key"
       ],
       "migrate": [
         "db_password_migrator"
+      ],
+      "operator": [
+        "db_password_operator"
       ]
     },
     "edge": {

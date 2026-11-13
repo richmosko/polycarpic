@@ -69,10 +69,8 @@ services:
     user: "10002:10002"
     environment:
       DB_PASSWORD_FILE: /run/secrets/db_password_worker
-      AUTH_SECRET_FILE: /run/secrets/auth_secret
     secrets:
       - {source: db_password_worker__worker, target: db_password_worker}
-      - {source: auth_secret__worker, target: auth_secret}
       - {source: credential_keyring__worker, target: credential_keyring}
       - {source: resend_api_key__worker, target: resend_api_key}
     networks: [default]
@@ -95,6 +93,25 @@ services:
       - {source: db_password_migrator__migrate, target: db_password_migrator}
     networks: [default]
     mem_limit: 512m
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 60s
+      timeout: 5s
+
+  operator:
+    <<: *hardened
+    image: *app-image
+    user: "10006:10006"
+    restart: "no"
+    profiles: [operator]
+    entrypoint: ["/app/bin/polycarpic", "cli"]
+    environment:
+      DB_PASSWORD_FILE: /run/secrets/db_password_operator
+    secrets:
+      - {source: db_password_operator__operator, target: db_password_operator}
+    networks: [default]
+    mem_limit: 256m
     tmpfs: [/tmp]
     healthcheck:
       test: ["CMD", "node", "-e", "process.exit(0)"]
@@ -166,10 +183,10 @@ secrets:
   resend_api_key__web: {file: /etc/polycarpic/secrets/web/resend_api_key}
   plaid_secret__web: {file: /etc/polycarpic/secrets/web/plaid_secret}
   db_password_worker__worker: {file: /etc/polycarpic/secrets/worker/db_password_worker}
-  auth_secret__worker: {file: /etc/polycarpic/secrets/worker/auth_secret}
   credential_keyring__worker: {file: /etc/polycarpic/secrets/worker/credential_keyring}
   resend_api_key__worker: {file: /etc/polycarpic/secrets/worker/resend_api_key}
   db_password_migrator__migrate: {file: /etc/polycarpic/secrets/migrate/db_password_migrator}
+  db_password_operator__operator: {file: /etc/polycarpic/secrets/operator/db_password_operator}
   db_password_backup__backup: {file: /etc/polycarpic/secrets/backup/db_password_backup}
   backup_store_credential__uploader: {file: /etc/polycarpic/secrets/uploader/backup_store_credential}
   heartbeat_url__uploader: {file: /etc/polycarpic/secrets/uploader/heartbeat_url}
