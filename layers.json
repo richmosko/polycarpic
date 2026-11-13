@@ -20,5 +20,12 @@
     "worker":     { "dir": "apps/worker",         "name": "@poly/worker",     "layer": 6, "subpaths": [], "allow": ["config", "config/log", "db", "db/startup", "secrets", "secrets/open", "import", "refdata", "securities", "posting", "tax"] },
     "migrate":    { "dir": "apps/migrate",        "name": "@poly/migrate",    "layer": 6, "subpaths": [], "allow": ["config", "db", "db/migrate"] }
   },
-  "sessionSetExempt": "packages/db/src/migrate.ts"
+  "sessionSetExempt": "packages/db/src/migrate.ts",
+  "confined": { "packages/db/src/new-user.ts": ["packages/db/src/context.ts"] },
+  "reservedLiterals": {
+    "enter_new_user": ["packages/db/src/new-user.ts"],
+    "claim_invitations": ["packages/tenancy/src/invitation.ts"],
+    "accept_invitations": ["packages/tenancy/src/invitation.ts"]
+  },
+  "confinedMembers": { "enterNewUser": ["packages/auth/src/user-hooks.ts", "packages/db/src/context.ts"] }
 }
