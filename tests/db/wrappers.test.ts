@@ -24,7 +24,7 @@ beforeAll(async () => {
   vi.resetModules();
   m0 = await import('../../packages/db/src/index.ts');
   await m0.close();
-  m0.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
+  m0.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
   session = await import('../../packages/db/src/session.ts');
@@ -89,7 +89,7 @@ describe('app.job_targets', () => {
 describe('withContextFreeTx', () => {
   it('first statement asserts app.user_id is empty: a connection carrying a user id is refused', async () => {
     await auth.close(); // drop pooled backends so the next one is fresh and picks up the role setting
-    m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) }); // close() resets the config
+    m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) }); // close() resets the config
     must(`ALTER ROLE poly_app IN DATABASE ${db} SET app.user_id = '${UID}'`);
     try {
       let ran = false;
@@ -97,7 +97,7 @@ describe('withContextFreeTx', () => {
       expect(ran).toBe(false);
     } finally {
       await auth.close();
-      m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
+      m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
       must(`ALTER ROLE poly_app IN DATABASE ${db} RESET app.user_id`);
     }
   });
@@ -131,7 +131,7 @@ describe('no nesting: all sixteen ordered pairs (self-nesting included), each re
 
 // ---------------------------------------------------------------- POLY-142 C11 (O1): withOperatorTx
 describe('withOperatorTx (@poly/db/operator)', () => {
-  it('runs as poly_worker with app.actor = operator:cli and an empty app.user_id; its handle has no enterNewUser  [red if: wrong pool, a second setting, a user id, or the new-user step leaks onto the handle]', async () => {
+  it('runs as poly_operator (POLY-146) with app.actor = operator:cli and an empty app.user_id; its handle has no enterNewUser  [red if: wrong pool, a second setting, a user id, or the new-user step leaks onto the handle]', async () => {
     const got = await operator.withOperatorTx(async (tx: any) => ({
       who: (await q(tx, `select current_user as v`))[0].v,
       actor: (await q(tx, `select current_setting('app.actor', true) as v`))[0].v,
@@ -139,11 +139,11 @@ describe('withOperatorTx (@poly/db/operator)', () => {
       sess: (await q(tx, `select coalesce(current_setting('app.session_id', true), '') as v`))[0].v,
       step: 'enterNewUser' in tx || typeof tx.enterNewUser === 'function',
     }));
-    expect(got).toEqual({ who: 'poly_worker', actor: 'operator:cli', uid: '', sess: '', step: false });
+    expect(got).toEqual({ who: 'poly_operator', actor: 'operator:cli', uid: '', sess: '', step: false });
   });
   it('is_local: after commit and after rollback, the next checkout of a max:1 pool reads app.actor and app.user_id empty  [red if: the setting is session-level and rides the backend]', async () => {
     await operator.close();
-    m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), max: 1 });
+    m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db), max: 1 });
     try {
       await operator.withOperatorTx(async () => 'ok');
       await expect(operator.withOperatorTx(async () => { throw new Error('boom'); })).rejects.toThrow('boom');
@@ -153,21 +153,21 @@ describe('withOperatorTx (@poly/db/operator)', () => {
       expect(raw).not.toBe('operator:cli'); // a later transaction on the same backend carries no operator actor
     } finally {
       await operator.close();
-      m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
+      m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
     }
   });
   it('refuses a connection that carries an app.user_id, the callback never running  [red if: the emptiness assertion is missing]', async () => {
     await operator.close();
-    m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
-    must(`ALTER ROLE poly_worker IN DATABASE ${db} SET app.user_id = '${UID}'`);
+    m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
+    must(`ALTER ROLE poly_operator IN DATABASE ${db} SET app.user_id = '${UID}'`);
     try {
       let ran = false;
       await expect(operator.withOperatorTx(async () => { ran = true; })).rejects.toThrow(/app\.user_id/i);
       expect(ran).toBe(false);
     } finally {
       await operator.close();
-      m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
-      must(`ALTER ROLE poly_worker IN DATABASE ${db} RESET app.user_id`);
+      m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
+      must(`ALTER ROLE poly_operator IN DATABASE ${db} RESET app.user_id`);
     }
   });
   it('no other entry point exports it: @poly/db, /auth, /session, /migrate and /startup have no withOperatorTx  [red if: a re-export is added to any of them]', async () => {
