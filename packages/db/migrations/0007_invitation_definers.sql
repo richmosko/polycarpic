@@ -180,3 +180,20 @@ CREATE TRIGGER invitation_20_set_once BEFORE UPDATE ON public.invitation
   FOR EACH ROW EXECUTE FUNCTION app.invitation_set_once();--> statement-breakpoint
 CREATE CONSTRAINT TRIGGER user_90_stamp_cleared AFTER INSERT OR UPDATE ON public."user"
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION app.signup_stamp_cleared();
+--> statement-breakpoint
+-- S14 (C33): between the insert and the accept, the stamped user's email and verified flag cannot change, so the address
+-- the claim matched is the address accept_invitations reads. Every other column passes, including the stamp's clearing.
+CREATE FUNCTION app.signup_email_fixed() RETURNS trigger
+  LANGUAGE plpgsql
+  SET search_path = ''
+  AS $$
+  BEGIN
+    IF OLD.signup_txid IS NOT NULL
+       AND (NEW.email IS DISTINCT FROM OLD.email OR NEW.email_verified IS DISTINCT FROM OLD.email_verified) THEN
+      RAISE EXCEPTION 'a user''s email is fixed until its sign-up is accepted' USING ERRCODE = '42501';
+    END IF;
+    RETURN NEW;
+  END
+  $$;--> statement-breakpoint
+CREATE TRIGGER user_20_signup_email_fixed BEFORE UPDATE ON public."user"
+  FOR EACH ROW EXECUTE FUNCTION app.signup_email_fixed();
