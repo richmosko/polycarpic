@@ -134,3 +134,28 @@ Two changes before it gates:
 - **G2. Confine `packages/tenancy/src/operator-invitation.ts`** to `apps/worker/src/cli/user-invite.ts` in `confined`, with a red case in C16. A web import could not succeed (no EXECUTE, no operator transaction), but making every later caller a review point follows the ruling's own R6 rule.
 
 Everything else in R0–R9 matches O1–O11.
+
+## Build check (09165dc)
+
+**Result: pass on O1–O11, G1 and G2.** Read: 0008, 0009, `context.ts`, `operator.ts`, `operator-invitation.ts`, `invitation.ts`, `apps/worker/src/cli/{main,user-invite}.ts`, `layers.json`, `definers.json`, the C7 spy in `tests/db/operator-invite.test.ts`, and pgTAP 06's C14 and C15. I ran nothing; the build-green run is the builder's.
+
+| Condition | Result | Evidence |
+|---|---|---|
+| O1 | pass | `withOperatorTx`: the worker pool, the empty-user assert, only `app.actor` set, a fourth `Kind` in the nesting guard |
+| O2 | pass | the definer's first statement raises `42501` on a user; EXECUTE is `poly_worker` only, the owner's included (0009) |
+| O3 | pass | `issued_via` and the one-way shape check (0008); the INSERT policy carries `app.current_user_id() IS NULL` |
+| O4 | pass | the advisory lock under `lock_timeout = '2s'`; the revoke policy is limited to unclaimed bootstrap rows; the one-live unique index |
+| O5 | pass | the literal `operator:cli`; payload `{invitation_id, issued_via}` on issue and `{invitation_id}` on revoke |
+| O6 | pass | the claim predicate, and accept's `u.id <> v_uid` |
+| O7 | pass | the link is written after `withOperatorTx` resolves; the spy wraps `pg.Client.prototype.query`; the logger reduces `err` to `{type, code}` |
+| O8 | pass | `origin` is `config.publicOrigin` |
+| O9, G2 | pass | `confined` holds both files; the reserved literal is in `operator-invitation.ts` |
+| O10 | pass | the same rule in `validOperatorEmail` and in the definer (`22023`) |
+| O11, G1 | pass | pgTAP 06: the INSERT holders, one inserter into `invitation`, one writer of `revoked_at`, and C14 run with no user |
+
+**The builder's two additions: accepted.**
+- Revoking the owner's implicit EXECUTE is a tightening, and `definers.json` matches it.
+- `SELECT (issued_via)` for `poly_app` adds no rows. The existing owner policy shows an owner only rows with an entity, so operator rows stay invisible.
+- The outcome-only CLI log line is stricter than O5 asked.
+
+**F1 (minor, not blocking).** The crash handler in `cli/main.ts` builds its logger on the default stream, which is stdout (fd 1). An unexpected throw outside `runUserInvite` writes a JSON line to stdout. No token can be in it: the token exists only inside `runUserInvite`, which catches everything, and `err` is reduced. It still breaks "stdout carries the link and nothing else". Fix: pass the stderr stream there too. It can be fixed in this loop or as a follow-up; that is the lead's call.
