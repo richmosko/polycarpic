@@ -1,11 +1,12 @@
 ---
 id: POLY-142
 title: Operator invite CLI
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-87]
 assignee: backend-lead
+paths: [process/cairn/issues/POLY-142.md, process/cairn/reviews/POLY-142/**, apps/worker/**, packages/db/**, packages/tenancy/**, tests/**, scripts/layers/**, infra/ci/**, .github/workflows/**, layers.json, eslint.config.js, package.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**]
 labels: [auth, cli]
 priority: null
 pr: null
@@ -46,3 +47,9 @@ B changes condition 23 to "only `issue_operator_invitation` and the `poly_app` o
 
 - The 7-day default expiry of an operator invitation (the architect's proposal).
 - Whether printing the link to stdout is enough for the first release, with email as a follow-up.
+
+## Comments
+
+### @team-lead — 2026-11-12
+
+Feature started. Branch: `feature/poly-142-operator-invite-cli`.
