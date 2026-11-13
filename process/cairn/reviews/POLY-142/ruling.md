@@ -249,3 +249,34 @@ Architect, read at 9d58648. seceng-142's conditions O1–O11 (`seceng-ruling-rev
   C16 adds red cases for that import from `apps/worker/src/main.ts` and for a re-export by `packages/tenancy/src/index.ts`.
 - **C7's spy** wraps `pg.Client.prototype.query`, so it sees every pooled client.
 - **Totals:** 16 conditions. The ruling gates.
+
+## Build check (architect, at 09165dc)
+
+Read against R0–R9, C1–C16 and addendum 1. One item must change before the verdict; everything else is built as ruled.
+
+| # | Result | Evidence |
+|---|---|---|
+| A1 | Pass. 0008 is generated: the column, `invitation_issued_via_check` and `invitation_operator_shape_check`, as R1 | `0008_invitation_issued_via.sql`; `meta/0008_snapshot.json` |
+| A2 | Pass. Order: user check → email (O10, `[\x01-\x20\x7f]`; Postgres text cannot hold NUL) → lock → revoke with audit → user check → insert → audit. `lock_timeout 2s`, `search_path ''`, grants and both policies verbatim, the unique index | `0009_operator_invitation.sql`; `definers.json` |
+| A3 | Pass. Measured: a diff of the 0007 and 0009 bodies shows only `CREATE OR REPLACE` and the one predicate in each | `diff` of the extracted claim and accept bodies |
+| A4 | Pass. A fourth `Kind`; worker pool; empty-user assert; one `set_config(…, true)`. Exported only by `operator.ts` | `context.ts`, `operator.ts`, `index.ts`, `db/package.json` |
+| A5 | **Correction required (below).** `user-invite.ts` writes stdout once, after the wrapper resolves; its logger goes to stderr. `config/log` reduces `err` to `{type, code}` (read, `log.ts:8, 58–66`), so a pg error cannot carry the email or the hash into a log line | `apps/worker/src/cli/*.ts` |
+| A6 | Pass. Only `InstanceStateRefused` returns 2 | `user-invite.ts` |
+| A7 | Pass. `layers.json` as R6 and G2; the plugin is unchanged; the layers check is green after the ARCH layer-map fix | `layers.json`; `node scripts/layers/check.mjs` exit 0 |
+| A8 | Pass. The CI map as R7: no new area, the four patterns in `auth` and `TABLE.db`, and no `.github/workflows` diff | `changes.mjs`; `git diff --stat 9d58648..09165dc` |
+| A9 | Pending: qa's same-day timing control at gate 3 | — |
+| A10 | Done in this commit (below) | `docs/ARCH/index.html`, `docs/ARCH/ARCH.pdf` |
+
+**Correction required (A5): `apps/worker/src/cli/main.ts`, the crash handler.** `main().then(…, (e) => createLogger({ service: 'worker' }).fatal(…))` uses the logger's default stream, which is stdout (read, `log.ts:109`). R5 says nothing but the link is ever written to stdout. Pass the same stderr stream that `main` already builds. No new test is owed; C7's captures cover stderr.
+
+**Builder changes, ruled:**
+- **0009 revokes `poly_govern`'s implicit EXECUTE on `issue_operator_invitation`: accepted.** O2 and C12 require the owner to be refused. `poly_govern` is NOLOGIN, so this closes a path only for a future definer body that calls it.
+- **`GRANT SELECT (issued_via) ON invitation TO poly_app`: accepted.** Rows are still filtered by `invitation_select` (`has_role(entity_id, 'owner')`). An operator or bootstrap row has no entity and stays invisible, so an owner learns only that their own rows read `'owner'`. The INSERT grant still omits the column.
+- **The `invitation.revoked` payload is `{invitation_id}` alone: accepted.** A revoked row is always a bootstrap row, so `issued_via` adds nothing.
+- **`main.ts` does not call `close()` before `process.exit`: accepted.** COMMIT has returned before the exit, and the exit ends the sockets.
+- **The `invitation.issued` log line carries the outcome only** (`log.schema.json` has no `invitation_id` or `issued_via`): accepted. The audit row carries both.
+
+**ARCH 1.15.21.** ARCH describes the built code: the four wrappers and the operator path (§2.1, the `packages/db` row in §2.2, §3.3); the issuer and the `poly_govern` grants (§3.3); and the operator command, bootstrap and `issued_via` on the `invitation` row (§3.1).
+- One conflict is resolved there. ARCH had reserved `issued_via` for `direct`, or the id of a change request (§3.1, §3.1b's 1 → 2 revocation). The built column is an enum of issuing paths, so ARCH now reads `'owner'` where it said `'direct'`. The change-request link becomes its own column, `change_request_id`, when §3.1b ships.
+- That is better than mixing an enum and a foreign key in one column. SECURITY A-24's wording is seceng's to check against it.
+- `docs/ARCH/ARCH.pdf` is regenerated (`DOCS_PORT=8793 ./scripts/export-pdf.sh ARCH`).
