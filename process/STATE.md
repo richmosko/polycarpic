@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-87-invite-only-sign-up`
 - **Started:** 2026-11-12
 - **Goal:** after the first operator user, an invitation is the only way into an instance, and sign-up commits the user, their Person, membership and accounts together.
-- **Status:** In Progress
+- **Status:** In Review — PR [#123](https://github.com/richmosko/polycarpic/pull/123)
 
 Standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job's budget is 100 s and only warns (86 s median), so a loop that pushes the median past it brings its own cut; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. A package is left only by its `@poly/<name>` import (lint-enforced). Nothing is deployed; second-factor enrolment stays closed until POLY-89.
 

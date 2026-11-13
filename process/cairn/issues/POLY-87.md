@@ -1,7 +1,7 @@
 ---
 id: POLY-87
 title: Invite-only sign-up
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-62, POLY-86, POLY-140, POLY-141]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [process/cairn/issues/POLY-87.md, process/cairn/reviews/POLY-87/**, packages/auth/**, packages/tenancy/**, packages/db/**, apps/web/src/routes/**, apps/web/src/hooks.server.ts, apps/web/tests/e2e/**, tests/db/**, tests/ci/**, tests/layers/**, scripts/layers/**, infra/ci/changes.mjs, layers.json, eslint.config.js, package.json, pnpm-lock.yaml, docs/ARCH/**, docs/SECURITY/**]
 labels: [auth]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/123
 created: 2026-11-08
 updated: 2026-11-12
 ---
@@ -62,3 +62,7 @@ Gate 1 closed: ruling at f00f2ab, 32 conditions, addenda 1 and 2 plus two in-pla
 ### @team-lead — 2026-11-12
 
 Gate 3: build at 833491f (steps 1–7, then the architect's R3 fix and condition 33). Lead's runs at 833491f: db battery 412 passed and 2 expected fail of 414 in 48 s locally (39 s before this loop); `tests/ci` 528, `tests/layers` 502, `tests/infra` 142, `pnpm test` 17 tasks, `pnpm lint` and `check-migrations` clean. Architect's build check at f948057: R1–R6 built as ruled apart from the 42501 mapping scope, fixed at 9984d48; the builder's additions (`myLandingEntity`, lint `globals`, exact-match `/sign-up` in `hooks.server.ts`) accepted. seceng's build check at e18b818: S1–S13 met, probed on the real migrations; it found S14 (a new user's email rewritten mid-sign-up to take another tenant's viewer invitation), ruled as condition 33 at 74e0ae8 and built as a trigger in 0007. The ruling stands at 33 conditions. ARCH 1.15.19, SECURITY 1.9.14. Path `apps/web/src/hooks.server.ts` added. SECURITY R-22 to R-24 await the Principal's approval.
+
+### @team-lead — 2026-11-12
+
+PR https://github.com/richmosko/polycarpic/pull/123 marked ready. Verdict PASS at 9051d1d (`process/cairn/reviews/POLY-87/verdict.md`, b86b055); head-match PASS. Timing, lead's runs: five sequential dispatch runs on 9051d1d, `db` 109, 106, 94, 92, 87 s (median 94; runs 43341943047, 43342512609, 43343144183, 43343666158, 43345203202); same-afternoon control on `main` 7eaa51a, 93, 94, 87 s (median 93; 43344193896, 43344702525, 43345784207); guard ruled met at 01cfd9c. Finish gate at b86b055: cairn Python suite 2017 OK, board JS suite 494, dashboard type check 0 errors, dist fresh. The Principal accepted the manager/owner rule (2026-11-13); SECURITY R-22 to R-24 await approval.
