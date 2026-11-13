@@ -82,8 +82,15 @@ export const invitation = pgTable(
     // POLY-87 (R1): a claim binds the invitation to one user, which makes it single use.
     claimedUserId: uuid('claimed_user_id').references(() => user.id),
     claimedAt: tstz('claimed_at'),
+    // POLY-142 (R1): who issued the row. poly_app's INSERT grant omits it, so an owner-issued row is always 'owner'.
+    issuedVia: text('issued_via').notNull().default('owner'),
   },
   (t) => [
+    check('invitation_issued_via_check', sql`${t.issuedVia} IN ('owner','operator','bootstrap')`),
+    check(
+      'invitation_operator_shape_check',
+      sql`${t.issuedVia} = 'owner' OR (${t.entityId} IS NULL AND ${t.inviterUserId} IS NULL AND ${t.role} = 'viewer')`,
+    ),
     check('invitation_role_check', sql`${t.role} IN ('viewer','manager','owner')`),
     check('invitation_token_hash_len_check', sql`octet_length(${t.tokenHash}) = 32`),
     check('invitation_claim_pair_check', sql`(${t.claimedUserId} IS NULL) = (${t.claimedAt} IS NULL)`),

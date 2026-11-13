@@ -18,6 +18,7 @@
     "@poly/refdata": "workspace:*",
     "@poly/secrets": "workspace:*",
     "@poly/securities": "workspace:*",
-    "@poly/tax": "workspace:*"
+    "@poly/tax": "workspace:*",
+    "@poly/tenancy": "workspace:*"
   }
 }

@@ -57,6 +57,20 @@
       "when": 1794524652141,
       "tag": "0007_invitation_definers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1794549067128,
+      "tag": "0008_invitation_issued_via",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1794549073834,
+      "tag": "0009_operator_invitation",
+      "breakpoints": true
     }
   ]
 }

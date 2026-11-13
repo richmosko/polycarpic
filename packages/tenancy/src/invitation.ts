@@ -1,6 +1,6 @@
 // Invitation claim and acceptance (POLY-87 ruling R1-R3; SECURITY C-01). The only file that names the two definers
 // (layers.json reservedLiterals). Runs SQL through the caller's transaction; the database decides every refusal.
-import { createHash } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { sql, type Tx } from '@poly/db';
 
 export class InvitationRequired extends Error {
@@ -69,4 +69,20 @@ export async function landingEntity(tx: Tx): Promise<string | null> {
         ORDER BY m.created_at DESC, m.entity_id DESC LIMIT 1),
       (SELECT e.id FROM public.entity e WHERE e.self_user_id = app.current_user_id())) AS id`);
   return r.rows[0]?.id ?? null;
+}
+
+/** A fresh token (32 random bytes, canonical base64url) and the hash the database stores. The token itself is never stored. */
+export function newInvitationToken(): { token: string; hash: Buffer } {
+  const token = randomBytes(32).toString('base64url');
+  return { token, hash: hashInvitationToken(token) };
+}
+
+/** The sign-up link an invitation is delivered as: `<origin>/sign-up?invitation=<token>`. */
+export function invitationLink(origin: string, token: string): string {
+  return `${origin.replace(/\/+$/, '')}/sign-up?invitation=${token}`;
+}
+
+/** The operator's address rule (POLY-142 O10); the issuing definer enforces the same. */
+export function validOperatorEmail(s: string): boolean {
+  return typeof s === 'string' && s.length <= 254 && !/[\x00-\x20\x7f]/.test(s) && /^[^@]+@[^@]+$/.test(s);
 }

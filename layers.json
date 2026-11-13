@@ -2,10 +2,10 @@
   "version": 1,
   "layers": { "0": "Platform", "1": "Identity", "2": "Sources", "3": "Books", "4": "Posting", "5": "Insight", "6": "Delivery" },
   "packages": {
-    "db":         { "dir": "packages/db",         "name": "@poly/db",         "layer": 0, "subpaths": ["./session", "./auth", "./migrate", "./startup"], "allow": [] },
+    "db":         { "dir": "packages/db",         "name": "@poly/db",         "layer": 0, "subpaths": ["./session", "./auth", "./migrate", "./startup", "./operator"], "allow": [] },
     "config":     { "dir": "packages/config",     "name": "@poly/config",     "layer": 0, "subpaths": ["./log"], "allow": [] },
     "auth":       { "dir": "packages/auth",       "name": "@poly/auth",       "layer": 1, "subpaths": [], "allow": ["db", "db/auth", "db/session", "tenancy"] },
-    "tenancy":    { "dir": "packages/tenancy",    "name": "@poly/tenancy",    "layer": 1, "subpaths": [], "allow": ["db"] },
+    "tenancy":    { "dir": "packages/tenancy",    "name": "@poly/tenancy",    "layer": 1, "subpaths": ["./operator-invitation"], "allow": ["db"] },
     "secrets":    { "dir": "packages/secrets",    "name": "@poly/secrets",    "layer": 1, "subpaths": ["./open"], "allow": [] },
     "import":     { "dir": "packages/import",     "name": "@poly/import",     "layer": 2, "subpaths": [], "allow": ["db", "secrets"] },
     "refdata":    { "dir": "packages/refdata",    "name": "@poly/refdata",    "layer": 2, "subpaths": [], "allow": ["db"] },
@@ -17,15 +17,20 @@
     "portfolio":  { "dir": "packages/portfolio",  "name": "@poly/portfolio",  "layer": 5, "subpaths": [], "allow": ["db", "ledger", "securities", "refdata"] },
     "ui":         { "dir": "packages/ui",         "name": "@poly/ui",         "layer": 6, "subpaths": [], "allow": [] },
     "web":        { "dir": "apps/web",            "name": "@poly/web",        "layer": 6, "subpaths": [], "allow": ["config", "config/log", "db", "db/startup", "auth", "tenancy", "secrets", "import", "refdata", "ledger", "securities", "posting", "reports", "tax", "portfolio", "ui"] },
-    "worker":     { "dir": "apps/worker",         "name": "@poly/worker",     "layer": 6, "subpaths": [], "allow": ["config", "config/log", "db", "db/startup", "secrets", "secrets/open", "import", "refdata", "securities", "posting", "tax"] },
+    "worker":     { "dir": "apps/worker",         "name": "@poly/worker",     "layer": 6, "subpaths": [], "allow": ["config", "config/log", "db", "db/startup", "db/operator", "tenancy", "tenancy/operator-invitation", "secrets", "secrets/open", "import", "refdata", "securities", "posting", "tax"] },
     "migrate":    { "dir": "apps/migrate",        "name": "@poly/migrate",    "layer": 6, "subpaths": [], "allow": ["config", "db", "db/migrate"] }
   },
   "sessionSetExempt": "packages/db/src/migrate.ts",
-  "confined": { "packages/db/src/new-user.ts": ["packages/db/src/context.ts"] },
+  "confined": {
+    "packages/db/src/new-user.ts": ["packages/db/src/context.ts"],
+    "packages/db/src/operator.ts": ["apps/worker/src/cli/user-invite.ts"],
+    "packages/tenancy/src/operator-invitation.ts": ["apps/worker/src/cli/user-invite.ts"]
+  },
   "reservedLiterals": {
     "enter_new_user": ["packages/db/src/new-user.ts"],
     "claim_invitations": ["packages/tenancy/src/invitation.ts"],
-    "accept_invitations": ["packages/tenancy/src/invitation.ts"]
+    "accept_invitations": ["packages/tenancy/src/invitation.ts"],
+    "issue_operator_invitation": ["packages/tenancy/src/operator-invitation.ts"]
   },
   "confinedMembers": { "enterNewUser": ["packages/auth/src/user-hooks.ts", "packages/db/src/context.ts"] }
 }

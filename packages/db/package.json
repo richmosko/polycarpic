@@ -8,7 +8,8 @@
     "./session": "./src/session.ts",
     "./auth": "./src/auth.ts",
     "./migrate": "./src/migrate.ts",
-    "./startup": "./src/startup.ts"
+    "./startup": "./src/startup.ts",
+    "./operator": "./src/operator.ts"
   },
   "scripts": {
     "test": "vitest run",

@@ -1,0 +1,3 @@
+ALTER TABLE "invitation" ADD COLUMN "issued_via" text DEFAULT 'owner' NOT NULL;--> statement-breakpoint
+ALTER TABLE "invitation" ADD CONSTRAINT "invitation_issued_via_check" CHECK ("invitation"."issued_via" IN ('owner','operator','bootstrap'));--> statement-breakpoint
+ALTER TABLE "invitation" ADD CONSTRAINT "invitation_operator_shape_check" CHECK ("invitation"."issued_via" = 'owner' OR ("invitation"."entity_id" IS NULL AND "invitation"."inviter_user_id" IS NULL AND "invitation"."role" = 'viewer'));
