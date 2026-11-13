@@ -10,7 +10,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict and seceng reviews under `process/cairn/reviews/POLY-86/`). One loop for the batch; add later auth nits here.
@@ -26,3 +26,9 @@ Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict an
 - [ ] qa: write the e2e step-up stamp inside the revoke spec, not in `serve.ts` before `vite build`; the spec fails if a run takes over 5 minutes to reach it (verdict follow-up 12).
 - [ ] The Resend mailer for `sendMagicLink`; apps/web passes one that answers 503 until it exists (ruling follow-up 3).
 - [ ] Avatar upload to our own origin, with the same-origin rule on `/update-user` image (ruling follow-up 2; seceng).
+
+## Comments
+
+### @team-lead — 2026-11-12
+
+From the POLY-87 loop (seceng, SECURITY R-24, approved by the Principal 2026-11-13 until the first production deploy): `/callback/:id` holds a `poly_app` pool connection across BetterAuth's outbound call to the IdP, and neither it nor `/magic-link/verify` is rate-limited. Add both routes to C-04's limited list and set `idle_in_transaction_session_timeout` for `poly_app`. This must land before the first deploy.

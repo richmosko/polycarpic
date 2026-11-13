@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 were approved at the gate; ARCH is now v1.15.16 (layer map and its enforcement; Drizzle Kit confirmed by the POLY-76 spike, §6.2; sign-up inside our own transaction, §3.1), SECURITY v1.9.12 and INFRA v1.3.8. `POLY-C` closed and archived. The first session's issues (POLY-76, 82, 83, 84, 85) are done; the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
+**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 were approved at the gate; ARCH is now v1.15.20 (layer map and its enforcement; Drizzle Kit confirmed by the POLY-76 spike, §6.2; sign-up inside our own transaction, §3.1), SECURITY v1.9.16 and INFRA v1.3.8. `POLY-C` closed and archived. The first session's issues (POLY-76, 82, 83, 84, 85) are done; the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
 **Started:** 2026-11-09  
 **Driver agent:** backend-lead (qa-engineer drives Validate)  
 **Gate criteria:** _see [`WORKFLOW.md`](WORKFLOW.md)_
@@ -15,17 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Invite-only sign-up
-- **Issue:** POLY-87 (cairn)
-- **Milestone:** POLY-M1
-- **Branch:** `feature/poly-87-invite-only-sign-up`
-- **Started:** 2026-11-12
-- **Goal:** after the first operator user, an invitation is the only way into an instance, and sign-up commits the user, their Person, membership and accounts together.
-- **Status:** In Review — PR [#123](https://github.com/richmosko/polycarpic/pull/123)
+_None. POLY-87 (Invite-only sign-up) merged 2026-11-13 via PR [#123](https://github.com/richmosko/polycarpic/pull/123) — ARCH 1.15.20, SECURITY 1.9.16. Every route that creates a user needs a live invitation, and the user, their Person, its membership and the invitation claim commit together; an invitee seats as a viewer, and a manager or owner invitation is claimed and seated in POLY-89. Nothing can issue an invitation on a fresh instance until POLY-142 (operator CLI) lands, so sign-up stays closed in practice; second-factor enrolment stays closed until POLY-89. The `db` CI job runs at about 93 s on `main` against a 100 s warning budget. Nothing is deployed. Five standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; a loop's `db` cost is judged against a same-day control on `main`, and cuts to the suite are POLY-143's; POLY-89's database gates land before, or with, the first route that creates a non-Person entity or sends an invitation; before the first deploy, Caddy overwrites `X-Forwarded-For` and drops the query string from its access log (POLY-138), and the provider callback and magic-link routes are rate-limited with an idle-in-transaction timeout (POLY-137, SECURITY R-24); a package is left only by its `@poly/<name>` import (lint-enforced). Follow-ups: POLY-137 (auth), POLY-138 (Caddy and edge), POLY-139 (sign-in and sessions screens), POLY-143 (CI and test time); POLY-97 carries the uploader access that gates the first backup._
 
-Standing constraints: no better-auth or passkey pin change merges before the S9 test in POLY-137 exists; the `db` job's budget is 100 s and only warns (86 s median), so a loop that pushes the median past it brings its own cut; Caddy must overwrite `X-Forwarded-For` (POLY-138) before the first deploy, or every sign-in answers 503. A package is left only by its `@poly/<name>` import (lint-enforced). Nothing is deployed; second-factor enrolment stays closed until POLY-89.
-
-- **Next:** POLY-97 (infra scaffolding; needs a real Hetzner project) alongside. POLY-131 held (P3).
+- **Next:** POLY-142 (operator invite CLI); POLY-97 (infra scaffolding; needs a real Hetzner project) alongside. POLY-131 held (P3).
 
 ## Releases
 

@@ -1,7 +1,7 @@
 ---
 id: POLY-87
 title: Invite-only sign-up
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-62, POLY-86, POLY-140, POLY-141]
@@ -66,3 +66,7 @@ Gate 3: build at 833491f (steps 1–7, then the architect's R3 fix and condition
 ### @team-lead — 2026-11-12
 
 PR https://github.com/richmosko/polycarpic/pull/123 marked ready. Verdict PASS at 9051d1d (`process/cairn/reviews/POLY-87/verdict.md`, b86b055); head-match PASS. Timing, lead's runs: five sequential dispatch runs on 9051d1d, `db` 109, 106, 94, 92, 87 s (median 94; runs 43341943047, 43342512609, 43343144183, 43343666158, 43345203202); same-afternoon control on `main` 7eaa51a, 93, 94, 87 s (median 93; 43344193896, 43344702525, 43345784207); guard ruled met at 01cfd9c. Finish gate at b86b055: cairn Python suite 2017 OK, board JS suite 494, dashboard type check 0 errors, dist fresh. The Principal accepted the manager/owner rule (2026-11-13); SECURITY R-22 to R-24 await approval.
+
+### @team-lead — 2026-11-12
+
+Validate passed; merging via PR #123. Closing. The Principal approved SECURITY R-22, R-23 and R-24 (2026-11-13; SECURITY 1.9.16). Follow-ups placed: POLY-142 (operator CLI, the first way to issue an invitation), POLY-89 (seat claimed manager and owner rows; the ordering rule on entity and invitation routes), POLY-90 (existing-user acceptance), POLY-137 (rate limit and idle timeout before the first deploy), POLY-139 (landing tie-break), POLY-143 (test-time items, including the seed-helper cut).

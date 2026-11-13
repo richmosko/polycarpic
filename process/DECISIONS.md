@@ -630,3 +630,21 @@ Add new decisions ABOVE this comment, newest first.
 **Why:** they go through the same filter code as a pull request and leave no throwaway PRs in the history.
 **Alternatives considered:** one scratch pull request per area, as the criterion was written.
 **Approved by:** the Principal (2026-11-12), on the architect's ruling.
+
+### 2026-11-13 — Invite-only sign-up ships in two parts, and an invitee seats as a viewer only
+**Decision:** POLY-87 is the sign-up transaction; the operator command that issues the first invitation is POLY-142, so a fresh instance has no way in until it lands. At sign-up an invitee is seated as a viewer at once; a manager or owner invitation is claimed and seated after second-step enrolment in POLY-89. A person's own unshared Person is owned from sign-up without a second step (SECURITY C-03). POLY-89's database gates must land before, or with, the first route that creates a non-Person entity or sends an invitation.
+**Why:** sixteen criteria across auth, tenancy, definers, a CLI and routes were more than one loop, and the two parts share only the invitation table. A manager or owner seat gives power over other people's data, which the second step protects; a Person holds only its owner's own books.
+**Alternatives considered:** one loop; refusing manager and owner invitations at sign-up until POLY-89.
+**Approved by:** the Principal (2026-11-12 split; 2026-11-13 seating rule), on the architect's ruling with seceng's review.
+
+### 2026-11-13 — Three sign-up risks are accepted
+**Decision:** SECURITY R-22 (an invitation link is as strong as a magic link), R-23 (a sign-in provider vouches for addresses it controls, so a verified email alone claims an invitation on the token-less paths) and R-24 (the provider callback holds a pool connection and is not rate-limited) are accepted. R-22 and R-23 are reviewed at POLY-90; R-24 is fixed on POLY-137 before the first production deploy.
+**Why:** the invitee's inbox is already the recovery root; requiring the token on every path costs every provider sign-up; R-24 is availability only on an instance that is not deployed.
+**Alternatives considered:** a second proof beyond the link; the token required on the OAuth and magic-link paths.
+**Approved by:** the Principal (2026-11-13), on seceng's review.
+
+### 2026-11-13 — A loop's test-time cost is measured against main on the same day
+**Decision:** a loop's `db` cost is the branch's battery-step median minus `main`'s at the merge base, in the same session, at least three full runs each, judged against the ruling's own estimate. The 100 s budget stays a warning on `main`; when `main`'s same-day median passes it, a cut is filed against the suite (POLY-143), not charged to the loop in flight.
+**Why:** on 2026-11-13 `main` measured 93 s where it had measured 86 s the day before with no change; identical code on the POLY-87 branch ranged from 87 to 109 s.
+**Alternatives considered:** a fixed line per loop (POLY-87's 92 s, which `main` itself exceeded).
+**Approved by:** architect ruling (POLY-87, "Timing guard"), requested by the lead.
