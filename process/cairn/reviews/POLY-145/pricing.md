@@ -36,6 +36,21 @@ Several options are built from the same pieces, so each piece is priced once her
 - **Harder to test or deploy:** nothing.
 - **Total:** about 0.25 loop-day in 1 loop. **H**
 
+### (a+) Today, hardened cheaply
+
+- **Hashed reset and magic-link tokens:** two options set in `packages/auth/src/options.ts`, plus a test that the stored value is not the emailed one. The defaults are from seceng's dist read (`threat-model.md`). Cost: 0.25 loop-day. **M** It fits as an item in POLY-137, where seceng has already filed it.
+- **X:** 0.25. **H**
+- **The operator CLI on its own login role** (poly_operator, holding only EXECUTE on `app.issue_operator_invitation`). This helps only if the credential stays out of the worker container. If its password file is mounted into the worker, code in the worker reads it and nothing is gained. So the CLI moves to a one-shot compose service under its own profile, as `migrate` already is (`prod.yml:84-101`), and POLY-98's `polycarpic-ops cli` wrapper targets that service.
+  - Rework to POLY-142: a new pool for `withOperatorTx` (`context.ts:195`, `pool.ts`), roles.sql, pg_hba, compose and its lint policy, and the grants in pgTAP `06` (EXECUTE moves from poly_worker to poly_operator). About 1 loop-day. **M**
+- **Backlog:** POLY-98 runs the command in a different service: +0.25.
+- **Running cost:** +1 login role and +1 secret file. No long-running container.
+- **Total:** about 1.5–2 loop-days in 1–2 loops. **M** Web and worker still assert identity, so R-2 stands for both.
+
+### (e4, seceng) One instance per family (hosted only)
+
+- No cost for a single-family instance, and no gain there either.
+- If the R-6 non-goal is ever reversed: per family, a Postgres (prod cap 3 GB, `prod.yml:25`), web, worker and S. Idle footprint is a guess of 1–1.5 GB per family, so about 4–6 families fit on an 8 GB VPS. That would need building provisioning, per-family deploy, backup, keyring and upgrade fan-out tooling: 5–10 loop-days plus ops that grow linearly with families. **guess** It complements the identity choice rather than replacing it: within one family, a compromised web can still act as any of that family's users.
+
 ### (b) Postgres verifies a signed token; sign-in moves to a separate service
 
 The build is S + E, with the lookup replaced by signature verification, plus:
@@ -106,7 +121,7 @@ The build is **K + I + J + X + S + E + D**, in that order. I is revoked at the e
 - **Running cost:** +1 container (guess 100–200 MB), one more image surface to scan.
 - It is independent of the identity decision and worth pricing into the import milestone whatever is chosen.
 
-### (e4) Staged (e1): a variant I propose, sent to seceng-145
+### (e5) Staged (e1): a variant I propose (seceng's (e4) is the per-family instance, priced below)
 
 - Stage 1 is **K + I + J + X**: about 3.5 loop-days, 1 loop, **M**.
   - It closes the worker half of R-2 at once: poly_worker can no longer name a user.
@@ -120,14 +135,18 @@ The build is **K + I + J + X + S + E + D**, in that order. I is revoked at the e
 | Option | Shipped rework (86 / 87 / 142) | Backlog delta, landing first (89, 137, 144, 129) | Total loop-days | Loops | New containers | Recurring ops | Conf. |
 |---|---|---|---|---|---|---|---|
 | (a) + X | 0 / 0 / 0 | 0 | 0.25 | 1 | 0 | none | H |
+| (a+) hardened today | 0 / 0 / 1 | +0.25 (POLY-98) | 1.5–2 | 1–2 | 0 (one-shot service) | one more secret | M |
+| (e4, seceng) instance per family | 0 | 0 single-family | 0 single-family; 5–10 + linear ops if hosted | — | ~4 per family | per-family everything | guess |
 | (b) JWT in Postgres | 3 / 1 / 0.25 | +0.5–1 | 15–22 | 5–6 | 1 | key rotation, extension rebuild per PG minor | L |
 | (c) PostgREST | 3 / 2 / 1 (+5–8 platform) | +30–50% on every data feature | 30–45 + tax | 8–10 | 2 | key rotation, second query surface | L |
 | (d1) role per user, shared login | — | — | 6–8, no gain | — | 0 | role churn | guess |
 | (d2) role per user, own credential | 3 / 1.5 / 0.5 | +0.5–1 | 18–25 | 5–6 | 1 | roles dump in every backup, connection sizing | L |
 | (e1) DB-checked opaque session | 3 / 1 / 0.25 | +0.5 | 11.5–14 | 4 | 1 | none beyond one more service | M |
-| (e4) staged (e1), stage 1 only | 0 / 0.25 / 0.25 | +0 (POLY-89 specs against the marker) | 3.5 | 1 | 0 | none | M |
+| (e5) staged (e1), stage 1 only | 0 / 0.25 / 0.25 | +0 (POLY-89 specs against the marker) | 3.5 | 1 | 0 | none | M |
 | (e2) job grants (on K) | 0 | +1.5–2.5 on POLY-64 | 1.5–2.5 | 0 (inside POLY-64) | 0 | none | M |
 | (e3) parser sandbox | 0 | +3–4 on POLY-64/77 | 3–4 | 0–1 | 1 | one more image | M |
+
+The (a+) items can be added to any option, and no other row includes them. With (e1) or (e5), the operator-role item is still the only thing that takes invitation issuing away from the worker credential. J removes the worker's power to name a user, not its EXECUTE on the issuer.
 
 "Landing first" is the honest comparison: every pivot option costs +2–3 more on POLY-89 if POLY-89 ships before it.
 
