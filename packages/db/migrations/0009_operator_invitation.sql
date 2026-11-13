@@ -8,6 +8,8 @@ CREATE UNIQUE INDEX invitation_one_live_bootstrap ON public.invitation ((true))
 
 GRANT INSERT (email, role, token_hash, expires_at, issued_via) ON public.invitation TO poly_govern;--> statement-breakpoint
 GRANT UPDATE (revoked_at) ON public.invitation TO poly_govern;--> statement-breakpoint
+-- Owners may read how a row was issued (C13: an owner-issued row reads 'owner'); the INSERT grant stays without it.
+GRANT SELECT (issued_via) ON public.invitation TO poly_app;--> statement-breakpoint
 CREATE POLICY invitation_operator_issue ON public.invitation FOR INSERT TO poly_govern
   WITH CHECK (entity_id IS NULL AND inviter_user_id IS NULL AND issued_via IN ('operator', 'bootstrap')
               AND role = 'viewer' AND app.current_user_id() IS NULL);--> statement-breakpoint
@@ -66,6 +68,8 @@ CREATE FUNCTION app.issue_operator_invitation(p_email text, p_hash bytea, p_boot
   END
   $$;--> statement-breakpoint
 REVOKE EXECUTE ON FUNCTION app.issue_operator_invitation(text, bytea, boolean) FROM PUBLIC;--> statement-breakpoint
+-- The owner holds EXECUTE implicitly; poly_worker alone may call it (C12).
+REVOKE EXECUTE ON FUNCTION app.issue_operator_invitation(text, bytea, boolean) FROM poly_govern;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION app.issue_operator_invitation(text, bytea, boolean) TO poly_worker;--> statement-breakpoint
 
 -- 0007's claim and accept, plus one predicate: a bootstrap invitation is dead once any user exists (accept excludes the
