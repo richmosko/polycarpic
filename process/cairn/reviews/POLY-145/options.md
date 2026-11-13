@@ -13,7 +13,7 @@ web connects as `poly_app`, worker as `poly_worker`. Before any query, `withTena
 
 ## (a+) Today's design, hardened cheaply
 
-(a) with the holes the threat model found closed, and nothing moved: BetterAuth's reset and magic-link tokens stored hashed (`verification.storeIdentifier` and the magic-link `storeToken` set to `"hashed"`); the auth secret removed from the worker (`current-state.md` §8.1); the operator CLI on its own login role holding only `EXECUTE` on the issuing definer, so the worker credential cannot issue invitations; `poly_app`'s `SELECT` on `two_factor` and `account` narrowed to what BetterAuth reads. Identity is still asserted by web and worker.
+(a) with the holes the threat model found closed, and nothing moved: BetterAuth's reset and magic-link tokens stored hashed (`verification.storeIdentifier` and the magic-link `storeToken` set to `"hashed"`); the auth secret removed from the worker (`current-state.md` §8.1); the operator CLI on its own login role holding only `EXECUTE` on the issuing definer, so the worker credential cannot issue invitations. Identity is still asserted by web and worker.
 
 ## (b) Postgres verifies a signed token; sign-in moves to a small separate service
 
