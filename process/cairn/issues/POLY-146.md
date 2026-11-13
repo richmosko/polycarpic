@@ -1,12 +1,12 @@
 ---
 id: POLY-146
 title: Identity hardening
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
-paths: [process/cairn/issues/POLY-146.md, packages/auth/**, packages/config/**, packages/db/**, apps/worker/**, infra/compose/**, infra/lint/**, infra/postgres/pg_hba.*.conf, tests/db/**, tests/layers/**, layers.json, eslint.config.js, package.json, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**]
+paths: [process/cairn/issues/POLY-146.md, process/cairn/reviews/POLY-146/**, packages/auth/**, packages/config/**, packages/db/**, packages/tenancy/**, apps/worker/**, infra/compose/**, infra/lint/**, infra/postgres/**, tests/**, scripts/layers/**, layers.json, eslint.config.js, package.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, bin/polycarpic, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**]
 labels: [security, auth]
 priority: P1
 pr: null
@@ -41,3 +41,9 @@ The CLI moves to its own login role, poly_operator, which holds only EXECUTE on 
 ## Estimate
 
 1.5–2 loop-days, 1 loop (M; pricing.md (a+))
+
+## Comments
+
+### @team-lead — 2026-11-13
+
+Feature started. Branch: `feature/poly-146-identity-hardening`.
