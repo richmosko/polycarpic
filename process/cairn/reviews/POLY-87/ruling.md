@@ -37,6 +37,7 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
 | `app.stamp_signup_user()`: BEFORE INSERT ON `public."user"`, invoker | — | — |
 | `app.invitation_set_once()`: BEFORE UPDATE ON `invitation`, invoker | — | — |
 | `app.signup_stamp_cleared()`: deferred constraint trigger AFTER INSERT OR UPDATE ON `user`, invoker | — | — |
+| `app.signup_email_fixed()`: BEFORE UPDATE ON `user`, invoker (C33) | — | — |
 | `app.enter_new_user(uuid)` | `poly_authz` | `poly_app` |
 | `app.claim_invitations(bytea, text) → void` | `poly_govern` | `poly_app` |
 | `app.accept_invitations(bytea) → uuid` | `poly_govern` | `poly_app` |
@@ -266,6 +267,26 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
       - a superuser `INSERT … signup_txid` commits with null;
       - pgTAP: inside one transaction, a superuser-planted stamp that differs from the current xid passes neither `enter_new_user` nor `accept_invitations`, and the commit is refused.
     - **Test impact:** any test that creates a user through BetterAuth (as `poly_app`) must now go through a real invitation (`seedInvitation`), not the `claimInvitation` mock alone. Otherwise its commit is refused. Superuser fixtures (`seedUser`, `seedTenancy`) are unaffected.
+
+33. **(S14; correction in place, in 0007, which is unmerged)** While a user's stamp is set (from insert until `accept_invitations` clears it), their `email` and `email_verified` cannot change.
+    - `app.signup_email_fixed()`, a BEFORE UPDATE trigger on `user` (invoker, `search_path = ''`), raises `42501` when `OLD.signup_txid IS NOT NULL` and either `email` or `email_verified` is `IS DISTINCT FROM` its old value. Every other column, including the clearing UPDATE of the stamp, passes.
+    - It goes into 0007: nothing from it is merged or deployed, so no 0008 is needed. `check-migrations` regenerates the snapshot.
+    - **BetterAuth 1.7.18 is unaffected** (read). No new-user path updates either column between the insert and our after-hook:
+      - `/sign-up/email` inserts `emailVerified: false`, and the user is not updated afterwards;
+      - OAuth (`oauth2/link-account.mjs:308–322`) inserts with the provider's `emailVerified` inside `runWithTransaction`, together with the account. The after-hook runs when that transaction ends. The `updateUser` calls at lines 222, 270 and 275 are for existing users only;
+      - magic link (`plugins/magic-link/index.mjs:179–193`) inserts `emailVerified: true`, and the `!user.emailVerified` promotion is skipped for a new user.
+
+      The C6 route tests confirm this.
+    - Probe on postgres:17.10 (a model table):
+      - P10's sequence (insert, then UPDATE `email` and `email_verified`) raises at the UPDATE;
+      - a `name` change mid-sign-up passes;
+      - after the clear, setting `email_verified` passes;
+      - an unstamped user's email change passes.
+    - Tests:
+      - P10's sequence as `poly_app` raises 42501 at step 3, and no membership is written;
+      - after commit, an email change of the same user passes;
+      - the three C6 routes still sign up.
+    - **Residual for SECURITY's R-2:** a SQL-level forger can still INSERT a fresh user with an invited, unclaimed address and `email_verified = true`, then accept. That account carries the invitee's own address, so the invitee can recover it by magic link or password reset. This is the C-84 residual already stated.
 
 ## Paths outside the issue's current `paths`
 
