@@ -38,7 +38,7 @@ SELECT is((SELECT count(*)::int FROM pg_constraint WHERE conrelid = 'public.invi
 SELECT is((SELECT count(*)::int FROM pg_constraint WHERE conrelid = 'public.invitation'::regclass AND contype = 'c'
     AND pg_get_constraintdef(oid) ~ 'claimed_user_id IS NULL\) = \(.*claimed_at IS NULL'), 1, 'the claimed pair check: (claimed_user_id IS NULL) = (claimed_at IS NULL)');
 SELECT is((SELECT count(*)::int FROM pg_constraint WHERE conrelid = 'public.invitation'::regclass AND contype = 'c'
-    AND pg_get_constraintdef(oid) ~ 'accepted_at IS NULL OR .*claimed_at IS NOT NULL'), 1, 'accepted implies claimed');
+    AND pg_get_constraintdef(oid) ~ 'accepted_at IS NULL\) OR \(.*claimed_at IS NOT NULL'), 1, 'accepted implies claimed');
 
 -- ---------------------------------------------------------------- fixtures
 SELECT is(pg_temp.sx($f$
@@ -80,7 +80,7 @@ SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f1', NUL
 SELECT is((SELECT role FROM public.membership WHERE entity_id = '00000000-0000-4000-8000-0000000000e1' AND user_id = '00000000-0000-4000-8000-0000000000f1'), 'viewer', 'C15: seated as viewer');
 SELECT isnt((SELECT accepted_at FROM public.invitation WHERE id = '00000000-0000-4000-8000-0000000000b1'), NULL, 'C15: accepted_at set on the seated row');
 SELECT is(pg_temp.q1($q$SELECT claimed_user_id::text FROM public.invitation WHERE id = '00000000-0000-4000-8000-0000000000b1'$q$), '00000000-0000-4000-8000-0000000000f1', 'C15: claimed_user_id bound to the new user');
-SELECT is(pg_temp.q1($q$SELECT (signup_txid IS NULL)::text FROM public.\"user\" WHERE id = '00000000-0000-4000-8000-0000000000f1'$q$), 'true', 'S13: accept_invitations clears the sign-up stamp before it returns (mutation: the stamp stays)');
+SELECT is(pg_temp.q1($q$SELECT (signup_txid IS NULL)::text FROM public."user" WHERE id = '00000000-0000-4000-8000-0000000000f1'$q$), 'true', 'S13: accept_invitations clears the sign-up stamp before it returns (mutation: the stamp stays)');
 SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f2', NULL,
     $q$SELECT app.accept_invitations(sha256('t2'::bytea))::text$q$), '',
   'C15: an owner invitation is claimed and not seated, even with second_step_at set by a superuser (S6; POLY-89 seats it)');
@@ -194,8 +194,8 @@ SELECT is(pg_temp.run_as('poly_govern', '00000000-0000-4000-8000-0000000000f1', 
   'ERR:42501', 'C31: nor claimed_user_id');
 
 -- ---------------------------------------------------------------- C32 (S13): the stamp
-SELECT is(pg_temp.q1($q$SELECT coalesce(string_agg(rolname::text, ',' ORDER BY rolname COLLATE "C"), '') FROM pg_roles WHERE has_column_privilege(oid, 'public.user', 'signup_txid', 'UPDATE') AND NOT rolsuper AND oid <> (SELECT relowner FROM pg_class WHERE oid = 'public.user'::regclass)$q$), 'poly_govern', 'C32: only poly_govern may UPDATE user.signup_txid');
-SELECT is(pg_temp.q1($q$SELECT coalesce(string_agg(rolname::text, ',' ORDER BY rolname COLLATE "C"), '') FROM pg_roles WHERE has_column_privilege(oid, 'public.user', 'signup_txid', 'INSERT') AND NOT rolsuper AND oid <> (SELECT relowner FROM pg_class WHERE oid = 'public.user'::regclass)$q$), '', 'C32: nobody may INSERT user.signup_txid');
+SELECT is(pg_temp.q1($q$SELECT coalesce(string_agg(rolname::text, ',' ORDER BY rolname COLLATE "C"), '') FROM pg_roles WHERE has_column_privilege(oid, 'public.user', 'signup_txid', 'UPDATE') AND NOT rolsuper AND rolname NOT LIKE 'pg\_%' AND oid <> (SELECT relowner FROM pg_class WHERE oid = 'public.user'::regclass)$q$), 'poly_govern', 'C32: only poly_govern may UPDATE user.signup_txid');
+SELECT is(pg_temp.q1($q$SELECT coalesce(string_agg(rolname::text, ',' ORDER BY rolname COLLATE "C"), '') FROM pg_roles WHERE has_column_privilege(oid, 'public.user', 'signup_txid', 'INSERT') AND NOT rolsuper AND rolname NOT LIKE 'pg\_%' AND oid <> (SELECT relowner FROM pg_class WHERE oid = 'public.user'::regclass)$q$), '', 'C32: nobody may INSERT user.signup_txid');
 SELECT is((SELECT count(*)::int FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
     WHERE p.proname = 'signup_stamp_cleared' AND t.tgrelid = 'public.user'::regclass AND t.tgdeferrable AND t.tginitdeferred AND t.tgconstraint <> 0), 1,
   'C32: signup_stamp_cleared is a DEFERRABLE INITIALLY DEFERRED constraint trigger on user');
@@ -207,7 +207,7 @@ SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', NUL
 
 -- ---------------------------------------------------------------- C23 (pgTAP part): no way to write an invitation or a user except poly_app
 SELECT is((SELECT array_agg(rolname::text ORDER BY rolname COLLATE "C") FROM pg_roles
-    WHERE has_any_column_privilege(oid, 'public.invitation', 'INSERT') AND NOT rolsuper AND oid <> (SELECT relowner FROM pg_class WHERE oid = 'public.invitation'::regclass)),
+    WHERE has_any_column_privilege(oid, 'public.invitation', 'INSERT') AND NOT rolsuper AND rolname NOT LIKE 'pg\_%' AND oid <> (SELECT relowner FROM pg_class WHERE oid = 'public.invitation'::regclass)),
   ARRAY['poly_app'], 'C23: INSERT on invitation is held by poly_app alone (poly_govern included: it only UPDATEs)');
 SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_proc WHERE pronamespace = 'app'::regnamespace
     AND prosrc ~* 'insert\s+into\s+("?public"?\.)?"?(invitation|user)"?([^a-z_]|$)'), NULL::text[],

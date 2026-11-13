@@ -235,7 +235,7 @@ describe('conditions 9, 10: any failure leaves no user, entity, membership or ac
       CREATE FUNCTION public.qa_refuse_session87() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
         IF EXISTS (SELECT 1 FROM public."user" WHERE id = NEW.user_id AND email LIKE 'rb-session-%') THEN RAISE EXCEPTION 'qa: session refused'; END IF; RETURN NEW; END $$;
       CREATE TRIGGER qa_rb_session BEFORE INSERT ON public.session FOR EACH ROW EXECUTE FUNCTION public.qa_refuse_session87();
-      CREATE TRIGGER qa_rb_entity BEFORE INSERT ON public.entity FOR EACH ROW WHEN (NEW.name = 'Explode Person') EXECUTE FUNCTION public.qa_refuse();
+      CREATE TRIGGER qa_rb_entity BEFORE INSERT ON public.entity FOR EACH ROW WHEN (NEW.name = 'Explode') EXECUTE FUNCTION public.qa_refuse();
       CREATE FUNCTION public.qa_refuse_accept() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
         IF NEW.email LIKE 'rb-accept-%' AND to_jsonb(NEW)->>'claimed_at' IS NOT NULL THEN RAISE EXCEPTION 'qa: accept refused'; END IF; RETURN NEW; END $$;
       CREATE TRIGGER qa_rb_accept BEFORE UPDATE ON public.invitation FOR EACH ROW EXECUTE FUNCTION public.qa_refuse_accept();`, e.db);
