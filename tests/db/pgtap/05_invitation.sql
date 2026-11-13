@@ -208,10 +208,13 @@ SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', NUL
 -- ---------------------------------------------------------------- C23 (pgTAP part): no way to write an invitation or a user except poly_app
 SELECT is((SELECT array_agg(rolname::text ORDER BY rolname COLLATE "C") FROM pg_roles
     WHERE has_any_column_privilege(oid, 'public.invitation', 'INSERT') AND NOT rolsuper AND rolname NOT LIKE 'pg\_%' AND oid <> (SELECT relowner FROM pg_class WHERE oid = 'public.invitation'::regclass)),
-  ARRAY['poly_app'], 'C23: INSERT on invitation is held by poly_app alone (poly_govern included: it only UPDATEs)');
+  ARRAY['poly_app', 'poly_govern'], 'C23 (as changed by POLY-142 C15): INSERT on invitation is held by poly_app (owner policy) and poly_govern (invitation_operator_issue) alone');
 SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_proc WHERE pronamespace = 'app'::regnamespace
-    AND prosrc ~* 'insert\s+into\s+("?public"?\.)?"?(invitation|user)"?([^a-z_]|$)'), NULL::text[],
-  'C23: no function in schema app inserts into invitation or user (pg_proc source scan, S11)');
+    AND prosrc ~* 'insert\s+into\s+("?public"?\.)?"?invitation"?([^a-z_]|$)'), ARRAY['issue_operator_invitation'],
+  'C23 (POLY-142): only issue_operator_invitation inserts into invitation (pg_proc source scan, S11)');
+SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_proc WHERE pronamespace = 'app'::regnamespace
+    AND prosrc ~* 'insert\s+into\s+("?public"?\.)?"?user"?([^a-z_]|$)'), NULL::text[],
+  'C23: no function in schema app inserts into user (pg_proc source scan, S11)');
 
 SELECT * FROM finish();
 ROLLBACK;

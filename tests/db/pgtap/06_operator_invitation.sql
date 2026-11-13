@@ -90,7 +90,7 @@ SELECT is(pg_temp.run_as('poly_authz', '', NULL, pg_temp.issue('x5@qa.test', fal
 SELECT is((SELECT count(*)::int FROM public.invitation WHERE email IN ('x3@qa.test', 'x4@qa.test', 'x5@qa.test')), 0, 'C12: no refused call left a row');
 
 -- ---------------------------------------------------------------- C13: grants and shape
-SELECT is((SELECT bool_or(has_table_privilege('poly_worker', t, p) OR has_any_column_privilege('poly_worker', t, p)) FROM unnest(ARRAY['public.invitation', 'public.audit_event']) t, unnest(ARRAY['INSERT', 'UPDATE', 'DELETE']) p), false, 'C13: poly_worker holds no INSERT/UPDATE/DELETE on invitation or audit_event, table or column (mutation: a direct grant)');
+SELECT is((SELECT bool_or(CASE WHEN p = 'DELETE' THEN has_table_privilege('poly_worker', t, p) ELSE has_table_privilege('poly_worker', t, p) OR has_any_column_privilege('poly_worker', t, p) END) FROM unnest(ARRAY['public.invitation', 'public.audit_event']) t, unnest(ARRAY['INSERT', 'UPDATE', 'DELETE']) p), false, 'C13: poly_worker holds no INSERT/UPDATE/DELETE on invitation or audit_event, table or column (mutation: a direct grant)');
 SELECT is((SELECT string_agg(attname::text, ',' ORDER BY attname COLLATE "C") FROM pg_attribute WHERE attrelid = 'public.invitation'::regclass AND attnum > 0 AND NOT attisdropped AND has_column_privilege('poly_govern', attrelid, attnum, 'INSERT')),
   'email,expires_at,issued_via,role,token_hash', 'C13: poly_govern''s INSERT columns on invitation are exactly email, role, token_hash, expires_at, issued_via');
 SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000142f0',
