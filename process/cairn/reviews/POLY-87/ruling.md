@@ -286,7 +286,7 @@ Architect, read at af7921c. Each claim below is marked **read** (with its file),
       - P10's sequence as `poly_app` raises 42501 at step 3, and no membership is written;
       - after commit, an email change of the same user passes;
       - the three C6 routes still sign up.
-    - **Residual for SECURITY's R-2:** a SQL-level forger can still INSERT a fresh user with an invited, unclaimed address and `email_verified = true`, then accept. That account carries the invitee's own address, so the invitee can recover it by magic link or password reset. This is the C-84 residual already stated.
+    - **Residual for SECURITY's R-2:** a SQL-level forger can still INSERT a fresh user with an invited, unclaimed address and `email_verified = true`, then accept. That account carries the invitee's own address, and the same forger can also insert an `account` row linking their own IdP identity, which a password reset does not remove. Recovery therefore also means unlinking. R-2 already allows this against any user, so it is no wider (SECURITY C-84 and R-2).
 
 ## Paths outside the issue's current `paths`
 
