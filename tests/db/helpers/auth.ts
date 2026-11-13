@@ -26,11 +26,11 @@ export type Env = Awaited<ReturnType<typeof boot>>;
 /** Switch for the one mocked export: claimInvitation. `impl` null = the ruling's real stub (throws InvitationRequired).
  *  A test file declares: vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o)) */
 // One object on globalThis: boot() calls vi.resetModules(), which would otherwise give the mock factory a second copy of this module.
-type Claim = { impl: null | ((tx: unknown, a: { email: string; token: string | null }) => Promise<unknown>) };
+type Claim = { impl: null | ((tx: unknown, a: { email: string; token: string | null }, real: (tx: unknown, a: { email: string; token: string | null }) => Promise<unknown>) => Promise<unknown>) };
 export const claim: Claim = ((globalThis as { __polyClaim?: Claim }).__polyClaim ??= { impl: null });
 export async function claimFactory(orig: () => Promise<unknown>) {
   const real = (await orig()) as Record<string, any>;
-  return { ...real, claimInvitation: (tx: unknown, a: any) => (claim.impl ? claim.impl(tx, a) : real.claimInvitation(tx, a)) };
+  return { ...real, claimInvitation: (tx: unknown, a: any) => (claim.impl ? claim.impl(tx, a, real.claimInvitation) : real.claimInvitation(tx, a)) };
 }
 
 export const hdr = { origin: BASE, 'content-type': 'application/json' };
@@ -98,14 +98,14 @@ export async function boot() {
     return `${name}=${encodeURIComponent(`${token}.${createHmac('sha256', SECRET).update(token).digest('base64')}`)}`;
   }
   /** Google, stubbed at the network edge only: the token endpoint answers with an unsigned id_token for `email`. */
-  async function oauth(email: string, a: any) {
+  async function oauth(email: string, a: any, verified = true) {
     const real = globalThis.fetch;
-    const idt = ['{"alg":"none"}', JSON.stringify({ sub: `sub-${email}`, email, email_verified: true, name: 'Oauth Person', iss: 'https://accounts.google.com', aud: 'qa-google' })]
+    const idt = ['{"alg":"none"}', JSON.stringify({ sub: `sub-${email}`, email, email_verified: verified, name: 'Oauth Person', iss: 'https://accounts.google.com', aud: 'qa-google' })]
       .map((x) => Buffer.from(x).toString('base64url')).join('.') + '.';
     vi.stubGlobal('fetch', async (i: any, init?: any) => {
       const u = String(i?.url ?? i);
       if (/oauth2\.googleapis\.com\/token/.test(u)) return new Response(JSON.stringify({ access_token: 'at', id_token: idt, token_type: 'Bearer', expires_in: 3600 }), { headers: { 'content-type': 'application/json' } });
-      if (/googleapis\.com/.test(u)) return new Response(JSON.stringify({ sub: `sub-${email}`, email, email_verified: true, name: 'Oauth Person' }), { headers: { 'content-type': 'application/json' } });
+      if (/googleapis\.com/.test(u)) return new Response(JSON.stringify({ sub: `sub-${email}`, email, email_verified: verified, name: 'Oauth Person' }), { headers: { 'content-type': 'application/json' } });
       return real(i, init);
     });
     try {

@@ -278,10 +278,18 @@ const noRelativeCrossPackage = {
       const p = computedPrefix(arg);
       if (p !== null && isPathSpec(p.split(/[?#]/)[0])) checkSpec(node, p, true);
     };
+    return specVisitors(context, check);
+  },
+};
+
+// Every form that names a module: static and dynamic imports, re-exports, require, import type, import =, import.meta.glob,
+// new URL(.., import.meta.url) and triple-slash path references. check(node, argNode).
+function specVisitors(context, check) {
+  const checkSpec = (node, spec) => check(node, { type: 'Literal', value: spec });
     const isImportMeta = (n, prop) =>
       n?.type === 'MemberExpression' && !n.computed && n.object.type === 'MetaProperty' && n.object.meta.name === 'import' && n.property.name === prop;
 
-    return {
+  return {
       ImportDeclaration: (node) => check(node, node.source),
       ExportNamedDeclaration: (node) => node.source && check(node, node.source),
       ExportAllDeclaration: (node) => check(node, node.source),
@@ -301,7 +309,7 @@ const noRelativeCrossPackage = {
           for (const e of list) {
             if (!e) continue;
             const s = staticValue(e);
-            if (s !== null) checkSpec(e, s.replace(/^!/, ''), false);
+            if (s !== null) checkSpec(e, s.replace(/^!/, ''));
             else check(e, e);
           }
         }
@@ -312,12 +320,11 @@ const noRelativeCrossPackage = {
       Program() {
         for (const c of context.sourceCode.getAllComments()) {
           const m = c.type === 'Line' && c.value.match(/^\/\s*<reference\s+path\s*=\s*["']([^"']+)["']/);
-          if (m) checkSpec(c, m[1], false);
+          if (m) checkSpec(c, m[1]);
         }
       },
     };
-  },
-};
+}
 
 // POLY-140 condition 15(a), (c): nothing mints a require function or reaches a builtin through a computed key.
 const FACTORY = new Set(['createRequire', 'getBuiltinModule']);
@@ -344,8 +351,108 @@ const noRequireFactory = {
   },
 };
 
+
+// ---- POLY-87: confinement (ruling R5) ------------------------------------------------------------------------------
+// A confined module is imported by named files only; a reserved literal appears in one file only; a confined member is
+// used as a property name in named files only. All three are driven by layers.json and sit under poly/*, so no inline
+// directive silences them (noInlineConfig). Path arithmetic only, as in no-relative-cross-package.
+const stem = (p) => p.replace(/\.[cm]?[jt]sx?$/, '');
+const relOf = (context, root) => path.relative(root, context.filename).split(path.sep).join('/');
+
+const confinedModule = {
+  meta: {
+    type: 'problem',
+    schema: [{
+      type: 'object',
+      properties: { root: { type: 'string' }, confined: { type: 'object', additionalProperties: { type: 'array', items: { type: 'string' } } }, packages: { type: 'object', additionalProperties: { type: 'string' } } },
+      required: ['root', 'confined', 'packages'],
+      additionalProperties: false,
+    }],
+  },
+  create(context) {
+    const { root, confined, packages } = context.options[0];
+    const rel = relOf(context, root);
+    if (rel.startsWith('..')) return {};
+    const fileDir = path.posix.dirname(rel);
+    const targets = new Map(Object.entries(confined).map(([f, who]) => [stem(f), who]));
+    const byName = Object.fromEntries(Object.entries(packages).map(([n, d]) => [`@poly/${n}`, d]));
+    const resolve = (spec) => {
+      if (isPathSpec(spec)) return path.posix.normalize(path.posix.join(fileDir, spec));
+      const m = spec.match(/^(@poly\/[^/]+)\/(.+)$/);
+      return m && byName[m[1]] ? `${byName[m[1]]}/src/${m[2]}` : null;
+    };
+    return specVisitors(context, (node, arg) => {
+      if (!arg) return;
+      const raw = staticValue(arg);
+      if (raw === null) return;
+      const t = resolve(raw.split(/[?#]/)[0]);
+      if (t === null) return;
+      const who = targets.get(stem(t));
+      if (who && !who.includes(rel)) context.report({ node, message: `'${raw}' is a confined module: only ${who.join(', ')} may import it (POLY-87 R5; SECURITY C-84).` });
+    });
+  },
+};
+
+const textOf = (node) => (node.type === 'TemplateLiteral' ? node.quasis.map((q) => q.value.cooked ?? '').join('\u0000') : staticValue(node));
+const reservedLiteral = {
+  meta: {
+    type: 'problem',
+    schema: [{ type: 'object', properties: { root: { type: 'string' }, reserved: { type: 'object', additionalProperties: { type: 'array', items: { type: 'string' } } } }, required: ['root', 'reserved'], additionalProperties: false }],
+  },
+  create(context) {
+    const { root, reserved } = context.options[0];
+    const rel = relOf(context, root);
+    if (rel.startsWith('..')) return {};
+    const test = (node, text) => {
+      if (text === null) return;
+      for (const [name, files] of Object.entries(reserved)) {
+        if (text.includes(name) && !files.includes(rel)) context.report({ node, message: `'${name}' is a reserved definer name: it may appear in ${files.join(', ')} only (POLY-87 R5).` });
+      }
+    };
+    return {
+      Literal: (node) => typeof node.value === 'string' && test(node, node.value),
+      TemplateLiteral: (node) => test(node, textOf(node)),
+    };
+  },
+};
+
+const confinedMember = {
+  meta: {
+    type: 'problem',
+    schema: [{ type: 'object', properties: { root: { type: 'string' }, members: { type: 'object', additionalProperties: { type: 'array', items: { type: 'string' } } } }, required: ['root', 'members'], additionalProperties: false }],
+  },
+  create(context) {
+    const { root, members } = context.options[0];
+    const rel = relOf(context, root);
+    if (rel.startsWith('..')) return {};
+    const report = (node, name) => {
+      if (!members[name].includes(rel)) context.report({ node, message: `'${name}' may be used as a property only in ${members[name].join(', ')} (POLY-87 R5).` });
+    };
+    const named = (key, computed) => {
+      const n = !computed && key.type === 'Identifier' ? key.name : staticValue(key);
+      return n !== null && Object.hasOwn(members, n) ? n : null;
+    };
+    return {
+      MemberExpression(node) {
+        const n = named(node.property, node.computed);
+        if (n) report(node.property, n);
+      },
+      ObjectPattern(node) {
+        for (const p of node.properties) {
+          if (p.type !== 'Property') continue;
+          const n = named(p.key, p.computed);
+          if (n) report(p.key, n);
+        }
+      },
+    };
+  },
+};
+
 export default {
   rules: {
+    'confined-module': confinedModule,
+    'reserved-literal': reservedLiteral,
+    'confined-member': confinedMember,
     'no-relative-cross-package': noRelativeCrossPackage,
     'no-require-factory': noRequireFactory,
     'named-imports-only': namedImportsOnly,

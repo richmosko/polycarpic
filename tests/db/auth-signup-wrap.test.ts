@@ -8,6 +8,7 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PW, boot, claim, get, jar, post, teardown, url, type Env } from './helpers/auth';
 import { must } from './helpers/sql';
+import { newToken, seedInvitation } from './helpers/invitation';
 import { USER_INSERTING } from '../../packages/auth/src/route-policy.ts';
 
 vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o as any));
@@ -30,20 +31,22 @@ afterAll(() => teardown(e));
 afterEach(() => { claim.impl = null; seen.length = 0; });
 
 const accepting = () => {
-  claim.impl = async (tx, a) => {
+  // POLY-87: the mock only records now and then runs the REAL claim, so every sign-up below needs a real invitation (invite()).
+  claim.impl = async (tx, a, real) => {
     const t = (await e.dba.clientOf(tx).query('select txid_current()::text t')).rows[0].t as string;
     seen.push({ kind: e.dba.currentClient()?.kind, txid: t, email: a.email, token: a.token });
-    return { accepted: true };
+    return real(tx, a);
   };
 };
 const userTx = (email: string) => must(`SELECT t.txid::text FROM public.qa_user_tx t JOIN public."user" u ON u.id = t.user_id WHERE u.email = '${email}'`, e.db).rows[0]?.[0];
+const invite = (email: string) => seedInvitation({ db: e.db, email, role: 'viewer' });
 const users = (email: string) => e.count(`SELECT 1 FROM public."user" WHERE email = '${email}'`);
 const stamp = () => `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 
 const oauthCallback = (email: string, a = auth) => e.oauth(email, a);
 
-const drivers: Record<string, (email: string) => Promise<Response>> = {
-  '/sign-up/email': (email) => e.handle(post('/sign-up/email', { email, password: PW, name: 'Signed Up', invitationToken: 'qa-invite' }), auth),
+const drivers: Record<string, (email: string, token?: string) => Promise<Response>> = {
+  '/sign-up/email': (email, token = newToken()) => e.handle(post('/sign-up/email', { email, password: PW, name: 'Signed Up', invitationToken: token }), auth),
   '/magic-link/verify': async (email) => {
     e.mails.length = 0;
     await e.handle(post('/sign-in/magic-link', { email, callbackURL: '/' }), auth);
@@ -63,14 +66,18 @@ describe('criterion 11: every user-inserting route runs inside withContextFreeTx
     it(`${path}: creates the user inside the wrapper, in the transaction the wrapper opened  [red if: the handler runs this route on the plain pool or under withTenant]`, async () => {
       accepting();
       const email = `wrap-${stamp()}@qa.test`;
-      const res = await drivers[path](email);
+      const token = invite(email);
+      const res = await drivers[path](email, token);
       expect(res.status, await res.clone().text()).toBeLessThan(400);
       expect(users(email)).toBe(1);
-      expect(seen).toHaveLength(1);
-      expect(seen[0].email).toBe(email);
-      expect(seen[0].kind).toBe('withContextFreeTx');
-      expect(userTx(email)).toBe(seen[0].txid);
-      expect(seen[0].token).toBe(path === '/sign-up/email' ? 'qa-invite' : null); // OAuth and magic link match by verified email (R3, U2)
+      // /sign-up/email claims twice (route hook, then the user hook; ruling R3); the other two routes once
+      expect(seen).toHaveLength(path === '/sign-up/email' ? 2 : 1);
+      for (const s of seen) {
+        expect(s.email).toBe(email);
+        expect(s.kind).toBe('withContextFreeTx');
+        expect(userTx(email)).toBe(s.txid);
+        expect(s.token).toBe(path === '/sign-up/email' ? token : null);
+      } // OAuth and magic link match by verified email (R3, U2)
     });
 
   for (const path of Object.keys(drivers))
@@ -100,9 +107,27 @@ describe('criterion 12: the sign-up hook never opens a transaction of its own', 
     const existing = e.seedUser();
     const { cookie } = await e.signIn(existing.email, auth);
     const email = `signedin-${stamp()}@qa.test`;
-    const res = await e.handle(post('/sign-up/email', { email, password: PW, name: 'X', invitationToken: 'qa-invite' }, cookie), auth);
+    const res = await e.handle(post('/sign-up/email', { email, password: PW, name: 'X', invitationToken: newToken() }, cookie), auth);
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(users(email)).toBe(0);
+  });
+});
+
+describe('POLY-87 build check: a commit-time 42501 is labelled invitation_required on the sign-up path only', () => {
+  it('a signed-in request whose COMMIT fails with 42501 is not answered 403 invitation_required  [red if: handler.ts maps every 42501, withTenant included]', async () => {
+    must(`CREATE FUNCTION public.qa_late_42501() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'qa: refused at commit' USING ERRCODE = '42501'; END $$;
+      CREATE CONSTRAINT TRIGGER qa_late_42501 AFTER UPDATE ON public."user" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.name = 'Late') EXECUTE FUNCTION public.qa_late_42501();`, e.db);
+    const u = e.seedUser();
+    const { cookie } = await e.signIn(u.email, auth);
+    let label: string | null = null;
+    let outcome = 'rejected';
+    try {
+      const r = await e.handle(post('/update-user', { name: 'Late' }, cookie), auth);
+      outcome = `status ${r.status}`;
+      label = (await r.text()).includes('invitation_required') ? 'invitation_required' : null;
+    } catch { /* the error surfaces: also fine */ }
+    expect(label, outcome).toBeNull();
+    expect(must(`SELECT name FROM public."user" WHERE id = '${u.id}'`, e.db).rows[0][0]).toBe('QA User');
   });
 });
 
@@ -110,7 +135,7 @@ describe('S1/P1: commit only on success', () => {
   it('sign-up whose session insert is refused leaves no user, no account, and no Set-Cookie  [red if: handleAuthRequest commits when auth.handler returns >= 400 (BetterAuth swallows the throw)]', async () => {
     accepting();
     const email = `refuse-${stamp()}@qa.test`;
-    const res = await drivers['/sign-up/email'](email);
+    const res = await drivers['/sign-up/email'](email, invite(email));
     expect(res.status).toBeGreaterThanOrEqual(400);
     expect(users(email)).toBe(0);
     expect(res.headers.getSetCookie()).toEqual([]);
@@ -119,6 +144,7 @@ describe('S1/P1: commit only on success', () => {
   it('magic-link verify whose session insert is refused leaves no user row  [red if: a 3xx to the error page is committed]', async () => {
     accepting();
     const email = `refuse-${stamp()}@qa.test`;
+    invite(email);
     const res = await drivers['/magic-link/verify'](email);
     expect(res.status).toBeGreaterThanOrEqual(300);
     expect(users(email)).toBe(0);

@@ -79,8 +79,17 @@ export const invitation = pgTable(
     expiresAt: tstz('expires_at').notNull(),
     acceptedAt: tstz('accepted_at'),
     revokedAt: tstz('revoked_at'),
+    // POLY-87 (R1): a claim binds the invitation to one user, which makes it single use.
+    claimedUserId: uuid('claimed_user_id').references(() => user.id),
+    claimedAt: tstz('claimed_at'),
   },
-  (t) => [check('invitation_role_check', sql`${t.role} IN ('viewer','manager','owner')`)],
+  (t) => [
+    check('invitation_role_check', sql`${t.role} IN ('viewer','manager','owner')`),
+    check('invitation_token_hash_len_check', sql`octet_length(${t.tokenHash}) = 32`),
+    check('invitation_claim_pair_check', sql`(${t.claimedUserId} IS NULL) = (${t.claimedAt} IS NULL)`),
+    check('invitation_accepted_claimed_check', sql`${t.acceptedAt} IS NULL OR ${t.claimedAt} IS NOT NULL`),
+    index('invitation_live_email_idx').on(sql`lower(${t.email})`).where(sql`${t.claimedAt} IS NULL AND ${t.revokedAt} IS NULL`),
+  ],
 ).enableRLS();
 
 export const notification = pgTable(

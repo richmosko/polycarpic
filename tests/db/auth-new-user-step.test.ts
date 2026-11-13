@@ -1,0 +1,256 @@
+// POLY-87 gate 2: the new-user step, app.enter_new_user (ruling R2, R4; conditions 5, 12-14; SECURITY C-84, T-90). The
+// database side is driven as poly_app over psql (one script = one transaction), because the TypeScript refusals (R4) are
+// layered on top of the definer and the definer decides. Titles end with [red if: <mutation>].
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { boot, teardown, type Env } from './helpers/auth';
+import { loadAllow } from './helpers/definers';
+import { seedInvitation, tokenHash } from './helpers/invitation';
+import { must, psql, psqlSession } from './helpers/pg';
+
+let e: Env;
+beforeAll(async () => { e = await boot(); });
+afterAll(() => teardown(e));
+
+const app = (sql: string) => psql(sql, e.db, { role: 'poly_app' });
+const uid = () => crypto.randomUUID();
+const ins = (id: string, email = `${id}@qa.test`) => `INSERT INTO public."user" (id, name, email) VALUES ('${id}', 'N', '${email}');`;
+const step = (id: string) => `SELECT app.enter_new_user('${id}');`;
+
+describe('condition 5: after the step, app.user_id is the new id until the end of the transaction', () => {
+  it('insert, enter_new_user, then current_setting reads the id; the step works as poly_app  [red if: the function is absent, or does not set the setting for the transaction]', () => {
+    const id = uid();
+    const r = app(`BEGIN; ${ins(id)} ${step(id)} SELECT current_setting('app.user_id'); SELECT app.current_user_id()::text; ROLLBACK;`);
+    expect(r.ok, r.err).toBe(true);
+    expect(r.rows.filter((x) => x[0] === id).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('condition 13: enter_new_user refuses (each on its own transaction), with 42501', () => {
+  const ctl = () => { // positive control: a fresh user passes, so every refusal below is about its input
+    const id = uid();
+    const r = app(`BEGIN; ${ins(id)} ${step(id)} ROLLBACK;`);
+    expect(r.ok, `control: ${r.err}`).toBe(true);
+  };
+  it('an existing user (inserted by an earlier transaction)  [red if: any user id is accepted]', () => {
+    ctl();
+    const id = uid();
+    must(ins(id), e.db);
+    expect(app(`BEGIN; ${step(id)} ROLLBACK;`).sqlstate).toBe('42501');
+  });
+  it('an existing user whose row this transaction UPDATEd (its xmin is ours; signup_txid is not)  [red if: the proof is xmin, not the stamp]', () => {
+    ctl();
+    const id = uid();
+    must(ins(id), e.db);
+    expect(app(`BEGIN; UPDATE public."user" SET name = 'changed' WHERE id = '${id}'; ${step(id)} ROLLBACK;`).sqlstate).toBe('42501');
+  });
+  it('a second call in the same transaction  [red if: the empty-app.user_id check is missing]', () => {
+    ctl();
+    const id = uid();
+    expect(app(`BEGIN; ${ins(id)} ${step(id)} ${step(id)} ROLLBACK;`).sqlstate).toBe('42501');
+  });
+  it('an id whose insert was rolled back to a savepoint  [red if: the lookup survives a savepoint rollback]', () => {
+    ctl();
+    const id = uid();
+    expect(app(`BEGIN; SAVEPOINT s; ${ins(id)} ROLLBACK TO s; ${step(id)} ROLLBACK;`).sqlstate).toBe('42501');
+  });
+  it('a user inserted inside a RELEASED savepoint is accepted (BetterAuth inserts in a savepoint)  [red if: the proof uses xmin, a subtransaction id]', () => {
+    const id = uid();
+    const r = app(`BEGIN; SAVEPOINT s; ${ins(id)} RELEASE s; ${step(id)} SELECT current_setting('app.user_id'); ROLLBACK;`);
+    expect(r.ok, r.err).toBe(true);
+  });
+  it('a user that already has a Person is refused even when the stamp matches  [red if: the self_user_id check is missing]', () => {
+    const id = uid();
+    const r = app(`BEGIN; ${ins(id)} ${step(id)}
+      INSERT INTO public.entity (type_id, name, self_user_id) SELECT t.id, 'P', '${id}' FROM public.entity_type t WHERE t.system_key = 'person';
+      SELECT set_config('app.user_id', '', true); ${step(id)} ROLLBACK;`);
+    expect(r.sqlstate).toBe('42501');
+  });
+  it('a later transaction cannot enter a user an earlier one inserted  [red if: the stamp is compared to anything but the current transaction id]', () => {
+    const id = uid();
+    must(ins(id), e.db);
+    expect(app(`BEGIN; ${step(id)} ROLLBACK;`).sqlstate).toBe('42501');
+  });
+  it('app.user_id forged to an existing user, then a new user stepped, is refused as a second entry  [red if: the step ignores a non-empty app.user_id]', () => {
+    const old = uid();
+    const fresh = uid();
+    must(ins(old), e.db);
+    expect(app(`BEGIN; SELECT set_config('app.user_id', '${old}', true); ${ins(fresh)} ${step(fresh)} ROLLBACK;`).sqlstate).toBe('42501');
+  });
+  it('a poly_app INSERT or UPDATE that supplies signup_txid is refused 42501, and so is a second user insert in one transaction  [red if: the column is grantable or the stamp trigger allows two users]', () => {
+    const a = uid();
+    const b = uid();
+    expect(app(`INSERT INTO public."user" (id, name, email, signup_txid) VALUES ('${a}', 'N', '${a}@qa.test', 1)`).sqlstate).toBe('42501');
+    must(ins(b), e.db);
+    expect(app(`UPDATE public."user" SET signup_txid = 1 WHERE id = '${b}'`).sqlstate).toBe('42501');
+    expect(app(`BEGIN; ${ins(uid())} ${ins(uid())} ROLLBACK;`).sqlstate).toBe('42501');
+  });
+});
+
+// ---------------------------------------------------------------- the TypeScript side (R4): the handle, not the index
+// ASSUMED surface (R4): inside @poly/db/auth's withContextFreeTx the Tx has a non-enumerable enterNewUser(id) -> Promise<void>.
+// Every case below rolls back with a sentinel, so no stamped row is committed (C32).
+class Rollback extends Error {}
+const inCtxFree = async (fn: (tx: any) => Promise<void>): Promise<unknown> => {
+  try {
+    await e.dba.withContextFreeTx(async (tx: any) => { await fn(tx); throw new Rollback(); });
+  } catch (x) { return x; }
+  return undefined;
+};
+const insTx = (tx: any, id: string) => tx.execute(e.dbm.sql`INSERT INTO public."user" (id, name, email) VALUES (${id}, 'N', ${`${id}@qa.test`})`);
+const refused = (x: unknown) => expect((x as { code?: string; cause?: { code?: string } })?.code ?? (x as any)?.cause?.code).toBe('42501');
+
+describe('condition 13 (handle): the step is reachable from withContextFreeTx\'s handle only, and the TypeScript side refuses too', () => {
+  it('a fresh user steps and app.user_id is the new id  [red if: the handle has no enterNewUser]', async () => {
+    const id = uid();
+    let seen = '';
+    const x = await inCtxFree(async (tx) => {
+      await insTx(tx, id);
+      await tx.enterNewUser(id);
+      seen = (await tx.execute(e.dbm.sql`SELECT current_setting('app.user_id') AS v`)).rows[0].v;
+    });
+    expect(x).toBeInstanceOf(Rollback);
+    expect(seen).toBe(id);
+  });
+  it('enterNewUser is not enumerable on the handle  [red if: the step shows up in Object.keys or a spread of the Tx]', async () => {
+    let keys: string[] = [];
+    let has = false;
+    await inCtxFree(async (tx) => { keys = Object.keys(tx); has = typeof tx.enterNewUser === 'function'; });
+    expect(has).toBe(true);
+    expect(keys).not.toContain('enterNewUser');
+  });
+  it('a second call is refused  [red if: the used flag and the database check are both missing]', async () => {
+    const id = uid();
+    let first: unknown = 'not run';
+    let second: unknown;
+    await inCtxFree(async (tx) => {
+      await insTx(tx, id);
+      first = await tx.enterNewUser(id).then(() => 'ok', (x: unknown) => x);
+      second = await tx.enterNewUser(id).then(() => 'ok', (x: unknown) => x);
+    });
+    expect(first).toBe('ok');
+    expect(second).not.toBe('ok');
+  });
+  it('an existing user\'s id is refused with 42501  [red if: any id is accepted]', async () => {
+    const old = uid();
+    must(ins(old), e.db);
+    let r: unknown = 'ok';
+    await inCtxFree(async (tx) => { r = await tx.enterNewUser(old).then(() => 'ok', (x: unknown) => x); });
+    refused(r);
+  });
+  it('a call after the transaction ended is refused  [red if: the closure outlives its transaction]', async () => {
+    let kept: any;
+    await inCtxFree(async (tx) => { kept = tx; });
+    const r = await kept.enterNewUser(uid()).then(() => 'ok', (x: unknown) => x);
+    expect(r).not.toBe('ok');
+  });
+  it('an id whose insert was rolled back to a savepoint is refused  [red if: the TypeScript side trusts a remembered id]', async () => {
+    const id = uid();
+    let r: unknown = 'ok';
+    await inCtxFree(async (tx) => {
+      await tx.execute(e.dbm.sql`SAVEPOINT s`);
+      await insTx(tx, id);
+      await tx.execute(e.dbm.sql`ROLLBACK TO s`);
+      r = await tx.enterNewUser(id).then(() => 'ok', (x: unknown) => x);
+    });
+    refused(r);
+  });
+});
+
+describe('condition 14: the step is not on the db index, db/auth or db/session, nor on withTenant\'s Tx', () => {
+  const surfaces: Record<string, string> = {
+    '@poly/db': '../../packages/db/src/index.ts',
+    '@poly/db/auth': '../../packages/db/src/auth.ts',
+    '@poly/db/session': '../../packages/db/src/session.ts',
+  };
+  for (const [name, path] of Object.entries(surfaces))
+    it(`${name}: no export is named like the step and no exported function's source calls enter_new_user  [red if: the step is exported from the index]`, async () => {
+      const m: Record<string, unknown> = await import(/* @vite-ignore */ path);
+      expect(Object.keys(m).filter((k) => /enter.?new.?user|newuser/i.test(k))).toEqual([]);
+      for (const [k, v] of Object.entries(m))
+        if (typeof v === 'function') expect(String(v), `${name}.${k}`).not.toMatch(/enter_new_user|enterNewUser/);
+    });
+  it('a withTenant and a withSystem Tx have no enterNewUser  [red if: the step is attached to every Tx, not to the context-free kind]', async () => {
+    const u = must(`INSERT INTO public."user" (name, email) VALUES ('T', 't-${uid()}@qa.test') RETURNING id`, e.db).rows[0]![0]!;
+    const has = await e.dbm.withTenant(e.dbs.sessionUserId(u), '00000000-0000-4000-8000-0000000000e2', async (tx: any) => 'enterNewUser' in tx || typeof tx.enterNewUser !== 'undefined');
+    expect(has).toBe(false);
+    // withSystem: M1's job_targets returns no rows, so (as wrappers.test.ts does) the superuser replaces its body in THIS database only
+    const target = { entityId: '33333333-3333-4333-8333-333333333333', connectionId: null };
+    must(`CREATE OR REPLACE FUNCTION app.job_targets(job text) RETURNS TABLE (entity_id uuid, principal_user_id uuid, connection_id uuid)
+      LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$ select '${target.entityId}'::uuid, '${u}'::uuid, null::uuid $$`, e.db);
+    const sysHas = await e.dbm.withSystem('qa_job', target, async (tx: any) => 'enterNewUser' in tx || typeof tx.enterNewUser !== 'undefined');
+    expect(sysHas, 'a withSystem Tx has no enterNewUser').toBe(false);
+    // control, so this cannot pass on a missing step everywhere: the context-free handle has it
+    let ctlHas = false;
+    await inCtxFree(async (tx) => { ctlHas = typeof tx.enterNewUser === 'function'; });
+    expect(ctlHas).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------- step 4 (TypeScript side): allowlist, commit-time stamp, S4 lock
+describe('condition 18: the new definers are on packages/db/sql/definers.json with the ruled owner and EXECUTE', () => {
+  it('enter_new_user (poly_authz), claim_invitations and accept_invitations (poly_govern) each execute for poly_app alone  [red if: a definer is added without its allowlist entry]', () => {
+    const got = Object.fromEntries(loadAllow().map((a) => [a.function, [a.owner, ...a.execute].join('>')]));
+    expect(got['app.enter_new_user(uuid)']).toBe('poly_authz>poly_app');
+    expect(got['app.claim_invitations(bytea, text)']).toBe('poly_govern>poly_app');
+    expect(got['app.accept_invitations(bytea)']).toBe('poly_govern>poly_app');
+  });
+});
+
+describe('condition 32 (S13): a stamp does not survive its transaction', () => {
+  it('a poly_app user INSERT that commits without accept_invitations fails at commit with 42501 and leaves no row  [red if: the deferred signup_stamp_cleared trigger is missing]', () => {
+    const id = uid();
+    expect(app(ins(id)).sqlstate).toBe('42501');
+    expect(must(`SELECT count(*) FROM public."user" WHERE id = '${id}'`, e.db).rows[0]![0]).toBe('0');
+  });
+  it('a superuser user INSERT (fixtures, restores) is unstamped and commits  [red if: the stamp is applied to every role, which breaks every fixture]', () => {
+    const id = uid();
+    must(ins(id), e.db);
+    expect(must(`SELECT count(*), count(signup_txid) FROM public."user" WHERE id = '${id}'`, e.db).rows[0]).toEqual(['1', '0']);
+  });
+  it('a poly_app INSERT is stamped with the transaction id  [red if: stamp_signup_user is absent]', () => {
+    const id = uid();
+    const r = app(`BEGIN; ${ins(id)} SELECT signup_txid = pg_current_xact_id()::text::bigint FROM public."user" WHERE id = '${id}'; ROLLBACK;`);
+    expect(r.ok, r.err).toBe(true);
+    expect(r.rows.flat()).toContain('t');
+  });
+});
+
+describe('condition 30 (S4): claim_invitations from a signed-in transaction takes no lock', () => {
+  it('while another session holds the row, a claim with app.user_id set answers 42501 at once instead of waiting out lock_timeout  [red if: the setting check comes after the row lock]', async () => {
+    const t = seedInvitation({ db: e.db, email: 'lock@qa.test', role: 'viewer' });
+    const hex = tokenHash(t).toString('hex');
+    const user = uid();
+    must(ins(user), e.db);
+    const holder = psqlSession(`BEGIN; SELECT 1 FROM public.invitation WHERE token_hash = decode('${hex}', 'hex') FOR UPDATE; SELECT pg_sleep(12);`, e.db);
+    try {
+      for (let i = 0; i < 60; i++) { // wait until the holder owns the row: a NOWAIT probe is refused (55P03)
+        if (psql(`SELECT 1 FROM public.invitation WHERE token_hash = decode('${hex}', 'hex') FOR UPDATE NOWAIT`, e.db).sqlstate === '55P03') break;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const t0 = Date.now();
+      const r = app(`BEGIN; SELECT set_config('app.user_id', '${user}', true); SELECT app.claim_invitations(decode('${hex}', 'hex'), 'lock@qa.test'); ROLLBACK;`);
+      expect(r.sqlstate).toBe('42501');
+      expect(Date.now() - t0).toBeLessThan(3500);
+    } finally { holder.kill(); }
+  });
+});
+
+describe('condition 33 (S14): while the stamp is set, email and email_verified are fixed', () => {
+  const person = (id: string) => `INSERT INTO public.entity (type_id, name, self_user_id) SELECT t.id, 'P', '${id}' FROM public.entity_type t WHERE t.system_key = 'person';`;
+  it('P10: insert, enter_new_user, provision, then UPDATE email and email_verified raises 42501 and no membership remains  [red if: signup_email_fixed is absent, so a sign-up can verify an invited address]', () => {
+    const id = uid();
+    const head = `BEGIN; ${ins(id)} ${step(id)} ${person(id)}`;
+    const ctl = app(`${head} UPDATE public."user" SET name = 'renamed' WHERE id = '${id}'; SELECT count(*) FROM public.membership WHERE user_id = '${id}'; ROLLBACK;`);
+    expect(ctl.ok, `control (other columns pass): ${ctl.err}`).toBe(true);
+    expect(ctl.rows.flat()).toContain('1');
+    const r = app(`${head} UPDATE public."user" SET email = 'victim@qa.test', email_verified = true WHERE id = '${id}'; ROLLBACK;`); // ROLLBACK, not COMMIT: the C32 commit check would also say 42501
+    expect(r.sqlstate).toBe('42501');
+    expect(must(`SELECT count(*) FROM public.membership WHERE user_id = '${id}'`, e.db).rows[0]![0]).toBe('0');
+  });
+  it('either column alone is refused too  [red if: the trigger checks only one of them]', () => {
+    for (const set of [`email = 'v2@qa.test'`, `email_verified = true`]) {
+      const id = uid();
+      expect(app(`BEGIN; ${ins(id)} ${step(id)} UPDATE public."user" SET ${set} WHERE id = '${id}'; ROLLBACK;`).sqlstate, set).toBe('42501');
+    }
+  });
+});

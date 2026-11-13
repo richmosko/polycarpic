@@ -1,7 +1,7 @@
 // The session loader, Settings → Sessions and the 30-day cap (POLY-86 ruling R5; seceng S13-S15).
 import { sql, withTenant, type Tx } from '@poly/db';
 import { sessionUserId, type SessionUserId } from '@poly/db/session';
-import { provisionPerson } from '@poly/tenancy';
+import { landingEntity, provisionPerson } from '@poly/tenancy';
 import { APIError } from 'better-auth/api';
 import { defaultAuth, type AnyAuth } from './handler.ts';
 import { cappedOut, requireRecentAuth } from './recent-auth.ts';
@@ -134,3 +134,6 @@ export interface Identity {
 /** Settings → Sessions for the request's identity (apps/web holds no SessionUserId brand). */
 export const listMySessions = (who: Identity): Promise<SessionRow[]> => withTenant(sessionUserId(who.userId), who.sessionId, (tx) => listSessions(tx));
 export const revokeMySession = (who: Identity, id: string): Promise<void> => withTenant(sessionUserId(who.userId), who.sessionId, (tx) => revokeSession(tx, id));
+
+/** The entity the signed-in user lands on at "/": the newest one an invitation seated, else their own Person (POLY-87 R3). */
+export const myLandingEntity = (who: Identity): Promise<string | null> => withTenant(sessionUserId(who.userId), who.sessionId, (tx) => landingEntity(tx));

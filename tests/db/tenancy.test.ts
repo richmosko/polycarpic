@@ -273,7 +273,7 @@ describe('membership writes and the owner gates (criterion 4, ruling O1/O2)', ()
     expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.membership SET role = 'viewer' WHERE entity_id = $1 AND user_id = $2`, [e, O2])))).toBe('42501');
     expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.membership SET role = 'manager' WHERE entity_id = $1 AND user_id = $2`, [e, V])))).toBe('42501');
     expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at)
-      VALUES ($1, 'g@qa.test', 'viewer', $2, decode('cc33', 'hex'), now() + interval '1 day')`, [e, O])))).toBe('42501');
+      VALUES ($1, 'g@qa.test', 'viewer', $2, decode(repeat('cc', 32), 'hex'), now() + interval '1 day')`, [e, O])))).toBe('42501');
     expect(ownersOf(e)).toBe(2);
   });
 
@@ -290,7 +290,7 @@ describe('membership writes and the owner gates (criterion 4, ruling O1/O2)', ()
     const e = await scratch(O, [[V, 'viewer']]);
     expect(await sqlstate(tenant(O, (tx) => q(tx, `UPDATE public.membership SET role = 'manager' WHERE entity_id = $1 AND user_id = $2`, [e, V])))).toBe('no error');
     expect(await sqlstate(tenant(O, (tx) => q(tx, `INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at)
-      VALUES ($1, 'ok@qa.test', 'viewer', $2, decode('dd44', 'hex'), now() + interval '1 day')`, [e, O])))).toBe('no error');
+      VALUES ($1, 'ok@qa.test', 'viewer', $2, decode(repeat('dd', 32), 'hex'), now() + interval '1 day')`, [e, O])))).toBe('no error');
   });
 
   // Mutation: drop the entity row lock (FOR UPDATE) from keep_an_owner / gate_owner_changes; both self-demotions then succeed and the entity has no owner.

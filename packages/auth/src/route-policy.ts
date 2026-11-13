@@ -2,7 +2,10 @@
 // @better-auth/passkey 1.7.18 expose with core, twoFactor, magicLink and passkey is in exactly one class. A path not in the map
 // answers 404, the same answer a blocked path gives. The hook is built from the map; the SvelteKit handle uses the same matcher.
 import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
+import { currentClient, currentTx } from '@poly/db/auth';
+import { claimInvitation, decodeInvitationToken, InvitationRequired } from '@poly/tenancy';
 import { requireRecentAuth } from './recent-auth.ts';
+import { invitationRequired } from './user-hooks.ts';
 
 export type RouteClass = 'open' | 'enrolment' | 'step-up' | 'blocked';
 export type Rule = { class: RouteClass; insertsUser?: true; realDomainOnly?: true; whenSession?: RouteClass | 'refused' };
@@ -150,7 +153,19 @@ export function routePolicyHook(tlsMode: TlsMode) {
     if (ctx.request && sent && !['GET', 'HEAD', 'OPTIONS'].includes(ctx.request.method) && sent !== origin) throw forbidden('invalid_origin');
     for (const src of [body, (ctx.query ?? {}) as Record<string, unknown>])
       for (const key of REDIRECT_KEYS) if (src[key] !== undefined && !ourOrigin(src[key], origin)) throw forbidden('invalid_redirect');
-    if (ctx.path === '/sign-up/email' && typeof body.invitationToken !== 'string') throw forbidden('invitation_required');
+    if (ctx.path === '/sign-up/email') {
+      // The same refusal for every cause (S8): a token that is not canonical, no transaction, no live row for token + email.
+      const token = body.invitationToken;
+      if (typeof token !== 'string' || decodeInvitationToken(token) === null) throw invitationRequired();
+      const tx = currentClient()?.kind === 'withContextFreeTx' ? currentTx() : null;
+      if (!tx) throw invitationRequired();
+      try {
+        await claimInvitation(tx, { email: String(body.email ?? ''), token });
+      } catch (e) {
+        if (e instanceof InvitationRequired) throw invitationRequired();
+        throw e;
+      }
+    }
     if (ctx.path === '/update-user') {
       const extra = Object.keys(body).filter((k) => k !== 'name' && k !== 'image');
       if (extra.length > 0 || (body.image !== undefined && body.image !== null)) throw new APIError('BAD_REQUEST', { message: 'update-user accepts a name and a null image only' });

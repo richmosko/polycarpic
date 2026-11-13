@@ -11,7 +11,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 Owners and managers must enrol a second factor (authenticator app or passkey); viewers may (P1). It is asked on a new device and as a step-up before export, purge, granting access and linking a bank. A user's own unshared Person is exempt until a forcing action (OQ-34). First enrolment is anchored on a code sent to the account email in addition to the password (ARCH §3.1c; SECURITY §4.1, C-03, A-28..A-30, A-32). Held raises are POLY-91.
@@ -35,3 +35,7 @@ Owners and managers must enrol a second factor (authenticator app or passkey); v
 ### @team-lead — 2026-11-11
 
 From the POLY-86 loop: (1) the enrolment class's grant check replaces POLY-86's flat refusal, and this issue adds the `recent_auth_at` writers (ruling follow-up 5). (2) In migration 0004 `two_factor.verified` defaults to true, BetterAuth's default; it must default to false so a write that omits it never marks a factor verified (seceng build review @ 04bd75b).
+
+### @team-lead — 2026-11-12
+
+From the POLY-87 loop. (1) Sign-up claims a manager or owner invitation without seating it (`claimed_at` set, `accepted_at` null); this issue's enrolment write seats those rows, beside the 1 → 2 owner rule (POLY-87 ruling R1, R2; seceng review §6). `accept_invitations` seats viewers only and its policy is viewer-only. (2) Ordering rule (seceng, 2026-11-13): the database gates that end the own-Person exemption (no Trust, Business, Household or Holding, no sharing, no step-up while unenrolled; SECURITY §4.1, C-03) are this issue's and are not built; `seat_creator` seats any creator as owner today. They must land before, or with, the first route that creates a non-Person entity or sends an invitation.

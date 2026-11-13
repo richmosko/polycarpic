@@ -28,3 +28,7 @@ Umbrella for the Caddy and edge-network findings from the POLY-95 and POLY-86 lo
 ### @team-lead — 2026-11-12
 
 From seceng on POLY-140 (2026-11-12): `.dockerignore` excludes `**/*.test.ts` and root `tests`, but not the other names the lint counts as tests (`.spec.*`, `.test.mjs`, `.test.mts` and the like). No such file exists today. Add the exclusions with this issue's edge work.
+
+### @team-lead — 2026-11-12
+
+From the POLY-87 loop (seceng): the invitation token sits in the `/sign-up` query string, so Caddy's access log format must drop the query before the first deploy.

@@ -21,6 +21,8 @@ const DRIZZLE_PG = ['node-postgres', 'postgres-js', 'neon-serverless', 'neon-htt
 const CRYPTO_NAMES = ['createCipheriv', 'createDecipheriv', 'publicEncrypt', 'privateDecrypt', 'subtle', 'webcrypto'];
 const HPKE = ['@hpke/*', 'hpke-js'];
 const SVELTEKIT = ['@sveltejs/kit', '$app/*', '$env/*'];
+// Declared so no-implied-eval and no-eval resolve setTimeout(...) and globalThis.eval(...) to the real globals (POLY-87 S7).
+const GLOBALS = Object.fromEntries(['setTimeout', 'setInterval', 'setImmediate', 'execScript', 'globalThis', 'window', 'global', 'self'].map((g) => [g, 'readonly']));
 const DISABLE_PROOFED = ['boundaries/*', 'no-restricted-imports', 'poly/*', 'import-x/*', 'eslint-comments/*'];
 
 export function generateConfig(layers, opts = {}) {
@@ -39,7 +41,7 @@ export function generateConfig(layers, opts = {}) {
     {
       name: 'poly/layers',
       files: names.map(base),
-      languageOptions: { parser: tseslint.parser },
+      languageOptions: { parser: tseslint.parser, globals: GLOBALS },
       plugins: { boundaries, poly, 'import-x': importX, 'eslint-comments': comments },
       settings: {
         'boundaries/elements': elements,
@@ -52,6 +54,13 @@ export function generateConfig(layers, opts = {}) {
         'boundaries/dependencies': [2, { default: 'disallow', policies }],
         'poly/no-computed-import': 2,
         'poly/no-session-user-id-cast': 2,
+        ...(layers.confined ? { 'poly/confined-module': [2, { root, confined: layers.confined, packages: Object.fromEntries(names.map((x) => [x, pk[x].dir])) }] } : {}),
+        ...(layers.reservedLiterals ? { 'poly/reserved-literal': [2, { root, reserved: layers.reservedLiterals }] } : {}),
+        ...(layers.confinedMembers ? { 'poly/confined-member': [2, { root, members: layers.confinedMembers }] } : {}),
+        // POLY-87 S7: nothing builds code from a string, so a reserved definer name cannot be assembled at run time.
+        'no-eval': 2,
+        'no-implied-eval': 2,
+        'no-new-func': 2,
         'eslint-comments/no-unlimited-disable': 2,
         'eslint-comments/no-use': [2, { allow: ['eslint-disable', 'eslint-disable-line', 'eslint-disable-next-line', 'eslint-enable'] }],
         'eslint-comments/no-restricted-disable': [2, ...DISABLE_PROOFED],
