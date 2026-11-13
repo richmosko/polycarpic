@@ -235,3 +235,17 @@ Architect, read at 9d58648. seceng-142's conditions O1–O11 (`seceng-ruling-rev
 **Doc follow-ups, not this loop's build:**
 - SECURITY C-01, C-84 and C-15, and new threats from T-98 on, are seceng's (`seceng-ruling-review.md`, "SECURITY doc edits").
 - INFRA §7.5 and the first-user runbook step say the invite sends an email. After this loop it prints the link once, and the wrapper must use `exec -T`. That text is the INFRA owner's.
+
+## Addendum 1: seceng's ruling check (`seceng-ruling-review.md` @ 0b7293b; all five amendments accepted)
+
+- **G1 (C14 corrected in place).** The new `UPDATE (revoked_at)` grant, together with POLY-87's `poly_govern` UPDATE policy (`USING (true) WITH CHECK (claimed_user_id = app.current_user_id())`), lets `poly_govern` revoke a claimed row while a user context is set. Only a `poly_govern`-owned definer body could do that, so:
+  - C14 is tested with `app.user_id` empty;
+  - C15's `pg_proc` scan also finds exactly one `app` function whose body writes `revoked_at` (`issue_operator_invitation`).
+- **G2 (R4, R6, C16).** `packages/tenancy/src/operator-invitation.ts` is confined to `apps/worker/src/cli/user-invite.ts`. The rule refuses re-exports inside the package (POLY-87 R5), so the file is reached through a subpath:
+  - `"./operator-invitation"` in `packages/tenancy/package.json` and `layers.json` `packages.tenancy.subpaths`;
+  - `packages.worker.allow` gains `"tenancy/operator-invitation"`;
+  - `confined` gains `"packages/tenancy/src/operator-invitation.ts": ["apps/worker/src/cli/user-invite.ts"]`.
+
+  C16 adds red cases for that import from `apps/worker/src/main.ts` and for a re-export by `packages/tenancy/src/index.ts`.
+- **C7's spy** wraps `pg.Client.prototype.query`, so it sees every pooled client.
+- **Totals:** 16 conditions. The ruling gates.
