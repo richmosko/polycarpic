@@ -64,3 +64,13 @@ The cost is real: (e1) in full is 11.5 to 14 loop-days by the architect's estima
 
 - Whether to commit to (e1) in full now, or to stage 1 plus the spike, with stage 2 decided on their results. I recommend the second.
 - Whether the plain-token fix waits for POLY-137 or lands as its own small change first.
+
+## After reading both recommendations (added 2026-11-13)
+
+All three reads name (e1) as the target and reject (b), (c) and (d). They differ on order: the architect puts both stages before POLY-89; seceng supports staging without fixing POLY-89's place; I put POLY-89 after stage 1 with a spike before stage 2.
+
+One correction to my point 4. The architect notes that web still serves the sign-in and sign-up pages, so an attacker who stays inside web can alter the page script and capture passwords as they are typed. "Passwords never pass through web" holds only if the sign-in service serves those pages too, which is unpriced (the architect guesses 1 to 2 loop-days and a DESIGN change). I had missed that.
+
+Neither recommendation addresses my point 1 (hashed session storage as a requirement of stage 2). It stays open.
+
+The architect's file does not carry the line I asked for about having seen seceng's lean towards (e1) before writing.
