@@ -29,7 +29,7 @@ const FILES = readdirSync(join(ROOT, 'tests/db')).filter((f) => f.endsWith('.tes
 
 // The ruling's table, pinned: which file belongs to which area.
 const TABLE: Record<(typeof AREAS)[number], string[]> = {
-  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step'],
+  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite'],
   tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap'],
   migrate: ['checks', 'connection', 'migrate-run-helper', 'runner', 'template-clone'],
   ops: ['ops-status', 'ops-hardening'],
@@ -79,6 +79,13 @@ describe('C8 classify', () => {
     [['apps/web/src/startup.ts'], ['ops'], 'startup.ts dropped from ops'],
     [['tests/log/canary.ts'], ['ops'], 'tests/log dropped from ops'],
     [['tests/db/runner.test.ts'], ['migrate'], 'runner moved'],
+    // POLY-142 R7: operator-invite joins auth (no new area); the CLI's own paths run it
+    [['tests/db/operator-invite.test.ts'], ['auth'], 'the new file is in no area, or in two'],
+    [['apps/worker/src/cli/main.ts'], ['auth'], 'apps/worker/src/cli dropped from auth / TABLE.db'],
+    [['apps/worker/src/cli/user-invite.ts'], ['auth'], 'apps/worker/src/cli dropped from auth / TABLE.db'],
+    [['apps/worker/src/startup.ts'], ['auth'], 'the worker startup guard (imported by the CLI) dropped from auth / TABLE.db'],
+    [['apps/worker/package.json'], ['auth'], 'the worker manifest dropped from auth / TABLE.db'],
+    [['bin/polycarpic'], ['auth'], 'the image dispatcher (run as a child by the CLI test) dropped from auth / TABLE.db'],
     [['tests/db/ops-hardening.test.ts', 'tests/db/auth-session.test.ts'], ['auth', 'ops'], 'a union of two areas is lost'],
   ];
   for (const [paths, want, mut] of ONLY) {

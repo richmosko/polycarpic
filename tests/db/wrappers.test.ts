@@ -15,6 +15,7 @@ let m: any;
 let auth: any;
 let session: any;
 let m0: any;
+let operator: any;
 
 beforeAll(async () => {
   db = freshDb();
@@ -27,6 +28,7 @@ beforeAll(async () => {
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
   session = await import('../../packages/db/src/session.ts');
+  operator = await import('../../packages/db/src/operator.ts'); // POLY-142 R3: the fourth wrapper, subpath @poly/db/operator
 });
 afterAll(async () => { await m?.close?.(); await auth?.close?.(); });
 
@@ -101,7 +103,7 @@ describe('withContextFreeTx', () => {
   });
 });
 
-describe('no nesting: all nine ordered pairs (self-nesting included), each refused with the inner callback never running', () => {
+describe('no nesting: all sixteen ordered pairs (self-nesting included), each refused with the inner callback never running  [POLY-142 C11: red if withOperatorTx is not a fourth Kind in context.ts]', () => {
   // M1's app.job_targets returns zero rows for every job (R4), so withSystem could never reach its callback. The
   // superuser replaces the body in THIS test database only (owner stays poly_authz) so the outer-system pairs run.
   beforeAll(() => {
@@ -112,9 +114,10 @@ describe('no nesting: all nine ordered pairs (self-nesting included), each refus
     tenant: (fn) => m.withTenant(session.sessionUserId(UID), SID, fn),
     system: (fn) => m.withSystem(SEEDED_JOB, SEEDED_TARGET, fn),
     ctxfree: (fn) => auth.withContextFreeTx(fn),
+    operator: (fn) => operator.withOperatorTx(fn),
   };
   // withSystem needs a resolvable principal to reach its callback: a job target is seeded by the superuser (seed shape
-    const kinds = ['tenant', 'system', 'ctxfree'];
+  const kinds = ['tenant', 'system', 'ctxfree', 'operator'];
   const pairs: [string, string][] = kinds.flatMap((o) => kinds.map((i) => [o, i] as [string, string]));
   for (const [outer, inner] of pairs) {
     it(`${inner} inside ${outer}`, async () => {
@@ -124,4 +127,54 @@ describe('no nesting: all nine ordered pairs (self-nesting included), each refus
       expect(innerRan).toBe(false);
     });
   }
+});
+
+// ---------------------------------------------------------------- POLY-142 C11 (O1): withOperatorTx
+describe('withOperatorTx (@poly/db/operator)', () => {
+  it('runs as poly_worker with app.actor = operator:cli and an empty app.user_id; its handle has no enterNewUser  [red if: wrong pool, a second setting, a user id, or the new-user step leaks onto the handle]', async () => {
+    const got = await operator.withOperatorTx(async (tx: any) => ({
+      who: (await q(tx, `select current_user as v`))[0].v,
+      actor: (await q(tx, `select current_setting('app.actor', true) as v`))[0].v,
+      uid: (await q(tx, `select coalesce(current_setting('app.user_id', true), '') as v`))[0].v,
+      sess: (await q(tx, `select coalesce(current_setting('app.session_id', true), '') as v`))[0].v,
+      step: 'enterNewUser' in tx || typeof tx.enterNewUser === 'function',
+    }));
+    expect(got).toEqual({ who: 'poly_worker', actor: 'operator:cli', uid: '', sess: '', step: false });
+  });
+  it('is_local: after commit and after rollback, the next checkout of a max:1 pool reads app.actor and app.user_id empty  [red if: the setting is session-level and rides the backend]', async () => {
+    await operator.close();
+    m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), max: 1 });
+    try {
+      await operator.withOperatorTx(async () => 'ok');
+      await expect(operator.withOperatorTx(async () => { throw new Error('boom'); })).rejects.toThrow('boom');
+      const after = await operator.withOperatorTx(async (tx: any) => (await q(tx, `select coalesce(current_setting('app.user_id', true), '') u`))[0].u);
+      expect(after).toBe('');
+      const raw = await m.withSystem(SEEDED_JOB, SEEDED_TARGET, async (tx: any) => (await q(tx, `select coalesce(current_setting('app.actor', true), '') a`))[0].a).catch(() => 'n/a');
+      expect(raw).not.toBe('operator:cli'); // a later transaction on the same backend carries no operator actor
+    } finally {
+      await operator.close();
+      m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
+    }
+  });
+  it('refuses a connection that carries an app.user_id, the callback never running  [red if: the emptiness assertion is missing]', async () => {
+    await operator.close();
+    m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
+    must(`ALTER ROLE poly_worker IN DATABASE ${db} SET app.user_id = '${UID}'`);
+    try {
+      let ran = false;
+      await expect(operator.withOperatorTx(async () => { ran = true; })).rejects.toThrow(/app\.user_id/i);
+      expect(ran).toBe(false);
+    } finally {
+      await operator.close();
+      m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
+      must(`ALTER ROLE poly_worker IN DATABASE ${db} RESET app.user_id`);
+    }
+  });
+  it('no other entry point exports it: @poly/db, /auth, /session, /migrate and /startup have no withOperatorTx  [red if: a re-export is added to any of them]', async () => {
+    for (const f of ['index', 'auth', 'session', 'migrate', 'startup']) {
+      const x: any = await import(`../../packages/db/src/${f}.ts`);
+      expect(Object.keys(x), f).not.toContain('withOperatorTx');
+    }
+    expect(Object.keys(operator)).toEqual(expect.arrayContaining(['withOperatorTx', 'close']));
+  });
 });

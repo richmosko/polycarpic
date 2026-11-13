@@ -20,8 +20,8 @@ export const DB_SHARED = [
 const T = (names) => names.map((n) => `tests/db/${n}.test.ts`);
 export const DB_AREAS = {
   auth: {
-    tests: T(['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step']),
-    paths: [/^packages\/auth\//, /^packages\/tenancy\//],
+    tests: T(['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite']),
+    paths: [/^packages\/auth\//, /^packages\/tenancy\//, /^apps\/worker\/src\/cli\//, /^apps\/worker\/src\/startup\.ts$/, /^apps\/worker\/package\.json$/, /^bin\/polycarpic$/],
   },
   tenancy: {
     tests: T(['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap']),
@@ -51,6 +51,7 @@ export const TABLE = {
   // POLY-102 R5: every path a job executes or imports, transitively, triggers that job.
   db: [
     /^tests\/db\//, /^packages\/tenancy\//, /^packages\/auth\//,
+    /^apps\/worker\/src\/cli\//, /^apps\/worker\/src\/startup\.ts$/, /^apps\/worker\/package\.json$/, /^bin\/polycarpic$/,
     /^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//,
     ...DB_SHARED,
   ],

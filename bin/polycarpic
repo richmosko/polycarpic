@@ -1,5 +1,5 @@
 #!/bin/sh
-# The image entrypoint (POLY-85 R5): polycarpic web|worker|migrate|status [args...]
+# The image entrypoint (POLY-85 R5): polycarpic web|worker|migrate|cli|status [args...]
 # One image, three services (ARCH 8.1); compose sets `command: ["web"]` and so on.
 set -eu
 here=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
@@ -9,9 +9,10 @@ case "$cmd" in
   web)     exec node "$here/apps/web/src/main.ts" "$@" ;;
   worker)  exec node "$here/apps/worker/src/main.ts" "$@" ;;
   migrate) exec node "$here/apps/migrate/src/cli.ts" "$@" ;;
+  cli)     exec node "$here/apps/worker/src/cli/main.ts" "$@" ;;
   status)  exec node "$here/apps/web/src/ops/cli-status.ts" "$@" ;;
   *)
-    echo "usage: polycarpic web|worker|migrate|status [args...]" >&2
+    echo "usage: polycarpic web|worker|migrate|cli|status [args...]" >&2
     exit 64
     ;;
 esac

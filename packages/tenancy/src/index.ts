@@ -45,4 +45,4 @@ export async function provisionPerson(tx: Tx): Promise<{ personId: string; creat
   return { personId: row.id, created: true };
 }
 
-export { InvitationRequired, claimInvitation, acceptInvitations, landingEntity, hashInvitationToken, decodeInvitationToken } from './invitation.ts';
+export { InvitationRequired, claimInvitation, acceptInvitations, landingEntity, hashInvitationToken, decodeInvitationToken, newInvitationToken, invitationLink, validOperatorEmail } from './invitation.ts';

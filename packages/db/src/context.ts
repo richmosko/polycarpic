@@ -1,5 +1,5 @@
-// The only connection path (ARCH §3.3): context is per transaction, never per session. withTenant, withSystem and
-// withContextFreeTx refuse to nest inside one another, so a query never runs under two identities.
+// The only connection path (ARCH §3.3): context is per transaction, never per session. withTenant, withSystem,
+// withContextFreeTx and withOperatorTx refuse to nest inside one another, so a query never runs under two identities.
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type pg from 'pg';
@@ -10,7 +10,7 @@ import type { SessionUserId } from './session.ts';
 export type Tx = NodePgDatabase;
 /** The handle withContextFreeTx passes: the one transaction kind that can enter a user it just inserted (R4). */
 export type ContextFreeTx = Tx & { enterNewUser(id: string): Promise<void> };
-type Kind = 'withTenant' | 'withSystem' | 'withContextFreeTx';
+type Kind = 'withTenant' | 'withSystem' | 'withContextFreeTx' | 'withOperatorTx';
 
 export class NestedContextError extends Error {
   constructor(inner: Kind, outer: Kind) {
@@ -186,4 +186,16 @@ export async function withContextFreeTx<T>(fn: (tx: ContextFreeTx) => Promise<T>
     const res = await c.query(`SELECT coalesce(pg_catalog.current_setting('app.user_id', true), '') AS v`);
     if (res.rows[0].v !== '') throw new ContextNotEmptyError();
   }, fn as (tx: Tx) => Promise<T>);
+}
+
+/**
+ * The operator's CLI transaction (POLY-142 R3; SECURITY C-84): the worker pool, no user, and only app.actor set. The actor is for
+ * the database's own logs: issue_operator_invitation writes its own literal. Exported on db/operator alone, to one caller.
+ */
+export async function withOperatorTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return inTransaction('withOperatorTx', workerPool, async (c) => {
+    const res = await c.query(`SELECT coalesce(pg_catalog.current_setting('app.user_id', true), '') AS v`);
+    if (res.rows[0].v !== '') throw new ContextNotEmptyError();
+    await c.query(`SELECT set_config('app.actor', 'operator:cli', true)`);
+  }, fn);
 }

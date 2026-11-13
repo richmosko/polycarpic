@@ -8,5 +8,6 @@
   { "function": "app.audit_membership()", "owner": "poly_govern", "execute": [] },
   { "function": "app.enter_new_user(uuid)", "owner": "poly_authz", "execute": ["poly_app"] },
   { "function": "app.claim_invitations(bytea, text)", "owner": "poly_govern", "execute": ["poly_app"] },
-  { "function": "app.accept_invitations(bytea)", "owner": "poly_govern", "execute": ["poly_app"] }
+  { "function": "app.accept_invitations(bytea)", "owner": "poly_govern", "execute": ["poly_app"] },
+  { "function": "app.issue_operator_invitation(p_email text, p_hash bytea, p_bootstrap boolean)", "owner": "poly_govern", "execute": ["poly_worker"] }
 ]
