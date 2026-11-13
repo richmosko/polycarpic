@@ -1,7 +1,7 @@
 ---
 id: POLY-146
 title: Identity hardening
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [process/cairn/issues/POLY-146.md, process/cairn/reviews/POLY-146/**, packages/auth/**, packages/config/**, packages/db/**, packages/tenancy/**, apps/worker/**, infra/compose/**, infra/lint/**, infra/postgres/**, tests/**, scripts/layers/**, layers.json, eslint.config.js, package.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, bin/polycarpic, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, process/cairn/issues/POLY-137.md, process/cairn/issues/POLY-97.md, process/cairn/issues/POLY-98.md]
 labels: [security, auth]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/126
 created: 2026-11-13
 updated: 2026-11-13
 ---
@@ -51,3 +51,7 @@ Feature started. Branch: `feature/poly-146-identity-hardening`.
 ### @architect — 2026-11-13
 
 Ruling addendum 1 (seceng review): the operator service logs to driver none and operator-one-shot requires it (T-99); C13 gains effective-privilege rows; the pre-connect check is a seatbelt. See process/cairn/reviews/POLY-146/ruling.md.
+
+### @team-lead — 2026-11-13
+
+PR opened: https://github.com/richmosko/polycarpic/pull/126. QA verdict pass (07c22000), security review pass (81a9a9dd). Awaiting the Principal's review and merge.
