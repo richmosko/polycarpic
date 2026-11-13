@@ -342,7 +342,8 @@ describe('conditions 12, 32: a sign-up missing a step is refused and leaves no u
   });
   it('C32: with acceptInvitations skipped the sign-up fails at commit (deferred stamp check) and leaves no user row  [red if: a stamped row can commit]', async () => {
     const { email, t, r } = await run(await variant({ enter: true, provision: true, accept: false })());
-    expect(r.status).toBeGreaterThanOrEqual(400);
+    expect(r.status).toBe(403);
+    expect(JSON.parse(await r.text()).code, 'the sign-up path still labels its commit-time 42501').toBe('invitation_required');
     expect(users(email)).toBe(0);
     expect(inviteRow(e.db, t)).toEqual(['', '', '']);
   });

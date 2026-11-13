@@ -113,6 +113,24 @@ describe('criterion 12: the sign-up hook never opens a transaction of its own', 
   });
 });
 
+describe('POLY-87 build check: a commit-time 42501 is labelled invitation_required on the sign-up path only', () => {
+  it('a signed-in request whose COMMIT fails with 42501 is not answered 403 invitation_required  [red if: handler.ts maps every 42501, withTenant included]', async () => {
+    must(`CREATE FUNCTION public.qa_late_42501() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'qa: refused at commit' USING ERRCODE = '42501'; END $$;
+      CREATE CONSTRAINT TRIGGER qa_late_42501 AFTER UPDATE ON public."user" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.name = 'Late') EXECUTE FUNCTION public.qa_late_42501();`, e.db);
+    const u = e.seedUser();
+    const { cookie } = await e.signIn(u.email, auth);
+    let label: string | null = null;
+    let outcome = 'rejected';
+    try {
+      const r = await e.handle(post('/update-user', { name: 'Late' }, cookie), auth);
+      outcome = `status ${r.status}`;
+      label = (await r.text()).includes('invitation_required') ? 'invitation_required' : null;
+    } catch { /* the error surfaces: also fine */ }
+    expect(label, outcome).toBeNull();
+    expect(must(`SELECT name FROM public."user" WHERE id = '${u.id}'`, e.db).rows[0][0]).toBe('QA User');
+  });
+});
+
 describe('S1/P1: commit only on success', () => {
   it('sign-up whose session insert is refused leaves no user, no account, and no Set-Cookie  [red if: handleAuthRequest commits when auth.handler returns >= 400 (BetterAuth swallows the throw)]', async () => {
     accepting();
