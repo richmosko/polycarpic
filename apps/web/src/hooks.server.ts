@@ -8,7 +8,7 @@ export const init: ServerInit = () => {
 
 const notFound = () => new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
 const isAuthTree = (p: string) => p === '/api/auth' || p.startsWith('/api/auth/');
-const isPublic = (p: string) => p === '/sign-in' || p.startsWith('/sign-in/') || p === '/healthz';
+const isPublic = (p: string) => p === '/sign-in' || p.startsWith('/sign-in/') || p === '/sign-up' || p === '/healthz';
 
 /** next is honoured only as a path on this origin: '/x', never '//x' or '/\x' (S12). */
 const safeNext = (path: string) => (path.startsWith('/') && path[1] !== '/' && path[1] !== '\\' ? path : '/');
