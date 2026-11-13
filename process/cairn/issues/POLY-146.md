@@ -47,3 +47,7 @@ The CLI moves to its own login role, poly_operator, which holds only EXECUTE on 
 ### @team-lead — 2026-11-13
 
 Feature started. Branch: `feature/poly-146-identity-hardening`.
+
+### @architect — 2026-11-13
+
+Ruling addendum 1 (seceng review): the operator service logs to driver none and operator-one-shot requires it (T-99); C13 gains effective-privilege rows; the pre-connect check is a seatbelt. See process/cairn/reviews/POLY-146/ruling.md.
