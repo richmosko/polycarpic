@@ -106,3 +106,9 @@ Open, not blocking the verdict:
 - R-2 widening to `poly_worker` is with the Principal.
 - INFRA §7.5 and the first-user runbook step still say the invite sends an email; they should say the link is printed once, and the wrapper must use `exec -T`. This is the INFRA owner's edit.
 - The 12.4 s file time is a candidate for POLY-143: it could share one clone and drop a child process.
+
+### @team-lead — 2026-11-12
+
+Gate 4: architect verdict PASS at f4f1a4f (comment @ b168176). Lead's finish pre-flight on cad7ee9: cairn Python suite 2017 OK (3 skipped), JS suite 494 pass, dashboard svelte-check 0 errors, dist fresh (rebuilt byte-identical).
+
+Principal, 2026-11-13: **approved** widening accepted risk R-2 to name `poly_worker`, as an interim statement. The Principal asked for a thorough investigation of whether a smaller component should assert identity to Postgres; that is POLY-145 (Identity trust boundary, P1, seceng), which re-words, keeps or retires R-2. The lead's proposal on POLY-145: it runs directly after this issue merges and ahead of POLY-89.
