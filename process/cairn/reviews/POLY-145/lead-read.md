@@ -73,4 +73,6 @@ One correction to my point 4. The architect notes that web still serves the sign
 
 Neither recommendation addresses my point 1 (hashed session storage as a requirement of stage 2). It stays open.
 
-The architect's file does not carry the line I asked for about having seen seceng's lean towards (e1) before writing.
+The architect's file carries an independence line (added at `014e8ab`): they saw seceng's lean towards (e1) before writing, had already priced (e1) as the cheapest option that stops SQL injection, and cannot rule out that it reinforced their view.
+
+My point 2 is disputed. Both teammates state that stage 1 leaves SQL injection in web at "any user", because the interim function believes whatever user web names. My reading is that an injected statement inside a transaction that already holds its marker cannot name a second user, provided the function refuses a second call in the same transaction; injection outside a marked transaction, and a stolen `poly_app` password, do reach any user. I have asked seceng to rule on it. Until they do, the stage 1 claim to rely on is theirs, the weaker one.
