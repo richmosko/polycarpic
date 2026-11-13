@@ -9,3 +9,4 @@
 Red by design until the build: wrap (3 sign-up tests), auth-fields core-calls, pgtap 04 (#19, #27), pgtap 05, new files.
 - Later fixes: pgtap 05 (constraint regex, quoting, pg_% roles); Explode trigger name; tenancy.test.ts 32-byte hashes; packages/tenancy/permission-matrix.json (sha256 hash, set-once-safe revoke); auth-signup-wrap + auth-signup-invite pin that only the sign-up run labels a commit-time 42501.
 - Local at d48a73b: db battery 414/414 (50 s wall; auth-signup-invite 17.9 s, auth-new-user-step 3.0 s), tests/ci 528, tests/layers 502, tests/infra 142.
+- apps/web/tests/e2e/shell.spec.ts:101: root redirect pin moves from /dashboard$ to /dashboard?entity=<uuid> (R3 item 6). Full e2e locally: 52 passed.

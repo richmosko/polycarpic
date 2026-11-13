@@ -98,7 +98,7 @@ test('CSP headers (C-07) and root redirect  [red if: script-src gains unsafe-inl
   expect(script).not.toContain("'unsafe-inline'");
   const root = await request.get(`${base}/`, { maxRedirects: 0 });
   expect(root.status()).toBe(307);
-  expect(root.headers()['location']).toMatch(/\/dashboard$/);
+  expect(root.headers()['location']).toMatch(/\/dashboard\?entity=[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/); // POLY-87 R3: the landing entity
 });
 
 test('Theme is a Light/Dark/Auto radio group that writes the cookie and class  [red if: a choice missing, cookie not written, class not set]', async ({ page, context }) => {
