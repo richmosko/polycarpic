@@ -105,10 +105,11 @@ describe('bin/polycarpic dispatcher', () => {
     expect(statSync(p).mode & 0o111).not.toBe(0);
     expect(readFileSync(p, 'utf8').split('\n')[0]).toMatch(/^#!\/bin\/sh\b/);
   });
-  it('dispatches web, worker, migrate and status, with exec', () => {
+  it('dispatches web, worker, migrate, status and cli, with exec  [POLY-142 C9, red if: no `cli` entry running apps/worker/src/cli/main.ts]', () => {
     const s = readFileSync(p, 'utf8');
-    for (const c of ['web', 'worker', 'migrate', 'status']) expect(s, c).toMatch(new RegExp(`\\b${c}\\b`));
+    for (const c of ['web', 'worker', 'migrate', 'status', 'cli']) expect(s, c).toMatch(new RegExp(`\\b${c}\\b`));
     expect(s).toMatch(/\bexec\s+node\b/);
+    expect(s).toMatch(/^\s*cli\)\s+exec node "\$here\/apps\/worker\/src\/cli\/main\.ts" "\$@"/m);
   });
   it('an unknown command exits non-zero without running node', () => {
     const r = spawnSync('sh', [p, 'bogus-command'], { encoding: 'utf8' });

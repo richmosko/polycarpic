@@ -38,7 +38,7 @@ function resolveSpec(from: string, s: string): string | null {
 
 const roots = [
   ...walk(join(ROOT, 'tests', 'db')),
-  ...['apps/migrate/src/cli.ts', 'apps/web/src/main.ts', ...readdirSync(join(ROOT, 'apps/web/src/ops')).map((f) => `apps/web/src/ops/${f}`)].map((f) => join(ROOT, f)),
+  ...['apps/migrate/src/cli.ts', 'apps/web/src/main.ts', 'apps/worker/src/cli/main.ts', ...readdirSync(join(ROOT, 'apps/web/src/ops')).map((f) => `apps/web/src/ops/${f}`)].map((f) => join(ROOT, f)),
 ];
 function closure(): Set<string> {
   const seen = new Set<string>();
