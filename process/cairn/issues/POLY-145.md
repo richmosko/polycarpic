@@ -24,14 +24,14 @@ seceng drives. The architect prices the rework and the topology. The lead gives 
 
 ## Acceptance criteria
 
-- [x] A threat model for the identity assertion alone: who the attackers are, and what each can do today from the web process, the worker process (which parses untrusted provider and import data), a stolen database credential, and a stolen session.
-- [x] At least these options are compared, each against the same attack scenarios: (a) today's design with its mitigations; (b) Postgres verifies a signed token whose signing key the web app and worker do not hold, with sign-in moved to a small separate service; (c) a thin generic data-access layer in front of Postgres, Supabase and PostgREST style; (d) one database role per user; (e) any stronger option the research finds.
-- [x] For each option: what it stops and what it does not, in plain words; the size of the code that must be trusted and how it would be audited and tested; what it does to the worker and to operator paths such as POLY-142's.
-- [x] How Supabase, and at least one other widely used system, actually do this is taken from their own documentation or source, cited, and dated. Nothing about them is stated from memory.
-- [x] The architect prices each option: rework to shipped issues (POLY-86, POLY-87, POLY-142), changes to the backlog (POLY-89, POLY-137, POLY-144, POLY-129), and running cost on one VPS.
-- [x] How the answer changes between a single-family self-hosted instance and a hosted, multi-family one (SECURITY R-6).
-- [x] seceng's recommendation and the architect's are stated separately, each named as theirs. The lead's independent read is a third section.
-- [x] The Principal decides. The decision is logged in `process/DECISIONS.md`, and R-2 is re-worded, kept, or retired to match. If the decision is a pivot, the rework is filed as issues with their order.
+- [x] A threat model for the identity assertion alone: who the attackers are, and what each can do today from the web process, the worker process (which parses untrusted provider and import data), a stolen database credential, and a stolen session. — process/cairn/reviews/POLY-145/threat-model.md: scenarios S1 to S8
+- [x] At least these options are compared, each against the same attack scenarios: (a) today's design with its mitigations; (b) Postgres verifies a signed token whose signing key the web app and worker do not hold, with sign-in moved to a small separate service; (c) a thin generic data-access layer in front of Postgres, Supabase and PostgREST style; (d) one database role per user; (e) any stronger option the research finds. — process/cairn/reviews/POLY-145/comparison.md: §1 reach per scenario; options.md
+- [x] For each option: what it stops and what it does not, in plain words; the size of the code that must be trusted and how it would be audited and tested; what it does to the worker and to operator paths such as POLY-142's. — process/cairn/reviews/POLY-145/comparison.md: §2 to §4
+- [x] How Supabase, and at least one other widely used system, actually do this is taken from their own documentation or source, cited, and dated. Nothing about them is stated from memory. — process/cairn/reviews/POLY-145/prior-art.md: every claim cited and dated 2026-11-13
+- [x] The architect prices each option: rework to shipped issues (POLY-86, POLY-87, POLY-142), changes to the backlog (POLY-89, POLY-137, POLY-144, POLY-129), and running cost on one VPS. — process/cairn/reviews/POLY-145/pricing.md: §2 and §3; current-state.md
+- [x] How the answer changes between a single-family self-hosted instance and a hosted, multi-family one (SECURITY R-6). — process/cairn/reviews/POLY-145/comparison.md: §5; pricing.md: §6
+- [x] seceng's recommendation and the architect's are stated separately, each named as theirs. The lead's independent read is a third section. — process/cairn/reviews/POLY-145/seceng-recommendation.md, architect-recommendation.md, lead-read.md
+- [x] The Principal decides. The decision is logged in `process/DECISIONS.md`, and R-2 is re-worded, kept, or retired to match. If the decision is a pivot, the rework is filed as issues with their order. — process/DECISIONS.md: 2026-11-13 entry; docs/SECURITY/index.html: R-2 (1.9.18); POLY-146 to POLY-149
 
 ## Output
 
