@@ -12,6 +12,8 @@
 // Every fail fixture is the pass fixture (baseline.ts) with ONE mutation. The last column names what, if the lint
 // regressed that way, turns the test red; the test itself is red now because the script does not exist.
 import { spawn } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { parse } from 'yaml';
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -133,7 +135,7 @@ const ROWS: Row[] = [
   ['${VAR} in security_opt', (s) => { svc(s, 'prod', 'web').security_opt = ['${SO}']; }, 'raw-interpolation', 'security_opt not scanned'],
   ['root service hidden behind a profile', (s) => { s.prod.services.dbg = { ...svc(s, 'prod', 'worker'), user: '0:0', profiles: ['debug'] }; }, 'user-nonroot', 'profiled services skipped (--profile * not used)'],
   ['FOO_FILE env pointing outside /run/secrets', (s) => { svc(s, 'prod', 'web').environment = { FOO_FILE: '/etc/x' }; }, 'env-secret', '*_FILE accepted without the path check'],
-  ['two services share one host secret file', (s) => { s.prod.secrets.auth_secret__worker.file = s.prod.secrets.auth_secret__web.file; }, 'secret-path', 'one file with two readers accepted'],
+  ['two services share one host secret file', (s) => { s.prod.secrets.resend_api_key__worker.file = s.prod.secrets.resend_api_key__web.file; }, 'secret-path', 'one file with two readers accepted'],
   ['ports: on web', (s) => { svc(s, 'prod', 'web').ports = ['3000:3000']; }, 'ports-caddy-only', 'ports allowed outside caddy'],
   ['ports: on postgres', (s) => { svc(s, 'staging', 'postgres').ports = ['5432:5432']; }, 'ports-caddy-only', 'staging not scanned'],
   ['caddy on a project default network', (s) => {
@@ -202,6 +204,20 @@ const ROWS: Row[] = [
     const l = s.text['infra/postgres/pg_hba.prod.conf']!.split('\n');
     s.text['infra/postgres/pg_hba.prod.conf'] = [...l.slice(4, 5), ...l.slice(0, 4), ...l.slice(5)].join('\n');
   }, 'pg-hba-prod', 'order of the first four lines not checked'],
+  // POLY-146 AC2 / AC6 (ruling R3): the auth secret leaves the worker; the operator secret stays in the one-shot service
+  ['prod worker mounts auth_secret', (s) => { giveSecret(s.prod, true, 'worker', 'auth_secret'); }, 'secret-matrix', 'the worker may hold the auth secret'],
+  ['staging worker mounts auth_secret', (s) => { giveSecret(s.staging, false, 'worker', 'auth_secret'); }, 'secret-matrix', 'the staging matrix still lists auth_secret for the worker'],
+  ['prod worker mounts db_password_operator', (s) => { giveSecret(s.prod, true, 'worker', 'db_password_operator'); }, 'secret-matrix', 'a long-running service may hold the operator password'],
+  ['prod web mounts db_password_operator', (s) => { giveSecret(s.prod, true, 'web', 'db_password_operator'); }, 'secret-matrix', 'web may hold the operator password'],
+  ['staging worker mounts db_password_operator', (s) => { giveSecret(s.staging, false, 'worker', 'db_password_operator'); }, 'secret-matrix', 'staging worker may hold the operator password'],
+  ['staging web mounts db_password_operator', (s) => { giveSecret(s.staging, false, 'web', 'db_password_operator'); }, 'secret-matrix', 'staging web may hold the operator password'],
+  ['prod operator restarts unless-stopped', (s) => { svc(s, 'prod', 'operator').restart = 'unless-stopped'; }, 'operator-one-shot', 'the operator may be long-running'],
+  ['staging operator restarts unless-stopped', (s) => { svc(s, 'staging', 'operator').restart = 'unless-stopped'; }, 'operator-one-shot', 'staging operator may be long-running'],
+  ['prod operator without its profile', (s) => { delete svc(s, 'prod', 'operator').profiles; }, 'operator-one-shot', 'the operator starts with the stack'],
+  ['staging operator without its profile', (s) => { delete svc(s, 'staging', 'operator').profiles; }, 'operator-one-shot', 'the staging operator starts with the stack'],
+  ['prod operator in a second profile', (s) => { svc(s, 'prod', 'operator').profiles = ['operator', 'extra']; }, 'operator-one-shot', 'profiles not exactly [operator]'],
+  ['prod operator without logging driver none', (s) => { delete svc(s, 'prod', 'operator').logging; }, 'operator-one-shot', 'the invitation link on stdout reaches the log driver (A1.1)'],
+  ['staging operator with the json-file log driver', (s) => { svc(s, 'staging', 'operator').logging = { driver: 'json-file' }; }, 'operator-one-shot', 'only the absence of logging is checked, not the driver'],
   // R1
   ['Caddy site block without the headers snippet', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\timport security_headers\n\tbasic_auth', '\tbasic_auth'); }, 'caddy-headers', 'per-site snippet import not checked'],
   ['Caddy snippet lacks nosniff', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\t\tX-Content-Type-Options "nosniff"\n', ''); }, 'caddy-headers', 'snippet contents not checked'],
@@ -220,6 +236,45 @@ describe.concurrent('compose-policy lint: fail fixtures (pass baseline + one mut
   it('every row documents the mutation that turns it red', async () => {
     for (const row of ROWS) expect(row[3].length).toBeGreaterThan(8);
   });
+});
+
+// POLY-146 AC6, AC7 (ruling R3): the repo's own files, read statically (the rendered-file lint runs on them in the pass test above).
+describe('POLY-146: the repo\'s compose and pg_hba files', () => {
+  const doc = (f: string) => parse(readFileSync(join(ROOT, 'infra/compose', f), 'utf8'), { merge: true });
+  const secretNames = (service: any): string[] => (service.secrets ?? []).map((x: any) => (typeof x === 'string' ? x : x.target ?? x.source));
+  for (const f of ['prod.yml', 'staging.yml']) {
+    it(`${f}: an operator service exists, one-shot, under its own profile, holding db_password_operator and nothing else  [red if: no operator service, long-running, or other secrets]`, () => {
+      const op = doc(f).services.operator;
+      expect(op, 'operator service').toBeDefined();
+      expect(String(op.restart)).toBe('no');
+      expect(op.profiles).toEqual(['operator']);
+      expect(op.logging?.driver, 'A1.1: the link on stdout must not reach a log driver').toBe('none');
+      expect(secretNames(op)).toEqual(['db_password_operator']);
+    });
+    it(`${f}: no service but operator mounts db_password_operator; web, worker and migrate hold no operator secret  [red if: a long-running service has the operator password (seceng #2)]`, () => {
+      const services = doc(f).services as Record<string, any>;
+      for (const [n, sv] of Object.entries(services)) if (n !== 'operator') expect(secretNames(sv), n).not.toContain('db_password_operator');
+      for (const n of ['web', 'worker']) {
+        expect(JSON.stringify(services[n]), `${n} names no operator secret`).not.toMatch(/operator/i);
+      }
+    });
+    it(`${f}: the worker mounts no auth secret and sets no AUTH_SECRET_FILE; web still does  [red if: the worker keeps the secret]`, () => {
+      const services = doc(f).services as Record<string, any>;
+      expect(secretNames(services.worker)).not.toContain('auth_secret');
+      expect(JSON.stringify(services.worker.environment ?? {})).not.toContain('AUTH_SECRET_FILE');
+      expect(secretNames(services.web)).toContain('auth_secret');
+    });
+  }
+  for (const [f, cidr] of [['pg_hba.prod.conf', '10.201.1.0/24'], ['pg_hba.staging.conf', '10.202.1.0/24']] as const) {
+    it(`${f}: poly_operator is admitted from ${cidr} with scram-sha-256, before the final reject  [red if: the line is missing, not scram, or after the reject]`, () => {
+      const rows = readFileSync(join(ROOT, 'infra/postgres', f), 'utf8').split('\n').map((l) => l.trim().split(/\s+/)).filter((r) => r[0] === 'host');
+      const at = rows.findIndex((r) => r[2] === 'poly_operator');
+      expect(at, 'poly_operator line').toBeGreaterThanOrEqual(0);
+      expect(rows[at]).toEqual(['host', 'polycarpic', 'poly_operator', cidr, 'scram-sha-256']);
+      const finalReject = rows.findIndex((r) => r[1] === 'all' && r[2] === 'all' && r[4] === 'reject');
+      expect(at).toBeLessThan(finalReject);
+    });
+  }
 });
 
 describe.concurrent('compose-policy lint: fail closed', () => {

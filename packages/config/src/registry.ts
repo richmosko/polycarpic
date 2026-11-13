@@ -1,7 +1,7 @@
 // The registry of operator secrets (POLY-85 ruling R3) and the secret-looking-name pattern (R2, S-1).
 // One table: a feature adds its row here, in its own PR, and makes it required when it needs it.
-export type Service = 'web' | 'worker' | 'migrate';
-export const SERVICES: readonly Service[] = ['web', 'worker', 'migrate'];
+export type Service = 'web' | 'worker' | 'migrate' | 'operator';
+export const SERVICES: readonly Service[] = ['web', 'worker', 'migrate', 'operator'];
 
 export interface SecretRow {
   /** The *_FILE variable name. */
@@ -13,8 +13,8 @@ export interface SecretRow {
 }
 
 export const REGISTRY: readonly SecretRow[] = [
-  { var: 'DATABASE_PASSWORD_FILE', services: ['web', 'worker', 'migrate'], required: true, shape: 'line' },
-  { var: 'AUTH_SECRET_FILE', services: ['web', 'worker'], required: true, shape: 'line' },
+  { var: 'DATABASE_PASSWORD_FILE', services: ['web', 'worker', 'migrate', 'operator'], required: true, shape: 'line' },
+  { var: 'AUTH_SECRET_FILE', services: ['web'], required: true, shape: 'line' },
   { var: 'CREDENTIAL_KEYRING_FILE', services: ['worker'], required: false, shape: 'text' },
   { var: 'OAUTH_GOOGLE_SECRET_FILE', services: ['web'], required: false, shape: 'line' },
   { var: 'OAUTH_GITHUB_SECRET_FILE', services: ['web'], required: false, shape: 'line' },

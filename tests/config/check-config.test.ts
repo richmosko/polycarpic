@@ -20,7 +20,7 @@ const file = (c: string) => { const p = join(dir, `f${n++}`); writeFileSync(p, c
 const good = (svc: Svc, over: Record<string, string | undefined> = {}): Record<string, string | undefined> => ({
   APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173',
   DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '1', DATABASE_NAME: 'none', DATABASE_USER: DBUSER[svc], DATABASE_SSLMODE: 'disable',
-  DATABASE_PASSWORD_FILE: file('pw\n'), ...(svc === 'migrate' ? {} : { AUTH_SECRET_FILE: file('auth\n') }), ...over,
+  DATABASE_PASSWORD_FILE: file('pw\n'), ...(svc !== 'web' ? {} : { AUTH_SECRET_FILE: file('auth\n') }), ...over,
 });
 const run = (svc: Svc, args: string[], env: Record<string, string | undefined>) => {
   const base: Record<string, string | undefined> = { PATH: process.env.PATH, HOME: process.env.HOME };
@@ -83,10 +83,15 @@ describe('check-config on every entrypoint (R3: the migrate container cannot see
     expect(r.code).toBe(1);
     expect(r.err).toContain('CREDENTIAL_KEYRING_FILE');
   });
-  it('web and worker require AUTH_SECRET_FILE; migrate does not', () => {
-    expect(run('web', ['check-config'], good('web', { AUTH_SECRET_FILE: undefined })).err).toContain('AUTH_SECRET_FILE');
-    expect(run('worker', ['check-config'], good('worker', { AUTH_SECRET_FILE: undefined })).err).toContain('AUTH_SECRET_FILE');
+  it('POLY-146 AC2: web requires AUTH_SECRET_FILE; migrate and worker do not [red if: worker still lists AUTH_SECRET_FILE]', () => {
+    expect(run('web', ['check-config'], good('web', { AUTH_SECRET_FILE: undefined })).err).toContain('check-config: AUTH_SECRET_FILE is not set');
+    expect(run('worker', ['check-config'], good('worker')).code).toBe(0);
     expect(run('migrate', ['check-config'], good('migrate')).code).toBe(0);
+  });
+  it('POLY-146 AC2: a worker with AUTH_SECRET_FILE set is refused as forbidden [red if: the worker may hold the auth secret]', () => {
+    const r = run('worker', ['check-config'], good('worker', { AUTH_SECRET_FILE: file('auth\n') }));
+    expect(r.code, r.text).toBe(1);
+    expect(r.err).toContain('AUTH_SECRET_FILE');
   });
 });
 
@@ -94,11 +99,12 @@ describe('start refuses before any pool exists (R3 Startup)', () => {
   for (const svc of ['web', 'worker'] as const) {
     it(`${svc}: a bad config exits 1 with one config.refused JSON line per problem (var, fault; never the path), connecting nowhere`, () => {
       const p = join(dir, `missing-${svc}`);
-      const r = run(svc, [], good(svc, { AUTH_SECRET_FILE: p, TLS_MODE: undefined }));
+      const bad = svc === 'web' ? 'AUTH_SECRET_FILE' : 'DATABASE_PASSWORD_FILE';
+      const r = run(svc, [], good(svc, { [bad]: p, TLS_MODE: undefined }));
       expect(r.code, r.text).toBe(1);
       const lines = r.text.split('\n').filter((l) => l.startsWith('{')).map((l) => JSON.parse(l));
       const refused = lines.filter((l) => l.event === 'config.refused');
-      expect(refused.map((l) => l.var).sort()).toEqual(['AUTH_SECRET_FILE', 'TLS_MODE']);
+      expect(refused.map((l) => l.var).sort()).toEqual([bad, 'TLS_MODE']);
       for (const l of refused) {
         expect(l.service).toBe(svc);
         expect(typeof l.fault).toBe('string');
@@ -142,4 +148,32 @@ describe('structure (R1, R7)', () => {
     expect(s.match(/schemaStatus\(/g)!.length).toBeGreaterThanOrEqual(2); // the definition and a call from the guard
   });
   it('the committed log schema exists beside the package', () => expect(existsSync(join(ROOT, 'packages/config/log.schema.json'))).toBe(true));
+});
+
+// POLY-146 AC2/AC5 (ruling R3): the operator is a service of its own. In-process on the real checkConfig; no file is read from the repo.
+describe('POLY-146: the operator service in the config registry', () => {
+  let mod: any;
+  const env = (over: Record<string, string | undefined> = {}) => ({ ...good('worker', { DATABASE_USER: 'poly_operator' }), ...over });
+  const load = async () => (mod ??= await import(join(ROOT, 'packages/config/src/index.ts')));
+  it('checkConfig(operator) is clean with DATABASE_USER=poly_operator and the one DB password file, no auth secret  [red if: operator is not a Service]', async () => {
+    const m = await load();
+    expect(m.SERVICES).toContain('operator');
+    expect(m.checkConfig('operator', env())).toEqual([]);
+  });
+  it('operator with DATABASE_USER=poly_worker is refused on DATABASE_USER  [red if: DB_USER.operator is not poly_operator]', async () => {
+    const m = await load();
+    expect(m.checkConfig('operator', env({ DATABASE_USER: 'poly_worker' })).map((p: any) => p.var)).toContain('DATABASE_USER');
+  });
+  it('worker with DATABASE_USER=poly_operator is refused too  [red if: the user check is not per service]', async () => {
+    const m = await load();
+    expect(m.checkConfig('worker', good('worker', { DATABASE_USER: 'poly_operator' })).map((p: any) => p.var)).toContain('DATABASE_USER');
+  });
+  it('AUTH_SECRET_FILE is forbidden in operator and worker, not_set in web  [red if: the registry row still names worker]', async () => {
+    const m = await load();
+    const fault = (svc: string, e: any) => m.checkConfig(svc, e).filter((p: any) => p.var === 'AUTH_SECRET_FILE').map((p: any) => p.fault);
+    expect(fault('operator', env({ AUTH_SECRET_FILE: file('a\n') }))).toEqual(['forbidden']);
+    expect(fault('worker', good('worker', { AUTH_SECRET_FILE: file('a\n') }))).toEqual(['forbidden']);
+    expect(fault('web', good('web', { AUTH_SECRET_FILE: undefined }))).toEqual(['not_set']);
+    expect(m.REGISTRY.find((r: any) => r.var === 'AUTH_SECRET_FILE').services).toEqual(['web']);
+  });
 });

@@ -56,7 +56,7 @@ export async function boot() {
   vi.resetModules();
   const dbm: any = await import('../../../packages/db/src/index.ts');
   await dbm.close();
-  dbm.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db) });
+  dbm.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
   const dba: any = await import('../../../packages/db/src/auth.ts');
   const dbs: any = await import('../../../packages/db/src/session.ts');
   const A: any = await import('../../../packages/auth/src/index.ts');

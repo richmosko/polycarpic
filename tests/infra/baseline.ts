@@ -36,8 +36,9 @@ export function giveSecret(proj: Y, prod: boolean, service: string, name: string
 const MATRIX_PROD: Record<string, string[]> = {
   postgres: ['db_superuser_password'],
   web: ['db_password_app', 'auth_secret', 'resend_api_key', 'plaid_secret'],
-  worker: ['db_password_worker', 'auth_secret', 'credential_keyring', 'resend_api_key'],
+  worker: ['db_password_worker', 'credential_keyring', 'resend_api_key'],
   migrate: ['db_password_migrator'],
+  operator: ['db_password_operator'],
   backup: ['db_password_backup'],
   uploader: ['backup_store_credential', 'heartbeat_url'],
 };
@@ -66,6 +67,8 @@ function project(kind: 'prod' | 'staging'): Y {
     web: hard(10001, { image: APP, networks: ['default', E] }),
     worker: hard(10002, { image: APP, networks: ['default'] }),
     migrate: hard(10003, { image: APP, networks: ['default'] }),
+    // POLY-146 R3: the one-shot operator service. Its own profile, restart "no", the one secret; no long-running service holds it.
+    operator: hard(prod ? 10006 : 10106, { image: APP, networks: ['default'], restart: 'no', profiles: ['operator'], logging: { driver: 'none' }, entrypoint: ['/app/bin/polycarpic', 'cli'], mem_limit: '256m' }),
   };
   if (prod) {
     services.backup = hard(10004, { image: '${POLY_POSTGRES_IMAGE:?}', networks: ['backup-net'] });
@@ -98,6 +101,7 @@ host  replication  all            all             reject
 host  polycarpic   poly_app       10.201.1.0/24   scram-sha-256
 host  polycarpic   poly_worker    10.201.1.0/24   scram-sha-256
 host  polycarpic   poly_migrator  10.201.1.0/24   scram-sha-256
+host  polycarpic   poly_operator  10.201.1.0/24   scram-sha-256
 host  all          all            all             reject
 local all          postgres                       peer
 `;
@@ -106,6 +110,7 @@ host  replication  all            all             reject
 host  polycarpic   poly_app       10.202.1.0/24   scram-sha-256
 host  polycarpic   poly_worker    10.202.1.0/24   scram-sha-256
 host  polycarpic   poly_migrator  10.202.1.0/24   scram-sha-256
+host  polycarpic   poly_operator  10.202.1.0/24   scram-sha-256
 host  all          all            all             reject
 local all          postgres                       peer
 `;

@@ -97,6 +97,7 @@ export function authOptions(input: AuthInput) {
       encryptOAuthTokens: true,
     },
     verification: {
+      storeIdentifier: 'hashed' as const,
       modelName: 'verification',
       fields: {
         identifier: f.verification.fields.identifier,
@@ -142,7 +143,7 @@ export function authOptions(input: AuthInput) {
           },
         },
       }),
-      magicLink({ sendMagicLink: input.sendMagicLink }),
+      magicLink({ sendMagicLink: input.sendMagicLink, storeToken: 'hashed' }),
       passkey({
         rpName: 'polycarpic',
         schema: {

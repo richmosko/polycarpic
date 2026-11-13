@@ -10,6 +10,8 @@ export interface PoolConfig {
   app?: Env;
   /** DATABASE_* settings for withSystem's pool (default: process.env). */
   worker?: Env;
+  /** DATABASE_* settings for withOperatorTx's pool (default: process.env). DATABASE_USER must be poly_operator. */
+  operator?: Env;
   /** Max connections per pool (pg default when unset). */
   max?: number;
 }
@@ -17,6 +19,18 @@ export interface PoolConfig {
 let config: PoolConfig = {};
 let app: pg.Pool | undefined;
 let worker: pg.Pool | undefined;
+let operator: pg.Pool | undefined;
+
+/**
+ * The operator pool refuses before any connection unless the configured user is poly_operator (POLY-146 R1). This is a seatbelt,
+ * not the boundary: the boundary is that no process but the `operator` service holds poly_operator's password.
+ */
+export class OperatorPoolRefused extends Error {
+  constructor() {
+    super('the operator pool requires DATABASE_USER=poly_operator');
+    this.name = 'OperatorPoolRefused';
+  }
+}
 
 export function configure(next: PoolConfig): void {
   config = next;
@@ -34,9 +48,16 @@ export function workerPool(): pg.Pool {
   return (worker ??= new pg.Pool({ ...connectionFrom(config.worker ?? process.env), ...maxOpt() }));
 }
 
+export function operatorPool(): pg.Pool {
+  const env = config.operator ?? process.env;
+  if (env.DATABASE_USER !== 'poly_operator') throw new OperatorPoolRefused();
+  if (operator) return operator;
+  return (operator = new pg.Pool({ ...connectionFrom(env), ...maxOpt() }));
+}
+
 export async function close(): Promise<void> {
-  const open = [app, worker].filter((p): p is pg.Pool => p !== undefined);
-  app = worker = undefined;
+  const open = [app, worker, operator].filter((p): p is pg.Pool => p !== undefined);
+  app = worker = operator = undefined;
   config = {};
   await Promise.all(open.map((p) => p.end()));
 }

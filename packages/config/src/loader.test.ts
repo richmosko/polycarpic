@@ -34,7 +34,7 @@ const good = (svc: Svc, over: Env = {}): Env => {
     DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '5432', DATABASE_NAME: 'polycarpic', DATABASE_USER: DBUSER[svc],
     DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: file('pw\n'),
   };
-  if (svc !== 'migrate') e.AUTH_SECRET_FILE = file('auth-secret\n');
+  if (svc === 'web') e.AUTH_SECRET_FILE = file('auth-secret\n');
   return { ...e, ...over };
 };
 const prod = (svc: Svc, over: Env = {}): Env =>
@@ -64,7 +64,7 @@ describe('good environments', () => {
 });
 
 describe('R3 *_FILE semantics (criterion 1: a missing or empty file refuses start, naming the variable)', () => {
-  const required: [Svc, string][] = [['web', 'DATABASE_PASSWORD_FILE'], ['worker', 'DATABASE_PASSWORD_FILE'], ['migrate', 'DATABASE_PASSWORD_FILE'], ['web', 'AUTH_SECRET_FILE'], ['worker', 'AUTH_SECRET_FILE']];
+  const required: [Svc, string][] = [['web', 'DATABASE_PASSWORD_FILE'], ['worker', 'DATABASE_PASSWORD_FILE'], ['migrate', 'DATABASE_PASSWORD_FILE'], ['web', 'AUTH_SECRET_FILE']];
   for (const [svc, v] of required) {
     it(`${svc}: ${v} unset refuses, naming it`, () => expect(vars(svc, good(svc, { [v]: undefined }))).toContain(v));
     it(`${svc}: ${v} set to '' refuses, naming it`, () => expect(vars(svc, good(svc, { [v]: '' }))).toContain(v));
@@ -130,6 +130,7 @@ describe('R3 *_FILE semantics (criterion 1: a missing or empty file refuses star
     it('CREDENTIAL_KEYRING_FILE is refused in web, even with a good file', () => expect(vars('web', good('web', { CREDENTIAL_KEYRING_FILE: file('k\n') }))).toContain('CREDENTIAL_KEYRING_FILE'));
     it('CREDENTIAL_KEYRING_FILE is refused in migrate', () => expect(vars('migrate', good('migrate', { CREDENTIAL_KEYRING_FILE: file('k\n') }))).toContain('CREDENTIAL_KEYRING_FILE'));
     it('AUTH_SECRET_FILE is refused in migrate (the migrator password only)', () => expect(vars('migrate', good('migrate', { AUTH_SECRET_FILE: file('a\n') }))).toContain('AUTH_SECRET_FILE'));
+    it('POLY-146: AUTH_SECRET_FILE is refused in worker and operator too (web alone holds it)', () => { for (const s of ['worker', 'operator'] as const) expect(vars(s as any, { ...good('worker'), DATABASE_USER: s === 'operator' ? 'poly_operator' : 'poly_worker', AUTH_SECRET_FILE: file('a\n') })).toContain('AUTH_SECRET_FILE'); });
     it('PRICE_API_KEY_FILE is refused in web', () => expect(vars('web', good('web', { PRICE_API_KEY_FILE: file('a\n') }))).toContain('PRICE_API_KEY_FILE'));
     for (const env of [good, stage, prod] as const) {
       it(`an unregistered *_FILE (a typo) is refused, naming it (${env === good ? 'development' : env === stage ? 'staging' : 'production'})`, () =>

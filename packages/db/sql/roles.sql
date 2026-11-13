@@ -13,6 +13,7 @@ BEGIN
       ('poly_migrator', true),
       ('poly_app',      true),
       ('poly_worker',   true),
+      ('poly_operator', true),
       ('poly_authz',    false),
       ('poly_purge',    false),
       ('poly_rollup',   false),
@@ -51,7 +52,7 @@ DO $db$
 BEGIN
   EXECUTE format('ALTER DATABASE %I OWNER TO poly_owner', current_database());
   EXECUTE format('REVOKE ALL ON DATABASE %I FROM PUBLIC', current_database());
-  EXECUTE format('GRANT CONNECT ON DATABASE %I TO poly_migrator, poly_app, poly_worker, poly_backup', current_database());
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO poly_migrator, poly_app, poly_worker, poly_operator, poly_backup', current_database());
 END
 $db$;
 

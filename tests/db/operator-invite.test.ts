@@ -242,15 +242,72 @@ function cli(args: string[], env: Record<string, string>): Promise<Child> {
     c.on('close', (code) => { clearTimeout(k); res({ code, out, err }); });
   });
 }
-const secret = join(mkdtempSync(join(tmpdir(), 'poly142-')), 'auth_secret');
-writeFileSync(secret, 'qa-auth-secret-0123456789abcdef0123456789abcdef\n');
 const childEnv = (extra: Record<string, string | undefined> = {}) => {
-  const env: Record<string, string | undefined> = { PATH: process.env.PATH, ...dbEnv('poly_worker', e.db), APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173', AUTH_SECRET_FILE: secret, ...extra };
+  const env: Record<string, string | undefined> = { PATH: process.env.PATH, ...dbEnv('poly_operator', e.db), APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173', ...extra };
   return Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined)) as Record<string, string>;
 };
 const counter = () => new Promise<{ port: number; n: () => number; close: () => void }>((r) => {
   let n = 0;
   const s = net.createServer((c) => { n++; c.on('error', () => {}); c.destroy(); }).listen(0, '127.0.0.1', () => r({ port: (s.address() as net.AddressInfo).port, n: () => n, close: () => s.close() }));
+});
+
+describe('POLY-146 AC5: the operator has its own pool (ruling R1)', () => {
+  const opm = () => import(join(ROOT, 'packages/db/src/operator.ts')) as Promise<any>;
+  const cfg = (operator: Record<string, string> | undefined) => e.dbm.configure({ app: dbEnv('poly_app', e.db), worker: dbEnv('poly_worker', e.db), operator });
+  const restore = () => cfg(dbEnv('poly_operator', e.db));
+  it('withOperatorTx runs as poly_operator, not the worker role  [red if: it still borrows the worker pool]', async () => {
+    const m = await opm();
+    restore();
+    const who = await m.withOperatorTx(async (tx: any) => (await tx.execute(e.dbm.sql`SELECT current_user AS u`)).rows[0].u);
+    expect(who).toBe('poly_operator');
+  });
+  it('an operator env whose DATABASE_USER is poly_worker throws OperatorPoolRefused and opens no connection  [red if: the pool is built from whatever user it is given]', async () => {
+    const c = await counter();
+    try {
+      const m = await opm();
+      expect(typeof m.OperatorPoolRefused, 'OperatorPoolRefused is exported on @poly/db/operator').toBe('function');
+      await e.dbm.close(); // pools are built once; the refusal is at build time
+      cfg({ ...dbEnv('poly_worker', e.db), DATABASE_HOST: '127.0.0.1', DATABASE_PORT: String(c.port) });
+      await expect(m.withOperatorTx(async () => 1)).rejects.toBeInstanceOf(m.OperatorPoolRefused);
+      expect(c.n(), 'no connection attempted').toBe(0);
+    } finally { c.close(); await e.dbm.close(); restore(); }
+  });
+  it('the same refusal when the user comes from process.env alone (no operator config)  [red if: the process.env path skips the user check]', async () => {
+    const c = await counter();
+    const saved = { ...process.env };
+    try {
+      const m = await opm();
+      await e.dbm.close();
+      cfg(undefined);
+      Object.assign(process.env, dbEnv('poly_worker', e.db), { DATABASE_HOST: '127.0.0.1', DATABASE_PORT: String(c.port) });
+      await expect(m.withOperatorTx(async () => 1)).rejects.toBeInstanceOf(m.OperatorPoolRefused);
+      expect(c.n()).toBe(0);
+    } finally {
+      for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
+      Object.assign(process.env, saved);
+      c.close();
+      await e.dbm.close();
+      restore();
+    }
+  });
+  it('a child `bin/polycarpic cli` run with DATABASE_USER=poly_worker exits 1 with config.refused naming DATABASE_USER and never connects  [red if: the CLI accepts the worker role]', async () => {
+    const c = await counter();
+    try {
+      const r = await cli(['user', 'invite', `wk-${stamp()}@qa.test`], childEnv({ ...dbEnv('poly_worker', e.db), DATABASE_HOST: '127.0.0.1', DATABASE_PORT: String(c.port) }));
+      expect(r.code, r.err).toBe(1);
+      expect(r.err).toMatch(/config\.refused/);
+      expect(r.err).toMatch(/DATABASE_USER/);
+      expect(r.out).toBe('');
+      expect(c.n()).toBe(0);
+    } finally { c.close(); }
+  });
+  it('a child run with AUTH_SECRET_FILE set is refused (the operator never holds the auth secret)  [red if: the operator registry row allows it]', async () => {
+    const f = join(mkdtempSync(join(tmpdir(), 'poly146-')), 'auth_secret');
+    writeFileSync(f, 'x-auth-secret-0123456789abcdef0123456789abcdef\n');
+    const r = await cli(['user', 'invite', `as-${stamp()}@qa.test`], childEnv({ AUTH_SECRET_FILE: f }));
+    expect(r.code).toBe(1);
+    expect(r.err).toMatch(/AUTH_SECRET_FILE/);
+  });
 });
 
 describe('C6 + C9: through the image dispatcher (sh bin/polycarpic cli user invite ...)', () => {
@@ -359,11 +416,11 @@ describe('C7: the token goes nowhere else', () => {
 
 // ---------------------------------------------------------------- definer allowlist (C12's definers.json half)
 describe('C12 (catalog half in TS): definers.json', () => {
-  it('lists app.issue_operator_invitation with owner poly_govern, EXECUTE [poly_worker]; the C-15 comparison finds no gap  [red if: absent, another owner or grantee]', () => {
+  it('lists app.issue_operator_invitation with owner poly_govern, EXECUTE [poly_operator]; the C-15 comparison finds no gap  [red if: absent, another owner or grantee]', () => {
     const d = loadAllow().filter((x) => x.function.startsWith('app.issue_operator_invitation('));
     expect(d).toHaveLength(1);
     expect(d[0]!.owner).toBe('poly_govern');
-    expect(d[0]!.execute).toEqual(['poly_worker']);
+    expect(d[0]!.execute).toEqual(['poly_operator']);
     expect(definerGaps(e.db)).toEqual([]);
   });
 });

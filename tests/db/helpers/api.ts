@@ -22,14 +22,15 @@ export function dbEnv(role: string, db: string): Record<string, string> {
   const s = JSON.parse(process.env.POLY_TEST_SERVER!);
   return { DATABASE_HOST: s.host, DATABASE_PORT: String(s.port), DATABASE_NAME: db, DATABASE_USER: role, DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: f };
 }
-export const LOGIN = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_backup'];
+export const LOGIN = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_backup', 'poly_operator'];
 
 /** Global setup, once per run: the roles are cluster-global, so their harness passwords are set here and freshDb() never does. */
 export function setRolePasswords(): void {
   const db = freshName();
   must(`CREATE DATABASE ${db}`);
   must(readFileSync(BOOTSTRAP, 'utf8'), db); // creates the roles (idempotent)
-  must(LOGIN.map((r) => `ALTER ROLE ${r} PASSWORD 'qa-${r}';`).join('\n'), db);
+  // a role roles.sql does not create yet is skipped here, so a missing poly_operator is reported by pgTAP 01, not by every suite
+  must(LOGIN.map((r) => `DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${r}') THEN ALTER ROLE ${r} PASSWORD 'qa-${r}'; END IF; END $$;`).join('\n'), db);
   must(`DROP DATABASE ${db}`);
 }
 
