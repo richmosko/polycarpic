@@ -72,3 +72,11 @@ My reading, labelled as mine: this loop keeps the issue's criteria as filed. The
 ### @architect — 2026-11-12
 
 Gate-1 ruling: process/cairn/reviews/POLY-142/ruling.md (R0–R9, C1–C16, seceng's O1–O11 folded in). The acceptance criteria are amended in place: the command is `polycarpic cli user invite`, lint confines `@poly/db/operator` to `apps/worker/src/cli/user-invite.ts`, the bootstrap rule holds in accept too, and the link is written after commit. Paths to add: `bin/polycarpic`. The operator tests join the `auth` db area, so there is no new area and no `ci.yml` edit. Timing cap: +9 s on the battery-step median against a same-day main.
+
+### @team-lead — 2026-11-12
+
+Gate 1 closed: ruling at 6d74446 (`process/cairn/reviews/POLY-142/ruling.md`), 16 conditions, one addendum (seceng G1 corrects C14 in place; G2 confines the tenancy issuer file). seceng review at 9400c41 (O1–O11), ruling check at 0b7293b, no condition open. Command is `polycarpic cli user invite`. No new CI area and no `ci.yml` edit; the tests join `auth`. Timing cap +9 s on the battery-step median against a same-day main (the architect's estimate, unmeasured). Path `bin/polycarpic` added (R9).
+
+Gate 2: tests red at c8df69d, 75 red for missing implementation, all 16 conditions and the CI-map pins covered (`red-gate.md`). qa's caveat: the tests that need the CLI fail at import, so their assertions are unproven until the build runs them. Suite cost unmeasured until gate 3.
+
+Open with the Principal: widening accepted risk R-2 to name `poly_worker` (seceng and the architect recommend yes). The SECURITY edits wait on it; the build does not.
