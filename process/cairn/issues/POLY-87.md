@@ -18,20 +18,20 @@ After the first (operator) user, an invitation is the only way into an instance;
 
 ## Acceptance criteria
 
-- [ ] With no invitation, the sign-up route refuses account creation; no config flag, env var or admin setting changes that.
-- [ ] An invitation link works once and expires; an accepted, revoked or expired link cannot be replayed.
-- [ ] An invitee with an entity invite lands on that entity; one without lands on their own Person.
-- [ ] /sign-up/email without a live invitation is refused at the route allowlist (ARCH §3.1c).
-- [ ] Sign-up by invitation commits the user row, the Person, the owner membership and the seeded accounts together; after a forced rollback of our transaction none of them exists (ARCH v1.14 §3.1).
-- [ ] Inside the sign-up transaction the hook sets `app.user_id` with `is_local = true` through packages/db before provisionPerson, and provisionPerson's inserts succeed as poly_app under FORCE RLS; with the step removed, the same sign-up is refused by RLS and leaves no user row.
-- [ ] A throw inside provisionPerson fails the sign-up and leaves no user row, Person, membership or account.
-- [ ] After the sign-up transaction commits, `app.user_id` is unset on that pooled backend (a context-free query there sees zero tenant rows).
-- [ ] The new-user step is reachable only through withContextFreeTx's handle, not from the db/auth index. It refuses an existing user's id, a second call, a call outside withContextFreeTx, and an id whose insert was rolled back to a savepoint (SECURITY C-84, T-90).
-- [ ] A throw after the new-user step leaves no user, entity or membership row. After both a commit and a rollback, the next checkout of that backend reads app.user_id empty.
-- [ ] The invitation is checked and consumed in the sign-up transaction. Two sign-ups racing on one invitation yield exactly one user, and the loser leaves no user row.
-- [ ] The step refuses a provisioned user's id planted in the setting by set_config; a rollback to the savepoint clears the recorded id.
-- [ ] A membership on an invited entity is written only by the invitation-accept definer: `poly_app` holds no INSERT on `membership` (POLY-62 ruling R4). The definer seats `app.current_user_id()` against a matching live invitation, and for manager or owner only after the second step is enrolled.
-- [ ] Operator invitations with no entity have their own definer path: `invitation` rows with `entity_id IS NULL` pass no `poly_app` policy, and `app.gate_owner_changes()` refuses them today (POLY-62 verdict).
+- [x] With no invitation, the sign-up route refuses account creation; no config flag, env var or admin setting changes that. _Proved by: tests/db/auth-signup-invite.test.ts C1+28, C2, C23._
+- [x] An invitation link works once and expires; an accepted, revoked or expired link cannot be replayed. _Proved by: auth-signup-invite C1, C3, C4 (single use, replay, race)._
+- [x] An invitee with an entity invite lands on that entity; one without lands on their own Person. _Proved by: auth-signup-invite C6, C7; apps/web/src/routes/page.server.test.ts; e2e shell.spec.ts root redirect._
+- [x] /sign-up/email without a live invitation is refused at the route allowlist (ARCH §3.1c). _Proved by: auth-signup-invite C1+28 (route hook 403), C24; route-policy tests._
+- [x] Sign-up by invitation commits the user row, the Person, the owner membership and the seeded accounts together; after a forced rollback of our transaction none of them exists (ARCH v1.14 §3.1). _Proved by: auth-signup-invite C9, C10, C32 variants._
+- [x] Inside the sign-up transaction the hook sets `app.user_id` with `is_local = true` through packages/db before provisionPerson, and provisionPerson's inserts succeed as poly_app under FORCE RLS; with the step removed, the same sign-up is refused by RLS and leaves no user row. _Proved by: auth-new-user-step C5, C13; auth-signup-invite C12 variant._
+- [x] A throw inside provisionPerson fails the sign-up and leaves no user row, Person, membership or account. _Proved by: auth-signup-invite C10 (provisionPerson trigger); the seeded accounts are ticked against the Person and its owner membership, as ruling R3 says._
+- [x] After the sign-up transaction commits, `app.user_id` is unset on that pooled backend (a context-free query there sees zero tenant rows). _Proved by: auth-signup-invite C11 (pool max 1, commit and rollback)._
+- [x] The new-user step is reachable only through withContextFreeTx's handle, not from the db/auth index. It refuses an existing user's id, a second call, a call outside withContextFreeTx, and an id whose insert was rolled back to a savepoint (SECURITY C-84, T-90). _Proved by: auth-new-user-step C13 (handle), C14; tests/layers fixtures 30-32._
+- [x] A throw after the new-user step leaves no user, entity or membership row. After both a commit and a rollback, the next checkout of that backend reads app.user_id empty. _Proved by: auth-signup-invite C10, C11._
+- [x] The invitation is checked and consumed in the sign-up transaction. Two sign-ups racing on one invitation yield exactly one user, and the loser leaves no user row. _Proved by: auth-signup-invite C4, C27._
+- [x] The step refuses a provisioned user's id planted in the setting by set_config; a rollback to the savepoint clears the recorded id. _Proved by: auth-new-user-step C13 (forged setting, savepoint); pgtap 05 C17, C32._
+- [x] A membership on an invited entity is written only by the invitation-accept definer: `poly_app` holds no INSERT on `membership` (POLY-62 ruling R4). The definer seats `app.current_user_id()` against a matching live invitation, and for manager or owner only after the second step is enrolled. _Proved by: pgtap 05 C15, C18; tests/db/pgtap/04_tenancy.sql._
+- [x] Operator invitations with no entity have their own definer path: `invitation` rows with `entity_id IS NULL` pass no `poly_app` policy, and `app.gate_owner_changes()` refuses them today (POLY-62 verdict). _Proved by: pgtap 05 C16, C23; auth-signup-invite C23._
 
 ## Comments
 
