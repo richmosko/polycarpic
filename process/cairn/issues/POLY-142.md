@@ -80,3 +80,9 @@ Gate 1 closed: ruling at 6d74446 (`process/cairn/reviews/POLY-142/ruling.md`), 1
 Gate 2: tests red at c8df69d, 75 red for missing implementation, all 16 conditions and the CI-map pins covered (`red-gate.md`). qa's caveat: the tests that need the CLI fail at import, so their assertions are unproven until the build runs them. Suite cost unmeasured until gate 3.
 
 Open with the Principal: widening accepted risk R-2 to name `poly_worker` (seceng and the architect recommend yes). The SECURITY edits wait on it; the build does not.
+
+### @team-lead — 2026-11-12
+
+Gate 3 closed: build green at f4f1a4f (build commits 55bdd41, 0e262d3, f4f1a4f; test fixes 713d615, 5225f83, 09165dc). qa's run of record at f4f1a4f: db battery 446 pass + 2 expected fail (448), 53.4 s; whole web e2e 52 pass (`build-gate-qa.md` @ 1e8868c). Timing guard, measured at 09165dc (f4f1a4f changes one line in `apps/worker/src/cli/main.ts`): median 57 s branch against 50 s on main at 558caf6, n = 3 alternating, local Docker; +7 s against the +9 s cap. `operator-invite.test.ts` runs 12.4 s as a file against the ruling's 7 s estimate. The CI `db` job median is read on the PR's first run (about 93 s on main, 100 s warning budget).
+
+Architect build check at 321b62a: A1–A8 pass, A5 corrected by f4f1a4f, A10 is ARCH 1.15.21. seceng build check at ca0c3c9: O1–O11, G1, G2 met; SECURITY 1.9.17, C-28 definition at 66fc9b6; R-2 text held for the Principal. Builder changes accepted by both: owner EXECUTE revoked, `poly_app` SELECT on `issued_via`, revoked payload `{invitation_id}`, no `close()`, outcome-only log line. Every teammate worktree clean at this gate.
