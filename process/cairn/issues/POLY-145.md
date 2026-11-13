@@ -1,7 +1,7 @@
 ---
 id: POLY-145
 title: Identity trust boundary
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: seceng
 paths: [process/cairn/issues/POLY-145.md, process/cairn/issues/POLY-89.md, process/cairn/issues/POLY-137.md, process/cairn/issues/POLY-64.md, process/cairn/issues/POLY-98.md, process/cairn/issues/POLY-146.md, process/cairn/issues/POLY-147.md, process/cairn/issues/POLY-148.md, process/cairn/issues/POLY-149.md, process/cairn/reviews/POLY-145/**, process/DECISIONS.md, process/STATE.md, docs/SECURITY/**, docs/ARCH/**]
 labels: [security, auth, spike]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/125
 created: 2026-11-12
 updated: 2026-11-13
 ---
@@ -60,3 +60,7 @@ Acceptance criteria, with where each is met (all under `process/cairn/reviews/PO
 6. Single-family against hosted: `comparison.md` §5, `pricing.md` §6.
 7. Three recommendations, each named: `seceng-recommendation.md`, `architect-recommendation.md`, `lead-read.md`. Independence caveat: seceng told the architect their lean before the architect's file was written; both record it.
 8. Decision logged in `process/DECISIONS.md` (2026-11-13). R-2 re-worded in SECURITY 1.9.18. Rework filed in order: POLY-146, POLY-147, POLY-148, POLY-89, POLY-149; notes on POLY-64, POLY-98 and POLY-137.
+
+### @team-lead — 2026-11-13
+
+PR opened: https://github.com/richmosko/polycarpic/pull/125. Awaiting the Principal's review and merge.
