@@ -116,3 +116,21 @@ Written before the ruling, so the architect can fold these in as numbered condit
 
 - **R-2 covers `poly_app` only.** Code execution in the worker can already forge `app.user_id` as `poly_worker`, and now it can also issue no-entity invitations. My recommendation: widen R-2 to name `poly_worker`, with the same rationale and mitigations plus O2, O3 and O5. That is a change to an accepted risk, so it needs the Principal's approval.
 - **INFRA is stale for this loop.** §7.5 and the first-deploy bootstrap step both say "an email to them". After this loop the CLI prints the link and sends nothing. That is devops's edit, plus O8's `exec` rule.
+
+## Ruling check (ruling.md @ 22edd82)
+
+The five amendments are accepted:
+- (1) the definer does not read `app.actor`;
+- (2) `lock_timeout` is 2 s. A token-less callback that holds a bootstrap row's lock across IdP calls (R-24) can make the issuer exit 1, and a retry is the remedy;
+- (3) bootstrap success is shown on two routes;
+- (4) a query spy stands in for the query log. The spy must wrap `pg.Client.prototype.query`, not one client instance, so it sees every pooled client;
+- (5) one named caller, with the literal in tenancy.
+
+Two changes before it gates:
+
+- **G1. C14 is false as worded.** R1 gives `poly_govern` `UPDATE (revoked_at)`. The existing POLY-87 policy, `FOR UPDATE TO poly_govern USING (true) WITH CHECK (claimed_user_id = app.current_user_id())`, ORs with the new one. So under `SET ROLE poly_govern` with `app.user_id = u`, an UPDATE of `revoked_at` on a non-bootstrap row claimed by `u` passes. A policy cannot restrict columns, and `poly_govern` cannot log in, so the gate is the definer bodies.
+  - Re-word C14: with `app.user_id` empty (the issuer's only context, O2), no `poly_govern` UPDATE changes `revoked_at` on a non-bootstrap row or a claimed bootstrap row.
+  - Add to C15's `pg_proc` scan: exactly one `app` function body writes `revoked_at` (`issue_operator_invitation`).
+- **G2. Confine `packages/tenancy/src/operator-invitation.ts`** to `apps/worker/src/cli/user-invite.ts` in `confined`, with a red case in C16. A web import could not succeed (no EXECUTE, no operator transaction), but making every later caller a review point follows the ruling's own R6 rule.
+
+Everything else in R0–R9 matches O1–O11.
