@@ -1,7 +1,7 @@
 ---
 id: POLY-145
 title: Identity trust boundary
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -64,3 +64,7 @@ Acceptance criteria, with where each is met (all under `process/cairn/reviews/PO
 ### @team-lead — 2026-11-13
 
 PR opened: https://github.com/richmosko/polycarpic/pull/125. Awaiting the Principal's review and merge.
+
+### @team-lead — 2026-11-13
+
+The Principal reviewed and approved the merge (2026-11-13); merging via PR #125. Closing. No QA handshake ran: the issue ships a decision record, with no product code or tests.
