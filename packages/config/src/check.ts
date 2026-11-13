@@ -47,7 +47,7 @@ export interface Config {
 }
 
 const APP_ENVS = ['development', 'staging', 'production'] as const;
-const DB_USER: Record<Service, string> = { web: 'poly_app', worker: 'poly_worker', migrate: 'poly_migrator' };
+const DB_USER: Record<Service, string> = { web: 'poly_app', worker: 'poly_worker', migrate: 'poly_migrator', operator: 'poly_operator' };
 const SSLMODES = ['disable', 'require', 'verify-full'];
 const MAX_SECRET_BYTES = 64 * 1024;
 /** Hosts that are never on the public DNS even where the public suffix list knows the final label. */

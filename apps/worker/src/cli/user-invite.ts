@@ -18,7 +18,7 @@ export interface InviteIo {
 }
 
 export async function runUserInvite(args: { email: string; bootstrap: boolean }, io: InviteIo): Promise<0 | 1 | 2> {
-  const log = createLogger({ service: 'worker', stream: new Writable({ write: (c, _e, cb) => (io.stderr.write(String(c)), cb()) }) });
+  const log = createLogger({ service: 'operator', stream: new Writable({ write: (c, _e, cb) => (io.stderr.write(String(c)), cb()) }) });
   if (!validOperatorEmail(args.email)) {
     io.stderr.write('refused: not an email address\n');
     return 1;

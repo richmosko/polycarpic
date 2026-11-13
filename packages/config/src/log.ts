@@ -11,7 +11,7 @@ import pino from 'pino';
 import schema from '../log.schema.json' with { type: 'json' };
 
 export type Level = 'debug' | 'info' | 'warn' | 'error' | 'fatal';
-export type LogService = 'web' | 'worker' | 'migrate';
+export type LogService = 'web' | 'worker' | 'migrate' | 'operator';
 export type Fields = Record<string, unknown>;
 
 export interface Rule {

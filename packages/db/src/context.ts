@@ -3,7 +3,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type pg from 'pg';
-import { appPool, workerPool } from './pool.ts';
+import { appPool, operatorPool, workerPool } from './pool.ts';
 import { enterNewUserOn } from './new-user.ts';
 import type { SessionUserId } from './session.ts';
 
@@ -189,11 +189,11 @@ export async function withContextFreeTx<T>(fn: (tx: ContextFreeTx) => Promise<T>
 }
 
 /**
- * The operator's CLI transaction (POLY-142 R3; SECURITY C-84): the worker pool, no user, and only app.actor set. The actor is for
+ * The operator's CLI transaction (POLY-142 R3; SECURITY C-84): the operator pool (poly_operator), no user, and only app.actor set. The actor is for
  * the database's own logs: issue_operator_invitation writes its own literal. Exported on db/operator alone, to one caller.
  */
 export async function withOperatorTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
-  return inTransaction('withOperatorTx', workerPool, async (c) => {
+  return inTransaction('withOperatorTx', operatorPool, async (c) => {
     const res = await c.query(`SELECT coalesce(pg_catalog.current_setting('app.user_id', true), '') AS v`);
     if (res.rows[0].v !== '') throw new ContextNotEmptyError();
     await c.query(`SELECT set_config('app.actor', 'operator:cli', true)`);

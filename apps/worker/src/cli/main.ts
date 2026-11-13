@@ -3,7 +3,6 @@
 import { Writable } from 'node:stream';
 import { ConfigError, loadConfig } from '@poly/config';
 import { createLogger } from '@poly/config/log';
-import { assertSchemaNotBehind } from '@poly/db/startup';
 import { validOperatorEmail } from '@poly/tenancy';
 import { runUserInvite } from './user-invite.ts';
 
@@ -23,22 +22,16 @@ async function main(): Promise<number> {
     err(USAGE);
     return 1;
   }
-  const log = createLogger({ service: 'worker', stream: new Writable({ write: (c, _e, cb) => (err(String(c)), cb()) }) });
+  const log = createLogger({ service: 'operator', stream: new Writable({ write: (c, _e, cb) => (err(String(c)), cb()) }) });
   let config;
   try {
-    config = loadConfig('worker');
+    config = loadConfig('operator');
   } catch (e) {
     if (e instanceof ConfigError) {
       for (const p of e.problems) log.error('config.refused', { var: p.var, fault: p.fault, outcome: 'refused' });
       return 1;
     }
     throw e;
-  }
-  try {
-    await assertSchemaNotBehind('worker');
-  } catch (e) {
-    log.fatal('schema.refused', { outcome: 'refused', err: e });
-    return 1;
   }
   return runUserInvite(
     { email, bootstrap: flags.length === 1 },
@@ -49,7 +42,7 @@ async function main(): Promise<number> {
 main().then(
   (code) => process.exit(code),
   (e) => {
-    createLogger({ service: 'worker', stream: new Writable({ write: (c, _e, cb) => (err(String(c)), cb()) }) }).fatal('process.crash', { outcome: 'error', err: e });
+    createLogger({ service: 'operator', stream: new Writable({ write: (c, _e, cb) => (err(String(c)), cb()) }) }).fatal('process.crash', { outcome: 'error', err: e });
     process.exit(1);
   },
 );

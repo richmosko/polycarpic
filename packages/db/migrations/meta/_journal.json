@@ -71,6 +71,13 @@
       "when": 1794549073834,
       "tag": "0009_operator_invitation",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1794592016691,
+      "tag": "0010_operator_role",
+      "breakpoints": true
     }
   ]
 }
