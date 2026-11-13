@@ -11,6 +11,10 @@ Two attacker capabilities recur, and they differ:
 
 web connects as `poly_app`, worker as `poly_worker`. Before any query, `withTenant` runs `set_config('app.user_id', <id>, true)`; every RLS policy reads `app.current_user_id()`. Postgres trusts whatever value is set, so any code that can send SQL as either role can name any user. BetterAuth runs inside web as `poly_app` and can read the `session` table, whose `token` column holds live session tokens in plaintext (`packages/db/src/schema/auth.ts`). Mitigations: parameterised SQL with lint and CodeQL (C-44); a branded `SessionUserId` and no exported raw pool (C-11); the sign-up stamp, so a forged id cannot enter an existing user through sign-up or invitation acceptance (C-84); web cannot open bank credentials (C-30); no DDL or TRUNCATE (C-10); `poly_worker`'s tenant writes are limited to the import path (SECURITY §4.4); `poly_worker` reads tenant data through the same RLS under whatever user it names.
 
+## (a+) Today's design, hardened cheaply
+
+(a) with the holes the threat model found closed, and nothing moved: BetterAuth's reset and magic-link tokens stored hashed (`verification.storeIdentifier` and the magic-link `storeToken` set to `"hashed"`); the auth secret removed from the worker (`current-state.md` §8.1); the operator CLI on its own login role holding only `EXECUTE` on the issuing definer, so the worker credential cannot issue invitations; `poly_app`'s `SELECT` on `two_factor` and `account` narrowed to what BetterAuth reads. Identity is still asserted by web and worker.
+
 ## (b) Postgres verifies a signed token; sign-in moves to a small separate service
 
 A new sign-in service (BetterAuth moves there) is the only holder of a private signing key. On every request, web passes the user's short-lived signed token (minutes) to Postgres as its first statement. A Postgres extension verifies the signature against the service's public key and exposes the verified claims; policies read the verified user id, never a GUC the app can set. web and worker hold the public key only, so they cannot mint a token for anyone; they can only replay tokens they have been handed. The session table moves out of `poly_app`'s reach. Needs: an extension that verifies JWTs inside Postgres (an existing one or our own), key rotation, and a refresh path from browser to service.
@@ -34,6 +38,10 @@ Applies on top of (b), (c), (d2) or (e1); on its own it changes nothing. When a 
 ## (e3) Worker: parser sandbox
 
 Independent of identity. The code that parses provider responses and uploaded files (the untrusted input) runs in a separate process with no database credential, no keyring and no network, and returns plain typed rows to a small writer that validates them and holds the database connection. A parser exploit then reaches only the rows of the file it is parsing. This shrinks the worker's attack surface at the place it actually meets hostile input, whatever the identity design.
+
+## (e4) One instance per family (hosted only)
+
+Matters only if the hosting non-goal is ever reversed (R-6). Each family gets its own web, worker, sign-in and database containers, with its own credentials and keyring; nothing is shared but the host and the edge proxy. A compromise of one family's processes reaches that family only, whatever the identity design inside it. It does not help a single-family instance, where there is only one family to reach.
 
 ## Not separately listed
 
