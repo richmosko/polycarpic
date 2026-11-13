@@ -3,15 +3,15 @@ BEGIN;
 SELECT no_plan();
 
 SELECT has_role(r) FROM unnest(ARRAY['poly_owner','poly_migrator','poly_app','poly_worker','poly_authz','poly_purge',
-  'poly_rollup','poly_graph','poly_stake','poly_govern','poly_journal','poly_backup']) r;
+  'poly_rollup','poly_graph','poly_stake','poly_govern','poly_journal','poly_backup','poly_operator']) r;
 
-SELECT is((SELECT count(*)::int FROM pg_roles WHERE rolname ~ '^poly_' AND rolname <> 'poly_backup'), 11,
-  'exactly eleven poly_* roles besides poly_backup');
+SELECT is((SELECT count(*)::int FROM pg_roles WHERE rolname ~ '^poly_' AND rolname <> 'poly_backup'), 12,
+  'exactly twelve poly_* roles besides poly_backup');
 SELECT is((SELECT count(*)::int FROM pg_roles WHERE rolname ~ '^poly_' AND (rolbypassrls OR rolsuper)
   AND rolname <> 'poly_backup'), 0, 'no poly_* role other than poly_backup bypasses RLS or is superuser');
 SELECT is((SELECT array_agg(rolname::text ORDER BY rolname) FROM pg_roles WHERE rolname ~ '^poly_' AND rolcanlogin
-  AND rolname <> 'poly_backup'), ARRAY['poly_app','poly_migrator','poly_worker'],
-  'LOGIN roles are poly_migrator, poly_app, poly_worker');
+  AND rolname <> 'poly_backup'), ARRAY['poly_app','poly_migrator','poly_operator','poly_worker'],
+  'LOGIN roles are poly_migrator, poly_app, poly_worker, poly_operator');
 SELECT is((SELECT array_agg(rolname::text ORDER BY rolname) FROM pg_roles WHERE rolname ~ '^poly_' AND NOT rolcanlogin),
   ARRAY['poly_authz','poly_govern','poly_graph','poly_journal','poly_owner','poly_purge','poly_rollup','poly_stake'],
   'NOLOGIN roles are the eight owner/definer roles');
@@ -93,7 +93,7 @@ SELECT is((SELECT count(*)::int FROM pg_auth_members m JOIN pg_roles u ON u.oid=
 SELECT is((SELECT pg_get_userbyid(datdba)::text FROM pg_database WHERE datname=current_database()), 'poly_owner', 'poly_owner owns the database');
 SELECT ok(NOT has_database_privilege('public', current_database(), 'CONNECT'), 'PUBLIC cannot CONNECT');
 SELECT ok(has_database_privilege('poly_app', current_database(), 'CONNECT') AND has_database_privilege('poly_worker', current_database(), 'CONNECT')
-  AND has_database_privilege('poly_migrator', current_database(), 'CONNECT') AND has_database_privilege('poly_backup', current_database(), 'CONNECT'), 'login roles can CONNECT');
+  AND has_database_privilege('poly_migrator', current_database(), 'CONNECT') AND has_database_privilege('poly_operator', current_database(), 'CONNECT') AND has_database_privilege('poly_backup', current_database(), 'CONNECT'), 'login roles can CONNECT');
 SELECT is((SELECT count(*)::int FROM pg_namespace n, unnest(ARRAY['poly_authz','poly_purge','poly_rollup','poly_graph','poly_stake','poly_govern','poly_journal']) r
   WHERE has_schema_privilege(r, n.oid, 'CREATE') AND n.nspname !~ '^pg_'), 0, 'no definer-owner role holds CREATE on any schema at rest');
 SELECT is((SELECT pg_get_userbyid(nspowner)::text FROM pg_namespace WHERE nspname='app'), 'poly_owner', 'schema app owned by poly_owner');

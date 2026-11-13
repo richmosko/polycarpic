@@ -226,3 +226,94 @@ describe('private-CA mode gates the OAuth routes (C-76)', () => {
     void jar; void BASE;
   });
 });
+
+// POLY-146 AC1 (ruling R4, seceng #1): reset and magic-link tokens are stored hashed. Real Postgres, the real routes, as poly_app.
+// One top-level describe, outside describe.each (the behaviour does not depend on the TLS mode).
+describe('POLY-146: reset and magic-link tokens are stored hashed', () => {
+  const stored = () => must('SELECT identifier FROM public.verification ORDER BY created_at DESC', e.db).rows.map((r) => r[0]!);
+  const verRows = () => e.count('SELECT 1 FROM public.verification');
+  const parts = (id: string) => [...new Set([id, id.slice(id.indexOf(':') + 1)])];
+  const sessionCookie = (r: Response) => r.headers.getSetCookie().some((c) => /session_token=[^;]+/.test(c) && !/Max-Age=0/i.test(c));
+  let auth: any;
+  let resetToken = '';
+  beforeAll(async () => {
+    auth = await e.mk('real-domain', (o) => ({ ...o, emailAndPassword: { ...o.emailAndPassword, sendResetPassword: async (d: any) => { resetToken = d.token; } } }));
+  });
+
+  it('reset: the stored identifier is not reset-password:<token> and holds no part of the token  [red if: verification.storeIdentifier is plain]', async () => {
+    must('DELETE FROM public.verification', e.db);
+    const u = e.seedUser();
+    await e.handle(post('/request-password-reset', { email: u.email, redirectTo: '/reset' }), auth);
+    expect(resetToken).not.toBe('');
+    const ids = stored();
+    expect(ids).toHaveLength(1);
+    expect(ids[0]).not.toBe(`reset-password:${resetToken}`);
+    expect(ids[0]).not.toContain(resetToken);
+  });
+
+  it('reset: a value read from verification, whole or without its prefix, is refused at POST /reset-password and GET /reset-password/:token  [red if: the stored identifier is accepted as the token]', async () => {
+    must('DELETE FROM public.verification', e.db);
+    const u = e.seedUser();
+    await e.handle(post('/request-password-reset', { email: u.email, redirectTo: '/reset' }), auth);
+    const [id] = stored();
+    const before = verRows();
+    for (const v of parts(id!)) {
+      const p = await e.handle(post('/reset-password', { newPassword: 'attacker chosen passphrase 77', token: v }), auth);
+      expect(p.status, `POST ${v}`).toBeGreaterThanOrEqual(400);
+      const g = await e.handle(get(`/reset-password/${encodeURIComponent(v)}?callbackURL=/reset`), auth);
+      const loc = g.headers.get('location') ?? '';
+      expect(loc, `GET ${v}`).toMatch(/error=/);
+      expect(loc, `GET ${v}`).not.toMatch(/[?&]token=/);
+    }
+    expect(verRows(), 'a refused value consumed nothing').toBe(before);
+    expect((await e.signIn(u.email, auth)).res.status, 'the password is unchanged').toBe(200);
+  });
+
+  it('reset: the emailed token resets the password once; a second use is refused  [red if: the token no longer verifies, or is reusable]', async () => {
+    must('DELETE FROM public.verification', e.db);
+    const u = e.seedUser();
+    await e.handle(post('/request-password-reset', { email: u.email, redirectTo: '/reset' }), auth);
+    const token = resetToken;
+    const r1 = await e.handle(post('/reset-password', { newPassword: 'a brand new passphrase 99', token }), auth);
+    expect(r1.status).toBe(200);
+    const r2 = await e.handle(post('/reset-password', { newPassword: 'yet another passphrase 98', token }), auth);
+    expect(r2.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it('magic link: the stored identifier is not the emailed token or its prefixed form  [red if: magicLink storeToken is plain]', async () => {
+    must('DELETE FROM public.verification', e.db);
+    const u = e.seedUser();
+    await e.handle(post('/sign-in/magic-link', { email: u.email, callbackURL: '/' }), auth);
+    const token = e.mails.at(-1)!.token;
+    const ids = stored();
+    expect(ids).toHaveLength(1);
+    expect(ids[0]).not.toBe(token);
+    expect(ids[0]).not.toBe(`magic-link:${token}`);
+    expect(ids[0]).not.toContain(token);
+  });
+
+  it('magic link: a value read from verification, whole or without its prefix, is refused at GET /magic-link/verify and starts no session  [red if: the stored value is accepted as the token]', async () => {
+    must('DELETE FROM public.verification', e.db);
+    const u = e.seedUser();
+    await e.handle(post('/sign-in/magic-link', { email: u.email, callbackURL: '/' }), auth);
+    const [id] = stored();
+    const before = verRows();
+    for (const v of parts(id!)) {
+      const r = await e.handle(get(`/magic-link/verify?token=${encodeURIComponent(v)}&callbackURL=/`), auth);
+      expect(sessionCookie(r), `session for ${v}`).toBe(false);
+    }
+    expect(verRows(), 'a refused value consumed nothing').toBe(before);
+    expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`)).toBe(0);
+  });
+
+  it('magic link: the emailed token signs in once; a second use starts no session  [red if: the token no longer verifies, or is reusable]', async () => {
+    must('DELETE FROM public.verification', e.db);
+    const u = e.seedUser();
+    await e.handle(post('/sign-in/magic-link', { email: u.email, callbackURL: '/' }), auth);
+    const token = e.mails.at(-1)!.token;
+    const r1 = await e.handle(get(`/magic-link/verify?token=${token}&callbackURL=/`), auth);
+    expect(sessionCookie(r1)).toBe(true);
+    const r2 = await e.handle(get(`/magic-link/verify?token=${token}&callbackURL=/`), auth);
+    expect(sessionCookie(r2)).toBe(false);
+  });
+});

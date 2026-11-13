@@ -83,6 +83,15 @@ describe('pinned options (criterion 2)', () => {
   });
 });
 
+describe('POLY-146 AC1: tokens are stored hashed  [red if: either option is plain or unset]', () => {
+  it('verification.storeIdentifier is hashed', () => expect(o.verification.storeIdentifier).toBe('hashed'));
+  it('the magic-link plugin stores its token hashed', () => {
+    const m = plugin('magic-link');
+    expect(m, 'magicLink installed').toBeDefined();
+    expect(m.options?.storeToken, 'if a version stops exposing plugin options, the tests/db magic-link case is the proof').toBe('hashed');
+  });
+});
+
 describe('image rule (criterion 15, S16b)', () => {
   const bad = ['https://evil.example/a.png', '/avatar.png', '/\\evil.example', '//evil.example/a.png', 'data:image/png;base64,AA', 'javascript:alert(1)'];
   for (const when of ['create', 'update'] as const)
