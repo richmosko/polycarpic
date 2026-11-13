@@ -121,11 +121,11 @@ The build is **K + I + J + X + S + E + D**, in that order. I is revoked at the e
 - **Running cost:** +1 container (guess 100–200 MB), one more image surface to scan.
 - It is independent of the identity decision and worth pricing into the import milestone whatever is chosen.
 
-### (e5) Staged (e1): a variant I propose (seceng's (e4) is the per-family instance, priced below)
+### (e1-staged) Staged (e1): a variant I propose
 
 - Stage 1 is **K + I + J + X**: about 3.5 loop-days, 1 loop, **M**.
   - It closes the worker half of R-2 at once: poly_worker can no longer name a user.
-  - It turns "any SQL as poly_app" into "only a call to one poly_app-only definer", which a catalog test can pin.
+  - It turns "any SQL as poly_app" into "only a call to one poly_app-only definer", which a catalog test can pin. That definer still believes whatever user poly_app names, so SQL injection in web (S1) and a stolen poly_app password (S5) stay "any user" until stage 2.
   - Nothing is thrown away: stage 2 deletes I and adds S + E.
 - Stage 2 is **S + E + D**: about 8–10 loop-days in 3 loops.
 - The total matches (e1). The difference is that the riskier half (the worker, which parses untrusted input) is closed before POLY-89 resumes, and POLY-89 can be specified once against the marker.
@@ -142,11 +142,11 @@ The build is **K + I + J + X + S + E + D**, in that order. I is revoked at the e
 | (d1) role per user, shared login | — | — | 6–8, no gain | — | 0 | role churn | guess |
 | (d2) role per user, own credential | 3 / 1.5 / 0.5 | +0.5–1 | 18–25 | 5–6 | 1 | roles dump in every backup, connection sizing | L |
 | (e1) DB-checked opaque session | 3 / 1 / 0.25 | +0.5 | 11.5–14 | 4 | 1 | none beyond one more service | M |
-| (e5) staged (e1), stage 1 only | 0 / 0.25 / 0.25 | +0 (POLY-89 specs against the marker) | 3.5 | 1 | 0 | none | M |
+| (e1-staged), stage 1 only | 0 / 0.25 / 0.25 | +0 (POLY-89 specs against the marker) | 3.5 | 1 | 0 | none | M |
 | (e2) job grants (on K) | 0 | +1.5–2.5 on POLY-64 | 1.5–2.5 | 0 (inside POLY-64) | 0 | none | M |
 | (e3) parser sandbox | 0 | +3–4 on POLY-64/77 | 3–4 | 0–1 | 1 | one more image | M |
 
-The (a+) items can be added to any option, and no other row includes them. With (e1) or (e5), the operator-role item is still the only thing that takes invitation issuing away from the worker credential. J removes the worker's power to name a user, not its EXECUTE on the issuer.
+The (a+) items can be added to any option, and no other row includes them. With (e1) or (e1-staged), the operator-role item is still the only thing that takes invitation issuing away from the worker credential. J removes the worker's power to name a user, not its EXECUTE on the issuer.
 
 "Landing first" is the honest comparison: every pivot option costs +2–3 more on POLY-89 if POLY-89 ships before it.
 

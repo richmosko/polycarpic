@@ -2,9 +2,11 @@
 
 Author: architect. I wrote this without reading `seceng-recommendation.md`. It draws on `current-state.md`, `pricing.md` (mine), and seceng's `options.md`, `threat-model.md`, `comparison.md` and `prior-art.md`. Sizes are in loop-days as `pricing.md` §0 defines them, calibrated on POLY-86 (3), POLY-87 (2) and POLY-142 (1).
 
+Independence: before I wrote this, I saw seceng's lean towards (e1), both in `comparison.md` and in their message. By then I had already priced (e1) as the cheapest option that stops SQL injection, and had sent seceng the marker-table mechanism and the staged variant. The lean did not change my recommendation, though I cannot rule out that it reinforced it.
+
 ## Recommendation
 
-**Move to (e1), Postgres checking an opaque session, in the staged order (e5). Add the (a+) hardening items, and finish both stages before POLY-89 resumes.** Fold (e2) into POLY-64, and (e3) into the first real parser (POLY-64 or POLY-77).
+**Move to (e1), Postgres checking an opaque session, in the staged order (e1-staged; `pricing.md`). Add the (a+) hardening items, and finish both stages before POLY-89 resumes.** Fold (e2) into POLY-64, and (e3) into the first real parser (POLY-64 or POLY-77).
 
 Concretely:
 
@@ -14,7 +16,7 @@ Concretely:
    - Web keeps asserting identity, but only through one poly_app-only definer (I).
    - Reset and magic-link tokens are stored hashed.
    - The operator CLI moves to its own login role, run from a one-shot service.
-   - At the end, the worker can name no user, and nothing in the database honours a `set_config` from any role.
+   - At the end, the worker can name no user, and nothing in the database honours a `set_config` from any role. Web still names any user through the interim definer, so SQL injection in web and a stolen poly_app password stay "any user" until stage 2.
 2. **Stage 2, about 8–10 loop-days in 3 loops.**
    - The sign-in service (S) takes BetterAuth, the auth secret and every grant on BetterAuth's tables.
    - Web enters through `app.enter_session(token)` (E).
