@@ -42,3 +42,7 @@ To do in this issue, whatever POLY-145 decides: set both options to `"hashed"`, 
 ### @team-lead — 2026-11-13
 
 The hashed reset and magic-link token item (my comment of 2026-11-13) has moved to POLY-146 (Identity hardening), by the Principal's POLY-145 decision that the hardening fixes land first. What stays here: once POLY-146 hashes the tokens, remove the plain-token sentence from SECURITY R-12 if POLY-146 has not already done so.
+
+### @team-lead — 2026-11-13
+
+From POLY-146 (seceng-146's read of better-auth 1.7.18; architect-146's gate-1 ruling R4): password reset is not wired today (`sendResetPassword` is unset, so the route answers `RESET_PASSWORD_DISABLED`). When this issue wires the mailer and turns reset on, set the reset token's lifetime to 900 seconds in the same change: the library default is one hour and SECURITY says 15 minutes. Add a test for the expiry.
