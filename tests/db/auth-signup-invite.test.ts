@@ -594,3 +594,18 @@ describe('condition 29 (S9): token handling', () => {
     for (const t of tokens) expect(all, 'a plaintext token reached the log').not.toContain(t);
   });
 });
+
+describe('condition 33 (S14): after the sign-up commits, an email change passes', () => {
+  it('the stamp is cleared, so the email can change (as poly_app, the way /change-email would)  [red if: signup_email_fixed refuses with a null stamp]', async () => {
+    const o = seedOwnerEntity(e.db);
+    const email = `s14-${stamp()}@qa.test`;
+    const t = seedInvitation({ db: e.db, email, role: 'viewer', entityId: o.entityId, as: o.ownerId });
+    const r = await signUp(email, t);
+    expect(r.status, await r.clone().text()).toBe(200);
+    const uid = uidOf(email);
+    const moved = `s14-moved-${stamp()}@qa.test`;
+    const u = psql(`BEGIN; SELECT set_config('app.user_id', '${uid}', true); UPDATE public."user" SET email = '${moved}', email_verified = true WHERE id = '${uid}'; COMMIT;`, e.db, { role: 'poly_app' });
+    expect(u.ok, u.err).toBe(true);
+    expect(users(moved)).toBe(1);
+  });
+});

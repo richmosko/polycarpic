@@ -234,3 +234,23 @@ describe('condition 30 (S4): claim_invitations from a signed-in transaction take
     } finally { holder.kill(); }
   });
 });
+
+describe('condition 33 (S14): while the stamp is set, email and email_verified are fixed', () => {
+  const person = (id: string) => `INSERT INTO public.entity (type_id, name, self_user_id) SELECT t.id, 'P', '${id}' FROM public.entity_type t WHERE t.system_key = 'person';`;
+  it('P10: insert, enter_new_user, provision, then UPDATE email and email_verified raises 42501 and no membership remains  [red if: signup_email_fixed is absent, so a sign-up can verify an invited address]', () => {
+    const id = uid();
+    const head = `BEGIN; ${ins(id)} ${step(id)} ${person(id)}`;
+    const ctl = app(`${head} UPDATE public."user" SET name = 'renamed' WHERE id = '${id}'; SELECT count(*) FROM public.membership WHERE user_id = '${id}'; ROLLBACK;`);
+    expect(ctl.ok, `control (other columns pass): ${ctl.err}`).toBe(true);
+    expect(ctl.rows.flat()).toContain('1');
+    const r = app(`${head} UPDATE public."user" SET email = 'victim@qa.test', email_verified = true WHERE id = '${id}'; ROLLBACK;`); // ROLLBACK, not COMMIT: the C32 commit check would also say 42501
+    expect(r.sqlstate).toBe('42501');
+    expect(must(`SELECT count(*) FROM public.membership WHERE user_id = '${id}'`, e.db).rows[0]![0]).toBe('0');
+  });
+  it('either column alone is refused too  [red if: the trigger checks only one of them]', () => {
+    for (const set of [`email = 'v2@qa.test'`, `email_verified = true`]) {
+      const id = uid();
+      expect(app(`BEGIN; ${ins(id)} ${step(id)} UPDATE public."user" SET ${set} WHERE id = '${id}'; ROLLBACK;`).sqlstate, set).toBe('42501');
+    }
+  });
+});
