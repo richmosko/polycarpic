@@ -31,7 +31,7 @@ The CLI moves to its own login role, poly_operator, which holds only EXECUTE on 
 - [x] `polycarpic cli user invite` runs in a one-shot `operator` compose service (its own profile, its own secret file, `restart: "no"`). No long-running service has the operator password: web, worker, and the staging web and worker. A test asserts that against the rendered prod and staging compose files (seceng #2). — tests/infra/lint.test.ts: operator-one-shot and secret-matrix rows, POLY-146 repo compose files
 - [x] `pg_hba.prod.conf` and `pg_hba.staging.conf` admit poly_operator from the app subnet with scram. — tests/infra/lint.test.ts: pg_hba poly_operator admitted rows
 - [x] The existing operator-invite tests (`tests/db/operator-invite.test.ts`, pgTAP 06) pass against the new role. — tests/db/operator-invite.test.ts and tests/db/pgtap/06_operator_invitation.sql: behaviour rows as poly_operator
-- [ ] SECURITY reflects the current state in C-01, C-84, R-2, R-12 (its plain-token sentence comes out) and the secrets table, and in the T1 row of the data-classification table (seceng #3). INFRA §7.5 names the operator service. ARCH §7 names the role.
+- [x] SECURITY reflects the current state in C-01, C-84, R-2, R-12 (its plain-token sentence comes out) and the secrets table, and in the T1 row of the data-classification table (seceng #3). INFRA §7.5 names the operator service. ARCH §7 names the role. — docs/SECURITY/index.html 1.9.19 (81a9a9dd, seceng), docs/INFRA/index.html 1.3.10 (b5a37021, devops-engineer), docs/ARCH/index.html 1.15.22 (2eaa54b1, architect): no automated test; each owner wrote its doc and the lead read every changed passage against the ruling
 
 ## Notes
 
