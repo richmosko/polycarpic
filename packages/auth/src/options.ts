@@ -3,6 +3,7 @@
 import { passkey } from '@better-auth/passkey';
 import { authFields } from '@poly/db/auth';
 import { magicLink, twoFactor } from 'better-auth/plugins';
+import { githubUserInfo } from './github.ts';
 import { passkeyOnlyHold } from './second-step.ts';
 import { routePolicyHook, type TlsMode } from './route-policy.ts';
 import { createRoutingPool } from './routing-pool.ts';
@@ -41,7 +42,7 @@ export function authOptions(input: AuthInput) {
     emailAndPassword: { enabled: true, revokeSessionsOnPasswordReset: true },
     socialProviders: {
       ...(input.google ? { google: input.google } : {}),
-      ...(input.github ? { github: input.github } : {}),
+      ...(input.github ? { github: { ...input.github, getUserInfo: githubUserInfo } } : {}),
     },
     user: {
       modelName: 'user',
