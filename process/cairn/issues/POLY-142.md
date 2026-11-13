@@ -18,14 +18,14 @@ The operator's command on the box: `polycarpic user invite <email> [--bootstrap]
 
 ## Acceptance criteria
 
-- [ ] The first user on an empty instance is created only by `polycarpic user invite <email> --bootstrap`, once. With any `user` row present it exits non-zero and writes nothing. An empty instance accepts no other first sign-up (INFRA S-1).
-- [ ] `polycarpic user invite <email>` issues a single-use invitation that shares no entity, and writes an `audit_event` of kind `invitation.issued` (`entity_id` null, `actor` `operator:cli`). The invitee sees only their own Person.
+- [ ] The first user on an empty instance is created only by `polycarpic cli user invite <email> --bootstrap`, once. With any `user` row present it exits non-zero and writes nothing. An empty instance accepts no other first sign-up (INFRA S-1).
+- [ ] `polycarpic cli user invite <email>` issues a single-use invitation that shares no entity, and writes an `audit_event` of kind `invitation.issued` (`entity_id` null, `actor` `operator:cli`, payload exactly `{invitation_id, issued_via}`). The invitee sees only their own Person.
 - [ ] Without `--bootstrap`, the command refuses on an empty instance, so it cannot create the first user.
-- [ ] A second `--bootstrap` on an empty instance revokes the earlier unclaimed bootstrap invitation. Two concurrent runs leave exactly one live one, because the issuing definer serialises them on an advisory lock.
-- [ ] `claim_invitations` refuses a bootstrap invitation once any user exists (`issued_via = 'bootstrap'`).
-- [ ] `withOperatorTx` (subpath `@poly/db/operator`) runs on the `poly_worker` pool and sets only `app.actor`, locally. It refuses to nest with the other three wrappers. Lint refuses to import it from anywhere but `apps/worker/src/cli/**`.
+- [ ] A second `--bootstrap` on an empty instance revokes the earlier unclaimed bootstrap invitation. Two concurrent runs leave exactly one live one, because the issuing definer serialises them on an advisory lock, bounded by a 2 s `lock_timeout`.
+- [ ] `claim_invitations` refuses a bootstrap invitation once any user exists (`issued_via = 'bootstrap'`), and `accept_invitations` once any other user exists.
+- [ ] `withOperatorTx` (subpath `@poly/db/operator`) runs on the `poly_worker` pool and sets only `app.actor`, locally. It refuses to nest with the other three wrappers. Lint refuses to import it from anywhere but `apps/worker/src/cli/user-invite.ts`.
 - [ ] The invitation is written only by `app.issue_operator_invitation` (owner `poly_govern`, EXECUTE `poly_worker` alone), and `poly_worker` holds no INSERT on `invitation`.
-- [ ] The link is printed once to stdout. The plaintext token is never logged or stored, and the expiry is 7 days.
+- [ ] The link (`PUBLIC_ORIGIN` + `/sign-up?invitation=<token>`) is printed once to stdout, after commit. The plaintext token is never logged, stored or sent to the database, and the expiry is 7 days.
 - [ ] Exit codes: 0 issued, 2 refused (instance state), 1 anything else. `check-config` validates the worker's `DATABASE_*` first.
 
 ## Proposed paths
@@ -43,10 +43,10 @@ The operator's command on the box: `polycarpic user invite <email> [--bootstrap]
 
 B changes condition 23 to "only `issue_operator_invitation` and the `poly_app` owner policy insert". seceng re-words C-84 in B: `db/auth` and `db/operator` are the two context-free paths, and only `db/auth` sets `app.user_id`.
 
-## Open for the Principal at this issue's start
+## Decided at this issue's start (Principal)
 
-- The 7-day default expiry of an operator invitation (the architect's proposal).
-- Whether printing the link to stdout is enough for the first release, with email as a follow-up.
+- Decided: an operator invitation expires after 7 days.
+- Decided: the link is printed once to stdout, for `--bootstrap` and for the plain invite. No mailer is built in this loop; email with the link embedded is the in-app invite's mechanism (POLY-144).
 
 ## Comments
 
@@ -68,3 +68,7 @@ The Principal also asked for an email invite option that does not invite the new
 Principal amendment (2026-11-13), replacing decision 2 in my previous comment. Quoted: "The in-app option is manditory... and the mechanism should be an email invite with the link embedded. but for the initial user and for now, STDOUT is probably fine."
 
 My reading, labelled as mine: this loop keeps the issue's criteria as filed. The CLI prints the link once to stdout, for `--bootstrap` and for the plain invite, and no mailer is built here. Email with the link embedded is the mechanism for the in-app invite, which is mandatory and filed as its own issue behind POLY-89. Expiry stays 7 days. Both of the issue's open questions are now closed.
+
+### @architect — 2026-11-12
+
+Gate-1 ruling: process/cairn/reviews/POLY-142/ruling.md (R0–R9, C1–C16, seceng's O1–O11 folded in). The acceptance criteria are amended in place: the command is `polycarpic cli user invite`, lint confines `@poly/db/operator` to `apps/worker/src/cli/user-invite.ts`, the bootstrap rule holds in accept too, and the link is written after commit. Paths to add: `bin/polycarpic`. The operator tests join the `auth` db area, so there is no new area and no `ci.yml` edit. Timing cap: +9 s on the battery-step median against a same-day main.
