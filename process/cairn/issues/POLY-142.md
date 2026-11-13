@@ -62,3 +62,9 @@ Principal decisions at kickoff (2026-11-13), on the two questions the issue left
 2. **Delivery: email, not stdout only.** The Principal's reason: nobody sees the CLI's stdout except perhaps during initial setup. This overrides the "link is printed once to stdout" criterion as the only delivery path and pulls the Resend mailer (POLY-137's `sendMagicLink` item, ruling follow-up 3) into reach of this loop. State of the tree: `RESEND_API_KEY_FILE` is registered for web and worker (`packages/config/src/registry.ts`, optional) and mounted in `infra/compose/prod.yml`; no mailer code exists, and `apps/web/src/lib/server/auth.ts` answers 503 for a magic link. Whether stdout survives for `--bootstrap` on a box with no mail key is for the gate-1 ruling.
 
 The Principal also asked for an email invite option that does not invite the new user to a group entity. Scope of that (CLI only, or an in-app route) is open with the Principal; an in-app route that sends an invitation falls under the POLY-89 ordering rule in STATE.md.
+
+### @team-lead — 2026-11-12
+
+Principal amendment (2026-11-13), replacing decision 2 in my previous comment. Quoted: "The in-app option is manditory... and the mechanism should be an email invite with the link embedded. but for the initial user and for now, STDOUT is probably fine."
+
+My reading, labelled as mine: this loop keeps the issue's criteria as filed. The CLI prints the link once to stdout, for `--bootstrap` and for the plain invite, and no mailer is built here. Email with the link embedded is the mechanism for the in-app invite, which is mandatory and filed as its own issue behind POLY-89. Expiry stays 7 days. Both of the issue's open questions are now closed.
