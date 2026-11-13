@@ -337,3 +337,26 @@ Follow-ups: POLY-89 seats claimed manager and owner rows (seceng §6). POLY-90 r
 - **S7:** C21 gains the `setTimeout('x', 0)` fixture under the real globals.
 - **S2:** C25 names the `getUserInfo` override, and tests the null return and the `github` fallback.
 - **Totals:** 32 conditions. R2's table gains `app.signup_stamp_cleared()`, and C18's direct-call check covers it. The ruling is closed.
+
+## Build check (architect, at 5ad6811)
+
+Read against R1–R6 and C1–C32 as amended. One item must change before the verdict; everything else is built as ruled.
+
+| R | Result | Where |
+|---|---|---|
+| R1 | Built as ruled: the claim pair, `signup_txid` with its index, the live-email partial index, and the token-length, claim-pair and accepted-needs-claim checks. | `migrations/0006_invitation_claim.sql:1–9`; `schema/auth.ts`, `schema/tenancy.ts` |
+| R2 | Built as ruled: owners, `search_path`, `lock_timeout 5s`, `ORDER BY id FOR UPDATE`, claim refused under `app.user_id`, accept gated on the stamp and on a verified email when no token is given, viewers only, the stamp cleared, set-once, the deferred commit check, and the column grants. The one extra is `ON CONFLICT DO NOTHING` on the viewer seat, which is accepted: a user created in this transaction holds no membership, so it never fires. | `0007_invitation_definers.sql:6–20, 28–46, 52–70, 73–122, 130–182`; `sql/definers.json:9–11` |
+| R3 | Built, with one correction required (below): the route hook claims with the canonical token, the user hook picks its mode by route template, the after-hook runs step → Person → accept, the GitHub `getUserInfo` override takes the primary verified address and returns null otherwise, and `/sign-up` sends no referrer, no-store and uses `replaceState`. | `route-policy.ts` (the `/sign-up/email` block); `user-hooks.ts:27–76`; `github.ts:19–30`; `options.ts`; `routes/sign-up/+page.server.ts`, `+page.svelte:18` |
+| R3 item 6 | Built as corrected: the landing is read from membership. | `tenancy/src/invitation.ts:63–72` |
+| R4 | Built: a non-enumerable per-transaction closure with a `used` flag and `TransactionClosed`, and `new-user.ts` runs one statement. Typing note: `currentTx()` still returns `Tx`, and `user-hooks.ts:41` casts it after the kind check. The method exists only on the context-free handle at run time, so this is accepted. | `db/src/context.ts` (the `withContextFreeTx` branch); `db/src/new-user.ts:5–7` |
+| R5 | Built: the `confined`, `reservedLiterals` and `confinedMembers` keys, the three rules (cooked values, computed literal keys), and `no-eval`, `no-implied-eval` and `no-new-func`. | `layers.json`; `scripts/layers/plugin.mjs`; `generate.mjs`; fixtures `tests/layers/fixtures/{confined-module,reserved-literal,confined-member}/` |
+| R6 | Built: both new files are in the `auth` area, and pgTAP 05 is in `tenancy`. The lead's runs: db battery 408 passed and 2 expected fail of 410, in 50 s. | `infra/ci/changes.mjs:23` |
+
+**Correction required, then re-run the `auth` area: `handler.ts`, in `inTransaction`'s catch.** It maps any `42501` to 403 `invitation_required`, on the `withTenant` branch too. A signed-in request refused by RLS or a guard at commit would then be reported as an invitation refusal. That is mislabelled, although the request still rolls back. Apply the mapping only when the run is the `USER_INSERTING` (`withContextFreeTx`) branch, and let the `withTenant` branch rethrow. Condition C28 covers the sign-up side. Add one case: a commit-time `42501` under `withTenant` is not answered `invitation_required`.
+
+**Builder additions, ruled:**
+- **`myLandingEntity` exported from `@poly/auth`: accepted.** It follows the `listMySessions` / `revokeMySession` pattern. The web layer cannot mint `SessionUserId` (A-39), so R3's "`withTenant` in `+page.server.ts`" is replaced by this call. It acts only for the request's own identity.
+- **`globals` in the generated lint config: accepted.** `no-implied-eval` resolves `setTimeout` only when it is declared, so this is what makes C21's fixture fire. All the listed names are real runtime globals, and no rule's scope widens.
+- **`isPublic` gains `/sign-up`, exact match only: accepted.** The page carries no data and answers no-store. `/sign-up/<anything>` stays behind sign-in.
+
+**ARCH 1.15.19.** ARCH matches the built code. One stale call is fixed in this commit: `provisionPerson(userId)` now reads `provisionPerson()`, after the step, which is the built signature. `docs/ARCH/ARCH.pdf` is regenerated (`DOCS_PORT=8791 ./scripts/export-pdf.sh ARCH`).
