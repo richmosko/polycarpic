@@ -207,7 +207,7 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     // the operator password is mounted only by the one-shot operator service (POLY-146)
     if (list(s.secrets).some((q) => (typeof q === 'string' ? q : q.target ?? q.source) === 'db_password_operator')) {
       const profiles = list(s.profiles);
-      if (sn !== 'operator' || s.restart !== 'no' || profiles.length !== 1 || profiles[0] !== 'operator') v('operator-one-shot', rel, `${at}: db_password_operator belongs to a service named operator with restart "no" and profiles [operator]`);
+      if (sn !== 'operator' || s.restart !== 'no' || profiles.length !== 1 || profiles[0] !== 'operator' || s.logging?.driver !== 'none') v('operator-one-shot', rel, `${at}: db_password_operator belongs to a service named operator with restart "no", profiles [operator] and logging driver none (its stdout carries the invitation link)`);
     }
     // networks
     const sNets = Object.keys(s.networks ?? {});

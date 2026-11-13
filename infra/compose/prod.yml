@@ -105,6 +105,7 @@ services:
     user: "10006:10006"
     restart: "no"
     profiles: [operator]
+    logging: {driver: "none"}
     entrypoint: ["/app/bin/polycarpic", "cli"]
     environment:
       DB_PASSWORD_FILE: /run/secrets/db_password_operator
