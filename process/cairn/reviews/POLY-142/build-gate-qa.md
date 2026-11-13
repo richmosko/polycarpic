@@ -27,6 +27,12 @@ Every test that failed at import now reaches its assertions: 448/448. Two spot m
 - the origin read from `BETTER_AUTH_URL` before `io.origin`: only C6/C9 "through the image dispatcher ... PUBLIC_ORIGIN" fails.
 Every title still ends with its `[red if: ...]` mutation.
 
+## Run of record at the last code sha f4f1a4f (CLI crash handler to stderr; later commits are docs)
+
+- Full db battery: 446 passed + 2 expected fail (448), 0 failed, Duration 53.4 s.
+- Whole web e2e suite: 52 passed (21.0 s).
+- The timing table above was taken at 09165dc and still serves as the control comparison; f4f1a4f changes only `apps/worker/src/cli/main.ts`.
+
 ## Notes
 
 - The control worktree sat under `.claude/worktrees/qa-142-ctl` and is removed after this gate.
