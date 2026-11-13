@@ -86,3 +86,23 @@ Open with the Principal: widening accepted risk R-2 to name `poly_worker` (secen
 Gate 3 closed: build green at f4f1a4f (build commits 55bdd41, 0e262d3, f4f1a4f; test fixes 713d615, 5225f83, 09165dc). qa's run of record at f4f1a4f: db battery 446 pass + 2 expected fail (448), 53.4 s; whole web e2e 52 pass (`build-gate-qa.md` @ 1e8868c). Timing guard, measured at 09165dc (f4f1a4f changes one line in `apps/worker/src/cli/main.ts`): median 57 s branch against 50 s on main at 558caf6, n = 3 alternating, local Docker; +7 s against the +9 s cap. `operator-invite.test.ts` runs 12.4 s as a file against the ruling's 7 s estimate. The CI `db` job median is read on the PR's first run (about 93 s on main, 100 s warning budget).
 
 Architect build check at 321b62a: A1–A8 pass, A5 corrected by f4f1a4f, A10 is ARCH 1.15.21. seceng build check at ca0c3c9: O1–O11, G1, G2 met; SECURITY 1.9.17, C-28 definition at 66fc9b6; R-2 text held for the Principal. Builder changes accepted by both: owner EXECUTE revoked, `poly_app` SELECT on `issued_via`, revoked payload `{invitation_id}`, no `close()`, outcome-only log line. Every teammate worktree clean at this gate.
+
+### @architect — 2026-11-12
+
+Gate 4 verdict (architect): **pass** at f4f1a4f. Ruling: process/cairn/reviews/POLY-142/ruling.md (R0–R9, C1–C16, addendum 1, build check).
+
+| Axis | Result | Evidence |
+|---|---|---|
+| Schema and definers (A1–A3) | Pass. 0008 generated; 0009 as ruled; claim and accept differ from 0007 only by the bootstrap predicate | 55bdd41, 0e262d3; build check @ 321b62a |
+| Wrapper and confinement (A4, A7) | Pass. Four kinds; `db/operator` and `tenancy/operator-invitation` each confined to `user-invite.ts` | 55bdd41; layers check exit 0 @ ca2c2b2 |
+| CLI contract (A5, A6) | Pass after correction. The crash handler now logs to stderr; stdout carries only the link | f4f1a4f |
+| CI map (A8) | Pass. The `auth` area; no `.github/workflows` diff | 55bdd41 |
+| Conditions C1–C16 | Pass. db battery 446 + 2 expected fail = 448; web e2e 52 green; two spot mutations each turned only their named test red | build-gate-qa.md @ 1e8868c |
+| Timing (A9) | Pass. +7 s battery wall median against a +9 s cap (n = 3, local, same hour). `operator-invite.test.ts` is 12.4 s against an estimate of 7 s, absorbed by the parallel group | build-gate-qa.md @ 1e8868c |
+| Docs (A10) | Pass. ARCH 1.15.21 and the PDF; SECURITY C-01, C-15, C-28, C-84 and T-98 to T-100 | 321b62a, ca0c3c9, 66fc9b6 |
+| `cairn gate` | Pass | c6c48af |
+
+Open, not blocking the verdict:
+- R-2 widening to `poly_worker` is with the Principal.
+- INFRA §7.5 and the first-user runbook step still say the invite sends an email; they should say the link is printed once, and the wrapper must use `exec -T`. This is the INFRA owner's edit.
+- The 12.4 s file time is a candidate for POLY-143: it could share one clone and drop a child process.
