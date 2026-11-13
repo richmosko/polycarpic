@@ -216,6 +216,8 @@ const ROWS: Row[] = [
   ['prod operator without its profile', (s) => { delete svc(s, 'prod', 'operator').profiles; }, 'operator-one-shot', 'the operator starts with the stack'],
   ['staging operator without its profile', (s) => { delete svc(s, 'staging', 'operator').profiles; }, 'operator-one-shot', 'the staging operator starts with the stack'],
   ['prod operator in a second profile', (s) => { svc(s, 'prod', 'operator').profiles = ['operator', 'extra']; }, 'operator-one-shot', 'profiles not exactly [operator]'],
+  ['prod operator without logging driver none', (s) => { delete svc(s, 'prod', 'operator').logging; }, 'operator-one-shot', 'the invitation link on stdout reaches the log driver (A1.1)'],
+  ['staging operator with the json-file log driver', (s) => { svc(s, 'staging', 'operator').logging = { driver: 'json-file' }; }, 'operator-one-shot', 'only the absence of logging is checked, not the driver'],
   // R1
   ['Caddy site block without the headers snippet', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\timport security_headers\n\tbasic_auth', '\tbasic_auth'); }, 'caddy-headers', 'per-site snippet import not checked'],
   ['Caddy snippet lacks nosniff', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\t\tX-Content-Type-Options "nosniff"\n', ''); }, 'caddy-headers', 'snippet contents not checked'],
@@ -246,6 +248,7 @@ describe('POLY-146: the repo\'s compose and pg_hba files', () => {
       expect(op, 'operator service').toBeDefined();
       expect(String(op.restart)).toBe('no');
       expect(op.profiles).toEqual(['operator']);
+      expect(op.logging?.driver, 'A1.1: the link on stdout must not reach a log driver').toBe('none');
       expect(secretNames(op)).toEqual(['db_password_operator']);
     });
     it(`${f}: no service but operator mounts db_password_operator; web, worker and migrate hold no operator secret  [red if: a long-running service has the operator password (seceng #2)]`, () => {

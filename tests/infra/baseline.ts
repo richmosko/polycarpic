@@ -68,7 +68,7 @@ function project(kind: 'prod' | 'staging'): Y {
     worker: hard(10002, { image: APP, networks: ['default'] }),
     migrate: hard(10003, { image: APP, networks: ['default'] }),
     // POLY-146 R3: the one-shot operator service. Its own profile, restart "no", the one secret; no long-running service holds it.
-    operator: hard(prod ? 10006 : 10106, { image: APP, networks: ['default'], restart: 'no', profiles: ['operator'], entrypoint: ['/app/bin/polycarpic', 'cli'], mem_limit: '256m' }),
+    operator: hard(prod ? 10006 : 10106, { image: APP, networks: ['default'], restart: 'no', profiles: ['operator'], logging: { driver: 'none' }, entrypoint: ['/app/bin/polycarpic', 'cli'], mem_limit: '256m' }),
   };
   if (prod) {
     services.backup = hard(10004, { image: '${POLY_POSTGRES_IMAGE:?}', networks: ['backup-net'] });

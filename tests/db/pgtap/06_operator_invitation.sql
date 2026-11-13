@@ -147,6 +147,12 @@ SELECT is((SELECT count(*)::int FROM pg_class WHERE relowner = (SELECT oid FROM 
 SELECT is((SELECT count(*)::int FROM pg_policy p WHERE (SELECT oid FROM pg_roles WHERE rolname = 'poly_operator') = ANY (p.polroles)), 0, 'POLY-146 AC3: no policy names poly_operator');
 SELECT is(pg_temp.run_as('poly_operator', '', NULL, $q$SELECT count(*)::text FROM public.invitation$q$), 'ERR:42501', 'POLY-146 AC3: poly_operator cannot read invitation');
 SELECT is(pg_temp.run_as('poly_operator', '', NULL, $q$SELECT count(*)::text FROM drizzle.__drizzle_migrations$q$), 'ERR:42501', 'POLY-146 AC3: poly_operator cannot read the migrations table');
+-- A1.2: effective privileges (an ACL naming PUBLIC slips past the named-ACL checks above)
+SELECT is((SELECT coalesce(string_agg(p.oid::regprocedure::text, ',' ORDER BY p.oid::regprocedure::text), '') FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname IN ('app', 'public') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e') AND has_function_privilege('poly_operator', p.oid, 'EXECUTE')), 'app.issue_operator_invitation(text,bytea,boolean)', 'POLY-146 A1.2: effective EXECUTE over app and public functions (extension members aside: pgTAP itself) is the issuer alone (mutation: a PUBLIC grant)');
+SELECT is((SELECT coalesce(string_agg(nspname::text, ',' ORDER BY nspname::text), '') FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema' AND has_schema_privilege('poly_operator', oid, 'USAGE')), 'app', 'POLY-146 A1.2: effective USAGE is on app alone');
+SELECT is((SELECT count(*)::int FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema' AND has_schema_privilege('poly_operator', oid, 'CREATE')), 0, 'POLY-146 A1.2: no effective CREATE on any schema');
+SELECT is(has_database_privilege('poly_operator', current_database(), 'TEMP') OR has_database_privilege('poly_operator', current_database(), 'CREATE'), false, 'POLY-146 A1.2: no effective TEMP or CREATE on the database');
 
 SELECT * FROM finish();
 ROLLBACK;

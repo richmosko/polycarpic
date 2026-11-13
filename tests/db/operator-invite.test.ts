@@ -266,16 +266,18 @@ describe('POLY-146 AC5: the operator has its own pool (ruling R1)', () => {
     try {
       const m = await opm();
       expect(typeof m.OperatorPoolRefused, 'OperatorPoolRefused is exported on @poly/db/operator').toBe('function');
+      await e.dbm.close(); // pools are built once; the refusal is at build time
       cfg({ ...dbEnv('poly_worker', e.db), DATABASE_HOST: '127.0.0.1', DATABASE_PORT: String(c.port) });
       await expect(m.withOperatorTx(async () => 1)).rejects.toBeInstanceOf(m.OperatorPoolRefused);
       expect(c.n(), 'no connection attempted').toBe(0);
-    } finally { c.close(); restore(); }
+    } finally { c.close(); await e.dbm.close(); restore(); }
   });
   it('the same refusal when the user comes from process.env alone (no operator config)  [red if: the process.env path skips the user check]', async () => {
     const c = await counter();
     const saved = { ...process.env };
     try {
       const m = await opm();
+      await e.dbm.close();
       cfg(undefined);
       Object.assign(process.env, dbEnv('poly_worker', e.db), { DATABASE_HOST: '127.0.0.1', DATABASE_PORT: String(c.port) });
       await expect(m.withOperatorTx(async () => 1)).rejects.toBeInstanceOf(m.OperatorPoolRefused);
@@ -284,6 +286,7 @@ describe('POLY-146 AC5: the operator has its own pool (ruling R1)', () => {
       for (const k of Object.keys(process.env)) if (!(k in saved)) delete process.env[k];
       Object.assign(process.env, saved);
       c.close();
+      await e.dbm.close();
       restore();
     }
   });
