@@ -35,7 +35,18 @@ In plain words:
 
 ### On staging
 
-I support the architect's staged path (`comparison.md`, e1-staged): stage 1 (marker table, scoped worker entry, interim web definer) first, stage 2 (sign-in service and `enter_session`) after. Stage 1 closes the worker half of R-2 only. Until stage 2 lands, one SQL bug in web is still every user, and R-2 must say so.
+I support the architect's staged path (`comparison.md`, e1-staged): stage 1 (marker table, scoped worker entry, interim web definer) first, stage 2 (sign-in service and `enter_session`) after. What stage 1 contains, and what it does not (`comparison.md` §7):
+
+- **Contains:** the worker can no longer name an arbitrary user. A single injected statement inside one of web's marked request transactions reaches only the requesting user.
+- **Does not contain:** injection on a path web runs outside a marked transaction (BetterAuth on the plain pool, the sign-up path); a stolen `poly_app` password; code execution in web. Each still reaches any user until stage 2.
+
+The web half holds only under three conditions, each with its own test in stage 1's red gate:
+
+1. **Every web query is sent in the driver's extended mode** (`queryMode: 'extended'`), so a query carries one statement. Test: a two-statement string sent through `packages/db` is refused.
+2. **The marker is the first statement of the real `BEGIN`**, before any savepoint can exist. Test: rolling back to any later savepoint leaves the marker in place, and the transaction still reads as the same user.
+3. **The definer refuses a second marker in the same transaction**, and `poly_app` holds no `UPDATE` or `DELETE` on the marker table. Test: a second call naming another user raises, and an update or delete of the marker as `poly_app` is refused.
+
+R-2's interim wording must say exactly this: neither "closed" nor "unchanged".
 
 ## What would change my mind
 
