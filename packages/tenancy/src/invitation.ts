@@ -59,13 +59,14 @@ export async function acceptInvitations(tx: Tx, args: { token: string | null }):
   }
 }
 
-/** The entity a signed-in user lands on: the newest one an accepted invitation seated, else their own Person. */
+/** The entity a signed-in user lands on: the newest membership on an entity other than their own Person, else the Person. */
 export async function landingEntity(tx: Tx): Promise<string | null> {
   const r = await tx.execute<{ id: string | null }>(sql`
     SELECT coalesce(
-      (SELECT i.entity_id FROM public.invitation i
-        WHERE i.claimed_user_id = app.current_user_id() AND i.accepted_at IS NOT NULL AND i.entity_id IS NOT NULL
-        ORDER BY i.created_at DESC, i.id DESC LIMIT 1),
+      (SELECT m.entity_id FROM public.membership m
+        WHERE m.user_id = app.current_user_id()
+          AND m.entity_id NOT IN (SELECT e.id FROM public.entity e WHERE e.self_user_id = app.current_user_id())
+        ORDER BY m.created_at DESC, m.entity_id DESC LIMIT 1),
       (SELECT e.id FROM public.entity e WHERE e.self_user_id = app.current_user_id())) AS id`);
   return r.rows[0]?.id ?? null;
 }

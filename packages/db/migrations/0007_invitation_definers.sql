@@ -12,10 +12,6 @@ GRANT SELECT (id, email, email_verified, signup_txid) ON public."user" TO poly_g
 GRANT UPDATE (signup_txid) ON public."user" TO poly_govern;--> statement-breakpoint
 
 CREATE POLICY entity_authz_read ON public.entity FOR SELECT TO poly_authz USING (true);--> statement-breakpoint
--- landingEntity reads the invitation that seated the signed-in user. Entity rows only: a no-entity row is visible to no
--- poly_app policy (C16).
-CREATE POLICY invitation_claimant_read ON public.invitation FOR SELECT TO poly_app
-  USING (entity_id IS NOT NULL AND claimed_user_id = app.current_user_id());--> statement-breakpoint
 CREATE POLICY invitation_govern_read ON public.invitation FOR SELECT TO poly_govern USING (true);--> statement-breakpoint
 CREATE POLICY invitation_govern_update ON public.invitation FOR UPDATE TO poly_govern
   USING (true) WITH CHECK (claimed_user_id = app.current_user_id());--> statement-breakpoint
