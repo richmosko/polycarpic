@@ -307,3 +307,18 @@ The architect is right about the xmin test I proposed in P5: an UPDATE in the sa
 - **Test.** The P10 sequence raises at step 3, and no membership is written.
 - **Check first.** No BetterAuth new-user path updates those columns before its after-hook runs. Magic link and OAuth set `email_verified` at create (read). The condition-6 route tests confirm it.
 - **If the lead defers S14,** record it as an R-2 residual in SECURITY.
+
+## C33 check (833491f)
+
+**S14 met.** The fix is `app.signup_email_fixed`, a BEFORE UPDATE trigger on `user`, in `packages/db/migrations/0007_invitation_definers.sql:186–199`.
+
+**Probe P11.** I ran it on scratch `postgres:17.10`, applying the real `roles.sql` and migrations 0000–0007 at 833491f, with the SQL run as `poly_app`. The container is removed.
+
+- **The theft sequence is refused.** I re-ran the P10 sequence: insert M, enter the new-user step, create the Person, then `UPDATE email = 'steal@x', email_verified = true`. It raises 42501 at the UPDATE. The transaction rolls back, leaving no user row and no membership.
+- **Legitimate updates still pass.**
+  - A `name` change while the stamp is set passes.
+  - An `email` change on a user whose sign-up committed passes.
+  - The happy-path sign-up still commits, with the stamp cleared.
+- **The earlier probes are unchanged on this head.** P10's refusals for S2, S4, S6, S10, S12 and S13 give the same results as before.
+
+**SECURITY.** C-84 carries C33. The remaining risk, a SQL-level forger inserting a fresh user for an invited address, sits in C-84 and in R-2, which already covers what such a forger can do. No new R entry is needed.
