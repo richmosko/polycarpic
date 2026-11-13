@@ -49,9 +49,9 @@ export function workerPool(): pg.Pool {
 }
 
 export function operatorPool(): pg.Pool {
-  if (operator) return operator;
   const env = config.operator ?? process.env;
   if (env.DATABASE_USER !== 'poly_operator') throw new OperatorPoolRefused();
+  if (operator) return operator;
   return (operator = new pg.Pool({ ...connectionFrom(env), ...maxOpt() }));
 }
 
