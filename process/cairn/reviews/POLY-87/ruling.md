@@ -381,3 +381,19 @@ Read against R1–R6 and C1–C32 as amended. One item must change before the ve
 - **`isPublic` gains `/sign-up`, exact match only: accepted.** The page carries no data and answers no-store. `/sign-up/<anything>` stays behind sign-in.
 
 **ARCH 1.15.19.** ARCH matches the built code. One stale call is fixed in this commit: `provisionPerson(userId)` now reads `provisionPerson()`, after the step, which is the built signature. `docs/ARCH/ARCH.pdf` is regenerated (`DOCS_PORT=8791 ./scripts/export-pdf.sh ARCH`).
+
+## Timing guard (R6, against a same-day control)
+
+- **Guard: met, restated against a same-day control.** R6's 92 s line assumed main ran at 86 s. Main measured 93 s on the same afternoon's runners, so a fixed line now measures runner drift as much as this loop.
+  - Measured by the lead, all full dispatch runs, run one after another:
+    - branch 9051d1d: job median 94 s, battery-step median 72 s (n = 5);
+    - main 7eaa51a: job median 93 s, battery-step median 66 s (n = 3).
+  - The loop's cost is therefore +1 s at the job median and +6 s at the battery-step median.
+  - That is within R6's estimate of ≤ 8 s of new file time. The branch's 94 s is also within the 100 s budget, which only warns.
+- **Cut: not owed in this loop; it is a follow-up.**
+  - qa's no-condition-dropped cuts (`temp/2026-11-13-qa-87-db-time.md` in qa-87's worktree, cuts 1, 2 and 5: superuser seeds through the `sql.ts` worker, one shared owner and entity per describe, a batched owner seed) save about 3 s of makespan.
+  - They belong in the db test-time umbrella, not a new top-level issue. The largest single item, C27's 5 s lock-timeout test, stays in this loop: it is the condition's only proof.
+- **Wording for future loops** (replaces the absolute line in R6-style guards):
+  - **Measure.** A loop's db cost is the difference between the branch head and main at the merge base, both measured in the same session, n ≥ 3 each, on the battery-step median (the job median carries setup noise).
+  - **Cap.** The cap is the ruling's own estimate, rounded up. The loop brings its own cut only if it is over that cap.
+  - **Budget.** The 100 s budget stays a warning on main itself. When main's same-day median exceeds it, that is filed against the suite as its own cut issue, not charged to the loop that happens to be running.
