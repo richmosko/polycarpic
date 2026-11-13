@@ -10,27 +10,28 @@ Independence: before I wrote this, I saw seceng's lean towards (e1), both in `co
 
 Concretely:
 
-1. **Stage 1, about 5–6 loop-days in 2 loops.**
+1. **Stage 1, about 5.5–6.5 loop-days in 2 loops.**
    - The transaction marker (K) replaces the settable GUC for every reader.
    - The worker enters only through a scoped job definer (J), and loses the auth secret (X).
    - Web keeps asserting identity, but only through one poly_app-only definer (I).
    - Reset and magic-link tokens are stored hashed.
    - The operator CLI moves to its own login role, run from a one-shot service.
-   - At the end, the worker can name no user, and nothing in the database honours a `set_config` from any role. Web still names any user through the interim definer, so SQL injection in web and a stolen poly_app password stay "any user" until stage 2.
-2. **Stage 2, about 8–10 loop-days in 3 loops.**
+   - Web queries go in extended mode, the marker comes first in the transaction, and the definer refuses a second marker (`comparison.md` §7).
+   - At the end, the worker can name no user, and nothing in the database honours a `set_config` from any role. For web, a single injected statement inside a marked transaction reaches only the requesting user. An injection on an unmarked path, a stolen poly_app password and code execution in web still reach any user until stage 2.
+2. **Stage 2, about 9–11.5 loop-days in 3 loops.**
    - The sign-in service (S) takes BetterAuth, the auth secret and every grant on BetterAuth's tables.
-   - Web enters through `app.enter_session(token)` (E).
+   - Web enters through `app.enter_session(handle)` (E). The database holds only a hash of the handle (H, `comparison.md` §7 point 1), so a backup holds nothing a reader can present.
    - I is revoked.
    - After stage 2, SQL injection in web, a stolen poly_app password and a database read at rest each reach no user, or only the requesting user.
 3. **POLY-89 then specifies its guards once, against the marker.** POLY-137, POLY-144 and POLY-129 follow unchanged in size.
 
-Total: **13–16 loop-days, about 5 loops**, before POLY-89. That is roughly twice the POLY-86 + POLY-87 + POLY-142 span. Confidence is **M**: it is built up from the files that change, not measured.
+Total: **14.5–18 loop-days, about 5 loops**, before POLY-89. That is roughly twice the POLY-86 + POLY-87 + POLY-142 span. Confidence is **M**: it is built up from the files that change, not measured.
 
 ## Why this one
 
 - **It removes the assertion rather than moving it.** Every policy and definer reads identity through one function (`current-state.md` §4). Changing how that function learns the user changes no policy. The part that decides identity inside the database is one definer, one marker table and one function body, short enough to read line by line and to test exhaustively in pgTAP. (b) and (c) move the trust into a component this team does not own or review: a native extension, or PostgREST.
 - **It is the cheapest option that stops SQL injection.**
-  - Against (b), it costs 11.5–14 loop-days where (b) costs 15–22, and needs no key rotation, no native code in Postgres, and has no revocation gap.
+  - Against (b), it costs 13–16 loop-days where (b) costs 15–22, and needs no key rotation, no native code in Postgres, and has no revocation gap.
   - (b)'s only candidate extension, `pg_session_jwt`, takes its key "by client request" per its README, so a compromised web could supply its own key. As it stands, (b) is not buildable.
   - (d2) costs more, needs CREATEROLE, and puts roles in every backup, for the same protection.
   - (c) costs two to three times as much, plus a standing tax on every data feature, and its security rests on the gateway's password, just as ours rests on poly_app's today.
@@ -51,7 +52,7 @@ Total: **13–16 loop-days, about 5 loops**, before POLY-89. That is roughly twi
 - Every request writes one marker row, so read-only requests now assign an xid. The cost is unmeasured. It is checked against POLY-63's under-2 s dashboard criterion, and a ruling on K sets the threshold before build.
 - Development and e2e need two servers behind a proxy.
 - Auth routes cross a process boundary when debugging.
-- POLY-89 waits about 13–16 loop-days more.
+- POLY-89 waits about 14.5–18 loop-days more.
 
 ## What would change my mind
 
@@ -74,7 +75,7 @@ Total: **13–16 loop-days, about 5 loops**, before POLY-89. That is roughly twi
 
 ## Open questions for the Principal
 
-1. Pivot fully before POLY-89 (about 13–16 loop-days), or stage 1 plus (a+) now (about 5) and stage 2 later at +2–3 extra?
+1. Pivot fully before POLY-89 (about 14.5–18 loop-days), or stage 1 plus (a+) now (about 5.5–6.5) and stage 2 later at +2–3 extra?
 2. Is a third long-running process acceptable for a self-hosting operator? It is the same image and deploy, but one more thing to watch.
 3. Should the sign-in service also serve the sign-in and sign-up pages, so that a persistent web compromise cannot capture passwords? That is unpriced: a guess of +1–2 loop-days and a DESIGN change.
 4. Does the hosting non-goal (R-6) still stand? The answer decides whether (e4) is ever planned and whether (e2) and (e3) are optional.

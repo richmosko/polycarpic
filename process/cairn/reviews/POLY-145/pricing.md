@@ -104,7 +104,7 @@ The build is **K + I + J + X + S + E + D**, in that order. I is revoked at the e
   - One marker INSERT per request, which forces an xid on read-only requests. Its WAL and latency cost is unmeasured. A guard: re-measure against POLY-63's under-2 s dashboard criterion.
   - No key management and no extension. The purge runs as a worker job.
 - **Neon / Vercel tertiary target (ARCH §7.6):** the marker is plain SQL and scoped to one transaction, so it works through a transaction-mode pooler (unmeasured on Neon). S becomes one more Vercel project or route group.
-- **Total:** about **11.5–14 loop-days in 4 loops**. **M**
+- **Total:** about **13–16 loop-days in 4 loops**: K, I, J, X, S, E and D, plus the stage-1 guards (0.5) and H (1–1.5) from `comparison.md` §7. **M**, with H a guess.
 
 ### (e2) Worker: scoped job grants
 
@@ -123,12 +123,12 @@ The build is **K + I + J + X + S + E + D**, in that order. I is revoked at the e
 
 ### (e1-staged) Staged (e1): a variant I propose
 
-- Stage 1 is **K + I + J + X**: about 3.5 loop-days, 1 loop, **M**.
+- Stage 1 is **K + I + J + X**, plus the three guards in seceng's ruling (`comparison.md` §7 point 2): every web query is sent in `queryMode: 'extended'`, enforced in `packages/db`; the marker is the first statement of the real BEGIN and survives any later savepoint rollback; and the definer refuses a second marker and any transaction that `withTenant` did not open. The guards add 0.5. Total: about 4 loop-days, 1 loop, **M**.
   - It closes the worker half of R-2 at once: poly_worker can no longer name a user.
-  - It turns "any SQL as poly_app" into "only a call to one poly_app-only definer", which a catalog test can pin. That definer still believes whatever user poly_app names, so SQL injection in web (S1) and a stolen poly_app password (S5) stay "any user" until stage 2.
+  - What it does for web, per `comparison.md` §7: a single injected statement inside a marked transaction reaches only the requesting user, provided all three guards hold, and each needs its own red-gate test. An injection on an unmarked path (the plain pool, sign-up), a stolen poly_app password (S5) and code execution in web still reach any user until stage 2, because web still chooses the id the interim definer believes.
   - Nothing is thrown away: stage 2 deletes I and adds S + E.
-- Stage 2 is **S + E + D**: about 8–10 loop-days in 3 loops.
-- The total matches (e1). The difference is that the riskier half (the worker, which parses untrusted input) is closed before POLY-89 resumes, and POLY-89 can be specified once against the marker.
+- Stage 2 is **S + E + H + D**: about 9–11.5 loop-days in 3 loops. **H** is a hashed session handle (`comparison.md` §7 point 1, option 1). The sign-in service issues a second random cookie, stores only `sha256(handle)` in `app.session_handle` (cascading from `session`), and `enter_session` takes the handle. Without H, stage 2 makes a database read worse than today. H costs 1–1.5 loop-days; that is a guess until the lead's pre-stage-2 spike measures every BetterAuth path that creates or replaces a session.
+- The total matches (e1), now that (e1) includes the guards and H. The difference is that the riskier half (the worker, which parses untrusted input) is closed before POLY-89 resumes, and POLY-89 can be specified once against the marker.
 
 ## 3. Side by side
 
@@ -141,8 +141,8 @@ The build is **K + I + J + X + S + E + D**, in that order. I is revoked at the e
 | (c) PostgREST | 3 / 2 / 1 (+5–8 platform) | +30–50% on every data feature | 30–45 + tax | 8–10 | 2 | key rotation, second query surface | L |
 | (d1) role per user, shared login | — | — | 6–8, no gain | — | 0 | role churn | guess |
 | (d2) role per user, own credential | 3 / 1.5 / 0.5 | +0.5–1 | 18–25 | 5–6 | 1 | roles dump in every backup, connection sizing | L |
-| (e1) DB-checked opaque session | 3 / 1 / 0.25 | +0.5 | 11.5–14 | 4 | 1 | none beyond one more service | M |
-| (e1-staged), stage 1 only | 0 / 0.25 / 0.25 | +0 (POLY-89 specs against the marker) | 3.5 | 1 | 0 | none | M |
+| (e1) DB-checked opaque session | 3 / 1 / 0.25 | +0.5 | 13–16 | 4 | 1 | none beyond one more service | M |
+| (e1-staged), stage 1 only | 0 / 0.25 / 0.25 | +0 (POLY-89 specs against the marker) | 4 | 1 | 0 | none | M |
 | (e2) job grants (on K) | 0 | +1.5–2.5 on POLY-64 | 1.5–2.5 | 0 (inside POLY-64) | 0 | none | M |
 | (e3) parser sandbox | 0 | +3–4 on POLY-64/77 | 3–4 | 0–1 | 1 | one more image | M |
 
