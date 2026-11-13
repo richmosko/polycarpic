@@ -71,7 +71,7 @@ SELECT is((SELECT count(*)::int FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tg
 SELECT is((SELECT array_agg(c.relname::text || '.' || t.tgname || ':' || CASE WHEN (t.tgtype & 2) = 2 THEN 'before' ELSE 'after' END ORDER BY t.tgname COLLATE "C")
     FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
     WHERE NOT t.tgisinternal AND c.relnamespace = 'public'::regnamespace AND c.relname IN ('membership', 'invitation') AND (t.tgtype & 1) = 1),
-  ARRAY['invitation.invitation_10_gate_owner_changes:before', 'membership.membership_10_gate_owner_changes:before', 'membership.membership_20_keep_an_owner:before', 'membership.membership_90_audit:after'],
+  ARRAY['invitation.invitation_10_gate_owner_changes:before', 'invitation.invitation_20_set_once:before', 'membership.membership_10_gate_owner_changes:before', 'membership.membership_20_keep_an_owner:before', 'membership.membership_90_audit:after'],
   'row triggers on membership and invitation are named so that gate (10) fires before keep_an_owner (20) and the audit (90, AFTER) last (mutation: rename one)');
 
 -- privileges: no DELETE anywhere for the app or the worker on entity, invitation, notification, audit_event; workers read only
@@ -93,7 +93,7 @@ SELECT is((SELECT array_agg(t || ':' || p ORDER BY t COLLATE "C", p COLLATE "C")
 SELECT is((SELECT count(*)::int FROM pg_policy p WHERE p.polrelid = 'public.audit_event'::regclass AND p.polcmd = 'a'
     AND p.polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'poly_govern')]::oid[]), 1, 'audit_event: one INSERT policy, TO poly_govern');
 SELECT is((SELECT count(*)::int FROM pg_policy p WHERE p.polrelid = 'public.membership'::regclass AND p.polcmd = 'a'
-    AND p.polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'poly_govern')]::oid[]), 1, 'membership: the creator-seat INSERT policy TO poly_govern exists');
+    AND p.polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'poly_govern')]::oid[]), 2, 'membership: two INSERT policies TO poly_govern: the creator seat and the viewer accept (POLY-87 R2)');
 
 SELECT * FROM finish();
 ROLLBACK;

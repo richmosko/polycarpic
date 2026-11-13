@@ -1,13 +1,12 @@
 // POLY-86 criteria 8, 9 (POLY-76 (b') re-run) and the schema half of S16a / ruling R8. Real Postgres, as poly_app.
 // Titles end with [red if: <mutation>].
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { PW, boot, claim, teardown, type Env } from './helpers/auth';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { PW, boot, teardown, type Env } from './helpers/auth';
+import { seedInvitation } from './helpers/invitation';
 import { must } from './helpers/sql';
 
-vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o as any));
-
 let e: Env;
-beforeAll(async () => { e = await boot(); claim.impl = async () => ({ accepted: true }); });
+beforeAll(async () => { e = await boot(); });
 afterAll(() => teardown(e));
 
 const MODELS = ['user', 'session', 'account', 'verification', 'twoFactor', 'passkey'] as const;
@@ -56,7 +55,8 @@ describe('criterion 9: timestamptz and the three core calls as poly_app', () => 
   it('signUpEmail (inside withContextFreeTx), signInEmail and getSession succeed as poly_app  [red if: a timestamp or id type mismatch between BetterAuth and the schema]', async () => {
     const auth = await e.mk();
     const email = `core-${Date.now()}@qa.test`;
-    const su = await e.dba.withContextFreeTx(() => auth.api.signUpEmail({ body: { email, password: PW, name: 'Core', invitationToken: 'qa' } }));
+    const invitationToken = seedInvitation({ db: e.db, email, role: 'viewer' }); // a real no-entity invitation (POLY-87)
+    const su = await e.dba.withContextFreeTx(() => auth.api.signUpEmail({ body: { email, password: PW, name: 'Core', invitationToken } }));
     expect(su.user.email).toBe(email);
     const si = await auth.api.signInEmail({ body: { email, password: PW }, returnHeaders: true });
     const cookie = si.headers.getSetCookie().map((c: string) => c.split(';')[0]).join('; ');

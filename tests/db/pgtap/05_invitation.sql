@@ -121,6 +121,12 @@ SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f4', NUL
 SELECT isnt((SELECT accepted_at FROM public.invitation WHERE id = '00000000-0000-4000-8000-0000000000b3'), NULL, 'C16: the no-entity row is claimed and accepted');
 SELECT is((SELECT count(*)::int FROM public.membership WHERE user_id = '00000000-0000-4000-8000-0000000000f4'), 0, 'C16: and seats no membership');
 
+SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f1', NULL, $q$SELECT count(*)::text FROM public.invitation$q$), '0',
+  'C16: a viewer seated by an invitation selects 0 rows from invitation, their own claimed row included (mutation: a claimant read policy)');
+SELECT is((SELECT array_agg(polname::text ORDER BY polname COLLATE "C") FROM pg_policy
+    WHERE polrelid = 'public.invitation'::regclass AND ((SELECT oid FROM pg_roles WHERE rolname = 'poly_app') = ANY (polroles) OR polroles = ARRAY[0]::oid[])),
+  ARRAY['invitation_insert', 'invitation_select', 'invitation_update'], 'C16: the policies that apply to poly_app on invitation are exactly invitation_select, invitation_insert, invitation_update');
+
 -- ---------------------------------------------------------------- C17: accept_invitations outside a sign-up transaction
 SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501',
   'C17: a signed-in existing user (app.user_id set, row inserted by an earlier transaction) is refused (mutation: accept trusts the setting)');

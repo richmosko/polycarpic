@@ -33,7 +33,7 @@ export async function seedTenancy({ db, tenant, q, provisionPerson }: Ctx): Prom
       VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), 'qa-fixture-E', 'business_pass_through')`);
     const id = (await q(tx, `SELECT id FROM public.entity WHERE name = 'qa-fixture-E'`))[0].id as string;
     await q(tx, `INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at)
-      VALUES ($1, 'new@qa.test', 'viewer', $2, decode('aa11', 'hex'), now() + interval '1 day')`, [id, u.owner]);
+      VALUES ($1, 'new@qa.test', 'viewer', $2, decode(repeat('aa', 32), 'hex'), now() + interval '1 day')`, [id, u.owner]);
     await q(tx, `INSERT INTO public.entity_type (name, kind, owner_user_id) VALUES ('Club', 'base', $1)`, [u.owner]);
     return id;
   });
@@ -45,7 +45,7 @@ export async function seedTenancy({ db, tenant, q, provisionPerson }: Ctx): Prom
   const f = await tenant(u.outsider, async (tx) => {
     const p = await provisionPerson(tx);
     await q(tx, `INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at)
-      VALUES ($1, 'x-new@qa.test', 'viewer', $2, decode('bb22', 'hex'), now() + interval '1 day')`, [p.personId, u.outsider]);
+      VALUES ($1, 'x-new@qa.test', 'viewer', $2, decode(repeat('bb', 32), 'hex'), now() + interval '1 day')`, [p.personId, u.outsider]);
     await q(tx, `INSERT INTO public.entity_type (name, kind, owner_user_id) VALUES ('Lodge', 'base', $1)`, [u.outsider]);
     return p.personId;
   });

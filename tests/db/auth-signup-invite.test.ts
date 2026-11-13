@@ -19,7 +19,7 @@ afterAll(() => teardown(e));
 const stamp = () => `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
 const users = (email: string) => e.count(`SELECT 1 FROM public."user" WHERE email = '${email}'`);
 const signUp = (email: string, invitationToken?: string, a = auth) =>
-  e.handle(post('/sign-up/email', { email, password: PW, name: 'Invited', ...(invitationToken === undefined ? {} : { invitationToken }) }), a);
+  e.handle(post('/sign-up/email', { email, password: PW, name: 'Invited', ...(invitationToken === undefined ? {} : { invitationToken }) }, '', { 'x-forwarded-for': '203.0.113.9' }), a); // requireClientIp variants need one valid X-Forwarded-For entry
 const body = async (r: Response) => ({ status: r.status, text: await r.clone().text() });
 
 // ---------------------------------------------------------------- step 6: closure (condition 23)

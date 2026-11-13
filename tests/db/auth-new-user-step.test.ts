@@ -169,10 +169,16 @@ describe('condition 14: the step is not on the db index, db/auth or db/session, 
       for (const [k, v] of Object.entries(m))
         if (typeof v === 'function') expect(String(v), `${name}.${k}`).not.toMatch(/enter_new_user|enterNewUser/);
     });
-  it('a withTenant Tx has no enterNewUser  [red if: the step is attached to every Tx, not to the context-free kind]', async () => {
+  it('a withTenant and a withSystem Tx have no enterNewUser  [red if: the step is attached to every Tx, not to the context-free kind]', async () => {
     const u = must(`INSERT INTO public."user" (name, email) VALUES ('T', 't-${uid()}@qa.test') RETURNING id`, e.db).rows[0]![0]!;
     const has = await e.dbm.withTenant(e.dbs.sessionUserId(u), '00000000-0000-4000-8000-0000000000e2', async (tx: any) => 'enterNewUser' in tx || typeof tx.enterNewUser !== 'undefined');
     expect(has).toBe(false);
+    // withSystem: M1's job_targets returns no rows, so (as wrappers.test.ts does) the superuser replaces its body in THIS database only
+    const target = { entityId: '33333333-3333-4333-8333-333333333333', connectionId: null };
+    must(`CREATE OR REPLACE FUNCTION app.job_targets(job text) RETURNS TABLE (entity_id uuid, principal_user_id uuid, connection_id uuid)
+      LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$ select '${target.entityId}'::uuid, '${u}'::uuid, null::uuid $$`, e.db);
+    const sysHas = await e.dbm.withSystem('qa_job', target, async (tx: any) => 'enterNewUser' in tx || typeof tx.enterNewUser !== 'undefined');
+    expect(sysHas, 'a withSystem Tx has no enterNewUser').toBe(false);
     // control, so this cannot pass on a missing step everywhere: the context-free handle has it
     let ctlHas = false;
     await inCtxFree(async (tx) => { ctlHas = typeof tx.enterNewUser === 'function'; });

@@ -26,11 +26,11 @@ export type Env = Awaited<ReturnType<typeof boot>>;
 /** Switch for the one mocked export: claimInvitation. `impl` null = the ruling's real stub (throws InvitationRequired).
  *  A test file declares: vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o)) */
 // One object on globalThis: boot() calls vi.resetModules(), which would otherwise give the mock factory a second copy of this module.
-type Claim = { impl: null | ((tx: unknown, a: { email: string; token: string | null }) => Promise<unknown>) };
+type Claim = { impl: null | ((tx: unknown, a: { email: string; token: string | null }, real: (tx: unknown, a: { email: string; token: string | null }) => Promise<unknown>) => Promise<unknown>) };
 export const claim: Claim = ((globalThis as { __polyClaim?: Claim }).__polyClaim ??= { impl: null });
 export async function claimFactory(orig: () => Promise<unknown>) {
   const real = (await orig()) as Record<string, any>;
-  return { ...real, claimInvitation: (tx: unknown, a: any) => (claim.impl ? claim.impl(tx, a) : real.claimInvitation(tx, a)) };
+  return { ...real, claimInvitation: (tx: unknown, a: any) => (claim.impl ? claim.impl(tx, a, real.claimInvitation) : real.claimInvitation(tx, a)) };
 }
 
 export const hdr = { origin: BASE, 'content-type': 'application/json' };
