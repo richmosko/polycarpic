@@ -354,12 +354,12 @@
         {
           "op": "insert",
           "table": "public.invitation",
-          "sql": "insert into public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at) values (:entity, 'probe@qa.test', 'viewer', :actor, decode(md5(random()::text), 'hex'), now() + interval '1 day')"
+          "sql": "insert into public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at) values (:entity, 'probe@qa.test', 'viewer', :actor, sha256(random()::text::bytea), now() + interval '1 day')"
         },
         {
           "op": "update",
           "table": "public.invitation",
-          "sql": "update public.invitation set revoked_at = now() where entity_id = :entity"
+          "sql": "update public.invitation set revoked_at = coalesce(revoked_at, now()) where entity_id = :entity"
         },
         {
           "op": "update",
