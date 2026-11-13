@@ -4,7 +4,7 @@ title: Second sign-in step
 status: backlog
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-86, POLY-62, POLY-87]
+blocked_by: [POLY-86, POLY-62, POLY-87, POLY-145]
 assignee: backend-lead
 paths: [packages/auth/**, packages/tenancy/**, packages/db/migrations/**, apps/web/src/routes/**, apps/cli/**]
 labels: [auth, security]

@@ -1,11 +1,12 @@
 ---
 id: POLY-145
 title: Identity trust boundary
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: seceng
+paths: [process/cairn/issues/POLY-145.md, process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-145/**, process/DECISIONS.md, docs/SECURITY/**, docs/ARCH/**]
 labels: [security, auth, spike]
 priority: P1
 pr: null
@@ -39,3 +40,9 @@ seceng drives. The architect prices the rework and the topology. The lead gives 
 ## Open at this issue's start
 
 - Whether POLY-89 waits for this decision (the lead recommends yes).
+
+## Comments
+
+### @team-lead — 2026-11-12
+
+Feature started. Branch: `feature/poly-145-identity-trust-boundary`. The Principal confirmed at the start that POLY-89 waits for this decision; POLY-89 is now blocked by this issue.
