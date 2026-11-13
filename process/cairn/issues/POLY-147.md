@@ -1,12 +1,12 @@
 ---
 id: POLY-147
 title: Identity marker (stage 1)
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-146]
 assignee: backend-lead
-paths: [process/cairn/issues/POLY-147.md, packages/db/**, packages/auth/**, packages/tenancy/**, apps/worker/**, tests/db/**, tests/layers/**, layers.json, eslint.config.js, package.json, docs/ARCH/**, docs/SECURITY/**]
+paths: [process/cairn/issues/POLY-147.md, process/cairn/reviews/POLY-147/**, packages/db/**, packages/auth/**, packages/tenancy/**, apps/worker/**, tests/**, scripts/layers/**, layers.json, eslint.config.js, package.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**]
 labels: [security, auth]
 priority: P1
 pr: null
@@ -58,3 +58,9 @@ With the three guards from `comparison.md` §7 in place, a single injected state
 ## Estimate
 
 4.5–5 loop-days, 1 loop (M; pricing.md blocks K, I, J + comparison.md §7 guards; +0.5 for seceng's check #4–#11)
+
+## Comments
+
+### @team-lead — 2026-11-13
+
+Feature started. Branch: `feature/poly-147-identity-marker`.
