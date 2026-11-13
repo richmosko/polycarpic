@@ -9,14 +9,14 @@ Author: seceng. Written without reading the architect's recommendation. Based on
 In plain words:
 
 1. **Sign-in moves out of the web app** into a small separate service with its own database role. Only that service can read or write sessions, password-reset links, magic links and second-factor secrets, and only it holds the auth secret. The browser reaches it directly on the `/api/auth/*` path, so the web app never sees a password or a second-factor code.
-2. **The web app asks Postgres who the user is, rather than telling it.** For each request it hands Postgres the session token from the cookie; one short database function checks that token against the session table and marks the transaction with that user in a way the web app cannot imitate. The web app's database password, on its own, names nobody.
+2. **The web app asks Postgres who the user is, rather than telling it.** For each request it hands Postgres the session token from the cookie; one short database function checks that token against the session table and records the user in a row only that function may write, keyed to the current transaction (the architect's marker table); every policy reads that row, never a setting the web app could change. The web app's database password, on its own, names nobody.
 3. **The worker acts only through grants.** When someone links a bank, the sign-in service issues a grant for that one connection. The worker can use it only for importing into that connection's entity, not to read or change anything else as that person.
 4. **Now, before anything else:** store reset and magic-link tokens hashed; take the auth secret out of the worker; give the operator's CLI its own database login with only the power to issue invitations.
 
 ### Why this one
 
 - **It closes the two attacks that are total today.** Today one SQL-injection bug, or a leaked app password, gives the attacker every family member's books and, through the plain reset links, their accounts for good (`threat-model.md` S1, S5). Under (e1) both reach only the user whose request it is, or nobody.
-- **The part that must be trusted is small enough to read in full.** The database side is one function of the order of 50 lines and a changed `current_user_id()`, using `pgcrypto` only. It can be tested exhaustively with pgTAP: a forged setting, a copied tag, an expired, revoked or unknown token must each give no rows. Nothing native of ours or of a third party runs inside the database.
+- **The part that must be trusted is small enough to read in full.** The database side is one function of the order of 50 lines, a marker table guarded by ordinary grants, and a changed `current_user_id()`. It can be tested exhaustively with pgTAP: a forged setting, a marker row written by the app's role, a marker from an earlier transaction, an expired, revoked or unknown token must each give no rows. Nothing native of ours or of a third party runs inside the database.
 - **Revoking a session works at once**, because the database checks the session row on every request. A signed-token design keeps a revoked token alive until it expires, unless it also checks the row.
 - **It tests R-2's earlier claim and finds it wrong.** R-2 said a database-verified token "would gain little" because `poly_app` reads the session table anyway. That is only true while sign-in runs inside the web app. Move sign-in out and the claim falls; with it falls most of the reach R-2 accepts.
 
@@ -33,9 +33,13 @@ In plain words:
 - **The worker still opens every bank credential.** That is the worker's job, not an identity question. Only (e3) narrows it.
 - **The sign-in service becomes the crown jewel.** Whoever controls it can create a session for anyone. It is safer than the web app because it exposes only the sign-in routes — no pages, no uploads, no bank data — not because it is small in code.
 
+### On staging
+
+I support the architect's staged path (`comparison.md`, e1-staged): stage 1 (marker table, scoped worker entry, interim web definer) first, stage 2 (sign-in service and `enter_session`) after. Stage 1 closes the worker half of R-2 only. Until stage 2 lands, one SQL bug in web is still every user, and R-2 must say so.
+
 ## What would change my mind
 
-- **The tag check is too slow.** If checking the transaction's identity on every policy call costs more than the architect's budget for a page, and the protected-setting variant is not available, I would move to (b) — but only after the key-in-startup-packet question is measured and closed.
+- **The marker lookup is too slow.** If reading the transaction's identity on every policy call costs more than the architect's budget for a page, I would look first at caching it per statement. I would move to (b) only after the key-in-startup-packet question is measured and closed, and the architect's reading of `pg_session_jwt` makes that unlikely.
 - **Hosting other families becomes a real plan.** Then (e1) is the floor, not the answer, and I would add (e4), one instance per family. A shared web process would hold every family's sessions.
 - **Splitting sign-in cannot carry POLY-89's second-step guards.** If the architect finds the guards cannot be rebuilt on the sign-in service's own transactions without weakening them, the split needs another design before it is adopted.
 - **The cost.** If the architect's price for (e1) is out of proportion for a single-family instance, I would recommend (a+) now plus (e1) before any second family or any hosted use — and say plainly that until then, one SQL bug remains every user.

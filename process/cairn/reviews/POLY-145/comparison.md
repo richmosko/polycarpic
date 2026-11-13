@@ -33,13 +33,32 @@ What no option stops: a persistent attacker inside web acting as the users who u
 
 **(d2) a database credential per user.** Postgres itself authenticates each user, so web cannot become a user whose credential it was not given. In practice the sign-in service must create a role per user and hand web a short-lived password per session; that service needs `CREATEROLE`, shared pooling stops working (one connection set per user), and `pg_hba` and role cleanup become part of sign-up and deletion. It gives the same protection as (e1) with Postgres's login machinery doing the check, at a higher cost and a more privileged sign-in service. Not recommended.
 
-**(e1) Postgres checks an opaque session.** The sign-in service owns the session table; web and worker lose every grant on it. web hands the cookie's token to one definer, which hashes it, finds a live session, and marks the transaction as that user in a way the caller cannot imitate (a tag only the definer's role can compute, bound to the transaction; or a protected setting, below). SQL alone, or a stolen app password, names nobody. Revocation is instant. Trusted code: the sign-in service (as in (b)), one definer of the order of 50 lines of SQL, the changed `app.current_user_id()`, and `pgcrypto`; nothing native of ours in the database. Tests: pgTAP — a forged `app.user_id` alone yields no rows; a tag copied from another transaction yields no rows; expired, revoked and unknown tokens yield none; the definer refuses a second call; `poly_app` cannot read the key, the session table or the verification table. Open design point (unmeasured): the cost of checking the tag on every policy call, and the alternative of a tiny extension that makes `app.user_id` settable only by the definer's role, which a managed host such as Neon may not allow. The architect owns that choice.
+**(e1) Postgres checks an opaque session.** The sign-in service owns the session table; web and worker lose every grant on it. web hands the cookie's token to one definer, which hashes it, finds a live session, and marks the transaction as that user in a way the caller cannot imitate. The architect's mechanism, which I prefer to the keyed tag in `options.md`: a marker table `app.tx_identity(xid8 primary key = pg_current_xact_id(), user_id, session_id)` that only the definers' owner may insert into, with `app.current_user_id()` reading that row and ignoring any setting. Postgres's own grants then enforce it, with no key to guard and no extension — the same stamp idea as C-84's `signup_txid`. SQL alone, or a stolen app password, names nobody. Revocation is instant. Trusted code: the sign-in service (as in (b)), one definer of the order of 50 lines of SQL, the changed `app.current_user_id()`, and the marker table's grants; nothing native in the database. Tests: pgTAP — a forged `app.user_id` alone yields no rows; `poly_app` and `poly_worker` cannot insert, update or delete a marker row; a marker committed by an earlier transaction gives a later one nothing; expired, revoked and unknown tokens yield none; the definer refuses a second call; `poly_app` cannot read the session or verification tables. Open points (unmeasured): the cost of the marker lookup on every policy call (a primary-key read, likely cheap, to be measured), that `pg_current_xact_id()` assigns a transaction id even to read-only requests, and the cleanup of committed marker rows, which grow by one per request.
 
 **(e2) scoped job grants for the worker.** Today the worker can name any user. With (e2) it can act only for the connections it holds a grant for, and only on the import path of that connection's entity. A worker compromise still reaches every grant it holds (they are sealed under its keyring), but no longer every user's whole books. A stolen worker password without the keyring reaches nothing. Trusted code: one more definer and the grant-minting step in the sign-in service. Tests: a job without a grant reads 0 rows; with a grant, it cannot read another entity or a non-import table.
 
 **(e3) parser sandbox.** The parsers of provider responses and uploads run in a separate process with no database password, no keyring and no network. A parser exploit reaches only the file it is parsing. It is the only option that touches the worker's biggest power (every bank credential). Trusted code: the small writer that validates parsed rows. Tests: the sandbox process has no secret files, no network and no database socket; malformed and oversized inputs are refused at the writer.
 
 **(e4) one instance per family.** Hosted only. A compromise in one family's stack reaches that family; nothing else contains a cross-family breach as completely.
+
+**(e1-staged) the architect's staged variant.** Stage 1 adds the marker table, a scoped worker entry (the (e2) idea) and an interim definer that only `poly_app` may call, which web uses as it sets the setting today. Stage 2 adds the sign-in service and `enter_session(token)`. Stage 1 alone closes the worker half of R-2: a worker compromise or a stolen worker password can no longer name an arbitrary user. It leaves the web half as it is today, because the interim definer believes whatever user `poly_app` names — so S1 and S5 stay "any user" until stage 2. Nothing in stage 1 is thrown away by stage 2. I support staging on that understanding; stage 1 must not be read as closing R-2.
+
+### Would it have contained the plain verification tokens on its own?
+
+The finding: `poly_app` can read password-reset and magic-link tokens in the clear (`threat-model.md`; filed on POLY-137). Per option, without the POLY-137 fix:
+
+| Option | Contained? | Why |
+|---|---|---|
+| (a) | No | `poly_app` reads `verification`, which has no RLS |
+| (a+) | Yes | The fix is part of it |
+| (b) | Yes, against web | `verification` moves to the sign-in service's role; SQL in web cannot read it. SQL injection *inside* the sign-in service would still read plain tokens |
+| (c) | Only if the gateway's roles hold no grant on the auth tables | The gateway's login can become any role it is granted; containment depends on the grant list, not on the design |
+| (d1) | No | BetterAuth stays in web on the login role |
+| (d2) | Yes, against web | Same reason as (b) |
+| (e1), (e1-staged) stage 2 | Yes, against web | Same reason as (b). Stage 1 alone: no |
+| (e2), (e3), (e4) | No / no / per family | They do not touch the auth tables |
+
+So every option that moves sign-in out of web contains it against web, and none contains it against the sign-in service itself. Hashing the tokens is needed under every option.
 
 ## 3. Trusted code, side by side
 
@@ -69,6 +88,6 @@ In every option except (a) and (a+), the sign-in service becomes the most valuab
 ## 6. What was not settled
 
 - Whether a magic-link sign-in still asks an enrolled user for their second factor (affects how bad S1 is today) — not measured.
-- Whether `pg_session_jwt` lets a connecting client override the server's key — not measured; the README sentence is the only evidence.
-- The per-call cost of a tag check in `app.current_user_id()` under (e1) — not measured.
+- Whether `pg_session_jwt` lets a connecting client override the server's key — not measured; the README sentence is the only evidence. The architect read it the same way independently, and also notes it has no releases and calls its API subject to change.
+- The per-call cost of the marker lookup in `app.current_user_id()` under (e1) — not measured.
 - How Supabase's other components (Edge Functions, Realtime, Storage) reach Postgres — no source found, so not used.
