@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: seceng
-paths: [process/cairn/issues/POLY-145.md, process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-145/**, process/DECISIONS.md, docs/SECURITY/**, docs/ARCH/**]
+paths: [process/cairn/issues/POLY-145.md, process/cairn/issues/POLY-89.md, process/cairn/issues/POLY-137.md, process/cairn/reviews/POLY-145/**, process/DECISIONS.md, docs/SECURITY/**, docs/ARCH/**]
 labels: [security, auth, spike]
 priority: P1
 pr: null
