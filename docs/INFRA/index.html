@@ -25,7 +25,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.3.9</span>
+    <span><strong>Version:</strong> 1.3.10</span>
     <span><strong>Last updated:</strong> 2026-11-13</span>
   </div>
 </header>
@@ -180,7 +180,7 @@ flowchart TB
       <tr><td><code>web</code></td><td>prod</td><td>The app image, by digest</td><td><code>web</code></td><td>768 MB</td><td><code>db_password_app</code>, <code>auth_secret</code>, OAuth client secrets, <code>resend_api_key</code>, <code>plaid_secret</code> (token exchange). No keyring.</td></tr>
       <tr><td><code>worker</code></td><td>prod</td><td>The same app image</td><td><code>worker</code></td><td>768 MB</td><td><code>db_password_worker</code>, <code>credential_keyring</code>, provider and price/BLS keys, <code>resend_api_key</code></td></tr>
       <tr><td><code>migrate</code></td><td>prod</td><td>The same app image</td><td><code>migrate</code>, one-off</td><td>512 MB</td><td><code>db_password_migrator</code> only</td></tr>
-      <tr><td><code>operator</code></td><td>prod</td><td>The same app image</td><td><code>polycarpic cli</code>, one-shot (<code>restart: "no"</code>, profile <code>operator</code>, started only by <code>docker compose --profile operator run --rm operator …</code>)</td><td>256 MB</td><td><code>db_password_operator</code> only. No long-running service mounts it; the compose-policy lint's <code>operator-one-shot</code> rule refuses it anywhere else. It connects as <code>poly_operator</code>, which holds EXECUTE on <code>app.issue_operator_invitation</code> and nothing else.</td></tr>
+      <tr><td><code>operator</code></td><td>prod</td><td>The same app image</td><td><code>polycarpic cli</code>, one-shot (<code>restart: "no"</code>, profile <code>operator</code>, <code>logging: {driver: "none"}</code>, started only by <code>docker compose --profile operator run --rm operator …</code>)</td><td>256 MB</td><td><code>db_password_operator</code> only. No long-running service mounts it; the compose-policy lint's <code>operator-one-shot</code> rule refuses it anywhere else and requires the one-shot shape and the <code>none</code> log driver, because the CLI's stdout carries the invitation link and must not reach a log file. It connects as <code>poly_operator</code>, which holds EXECUTE on <code>app.issue_operator_invitation</code> and nothing else.</td></tr>
       <tr><td><code>postgres</code>, <code>web</code>, <code>worker</code>, <code>migrate</code>, <code>operator</code></td><td>staging</td><td>Same images</td><td>same</td><td>1 GB / 384 MB / 384 MB / 512 MB / 256 MB</td><td>Distinct values from <code>/etc/polycarpic/staging-secrets/</code>, its own keyring, Plaid sandbox secret only (C-77)</td></tr>
       <tr><td><code>backup</code></td><td>prod</td><td>The same app image, or a small tools image (<code>age</code>, <code>pg_basebackup</code>, <code>pg_dump</code>), by digest. <strong>No <code>rclone</code></strong>, no bucket client.</td><td><code>backup</code>, run by a systemd timer; also run once by the deploy script for the pre-migration backup (§4.5)</td><td>256 MB</td><td><code>db_password_backup</code> and the age <em>public</em> key as config. Nothing else; never the private key, never the bucket credential. Networks: <code>backup-net</code> only (internal, no internet).</td></tr>
       <tr><td><code>uploader</code></td><td>prod</td><td>A small tools image (<code>rclone</code> and a shell), by digest</td><td><code>uploader</code>, run by a systemd timer every minute and after each backup run</td><td>128 MB</td><td><code>backup_store_credential</code> (the put-only pair) and <code>heartbeat_url</code>. <strong>No database credential</strong>, no route to Postgres. Network: <code>upload-net</code> only (internet allowed; on the home box the host allowlist still limits it to 443).</td></tr>
@@ -767,7 +767,7 @@ laptop$ infra/vercel/deploy.sh --tag v1.0.0</code></pre>
   </ol>
 
   <h3 id="rb-cli">7.5 The operator commands you will use</h3>
-  <p>Run on the box. <code>polycarpic-ops cli …</code> runs the application CLI in the one-shot <code>operator</code> container (<code>docker compose --profile operator run --rm operator …</code>) under its own database login, <code>poly_operator</code>, never the worker's; each command writes an <code>audit_event</code> (SECURITY C-01, C-35, §4.1).</p>
+  <p>Run on the box. <code>polycarpic-ops cli …</code> runs the application CLI in the one-shot <code>operator</code> container (<code>docker compose --profile operator run --rm operator …</code>; the link prints to your terminal only, and <code>docker logs</code> for that container shows nothing) under its own database login, <code>poly_operator</code>, never the worker's; each command writes an <code>audit_event</code> (SECURITY C-01, C-35, §4.1).</p>
   <table>
     <thead><tr><th>Command</th><th>What it does</th><th>You should see</th></tr></thead>
     <tbody>
