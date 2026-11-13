@@ -124,3 +124,15 @@ same-day control on `main`. Compose-lint rows each run the CLI end to end: about
   TEMP and CREATE are false. Catalog queries, under 1 s `(unmeasured)`.
 - **A1.3 (R1):** the code comment on the pre-connect check calls it a seatbelt; the boundary is that no process but `operator`
   holds the password.
+
+## Addendum 2 — the poly_operator password
+
+- roles.sql sets no password for any LOGIN role, by design (its header): provisioning sets each one with `ALTER ROLE … PASSWORD`
+  from the mounted secret file. poly_operator follows the same path. Its source is `/etc/polycarpic/secrets/operator/db_password_operator`
+  (staging: `/etc/polycarpic/staging-secrets/operator/db_password_operator`).
+- Owner: POLY-97's `infra/provision.sh`. It sets the password and creates the `operator` secrets directory (F6: one directory
+  per service, `root:<gid>` 0750, file 0440, gid 10006 prod / 10106 staging). `provision-check.sh` asserts the directory and the
+  file mode. Nothing in POLY-146 writes provisioning. The test harness sets poly_operator's password through `helpers/api.ts`
+  `LOGIN` (R5).
+- Record: POLY-97.md is outside this issue's paths, so the lead files this as a comment on POLY-97 in the post-merge docs PR.
+  Until then, this addendum is the record. No deploy precedes POLY-97, so no instance has the role without a password.
