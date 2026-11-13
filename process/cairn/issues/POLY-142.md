@@ -1,7 +1,7 @@
 ---
 id: POLY-142
 title: Operator invite CLI
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-87]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [process/cairn/issues/POLY-142.md, process/cairn/reviews/POLY-142/**, apps/worker/**, packages/db/**, packages/tenancy/**, tests/**, scripts/layers/**, infra/ci/**, .github/workflows/**, layers.json, eslint.config.js, package.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, bin/polycarpic]
 labels: [auth, cli]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/124
 created: 2026-11-12
 updated: 2026-11-12
 ---
@@ -112,3 +112,7 @@ Open, not blocking the verdict:
 Gate 4: architect verdict PASS at f4f1a4f (comment @ b168176). Lead's finish pre-flight on cad7ee9: cairn Python suite 2017 OK (3 skipped), JS suite 494 pass, dashboard svelte-check 0 errors, dist fresh (rebuilt byte-identical).
 
 Principal, 2026-11-13: **approved** widening accepted risk R-2 to name `poly_worker`, as an interim statement. The Principal asked for a thorough investigation of whether a smaller component should assert identity to Postgres; that is POLY-145 (Identity trust boundary, P1, seceng), which re-words, keeps or retires R-2. The lead's proposal on POLY-145: it runs directly after this issue merges and ahead of POLY-89.
+
+### @team-lead — 2026-11-12
+
+PR opened: https://github.com/richmosko/polycarpic/pull/124. Awaiting Validate.
