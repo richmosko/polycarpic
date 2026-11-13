@@ -1,7 +1,7 @@
 ---
 id: POLY-146
 title: Identity hardening
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -55,3 +55,7 @@ Ruling addendum 1 (seceng review): the operator service logs to driver none and 
 ### @team-lead — 2026-11-13
 
 PR opened: https://github.com/richmosko/polycarpic/pull/126. QA verdict pass (07c22000), security review pass (81a9a9dd). Awaiting the Principal's review and merge.
+
+### @team-lead — 2026-11-13
+
+Validate passed (QA verdict 07c22000, security review 81a9a9dd, CI green on b55cab64); the Principal approved the merge (2026-11-13). Merging via PR #126. Closing.
