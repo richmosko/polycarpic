@@ -109,3 +109,18 @@ same-day control on `main`. Compose-lint rows each run the CLI end to end: about
 - **qa-engineer-146:** every test file above, including `packages/*/src/*.test.ts` and `tests/**`.
 - **seceng-146:** `docs/SECURITY/**`. **architect:** this file and `docs/ARCH/**`.
 - Unchanged by anyone: `bin/polycarpic`, `layers.json`, `Dockerfile`, `infra/ci/**`.
+
+## Addendum 1 — seceng-146's review (two musts, accepted)
+
+- **A1.1 (R3, T-99, C-01):** the CLI is the `run` container's PID 1, so its stdout (the link) would reach the log driver. The
+  `operator` service sets `logging: {driver: "none"}`; `operator-one-shot` also requires it. The runbook command is
+  `docker compose --profile operator run --rm operator user invite <email>`. devops-engineer-146 measures on local Docker before
+  build green: the attached `run` still prints the link, and `docker logs` on that container yields nothing `(unmeasured)`.
+  If the attached output is lost, stop and tell the lead; never fall back to `json-file`. R5 gains one fail row: operator
+  without `logging.driver: none` → `operator-one-shot`.
+- **A1.2 (R5, C13):** add effective-privilege rows, since an ACL naming PUBLIC slips past the named-ACL checks: over every
+  function in `app` and `public`, `has_function_privilege('poly_operator', oid, 'EXECUTE')` is true for the issuer alone; among
+  non-`pg_*`/`information_schema` schemas, USAGE is true for `app` alone and CREATE false everywhere; `has_database_privilege`
+  TEMP and CREATE are false. Catalog queries, under 1 s `(unmeasured)`.
+- **A1.3 (R1):** the code comment on the pre-connect check calls it a seatbelt; the boundary is that no process but `operator`
+  holds the password.
