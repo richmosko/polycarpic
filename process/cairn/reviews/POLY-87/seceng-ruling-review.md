@@ -254,3 +254,56 @@ The architect is right about the xmin test I proposed in P5: an UPDATE in the sa
     - a row given a future `signup_txid` by a superuser (a restored row) passes neither `enter_new_user` nor `accept_invitations` in any later transaction, and stays null-or-refused.
   - If the architect prefers, a restore-runbook step that nulls the column is the fallback, but the in-transaction clear is the stronger choice.
   - Optional and partial, not a substitute: `accept_invitations` can also refuse when the stamped user already has a membership other than their Person's owner row. An existing user who holds only their own Person passes that check, so S13's clear remains the control.
+
+## Build check (5ad6811)
+
+**Verdict: S1–S13 met.** One new finding, S14. It assumes an attacker who can run SQL as `poly_app`, and it is cheap to close.
+
+**Probe P10.** I ran it on scratch `postgres:17.10`, using the real `roles.sql` and migrations 0000–0007 applied as `poly_migrator` with `SET ROLE poly_owner`. The SQL was run as `poly_app`. Every result below is what the migrations do, not a model of them. The container is removed.
+
+| S | Met | Where | Evidence |
+|---|---|---|---|
+| S1 | yes | `packages/auth/src/user-hooks.ts:28–37` (`tokenFor` chooses by `ctx.path`; `/sign-up/email` with no token → 403; any other path → 403) | condition 24 tests |
+| S2 | yes | `0007:93–95` (null hash and not `email_verified` → 42501); `packages/auth/src/github.ts:19–30` (`getUserInfo` override: the primary and verified entry only, else null); `options.ts:45` | P10: a token-less accept for an unverified new user raised "a verified email is required"; condition 25 |
+| S3 | yes | BetterAuth default `requireLocalEmailVerified`; nothing in `options.ts` overrides it | condition 26 |
+| S4 | yes | `0007:58–60`, returns void | P10: a claim with `app.user_id` set → 42501; condition 30, pgTAP C30 |
+| S5 | yes | `0007:55, 65, 76, 101` (`lock_timeout = '5s'`, `ORDER BY i.id FOR UPDATE`); `invitation.ts:28–31` maps 55P03 to the refusal | condition 27 |
+| S6 | yes | `0007:19–20` (policy `role = 'viewer'`), `0007:104–109` (only viewer rows are seated) | P10: an owner invitation for a user whose `second_step_at` a superuser set → claimed, not accepted, no seat; a direct `poly_app` membership INSERT → permission denied |
+| S7 | yes | `layers.json` (`reservedLiterals` per file, `confinedMembers`); `scripts/layers/generate.mjs:24, 61–63` (globals declared; `no-eval`, `no-implied-eval`, `no-new-func`); fixtures `tests/layers/fixtures/31-*`, `32-*` (escaped, unicode-escaped, the sql tag, `setTimeout` string, computed literal key) | — |
+| S8 | yes | `user-hooks.ts:25, 46–53`; `route-policy.ts` (`/sign-up/email` branch); `handler.ts:59–62` (a 42501 at COMMIT → the same 403 body) | conditions 1, 28, including the callback and magic-link redirect target |
+| S9 | yes | `invitation.ts:14–25` (canonical 32-byte decode, sha256 of the bytes); `apps/web/src/routes/sign-up/+page.server.ts:5` (`no-referrer`, `no-store`); `+page.svelte:15–18` (`replaceState`) | condition 29 |
+| S10 | yes | `0007:151–164, 179–180` | P10: an owner's revoke followed by an un-revoke → 42501; pgTAP C31 |
+| S11 | yes | pgTAP `05_invitation.sql:212–214` (no `app` function inserts into `invitation` or `user`); `auth-signup-invite.test.ts:85–111` | — |
+| S12 | yes | `0007:36, 88–92` (`signup_txid = pg_current_xact_id()`); 0005 column grants omit `signup_txid` | P10: accept forged to an existing user U → 42501, also after an UPDATE of U's row in the same transaction; `enter_new_user(U)` → 42501; `poly_app` writing `signup_txid` → permission denied |
+| S13 | yes | `0007:115` (accept clears the stamp), `0007:139–141` (a non-`poly_app` insert gets null), `0007:166–182` (the deferred check) | P10: superuser fixture stamps read null; a happy sign-up commits with the stamp null and lands on E (viewer@E, owner@own Person); a token replay → 42501; an insert with no accept → refused at COMMIT, and no row is left |
+
+**`apps/web/src/hooks.server.ts:11`: `isPublic` gains exactly `'/sign-up'`. Pass.**
+
+- The match is exact: `/sign-up/x` stays private, and the query string is not part of `pathname`.
+- The page's load sets two headers and returns no data, so an unauthenticated visitor gets the form and nothing else.
+- The page reaches the database only through `/api/auth/sign-up/email`, which every condition above guards.
+
+**Two observations, neither blocking.**
+
+- **(a) `handler.ts:59–62` covers more than sign-up.** It maps any `42501` that surfaces at COMMIT to 403 `invitation_required`, on every route that `inTransaction` wraps, `withTenant` ones included.
+  - No information leaks, but a commit-time refusal on a signed-in route would carry a misleading code.
+  - Suggestion: apply the mapping only on the `withContextFreeTx` branch.
+- **(b) The user hooks read `ctx.path`.** If a future BetterAuth reports the concrete path instead of the template, both hooks refuse, so they fail closed. Condition 24 pins this.
+
+**S14 (new; proposed for this loop, since it is a migration-only change).**
+
+- **The gap.** A sign-up transaction can rewrite its own new user's email before calling accept.
+  - `poly_app` holds `UPDATE (email, email_verified)` on `user` (0001, 0005), and `accept_invitations` reads the email from the row at call time.
+  - Probe P10, as `poly_app`, in one transaction:
+    1. insert user M as `mallory@x` (stamped);
+    2. `enter_new_user`, then the Person;
+    3. `UPDATE user SET email = 'steal@x', email_verified = true`;
+    4. `accept_invitations(NULL)`;
+    5. set the email back, then commit.
+  - Result: M is seated as viewer on E, against an invitation addressed to `steal@x`.
+- **Who can do this.** Only an attacker who can run SQL as `poly_app` (R-2): the route hooks never update the email.
+- **Why R-2 does not already cover it.** R-2 lets such an attacker act as any existing user. But a forged direct invitation is refused by `gate_owner_changes` on an entity with several owners. This path instead takes any pending viewer invitation, in any tenant, into a durable account the attacker owns.
+- **Fix.** A BEFORE UPDATE trigger on `user` refuses (42501) any change to `email` or `email_verified` while `signup_txid IS NOT NULL`, which is the window between insert and accept.
+- **Test.** The P10 sequence raises at step 3, and no membership is written.
+- **Check first.** No BetterAuth new-user path updates those columns before its after-hook runs. Magic link and OAuth set `email_verified` at create (read). The condition-6 route tests confirm it.
+- **If the lead defers S14,** record it as an R-2 residual in SECURITY.
