@@ -1,0 +1,43 @@
+---
+id: POLY-146
+title: Identity hardening
+status: todo
+milestone: POLY-M1
+parent: null
+blocked_by: []
+assignee: backend-lead
+paths: [process/cairn/issues/POLY-146.md, packages/auth/**, packages/config/**, packages/db/**, apps/worker/**, infra/compose/**, infra/lint/**, infra/postgres/pg_hba.*.conf, tests/db/**, tests/layers/**, layers.json, eslint.config.js, package.json, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**]
+labels: [security, auth]
+priority: P1
+pr: null
+created: 2026-11-13
+updated: 2026-11-13
+---
+
+These are the cheap fixes from POLY-145's decision (option a+, `process/cairn/reviews/POLY-145/pricing.md`), landed ahead of stage 1. Each one closes a hole that exists under every identity design:
+- BetterAuth stores password-reset and magic-link tokens in the clear (`threat-model.md`). This item moves here from POLY-137.
+- The worker is given the auth secret and never uses it (`current-state.md` §8.1).
+- The operator CLI shares poly_worker's credential, so a worker compromise can issue invitations.
+
+The CLI moves to its own login role, poly_operator, which holds only EXECUTE on `app.issue_operator_invitation`. It runs from a one-shot compose service under its own profile, as `migrate` does, so the operator password is never mounted into the worker. Identity is still asserted by web and worker; stage 1 changes that.
+
+## Acceptance criteria
+
+- [ ] `verification.storeIdentifier` and the magic-link plugin's `storeToken` are set to hashed in `packages/auth/src/options.ts`. A test shows the stored value of a reset token and of a magic-link token is not the emailed value, and that each still verifies once. A value read from `verification` and presented at `/reset-password` or `/magic-link/verify` is refused (seceng #1).
+- [ ] `AUTH_SECRET_FILE` is required for web alone (`packages/config/src/registry.ts:17`). The worker service in `infra/compose/prod.yml` and `staging.yml` mounts no auth secret, and the compose lint refuses one.
+- [ ] A LOGIN role poly_operator exists in `packages/db/sql/roles.sql`, with the same attribute hygiene as the others. It holds CONNECT, USAGE on `app`, and EXECUTE on `app.issue_operator_invitation`, and nothing else. pgTAP checks its grants catalog-exactly.
+- [ ] poly_worker no longer holds EXECUTE on `app.issue_operator_invitation`. pgTAP 06's C12 is updated to name the new role.
+- [ ] `withOperatorTx` runs on a pool configured from the operator's own `DATABASE_*` settings, never the worker pool. In a worker process it fails closed.
+- [ ] `polycarpic cli user invite` runs in a one-shot `operator` compose service (its own profile, its own secret file, `restart: "no"`). No long-running service has the operator password: web, worker, and the staging web and worker. A test asserts that against the rendered prod and staging compose files (seceng #2).
+- [ ] `pg_hba.prod.conf` and `pg_hba.staging.conf` admit poly_operator from the app subnet with scram.
+- [ ] The existing operator-invite tests (`tests/db/operator-invite.test.ts`, pgTAP 06) pass against the new role.
+- [ ] SECURITY reflects the current state in C-01, C-84, R-2, R-12 (its plain-token sentence comes out) and the secrets table, and in the T1 row of the data-classification table (seceng #3). INFRA §7.5 names the operator service. ARCH §7 names the role.
+
+## Notes
+
+- POLY-98 (the `polycarpic-ops` wrapper) targets the `operator` service, not the worker.
+- POLY-137 loses its hashed-token item to this issue.
+
+## Estimate
+
+1.5–2 loop-days, 1 loop (M; pricing.md (a+))

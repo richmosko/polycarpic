@@ -11,7 +11,7 @@ labels: [ops, cli]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 The operator subcommands INFRA §7 and §8 name (set-secret through cli pass-through). status prints digest, last deploy, last backup from last-upload (never from the app), certificate days, disk, unaccounted poly_backup connections in 24 h, and non-temporary replication slots. Secrets are read without echo and written 0400.
@@ -28,3 +28,7 @@ The operator subcommands INFRA §7 and §8 name (set-secret through cli pass-thr
 ### @team-lead — 2026-11-12
 
 From the POLY-142 loop (`process/cairn/reviews/POLY-142/ruling.md` R0; seceng O8 in `seceng-ruling-review.md`). (1) `polycarpic-ops cli …` runs `docker compose exec -T worker /app/bin/polycarpic cli …`, never `run`: `run` makes the command the container's PID 1 and the log driver keeps the printed invitation link on disk. (2) INFRA §7.5 and the first-deploy bootstrap step say the invite sends an email; POLY-142 prints the link once to stdout and sends nothing (Principal, 2026-11-13). devops-engineer corrects that text with this issue. Email delivery is POLY-144's.
+
+### @team-lead — 2026-11-13
+
+From POLY-145's decision: POLY-146 moves `polycarpic cli user invite` to a one-shot `operator` compose service on its own login role, poly_operator. The `polycarpic-ops cli` wrapper targets that service, not the worker.

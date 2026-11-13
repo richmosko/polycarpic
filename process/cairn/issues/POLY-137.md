@@ -10,7 +10,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict and seceng reviews under `process/cairn/reviews/POLY-86/`). One loop for the batch; add later auth nits here.
@@ -32,3 +32,13 @@ Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict an
 ### @team-lead — 2026-11-12
 
 From the POLY-87 loop (seceng, SECURITY R-24, approved by the Principal 2026-11-13 until the first production deploy): `/callback/:id` holds a `poly_app` pool connection across BetterAuth's outbound call to the IdP, and neither it nor `/magic-link/verify` is rate-limited. Add both routes to C-04's limited list and set `idle_in_transaction_session_timeout` for `poly_app`. This must land before the first deploy.
+
+### @team-lead — 2026-11-12
+
+Added from POLY-145 (seceng-145, threat-model.md S1 and S5 at 53f129b; lead checked against the tree at eb7d195). Verification tokens are stored in the clear. `packages/auth/src/options.ts` sets neither `verification.storeIdentifier` nor the magic-link plugin's `storeToken`; better-auth 1.7.18's magic-link default is `"plain"` (`dist/plugins/magic-link/index.mjs:42`). `public.verification` has no row-level security and `poly_app` holds SELECT on it (`0001_app_foundation.sql:27`). So SQL run as `poly_app` can request a reset or magic link for any user, read the token, and take the account. SECURITY R-12's "a DB read alone cannot forge one" covers the session cookie only.
+
+To do in this issue, whatever POLY-145 decides: set both options to `"hashed"`, add a test that a stored verification value never equals the token sent, and correct R-12's wording. This is a must-have before the first deploy.
+
+### @team-lead — 2026-11-13
+
+The hashed reset and magic-link token item (my comment of 2026-11-13) has moved to POLY-146 (Identity hardening), by the Principal's POLY-145 decision that the hardening fixes land first. What stays here: once POLY-146 hashes the tokens, remove the plain-token sentence from SECURITY R-12 if POLY-146 has not already done so.

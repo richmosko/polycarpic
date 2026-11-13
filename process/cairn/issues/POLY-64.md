@@ -10,7 +10,7 @@ labels: []
 priority: null
 pr: null
 created: 2026-09-27
-updated: 2026-11-08
+updated: 2026-11-13
 ---
 
 PRD §4 Story 2. Kickoff §2.6/§2.11: draft to confirm flow, DB-trigger-enforced immutability once posted. Source: docs/PRD/index.html
@@ -44,3 +44,29 @@ Correction (DESIGN pass 6, 2026-10-10): there is no header bell. Notifications a
 ### @architect — 2026-11-08
 
 Re-scoped 2026-11-08. The ledger core moves to POLY-107 and custodial accounts to POLY-108; POLY-64 posts into them. The notification and audit_event tables move to POLY-62; this issue keeps the notification centre UI and the link-health producers. Scope: ImportAdapter plus fake source, raw store and de-dup, drafts, rules, confirm with gates G1 to G6, and the worker's import poll. Data-source priority per custodial: files, then a direct free API, then Plaid, then SimpleFIN; implementation order fake, files, direct, Plaid, SimpleFIN. Before v1.0 the Plaid Sandbox feeds the real adapter on staging and no real books exist.
+
+### @architect — 2026-11-13
+
+**scoped job grants (POLY-145 option e2)**
+
+The worker enters a transaction only through `app.enter_job` (stage 1), which marks it `kind = 'system:<job>'`. Write this issue's import-path policies so that a `system:*` marker gets only the import-path writes, and only for the entity and connection the job was entered for. Read the scope from the marker, and give it nothing outside the import tables. A job grant is minted when a connection is linked, stored as a hash, sealed under the keyring with `packages/secrets`, and checked by `app.enter_job`. Once grants exist, `enter_job` refuses a call with no valid grant. Stage 1's `enter_job` takes no grant, so this issue is where the check begins (seceng #21). Tests:
+- `enter_job` with no grant, or a revoked one, is refused;
+- a job with no grant reads 0 rows;
+- with a grant, it cannot read another entity or any non-import table.
+
+Estimate: +1.5–2.5 loop-days on this issue (`pricing.md` (e2), confidence M).
+
+### @architect — 2026-11-13
+
+**parser sandbox (POLY-145 option e3)**
+
+The code that parses provider responses and uploaded files runs in its own compose service, not as a child process: a child shares the worker's uid and can read `/run/secrets`. That service has:
+- `network_mode: none`, no secrets, a read-only filesystem and a non-root user;
+- a shared tmpfs or socket volume, through which it receives one input and returns plain typed rows;
+- a small writer in the worker that validates every row before it touches the database.
+
+Tests:
+- the sandbox container has no secret file, no network and no database socket;
+- malformed and oversized inputs are refused at the writer.
+
+Estimate: +3–4 loop-days and one more container, an RSS guess of 100–200 MB (`pricing.md` (e3), confidence M). It is independent of the identity design.
