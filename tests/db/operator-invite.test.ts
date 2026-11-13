@@ -299,12 +299,17 @@ describe('C6 + C9: through the image dispatcher (sh bin/polycarpic cli user invi
 });
 
 // ---------------------------------------------------------------- C10
+// Advisory locks are per database, so a try-lock on this clone's key is a probe that cannot see (or disturb) a parallel file's
+// database. It never reads pg_locks, which is cluster-wide (tests/ci/db-harness C5).
+const keyHeld = (): boolean =>
+  must(`BEGIN; SELECT pg_try_advisory_xact_lock(hashtextextended('app.issue_operator_invitation', 0)); COMMIT;`, e.db).rows[0]![0] === 'f';
+
 describe('C10: the lock bound', () => {
   it('while another session holds the advisory key, --bootstrap exits 1 within 3 s and writes nothing  [red if: no lock_timeout (it would wait forever), or it exits 2/0]', async () => {
     const holder = psqlSession(`BEGIN; SELECT pg_advisory_xact_lock(hashtextextended('app.issue_operator_invitation', 0)); SELECT pg_sleep(8);`, e.db);
     try {
-      for (let i = 0; i < 50 && e.count(`SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted`) === 0; i++) await new Promise((r) => setTimeout(r, 100));
-      expect(e.count(`SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted`), 'the holder has the key').toBeGreaterThan(0);
+      for (let i = 0; i < 50 && !keyHeld(); i++) await new Promise((r) => setTimeout(r, 100));
+      expect(keyHeld(), 'the holder has the key').toBe(true);
       const before = counts();
       const t0 = Date.now();
       const r = await invite(`locked-${stamp()}@qa.test`, true);
@@ -316,7 +321,7 @@ describe('C10: the lock bound', () => {
     } finally {
       holder.kill();
       // docker exec may outlive the client: wait until the key is free again so later tests do not hit the 2 s bound
-      for (let i = 0; i < 150 && e.count(`SELECT 1 FROM pg_locks WHERE locktype = 'advisory' AND granted`) > 0; i++) await new Promise((r) => setTimeout(r, 100));
+      for (let i = 0; i < 150 && keyHeld(); i++) await new Promise((r) => setTimeout(r, 100));
     }
   }, 30_000);
 });
