@@ -49,7 +49,7 @@ async function main(): Promise<number> {
 main().then(
   (code) => process.exit(code),
   (e) => {
-    createLogger({ service: 'worker' }).fatal('process.crash', { outcome: 'error', err: e });
+    createLogger({ service: 'worker', stream: new Writable({ write: (c, _e, cb) => (err(String(c)), cb()) }) }).fatal('process.crash', { outcome: 'error', err: e });
     process.exit(1);
   },
 );
