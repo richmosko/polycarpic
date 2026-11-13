@@ -53,3 +53,12 @@ B changes condition 23 to "only `issue_operator_invitation` and the `poly_app` o
 ### @team-lead — 2026-11-12
 
 Feature started. Branch: `feature/poly-142-operator-invite-cli`.
+
+### @team-lead — 2026-11-12
+
+Principal decisions at kickoff (2026-11-13), on the two questions the issue left open:
+
+1. **Expiry: 7 days**, as the architect proposed.
+2. **Delivery: email, not stdout only.** The Principal's reason: nobody sees the CLI's stdout except perhaps during initial setup. This overrides the "link is printed once to stdout" criterion as the only delivery path and pulls the Resend mailer (POLY-137's `sendMagicLink` item, ruling follow-up 3) into reach of this loop. State of the tree: `RESEND_API_KEY_FILE` is registered for web and worker (`packages/config/src/registry.ts`, optional) and mounted in `infra/compose/prod.yml`; no mailer code exists, and `apps/web/src/lib/server/auth.ts` answers 503 for a magic link. Whether stdout survives for `--bootstrap` on a box with no mail key is for the gate-1 ruling.
+
+The Principal also asked for an email invite option that does not invite the new user to a group entity. Scope of that (CLI only, or an in-app route) is open with the Principal; an in-app route that sends an invitation falls under the POLY-89 ordering rule in STATE.md.
