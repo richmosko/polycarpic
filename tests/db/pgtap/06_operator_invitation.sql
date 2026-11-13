@@ -80,7 +80,7 @@ SELECT is(pg_temp.run_as('poly_worker', '', NULL, pg_temp.issue('x1@qa.test', fa
 SELECT is((SELECT issued_via FROM public.invitation WHERE email = 'x1@qa.test'), 'operator', 'C2: issued_via is operator');
 SELECT is(pg_temp.run_as('poly_worker', '', NULL, pg_temp.issue('x2@qa.test', true)), 'ERR:55000', 'R2 step 4: bootstrap on a non-empty instance raises 55000');
 SELECT is((SELECT count(*)::int FROM public.invitation WHERE issued_via = 'bootstrap' AND claimed_at IS NULL AND revoked_at IS NULL), 1, 'R2 step 4: the refusal rolled the revoke back (one live bootstrap row remains; mutation: the revoke commits before the user check)');
-SELECT is((SELECT count(*)::int FROM public.audit_event WHERE kind = 'invitation.revoked'), 1, 'R2 step 4: ...and no extra revoked audit row survived');
+SELECT is((SELECT count(*)::int FROM public.audit_event WHERE kind = 'invitation.revoked'), 2, 'R2 step 4: ...and no extra revoked audit row survived (two: boot1, then boot2 revoked by the UPPER@QA.TEST bootstrap; the refused x2 call added none)');
 SELECT is(pg_temp.run_as('poly_worker', '00000000-0000-4000-8000-0000000142f1', NULL, pg_temp.issue('x3@qa.test', false)), 'ERR:42501', 'O2: a forged app.user_id (a withSystem- or tenant-shaped context) is refused 42501 (mutation: the user-context check is missing)');
 SELECT is(pg_temp.run_as('poly_worker', '00000000-0000-4000-8000-0000000142f1', NULL, pg_temp.issue('x3@qa.test', true)), 'ERR:42501', 'O2: ...for bootstrap too, before the state check');
 SELECT is(pg_temp.run_as('poly_worker', '', 'SELECT set_config(''app.user_id'', ''00000000-0000-4000-8000-0000000142f1'', true)', pg_temp.issue('x4@qa.test', false)), 'ERR:42501', 'O2: app.user_id set after the role switch, same refusal');
