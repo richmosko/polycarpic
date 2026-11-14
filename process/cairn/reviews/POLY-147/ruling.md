@@ -41,8 +41,19 @@ CREATE POLICY tx_identity_purge ON app.tx_identity FOR DELETE TO poly_purge
 - No FK to `public."user"`: an FK takes a `FOR KEY SHARE` lock on the user row every request (WAL and contention). An asserted id that
   names no user reaches no rows. `user_id` is not checked against `user` in stage 1.
 - No index beyond the PK. The purge scans; the table holds about one hour of committed markers (unmeasured).
-- `pg_xact_status` returns NULL for an xid too old for the commit log; `IS DISTINCT FROM` makes that purgeable. xid8 never repeats.
+- **NULL status counts as finished.** `pg_xact_status` returns NULL for an xid older than the retained commit log. The commit log is
+  truncated only below the oldest xid any database still needs, which is older than every running transaction, so a NULL xid cannot be
+  in progress. Hence `IS DISTINCT FROM 'in progress'`, never `<>` (with `<>` such rows are never purged). xid8 never repeats.
 - The owner, poly_owner, holds every privilege implicitly; the catalog test excludes the owner, as `01_roles.sql` does for functions.
+  For everyone else it asserts the exact ACL: SELECT for the nine roles above, INSERT poly_authz, DELETE poly_purge, and nothing else
+  (no UPDATE, TRUNCATE, REFERENCES, TRIGGER), with PUBLIC, poly_operator and poly_backup listed explicitly. poly_backup still reads
+  every row through `pg_read_all_data` + BYPASSRLS, as it reads every table; that is the backup's job and the catalog test names it.
+- No runtime role can shadow a relation through `pg_temp`: `roles.sql` revokes ALL on the database from PUBLIC and grants CONNECT
+  only, so none holds TEMP. The catalog test asserts it (`has_database_privilege(r, current_database(), 'TEMP')` false for poly_app,
+  poly_worker, poly_operator). Every relation in every new or replaced body is schema-qualified anyway.
+- `max_prepared_transactions` stays 0 (the default; nothing in `infra/` sets it). The catalog test asserts it on the test server, so a
+  marked transaction cannot be parked in the prepared state.
+- `withTenant` never opens `BEGIN READ ONLY`: the marker is a write.
 
 **`app.current_user_id()`** — `CREATE OR REPLACE`, still `LANGUAGE sql STABLE`, invoker, no `SET` clause, grants unchanged:
 `SELECT t.user_id FROM app.tx_identity t WHERE t.xid = pg_catalog.pg_current_xact_id_if_assigned()`.
@@ -56,7 +67,9 @@ from the marker first: `v_actor := coalesce((SELECT CASE t.kind WHEN 'web' THEN 
 FROM app.tx_identity t WHERE t.xid = pg_catalog.pg_current_xact_id_if_assigned()), nullif(current_setting('app.actor', true), ''), 'none')`.
 In a marked transaction a forged `app.actor` is ignored; it still labels the unmarked operator path, whose issuer writes its own literal.
 
-**`app.job_targets(text)`** — REVOKE EXECUTE FROM poly_worker (as poly_authz). It stays the per-job extension point, called only by `enter_job`.
+**`app.job_targets(text)`** — REVOKE EXECUTE FROM poly_worker (as poly_authz). It stays the per-job extension point, called only by
+`enter_job`. (seceng's note 14 says the grant may stay; it is revoked because `enter_job` is now its only caller, and a worker that can
+list job targets learns which users link which connections.)
 
 ## R2 — The definers
 
@@ -65,12 +78,40 @@ in `packages/db/sql/definers.json`. Every refusal is `ERRCODE = '42501'` with th
 message. The marker check reads `app.tx_identity` through `tx_identity_own` (owner's own transaction) and runs before any write; the PK is
 the backstop (`23505`).
 
-| Definer | Owner | EXECUTE | Checks, in order | Writes |
+**The exact-call check (adopted from seceng's note 7).** Each `enter_*` definer refuses unless the client's statement is its own exact
+call: `regexp_replace(btrim(pg_catalog.current_query()), ';\s*$', '') = <canonical text>`, else `42501` `an identity definer must be
+called on its own`. Canonical texts: `SELECT app.enter_asserted_user($1, $2)`, `SELECT app.enter_job($1, $2, $3)`,
+`SELECT app.enter_new_user($1)`. With extended mode (R4) the client's statement is the prepared text with placeholders. An injected
+fragment therefore cannot call a definer from inside a larger statement, on a marked path or an unmarked one. `current_query()` reads
+`track_activities`, which only a superuser can change (default on); if it is off, `current_query()` is NULL and the definer refuses,
+which fails closed. Source-based, `(unmeasured)` until the test below runs: Postgres reports the portal's source text at Execute
+(`postgres.c` `exec_execute_message`). A stolen poly_app password can still send the exact text with any id; stage 2 closes that.
+The definer does not check a live session row (seceng's optional note 7): poly_app reads every session row, so the check would pass for
+any user with a session, and stage 2's `enter_session` makes the real check.
+
+Full signatures, as `pg_get_function_identity_arguments` prints them (the catalog test pins these strings):
+
+| Definer | Owner | EXECUTE | Checks, in order (SQLSTATE, exact message) | Writes |
 |---|---|---|---|---|
-| `app.enter_asserted_user(p_user uuid, p_session uuid) RETURNS void` | poly_authz | poly_app | 1. either arg null → `22004` `identity is required`. 2. a marker exists for `pg_current_xact_id_if_assigned()` → `this transaction already has an identity`. 3. `pg_current_xact_id_if_assigned() IS NOT NULL` → `the identity marker must be the first write of its transaction`. | `(pg_current_xact_id(), p_user, p_session, 'web')` |
-| `app.enter_job(p_job text, p_entity uuid, p_connection uuid) RETURNS uuid` | poly_authz | poly_worker | 1. `p_job !~ '^[a-z][a-z0-9_]{0,62}$'` → `22023` `invalid job name`. 2. marker exists → as above. 3. xid assigned → as above. 4. `SELECT principal_user_id FROM app.job_targets(p_job) WHERE entity_id = p_entity AND connection_id IS NOT DISTINCT FROM p_connection`: unless exactly one row with a non-null principal → `P0002` `job <p_job> resolved no single principal`. | `(…, principal, NULL, 'system:' \|\| p_job)`; returns the principal |
-| `app.enter_new_user(uuid) RETURNS void` (`CREATE OR REPLACE`) | poly_authz | poly_app | 1. marker exists → `a user is already in context` (message kept: POLY-87 tests). 2. and 3. unchanged (stamp, no Person). No xid check: it must run after the user insert. | `(…, $1, NULL, 'signup')` replacing `set_config` |
-| `app.purge_tx_identity() RETURNS integer` | poly_purge | poly_worker | none | `DELETE … WHERE created_at < now() - interval '1 hour' AND pg_xact_status(xid) IS DISTINCT FROM 'in progress'`; returns the row count |
+| `app.enter_asserted_user(p_user uuid, p_session uuid) RETURNS void` | poly_authz | poly_app | 1. not the exact call → `42501` `an identity definer must be called on its own`. 2. either argument null → `22004` `identity is required`. 3. a marker exists for `pg_current_xact_id_if_assigned()` → `42501` `this transaction already has an identity`. 4. `pg_current_xact_id_if_assigned() IS NOT NULL` → `42501` `the identity marker must be the first write of its transaction`. | `(pg_current_xact_id(), p_user, p_session, 'web')` |
+| `app.enter_job(p_job text, p_entity uuid, p_connection uuid) RETURNS uuid` | poly_authz | poly_worker | 1. exact call → as above. 2. `p_job IS NULL OR p_job !~ '^[a-z][a-z0-9_]{0,62}$'` → `22023` `invalid job name`. 3. marker exists → as above. 4. xid assigned → as above. 5. `SELECT principal_user_id FROM app.job_targets(p_job) WHERE entity_id = p_entity AND connection_id IS NOT DISTINCT FROM p_connection`: unless exactly one row with a non-null principal → `P0002` `job <p_job> resolved no single principal`. | `(…, principal, NULL, 'system:' \|\| p_job)`; returns the principal |
+| `app.enter_new_user(uuid) RETURNS void` (`CREATE OR REPLACE`, unnamed argument kept) | poly_authz | poly_app | 1. exact call → as above. 2. marker exists → `42501` `a user is already in context` (message kept for POLY-87). 3. and 4. unchanged: `42501` `not a user created by this transaction`, `42501` `the user already has a Person`. No xid check: it must run after the user insert. | `(…, $1, NULL, 'signup')`, replacing `set_config` |
+| `app.purge_tx_identity() RETURNS integer` | poly_purge | poly_worker | none; no argument, so the caller cannot choose the age | `DELETE FROM app.tx_identity WHERE created_at < pg_catalog.now() - interval '1 hour' AND pg_catalog.pg_xact_status(xid) IS DISTINCT FROM 'in progress'`; returns the row count. No row is skipped for its kind or contents. |
+
+The `kind` comes only from the definer body; no definer takes it as an argument.
+
+**What the TypeScript caller sees.** Definer refusals come out of `withTenant`, `withSystem` and the `enterNewUser` handle as node-pg's
+`DatabaseError`, with `.code` the SQLSTATE above and `.message` the exact text, and the transaction rolled back. The one exception is
+`withSystem`: it rethrows `P0002` as `NoPrincipalError(job)`. The wrappers add no new error classes beyond R4's `ExtendedModeRequired`.
+
+**The savepoint cases, each with its outcome:**
+- Marker, then any later savepoint rolled back (routing pool `ROLLBACK` → `ROLLBACK TO SAVEPOINT ba_n`, or a drizzle `tx.transaction`
+  that throws): the marker was written before the savepoint, so it stays and `current_user_id()` is unchanged.
+- Sign-up: `SAVEPOINT ba_n`, user insert, `enter_new_user`, `ROLLBACK TO ba_n`. The marker and user row go. Then `enter_new_user(<that
+  id>)` and `enter_new_user(<any pre-existing id>)` give `42501` `not a user created by this transaction`. `enter_asserted_user(<any>)`
+  gives `42501` `the identity marker must be the first write of its transaction`. `current_user_id()` is NULL.
+- Sign-up with `RELEASE` instead: the marker stays; a second `enter_new_user` gives `42501` `a user is already in context`, and
+  `enter_asserted_user` gives `42501` `this transaction already has an identity`.
 
 - Owner CREATE on `app` is granted to poly_authz and poly_purge for the file only, then revoked, as in `0001`/`0007`.
 - The age is a constant in the body and in the policy; the caller passes nothing. The schedule lands with the worker's first job loop.
@@ -85,25 +126,37 @@ the backstop (`23505`).
 - `withTenant(userId, sessionId, fn)`: UUID check on both, then setup = `SELECT app.enter_asserted_user($1, $2)`. No `set_config`.
 - `withSystem(job, target, fn)`: TS regex check kept; setup = `SELECT app.enter_job($1, $2, $3)`. A `P0002` from the definer is rethrown
   as `NoPrincipalError(job)`. No `set_config`, no `app.actor`.
-- `withContextFreeTx`: setup = `SELECT app.current_user_id() IS NULL AS ok`; `ContextNotEmptyError` if not. No `current_setting`.
-- `withOperatorTx`: drops its `current_setting('app.user_id')` check (poly_operator cannot execute `current_user_id()`; the issuer's own
-  check is the guard). `set_config('app.actor', 'operator:cli', true)` stays.
+- `withContextFreeTx`: setup = `SELECT app.current_user_id() IS NULL AS ok`, which reads the marker. If it is not true, the wrapper
+  throws `ContextNotEmptyError`. No `current_setting`. At the top of a fresh transaction it is always true, so the check is a
+  seatbelt, not a boundary.
+- `withOperatorTx`: drops its `current_setting('app.user_id')` check and does not replace it. poly_operator holds no EXECUTE on
+  `current_user_id()` and no SELECT on `tx_identity`. It also has no way to write a marker (no `enter_*` grant, no INSERT), so a
+  marker on the operator pool is impossible. The boundary is the issuer's own check, `app.current_user_id() IS NOT NULL` → `42501`,
+  which runs as poly_govern. `set_config('app.actor', 'operator:cli', true)` stays.
 - `new-user.ts` unchanged (`SELECT app.enter_new_user($1)`).
 
 **Sign-up savepoint (guard ii, sign-up).** `enter_new_user` runs inside BetterAuth's `SAVEPOINT ba_n`, after the user insert, so the marker
-can be rolled back with it. After `ROLLBACK TO ba_n`: the user row is gone, so `enter_new_user` refuses every existing id (stamp check);
-the xid stays assigned (a subtransaction write assigns the parent's xid first), so `enter_asserted_user` refuses every id; and the
-transaction reads null from then on. See OQ-3 for "any user".
+can be rolled back with it. The outcomes are listed in R2. They hold because the stamp check finds no row, and because a subtransaction
+write assigns the parent's xid first, so the xid stays assigned after the rollback. See OQ-3 for "any user".
 
 ## R4 — Extended mode on every poly_app / poly_worker query (guard i)
 
-- One seam: `packages/db/src/extended-client.ts` exports `class ExtendedClient extends pg.Client` whose `query(config, values, cb)`:
-  turns a string into `{ text }`, throws `ExtendedModeRequired` on a Submittable (an object with `submit`, e.g. a cursor), and calls
-  `super.query({ ...config, queryMode: 'extended' }, values, cb)`. `pg@8.23.1` `lib/query.js:35-37` prepares whenever
-  `queryMode === 'extended'`, and Postgres refuses a prepared string holding two commands (`42601`).
-- `pool.ts`: all three `new pg.Pool({...})` pass `Client: ExtendedClient` (`pg-pool` `index.js:95` honours `options.Client`). This one
-  change covers the three paths: the wrappers (clients from `appPool`/`workerPool`/`operatorPool`), BetterAuth's routing-pool handle
-  (`store.client` is an `appPool` client), and BetterAuth's plain pool (`authPool` is `appPool`; both `pool.query` and `connect()`).
+- **The seam is one class, not a lint rule:** `packages/db/src/extended-client.ts` exports `class ExtendedClient extends pg.Client` and
+  `class ExtendedModeRequired extends Error`. `pg@8.23.1` has no pool- or client-level mode; `queryMode` is read per query
+  (`lib/query.js:19,36`), which is why the backend-lead found no option. The class therefore overrides `query(config, values, cb)` on
+  every client the pool creates. It turns a string into `{ text: config }`, keeps every other field, sets `queryMode: 'extended'`
+  (overwriting any caller value), and calls `super.query(next, values, cb)`. It throws `ExtendedModeRequired` (message
+  `ExtendedModeRequired: a query must be sent in extended mode`) on a Submittable, meaning any object with a `submit` function, such
+  as `pg-cursor` or `pg-query-stream`, which bypasses the `Query` config. `lib/query.js:35-37` prepares whenever `queryMode ===
+  'extended'`, and Postgres refuses a prepared string holding two commands (`42601`, `cannot insert multiple commands into a prepared
+  statement`). A multi-statement string surfaces as that `DatabaseError`.
+- `pool.ts`: all three `new pg.Pool({...})` pass `Client: ExtendedClient`. `pg-pool` `index.js:95` builds each client with
+  `this.options.Client`, and `index.js:241` calls `new this.Client(this.options)`. So every client the pool creates is an
+  `ExtendedClient`, and nothing patches a checked-out client afterwards. This covers the three paths: the wrappers (clients from
+  `appPool`/`workerPool`/`operatorPool`); BetterAuth's routing-pool handle (`store.handle.query` calls `store.client.query`, an
+  `appPool` client); and BetterAuth's plain pool (`authPool` is `appPool`, both `pool.query` and `connect()`).
+- seceng's note 13 holds: the routing pool's `rewrite` inspects only a query's leading keyword. A string like `SELECT 1; COMMIT; BEGIN; …`
+  passes `rewrite`, so on that path the refusal rests wholly on extended mode. The (i) tests send that exact string through the handle.
 - `migrate.ts`'s two `new pg.Client` stay simple-protocol (poly_migrator runs multi-statement migration files; out of scope).
 - **Bypass check:** a vitest unit test `packages/db/src/extended-client.test.ts` asserting each pool's `options.Client === ExtendedClient`
   and the Submittable refusal, plus a source scan in the same file: under `packages/` and `apps/` (excluding `node_modules`, `.claude`),
@@ -122,11 +175,17 @@ transaction reads null from then on. See OQ-3 for "any user".
 ## R6 — Tests that encode the old mechanism
 
 Helpers that impersonate a user with `set_config('app.user_id', …)` move to the marker: psql/vitest helpers
-(`tests/db/helpers/invitation.ts`, and any `BEGIN; SELECT set_config('app.user_id'…)` string) send `SELECT app.enter_asserted_user('<uid>',
-'<sid>')` as the first statement after `BEGIN`. pgTAP files run in one transaction whose xid is assigned by the fixtures, so there
+(`tests/db/helpers/invitation.ts`, and any `BEGIN; SELECT set_config('app.user_id'…)` string) send the definer's exact call as the first
+statement after `BEGIN`, bound with psql 17's `\bind`: `SELECT app.enter_asserted_user($1, $2) \bind '<uid>' '<sid>' \g`. A call with
+literals (`enter_asserted_user('<uid>', …)`) is refused by the exact-call check, as is one inside a multi-statement `-c` string. The same
+applies to `enter_new_user` in `auth-new-user-step`'s `step()` helper. `helpers/pg.ts` already feeds psql with `-f -`, which sends each
+statement on its own. pgTAP files run in one transaction whose xid is assigned by the fixtures, so there
 `pg_temp.run_as` sets identity as superuser: `DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id(); INSERT … (pg_current_xact_id(),
 uid, NULL, 'web')` (or only the DELETE for `''`). Superuser bypasses grants and RLS; no production role can do this, which pgTAP also
-asserts. Definer success paths that need a fresh xid are therefore vitest db tests, never pgTAP.
+asserts. Definer success paths that need a fresh xid are therefore vitest db tests, never pgTAP. In pgTAP, any `enter_*` called through
+`run_as` sits inside a larger top-level statement. It is refused by the exact-call check first, so a pgTAP assertion about an `enter_*`
+refusal expects `an identity definer must be called on its own`. The specific refusals (marker exists, xid assigned, stamp, Person) are
+asserted in vitest db, where the exact call can be sent.
 
 ## R7 — Measurement harness
 
@@ -152,7 +211,12 @@ under `tests/layers/fixtures/`. New pgTAP file: `07_identity_marker.sql`. New db
 
 | Criterion | Test | Kind |
 |---|---|---|
-| K1 table shape, grants (no UPDATE/TRUNCATE for anyone but owner; DELETE poly_purge alone; INSERT poly_authz alone), RLS forced, the four policies | `07` catalog: `information_schema.columns`, `aclexplode(relacl)` minus owner, `pg_policy` quals | pgTAP |
+| K1 table shape, the exact ACL of R1 (PUBLIC, poly_operator, poly_backup named), RLS enabled and forced, the four policies | `07` catalog: `information_schema.columns`, `aclexplode(relacl)` minus owner, `pg_policy` quals | pgTAP |
+| R1 hardening: no TEMP for poly_app/poly_worker/poly_operator; `max_prepared_transactions` = 0 | `07` | pgTAP |
+| R2 signatures and EXECUTE | `07`: for each of the four definers, `pg_get_function_identity_arguments` = R2's string, owner, `prosecdef`, `proconfig` = `{search_path=""}`, and EXECUTE grantees minus owner exactly as R2 (PUBLIC none, every other login role none); `packages/db/sql/definers.json` lists them (the existing allowlist test) | pgTAP |
+| R2 exact-call check | `identity-marker`: as poly_app, `SELECT app.enter_asserted_user($1,$2), 1` and `SELECT * FROM (SELECT app.enter_asserted_user($1,$2)) s`, both sent through `withTenant`'s client in extended mode, give `42501` `an identity definer must be called on its own`. The same for `enter_job` as poly_worker and `enter_new_user` as poly_app. The exact text succeeds. | db |
+| R3 `withContextFreeTx` reads the marker | `wrappers.test.ts`: with a session-level `set_config('app.user_id', <uuid>, false)` left on the backend, `withContextFreeTx` proceeds and `current_user_id()` inside it is NULL. The old "refuses when the setting is set" assertion is inverted (OQ-1). | db |
+| R3 `withOperatorTx` | `operator-invite.test.ts`: with a forged session-level `app.user_id`, the invite still succeeds (the setting means nothing). Its source sends no `current_setting('app.user_id')` (covered by the reserved-literal lint). | db + lint |
 | K1 readers see only their transaction's row | `identity-marker`: commit a marker in tx A; in tx B (marked and unmarked) as poly_app and poly_worker, `SELECT count(*) FROM app.tx_identity` = own rows only | db |
 | K1 read side never assigns an xid | `identity-marker`: `BEGIN READ ONLY`; forged `set_config`; `current_user_id()` IS NULL; `pg_current_xact_id_if_assigned()` IS NULL afterwards; no error | db |
 | K2 body pinned | `01_roles.sql:86` rewritten: body matches `FROM app.tx_identity` and `pg_current_xact_id_if_assigned()`, contains neither `current_setting` nor `pg_current_xact_id()` | pgTAP |
@@ -163,8 +227,8 @@ under `tests/layers/fixtures/`. New pgTAP file: `07_identity_marker.sql`. New db
 | J2 worker reach | doc criterion; no test beyond J1 (today `job_targets` is empty) | — |
 | J3 each definer writes its own kind | `identity-marker`: call each, read `kind`: `web`, `system:qa_job`, `signup`; no definer takes a kind argument (`07`: `pg_get_function_arguments`) | db + pgTAP |
 | I1 EXECUTE per `enter_*` | `07`: for every `app.enter\_%` function, grantees minus owner = exactly {asserted_user: poly_app; job: poly_worker; new_user: poly_app}; an unlisted `enter_*` fails | pgTAP |
-| (i) extended mode, three paths | `identity-marker`: `'SELECT 1; SELECT 2'` refused `42601` through (a) `tx.execute(sql.raw(…))` in `withTenant` and a `workerPool()` query, (b) `createRoutingPool()` inside `withTenant`, (c) `createRoutingPool()` outside any transaction, via `query` and via `connect()` | db |
-| (i) bypass refused | `packages/db/src/extended-client.test.ts` per R4 | unit |
+| (i) extended mode, three paths | `identity-marker`: `'SELECT 1; SELECT 2'` and `'SELECT 1; COMMIT; BEGIN; SELECT 1'` refused `42601` through (a) `tx.execute(sql.raw(…))` in `withTenant` and a `workerPool()` / `operatorPool()` query, (b) `createRoutingPool()` inside `withTenant`, (c) `createRoutingPool()` outside any transaction, via `query` and via `connect()`; after (b) the marker is still in place | db |
+| (i) bypass refused | `packages/db/src/extended-client.test.ts` per R4: each pool's `options.Client === ExtendedClient`; a caller-supplied `queryMode` is overwritten; a Submittable throws `ExtendedModeRequired`; the source scan | unit |
 | (ii) marker survives savepoints | `identity-marker`: in `withTenant`, routing-pool `BEGIN`/`ROLLBACK` and a drizzle `tx.transaction` that throws, then `current_user_id()` = the user | db |
 | (ii, sign-up) | `identity-marker`: as poly_app `BEGIN; SAVEPOINT ba_1; insert user; enter_new_user; ROLLBACK TO ba_1;` then `enter_new_user` for that id and for an existing id → 42501, `enter_asserted_user` → 42501, `current_user_id()` null | db |
 | (iii) second marker refused | `identity-marker`: each `enter_*` after a marker → 42501 `this transaction already has an identity` (new_user: `a user is already in context`); UPDATE/DELETE/INSERT on `tx_identity` as poly_app and poly_worker → 42501 | db |
@@ -172,14 +236,51 @@ under `tests/layers/fixtures/`. New pgTAP file: `07_identity_marker.sql`. New db
 | Measurement | R7 | bench |
 | No `app.session_id` reader | `07`: no `pg_proc.prosrc` in `app`/`public` and no `pg_policy` qual mentions `app.session_id`; lint `31-reserved-literal/fail-app-session-id.ts` and `fail-app-user-id.ts` | pgTAP + lint |
 | Only the marker functions read `tx_identity` | `07`: `prosrc ILIKE '%tx_identity%'` only for `current_user_id`, `current_session_id`, `audit_membership` and the four definers | pgTAP |
-| Docs | architect (ARCH) and seceng (SECURITY) at their dispatch | — |
+| Docs | R9 phrases, checked by grep over the text of `docs/ARCH/index.html` and `docs/SECURITY/index.html` (tags stripped) | grep (qa, at verdict) |
+
+## R9 — Doc phrases (grep-checkable)
+
+The checks run on the HTML with tags stripped and whitespace collapsed, and are case-sensitive. ARCH is the architect's; SECURITY is
+seceng-147's, who may substitute an equivalent phrase at review by amending this list in their review file. Each **must** phrase is
+required verbatim. Each **must not** phrase must be absent.
+
+- **ARCH §3.3** must contain: `app.tx_identity`; `pg_current_xact_id_if_assigned()`; `catches earlier writes, not earlier reads`;
+  `the marker's session_id is web's word, not proof`; `no definer may treat it as proof of a session`; `an identity definer must be
+  called on its own`. It must not contain `set_config('app.user_id'` or `only the email-challenge definers and enrolment guards read`.
+- **ARCH §3.1** must contain: `queryMode: 'extended'`; `the marker is the first statement after the real BEGIN`. It must not contain
+  `about 30 lines`.
+- **SECURITY R-2** must contain: `narrowed`; `the linking user of any existing connection, with that user's full read reach`; `job_targets
+  returns no rows`. It must not contain `which any role can set` or `R-2 is closed`.
+- **SECURITY T-18** must contain `app.tx_identity`. It must not contain `sets app.user_id to anyone`.
+- **SECURITY C-84** must contain `app.tx_identity` and `enter_new_user`.
+
+## seceng's prep notes — disposition
+
+| Note | Disposition |
+|---|---|
+| 1 REVOKE FROM PUBLIC; catalog covers PUBLIC and every login role | Adopted (R2, R8 "R2 signatures and EXECUTE") |
+| 2 xid8; owner; FORCE RLS; INSERT WITH CHECK; no TRUNCATE/REFERENCES/TRIGGER; purge owner holds DELETE only | Adopted (R1) |
+| 3 NULL status; caller cannot pick the age | Adopted (R1, R2: no argument) |
+| 4 `max_prepared_transactions` = 0 asserted | Adopted (R1, R8) |
+| 5 `pg_temp` shadowing; TEMP to PUBLIC | Adopted: TEMP is already revoked (`roles.sql` REVOKE ALL ON DATABASE FROM PUBLIC); the catalog test asserts it; bodies qualified |
+| 6 a marker written mid-statement | Covered by the exact-call check (R2) |
+| 7 exact-call check | Adopted (R2). The live-session check was rejected; the reason is in R2 |
+| 8 sign-up savepoint | Adopted (R2 cases, OQ-3) |
+| 9 the two "no user yet" checks read the marker | `withContextFreeTx` adopted. `withOperatorTx` drops the check, because the operator has no way to write a marker (R3) |
+| 10 `app.actor`; kind from the marker | Adopted (`audit_membership`, R1) |
+| 11 session_id is web's word | Adopted (R5, R9 ARCH phrase) |
+| 12 per-query mode; Submittables | Adopted (R4) |
+| 13 routing pool checks the first word only | Adopted (R4, R8 test string) |
+| 14 `job_targets` EXECUTE may stay | Rejected; the reason is in R1 |
+| 15 no READ ONLY `withTenant` | Adopted (R1) |
 
 ## OQ — for the lead (each with the recommendation the build proceeds on)
 
 1. **"Every POLY-87 test still passes" cannot hold verbatim.** Tests that set or read `app.user_id` assert the old mechanism and invert under
    the marker: `auth-new-user-step` conditions 5 (reads `current_setting('app.user_id')` after the step), the forged-setting refusal
    (`:73-77`; a forged setting no longer counts, so the step succeeds) and the claim-with-setting refusal (`:219-232`); pgTAP `05` C17, C30
-   and its `run_as`; pgTAP `06` O2 (`:28,30`, forged setting → issuer refused). **Recommendation:** read the criterion as "every POLY-87
+   and its `run_as`; pgTAP `06` O2 (`:28,30`, forged setting → issuer refused); the `ContextNotEmptyError` cases in `wrappers.test.ts`;
+   and every psql string that calls an `enter_*` with literals (R2's exact-call check). **Recommendation:** read the criterion as "every POLY-87
    property still holds". Each such assertion is rewritten in the red gate to the marker form (a real marker in place of the setting, the
    reading via `current_user_id()`), keeping its red-if mutation; none is deleted. O2 becomes two: a forged setting no longer blocks the
    issuer, and a marker does.
