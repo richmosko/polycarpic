@@ -11,7 +11,7 @@ labels: [security, auth]
 priority: P1
 pr: null
 created: 2026-11-13
-updated: 2026-11-13
+updated: 2026-11-14
 ---
 
 Stage 1 of POLY-145's decision, (e1), staged (`process/cairn/reviews/POLY-145/pricing.md` §1 and §2; `comparison.md` §7). Postgres stops believing a setting that any role can write. Identity is written only by definers into a transaction marker, `app.tx_identity`, keyed by `pg_current_xact_id()`, and `app.current_user_id()` reads only that marker. There are three ways in:
@@ -64,3 +64,15 @@ With the three guards from `comparison.md` §7 in place, a single injected state
 ### @team-lead — 2026-11-13
 
 Feature started. Branch: `feature/poly-147-identity-marker`.
+
+### @architect — 2026-11-14
+
+Gate 1 — ruling: `process/cairn/reviews/POLY-147/ruling.md`. The design itself is (e1) staged, as decided; the ruling only makes it buildable.
+- R1: migration `0011_identity_marker.sql`. It creates `app.tx_identity` with RLS forced. INSERT goes to poly_authz alone and DELETE to poly_purge alone. Readers see their own row under `xid = pg_current_xact_id_if_assigned()`. The new `current_user_id()` and `current_session_id()` read the marker only, and `audit_membership` reads the actor from the marker.
+- R2: four definers, `enter_asserted_user`, `enter_job`, the revised `enter_new_user` and `purge_tx_identity`. Each one's refusals and error codes are exact.
+- R3: in each wrapper the marker is the first statement after the real BEGIN. The sign-up savepoint case is handled.
+- R4: `ExtendedClient` is passed as `Client` to all three pools, which covers both BetterAuth paths. A source-scan unit test refuses any bypass.
+- R5–R6: readers of `app.session_id` move to the marker, and `app.session_id` and `app.user_id` become reserved literals. Test impersonation moves to the marker.
+- R7: the bench harness lives under `tests/db/bench/` and runs against a same-server, same-day control on `main`.
+- R8: the test map.
+Open questions OQ-1 to OQ-4 go to the lead. The build proceeds on each recommendation unless this file says otherwise.
