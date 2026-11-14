@@ -68,3 +68,50 @@ The new definers must also be entered in `definers.json` with the same sets.
 - **The R4 source scan matches `new pg.Pool(` and `new pg.Client(` literally.** It misses `import { Pool, Client } from 'pg'` and `pg.native` inside `packages/db`. The scan must refuse any binding of `Pool`, `Client` or `native` from `pg` outside `pool.ts`, `migrate.ts` and `extended-client.ts`.
 - **`startup.ts` and any other runtime client.** Confirm they come from the ExtendedClient pools.
 - **The migration text.** Read `0011` against R1 and R2 line by line: schema-qualified names, REVOKE FROM PUBLIC on every function, the CREATE-on-`app` grant revoked at the end, and the policy role lists.
+
+## 2. Delta review — `ruling.md` e2104584 → 60bfbb6e
+
+**Verdict: buildable.** S1 is covered and S2 is nearly covered. One line is still required (D2). The exact-call check is sound and I recommend keeping it; my withdrawal in §1 was wrong (D1).
+
+### D1 — the exact-call check (R2): keep it
+
+**What it stops that nothing else stops in stage 1.** SQL injection can no longer call an identity definer in any form, on any path:
+- The canonical text carries placeholders (`$1, $2`). An injected string cannot bind parameters, so:
+  - a fragment inside a larger statement is refused;
+  - a whole injected statement with literals is refused;
+  - a `DO` block that calls the definer is refused, because `current_query()` is the `DO` text (this closes S4 for identity);
+  - a `COMMIT` followed by a fresh call is refused.
+- Without the check, on an unmarked path (BetterAuth's plain pool, or the sign-up transaction before its user insert), a `DO` block or a fragment inside an open BetterAuth transaction could name any user directly in Postgres.
+
+What stays open: poly_app's direct grants on BetterAuth's tables (plant a magic link, read session rows; R-2), a stolen poly_app password, and code execution in web. R-2's "injection on an unmarked path reaches any user" therefore stays true. The route, though, becomes an account takeover through sign-in. That leaves an auth event, a new session in the victim's Sessions list, and needs the attacker to complete a sign-in, instead of a silent query. My §1 withdrawal compared only the end reach and missed this.
+
+**What it costs.** At run time, a string compare per request (nothing measurable). In tests:
+- psql helpers move to `\bind`, which needs psql ≥ 16 in the test image (confirm the image's version at build).
+- pgTAP can no longer assert the specific refusals, so those move to vitest db. That is a little more `db` suite time, which goes in the loop's suite-time report.
+- Build: about 0.25 loop-day.
+
+**Ways it could fail open or break sign-in:**
+- **`track_activities` off: no effect. The ruling's mechanism is mis-sourced.** `current_query()` returns the backend's `debug_query_string`, the text the client sent. It does not read `pg_stat_activity`, so `track_activities` and `track_activity_query_size` do not affect it (unmeasured; source reading). In the extended protocol, `exec_bind_message` and `exec_execute_message` set it to the prepared statement's source text. The architect should correct R2's sentence so ARCH does not repeat it.
+- **The one real fail-open is how the comparison is written.** `IF current_query() <> canonical THEN RAISE` passes on NULL. It must be `IS DISTINCT FROM` (or `NOT coalesce(… = …, false)`). **Blocking at build check: I will read every `enter_*` body for this.** A client statement never has a NULL `debug_query_string`, so a test cannot reach the NULL case. Code reading is the check.
+- **Pipelining.** Each Execute reports its own portal's text, so a pipelined batch is checked per statement. node-postgres does not pipeline anyway.
+- **pgbouncer or Neon in transaction mode.** The backend sees the same Parse text, so the check is unchanged. Unnamed statements are fine.
+- **Drizzle.** Not on the path: each wrapper's setup and `new-user.ts` call `client.query` with literal canonical text. **Build-check item:** the three caller strings must match R2's canonical texts byte for byte (`($1, $2)` with one space).
+  - A drizzle template `sql\`SELECT app.enter_asserted_user(${a}, ${b})\`` would render the canonical text and pass. That is a code bug, not an injection, and the reserved-literal lint already confines the definer names to `context.ts`.
+- **Sign-in and sign-up.** No break. BetterAuth never calls a definer. `enter_new_user` is sent by `enterNewUserOn` on the request's own client, as one statement. A trailing newline or a changed space only refuses, which is fail-closed and caught by the existing sign-up tests.
+
+**Recommendation to the Principal: keep it.** For about a quarter of a loop-day, no SQL-injection bug on any path can name a user to Postgres directly. The remaining injection route is a visible account takeover until stage 2. Dropping it saves the test churn and nothing else.
+
+### D2 — S1, S2 and S6 against the re-issue
+
+| Finding | Status @ 60bfbb6e | Still required |
+|---|---|---|
+| S1 one-statement exits | **Covered.** `max_prepared_transactions = 0` asserted in `07` (that is what refuses `PREPARE TRANSACTION`); TEMP absence asserted; the `COMMIT; BEGIN` string is in (i). | My `DO $$BEGIN COMMIT; END$$`-inside-`withTenant` test drops to **(N)**. With the exact-call check, a transaction ended early cannot be marked again, and later statements read null. |
+| S2 exact grantee sets | **Mostly covered:** the `tx_identity` ACL names PUBLIC, poly_operator and poly_backup; the four definers have exact EXECUTE sets. | **(B), one line in `07`:** exact EXECUTE sets for `app.current_session_id()` (poly_app alone) and `app.job_targets(text)` (nobody but its owner), PUBLIC absent. J1's "poly_worker's grant gone" does not catch a grant to poly_app, which would tell web which users link which connections. |
+| S6 check the xid before COMMIT | Not adopted. | **Withdrawn.** With the exact-call check, an early `COMMIT` leaves the rest of `fn` unmarked, reading null and refused on writes, and nothing can mark it again. |
+
+### Other points in the delta
+
+- **R9's SECURITY phrases: accepted as written.** I will use them verbatim. Any substitution will be listed here first.
+- **R1's `job_targets` revoke (my note 14 rejected):** agreed. The architect's reason is the better one.
+- **Live-session check rejected:** agreed; stage 2's `enter_session` makes the real check.
+- **Still open from §1:** S3 (ARCH phrase in R9: covered), S4 (identity half closed by D1; revoking plpgsql still removes `DO` for other multi-transaction mischief: (N), optional), S5 (the architect's).
