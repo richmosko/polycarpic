@@ -145,3 +145,11 @@ One limit, which §3.4 already states: no script was run under the service's CSP
 1. The header and §1 take my counts: 28 PASS, 4 FAIL, 4 REPORT, with checks at `9fda8f8d`. H.refresh is listed as a FAIL, with its finding.
 2. §6 block H names the refresh decision as a regression from today, which needs a ruling.
 3. §6 "For POLY-89" names the `two_factor_enabled` guard as a POLY-89 requirement.
+
+**Accepted, 2026-11-15 (seceng), on the record at `65a85c25`.**
+All three requested edits are in, and §1's option-2 sentence agrees with the ruling above.
+- The header and §1 give 28 PASS, 4 FAIL, 4 REPORT at checks `9fda8f8d`, with H.refresh as a FAIL.
+- §6 block H names the refresh regression for a stage-2 ruling.
+- §6 "For POLY-89" names the `two_factor_enabled` guard.
+
+One leftover, which does not block acceptance: the record's first line still cites "checks at `08cc62b8`" for the run, while the result line beneath it cites `9fda8f8d`.

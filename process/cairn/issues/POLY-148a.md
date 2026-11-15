@@ -21,10 +21,10 @@ seceng writes, before the harness exists, one executable check per measurable it
 
 ## Acceptance criteria
 
-- [ ] One check per POLY-148 item (session handle per sign-in path, same-origin service and its grant list, cookie scope, sign-in pages, magic link and second factor), each asserting against real responses, cookies or the database catalog, never a file's presence.
-- [ ] A single entry point runs them all and prints pass or fail per item; with no spike present every check fails for its stated reason, and that run is recorded in a comment on this issue.
-- [ ] A short README states the contract the harness must expose (commands, ports, role names) and nothing more.
-- [ ] After the build, seceng's review of each result is in `process/cairn/reviews/POLY-148/spike.md`, including the `__Host-` versus `__Secure-` trade-off and any gap handed to POLY-89.
+- [x] One check per POLY-148 item (session handle per sign-in path, same-origin service and its grant list, cookie scope, sign-in pages, magic link and second factor), each asserting against real responses, cookies or the database catalog, never a file's presence.
+- [x] A single entry point runs them all and prints pass or fail per item; with no spike present every check fails for its stated reason, and that run is recorded in a comment on this issue.
+- [x] A short README states the contract the harness must expose (commands, ports, role names) and nothing more.
+- [x] After the build, seceng's review of each result is in `process/cairn/reviews/POLY-148/spike.md`, including the `__Host-` versus `__Secure-` trade-off and any gap handed to POLY-89.
 
 ## Comments
 
