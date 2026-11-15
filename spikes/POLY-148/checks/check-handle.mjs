@@ -1,11 +1,12 @@
 // (H) The hashed session handle, option 1 of POLY-145 comparison.md §7 point 1: a second random cookie, only sha256(handle) in
 // app.session_handle, cascading from session. One named line per path that creates or replaces a session on better-auth 1.7.18.
 // [issue] lines are the paths POLY-148 names; [beyond] lines are the other session-creating routes our allowlist leaves open
-// (read from the 1.7.18 dist: every internalAdapter.createSession call reachable through AUTH_ROUTES).
+// (read from the 1.7.18 dist: every internalAdapter.createSession call reachable through AUTH_ROUTES). /two-factor/enable rotates
+// only with skipVerificationOnEnable or method otp, neither configured, and /verify-email only with autoSignInAfterVerification: no lines.
 // POLY148_OPTION=2 switches the per-path predicate to option 2: the session row stores sha256(token), never the token.
 import {
   CFG, Jar, Lines, PW, SESSION_RE, IDP_LOG, auth, enrolTotp, get, handleRow, handleSet, isDeletion, lit, magicLink, must, oauth, one,
-  passkeySignIn, post, psql, registerPasskey, run, seedInvitation, seedUser, sessionExists, sessionOfJar, sessionsOf, setRecentAuth,
+  handlesOfUser, passkeySignIn, post, psql, registerPasskey, run, seedInvitation, seedUser, sessionExists, sessionOfJar, sessionsOf, setRecentAuth,
   sha256, sha256hex, signIn, tokenOf, whoami,
 } from './lib.mjs';
 
@@ -93,8 +94,10 @@ const defs = [
     const e = await enrolledUser();
     t.need(e.verify.status === 200, `enrolment's first verify answered ${e.verify.status}`);
     const n = sessionsOf(e.u.id);
+    const h = handlesOfUser(e.u.id);
     const { res: held, jar } = await signIn(e.u.email);
     t.need(sessionsOf(e.u.id) === n, 'the held sign-in left a session row');
+    t.ok(handlesOfUser(e.u.id) === h, 'the held sign-in left an app.session_handle row');
     t.ok(!handleSet(held), 'the held sign-in set a handle cookie');
     const res = await post(auth('/two-factor/verify-totp'), { code: await e.totp.next() }, { jar });
     await issued(t, res, jar);

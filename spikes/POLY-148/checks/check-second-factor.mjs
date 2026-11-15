@@ -2,7 +2,7 @@
 // (TOTP, enrolled through the real routes; passkey-only, second_step_at set) who signs in by magic link, by email or by OAuth is
 // asked for the second factor and leaves with no session row, no session cookie and no handle. A user with no second step gets
 // a session on the same path (the control), so a hold that refuses everyone does not pass. A gap here goes to POLY-89.
-import { CFG, Lines, SESSION_RE, enrolTotp, isDeletion, magicLink, oauth, seedUser, sessionsOf, signIn } from './lib.mjs';
+import { CFG, Lines, SESSION_RE, enrolTotp, handlesOfUser, isDeletion, magicLink, oauth, seedUser, sessionsOf, signIn } from './lib.mjs';
 
 const L = new Lines('M', 'magic link and the second factor');
 const PATHS = { 'magic-link': magicLink, email: (e) => signIn(e), 'oauth-callback': oauth };
@@ -12,8 +12,10 @@ const live = (res, re) => res.cookies.some((c) => re.test(c.name) && !isDeletion
 
 async function held(t, label, u, kind, path) {
   const before = sessionsOf(u.id);
+  const hBefore = handlesOfUser(u.id);
   const { res } = await PATHS[path](u.email);
   t.ok(sessionsOf(u.id) === before, `${label}: ${path} left a session row`);
+  t.ok(handlesOfUser(u.id) === hBefore, `${label}: ${path} left an app.session_handle row`);
   t.ok(!live(res, SESSION_RE), `${label}: ${path} set a session cookie`);
   t.ok(!live(res, new RegExp(`^${CFG.handle}$`)), `${label}: ${path} set a handle cookie`);
   if (kind === 'totp') t.ok(live(res, /two_factor$/), `${label}: ${path} set no two_factor cookie (the user cannot finish)`);

@@ -4,7 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {
-  BA_TABLES, CFG, Jar, Lines, PW, SPIKE, auth, betterAuthFrom, enrolTotp, get, installWriteLog, lit, magicLink, must, one, pinnedVersion, post,
+  BA_TABLES, CFG, Jar, Lines, PW, SPIKE, auth, betterAuthFrom, enrolTotp, get, handlesOfUser, installWriteLog, lit, magicLink, must, one, pinnedVersion, post,
   run, seedInvitation, seedUser, sessionOfJar, sessionsOf, signIn, writersOf,
 } from './lib.mjs';
 
@@ -28,6 +28,18 @@ const defs = [
     t.need(got, `better-auth does not resolve from ${p.serviceEntry} (directly or through @poly/auth)`);
     t.ok(got.version === pinnedVersion(), `the service resolves better-auth ${got.version}; the pin in packages/auth is ${pinnedVersion()}`);
     t.ok(run('ps', ['-o', 'command=', '-p', String(p.service)]).out.includes(path.basename(entry)), `process ${p.service} is not running ${p.serviceEntry}`);
+  }],
+  ['auth-source-unchanged', 'the service runs packages/auth/src as shipped: imported in place, or a byte-identical copy', async (t) => {
+    const p = pids();
+    t.need(p.authSource, '.run/pids.json names no authSource (the directory the service loads options.ts, handler.ts and the rest from)');
+    const dir = path.resolve(SPIKE, p.authSource);
+    const shipped = path.resolve(SPIKE, '../../packages/auth/src');
+    if (dir === shipped) { t.note('the service imports packages/auth/src in place'); return; }
+    for (const f of fs.readdirSync(shipped).filter((x) => x.endsWith('.ts') && !x.endsWith('.test.ts'))) {
+      const copy = path.join(dir, f);
+      if (!fs.existsSync(copy)) { t.note(`${f}: not copied (the service must not need it)`); continue; }
+      t.ok(fs.readFileSync(copy).equals(fs.readFileSync(path.join(shipped, f))), `${p.authSource}/${f} differs from packages/auth/src/${f}: not "unchanged"; the record names each difference`);
+    }
   }],
   ['routed-as-poly_auth', 'a sign-in through Caddy is written by the service, logged in as poly_auth', async (t) => {
     const u = await seedUser();
@@ -107,8 +119,11 @@ const defs = [
     const e = await enrolTotp(u);
     t.need(e.verify.status === 200, `enrolment's verify answered ${e.verify.status}: ${e.verify.text.slice(0, 120)}`);
     const n = sessionsOf(u.id);
+    const h = handlesOfUser(u.id);
     const { res } = await signIn(u.email);
     t.ok(sessionsOf(u.id) === n, 'the held sign-in created a session row');
+    t.ok(handlesOfUser(u.id) === h, 'the held sign-in left an app.session_handle row');
+    t.ok(!res.cookies.some((c) => c.name === CFG.handle && c.value), 'the held sign-in set a handle cookie (a dead one also overwrites the browser\'s live handle)');
     t.ok(!res.cookies.some((c) => /session_token$/.test(c.name) && c.value), 'the held sign-in set a session cookie');
     t.ok(res.cookies.some((c) => /two_factor$/.test(c.name) && c.value), 'the held sign-in set no two_factor cookie (the user is stranded)');
   }],
