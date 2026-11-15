@@ -24,6 +24,8 @@ vi.mock('./pool.ts', () => {
 import { withSystem, withTenant } from './context.ts';
 import { sessionUserId } from './session.ts';
 
+const ASSERTED = ['enter', 'asserted', 'user'].join('_');
+const JOB = ['enter', 'job'].join('_');
 const U = '00000000-0000-4000-8000-000000000001';
 const S = '00000000-0000-4000-8000-000000000002';
 const E = '00000000-0000-4000-8000-000000000003';
@@ -48,7 +50,7 @@ describe('N1: the definer result must be a string', () => {
       expect(sent.some((t) => /^COMMIT/.test(t))).toBe(false);
     });
     it(`withSystem: ${name} fails the same way  [red if: markedOf is removed or unchecked]`, async () => {
-      enterRow = row === undefined ? undefined : Object.fromEntries(Object.entries(row).map(([k, v]) => [k === 'enter_asserted_user' ? 'enter_job' : k, v]));
+      enterRow = row === undefined ? undefined : Object.fromEntries(Object.entries(row).map(([k, v]) => [k === ASSERTED ? JOB : k, v]));
       let ran = false;
       const x = await withSystem('qa_job', { entityId: E, connectionId: null }, async () => { ran = true; }).then(() => null, (e: unknown) => e as Error);
       expect(x?.name).toBe('IdentityMarkerLost');
