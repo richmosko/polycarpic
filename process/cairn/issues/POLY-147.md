@@ -1,7 +1,7 @@
 ---
 id: POLY-147
 title: Identity marker (stage 1)
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-146]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [process/cairn/issues/POLY-147.md, process/cairn/reviews/POLY-147/**, packages/db/**, packages/auth/**, packages/tenancy/**, apps/worker/**, tests/**, scripts/layers/**, infra/ci/**, layers.json, eslint.config.js, package.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**]
 labels: [security, auth]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/127
 created: 2026-11-13
 updated: 2026-11-15
 ---
@@ -128,3 +128,7 @@ Open: the docs criterion (ARCH 3.1/3.3, SECURITY R-2/T-18/C-84). Four non-blocki
 ### @qa-engineer — 2026-11-15
 
 Gate 4, docs-checked @ 67419c74. R9 phrases (tag-stripped, case-sensitive): every must present, every must-not absent in ARCH 1.16.0 and SECURITY 1.9.20; R-2, T-18, C-84 and ARCH §3.3 also pass scoped to their sections. One note: 'the marker is the first statement after the real BEGIN' is in ARCH §3.3, not §3.1 (queryMode is in §3.1c); passes on R8's whole-document grep, fails a strict §3.1 reading. INFRA 1.3.12 says roles.sql is re-run after restore and at each major upgrade. Code re-run from a clean checkout on 67419c74, exit codes read: lint 0, typecheck 0, units 0, dist-freshness 0, layers 528/528, tests/ci 534/534, tests/infra 163/163, db 511/511. Web e2e 52/52 on 71ba9813. Per-criterion evidence list sent to the lead.
+
+### @team-lead — 2026-11-15
+
+PR opened: https://github.com/richmosko/polycarpic/pull/127. Awaiting Validate. Head-match PASS against 67419c74 (qa's last full green run); everything after it is docs and tracker.
