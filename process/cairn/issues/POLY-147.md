@@ -1,7 +1,7 @@
 ---
 id: POLY-147
 title: Identity marker (stage 1)
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-146]
@@ -132,3 +132,7 @@ Gate 4, docs-checked @ 67419c74. R9 phrases (tag-stripped, case-sensitive): ever
 ### @team-lead — 2026-11-15
 
 PR opened: https://github.com/richmosko/polycarpic/pull/127. Awaiting Validate. Head-match PASS against 67419c74 (qa's last full green run); everything after it is docs and tracker.
+
+### @team-lead — 2026-11-15
+
+Validate passed; merging via PR #127. Closing. PR CI on afa02a20: all eight jobs green (cairn, changes, guard, lint, unit, db, image, app). Merge approved by the Principal ("merge when green", 2026-11-15).
