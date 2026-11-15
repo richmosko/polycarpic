@@ -115,3 +115,45 @@ What stays open: poly_app's direct grants on BetterAuth's tables (plant a magic 
 - **R1's `job_targets` revoke (my note 14 rejected):** agreed. The architect's reason is the better one.
 - **Live-session check rejected:** agreed; stage 2's `enter_session` makes the real check.
 - **Still open from §1:** S3 (ARCH phrase in R9: covered), S4 (identity half closed by D1; revoking plpgsql still removes `DO` for other multi-transaction mischief: (N), optional), S5 (the architect's).
+
+## 3. Delta review — `ruling.md` 60bfbb6e → 4d50ce17
+
+**Verdict: cleared for tests-red.** Nothing in this delta blocks. S1, S2 and S6 are covered by tests in R8 that fail if their holes open. The build-check item for the exact-call comparison (`IS DISTINCT FROM` in every `enter_*` body) stands for job 2.
+
+### E1 — the `query_to_xml` family against the exact-call check
+
+**(1) Sufficient: yes.** The family matters only if a fragment can plant a marker inside the same statement. Every way to write a marker is one of the three `enter_*` definers; INSERT is poly_authz's alone. Every definer refuses before any write unless `current_query()` is its own canonical text. A statement that also calls `query_to_xml` (or anything else) is never that text, so the definer refuses, no marker exists, and the fresh snapshot reads null. The check works on the definer, not on what the statement does, so it covers the whole family without naming it.
+
+**Is it tested?** Indirectly, yes. The R8 exact-call row sends `SELECT app.enter_asserted_user($1, $2), 1`, which is the same refusal. That test fails if the check is removed or weakened to a prefix match. Optional, **(N)**: one more row in `identity-marker`. In an *unmarked* poly_app transaction, send `SELECT app.enter_asserted_user($1, $2), pg_catalog.query_to_xml('SELECT count(*) FROM public.entity', false, false, '')` with a seeded owner's id. Expect `42501` and no marker. This pins the ruling's attack exactly and costs a few lines.
+
+**(2) Revoke EXECUTE on the family from PUBLIC: an option for the Principal, (N).**
+- **What it adds after the exact-call check:** defence in depth only. It removes the one primitive that defeats the snapshot reasoning, in case a future definer ever writes identity-bearing state and forgets the check. Today nothing else plants a marker.
+- **The family is wider than three.** Every built-in that runs a caller-supplied SQL string through SPI belongs in it:
+  - `query_to_xml`, `query_to_xmlschema`, `query_to_xml_and_xmlschema`;
+  - `table_to_xml*`, `cursor_to_xml*`, `schema_to_xml*`, `database_to_xml*`;
+  - `ts_stat(text)`, `ts_stat(text, text)` and `ts_rewrite(tsquery, text)`, which also execute a query string (unmeasured; read from Postgres's documented signatures).
+  
+  If it is done, the catalog test should list every `pg_catalog` function whose name matches those patterns and assert PUBLIC absent.
+- **Cost:** about 0.1 loop-day: two REVOKE lines in `roles.sql` beside R10 (superuser, per database, idempotent), and one `07` assertion. pg_dump keeps changed ACLs on `pg_catalog` functions (`pg_init_privs`, since 9.6), so a restore keeps the revoke (unmeasured). A grep finds no use of these functions in our code, BetterAuth, drizzle or kysely; the builder confirms with the same grep as R10.
+- **My recommendation:** take it, with R10, in this loop. It is cheap, it is the same kind of change as R10, and the Principal puts security first. It is not required; the exact-call check already closes the attack.
+
+### E2 — R10's test design
+
+**(3) Sound.** `CREATE FUNCTION` checks CREATE on the target schema before USAGE on the language. A role with no schema would get the schema error and prove nothing about the language. Granting CREATE on a throwaway `qa_lang` inside a rolled-back superuser transaction makes the language check the one that answers. `DO` checks only the language, so it needs no schema.
+- The exact `lanacl` set (eight roles, PUBLIC absent) already catches poly_backup and poly_migrator regaining USAGE. Extending the `DO` assertion to them is optional.
+- `laninline <> 0 AND lanname <> 'plpgsql'` = 0 rightly guards against a second inline language (for example `plperl`) arriving later with PUBLIC USAGE.
+- `poly_migrator` → `SET ROLE poly_owner` → `DO` still works. That is accepted: the migrator is the deploy credential and can already do everything as poly_owner.
+
+### E3 — S1, S2, S6
+
+| Finding | Status @ 4d50ce17 |
+|---|---|
+| S1 | **Covered.** The PREPARE, `DO … COMMIT` and `max_prepared_transactions` rows are in R8, each with a red-if. The PREPARE test asserts the right outcome: a failed `PREPARE TRANSACTION` becomes a rollback, later reads are null, and `withTenant` rejects. |
+| S2 / D2 | **Covered.** The R8 row "R2 signatures and EXECUTE" gives exact `aclexplode` sets, PUBLIC included, for the four definers, `current_session_id` {poly_app} and `job_targets` {}. `definers.json` follows. |
+| S6 | **Covered (kept by the lead).** The commit check needs no definer call, so it cannot trip the exact-call check. Its test (`COMMIT` via `tx.execute`, then an INSERT refused by RLS, then `IdentityMarkerLost`) fails if the check is removed. Build-check item: the TS comparison must treat a null `x` as a mismatch, as R3 says. |
+
+### E4 — other points in the delta
+
+- **R2 now states `current_query()` as `debug_query_string`,** and R9 bars `track_activities` from ARCH. Correct.
+- **The R7 case L (2,000 rows) answers S5.** Closed on my side.
+- **The `global-setup.ts` psql ≥ 16 check** fails loudly rather than skipping. Good.
