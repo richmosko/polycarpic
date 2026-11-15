@@ -116,26 +116,21 @@ What stays open: poly_app's direct grants on BetterAuth's tables (plant a magic 
 - **Live-session check rejected:** agreed; stage 2's `enter_session` makes the real check.
 - **Still open from §1:** S3 (ARCH phrase in R9: covered), S4 (identity half closed by D1; revoking plpgsql still removes `DO` for other multi-transaction mischief: (N), optional), S5 (the architect's).
 
-## 3. Delta review — `ruling.md` 60bfbb6e → 4d50ce17
+## 3. Delta review — `ruling.md` 60bfbb6e → 2027afdb (4d50ce17 and its addendum)
 
-**Verdict: cleared for tests-red.** Nothing in this delta blocks. S1, S2 and S6 are covered by tests in R8 that fail if their holes open. The build-check item for the exact-call comparison (`IS DISTINCT FROM` in every `enter_*` body) stands for job 2.
+**Verdict @ 2027afdb: cleared for tests-red.** Nothing in this delta blocks. S1, S2 and S6 are covered by tests in R8 that fail if their holes open. The build-check item for the exact-call comparison (`IS DISTINCT FROM` in every `enter_*` body) stands for job 2.
 
 ### E1 — the `query_to_xml` family against the exact-call check
 
 **(1) Sufficient: yes.** The family matters only if a fragment can plant a marker inside the same statement. Every way to write a marker is one of the three `enter_*` definers; INSERT is poly_authz's alone. Every definer refuses before any write unless `current_query()` is its own canonical text. A statement that also calls `query_to_xml` (or anything else) is never that text, so the definer refuses, no marker exists, and the fresh snapshot reads null. The check works on the definer, not on what the statement does, so it covers the whole family without naming it.
 
-**Is it tested?** Indirectly, yes. The R8 exact-call row sends `SELECT app.enter_asserted_user($1, $2), 1`, which is the same refusal. That test fails if the check is removed or weakened to a prefix match. Optional, **(N)**: one more row in `identity-marker`. In an *unmarked* poly_app transaction, send `SELECT app.enter_asserted_user($1, $2), pg_catalog.query_to_xml('SELECT count(*) FROM public.entity', false, false, '')` with a seeded owner's id. Expect `42501` and no marker. This pins the ruling's attack exactly and costs a few lines.
+**Is it tested?** Yes, directly: 2027afdb adds R8 row "R2 the `query_to_xml` route". It sends the fragment on BetterAuth's plain pool and inside `withContextFreeTx` before any insert, and expects `42501` with no marker. It is red if the check is missing: without it, the definer writes a marker on the plain pool (no xid yet) and the statement succeeds. The `<>`-form fail-open stays a code-reading item for build check.
 
-**(2) Revoke EXECUTE on the family from PUBLIC: an option for the Principal, (N).**
-- **What it adds after the exact-call check:** defence in depth only. It removes the one primitive that defeats the snapshot reasoning, in case a future definer ever writes identity-bearing state and forgets the check. Today nothing else plants a marker.
-- **The family is wider than three.** Every built-in that runs a caller-supplied SQL string through SPI belongs in it:
-  - `query_to_xml`, `query_to_xmlschema`, `query_to_xml_and_xmlschema`;
-  - `table_to_xml*`, `cursor_to_xml*`, `schema_to_xml*`, `database_to_xml*`;
-  - `ts_stat(text)`, `ts_stat(text, text)` and `ts_rewrite(tsquery, text)`, which also execute a query string (unmeasured; read from Postgres's documented signatures).
-  
-  If it is done, the catalog test should list every `pg_catalog` function whose name matches those patterns and assert PUBLIC absent.
-- **Cost:** about 0.1 loop-day: two REVOKE lines in `roles.sql` beside R10 (superuser, per database, idempotent), and one `07` assertion. pg_dump keeps changed ACLs on `pg_catalog` functions (`pg_init_privs`, since 9.6), so a restore keeps the revoke (unmeasured). A grep finds no use of these functions in our code, BetterAuth, drizzle or kysely; the builder confirms with the same grep as R10.
-- **My recommendation:** take it, with R10, in this loop. It is cheap, it is the same kind of change as R10, and the Principal puts security first. It is not required; the exact-call check already closes the attack.
+**(2) Revoking EXECUTE on the family from PUBLIC: I agree with the architect, do not revoke. My recommendation at 50f334b1 to take it is withdrawn, so there is no disagreement to put to the Principal.**
+- **Mechanism:** the family matters only if a marker can be planted inside the statement that reads. Only the three `enter_*` definers can write a marker, and each refuses anything but its own canonical, parameter-bound statement. What is left is a holder of poly_app's password, or code in web. Either can send the canonical call as one statement and read in the next, so the revoke takes nothing from them.
+- **What it would still add:** a backstop against a regression: a future identity definer shipped without the check, or a check written with `<>`. Two things already cover that: R8's catalog row (any unlisted `enter_*` fails) and my build-check reading of every body. The revoke would also have to cover `ts_stat` and `ts_rewrite(tsquery, text)` to be complete.
+- **The upgrade cost is smaller than the ruling says.** `roles.sql` runs per database at provisioning and would re-apply the revoke, and pg_dump carries changed `pg_catalog` ACLs (unmeasured). Small as it is, it still exceeds a gain that is nil today.
+- **Condition:** R2's "revisit if the exact-call check is ever removed" stands. The same must hold for any future definer that writes identity-bearing state.
 
 ### E2 — R10's test design
 
