@@ -103,7 +103,7 @@ export interface SessionRow {
 export async function listSessions(tx: Tx): Promise<SessionRow[]> {
   const res = await tx.execute<{ id: string; user_agent: string | null; ip_address: string | null; created_at: Date | string; updated_at: Date | string; current: boolean }>(sql`
     SELECT id, user_agent, ip_address, created_at, updated_at,
-           (id::text = coalesce(pg_catalog.current_setting('app.session_id', true), '')) AS current
+           (id::text = coalesce(app.current_session_id()::text, '')) AS current
     FROM public.session WHERE user_id = app.current_user_id() ORDER BY created_at`);
   return res.rows.map((r) => ({ id: r.id, userAgent: r.user_agent, ipAddress: r.ip_address, createdAt: new Date(r.created_at), updatedAt: new Date(r.updated_at), current: r.current }));
 }
@@ -111,11 +111,11 @@ export async function listSessions(tx: Tx): Promise<SessionRow[]> {
 /** Revokes by id for the caller. Another session than the current one is a step-up action; the current one is sign-out. */
 export async function revokeSession(tx: Tx, id: string): Promise<void> {
   const own = await tx.execute<{ current: boolean }>(sql`
-    SELECT (id::text = coalesce(pg_catalog.current_setting('app.session_id', true), '')) AS current
+    SELECT (id::text = coalesce(app.current_session_id()::text, '')) AS current
     FROM public.session WHERE id = ${id}::uuid AND user_id = app.current_user_id()`);
   if (own.rows.length === 0) throw new HttpError(404, 'not_found');
   if (!own.rows[0]!.current) {
-    const cur = await tx.execute<{ s: string }>(sql`SELECT coalesce(pg_catalog.current_setting('app.session_id', true), '') AS s`);
+    const cur = await tx.execute<{ s: string }>(sql`SELECT coalesce(app.current_session_id()::text, '') AS s`);
     try {
       await requireRecentAuth(cur.rows[0]!.s);
     } catch (e) {

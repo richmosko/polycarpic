@@ -1,7 +1,8 @@
 // The only connection path (ARCH §3.3): context is per transaction, never per session. withTenant, withSystem,
 // withContextFreeTx and withOperatorTx refuse to nest inside one another, so a query never runs under two identities.
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { drizzle, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { drizzle, NodePgTransaction, type NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { PgDialect } from 'drizzle-orm/pg-core';
 import type pg from 'pg';
 import { appPool, operatorPool, workerPool } from './pool.ts';
 import { enterNewUserOn } from './new-user.ts';
@@ -26,8 +27,15 @@ export class NoPrincipalError extends Error {
 }
 export class ContextNotEmptyError extends Error {
   constructor() {
-    super('app.user_id is set on a context-free transaction');
+    super('an identity is already in context on a context-free transaction');
     this.name = 'ContextNotEmptyError';
+  }
+}
+
+export class IdentityMarkerLost extends Error {
+  constructor() {
+    super('IdentityMarkerLost: the transaction that carried the identity marker has ended');
+    this.name = 'IdentityMarkerLost';
   }
 }
 
@@ -67,6 +75,8 @@ interface Store {
   /** One stable handle per transaction; it refuses queries once the transaction has ended (S3). */
   handle: AuthClient;
   tx?: Tx;
+  /** The xid text the identity definer returned (R3); set by a wrapper whose setup writes a marker. */
+  marked?: string;
 }
 
 const JOB_NAME = /^[a-z][a-z0-9_]{0,62}$/;
@@ -100,7 +110,7 @@ export function clientOf(tx: Tx): pg.PoolClient {
   return c;
 }
 
-async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (client: pg.PoolClient) => Promise<void>, fn: (tx: Tx) => Promise<T>): Promise<T> {
+async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (client: pg.PoolClient, store: Store) => Promise<void>, fn: (tx: Tx) => Promise<T>): Promise<T> {
   const outer = active.getStore();
   if (outer?.live) throw new NestedContextError(kind, outer.kind);
   const client = await getPool().connect();
@@ -120,7 +130,9 @@ async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (clie
     return await active.run(store, async () => {
       await client.query('BEGIN');
       try {
-        const tx = drizzle(client);
+        // A NodePgTransaction, not drizzle(client): the database object's transaction() issues its own BEGIN and, on a throw, a
+        // ROLLBACK of the whole real transaction, which would end the marked transaction. The transaction object's is a savepoint.
+        const tx = new NodePgTransaction(new PgDialect(), drizzle(client)._.session, undefined) as unknown as Tx;
         if (kind === 'withContextFreeTx') {
           let used = false;
           Object.defineProperty(tx, 'enterNewUser', {
@@ -135,8 +147,15 @@ async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (clie
         }
         clients.set(tx, client);
         store.tx = tx;
-        await setup(client);
+        // The first statement after the real BEGIN is the whole identity step (guard ii): nothing is sent between the two,
+        // so the marker exists before fn can open a savepoint.
+        await setup(client, store);
         const out = await fn(tx);
+        if (store.marked !== undefined) {
+          // S6: a whole-statement COMMIT inside fn would have ended the marked transaction; the xid then differs or is unassigned.
+          const x = await client.query('SELECT pg_catalog.pg_current_xact_id_if_assigned()::pg_catalog.text AS x');
+          if (x.rows[0]?.x !== store.marked) throw new IdentityMarkerLost();
+        }
         const done = await client.query('COMMIT');
         // COMMIT on an aborted transaction succeeds as a statement and rolls back; node-pg reports the command (S2)
         if (done.command !== 'COMMIT') throw new TransactionAborted();
@@ -156,8 +175,11 @@ async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (clie
 /** A signed-in request. userId carries the SessionUserId brand (SECURITY A-39). */
 export async function withTenant<T>(userId: SessionUserId, sessionId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
   if (!UUID.test(userId)) throw new TypeError('withTenant: userId is not a uuid');
-  return inTransaction('withTenant', appPool, async (c) => {
-    await c.query(`SELECT set_config('app.user_id', $1, true), set_config('app.session_id', $2, true)`, [userId, sessionId]);
+  if (!UUID.test(sessionId)) throw new TypeError('withTenant: sessionId is not a uuid');
+  return inTransaction('withTenant', appPool, async (c, store) => {
+    // The canonical text, byte for byte (R2's exact-call check); the result column is read by its default name.
+    const res = await c.query('SELECT app.enter_asserted_user($1, $2)', [userId, sessionId]);
+    store.marked = res.rows[0].enter_asserted_user as string;
   }, fn);
 }
 
@@ -169,33 +191,31 @@ export interface JobTarget {
 /** A system job acting for one target's principal. Never context-free: errors unless exactly one principal resolves. */
 export async function withSystem<T>(job: string, target: JobTarget, fn: (tx: Tx) => Promise<T>): Promise<T> {
   if (!JOB_NAME.test(job)) throw new TypeError(`withSystem: invalid job name ${JSON.stringify(job)}`);
-  return inTransaction('withSystem', workerPool, async (c) => {
-    const res = await c.query(
-      `SELECT principal_user_id FROM app.job_targets($1) WHERE entity_id = $2 AND connection_id IS NOT DISTINCT FROM $3::uuid`,
-      [job, target?.entityId, target?.connectionId ?? null],
-    );
-    const principal = res.rows[0]?.principal_user_id as string | null | undefined;
-    if (res.rowCount !== 1 || !principal) throw new NoPrincipalError(job);
-    await c.query(`SELECT set_config('app.user_id', $1, true), set_config('app.actor', $2, true)`, [principal, `system:${job}`]);
+  return inTransaction('withSystem', workerPool, async (c, store) => {
+    try {
+      const res = await c.query('SELECT app.enter_job($1, $2, $3)', [job, target?.entityId, target?.connectionId ?? null]);
+      store.marked = res.rows[0].enter_job as string;
+    } catch (e) {
+      if ((e as { code?: string }).code === 'P0002') throw new NoPrincipalError(job);
+      throw e;
+    }
   }, fn);
 }
 
 /** Sign-up and other pre-identity work. Exported to packages/auth alone (db/auth). C-84: asserts first that no identity is set. */
 export async function withContextFreeTx<T>(fn: (tx: ContextFreeTx) => Promise<T>): Promise<T> {
   return inTransaction('withContextFreeTx', appPool, async (c) => {
-    const res = await c.query(`SELECT coalesce(pg_catalog.current_setting('app.user_id', true), '') AS v`);
-    if (res.rows[0].v !== '') throw new ContextNotEmptyError();
+    const res = await c.query('SELECT app.current_user_id() IS NULL AS ok');
+    if (res.rows[0].ok !== true) throw new ContextNotEmptyError();
   }, fn as (tx: Tx) => Promise<T>);
 }
 
 /**
- * The operator's CLI transaction (POLY-142 R3; SECURITY C-84): the operator pool (poly_operator), no user, and only app.actor set. The actor is for
+ * The operator's CLI transaction (POLY-142 R3; SECURITY C-84): the operator pool (poly_operator), no user (it cannot write a marker: no enter_* grant), and only app.actor set. The actor is for
  * the database's own logs: issue_operator_invitation writes its own literal. Exported on db/operator alone, to one caller.
  */
 export async function withOperatorTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
   return inTransaction('withOperatorTx', operatorPool, async (c) => {
-    const res = await c.query(`SELECT coalesce(pg_catalog.current_setting('app.user_id', true), '') AS v`);
-    if (res.rows[0].v !== '') throw new ContextNotEmptyError();
     await c.query(`SELECT set_config('app.actor', 'operator:cli', true)`);
   }, fn);
 }

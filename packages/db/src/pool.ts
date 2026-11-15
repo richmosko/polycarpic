@@ -4,6 +4,7 @@
 // configure() is the seam where an app (or a test holding both roles) passes config down. Nothing outside packages/db sees a pool.
 import pg from 'pg';
 import { connectionFrom, type Env } from './connection.ts';
+import { ExtendedClient } from './extended-client.ts';
 
 export interface PoolConfig {
   /** DATABASE_* settings for the tenant / context-free pool (default: process.env). */
@@ -41,18 +42,18 @@ function maxOpt(): { max?: number } {
 }
 
 export function appPool(): pg.Pool {
-  return (app ??= new pg.Pool({ ...connectionFrom(config.app ?? process.env), ...maxOpt() }));
+  return (app ??= new pg.Pool({ ...connectionFrom(config.app ?? process.env), Client: ExtendedClient, ...maxOpt() }));
 }
 
 export function workerPool(): pg.Pool {
-  return (worker ??= new pg.Pool({ ...connectionFrom(config.worker ?? process.env), ...maxOpt() }));
+  return (worker ??= new pg.Pool({ ...connectionFrom(config.worker ?? process.env), Client: ExtendedClient, ...maxOpt() }));
 }
 
 export function operatorPool(): pg.Pool {
   const env = config.operator ?? process.env;
   if (env.DATABASE_USER !== 'poly_operator') throw new OperatorPoolRefused();
   if (operator) return operator;
-  return (operator = new pg.Pool({ ...connectionFrom(env), ...maxOpt() }));
+  return (operator = new pg.Pool({ ...connectionFrom(env), Client: ExtendedClient, ...maxOpt() }));
 }
 
 export async function close(): Promise<void> {

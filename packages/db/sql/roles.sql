@@ -42,6 +42,12 @@ $roles$;
 
 GRANT pg_read_all_data TO poly_backup;
 
+-- POLY-147 (ruling R10): no plpgsql for the runtime roles. DO blocks and CREATE FUNCTION ... LANGUAGE plpgsql then fail for poly_app,
+-- poly_worker, poly_operator, poly_backup and poly_migrator (42501). Calling an existing plpgsql function needs no USAGE, so every
+-- definer and trigger runs as before; the roles that create them keep USAGE. Per database, idempotent.
+REVOKE USAGE ON LANGUAGE plpgsql FROM PUBLIC;
+GRANT USAGE ON LANGUAGE plpgsql TO poly_owner, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal;
+
 -- poly_migrator reaches poly_owner and each definer owner only by SET ROLE (ARCH §6.2, SECURITY C-85):
 -- INHERIT FALSE means it cannot use their privileges without switching; no ADMIN OPTION.
 GRANT poly_owner, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal
