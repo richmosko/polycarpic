@@ -89,3 +89,7 @@ Gate 1, Principal's decisions (2026-11-14 local; `process/DECISIONS.md`, 2026-11
 ### @team-lead — 2026-11-15
 
 Gate 1 correction (Principal, 2026-11-14 local): the exact-call check is KEPT. This reverses the line above. Basis: seceng's delta review (security-review.md §2 D1 @ b5769439): injected SQL cannot bind parameters, so no injection can name a user to Postgres directly, and the `track_activities` dependency cited against the check does not exist. S4 (plpgsql revoke) stays in scope. S6 stays in the ruling. `process/DECISIONS.md` entry replaced, not stacked.
+
+### @qa-engineer — 2026-11-15
+
+Gate 2, tests-red @ ee1ff9eb (ruling 2027afdb). New failing: 44 db (tests/db/identity-marker.test.ts) + 3 unit (pg-seam-scan) + extended-client.test.ts (module absent, 5 tests) + 7 lint fixtures (31-reserved-literal) + pgTAP 07 (script errors, table absent). Rewritten onto the marker per R6/OQ-1 and red until built: db suite 94 failed / 509 total (415 pass) = 44 new + 45 rewritten (auth-new-user-step 6, auth-signup-invite 27 via the owner/invite fixtures, auth-routing-pool 3, wrappers 6, matrix 2, operator-invite 1) + 5 pgTAP files (01, 02, 05, 06, 07). Every other db test passes (ops-* need svelte-kit sync in a fresh worktree). Observed codes: DO COMMIT today 2D000 (R10 makes it 42501). PREPARE TRANSACTION expected 55000 (asserted, unmeasured until built). Finding: 02_rls_catalog battery flags app.tx_identity (xid8 key, no TRUNCATE trigger): exemption added, count 7 to 8, needs seceng sign-off. Harness: tests/db/bench/.
