@@ -1,7 +1,7 @@
 ---
 id: POLY-148b
 title: Spike build and record
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-148
 blocked_by: [POLY-148a]
