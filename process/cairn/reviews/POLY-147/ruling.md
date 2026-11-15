@@ -201,7 +201,7 @@ write assigns the parent's xid first, so the xid stays assigned after the rollba
 - **K2 on `entity_type`: confirmed.** `entity_type_select` (`0003:291-292`) shows `owner_user_id IS NULL` system types to anyone by
   design, so the count is not zero. The K2 row reads instead:
   - `count(*) = 0` on `entity`, `membership`, `invitation`, `notification` and `audit_event`;
-  - on `entity_type`, `count(*) FILTER (WHERE owner_user_id IS NOT NULL) = 0`.
+  - on `entity_type`, `count(*) FILTER (WHERE name = '<seeded type name>') = 0`. A filter on `owner_user_id` is not possible: poly_app and poly_worker hold no grant on that column (`0003:300` grants `id, created_at, name, kind, system_key`), so it gives `42501`. A with-marker control shows all six counts nonzero.
   - To stay red with the hole open, the fixture seeds, as superuser and owned by the forged uuid's user: one custom `entity_type`; an
     entity of that type with an owner membership; and one row in each of `invitation`, `notification` and `audit_event` that the user
     could see. Each count is then nonzero if a forged setting ever reaches `current_user_id()`.
