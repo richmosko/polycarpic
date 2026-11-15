@@ -1,5 +1,5 @@
 // POLY-87 ruling R7: how A's tests create invitations. Test code only; A adds no way to write one.
-//  - entity rows: INSERTed as poly_app with app.user_id = the entity's owner (the production owner policy and
+//  - entity rows: INSERTed as poly_app with the identity marker of the entity's owner (the production owner policy and
 //    gate_owner_changes, a sole owner is allowed), so the fixture is itself a test of the production grant;
 //  - no-entity rows: superuser, because A has no path that writes them (that is the point, condition 23);
 //  - expired / revoked / claimed rows are set up afterwards as superuser.
@@ -8,6 +8,7 @@
 // test pins hashInvitationToken to this same function.
 import { createHash, randomBytes } from 'node:crypto';
 import { must, psql } from './pg.ts';
+import { asUserSql, SID } from './marker.ts';
 
 export const tokenHash = (token: string): Buffer => createHash('sha256').update(Buffer.from(token, 'base64url')).digest();
 export const newToken = (): string => randomBytes(32).toString('base64url');
@@ -29,7 +30,7 @@ export function seedOwnerEntity(db: string, tag = Math.random().toString(36).sli
   const ownerId = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('Owner ${tag}', '${ownerEmail}', true) RETURNING id`, db).rows[0][0]!;
   const name = `qa-ent-${tag}`;
   const r = must(
-    `BEGIN; SELECT set_config('app.user_id', '${ownerId}', true);
+    `BEGIN; ${asUserSql(ownerId, SID)}
      INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), '${name}', 'business_pass_through');
      SELECT id FROM public.entity WHERE name = '${name}'; COMMIT;`,
     db,
@@ -47,7 +48,7 @@ export function seedInvitation(a: SeedArgs): string {
   if (a.entityId) {
     if (!a.as) throw new Error('seedInvitation: an entity invitation needs `as` (the owner)');
     must(
-      `BEGIN; SELECT set_config('app.user_id', '${a.as}', true);
+      `BEGIN; ${asUserSql(a.as, SID)}
        INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at)
        VALUES ('${a.entityId}', '${a.email}', '${role}', '${a.as}', decode('${hex}', 'hex'), ${exp}); COMMIT;`,
       a.db,

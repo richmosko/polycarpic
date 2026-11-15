@@ -74,17 +74,19 @@ SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app','poly_worker']) r, 
 -- public schema, app.job_targets
 SELECT ok(NOT has_schema_privilege('poly_app','public','CREATE'),'poly_app has no CREATE on public');
 SELECT ok(NOT has_schema_privilege('poly_worker','public','CREATE'),'poly_worker has no CREATE on public');
-SELECT ok(has_function_privilege('poly_worker','app.job_targets(text)','EXECUTE'),'poly_worker executes app.job_targets');
+SELECT ok(NOT has_function_privilege('poly_worker','app.job_targets(text)','EXECUTE'),'poly_worker cannot execute app.job_targets: enter_job is its only caller (POLY-147)');
 SELECT ok(NOT has_function_privilege('poly_app','app.job_targets(text)','EXECUTE'),'poly_app cannot execute app.job_targets');
 SELECT ok(NOT has_function_privilege('public','app.job_targets(text)','EXECUTE'),'PUBLIC cannot execute app.job_targets');
 SELECT ok((SELECT prosecdef FROM pg_proc WHERE oid='app.job_targets(text)'::regprocedure),'app.job_targets is SECURITY DEFINER');
-SELECT is((SELECT array_agg(a.grantee::regrole::text ORDER BY a.grantee::regrole::text) FROM pg_proc p CROSS JOIN LATERAL aclexplode(p.proacl) a
+SELECT is((SELECT count(*)::int FROM pg_proc p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
   WHERE p.oid='app.job_targets(text)'::regprocedure AND a.privilege_type='EXECUTE' AND a.grantee <> p.proowner),
-  ARRAY['poly_worker'], 'EXECUTE on app.job_targets is granted to poly_worker alone');
+  0, 'EXECUTE on app.job_targets is granted to no role but its owner (POLY-147)');
 
--- nullif form (A-3)
-SELECT matches(pg_get_functiondef('app.current_user_id()'::regprocedure), 'nullif\(\s*(pg_catalog\.)?current_setting\(\s*''app\.user_id''(::text)?,\s*true\s*\),\s*''''(::text)?\s*\)',
-  'app.current_user_id() uses the nullif form');
+-- the marker form (POLY-147 K2): the body reads the transaction marker only, never a setting, never pg_current_xact_id()
+SELECT matches(pg_get_functiondef('app.current_user_id()'::regprocedure), 'FROM app\.tx_identity', 'app.current_user_id() reads app.tx_identity');
+SELECT matches(pg_get_functiondef('app.current_user_id()'::regprocedure), 'pg_current_xact_id_if_assigned\(\)', 'app.current_user_id() keys on pg_current_xact_id_if_assigned()');
+SELECT doesnt_match(pg_get_functiondef('app.current_user_id()'::regprocedure), 'current_setting', 'app.current_user_id() no longer reads a setting');
+SELECT doesnt_match(regexp_replace(pg_get_functiondef('app.current_user_id()'::regprocedure), 'pg_current_xact_id_if_assigned', '', 'g'), 'pg_current_xact_id\(\)', 'app.current_user_id() never calls pg_current_xact_id() (it would assign an id)');
 
 -- ruling R1/R2/R3
 SELECT is((SELECT count(*)::int FROM pg_auth_members m JOIN pg_roles u ON u.oid=m.member

@@ -28,6 +28,11 @@
   },
   "reservedLiterals": {
     "enter_new_user": ["packages/db/src/new-user.ts"],
+    "enter_asserted_user": ["packages/db/src/context.ts"],
+    "enter_job": ["packages/db/src/context.ts"],
+    "purge_tx_identity": [],
+    "app.session_id": [],
+    "app.user_id": [],
     "claim_invitations": ["packages/tenancy/src/invitation.ts"],
     "accept_invitations": ["packages/tenancy/src/invitation.ts"],
     "issue_operator_invitation": ["packages/tenancy/src/operator-invitation.ts"]

@@ -43,10 +43,18 @@ describe('the §4.2.1 matrix data (criterion 10)', () => {
   it('reverse coverage: every real relation is named by a row, the exemption list or the unlisted list', () => {
     const m = loadMatrix();
     expect(coverageGaps(db, m.rows, m.unlisted ?? [], exemptions())).toEqual([]);
-    expect(m.unlisted?.map((u) => u.table).sort()).toEqual(['public.entity_type', 'public.notification']);
-    // ruling N4: the cover for an unlisted table is its per-table cross-tenant test in tenancy.test.ts
-    const cover = readFileSync(join(ROOT, 'tests', 'db', 'tenancy.test.ts'), 'utf8');
-    for (const u of m.unlisted ?? []) expect(cover, `${u.table} needs a cross-tenant case in tenancy.test.ts`).toContain(`['${u.table}',`);
+    expect(m.unlisted?.map((u) => u.table).sort()).toEqual(['app.tx_identity', 'public.entity_type', 'public.notification']);
+    // ruling N4: the cover for an unlisted table is its per-table cross-tenant test in tenancy.test.ts. POLY-147: the identity
+    // marker is not role-scoped, so its cover is the K1 test in identity-marker.test.ts (one transaction sees only its own row).
+    // Red-if: that test is deleted or renamed, or the table is unlisted-with-no-cover. The rule stays strict for the other two.
+    const read = (f: string) => readFileSync(join(ROOT, 'tests', 'db', f), 'utf8');
+    const COVER: Record<string, { file: string; needle: (t: string) => string; why: string }> = {
+      'app.tx_identity': { file: 'identity-marker.test.ts', needle: () => 'K1 readers see only their own transaction', why: 'the K1 own-row test in identity-marker.test.ts' },
+    };
+    for (const u of m.unlisted ?? []) {
+      const c = COVER[u.table] ?? { file: 'tenancy.test.ts', needle: (t: string) => `['${t}',`, why: 'a cross-tenant case in tenancy.test.ts' };
+      expect(read(c.file), `${u.table} needs ${c.why}`).toContain(c.needle(u.table));
+    }
   });
 
   it('canary: an uncovered table, a misspelled row table, a stale unlisted entry and a matrix table on the exemption list are each reported', () => {

@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { boot, teardown, type Env } from './helpers/auth';
 import { loadAllow } from './helpers/definers';
 import { seedInvitation, tokenHash } from './helpers/invitation';
+import { asUserSql, newUserSql } from './helpers/marker';
 import { must, psql, psqlSession } from './helpers/pg';
 
 let e: Env;
@@ -14,14 +15,17 @@ afterAll(() => teardown(e));
 const app = (sql: string) => psql(sql, e.db, { role: 'poly_app' });
 const uid = () => crypto.randomUUID();
 const ins = (id: string, email = `${id}@qa.test`) => `INSERT INTO public."user" (id, name, email) VALUES ('${id}', 'N', '${email}');`;
-const step = (id: string) => `SELECT app.enter_new_user('${id}');`;
+// POLY-147 (R6): the step is the definer's exact call, bound; a call with literals is refused by the exact-call check.
+const step = (id: string) => newUserSql(id);
+const marker = `SELECT user_id::text || '/' || kind FROM app.tx_identity WHERE xid = pg_current_xact_id_if_assigned();`;
 
-describe('condition 5: after the step, app.user_id is the new id until the end of the transaction', () => {
-  it('insert, enter_new_user, then current_setting reads the id; the step works as poly_app  [red if: the function is absent, or does not set the setting for the transaction]', () => {
+describe('condition 5: after the step, the identity marker holds the new id (kind signup) until the end of the transaction', () => {
+  it('insert, enter_new_user, then current_user_id() and the marker read the id; the step works as poly_app  [red if: the function does not write the marker, or writes another kind]', () => {
     const id = uid();
-    const r = app(`BEGIN; ${ins(id)} ${step(id)} SELECT current_setting('app.user_id'); SELECT app.current_user_id()::text; ROLLBACK;`);
+    const r = app(`BEGIN; ${ins(id)} ${step(id)} ${marker} SELECT app.current_user_id()::text; ROLLBACK;`);
     expect(r.ok, r.err).toBe(true);
-    expect(r.rows.filter((x) => x[0] === id).length).toBeGreaterThanOrEqual(2);
+    expect(r.rows.flat()).toContain(`${id}/signup`);
+    expect(r.rows.flat()).toContain(id);
   });
 });
 
@@ -43,7 +47,7 @@ describe('condition 13: enter_new_user refuses (each on its own transaction), wi
     must(ins(id), e.db);
     expect(app(`BEGIN; UPDATE public."user" SET name = 'changed' WHERE id = '${id}'; ${step(id)} ROLLBACK;`).sqlstate).toBe('42501');
   });
-  it('a second call in the same transaction  [red if: the empty-app.user_id check is missing]', () => {
+  it('a second call in the same transaction  [red if: the marker-exists check is missing]', () => {
     ctl();
     const id = uid();
     expect(app(`BEGIN; ${ins(id)} ${step(id)} ${step(id)} ROLLBACK;`).sqlstate).toBe('42501');
@@ -55,26 +59,39 @@ describe('condition 13: enter_new_user refuses (each on its own transaction), wi
   });
   it('a user inserted inside a RELEASED savepoint is accepted (BetterAuth inserts in a savepoint)  [red if: the proof uses xmin, a subtransaction id]', () => {
     const id = uid();
-    const r = app(`BEGIN; SAVEPOINT s; ${ins(id)} RELEASE s; ${step(id)} SELECT current_setting('app.user_id'); ROLLBACK;`);
+    const r = app(`BEGIN; SAVEPOINT s; ${ins(id)} RELEASE s; ${step(id)} ${marker} ROLLBACK;`);
     expect(r.ok, r.err).toBe(true);
+    expect(r.rows.flat()).toContain(`${id}/signup`);
   });
   it('a user that already has a Person is refused even when the stamp matches  [red if: the self_user_id check is missing]', () => {
+    // Superuser plays poly_app and clears the marker (no production role can), so the Person check is reached, not the marker check.
     const id = uid();
-    const r = app(`BEGIN; ${ins(id)} ${step(id)}
+    const r = psql(`BEGIN; SET LOCAL ROLE poly_app; ${ins(id)} ${step(id)}
       INSERT INTO public.entity (type_id, name, self_user_id) SELECT t.id, 'P', '${id}' FROM public.entity_type t WHERE t.system_key = 'person';
-      SELECT set_config('app.user_id', '', true); ${step(id)} ROLLBACK;`);
+      RESET ROLE; DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id(); SET LOCAL ROLE poly_app; ${step(id)} ROLLBACK;`, e.db);
     expect(r.sqlstate).toBe('42501');
+    expect(r.err).toMatch(/already has a Person/);
   });
   it('a later transaction cannot enter a user an earlier one inserted  [red if: the stamp is compared to anything but the current transaction id]', () => {
     const id = uid();
     must(ins(id), e.db);
     expect(app(`BEGIN; ${step(id)} ROLLBACK;`).sqlstate).toBe('42501');
   });
-  it('app.user_id forged to an existing user, then a new user stepped, is refused as a second entry  [red if: the step ignores a non-empty app.user_id]', () => {
+  it('a marker for an existing user, then a new user stepped, is refused as a second entry  [red if: the step ignores an existing marker]', () => {
     const old = uid();
     const fresh = uid();
     must(ins(old), e.db);
-    expect(app(`BEGIN; SELECT set_config('app.user_id', '${old}', true); ${ins(fresh)} ${step(fresh)} ROLLBACK;`).sqlstate).toBe('42501');
+    const r = app(`BEGIN; ${asUserSql(old)} ${ins(fresh)} ${step(fresh)} ROLLBACK;`);
+    expect(r.sqlstate).toBe('42501');
+    expect(r.err).toMatch(/a user is already in context/);
+  });
+  it('a forged app.user_id means nothing: the same sequence with only the setting succeeds  [red if: the step still reads the setting]', () => {
+    const old = uid();
+    const fresh = uid();
+    must(ins(old), e.db);
+    const r = app(`BEGIN; SELECT set_config('app.user_id', '${old}', true); ${ins(fresh)} ${step(fresh)} SELECT app.current_user_id()::text; ROLLBACK;`);
+    expect(r.ok, r.err).toBe(true);
+    expect(r.rows.flat()).toContain(fresh);
   });
   it('a poly_app INSERT or UPDATE that supplies signup_txid is refused 42501, and so is a second user insert in one transaction  [red if: the column is grantable or the stamp trigger allows two users]', () => {
     const a = uid();
@@ -100,13 +117,13 @@ const insTx = (tx: any, id: string) => tx.execute(e.dbm.sql`INSERT INTO public."
 const refused = (x: unknown) => expect((x as { code?: string; cause?: { code?: string } })?.code ?? (x as any)?.cause?.code).toBe('42501');
 
 describe('condition 13 (handle): the step is reachable from withContextFreeTx\'s handle only, and the TypeScript side refuses too', () => {
-  it('a fresh user steps and app.user_id is the new id  [red if: the handle has no enterNewUser]', async () => {
+  it('a fresh user steps and the marker holds the new id  [red if: the handle has no enterNewUser]', async () => {
     const id = uid();
     let seen = '';
     const x = await inCtxFree(async (tx) => {
       await insTx(tx, id);
       await tx.enterNewUser(id);
-      seen = (await tx.execute(e.dbm.sql`SELECT current_setting('app.user_id') AS v`)).rows[0].v;
+      seen = (await tx.execute(e.dbm.sql`SELECT app.current_user_id()::text AS v`)).rows[0].v;
     });
     expect(x).toBeInstanceOf(Rollback);
     expect(seen).toBe(id);
@@ -216,7 +233,7 @@ describe('condition 32 (S13): a stamp does not survive its transaction', () => {
 });
 
 describe('condition 30 (S4): claim_invitations from a signed-in transaction takes no lock', () => {
-  it('while another session holds the row, a claim with app.user_id set answers 42501 at once instead of waiting out lock_timeout  [red if: the setting check comes after the row lock]', async () => {
+  it('while another session holds the row, a claim with a marker in place answers 42501 at once instead of waiting out lock_timeout  [red if: the marker check comes after the row lock]', async () => {
     const t = seedInvitation({ db: e.db, email: 'lock@qa.test', role: 'viewer' });
     const hex = tokenHash(t).toString('hex');
     const user = uid();
@@ -228,7 +245,7 @@ describe('condition 30 (S4): claim_invitations from a signed-in transaction take
         await new Promise((r) => setTimeout(r, 100));
       }
       const t0 = Date.now();
-      const r = app(`BEGIN; SELECT set_config('app.user_id', '${user}', true); SELECT app.claim_invitations(decode('${hex}', 'hex'), 'lock@qa.test'); ROLLBACK;`);
+      const r = app(`BEGIN; ${asUserSql(user)} SELECT app.claim_invitations(decode('${hex}', 'hex'), 'lock@qa.test'); ROLLBACK;`);
       expect(r.sqlstate).toBe('42501');
       expect(Date.now() - t0).toBeLessThan(3500);
     } finally { holder.kill(); }

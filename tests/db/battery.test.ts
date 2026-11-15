@@ -80,13 +80,13 @@ describe('pool reuse on a dirty backend (criterion 6, C-12)', () => {
     const p2 = await tenant(B, async (tx) => ({ pid: await pid(tx), a: (await q(tx, 'select count(*)::int n from public.qa_canary_rls where owner_user_id = $1', [A]))[0].n,
       all: (await q(tx, 'select count(*)::int n from public.qa_canary_rls'))[0].n }));
     const p3 = await free(async (tx) => ({ pid: await pid(tx), n: (await q(tx, 'select count(*)::int n from public.qa_canary_rls'))[0].n,
-      ctx: (await q(tx, `select coalesce(current_setting('app.user_id', true), '<null>') c`))[0].c }));
+      ctx: (await q(tx, `select coalesce(app.current_user_id()::text, '<null>') c`))[0].c }));
     expect([p2.pid, p3.pid], 'precondition: one physical backend serves all three checkouts').toEqual([p1.pid, p1.pid]);
     expect(p1.own).toBe(1);
     expect(p2.a).toBe(0);
     expect(p2.all).toBe(1);
     expect(p3.n).toBe(0);
-    expect(p3.ctx, 'a reused backend reads empty, not NULL (A-3); the nullif form handles it').toBe('');
+    expect(p3.ctx, 'a reused backend carries no identity: the marker is per transaction').toBe('<null>');
   });
 
   it('the same holds when the previous tenant\'s transaction threw and rolled back', async () => {

@@ -1,6 +1,6 @@
 // The routing pool (ARCH §3.1c, SECURITY A-31; POLY-86 ruling R2, seceng S3-S5). BetterAuth is handed this pg-Pool-shaped
 // object. Inside a transaction of ours (withTenant or withContextFreeTx) its statements run on that request's client, with
-// BEGIN / COMMIT / ROLLBACK turned into savepoints; outside one, they go to the plain poly_app pool, which holds no GUC.
+// BEGIN / COMMIT / ROLLBACK turned into savepoints; outside one, they go to the plain poly_app pool, which carries no identity marker.
 import { authPool, currentClient, type AuthClient } from '@poly/db/auth';
 
 export class RoutingPoolContention extends Error {

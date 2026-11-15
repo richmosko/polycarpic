@@ -536,6 +536,10 @@
   ],
   "unlisted": [
     {
+      "table": "app.tx_identity",
+      "reason": "not role-scoped: a row is visible only to its own transaction and written only by the enter_* definers (POLY-147 ruling R1)"
+    },
+    {
       "table": "public.notification",
       "reason": "recipient-scoped, not role-scoped; covered by its per-table cross-tenant test in tests/db/tenancy.test.ts (POLY-62 ruling R7)"
     },

@@ -1,0 +1,245 @@
+# POLY-147 — security review (seceng)
+
+## 1. Ruling review — `ruling.md` @ e2104584
+
+Read as an attacker against the tree at `61da0e72` and the ruling's text. **Verdict: buildable once S1 and S2 are added to the test map.** Neither changes the design; both are tests that pin a premise guard (ii) relies on. Everything else is accepted or non-blocking.
+
+Tags: **(B)** blocking, needed before tests-red; **(N)** non-blocking: a fix I want, but it does not gate the build. "Unmeasured" means I am reasoning from Postgres semantics, and the test named is what measures it.
+
+### Findings
+
+**S1 (B): a single statement can still end the transaction.** Guard (ii)'s claim is that one injected statement cannot leave the marked transaction. Extended mode stops `x; COMMIT; BEGIN; …`, but three one-statement routes remain:
+- `PREPARE TRANSACTION 'p'` detaches the marked transaction from the session. Statements after it then run unmarked, autocommit, with no xid, so a second injection can call `enter_asserted_user` naming anyone. The routing pool refuses `PREPARE` (`routing-pool.ts` CONTROL); `tx.execute` does not. This is blocked only while `max_prepared_transactions = 0`, which is Postgres's default. Nothing in the tree asserts it, and an INFRA tuning change could raise it silently.
+- `DO $$ BEGIN COMMIT; … END $$`, or `CALL` of a procedure that commits. Inside an explicit transaction block Postgres refuses this (`invalid transaction termination`; unmeasured).
+- A bare `COMMIT` sent as one whole statement through `tx.execute(sql.raw(…))`. It is accepted. The rest of `fn` then runs unmarked and reads null (fail closed). A second whole-statement injection would be needed to gain anything.
+
+**Fix required:** in `07_identity_marker.sql`, assert `current_setting('max_prepared_transactions') = '0'`. In `identity-marker.test.ts`, inside `withTenant`: `PREPARE TRANSACTION 'x'` is refused; `DO $$BEGIN COMMIT; END$$` is refused; and afterwards `current_user_id()` is still the user. **Red-if:** `max_prepared_transactions` is raised, or the wrapper stops opening a real `BEGIN`. For the bare-`COMMIT` case see S6.
+
+**S2 (B): the catalog tests must state exact grantee sets, PUBLIC included, for every new object.** I1 covers `app.enter\_%` only. The same "exactly these grantees, PUBLIC absent" rule must also cover:
+- `purge_tx_identity`: poly_worker alone.
+- `current_session_id`: poly_app alone.
+- `job_targets`: nobody.
+- `tx_identity`'s relation ACL. K1 says "no UPDATE/TRUNCATE"; it must instead be the whole `aclexplode` set (SELECT for the nine listed roles, INSERT poly_authz, DELETE poly_purge, nothing else), so a stray `REFERENCES` or `TRIGGER` grant also fails.
+
+The new definers must also be entered in `definers.json` with the same sets.
+
+**Mechanism:** Postgres grants EXECUTE on a new function to PUBLIC. `roles.sql:60`'s default privileges cover objects created by the listed owner roles. Only an explicit exact-set test catches a function created under some other role, or a grant re-added later. **Red-if:** any new object gains a grantee.
+
+**S3 (N): the session id in a `web` marker is web's word, not proof.** `enter_asserted_user` stores `p_session` unchecked, so in stage 1 `current_session_id()` is exactly as trustworthy as `app.session_id` was. Today its only reader is the Sessions list (it marks "current"). The danger is POLY-89, whose email-challenge and enrolment guards would read it. **Fix required (docs):** ARCH §3.3 says that until stage 2 the marker's `session_id` is asserted by web, and that no definer may treat it as proof that a session exists or is recent. SECURITY carries the same in R-2. POLY-89's ruling must cite this.
+
+**S4 (N): a whole-statement `DO` on the plain pool can run several transactions.** On BetterAuth's unmarked plain pool (autocommit), a `DO` block may `COMMIT` and run any amount of plpgsql, including `enter_asserted_user(victim)` followed by tenancy reads and writes. This is inside R-2's accepted "injection on an unmarked path reaches any user", so the wording does not change. It needs the attacker to control a whole statement, not a fragment.
+- **Stronger option:** in `roles.sql` (superuser bootstrap), `REVOKE USAGE ON LANGUAGE plpgsql FROM PUBLIC`, with USAGE granted to poly_owner and the definer owners. `DO` and temp plpgsql functions then fail for poly_app, poly_worker and poly_operator.
+- **Cost:** about 0.1 loop-day, plus a check that nothing at runtime uses `DO`. I recommend it in this loop or in POLY-97's provisioning. The lead should offer it to the Principal.
+
+**S5 (N): the read-side cost is evaluated per row (flag for the architect).** `current_user_id()` is now a non-inlined STABLE function with a FROM clause, called inside policy quals. Postgres may evaluate it once per candidate row. The R7 bench seeds 20 entities and will under-read this on ledger-sized tables. Not a security finding, but if the 1,000-row case is slow, the issue's fallback (`(SELECT app.current_user_id())` initplans) is the remedy, and the 18 policies would change.
+
+**S6 (N): check before COMMIT that the transaction is still the one that was marked.** Make `enter_asserted_user` and `enter_job` return `pg_current_xact_id()::text`. Just before its COMMIT, `inTransaction` checks `pg_current_xact_id_if_assigned()` against that value, and throws (rolls back) if they differ or the result is null. This turns S1's bare-`COMMIT` case from a silent run of unmarked statements into a failed request. **Cost:** a few lines plus one db test.
+
+### The lead's specific questions
+
+| Question | Ruling | Mechanism |
+|---|---|---|
+| OQ-1: rewrite the POLY-87 tests to the marker form; O2 split | **Accept** | The old assertions test the setting, which no longer carries identity, so keeping them verbatim would prove nothing. Condition: each rewritten assertion keeps a stated red-if mutation, none is deleted, and O2's two halves are "a forged setting does not block the issuer" and "a real marker (superuser-planted, R6) does". |
+| OQ-2: poly_operator's K2 case is 42501, no new grant | **Accept** | poly_operator cannot call `current_user_id()` and holds no SELECT on tenancy or `tx_identity`. 42501 on both is stronger than "null and zero rows". The issuer's check (as poly_govern, which reads the marker) stays the real guard. Add: catalog asserts poly_operator holds no privilege on `tx_identity` (S2). |
+| OQ-3: sign-up rollback tested for "any user that exists outside this transaction" | **Accept** | After `ROLLBACK TO ba_n`, the only user the transaction can enter is one it inserts afresh: the stamp trigger sets `signup_txid` on insert alone, and poly_app has no UPDATE on it. That user has no Person, no membership, and cannot commit without a live invitation (`user_90_stamp_cleared`). Its reach is a new sign-up, which poly_app can already do. |
+| OQ-4: purge testable only against its own transaction | **Accept** | Under MVCC, another session's uncommitted marker is invisible to the purge's DELETE scan at any age, so it can never be removed. The status predicate only matters for the purge's own transaction, which the K4 test covers. |
+| R3: drop `withOperatorTx`'s no-user check | **Accept** | poly_operator cannot write a marker: it holds EXECUTE on no `enter_*` (I1 asserts this). The one identity-sensitive definer it can call, the issuer, checks `current_user_id() IS NULL` as poly_govern itself. A TS check that cannot run (42501) adds nothing. |
+| R1: `tx_identity_purge_read USING (true)` for poly_purge | **Accept** | poly_purge is NOLOGIN. Only poly_migrator (trusted at deploy, and already able to become poly_owner) can `SET ROLE` to it, and its one definer takes no argument. A row holds a user id, a session *row* id (not the token) and a kind: low value. Guarded by R8's "only the marker functions read `tx_identity`" prosrc test, which must also fail if any other poly_purge-owned function appears. Calling `current_user_id()` inside a poly_purge definer stays correct, because the function filters `xid = if_assigned()` explicitly. |
+| R1: no FK on `user_id` | **Accept** | In stage 1 an FK proves only that some user exists, not that the caller is that user. Web asserts the id either way. An id naming no user matches no membership, so it reaches nothing. The lock cost is real. Revisit in stage 2, where `enter_session` derives the id from a session row. |
+| My "exact own call" tightening of `enter_asserted_user` | **Withdrawn, not required** | It would stop an injected fragment on the unmarked plain pool from calling the definer. But on that same path poly_app's direct grants on BetterAuth's tables already reach any user (plant a magic link, read session rows; R-2), and only stage 2 removes those. It narrows nothing R-2 states, and it adds a `track_activities` dependency. S4 is the cheaper hardening of the same path. |
+
+### Questions I pressed with no finding
+
+- **Who can write, change, remove or outlive a marker.**
+  - INSERT: poly_authz only, under `WITH CHECK xid = pg_current_xact_id()`.
+  - UPDATE: no grant exists.
+  - DELETE: poly_purge only, never an in-progress transaction.
+  - FORCE RLS binds the owner. `xid8` is 64-bit with its epoch, so an id never recurs and wraparound cannot revive an old marker.
+  - A subtransaction marker carries the top-level xid, and `ROLLBACK TO` removes it. That case is covered by guard (ii) and the sign-up test.
+  - Every definer uses `search_path = ''` and schema-qualifies its names. That closes the `pg_temp` shadowing of unqualified relations; keep it that way at build check.
+- **The read side.** `current_user_id()` uses only `pg_current_xact_id_if_assigned()`. An unmarked transaction, including `BEGIN READ ONLY`, reads null; the K1 read-only test would fail if the read side assigned an xid.
+- **Guards.** (i) A single `ExtendedClient` on all three pools, plus a refusal of Submittables, covers the wrappers, the routing-pool handle and the plain pool; the source scan is noted under build check. (ii) Nothing runs between `BEGIN` and setup. (iii) Every definer refuses a second marker, and the PK is the backstop. The interim definer's refusal of an assigned xid is tested after a real insert.
+- **Worker reach.** `enter_job` alone, `job_targets` reachable only through it, `kind` validated in SQL and by the CHECK constraint. Today `job_targets` is empty, so the reach is nil. With rows, the worker can act as the principal of any `(entity, connection)` the function returns, and no wider. That matches seceng #10.
+- **Settings readers.** After R5, nothing steerable remains: `app.session_id` has no reader and `app.user_id` is inert, both enforced by lint and prosrc. `app.actor` is read only as the fallback label in unmarked transactions. No membership write can happen there, since those policies need a non-null user.
+- **Conditions #4–#11.** Each has a test in R8 that fails if its hole opens, given S1 and S2. #12 (the HMAC fallback key) applies only if R7's threshold fails; if so, the re-issued ruling must carry its pgTAP check.
+
+### For build check (job 2)
+
+- **The R4 source scan matches `new pg.Pool(` and `new pg.Client(` literally.** It misses `import { Pool, Client } from 'pg'` and `pg.native` inside `packages/db`. The scan must refuse any binding of `Pool`, `Client` or `native` from `pg` outside `pool.ts`, `migrate.ts` and `extended-client.ts`.
+- **`startup.ts` and any other runtime client.** Confirm they come from the ExtendedClient pools.
+- **The migration text.** Read `0011` against R1 and R2 line by line: schema-qualified names, REVOKE FROM PUBLIC on every function, the CREATE-on-`app` grant revoked at the end, and the policy role lists.
+
+## 2. Delta review — `ruling.md` e2104584 → 60bfbb6e
+
+**Verdict: buildable.** S1 is covered and S2 is nearly covered. One line is still required (D2). The exact-call check is sound and I recommend keeping it; my withdrawal in §1 was wrong (D1).
+
+### D1 — the exact-call check (R2): keep it
+
+**What it stops that nothing else stops in stage 1.** SQL injection can no longer call an identity definer in any form, on any path:
+- The canonical text carries placeholders (`$1, $2`). An injected string cannot bind parameters, so:
+  - a fragment inside a larger statement is refused;
+  - a whole injected statement with literals is refused;
+  - a `DO` block that calls the definer is refused, because `current_query()` is the `DO` text (this closes S4 for identity);
+  - a `COMMIT` followed by a fresh call is refused.
+- Without the check, on an unmarked path (BetterAuth's plain pool, or the sign-up transaction before its user insert), a `DO` block or a fragment inside an open BetterAuth transaction could name any user directly in Postgres.
+
+What stays open: poly_app's direct grants on BetterAuth's tables (plant a magic link, read session rows; R-2), a stolen poly_app password, and code execution in web. R-2's "injection on an unmarked path reaches any user" therefore stays true. The route, though, becomes an account takeover through sign-in. That leaves an auth event, a new session in the victim's Sessions list, and needs the attacker to complete a sign-in, instead of a silent query. My §1 withdrawal compared only the end reach and missed this.
+
+**What it costs.** At run time, a string compare per request (nothing measurable). In tests:
+- psql helpers move to `\bind`, which needs psql ≥ 16 in the test image (confirm the image's version at build).
+- pgTAP can no longer assert the specific refusals, so those move to vitest db. That is a little more `db` suite time, which goes in the loop's suite-time report.
+- Build: about 0.25 loop-day.
+
+**Ways it could fail open or break sign-in:**
+- **`track_activities` off: no effect. The ruling's mechanism is mis-sourced.** `current_query()` returns the backend's `debug_query_string`, the text the client sent. It does not read `pg_stat_activity`, so `track_activities` and `track_activity_query_size` do not affect it (unmeasured; source reading). In the extended protocol, `exec_bind_message` and `exec_execute_message` set it to the prepared statement's source text. The architect should correct R2's sentence so ARCH does not repeat it.
+- **The one real fail-open is how the comparison is written.** `IF current_query() <> canonical THEN RAISE` passes on NULL. It must be `IS DISTINCT FROM` (or `NOT coalesce(… = …, false)`). **Blocking at build check: I will read every `enter_*` body for this.** A client statement never has a NULL `debug_query_string`, so a test cannot reach the NULL case. Code reading is the check.
+- **Pipelining.** Each Execute reports its own portal's text, so a pipelined batch is checked per statement. node-postgres does not pipeline anyway.
+- **pgbouncer or Neon in transaction mode.** The backend sees the same Parse text, so the check is unchanged. Unnamed statements are fine.
+- **Drizzle.** Not on the path: each wrapper's setup and `new-user.ts` call `client.query` with literal canonical text. **Build-check item:** the three caller strings must match R2's canonical texts byte for byte (`($1, $2)` with one space).
+  - A drizzle template `sql\`SELECT app.enter_asserted_user(${a}, ${b})\`` would render the canonical text and pass. That is a code bug, not an injection, and the reserved-literal lint already confines the definer names to `context.ts`.
+- **Sign-in and sign-up.** No break. BetterAuth never calls a definer. `enter_new_user` is sent by `enterNewUserOn` on the request's own client, as one statement. A trailing newline or a changed space only refuses, which is fail-closed and caught by the existing sign-up tests.
+
+**Recommendation to the Principal: keep it.** For about a quarter of a loop-day, no SQL-injection bug on any path can name a user to Postgres directly. The remaining injection route is a visible account takeover until stage 2. Dropping it saves the test churn and nothing else.
+
+### D2 — S1, S2 and S6 against the re-issue
+
+| Finding | Status @ 60bfbb6e | Still required |
+|---|---|---|
+| S1 one-statement exits | **Covered.** `max_prepared_transactions = 0` asserted in `07` (that is what refuses `PREPARE TRANSACTION`); TEMP absence asserted; the `COMMIT; BEGIN` string is in (i). | My `DO $$BEGIN COMMIT; END$$`-inside-`withTenant` test drops to **(N)**. With the exact-call check, a transaction ended early cannot be marked again, and later statements read null. |
+| S2 exact grantee sets | **Mostly covered:** the `tx_identity` ACL names PUBLIC, poly_operator and poly_backup; the four definers have exact EXECUTE sets. | **(B), one line in `07`:** exact EXECUTE sets for `app.current_session_id()` (poly_app alone) and `app.job_targets(text)` (nobody but its owner), PUBLIC absent. J1's "poly_worker's grant gone" does not catch a grant to poly_app, which would tell web which users link which connections. |
+| S6 check the xid before COMMIT | Not adopted. | **Withdrawn.** With the exact-call check, an early `COMMIT` leaves the rest of `fn` unmarked, reading null and refused on writes, and nothing can mark it again. |
+
+### Other points in the delta
+
+- **R9's SECURITY phrases: accepted as written.** I will use them verbatim. Any substitution will be listed here first.
+- **R1's `job_targets` revoke (my note 14 rejected):** agreed. The architect's reason is the better one.
+- **Live-session check rejected:** agreed; stage 2's `enter_session` makes the real check.
+- **Still open from §1:** S3 (ARCH phrase in R9: covered), S4 (identity half closed by D1; revoking plpgsql still removes `DO` for other multi-transaction mischief: (N), optional), S5 (the architect's).
+
+## 3. Delta review — `ruling.md` 60bfbb6e → 2027afdb (4d50ce17 and its addendum)
+
+**Verdict @ 2027afdb: cleared for tests-red.** Nothing in this delta blocks. S1, S2 and S6 are covered by tests in R8 that fail if their holes open. The build-check item for the exact-call comparison (`IS DISTINCT FROM` in every `enter_*` body) stands for job 2.
+
+### E1 — the `query_to_xml` family against the exact-call check
+
+**(1) Sufficient: yes.** The family matters only if a fragment can plant a marker inside the same statement. Every way to write a marker is one of the three `enter_*` definers; INSERT is poly_authz's alone. Every definer refuses before any write unless `current_query()` is its own canonical text. A statement that also calls `query_to_xml` (or anything else) is never that text, so the definer refuses, no marker exists, and the fresh snapshot reads null. The check works on the definer, not on what the statement does, so it covers the whole family without naming it.
+
+**Is it tested?** Yes, directly: 2027afdb adds R8 row "R2 the `query_to_xml` route". It sends the fragment on BetterAuth's plain pool and inside `withContextFreeTx` before any insert, and expects `42501` with no marker. It is red if the check is missing: without it, the definer writes a marker on the plain pool (no xid yet) and the statement succeeds. The `<>`-form fail-open stays a code-reading item for build check.
+
+**(2) Revoking EXECUTE on the family from PUBLIC: I agree with the architect, do not revoke. My recommendation at 50f334b1 to take it is withdrawn, so there is no disagreement to put to the Principal.**
+- **Mechanism:** the family matters only if a marker can be planted inside the statement that reads. Only the three `enter_*` definers can write a marker, and each refuses anything but its own canonical, parameter-bound statement. What is left is a holder of poly_app's password, or code in web. Either can send the canonical call as one statement and read in the next, so the revoke takes nothing from them.
+- **What it would still add:** a backstop against a regression: a future identity definer shipped without the check, or a check written with `<>`. Two things already cover that: R8's catalog row (any unlisted `enter_*` fails) and my build-check reading of every body. The revoke would also have to cover `ts_stat` and `ts_rewrite(tsquery, text)` to be complete.
+- **The upgrade cost is smaller than the ruling says.** `roles.sql` runs per database at provisioning and would re-apply the revoke, and pg_dump carries changed `pg_catalog` ACLs (unmeasured). Small as it is, it still exceeds a gain that is nil today.
+- **Condition:** R2's "revisit if the exact-call check is ever removed" stands. The same must hold for any future definer that writes identity-bearing state.
+
+### E2 — R10's test design
+
+**(3) Sound.** `CREATE FUNCTION` checks CREATE on the target schema before USAGE on the language. A role with no schema would get the schema error and prove nothing about the language. Granting CREATE on a throwaway `qa_lang` inside a rolled-back superuser transaction makes the language check the one that answers. `DO` checks only the language, so it needs no schema.
+- The exact `lanacl` set (eight roles, PUBLIC absent) already catches poly_backup and poly_migrator regaining USAGE. Extending the `DO` assertion to them is optional.
+- `laninline <> 0 AND lanname <> 'plpgsql'` = 0 rightly guards against a second inline language (for example `plperl`) arriving later with PUBLIC USAGE.
+- `poly_migrator` → `SET ROLE poly_owner` → `DO` still works. That is accepted: the migrator is the deploy credential and can already do everything as poly_owner.
+
+### E3 — S1, S2, S6
+
+| Finding | Status @ 4d50ce17 |
+|---|---|
+| S1 | **Covered.** The PREPARE, `DO … COMMIT` and `max_prepared_transactions` rows are in R8, each with a red-if. The PREPARE test asserts the right outcome: a failed `PREPARE TRANSACTION` becomes a rollback, later reads are null, and `withTenant` rejects. |
+| S2 / D2 | **Covered.** The R8 row "R2 signatures and EXECUTE" gives exact `aclexplode` sets, PUBLIC included, for the four definers, `current_session_id` {poly_app} and `job_targets` {}. `definers.json` follows. |
+| S6 | **Covered (kept by the lead).** The commit check needs no definer call, so it cannot trip the exact-call check. Its test (`COMMIT` via `tx.execute`, then an INSERT refused by RLS, then `IdentityMarkerLost`) fails if the check is removed. Build-check item: the TS comparison must treat a null `x` as a mismatch, as R3 says. |
+
+### E4 — other points in the delta
+
+- **R2 now states `current_query()` as `debug_query_string`,** and R9 bars `track_activities` from ARCH. Correct.
+- **The R7 case L (2,000 rows) answers S5.** Closed on my side.
+- **The `global-setup.ts` psql ≥ 16 check** fails loudly rather than skipping. Good.
+
+## 4. Red gate — the `app.tx_identity` exemption in `02_rls_catalog.sql` (077173d3)
+
+**Ruling: reject the whole-table exemption. Require a per-reason exemption for `pk_not_uuid` only, and add the missing TRUNCATE guard. (B), before build-green.** qa and backend-lead fix it in their own files; the architect adds one line to R1.
+
+**What 02 checks, and what fires on the marker as R1 builds it.** `battery_gaps` has ten table checks:
+- **Two fire:**
+  - `pk_not_uuid`: the key is `xid8`, by design. A uuid key would make the marker meaningless.
+  - `no_truncate_trigger`: R1 adds none.
+- **Eight pass, and the whole-table exemption switches them off:** `rls_disabled`, `not_forced`, `no_policy`, `for_all_policy`, `raw_context_read`, `column_grant_not_allowlisted`, `policy_public` and `policy_trivial_for_app`. (`tx_identity_purge_read`'s `USING (true)` is `TO poly_purge`, not app or worker, so it passes.)
+
+**Reach of the whole-table exemption.** It hides from the general net exactly the regressions that would make the marker forgeable or readable:
+- RLS turned off or unforced;
+- a `FOR ALL` or `TO PUBLIC` policy;
+- `USING (true)` granted to poly_app;
+- an INSERT or UPDATE column grant to poly_app or poly_worker. That is the worst case: poly_app writes its own marker naming anyone, and every guard in stage 1 is void.
+
+07's catalog rows pin the exact ACL and the four policies today. But 07 is a per-feature file, and 02 is the net every migration runs through (C-13). The most sensitive table must stay inside the net, not beside it.
+
+**TRUNCATE: add the trigger.** Today TRUNCATE is harmless on this table:
+- only the owner, poly_owner, may truncate, and it is reached only through the migrator;
+- a TRUNCATE waits behind the row-exclusive lock of every open marked transaction, so it can never remove another transaction's live marker;
+- truncating its own marker leaves the transaction unmarked, so it reads null and cannot re-mark, because the xid is now assigned.
+
+That reasoning is mine, unmeasured. The guard is still one line, reusing the existing function: `CREATE TRIGGER tx_identity_no_truncate BEFORE TRUNCATE ON app.tx_identity FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate();`. It keeps the table under the uniform rule instead of a second exemption. The purge uses DELETE, so it is unaffected.
+
+**Required change to `02_rls_catalog.sql`:**
+1. Remove `app.tx_identity` from `exemptions()`. The table count returns to 7.
+2. Add `pg_temp.reason_exemptions()` returning exactly `ARRAY['app.tx_identity:pk_not_uuid']`, with the same review rule as the table list. `battery_gaps` drops a row only when its `rel:reason` pair is listed. Each entry must exist (`to_regclass`), and the list's cardinality is 1.
+3. Canaries, inside the file's rolled-back transaction:
+   - a uuid-keyed canary listed for `pk_not_uuid` that has RLS disabled must still report `rls_disabled`, so a reason exemption hides only its own reason;
+   - `ALTER TABLE app.tx_identity DISABLE ROW LEVEL SECURITY`, then the real chain must report `app.tx_identity:rls_disabled`.
+   
+   **Red-if:** the reason filter compares by table alone, or tx_identity rejoins the table list.
+
+## 5. Delta review — R11 @ 3592663f
+
+**Verdict: nothing blocking.**
+
+- **The 17-signature list is complete for core PostgreSQL 17, to my reading. (N)** These are the PUBLIC-executable core built-ins that run a caller-supplied SQL string or cursor:
+  - the `*_to_xml*` family (`query`, `table`, `cursor`, `schema`, `database`);
+  - `ts_stat` (both forms);
+  - `ts_rewrite(tsquery, text)`.
+
+  The other routes to running SQL are not PUBLIC-executable by default: `dblink` and `postgres_fdw` are extensions and not installed, the server-file and large-object functions need superuser or a `pg_*_server_files` role, and the logical-decoding functions need REPLICATION. This is unmeasured, read from the PostgreSQL 17 function reference. The pattern-plus-count test catches a new function under these names, but not a new family. Re-read the list at each major upgrade.
+- **Extensions: pgTAP's `lives_ok`, `throws_ok`, `results_eq` and friends also run caller-supplied SQL, and PUBLIC can execute them. (N)** They are installed only in test databases (`tests/db/pgtap.test.ts:19`; no `CREATE EXTENSION` anywhere in `packages/` or `infra/`). Follow-up for POLY-97's provisioning check: assert that production's `pg_extension` holds `plpgsql` alone. Any extension added later gets the same R11 review.
+- **R11's note on the R8 `query_to_xml` row is sound. (N)** Postgres checks EXECUTE permission on `query_to_xml` when it sets up the statement, before anything runs. So with R11 in place, the fragment is refused on EXECUTE every time, never by the exact-call check. That row now proves R11, not the exact-call check, and it would stay green with the check removed. The exact-call check's red-if rests on the R2 rows, which use no built-in, and those are enough. Optional: qa may tighten the row to expect `permission denied for function query_to_xml` exactly, so it is an unambiguous R11 test.
+
+## 6. Build check — @ 04726635 against ruling 5ded4562
+
+Read `git diff main..04726635` for `packages/db/**`, `packages/auth/**`, `packages/tenancy/**` and `layers.json`, plus the per-reason exemption in `02_rls_catalog.sql`. **Verdict: no blocking findings.**
+
+### My checklist
+
+| Item | Result |
+|---|---|
+| Every `enter_*` comparison is `IS DISTINCT FROM` | **Pass.** All three bodies (`0011` `enter_asserted_user`, `enter_job`, `enter_new_user`) use `regexp_replace(btrim(current_query()), ';\s*$', '') IS DISTINCT FROM '<canonical>'`. No `<>` anywhere. |
+| Caller strings are byte-exact | **Pass.** `context.ts` sends `'SELECT app.enter_asserted_user($1, $2)'` and `'SELECT app.enter_job($1, $2, $3)'`; `new-user.ts` sends `'SELECT app.enter_new_user($1)'`. No alias. Results are read as `rows[0].enter_asserted_user` and `rows[0].enter_job`. |
+| S6 treats a null xid as a mismatch | **Pass.** `x.rows[0]?.x !== store.marked` throws `IdentityMarkerLost` on null, undefined or a different xid. The catch rolls back. See N1. |
+| `0011`, line by line | **Pass.** Every relation and function is schema-qualified (the operators `\|\|` and `!~` resolve through the implicit `pg_catalog`). Every new function has REVOKE FROM PUBLIC (`current_session_id`, `enter_asserted_user`, `enter_job`, `purge_tx_identity`). The replaced ones (`current_user_id`, `enter_new_user`, `audit_membership`) keep their ACLs under `CREATE OR REPLACE`, each run as its original owner. `job_targets` loses poly_worker. CREATE on `app` is granted to authz, purge and govern for the file and revoked on the last line, as poly_owner. The policy role lists match R1. The INSERT policy checks `xid = pg_current_xact_id()`. `tx_identity_no_truncate` is present. The `kind` CHECK constraint is present, and each definer writes its kind itself. |
+| R4 scan catches every `pg` binding | **Pass for what R4 asks.** Value imports (`import`, `require`, `import()`), constructors, the subclass and `pg-native`/`.native` are all checked; 3 of 3 pools pass `Client: ExtendedClient`. Lint already refuses `pg` and `pg-pool` outside `packages/db`. Gaps in N2. |
+| `startup.ts` and other runtime clients | **Pass.** `startup.ts` uses `appPool`/`workerPool`. `authPool` is `appPool` (`db/src/auth.ts:7`). The only plain `pg.Client` is `migrate.ts` (poly_migrator), and the scan pins it there. |
+| `ExtendedClient` | **Pass.** It refuses Submittables, copies the config, and forces `queryMode = 'extended'` over any caller value. |
+| R10 and R11 in `roles.sql` | **Pass.** The plpgsql revoke and grant are as ruled. All 17 signatures are revoked from PUBLIC, matching §5. |
+| The handle change (`NodePgTransaction`) | **Pass: it opens no path around the marker.** It is built from the session's own dialect and schema, and constructing it sends nothing, so the marker is still the first statement after BEGIN. A nested `tx.transaction()` is now a savepoint, which keeps the marker (guard ii). `clientOf(tx)` still serves only the routing pool. See N3. |
+| `app.session_id` / `app.user_id` readers | **Pass.** `session.ts`'s three reads use `app.current_session_id()`. `reservedLiterals` now forbids both setting names everywhere, and confines `enter_asserted_user`/`enter_job` to `context.ts`. `withOperatorTx` no longer reads the setting. |
+| Per-reason exemption (§4) | **Pass.** The table list no longer has `app.tx_identity`. The pair list is `app.tx_identity:pk_not_uuid` alone, with cardinality 1, the entry must exist, and it must be needed. Without it the marker fires exactly `pk_not_uuid`. The RLS-off mutation is reported. |
+
+### Non-blocking
+
+- **N1 — make S6 fail if the definer's result is missing.** `store.marked` is set straight from `rows[0].enter_asserted_user`. If that column were ever renamed or aliased, `marked` would be `undefined` and the S6 check would be skipped silently, because it runs only when `marked !== undefined`. Today the definer always returns text, and the S6 db test (`IdentityMarkerLost` after a `COMMIT`) would go red on the drift. Fix (two lines): throw unless `typeof marked === 'string'`, in both wrappers.
+- **N2 — gaps in the source scan.** It misses:
+  - re-exports (`export { default as x } from 'pg'`, `export * from 'pg'`);
+  - constructors through an alias (`new driver.Pool(`);
+  - a `pg-pool` import inside `packages/db` (lint covers it everywhere else).
+  
+  Each needs a code change inside `packages/db`, not an injection, so this is a seatbelt gap. Fix: add `export … from 'pg'` to the value regex, widen the constructor regex to `\bnew\s+[\w$.]*\b(Pool|Client)\(`, and add `pg-pool` to the module list.
+- **N3 — drizzle's session is still reachable.** `tx._.session.transaction(…)` reaches `NodePgSession.transaction()`, which sends a real BEGIN and ROLLBACK. A caller who writes that ends the marked transaction. That fails closed: later statements read null, writes are refused under RLS, and S6 throws `IdentityMarkerLost`. It is a code bug, not reachable by injection, and needs no change. Note it for whoever next touches the handle.
+
+## 7. Build delta — 04726635 → 71ba9813
+
+**Verdict: no blocking findings. N1 and N2 are closed.**
+
+- **N1: done as I meant it.** `markedOf()` throws `IdentityMarkerLost` unless the definer's result is a string, and both wrappers use it. It throws inside setup, so the existing catch rolls back. `marked-of.test.ts` covers a number, null, a renamed column and a missing row, for both wrappers. Each case asserts that the callback never runs and no COMMIT is sent. A pre-N1 wrapper (value stored unchecked) would run the callback, so the test is red on it.
+- **N2: done; the scan now catches all three forms.**
+  - Re-exports: `export { … } from 'pg'` and `export * from 'pg'`, while `export type` is still allowed.
+  - Aliased constructors: `new x.Pool(`, `x.Pool(` and `new y.Client(`.
+  - `pg-pool` imported anywhere, `packages/db` included.
+  
+  Each pattern is pinned by a sample test that goes red if the pattern is narrowed again.
+- **CI area map: no security content.** `identity-marker.test.ts` joins the auth area. A change under `packages/db/`, including `roles.sql` and the migrations, is in `DB_SHARED`, so it still runs the marker tests in every area.

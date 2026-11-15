@@ -5,6 +5,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { dbEnv } from './helpers/api';
 import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
 import { claimedBy, inviteRow, newToken, seedInvitation, seedOwnerEntity, tokenHash } from './helpers/invitation';
+import { asUserSql } from './helpers/marker';
 import { psql, psqlSession } from './helpers/pg';
 import { must } from './helpers/sql';
 
@@ -271,12 +272,12 @@ describe('conditions 9, 10: any failure leaves no user, entity, membership or ac
 });
 
 describe('condition 11: the pooled backend carries no identity after a sign-up', () => {
-  it('after a commit, and after a rollback, the next checkout of the same backend (max: 1) reads app.user_id empty and sees zero tenant rows  [red if: the setting is session-level, so it rides the backend into the pool]', async () => {
+  it('after a commit, and after a rollback, the next checkout of the same backend (max: 1) reads no marker identity and sees zero tenant rows  [red if: the marker is not per transaction, so it rides the backend into the pool]', async () => {
     await e.dbm.close();
     e.dbm.configure({ app: dbEnv('poly_app', e.db), worker: dbEnv('poly_worker', e.db), max: 1 });
     const a = await e.mk();
     const probe = async () => e.dba.withContextFreeTx(async (tx: any) => {
-      const s = (await tx.execute(e.dbm.sql`SELECT coalesce(current_setting('app.user_id', true), '') AS v, pg_backend_pid() AS pid, (SELECT count(*) FROM public.entity) AS n`)).rows[0];
+      const s = (await tx.execute(e.dbm.sql`SELECT coalesce(app.current_user_id()::text, '') AS v, pg_backend_pid() AS pid, (SELECT count(*) FROM public.entity) AS n`)).rows[0];
       return { v: s.v as string, pid: s.pid as number, n: Number(s.n) };
     });
     const before = await probe();
@@ -604,7 +605,7 @@ describe('condition 33 (S14): after the sign-up commits, an email change passes'
     expect(r.status, await r.clone().text()).toBe(200);
     const uid = uidOf(email);
     const moved = `s14-moved-${stamp()}@qa.test`;
-    const u = psql(`BEGIN; SELECT set_config('app.user_id', '${uid}', true); UPDATE public."user" SET email = '${moved}', email_verified = true WHERE id = '${uid}'; COMMIT;`, e.db, { role: 'poly_app' });
+    const u = psql(`BEGIN; ${asUserSql(uid)} UPDATE public."user" SET email = '${moved}', email_verified = true WHERE id = '${uid}'; COMMIT;`, e.db, { role: 'poly_app' });
     expect(u.ok, u.err).toBe(true);
     expect(users(moved)).toBe(1);
   });

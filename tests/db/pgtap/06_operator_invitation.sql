@@ -4,16 +4,26 @@
 BEGIN;
 SELECT no_plan();
 
+-- POLY-147 (R6): identity is the transaction marker. A superuser writes it (no production role can); '' clears it.
+CREATE FUNCTION pg_temp.set_id(uid text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  IF to_regclass('app.tx_identity') IS NULL THEN
+    IF uid <> '' THEN RAISE EXCEPTION 'no app.tx_identity: nothing can carry an identity' USING ERRCODE = '42P01'; END IF;
+    RETURN;
+  END IF;
+  DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id();
+  IF uid <> '' THEN INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), uid::uuid, NULL, 'web'); END IF;
+END $$;
 CREATE FUNCTION pg_temp.sx(q text) RETURNS text LANGUAGE plpgsql AS $$ BEGIN EXECUTE q; RETURN 'ok'; EXCEPTION WHEN OTHERS THEN RETURN 'ERR:' || SQLSTATE; END $$;
 CREATE FUNCTION pg_temp.run_as(role text, uid text, pre text, q text) RETURNS text LANGUAGE plpgsql AS $$
 DECLARE r text;
 BEGIN
-  PERFORM set_config('app.user_id', uid, true);
+  PERFORM pg_temp.set_id(uid);
   EXECUTE format('SET LOCAL ROLE %I', role);
   IF pre IS NOT NULL THEN EXECUTE pre; END IF;
   EXECUTE q INTO r;
   RESET ROLE;
-  PERFORM set_config('app.user_id', '', true);
+  PERFORM pg_temp.set_id('');
   RETURN coalesce(r, '');
 EXCEPTION WHEN OTHERS THEN RETURN 'ERR:' || SQLSTATE;
 END $$;
@@ -69,10 +79,10 @@ SELECT is(pg_temp.sx($f$
   INSERT INTO public."user" (id, name, email, email_verified) VALUES
     ('00000000-0000-4000-8000-0000000142f0', 'Owner', 'owner142@qa.test', true),
     ('00000000-0000-4000-8000-0000000142f1', 'Claimant', 'claimant142@qa.test', true);
-  SELECT set_config('app.user_id', '00000000-0000-4000-8000-0000000142f0', true);
+  SELECT pg_temp.set_id('00000000-0000-4000-8000-0000000142f0');
   INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES ('00000000-0000-4000-8000-0000000142e1',
     (SELECT id FROM public.entity_type WHERE system_key = 'business'), 'qa-E142', 'business_pass_through');
-  SELECT set_config('app.user_id', '', true);
+  SELECT pg_temp.set_id('');
 $f$), 'ok', 'fixture: two users and an entity');
 
 -- ---------------------------------------------------------------- C12: who may call (instance now non-empty)
@@ -84,13 +94,13 @@ SELECT is((SELECT issued_via FROM public.invitation WHERE email = 'x1@qa.test'),
 SELECT is(pg_temp.run_as('poly_operator', '', NULL, pg_temp.issue('x2@qa.test', true)), 'ERR:55000', 'R2 step 4: bootstrap on a non-empty instance raises 55000');
 SELECT is((SELECT count(*)::int FROM public.invitation WHERE issued_via = 'bootstrap' AND claimed_at IS NULL AND revoked_at IS NULL), 1, 'R2 step 4: the refusal rolled the revoke back (one live bootstrap row remains; mutation: the revoke commits before the user check)');
 SELECT is((SELECT count(*)::int FROM public.audit_event WHERE kind = 'invitation.revoked'), 2, 'R2 step 4: ...and no extra revoked audit row survived (two: boot1, then boot2 revoked by the UPPER@QA.TEST bootstrap; the refused x2 call added none)');
-SELECT is(pg_temp.run_as('poly_operator', '00000000-0000-4000-8000-0000000142f1', NULL, pg_temp.issue('x3@qa.test', false)), 'ERR:42501', 'O2: a forged app.user_id (a withSystem- or tenant-shaped context) is refused 42501 (mutation: the user-context check is missing)');
+SELECT is(pg_temp.run_as('poly_operator', '00000000-0000-4000-8000-0000000142f1', NULL, pg_temp.issue('x3@qa.test', false)), 'ERR:42501', 'O2: a marker for a user (a withSystem- or tenant-shaped context) is refused 42501 (mutation: the user-context check is missing)');
 SELECT is(pg_temp.run_as('poly_operator', '00000000-0000-4000-8000-0000000142f1', NULL, pg_temp.issue('x3@qa.test', true)), 'ERR:42501', 'O2: ...for bootstrap too, before the state check');
-SELECT is(pg_temp.run_as('poly_operator', '', 'SELECT set_config(''app.user_id'', ''00000000-0000-4000-8000-0000000142f1'', true)', pg_temp.issue('x4@qa.test', false)), 'ERR:42501', 'O2: app.user_id set after the role switch, same refusal');
+SELECT is(pg_temp.run_as('poly_operator', '', 'SELECT set_config(''app.user_id'', ''00000000-0000-4000-8000-0000000142f1'', true)', pg_temp.issue('x4@qa.test', false)) ~ '^[0-9a-f-]{36}$', true, 'O2: a forged app.user_id set after the role switch means nothing: the issuer reads the marker only (mutation: it still reads the setting)');--('x4@qa.test', false)) ~ '^[0-9a-f-]{36}$', true, 'O2: a forged app.user_id set after the role switch means nothing: the issuer reads the marker only (mutation: it still reads the setting)');
 SELECT is(pg_temp.run_as('poly_app', '', NULL, pg_temp.issue('x5@qa.test', false)), 'ERR:42501', 'C12: poly_app lacks EXECUTE');
 SELECT is(pg_temp.run_as('poly_govern', '', NULL, pg_temp.issue('x5@qa.test', false)), 'ERR:42501', 'C12: poly_govern lacks EXECUTE');
 SELECT is(pg_temp.run_as('poly_authz', '', NULL, pg_temp.issue('x5@qa.test', false)), 'ERR:42501', 'C12: poly_authz lacks EXECUTE');
-SELECT is((SELECT count(*)::int FROM public.invitation WHERE email IN ('x3@qa.test', 'x4@qa.test', 'x5@qa.test')), 0, 'C12: no refused call left a row');
+SELECT is((SELECT count(*)::int FROM public.invitation WHERE email IN ('x3@qa.test', 'x5@qa.test')), 0, 'C12: no refused call left a row');
 
 -- ---------------------------------------------------------------- C13: grants and shape
 SELECT is((SELECT bool_or(CASE WHEN p = 'DELETE' THEN has_table_privilege('poly_worker', t, p) ELSE has_table_privilege('poly_worker', t, p) OR has_any_column_privilege('poly_worker', t, p) END) FROM unnest(ARRAY['public.invitation', 'public.audit_event']) t, unnest(ARRAY['INSERT', 'UPDATE', 'DELETE']) p), false, 'C13: poly_worker holds no INSERT/UPDATE/DELETE on invitation or audit_event, table or column (mutation: a direct grant)');
@@ -111,7 +121,7 @@ SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (email, role, token_hash, 
 SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (email, role, inviter_user_id, entity_id, token_hash, expires_at, issued_via) VALUES ('sh6@qa.test', 'viewer', '00000000-0000-4000-8000-0000000142f0', '00000000-0000-4000-8000-0000000142e1', sha256('sh6'::bytea), now() + interval '1 day', 'owner')$f$), 'ok', 'R1/O3: the shape check is one-directional, an owner row keeps its entity and inviter');
 SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (email, role, inviter_user_id, token_hash, expires_at) VALUES ('sh7@qa.test', 'viewer', '00000000-0000-4000-8000-0000000142f0', sha256('sh7'::bytea), now() + interval '1 day')$f$), 'ok', 'R1/O3 (room for POLY-144): a no-entity row with an inviter is admitted when issued_via = owner');
 
--- ---------------------------------------------------------------- C14: revocation scope (app.user_id empty, G1)
+-- ---------------------------------------------------------------- C14: revocation scope (no marker, G1)
 SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (id, email, role, token_hash, expires_at, issued_via, claimed_user_id, claimed_at) VALUES ('00000000-0000-4000-8000-0000000142b1', 'cb@qa.test', 'viewer', sha256('cb'::bytea), now() + interval '1 day', 'bootstrap', '00000000-0000-4000-8000-0000000142f1', now())$f$), 'ok', 'fixture: a claimed bootstrap row (not live, so the unique index admits it)');
 SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (id, email, role, token_hash, expires_at, issued_via) VALUES ('00000000-0000-4000-8000-0000000142b2', 'op@qa.test', 'viewer', sha256('op'::bytea), now() + interval '1 day', 'operator')$f$), 'ok', 'fixture: a live operator row');
 SELECT isnt(pg_temp.run_as('poly_govern', '', NULL, $q$WITH u AS (UPDATE public.invitation SET revoked_at = now() WHERE id = '00000000-0000-4000-8000-0000000142b2' RETURNING 1) SELECT count(*)::text FROM u$q$), '1', 'C14: poly_govern cannot revoke a non-bootstrap row (mutation: the policy lacks issued_via = bootstrap)');
