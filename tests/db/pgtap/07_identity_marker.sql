@@ -53,6 +53,10 @@ SELECT is((SELECT array_agg(polname::text ORDER BY polname COLLATE "C") FROM pg_
 SELECT matches((SELECT pg_get_expr(polqual, polrelid) FROM pg_policy WHERE polrelid = 'app.tx_identity'::regclass AND polname = 'tx_identity_purge'), 'pg_xact_status\(xid\) IS DISTINCT FROM ''in progress''', 'R1: the purge policy repeats the in-progress guard (IS DISTINCT FROM, never <>)');
 SELECT is((SELECT count(*)::int FROM pg_policy WHERE polrelid = 'app.tx_identity'::regclass AND 0 = ANY (polroles)), 0, 'R1: no policy applies to PUBLIC');
 
+SELECT is((SELECT count(*)::int FROM pg_trigger t WHERE t.tgrelid = 'app.tx_identity'::regclass AND NOT t.tgisinternal AND t.tgenabled IN ('O', 'A')
+    AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2 AND (t.tgtype & 32) = 32 AND t.tgfoid = 'app.refuse_truncate()'::regprocedure), 1,
+  'R1 (seceng review 4): a BEFORE TRUNCATE statement trigger on the marker table runs app.refuse_truncate() (mutation: the trigger is missing; there is no TRUNCATE exemption)');
+
 -- ---------------------------------------------------------------- R1 hardening
 SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app', 'poly_worker', 'poly_operator']) r WHERE has_database_privilege(r, current_database(), 'TEMP')), 0, 'R1: no runtime role holds TEMP (pg_temp cannot shadow a relation in a definer)');
 SELECT is(current_setting('max_prepared_transactions'), '0', 'S1: max_prepared_transactions = 0, so a marked transaction cannot be parked (mutation: the setting is raised)');
@@ -78,6 +82,16 @@ SELECT ok(has_function_privilege('poly_app', 'app.current_user_id()', 'EXECUTE')
 SELECT is((SELECT string_agg(p.proname || '=>' || pg_temp.grantees(p.oid::regprocedure::text), ';' ORDER BY p.proname COLLATE "C") FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname LIKE 'enter\_%'),
   'enter_asserted_user=>poly_app;enter_job=>poly_worker;enter_new_user=>poly_app', 'I1: every app.enter_* function, with its exact EXECUTE set; an unlisted enter_* fails here');
 SELECT is((SELECT count(*)::int FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname ~ '^(enter_|purge_tx)' AND pg_get_function_arguments(p.oid) ~* 'kind'), 0, 'J3: no definer takes a kind argument; the kind comes from the body');
+
+-- ---------------------------------------------------------------- R11: no "run a SQL string" built-in for PUBLIC
+CREATE FUNCTION pg_temp.sqlstr() RETURNS SETOF pg_proc LANGUAGE sql AS $$
+  SELECT p.* FROM pg_proc p WHERE p.pronamespace = 'pg_catalog'::regnamespace
+    AND (p.proname ~ '^(query|table|cursor|schema|database)_to_xml' OR p.proname = 'ts_stat' OR p.oid = 'pg_catalog.ts_rewrite(tsquery, text)'::regprocedure)
+$$;
+SELECT is((SELECT count(*)::int FROM pg_temp.sqlstr()), 17, 'R11: 17 functions match the pattern on this Postgres (a function a later version adds under these names fails here until listed)');
+SELECT is((SELECT count(*)::int FROM pg_temp.sqlstr() p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a WHERE a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner), 0,
+  'R11: no grantee but the owner holds EXECUTE on any of them, PUBLIC absent (mutation: the REVOKE lines are missing from roles.sql)');
+SELECT is((SELECT count(*)::int FROM pg_temp.sqlstr() p, unnest(ARRAY['poly_app', 'poly_worker', 'poly_operator']) r WHERE has_function_privilege(r, p.oid, 'EXECUTE')), 0, 'R11: poly_app, poly_worker and poly_operator cannot execute any of them');
 
 -- ---------------------------------------------------------------- K2: a forged setting grants nothing
 INSERT INTO public."user" (id, name, email, email_verified) VALUES ('00000000-0000-4000-8000-0000000147a1', 'K2 owner', 'k2owner@qa.test', true);

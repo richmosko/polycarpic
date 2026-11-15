@@ -5,15 +5,21 @@ BEGIN;
 SELECT no_plan();
 
 -- THE EXEMPTION LIST (SECURITY C-13). Adding an entry needs SecEng review of the diff. Nothing is exempted by pattern
--- or schema. app.tx_identity joined with migration 0011 (POLY-147). two_factor and passkey joined with migration 0004 (POLY-86); a listed-but-absent entry fails below.
+-- or schema. two_factor and passkey joined with migration 0004 (POLY-86); a listed-but-absent entry fails below.
 CREATE FUNCTION pg_temp.exemptions() RETURNS text[] LANGUAGE sql AS $f$
-  SELECT ARRAY['public."user"', 'public.session', 'public.account', 'public.verification', 'public.two_factor', 'public.passkey', 'drizzle.__drizzle_migrations', 'app.tx_identity']
+  SELECT ARRAY['public."user"', 'public.session', 'public.account', 'public.verification', 'public.two_factor', 'public.passkey', 'drizzle.__drizzle_migrations']
 $f$;
 
 -- One row per gap. Scope: every relation outside pg_catalog, information_schema, pg_toast, minus temporary relations
 -- (session-private; no poly_* role holds TEMP, asserted in 03). Exempt relations are compared by oid.
 -- POLY-62 O4: the column-grant allowlist. A column INSERT or UPDATE privilege that poly_app or poly_worker holds on an in-scope
 -- table must be named here; a table-level grant counts as every column. Adding an entry needs SecEng review of the diff.
+-- THE PER-REASON EXEMPTIONS (POLY-147, seceng review 4). 'rel:reason' pairs; a listed pair hides that one check on that one
+-- relation and nothing else. Adding an entry needs SecEng review of the diff, as for the table list above.
+CREATE FUNCTION pg_temp.reason_exemptions() RETURNS text[] LANGUAGE sql AS $f$
+  SELECT ARRAY['app.tx_identity:pk_not_uuid']
+$f$;
+
 CREATE FUNCTION pg_temp.col_allow() RETURNS text[] LANGUAGE sql AS $f$
   SELECT ARRAY['update:public.entity.name', 'update:public.entity.tax_classification', 'update:public.membership.role',
     'update:public.invitation.revoked_at', 'update:public.notification.read_at',
@@ -23,7 +29,7 @@ CREATE FUNCTION pg_temp.col_allow() RETURNS text[] LANGUAGE sql AS $f$
     'insert:public.entity_type.name', 'insert:public.entity_type.kind', 'insert:public.entity_type.owner_user_id']
 $f$;
 
-CREATE FUNCTION pg_temp.battery_gaps(exempt text[], colallow text[] DEFAULT pg_temp.col_allow()) RETURNS TABLE (rel regclass, reason text) LANGUAGE sql AS $f$
+CREATE FUNCTION pg_temp.battery_gaps(exempt text[], colallow text[] DEFAULT pg_temp.col_allow(), reasonex text[] DEFAULT pg_temp.reason_exemptions()) RETURNS TABLE (rel regclass, reason text) LANGUAGE sql AS $f$
   WITH ex AS (SELECT to_regclass(e)::oid AS oid FROM unnest(exempt) e),
   scope AS (
     SELECT c.*, n.nspname AS nsp FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -57,16 +63,23 @@ CREATE FUNCTION pg_temp.battery_gaps(exempt text[], colallow text[] DEFAULT pg_t
     ('view_not_security_invoker', c.relkind = 'v'
        AND NOT (coalesce(c.reloptions, '{}') && ARRAY['security_invoker=true', 'security_invoker=on'])
        AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid AND d.deptype = 'e'))
-  ) g(reason, hit) WHERE g.hit
+  ) g(reason, hit) WHERE g.hit AND NOT ((c.oid::regclass::text || ':' || g.reason) = ANY (reasonex))
 $f$;
 CREATE FUNCTION pg_temp.gaps_of(rels text[], exempt text[], colallow text[] DEFAULT pg_temp.col_allow()) RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(rel::text || ':' || reason ORDER BY rel::text COLLATE "C", reason COLLATE "C"), '{}')
   FROM pg_temp.battery_gaps(exempt, colallow) WHERE rel::text = ANY (rels)
 $f$;
 
+-- per-reason list: each entry names a real relation, the list is the one entry, and each entry hides a gap that really fires
+-- (a listed-but-unneeded entry fails). The xid8 key of the identity marker is the one gap, by design.
+SELECT ok(to_regclass(split_part(e, ':', 1)) IS NOT NULL, 'reason exemption names a real relation: ' || e) FROM unnest(pg_temp.reason_exemptions()) e;
+SELECT is(cardinality(pg_temp.reason_exemptions()), 1, 'the per-reason list is exactly one entry');
+SELECT ok(EXISTS (SELECT 1 FROM pg_temp.battery_gaps(pg_temp.exemptions(), pg_temp.col_allow(), '{}') g WHERE g.rel::text || ':' || g.reason = e), 'reason exemption is needed, it hides a gap that fires: ' || e) FROM unnest(pg_temp.reason_exemptions()) e;
+SELECT is((SELECT coalesce(array_agg(rel::text || ':' || reason), '{}') FROM pg_temp.battery_gaps(pg_temp.exemptions(), pg_temp.col_allow(), '{}') WHERE rel::text = 'app.tx_identity'), ARRAY['app.tx_identity:pk_not_uuid'], 'the marker table fires exactly pk_not_uuid without the reason list (the TRUNCATE trigger exists, every other check passes)');
+
 -- R2: each exemption exists, so a stale or misspelled entry fails instead of exempting nothing
 SELECT ok(to_regclass(e) IS NOT NULL, 'exemption exists: ' || e) FROM unnest(pg_temp.exemptions()) e;
-SELECT is(cardinality(pg_temp.exemptions()), 8, 'the exemption list is the eight entries: BetterAuth''s six tables, the migrations ledger and the identity marker (xid8 key by design; no role holds TRUNCATE; POLY-147, needs SecEng sign-off)');
+SELECT is(cardinality(pg_temp.exemptions()), 7, 'the exemption list is the seven entries: BetterAuth''s six tables and the migrations ledger (the identity marker is not here: seceng POLY-147 review 4)');
 
 -- the real chain: zero gaps (every M1 relation is exempt), and without the list the exempt tables do show up
 SELECT is((SELECT coalesce(array_agg(rel::text || ':' || reason), '{}') FROM pg_temp.battery_gaps(pg_temp.exemptions())), '{}'::text[],
@@ -127,6 +140,7 @@ CREATE VIEW public.qa_canary_view_on WITH (security_invoker = on) AS SELECT 1 AS
 CREATE TEMP TABLE qa_canary_temp (id int);
 -- POLY-62 canaries: each is compliant but for the one reason under test
 CREATE TABLE public.qa_canary_pkint (id int PRIMARY KEY);
+CREATE TABLE public.qa_canary_reasonex (id int PRIMARY KEY);
 CREATE TABLE public.qa_canary_pkuuid (id uuid PRIMARY KEY);
 CREATE TABLE public.qa_canary_rawctx (id uuid PRIMARY KEY, owner_user_id uuid);
 CREATE TABLE public.qa_canary_updcol (id uuid PRIMARY KEY, owner_user_id uuid, note text);
@@ -173,6 +187,13 @@ SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_view', 'qa_canary_view_inv', 'qa_cana
 SELECT is((SELECT count(*)::int FROM pg_temp.battery_gaps(pg_temp.exemptions()) WHERE rel::text LIKE '%qa_canary_temp'), 0, 'a temporary relation is out of scope');
 -- POLY-62 R7 reasons. Mutation for each: delete its VALUES line from battery_gaps and the canary goes unreported.
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_pkint'], pg_temp.exemptions()), ARRAY['qa_canary_pkint:pk_not_uuid'], 'an integer primary key: exactly pk_not_uuid (C-18)');
+-- a reason exemption hides only its own reason: an int-keyed table with RLS off, listed for pk_not_uuid, still reports rls_disabled
+SELECT is((SELECT coalesce(array_agg(reason ORDER BY reason COLLATE "C") FILTER (WHERE reason IN ('pk_not_uuid', 'rls_disabled')), '{}') FROM pg_temp.battery_gaps(pg_temp.exemptions(), pg_temp.col_allow(), ARRAY['qa_canary_reasonex:pk_not_uuid']) WHERE rel::text = 'qa_canary_reasonex'), ARRAY['rls_disabled'], 'a per-reason exemption hides only pk_not_uuid and leaves rls_disabled (mutation: the filter compares the table alone)');
+SELECT is((SELECT coalesce(array_agg(reason ORDER BY reason COLLATE "C") FILTER (WHERE reason IN ('pk_not_uuid', 'rls_disabled')), '{}') FROM pg_temp.battery_gaps(pg_temp.exemptions(), pg_temp.col_allow(), '{}') WHERE rel::text = 'qa_canary_reasonex'), ARRAY['pk_not_uuid', 'rls_disabled'], 'control: without the reason list the canary reports both');
+-- the marker table stays inside the net: switch its RLS off and the real chain reports it
+ALTER TABLE app.tx_identity DISABLE ROW LEVEL SECURITY;
+SELECT ok(EXISTS (SELECT 1 FROM pg_temp.battery_gaps(pg_temp.exemptions()) WHERE rel::text = 'app.tx_identity' AND reason = 'rls_disabled'), 'the marker table with RLS off is reported by the real chain (mutation: it rejoins the table exemption list)');
+ALTER TABLE app.tx_identity ENABLE ROW LEVEL SECURITY;
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_pkuuid'], pg_temp.exemptions()), '{}'::text[], 'a uuid primary key has no gap');
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_rawctx'], pg_temp.exemptions()), ARRAY['qa_canary_rawctx:raw_context_read'], 'a policy reading current_setting itself: exactly raw_context_read');
 SELECT is(pg_temp.gaps_of(ARRAY['qa_canary_updcol'], pg_temp.exemptions()), ARRAY['qa_canary_updcol:column_grant_not_allowlisted'], 'poly_app holding UPDATE on a column off the allowlist: exactly column_grant_not_allowlisted');

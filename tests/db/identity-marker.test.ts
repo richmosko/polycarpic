@@ -162,17 +162,24 @@ describe('R2 the exact-call check: an identity definer answers only its own call
 
 describe('R2 the query_to_xml route: one fragment on an unmarked path cannot mark a victim and read as them', () => {
   const frag = `SELECT 1 WHERE app.enter_asserted_user('${V}', '${S}') IS NOT NULL AND query_to_xml('SELECT count(*) FROM public.entity', true, false, '') IS NOT NULL`;
-  it("through BetterAuth's plain pool (outside any transaction), the fragment is refused and no marker results  [red if: the exact-call check is missing]", async () => {
+  // R11: the built-in's EXECUTE may refuse the fragment before the exact-call check runs, so either message is accepted; no marker either way.
+  const either = (x: any) => expect([NOT_ALONE, 'permission denied for function query_to_xml'].some((m) => msgOf(x).includes(m)), msgOf(x)).toBe(true);
+  it("through BetterAuth's plain pool (outside any transaction), the fragment is refused and no marker results  [red if: neither the exact-call check nor the R11 revoke exists]", async () => {
     const x = await fails(pool.query(frag));
     expect(codeOf(x), msgOf(x)).toBe('42501');
-    expect(msgOf(x)).toContain(NOT_ALONE);
+    either(x);
     expect(markers(V)).toBe(0);
   });
-  it('inside withContextFreeTx before any insert, the same refusal  [red if: the exact-call check is missing]', async () => {
+  it('inside withContextFreeTx before any insert, the same refusal  [red if: neither the exact-call check nor the R11 revoke exists]', async () => {
     const x = await fails(dba.withContextFreeTx(async () => { const l = await pool.connect(); try { await l.query(frag); } finally { l.release(); } }));
     expect(codeOf(x), msgOf(x)).toBe('42501');
-    expect(msgOf(x)).toContain(NOT_ALONE);
+    either(x);
     expect(markers(V)).toBe(0);
+  });
+  it('R11: query_to_xml as poly_app is refused 42501 permission denied for function query_to_xml  [red if: the REVOKE from PUBLIC is missing from roles.sql]', async () => {
+    const x = await inTx('poly_app', (c) => fails(q(c, `SELECT query_to_xml('SELECT 1', true, false, '')`)));
+    expect(codeOf(x), msgOf(x)).toBe('42501');
+    expect(msgOf(x)).toContain('permission denied for function query_to_xml');
   });
 });
 
