@@ -199,3 +199,34 @@ That reasoning is mine, unmeasured. The guard is still one line, reusing the exi
   The other routes to running SQL are not PUBLIC-executable by default: `dblink` and `postgres_fdw` are extensions and not installed, the server-file and large-object functions need superuser or a `pg_*_server_files` role, and the logical-decoding functions need REPLICATION. This is unmeasured, read from the PostgreSQL 17 function reference. The pattern-plus-count test catches a new function under these names, but not a new family. Re-read the list at each major upgrade.
 - **Extensions: pgTAP's `lives_ok`, `throws_ok`, `results_eq` and friends also run caller-supplied SQL, and PUBLIC can execute them. (N)** They are installed only in test databases (`tests/db/pgtap.test.ts:19`; no `CREATE EXTENSION` anywhere in `packages/` or `infra/`). Follow-up for POLY-97's provisioning check: assert that production's `pg_extension` holds `plpgsql` alone. Any extension added later gets the same R11 review.
 - **R11's note on the R8 `query_to_xml` row is sound. (N)** Postgres checks EXECUTE permission on `query_to_xml` when it sets up the statement, before anything runs. So with R11 in place, the fragment is refused on EXECUTE every time, never by the exact-call check. That row now proves R11, not the exact-call check, and it would stay green with the check removed. The exact-call check's red-if rests on the R2 rows, which use no built-in, and those are enough. Optional: qa may tighten the row to expect `permission denied for function query_to_xml` exactly, so it is an unambiguous R11 test.
+
+## 6. Build check — @ 04726635 against ruling 5ded4562
+
+Read `git diff main..04726635` for `packages/db/**`, `packages/auth/**`, `packages/tenancy/**` and `layers.json`, plus the per-reason exemption in `02_rls_catalog.sql`. **Verdict: no blocking findings.**
+
+### My checklist
+
+| Item | Result |
+|---|---|
+| Every `enter_*` comparison is `IS DISTINCT FROM` | **Pass.** All three bodies (`0011` `enter_asserted_user`, `enter_job`, `enter_new_user`) use `regexp_replace(btrim(current_query()), ';\s*$', '') IS DISTINCT FROM '<canonical>'`. No `<>` anywhere. |
+| Caller strings are byte-exact | **Pass.** `context.ts` sends `'SELECT app.enter_asserted_user($1, $2)'` and `'SELECT app.enter_job($1, $2, $3)'`; `new-user.ts` sends `'SELECT app.enter_new_user($1)'`. No alias. Results are read as `rows[0].enter_asserted_user` and `rows[0].enter_job`. |
+| S6 treats a null xid as a mismatch | **Pass.** `x.rows[0]?.x !== store.marked` throws `IdentityMarkerLost` on null, undefined or a different xid. The catch rolls back. See N1. |
+| `0011`, line by line | **Pass.** Every relation and function is schema-qualified (the operators `\|\|` and `!~` resolve through the implicit `pg_catalog`). Every new function has REVOKE FROM PUBLIC (`current_session_id`, `enter_asserted_user`, `enter_job`, `purge_tx_identity`). The replaced ones (`current_user_id`, `enter_new_user`, `audit_membership`) keep their ACLs under `CREATE OR REPLACE`, each run as its original owner. `job_targets` loses poly_worker. CREATE on `app` is granted to authz, purge and govern for the file and revoked on the last line, as poly_owner. The policy role lists match R1. The INSERT policy checks `xid = pg_current_xact_id()`. `tx_identity_no_truncate` is present. The `kind` CHECK constraint is present, and each definer writes its kind itself. |
+| R4 scan catches every `pg` binding | **Pass for what R4 asks.** Value imports (`import`, `require`, `import()`), constructors, the subclass and `pg-native`/`.native` are all checked; 3 of 3 pools pass `Client: ExtendedClient`. Lint already refuses `pg` and `pg-pool` outside `packages/db`. Gaps in N2. |
+| `startup.ts` and other runtime clients | **Pass.** `startup.ts` uses `appPool`/`workerPool`. `authPool` is `appPool` (`db/src/auth.ts:7`). The only plain `pg.Client` is `migrate.ts` (poly_migrator), and the scan pins it there. |
+| `ExtendedClient` | **Pass.** It refuses Submittables, copies the config, and forces `queryMode = 'extended'` over any caller value. |
+| R10 and R11 in `roles.sql` | **Pass.** The plpgsql revoke and grant are as ruled. All 17 signatures are revoked from PUBLIC, matching §5. |
+| The handle change (`NodePgTransaction`) | **Pass: it opens no path around the marker.** It is built from the session's own dialect and schema, and constructing it sends nothing, so the marker is still the first statement after BEGIN. A nested `tx.transaction()` is now a savepoint, which keeps the marker (guard ii). `clientOf(tx)` still serves only the routing pool. See N3. |
+| `app.session_id` / `app.user_id` readers | **Pass.** `session.ts`'s three reads use `app.current_session_id()`. `reservedLiterals` now forbids both setting names everywhere, and confines `enter_asserted_user`/`enter_job` to `context.ts`. `withOperatorTx` no longer reads the setting. |
+| Per-reason exemption (§4) | **Pass.** The table list no longer has `app.tx_identity`. The pair list is `app.tx_identity:pk_not_uuid` alone, with cardinality 1, the entry must exist, and it must be needed. Without it the marker fires exactly `pk_not_uuid`. The RLS-off mutation is reported. |
+
+### Non-blocking
+
+- **N1 — make S6 fail if the definer's result is missing.** `store.marked` is set straight from `rows[0].enter_asserted_user`. If that column were ever renamed or aliased, `marked` would be `undefined` and the S6 check would be skipped silently, because it runs only when `marked !== undefined`. Today the definer always returns text, and the S6 db test (`IdentityMarkerLost` after a `COMMIT`) would go red on the drift. Fix (two lines): throw unless `typeof marked === 'string'`, in both wrappers.
+- **N2 — gaps in the source scan.** It misses:
+  - re-exports (`export { default as x } from 'pg'`, `export * from 'pg'`);
+  - constructors through an alias (`new driver.Pool(`);
+  - a `pg-pool` import inside `packages/db` (lint covers it everywhere else).
+  
+  Each needs a code change inside `packages/db`, not an injection, so this is a seatbelt gap. Fix: add `export … from 'pg'` to the value regex, widen the constructor regex to `\bnew\s+[\w$.]*\b(Pool|Client)\(`, and add `pg-pool` to the module list.
+- **N3 — drizzle's session is still reachable.** `tx._.session.transaction(…)` reaches `NodePgSession.transaction()`, which sends a real BEGIN and ROLLBACK. A caller who writes that ends the marked transaction. That fails closed: later statements read null, writes are refused under RLS, and S6 throws `IdentityMarkerLost`. It is a code bug, not reachable by injection, and needs no change. Note it for whoever next touches the handle.
