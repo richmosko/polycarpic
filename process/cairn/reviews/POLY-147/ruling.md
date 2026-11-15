@@ -1,6 +1,6 @@
 # POLY-147 — gate 1 ruling (architect)
 
-Scope: the issue file's criteria (K, J, I, the three guards, the measurement, no `app.session_id` reader, docs), plus the plpgsql revoke (R10). The design is (e1), staged
+Scope: the issue file's criteria (K, J, I, the three guards, the measurement, no `app.session_id` reader, docs), plus the plpgsql revoke (R10) and the SQL-string built-ins revoke (R11). The design is (e1), staged
 (`process/DECISIONS.md`, 2026-11-13); this ruling only makes it buildable. Measured = read from the tree at `61da0e72` or from the installed
 package source (`pg@8.23.1`, `pg-pool@3.14.0`, `drizzle-orm@0.45.4`); anything else is tagged `(unmeasured)`. Open questions are in §OQ and
 are the lead's; the ruling proceeds on the stated recommendation unless the issue file says otherwise.
@@ -96,10 +96,7 @@ statement's source text, set at Bind and Execute. It does not read `pg_stat_acti
   or sign-up before its user insert) could call `enter_asserted_user(<victim>, …)` and then `query_to_xml('SELECT … FROM
   public.entity', …)`, and read the victim's tenant rows in a single statement. The read side's STABLE snapshot does not prevent it
   (unmeasured; Postgres semantics).
-- **Revoking the family from PUBLIC (recommendation only, not adopted):** do not revoke now. With the check in place, only a holder of
-  poly_app's password or code in web can mark another user. Either can already send a second statement, so the revoke would narrow
-  nothing, and it would change built-in catalog ACLs that every Postgres upgrade and restore must carry. Revisit it if the exact-call
-  check is ever removed.
+- **Revoking the family from PUBLIC:** adopted as R11 (Principal, 2026-11-15, on seceng's E1(2)), as a second layer under the check.
 - **What stays open:** poly_app's direct grants on BetterAuth's tables, a stolen poly_app password and code execution in web. Until
   stage 2 the injection route to another user is an account takeover through sign-in (visible, leaves a session), not a silent query.
 - **A second statement in an open unmarked transaction** reads as the victim only if it is itself injected, and the check refuses it.
@@ -320,6 +317,38 @@ required verbatim. Each **must not** phrase must be absent.
   `auth-*`, `operator-invite`, `wrappers`) runs through `must`/`psql` as superuser, which bypasses language ACLs. pgTAP's `pg_temp`
   helpers also run as superuser. `checks.test.ts` only lints migration text; it does not execute it.
 - **Cost:** about 0.1 loop-day (a guess). devops notes the bootstrap change in INFRA's provisioning text at the docs criterion.
+
+## R11 — No "run a SQL string" built-ins for PUBLIC (addendum; Principal, 2026-11-15; seceng E1(2))
+
+- **The list, by signature, read from the test image (`polycarpic-pgtap:7958605b474b`, built from the pinned digest, which reports
+  `PostgreSQL 17.12`):** `query_to_xml(text,boolean,boolean,text)`, `query_to_xmlschema(text,boolean,boolean,text)`,
+  `query_to_xml_and_xmlschema(text,boolean,boolean,text)`, `table_to_xml(regclass,boolean,boolean,text)`,
+  `table_to_xmlschema(regclass,boolean,boolean,text)`, `table_to_xml_and_xmlschema(regclass,boolean,boolean,text)`,
+  `cursor_to_xml(refcursor,integer,boolean,boolean,text)`, `cursor_to_xmlschema(refcursor,boolean,boolean,text)`,
+  `schema_to_xml(name,boolean,boolean,text)`, `schema_to_xmlschema(name,boolean,boolean,text)`,
+  `schema_to_xml_and_xmlschema(name,boolean,boolean,text)`, `database_to_xml(boolean,boolean,text)`,
+  `database_to_xmlschema(boolean,boolean,text)`, `database_to_xml_and_xmlschema(boolean,boolean,text)`, `ts_stat(text)`,
+  `ts_stat(text,text)`, `ts_rewrite(tsquery,text)`. That is 17 functions. `ts_rewrite(tsquery,tsquery,tsquery)` is IMMUTABLE and runs
+  no SQL, so it is not on the list.
+- **Where:** `packages/db/sql/roles.sql`, right after R10's two statements. It holds one
+  `REVOKE EXECUTE ON FUNCTION pg_catalog.<name>(<args>) FROM PUBLIC;` per signature above. That is idempotent, and only the bootstrap
+  superuser (the functions' owner) can run it.
+- **EXECUTE back:** nobody. A grep of `packages/*/src`, `apps/*/src`, `packages/db/migrations`, `tests/db`, better-auth, drizzle-orm and
+  kysely finds no use of any of them. A superuser bypasses the ACL, so the test harness is unaffected.
+- **Tests:**
+  - `07` catalog: for every `pg_catalog` function whose name matches `^(query|table|cursor|schema|database)_to_xml` or is `ts_stat`, plus
+    `ts_rewrite(tsquery,text)`, `aclexplode(proacl)` has no grantee but the owner (PUBLIC absent), and
+    `has_function_privilege(r, oid, 'EXECUTE')` is false for poly_app, poly_worker and poly_operator. The match is by pattern, so a
+    function a later Postgres adds under these names fails the test until it is listed. The test also asserts the count is 17.
+  - `identity-marker` db: as poly_app, `SELECT query_to_xml('SELECT 1', true, false, '')` → `42501`
+    `permission denied for function query_to_xml`.
+- **Interaction with R8's `query_to_xml` row:** with R11 in place, that fragment may be refused for the function's EXECUTE before
+  the exact-call check runs. The row asserts `42501` with either message, and no marker. Its exact-call coverage stands on the R2
+  exact-call rows, which use no built-in.
+- **Restore and major upgrade:** these ACLs live in the database's own `pg_proc`. `pg_dump` (and so `pg_upgrade`) carries changes
+  from the initdb privileges (unmeasured). Whatever happens, `roles.sql` is re-run after any restore or major upgrade, and it re-applies
+  the revoke. devops states that in INFRA's provisioning and restore runbooks at the docs criterion. The `07` test fails if the
+  bootstrap ever loses the lines. It runs on fresh test databases, not on a live instance.
 
 ## seceng's prep notes — disposition
 
