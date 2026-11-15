@@ -6,7 +6,7 @@
 // POLY148_OPTION=2 switches the per-path predicate to option 2: the session row stores sha256(token), never the token.
 import {
   CFG, Jar, Lines, PW, SESSION_RE, IDP_LOG, auth, enrolTotp, get, handleRow, handleSet, isDeletion, lit, magicLink, must, oauth, one,
-  handlesOfUser, passkeySignIn, post, psql, registerPasskey, run, seedInvitation, seedUser, sessionExists, sessionOfJar, sessionsOf, setRecentAuth,
+  handlesOfUser, passkeySignIn, post, psql, psqlAs, registerPasskey, run, seedInvitation, seedUser, sessionExists, sessionOfJar, sessionsOf, setRecentAuth,
   sha256, sha256hex, signIn, tokenOf, whoami,
 } from './lib.mjs';
 
@@ -184,7 +184,22 @@ const defs = [
     if (!now || now.id === old?.id) { t.note('verify-registration created no new session on 1.7.18 with a session present: not a session-creating path here'); return 'report'; }
     await issued(t, res, jar);
   }],
-  ['sign-out', 'revocation: POST /api/auth/sign-out kills the handle in the same transaction', async (t) => {
+  ['handle-insert-failure', 'report: with the handle INSERT forced to fail, does a sign-in leave a session with no handle?', async (t) => {
+    if (OPT2) return 'report';
+    const u = await seedUser();
+    must(`ALTER TABLE app.session_handle ADD CONSTRAINT qa148_block CHECK (false) NOT VALID`);
+    let res;
+    try {
+      ({ res } = await signIn(u.email));
+    } finally {
+      must(`ALTER TABLE app.session_handle DROP CONSTRAINT IF EXISTS qa148_block`);
+    }
+    const orphans = Number(one(`SELECT count(*) FROM public.session s WHERE s.user_id = ${lit(u.id)} AND NOT EXISTS (SELECT 1 FROM app.session_handle h WHERE h.session_id = s.id)`));
+    t.note(`sign-in answered ${res.status}; session cookie set: ${res.cookies.some((c) => SESSION_RE.test(c.name) && !isDeletion(c))}; handle cookie set: ${!!handleSet(res)}`);
+    t.note(orphans ? `${orphans} session row(s) committed with no handle: the session and its handle are not one transaction (fails safe: web refuses it)` : 'no orphan session: the session and its handle commit or roll back together');
+    return 'report';
+  }],
+  ['sign-out','revocation: POST /api/auth/sign-out kills the handle in the same transaction', async (t) => {
     const u = await seedUser();
     const { res, jar } = await signIn(u.email);
     const b = await issued(t, res, jar);
@@ -211,6 +226,19 @@ const defs = [
     const h = sha256(Buffer.from(b.handle, 'utf8'));
     for (const [label, v] of [['hex sha256', h.toString('hex')], ['base64url sha256', h.toString('base64url')], ['random', sha256hex(String(Math.random()))]])
       t.ok((await whoami(handleOnly(v))).status === 401, `a handle cookie holding the ${label} is accepted`);
+    // The SQL layer (web's own role): no definer poly_app can call resolves a value read from the database. Web hashing in Node
+    // and passing the hash makes the stored hash a credential; the definer must take the plain handle and hash it in Postgres.
+    const stored = one(`SELECT encode(handle_hash, 'hex') FROM app.session_handle WHERE session_id = ${lit(b.session.id)}`);
+    const fns = must(`SELECT p.oid::regprocedure::text, p.proname, n.nspname, format_type(p.proargtypes[0], NULL) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+      WHERE p.prosecdef AND p.pronargs = 1 AND format_type(p.proargtypes[0], NULL) IN ('bytea', 'text')
+        AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'qa148') AND has_function_privilege('poly_app', p.oid, 'EXECUTE')`);
+    t.need(psqlAs('poly_app', 'SELECT 1').ok, `cannot log in as poly_app (README: password qa-poly_app over TCP in the container): ${psqlAs('poly_app', 'SELECT 1').err.split('\n')[0]}`);
+    t.note(`definers poly_app can call with one bytea or text argument: ${fns.map((f) => f[0]).join(', ') || 'none'}`);
+    for (const [sig, name, nsp, type] of fns) {
+      const arg = type === 'bytea' ? `decode('${stored}', 'hex')` : `'${stored}'`;
+      const r = psqlAs('poly_app', `BEGIN; SELECT * FROM "${nsp}"."${name}"(${arg}); ROLLBACK;`);
+      t.ok(!(r.out.includes(b.session.id) || r.out.includes(b.session.userId)), `${sig}, called as poly_app with the stored handle_hash, returns the user or session: a hash from a backup is a credential`);
+    }
     const dump = run('docker', ['exec', CFG.container, 'pg_dump', '-U', 'postgres', '-d', CFG.db, '--data-only']);
     t.need(dump.code === 0, `pg_dump failed: ${dump.err.slice(0, 160)}`);
     t.ok(!dump.out.includes(b.handle), 'a data-only pg_dump (a backup) contains the plain handle');

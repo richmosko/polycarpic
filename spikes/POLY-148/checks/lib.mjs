@@ -41,6 +41,13 @@ export function psql(sql) {
   const m = /ERROR:\s+([0-9A-Z]{5}):/.exec(r.err);
   return { ok: r.code === 0, rows: r.out.split('\n').filter((l) => l.length).map((l) => l.split(SEP)), sqlstate: m?.[1] ?? null, err: r.err.trim() };
 }
+/** Run SQL logged in as a runtime role over TCP inside the container (password `qa-<role>`, README). */
+export function psqlAs(role, sql) {
+  const r = run('docker', ['exec', '-i', CFG.container, 'psql', `postgresql://${role}:qa-${role}@127.0.0.1:5432/${CFG.db}`, '-X', '-q', '-At', '-F', SEP,
+    '-v', 'ON_ERROR_STOP=1', '-v', 'VERBOSITY=verbose', '-f', '-'], { input: sql });
+  const m = /ERROR:\s+([0-9A-Z]{5}):/.exec(r.err);
+  return { ok: r.code === 0, rows: r.out.split('\n').filter((l) => l.length).map((l) => l.split(SEP)), sqlstate: m?.[1] ?? null, err: r.err.trim(), out: r.out };
+}
 export function must(sql) {
   const r = psql(sql);
   if (!r.ok) throw new Error(`SQL failed: ${r.err.split('\n')[0]} :: ${sql.trim().slice(0, 120)}`);
