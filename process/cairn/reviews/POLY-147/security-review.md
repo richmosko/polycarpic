@@ -186,3 +186,16 @@ That reasoning is mine, unmeasured. The guard is still one line, reusing the exi
    - `ALTER TABLE app.tx_identity DISABLE ROW LEVEL SECURITY`, then the real chain must report `app.tx_identity:rls_disabled`.
    
    **Red-if:** the reason filter compares by table alone, or tx_identity rejoins the table list.
+
+## 5. Delta review — R11 @ 3592663f
+
+**Verdict: nothing blocking.**
+
+- **The 17-signature list is complete for core PostgreSQL 17, to my reading. (N)** These are the PUBLIC-executable core built-ins that run a caller-supplied SQL string or cursor:
+  - the `*_to_xml*` family (`query`, `table`, `cursor`, `schema`, `database`);
+  - `ts_stat` (both forms);
+  - `ts_rewrite(tsquery, text)`.
+
+  The other routes to running SQL are not PUBLIC-executable by default: `dblink` and `postgres_fdw` are extensions and not installed, the server-file and large-object functions need superuser or a `pg_*_server_files` role, and the logical-decoding functions need REPLICATION. This is unmeasured, read from the PostgreSQL 17 function reference. The pattern-plus-count test catches a new function under these names, but not a new family. Re-read the list at each major upgrade.
+- **Extensions: pgTAP's `lives_ok`, `throws_ok`, `results_eq` and friends also run caller-supplied SQL, and PUBLIC can execute them. (N)** They are installed only in test databases (`tests/db/pgtap.test.ts:19`; no `CREATE EXTENSION` anywhere in `packages/` or `infra/`). Follow-up for POLY-97's provisioning check: assert that production's `pg_extension` holds `plpgsql` alone. Any extension added later gets the same R11 review.
+- **R11's note on the R8 `query_to_xml` row is sound. (N)** Postgres checks EXECUTE permission on `query_to_xml` when it sets up the statement, before anything runs. So with R11 in place, the fragment is refused on EXECUTE every time, never by the exact-call check. That row now proves R11, not the exact-call check, and it would stay green with the check removed. The exact-call check's red-if rests on the R2 rows, which use no built-in, and those are enough. Optional: qa may tighten the row to expect `permission denied for function query_to_xml` exactly, so it is an unambiguous R11 test.
