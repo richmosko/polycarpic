@@ -54,8 +54,11 @@ SELECT matches((SELECT pg_get_expr(polqual, polrelid) FROM pg_policy WHERE polre
 SELECT is((SELECT count(*)::int FROM pg_policy WHERE polrelid = 'app.tx_identity'::regclass AND 0 = ANY (polroles)), 0, 'R1: no policy applies to PUBLIC');
 
 SELECT is((SELECT count(*)::int FROM pg_trigger t WHERE t.tgrelid = 'app.tx_identity'::regclass AND NOT t.tgisinternal AND t.tgenabled IN ('O', 'A')
-    AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2 AND (t.tgtype & 32) = 32 AND t.tgfoid = 'app.refuse_truncate()'::regprocedure), 1,
+    AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2 AND (t.tgtype & 32) = 32 AND t.tgname = 'tx_identity_no_truncate' AND t.tgfoid = 'app.refuse_truncate()'::regprocedure), 1,
   'R1 (seceng review 4): a BEFORE TRUNCATE statement trigger on the marker table runs app.refuse_truncate() (mutation: the trigger is missing; there is no TRUNCATE exemption)');
+
+CREATE FUNCTION pg_temp.super_truncate() RETURNS text LANGUAGE plpgsql AS $$ BEGIN TRUNCATE app.tx_identity; RETURN 'ok'; EXCEPTION WHEN OTHERS THEN RETURN 'ERR:' || SQLSTATE; END $$;
+SELECT is(pg_temp.super_truncate(), 'ERR:42501', 'R1 addendum: a TRUNCATE gives 42501 even for a superuser (mutation: the trigger is missing)');
 
 -- ---------------------------------------------------------------- R1 hardening
 SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app', 'poly_worker', 'poly_operator']) r WHERE has_database_privilege(r, current_database(), 'TEMP')), 0, 'R1: no runtime role holds TEMP (pg_temp cannot shadow a relation in a definer)');
