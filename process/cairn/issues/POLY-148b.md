@@ -1,7 +1,7 @@
 ---
 id: POLY-148b
 title: Spike build and record
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-148
 blocked_by: [POLY-148a]
@@ -10,6 +10,11 @@ paths: [spikes/POLY-148/**, process/cairn/reviews/POLY-148/**, process/cairn/iss
 stage: execute
 estimate.cost_usd: "15.00"
 estimate.gate_cycles: 3
+actual.cost_usd: "4.2551"
+actual.tokens: 23418856
+actual.gate_cycles: 2
+actual.wall_clock: 40
+ratio: "0.28"
 labels: [security, auth, spike]
 priority: null
 pr: null
