@@ -1,7 +1,7 @@
 ---
 id: POLY-148
 title: Sign-in service spike
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-147]
@@ -9,7 +9,7 @@ assignee: seceng
 paths: [process/cairn/issues/POLY-148.md, process/cairn/reviews/POLY-148/**, spikes/POLY-148/**]
 labels: [security, auth, spike]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/129
 created: 2026-11-13
 updated: 2026-11-15
 ---
@@ -52,3 +52,7 @@ Acceptance criteria ticked against the record `process/cairn/reviews/POLY-148/sp
 7. The record: §6 gives the changes to blocks S, E and H and their price.
 
 Follow-ups for POLY-149, POLY-89, POLY-138 and SECURITY are held for one filing pass after merge.
+
+### @team-lead — 2026-11-15
+
+PR opened: https://github.com/richmosko/polycarpic/pull/129. Awaiting Validate.
