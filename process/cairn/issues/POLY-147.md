@@ -102,3 +102,7 @@ Principal (2026-11-15): the bootstrap also revokes PUBLIC's EXECUTE on the built
 ### @team-lead — 2026-11-15
 
 CI dispatch run 43760544343 on built @ 04726635: `db` (preflight) and `lint` both fail on one cause. `tests/db/identity-marker.test.ts` is in no area of `infra/ci/changes.mjs` DB_AREAS, so `tests/ci/db-areas.test.ts` fails (C7, C10; the "19 mapped files" control). `guard`, `changes`, `cairn`, `unit` pass. Local runs missed it: nobody ran `tests/ci`. devops-147 is spawned for the area-map fix and, later, the INFRA runbook line (R11). `paths` widened with `infra/ci/**` and `docs/INFRA/**`.
+
+### @qa-engineer — 2026-11-15
+
+Gate 3, build-green run on 04726635 (clean worktree, svelte-kit sync): lint 0, typecheck 0, turbo units 0, layers 528/528, db 511/511 (pgTAP included), tests/ci 525 pass 9 FAIL: infra/ci/changes.mjs DB_AREAS lacks tests/db/identity-marker.test.ts (add to tenancy; pinned in 4358eb43). Red-ifs proven in a scratch worktree: handle reverted to drizzle(client) -> nested-savepoint case red (plus 2 other savepoint tests); enter_asserted_user check removed -> 6 exact-call rows red. db suite wall, alternating, same container: main 65, 66, 55, 58 s; branch 60, 58, 56 s (median main 61.5, branch 58): no measurable growth.
