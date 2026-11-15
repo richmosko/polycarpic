@@ -71,6 +71,25 @@ In a marked transaction a forged `app.actor` is ignored; it still labels the unm
 `enter_job`. (seceng's note 14 says the grant may stay; it is revoked because `enter_job` is now its only caller, and a worker that can
 list job targets learns which users link which connections.)
 
+**Addendum to R1 and R8: TRUNCATE guard and per-reason exemption (seceng §4, adopted by the lead).** Migration `0011` adds
+`CREATE TRIGGER tx_identity_no_truncate BEFORE TRUNCATE ON app.tx_identity FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate();`.
+That reuses `0003`'s invoker function, so the marker sits under the same rule as the six tenancy tables, and a TRUNCATE gives `42501`
+even for a superuser.
+- **The purge is unaffected:** it uses DELETE. No TRUNCATE trigger fires on DELETE.
+- **The bench is unaffected:** each run migrates a fresh database and never truncates.
+- **No test helper is affected:** none truncates the marker. The R6 pgTAP helper clears it with DELETE, and `07`'s TRUNCATE assertions
+  run as runtime roles, which are refused for privilege first.
+- **R10 is unaffected:** firing a plpgsql trigger function needs no USAGE on the language.
+
+In R8, `02_rls_catalog.sql` keeps its 7-entry table-exemption list, with `app.tx_identity` not on it, so all ten `battery_gaps` checks
+run on the marker. A separate per-reason list, `pg_temp.reason_exemptions()`, holds exactly `app.tx_identity:pk_not_uuid`. The xid8
+key is by design. A row is dropped only when its `rel:reason` pair is listed, every entry must resolve with `to_regclass`, and the
+list's cardinality is 1. Its canaries show that a reason exemption hides only its own check:
+- a uuid-keyed canary listed for `pk_not_uuid`, with RLS disabled, still reports `rls_disabled`;
+- `ALTER TABLE app.tx_identity DISABLE ROW LEVEL SECURITY` in the rolled-back transaction makes the real chain report
+  `app.tx_identity:rls_disabled`.
+- **Red-if:** the reason filter compares by table alone, or `app.tx_identity` rejoins the table list.
+
 ## R2 — The definers
 
 All `LANGUAGE plpgsql SECURITY DEFINER SET search_path = ''`, every reference schema-qualified, REVOKE EXECUTE FROM PUBLIC, and each entered
