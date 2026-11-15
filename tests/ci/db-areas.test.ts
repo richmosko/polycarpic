@@ -29,8 +29,8 @@ const FILES = readdirSync(join(ROOT, 'tests/db')).filter((f) => f.endsWith('.tes
 
 // The ruling's table, pinned: which file belongs to which area.
 const TABLE: Record<(typeof AREAS)[number], string[]> = {
-  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite'],
-  tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap', 'identity-marker'], // POLY-147: the identity marker rides with the tenancy area
+  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker'],
+  tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap'],
   migrate: ['checks', 'connection', 'migrate-run-helper', 'runner', 'template-clone'],
   ops: ['ops-status', 'ops-hardening'],
 };
