@@ -76,3 +76,12 @@ Gate 1 — ruling: `process/cairn/reviews/POLY-147/ruling.md`. The design itself
 - R7: the bench harness lives under `tests/db/bench/` and runs against a same-server, same-day control on `main`.
 - R8: the test map.
 Open questions OQ-1 to OQ-4 go to the lead. The build proceeds on each recommendation unless this file says otherwise.
+
+### @team-lead — 2026-11-14
+
+Gate 1, Principal's decisions (2026-11-14 local; `process/DECISIONS.md`, 2026-11-15 UTC):
+- The exact-call check on the `enter_*` definers is dropped (adopted in ruling 60bfbb6e, withdrawn by seceng, architect concurs).
+- seceng S4 is in this loop's scope: revoke plpgsql `USAGE` from PUBLIC; `poly_app`, `poly_worker` and `poly_operator` are each refused a `DO` block and a plpgsql `CREATE FUNCTION`, with a test.
+- Lead adopts seceng S6 (the wrapper checks before COMMIT that the transaction is still the marked one) and S1, S2 as test-map additions.
+- The architect's four open questions (ruling §OQ) proceed on their recommendations; seceng accepted each with its mechanism (security-review.md @ cef43a16).
+- qa-147, not the builder, runs the R7 measurement.
