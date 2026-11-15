@@ -132,7 +132,8 @@ async function inTransaction<T>(kind: Kind, getPool: () => pg.Pool, setup: (clie
       try {
         // A NodePgTransaction, not drizzle(client): the database object's transaction() issues its own BEGIN and, on a throw, a
         // ROLLBACK of the whole real transaction, which would end the marked transaction. The transaction object's is a savepoint.
-        const tx = new NodePgTransaction(new PgDialect(), drizzle(client)._.session, undefined) as unknown as Tx;
+        const s = drizzle(client)._.session as unknown as ConstructorParameters<typeof NodePgTransaction>[1] & { dialect: PgDialect; schema: undefined };
+        const tx = new NodePgTransaction(s.dialect, s, s.schema) as unknown as Tx;
         if (kind === 'withContextFreeTx') {
           let used = false;
           Object.defineProperty(tx, 'enterNewUser', {
