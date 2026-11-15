@@ -25,3 +25,15 @@ seceng writes, before the harness exists, one executable check per measurable it
 - [ ] A single entry point runs them all and prints pass or fail per item; with no spike present every check fails for its stated reason, and that run is recorded in a comment on this issue.
 - [ ] A short README states the contract the harness must expose (commands, ports, role names) and nothing more.
 - [ ] After the build, seceng's review of each result is in `process/cairn/reviews/POLY-148/spike.md`, including the `__Host-` versus `__Secure-` trade-off and any gap handed to POLY-89.
+
+## Comments
+
+### @seceng — 2026-11-15
+
+Checks written before the harness: `spikes/POLY-148/checks/` (contract in README.md, record requirements in RECORD.md). Entry point `node spikes/POLY-148/checks/run.mjs`.
+
+**Red run, no harness present (2026-11-15):** 34 lines, 34 FAIL, 0 PASS, exit 1. Every line fails for the same named reason: Caddy :58480, web :58481 and the service :58482 refuse connections, and container `poly148-pg` does not exist. Lines: H 14 (one per session-creating path, plus sign-out and forgery), S 11, C 4, M 3, P 2 (report only).
+
+The pure parts were checked against independent oracles: TOTP matches the RFC 6238 vector, the software passkey verifies under `@simplewebauthn/server` 13.3.3, and the cookie jar applies the RFC 6265 path and prefix rules. Every other predicate is exercised for the first time against the harness.
+
+H covers six session-creating routes the issue does not list, read from the 1.7.18 dist: sign-up, backup code, two-factor disable, change-password, passkey sign-in, and passkey registration with createSession.
