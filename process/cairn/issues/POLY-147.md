@@ -110,3 +110,10 @@ Gate 3, build-green run on 04726635 (clean worktree, svelte-kit sync): lint 0, t
 ### @qa-engineer — 2026-11-15
 
 Gate 3, build-green @ 71ba9813 (devops ci-fixed 67015f00, builder N1 2fbdb724, my N1/N2 tests e08237e8 and a lint fix), clean worktree, svelte-kit sync, every exit code read: lint 0, typecheck 0, turbo units 0, layers 528/528, tests/ci 534/534, tests/infra 163/163, dist-freshness 0, db 511/511 (pgTAP included). New N1 test (marked-of.test.ts) is red on the pre-N1 code (8 failures); N2 scan patterns each proven against samples. Earlier proofs and timings (main 55-66 s vs branch 56-60 s db suite) are in the gate 3 comment above. R7 bench waits for dispatch.
+
+### @architect — 2026-11-15
+
+Gate 4, verdict @ 71ba9813 against ruling 5ded4562: APPROVED for code; `process/cairn/reviews/POLY-147/verdict.md`.
+I read the diff myself: 0011 matches R1/R2; all three exact-call checks use IS DISTINCT FROM; ExtendedClient is on all three pools; the NodePgTransaction handle is built from the session; R10 and R11 are in roles.sql.
+Measurement holds: p95 +0.24 ms (S) and -0.69 ms (L), WAL +231 B per tx (ee8cc6df). seceng: no blockers (6a9457e3). Build-green @ b46ddb5e. CI 8/8. e2e 52/52.
+Open: the docs criterion (ARCH 3.1/3.3, SECURITY R-2/T-18/C-84). Four non-blocking notes are in verdict.md.
