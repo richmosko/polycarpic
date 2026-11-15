@@ -7,18 +7,28 @@
 BEGIN;
 SELECT no_plan();
 
+-- POLY-147 (R6): identity is the transaction marker. A superuser writes it (no production role can); '' clears it.
+CREATE FUNCTION pg_temp.set_id(uid text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  IF to_regclass('app.tx_identity') IS NULL THEN
+    IF uid <> '' THEN RAISE EXCEPTION 'no app.tx_identity: nothing can carry an identity' USING ERRCODE = '42P01'; END IF;
+    RETURN;
+  END IF;
+  DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id();
+  IF uid <> '' THEN INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), uid::uuid, NULL, 'web'); END IF;
+END $$;
 CREATE FUNCTION pg_temp.sx(q text) RETURNS text LANGUAGE plpgsql AS $$ BEGIN EXECUTE q; RETURN 'ok'; EXCEPTION WHEN OTHERS THEN RETURN 'ERR:' || SQLSTATE; END $$;
 CREATE FUNCTION pg_temp.q1(q text) RETURNS text LANGUAGE plpgsql AS $$ DECLARE r text; BEGIN EXECUTE q INTO r; RETURN coalesce(r, ''); EXCEPTION WHEN OTHERS THEN RETURN 'ERR:' || SQLSTATE; END $$;
--- runs `pre` (optional) then `q` (a statement returning one text value) as `role` with app.user_id = uid ('' = none)
+-- runs `pre` (optional) then `q` (a statement returning one text value) as `role` with the identity marker of uid ('' = none)
 CREATE FUNCTION pg_temp.run_as(role text, uid text, pre text, q text) RETURNS text LANGUAGE plpgsql AS $$
 DECLARE r text;
 BEGIN
-  PERFORM set_config('app.user_id', uid, true);
+  PERFORM pg_temp.set_id(uid);
   EXECUTE format('SET LOCAL ROLE %I', role);
   IF pre IS NOT NULL THEN EXECUTE pre; END IF;
   EXECUTE q INTO r;
   RESET ROLE;
-  PERFORM set_config('app.user_id', '', true);
+  PERFORM pg_temp.set_id('');
   RETURN coalesce(r, '');
 EXCEPTION WHEN OTHERS THEN RETURN 'ERR:' || SQLSTATE;
 END $$;
@@ -51,10 +61,10 @@ SELECT is(pg_temp.sx($f$
     ('00000000-0000-4000-8000-0000000000f6', 'U6', 'u6@qa.test', false),
     ('00000000-0000-4000-8000-0000000000f7', 'U7', 'u7@qa.test', true),
     ('00000000-0000-4000-8000-0000000000f8', 'Existing', 'p@qa.test', true);
-  SELECT set_config('app.user_id', '00000000-0000-4000-8000-0000000000f0', true);
+  SELECT pg_temp.set_id('00000000-0000-4000-8000-0000000000f0');
   INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES ('00000000-0000-4000-8000-0000000000e1',
     (SELECT id FROM public.entity_type WHERE system_key = 'business'), 'qa-E', 'business_pass_through');
-  SELECT set_config('app.user_id', '', true);
+  SELECT pg_temp.set_id('');
   UPDATE public."user" SET second_step_at = now() WHERE id = '00000000-0000-4000-8000-0000000000f2';
   INSERT INTO public.invitation (id, entity_id, email, role, inviter_user_id, token_hash, expires_at) VALUES
     ('00000000-0000-4000-8000-0000000000b1', '00000000-0000-4000-8000-0000000000e1', 'u1@qa.test', 'viewer', '00000000-0000-4000-8000-0000000000f0', sha256('t1'::bytea), now() + interval '1 day'),
@@ -129,7 +139,7 @@ SELECT is((SELECT array_agg(polname::text ORDER BY polname COLLATE "C") FROM pg_
 
 -- ---------------------------------------------------------------- C17: accept_invitations outside a sign-up transaction
 SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501',
-  'C17: a signed-in existing user (app.user_id set, row inserted by an earlier transaction) is refused (mutation: accept trusts the setting)');
+  'C17: a signed-in existing user (a marker in place, row inserted by an earlier transaction) is refused (mutation: accept trusts the marker)');
 SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', $q$UPDATE public."user" SET name = 'touched' WHERE id = '00000000-0000-4000-8000-0000000000f8'$q$,
     $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501', 'C17: the same forgery after this transaction UPDATEd the row (the xmin test would pass it)');
 SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501', 'C17: with no user set at all');
@@ -168,9 +178,9 @@ SELECT ok(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f0', NUL
 -- ---------------------------------------------------------------- C29/C30: claim_invitations
 SELECT is((SELECT pg_get_function_result(oid) FROM pg_proc WHERE pronamespace = 'app'::regnamespace AND proname = 'claim_invitations'), 'void', 'C30: claim_invitations returns void (no oracle in its result)');
 SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.claim_invitations(sha256('t4'::bytea), 'p@qa.test')::text$q$), 'ERR:42501',
-  'C30: claim_invitations with app.user_id set raises 42501 (mutation: no signed-in check)');
+  'C30: claim_invitations with a marker in place raises 42501 (mutation: no signed-in check)');
 SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.claim_invitations(sha256('t4'::bytea), 'p@qa.test')::text$q$), '',
-  'C30 control: the same claim with no user set succeeds, so the 42501 above is the setting check');
+  'C30 control: the same claim with no user set succeeds, so the 42501 above is the marker check');
 SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.claim_invitations(sha256('t4'::bytea), 'someone.else@qa.test')::text$q$), 'ERR:42501', 'C29: a mismatched email is refused 42501');
 SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.claim_invitations(sha256('unknown'::bytea), 'p@qa.test')::text$q$), 'ERR:42501', 'C29: an unknown token is refused 42501');
 SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.claim_invitations(NULL, 'u1@qa.test')::text$q$), 'ERR:42501', 'C29: a token-less claim for an email whose invitation is already claimed is refused');

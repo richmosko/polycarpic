@@ -36,22 +36,22 @@ afterAll(async () => { await m?.close?.(); await auth?.close?.(); });
 const q = (tx: any, text: string, p?: unknown[]) => auth.clientOf(tx).query(text, p).then((r: any) => r.rows);
 
 describe('withTenant', () => {
-  it('sets app.user_id and app.session_id transaction-locally (is_local = true)', async () => {
+  it('writes the identity marker for this transaction only: current_user_id() and current_session_id() read it, kind web  [red if: withTenant still sets app.user_id, or the marker outlives the transaction]', async () => {
     const got = await m.withTenant(session.sessionUserId(UID), SID, async (tx: any) => ({
-      u: (await q(tx, `select current_setting('app.user_id') u`))[0].u,
-      s: (await q(tx, `select current_setting('app.session_id') s`))[0].s,
-      cu: (await q(tx, `select app.current_user_id()::text cu`))[0].cu,
+      u: (await q(tx, `select app.current_user_id()::text u`))[0].u,
+      s: (await q(tx, `select app.current_session_id()::text s`))[0].s,
+      k: (await q(tx, `select kind from app.tx_identity where xid = pg_current_xact_id_if_assigned()`))[0].k,
+      raw: (await q(tx, `select coalesce(current_setting('app.user_id', true), '') raw`))[0].raw,
     }));
-    expect(got).toEqual({ u: UID, s: SID, cu: UID });
-    // a following transaction on the pool carries nothing: the GUC reads '' (not NULL) and the nullif form gives NULL
-    const after = await auth.withContextFreeTx(async (tx: any) => (await q(tx,
-      `select coalesce(current_setting('app.user_id', true), '<null>') raw, app.current_user_id() is null as denied`))[0]);
+    expect(got).toEqual({ u: UID, s: SID, k: 'web', raw: '' });
+    // a following transaction on the pool carries nothing
+    const after = await auth.withContextFreeTx(async (tx: any) => (await q(tx, `select app.current_user_id() is null as denied`))[0]);
     expect(after.denied).toBe(true);
   });
 
-  it('current_user_id() uses the nullif form: empty string yields NULL, not a cast error', async () => {
+  it('a forged app.user_id grants nothing: current_user_id() stays NULL  [red if: current_user_id() still reads the setting]', async () => {
     const r = await auth.withContextFreeTx(async (tx: any) => {
-      await q(tx, `select set_config('app.user_id', '', true)`);
+      await q(tx, `select set_config('app.user_id', '${UID}', true)`);
       return (await q(tx, `select app.current_user_id() is null as n`))[0].n;
     });
     expect(r).toBe(true);
@@ -79,22 +79,22 @@ describe('withSystem job name', () => {
 });
 
 describe('app.job_targets', () => {
-  it('is executable by poly_worker, refused (42501) for poly_app', () => {
-    expect(must(`select count(*) from app.job_targets('no-such-job')`, db, { role: 'poly_worker' }).rows[0][0]).toBe('0');
-    const r = psql(`select * from app.job_targets('x')`, db, { role: 'poly_app' });
-    expect(r.sqlstate).toBe('42501');
+  it('is executable by no runtime role: enter_job is its only caller  [red if: poly_worker keeps EXECUTE on job_targets]', () => {
+    for (const role of ['poly_worker', 'poly_app']) {
+      const r = psql(`select * from app.job_targets('x')`, db, { role });
+      expect(r.sqlstate, role).toBe('42501');
+    }
   });
 });
 
 describe('withContextFreeTx', () => {
-  it('first statement asserts app.user_id is empty: a connection carrying a user id is refused', async () => {
+  it('a connection carrying a session-level app.user_id is not refused and still reads no identity  [red if: the wrapper still asserts the setting, or current_user_id() reads it]', async () => {
     await auth.close(); // drop pooled backends so the next one is fresh and picks up the role setting
     m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) }); // close() resets the config
     must(`ALTER ROLE poly_app IN DATABASE ${db} SET app.user_id = '${UID}'`);
     try {
-      let ran = false;
-      await expect(auth.withContextFreeTx(async () => { ran = true; })).rejects.toThrow(/app\.user_id/i);
-      expect(ran).toBe(false);
+      const got = await auth.withContextFreeTx(async (tx: any) => (await q(tx, `select app.current_user_id() is null as n, coalesce(current_setting('app.user_id', true), '') as raw`))[0]);
+      expect(got).toEqual({ n: true, raw: UID });
     } finally {
       await auth.close();
       m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
@@ -131,24 +131,21 @@ describe('no nesting: all sixteen ordered pairs (self-nesting included), each re
 
 // ---------------------------------------------------------------- POLY-142 C11 (O1): withOperatorTx
 describe('withOperatorTx (@poly/db/operator)', () => {
-  it('runs as poly_operator (POLY-146) with app.actor = operator:cli and an empty app.user_id; its handle has no enterNewUser  [red if: wrong pool, a second setting, a user id, or the new-user step leaks onto the handle]', async () => {
+  it('runs as poly_operator (POLY-146) with app.actor = operator:cli; it can read no identity and its handle has no enterNewUser  [red if: wrong pool, a second setting, or the new-user step leaks onto the handle]', async () => {
     const got = await operator.withOperatorTx(async (tx: any) => ({
       who: (await q(tx, `select current_user as v`))[0].v,
       actor: (await q(tx, `select current_setting('app.actor', true) as v`))[0].v,
-      uid: (await q(tx, `select coalesce(current_setting('app.user_id', true), '') as v`))[0].v,
-      sess: (await q(tx, `select coalesce(current_setting('app.session_id', true), '') as v`))[0].v,
+      read: await q(tx, `select app.current_user_id()::text as v`).then(() => 'read', (x: any) => x.code),
       step: 'enterNewUser' in tx || typeof tx.enterNewUser === 'function',
     }));
-    expect(got).toEqual({ who: 'poly_operator', actor: 'operator:cli', uid: '', sess: '', step: false });
+    expect(got).toEqual({ who: 'poly_operator', actor: 'operator:cli', read: '42501', step: false });
   });
-  it('is_local: after commit and after rollback, the next checkout of a max:1 pool reads app.actor and app.user_id empty  [red if: the setting is session-level and rides the backend]', async () => {
+  it('is_local: after commit and after rollback, the next checkout of a max:1 pool reads no operator actor  [red if: the setting is session-level and rides the backend]', async () => {
     await operator.close();
     m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db), max: 1 });
     try {
       await operator.withOperatorTx(async () => 'ok');
       await expect(operator.withOperatorTx(async () => { throw new Error('boom'); })).rejects.toThrow('boom');
-      const after = await operator.withOperatorTx(async (tx: any) => (await q(tx, `select coalesce(current_setting('app.user_id', true), '') u`))[0].u);
-      expect(after).toBe('');
       const raw = await m.withSystem(SEEDED_JOB, SEEDED_TARGET, async (tx: any) => (await q(tx, `select coalesce(current_setting('app.actor', true), '') a`))[0].a).catch(() => 'n/a');
       expect(raw).not.toBe('operator:cli'); // a later transaction on the same backend carries no operator actor
     } finally {
@@ -156,14 +153,14 @@ describe('withOperatorTx (@poly/db/operator)', () => {
       m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
     }
   });
-  it('refuses a connection that carries an app.user_id, the callback never running  [red if: the emptiness assertion is missing]', async () => {
+  it('a connection carrying an app.user_id is not refused: the setting means nothing to the operator path  [red if: the wrapper still asserts the setting]', async () => {
     await operator.close();
     m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
     must(`ALTER ROLE poly_operator IN DATABASE ${db} SET app.user_id = '${UID}'`);
     try {
       let ran = false;
-      await expect(operator.withOperatorTx(async () => { ran = true; })).rejects.toThrow(/app\.user_id/i);
-      expect(ran).toBe(false);
+      await operator.withOperatorTx(async () => { ran = true; });
+      expect(ran).toBe(true);
     } finally {
       await operator.close();
       m.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });

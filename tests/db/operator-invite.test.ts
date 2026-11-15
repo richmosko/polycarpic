@@ -261,6 +261,20 @@ describe('POLY-146 AC5: the operator has its own pool (ruling R1)', () => {
     const who = await m.withOperatorTx(async (tx: any) => (await tx.execute(e.dbm.sql`SELECT current_user AS u`)).rows[0].u);
     expect(who).toBe('poly_operator');
   });
+  it('POLY-147: a forged app.user_id on the operator role means nothing; the invite still succeeds  [red if: the issuer or the wrapper still reads the setting]', async () => {
+    const m = await opm();
+    await m.close();
+    restore();
+    must(`ALTER ROLE poly_operator IN DATABASE ${e.db} SET app.user_id = '11111111-1111-4111-8111-111111111111'`);
+    try {
+      const r = await invite(`forged-${stamp()}@qa.test`, false);
+      expect(r.code, r.err).toBe(0);
+    } finally {
+      await m.close();
+      restore();
+      must(`ALTER ROLE poly_operator IN DATABASE ${e.db} RESET app.user_id`);
+    }
+  });
   it('an operator env whose DATABASE_USER is poly_worker throws OperatorPoolRefused and opens no connection  [red if: the pool is built from whatever user it is given]', async () => {
     const c = await counter();
     try {

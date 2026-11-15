@@ -24,13 +24,14 @@ beforeAll(async () => {
 afterAll(() => teardown(e));
 
 describe('inside withTenant', () => {
-  it('BetterAuth statements run on the request client: same backend, GUCs visible  [red if: the pool opens its own connection]', async () => {
+  it('BetterAuth statements run on the request client: same backend, the marker identity visible  [red if: the pool opens its own connection]', async () => {
     await tenant(U1, async (tx) => {
       const outer = (await e.dba.clientOf(tx).query('select pg_backend_pid() p')).rows[0].p;
       const l = await lease();
-      const r = (await l.query(`select pg_backend_pid() p, current_setting('app.user_id') u, current_setting('app.session_id') s`)).rows[0];
-      expect(r).toEqual({ p: outer, u: U1, s: S1 });
-      l.release();
+      try {
+        const r = (await l.query(`select pg_backend_pid() p, app.current_user_id()::text u, app.current_session_id()::text s`)).rows[0];
+        expect(r).toEqual({ p: outer, u: U1, s: S1 });
+      } finally { l.release(); }
     });
   });
 
@@ -141,18 +142,19 @@ describe('serialisation (criterion 1)', () => {
 });
 
 describe('outside a transaction', () => {
-  it('a plain poly_app pool with no GUC  [red if: it returns a client still carrying app.user_id]', async () => {
-    const r = await pool.query(`select coalesce(current_setting('app.user_id', true), '') u, coalesce(current_setting('app.session_id', true), '') s, current_user cu`);
+  it('a plain poly_app pool with no marker  [red if: it returns a client still carrying an identity]', async () => {
+    const r = await pool.query(`select coalesce(app.current_user_id()::text, '') u, coalesce(app.current_session_id()::text, '') s, current_user cu`);
     expect(r.rows[0]).toEqual({ u: '', s: '', cu: 'poly_app' });
   });
 
-  it('P7: a backend that served a withTenant, checked out next on the plain path, reads both GUCs empty  [red if: set_config(.., false) leaks the identity]', async () => {
+  it('P7: a backend that served a withTenant, checked out next on the plain path, reads no identity  [red if: an identity leaks onto the backend]', async () => {
     await tenant(U2, async () => {});
     for (let i = 0; i < 5; i++) {
       const c = await pool.connect();
-      const r = (await c.query(`select coalesce(current_setting('app.user_id', true), '') u, coalesce(current_setting('app.session_id', true), '') s`)).rows[0];
-      expect(r).toEqual({ u: '', s: '' });
-      c.release();
+      try {
+        const r = (await c.query(`select coalesce(app.current_user_id()::text, '') u, coalesce(app.current_session_id()::text, '') s`)).rows[0];
+        expect(r).toEqual({ u: '', s: '' });
+      } finally { c.release(); }
     }
   });
 });

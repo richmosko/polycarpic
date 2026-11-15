@@ -1,0 +1,125 @@
+-- POLY-147 (ruling 2027afdb, R1, R2, R5, R8, R10; seceng conditions). The identity marker and its definers, as catalog facts and
+-- as the role-level behaviour pgTAP can reach. One transaction, rolled back. Behaviour that needs a fresh transaction id (a
+-- definer's success path, the exact-call refusals, savepoints, purge) is in tests/db/identity-marker.test.ts: here a superuser
+-- writes the marker (pg_temp.set_id), which no production role can. Each message names the mutation that turns it red.
+BEGIN;
+SELECT no_plan();
+
+CREATE FUNCTION pg_temp.set_id(uid text) RETURNS void LANGUAGE plpgsql AS $$
+BEGIN
+  DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id();
+  IF uid <> '' THEN INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), uid::uuid, NULL, 'web'); END IF;
+END $$;
+-- runs q as role (after the marker for uid, '' = none); returns the single text value, or 'ERR:<sqlstate>'
+CREATE FUNCTION pg_temp.run_as(role text, uid text, q text) RETURNS text LANGUAGE plpgsql AS $$
+DECLARE r text;
+BEGIN
+  PERFORM pg_temp.set_id(uid);
+  EXECUTE format('SET LOCAL ROLE %I', role);
+  EXECUTE q INTO r;
+  RESET ROLE;
+  PERFORM pg_temp.set_id('');
+  RETURN coalesce(r, '');
+EXCEPTION WHEN OTHERS THEN RETURN 'ERR:' || SQLSTATE;
+END $$;
+-- the exact EXECUTE grantees of a function, owner excluded, PUBLIC named
+CREATE FUNCTION pg_temp.grantees(f text) RETURNS text LANGUAGE sql AS $$
+  SELECT coalesce(string_agg(CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END, ',' ORDER BY CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END COLLATE "C"), '')
+  FROM pg_proc p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+  WHERE p.oid = f::regprocedure AND a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner
+$$;
+CREATE FUNCTION pg_temp.fn(nm text) RETURNS regprocedure LANGUAGE sql AS $$
+  SELECT p.oid::regprocedure FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname = nm
+$$;
+
+-- ---------------------------------------------------------------- K1: the table
+SELECT has_table('app', 'tx_identity', 'app.tx_identity exists (mutation: migration 0011 absent)');
+SELECT is((SELECT string_agg(column_name || ':' || data_type || ':' || is_nullable, ',' ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'app' AND table_name = 'tx_identity'),
+  'xid:xid8:NO,user_id:uuid:NO,session_id:uuid:YES,kind:text:NO,created_at:timestamp with time zone:NO', 'K1: columns xid8, user_id, session_id (null), kind, created_at, in this order');
+SELECT is((SELECT array_agg(a.attname::text) FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey) WHERE i.indrelid = 'app.tx_identity'::regclass AND i.indisprimary), ARRAY['xid'], 'K1: xid is the primary key (a second marker per transaction stays impossible)');
+SELECT is((SELECT count(*)::int FROM pg_constraint WHERE conrelid = 'app.tx_identity'::regclass AND contype = 'f'), 0, 'R1: no foreign key (it would lock the user row on every request)');
+SELECT is((SELECT count(*)::int FROM pg_constraint WHERE conrelid = 'app.tx_identity'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) ~ 'web' AND pg_get_constraintdef(oid) ~ 'signup' AND pg_get_constraintdef(oid) ~ 'system:'), 1, 'R1: a CHECK limits kind to web, signup and system:<job>');
+SELECT is((SELECT pg_get_userbyid(relowner)::text FROM pg_class WHERE oid = 'app.tx_identity'::regclass), 'poly_owner', 'R1: owned by poly_owner');
+SELECT ok((SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid = 'app.tx_identity'::regclass), 'R1: RLS enabled and FORCEd (mutation: not forced)');
+SELECT is((SELECT string_agg(CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END || ':' || a.privilege_type, ',' ORDER BY CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END COLLATE "C", a.privilege_type COLLATE "C")
+    FROM pg_class c CROSS JOIN LATERAL aclexplode(c.relacl) a WHERE c.oid = 'app.tx_identity'::regclass AND a.grantee <> c.relowner),
+  'poly_app:SELECT,poly_authz:INSERT,poly_authz:SELECT,poly_govern:SELECT,poly_graph:SELECT,poly_journal:SELECT,poly_purge:DELETE,poly_purge:SELECT,poly_rollup:SELECT,poly_stake:SELECT,poly_worker:SELECT',
+  'R1: the exact ACL minus the owner: SELECT for nine roles, INSERT poly_authz, DELETE poly_purge; no UPDATE, TRUNCATE, REFERENCES, TRIGGER; PUBLIC, poly_operator, poly_backup absent');
+SELECT is((SELECT count(*)::int FROM pg_roles r, unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p WHERE r.rolname IN ('poly_operator', 'poly_migrator') AND has_table_privilege(r.oid, 'app.tx_identity', p)), 0, 'R1: poly_operator and poly_migrator hold no privilege on the marker');
+SELECT is((SELECT count(*)::int FROM pg_policy WHERE polrelid = 'app.tx_identity'::regclass), 4, 'R1: exactly four policies');
+SELECT is((SELECT pg_get_expr(polqual, polrelid) FROM pg_policy WHERE polrelid = 'app.tx_identity'::regclass AND polname = 'tx_identity_own' AND polcmd = 'r'), '(xid = pg_current_xact_id_if_assigned())', 'R1: the read policy is xid = pg_current_xact_id_if_assigned() (mutation: pg_current_xact_id(), which assigns an id)');
+SELECT is((SELECT pg_get_expr(polwithcheck, polrelid) FROM pg_policy WHERE polrelid = 'app.tx_identity'::regclass AND polname = 'tx_identity_enter' AND polcmd = 'a'), '(xid = pg_current_xact_id())', 'R1: the insert policy checks xid = pg_current_xact_id()');
+SELECT is((SELECT array_agg(polname::text ORDER BY polname COLLATE "C") FROM pg_policy WHERE polrelid = 'app.tx_identity'::regclass), ARRAY['tx_identity_enter', 'tx_identity_own', 'tx_identity_purge', 'tx_identity_purge_read'], 'R1: the four policies by name');
+SELECT matches((SELECT pg_get_expr(polqual, polrelid) FROM pg_policy WHERE polrelid = 'app.tx_identity'::regclass AND polname = 'tx_identity_purge'), 'pg_xact_status\(xid\) IS DISTINCT FROM ''in progress''', 'R1: the purge policy repeats the in-progress guard (IS DISTINCT FROM, never <>)');
+SELECT is((SELECT count(*)::int FROM pg_policy WHERE polrelid = 'app.tx_identity'::regclass AND 0 = ANY (polroles)), 0, 'R1: no policy applies to PUBLIC');
+
+-- ---------------------------------------------------------------- R1 hardening
+SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app', 'poly_worker', 'poly_operator']) r WHERE has_database_privilege(r, current_database(), 'TEMP')), 0, 'R1: no runtime role holds TEMP (pg_temp cannot shadow a relation in a definer)');
+SELECT is(current_setting('max_prepared_transactions'), '0', 'S1: max_prepared_transactions = 0, so a marked transaction cannot be parked (mutation: the setting is raised)');
+
+-- ---------------------------------------------------------------- R2: the definers (seceng S2)
+SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('enter_asserted_user'))), 'p_user uuid, p_session uuid', 'R2: enter_asserted_user(p_user uuid, p_session uuid)');
+SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('enter_job'))), 'p_job text, p_entity uuid, p_connection uuid', 'R2: enter_job(p_job text, p_entity uuid, p_connection uuid)');
+SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('enter_new_user'))), 'uuid', 'R2: enter_new_user(uuid), the unnamed argument kept');
+SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('purge_tx_identity'))), '', 'R2: purge_tx_identity() takes no argument, so the caller cannot choose the age');
+SELECT is((SELECT pg_get_function_result(pg_temp.fn('purge_tx_identity'))), 'integer', 'R2: purge_tx_identity returns the row count');
+SELECT is((SELECT string_agg(p.proname || ':' || pg_get_userbyid(p.proowner) || ':' || p.prosecdef::text || ':' || coalesce(p.proconfig::text, 'none') || ':' || pg_get_function_result(p.oid), ',' ORDER BY p.proname COLLATE "C")
+    FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname IN ('enter_asserted_user', 'enter_job', 'enter_new_user', 'purge_tx_identity')),
+  'enter_asserted_user:poly_authz:true:{search_path=""}:text,enter_job:poly_authz:true:{search_path=""}:text,enter_new_user:poly_authz:true:{search_path=""}:void,purge_tx_identity:poly_purge:true:{search_path=""}:integer',
+  'R2: owners poly_authz / poly_purge, SECURITY DEFINER, search_path pinned empty, results text, text, void, integer');
+SELECT is((SELECT string_agg(p.proname, ',' ORDER BY p.proname COLLATE "C") FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname IN ('enter_asserted_user', 'enter_job', 'enter_new_user') AND p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')), 'enter_asserted_user,enter_job,enter_new_user', 'R2: the three identity definers are plpgsql');
+SELECT is(pg_temp.grantees(pg_temp.fn('enter_asserted_user')::text), 'poly_app', 'I1: EXECUTE on enter_asserted_user: poly_app alone (mutation: PUBLIC, or poly_worker)');
+SELECT is(pg_temp.grantees(pg_temp.fn('enter_job')::text), 'poly_worker', 'J1: EXECUTE on enter_job: poly_worker alone');
+SELECT is(pg_temp.grantees('app.enter_new_user(uuid)'), 'poly_app', 'K3: EXECUTE on enter_new_user: poly_app alone');
+SELECT is(pg_temp.grantees(pg_temp.fn('purge_tx_identity')::text), 'poly_worker', 'K4: EXECUTE on purge_tx_identity: poly_worker alone');
+SELECT is(pg_temp.grantees(pg_temp.fn('current_session_id')::text), 'poly_app', 'R1: EXECUTE on current_session_id: poly_app alone');
+SELECT is(pg_temp.grantees('app.job_targets(text)'), '', 'J1: job_targets has no EXECUTE grantee but its owner');
+SELECT ok(has_function_privilege('poly_app', 'app.current_user_id()', 'EXECUTE') AND has_function_privilege('poly_worker', 'app.current_user_id()', 'EXECUTE') AND NOT has_function_privilege('public', 'app.current_user_id()', 'EXECUTE'), 'R1: current_user_id grants unchanged: poly_app and poly_worker, not PUBLIC');
+SELECT is((SELECT string_agg(p.proname || '=>' || pg_temp.grantees(p.oid::regprocedure::text), ';' ORDER BY p.proname COLLATE "C") FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname LIKE 'enter\_%'),
+  'enter_asserted_user=>poly_app;enter_job=>poly_worker;enter_new_user=>poly_app', 'I1: every app.enter_* function, with its exact EXECUTE set; an unlisted enter_* fails here');
+SELECT is((SELECT count(*)::int FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname ~ '^(enter_|purge_tx)' AND pg_get_function_arguments(p.oid) ~* 'kind'), 0, 'J3: no definer takes a kind argument; the kind comes from the body');
+
+-- ---------------------------------------------------------------- K2: a forged setting grants nothing
+INSERT INTO public."user" (id, name, email, email_verified) VALUES ('00000000-0000-4000-8000-0000000147a1', 'K2 owner', 'k2owner@qa.test', true);
+SELECT pg_temp.set_id('00000000-0000-4000-8000-0000000147a1');
+INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES ('00000000-0000-4000-8000-0000000147e1',
+  (SELECT id FROM public.entity_type WHERE system_key = 'business'), 'qa-K2', 'business_pass_through');
+INSERT INTO public.entity_type (name, kind, owner_user_id) VALUES ('K2 Club', 'base', '00000000-0000-4000-8000-0000000147a1');
+SELECT pg_temp.set_id('');
+SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000147a1', $q$SELECT count(*)::text FROM public.entity$q$), '1', 'K2 control: with the marker, the owner sees the entity, so the zeros below are the forged setting not counting');
+SELECT is(pg_temp.run_as('poly_app', '', $q$SELECT set_config('app.user_id', '00000000-0000-4000-8000-0000000147a1', true) || '|' || coalesce(app.current_user_id()::text, 'null')$q$), '00000000-0000-4000-8000-0000000147a1|null', 'K2: poly_app, forged app.user_id: current_user_id() is null (mutation: the body reads the setting)');
+SELECT is(pg_temp.run_as('poly_worker', '', $q$SELECT set_config('app.user_id', '00000000-0000-4000-8000-0000000147a1', true) || '|' || coalesce(app.current_user_id()::text, 'null')$q$), '00000000-0000-4000-8000-0000000147a1|null', 'K2: poly_worker, forged app.user_id: current_user_id() is null');
+SELECT is(pg_temp.run_as(r, '', format($q$SELECT (set_config('app.user_id', '00000000-0000-4000-8000-0000000147a1', true) IS NOT NULL AND (SELECT count(*) FROM public.%I) = 0)::text$q$, t)), 'true', 'K2: ' || r || ' with a forged setting reads zero rows of ' || t)
+  FROM unnest(ARRAY['poly_app', 'poly_worker']) r, unnest(ARRAY['entity', 'membership', 'invitation', 'audit_event', 'notification', 'entity_type']) t;
+SELECT is(pg_temp.run_as('poly_operator', '', $q$SELECT set_config('app.user_id', '00000000-0000-4000-8000-0000000147a1', true) || app.current_user_id()::text$q$), 'ERR:42501', 'K2 (OQ-2): poly_operator, forged setting: current_user_id() is refused 42501, no new grant');
+SELECT is(pg_temp.run_as('poly_operator', '', $q$SELECT count(*)::text FROM app.tx_identity$q$), 'ERR:42501', 'K2 (OQ-2): poly_operator cannot read the marker table');
+
+-- ---------------------------------------------------------------- no production role can write the marker
+SELECT is(pg_temp.run_as(r, '', s), 'ERR:42501', 'K1: ' || r || ' cannot ' || split_part(s, ' ', 1) || ' the marker table')
+  FROM unnest(ARRAY['poly_app', 'poly_worker']) r,
+       unnest(ARRAY['INSERT INTO app.tx_identity (xid, user_id, kind) VALUES (pg_current_xact_id(), ''00000000-0000-4000-8000-0000000147a1'', ''web'')',
+                    'UPDATE app.tx_identity SET user_id = ''00000000-0000-4000-8000-0000000147a1''',
+                    'DELETE FROM app.tx_identity',
+                    'TRUNCATE app.tx_identity']) s;
+SELECT is(pg_temp.run_as('poly_purge', '', $q$SELECT count(*)::text FROM (SELECT 1 FROM app.tx_identity WHERE false) s$q$), '0', 'K1 control: poly_purge may read the marker table');
+SELECT is(pg_temp.run_as('poly_authz', '', $q$UPDATE app.tx_identity SET kind = 'web'$q$), 'ERR:42501', 'K1: even the definer owner holds no UPDATE');
+SELECT is(pg_temp.run_as('poly_authz', '', $q$DELETE FROM app.tx_identity$q$), 'ERR:42501', 'K1: ...and no DELETE (only the purge definer owner has it)');
+
+-- ---------------------------------------------------------------- no app.session_id reader; only the marker functions read the marker
+SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname IN ('app', 'public') AND p.prosrc ILIKE '%app.session_id%'), 0, 'S9: no function body in app or public mentions app.session_id');
+SELECT is((SELECT count(*)::int FROM pg_policy WHERE pg_get_expr(polqual, polrelid) ILIKE '%app.session_id%' OR pg_get_expr(polwithcheck, polrelid) ILIKE '%app.session_id%'), 0, 'S9: no policy mentions app.session_id');
+SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname IN ('app', 'public') AND p.prosrc ILIKE '%app.user_id%'), 0, 'K2: no function body mentions app.user_id any more');
+SELECT is((SELECT string_agg(p.proname, ',' ORDER BY p.proname COLLATE "C") FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname IN ('app', 'public') AND p.prosrc ILIKE '%tx\_identity%'),
+  'audit_membership,current_session_id,current_user_id,enter_asserted_user,enter_job,enter_new_user,purge_tx_identity', 'R8: only these seven functions read or write the marker table (mutation: a new reader)');
+SELECT is((SELECT count(*)::int FROM pg_policy WHERE pg_get_expr(polqual, polrelid) ILIKE '%tx\_identity%' AND polrelid <> 'app.tx_identity'::regclass), 0, 'R8: no policy outside the marker table reads it directly');
+SELECT matches((SELECT prosrc FROM pg_proc WHERE oid = 'app.audit_membership()'::regprocedure), 'tx_identity', 'R1: audit_membership reads the actor label from the marker');
+
+-- ---------------------------------------------------------------- R10: no plpgsql for the runtime roles
+SELECT is((SELECT string_agg(CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END, ',' ORDER BY CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END COLLATE "C")
+    FROM pg_language l CROSS JOIN LATERAL aclexplode(l.lanacl) a WHERE l.lanname = 'plpgsql' AND a.privilege_type = 'USAGE' AND a.grantee <> l.lanowner),
+  'poly_authz,poly_govern,poly_graph,poly_journal,poly_owner,poly_purge,poly_rollup,poly_stake', 'R10: USAGE on plpgsql is held by exactly the eight owner roles; PUBLIC absent (mutation: the REVOKE is missing)');
+SELECT is((SELECT count(*)::int FROM pg_language WHERE laninline <> 0 AND lanname <> 'plpgsql'), 0, 'R10: no other language has an inline handler (no DO in another language)');
+SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app', 'poly_worker', 'poly_operator', 'poly_backup', 'poly_migrator']) r WHERE has_language_privilege(r, 'plpgsql', 'USAGE')), 0, 'R10: no login role can use plpgsql');
+
+SELECT * FROM finish();
+ROLLBACK;
