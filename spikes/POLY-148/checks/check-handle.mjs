@@ -132,7 +132,10 @@ const defs = [
       t.ok(handleRow(h.value).sessionId === b.session.id, 'the re-issued handle does not map to the refreshed session');
       if (h.value !== b.handle) t.ok((await whoami(handleOnly(b.handle))).status === 401, 'the handle rotated on refresh but the old one still answers');
     } else {
-      t.ok((first?.maxAge ?? 0) >= left() - 60, `after refresh the session outlives the handle cookie: handle Max-Age ${first?.maxAge ?? 'session-only'} s, session expires in ${Math.round(left())} s, and the refreshing response set no handle`);
+      // The handle was issued seconds ago, so comparing its Max-Age with the time left now proves nothing. Refresh can slide the
+      // session to the 30-day cap, so a handle that is never re-issued must itself last to the cap.
+      const CAP = 30 * 86400;
+      t.ok((first?.maxAge ?? 0) >= CAP - 60, `refresh sets no handle and the handle's Max-Age (${first?.maxAge ?? 'session-only'} s) is shorter than the 30-day cap the session can slide to: a refreshed session outlives its handle cookie`);
     }
     t.ok((await whoami(handleOnly(h?.value ?? b.handle))).status === 200, 'after refresh the current handle no longer answers GET /spike/whoami');
   }],
