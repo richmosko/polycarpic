@@ -106,3 +106,7 @@ CI dispatch run 43760544343 on built @ 04726635: `db` (preflight) and `lint` bot
 ### @qa-engineer — 2026-11-15
 
 Gate 3, build-green run on 04726635 (clean worktree, svelte-kit sync): lint 0, typecheck 0, turbo units 0, layers 528/528, db 511/511 (pgTAP included), tests/ci 525 pass 9 FAIL: infra/ci/changes.mjs DB_AREAS lacks tests/db/identity-marker.test.ts (add to tenancy; pinned in 4358eb43). Red-ifs proven in a scratch worktree: handle reverted to drizzle(client) -> nested-savepoint case red (plus 2 other savepoint tests); enter_asserted_user check removed -> 6 exact-call rows red. db suite wall, alternating, same container: main 65, 66, 55, 58 s; branch 60, 58, 56 s (median main 61.5, branch 58): no measurable growth.
+
+### @qa-engineer — 2026-11-15
+
+Gate 3, build-green @ 71ba9813 (devops ci-fixed 67015f00, builder N1 2fbdb724, my N1/N2 tests e08237e8 and a lint fix), clean worktree, svelte-kit sync, every exit code read: lint 0, typecheck 0, turbo units 0, layers 528/528, tests/ci 534/534, tests/infra 163/163, dist-freshness 0, db 511/511 (pgTAP included). New N1 test (marked-of.test.ts) is red on the pre-N1 code (8 failures); N2 scan patterns each proven against samples. Earlier proofs and timings (main 55-66 s vs branch 56-60 s db suite) are in the gate 3 comment above. R7 bench waits for dispatch.
