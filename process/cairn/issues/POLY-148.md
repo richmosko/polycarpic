@@ -1,7 +1,7 @@
 ---
 id: POLY-148
 title: Sign-in service spike
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-147]
@@ -11,7 +11,7 @@ labels: [security, auth, spike]
 priority: P1
 pr: null
 created: 2026-11-13
-updated: 2026-11-13
+updated: 2026-11-15
 ---
 
 This spike measures, before stage 2 is ruled, the four things stage 2's price and design rest on (`process/cairn/reviews/POLY-145/pricing.md` §2 (e1), `comparison.md` §7 point 1, `architect-recommendation.md` open question 3). It ships a measurement record and throwaway code under `spikes/`, with no product change. seceng drives and backend-lead builds. The architect rules stage 2 from the record.
@@ -32,3 +32,9 @@ This spike measures, before stage 2 is ruled, the four things stage 2's price an
 ## Estimate
 
 1.5–2 loop-days, 1 loop (guess; no measured analogue; +0.5 for the cookie-scope item)
+
+## Comments
+
+### @team-lead — 2026-11-15
+
+Feature started. Branch: `feature/poly-148-sign-in-service-spike`.
