@@ -11,7 +11,7 @@ labels: [ops, cli]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-13
+updated: 2026-11-15
 ---
 
 The operator subcommands INFRA §7 and §8 name (set-secret through cli pass-through). status prints digest, last deploy, last backup from last-upload (never from the app), certificate days, disk, unaccounted poly_backup connections in 24 h, and non-temporary replication slots. Secrets are read without echo and written 0400.
@@ -22,6 +22,7 @@ The operator subcommands INFRA §7 and §8 name (set-secret through cli pass-thr
 - [ ] list-secrets never prints a value.
 - [ ] status fits one screen and exits non-zero on any red item.
 - [ ] INFRA §7.5 and §8 match the output verbatim, or INFRA is corrected in the same PR.
+- [ ] `status` checks the bootstrap revokes on the live database: plpgsql `USAGE` absent for PUBLIC, and PUBLIC holds no EXECUTE on the 17 SQL-string built-ins (POLY-147 ruling R10, R11; SECURITY C-87). Red if a restore or major upgrade lost them. The restore step in INFRA §8.10 becomes a named command if one is added here.
 
 ## Comments
 
@@ -36,3 +37,7 @@ From POLY-145's decision: POLY-146 moves `polycarpic cli user invite` to a one-s
 ### @team-lead — 2026-11-13
 
 From POLY-146's security review (`process/cairn/reviews/POLY-146/security-review.md`, Follow-ups): INFRA §7.5 routes every `polycarpic-ops cli …` command through the one-shot `operator` service, but poly_operator holds only EXECUTE on `app.issue_operator_invitation`. Each later command (`reset-mfa`, `remove-owner`, `set-founder`, `secrets rotate`) needs grants it does not hold. Each must arrive with its own grant review by seceng, never a default widening of poly_operator, and the credential keyring is not mounted into `operator` without one.
+
+### @team-lead — 2026-11-15
+
+Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `process/cairn/reviews/POLY-147/` (ruling, security-review, verdict) and devops-147's findings.
