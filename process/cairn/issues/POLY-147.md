@@ -117,3 +117,7 @@ Gate 4, verdict @ 71ba9813 against ruling 5ded4562: APPROVED for code; `process/
 I read the diff myself: 0011 matches R1/R2; all three exact-call checks use IS DISTINCT FROM; ExtendedClient is on all three pools; the NodePgTransaction handle is built from the session; R10 and R11 are in roles.sql.
 Measurement holds: p95 +0.24 ms (S) and -0.69 ms (L), WAL +231 B per tx (ee8cc6df). seceng: no blockers (6a9457e3). Build-green @ b46ddb5e. CI 8/8. e2e 52/52.
 Open: the docs criterion (ARCH 3.1/3.3, SECURITY R-2/T-18/C-84). Four non-blocking notes are in verdict.md.
+
+### @qa-engineer — 2026-11-15
+
+Gate 4, docs-checked @ 67419c74. R9 phrases (tag-stripped, case-sensitive): every must present, every must-not absent in ARCH 1.16.0 and SECURITY 1.9.20; R-2, T-18, C-84 and ARCH §3.3 also pass scoped to their sections. One note: 'the marker is the first statement after the real BEGIN' is in ARCH §3.3, not §3.1 (queryMode is in §3.1c); passes on R8's whole-document grep, fails a strict §3.1 reading. INFRA 1.3.12 says roles.sql is re-run after restore and at each major upgrade. Code re-run from a clean checkout on 67419c74, exit codes read: lint 0, typecheck 0, units 0, dist-freshness 0, layers 528/528, tests/ci 534/534, tests/infra 163/163, db 511/511. Web e2e 52/52 on 71ba9813. Per-criterion evidence list sent to the lead.
