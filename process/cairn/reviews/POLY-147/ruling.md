@@ -182,6 +182,30 @@ The `kind` comes only from the definer body; no definer takes it as an argument.
 can be rolled back with it. The outcomes are listed in R2. They hold because the stamp check finds no row, and because a subtransaction
 write assigns the parent's xid first, so the xid stays assigned after the rollback. See OQ-3 for "any user".
 
+**Addendum to R3 and R8 (build 24b1c5cd): the transaction handle, and K2 on `entity_type`.**
+- **The handle: accepted.** `drizzle(client).transaction()` is the database object's method: it sends its own `begin` (a no-op
+  warning inside ours) and, on a throw, a whole-transaction `rollback` (drizzle-orm 0.45.4 `node-postgres/session.js:180-195`). That
+  would end the marked transaction. The behaviour predates this loop, but it now matters. `NodePgTransaction.transaction()` uses
+  `savepoint sp<n>` / `rollback to savepoint sp<n>` (`:205-221`), so handing out a `NodePgTransaction` (nestedIndex 0) is right.
+  Constructing it sends nothing, so the marker is still the first statement after BEGIN.
+  - One change: build it exactly as drizzle's own `transaction()` does (`:183`), from the session's
+    dialect and schema (`const s = drizzle(client)._.session; new NodePgTransaction(s.dialect, s, s.schema)`), not from
+    `new PgDialect()` and `undefined`. The configuration then has one source.
+  - **For callers:** `Tx` keeps its name and every query method. A nested `tx.transaction()` is now a real savepoint. `tx.rollback()`
+    throws drizzle's `TransactionRollbackError`, and `inTransaction` rolls back the whole transaction as for any throw. `$client` is
+    gone; no source uses it (grep of `packages/*/src` and `apps/*/src`).
+  - **For S6:** nothing changes. A savepoint rollback keeps the xid, so the pre-COMMIT read still equals `marked`. A whole-statement
+    `COMMIT` still fails it.
+  - **R8 (ii)** gains a nested case: `tx.transaction(a => a.transaction(b => { throw }))` caught, then `current_user_id()` is still the
+    user and a row written before the outer savepoint is still present. **Red-if:** the handle is `drizzle(client)` again.
+- **K2 on `entity_type`: confirmed.** `entity_type_select` (`0003:291-292`) shows `owner_user_id IS NULL` system types to anyone by
+  design, so the count is not zero. The K2 row reads instead:
+  - `count(*) = 0` on `entity`, `membership`, `invitation`, `notification` and `audit_event`;
+  - on `entity_type`, `count(*) FILTER (WHERE owner_user_id IS NOT NULL) = 0`.
+  - To stay red with the hole open, the fixture seeds, as superuser and owned by the forged uuid's user: one custom `entity_type`; an
+    entity of that type with an owner membership; and one row in each of `invitation`, `notification` and `audit_event` that the user
+    could see. Each count is then nonzero if a forged setting ever reaches `current_user_id()`.
+
 ## R4 — Extended mode on every poly_app / poly_worker query (guard i)
 
 - **The seam is one class, not a lint rule:** `packages/db/src/extended-client.ts` exports `class ExtendedClient extends pg.Client` and
