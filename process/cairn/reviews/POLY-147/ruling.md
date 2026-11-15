@@ -1,6 +1,6 @@
 # POLY-147 — gate 1 ruling (architect)
 
-Scope: the issue file's criteria (K, J, I, the three guards, the measurement, no `app.session_id` reader, docs). The design is (e1), staged
+Scope: the issue file's criteria (K, J, I, the three guards, the measurement, no `app.session_id` reader, docs), plus the plpgsql revoke (R10). The design is (e1), staged
 (`process/DECISIONS.md`, 2026-11-13); this ruling only makes it buildable. Measured = read from the tree at `61da0e72` or from the installed
 package source (`pg@8.23.1`, `pg-pool@3.14.0`, `drizzle-orm@0.45.4`); anything else is tagged `(unmeasured)`. Open questions are in §OQ and
 are the lead's; the ruling proceeds on the stated recommendation unless the issue file says otherwise.
@@ -245,6 +245,7 @@ under `tests/layers/fixtures/`. New pgTAP file: `07_identity_marker.sql`. New db
 | Measurement | R7 | bench |
 | No `app.session_id` reader | `07`: no `pg_proc.prosrc` in `app`/`public` and no `pg_policy` qual mentions `app.session_id`; lint `31-reserved-literal/fail-app-session-id.ts` and `fail-app-user-id.ts` | pgTAP + lint |
 | Only the marker functions read `tx_identity` | `07`: `prosrc ILIKE '%tx_identity%'` only for `current_user_id`, `current_session_id`, `audit_membership` and the four definers | pgTAP |
+| R10 plpgsql | `07`: the `aclexplode(lanacl)` grantee set for plpgsql is exactly the eight roles of R10, with PUBLIC absent. No other language with an inline handler exists: `count(*) FROM pg_language WHERE laninline <> 0 AND lanname <> 'plpgsql'` = 0. `identity-marker`: as poly_app, poly_worker and poly_operator, `DO $$BEGIN END$$` → `42501` `permission denied for language plpgsql`. For each of the three, a superuser first grants CREATE on a throwaway schema `qa_lang` inside a rolled-back transaction, so the schema check cannot answer first; `CREATE FUNCTION qa_lang.f() RETURNS int LANGUAGE plpgsql AS $$BEGIN RETURN 1; END$$` then gives the same error. **Red-if:** the REVOKE is missing, or a runtime role regains USAGE. | pgTAP + db |
 | Docs | R9 phrases, checked by grep over the text of `docs/ARCH/index.html` and `docs/SECURITY/index.html` (tags stripped) | grep (qa, at verdict) |
 
 ## R9 — Doc phrases (grep-checkable)
@@ -261,6 +262,28 @@ required verbatim. Each **must not** phrase must be absent.
   returns no rows`. It must not contain `which any role can set` or `R-2 is closed`.
 - **SECURITY T-18** must contain `app.tx_identity`. It must not contain `sets app.user_id to anyone`.
 - **SECURITY C-84** must contain `app.tx_identity` and `enter_new_user`.
+
+## R10 — No plpgsql for the runtime roles (seceng S4; Principal, 2026-11-14)
+
+- **Where:** `packages/db/sql/roles.sql`, the superuser bootstrap, after the role loop. The language is owned by the bootstrap
+  superuser, so neither poly_migrator nor poly_owner could change it. `pg_language` is per database, and `roles.sql` already runs per
+  database (in provisioning, and in the harness's `freshDb`). Both statements are idempotent:
+  `REVOKE USAGE ON LANGUAGE plpgsql FROM PUBLIC;`
+  `GRANT USAGE ON LANGUAGE plpgsql TO poly_owner, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal;`
+- **What it does:** `DO` and `CREATE FUNCTION … LANGUAGE plpgsql` fail for poly_app, poly_worker, poly_operator, poly_backup and
+  poly_migrator with `42501`. Calling an existing plpgsql function needs no USAGE on the language, so every definer and trigger runs as
+  before.
+- **No runtime use (confirmed):** a grep of `packages/*/src`, `apps/*/src`, `better-auth@1.7.18` (with `@better-auth/core` and
+  `@better-auth/passkey`), `drizzle-orm@0.45.4` (`node-postgres`, `pg-core`) and `kysely@0.29.8` finds no `DO` block and no function
+  creation. It agrees with the lead's search.
+- **The migrator keeps working:** migrations create plpgsql functions only after `SET ROLE` to poly_owner or a definer owner
+  (`0003`, `0007`, `0009`), and Postgres checks language USAGE against the current role, so those roles keep USAGE. No migration and no
+  statement in `migrate.ts` runs `DO` or creates a function as poly_migrator itself. That is a static read; the suite's full
+  migration run measures it.
+- **The harness keeps working:** every test `DO` and `CREATE FUNCTION` (`helpers/api.ts:33`, and the `qa_*` trigger functions in
+  `auth-*`, `operator-invite`, `wrappers`) runs through `must`/`psql` as superuser, which bypasses language ACLs. pgTAP's `pg_temp`
+  helpers also run as superuser. `checks.test.ts` only lints migration text; it does not execute it.
+- **Cost:** about 0.1 loop-day (a guess). devops notes the bootstrap change in INFRA's provisioning text at the docs criterion.
 
 ## seceng's prep notes — disposition
 
