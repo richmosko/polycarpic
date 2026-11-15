@@ -55,6 +55,13 @@ const auth = createAuth(options as never);
 http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', ORIGIN);
   try {
+    if (url.pathname === '/sign-in' || url.pathname === '/sign-up') {
+      // The moved sign-in pages (sizing item): a bare password form under the strictest CSP that works for a static page. ?csp=open is the control.
+      const csp = url.searchParams.get('csp') === 'open' ? "default-src 'self'" : "default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self'; connect-src 'self'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'";
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp, 'x-content-type-options': 'nosniff' });
+      res.end(`<!doctype html><html><head><meta charset="utf-8"><title>${url.pathname.slice(1)}</title></head><body><form method="post" action="/api/auth/sign-in/email"><input id="email" name="email" type="email"><input id="password" name="password" type="password"><button>Sign in</button></form></body></html>`);
+      return;
+    }
     if (!(url.pathname === '/api/auth' || url.pathname.startsWith('/api/auth/'))) {
       res.writeHead(404, { 'content-type': 'application/json' }).end('{"message":"Not found"}');
       return;

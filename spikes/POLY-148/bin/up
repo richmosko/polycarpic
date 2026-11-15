@@ -73,11 +73,15 @@ const webPid = start('web', 'web/server.mjs', { ...base, ...dbEnv('poly_app'), W
 const servicePid = start('service', 'service/server.ts', { ...base, ...dbEnv('poly_auth'), BETTER_AUTH_SECRET: SECRET, SERVICE_PORT: String(PORTS.service) });
 
 // ---- Caddy, in a container: plain HTTP on 58480, upstreams on the host ----
-sh('docker', ['rm', '-f', CADDY.container]);
+sh('docker', ['rm', '-f', CADDY.container, CADDY.containerSw]);
 must(sh('docker', ['run', '-d', '--name', CADDY.container, '--add-host', 'host.docker.internal:host-gateway', '-p', `127.0.0.1:${PORTS.caddy}:80`,
   '-v', `${path.join(SPIKE, 'caddy/Caddyfile')}:/etc/caddy/Caddyfile:ro`, CADDY.image]), 'docker run caddy');
 
-fs.writeFileSync(path.join(RUN, 'pids.json'), JSON.stringify({ web: webPid, service: servicePid, caddy: CADDY.container, serviceEntry: 'service/server.ts', option }));
+// a second Caddy for the service-worker item only: the same routes plus the refusal of Service-Worker: script requests
+must(sh('docker', ['run', '-d', '--name', CADDY.containerSw, '--add-host', 'host.docker.internal:host-gateway', '-p', `127.0.0.1:${PORTS.caddySw}:80`,
+  '-v', `${path.join(SPIKE, 'caddy/Caddyfile.sw')}:/etc/caddy/Caddyfile:ro`, CADDY.image]), 'docker run caddy (service-worker rule)');
+
+fs.writeFileSync(path.join(RUN, 'pids.json'), JSON.stringify({ web: webPid, service: servicePid, caddy: CADDY.container, serviceEntry: 'service/server.ts', authSource: '../../packages/auth/src', option }));
 
 // ---- readiness: all four answer ----
 const probes = [['web', `http://127.0.0.1:${PORTS.web}/spike/whoami`], ['service', `http://127.0.0.1:${PORTS.service}/api/auth/ok`],

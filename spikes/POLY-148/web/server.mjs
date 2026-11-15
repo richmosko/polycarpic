@@ -31,6 +31,19 @@ http.createServer(async (req, res) => {
       if (!r.rows[0]) return send(res, 401, { message: 'unknown handle' });
       return send(res, 200, { userId: r.rows[0].user_id, sessionId: r.rows[0].session_id });
     }
+    if (url.pathname === '/spike/cookies') return send(res, 200, { names: Object.keys(cookies(req.headers.cookie)) }); // names only, never values
+    if (url.pathname === '/') {
+      // web's own page, under web's CSP (apps/web/vite.config.ts kit.csp): the script the measurements run is the page's, same origin as the sign-in page
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; frame-ancestors 'none'" });
+      return res.end('<!doctype html><html><head><meta charset="utf-8"><title>web</title></head><body>web</body></html>');
+    }
+    if (url.pathname === '/spike/sw.js') {
+      // a compromised web can answer its own script path with a wide scope
+      res.writeHead(200, { 'content-type': 'text/javascript', 'service-worker-allowed': '/' });
+      return res.end(`self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+self.addEventListener('fetch', (e) => { if (new URL(e.request.url).pathname === '/sign-in') e.respondWith(new Response('<!doctype html><title>altered</title><body data-altered="yes"><input id="password" type="password"></body>', { headers: { 'content-type': 'text/html' } })); });`);
+    }
     return send(res, 404, { message: 'Not found' });
   } catch (e) {
     console.error(e);

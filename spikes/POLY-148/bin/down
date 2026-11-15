@@ -11,5 +11,5 @@ if (fs.existsSync(f)) {
   for (const pid of [p.web, p.service]) { try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ } }
   fs.rmSync(f);
 }
-spawnSync('docker', ['rm', '-f', CADDY.container], { stdio: 'ignore' });
+spawnSync('docker', ['rm', '-f', CADDY.container, CADDY.containerSw], { stdio: 'ignore' });
 if (!process.argv.includes('--keep-db')) spawnSync('docker', ['rm', '-f', PG.container], { stdio: 'ignore' });
