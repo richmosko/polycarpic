@@ -152,3 +152,37 @@ What stays open: poly_app's direct grants on BetterAuth's tables (plant a magic 
 - **R2 now states `current_query()` as `debug_query_string`,** and R9 bars `track_activities` from ARCH. Correct.
 - **The R7 case L (2,000 rows) answers S5.** Closed on my side.
 - **The `global-setup.ts` psql ≥ 16 check** fails loudly rather than skipping. Good.
+
+## 4. Red gate — the `app.tx_identity` exemption in `02_rls_catalog.sql` (077173d3)
+
+**Ruling: reject the whole-table exemption. Require a per-reason exemption for `pk_not_uuid` only, and add the missing TRUNCATE guard. (B), before build-green.** qa and backend-lead fix it in their own files; the architect adds one line to R1.
+
+**What 02 checks, and what fires on the marker as R1 builds it.** `battery_gaps` has ten table checks:
+- **Two fire:**
+  - `pk_not_uuid`: the key is `xid8`, by design. A uuid key would make the marker meaningless.
+  - `no_truncate_trigger`: R1 adds none.
+- **Eight pass, and the whole-table exemption switches them off:** `rls_disabled`, `not_forced`, `no_policy`, `for_all_policy`, `raw_context_read`, `column_grant_not_allowlisted`, `policy_public` and `policy_trivial_for_app`. (`tx_identity_purge_read`'s `USING (true)` is `TO poly_purge`, not app or worker, so it passes.)
+
+**Reach of the whole-table exemption.** It hides from the general net exactly the regressions that would make the marker forgeable or readable:
+- RLS turned off or unforced;
+- a `FOR ALL` or `TO PUBLIC` policy;
+- `USING (true)` granted to poly_app;
+- an INSERT or UPDATE column grant to poly_app or poly_worker. That is the worst case: poly_app writes its own marker naming anyone, and every guard in stage 1 is void.
+
+07's catalog rows pin the exact ACL and the four policies today. But 07 is a per-feature file, and 02 is the net every migration runs through (C-13). The most sensitive table must stay inside the net, not beside it.
+
+**TRUNCATE: add the trigger.** Today TRUNCATE is harmless on this table:
+- only the owner, poly_owner, may truncate, and it is reached only through the migrator;
+- a TRUNCATE waits behind the row-exclusive lock of every open marked transaction, so it can never remove another transaction's live marker;
+- truncating its own marker leaves the transaction unmarked, so it reads null and cannot re-mark, because the xid is now assigned.
+
+That reasoning is mine, unmeasured. The guard is still one line, reusing the existing function: `CREATE TRIGGER tx_identity_no_truncate BEFORE TRUNCATE ON app.tx_identity FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate();`. It keeps the table under the uniform rule instead of a second exemption. The purge uses DELETE, so it is unaffected.
+
+**Required change to `02_rls_catalog.sql`:**
+1. Remove `app.tx_identity` from `exemptions()`. The table count returns to 7.
+2. Add `pg_temp.reason_exemptions()` returning exactly `ARRAY['app.tx_identity:pk_not_uuid']`, with the same review rule as the table list. `battery_gaps` drops a row only when its `rel:reason` pair is listed. Each entry must exist (`to_regclass`), and the list's cardinality is 1.
+3. Canaries, inside the file's rolled-back transaction:
+   - a uuid-keyed canary listed for `pk_not_uuid` that has RLS disabled must still report `rls_disabled`, so a reason exemption hides only its own reason;
+   - `ALTER TABLE app.tx_identity DISABLE ROW LEVEL SECURITY`, then the real chain must report `app.tx_identity:rls_disabled`.
+   
+   **Red-if:** the reason filter compares by table alone, or tx_identity rejoins the table list.
