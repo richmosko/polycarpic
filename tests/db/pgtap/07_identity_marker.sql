@@ -102,7 +102,13 @@ SELECT pg_temp.set_id('00000000-0000-4000-8000-0000000147a1');
 INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES ('00000000-0000-4000-8000-0000000147e1',
   (SELECT id FROM public.entity_type WHERE system_key = 'business'), 'qa-K2', 'business_pass_through');
 INSERT INTO public.entity_type (name, kind, owner_user_id) VALUES ('K2 Club', 'base', '00000000-0000-4000-8000-0000000147a1');
+INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at)
+  VALUES ('00000000-0000-4000-8000-0000000147e1', 'k2inv@qa.test', 'viewer', '00000000-0000-4000-8000-0000000147a1', sha256('k2'::bytea), now() + interval '1 day');
+INSERT INTO public.notification (entity_id, recipient_user_id, kind) VALUES ('00000000-0000-4000-8000-0000000147e1', '00000000-0000-4000-8000-0000000147a1', 'qa.k2');
 SELECT pg_temp.set_id('');
+SELECT is(pg_temp.run_as(r, '00000000-0000-4000-8000-0000000147a1', format($q$SELECT (SELECT count(*) FROM public.%I WHERE %s) > 0$q$, t, CASE WHEN t = 'entity_type' THEN 'name = ''K2 Club''' ELSE 'true' END)), 'true',
+  'K2 control: with the marker, ' || r || ' sees rows of ' || t || ', so each zero below is the forged setting not counting')
+  FROM unnest(ARRAY['poly_app', 'poly_worker']) r, unnest(ARRAY['entity', 'membership', 'invitation', 'audit_event', 'notification', 'entity_type']) t;
 SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000147a1', $q$SELECT count(*)::text FROM public.entity$q$), '1', 'K2 control: with the marker, the owner sees the entity, so the zeros below are the forged setting not counting');
 SELECT is(pg_temp.run_as('poly_app', '', $q$SELECT set_config('app.user_id', '00000000-0000-4000-8000-0000000147a1', true) || '|' || coalesce(app.current_user_id()::text, 'null')$q$), '00000000-0000-4000-8000-0000000147a1|null', 'K2: poly_app, forged app.user_id: current_user_id() is null (mutation: the body reads the setting)');
 SELECT is(pg_temp.run_as('poly_worker', '', $q$SELECT set_config('app.user_id', '00000000-0000-4000-8000-0000000147a1', true) || '|' || coalesce(app.current_user_id()::text, 'null')$q$), '00000000-0000-4000-8000-0000000147a1|null', 'K2: poly_worker, forged app.user_id: current_user_id() is null');

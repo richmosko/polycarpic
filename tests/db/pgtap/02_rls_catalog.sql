@@ -220,7 +220,7 @@ WHERE p.prorettype = 'pg_catalog.trigger'::regtype AND n.nspname NOT IN ('pg_cat
 -- cleanup, then the chain is clean again
 DROP TABLE public.qa_canary_part_child, public.qa_canary_part, public.qa_canary_ok, public.qa_canary_noforce, public.qa_canary_off,
   public.qa_canary_forall, public.qa_canary_notrunc;
-DROP TABLE public.qa_canary_pkint, public.qa_canary_pkuuid, public.qa_canary_rawctx, public.qa_canary_updcol, public.qa_canary_updok,
+DROP TABLE public.qa_canary_reasonex, public.qa_canary_pkint, public.qa_canary_pkuuid, public.qa_canary_rawctx, public.qa_canary_updcol, public.qa_canary_updok,
   public.qa_canary_tblgrant, public.qa_canary_pubpol, public.qa_canary_trivial, public.qa_canary_trivok;
 DROP TABLE public.qa_canary_part_bare;
 DROP FOREIGN TABLE public.qa_canary_foreign;

@@ -257,6 +257,17 @@ describe('(ii) the marker survives any later savepoint rollback', () => {
     });
     expect(got).toBe(U);
   });
+  it('a nested savepoint case: tx.transaction(a => a.transaction(b => throw)), caught, leaves the user in place and a row written before the outer savepoint present  [red if: the handle is drizzle(client) again, whose nested transaction() ends the marked transaction]', async () => {
+    const got = await tenant(U, async (tx) => {
+      await tx.execute(raw(`INSERT INTO public.entity_type (name, kind, owner_user_id) VALUES ('qa-nested-sp', 'base', '${U}')`));
+      await fails(tx.transaction(async (a: any) => { await a.transaction(async () => { throw new Error('boom'); }); }));
+      return {
+        user: (await rows(tx, 'SELECT app.current_user_id()::text AS u'))[0].u,
+        kept: Number((await rows(tx, `SELECT count(*) AS n FROM public.entity_type WHERE name = 'qa-nested-sp'`))[0].n),
+      };
+    });
+    expect(got).toEqual({ user: U, kept: 1 });
+  });
   it('the marker row is the transaction\'s first write: its xid is the one withTenant\'s first statement assigned  [red if: another statement runs between BEGIN and the marker]', async () => {
     const r = await tenant(U, async (tx) => (await rows(tx, `SELECT (xid = pg_current_xact_id()) AS same, kind FROM app.tx_identity WHERE xid = pg_current_xact_id_if_assigned()`))[0]);
     expect(r).toEqual({ same: true, kind: 'web' });
