@@ -79,6 +79,12 @@ interface Store {
   marked?: string;
 }
 
+/** seceng N1: a definer result that is not a string (a renamed column) must fail the request, never skip S6's pre-COMMIT check. */
+function markedOf(v: unknown): string {
+  if (typeof v !== 'string') throw new IdentityMarkerLost();
+  return v;
+}
+
 const JOB_NAME = /^[a-z][a-z0-9_]{0,62}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const active = new AsyncLocalStorage<Store>();
@@ -180,7 +186,7 @@ export async function withTenant<T>(userId: SessionUserId, sessionId: string, fn
   return inTransaction('withTenant', appPool, async (c, store) => {
     // The canonical text, byte for byte (R2's exact-call check); the result column is read by its default name.
     const res = await c.query('SELECT app.enter_asserted_user($1, $2)', [userId, sessionId]);
-    store.marked = res.rows[0].enter_asserted_user as string;
+    store.marked = markedOf(res.rows[0]?.enter_asserted_user);
   }, fn);
 }
 
@@ -195,7 +201,7 @@ export async function withSystem<T>(job: string, target: JobTarget, fn: (tx: Tx)
   return inTransaction('withSystem', workerPool, async (c, store) => {
     try {
       const res = await c.query('SELECT app.enter_job($1, $2, $3)', [job, target?.entityId, target?.connectionId ?? null]);
-      store.marked = res.rows[0].enter_job as string;
+      store.marked = markedOf(res.rows[0]?.enter_job);
     } catch (e) {
       if ((e as { code?: string }).code === 'P0002') throw new NoPrincipalError(job);
       throw e;
