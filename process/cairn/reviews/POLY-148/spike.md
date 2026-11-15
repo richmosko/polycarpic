@@ -73,3 +73,68 @@ Web's script is `page.evaluate` in web's page at `/` (same origin, under web's C
 - **H (hashed session handle), unpriced in the table above:** option 1 works on every session path (13 lines) with one 41-line plugin, one table and the lookup; the cost is the plugin, its tests (one per session path, 14 here), the revoke narrowing of `poly_app` and the decision on refresh. About 1 loop-day (guess). Option 2 was not needed.
 - **Pages:** moving the two built pages is 1–2 loop-days (guess); it does not stop a persistent web compromise on the same origin (§2a). The Principal decides between "not moved" (the passwords typed at `/sign-in` stay at web's risk, stated in SECURITY), "moved to the service, same origin" (a policy against casual changes, not against a web compromise) and "separate origin" (stops it; redesigns the cookies and the handoff; not priced here).
 - **For POLY-89:** (b) `recent_auth_at` and (a) `two_factor_enabled` are the columns the first-verify rotation and the enrolment need; no gap in the magic-link hold.
+
+## 7. Security reading (seceng)
+
+*Signed: seceng, 2026-11-15. I reproduced the run myself: `bin/up`, then `run.mjs`, then H on its own, then `browser/measure.mjs`, then `bin/down`, all from my own checkout. Harness `c3055b0e`; checks `9fda8f8d`.*
+
+**My counts: 28 PASS, 4 FAIL, 4 REPORT, 0 UNMEASURED on 36 lines. Chromium confirmed 7 of 7.**
+
+The one difference from §1 is **H.refresh**, which now FAILs. Its predicate was my bug. It compared a handle issued seconds earlier with the time left on an artificially refreshed session, so it could not fail. Fixed at `9fda8f8d`: a handle that refresh never re-issues must last to the 30-day cap. The behaviour §1 describes under "Findings on H" is right. Only the line's grade and the counts in this file's header change.
+
+### What the sign-in service can do by design
+The service writes sessions, which is its job. So anyone who takes over the service, or steals its database password, can create a session for any user and act as them. No grant removes that, because Postgres cannot check a password itself. What stage 2 can still decide is whether such an attack is visible. A session that is created shows in the victim's Sessions list and sign-in emails; a direct database read shows nowhere. Most of what follows is about keeping the service on the visible path.
+
+### Each FAIL and finding: how it works, what an attacker reaches, and what stage 2 does
+
+1. **A stored hash works as a password at the database (H.forgery, FAIL).**
+   - How it works: web hashes the cookie itself and asks the database "who owns this hash?".
+   - What an attacker reaches: anyone who can run database queries as web's role (an injection bug, code running in web, or web's stolen database password) and who has a copy of the hashes can sign in as any user whose hash they hold. The copy can come from a backup, from the sign-in service's role, or from anyone who reads that table. Hashing was meant to make a stolen backup useless; with this lookup it is not.
+   - Fix (stage 2, block E): the database function takes the cookie's plain value and hashes it itself. Web never sends a hash, and a hash from the database is then refused. Option 2 would not help, for the same reason. **Required.**
+2. **The service can quietly read anyone's data (S.poly_auth-grants FAIL, plus finding A).**
+   - How it works: sign-up creates the new user's Person entity with a direct insert, so the service needs write access to the entity table and to its row policies. The service is also given the stage-1 function in which the caller names the user (`enter_asserted_user`).
+   - What an attacker reaches: together these let code in the service name any user and read their entities and memberships, with no session row and no trace. That is the exact reach the 2026-11-15 decision took away from web.
+   - Fix (stage 2, blocks S and E): (i) a database function `provision_person()` does the Person insert, so the service holds no tenancy write grant; (ii) the service enters the database through its own live session (`enter_auth_session(token)`, which checks the session row) and is never granted `enter_asserted_user`. After both, taking over the service still reaches any user, but only by creating a session the victim can see. **Required.** About +0.5 loop-day each (guess, as §6).
+3. **The second-factor switch has no guard (stand-in 1, for POLY-89).**
+   - How it works: the role that runs BetterAuth must be able to write `user.two_factor_enabled`.
+   - What an attacker reaches: with that grant, one injected SQL statement can switch the second factor off for any user, silently. Anyone who also has that user's password then signs in with no second factor.
+   - Fix: **POLY-89 must guard the column.** It may turn on only in the transaction that verifies the factor, and turn off only in the transaction that deletes the factor after a step-up. §6's "no gap for POLY-89" holds for the magic-link hold but not for this column.
+4. **Freshness copied into a new session (stand-in 2).**
+   - How it works: when BetterAuth replaces a session, it copies the "signed in recently" time.
+   - What an attacker reaches: someone who can insert a session row could mint one that skips the password re-prompt. That gives the service's attacker nothing new, since it already writes the credential tables directly.
+   - Fix: strip the column in a hook rather than grant it. The cost is that a user whose session was just replaced is asked for their password once more within 5 minutes.
+5. **The sign-up stamp (stand-in 3).** Needed. In stage 2 it should name `poly_auth` only. It gives nothing beyond sign-up, because the commit-time check still requires an accepted invitation.
+6. **The handle does not slide on refresh (H.refresh FAIL).**
+   - This is not a security weakness, since a shorter life is safer. It is a step back from today: web's `loadSession` re-issues the cookie on refresh now. In stage 2 nothing re-issues either cookie, so a user who is active every day is signed out after 7 days.
+   - Fix: the service re-issues both cookies on refresh, within the 30-day cap. Stage 2 needs this decision.
+7. **The 30-day cap leaves a dead cookie behind (C.capped-out-clear FAIL).** The session row is deleted, so the cookie is useless and nothing is reachable. It only fails to be removed from the browser. One-line fix in `handler.ts`.
+8. **A session can be committed without its handle (H.handle-insert-failure, REPORT).** The sign-in fails and web refuses a session that has no handle, so it fails safe. The orphan rows are clutter, not access. Stage 2 should create both in one transaction.
+9. **Cookie prefixes.**
+   - I agree with §1: BetterAuth's cookie becomes `__Secure-` with `Path=/api/auth`, and the handle stays `__Host-` with `Path=/`.
+   - The one thing `__Secure-` gives up: a sibling subdomain could plant a same-name cookie, so a victim might act in the attacker's account at `/api/auth` (login CSRF). BetterAuth signs its cookies, so a planted one must be a real, signed session of the attacker's. That needs a hostile subdomain on our domain, which a single-family install does not have. **Accept,** and state it in SECURITY.
+
+### The harness deviations in §5
+Each holds. None of them changes a hook, a grant or a cookie decision:
+- Chromium stored the same cookies over loopback HTTP.
+- Rate limiting is per process and touches no item here.
+- The Google fake replaces only the network edge.
+- The SQL-set `second_step_at` is how the shipped tests seed the hold.
+
+One limit, which §3.4 already states: no script was run under the service's CSP.
+
+### The `recent_auth_at` claim (§1, stand-in (b))
+**Confirmed from the shipped grants.** `packages/db/migrations/0005_auth_second_step_grants.sql` line 9 grants `poly_app` INSERT on `session` with a column list that leaves out `recent_auth_at`, and no later migration grants it. So the first-verify rotation's insert is refused for `poly_app` today. Today that refusal is latent: enrolment is closed (the enrolment routes answer 403 until POLY-89, as 0005's header comment states), so nobody reaches the rotation. It bites when POLY-89 opens enrolment.
+
+### The sign-in pages: my view on the three options in §6
+- **Measured fact.** On the same origin, web's script can open `/sign-in` and read what is typed into it, whichever process served the page (§2a). Even on a separate origin, a compromised web can still show a fake "please sign in again" box on one of its own pages. So moving the pages protects the real page, not the user's habit of typing their password wherever it is asked for.
+- **"Moved, same origin":** costs 1–2 loop-days and stops nothing an attacker in web would do. **I recommend against it.**
+- **"Separate origin":** is a real wall for the page itself, but it redesigns the cookies and the hand-off between the two origins, and it is unpriced. Reconsider it if hosting for several families (R-6) comes back.
+- **"Not moved":** **This is my recommendation.** It comes with three things:
+  - Caddy refuses any request that carries `Service-Worker: script` (§2c measured that it stops the worker). A service worker survives a server clean-up and keeps altering pages afterwards, so this matters whatever else is decided. It belongs with POLY-138 (Caddy and edge).
+  - SECURITY's Open Risks states, for the Principal's approval: "a persistent compromise of web captures passwords typed into the app".
+  - The second factor (POLY-89) limits what a captured password is worth.
+
+### Verdict: **changes requested** (three edits to §1–§6; then accepted as the basis for ruling stage 2)
+1. The header and §1 take my counts: 28 PASS, 4 FAIL, 4 REPORT, with checks at `9fda8f8d`. H.refresh is listed as a FAIL, with its finding.
+2. §6 block H names the refresh decision as a regression from today, which needs a ruling.
+3. §6 "For POLY-89" names the `two_factor_enabled` guard as a POLY-89 requirement.
