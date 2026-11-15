@@ -11,7 +11,7 @@ labels: [security, auth]
 priority: P1
 pr: null
 created: 2026-11-13
-updated: 2026-11-14
+updated: 2026-11-15
 ---
 
 Stage 1 of POLY-145's decision, (e1), staged (`process/cairn/reviews/POLY-145/pricing.md` §1 and §2; `comparison.md` §7). Postgres stops believing a setting that any role can write. Identity is written only by definers into a transaction marker, `app.tx_identity`, keyed by `pg_current_xact_id()`, and `app.current_user_id()` reads only that marker. There are three ways in:
@@ -85,3 +85,7 @@ Gate 1, Principal's decisions (2026-11-14 local; `process/DECISIONS.md`, 2026-11
 - Lead adopts seceng S6 (the wrapper checks before COMMIT that the transaction is still the marked one) and S1, S2 as test-map additions.
 - The architect's four open questions (ruling §OQ) proceed on their recommendations; seceng accepted each with its mechanism (security-review.md @ cef43a16).
 - qa-147, not the builder, runs the R7 measurement.
+
+### @team-lead — 2026-11-15
+
+Gate 1 correction (Principal, 2026-11-14 local): the exact-call check is KEPT. This reverses the line above. Basis: seceng's delta review (security-review.md §2 D1 @ b5769439): injected SQL cannot bind parameters, so no injection can name a user to Postgres directly, and the `track_activities` dependency cited against the check does not exist. S4 (plpgsql revoke) stays in scope. S6 stays in the ruling. `process/DECISIONS.md` entry replaced, not stacked.
