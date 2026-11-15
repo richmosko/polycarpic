@@ -11,7 +11,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-13
+updated: 2026-11-15
 ---
 
 Owners and managers must enrol a second factor (authenticator app or passkey); viewers may (P1). It is asked on a new device and as a step-up before export, purge, granting access and linking a bank. A user's own unshared Person is exempt until a forcing action (OQ-34). First enrolment is anchored on a code sent to the account email in addition to the password (ARCH §3.1c; SECURITY §4.1, C-03, A-28..A-30, A-32). Held raises are POLY-91.
@@ -29,6 +29,8 @@ Owners and managers must enrol a second factor (authenticator app or passkey); v
 - [ ] Database guards in BetterAuth's measured order (twoFactorEnabled flip, twoFactor.verified, passkey INSERT, session INSERT stamp) plus the hooks.before enrolment class.
 - [ ] app.own_person_exempt() is the one predicate for the hold, the last-method trigger, the sign-in gate and SecondStep.required; the last-method trigger refuses removing a manager's or owner's last factor.
 - [ ] Tests: ARCH §3.1c Tests, the OQ-34, email-anchoring, A-28 and integration items.
+- [ ] `app.promote_held_roles` and every other POLY-89 definer take the user from `app.current_user_id()` (the POLY-147 marker), never from a transaction-local setting; ARCH §3.1c is corrected in the same PR.
+- [ ] No POLY-89 guard treats the marker's `session_id` as proof that a session exists or is recent: until POLY-149 it is the value web passed (SECURITY R-2, C-86; POLY-147 seceng S3). A test forges it and the guard still refuses.
 
 ## Comments
 
@@ -48,3 +50,7 @@ POLY-145 is decided: the target is (e1), and this issue lands after stage 1 and 
 - Every new `enter_*` or definer refuses a transaction without a marker.
 
 Write the guards as triggers on BetterAuth's tables that are indifferent to the calling role. Where a check must name a role, it names the role set {poly_app, poly_auth}, and stage 2 flips that set under test. The existing example is `app.stamp_signup_user()` (`0007:139`, `current_user <> 'poly_app'`); `gate_owner_changes` names poly_govern and poly_purge, which stay (seceng #20). Stage 2 moves BetterAuth's writes from poly_app transactions to poly_auth ones; built that way, only the test fixtures change role (priced at +2–3 loop-days in stage 2). Do not grant poly_app anything new on BetterAuth's tables. Stage 2 revokes all of them.
+
+### @team-lead — 2026-11-15
+
+Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `process/cairn/reviews/POLY-147/` (ruling, security-review, verdict) and devops-147's findings.

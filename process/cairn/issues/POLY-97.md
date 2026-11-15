@@ -11,7 +11,7 @@ labels: [ops, infra]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-13
+updated: 2026-11-15
 ---
 
 The committed, idempotent scripts INFRA §7.1 steps 7–11 call (D-7): create.sh, cloud-init, provision.sh and provision-check.sh. provision-check is the evidence for C-70, C-71, C-72, C-76, C-77 and C-79 (sshd from sshd -T, the C-79 set, spool holds only .age, Docker pools vs fixed subnets).
@@ -22,6 +22,8 @@ The committed, idempotent scripts INFRA §7.1 steps 7–11 call (D-7): create.sh
 - [ ] On a real Hetzner project create.sh run twice is a no-op the second time and never opens a port other than 22/80/443.
 - [ ] provision-check ends ALL CHECKS PASSED, and each FAIL line names its fix.
 - [ ] No secret is printed or logged.
+- [ ] provision-check asserts the production database's `pg_extension` is exactly `{plpgsql}`: pgTAP's `lives_ok` / `throws_ok` / `results_eq` run caller-supplied SQL and PUBLIC can execute them, so pgTAP must never reach production (POLY-147 seceng review §5).
+- [ ] At the first staging deploy, the POLY-147 marker measurement (`tests/db/bench/`) is re-run on the VPS against a control and the p95 and WAL deltas are recorded beside `process/cairn/reviews/POLY-147/marker-measure.md`; the first run was one Mac host, and the marker's cost is a commit that flushes WAL (verdict note 3). Limits: 5 ms at p95, 1 KB of WAL per transaction.
 
 ## Comments
 
@@ -36,3 +38,7 @@ From the POLY-142 loop (ruling R0, read by the architect at 22edd82): the worker
 ### @team-lead — 2026-11-13
 
 From POLY-146: `packages/db/sql/roles.sql` creates a new LOGIN role, poly_operator, without a password, as it does the other login roles. Provisioning must generate `db_password_operator` under the operator's own secrets directory and set the role's password from it, alongside the other roles' passwords. The `operator` compose service is the only one that mounts that file (compose lint `operator-one-shot` and the secret matrix enforce it); provisioning must not place it in the web or worker directories. INFRA §3.2 lists it among the generated secrets.
+
+### @team-lead — 2026-11-15
+
+Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `process/cairn/reviews/POLY-147/` (ruling, security-review, verdict) and devops-147's findings.
