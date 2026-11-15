@@ -48,6 +48,27 @@ GRANT pg_read_all_data TO poly_backup;
 REVOKE USAGE ON LANGUAGE plpgsql FROM PUBLIC;
 GRANT USAGE ON LANGUAGE plpgsql TO poly_owner, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal;
 
+-- POLY-147 (ruling R11): the built-ins that run a SQL string are not executable by PUBLIC. A second layer under the definers' exact-call
+-- check: with them, one injected fragment could mark a user and read as them in a single statement. EXECUTE goes back to nobody;
+-- a superuser bypasses the ACL. Idempotent. Re-run after any restore or major upgrade.
+REVOKE EXECUTE ON FUNCTION pg_catalog.query_to_xml(text,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.query_to_xmlschema(text,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.query_to_xml_and_xmlschema(text,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.table_to_xml(regclass,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.table_to_xmlschema(regclass,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.table_to_xml_and_xmlschema(regclass,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.cursor_to_xml(refcursor,integer,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.cursor_to_xmlschema(refcursor,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.schema_to_xml(name,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.schema_to_xmlschema(name,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.schema_to_xml_and_xmlschema(name,boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.database_to_xml(boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.database_to_xmlschema(boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.database_to_xml_and_xmlschema(boolean,boolean,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.ts_stat(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.ts_stat(text,text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION pg_catalog.ts_rewrite(tsquery,text) FROM PUBLIC;
+
 -- poly_migrator reaches poly_owner and each definer owner only by SET ROLE (ARCH §6.2, SECURITY C-85):
 -- INHERIT FALSE means it cannot use their privileges without switching; no ADMIN OPTION.
 GRANT poly_owner, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal

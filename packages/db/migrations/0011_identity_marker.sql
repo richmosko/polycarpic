@@ -29,6 +29,9 @@ CREATE POLICY tx_identity_purge ON app.tx_identity FOR DELETE TO poly_purge
   USING (created_at < pg_catalog.now() - interval '1 hour'
          AND pg_catalog.pg_xact_status(xid) IS DISTINCT FROM 'in progress');--> statement-breakpoint
 
+-- No TRUNCATE (a superuser's included), like the tenancy tables (0003); the purge is the definer's DELETE alone.
+CREATE TRIGGER tx_identity_no_truncate BEFORE TRUNCATE ON app.tx_identity FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate();--> statement-breakpoint
+
 -- The readers. Invoker, no SET clause, grants unchanged for current_user_id (0001). A transaction that wrote no marker has no xid,
 -- the key is NULL, and the result is NULL: it fails closed.
 CREATE OR REPLACE FUNCTION app.current_user_id() RETURNS uuid
