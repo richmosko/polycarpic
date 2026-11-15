@@ -1,0 +1,15 @@
+#!/usr/bin/env node
+// Stops web, the service and Caddy; drops Postgres too unless --keep-db (bin/up uses that to restart without a re-migrate).
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { CADDY, PG, RUN } from '../harness/config.mjs';
+
+const f = path.join(RUN, 'pids.json');
+if (fs.existsSync(f)) {
+  const p = JSON.parse(fs.readFileSync(f, 'utf8'));
+  for (const pid of [p.web, p.service]) { try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ } }
+  fs.rmSync(f);
+}
+spawnSync('docker', ['rm', '-f', CADDY.container], { stdio: 'ignore' });
+if (!process.argv.includes('--keep-db')) spawnSync('docker', ['rm', '-f', PG.container], { stdio: 'ignore' });
