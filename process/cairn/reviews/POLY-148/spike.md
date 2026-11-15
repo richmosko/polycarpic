@@ -113,6 +113,13 @@ The service writes sessions, which is its job. So anyone who takes over the serv
    - I agree with §1: BetterAuth's cookie becomes `__Secure-` with `Path=/api/auth`, and the handle stays `__Host-` with `Path=/`.
    - The one thing `__Secure-` gives up: a sibling subdomain could plant a same-name cookie, so a victim might act in the attacker's account at `/api/auth` (login CSRF). BetterAuth signs its cookies, so a planted one must be a real, signed session of the attacker's. That needs a hostile subdomain on our domain, which a single-family install does not have. **Accept,** and state it in SECURITY.
 
+### Is option 2 owed? No. I agree with the builder.
+The issue builds option 2 only if a session path fails to reach the hook or cannot set the cookie. None did. All twelve path lines reach the hook and set the handle, and sign-out kills it.
+The two H failures are not path failures, and option 2 would cure neither:
+- **H.forgery:** under option 2 the stored value would be `sha256(token)`, and handing that to a lookup function is the same credential.
+- **H.refresh:** BetterAuth's own cookie is not re-issued on refresh either.
+Both are fixed in block E and in the refresh ruling, not by changing which value is hashed.
+
 ### The harness deviations in §5
 Each holds. None of them changes a hook, a grant or a cookie decision:
 - Chromium stored the same cookies over loopback HTTP.
