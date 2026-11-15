@@ -72,7 +72,7 @@ describe('requireClientIp', () => {
     const u = e.seedUser();
     expect((await e.handle(signIn(u.email, PW, '203.0.113.5'), strict)).status).toBe(200);
     expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`)).toBe(1);
-    const list = await e.dbm.withTenant(e.dbs.sessionUserId(u.id), (await e.sessionRow(u.email)).id ?? '', (tx: any) => e.A.listSessions(tx));
+    const list = await e.dbm.withTenant(e.dbs.sessionUserId(u.id), (await e.sessionRow(u.email))[0], (tx: any) => e.A.listSessions(tx));
     expect(list[0].ipAddress).toBe('203.0.113.5');
   });
 });

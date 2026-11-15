@@ -40,7 +40,7 @@ describe('withTenant', () => {
     const got = await m.withTenant(session.sessionUserId(UID), SID, async (tx: any) => ({
       u: (await q(tx, `select app.current_user_id()::text u`))[0].u,
       s: (await q(tx, `select app.current_session_id()::text s`))[0].s,
-      k: (await q(tx, `select kind from app.tx_identity where xid = pg_current_xact_id_if_assigned()`))[0].k,
+      k: (await q(tx, `select kind as k from app.tx_identity where xid = pg_current_xact_id_if_assigned()`))[0].k,
       raw: (await q(tx, `select coalesce(current_setting('app.user_id', true), '') raw`))[0].raw,
     }));
     expect(got).toEqual({ u: UID, s: SID, k: 'web', raw: '' });
@@ -135,7 +135,12 @@ describe('withOperatorTx (@poly/db/operator)', () => {
     const got = await operator.withOperatorTx(async (tx: any) => ({
       who: (await q(tx, `select current_user as v`))[0].v,
       actor: (await q(tx, `select current_setting('app.actor', true) as v`))[0].v,
-      read: await q(tx, `select app.current_user_id()::text as v`).then(() => 'read', (x: any) => x.code),
+      read: await (async () => { // a savepoint: the refused call must not abort the operator transaction
+        await q(tx, 'SAVEPOINT qa_read');
+        const code = await q(tx, `select app.current_user_id()::text as v`).then(() => 'read', (x: any) => x.code);
+        await q(tx, 'ROLLBACK TO SAVEPOINT qa_read');
+        return code;
+      })(),
       step: 'enterNewUser' in tx || typeof tx.enterNewUser === 'function',
     }));
     expect(got).toEqual({ who: 'poly_operator', actor: 'operator:cli', read: '42501', step: false });
