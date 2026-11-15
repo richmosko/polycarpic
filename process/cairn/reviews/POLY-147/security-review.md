@@ -230,3 +230,16 @@ Read `git diff main..04726635` for `packages/db/**`, `packages/auth/**`, `packag
   
   Each needs a code change inside `packages/db`, not an injection, so this is a seatbelt gap. Fix: add `export … from 'pg'` to the value regex, widen the constructor regex to `\bnew\s+[\w$.]*\b(Pool|Client)\(`, and add `pg-pool` to the module list.
 - **N3 — drizzle's session is still reachable.** `tx._.session.transaction(…)` reaches `NodePgSession.transaction()`, which sends a real BEGIN and ROLLBACK. A caller who writes that ends the marked transaction. That fails closed: later statements read null, writes are refused under RLS, and S6 throws `IdentityMarkerLost`. It is a code bug, not reachable by injection, and needs no change. Note it for whoever next touches the handle.
+
+## 7. Build delta — 04726635 → 71ba9813
+
+**Verdict: no blocking findings. N1 and N2 are closed.**
+
+- **N1: done as I meant it.** `markedOf()` throws `IdentityMarkerLost` unless the definer's result is a string, and both wrappers use it. It throws inside setup, so the existing catch rolls back. `marked-of.test.ts` covers a number, null, a renamed column and a missing row, for both wrappers. Each case asserts that the callback never runs and no COMMIT is sent. A pre-N1 wrapper (value stored unchecked) would run the callback, so the test is red on it.
+- **N2: done; the scan now catches all three forms.**
+  - Re-exports: `export { … } from 'pg'` and `export * from 'pg'`, while `export type` is still allowed.
+  - Aliased constructors: `new x.Pool(`, `x.Pool(` and `new y.Client(`.
+  - `pg-pool` imported anywhere, `packages/db` included.
+  
+  Each pattern is pinned by a sample test that goes red if the pattern is narrowed again.
+- **CI area map: no security content.** `identity-marker.test.ts` joins the auth area. A change under `packages/db/`, including `roles.sql` and the migrations, is in `DB_SHARED`, so it still runs the marker tests in every area.
