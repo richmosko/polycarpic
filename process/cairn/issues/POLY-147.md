@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-146]
 assignee: backend-lead
-paths: [process/cairn/issues/POLY-147.md, process/cairn/reviews/POLY-147/**, packages/db/**, packages/auth/**, packages/tenancy/**, apps/worker/**, tests/**, scripts/layers/**, layers.json, eslint.config.js, package.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**]
+paths: [process/cairn/issues/POLY-147.md, process/cairn/reviews/POLY-147/**, packages/db/**, packages/auth/**, packages/tenancy/**, apps/worker/**, tests/**, scripts/layers/**, infra/ci/**, layers.json, eslint.config.js, package.json, apps/*/package.json, packages/*/package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**]
 labels: [security, auth]
 priority: P1
 pr: null
@@ -98,3 +98,7 @@ Gate 2, tests-red @ ee1ff9eb (ruling 2027afdb). New failing: 44 db (tests/db/ide
 
 Gate 1 cleared: seceng cleared ruling 4d50ce17 for tests-red (security-review.md §3 @ 50f334b1); the lead read the 14-line addendum to 2027afdb, which adds the test seceng called optional. qa-147 released against ruling @ 2027afdb.
 Principal (2026-11-15): the bootstrap also revokes PUBLIC's EXECUTE on the built-ins that run a SQL string (`*_to_xml*`, `ts_stat`, `ts_rewrite(tsquery, text)`), on seceng's recommendation over the architect's objection. The architect adds it as R11.
+
+### @team-lead — 2026-11-15
+
+CI dispatch run 43760544343 on built @ 04726635: `db` (preflight) and `lint` both fail on one cause. `tests/db/identity-marker.test.ts` is in no area of `infra/ci/changes.mjs` DB_AREAS, so `tests/ci/db-areas.test.ts` fails (C7, C10; the "19 mapped files" control). `guard`, `changes`, `cairn`, `unit` pass. Local runs missed it: nobody ran `tests/ci`. devops-147 is spawned for the area-map fix and, later, the INFRA runbook line (R11). `paths` widened with `infra/ci/**` and `docs/INFRA/**`.
