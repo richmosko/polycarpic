@@ -1,7 +1,7 @@
 ---
 id: POLY-148a
 title: Spike predicates and review
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-148
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [spikes/POLY-148/checks/**, process/cairn/reviews/POLY-148/**, process/ca
 stage: execute
 estimate.cost_usd: "6.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "8.4747"
+actual.tokens: 19274856
+actual.gate_cycles: 2
+actual.wall_clock: 40
+ratio: "1.41"
 labels: [security, auth, spike]
 priority: null
 pr: null
