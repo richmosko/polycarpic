@@ -25,7 +25,7 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.3.11</span>
+    <span><strong>Version:</strong> 1.3.12</span>
     <span><strong>Last updated:</strong> 2026-11-15</span>
   </div>
 </header>
@@ -514,6 +514,7 @@ flowchart LR
     <li>List the bucket with the read credential; take the newest base backup and WAL.</li>
     <li>Decrypt with the age private key from the password manager. Assert the globals file contains no password hash (<code>--no-role-passwords</code>); the drill then sets passwords on the restored roles.</li>
     <li>Start a scratch Postgres at the recorded major; restore the globals, then recover to the latest WAL; separately restore the <code>pg_dump</code> into a second scratch instance.</li>
+    <li>Re-run <code>packages/db/sql/roles.sql</code> as the superuser on each restored instance, then assert that <code>DO $$BEGIN END$$</code> as <code>poly_app</code> fails with <code>permission denied for language plpgsql</code> and that <code>SELECT query_to_xml('SELECT 1', true, false, '')</code> as <code>poly_app</code> fails with <code>permission denied for function</code>.</li>
     <li>Assert: the trial balance of every entity sums to zero; the per-entity hash-chain verifier passes (C-24); the roles from the globals file exist; the latest journal entry is within 20 minutes of the drill's start for the WAL path; the row count of a <code>FORCE ROW LEVEL SECURITY</code> table restored from the <code>pg_dump</code> equals the count in the base-backup restore (proof that <code>BYPASSRLS</code> dumped it whole, C-79).</li>
     <li>Assert, using the box credential file copied for the drill, that <strong>deleting an existing object fails</strong>, so does <strong>overwriting an object's version</strong>, shortening its retention, and changing the bucket's default retention (C-73's second test).</li>
     <li>Record date, backup names, timings and pass or fail in <code>process/cairn/reviews/restore-drill-&lt;date&gt;.md</code> via the lead (not edited by hand on the box). Destroy the scratch instances.</li>
