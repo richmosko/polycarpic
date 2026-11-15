@@ -2,7 +2,7 @@
 // withContextFreeTx and withOperatorTx refuse to nest inside one another, so a query never runs under two identities.
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { drizzle, NodePgTransaction, type NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { PgDialect } from 'drizzle-orm/pg-core';
+import type { PgDialect } from 'drizzle-orm/pg-core';
 import type pg from 'pg';
 import { appPool, operatorPool, workerPool } from './pool.ts';
 import { enterNewUserOn } from './new-user.ts';
