@@ -11,7 +11,7 @@ labels: [ops, infra]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-15
+updated: 2026-11-16
 ---
 
 The committed, idempotent scripts INFRA §7.1 steps 7–11 call (D-7): create.sh, cloud-init, provision.sh and provision-check.sh. provision-check is the evidence for C-70, C-71, C-72, C-76, C-77 and C-79 (sshd from sshd -T, the C-79 set, spool holds only .age, Docker pools vs fixed subnets).
@@ -42,3 +42,7 @@ From POLY-146: `packages/db/sql/roles.sql` creates a new LOGIN role, poly_operat
 ### @team-lead — 2026-11-15
 
 Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `process/cairn/reviews/POLY-147/` (ruling, security-review, verdict) and devops-147's findings.
+
+### @team-lead — 2026-11-16
+
+Deploy gate (Principal, 2026-11-16; `process/DECISIONS.md`): staging here holds test data only. No real household data is deployed until POLY-149's revocation PR has merged.

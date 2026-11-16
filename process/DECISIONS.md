@@ -677,3 +677,13 @@ Add new decisions ABOVE this comment, newest first.
 - Turn backup codes off (seceng's recommendation in `process/cairn/reviews/POLY-89/ruling-review.md`, D1 option (a)) — closes the copy now, under an hour of work (a guess); the user loses self-service recovery.
 - Store recovery codes our own way, bound to the user — not priced.
 **Approved by:** the Principal (2026-11-16), on seceng's review of the ruling at `7e73fd7e` and its note on what remains after stage 2.
+
+### 2026-11-16 — No real household data is deployed before stage 2's revocation merges
+**Decision:** the first deploy that holds real household data waits until the last PR of POLY-149 (the revocation of `poly_app`'s grants on BetterAuth's tables) has merged. A staging deploy with test data (POLY-97) does not wait.
+**Why:** until the revocation, one injection bug in web lets an attacker plant a magic link and sign in as any user without a second factor (SECURITY R-2), and with copied backup codes as any user with an authenticator app too (the entry above); only passkey-only users are out of reach. R-2 carried a review date (no later than 2027-03-31), which is a deadline and not a gate. The Principal accepts holes in the in-between state on the condition that nothing real is exposed to them.
+**Alternatives considered:**
+- Deploy real data earlier and accept R-2 as it stands until the revocation — rejected.
+- Gate staging as well — not needed; staging holds test data only.
+**Cost:** no real data until stage 2 is done, which POLY-149 estimates at 11.5–15.5 loop-days over 3 loops.
+**Approved by:** the Principal (2026-11-16), on seceng's recommendation.
+

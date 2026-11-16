@@ -11,7 +11,7 @@ labels: [security, auth]
 priority: P1
 pr: null
 created: 2026-11-13
-updated: 2026-11-15
+updated: 2026-11-16
 ---
 
 Stage 2 of POLY-145's decision (`process/cairn/reviews/POLY-145/pricing.md` §1 blocks S, E, H and D). BetterAuth, the auth secret and every grant on BetterAuth's tables move to a third process, `polycarpic auth`, on its own login role poly_auth, served on the same origin at `/api/auth/*`. Web enters a transaction only by handing the database a session handle. The database holds just a hash of that handle and checks it in `app.enter_session`; the interim definer from stage 1 is revoked. Once this ships, SQL injection in web, a stolen poly_app password and a read of the database at rest each reach no user, or only the requesting user. Code execution in web still reaches the users active while it runs (`comparison.md` §1). Because POLY-89 lands first, its guards and their fixtures move from poly_app to poly_auth transactions here.
@@ -62,3 +62,7 @@ It is likely to land as three PRs: S, then E with H, then the revocation and the
 ### @team-lead — 2026-11-15
 
 Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cairn/reviews/POLY-148/spike.md` (§1, §2, §6 and seceng's reading in §7).
+
+### @team-lead — 2026-11-16
+
+Deploy gate (Principal, 2026-11-16; `process/DECISIONS.md`): no real household data is deployed before this issue's last PR, the revocation, has merged. Staging with test data (POLY-97) may go ahead. Backup codes stay on in POLY-89, and the copy risk they carry closes at the same PR.
