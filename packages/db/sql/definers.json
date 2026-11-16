@@ -30,5 +30,6 @@
   { "function": "app.require_enrolled_inviter()", "owner": "poly_govern", "execute": [] },
   { "function": "app.issue_email_challenge(p_purpose text)", "owner": "poly_govern", "execute": ["poly_app"] },
   { "function": "app.confirm_email_challenge(p_code text)", "owner": "poly_govern", "execute": ["poly_app"] },
+  { "function": "app.signup_stamp_cleared()", "owner": "poly_govern", "execute": [] },
   { "function": "app.reset_second_step(p_email text)", "owner": "poly_govern", "execute": ["poly_operator"] }
 ]

@@ -18,7 +18,7 @@ describe('pinned options (criterion 2)', () => {
   it('account create and update before-hooks drop idToken and keep the rest  [red if: either hook missing or passes idToken through]', async () => {
     for (const when of ['create', 'update'] as const) {
       const out = await hook('account', when, { idToken: 'JWT', accessToken: 'at', providerId: 'google' });
-      expect(out, when).not.toHaveProperty('idToken');
+      expect(out.idToken, when).toBeNull();
       expect(out.accessToken, when).toBe('at');
     }
   });

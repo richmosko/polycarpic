@@ -47,6 +47,11 @@ CREATE TRIGGER enrolment_grant_no_truncate BEFORE TRUNCATE ON app.enrolment_gran
 -- app.current_session_id() (0011) is executable by poly_app only; the definers below read the marker's session too.
 GRANT EXECUTE ON FUNCTION app.current_session_id() TO poly_authz, poly_govern;--> statement-breakpoint
 
+-- 0007's commit-time stamp check ran as the committing role and read public."user", so any UPDATE of a user by a role with no
+-- USAGE on public (the operator's reset) failed at COMMIT. It becomes a definer of poly_govern; the check itself is unchanged.
+DROP TRIGGER user_90_stamp_cleared ON public."user";--> statement-breakpoint
+DROP FUNCTION app.signup_stamp_cleared();--> statement-breakpoint
+
 GRANT CREATE ON SCHEMA app TO poly_authz, poly_govern;--> statement-breakpoint
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -198,7 +203,7 @@ CREATE FUNCTION app.set_two_factor_enabled(p_on boolean) RETURNS void
     v_first boolean;
     v_grant uuid;
   BEGIN
-    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') IS DISTINCT FROM 'SELECT app.set_two_factor_enabled($1)' THEN
+    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') !~ '^SELECT app\.set_two_factor_enabled\(\$1\)( AS [a-z_][a-z0-9_]{0,62})?$' THEN
       RAISE EXCEPTION 'a second-step definer must be called on its own' USING ERRCODE = '42501';
     END IF;
     v_uid := app.current_user_id();
@@ -423,6 +428,18 @@ CREATE FUNCTION app.require_enrolled_inviter() RETURNS trigger
   END
   $fn$;--> statement-breakpoint
 
+CREATE FUNCTION app.signup_stamp_cleared() RETURNS trigger
+  LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path = ''
+  AS $fn$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM public."user" u WHERE u.id = NEW.id AND u.signup_txid IS NOT NULL) THEN
+      RAISE EXCEPTION 'a sign-up must end by accepting its invitation' USING ERRCODE = '42501';
+    END IF;
+    RETURN NULL;
+  END
+  $fn$;--> statement-breakpoint
+
 -- The emailed code (R2). Six digits from the first 32 bits of a random uuid; stored as sha256(code || ':' || id); returned once.
 -- NULL (suppressed) when 3 or more challenges were made in 15 minutes or the wrong entries of 24 hours reach 10.
 CREATE FUNCTION app.issue_email_challenge(p_purpose text) RETURNS text
@@ -436,7 +453,7 @@ CREATE FUNCTION app.issue_email_challenge(p_purpose text) RETURNS text
     v_bytes bytea;
     v_code text;
   BEGIN
-    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') IS DISTINCT FROM 'SELECT app.issue_email_challenge($1)' THEN
+    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') !~ '^SELECT app\.issue_email_challenge\(\$1\)( AS [a-z_][a-z0-9_]{0,62})?$' THEN
       RAISE EXCEPTION 'a second-step definer must be called on its own' USING ERRCODE = '42501';
     END IF;
     v_uid := app.current_user_id();
@@ -473,7 +490,7 @@ CREATE FUNCTION app.confirm_email_challenge(p_code text) RETURNS boolean
     v_sid uuid;
     c record;
   BEGIN
-    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') IS DISTINCT FROM 'SELECT app.confirm_email_challenge($1)' THEN
+    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') !~ '^SELECT app\.confirm_email_challenge\(\$1\)( AS [a-z_][a-z0-9_]{0,62})?$' THEN
       RAISE EXCEPTION 'a second-step definer must be called on its own' USING ERRCODE = '42501';
     END IF;
     v_uid := app.current_user_id();
@@ -511,7 +528,7 @@ CREATE FUNCTION app.reset_second_step(p_email text) RETURNS boolean
   DECLARE
     v_user uuid;
   BEGIN
-    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') IS DISTINCT FROM 'SELECT app.reset_second_step($1)' THEN
+    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') !~ '^SELECT app\.reset_second_step\(\$1\)( AS [a-z_][a-z0-9_]{0,62})?$' THEN
       RAISE EXCEPTION 'a second-step definer must be called on its own' USING ERRCODE = '42501';
     END IF;
     IF app.current_user_id() IS NOT NULL THEN
@@ -537,6 +554,7 @@ CREATE FUNCTION app.reset_second_step(p_email text) RETURNS boolean
 
 -- EXECUTE (R1.5): the login role the call comes from, and nobody else. The helpers the invoker triggers call are executable by
 -- poly_app; the two that mutate refuse unless they run inside a trigger.
+REVOKE EXECUTE ON FUNCTION app.signup_stamp_cleared() FROM PUBLIC;--> statement-breakpoint
 REVOKE EXECUTE ON FUNCTION app.step_up_fresh(), app.enrol_proof(text), app.enrolment_grant_live(), app.check_factor_removal(uuid, text, uuid),
   app.set_two_factor_enabled(boolean), app.consume_passkey_grant(), app.take_recent_auth_stamp(uuid), app.seat_claimed_invitations(),
   app.sync_second_step(), app.two_factor_consistent(), app.require_second_step_for_role(), app.require_enrolled_inviter(),
@@ -546,7 +564,7 @@ GRANT EXECUTE ON FUNCTION app.step_up_fresh(), app.enrol_proof(text), app.enrolm
   app.issue_email_challenge(text), app.confirm_email_challenge(text) TO poly_app;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION app.reset_second_step(text) TO poly_operator;--> statement-breakpoint
 -- CREATE TRIGGER needs EXECUTE for its creator; poly_owner holds it only for this file.
-GRANT EXECUTE ON FUNCTION app.sync_second_step(), app.two_factor_consistent(), app.require_second_step_for_role(), app.require_enrolled_inviter() TO poly_owner;--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION app.sync_second_step(), app.two_factor_consistent(), app.require_second_step_for_role(), app.require_enrolled_inviter(), app.signup_stamp_cleared() TO poly_owner;--> statement-breakpoint
 
 SET ROLE poly_owner;--> statement-breakpoint
 
@@ -734,11 +752,13 @@ CREATE TRIGGER passkey_80_sync AFTER INSERT OR DELETE ON public.passkey
   FOR EACH ROW EXECUTE FUNCTION app.sync_second_step();--> statement-breakpoint
 CREATE TRIGGER membership_05_second_step BEFORE INSERT OR UPDATE OF role ON public.membership
   FOR EACH ROW EXECUTE FUNCTION app.require_second_step_for_role();--> statement-breakpoint
+CREATE CONSTRAINT TRIGGER user_90_stamp_cleared AFTER INSERT OR UPDATE ON public."user"
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION app.signup_stamp_cleared();--> statement-breakpoint
 CREATE TRIGGER invitation_05_second_step BEFORE INSERT ON public.invitation
   FOR EACH ROW EXECUTE FUNCTION app.require_enrolled_inviter();--> statement-breakpoint
 
 -- The file-scoped trigger-creation grant goes back; only the grantor can revoke it.
 SET ROLE poly_govern;--> statement-breakpoint
-REVOKE EXECUTE ON FUNCTION app.sync_second_step(), app.two_factor_consistent(), app.require_second_step_for_role(), app.require_enrolled_inviter() FROM poly_owner;--> statement-breakpoint
+REVOKE EXECUTE ON FUNCTION app.sync_second_step(), app.two_factor_consistent(), app.require_second_step_for_role(), app.require_enrolled_inviter(), app.signup_stamp_cleared() FROM poly_owner;--> statement-breakpoint
 SET ROLE poly_owner;--> statement-breakpoint
 REVOKE CREATE ON SCHEMA app FROM poly_authz, poly_govern;

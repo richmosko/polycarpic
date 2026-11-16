@@ -80,7 +80,7 @@ export async function userUpdateBefore(data: Data): Promise<Hooked> {
   return { data: 'image' in data ? stripImage(data) : data };
 }
 
+// BetterAuth merges a hook's data over the original (db/with-hooks.mjs), so omitting the key keeps the token: it is set to null.
 export async function accountDropIdToken(data: Data): Promise<Hooked> {
-  const { idToken: _dropped, ...rest } = data;
-  return { data: rest };
+  return { data: { ...data, idToken: null } };
 }
