@@ -144,3 +144,32 @@ POLY-89c addendum (ruling 6eed53f8, D1=b, criterion 16): +8 D1(b) tests (4 per r
 ### @qa-engineer — 2026-11-16
 
 POLY-89c gate 2 (ruling 6eed53f8): the todos are now tests against the ruled names. New files second-step-challenge (R2 code, grant, first enrolment in SQL in the measured order, the manager-invite seating, race 2), second-step-reset (reset_second_step as poly_operator, the CLI runUserResetMfa exit 0/2), helpers/second-step.ts (fixtures, RFC 6238 TOTP); second-step-flow gains the end-to-end enrolment through the real handler (anchor routes, enable, verify-totp), the statement-level assertion for R3 #1/#3 (SQL captured on the pg client: no two_factor_enabled in any UPDATE of user, no recent_auth_at in any INSERT into session), C4 step-up and new device, C5 Google, C8 indistinguishable 4th send. Totals over the 4 POLY-89 files: 112 red, 20 green, 5 todo. Green = holds today (grants, unmarked refresh, lockout, D1b unmarked consume, C5 Google not stamped/held). Todo kept, each with its missing piece: passkey assertion (no software WebAuthn authenticator), D1(b) over HTTP backup-code sign-in (reuses the enrolment flow once green), CLI child process through bin/polycarpic (needs cli/main.ts dispatch), two web e2e (placeholder page absent).
+
+### @seceng — 2026-11-16
+
+**Build review (seceng) at `a8370f78`: accepted, nothing blocks.** Details: `process/cairn/reviews/POLY-89/build-review.md`.
+
+I found no way around any guard. I re-ran the four second-step suites myself (147 pass) and seven probes of my own on a fresh clone. The probes show:
+- a passkey grant cannot be turned into a step-up stamp;
+- one user cannot write another user's factor row;
+- unmarked writes cannot copy a secret or delete a passkey;
+- a session INSERT cannot set `recent_auth_at`.
+
+Conditions C-a to C-e and the early rulings are met. C-f is partly met (N2, N3).
+
+Not blocking:
+- **N1.** poly_app may execute five POLY-89 functions that R1.5 does not list. All are safe: two read only, one only locks and checks, and the two that write refuse outside a trigger (probed). List all seven in R1.5, and pin the set in a catalog test.
+- **N2.** The reset can hit the wrong user. The email index is case-sensitive (`Dup@` and `dup@` both insert), and the reset takes the first lower-cased match. No attacker gains from this; the harm is an operator signing out the wrong person. Fix in this PR: refuse when more than one user matches.
+- **N3.** Refusing a deleted user (tombstone) waits for account deletion, which is not built yet. The condition moves to that issue.
+- **N4.** An invitee who already holds a viewer seat is marked accepted without the raise. No access is gained; file it with POLY-91.
+- **N5.** The sign-in gate's redirect drops the refreshed session cookie. This is functional only.
+
+D1 (b) is confirmed as decided: copying another user's backup codes without a marker still succeeds. SECURITY R-2 states it, beside the deploy gate.
+
+SECURITY 1.9.22 edits, in this commit:
+- **R-2:** the backup-code copy, the unguarded `user.email`, the 5-minute step-up leftover, and the deploy gate.
+- **R-25:** the second factor is built but no screen reaches enrolment yet.
+- **§4.1:** for a user with no password, a session under 5 minutes old stands in for the password; no link form; the 24-hour cap on wrong entries; the password half of the anchor is the app's check.
+- **T1:** the hook sets `idToken` to null.
+
+INFRA's first-deploy checklist has no line on the deploy gate. It is devops-engineer's doc, so it is for the lead to place.
