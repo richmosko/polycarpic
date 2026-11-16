@@ -5,15 +5,17 @@ import { ConfigError, loadConfig } from '@poly/config';
 import { createLogger } from '@poly/config/log';
 import { validOperatorEmail } from '@poly/tenancy';
 import { runUserInvite } from './user-invite.ts';
+import { runUserResetMfa } from './user-reset-mfa.ts';
 
-const USAGE = 'usage: polycarpic cli user invite <email> [--bootstrap]\n';
+const USAGE = 'usage: polycarpic cli user invite <email> [--bootstrap] | polycarpic cli user reset-mfa <email>\n';
 const err = (s: string): void => void process.stderr.write(s);
 
 async function main(): Promise<number> {
   const argv = process.argv.slice(2);
   const flags = argv.filter((a) => a.startsWith('--'));
   const pos = argv.filter((a) => !a.startsWith('--'));
-  if (pos[0] !== 'user' || pos[1] !== 'invite' || pos.length !== 3 || flags.length > 1 || flags.some((f) => f !== '--bootstrap')) {
+  const reset = pos[0] === 'user' && pos[1] === 'reset-mfa';
+  if (pos[0] !== 'user' || (pos[1] !== 'invite' && !reset) || pos.length !== 3 || flags.length > (reset ? 0 : 1) || flags.some((f) => f !== '--bootstrap')) {
     err(USAGE);
     return 1;
   }
@@ -33,6 +35,7 @@ async function main(): Promise<number> {
     }
     throw e;
   }
+  if (reset) return runUserResetMfa({ email }, { stdout: process.stdout, stderr: process.stderr, origin: config.publicOrigin });
   return runUserInvite(
     { email, bootstrap: flags.length === 1 },
     { stdout: process.stdout, stderr: process.stderr, origin: config.publicOrigin },

@@ -7,6 +7,7 @@ import { sessionUserId } from '@poly/db/session';
 import type { createAuth } from './index.ts';
 import { matchAuthPath, USER_INSERTING } from './route-policy.ts';
 import { cappedOut } from './recent-auth.ts';
+import { COMMIT_HEADER } from './anchor.ts';
 
 export type AnyAuth = Awaited<ReturnType<typeof createAuth>>;
 
@@ -49,11 +50,16 @@ function withoutCookies(res: Response): Response {
 
 async function inTransaction(request: Request, auth: AnyAuth, run: <T>(fn: () => Promise<T>) => Promise<T>, contextFree = false): Promise<Response> {
   try {
-    return await run(async () => {
+    const res = await run(async () => {
       const res = await auth.handler(request);
-      if (isFailure(res)) throw new RollbackWith(res);
+      // An answer that must still commit (a wrong emailed code records its attempt) carries the header; it never leaves the process.
+      if (isFailure(res) && !res.headers.has(COMMIT_HEADER)) throw new RollbackWith(res);
       return res;
     });
+    if (!res.headers.has(COMMIT_HEADER)) return res;
+    const headers = new Headers(res.headers);
+    headers.delete(COMMIT_HEADER);
+    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
   } catch (e) {
     if (e instanceof RollbackWith) return withoutCookies(e.response);
     // A refusal the database raises at COMMIT (the stamp check, C32) surfaces after BetterAuth answered 200: the same 403.

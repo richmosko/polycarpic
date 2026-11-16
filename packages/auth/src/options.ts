@@ -4,14 +4,15 @@ import { passkey } from '@better-auth/passkey';
 import { authFields } from '@poly/db/auth';
 import { magicLink, twoFactor } from 'better-auth/plugins';
 import { githubUserInfo } from './github.ts';
+import { secondStepAnchor, type SendSecondStepCode } from './anchor.ts';
 import { passkeyOnlyHold } from './second-step.ts';
 import { routePolicyHook, type TlsMode } from './route-policy.ts';
 import { createRoutingPool } from './routing-pool.ts';
-import { accountDropIdToken, userCreateAfter, userCreateBefore, userUpdateBefore } from './user-hooks.ts';
+import { accountDropIdToken, sessionCreateBefore, userCreateAfter, userCreateBefore, userUpdateBefore } from './user-hooks.ts';
 
 const DAY = 86400;
 /** C-04: five a minute per IP on the credential and verification paths (S19). */
-const LIMITED = ['/sign-in/email', '/sign-in/magic-link', '/sign-up/email', '/request-password-reset', '/two-factor/verify-totp', '/two-factor/verify-backup-code', '/passkey/verify-authentication'];
+const LIMITED = ['/sign-in/email', '/sign-in/magic-link', '/sign-up/email', '/request-password-reset', '/two-factor/verify-totp', '/two-factor/verify-backup-code', '/passkey/verify-authentication', '/second-step/send-code', '/second-step/confirm-code'];
 const customRules = Object.fromEntries(LIMITED.map((p) => [p, { window: 60, max: 5 }]));
 
 export interface Provider {
@@ -27,6 +28,8 @@ export interface AuthInput {
   /** S19: refuse an /api/auth/* request whose client IP does not resolve (true outside development). */
   requireClientIp: boolean;
   sendMagicLink: (m: { email: string; token: string; url: string }) => Promise<void>;
+  /** The emailed code that first enrolment rests on (R2). Web's version throws until the mailer exists (POLY-137). */
+  sendSecondStepCode?: SendSecondStepCode;
 }
 
 /** Fields are read from db/auth at call time, so the startup check sees exactly the map in force. */
@@ -121,6 +124,7 @@ export function authOptions(input: AuthInput) {
     },
     databaseHooks: {
       user: { create: { before: userCreateBefore, after: userCreateAfter }, update: { before: userUpdateBefore } },
+      session: { create: { before: sessionCreateBefore } },
       account: { create: { before: accountDropIdToken }, update: { before: accountDropIdToken } },
     },
     hooks: { before: routePolicyHook(input.tlsMode), after: passkeyOnlyHold },
@@ -144,6 +148,7 @@ export function authOptions(input: AuthInput) {
         },
       }),
       magicLink({ sendMagicLink: input.sendMagicLink, storeToken: 'hashed' }),
+      secondStepAnchor({ sendSecondStepCode: input.sendSecondStepCode }),
       passkey({
         rpName: 'polycarpic',
         schema: {

@@ -4,16 +4,18 @@
 import { APIError, createAuthMiddleware, getSessionFromCtx } from 'better-auth/api';
 import { currentClient, currentTx } from '@poly/db/auth';
 import { claimInvitation, decodeInvitationToken, InvitationRequired } from '@poly/tenancy';
+import { enrolmentGrantLive } from './anchor.ts';
 import { requireRecentAuth } from './recent-auth.ts';
 import { invitationRequired } from './user-hooks.ts';
 
-export type RouteClass = 'open' | 'enrolment' | 'step-up' | 'blocked';
+export type RouteClass = 'open' | 'enrolment' | 'step-up' | 'anchor' | 'blocked';
 export type Rule = { class: RouteClass; insertsUser?: true; realDomainOnly?: true; whenSession?: RouteClass | 'refused' };
 export type TlsMode = 'real-domain' | 'private-ca';
 
 const open = (extra: Omit<Rule, 'class'> = {}): Rule => ({ class: 'open', ...extra });
 const enrolment: Rule = { class: 'enrolment' };
 const stepUp = (extra: Omit<Rule, 'class'> = {}): Rule => ({ class: 'step-up', ...extra });
+const anchor: Rule = { class: 'anchor' };
 const blocked: Rule = { class: 'blocked' };
 
 export const AUTH_ROUTES: Readonly<Record<string, Rule>> = {
@@ -41,6 +43,8 @@ export const AUTH_ROUTES: Readonly<Record<string, Rule>> = {
   '/list-accounts': open(),
   '/passkey/list-user-passkeys': open(),
   '/passkey/update-passkey': open(),
+  '/second-step/send-code': anchor,
+  '/second-step/confirm-code': anchor,
   '/two-factor/enable': enrolment,
   '/passkey/generate-register-options': enrolment,
   '/passkey/verify-registration': enrolment,
@@ -171,19 +175,31 @@ export function routePolicyHook(tlsMode: TlsMode) {
       if (extra.length > 0 || (body.image !== undefined && body.image !== null)) throw new APIError('BAD_REQUEST', { message: 'update-user accepts a name and a null image only' });
     }
 
+    // S16, S17: a registration never mints a session, and the only second factor BetterAuth may enable is totp.
+    if (ctx.path === '/passkey/verify-registration' && body.createSession) throw new APIError('BAD_REQUEST', { code: 'create_session_refused', message: 'create_session_refused' });
+    if (ctx.path === '/two-factor/enable' && body.method !== undefined && body.method !== 'totp') throw new APIError('BAD_REQUEST', { code: 'method_refused', message: 'method_refused' });
+
     let cls: RouteClass | 'refused' = rule.class;
     if (rule.whenSession) {
       const s = await getSessionFromCtx(raw as never, { disableRefresh: true });
       if (s) cls = rule.whenSession;
     }
     if (cls === 'refused') throw forbidden('session_present');
-    if (cls !== 'enrolment' && cls !== 'step-up') return;
+    if (cls !== 'enrolment' && cls !== 'step-up' && cls !== 'anchor') return;
 
     const session = await getSessionFromCtx(raw as never, { disableRefresh: true });
     if (!session) return; // BetterAuth's own session middleware answers 401
     const secondStepAt = (session.user as { secondStepAt?: Date | null }).secondStepAt;
-    // Enrolment with no second step needs POLY-89's grant, which does not exist yet: nobody enrols (fails closed).
-    if (cls === 'enrolment' && !secondStepAt) throw forbidden('second_step_required');
+    if (cls === 'anchor') {
+      // The anchor is for a first enrolment only (R2).
+      if (secondStepAt) throw forbidden('second_step_already_set');
+      return;
+    }
+    // A first factor needs a live grant: the emailed code, confirmed for this session (R5). Any later factor needs a fresh step-up.
+    if (cls === 'enrolment' && !secondStepAt) {
+      if (!(await enrolmentGrantLive())) throw forbidden('email_confirmation_required');
+      return;
+    }
     await requireRecentAuth(session.session.id);
   });
 }

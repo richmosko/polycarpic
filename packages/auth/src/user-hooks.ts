@@ -1,6 +1,7 @@
 // databaseHooks (POLY-86 ruling R4, R7; seceng S11, S16b): the sign-up wrapper assertion with the invitation claim, the
 // image rule, and the hook that keeps the IdP's idToken out of the account table.
 import { currentClient, currentTx, type ContextFreeTx } from '@poly/db/auth';
+import { setTwoFactorEnabled } from './anchor.ts';
 import { acceptInvitations, claimInvitation, InvitationRequired, provisionPerson } from '@poly/tenancy';
 import { APIError } from 'better-auth/api';
 
@@ -77,7 +78,17 @@ export async function userCreateAfter(user: { id: string }, ctx?: HookCtx): Prom
 
 /** Until avatar upload exists the only accepted image is null; a provider's picture URL is never stored (criterion 15). */
 export async function userUpdateBefore(data: Data): Promise<Hooked> {
-  return { data: 'image' in data ? stripImage(data) : data };
+  const out = 'image' in data ? stripImage(data) : data;
+  if (data.twoFactorEnabled === undefined) return { data: out };
+  // R3 #1: poly_app holds no UPDATE on the column. The definer flips it (and applies the grant and step-up rules); the key goes out of
+  // BetterAuth's UPDATE as undefined, because the adapter merges hook data over the original, so omitting it would not remove it.
+  await setTwoFactorEnabled(data.twoFactorEnabled === true);
+  return { data: { ...out, twoFactorEnabled: undefined } };
+}
+
+/** R3 #3: poly_app cannot INSERT recent_auth_at; BetterAuth copies it on a rotation. The database stamps the one enrolment session. */
+export async function sessionCreateBefore(data: Data): Promise<Hooked> {
+  return { data: { ...data, recentAuthAt: undefined } };
 }
 
 // BetterAuth merges a hook's data over the original (db/with-hooks.mjs), so omitting the key keeps the token: it is set to null.
