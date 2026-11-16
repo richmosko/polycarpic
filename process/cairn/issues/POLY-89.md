@@ -33,6 +33,7 @@ Owners and managers must enrol a second factor (authenticator app or passkey); v
 - [ ] No POLY-89 guard treats the marker's `session_id` as proof that a session exists or is recent: until POLY-149 it is the value web passed (SECURITY R-2, C-86; POLY-147 seceng S3). A test forges it and the guard still refuses.
 - [ ] **`user.two_factor_enabled` is guarded (POLY-148 spike §7.3, requirement).** It turns on only in the transaction that verifies the factor, and off only in the transaction that deletes the factor after a step-up. The role that runs BetterAuth must hold UPDATE on the column, and without the guard one injected statement switches the second factor off for any user, silently.
 - [ ] **The first-verify rotation can insert its session.** `0005_auth_second_step_grants.sql` line 9 leaves `recent_auth_at` out of poly_app's INSERT on `session`, and BetterAuth copies that column when it replaces a session, so the rotation is refused once enrolment opens (confirmed from the shipped grants, POLY-148 spike §7). Strip the column in a `session.create.before` hook or grant it; seceng prefers stripping (§7.4).
+- [ ] The IdP's `id_token` is never stored: `accountDropIdToken` returns `idToken: null` (BetterAuth 1.7.18 merges a hook's data over the original, so a key left out is still written), measured on the stored `account` row on create and on update, not on the hook's return value. SECURITY T1, A-33 and ARCH are corrected to match (found in this loop, 2026-11-16).
 
 ## Comments
 
