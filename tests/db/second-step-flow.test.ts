@@ -54,6 +54,29 @@ describe('C3/C9 the enrolment class and the route policy (R3, R5)', () => {
   it.todo('C6 (e2e): after reset-mfa a manager signs in and every page redirects to /settings/second-step');
 });
 
+describe('criterion 16: the IdP id_token is never stored (accountDropIdToken)', () => {
+  // The shipped unit test (packages/auth/src/options.test.ts) checks only the hook's return value, which passes against the
+  // bug: with-hooks.mjs merges the returned data over the original, so a key left out is still written. These read the STORED row.
+  const idTokens = (email: string) => must(`SELECT a.id_token IS NULL, a.provider_id FROM public.account a JOIN public."user" u ON u.id = a.user_id WHERE u.email = '${email}' AND a.provider_id = 'google'`, e.db).rows;
+  it('account CREATE through the real OAuth callback leaves account.id_token NULL [red if: the hook drops idToken by omitting the key]', async () => {
+    const u = e.seedUser({ password: false });
+    const r = await e.oauth(u.email, e.auth);
+    expect([200, 302, 303]).toContain(r.status);
+    const rows = idTokens(u.email);
+    expect(rows.length).toBe(1);
+    expect(rows[0]![0]).toBe('t');
+  });
+  it('account UPDATE (a second Google sign-in refreshes the tokens) leaves account.id_token NULL even when a token was stored before [red if: the update hook omits the key instead of returning idToken: null]', async () => {
+    const u = e.seedUser({ password: false });
+    await e.oauth(u.email, e.auth);
+    must(`UPDATE public.account SET id_token = 'OLD-IDT-SECRET' WHERE user_id = '${u.id}' AND provider_id = 'google'`, e.db);
+    await e.oauth(u.email, e.auth);
+    const rows = idTokens(u.email);
+    expect(rows.length).toBe(1);
+    expect(rows[0]![0]).toBe('t');
+  });
+});
+
 describe('R3 #1 the unmeasured claim: userUpdateBefore data replaces BetterAuth\'s update', () => {
   // MEASUREMENT, not a build test. twoFactorEnabled cannot be driven yet (the enrolment class is a flat 403 today), so the
   // same mechanism is measured on /update-user: a patched user.update.before drops `name` (as R3 #1's hook drops

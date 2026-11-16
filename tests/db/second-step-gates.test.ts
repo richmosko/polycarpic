@@ -396,8 +396,34 @@ describe('C-a sign-in under the carve-out (poly_app, 0013 applied)', () => {
     });
   }
   it.todo('C-a: a real TOTP sign-in through /sign-in/email for an enrolled user commits as poly_app (drive with the real handler once enrolment fixtures exist; the SQL halves above are red now)');
-  it.todo('D1 (a) backup codes off: /two-factor/verify-backup-code and /two-factor/generate-backup-codes are Blocked, and every backup_codes change on a verified row is refused, marked or not');
-  it.todo('D1 (b) backup codes kept: an unmarked backup_codes change on a verified row commits (sign-in consumes one); a marked one needs a fresh step-up; SECURITY R-2 states the copy-a-code bypass');
+  // D1 = (b), the Principal's decision: backup codes stay. The carve-out lets a sign-in consume a code, on a verified row only.
+  for (const role of ROLES) {
+    it(`D1(b) ${role}: an unmarked backup_codes change on a VERIFIED two_factor row commits (a backup-code sign-in consumes one code) [red if: guard_two_factor refuses unmarked backup_codes or two_factor_91_consistent uses the marker]`, async () => {
+      const u = await seed({ enrolled: true });
+      await unmarked(role, `UPDATE public.two_factor SET backup_codes = 'consumed-one' WHERE user_id = $1`, [u.id]);
+      expect(must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows[0]![0]).toBe('consumed-one');
+    });
+    it(`D1(b) ${role}: an unmarked backup_codes change on an UNVERIFIED row is refused (the carve-out is verified rows only) [red if: the carve-out ignores verified for backup_codes]`, async () => {
+      const u = await seed();
+      must(`INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s','b','${u.id}',false)`, db);
+      await expect(unmarked(role, `UPDATE public.two_factor SET backup_codes = 'x' WHERE user_id = $1`, [u.id])).rejects.toBeTruthy();
+    });
+    it(`D1(b) ${role}: a MARKED backup_codes change on a verified row (regenerate) without a fresh step-up is refused [red if: a marked rewrite needs no step-up]`, async () => {
+      const u = await seed({ enrolled: true });
+      const x = await marked(role, u.id, null, (q) => fails(q(`UPDATE public.two_factor SET backup_codes = 'regen' WHERE user_id = $1`, [u.id])));
+      expect(x).not.toBeNull();
+    });
+    it(`D1(b) ${role}: a MARKED backup_codes change with a fresh step-up commits, and a stamp older than 300 s does not [red if: the regenerate clause is absent or the window is wrong]`, async () => {
+      const u = await seed({ enrolled: true });
+      const s = must(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tkb${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`, db).rows[0]![0]!;
+      await marked(role, u.id, s, (q) => q(`UPDATE public.two_factor SET backup_codes = 'regen' WHERE user_id = $1`, [u.id]));
+      must(`UPDATE public.session SET recent_auth_at = now() - interval '301 seconds' WHERE id = '${s}'`, db);
+      const stale = await marked(role, u.id, s, (q) => fails(q(`UPDATE public.two_factor SET backup_codes = 'regen' WHERE user_id = $1`, [u.id])));
+      expect(stale).not.toBeNull();
+    });
+  }
+  it.todo('D1(b): a backup-code sign-in through /two-factor/verify-backup-code over HTTP commits as poly_app (needs a real enrolled TOTP user with BetterAuth-encrypted backup codes; the SQL halves above are the guard)');
+  it.todo('R3 #1 and #3 (ruling 6eed53f8): the SQL actually sent by verify-totp names neither two_factor_enabled nor recent_auth_at (measure on the statement; needs the verify-totp path with a live grant, written with the build)');
 });
 
 describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
