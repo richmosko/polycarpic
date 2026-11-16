@@ -1,7 +1,7 @@
 ---
 id: POLY-89
 title: Second sign-in step
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-86, POLY-62, POLY-87, POLY-147]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-89/**, packages/auth/**, packages/tenancy/**, packages/db/**, packages/config/**, apps/web/**, apps/worker/**, tests/**, infra/ci/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**]
 labels: [auth, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/131
 created: 2026-11-08
 updated: 2026-11-16
 ---
@@ -172,3 +172,7 @@ Verdict condition met: seceng's delta sign-off is at 03d8dbca (accepted at 4ef34
 Correction to the verdict's finding 2. My browser check did **not** cover C4/C5. What I checked, against a local build at a8370f78: signed out, `/dashboard` and `/settings/second-step` redirect to `/sign-in`; signed in as the fixture manager with no second step, `/dashboard`, `/settings/sessions` and `/` each answer 303 to `/settings/second-step`, which loads. I did it over HTTP with the `x-forwarded-for` header the e2e uses, because the app refuses sign-in from a browser tab with no resolvable client address. An enrolled user held at `/sign-in` is proved only in `tests/db` through the real handler; the browser test for it goes with the second-step screens issue.
 
 Criterion 14's wording predates ruling R1.4: no role holds UPDATE on `two_factor_enabled`; the definer writes it.
+
+### @team-lead — 2026-11-16
+
+PR opened: https://github.com/richmosko/polycarpic/pull/131. Awaiting Validate.

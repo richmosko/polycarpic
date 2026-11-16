@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-89-second-sign-in-step`
 - **Started:** 2026-11-16
 - **Goal:** Owners and managers must enrol a second factor (authenticator app or passkey), anchored on an emailed code, asked on a new device and as a step-up; the own unshared Person is exempt until a forcing action; every guard is a database gate read from the POLY-147 marker.
-- **Status:** In Progress
+- **Status:** In Review — PR [#131](https://github.com/richmosko/polycarpic/pull/131)
 
 _Standing context. POLY-148 (Sign-in service spike) merged 2026-11-16 via PR [#129](https://github.com/richmosko/polycarpic/pull/129) — SECURITY 1.9.21. The record is `process/cairn/reviews/POLY-148/spike.md`, accepted by seceng: 28 PASS, 4 FAIL, 4 REPORT on 36 check lines, Chromium 7 of 7. Stage 2 (POLY-149) is ruled from it. Three changes are required there: the session lookup takes the plain handle and hashes inside Postgres; a `provision_person` definer replaces the service's tenancy write grant (stage 2's price is re-opened, about +0.5 loop-day, a guess); the service enters by its own session and never holds `enter_asserted_user`. Refresh re-issuing neither cookie needs a stage-2 ruling. The Principal decided the sign-in pages stay in web (`process/DECISIONS.md`, 2026-11-15); the accepted risk is SECURITY R-25 (T-101), and neither of its mitigations is built yet (POLY-138, POLY-89). Follow-ups are filed on POLY-149 (stage 2's required changes and the refresh ruling), POLY-89 (the `two_factor_enabled` guard; the first-verify rotation's `recent_auth_at` grant gap), POLY-138 (Caddy refuses `Service-Worker: script`) and POLY-143 (`tests/infra/image` unexplained failures on macOS)._
 
