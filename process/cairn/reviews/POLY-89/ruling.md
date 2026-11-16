@@ -25,6 +25,15 @@
    - `poly_govern`, which is NOLOGIN and runs only inside its own definers;
    - a superuser (fixtures, restores).
 
+   This applies to every POLY-89 guard. A restore with triggers on must be able to reproduce legitimate states: a manager whose `second_step_at` is NULL after `reset-mfa`, or an invitation from an inviter who was later reset. A superuser can already disable triggers, so the pass adds no reach.
+
+   The invoker guards test `current_user`, and under `SET ROLE poly_app` that is already poly_app.
+
+   The SECURITY DEFINER guards run as `poly_govern` whoever calls them. These are `membership_05_second_step`, `invitation_05_second_step` and `two_factor_consistent`.
+   - They give `poly_govern` **no** pass, since `seat_creator`, `accept_invitations` and `seat_claimed_invitations` are poly_govern definers whose writes they exist to check.
+   - They pass only when `session_user` is a superuser **and** `current_setting('role') = 'none'`. Without the second test, a superuser login that did `SET ROLE poly_app`, as pgTAP 05–07 do, would skip the checks those tests exist to show.
+   - That a definer call leaves `role` unchanged is (unmeasured). The test: as a superuser with `SET LOCAL ROLE poly_app`, an unenrolled manager seat, an invitation from an unenrolled inviter, and an inconsistent flag are each refused; with no `SET ROLE` each passes.
+
    Stage 2 therefore changes only the fixtures' role. qa's role tests (POLY-89c):
    - Every refusal path runs as poly_app and as a fixture login role `poly_auth`. The harness creates that role with poly_app's grants on BetterAuth's tables; `roles.sql` gains it only in POLY-149.
    - Positive paths run as poly_app, because `tx_identity_own` does not reach poly_auth until stage 2.
