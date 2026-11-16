@@ -49,11 +49,11 @@ describe('C7 one area, one project', () => {
     for (const f of all) expect(existsSync(join(ROOT, f)), f).toBe(true);
     expect([...all].sort()).toEqual(FILES);
   });
-  it('every file is in exactly one project: SERIAL or the parallel remainder; SERIAL files are in migrate and ops only', async () => {
+  it('every file is in exactly one project: SERIAL or the parallel remainder; SERIAL files are in migrate, ops and the two poly_auth fixture files only', async () => {
     const cfg: any = await import(pathToFileURL(join(ROOT, 'tests/db/vitest.config.ts')).href);
     if (!Array.isArray(cfg.SERIAL)) throw new Error('tests/db/vitest.config.ts does not export SERIAL');
     const { DB_AREAS } = await ch();
-    for (const s of cfg.SERIAL as string[]) expect([...DB_AREAS.migrate!.tests, ...DB_AREAS.ops!.tests], s).toContain(s);
+    for (const s of cfg.SERIAL as string[]) expect([...DB_AREAS.migrate!.tests, ...DB_AREAS.ops!.tests, 'tests/db/second-step-gates.test.ts', 'tests/db/second-step-challenge.test.ts'], s).toContain(s);
   });
   it('each area\'s own test files match its own paths and no other area\'s  [red if: a test file is not covered by its area]', async () => {
     const { classify, DB_AREAS } = await ch();
