@@ -1,0 +1,96 @@
+#!/usr/bin/env node
+// Starts the POLY-148 harness: Postgres (container), web, the sign-in service, Caddy (container). Exits 0 when all four answer.
+// Idempotent: a second run restarts web, the service and Caddy against the same database. `--option 2` starts option 2.
+// The containers carry no host install: Caddy and Postgres run in Docker, the two Node processes run from the workspace.
+import { spawn, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { CADDY, PG, PORTS, RUN, SECRET, SPIKE, ROOT, rolePassword } from '../harness/config.mjs';
+
+const option = process.argv.includes('--option') ? process.argv[process.argv.indexOf('--option') + 1] : '1';
+const sh = (cmd, args, input) => {
+  const r = spawnSync(cmd, args, { encoding: 'utf8', input, timeout: 600_000 });
+  return { code: r.status ?? 127, out: r.stdout ?? '', err: (r.stderr ?? '') + (r.error ? String(r.error) : '') };
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const psql = (sql, db = PG.db) => sh('docker', ['exec', '-i', PG.container, 'psql', '-X', '-q', '-At', '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', db, '-f', '-'], sql);
+const must = (r, what) => { if (r.code !== 0) { console.error(`bin/up: ${what} failed:\n${(r.err || r.out).slice(-1500)}`); process.exit(1); } return r; };
+
+fs.mkdirSync(RUN, { recursive: true });
+sh(path.join(SPIKE, 'bin', 'down'), ['--keep-db']);
+
+// ---- Postgres: the product's pinned image, the product's chain, then the spike's SQL ----
+const { IMAGE, buildArgv } = await import(pathToFileURL(path.join(ROOT, 'tests/db/helpers/pgtap-image.mjs')).href);
+if (sh('docker', ['image', 'inspect', IMAGE]).code !== 0) must(sh('docker', buildArgv()), 'docker build of the pgTAP image');
+const state = sh('docker', ['inspect', '-f', '{{.State.Running}}', PG.container]);
+let fresh = false;
+if (state.out.trim() !== 'true') {
+  sh('docker', ['rm', '-f', PG.container]);
+  must(sh('docker', ['run', '-d', '--name', PG.container, '-e', 'POSTGRES_PASSWORD=qa', '-p', `127.0.0.1:${PORTS.pg}:5432`, IMAGE]), 'docker run postgres');
+  for (let i = 0, ok = 0; ; i++) {
+    if (i > 90) { console.error('bin/up: postgres did not become ready'); process.exit(1); }
+    ok = sh('docker', ['exec', PG.container, 'psql', '-X', '-At', '-h', '127.0.0.1', '-U', 'postgres', '-c', 'select 1']).code === 0 ? ok + 1 : 0;
+    if (ok >= 2) break;
+    await sleep(1000);
+  }
+  fresh = true;
+}
+const migrated = psql(`SELECT to_regclass('app.spike_session_of_handle') IS NOT NULL`);
+if (fresh || migrated.out.trim() !== 't') {
+  sh('docker', ['exec', PG.container, 'psql', '-U', 'postgres', '-c', `DROP DATABASE IF EXISTS ${PG.db} WITH (FORCE)`]);
+  must(sh('docker', ['exec', PG.container, 'psql', '-X', '-q', '-U', 'postgres', '-c', `CREATE DATABASE ${PG.db}`]), 'create database');
+  const roles = fs.readFileSync(path.join(ROOT, 'packages/db/sql/roles.sql'), 'utf8');
+  must(psql(roles), 'roles.sql');
+  const logins = ['poly_migrator', 'poly_app', 'poly_worker', 'poly_operator', 'poly_backup'];
+  must(psql(logins.map((r) => `ALTER ROLE ${r} PASSWORD '${rolePassword(r)}';`).join('\n')), 'role passwords');
+  const env = { ...process.env, ...dbEnv('poly_migrator') };
+  const m = spawnSync('node', [path.join(ROOT, 'apps/migrate/src/cli.ts')], { encoding: 'utf8', env, timeout: 300_000 });
+  if (m.status !== 0) { console.error(`bin/up: migrate failed:\n${(m.stderr + m.stdout).slice(-1500)}`); process.exit(1); }
+}
+// the spike's own SQL is idempotent and re-applied on every up, so an edit to it needs no rebuild of the database
+must(psql(fs.readFileSync(path.join(SPIKE, 'sql/spike.sql'), 'utf8')), 'sql/spike.sql');
+must(psql(`ALTER ROLE poly_auth PASSWORD '${rolePassword('poly_auth')}';`), 'poly_auth password');
+
+function pwFile(role) {
+  const f = path.join(RUN, `db_password_${role}`);
+  fs.writeFileSync(f, `${rolePassword(role)}\n`, { mode: 0o600 });
+  return f;
+}
+function dbEnv(role) {
+  return { DATABASE_HOST: '127.0.0.1', DATABASE_PORT: String(PORTS.pg), DATABASE_NAME: PG.db, DATABASE_USER: role, DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: pwFile(role) };
+}
+
+// ---- web and the sign-in service: explicit environments, so the secret is in the service's and nowhere else ----
+const base = { PATH: process.env.PATH, HOME: process.env.HOME ?? '', POLY148_OPTION: option };
+function start(name, entry, env) {
+  const log = fs.openSync(path.join(RUN, `${name}.log`), 'w');
+  const child = spawn('node', [entry], { cwd: SPIKE, env, detached: true, stdio: ['ignore', log, log] });
+  child.unref();
+  return child.pid;
+}
+const webPid = start('web', 'web/server.mjs', { ...base, ...dbEnv('poly_app'), WEB_PORT: String(PORTS.web) });
+const servicePid = start('service', 'service/server.ts', { ...base, ...dbEnv('poly_auth'), BETTER_AUTH_SECRET: SECRET, SERVICE_PORT: String(PORTS.service) });
+
+// ---- Caddy, in a container: plain HTTP on 58480, upstreams on the host ----
+sh('docker', ['rm', '-f', CADDY.container, CADDY.containerSw]);
+must(sh('docker', ['run', '-d', '--name', CADDY.container, '--add-host', 'host.docker.internal:host-gateway', '-p', `127.0.0.1:${PORTS.caddy}:80`,
+  '-v', `${path.join(SPIKE, 'caddy/Caddyfile')}:/etc/caddy/Caddyfile:ro`, CADDY.image]), 'docker run caddy');
+
+// a second Caddy for the service-worker item only: the same routes plus the refusal of Service-Worker: script requests
+must(sh('docker', ['run', '-d', '--name', CADDY.containerSw, '--add-host', 'host.docker.internal:host-gateway', '-p', `127.0.0.1:${PORTS.caddySw}:80`,
+  '-v', `${path.join(SPIKE, 'caddy/Caddyfile.sw')}:/etc/caddy/Caddyfile:ro`, CADDY.image]), 'docker run caddy (service-worker rule)');
+
+fs.writeFileSync(path.join(RUN, 'pids.json'), JSON.stringify({ web: webPid, service: servicePid, caddy: CADDY.container, serviceEntry: 'service/server.ts', authSource: '../../packages/auth/src', option }));
+
+// ---- readiness: all four answer ----
+const probes = [['web', `http://127.0.0.1:${PORTS.web}/spike/whoami`], ['service', `http://127.0.0.1:${PORTS.service}/api/auth/ok`],
+  ['caddy to service', `http://127.0.0.1:${PORTS.caddy}/api/auth/ok`], ['caddy to web', `http://127.0.0.1:${PORTS.caddy}/spike/whoami`]];
+for (const [label, url] of probes) {
+  let up = false;
+  for (let i = 0; i < 60 && !up; i++) {
+    try { await fetch(url); up = true; } catch { await sleep(500); }
+  }
+  if (!up) { console.error(`bin/up: ${label} (${url}) did not answer; see ${RUN}/*.log`); process.exit(1); }
+}
+console.log(`up (option ${option}): origin http://127.0.0.1:${PORTS.caddy}, web ${PORTS.web}, service ${PORTS.service}, postgres ${PORTS.pg}`);

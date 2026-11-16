@@ -1,0 +1,16 @@
+{
+	admin off
+	auto_https off
+	http_port 80
+}
+
+# The app origin, plain HTTP. /api/auth/* and the two sign-in pages are the sign-in service; everything else is web. Upstreams are the host's two Node processes.
+:80 {
+	@auth path /api/auth /api/auth/* /sign-in /sign-in/* /sign-up /sign-up/*
+	handle @auth {
+		reverse_proxy host.docker.internal:58482
+	}
+	handle {
+		reverse_proxy host.docker.internal:58481
+	}
+}

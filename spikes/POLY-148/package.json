@@ -1,0 +1,1 @@
+{ "name": "poly-148-spike", "private": true, "type": "module", "description": "Throwaway spike (POLY-148). No dependencies of its own; it loads the workspace's better-auth, pg and @poly/* packages by path." }
