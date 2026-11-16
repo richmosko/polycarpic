@@ -534,12 +534,20 @@ CREATE FUNCTION app.reset_second_step(p_email text) RETURNS boolean
   AS $fn$
   DECLARE
     v_user uuid;
+    v_n bigint;
   BEGIN
     IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') IS DISTINCT FROM 'SELECT app.reset_second_step($1)' THEN
       RAISE EXCEPTION 'a second-step definer must be called on its own' USING ERRCODE = '42501';
     END IF;
     IF app.current_user_id() IS NOT NULL THEN
       RAISE EXCEPTION 'the reset is issued without a user in context' USING ERRCODE = '42501';
+    END IF;
+    -- user_email_unique is case-sensitive, so two rows can match: which one is reset would be undefined. Refuse, reset neither.
+    SELECT pg_catalog.count(*) INTO v_n FROM public."user" u WHERE pg_catalog.lower(u.email) = pg_catalog.lower(p_email);
+    IF v_n = 0 THEN
+      RAISE EXCEPTION 'no such user' USING ERRCODE = 'P0002';
+    ELSIF v_n > 1 THEN
+      RAISE EXCEPTION 'more than one user matches' USING ERRCODE = '21000';
     END IF;
     SELECT u.id INTO v_user FROM public."user" u WHERE pg_catalog.lower(u.email) = pg_catalog.lower(p_email) FOR UPDATE;
     IF NOT FOUND THEN
