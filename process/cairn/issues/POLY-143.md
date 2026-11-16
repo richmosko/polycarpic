@@ -22,6 +22,7 @@ An umbrella for small CI and test-time items found in the POLY-141 and POLY-87 l
 - [ ] A `workflow_dispatch` run with a `base` input runs the cairn filter, so a timing or area run does not pay the full cairn suite (about 110 s) each time.
 - [ ] If the `db` job's same-day median on `main` passes 100 s: the serial group runs beside the parallel one on a second Postgres cluster (POLY-141 ruling, criterion-1 tuning), with `ops-hardening`'s timing test re-measured under contention.
 - [ ] The host-psql fallback in `tests/db/helpers/pg.ts` either checks for psql >= 16 or is removed: the POLY-147 helpers use `\bind`, CI runs psql inside the Postgres image (17.x), and a developer's host psql can be older (14 on the Principal's machine).
+- [ ] `tests/infra/image` is explained on macOS: on 2026-11-15 two local runs on the POLY-148 branch (which changes nothing those tests read) failed different tests each time (a 10 s hook timeout in `postgres.test.ts` and a 5 s timeout in `caddy.test.ts`; then three permission and `archive_command` assertions in `postgres.test.ts`). No control was run on `main`, and CI skipped the `image` job for that PR. Either the suite is made reliable locally or the difference from Linux is written down.
 
 ## Comments
 
@@ -32,3 +33,7 @@ From the POLY-142 loop (`process/cairn/reviews/POLY-142/build-gate-qa.md` @ 1e88
 ### @team-lead — 2026-11-15
 
 Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `process/cairn/reviews/POLY-147/` (ruling, security-review, verdict) and devops-147's findings.
+
+### @team-lead — 2026-11-15
+
+Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cairn/reviews/POLY-148/spike.md` (§1, §2, §6 and seceng's reading in §7).

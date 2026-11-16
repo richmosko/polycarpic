@@ -31,6 +31,8 @@ Owners and managers must enrol a second factor (authenticator app or passkey); v
 - [ ] Tests: ARCH §3.1c Tests, the OQ-34, email-anchoring, A-28 and integration items.
 - [ ] `app.promote_held_roles` and every other POLY-89 definer take the user from `app.current_user_id()` (the POLY-147 marker), never from a transaction-local setting; ARCH §3.1c is corrected in the same PR.
 - [ ] No POLY-89 guard treats the marker's `session_id` as proof that a session exists or is recent: until POLY-149 it is the value web passed (SECURITY R-2, C-86; POLY-147 seceng S3). A test forges it and the guard still refuses.
+- [ ] **`user.two_factor_enabled` is guarded (POLY-148 spike §7.3, requirement).** It turns on only in the transaction that verifies the factor, and off only in the transaction that deletes the factor after a step-up. The role that runs BetterAuth must hold UPDATE on the column, and without the guard one injected statement switches the second factor off for any user, silently.
+- [ ] **The first-verify rotation can insert its session.** `0005_auth_second_step_grants.sql` line 9 leaves `recent_auth_at` out of poly_app's INSERT on `session`, and BetterAuth copies that column when it replaces a session, so the rotation is refused once enrolment opens (confirmed from the shipped grants, POLY-148 spike §7). Strip the column in a `session.create.before` hook or grant it; seceng prefers stripping (§7.4).
 
 ## Comments
 
@@ -54,3 +56,7 @@ Write the guards as triggers on BetterAuth's tables that are indifferent to the 
 ### @team-lead — 2026-11-15
 
 Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `process/cairn/reviews/POLY-147/` (ruling, security-review, verdict) and devops-147's findings.
+
+### @team-lead — 2026-11-15
+
+Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cairn/reviews/POLY-148/spike.md` (§1, §2, §6 and seceng's reading in §7).

@@ -23,6 +23,7 @@ Umbrella for the Caddy and edge-network findings from the POLY-95 and POLY-86 lo
 - [ ] A lint rule so a staging container cannot take prod's alias on the edge networks (POLY-95 seceng build review F11).
 - [ ] A Renovate rule for the single Postgres `FROM` line and the pinned `age` version (INFRA §6.1a, §5), if no issue owns Renovate config (POLY-95 ruling F4).
 - [ ] **The Postgres image runs the minor its tag names.** `infra/postgres/Dockerfile` pins `postgres:17.10@sha256:…`, but line 2's `apt-get upgrade -y` moves the server to 17.12; the digest pins only the base layer (POLY-147 ruling R11; devops finding, not verified against a live apt run). Drop the upgrade and bump the digest when a new minor is wanted, or hold the postgres packages; a test asserts `SHOW server_version` matches the tag.
+- [ ] **Caddy refuses any request carrying `Service-Worker: script`.** The app registers no service worker. One planted by a compromised web would keep serving altered pages, the sign-in page included, after the server is cleaned up. Measured in Chromium to stop registration (POLY-148 spike §2c, `spikes/POLY-148/caddy/Caddyfile.sw`). Part of the Principal's decision that the sign-in pages stay in web (`process/DECISIONS.md`, 2026-11-15). A config test pins the rule on both sites.
 
 ## Comments
 
@@ -37,3 +38,7 @@ From the POLY-87 loop (seceng): the invitation token sits in the `/sign-up` quer
 ### @team-lead — 2026-11-15
 
 Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `process/cairn/reviews/POLY-147/` (ruling, security-review, verdict) and devops-147's findings.
+
+### @team-lead — 2026-11-15
+
+Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cairn/reviews/POLY-148/spike.md` (§1, §2, §6 and seceng's reading in §7).
