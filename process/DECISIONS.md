@@ -669,3 +669,11 @@ Add new decisions ABOVE this comment, newest first.
 - Separate origin (`auth.<domain>`) — the stronger option; unpriced, needs its own spike; reconsider if hosting for several families (SECURITY R-6) comes back.
 **Approved by:** Principal (seceng recommended it in the record's §7)
 **Supersedes:** none; it answers the open pages item in POLY-148.
+
+### 2026-11-16 — Backup codes stay on; the copy risk is accepted until stage 2's revocation
+**Decision:** POLY-89 keeps BetterAuth's backup codes. The Principal accepts, until the last PR of POLY-149 (the revocation) merges, that SQL as `poly_app` can copy its own encrypted backup codes into another user's `two_factor` row and, with the planted magic link SECURITY R-2 already records, sign in as any user who has an authenticator app, with no signal to the victim. SECURITY R-2 states this (seceng, at POLY-89's build review), and POLY-149 carries a criterion that removes the item when the revocation lands.
+**Why:** the hole belongs to the in-between state, not the finished design. It needs `poly_app`'s SELECT and UPDATE on `two_factor` and INSERT on `verification`; POLY-149's revocation removes all three. Nothing is deployed, and nobody can enrol until the second-step screens exist. Turning backup codes off would leave the operator's `reset-mfa` as the only recovery from a lost phone, because nothing re-confirms a session after first enrolment yet. After stage 2 only someone who controls the sign-in service can copy codes, which adds nothing to creating a session outright, and planted codes die when the auth secret is rotated at eviction (seceng's reading, 2026-11-16).
+**Alternatives considered:**
+- Turn backup codes off (seceng's recommendation in `process/cairn/reviews/POLY-89/ruling-review.md`, D1 option (a)) — closes the copy now, under an hour of work (a guess); the user loses self-service recovery.
+- Store recovery codes our own way, bound to the user — not priced.
+**Approved by:** the Principal (2026-11-16), on seceng's review of the ruling at `7e73fd7e` and its note on what remains after stage 2.

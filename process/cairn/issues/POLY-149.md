@@ -50,6 +50,7 @@ It is likely to land as three PRs: S, then E with H, then the revocation and the
 
 **D: docs**
 - [ ] ARCH §2.2, §3.1, §3.1c, §3.3 and §7; SECURITY R-2 re-worded to its residual, never retired (seceng #15). The residual stays: the sign-in service can create any session, code execution in web reaches the users active while it runs, and the worker's reach lasts until POLY-64's scoping lands. Also T-18, A-31, A-39, C-84 and the secrets table; INFRA §2.2 and §7.5. All of them state the current state only.
+- [ ] SECURITY R-2's backup-code item (POLY-89 D1: copied backup codes plus a planted magic link sign in as any authenticator-app user) is removed when the revocation lands; the residual names the sign-in service's write access to factor rows.
 - [ ] Running cost measured: the RSS of the auth container at idle and under the e2e suite, recorded against ARCH §7.3.
 
 ## Estimate
