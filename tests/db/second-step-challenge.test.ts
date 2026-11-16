@@ -4,16 +4,17 @@
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { cloneMigrated } from './helpers/api';
-import { fixture, fails, msgOf, ROLES } from './helpers/second-step';
+import { createAuthRole, dropAuthRole, fixture, fails, msgOf, ROLES } from './helpers/second-step';
 import { must } from './helpers/sql';
 
 let db: string;
 let f: ReturnType<typeof fixture>;
-beforeAll(() => { db = cloneMigrated(); f = fixture(db, 893); });
-afterAll(() => {});
+// poly_auth is cluster-wide state: this file is in SERIAL (vitest.config.ts); it creates the role here and drops it in afterAll.
+beforeAll(() => { createAuthRole(); db = cloneMigrated(); f = fixture(db, 893); });
+afterAll(() => { dropAuthRole(); });
 
-const issue = (q: any) => q(`SELECT app.issue_email_challenge($1) AS c`, ['first_enrolment']).then((r: any) => r.rows[0].c as string | null);
-const confirm = (q: any, code: string) => q(`SELECT app.confirm_email_challenge($1) AS ok`, [code]).then((r: any) => r.rows[0].ok as boolean);
+const issue = (q: any) => q(`SELECT app.issue_email_challenge($1)`, ['first_enrolment']).then((r: any) => r.rows[0].issue_email_challenge as string | null);
+const confirm = (q: any, code: string) => q(`SELECT app.confirm_email_challenge($1)`, [code]).then((r: any) => r.rows[0].confirm_email_challenge as boolean);
 const wrong = (code: string) => (code === '000000' ? '000001' : '000000');
 
 describe('C8 the emailed code (R2)', () => {
@@ -182,7 +183,7 @@ describe('C2 an owner or manager invitation seats only at enrolment (R3 #8, #12;
     expect(f.one(`SELECT count(*) FROM public.membership WHERE entity_id = '${ent}' AND user_id = '${u.id}'`)).toBe('0');
     const s = f.session(u.id);
     await f.committed('poly_app', u.id, s, async (q) => {
-      expect((await q(`SELECT app.confirm_email_challenge($1) AS ok`, [(await q(`SELECT app.issue_email_challenge($1) AS c`, ['first_enrolment'])).rows[0].c])).rows[0].ok).toBe(true);
+      expect((await q(`SELECT app.confirm_email_challenge($1)`, [(await q(`SELECT app.issue_email_challenge($1)`, ['first_enrolment'])).rows[0].issue_email_challenge])).rows[0].confirm_email_challenge).toBe(true);
       await q(`INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('sec', 'bk', $1, false)`, [u.id]);
       await q('SELECT app.set_two_factor_enabled($1)', [true]);
       await q(`UPDATE public.two_factor SET verified = true WHERE user_id = $1`, [u.id]);

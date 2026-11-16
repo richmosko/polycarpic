@@ -65,13 +65,13 @@ SELECT is((SELECT array_agg(c.relname::text || '.' || p.proname::text ORDER BY c
   ARRAY['audit_event.refuse_change', 'entity.check_entity', 'entity.seat_creator', 'invitation.gate_owner_changes', 'membership.audit_membership', 'membership.gate_owner_changes', 'membership.keep_an_owner'],
   'check_entity, seat_creator, gate_owner_changes (membership and invitation), audit_membership, keep_an_owner and refuse_change are attached');
 SELECT is((SELECT count(*)::int FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
-    WHERE NOT t.tgisinternal AND p.proname = 'refuse_truncate' AND (t.tgtype & 32) = 32 AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2), 7, 'BEFORE TRUNCATE statement trigger on the six tenancy tables and the identity marker (POLY-147, seceng review 4)');
+    WHERE NOT t.tgisinternal AND p.proname = 'refuse_truncate' AND (t.tgtype & 32) = 32 AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2), 9, 'BEFORE TRUNCATE statement trigger on the six tenancy tables, the identity marker and the two second-step tables (POLY-147, POLY-89)');
 
 -- trigger order is set by trigger names (addendum 1): the gate fires before the last-owner guard, the audit row comes after
 SELECT is((SELECT array_agg(c.relname::text || '.' || t.tgname || ':' || CASE WHEN (t.tgtype & 2) = 2 THEN 'before' ELSE 'after' END ORDER BY t.tgname COLLATE "C")
     FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
     WHERE NOT t.tgisinternal AND c.relnamespace = 'public'::regnamespace AND c.relname IN ('membership', 'invitation') AND (t.tgtype & 1) = 1),
-  ARRAY['invitation.invitation_10_gate_owner_changes:before', 'invitation.invitation_20_set_once:before', 'membership.membership_10_gate_owner_changes:before', 'membership.membership_20_keep_an_owner:before', 'membership.membership_90_audit:after'],
+  ARRAY['invitation.invitation_05_second_step:before', 'invitation.invitation_10_gate_owner_changes:before', 'invitation.invitation_20_set_once:before', 'membership.membership_05_second_step:before', 'membership.membership_10_gate_owner_changes:before', 'membership.membership_20_keep_an_owner:before', 'membership.membership_90_audit:after'],
   'row triggers on membership and invitation are named so that gate (10) fires before keep_an_owner (20) and the audit (90, AFTER) last (mutation: rename one)');
 
 -- privileges: no DELETE anywhere for the app or the worker on entity, invitation, notification, audit_event; workers read only
@@ -93,7 +93,7 @@ SELECT is((SELECT array_agg(t || ':' || p ORDER BY t COLLATE "C", p COLLATE "C")
 SELECT is((SELECT count(*)::int FROM pg_policy p WHERE p.polrelid = 'public.audit_event'::regclass AND p.polcmd = 'a'
     AND p.polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'poly_govern')]::oid[]), 1, 'audit_event: one INSERT policy, TO poly_govern');
 SELECT is((SELECT count(*)::int FROM pg_policy p WHERE p.polrelid = 'public.membership'::regclass AND p.polcmd = 'a'
-    AND p.polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'poly_govern')]::oid[]), 2, 'membership: two INSERT policies TO poly_govern: the creator seat and the viewer accept (POLY-87 R2)');
+    AND p.polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'poly_govern')]::oid[]), 3, 'membership: three INSERT policies TO poly_govern: the creator seat, the viewer accept (POLY-87 R2) and the claimed-invitation seat (POLY-89)');
 
 SELECT * FROM finish();
 ROLLBACK;

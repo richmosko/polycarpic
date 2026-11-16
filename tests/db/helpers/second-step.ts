@@ -15,6 +15,18 @@ export const fails = async (p: Promise<unknown>) => { try { await p; return null
 export const msgOf = (x: any): string => String(x?.cause?.message ?? x?.message ?? x);
 export const codeOf = (x: any): string | undefined => x?.code ?? x?.cause?.code;
 
+/**
+ * The stage-2 fixture role (ruling R1.3): poly_auth with poly_app's grants by membership; roles.sql gains the real role only in
+ * POLY-149. It is cluster-wide state, so only SERIAL files call these (tests/db/vitest.config.ts): the role exists while they run
+ * and is gone before any pgtap role-hygiene suite reads pg_roles.
+ */
+export function createAuthRole(): void {
+  must(`DO $$ BEGIN CREATE ROLE poly_auth LOGIN PASSWORD 'qa-poly_auth' IN ROLE poly_app; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`);
+}
+export function dropAuthRole(): void {
+  must(`DROP ROLE IF EXISTS poly_auth`);
+}
+
 let counter = 0;
 export const uuid = (tag: number, k: number) => `00000000-0000-4000-8000-${String(tag).padStart(6, '0')}${String(k).padStart(6, '0')}`;
 

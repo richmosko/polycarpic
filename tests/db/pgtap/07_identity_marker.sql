@@ -79,7 +79,7 @@ SELECT is(pg_temp.grantees(pg_temp.fn('enter_asserted_user')::text), 'poly_app',
 SELECT is(pg_temp.grantees(pg_temp.fn('enter_job')::text), 'poly_worker', 'J1: EXECUTE on enter_job: poly_worker alone');
 SELECT is(pg_temp.grantees('app.enter_new_user(uuid)'), 'poly_app', 'K3: EXECUTE on enter_new_user: poly_app alone');
 SELECT is(pg_temp.grantees(pg_temp.fn('purge_tx_identity')::text), 'poly_worker', 'K4: EXECUTE on purge_tx_identity: poly_worker alone');
-SELECT is(pg_temp.grantees(pg_temp.fn('current_session_id')::text), 'poly_app', 'R1: EXECUTE on current_session_id: poly_app alone');
+SELECT is(pg_temp.grantees(pg_temp.fn('current_session_id')::text), 'poly_app,poly_authz,poly_govern', 'R1: EXECUTE on current_session_id: poly_app, plus the two definer owners whose POLY-89 functions read the marker session (POLY-89 R1.2; seceng to confirm); never PUBLIC or poly_worker');
 SELECT is(pg_temp.grantees('app.job_targets(text)'), '', 'J1: job_targets has no EXECUTE grantee but its owner');
 SELECT ok(has_function_privilege('poly_app', 'app.current_user_id()', 'EXECUTE') AND has_function_privilege('poly_worker', 'app.current_user_id()', 'EXECUTE') AND NOT has_function_privilege('public', 'app.current_user_id()', 'EXECUTE'), 'R1: current_user_id grants unchanged: poly_app and poly_worker, not PUBLIC');
 SELECT is((SELECT string_agg(p.proname || '=>' || pg_temp.grantees(p.oid::regprocedure::text), ';' ORDER BY p.proname COLLATE "C") FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname LIKE 'enter\_%'),
@@ -98,6 +98,9 @@ SELECT is((SELECT count(*)::int FROM pg_temp.sqlstr() p, unnest(ARRAY['poly_app'
 
 -- ---------------------------------------------------------------- K2: a forged setting grants nothing
 INSERT INTO public."user" (id, name, email, email_verified) VALUES ('00000000-0000-4000-8000-0000000147a1', 'K2 owner', 'k2owner@qa.test', true);
+-- POLY-89: the fixture owner is enrolled (a verified factor and the flag) before creating a Business
+INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '00000000-0000-4000-8000-0000000147a1', true);
+UPDATE public."user" SET two_factor_enabled = true WHERE id = '00000000-0000-4000-8000-0000000147a1';
 SELECT pg_temp.set_id('00000000-0000-4000-8000-0000000147a1');
 INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES ('00000000-0000-4000-8000-0000000147e1',
   (SELECT id FROM public.entity_type WHERE system_key = 'business'), 'qa-K2', 'business_pass_through');

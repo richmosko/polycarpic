@@ -61,6 +61,9 @@ SELECT is(pg_temp.sx($f$
     ('00000000-0000-4000-8000-0000000000f6', 'U6', 'u6@qa.test', false),
     ('00000000-0000-4000-8000-0000000000f7', 'U7', 'u7@qa.test', true),
     ('00000000-0000-4000-8000-0000000000f8', 'Existing', 'p@qa.test', true);
+  -- POLY-89: creating a Business needs a second step; the fixture owner is enrolled (a verified factor and the flag), not exempted
+  INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '00000000-0000-4000-8000-0000000000f0', true);
+  UPDATE public."user" SET two_factor_enabled = true WHERE id = '00000000-0000-4000-8000-0000000000f0';
   SELECT pg_temp.set_id('00000000-0000-4000-8000-0000000000f0');
   INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES ('00000000-0000-4000-8000-0000000000e1',
     (SELECT id FROM public.entity_type WHERE system_key = 'business'), 'qa-E', 'business_pass_through');
@@ -105,9 +108,9 @@ SELECT is(pg_temp.run_as('poly_govern', '00000000-0000-4000-8000-0000000000f5', 
   'ERR:42501', 'S6: the poly_govern INSERT policy on membership seats viewers only (mutation: policy without role = viewer)');
 SELECT is((SELECT array_agg(p.proname::text ORDER BY p.proname COLLATE "C") FROM pg_proc p
     WHERE p.pronamespace = 'app'::regnamespace AND p.prosrc ~* 'insert\s+into\s+("?public"?\.)?"?membership'),
-  ARRAY['accept_invitations', 'seat_creator'], 'C15: only seat_creator and accept_invitations insert into membership (body scan)');
+  ARRAY['accept_invitations', 'seat_claimed_invitations', 'seat_creator'], 'C15: only seat_creator, accept_invitations and seat_claimed_invitations (POLY-89 R3 #12, called only by sync_second_step) insert into membership (body scan)');
 SELECT is((SELECT count(*)::int FROM pg_policy WHERE polrelid = 'public.membership'::regclass AND polcmd = 'a'
-    AND polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'poly_govern')]::oid[]), 2, 'C15: exactly two poly_govern INSERT policies on membership: seat_creator''s and accept_invitations''');
+    AND polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'poly_govern')]::oid[]), 3, 'C15: exactly three poly_govern INSERT policies on membership: seat_creator, accept_invitations and (POLY-89) the claimed-invitation seat');
 SELECT is((SELECT count(*)::int FROM pg_policy WHERE polrelid = 'public.membership'::regclass AND polcmd = 'a'
     AND polroles = ARRAY[(SELECT oid FROM pg_roles WHERE rolname = 'poly_govern')]::oid[]
     AND pg_get_expr(polwithcheck, polrelid) ~ 'viewer' AND pg_get_expr(polwithcheck, polrelid) ~ 'current_user_id'), 1, 'S6: one of them is limited to role = viewer for app.current_user_id()');

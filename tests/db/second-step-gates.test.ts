@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { cloneMigrated } from './helpers/api';
 import { DB_PKG, server, url } from './helpers/pg';
+import { createAuthRole, dropAuthRole } from './helpers/second-step';
 import { must } from './helpers/sql';
 
 const pgmod = createRequire(join(DB_PKG, 'package.json'))('pg');
@@ -20,9 +21,11 @@ const NO_SESSION = '00000000-0000-4000-8000-0000000089ff';
 
 beforeAll(() => {
   db = cloneMigrated();
-  // poly_auth (the stage-2 fixture role) is created once per run in helpers/api.ts setRolePasswords, never here (cluster-wide state)
+  // poly_auth (the stage-2 fixture role) is cluster-wide state: this file is in SERIAL (vitest.config.ts), creates it here and drops it
+  // in afterAll, so no parallel file and no pgtap role-hygiene suite ever sees it.
+  createAuthRole();
 });
-afterAll(() => { /* the cloned database is dropped with the run's server */ });
+afterAll(() => { dropAuthRole(); });
 
 const codeOf = (x: any): string | undefined => x?.code ?? x?.cause?.code;
 const msgOf = (x: any): string => String(x?.cause?.message ?? x?.message ?? x);
@@ -307,7 +310,7 @@ describe('C8 email_challenge and enrolment_grant (R2)', () => {
     it(`${role}: issue_email_challenge needs a marker that carries a session, and a code is six digits, stored hashed, returned once [red if: issue_email_challenge is absent or stores the code]`, async () => {
       const u = await seed();
       must(`INSERT INTO public.session (id, user_id, token, expires_at) VALUES ('${SID}', '${u.id}', 'tkc${n}${Math.random()}', now() + interval '1 day') ON CONFLICT DO NOTHING`, db);
-      const code = await marked(role, u.id, SID, async (q) => (await q(`SELECT app.issue_email_challenge('first_enrolment') AS c`)).rows[0].c);
+      const code = await marked(role, u.id, SID, async (q) => (await q(`SELECT app.issue_email_challenge($1)`, ['first_enrolment'])).rows[0].issue_email_challenge);
       expect(code).toMatch(/^\d{6}$/);
     });
   }

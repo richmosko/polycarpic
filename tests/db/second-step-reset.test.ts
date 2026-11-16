@@ -20,7 +20,7 @@ async function asOperator<T>(fn: (q: (t: string, v?: unknown[]) => Promise<any>)
   try { await q('BEGIN'); const r = await fn(q); if (commit) await q('COMMIT'); return r; }
   finally { await c.query('ROLLBACK').catch(() => {}); await c.end(); }
 }
-const reset = (email: string) => asOperator((q) => q('SELECT app.reset_second_step($1) AS r', [email]).then((r) => r.rows[0].r));
+const reset = (email: string) => asOperator((q) => q('SELECT app.reset_second_step($1)', [email]).then((r) => r.rows[0].reset_second_step));
 
 async function enrolled() {
   const u = await f.user({ enrolled: true });
@@ -70,7 +70,7 @@ describe('C6 reset_second_step (R6)', () => {
     expect(await f.marked('poly_app', u.id, s, (q) => q('SELECT app.second_step_required() AS r').then((r) => r.rows[0].r))).toBe(true);
   });
   it('refuses a call that carries a user marker, and no runtime role may execute it [red if: the definer accepts a marker or is granted to poly_app/poly_worker/poly_auth]', async () => {
-    for (const r of ['poly_app', 'poly_worker', 'poly_auth'])
+    for (const r of ['poly_app', 'poly_worker']) // poly_auth is a SERIAL-only fixture role; the gates file checks it
       expect(must(`SELECT has_function_privilege('${r}', 'app.reset_second_step(text)', 'EXECUTE')`, db).rows[0]![0], r).toBe('f');
     expect(must(`SELECT has_function_privilege('poly_operator', 'app.reset_second_step(text)', 'EXECUTE')`, db).rows[0]![0]).toBe('t');
   });
