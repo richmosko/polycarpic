@@ -583,5 +583,13 @@ describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect:
     const exactCall = ['app.set_two_factor_enabled(boolean)', 'app.issue_email_challenge(text)', 'app.confirm_email_challenge(text)']; // app.reset_second_step is poly_operator's, not poly_app's
     expect([...got].sort()).toEqual([...before89, ...readOnly, ...forTriggers, ...exactCall].sort());
     expect(must(`SELECT has_function_privilege('poly_auth', 'app.reset_second_step(text)', 'EXECUTE')`, db).rows[0]![0]).toBe('f');
+    // R1.5 (d88aa7ae): the group a function is in is part of the pin. The three (and reset_second_step) carry the exact-call check, which
+    // reads current_query(); the seven helpers do not, so a function that moves between groups fails here.
+    const checks = (names: string[]) => must(`SELECT proname FROM pg_proc p JOIN pg_namespace s ON s.oid = p.pronamespace WHERE s.nspname = 'app' AND proname = ANY(ARRAY[${names.map((x) => `'${x}'`).join(',')}]) AND prosrc ~ 'current_query' ORDER BY 1`, db).rows.map((r) => r[0]);
+    expect(checks(['set_two_factor_enabled', 'issue_email_challenge', 'confirm_email_challenge', 'reset_second_step']).sort()).toEqual(['confirm_email_challenge', 'issue_email_challenge', 'reset_second_step', 'set_two_factor_enabled']);
+    expect(checks(['second_step_required', 'enrolment_grant_live', 'step_up_fresh', 'enrol_proof', 'check_factor_removal', 'consume_passkey_grant', 'take_recent_auth_stamp'])).toEqual([]);
+    // poly_operator holds reset_second_step among the POLY-89 functions and none of poly_app's
+    const operatorHas = must(`SELECT p.proname FROM pg_proc p JOIN pg_namespace s ON s.oid = p.pronamespace WHERE s.nspname = 'app' AND p.prokind = 'f' AND has_function_privilege('poly_operator', p.oid, 'EXECUTE') AND p.proname IN ('reset_second_step', 'second_step_required', 'enrolment_grant_live', 'step_up_fresh', 'enrol_proof', 'check_factor_removal', 'consume_passkey_grant', 'take_recent_auth_stamp', 'set_two_factor_enabled', 'issue_email_challenge', 'confirm_email_challenge') ORDER BY 1`, db).rows.map((r) => r[0]);
+    expect(operatorHas).toEqual(['reset_second_step']);
   });
 });
