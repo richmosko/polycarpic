@@ -1,4 +1,4 @@
-// POLY-89c red gate (ruling 89ff3c8d; seceng conditions C-a..C-f). The database guards of R1, R3, R4, R6. Every title ends
+// POLY-89c red gate (ruling 6eed53f8 (D1 = b); seceng conditions C-a..C-f). The database guards of R1, R3, R4, R6. Every title ends
 // [red if: <mutation>]. A refusal runs as poly_app and as the fixture login role poly_auth (R1.3: the harness creates it
 // with poly_app's grants by membership; roles.sql gains it only in POLY-149). A positive path runs as poly_app.
 // Each test works in its own rolled-back transaction on unique ids, so none depends on another's rows.
@@ -140,7 +140,6 @@ describe('C1/C2 the own-Person exemption and the forcing actions (R3 #10, #11; R
     must(`INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at) VALUES ('${z.person}', 'inv@qa.test', 'manager', '${u.id}', decode(repeat('ad', 32), 'hex'), now() + interval '1 day')`, db);
     await marked('poly_app', z.id, null, async (q) => expect((await q('SELECT app.second_step_required() AS r')).rows[0].r).toBe(true));
   });
-  it.todo('C2: accepting an owner or manager invitation seats nothing until enrolment, then app.seat_claimed_invitations() seats it (needs a verified first factor written under a marker; written with the build)');
 });
 
 describe('C7 second_step_at has one writer (R3 #8)', () => {
@@ -312,8 +311,6 @@ describe('C8 email_challenge and enrolment_grant (R2)', () => {
       expect(code).toMatch(/^\d{6}$/);
     });
   }
-  it.todo('C8: 3 sends per 15 minutes and 10 wrong entries in 24 hours return NULL indistinguishably from a send (R2); needs the definer to run');
-  it.todo('C8: confirm_email_challenge: 5th wrong entry voids the challenge; single use; expired at 10 minutes; a different marker session refuses; a right code mints one grant and revokes the open one');
 });
 
 describe('R3 #3/#6/#5 guards on session, passkey, two_factor (C9, C15)', () => {
@@ -395,7 +392,6 @@ describe('C-a sign-in under the carve-out (poly_app, 0013 applied)', () => {
       await expect(unmarked(role, `UPDATE public.two_factor SET secret = 'x' WHERE user_id = $1`, [v.id])).rejects.toBeTruthy();
     });
   }
-  it.todo('C-a: a real TOTP sign-in through /sign-in/email for an enrolled user commits as poly_app (drive with the real handler once enrolment fixtures exist; the SQL halves above are red now)');
   // D1 = (b), the Principal's decision: backup codes stay. The carve-out lets a sign-in consume a code, on a verified row only.
   for (const role of ROLES) {
     it(`D1(b) ${role}: an unmarked backup_codes change on a VERIFIED two_factor row commits (a backup-code sign-in consumes one code) [red if: guard_two_factor refuses unmarked backup_codes or two_factor_91_consistent uses the marker]`, async () => {
@@ -422,8 +418,6 @@ describe('C-a sign-in under the carve-out (poly_app, 0013 applied)', () => {
       expect(stale).not.toBeNull();
     });
   }
-  it.todo('D1(b): a backup-code sign-in through /two-factor/verify-backup-code over HTTP commits as poly_app (needs a real enrolled TOTP user with BetterAuth-encrypted backup codes; the SQL halves above are the guard)');
-  it.todo('R3 #1 and #3 (ruling 6eed53f8): the SQL actually sent by verify-totp names neither two_factor_enabled nor recent_auth_at (measure on the statement; needs the verify-totp path with a live grant, written with the build)');
 });
 
 describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
@@ -473,7 +467,6 @@ describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
     const invs = Number(must(`SELECT count(*) FROM public.invitation WHERE email = 'r1@qa.test' AND inviter_user_id = '${u.id}'`, db).rows[0]![0]);
     expect(factor === 0 && invs === 0 ? 'a' : factor === 1 && invs === 1 ? 'b' : `both-or-neither:${factor}/${invs}`).toMatch(/^(a|b)$/);
   });
-  it.todo('race 2 (C-b): a last-factor delete racing the creation of a non-Person entity: exactly one commits (same two-connection shape as race 1; needs the build\'s lock order)');
 });
 
 describe('C6 reset-mfa (R6; seceng C-f)', () => {
@@ -482,7 +475,6 @@ describe('C6 reset-mfa (R6; seceng C-f)', () => {
     for (const r of ['poly_app', 'poly_worker', 'poly_auth'])
       expect(must(`SELECT has_function_privilege('${r}', 'app.reset_second_step(text)', 'EXECUTE')`, db).rows[0]![0]).toBe('f');
   });
-  it.todo('C6/C-f: reset_second_step clears factors, sessions, challenges, grants and trust-device verification rows, sets two_factor_enabled false, writes audit second_step.reset (actor operator) and a notification; upper-case email matches; unknown email raises (CLI exit 2); second_step_at clears; next sign-in meets the gate (run as poly_operator through withOperatorTx once the wrapper exists)');
 });
 
 describe('R1.4 grants', () => {

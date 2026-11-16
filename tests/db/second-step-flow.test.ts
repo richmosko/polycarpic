@@ -1,7 +1,8 @@
-// POLY-89c (ruling 89ff3c8d, R3 #1). The BetterAuth-facing half: hook behaviour measured against the pinned 1.7.18, and
+// POLY-89c (ruling 6eed53f8, R3 #1; D1 = (b); criterion 16). The BetterAuth-facing half: hook behaviour measured against the pinned 1.7.18, and
 // the HTTP flows. Every title ends [red if: <mutation>].
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { boot, post, teardown, type Env } from './helpers/auth';
+import { PW, boot, jar, post, teardown, type Env } from './helpers/auth';
+import { pgmod, totp } from './helpers/second-step';
 import { must } from './helpers/sql';
 
 vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o as any));
@@ -46,10 +47,107 @@ describe('C3/C9 the enrolment class and the route policy (R3, R5)', () => {
     const authed = await e.handle(post('/second-step/confirm-code', { code: '000000' }, cookie));
     expect([200, 400, 403]).toContain(authed.status); // never 404: the route exists
   });
-  it.todo('C3: enrolment needs the password plus a confirmed emailed code; a wrong password, a wrong code or an expired code leaves the factor inactive (second_step_at NULL, two_factor_enabled false)');
-  it.todo('C4: a new device is held for the factor; a known device within its session is not; step-up routes always prompt; a completed first enrolment counts as the step-up');
-  it.todo('C5: a TOTP and a passkey each satisfy the step; Google and GitHub sign-in satisfy neither and never stamp recent_auth_at');
-  it.todo('C15: the first TOTP verify can rotate the session: BetterAuth\'s session INSERT (copy of the old row) succeeds because session.create.before strips recentAuthAt, and the new row is stamped');
+  // ---- the enrolment end to end through the real handler (C3, C4, C5, C15), with the SQL actually sent captured (R3 #1, #3) ----
+  const mails: { email: string; code: string }[] = [];
+  const mkWithMailer = () => e.A.createAuth({
+    ...e.optionsOf('real-domain', { sendSecondStepCode: async (m: any) => {
+      const code = Object.values(m).find((v) => typeof v === 'string' && /^\d{6}$/.test(v as string)) as string;
+      mails.push({ email: String(m.email ?? m.to ?? ''), code });
+    } }),
+    rateLimit: { enabled: false },
+  });
+  const json = async (r: Response) => (await r.clone().json().catch(() => ({}))) as any;
+  async function enrol(auth: any, u: { id: string; email: string }, captured?: string[]) {
+    let { cookie } = await e.signIn(u.email, auth);
+    mails.length = 0;
+    const sent = await e.handle(post('/second-step/send-code', { password: PW }, cookie), auth);
+    expect(sent.status).toBe(200);
+    const code = mails.find((m) => m.email.toLowerCase() === u.email.toLowerCase())!.code;
+    expect(code).toMatch(/^\d{6}$/);
+    const conf = await e.handle(post('/second-step/confirm-code', { code }, cookie), auth);
+    expect(conf.status).toBe(200);
+    const en = await e.handle(post('/two-factor/enable', { password: PW }, cookie), auth);
+    expect(en.status).toBe(200);
+    const secret = new URL((await json(en)).totpURI).searchParams.get('secret')!;
+    const orig = pgmod.Client.prototype.query;
+    if (captured) pgmod.Client.prototype.query = function (this: unknown, ...a: any[]) { const q = a[0]; captured.push(typeof q === 'string' ? q : String(q?.text)); return orig.apply(this, a); };
+    try {
+      const ver = await e.handle(post('/two-factor/verify-totp', { code: totp(secret) }, cookie), auth);
+      expect(ver.status).toBe(200);
+      cookie = jar(cookie, ver);
+    } finally { pgmod.Client.prototype.query = orig; }
+    return { cookie, secret };
+  }
+  it('C3/C15: password + emailed code + TOTP verify enrols: the first-verify rotation inserts its session, the flag and second_step_at are set, the new session is stamped [red if: the anchor routes, the grant path or the session.create.before strip is absent]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    await enrol(auth, u);
+    expect(must(`SELECT two_factor_enabled, second_step_at IS NOT NULL FROM public."user" WHERE id = '${u.id}'`, e.db).rows[0]).toEqual(['t', 't']);
+    expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}' AND recent_auth_at IS NOT NULL`)).toBe(1);
+  });
+  it('R3 #1 and #3 on the statement: the SQL sent by verify-totp names two_factor_enabled in no UPDATE of "user" and recent_auth_at in no INSERT into session (the hooks return the keys as undefined), and the flag still ends set through the definer [red if: a hook leaves the key in the data]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    const sql: string[] = [];
+    await enrol(auth, u, sql);
+    const upd = sql.filter((t) => /update\s+("public"\.)?"user"\s/i.test(t));
+    const ins = sql.filter((t) => /insert\s+into\s+("public"\.)?"session"/i.test(t));
+    expect(upd.length, 'the update of user was seen').toBeGreaterThan(0);
+    expect(ins.length, 'the session insert was seen').toBeGreaterThan(0);
+    for (const t of upd) expect(t).not.toMatch(/two_factor_enabled/);
+    for (const t of ins) expect(t).not.toMatch(/recent_auth_at/);
+    expect(must(`SELECT two_factor_enabled FROM public."user" WHERE id = '${u.id}'`, e.db).rows[0]![0]).toBe('t');
+  });
+  it('C3: a wrong password sends no code; a wrong code leaves the factor inactive and /two-factor/enable stays 403 email_confirmation_required [red if: the anchor routes are absent or a first factor needs only the password]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    const { cookie } = await e.signIn(u.email, auth);
+    mails.length = 0;
+    await e.handle(post('/second-step/send-code', { password: 'not the password' }, cookie), auth);
+    expect(mails.length).toBe(0);
+    await e.handle(post('/second-step/send-code', { password: PW }, cookie), auth);
+    expect(mails.length).toBe(1);
+    const wrongCode = mails[0]!.code === '000000' ? '000001' : '000000';
+    const conf = await e.handle(post('/second-step/confirm-code', { code: wrongCode }, cookie), auth);
+    expect(conf.status).not.toBe(200);
+    const en = await e.handle(post('/two-factor/enable', { password: PW }, cookie), auth);
+    expect(en.status).toBe(403);
+    expect(JSON.stringify(await json(en))).toContain('email_confirmation_required');
+    expect(must(`SELECT second_step_at IS NULL AND NOT two_factor_enabled FROM public."user" WHERE id = '${u.id}'`, e.db).rows[0]![0]).toBe('t');
+  });
+  it('C8: the 4th send-code in 15 minutes answers exactly as a real send does (status and body keys) [red if: suppression is distinguishable]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    const { cookie } = await e.signIn(u.email, auth);
+    const shapes: string[] = [];
+    for (let i = 0; i < 4; i++) { const r = await e.handle(post('/second-step/send-code', { password: PW }, cookie), auth); shapes.push(`${r.status}:${Object.keys(await json(r)).sort().join(',')}`); }
+    expect(new Set(shapes).size).toBe(1);
+    expect(shapes[0]).toMatch(/^200:/);
+  });
+  it('C4: after enrolment a NEW device is held (no session cookie); a step-up route works right after enrolment (it counts as the step-up) and says step_up_required once the stamp is over 300 s old [red if: the hold, the stamp or the window is missing]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    const { cookie } = await enrol(auth, u);
+    const fresh = await e.handle(post('/two-factor/generate-backup-codes', { password: PW }, cookie), auth);
+    expect(JSON.stringify(await json(fresh))).not.toContain('step_up_required');
+    must(`UPDATE public.session SET recent_auth_at = now() - interval '301 seconds' WHERE user_id = '${u.id}'`, e.db);
+    const stale = await e.handle(post('/two-factor/generate-backup-codes', { password: PW }, cookie), auth);
+    expect(stale.status).toBe(403);
+    expect(JSON.stringify(await json(stale))).toContain('step_up_required');
+    const device = await e.handle(post('/sign-in/email', { email: u.email, password: PW }), auth);
+    expect(device.headers.getSetCookie().some((c) => /session_token=[^;]/.test(c) && !/max-age=0/i.test(c))).toBe(false);
+  });
+  it('C5: Google sign-in satisfies neither the step nor a step-up: an unenrolled user\'s Google session is not stamped, and an enrolled user\'s Google sign-in is held [red if: the callback stamps recent_auth_at or skips the hold]', async () => {
+    const un = e.seedUser({ password: false });
+    await e.oauth(un.email, e.auth);
+    expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${un.id}' AND recent_auth_at IS NULL`)).toBe(1);
+    const en = e.seedUser({ twoFactor: true, password: false });
+    const r = await e.oauth(en.email, e.auth);
+    expect(r.headers.getSetCookie().some((c) => /session_token=[^;]/.test(c) && !/max-age=0/i.test(c))).toBe(false);
+    expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${en.id}'`)).toBe(0);
+  });
+  it.todo('C5: a passkey assertion satisfies the sign-in step (TOTP is covered by the enrolment flow above; a passkey needs a software WebAuthn authenticator, which the harness does not have)');
+  it.todo('D1(b) over HTTP: a backup-code sign-in through /two-factor/verify-backup-code commits as poly_app (the TOTP-enrolled user above plus its generated codes; written once the enrolment flow is green, since it reuses it)');
   it.todo('C1 (e2e, apps/web/tests/e2e): a new user whose only entity is the own Person signs in at /sign-in and reaches /dashboard with no redirect');
   it.todo('C6 (e2e): after reset-mfa a manager signs in and every page redirects to /settings/second-step');
 });
