@@ -493,6 +493,56 @@ describe('R1.4 grants', () => {
   });
 });
 
+describe('R1.3 amended (35e375b5): a superuser passes every guard; a superuser acting through SET LOCAL ROLE poly_app does not', () => {
+  const asSuper = async <T>(setRole: boolean, user: string | null, fn: (q: (t: string, v?: unknown[]) => Promise<any>) => Promise<T>, commit = false): Promise<T> => {
+    const c = new pgmod.Client({ connectionString: server().superUrl.replace(/\/[^/]*$/, `/${db}`) });
+    await c.connect();
+    const q = (text: string, values?: unknown[]) => c.query({ text, values, queryMode: 'extended' });
+    try {
+      await q('BEGIN');
+      if (setRole) await q('SET LOCAL ROLE poly_app');
+      if (user) await q('SELECT app.enter_asserted_user($1, $2)', [user, SID]);
+      const r = await fn(q);
+      if (commit) await q('COMMIT');
+      return r;
+    } finally { await c.query('ROLLBACK').catch(() => {}); await c.end(); }
+  };
+  it('an unenrolled manager seat: refused under SET LOCAL ROLE poly_app, passes with no SET ROLE [red if: a guard exempts by session_user alone, or does not exempt a superuser]', async () => {
+    const owner = await seed({ enrolled: true });
+    const v = await seed({ enrolled: false });
+    const ent = await shared(owner.id, `r13a${v.id}`);
+    must(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ('${ent}', '${v.id}', 'viewer')`, db);
+    const x = await asSuper(true, owner.id, (q) => fails(q(`UPDATE public.membership SET role = 'manager' WHERE entity_id = $1 AND user_id = $2`, [ent, v.id])));
+    expect(msgOf(x)).toMatch(REFUSED);
+    const seat = await asSuper(false, null, (q) => fails(q(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ($1, $2, 'manager') ON CONFLICT (entity_id, user_id) DO UPDATE SET role = 'manager'`, [ent, v.id])));
+    expect(seat).toBeNull();
+  });
+  it('an invitation from an unenrolled inviter: refused under SET LOCAL ROLE poly_app, passes with no SET ROLE [red if: invitation_05_second_step has no superuser pass or keys it on session_user]', async () => {
+    const u = await seed({ enrolled: false });
+    const ins = (q: any) => q(`INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at) VALUES ($1, 'r13b@qa.test', 'viewer', $2, decode(repeat('b1', 32), 'hex'), now() + interval '1 day')`, [u.person, u.id]);
+    expect(msgOf(await asSuper(true, u.id, (q) => fails(ins(q))))).toMatch(REFUSED);
+    expect(await asSuper(false, null, (q) => fails(ins(q)))).toBeNull();
+  });
+  it('an inconsistent two_factor_enabled: a user INSERT with the flag on is refused under SET LOCAL ROLE poly_app, and passes with no SET ROLE [red if: guard_two_factor_flag or the commit-time check has no superuser pass]', async () => {
+    const ins = (q: any, id: string) => q(`INSERT INTO public."user" (id, name, email, two_factor_enabled) VALUES ($1, 'x', $2, true)`, [id, `r13c${id.slice(-6)}@qa.test`]);
+    const a = uid(960 + ++n);
+    const b = uid(960 + ++n);
+    expect(await asSuper(true, null, (q) => fails(ins(q, a)))).not.toBeNull();
+    expect(await asSuper(false, null, (q) => fails(ins(q, b).then(() => q('SET CONSTRAINTS ALL IMMEDIATE'))))).toBeNull();
+  });
+  it('MEASURED: a definer call leaves current_setting(\'role\') unchanged, so the guards can read it [red if: a SECURITY DEFINER call reports role none inside the guard, or a guard names SET ROLE]', async () => {
+    const u = await seed({ enrolled: false });
+    const roles = await asSuper(true, u.id, async (q) => {
+      const before = (await q(`SELECT current_setting('role') AS r`)).rows[0].r;
+      await q('SELECT app.second_step_required() AS r');
+      const after = (await q(`SELECT current_setting('role') AS r`)).rows[0].r;
+      return [before, after];
+    });
+    expect(roles).toEqual(['poly_app', 'poly_app']);
+    expect(must(`SELECT count(*) FROM pg_proc p JOIN pg_namespace s ON s.oid = p.pronamespace WHERE s.nspname = 'app' AND p.prosrc ~* 'set\\s+(local\\s+)?role|set_config\\(\\s*''role''' AND p.proname IN ('guard_two_factor_flag','guard_two_factor','guard_passkey','guard_recent_auth','stamp_recent_auth','refuse_last_method','sync_second_step','two_factor_consistent','require_second_step_for_role','require_enrolled_inviter')`, db).rows[0]![0]).toBe('0');
+  });
+});
+
 describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect: the two read definers are exempt)', () => {
   const CALLS: [string, unknown[]][] = [
     ['app.set_two_factor_enabled', [true]],
