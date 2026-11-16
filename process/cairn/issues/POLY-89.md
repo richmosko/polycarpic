@@ -99,3 +99,31 @@ Not blocking:
 - **N8.** poly_app's unguarded UPDATE on `user.email` redirects the anchor. That is R-2's reach; SECURITY names it.
 
 For the lead: after this loop nobody can enrol, because there are no screens and nothing besides first enrolment writes `recent_auth_at`. So R-25's second-factor mitigation is built in the database but not reachable by users. Two issues are needed: the second-step screens and the "Confirm it's you" re-authentication route.
+
+### @seceng — 2026-11-16
+
+**Ruling review (seceng) of `7e73fd7e`: accepted on one decision (D1), with conditions.** This replaces my review of `41a52277`. Details: `process/cairn/reviews/POLY-89/ruling-review.md`. B1, B2 and B4 are fixed. I checked all 19 [Sn] answers against my list; each holds, with the conditions below.
+
+**Blocking:**
+- **D1. Backup codes. The ruling accepts this risk itself, but only the Principal can.**
+  - How: every user's backup codes are encrypted with the same key. #5 must let them change without a marker, because a backup-code sign-in rewrites them.
+  - Reach: one injected statement copies an attacker's own codes into any user's row. Add the magic link R-2 already lets poly_app plant, and the attacker signs in as any authenticator-app user with no password and no factor, unseen, until POLY-149.
+  - (a) Recommended: turn backup codes off (Blocked class; refuse unmarked rewrites). Under an hour of work (a guess). A lost phone is recovered with a passkey or `reset-mfa`.
+  - (b) Keep them, with that exact text in R-2, approved by the Principal.
+  - qa can write every test except this carve-out's backup-code half.
+
+**Conditions (not blocking; each is checked at the build review):**
+- **C-a.** Add tests that real sign-ins still work as poly_app: authenticator app, wrong-code lockout, passkey, and backup code if kept.
+  - #9 and #8 must compute for the changed row's own user, not the marker's. Otherwise sign-in fails at commit, and `reset-mfa` leaves `second_step_at` set, breaking C6.
+  - The unmarked carve-out applies to verified rows only. The passkey counter may not go down.
+- **C-b.** The locks only work if each check reads after taking its lock, in a later statement and in a VOLATILE function. Add a test that runs two connections at once.
+- **C-c. The passkey stamp (#6) is accepted.**
+  - The proof is the consumed grant, which is tied to the session that asked for the code. The stamp must hit exactly one row.
+  - Leftover risk, for R-2: with a stolen poly_app password, someone can name a victim's freshly stamped session within its 5 minutes. Record it as a fourth forge case that passes by design.
+- **C-d. The passkey delete/rename claim is wrong.** Both routes run BetterAuth's `requireResourceOwnership` check before the handler. Keep #6 and #7 as the floor against SQL, and fix the sentence.
+- **C-e.** For a user with no password, a magic-link session counts as the "fresh IdP round trip", so first enrolment needs only the mailbox. ARCH and SECURITY must say so.
+- **C-f. The poly_operator grant (R6) is approved, with conditions.**
+  - Reach of a stolen poly_operator: it can remove anyone's factors and end their sessions. That is a lockout and a downgrade, not a takeover, without the password and the mailbox.
+  - Conditions: match the email lower-cased; refuse an unknown or deleted user with a non-zero exit; notify the user.
+
+**For the lead:** after this loop nobody can enrol. So R-25's second-factor protection is built in the database but cannot be reached by users. Two issues are needed: the second-step screens and the "Confirm it's you" route.

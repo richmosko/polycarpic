@@ -1,80 +1,103 @@
-# POLY-89 — seceng review of the ruling at `41a52277`
+# POLY-89 — seceng review of the ruling at `7e73fd7e`
 
-*seceng, 2026-11-16. Read against the tree at `8e3d9d88`, better-auth / @better-auth/passkey 1.7.18 from `node_modules` (code-read), and backend-lead-89's live write-order run. **Verdict: changes requested** (four blocking findings, B1–B4). Everything else stands as ruled.*
+*seceng, 2026-11-16. Read against the ruling at `7e73fd7e`, better-auth and @better-auth/passkey 1.7.18 as installed (code-read), and backend-lead-89's live run. It replaces my review of `41a52277`.*
 
-The ruling gets the main thing right. Factor rows, the on/off flag and the step-up stamp are all guarded in the database. Every proof is a row that only a definer writes. No new poly_app grant is added. Removing any factor (not only the last) needs a fresh step-up. The flag is checked at commit against a verified row. Those close the bypass routes I listed before the ruling: factors added, moved, re-keyed or deleted by direct SQL, and a flag switched off or on by direct SQL.
+**Verdict: accepted on one decision (D1) and the conditions below.**
+
+- **Fixed since the last version.** B1 (sign-in's own writes), B2 (`createSession`) and B4 (the race on the exemption) are fixed.
+- **What blocks.** D1 is the only blocking item. It is a risk the ruling accepts on the Principal's behalf, and only the Principal can accept it.
+- **What qa may start.** qa may write tests now for everything except the backup-code half of R3 #5's unmarked carve-out.
 
 ## Blocking
 
-**B1. The factor guards refuse sign-in's own writes, so TOTP and passkey sign-in break.** (R3 #5)
-- **How it works.** At sign-in the user has no session yet, so the request runs on the plain pool with no marker, and `app.current_user_id()` is NULL. BetterAuth still writes the factor rows there (code-read):
-  - TOTP verify resets or increments `failed_verification_count` and sets `locked_until` (`verify-two-factor.mjs:136-202`);
-  - a backup code rewrites `backup_codes` (`backup-codes/index.mjs:222-233`);
-  - a passkey sign-in updates `counter` (`passkey/dist/index.mjs:581`).
-
-  R3 #5 requires `user_id = app.current_user_id()` on every UPDATE, so each of these writes is refused.
-- **What it reaches.** No attacker gains anything; the failure is closed. But no enrolled user can finish signing in, and a wrong TOTP code errors without counting toward the lockout.
-- **Fix.** With no marker, an UPDATE may change exactly:
-  - `two_factor`: `failed_verification_count` and `locked_until`; `backup_codes` too, unless B3 takes option (a);
-  - `passkey`: `counter`, and only to a value no lower than before (authenticators that always send 0 pass).
-
-  Every other column, every INSERT and every DELETE without a marker is refused. Tests: a real TOTP sign-in, a wrong-code lockout and a passkey sign-in each succeed as poly_app; an unmarked UPDATE of `secret`, `verified`, `user_id`, `public_key` or `credential_id` is refused.
-
-**B2. A first passkey registration with `createSession: true` creates a second session, and the database marks it as recently confirmed.** (R3 #3 with #5; live run, flow 6)
-- **How it works.** `/passkey/verify-registration` with `createSession: true` inserts the passkey, then a new session, in one transaction (measured: 200 as poly_app, and the route policy did not refuse it).
-  - Under the ruling, the passkey INSERT consumes the grant.
-  - The session-INSERT stamp (#3) then sees a grant consumed in this transaction and stamps the new session's `recent_auth_at`.
-- **What it reaches.** Someone holding the user's cookie gets a second session with a fresh step-up. Revoking the stolen session does not end it. For 5 minutes it can do any step-up action: change the email, unlink a provider, revoke the user's other sessions. The same flag on an enrolled user's later passkey still creates an unstamped extra session, so the problem is not only the stamp.
-- **Fix, both parts.**
-  1. The enrolment class refuses `body.createSession` when it is set to anything but false, in the before-hook, with a test.
-  2. #3 stamps only the TOTP path's replacement session. The grant records which write consumed it (`consumed_by` `totp` | `passkey`). #3 stamps only when it is `totp` and the marker's session row was deleted in this transaction, and only once per grant (`stamped_at`).
-
-**B3. Copying encrypted backup codes lets anyone with SQL as poly_app skip the second step. This needs a decision.**
-- **How it works.** BetterAuth encrypts every user's backup codes with the same auth secret, and nothing ties the encrypted value to the user. So one statement copies the attacker's own encrypted codes into a victim's row: `UPDATE two_factor SET backup_codes = (mine) WHERE user_id = victim`. B1 has to let `backup_codes` change without a marker, because redeeming a code at sign-in does exactly that. A trigger cannot tell a redemption from a copy, since both replace the whole encrypted value.
-- **What it reaches.** SECURITY R-2 already lets SQL as poly_app outside a marked transaction plant a magic link for any user. Until now the second step was what still stopped that for an enrolled user. With the copy, the attacker uses the planted link, then one of their own backup codes, and signs in as any TOTP-enrolled user with no password and no factor. Nothing tells the victim. This stays open until POLY-149 removes poly_app's grants.
-- **Option (a), my recommendation.** Put `/two-factor/verify-backup-code` and `/two-factor/generate-backup-codes` in the Blocked class, and refuse any `backup_codes` change without a marker.
-  - Cost: about half a loop-hour (a guess) for a route-policy line, a guard line and two tests.
-  - The user loses self-service recovery with a backup code. A lost phone is recovered with a second method (a passkey) or the operator's `reset-mfa`, and on a family instance the operator is a family member.
-- **Option (b).** Keep backup codes. SECURITY R-2 then states the bypass above for the Principal's approval, closing at POLY-149.
-
-**B4. The exemption can be lost and kept at the same time: two transactions each pass on what the other has not yet committed.** (R4; C10)
+**D1. Backup codes: the ruling accepts the risk (option b) without the Principal.** (R3 #5, [S1, S3])
 - **How it works.**
-  - Transaction 1 deletes the user's last factor. The last-method check passes because the Person has no invitations yet.
-  - Transaction 2, at the same moment, inserts the user's first invitation on their Person. The enrolled-inviter check (#11) passes because `second_step_at` is still set.
-  - Both commit. The same race exists between a factor delete and the owner row written when an entity is created (#10).
-- **What it reaches.** The user's Person is shared, or they own a Trust, with no second factor. The rule the issue exists for is broken. Only the user's own actions get there, and they need a step-up, so another person gains nothing. But "the one predicate" stops being an invariant.
-- **Fix.** #6, #10, #11, `set_two_factor_enabled` and `sync_second_step` each take `SELECT 1 FROM "user" WHERE id = me FOR UPDATE` as their first statement. One test runs two connections, one deleting the factor and one inviting, and expects exactly one to commit.
+  - BetterAuth stores every user's backup codes encrypted with the one auth secret (code-read: the two-factor plugin's `storeBackupCodes: "encrypted"` default, `backup-codes/index.mjs:19`). Nothing ties the encrypted value to its user.
+  - #5 lets `backup_codes` change without a marker, because a sign-in that uses a backup code rewrites it.
+  - A trigger cannot tell that rewrite from a copy, because both replace the whole value.
+- **What an attacker reaches.**
+  - The attack needs SQL as poly_app. An injection bug is enough; no stolen password and no code running in web is needed.
+  - One statement copies the attacker's own encrypted codes into a victim's row.
+  - SECURITY R-2 already lets that same access plant a magic link for any user. The attacker signs in through the link, then enters one of their own backup codes.
+  - The result: signed in as any user who has an authenticator app, with no password and no factor of theirs, and nothing tells the victim. This stays open until POLY-149.
+  - The second step is the only thing that stops R-2's magic link for an enrolled user. This hole removes it for every authenticator-app user.
+- **Options for the Principal.**
+  - **(a) Turn backup codes off. This is my recommendation.**
+    - `/two-factor/verify-backup-code` and `/two-factor/generate-backup-codes` go in the Blocked class.
+    - #5 refuses any `backup_codes` change without a marker.
+    - Cost: one route-policy line, one guard line and two tests, under an hour (a guess).
+    - What the user gives up: recovering a lost phone with a backup code. They recover it with a second method (a passkey) or with the operator's `reset-mfa`. On a family instance the operator is a family member.
+  - **(b) Keep backup codes as ruled.** SECURITY R-2 then states the bypass above in those words, approved by the Principal, closing at POLY-149.
 
-## Not blocking
+## Conditions (not blocking; each one is checked at the build review)
 
-**N1. The sliding refresh.** The ruling adds no trigger on `session` UPDATE, only #3 on INSERT. poly_app cannot update `recent_auth_at` or `user_id`. So getSession's unmarked `UPDATE session SET expires_at, updated_at` meets no guard and gains nothing. Correction to the lead's reading: this is not a gap in the ruling. Add one regression test that a signed-in request still refreshes as poly_app with 0013 applied.
+**C-a. Sign-in's carve-out needs tests, and the commit-time checks must use the row's own user.** (B1's fix, [S3])
+- The carve-out in #5 and #6 is right. Four tests must show it works: as poly_app with 0013 applied, a real TOTP sign-in, a wrong-code lockout, a passkey sign-in and (under option b) a backup-code sign-in each succeed. R8 lists none of them.
+- `two_factor_91_consistent` (#9) fires at commit on those sign-in updates, which carry no marker. `sync_second_step` (#8) fires on R6's deletes, which also carry no user marker. Both must compute for the changed row's `user_id` (NEW or OLD), not for `app.current_user_id()`. The "refuse another user's row" check applies only when a marker is present.
+  - If #9 uses the marker, sign-in fails at commit.
+  - If #8 uses the marker, `reset-mfa` leaves `second_step_at` set. The user is then locked out instead of being sent to set up a second step, which breaks C6.
+- Two narrowings:
+  - The unmarked carve-out applies only to a **verified** `two_factor` row, since the sign-in step exists only for an enrolled user.
+  - An unmarked `passkey.counter` may not go down. An authenticator that always sends 0 still passes.
 
-**N2. `method: "otp"`.** Correction to the lead's reading: the database already refuses it, even if `otpOptions` were set. Turning the flag on needs a grant or a step-up and an unverified row. #5 refuses a verified row without a consumed grant. The commit check (#9) refuses the flag without a verified row. Belt and braces, as the live run said: add `method: otp` to the enrolment class's refusals, and a test that fails if `otpOptions` is ever configured.
+**C-b. The locks hold only if each check reads after taking its lock.** ([S7], R1.6) A function that reads `second_step_at`, invitations or memberships after taking its lock must be VOLATILE and must read in a statement after the lock. Under READ COMMITTED, only a later statement sees the other transaction's commit. Add the two-connection test to R8: a last-factor delete racing a first invitation on the own Person, and racing an entity's creation. Exactly one may commit.
 
-**N3. R3 #5's passkey stamp, judged against "the session id never proves a session".** It holds, on one condition.
-- **Why it holds.** The proof is the grant, not the session id. A grant is minted only by a correct emailed code, for the session named at that moment, and consuming it requires the same session again. The stamp can only land on the session that asked for the code. A stamp never travels to another session.
-- **Condition.** Stamp `WHERE id = grant.session_id AND user_id = me`, refuse unless exactly one row is updated, and do it in the same statement block as the consume.
-- **What stays open.** With a stolen poly_app password, or code running inside web, an attacker can name the victim and the victim's own real session. During the 5 minutes after that session's enrolment, the step-up check passes for them, because the marker's session id is web's word. This is R-2's reach, narrowed to a 5-minute window, and it closes at POLY-149. R1.2's forge test (a) names a session with no grant. Add a fourth case that records this by design: a real session of the same user with a fresh stamp passes, and is listed in SECURITY R-2.
+**C-c. The passkey stamp in #6, judged against "the session id never proves a session". Accepted.** ([S4], [S11])
+- **Why it is safe.** The proof is the grant, not the session id.
+  - A grant is minted only by a correct emailed code.
+  - At minting it is bound to the session named at that moment.
+  - Consuming it requires that same session again.
+  So the stamp can land only on the session that asked for the code.
+- **Condition.** The stamp's UPDATE must hit exactly one row, or the transaction refuses.
+- **What stays open, and goes into SECURITY R-2.** With a stolen poly_app password, or code running in web, an attacker can name a victim and that victim's own real session during the 5 minutes after it was stamped, and the step-up check passes. The session id is web's word until POLY-149.
+- Add this as a fourth forge case, which passes by design and is documented as such, so the record shows it was looked at.
 
-**N4. Second writers.** poly_govern gets `UPDATE (two_factor_enabled, second_step_at)` on `user`, and every guard lets poly_govern through unchecked. So any present or future poly_govern definer could write `second_step_at` or a factor row, and "only `sync_second_step` writes it" (C7) is enforced by nothing. Add a catalog test:
-- only `app.sync_second_step`'s body writes `second_step_at`;
-- only `set_two_factor_enabled` and `reset_second_step` write `two_factor_enabled`;
-- only `reset_second_step` deletes from `two_factor`, `passkey` or `verification`.
+**C-d. Re-check the claim about passkey delete and rename; the claim is wrong. The closure in #6 and #7 stays.**
+- Both routes run BetterAuth's `requireResourceOwnership` middleware before the handler (`passkey/dist/index.mjs`, the `use` arrays of `deletePasskey` and `updatePasskey`; `better-auth/dist/api/middlewares/authorization.mjs`). It loads the passkey by id and refuses when `userId` differs from the session's user. The `WHERE id` the ruling cites is the handler, which runs only after that check.
+- So a signed-in user cannot act on another user's passkey through these routes today (code-read).
+- #6 and #7 still matter. They are the floor against SQL as poly_app, and against a future BetterAuth release that drops the middleware.
+- Change the ruling's sentence to say BetterAuth checks ownership and the triggers are the floor. Keep the test; it then measures both layers.
 
-**N5. The password half of the anchor is an app check, not a database one.** R2's issuer checks only the marker. The password is checked by the route's `validatePassword`. A user with no password account passes on "a session created in the last 5 minutes", and a magic-link sign-in creates such a session too. For a user with no password and no IdP account, first enrolment therefore needs only their mailbox. That is the recovery root ARCH already accepts, but SECURITY §4.1 and ARCH §3.1c must say it plainly. They must not claim the database enforces the password.
+**C-e. The anchor's substitute for a password is weaker than an IdP round trip.** ([S9], R2)
+- A user with no password passes `send-code` with "a session created within the last 5 minutes".
+- A magic-link sign-in creates such a session too.
+- So for a user with no password, first enrolment needs only their mailbox. That fits "email is the recovery root", but ARCH §3.1c and SECURITY §4.1 must say it in those words, not "a fresh IdP round trip".
 
-**N6. Guessing the emailed code.** Three sends per 15 minutes, five tries each, is 15 guesses per 15 minutes, about 1,440 a day, against 10^6 codes. That is roughly a 0.14% chance a day, and each send needs the password. Add a 24-hour cap of 10 challenges per user, and email the user when a code is voided at five wrong tries (once the mailer exists). This is cheap.
+**C-f. R6: the `reset_second_step` grant to poly_operator. Approved.**
+- **What a stolen poly_operator credential reaches.** It can remove anyone's factors and end all their sessions.
+  - Re-enrolment still needs the account's password and the emailed code. So a reset leads to a takeover only for someone who also has both.
+  - Without them it is a lockout and a downgrade, and the audit event records it.
+- **Conditions, carried from my last review and not in this version:**
+  - match the email lower-cased, as the unique index does;
+  - refuse, with a non-zero exit, when no user matches or the user is a tombstone;
+  - write a `notification` to the user, and an email once POLY-137's mailer exists. A reset is a security event the user must see (SECURITY §9).
 
-**N7. R6: `reset_second_step`'s grant to `poly_operator`. Approved, with conditions.**
-- **What a stolen `poly_operator` credential reaches.** It can remove anyone's factors and sign them out everywhere. Re-enrolment still needs the account's password and the emailed code, so a reset alone is a takeover only for someone who also holds both. Otherwise it is a lockout and a downgrade.
-- **Conditions.**
-  - Match the email the way the unique index does (lower-cased). Refuse when no user is found, with the CLI's non-zero exit.
-  - Refuse a tombstoned user.
-  - Write a `notification` to the user now, and email them when POLY-137's mailer lands. An operator reset is a security event the user must see (SECURITY §9).
-  - Lint keeps the one-caller confinement.
+## The [Sn] answers, checked against my list
 
-**N8. `user.email` is still updatable with no guard.** poly_app holds UPDATE on `email` and `email_verified`. One statement can point a victim's account at the attacker's mailbox, which defeats the anchor and password reset alike. This is R-2's reach and not this loop's to close. SECURITY R-2 will name it, and POLY-149 inherits it.
+| Item | Verdict |
+|---|---|
+| S1 | Holds, except the backup codes (D1). |
+| S2 | Holds. |
+| S3 | Holds, with C-a. |
+| S4 | Holds, with C-c. |
+| S5 | Holds, with C-a for R6. |
+| S6 | Holds. |
+| S7 | Holds, with C-b. |
+| S8 | Holds. The notice on a code voided at five tries waits on the mailer. |
+| S9 | Holds, with C-e. |
+| S10 | Holds. |
+| S11 | Holds. |
+| S12 | Holds. |
+| S13 | Holds. |
+| S14 | Holds. |
+| S15 | Holds. |
+| S16 | Holds. |
+| S17 | Holds. |
+| S18 | Holds. |
+| S19 | Holds. |
 
-## Bubble-up (for the lead, not the ruling)
-- **R7 plus the ruling's Open list mean nobody can enrol after this loop.** There are no screens for setting up a second step, and nothing writes `recent_auth_at` apart from first enrolment. So SECURITY R-25's second-factor mitigation stays "not in effect" after POLY-89 merges. Two issues need filing: the second-step screens, and the re-authentication route for "Confirm it's you". SECURITY will say R-25's mitigation is built in the database and not reachable by users.
-- **SECURITY edits this loop** (mine, at the build review): R-2 (N3, N8, and B3 if option (b)), R-25's mitigation status, §4.1 (N5).
+## For the lead
+- After this loop nobody can enrol (R7), and nothing writes `recent_auth_at` except first enrolment (Open). So SECURITY R-25's second-factor mitigation is built in the database but not reachable by users.
+  - Two issues are needed: the second-step screens, and the "Confirm it's you" re-authentication route.
+  - SECURITY will say exactly this at the build review.
+- My SECURITY edits this loop: R-2 (C-c's leftover risk, the unguarded `user.email`, and D1's text under option b), R-25's mitigation status, and §4.1 (C-e).
