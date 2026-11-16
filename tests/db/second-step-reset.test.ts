@@ -3,8 +3,10 @@
 // exporting runUserResetMfa({ email }, { stdout, stderr }) -> 0 | 1 | 2 (ASSUMED: the shape of runUserInvite; exit 2 on no match is ruled).
 // Red today because the definer and the command are absent. Titles end [red if: ...].
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { cloneMigrated } from './helpers/api';
-import { url } from './helpers/pg';
+import { cloneMigrated, dbEnv } from './helpers/api';
+import { spawn } from 'node:child_process';
+import { join } from 'node:path';
+import { ROOT, url } from './helpers/pg';
 import { fixture, pgmod, fails, msgOf } from './helpers/second-step';
 import { must } from './helpers/sql';
 
@@ -99,5 +101,33 @@ describe('C6 the command (apps/worker/src/cli/user-reset-mfa.ts)', () => {
     expect(await mod.runUserResetMfa({ email: 'nobody-here@qa.test' }, b.io)).toBe(2);
     await close();
   });
-  it.todo('C6: `sh bin/polycarpic cli user reset-mfa <email>` through the operator service wrapper (child process; mirrors operator-invite.test.ts; needs the dispatch in cli/main.ts to exist)');
+  it('through the image dispatcher: `sh bin/polycarpic cli user reset-mfa <email>` exits 0 for a known user (case-insensitive), 2 for an unknown email, prints no secret, and a poly_worker run is refused [red if: cli/main.ts has no reset-mfa entry or accepts the worker role]', async () => {
+    const u = await enrolled();
+    const env = (user: string) => ({ PATH: process.env.PATH!, ...dbEnv(user, db), APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173' });
+    const run = (args: string[], e: Record<string, string>) => new Promise<{ code: number | null; out: string; err: string }>((res) => {
+      const c = spawn('sh', [join(ROOT, 'bin', 'polycarpic'), 'cli', ...args], { env: e, stdio: ['ignore', 'pipe', 'pipe'] });
+      let out = ''; let err = '';
+      c.stdout.on('data', (d) => (out += d)); c.stderr.on('data', (d) => (err += d));
+      const k = setTimeout(() => c.kill('SIGKILL'), 60_000);
+      c.on('close', (code) => { clearTimeout(k); res({ code, out, err }); });
+    });
+    const bad = await run(['user', 'reset-mfa', 'nobody-here@qa.test'], env('poly_operator'));
+    expect(bad.code, bad.err).toBe(2);
+    const worker = await run(['user', 'reset-mfa', u.email], env('poly_worker'));
+    expect(worker.code, worker.err).toBe(1);
+    expect(must(`SELECT count(*) FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows[0]![0]).toBe('1');
+    const ok = await run(['user', 'reset-mfa', u.email.toUpperCase()], env('poly_operator'));
+    expect(ok.code, ok.err).toBe(0);
+    expect(must(`SELECT count(*) FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows[0]![0]).toBe('0');
+    expect(ok.out + ok.err).not.toMatch(/secret|backup|token|password/i);
+  });
+  it('seceng (4): reset_second_step refuses every text that is not exactly "SELECT app.reset_second_step($1)" [red if: the exact-call check admits an alias or fails open on NULL]', async () => {
+    const u = await enrolled();
+    for (const text of ['SELECT app.reset_second_step($1) AS r', 'select app.reset_second_step($1)', '/* x */ SELECT app.reset_second_step($1)', 'SELECT app.reset_second_step($1), 1', 'SELECT * FROM app.reset_second_step($1)']) {
+      const x = await fails(asOperator((q) => q(text, [u.email])));
+      expect(x, text).not.toBeNull();
+      expect(msgOf(x), text).toMatch(/on its own|exact|called/i);
+    }
+    expect(must(`SELECT count(*) FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows[0]![0]).toBe('1');
+  });
 });

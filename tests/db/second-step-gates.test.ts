@@ -492,3 +492,37 @@ describe('R1.4 grants', () => {
     expect(r[1]).toBe('false');
   });
 });
+
+describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect: the two read definers are exempt)', () => {
+  const CALLS: [string, unknown[]][] = [
+    ['app.set_two_factor_enabled', [true]],
+    ['app.issue_email_challenge', ['first_enrolment']],
+    ['app.confirm_email_challenge', ['123456']],
+  ];
+  // every text below is NOT the definer's exact parameter-bound call; each must be refused by the definer's own check
+  const variants = (f: string) => [
+    `SELECT ${f}($1) AS c`,
+    `select ${f}($1)`,
+    `/* x */ SELECT ${f}($1)`,
+    `SELECT ${f}($1), 1`,
+    `SELECT ${f}($1) WHERE true`,
+    `SELECT * FROM ${f}($1)`,
+  ];
+  for (const role of ROLES) {
+    it(`${role}: set_two_factor_enabled, issue_email_challenge and confirm_email_challenge refuse every text that is not exactly "SELECT app.<name>($1)": an alias, lower case, a comment, an extra column, a suffix, FROM [red if: the exact-call check admits an alias or is a regex that fails open on NULL]`, async () => {
+      const u = await seed({ enrolled: false });
+      const s = must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tkx${n}${Math.random()}', now() + interval '1 day') RETURNING id`, db).rows[0]![0]!;
+      for (const [f, args] of CALLS) {
+        for (const text of variants(f)) {
+          const x = await marked(role, u.id, s, (q) => fails(q(text, args)));
+          expect(x, text).not.toBeNull();
+          expect(msgOf(x), text).toMatch(/on its own|exact|called/i);
+        }
+      }
+    });
+  }
+  it('app.second_step_required() and app.enrolment_grant_live() are STABLE, take no arguments, return boolean and write nothing (the two exempt read definers) [red if: either is volatile, takes an argument, or has an INSERT, UPDATE or DELETE in its body]', () => {
+    const rows = must(`SELECT proname, provolatile, pronargs, prorettype::regtype::text, prosrc ~* '(insert\\s+into|update\\s+[a-z_".]+\\s+set|delete\\s+from)' FROM pg_proc p JOIN pg_namespace s ON s.oid = p.pronamespace WHERE s.nspname = 'app' AND proname IN ('second_step_required', 'enrolment_grant_live') ORDER BY 1`, db).rows;
+    expect(rows).toEqual([['enrolment_grant_live', 's', '0', 'boolean', 'f'], ['second_step_required', 's', '0', 'boolean', 'f']]);
+  });
+});

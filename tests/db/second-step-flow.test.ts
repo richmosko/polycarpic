@@ -69,7 +69,8 @@ describe('C3/C9 the enrolment class and the route policy (R3, R5)', () => {
     expect(conf.status).toBe(200);
     const en = await e.handle(post('/two-factor/enable', { password: PW }, cookie), auth);
     expect(en.status).toBe(200);
-    const secret = new URL((await json(en)).totpURI).searchParams.get('secret')!;
+    const enJson = await json(en);
+    const secret = new URL(enJson.totpURI).searchParams.get('secret')!;
     const orig = pgmod.Client.prototype.query;
     if (captured) pgmod.Client.prototype.query = function (this: unknown, ...a: any[]) { const q = a[0]; captured.push(typeof q === 'string' ? q : String(q?.text)); return orig.apply(this, a); };
     try {
@@ -77,7 +78,7 @@ describe('C3/C9 the enrolment class and the route policy (R3, R5)', () => {
       expect(ver.status).toBe(200);
       cookie = jar(cookie, ver);
     } finally { pgmod.Client.prototype.query = orig; }
-    return { cookie, secret };
+    return { cookie, secret, backupCodes: (enJson.backupCodes ?? []) as string[] };
   }
   it('C3/C15: password + emailed code + TOTP verify enrols: the first-verify rotation inserts its session, the flag and second_step_at are set, the new session is stamped [red if: the anchor routes, the grant path or the session.create.before strip is absent]', async () => {
     const auth = await mkWithMailer();
@@ -182,9 +183,60 @@ describe('C3/C9 the enrolment class and the route policy (R3, R5)', () => {
     expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}' AND recent_auth_at IS NOT NULL`)).toBe(1);
     expect(must(`SELECT consumed_by FROM app.enrolment_grant WHERE user_id = '${u.id}'`, e.db).rows[0]![0]).toBe('passkey');
   });
-  it.todo('D1(b) over HTTP: a backup-code sign-in through /two-factor/verify-backup-code commits as poly_app (the TOTP-enrolled user above plus its generated codes; written once the enrolment flow is green, since it reuses it)');
-  it.todo('C1 (e2e, apps/web/tests/e2e): a new user whose only entity is the own Person signs in at /sign-in and reaches /dashboard with no redirect');
-  it.todo('C6 (e2e): after reset-mfa a manager signs in and every page redirects to /settings/second-step');
+  it('D1(b) over HTTP: after enrolment a new device is held, and /two-factor/verify-backup-code with a generated code signs it in as poly_app; the consumed code is rewritten and cannot be used twice [red if: the unmarked backup_codes carve-out or the commit-time check refuses the sign-in]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    const { backupCodes } = await enrol(auth, u);
+    expect(backupCodes.length).toBeGreaterThan(1);
+    const before = must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0];
+    const held = await e.handle(post('/sign-in/email', { email: u.email, password: PW }), auth);
+    const heldCookie = jar('', held);
+    expect(held.headers.getSetCookie().some((c) => /session_token=[^;]/.test(c) && !/max-age=0/i.test(c))).toBe(false);
+    const ok = await e.handle(post('/two-factor/verify-backup-code', { code: backupCodes[0] }, heldCookie), auth);
+    expect(ok.status).toBe(200);
+    expect(ok.headers.getSetCookie().some((c) => /session_token=[^;]/.test(c) && !/max-age=0/i.test(c))).toBe(true);
+    expect(must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0]).not.toBe(before);
+    const held2 = await e.handle(post('/sign-in/email', { email: u.email, password: PW }), auth);
+    const again = await e.handle(post('/two-factor/verify-backup-code', { code: backupCodes[0] }, jar('', held2)), auth);
+    expect(again.status).not.toBe(200);
+  });
+  it('seceng: a wrong emailed code answers 403 and the response reaching the client carries no x-poly-commit header [red if: the commit header leaks]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    const { cookie } = await e.signIn(u.email, auth);
+    mails.length = 0;
+    await e.handle(post('/second-step/send-code', { password: PW }, cookie), auth);
+    const wrong = mails[0]!.code === '000000' ? '000001' : '000000';
+    const r = await e.handle(post('/second-step/confirm-code', { code: wrong }, cookie), auth);
+    expect(r.status).toBe(403);
+    expect(r.headers.has('x-poly-commit')).toBe(false);
+    expect(must(`SELECT attempts FROM app.email_challenge WHERE user_id = '${u.id}'`, e.db).rows[0]![0]).toBe('1'); // the attempt was committed
+  });
+  it('seceng: the handler commits on x-poly-commit only for /second-step/confirm-code with a 403; the same header on a 403 from any other path rolls back [red if: the header is honoured on every path]', async () => {
+    const { createAuthMiddleware, APIError } = await import('better-auth/api');
+    const forged = { id: 'qa-forge', hooks: { after: [{
+      matcher: (c: { path?: string }) => c.path === '/update-user',
+      handler: createAuthMiddleware(async (ctx: any) => { ctx.setHeader('x-poly-commit', '1'); throw new APIError('FORBIDDEN', { message: 'forged' }); }),
+    }] } };
+    const auth = await e.mk('real-domain', (o) => { o.plugins.push(forged); return o; });
+    const u = e.seedUser({ name: 'Before' });
+    const { cookie } = await e.signIn(u.email, auth);
+    const r = await e.handle(post('/update-user', { name: 'Forged' }, cookie), auth);
+    expect(r.status).toBe(403);
+    expect(r.headers.has('x-poly-commit')).toBe(false);
+    expect(must(`SELECT name FROM public."user" WHERE id = '${u.id}'`, e.db).rows[0]![0]).toBe('Before'); // rolled back, not committed
+  });
+  it('seceng: send-code refuses a user whose email is not verified (403) and mails nothing, and no challenge row exists [red if: the code goes to an unverified address]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    const { cookie } = await e.signIn(u.email, auth);
+    must(`UPDATE public."user" SET email_verified = false WHERE id = '${u.id}'`, e.db);
+    mails.length = 0;
+    const r = await e.handle(post('/second-step/send-code', { password: PW }, cookie), auth);
+    expect(r.status).toBe(403);
+    expect(mails.length).toBe(0);
+    expect(e.count(`SELECT 1 FROM app.email_challenge WHERE user_id = '${u.id}'`)).toBe(0);
+  });
 });
 
 describe('criterion 16: the IdP id_token is never stored (accountDropIdToken)', () => {
