@@ -179,7 +179,7 @@ INFRA's first-deploy checklist has no line on the deploy gate. It is devops-engi
 **Delta sign-off (seceng) at `4ef34421`: accepted.** N1, N2 and N5 are closed. The 303's cookie is the user's own refreshed session, the same as the normal response, so it leaks nothing. The 21000 refusal tells only the operator, who already learns from exit 2 whether an address exists. Details: `process/cairn/reviews/POLY-89/build-review.md`, Delta at 4ef34421.
 ### @architect — 2026-11-16
 
-**Verdict (POLY-89e): approve at code sha 4ef344212d4c2ec37321f9e248c24f61e03f5152, on one condition: seceng-89's delta sign-off on N1, N2 and N5 lands.** I read the code: 0012, 0013, `packages/auth` (anchor, hooks, route policy, handler, session), web's gate and placeholder, the reset CLI and its wrapper, and the named tests. I did not rely on the reports alone.
+**Verdict (POLY-89e): approve at code sha 4ef344212d4c2ec37321f9e248c24f61e03f5152.** seceng-89's build review accepted it, and its delta sign-off closes N1, N2 and N5 (`build-review.md`, "Delta at 4ef34421", @ 03d8dbca). I read the code: 0012, 0013, `packages/auth` (anchor, hooks, route policy, handler, session), web's gate and placeholder, the reset CLI and its wrapper, and the named tests. I did not rely on the reports alone.
 
 | Axis | Result | Evidence |
 |---|---|---|
