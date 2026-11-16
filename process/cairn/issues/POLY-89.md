@@ -1,12 +1,12 @@
 ---
 id: POLY-89
 title: Second sign-in step
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-86, POLY-62, POLY-87, POLY-147]
 assignee: backend-lead
-paths: [packages/auth/**, packages/tenancy/**, packages/db/migrations/**, apps/web/src/routes/**, apps/cli/**]
+paths: [process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-89/**, packages/auth/**, packages/tenancy/**, packages/db/**, packages/config/**, apps/web/**, apps/cli/**, tests/**, infra/ci/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**]
 labels: [auth, security]
 priority: null
 pr: null
@@ -60,3 +60,7 @@ Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `p
 ### @team-lead — 2026-11-15
 
 Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cairn/reviews/POLY-148/spike.md` (§1, §2, §6 and seceng's reading in §7).
+
+### @team-lead — 2026-11-15
+
+Feature started. Branch: `feature/poly-89-second-sign-in-step`. `paths` front-loaded with the issue file, the review folder, tests, the lint and layer config, the lockfile and the four docs the ruling may bump.
