@@ -79,7 +79,7 @@ SELECT is(pg_temp.grantees(pg_temp.fn('enter_asserted_user')::text), 'poly_app',
 SELECT is(pg_temp.grantees(pg_temp.fn('enter_job')::text), 'poly_worker', 'J1: EXECUTE on enter_job: poly_worker alone');
 SELECT is(pg_temp.grantees('app.enter_new_user(uuid)'), 'poly_app', 'K3: EXECUTE on enter_new_user: poly_app alone');
 SELECT is(pg_temp.grantees(pg_temp.fn('purge_tx_identity')::text), 'poly_worker', 'K4: EXECUTE on purge_tx_identity: poly_worker alone');
-SELECT is(pg_temp.grantees(pg_temp.fn('current_session_id')::text), 'poly_app,poly_authz,poly_govern', 'R1: EXECUTE on current_session_id: poly_app, plus the two definer owners whose POLY-89 functions read the marker session (POLY-89 R1.2; seceng to confirm); never PUBLIC or poly_worker');
+SELECT is(pg_temp.grantees(pg_temp.fn('current_session_id')::text), 'poly_app,poly_govern', 'R1: EXECUTE on current_session_id: poly_app and poly_govern (the definer owner whose POLY-89 functions read the marker session; seceng fffd8abb); never PUBLIC, poly_authz or poly_worker');
 SELECT is(pg_temp.grantees('app.job_targets(text)'), '', 'J1: job_targets has no EXECUTE grantee but its owner');
 SELECT ok(has_function_privilege('poly_app', 'app.current_user_id()', 'EXECUTE') AND has_function_privilege('poly_worker', 'app.current_user_id()', 'EXECUTE') AND NOT has_function_privilege('public', 'app.current_user_id()', 'EXECUTE'), 'R1: current_user_id grants unchanged: poly_app and poly_worker, not PUBLIC');
 SELECT is((SELECT string_agg(p.proname || '=>' || pg_temp.grantees(p.oid::regprocedure::text), ';' ORDER BY p.proname COLLATE "C") FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname LIKE 'enter\_%'),

@@ -151,7 +151,7 @@ SELECT is((SELECT count(*)::int FROM public.membership WHERE user_id = '00000000
 -- ---------------------------------------------------------------- C18: the trigger functions
 SELECT is((SELECT array_agg(proname::text || ':' || prosecdef ORDER BY proname COLLATE "C") FROM pg_proc WHERE pronamespace = 'app'::regnamespace
     AND proname IN ('stamp_signup_user', 'invitation_set_once', 'signup_stamp_cleared')),
-  ARRAY['invitation_set_once:false', 'signup_stamp_cleared:false', 'stamp_signup_user:false'], 'C18: the three trigger functions exist and run as invoker');
+  ARRAY['invitation_set_once:false', 'signup_stamp_cleared:true', 'stamp_signup_user:false'], 'C18: the three trigger functions exist; signup_stamp_cleared is a poly_govern definer since POLY-89 (seceng-accepted, so poly_operator needs no USAGE on public); the other two run as invoker');
 SELECT ok(pg_temp.sx('SELECT app.stamp_signup_user()') <> 'ok' AND pg_temp.sx('SELECT app.invitation_set_once()') <> 'ok' AND pg_temp.sx('SELECT app.signup_stamp_cleared()') <> 'ok'
     AND EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'stamp_signup_user' AND pronamespace = 'app'::regnamespace), 'C18: calling a trigger function directly fails (and the function exists)');
 SELECT ok(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.stamp_signup_user()::text$q$) IN ('ERR:42501', 'ERR:0A000')
