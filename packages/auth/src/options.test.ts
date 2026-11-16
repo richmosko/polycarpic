@@ -33,8 +33,8 @@ describe('pinned options (criterion 2)', () => {
     expect(t.options?.trustDeviceMaxAge).toBeGreaterThan(0);
   });
 
-  it('plugins are exactly twoFactor, magicLink, passkey: no bearer, no extras  [red if: bearer or any unreviewed plugin is installed]', () => {
-    expect((o.plugins ?? []).map((p: any) => p.id).sort()).toEqual(['magic-link', 'passkey', 'two-factor']);
+  it('plugins are exactly twoFactor, magicLink, passkey and the second-step anchor: no bearer, no extras  [red if: bearer or any unreviewed plugin is installed]', () => {
+    expect((o.plugins ?? []).map((p: any) => p.id).sort()).toEqual(['magic-link', 'passkey', 'second-step-anchor', 'two-factor']);
   });
 
   it('deleteUser is off; sign-in with password on; a password reset revokes sessions; autoSignInAfterVerification unset  [red if: deleteUser enabled, revokeSessionsOnPasswordReset false, or auto sign-in on verify (H2)]', () => {
