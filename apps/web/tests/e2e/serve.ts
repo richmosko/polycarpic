@@ -64,11 +64,8 @@ const SHARED = must(`BEGIN; ${asUserSql(OWNER_ID)}
   SELECT id FROM public.entity WHERE name = 'E2E Shared'; COMMIT;`, db, { role: 'poly_app' }).rows.at(-1)![0]!;
 const MGR_ID = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('Manny Manager', 'manager@e2e.test', true) RETURNING id`, db).rows[0]![0]!;
 must(`INSERT INTO public.account (account_id, provider_id, user_id, password) VALUES ('${MGR_ID}', 'credential', '${MGR_ID}', '${hash}')`, db);
-// require_second_step_for_role refuses even a superuser seating an unenrolled manager, so the manager is enrolled, seated, and then reset
-// through the real operator definer: exactly how a manager comes to have no second step.
-must(`BEGIN; INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '${MGR_ID}', true); UPDATE public."user" SET two_factor_enabled = true WHERE id = '${MGR_ID}'; COMMIT;`, db);
+// A superuser seat passes every guard (R1.3 as amended), so the manager is seated with no second step: the state reset-mfa leaves behind.
 must(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ('${SHARED}', '${MGR_ID}', 'manager')`, db);
-must(`SELECT app.reset_second_step($1) \\bind 'manager@e2e.test' \\g /dev/null`, db, { role: 'poly_operator' });
 mkdirSync(join(here, '.auth'), { recursive: true });
 writeFileSync(join(here, '.auth', 'user.json'), JSON.stringify({ cookies, origins: [] }));
 await close();
