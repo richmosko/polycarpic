@@ -1,7 +1,7 @@
 ---
 id: POLY-89c
 title: Second step tests
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-89
 blocked_by: [POLY-89a]
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-89/**, proce
 stage: execute
 estimate.cost_usd: "14.00"
 estimate.gate_cycles: 3
-labels: [auth, security]
+actual.cost_usd: "10.0115"
+actual.tokens: 64110429
+actual.gate_cycles: 9
+actual.wall_clock: 1182
+ratio: "0.72"
+labels: [auth, security, bloat]
 priority: null
 pr: null
 created: 2026-11-16

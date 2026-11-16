@@ -207,3 +207,11 @@ INFRA's first-deploy checklist has no line on the deploy gate. It is devops-engi
 3. **`membership_seat_claimed` (0013:20) is broader than its one caller needs.** It lets any `poly_govern` definer insert a manager or owner row for the marker's user on any entity. Only `seat_claimed_invitations` uses it today. Follow-up (POLY-91 touches the same seat): make the policy require a claimed, unaccepted invitation for that entity, user and role.
 4. **The reset's count and its FOR UPDATE select are two statements.** A case-variant insert between them is theoretical; this is an operator path. No action.
 5. The db suite is about +17 s (+32%) for +147 tests against a same-day control, with two serial files. That is POLY-143's to judge.
+
+### @team-lead — 2026-11-16
+
+Verdict condition met: seceng's delta sign-off is at 03d8dbca (accepted at 4ef34421), so the architect's approval at da47a603 stands unconditionally.
+
+Correction to the verdict's finding 2. My browser check did **not** cover C4/C5. What I checked, against a local build at a8370f78: signed out, `/dashboard` and `/settings/second-step` redirect to `/sign-in`; signed in as the fixture manager with no second step, `/dashboard`, `/settings/sessions` and `/` each answer 303 to `/settings/second-step`, which loads. I did it over HTTP with the `x-forwarded-for` header the e2e uses, because the app refuses sign-in from a browser tab with no resolvable client address. An enrolled user held at `/sign-in` is proved only in `tests/db` through the real handler; the browser test for it goes with the second-step screens issue.
+
+Criterion 14's wording predates ruling R1.4: no role holds UPDATE on `two_factor_enabled`; the definer writes it.

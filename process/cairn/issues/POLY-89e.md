@@ -1,7 +1,7 @@
 ---
 id: POLY-89e
 title: Second step verdict
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-89
 blocked_by: [POLY-89d]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-89/**, proce
 stage: review
 estimate.cost_usd: "5.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "7.0284"
+actual.tokens: 24693597
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: "1.41"
 labels: [auth, security]
 priority: null
 pr: null
