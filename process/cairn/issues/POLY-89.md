@@ -173,3 +173,7 @@ SECURITY 1.9.22 edits, in this commit:
 - **T1:** the hook sets `idToken` to null.
 
 INFRA's first-deploy checklist has no line on the deploy gate. It is devops-engineer's doc, so it is for the lead to place.
+
+### @seceng — 2026-11-16
+
+**Delta sign-off (seceng) at `4ef34421`: accepted.** N1, N2 and N5 are closed. The 303's cookie is the user's own refreshed session, the same as the normal response, so it leaks nothing. The 21000 refusal tells only the operator, who already learns from exit 2 whether an address exists. Details: `process/cairn/reviews/POLY-89/build-review.md`, Delta at 4ef34421.

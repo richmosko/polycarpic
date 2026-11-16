@@ -73,3 +73,24 @@
 
 ## Docs outside my ownership
 - **INFRA:** the first-deploy checklist (INFRA §7) should state that no real household data goes in before POLY-149's revocation merges. That belongs to devops-engineer; the lead should place it.
+
+## Delta at `4ef34421`: accepted
+
+The delta is `git diff a8370f78 4ef34421 -- packages apps tests`. I re-ran `second-step-reset` and `second-step-gates`: 2 files, 98 tests pass.
+
+- **N1: closed.**
+  - R1.5 (`d88aa7ae`) lists the seven functions poly_app may execute without the exact-call check, each with the reason it is safe.
+  - The catalog pin (`second-step-gates`, "N1") fixes three things:
+    - the exact set of `app` functions poly_app may EXECUTE;
+    - which of them carry the `current_query()` check;
+    - that poly_operator holds `reset_second_step` and nothing of poly_app's among these.
+  - A new grant fails CI.
+- **N2: closed.**
+  - **The fix.** `reset_second_step` counts the lower-cased matches before it locks anything. It raises `P0002` for none and `21000` for more than one, and resets neither. The CLI maps 21000 to exit 1, "failed: nothing was reset". Neither message names an email.
+  - **What it can reveal.** Only poly_operator can run it. The operator already learns whether an address exists from exit 0 versus exit 2, so 21000 adds one fact for the same person: that two case variants exist. No runtime role reaches it.
+- **N5: closed.**
+  - **The fix.** The gate's 303 now carries `loaded.setCookie`.
+  - **What it can leak.** That value is the same refreshed session cookie the user's normal response would carry, for the user's own session, httpOnly and Secure. A gated user receives nothing they would not get on an ungated page.
+  - **Test.** `hooks.server.gate.test.ts` asserts the cookie set is identical on the 303, on the placeholder, and on an ungated page.
+
+Still carried: N3 (refusing a tombstone) moves to account deletion (C-52), and N4 is filed with POLY-91.
