@@ -45,7 +45,7 @@ CREATE TRIGGER email_challenge_no_truncate BEFORE TRUNCATE ON app.email_challeng
 CREATE TRIGGER enrolment_grant_no_truncate BEFORE TRUNCATE ON app.enrolment_grant FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate();--> statement-breakpoint
 
 -- app.current_session_id() (0011) is executable by poly_app only; the definers below read the marker's session too.
-GRANT EXECUTE ON FUNCTION app.current_session_id() TO poly_authz, poly_govern;--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION app.current_session_id() TO poly_govern;--> statement-breakpoint
 
 -- 0007's commit-time stamp check ran as the committing role and read public."user", so any UPDATE of a user by a role with no
 -- USAGE on public (the operator's reset) failed at COMMIT. It becomes a definer of poly_govern; the check itself is unchanged.
