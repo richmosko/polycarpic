@@ -1,7 +1,7 @@
 ---
 id: POLY-89e
 title: Second step verdict
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-89
 blocked_by: [POLY-89d]
