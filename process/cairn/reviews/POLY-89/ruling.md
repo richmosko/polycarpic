@@ -1,15 +1,15 @@
 # POLY-89 — Second sign-in step: ruling (architect)
 
 **Basis.**
-- Branch `feature/poly-89-second-sign-in-step` @ 8e3d9d88. better-auth and @better-auth/passkey 1.7.18; no pin changes. The POLY-147 marker (`app.tx_identity`, migration 0011).
+- Branch `feature/poly-89-second-sign-in-step` @ 414272df. better-auth and @better-auth/passkey 1.7.18; no pin changes. The POLY-147 marker (`app.tx_identity`, migration 0011).
 - BetterAuth's write order and transaction boundaries were measured by backend-lead-89 on Postgres 17 with `log_statement=all`, as poly_app and as a superuser (order only). The record is in backend-lead-89's worktree, `temp/2026-11-16-backend-lead-89-betterauth-write-order.md`, "Live run".
-- seceng-89's attack items 1–19 are answered in place, cited as [Sn].
+- seceng-89's attack items 1–19 are answered in place, cited as [Sn]. The conditions of seceng's review at 414272df (`ruling-review.md`) are adopted in place, cited as [C-a]…[C-f]. D1 is the Principal's decision and is not ruled here (R3 #5).
 
 **Tags.** Criteria are C1–C15 in POLY-89's order. "(code-read)" means read from the 1.7.18 tarball and not run. "(unmeasured)" means qa's red test measures it first.
 
 ## R1. Rules every guard follows
 
-1. **Identity.** Every POLY-89 definer and trigger takes the acting user from `app.current_user_id()`. It refuses (`42501`) when that is NULL, except on the few unmarked sign-in columns in R3 #6 [S3]. The operator reset (R6) is the inverse: it refuses when a user marker *is* present, as `app.issue_operator_invitation` does. No function reads `current_setting('app.*')`. `app.promote_held_roles` (POLY-91) takes no parameter and reads `app.current_user_id()` [S6].
+1. **Identity.** Every POLY-89 definer and trigger takes the acting user from `app.current_user_id()`. It refuses (`42501`) when that is NULL, except on the unmarked sign-in columns in R3 #5 and #6 [S3]. The commit-time check (#9) and the sync (#8) are not checks on the actor: they compute for the changed row's own user [C-a]. The operator reset (R6) is the inverse: it refuses when a user marker *is* present, as `app.issue_operator_invitation` does. No function reads `current_setting('app.*')`. `app.promote_held_roles` (POLY-91) takes no parameter and reads `app.current_user_id()` [S6].
 2. **The session id narrows a check; it never proves one (C13) [S4].** `app.current_session_id()` is web's word until POLY-149. It is used only as an extra equality that can make a check refuse. The proof in every guard is a row only a definer writes:
    - an `enrolment_grant`, minted by a correct emailed code;
    - that grant's `consumed_xid`;
@@ -19,6 +19,8 @@
    - (a) another real session of the same user, holding no grant and no fresh stamp;
    - (b) a uuid with no session row;
    - (c) another user's session that holds a fresh stamp or a live grant.
+
+   A fourth case **passes by design** and is documented as passing [C-c]. The marker names a victim and the victim's own real session within 5 minutes of its stamp, so the step-up check passes. That is web's word until POLY-149, and SECURITY R-2 states it.
 3. **Role-indifferent.** No guard names poly_app or poly_auth. Only two kinds of role pass a guard unchecked, as in `app.gate_owner_changes`:
    - `poly_govern`, which is NOLOGIN and runs only inside its own definers;
    - a superuser (fixtures, restores).
@@ -35,9 +37,10 @@
      - `poly_govern` on `session`: `SELECT (id, user_id, created_at, recent_auth_at)`, `UPDATE (recent_auth_at)`, `DELETE`.
      - `poly_govern` on `two_factor` and `passkey`: `SELECT`, `DELETE`.
      - `poly_govern` on `verification`: `DELETE`.
+     - `poly_govern` on `notification`: `INSERT`, with a policy `FOR INSERT TO poly_govern` (R6). No role holds it today.
      - `poly_authz`: `SELECT (id, self_user_id)` on `entity`, and SELECT on `invitation` for `entity_id, claimed_user_id, claimed_at, accepted_at, revoked_at, expires_at`, both with role-targeted policies, as for `membership`.
 5. **Exact call.** Every definer a login role may EXECUTE refuses unless `current_query()` is exactly its own parameter-bound call, by the `enter_*` check in 0011. An injected fragment therefore cannot draw an emailed code, confirm one, or flip the factor flag.
-6. **Locks against write skew [S7].** `app.refuse_last_method()` takes `FOR UPDATE` on the user's `user` row. R3 #10 and #11 take `FOR SHARE` on the member's or inviter's `user` row. A last-factor delete and a concurrent seat, invite or (later) rollup edge are thereby serialised.
+6. **Locks against write skew [S7].** `app.refuse_last_method()` takes `FOR UPDATE` on the user's `user` row. R3 #10 and #11 take `FOR SHARE` on the member's or inviter's `user` row. A last-factor delete and a concurrent seat, invite or (later) rollup edge are thereby serialised. Each such function is VOLATILE and reads `second_step_at`, memberships and invitations in a statement *after* the one that takes the lock. Under READ COMMITTED only a later statement sees the other transaction's commit [C-b].
 
 ## R2. The emailed code (C3, C8)
 
@@ -76,7 +79,7 @@
 **Routes: a packages/auth plugin, `secondStepAnchor`.** Being a plugin, it moves to the sign-in service with BetterAuth.
 - `POST /second-step/send-code`:
   - It takes the password and checks it with BetterAuth's `validatePassword`.
-  - A user with no credential account instead needs a session created within the last 5 minutes: the fresh IdP round trip.
+  - A user with no password instead needs a session created within the last 5 minutes. A magic-link sign-in makes such a session too. For a user with no password, first enrolment therefore rests on **the mailbox alone**, consistent with email being the recovery root. ARCH §3.1c and SECURITY §4.1 say exactly this, not "a fresh IdP round trip" [C-e].
   - Inside the request's `withTenant` it calls the issuer, then `AuthInput.sendSecondStepCode` before commit, so a failed send rolls the challenge back.
   - The response is identical whether the code was sent or suppressed.
 - `POST /second-step/confirm-code` calls the confirmer.
@@ -94,7 +97,7 @@
 - **Before the BEGIN, unmarked:** `getSession`'s sliding refresh `UPDATE session SET expires_at, updated_at`.
 
 **Code-read, not run:**
-- passkey delete and rename, by `id` only, with **no ownership check** (`@better-auth/passkey` dist `index.mjs:690`, `:741`);
+- passkey delete and rename, by `id`, after BetterAuth's `requireResourceOwnership` middleware has refused another user's passkey;
 - passkey sign-in, which UPDATEs `counter`;
 - backup-code use, which UPDATEs `backup_codes`.
 
@@ -104,11 +107,11 @@
 | 2 | `user_30_two_factor_flag` BEFORE INSERT OR UPDATE OF two_factor_enabled ON user | `app.guard_two_factor_flag()` (poly_govern) | INSERT: the flag must be false. UPDATE: refused except under R1.3's exemption, so only #1 and R6 can write it. |
 | 3 | `session_10_recent_auth` BEFORE INSERT ON session; `session_11_recent_auth_fixed` BEFORE UPDATE OF recent_auth_at ON session | `app.stamp_recent_auth()`, `app.guard_recent_auth()` (poly_govern) | INSERT sets `NEW.recent_auth_at := now()` only when one grant meets all of these: `user_id = NEW.user_id = app.current_user_id()`, `consumed_xid = pg_current_xact_id()`, `consumed_by = 'totp'`, and `stamped_at` NULL. That grant then gets `stamped_at`, so the stamp fires once [S11, S16]. Every other INSERT gets NULL, whatever it carried. In packages/auth, databaseHooks `session.create.before` also strips `recentAuthAt`, because poly_app has no INSERT on the column. This lets the rotations insert (C15) and makes disable start a fresh window [S19]. UPDATE OF `recent_auth_at` is refused except under R1.3. There is no other session-UPDATE guard: the unmarked refresh (`expires_at`, `updated_at`) and the other granted columns stay as they are, so a refresh never needs the marker and never stamps [S15]. |
 | 4 | FK actions | none | Deleting the old session sets `enrolment_grant.session_id` NULL and cascades its challenges. |
-| 5 | `two_factor_10_guard` BEFORE INSERT OR UPDATE ON two_factor | `app.guard_two_factor()` (poly_govern) | Marked, and the row's `user_id = app.current_user_id()`. `user_id` never changes [S1]. INSERT, and any change of `secret` or `backup_codes` on an **unverified** row: `verified` false, plus a live grant (first factor) or a fresh step-up (later) [S12]. `verified` false → true: a grant with `consumed_xid = pg_current_xact_id()` (first factor) or a fresh step-up (later). On a **verified** row: `verified` true → false and any change of `secret` are refused [S1]; a `backup_codes` change, marked, needs a fresh step-up (regenerate). Unmarked, only these may change: `failed_verification_count`, `locked_until`, `backup_codes`. That is the sign-in step: lockout counters and one backup code consumed. An unmarked `backup_codes` rewrite is a residual under R-2 until stage 2 [S1, S3]. |
-| 6 | `passkey_10_guard` BEFORE INSERT OR UPDATE ON passkey | `app.guard_passkey()` (poly_govern) | INSERT: marked, `user_id = app.current_user_id()`. For a first factor it consumes the live grant (`consumed_by = 'passkey'`) and stamps the marker session's `recent_auth_at` (`WHERE id = marker session AND user_id = me`). A later factor needs a fresh step-up [S1]. UPDATE: `user_id`, `public_key` and `credential_id` never change. Marked: `name` or `counter`, on a row whose `user_id = app.current_user_id()`. That closes BetterAuth's rename-by-id of another user's passkey. Unmarked: `counter` only (passkey sign-in). |
-| 7 | `two_factor_20_last_method`, `passkey_20_last_method` BEFORE DELETE; also inside #1 *off* | `app.refuse_last_method()` (poly_govern) | Marked, the row's `user_id = app.current_user_id()`, and a fresh step-up. That closes BetterAuth's delete-by-id of another user's passkey, and a viewer's silent loss of a factor [S1]. It locks the user row (R1.6). It refuses when no method would remain while the user holds manager or owner on an entity where `app.own_person_exempt(entity)` is false. |
-| 8 | `two_factor_80_sync` AFTER INSERT OR UPDATE OF verified OR DELETE; `passkey_80_sync` AFTER INSERT OR DELETE | **`app.sync_second_step()`** (poly_govern) | **The single writer of `second_step_at` (C7) [S5].** It recomputes the column for `app.current_user_id()` and refuses a row of another user, except under R1.3, where R6 deletes. The column is set (an existing value kept) while a verified two_factor row or any passkey exists, and NULL otherwise. An `account` row never counts [S10]. NULL → set calls `app.seat_claimed_invitations()`. A catalog test fails if another function body assigns `second_step_at`, or if any role other than poly_govern holds UPDATE on it. |
-| 9 | `user_91_two_factor_consistent` CONSTRAINT AFTER UPDATE OF two_factor_enabled ON user; `two_factor_91_consistent` CONSTRAINT AFTER INSERT OR UPDATE OR DELETE ON two_factor; both DEFERRABLE INITIALLY DEFERRED | `app.two_factor_consistent()` (poly_govern) | At commit, `two_factor_enabled` must equal "a verified two_factor row of the user exists". The flip turns on only in the transaction that verifies the factor and off only in the transaction that deletes it (C14) [S2, S18]. Deferred is sound: the live run shows the flip and the delete in one transaction. |
+| 5 | `two_factor_10_guard` BEFORE INSERT OR UPDATE ON two_factor | `app.guard_two_factor()` (poly_govern) | `user_id` never changes [S1]. **Marked writes** need the row's `user_id = app.current_user_id()`. INSERT, and any change of `secret` or `backup_codes` on an **unverified** row, need `verified` false plus a live grant (first factor) or a fresh step-up (later) [S12]. `verified` false → true needs a grant with `consumed_xid = pg_current_xact_id()` (first factor) or a fresh step-up (later). On a **verified** row, `verified` true → false and any change of `secret` are refused [S1]. **Unmarked writes** (the sign-in step; every unmarked INSERT is refused) are allowed only on a **verified** row, and only to `failed_verification_count` and `locked_until` [S3, C-a]. **Backup-code clause (D1, the Principal's decision; exactly one of these lines holds):** **(a) off:** `/two-factor/verify-backup-code` and `/two-factor/generate-backup-codes` go into the Blocked class, and every change of `backup_codes` on a verified row is refused, marked or not. **(b) kept:** an unmarked change of `backup_codes` on a verified row is allowed (one code consumed at sign-in); a marked one needs a fresh step-up (regenerate). SECURITY R-2 then states the copy-a-code bypass until POLY-149. |
+| 6 | `passkey_10_guard` BEFORE INSERT OR UPDATE ON passkey | `app.guard_passkey()` (poly_govern) | INSERT: marked, `user_id = app.current_user_id()`. For a first factor it consumes the live grant (`consumed_by = 'passkey'`) and stamps the marker session's `recent_auth_at` (`WHERE id = marker session AND user_id = me`). That UPDATE must hit exactly one row, or the transaction refuses [C-c]. The grant is the proof, so the stamp can only land on the session that asked for the code. A later factor needs a fresh step-up [S1]. UPDATE: `user_id`, `public_key` and `credential_id` never change. Marked, `name` or `counter` may change, on a row whose `user_id = app.current_user_id()`. Unmarked (passkey sign-in), only `counter` may change, and it never goes down; a constant 0 passes [C-a]. BetterAuth's `requireResourceOwnership` already refuses another user's passkey on rename; this guard is the floor beneath it [C-d]. |
+| 7 | `two_factor_20_last_method`, `passkey_20_last_method` BEFORE DELETE; also inside #1 *off* | `app.refuse_last_method()` (poly_govern) | A delete needs a marker, the row's `user_id = app.current_user_id()` and a fresh step-up. This is the floor beneath BetterAuth's own ownership check on delete [C-d], and it stops a viewer losing a factor silently [S1]. It locks the user row (R1.6). It refuses when no method would remain while the user holds manager or owner on an entity where `app.own_person_exempt(entity)` is false. |
+| 8 | `two_factor_80_sync` AFTER INSERT OR UPDATE OF verified OR DELETE; `passkey_80_sync` AFTER INSERT OR DELETE | **`app.sync_second_step()`** (poly_govern) | **The single writer of `second_step_at` (C7) [S5].** It recomputes the column for the changed row's `user_id` (NEW, or OLD on a delete), never for the marker's user. With a marker present it refuses a row of another user; with none it computes anyway, so R6's deletes clear `second_step_at` [C-a]. The column is set (an existing value kept) while a verified two_factor row or any passkey exists, and NULL otherwise. An `account` row never counts [S10]. NULL → set calls `app.seat_claimed_invitations()`. A catalog test fails if another function body assigns `second_step_at`, or if any role other than poly_govern holds UPDATE on it. |
+| 9 | `user_91_two_factor_consistent` CONSTRAINT AFTER UPDATE OF two_factor_enabled ON user; `two_factor_91_consistent` CONSTRAINT AFTER INSERT OR UPDATE OR DELETE ON two_factor; both DEFERRABLE INITIALLY DEFERRED | `app.two_factor_consistent()` (poly_govern) | At commit, for the changed row's `user_id` (NEW or OLD, never the marker's user), `two_factor_enabled` must equal "a verified two_factor row of that user exists". Unmarked sign-in updates therefore commit [C-a]. The flip turns on only in the transaction that verifies the factor and off only in the transaction that deletes it (C14) [S2, S18]. Deferred is sound: the live run shows the flip and the delete in one transaction. |
 | 10 | `membership_05_second_step` BEFORE INSERT OR UPDATE OF role ON membership | `app.require_second_step_for_role()` (poly_govern) | Refuses manager or owner for a member whose `second_step_at` is NULL, with `second_step_required`. The one pass is the own Person: `NEW.user_id = app.current_user_id()` and `app.own_person_exempt(NEW.entity_id)`. It covers `seat_creator` (creating any entity), `accept_invitations` and an UPDATE raise (C2). The UPDATE refusal is interim; POLY-91 replaces that branch with the hold. |
 | 11 | `invitation_05_second_step` BEFORE INSERT ON invitation | `app.require_enrolled_inviter()` (poly_govern) | When `entity_id` is set: `inviter_user_id = app.current_user_id()` and that user has `second_step_at` (C2, sharing). Operator rows (`entity_id` NULL) pass. |
 | 12 | called by #8 | `app.seat_claimed_invitations()` (poly_govern; no EXECUTE grant) | For `app.current_user_id()`: each unrevoked invitation with `claimed_user_id = me`, `accepted_at` NULL and role manager or owner becomes a membership row and gets `accepted_at` (POLY-87 R1, R2). POLY-91 adds `promote_held_roles()` here. |
@@ -147,11 +150,13 @@ The operator CLI already exists: `polycarpic cli user invite`, in `apps/worker/s
 - **Command:** `apps/worker/src/cli/user-reset-mfa.ts`, dispatched from `cli/main.ts`.
 - **Wrapper:** `packages/tenancy/src/operator-reset.ts`, the one file that names the definer. It runs in `withOperatorTx`, with the `layers.json` confinements to match.
 - **Definer:** `app.reset_second_step(p_email text) RETURNS boolean` (poly_govern; EXECUTE **poly_operator only**). It refuses any user marker and checks for the exact call. It:
+  - matches `lower(email)`, as the unique index does, and raises (the CLI exits 2) when no user matches or, once §3.4a adds the tombstone columns, the user is a tombstone [C-f];
   - locks the user row;
   - deletes the user's `two_factor` and `passkey` rows; #8 clears `second_step_at`, as the column's single writer;
   - sets `two_factor_enabled` false;
   - deletes every session, challenge and grant of the user, and the trust-device `verification` rows (`value = user id::text`, code-read `verify-two-factor.mjs:53`);
-  - writes `audit_event` kind `second_step.reset`, actor `operator`, with `subject_user_id`.
+  - writes `audit_event` kind `second_step.reset`, actor `operator`, with `subject_user_id`;
+  - writes a `notification` to the user. The email follows once POLY-137's mailer exists; a reset is a security event the user must see (SECURITY §9) [C-f].
 - **Unchanged:** memberships. The command's exit codes are those of `user invite`.
 - **Grant review:** seceng-89 reviews this grant in this loop. That is the per-command review POLY-98 asks for.
 
@@ -189,10 +194,15 @@ Everything else is in `tests/db`.
 
 **Tests.** ARCH §3.1c Tests stand (C11). The ruling adds:
 - one test per criterion;
-- R1.2's three forge cases (C13);
+- R1.2's three refusing forge cases, plus the fourth, passing by design (C13);
 - R1.3's role and catalog tests (C12);
 - the exact-call refusal for every definer granted to a login role;
-- passkey delete and rename by another user's id, refused;
+- passkey delete and rename by another user's id: refused by BetterAuth over HTTP, and by #6 and #7 as SQL as poly_app;
+- **sign-in under the carve-out** [C-a]: as poly_app with 0013 applied, these each succeed and commit: a real TOTP sign-in, a wrong-code lockout, a passkey sign-in, and (under D1 (b) only) a backup-code sign-in;
+- `reset-mfa` clears `second_step_at`, and the next sign-in of a manager meets the gate (C6, [C-a]);
+- **two-connection races** [C-b]. A last-factor delete races a first invitation on the own Person, and in a second test races an entity's creation; exactly one of each pair commits;
+- the passkey stamp hitting a row count other than 1 refuses [C-c];
+- `reset-mfa`: an upper-case email matches, an unknown email exits 2, and the user receives a notification [C-f];
 - `createSession: true` and `method: otp`, refused;
 - the unmarked refresh, passing.
 
