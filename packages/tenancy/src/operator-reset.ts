@@ -18,8 +18,8 @@ const pgError = (e: unknown): PgError => {
 /** Clears the user's factors, sessions, challenges and grants; true when it ran. */
 export async function resetSecondStep(tx: Tx, args: { email: string }): Promise<boolean> {
   try {
-    const r = await tx.execute<{ r: boolean }>(sql`SELECT app.reset_second_step(${args.email}) AS r`);
-    return r.rows[0]?.r === true;
+    const r = await tx.execute<{ reset_second_step: boolean }>(sql`SELECT app.reset_second_step(${args.email})`);
+    return r.rows[0]?.reset_second_step === true;
   } catch (e) {
     if (pgError(e).code === 'P0002') throw new NoSuchUser();
     throw e;

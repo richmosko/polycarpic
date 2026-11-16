@@ -203,7 +203,7 @@ CREATE FUNCTION app.set_two_factor_enabled(p_on boolean) RETURNS void
     v_first boolean;
     v_grant uuid;
   BEGIN
-    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') !~ '^SELECT app\.set_two_factor_enabled\(\$1\)( AS [a-z_][a-z0-9_]{0,62})?$' THEN
+    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') IS DISTINCT FROM 'SELECT app.set_two_factor_enabled($1)' THEN
       RAISE EXCEPTION 'a second-step definer must be called on its own' USING ERRCODE = '42501';
     END IF;
     v_uid := app.current_user_id();
@@ -453,7 +453,7 @@ CREATE FUNCTION app.issue_email_challenge(p_purpose text) RETURNS text
     v_bytes bytea;
     v_code text;
   BEGIN
-    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') !~ '^SELECT app\.issue_email_challenge\(\$1\)( AS [a-z_][a-z0-9_]{0,62})?$' THEN
+    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') IS DISTINCT FROM 'SELECT app.issue_email_challenge($1)' THEN
       RAISE EXCEPTION 'a second-step definer must be called on its own' USING ERRCODE = '42501';
     END IF;
     v_uid := app.current_user_id();
@@ -490,7 +490,7 @@ CREATE FUNCTION app.confirm_email_challenge(p_code text) RETURNS boolean
     v_sid uuid;
     c record;
   BEGIN
-    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') !~ '^SELECT app\.confirm_email_challenge\(\$1\)( AS [a-z_][a-z0-9_]{0,62})?$' THEN
+    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') IS DISTINCT FROM 'SELECT app.confirm_email_challenge($1)' THEN
       RAISE EXCEPTION 'a second-step definer must be called on its own' USING ERRCODE = '42501';
     END IF;
     v_uid := app.current_user_id();
@@ -528,7 +528,7 @@ CREATE FUNCTION app.reset_second_step(p_email text) RETURNS boolean
   DECLARE
     v_user uuid;
   BEGIN
-    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') !~ '^SELECT app\.reset_second_step\(\$1\)( AS [a-z_][a-z0-9_]{0,62})?$' THEN
+    IF pg_catalog.regexp_replace(pg_catalog.btrim(pg_catalog.current_query()), ';\s*$', '') IS DISTINCT FROM 'SELECT app.reset_second_step($1)' THEN
       RAISE EXCEPTION 'a second-step definer must be called on its own' USING ERRCODE = '42501';
     END IF;
     IF app.current_user_id() IS NOT NULL THEN

@@ -29,8 +29,8 @@ export async function setTwoFactorEnabled(on: boolean): Promise<void> {
 
 /** True when the marker's user holds a live grant for the marker's session (the enrolment class, R5). */
 export async function enrolmentGrantLive(): Promise<boolean> {
-  const rows = asRows<{ l: boolean }>(await pool.query('SELECT app.enrolment_grant_live() AS l', []));
-  return rows[0]?.l === true;
+  const rows = asRows<{ enrolment_grant_live: boolean }>(await pool.query('SELECT app.enrolment_grant_live()', []));
+  return rows[0]?.enrolment_grant_live === true;
 }
 
 const refusal = (status: number, code: string): Response =>
@@ -42,6 +42,8 @@ export function secondStepAnchor(opts: { sendSecondStepCode?: SendSecondStepCode
     endpoints: {
       sendSecondStepCode: createAuthEndpoint('/second-step/send-code', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
         const { user, session } = ctx.context.session;
+        // ARCH §3.1c: the code goes to the current verified address only.
+        if (!user.emailVerified) throw new APIError('FORBIDDEN', { code: 'email_not_verified', message: 'email_not_verified' });
         const password = (ctx.body as { password?: unknown } | undefined)?.password;
         const accounts = await ctx.context.internalAdapter.findAccounts(user.id);
         const credential = accounts.find((a) => a.providerId === 'credential' && a.password);
@@ -54,8 +56,8 @@ export function secondStepAnchor(opts: { sendSecondStepCode?: SendSecondStepCode
           // No password: the session must be a fresh sign-in (a magic link makes one). The mailbox alone, as email is the recovery root (C-e).
           throw new APIError('FORBIDDEN', { code: 'recent_sign_in_required', message: 'recent_sign_in_required' });
         }
-        const rows = asRows<{ c: string | null }>(await pool.query('SELECT app.issue_email_challenge($1) AS c', ['first_enrolment']));
-        const code = rows[0]?.c ?? null;
+        const rows = asRows<{ issue_email_challenge: string | null }>(await pool.query('SELECT app.issue_email_challenge($1)', ['first_enrolment']));
+        const code = rows[0]?.issue_email_challenge ?? null;
         if (code !== null) {
           if (!opts.sendSecondStepCode) throw new Error('second step: sendSecondStepCode is not configured');
           // Before commit: a failed send rolls the challenge back.
@@ -66,8 +68,8 @@ export function secondStepAnchor(opts: { sendSecondStepCode?: SendSecondStepCode
       confirmSecondStepCode: createAuthEndpoint('/second-step/confirm-code', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
         const code = (ctx.body as { code?: unknown } | undefined)?.code;
         if (typeof code !== 'string') throw new APIError('BAD_REQUEST', { code: 'invalid_code', message: 'invalid_code' });
-        const rows = asRows<{ ok: boolean }>(await pool.query('SELECT app.confirm_email_challenge($1) AS ok', [code]));
-        if (rows[0]?.ok !== true) return refusal(403, 'invalid_code');
+        const rows = asRows<{ confirm_email_challenge: boolean }>(await pool.query('SELECT app.confirm_email_challenge($1)', [code]));
+        if (rows[0]?.confirm_email_challenge !== true) return refusal(403, 'invalid_code');
         return ctx.json({ status: true });
       }),
     },

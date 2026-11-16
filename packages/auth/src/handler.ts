@@ -48,20 +48,28 @@ function withoutCookies(res: Response): Response {
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
+/** Drops the internal header from every answer; it never leaves the process. */
+function withoutCommitHeader(res: Response): Response {
+  if (!res.headers.has(COMMIT_HEADER)) return res;
+  const headers = new Headers(res.headers);
+  headers.delete(COMMIT_HEADER);
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
 async function inTransaction(request: Request, auth: AnyAuth, run: <T>(fn: () => Promise<T>) => Promise<T>, contextFree = false): Promise<Response> {
+  // The header commits only the wrong-code answer of /second-step/confirm-code, a 403 (it records the attempt). Anywhere else it is
+  // ignored: a failure rolls back as before.
+  const template = matchAuthPath(new URL(request.url).pathname)?.template;
+  const keeps = (res: Response): boolean => res.headers.has(COMMIT_HEADER) && res.status === 403 && template === '/second-step/confirm-code';
   try {
     const res = await run(async () => {
       const res = await auth.handler(request);
-      // An answer that must still commit (a wrong emailed code records its attempt) carries the header; it never leaves the process.
-      if (isFailure(res) && !res.headers.has(COMMIT_HEADER)) throw new RollbackWith(res);
+      if (isFailure(res) && !keeps(res)) throw new RollbackWith(res);
       return res;
     });
-    if (!res.headers.has(COMMIT_HEADER)) return res;
-    const headers = new Headers(res.headers);
-    headers.delete(COMMIT_HEADER);
-    return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+    return withoutCommitHeader(res);
   } catch (e) {
-    if (e instanceof RollbackWith) return withoutCookies(e.response);
+    if (e instanceof RollbackWith) return withoutCommitHeader(withoutCookies(e.response));
     // A refusal the database raises at COMMIT (the stamp check, C32) surfaces after BetterAuth answered 200: the same 403.
     if (contextFree && (e as { code?: string }).code === '42501') {
       return new Response(JSON.stringify({ code: 'invitation_required', message: 'invitation_required' }), { status: 403, headers: { 'content-type': 'application/json' } });
