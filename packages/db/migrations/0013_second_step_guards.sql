@@ -357,7 +357,7 @@ CREATE FUNCTION app.two_factor_consistent() RETURNS trigger
     v_user uuid;
     v_flag boolean;
   BEGIN
-    IF (SELECT r.rolsuper FROM pg_catalog.pg_roles r WHERE r.rolname = session_user) THEN
+    IF (SELECT r.rolsuper FROM pg_catalog.pg_roles r WHERE r.rolname = session_user) AND pg_catalog.current_setting('role') = 'none' THEN
       RETURN NULL;
     END IF;
     IF TG_TABLE_NAME = 'user' THEN
@@ -387,6 +387,10 @@ CREATE FUNCTION app.require_second_step_for_role() RETURNS trigger
   DECLARE
     v_set boolean;
   BEGIN
+    -- A superuser session (fixtures, restores) passes, but not one that has switched role (R1.3).
+    IF (SELECT r.rolsuper FROM pg_catalog.pg_roles r WHERE r.rolname = session_user) AND pg_catalog.current_setting('role') = 'none' THEN
+      RETURN NEW;
+    END IF;
     IF NEW.role NOT IN ('manager', 'owner') THEN
       RETURN NEW;
     END IF;
@@ -413,6 +417,9 @@ CREATE FUNCTION app.require_enrolled_inviter() RETURNS trigger
   DECLARE
     v_set boolean;
   BEGIN
+    IF (SELECT r.rolsuper FROM pg_catalog.pg_roles r WHERE r.rolname = session_user) AND pg_catalog.current_setting('role') = 'none' THEN
+      RETURN NEW;
+    END IF;
     IF NEW.entity_id IS NULL THEN
       RETURN NEW;
     END IF;
