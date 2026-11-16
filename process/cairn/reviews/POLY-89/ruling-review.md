@@ -72,6 +72,23 @@
   - refuse, with a non-zero exit, when no user matches or the user is a tombstone;
   - write a `notification` to the user, and an email once POLY-137's mailer exists. A reset is a security event the user must see (SECURITY §9).
 
+## My findings on `41a52277`, re-read against `7e73fd7e`
+
+| Finding | Status | Ruling line it rests on |
+|---|---|---|
+| B1 sign-in's own writes | **Closed.** Tests are still needed, and #8 and #9 must use the row's own user (C-a). | #5: "Unmarked, only these may change: `failed_verification_count`, `locked_until`, `backup_codes`"; #6: "Unmarked: `counter` only" |
+| B2 passkey `createSession` | **Closed.** | "The enrolment class refuses `body.createSession` on `/passkey/verify-registration` with 400"; #3: "`consumed_by = 'totp'`, and `stamped_at` NULL … the stamp fires once" |
+| B3 backup-code copy | **Open (D1).** It goes to the Principal. | #5: "An unmarked `backup_codes` rewrite is a residual under R-2 until stage 2" |
+| B4 race on the exemption | **Partly closed.** The locks are ruled. Still to do: each check reads after its lock, and the two-connection test (C-b). | R1.6: "`app.refuse_last_method()` takes `FOR UPDATE` … R3 #10 and #11 take `FOR SHARE`" |
+| N1 sliding refresh | **Closed.** | #3: "the unmarked refresh (`expires_at`, `updated_at`) … never needs the marker and never stamps"; R8: "the unmarked refresh, passing" |
+| N2 `method: otp` | **Closed.** | "`/two-factor/enable` refuses any `body.method` other than `totp`"; "`createAuth` refuses to start if `twoFactor` is given `otpOptions`" |
+| N3 the passkey stamp | **Partly closed.** Still to do: the stamp hits exactly one row, and the fourth forge case is recorded (C-c). | #6: "stamps the marker session's `recent_auth_at` (`WHERE id = marker session AND user_id = me`)" |
+| N4 who else writes the columns | **Partly closed.** `second_step_at` is covered. Still to do: the flag's writers and the deletes of factor rows (C-a; catalog test). | #8: "A catalog test fails if another function body assigns `second_step_at`" |
+| N5 the anchor's password half | **Partly closed.** Still to do: a magic-link session counts as the "IdP round trip" (C-e). | R2: "The password half of the anchor is an app control" |
+| N6 guessing the code | **Closed.** The notice waits on the mailer. | R2: "the user's wrong entries in the last 24 hours sum to 10 or more" |
+| N7 the R6 grant | **Partly closed.** Still to do: match the email lower-cased, refuse an unknown or deleted user, notify the user (C-f). | R6: "locks the user row … writes `audit_event` kind `second_step.reset`" |
+| N8 `user.email` | **Closed** as a stated residual. | R2: "That role can UPDATE `user.email` and so redirect the code. This is R-2's reach" |
+
 ## The [Sn] answers, checked against my list
 
 | Item | Verdict |
