@@ -1,7 +1,8 @@
 // POLY-89c (ruling 6eed53f8, R3 #1; D1 = (b); criterion 16). The BetterAuth-facing half: hook behaviour measured against the pinned 1.7.18, and
 // the HTTP flows. Every title ends [red if: <mutation>].
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import { PW, boot, jar, post, teardown, type Env } from './helpers/auth';
+import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
+import { softAuthenticator } from './helpers/webauthn';
 import { pgmod, totp } from './helpers/second-step';
 import { must } from './helpers/sql';
 
@@ -146,7 +147,41 @@ describe('C3/C9 the enrolment class and the route policy (R3, R5)', () => {
     expect(r.headers.getSetCookie().some((c) => /session_token=[^;]/.test(c) && !/max-age=0/i.test(c))).toBe(false);
     expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${en.id}'`)).toBe(0);
   });
-  it.todo('C5: a passkey assertion satisfies the sign-in step (TOTP is covered by the enrolment flow above; a passkey needs a software WebAuthn authenticator, which the harness does not have)');
+  it('C5/C-a: a passkey assertion signs in as poly_app: 200, a session cookie, and the unmarked passkey.counter update commits (0 -> 1) [red if: guard_passkey refuses the unmarked counter update, or the commit-time check uses the marker]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    const k = softAuthenticator();
+    must(`INSERT INTO public.passkey (public_key, user_id, credential_id, counter, device_type, backed_up, transports) VALUES ('${k.publicKey}', '${u.id}', '${k.credentialId}', 0, 'singleDevice', false, 'internal')`, e.db);
+    must(`UPDATE public."user" SET second_step_at = now() WHERE id = '${u.id}'`, e.db);
+    const g = await e.handle(get('/passkey/generate-authenticate-options'), auth);
+    expect(g.status).toBe(200);
+    const opt = await json(g);
+    const r = await e.handle(post('/passkey/verify-authentication', { response: k.assert(opt, 1) }, jar('', g)), auth);
+    expect(r.status).toBe(200);
+    expect(r.headers.getSetCookie().some((c) => /session_token=[^;]/.test(c) && !/max-age=0/i.test(c))).toBe(true);
+    expect(must(`SELECT counter FROM public.passkey WHERE credential_id = '${k.credentialId}'`, e.db).rows[0]![0]).toBe('1');
+  });
+  it('C3/C5: a passkey is a first factor through the same anchor: password + emailed code, then register-options and verify-registration enrol it, second_step_at is set and the session that asked is stamped; createSession stays refused [red if: guard_passkey does not consume the grant or stamp the marker session exactly once]', async () => {
+    const auth = await mkWithMailer();
+    const u = e.seedUser();
+    const { cookie } = await e.signIn(u.email, auth);
+    mails.length = 0;
+    await e.handle(post('/second-step/send-code', { password: PW }, cookie), auth);
+    const conf = await e.handle(post('/second-step/confirm-code', { code: mails[0]!.code }, cookie), auth);
+    expect(conf.status).toBe(200);
+    const k = softAuthenticator();
+    const g = await e.handle(get('/passkey/generate-register-options', cookie), auth);
+    expect(g.status).toBe(200);
+    const gc = jar(cookie, g);
+    const refused = await e.handle(post('/passkey/verify-registration', { response: k.register(await json(g)), name: 'k', createSession: true }, gc), auth);
+    expect(refused.status).toBe(400);
+    const g2 = await e.handle(get('/passkey/generate-register-options', cookie), auth);
+    const ok = await e.handle(post('/passkey/verify-registration', { response: k.register(await json(g2)), name: 'k' }, jar(cookie, g2)), auth);
+    expect(ok.status).toBe(200);
+    expect(must(`SELECT second_step_at IS NOT NULL FROM public."user" WHERE id = '${u.id}'`, e.db).rows[0]![0]).toBe('t');
+    expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}' AND recent_auth_at IS NOT NULL`)).toBe(1);
+    expect(must(`SELECT consumed_by FROM app.enrolment_grant WHERE user_id = '${u.id}'`, e.db).rows[0]![0]).toBe('passkey');
+  });
   it.todo('D1(b) over HTTP: a backup-code sign-in through /two-factor/verify-backup-code commits as poly_app (the TOTP-enrolled user above plus its generated codes; written once the enrolment flow is green, since it reuses it)');
   it.todo('C1 (e2e, apps/web/tests/e2e): a new user whose only entity is the own Person signs in at /sign-in and reaches /dashboard with no redirect');
   it.todo('C6 (e2e): after reset-mfa a manager signs in and every page redirects to /settings/second-step');
