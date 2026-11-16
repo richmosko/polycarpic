@@ -11,7 +11,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-15
+updated: 2026-11-16
 ---
 
 Owners and managers must enrol a second factor (authenticator app or passkey); viewers may (P1). It is asked on a new device and as a step-up before export, purge, granting access and linking a bank. A user's own unshared Person is exempt until a forcing action (OQ-34). First enrolment is anchored on a code sent to the account email in addition to the password (ARCH §3.1c; SECURITY §4.1, C-03, A-28..A-30, A-32). Held raises are POLY-91.
@@ -64,3 +64,16 @@ Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cair
 ### @team-lead — 2026-11-15
 
 Feature started. Branch: `feature/poly-89-second-sign-in-step`. `paths` front-loaded with the issue file, the review folder, tests, the lint and layer config, the lockfile and the four docs the ruling may bump.
+
+### @architect — 2026-11-16
+
+Ruling for POLY-89 (89a): `process/cairn/reviews/POLY-89/ruling.md`. seceng-89 reviews it before any test is written. Each of the 15 criteria (C1–C15) maps to a section there.
+- R1, rules every guard follows: the user comes from `app.current_user_id()`. The marker's session id only narrows a check and never proves anything. The proof is always a row only a definer writes: the grant, its `consumed_xid`, or `recent_auth_at`. The forge triple is the C13 test. Guards name no login role, and no new poly_app grant is made on BetterAuth's tables.
+- `user.two_factor_enabled` (C14) is written only by `app.set_two_factor_enabled()`, a poly_govern definer called from `userUpdateBefore` on the request's transaction. A trigger refuses any other write, and a deferred check holds the flag equal to "a verified two_factor row exists". So no role needs UPDATE on the column, stage 2's included.
+- `recent_auth_at` (C15): stripped in `session.create.before`. The stamp trigger sets it only when a grant was consumed in this transaction, and otherwise nulls it.
+- `second_step_at` (C7): the only writer is `app.sync_second_step()`.
+- Exemption (C10): `app.own_person_exempt(entity)` is the one predicate; `app.second_step_required()` serves both the sign-in gate and `SecondStep.required`.
+- Order (C9): the TOTP flip, the session stamp, the grant's FK set null, verified, the passkey INSERT. Migrations 0012 (tables) and 0013 (guards).
+- reset-mfa (C6): lives here, as `apps/worker/src/cli/user-reset-mfa.ts` beside `user invite`, over the definer `app.reset_second_step(email)` with EXECUTE to poly_operator only. The issue's `apps/cli/**` path becomes `apps/worker/**`.
+- Screens: POLY-139 does not cover the set-up, second-step or Confirm it's you screens. This loop ships only a placeholder at `/settings/second-step`; R7 lists what an e2e can show.
+- Open: Confirm it's you has no `recent_auth_at` writer. It needs its own issue.
