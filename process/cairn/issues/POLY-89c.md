@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-89
 blocked_by: [POLY-89a]
 assignee: qa-engineer
-paths: [process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-89/**, process/cairn/issues/POLY-89c.md, tests/**, infra/ci/**, apps/web/tests/e2e/**]
+paths: [process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-89/**, process/cairn/issues/POLY-89c.md, tests/**, infra/ci/**, apps/web/tests/e2e/**, apps/web/src/hooks.server*.test.ts]
 stage: execute
 estimate.cost_usd: "14.00"
 estimate.gate_cycles: 3
