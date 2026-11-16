@@ -1,7 +1,7 @@
 ---
 id: POLY-89b
 title: Second step security review
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-89
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-89/**, proce
 stage: review
 estimate.cost_usd: "9.00"
 estimate.gate_cycles: 2
-labels: [auth, security]
+actual.cost_usd: "9.4371"
+actual.tokens: 24935171
+actual.gate_cycles: 3
+actual.wall_clock: 1187
+ratio: "1.05"
+labels: [auth, security, bloat]
 priority: null
 pr: null
 created: 2026-11-16
