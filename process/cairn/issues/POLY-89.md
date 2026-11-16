@@ -128,3 +128,11 @@ For the lead: after this loop nobody can enrol, because there are no screens and
   - Conditions: match the email lower-cased; refuse an unknown or deleted user with a non-zero exit; notify the user.
 
 **For the lead:** after this loop nobody can enrol. So R-25's second-factor protection is built in the database but cannot be reached by users. Two issues are needed: the second-step screens and the "Confirm it's you" route.
+
+### @qa-engineer — 2026-11-16
+
+POLY-89c red gate against ruling 89ff3c8d (tests/db/second-step-gates.test.ts, second-step-flow.test.ts; DB_AREAS auth, tests/ci/db-areas updated; poly_auth fixture role created once in helpers/api.ts setRolePasswords). 93 tests: 62 red, 17 green, 14 todo.
+- FINDING (R3 #1's unmeasured claim is false as worded): better-auth 1.7.18 db/with-hooks.mjs:56 merges the hook's data over the original, so omitting twoFactorEnabled removes nothing; returning it as undefined skips the column (measured on /update-user; two green MEASURED tests pin both).
+- Red reasons: C1/C2/C10 second_step_required() and the membership/invitation guards do not exist; C7 no sync_second_step; C8 email_challenge/enrolment_grant tables absent; C14 set_two_factor_enabled and the commit-time consistency check absent; forge cases (a)(b)(c) red because the definer is absent, (d) passes by design once it exists; R1 no-marker/exact-call/catalog tests need the definers; C9/C15 route policy still answers the flat 403 second_step_required and createAuth accepts otpOptions; reset_second_step absent; two_factor.verified still defaults true.
+- 17 green hold TODAY and must keep holding: no UPDATE on second_step_at/two_factor_enabled/recent_auth_at, no INSERT of recent_auth_at, unmarked refresh, wrong-code lockout (C-a), plus the enrolled-user positive path.
+- todo (14): backup codes D1 (a) and (b) (placeholders, not written); accept-invite seating; 3-sends/15 min and 10-wrong/24 h; confirm_email_challenge details; race 2; reset_second_step behaviour and CLI; C3/C4/C5/C15 HTTP flows; two web e2e. Each needs the build's definers or fixtures to be written without guessing.

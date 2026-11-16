@@ -31,6 +31,8 @@ export function setRolePasswords(): void {
   must(readFileSync(BOOTSTRAP, 'utf8'), db); // creates the roles (idempotent)
   // a role roles.sql does not create yet is skipped here, so a missing poly_operator is reported by pgTAP 01, not by every suite
   must(LOGIN.map((r) => `DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${r}') THEN ALTER ROLE ${r} PASSWORD 'qa-${r}'; END IF; END $$;`).join('\n'), db);
+  // POLY-89c: the stage-2 fixture role (ruling R1.3). poly_app's grants by membership; roles.sql gains the real role only in POLY-149.
+  must(`DO $$ BEGIN CREATE ROLE poly_auth LOGIN PASSWORD 'qa-poly_auth' IN ROLE poly_app; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`, db);
   must(`DROP DATABASE ${db}`);
 }
 
