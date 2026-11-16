@@ -59,6 +59,28 @@ describe('C6 reset_second_step (R6)', () => {
     expect(x).not.toBeNull();
     expect(msgOf(x)).not.toMatch(/does not exist/);
   });
+  it('N2: two users whose emails differ only in case: reset raises and resets NEITHER; the CLI exits 1 [red if: the match takes the first of several rows (which user is reset is undefined)]', async () => {
+    const a = await f.user({ enrolled: true });
+    const b = await f.user({ enrolled: true });
+    const tag = a.id.slice(-8);
+    must(`UPDATE public."user" SET email = 'Dup${tag}@qa.test' WHERE id = '${a.id}'; UPDATE public."user" SET email = 'dup${tag}@qa.test' WHERE id = '${b.id}'`, db);
+    const x = await fails(reset(`dup${tag}@qa.test`));
+    expect(x).not.toBeNull();
+    expect(msgOf(x)).not.toMatch(/does not exist/);
+    for (const id of [a.id, b.id]) {
+      expect(must(`SELECT count(*) FROM public.two_factor WHERE user_id = '${id}'`, db).rows[0]![0], id).toBe('1');
+      expect(must(`SELECT second_step_at IS NOT NULL FROM public."user" WHERE id = '${id}'`, db).rows[0]![0], id).toBe('t');
+    }
+    const mod: any = await import('../../apps/worker/src/cli/user-reset-mfa.ts');
+    const { configure, close } = (await import('../../packages/db/src/index.ts')) as any;
+    await close();
+    configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
+    const out: string[] = [];
+    const code = await mod.runUserResetMfa({ email: `DUP${tag}@qa.test` }, { stdout: { write: (s: string) => { out.push(s); } }, stderr: { write: (s: string) => { out.push(s); } }, origin: 'https://app.qa.test' });
+    await close();
+    expect(code).toBe(1);
+    expect(must(`SELECT count(*) FROM public.two_factor WHERE user_id IN ('${a.id}', '${b.id}')`, db).rows[0]![0]).toBe('2');
+  });
   it('leaves memberships unchanged, and the user\'s next require-second-step state is true for a manager (sign-in meets the gate) [red if: reset removes memberships or second_step_at stays set]', async () => {
     const u = await enrolled();
     const owner = await f.user({ enrolled: true });

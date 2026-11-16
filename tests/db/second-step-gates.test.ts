@@ -575,4 +575,13 @@ describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect:
     const rows = must(`SELECT proname, provolatile, pronargs, prorettype::regtype::text, prosrc ~* '(insert\\s+into|update\\s+[a-z_".]+\\s+set|delete\\s+from)' FROM pg_proc p JOIN pg_namespace s ON s.oid = p.pronamespace WHERE s.nspname = 'app' AND proname IN ('second_step_required', 'enrolment_grant_live') ORDER BY 1`, db).rows;
     expect(rows).toEqual([['enrolment_grant_live', 's', '0', 'boolean', 'f'], ['second_step_required', 's', '0', 'boolean', 'f']]);
   });
+  it('N1 (green today BY DESIGN, a pin): the exact set of app functions poly_app may EXECUTE, so a new one fails until someone reviews it [red if: a function is granted to poly_app, or one of these loses its grant]', () => {
+    const got = must(`SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace s ON s.oid = p.pronamespace WHERE s.nspname = 'app' AND p.prokind = 'f' AND has_function_privilege('poly_app', p.oid, 'EXECUTE') ORDER BY 1`, db).rows.map((r) => r[0]);
+    const before89 = ['app.accept_invitations(bytea)', 'app.claim_invitations(bytea,text)', 'app.current_session_id()', 'app.current_user_id()', 'app.enter_asserted_user(uuid,uuid)', 'app.enter_new_user(uuid)', 'app.has_role(uuid,text)', 'app.owner_count(uuid)', 'app.visible_entities()'];
+    const readOnly = ['app.second_step_required()', 'app.enrolment_grant_live()']; // R1.5 exempt: no exact-call check
+    const forTriggers = ['app.step_up_fresh()', 'app.enrol_proof(text)', 'app.check_factor_removal(uuid,text,uuid)', 'app.consume_passkey_grant()', 'app.take_recent_auth_stamp(uuid)']; // invoker triggers call them (seceng N1)
+    const exactCall = ['app.set_two_factor_enabled(boolean)', 'app.issue_email_challenge(text)', 'app.confirm_email_challenge(text)']; // app.reset_second_step is poly_operator's, not poly_app's
+    expect([...got].sort()).toEqual([...before89, ...readOnly, ...forTriggers, ...exactCall].sort());
+    expect(must(`SELECT has_function_privilege('poly_auth', 'app.reset_second_step(text)', 'EXECUTE')`, db).rows[0]![0]).toBe('f');
+  });
 });
