@@ -1,7 +1,7 @@
 ---
 id: POLY-89b
 title: Second step security review
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-89
 blocked_by: []

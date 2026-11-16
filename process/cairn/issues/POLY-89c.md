@@ -1,7 +1,7 @@
 ---
 id: POLY-89c
 title: Second step tests
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-89
 blocked_by: [POLY-89a]
