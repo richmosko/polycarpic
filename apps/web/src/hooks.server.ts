@@ -39,6 +39,10 @@ export const handle: Handle = async ({ event, resolve }) => {
     const to = new URLSearchParams({ next: safeNext(pathname + search) });
     return new Response(null, { status: 303, headers: { location: `/sign-in?${to}` } });
   }
+  // The sign-in gate (POLY-89 R5): while the database says a second step is required, every page but the placeholder redirects to it.
+  if (loaded.secondStepRequired && pathname !== '/settings/second-step') {
+    return new Response(null, { status: 303, headers: { location: '/settings/second-step' } });
+  }
   event.locals.session = loaded.shell;
   event.locals.identity = { userId: loaded.userId, sessionId: loaded.sessionId };
   const res = await page();

@@ -14,6 +14,8 @@ export interface LoadedSession {
   userId: SessionUserId;
   sessionId: string;
   shell: ShellSession;
+  /** app.second_step_required(): the sign-in gate (POLY-89 R4, R5). One answer from the database; nothing here re-derives it. */
+  secondStepRequired: boolean;
   /** BetterAuth's own refreshed Set-Cookie headers, and nothing else. */
   setCookie: string[];
 }
@@ -82,9 +84,11 @@ export async function loadSession(request: Request, given: Promise<AnyAuth> | An
       throw again;
     }
   }
+  const gate = await withTenant(userId, sessionId, (tx) => tx.execute<{ r: boolean }>(sql`SELECT app.second_step_required() AS r`));
   return {
     userId,
     sessionId,
+    secondStepRequired: gate.rows[0]?.r === true,
     shell: { user: { id: found.user.id, name: found.user.name, image: found.user.image ?? null }, expiresAt: new Date(found.session.expiresAt).toISOString() },
     setCookie: got.headers.getSetCookie(),
   };

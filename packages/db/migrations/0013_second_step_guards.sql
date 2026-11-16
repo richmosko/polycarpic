@@ -84,7 +84,7 @@ CREATE FUNCTION app.second_step_needed() RETURNS boolean
   $$;--> statement-breakpoint
 -- The sign-in gate and SecondStep.required (R4): one answer. A pure read of the marker user's own state, so no exact-call check.
 CREATE FUNCTION app.second_step_required() RETURNS boolean
-  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  LANGUAGE plpgsql STABLE SECURITY DEFINER
   SET search_path = ''
   AS $fn$
   DECLARE
@@ -149,7 +149,7 @@ CREATE FUNCTION app.enrol_proof(p_by text) RETURNS boolean
 
 -- A live grant exists for the marker's user and session: the enrolment class's check (R5). A pure read of its own state.
 CREATE FUNCTION app.enrolment_grant_live() RETURNS boolean
-  LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+  LANGUAGE plpgsql STABLE SECURITY DEFINER
   SET search_path = ''
   AS $fn$
   BEGIN
