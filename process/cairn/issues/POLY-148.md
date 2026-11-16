@@ -1,7 +1,7 @@
 ---
 id: POLY-148
 title: Sign-in service spike
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-147]
@@ -56,3 +56,7 @@ Follow-ups for POLY-149, POLY-89, POLY-138 and SECURITY are held for one filing 
 ### @team-lead — 2026-11-15
 
 PR opened: https://github.com/richmosko/polycarpic/pull/129. Awaiting Validate.
+
+### @team-lead — 2026-11-15
+
+Validate passed (seceng's accepting verdict in the record's §7; CI green on `4bb0f395`); merging via PR #129. Closing.
