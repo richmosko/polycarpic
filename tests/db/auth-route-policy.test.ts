@@ -136,13 +136,13 @@ describe.each(modes)('route policy, %s mode', (mode) => {
     expect(x.headers.getSetCookie()).toEqual([]);
   });
 
-  it('class checks: enrolment paths refuse a user with no second_step_at (403 second_step_required)  [red if: the enrolment class is open or missing (S16c)]', async () => {
+  it('class checks: enrolment paths refuse a user with no second_step_at and no live grant (403 email_confirmation_required, ruling R5)  [red if: the enrolment class is open, missing, or still answers the flat second_step_required (S16c)]', async () => {
     const u = e.seedUser();
     const { cookie } = await e.signIn(u.email, auth);
     for (const [m, p, b] of [['POST', '/two-factor/enable', { password: PW }], ['GET', '/passkey/generate-register-options', null], ['POST', '/passkey/verify-registration', { response: {} }], ['POST', '/two-factor/verify-totp', { code: '000000' }]] as const) {
       const r = await e.handle(m === 'GET' ? get(p, cookie) : post(p, b, cookie), auth);
       expect(r.status, p).toBe(403);
-      expect(JSON.stringify(await body(r)), p).toMatch(/second_step_required/);
+      expect(JSON.stringify(await body(r)), p).toMatch(/email_confirmation_required/);
     }
   });
 

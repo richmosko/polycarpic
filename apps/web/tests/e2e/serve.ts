@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cloneMigrated, dbEnv, setRolePasswords } from '../../../../tests/db/helpers/api.ts';
 import { ensureBootstrapLockDir, releaseBootstrapLockDir } from '../../../../tests/db/helpers/bootstrap-lock.ts';
+import { asUserSql } from '../../../../tests/db/helpers/marker.ts';
 import { must, startServer } from '../../../../tests/db/helpers/pg.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -54,6 +55,20 @@ const cookies = signed.headers.getSetCookie().map((c: string) => {
 // A second session and a step-up stamp (what POLY-89's definers will write), so the Sessions spec can revoke another session.
 await auth.api.signInEmail({ body: { email: EMAIL, password: PASSWORD } });
 must(`UPDATE public.session SET recent_auth_at = now() WHERE user_id = '${id}'`, db);
+// POLY-89 (R7): a manager with no second step, which is the state `polycarpic cli user reset-mfa` leaves behind. The entity belongs to an
+// enrolled owner (a verified factor and the flag as superuser, then the Business as poly_app under the marker, as the db fixtures do).
+const OWNER_ID = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('Grace Owner', 'owner@e2e.test', true) RETURNING id`, db).rows[0]![0]!;
+must(`BEGIN; INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '${OWNER_ID}', true); UPDATE public."user" SET two_factor_enabled = true WHERE id = '${OWNER_ID}'; COMMIT;`, db);
+const SHARED = must(`BEGIN; ${asUserSql(OWNER_ID)}
+  INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), 'E2E Shared', 'business_pass_through');
+  SELECT id FROM public.entity WHERE name = 'E2E Shared'; COMMIT;`, db, { role: 'poly_app' }).rows.at(-1)![0]!;
+const MGR_ID = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('Manny Manager', 'manager@e2e.test', true) RETURNING id`, db).rows[0]![0]!;
+must(`INSERT INTO public.account (account_id, provider_id, user_id, password) VALUES ('${MGR_ID}', 'credential', '${MGR_ID}', '${hash}')`, db);
+// require_second_step_for_role refuses even a superuser seating an unenrolled manager, so the manager is enrolled, seated, and then reset
+// through the real operator definer: exactly how a manager comes to have no second step.
+must(`BEGIN; INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '${MGR_ID}', true); UPDATE public."user" SET two_factor_enabled = true WHERE id = '${MGR_ID}'; COMMIT;`, db);
+must(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ('${SHARED}', '${MGR_ID}', 'manager')`, db);
+must(`SELECT app.reset_second_step($1) \\bind 'manager@e2e.test' \\g /dev/null`, db, { role: 'poly_operator' });
 mkdirSync(join(here, '.auth'), { recursive: true });
 writeFileSync(join(here, '.auth', 'user.json'), JSON.stringify({ cookies, origins: [] }));
 await close();
