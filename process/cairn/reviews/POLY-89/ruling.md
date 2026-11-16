@@ -48,7 +48,15 @@
      - `poly_govern` on `verification`: `DELETE`.
      - `poly_govern` on `notification`: `INSERT`, with a policy `FOR INSERT TO poly_govern` (R6). No role holds it today.
      - `poly_authz`: `SELECT (id, self_user_id)` on `entity`, and SELECT on `invitation` for `entity_id, claimed_user_id, claimed_at, accepted_at, revoked_at, expires_at`, both with role-targeted policies, as for `membership`.
-5. **Exact call.** Every definer a login role may EXECUTE refuses unless `current_query()` is exactly its own parameter-bound call, by the `enter_*` check in 0011. An injected fragment therefore cannot draw an emailed code, confirm one, or flip the factor flag. Two functions are exempt: `app.second_step_required()` and `app.enrolment_grant_live()`. Each must be STABLE, write nothing, take no parameter, and return one boolean about the marker's own user and session. An injected call then learns nothing poly_app cannot already read (`user.second_step_at`, its own memberships) and changes nothing. A catalog test checks those four properties.
+5. **Exact call.** Every definer a login role may EXECUTE refuses unless `current_query()` is exactly its own parameter-bound call, by the `enter_*` check in 0011. An injected fragment therefore cannot draw an emailed code, confirm one, or flip the factor flag. Seven functions poly_app may EXECUTE are exempt. Each is safe for its own reason:
+   - **Reads that answer one boolean about the marker's own user or session**, and write nothing. An injected call learns nothing poly_app cannot already read.
+     - `app.second_step_required()` and `app.enrolment_grant_live()` (STABLE, no parameter);
+     - `app.step_up_fresh()` (no parameter);
+     - `app.enrol_proof(p_by)`, where the parameter only picks which proof is asked about.
+   - **`app.check_factor_removal(p_user, p_kind, p_id)`** refuses unless `p_user` is the marker's user. Otherwise it takes a row lock on that user's own row, then refuses or returns. Its only effect is the caller holding its own lock until its transaction ends.
+   - **`app.consume_passkey_grant()` and `app.take_recent_auth_stamp(p_user)`**, the two that write, do nothing outside a trigger. At `pg_trigger_depth() = 0` the first raises and the second returns false; that holds through `RETURNING` too (seceng probes P1, P2). A login role cannot create a trigger, so they run only inside the passkey INSERT and the session INSERT they serve.
+
+   Every other POLY-89 function poly_app may EXECUTE carries the check: `set_two_factor_enabled`, `issue_email_challenge` and `confirm_email_challenge`. A catalog test pins the exact set of POLY-89 functions poly_app may EXECUTE, and which of them carry the check. A new grant fails CI until someone reviews it here.
 6. **Locks against write skew [S7].** `app.refuse_last_method()` takes `FOR UPDATE` on the user's `user` row. R3 #10 and #11 take `FOR SHARE` on the member's or inviter's `user` row. A last-factor delete and a concurrent seat, invite or (later) rollup edge are thereby serialised. Each such function is VOLATILE and reads `second_step_at`, memberships and invitations in a statement *after* the one that takes the lock. Under READ COMMITTED only a later statement sees the other transaction's commit [C-b].
 
 ## R2. The emailed code (C3, C8)
