@@ -10,7 +10,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-13
+updated: 2026-11-16
 ---
 
 Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict and seceng reviews under `process/cairn/reviews/POLY-86/`). One loop for the batch; add later auth nits here.
@@ -46,3 +46,7 @@ The hashed reset and magic-link token item (my comment of 2026-11-13) has moved 
 ### @team-lead — 2026-11-13
 
 From POLY-146 (seceng-146's read of better-auth 1.7.18; architect-146's gate-1 ruling R4): password reset is not wired today (`sendResetPassword` is unset, so the route answers `RESET_PASSWORD_DISABLED`). When this issue wires the mailer and turns reset on, set the reset token's lifetime to 900 seconds in the same change: the library default is one hour and SECURITY says 15 minutes. Add a test for the expiry.
+
+### @team-lead — 2026-11-16
+
+From the POLY-89 loop (merged 2026-11-17, PR #131). `sendSecondStepCode` throws "mailer not configured" until the Resend mailer lands, so second-step enrolment in production waits on this issue. Also email the user when an emailed code is voided at five wrong tries, and when an operator resets their second step (seceng C-f and build review N6, `process/cairn/reviews/POLY-89/build-review.md`).

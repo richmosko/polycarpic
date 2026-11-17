@@ -10,7 +10,7 @@ labels: [ci, tooling]
 priority: null
 pr: null
 created: 2026-11-12
-updated: 2026-11-15
+updated: 2026-11-16
 ---
 
 An umbrella for small CI and test-time items found in the POLY-141 and POLY-87 loops. None blocks a feature; each is taken when the `db` job's same-day median on `main` nears its 100 s warning budget, or when a loop is already in the files concerned. The timing rule these serve: a loop's cost is the branch's battery-step median minus `main`'s at the merge base, same session, at least three runs each (POLY-87 ruling, "Timing guard").
@@ -37,3 +37,7 @@ Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `p
 ### @team-lead — 2026-11-15
 
 Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cairn/reviews/POLY-148/spike.md` (§1, §2, §6 and seceng's reading in §7).
+
+### @team-lead — 2026-11-16
+
+From the POLY-89 loop (merged 2026-11-17, PR #131). (1) `ops-status` (30 tests) and `ops-hardening` (3) fail on a fresh checkout with `Failed to load tsconfig '$app/tsconfig': Tsconfig not found` (apps/web/src/ops/status.ts): `.svelte-kit/tsconfig.json` comes from `svelte-kit sync`, which a fresh worktree lacks. Run the sync before `tests/db`. (2) POLY-89 added about 17 s (32%) to the db suite: 70 s against 53 s on main, same day, two runs each, for 147 more tests in 4 files. Two of those files run serial because they share the poly_auth fixture role.

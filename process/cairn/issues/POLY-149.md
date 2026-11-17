@@ -66,3 +66,7 @@ Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cair
 ### @team-lead — 2026-11-16
 
 Deploy gate (Principal, 2026-11-16; `process/DECISIONS.md`): no real household data is deployed before this issue's last PR, the revocation, has merged. Staging with test data (POLY-97) may go ahead. Backup codes stay on in POLY-89, and the copy risk they carry closes at the same PR.
+
+### @team-lead — 2026-11-16
+
+From the POLY-89 loop (merged 2026-11-17, PR #131). The poly_auth test fixture is created IN ROLE poly_app, so it does not model this stage's narrower role; replace it with the real role here (seceng, 2026-11-16).
