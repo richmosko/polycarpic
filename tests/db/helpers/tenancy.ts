@@ -27,6 +27,10 @@ export async function seedTenancy({ db, tenant, q, provisionPerson }: Ctx): Prom
   const u = ID;
   must(`INSERT INTO public."user" (id, name, email) VALUES
     ('${u.owner}', 'O', 'o@qa.test'), ('${u.manager}', 'M', 'm@qa.test'), ('${u.viewer}', 'V', 'v@qa.test'), ('${u.outsider}', 'X', 'x@qa.test'), ('${u.owner2}', 'O2', 'o2@qa.test')`, db);
+  // POLY-89: creating a Business needs a second step, so O, O2 (promoted by the owner-gate tests) M (seated as manager), V (raised to manager by the gate tests) and X (invites on the own Person) are enrolled as superuser:
+  // a verified factor and the flag in one transaction; the sync trigger sets second_step_at. No guard is weakened.
+  for (const id of [u.owner, u.owner2, u.manager, u.viewer, u.outsider])
+    must(`BEGIN; INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '${id}', true); UPDATE public."user" SET two_factor_enabled = true WHERE id = '${id}'; COMMIT;`, db);
   // O creates E (a Business, so the owner can edit a classification); the creator trigger seats O as owner
   const e = await tenant(u.owner, async (tx) => {
     await q(tx, `INSERT INTO public.entity (type_id, name, tax_classification)

@@ -1,38 +1,39 @@
 ---
 id: POLY-89
 title: Second sign-in step
-status: backlog
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-86, POLY-62, POLY-87, POLY-147]
 assignee: backend-lead
-paths: [packages/auth/**, packages/tenancy/**, packages/db/migrations/**, apps/web/src/routes/**, apps/cli/**]
+paths: [process/cairn/issues/POLY-89.md, process/cairn/reviews/POLY-89/**, packages/auth/**, packages/tenancy/**, packages/db/**, packages/config/**, apps/web/**, apps/worker/**, tests/**, infra/ci/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**]
 labels: [auth, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/131
 created: 2026-11-08
-updated: 2026-11-15
+updated: 2026-11-16
 ---
 
 Owners and managers must enrol a second factor (authenticator app or passkey); viewers may (P1). It is asked on a new device and as a step-up before export, purge, granting access and linking a bank. A user's own unshared Person is exempt until a forcing action (OQ-34). First enrolment is anchored on a code sent to the account email in addition to the password (ARCH §3.1c; SECURITY §4.1, C-03, A-28..A-30, A-32). Held raises are POLY-91.
 
 ## Acceptance criteria
 
-- [ ] A new user whose only entity is their own unshared Person reaches the dashboard with no enrolment prompt.
-- [ ] Each of these forces enrolment first: creating a Person, Trust, Business, Household or Holding; sharing the own Person (first invite or a roll-up edge); accepting an owner or manager invitation; export, purge, grant, bank link on the own Person. Viewing shared entities never does.
-- [ ] Enrolment requires the password (or a fresh IdP round trip) plus a confirmed emailed code; without it the factor does not become active.
-- [ ] A new device prompts for the factor; a known device within its session does not; step-up actions always prompt; a completed first enrolment counts as the step-up.
-- [ ] A passkey and an authenticator app each satisfy the step; Google and GitHub sign-in satisfy neither.
-- [ ] polycarpic user reset-mfa clears a user's factors, revokes every session, writes an audit event, and the user must re-enrol.
-- [ ] user.second_step_at is written only by app.sync_second_step(); poly_app has no UPDATE on it.
-- [ ] email_challenge: hashed, session-bound, 10 minutes, single use, 5 tries, 3 sends per 15 minutes with an indistinguishable response; enrolment_grant: one live per user, session_id ON DELETE SET NULL, consumed_txid recorded.
-- [ ] Database guards in BetterAuth's measured order (twoFactorEnabled flip, twoFactor.verified, passkey INSERT, session INSERT stamp) plus the hooks.before enrolment class.
-- [ ] app.own_person_exempt() is the one predicate for the hold, the last-method trigger, the sign-in gate and SecondStep.required; the last-method trigger refuses removing a manager's or owner's last factor.
-- [ ] Tests: ARCH §3.1c Tests, the OQ-34, email-anchoring, A-28 and integration items.
-- [ ] `app.promote_held_roles` and every other POLY-89 definer take the user from `app.current_user_id()` (the POLY-147 marker), never from a transaction-local setting; ARCH §3.1c is corrected in the same PR.
-- [ ] No POLY-89 guard treats the marker's `session_id` as proof that a session exists or is recent: until POLY-149 it is the value web passed (SECURITY R-2, C-86; POLY-147 seceng S3). A test forges it and the guard still refuses.
-- [ ] **`user.two_factor_enabled` is guarded (POLY-148 spike §7.3, requirement).** It turns on only in the transaction that verifies the factor, and off only in the transaction that deletes the factor after a step-up. The role that runs BetterAuth must hold UPDATE on the column, and without the guard one injected statement switches the second factor off for any user, silently.
-- [ ] **The first-verify rotation can insert its session.** `0005_auth_second_step_grants.sql` line 9 leaves `recent_auth_at` out of poly_app's INSERT on `session`, and BetterAuth copies that column when it replaces a session, so the rotation is refused once enrolment opens (confirmed from the shipped grants, POLY-148 spike §7). Strip the column in a `session.create.before` hook or grant it; seceng prefers stripping (§7.4).
+- [x] A new user whose only entity is their own unshared Person reaches the dashboard with no enrolment prompt. Proved by: e2e second-step.spec.ts "C1", second-step-gates "C1".
+- [x] Each of these forces enrolment first: creating a Person, Trust, Business, Household or Holding; sharing the own Person (first invite or a roll-up edge); accepting an owner or manager invitation; export, purge, grant, bank link on the own Person. Viewing shared entities never does. Proved by: second-step-gates "C2" (4 types x 2 roles, second Person, sharing, raise, enrolled passes, viewing never forces), second-step-challenge "an owner or manager invitation seats only at enrolment".
+- [x] Enrolment requires the password (or a fresh IdP round trip) plus a confirmed emailed code; without it the factor does not become active. Proved by: second-step-flow "C3/C15", "C3: a wrong password...", second-step-challenge "without a confirmed emailed code".
+- [x] A new device prompts for the factor; a known device within its session does not; step-up actions always prompt; a completed first enrolment counts as the step-up. Proved by: second-step-flow "C4" (new device held, step-up window 300 s, enrolment counts as step-up).
+- [x] A passkey and an authenticator app each satisfy the step; Google and GitHub sign-in satisfy neither. Proved by: second-step-flow "C5" (Google not stamped, held), passkey sign-in and passkey first factor, TOTP enrolment.
+- [x] polycarpic user reset-mfa clears a user's factors, revokes every session, writes an audit event, and the user must re-enrol. Proved by: second-step-reset (definer, case-insensitive, unknown email, memberships kept, gate after reset, CLI in-process and child process), e2e "C6".
+- [x] user.second_step_at is written only by app.sync_second_step(); poly_app has no UPDATE on it. Proved by: second-step-gates "C7 second_step_at has one writer" (grants, catalog scan, sync both directions).
+- [x] email_challenge: hashed, session-bound, 10 minutes, single use, 5 tries, 3 sends per 15 minutes with an indistinguishable response; enrolment_grant: one live per user, session_id ON DELETE SET NULL, consumed_txid recorded. Proved by: second-step-challenge "C8 the emailed code" (hash, session-bound, 10 min, single use, 5 tries, sends and wrong-entry limits, grant, FK actions), second-step-flow "C8".
+- [x] Database guards in BetterAuth's measured order (twoFactorEnabled flip, twoFactor.verified, passkey INSERT, session INSERT stamp) plus the hooks.before enrolment class. Proved by: second-step-challenge "C3/C15 first enrolment in SQL", second-step-gates "R3 guards" and "C14", second-step-flow route-policy tests.
+- [x] app.own_person_exempt() is the one predicate for the hold, the last-method trigger, the sign-in gate and SecondStep.required; the last-method trigger refuses removing a manager's or owner's last factor. Proved by: second-step-gates "C10", "C10 last method and the races", second-step-challenge "race 2".
+- [x] Tests: ARCH §3.1c Tests, the OQ-34, email-anchoring, A-28 and integration items. Proved by: the suites above, mapped in process/cairn/reviews/POLY-89/ and the POLY-89 comments.
+- [x] `app.promote_held_roles` and every other POLY-89 definer take the user from `app.current_user_id()` (the POLY-147 marker), never from a transaction-local setting; ARCH §3.1c is corrected in the same PR. Proved by: second-step-gates "R1.1/R1.5" (no marker refused, planted setting ignored, catalog scan of function bodies).
+- [x] No POLY-89 guard treats the marker's `session_id` as proof that a session exists or is recent: until POLY-149 it is the value web passed (SECURITY R-2, C-86; POLY-147 seceng S3). A test forges it and the guard still refuses. Proved by: second-step-gates "C13/R1.2" forge cases (a) (b) (c) refused, (d) passes by design.
+- [x] **`user.two_factor_enabled` is guarded (POLY-148 spike §7.3, requirement).** It turns on only in the transaction that verifies the factor, and off only in the transaction that deletes the factor after a step-up. The role that runs BetterAuth must hold UPDATE on the column, and without the guard one injected statement switches the second factor off for any user, silently. Proved by: second-step-gates "C14" (both roles), the statement-level test in second-step-flow, the hook measurement tests.
+- [x] **The first-verify rotation can insert its session.** `0005_auth_second_step_grants.sql` line 9 leaves `recent_auth_at` out of poly_app's INSERT on `session`, and BetterAuth copies that column when it replaces a session, so the rotation is refused once enrolment opens (confirmed from the shipped grants, POLY-148 spike §7). Strip the column in a `session.create.before` hook or grant it; seceng prefers stripping (§7.4). Proved by: second-step-flow "C3/C15" (the rotation inserts its session) and second-step-challenge session INSERT stamp tests.
+- [x] The IdP's `id_token` is never stored: `accountDropIdToken` returns `idToken: null` (BetterAuth 1.7.18 merges a hook's data over the original, so a key left out is still written), measured on the stored `account` row on create and on update, not on the hook's return value. SECURITY T1, A-33 and ARCH are corrected to match (found in this loop, 2026-11-16). Proved by: second-step-flow "criterion 16" (stored account.id_token, create and update).
 
 ## Comments
 
@@ -60,3 +61,122 @@ Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `p
 ### @team-lead — 2026-11-15
 
 Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cairn/reviews/POLY-148/spike.md` (§1, §2, §6 and seceng's reading in §7).
+
+### @team-lead — 2026-11-15
+
+Feature started. Branch: `feature/poly-89-second-sign-in-step`. `paths` front-loaded with the issue file, the review folder, tests, the lint and layer config, the lockfile and the four docs the ruling may bump.
+
+### @architect — 2026-11-16
+
+Ruling for POLY-89 (89a): `process/cairn/reviews/POLY-89/ruling.md`. seceng-89 reviews it before any test is written. Each of the 15 criteria (C1–C15) maps to a section there.
+- R1, rules every guard follows: the user comes from `app.current_user_id()`. The marker's session id only narrows a check and never proves anything. The proof is always a row only a definer writes: the grant, its `consumed_xid`, or `recent_auth_at`. The forge triple is the C13 test. Guards name no login role, and no new poly_app grant is made on BetterAuth's tables.
+- `user.two_factor_enabled` (C14) is written only by `app.set_two_factor_enabled()`, a poly_govern definer called from `userUpdateBefore` on the request's transaction. A trigger refuses any other write, and a deferred check holds the flag equal to "a verified two_factor row exists". So no role needs UPDATE on the column, stage 2's included.
+- `recent_auth_at` (C15): stripped in `session.create.before`. The stamp trigger sets it once, only on the TOTP session swap whose grant this transaction consumed; every other INSERT gets NULL. Passkey registration refuses `createSession`, `/two-factor/enable` refuses `method: otp`, and the factor rows carry their own guards: owner match, step-up, the last method and the unmarked sign-in columns (R3).
+- `second_step_at` (C7): the only writer is `app.sync_second_step()`.
+- Exemption (C10): `app.own_person_exempt(entity)` is the one predicate; `app.second_step_required()` serves both the sign-in gate and `SecondStep.required`.
+- Order (C9): the TOTP flip, the session stamp, the grant's FK set null, verified, the passkey INSERT. Migrations 0012 (tables) and 0013 (guards).
+- reset-mfa (C6): lives here, as `apps/worker/src/cli/user-reset-mfa.ts` beside `user invite`, over the definer `app.reset_second_step(email)` with EXECUTE to poly_operator only. The issue's `apps/cli/**` path becomes `apps/worker/**`.
+- Screens: POLY-139 does not cover the set-up, second-step or Confirm it's you screens. This loop ships only a placeholder at `/settings/second-step`; R7 lists what an e2e can show.
+- Open: Confirm it's you has no `recent_auth_at` writer. It needs its own issue.
+
+### @seceng — 2026-11-16
+
+**Ruling review (seceng) of `41a52277`: changes requested, four blocking.** Superseded by the review of `7e73fd7e` below. Full text: `process/cairn/reviews/POLY-89/ruling-review-41a52277.md`.
+
+### @seceng — 2026-11-16
+
+**Ruling review (seceng) of `7e73fd7e`: accepted on one decision (D1), with conditions.** This replaces my review of `41a52277`. Details: `process/cairn/reviews/POLY-89/ruling-review.md`. B1, B2 and B4 are fixed. I checked all 19 [Sn] answers against my list; each holds, with the conditions below.
+
+**Blocking:**
+- **D1. Backup codes. The ruling accepts this risk itself, but only the Principal can.**
+  - How: every user's backup codes are encrypted with the same key. #5 must let them change without a marker, because a backup-code sign-in rewrites them.
+  - Reach: one injected statement copies an attacker's own codes into any user's row. Add the magic link R-2 already lets poly_app plant, and the attacker signs in as any authenticator-app user with no password and no factor, unseen, until POLY-149.
+  - (a) Recommended: turn backup codes off (Blocked class; refuse unmarked rewrites). Under an hour of work (a guess). A lost phone is recovered with a passkey or `reset-mfa`.
+  - (b) Keep them, with that exact text in R-2, approved by the Principal.
+  - qa can write every test except this carve-out's backup-code half.
+
+**Conditions (not blocking; each is checked at the build review):**
+- **C-a.** Add tests that real sign-ins still work as poly_app: authenticator app, wrong-code lockout, passkey, and backup code if kept.
+  - #9 and #8 must compute for the changed row's own user, not the marker's. Otherwise sign-in fails at commit, and `reset-mfa` leaves `second_step_at` set, breaking C6.
+  - The unmarked carve-out applies to verified rows only. The passkey counter may not go down.
+- **C-b.** The locks only work if each check reads after taking its lock, in a later statement and in a VOLATILE function. Add a test that runs two connections at once.
+- **C-c. The passkey stamp (#6) is accepted.**
+  - The proof is the consumed grant, which is tied to the session that asked for the code. The stamp must hit exactly one row.
+  - Leftover risk, for R-2: with a stolen poly_app password, someone can name a victim's freshly stamped session within its 5 minutes. Record it as a fourth forge case that passes by design.
+- **C-d. The passkey delete/rename claim is wrong.** Both routes run BetterAuth's `requireResourceOwnership` check before the handler. Keep #6 and #7 as the floor against SQL, and fix the sentence.
+- **C-e.** For a user with no password, a magic-link session counts as the "fresh IdP round trip", so first enrolment needs only the mailbox. ARCH and SECURITY must say so.
+- **C-f. The poly_operator grant (R6) is approved, with conditions.**
+  - Reach of a stolen poly_operator: it can remove anyone's factors and end their sessions. That is a lockout and a downgrade, not a takeover, without the password and the mailbox.
+  - Conditions: match the email lower-cased; refuse an unknown or deleted user with a non-zero exit; notify the user.
+
+**For the lead:** after this loop nobody can enrol. So R-25's second-factor protection is built in the database but cannot be reached by users. Two issues are needed: the second-step screens and the "Confirm it's you" route.
+
+### @qa-engineer — 2026-11-16
+
+POLY-89c red gate against ruling 89ff3c8d (tests/db/second-step-gates.test.ts, second-step-flow.test.ts; DB_AREAS auth, tests/ci/db-areas updated; poly_auth fixture role created once in helpers/api.ts setRolePasswords). 93 tests: 62 red, 17 green, 14 todo.
+- FINDING (R3 #1's unmeasured claim is false as worded): better-auth 1.7.18 db/with-hooks.mjs:56 merges the hook's data over the original, so omitting twoFactorEnabled removes nothing; returning it as undefined skips the column (measured on /update-user; two green MEASURED tests pin both).
+- Red reasons: C1/C2/C10 second_step_required() and the membership/invitation guards do not exist; C7 no sync_second_step; C8 email_challenge/enrolment_grant tables absent; C14 set_two_factor_enabled and the commit-time consistency check absent; forge cases (a)(b)(c) red because the definer is absent, (d) passes by design once it exists; R1 no-marker/exact-call/catalog tests need the definers; C9/C15 route policy still answers the flat 403 second_step_required and createAuth accepts otpOptions; reset_second_step absent; two_factor.verified still defaults true.
+- 17 green hold TODAY and must keep holding: no UPDATE on second_step_at/two_factor_enabled/recent_auth_at, no INSERT of recent_auth_at, unmarked refresh, wrong-code lockout (C-a), plus the enrolled-user positive path.
+- todo (14): backup codes D1 (a) and (b) (placeholders, not written); accept-invite seating; 3-sends/15 min and 10-wrong/24 h; confirm_email_challenge details; race 2; reset_second_step behaviour and CLI; C3/C4/C5/C15 HTTP flows; two web e2e. Each needs the build's definers or fixtures to be written without guessing.
+
+### @qa-engineer — 2026-11-16
+
+POLY-89c addendum (ruling 6eed53f8, D1=b, criterion 16): +8 D1(b) tests (4 per role: unmarked backup_codes on a verified row commits [green today, pin]; unmarked on an unverified row refused; marked rewrite needs a fresh step-up; 300 s window) and +2 criterion-16 tests on the STORED account.id_token (create via a real Google callback, update over an old token): both RED today, so shipped accountDropIdToken writes the token. The shipped unit test options.test.ts:18-23 checks only the return value and passes against the bug (outside 89c paths; 89d should assert idToken === null). D1(a) placeholder dropped. Totals in the two files: 70 red, 19 green, 14 todo. Still todo: verify-totp statement measurement for R3 #1/#3 (key absent from the sent SQL), needs the build's grant path.
+
+### @qa-engineer — 2026-11-16
+
+POLY-89c gate 2 (ruling 6eed53f8): the todos are now tests against the ruled names. New files second-step-challenge (R2 code, grant, first enrolment in SQL in the measured order, the manager-invite seating, race 2), second-step-reset (reset_second_step as poly_operator, the CLI runUserResetMfa exit 0/2), helpers/second-step.ts (fixtures, RFC 6238 TOTP); second-step-flow gains the end-to-end enrolment through the real handler (anchor routes, enable, verify-totp), the statement-level assertion for R3 #1/#3 (SQL captured on the pg client: no two_factor_enabled in any UPDATE of user, no recent_auth_at in any INSERT into session), C4 step-up and new device, C5 Google, C8 indistinguishable 4th send. Totals over the 4 POLY-89 files: 112 red, 20 green, 5 todo. Green = holds today (grants, unmarked refresh, lockout, D1b unmarked consume, C5 Google not stamped/held). Todo kept, each with its missing piece: passkey assertion (no software WebAuthn authenticator), D1(b) over HTTP backup-code sign-in (reuses the enrolment flow once green), CLI child process through bin/polycarpic (needs cli/main.ts dispatch), two web e2e (placeholder page absent).
+
+### @seceng — 2026-11-16
+
+**Build review (seceng) at `a8370f78`: accepted, nothing blocks.** Details: `process/cairn/reviews/POLY-89/build-review.md`.
+
+I found no way around any guard. I re-ran the four second-step suites myself (147 pass) and seven probes of my own on a fresh clone. The probes show:
+- a passkey grant cannot be turned into a step-up stamp;
+- one user cannot write another user's factor row;
+- unmarked writes cannot copy a secret or delete a passkey;
+- a session INSERT cannot set `recent_auth_at`.
+
+Conditions C-a to C-e and the early rulings are met. C-f is partly met (N2, N3).
+
+Not blocking:
+- **N1.** poly_app may execute five POLY-89 functions that R1.5 does not list. All are safe: two read only, one only locks and checks, and the two that write refuse outside a trigger (probed). List all seven in R1.5, and pin the set in a catalog test.
+- **N2.** The reset can hit the wrong user. The email index is case-sensitive (`Dup@` and `dup@` both insert), and the reset takes the first lower-cased match. No attacker gains from this; the harm is an operator signing out the wrong person. Fix in this PR: refuse when more than one user matches.
+- **N3.** Refusing a deleted user (tombstone) waits for account deletion, which is not built yet. The condition moves to that issue.
+- **N4.** An invitee who already holds a viewer seat is marked accepted without the raise. No access is gained; file it with POLY-91.
+- **N5.** The sign-in gate's redirect drops the refreshed session cookie. This is functional only.
+
+D1 (b) is confirmed as decided: copying another user's backup codes without a marker still succeeds. SECURITY R-2 states it, beside the deploy gate.
+
+SECURITY 1.9.22 edits, in this commit:
+- **R-2:** the backup-code copy, the unguarded `user.email`, the 5-minute step-up leftover, and the deploy gate.
+- **R-25:** the second factor is built but no screen reaches enrolment yet.
+- **§4.1:** for a user with no password, a session under 5 minutes old stands in for the password; no link form; the 24-hour cap on wrong entries; the password half of the anchor is the app's check.
+- **T1:** the hook sets `idToken` to null.
+
+INFRA's first-deploy checklist has no line on the deploy gate. It is devops-engineer's doc, so it is for the lead to place.
+
+### @seceng — 2026-11-16
+
+**Delta sign-off (seceng) at `4ef34421`: accepted.** N1, N2 and N5 are closed. The 303's cookie is the user's own refreshed session, the same as the normal response, so it leaks nothing. The 21000 refusal tells only the operator, who already learns from exit 2 whether an address exists. Details: `process/cairn/reviews/POLY-89/build-review.md`, Delta at 4ef34421.
+### @architect — 2026-11-16
+
+**Verdict (POLY-89e): approve at code sha 4ef344212d4c2ec37321f9e248c24f61e03f5152.** seceng-89's build review accepted it, and its delta sign-off closes N1, N2 and N5 (`build-review.md`, "Delta at 4ef34421", @ 03d8dbca). I read the code: 0012, 0013, `packages/auth` (anchor, hooks, route policy, handler, session), web's gate and placeholder, the reset CLI and its wrapper, and the named tests. I did not rely on the reports alone.
+
+The axis table and the five non-blocking findings: `process/cairn/reviews/POLY-89/verdict.md`.
+
+### @team-lead — 2026-11-16
+
+Verdict condition met: seceng's delta sign-off is at 03d8dbca (accepted at 4ef34421), so the architect's approval at da47a603 stands unconditionally.
+
+Correction to the verdict's finding 2. My browser check did **not** cover C4/C5. What I checked, against a local build at a8370f78: signed out, `/dashboard` and `/settings/second-step` redirect to `/sign-in`; signed in as the fixture manager with no second step, `/dashboard`, `/settings/sessions` and `/` each answer 303 to `/settings/second-step`, which loads. I did it over HTTP with the `x-forwarded-for` header the e2e uses, because the app refuses sign-in from a browser tab with no resolvable client address. An enrolled user held at `/sign-in` is proved only in `tests/db` through the real handler; the browser test for it goes with the second-step screens issue.
+
+Criterion 14's wording predates ruling R1.4: no role holds UPDATE on `two_factor_enabled`; the definer writes it.
+
+### @team-lead — 2026-11-16
+
+PR opened: https://github.com/richmosko/polycarpic/pull/131. Awaiting Validate.
+
+### @team-lead — 2026-11-16
+
+Validate passed; merging via PR #131. Closing. CI green on head e38d73e7 (app, lint, unit, db, image, cairn, changes, guard). Follow-ups go in one post-merge docs PR.

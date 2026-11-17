@@ -29,7 +29,7 @@ const FILES = readdirSync(join(ROOT, 'tests/db')).filter((f) => f.endsWith('.tes
 
 // The ruling's table, pinned: which file belongs to which area.
 const TABLE: Record<(typeof AREAS)[number], string[]> = {
-  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker'],
+  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker'],
   tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap'],
   migrate: ['checks', 'connection', 'migrate-run-helper', 'runner', 'template-clone'],
   ops: ['ops-status', 'ops-hardening'],
@@ -49,11 +49,11 @@ describe('C7 one area, one project', () => {
     for (const f of all) expect(existsSync(join(ROOT, f)), f).toBe(true);
     expect([...all].sort()).toEqual(FILES);
   });
-  it('every file is in exactly one project: SERIAL or the parallel remainder; SERIAL files are in migrate and ops only', async () => {
+  it('every file is in exactly one project: SERIAL or the parallel remainder; SERIAL files are in migrate, ops and the two poly_auth fixture files only', async () => {
     const cfg: any = await import(pathToFileURL(join(ROOT, 'tests/db/vitest.config.ts')).href);
     if (!Array.isArray(cfg.SERIAL)) throw new Error('tests/db/vitest.config.ts does not export SERIAL');
     const { DB_AREAS } = await ch();
-    for (const s of cfg.SERIAL as string[]) expect([...DB_AREAS.migrate!.tests, ...DB_AREAS.ops!.tests], s).toContain(s);
+    for (const s of cfg.SERIAL as string[]) expect([...DB_AREAS.migrate!.tests, ...DB_AREAS.ops!.tests, 'tests/db/second-step-gates.test.ts', 'tests/db/second-step-challenge.test.ts'], s).toContain(s);
   });
   it('each area\'s own test files match its own paths and no other area\'s  [red if: a test file is not covered by its area]', async () => {
     const { classify, DB_AREAS } = await ch();
@@ -188,7 +188,7 @@ describe('C10 --db-select', () => {
     const r = spawnSync('node', [join(root, 'infra/ci/changes.mjs'), '--db-select'], { cwd: root, encoding: 'utf8', env: { PATH: process.env.PATH ?? '', DB_AUTH: 'true', DB_TENANCY: 'false', DB_MIGRATE: 'false', DB_OPS: 'false' } });
     return { code: r.status, stdout: r.stdout, stderr: r.stderr };
   };
-  it('control: a scratch tree with exactly the 20 mapped files is valid', () => {
+  it('control: a scratch tree with exactly the 24 mapped files is valid', () => {
     const r = runIn(tree(FILES));
     expect(r.code, r.stderr).toBe(0);
     expect(r.stdout.split('\n').filter(Boolean).sort()).toEqual(tf(TABLE.auth));

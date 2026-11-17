@@ -29,6 +29,9 @@ export function seedOwnerEntity(db: string, tag = Math.random().toString(36).sli
   const ownerEmail = `owner-${tag}@qa.test`;
   const ownerId = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('Owner ${tag}', '${ownerEmail}', true) RETURNING id`, db).rows[0][0]!;
   const name = `qa-ent-${tag}`;
+  // POLY-89: creating a Business needs a second step. The owner is enrolled as superuser (a verified factor and the flag in one
+  // transaction; the sync trigger sets second_step_at), which the ruling allows for fixtures. No guard is weakened.
+  must(`BEGIN; INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '${ownerId}', true); UPDATE public."user" SET two_factor_enabled = true WHERE id = '${ownerId}'; COMMIT;`, db);
   const r = must(
     `BEGIN; ${asUserSql(ownerId, SID)}
      INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), '${name}', 'business_pass_through');

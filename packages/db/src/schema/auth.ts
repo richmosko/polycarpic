@@ -78,7 +78,8 @@ export const twoFactor = pgTable(
     secret: text('secret').notNull(),
     backupCodes: text('backup_codes').notNull(),
     userId: uuid('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
-    verified: boolean('verified').default(true),
+    // POLY-89 (0012): a write that omits it never marks a factor verified (BetterAuth's default is true).
+    verified: boolean('verified').default(false).notNull(),
     failedVerificationCount: integer('failed_verification_count').default(0),
     lockedUntil: tstz('locked_until'),
   },

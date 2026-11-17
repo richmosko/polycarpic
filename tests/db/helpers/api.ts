@@ -31,6 +31,8 @@ export function setRolePasswords(): void {
   must(readFileSync(BOOTSTRAP, 'utf8'), db); // creates the roles (idempotent)
   // a role roles.sql does not create yet is skipped here, so a missing poly_operator is reported by pgTAP 01, not by every suite
   must(LOGIN.map((r) => `DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${r}') THEN ALTER ROLE ${r} PASSWORD 'qa-${r}'; END IF; END $$;`).join('\n'), db);
+  // POLY-89c: a poly_auth left by an interrupted run would fail pgTAP role hygiene; the SERIAL files that need it create and drop it.
+  must(`DROP ROLE IF EXISTS poly_auth`, db);
   must(`DROP DATABASE ${db}`);
 }
 

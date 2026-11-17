@@ -355,7 +355,10 @@ describe('J1/J3 the wrappers write the marker, each definer its own kind', () =>
     expect(msgOf(x)).toMatch(/permission denied/);
   });
   it('audit_membership labels the actor from the marker kind and ignores a forged app.actor in a marked transaction  [red if: the trigger still reads app.actor first]', () => {
+    // POLY-89: creating a Business needs a second step; U is enrolled for the seat (the audit label is what is under test)
     const seat = (kind: string) => psql(`BEGIN;
+      INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '${U}', true);
+      UPDATE public."user" SET two_factor_enabled = true WHERE id = '${U}';
       INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), '${U}', NULL, '${kind}');
       SELECT set_config('app.actor', 'forged', true);
       INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES ('${E}', (SELECT id FROM public.entity_type WHERE system_key = 'business'), 'qa-147-${kind.replace(/\W/g, '')}', 'business_pass_through') ON CONFLICT DO NOTHING;

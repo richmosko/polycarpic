@@ -5,7 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
-    "./operator-invitation": "./src/operator-invitation.ts"
+    "./operator-invitation": "./src/operator-invitation.ts",
+    "./operator-reset": "./src/operator-reset.ts"
   },
   "scripts": {
     "test": "vitest run",

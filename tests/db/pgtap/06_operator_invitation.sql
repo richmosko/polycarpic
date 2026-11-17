@@ -79,6 +79,9 @@ SELECT is(pg_temp.sx($f$
   INSERT INTO public."user" (id, name, email, email_verified) VALUES
     ('00000000-0000-4000-8000-0000000142f0', 'Owner', 'owner142@qa.test', true),
     ('00000000-0000-4000-8000-0000000142f1', 'Claimant', 'claimant142@qa.test', true);
+  -- POLY-89: the fixture owner is enrolled (a verified factor and the flag) before creating a Business
+  INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '00000000-0000-4000-8000-0000000142f0', true);
+  UPDATE public."user" SET two_factor_enabled = true WHERE id = '00000000-0000-4000-8000-0000000142f0';
   SELECT pg_temp.set_id('00000000-0000-4000-8000-0000000142f0');
   INSERT INTO public.entity (id, type_id, name, tax_classification) VALUES ('00000000-0000-4000-8000-0000000142e1',
     (SELECT id FROM public.entity_type WHERE system_key = 'business'), 'qa-E142', 'business_pass_through');
@@ -113,7 +116,11 @@ SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000142f0',
     NULL, $q$INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at) VALUES ('00000000-0000-4000-8000-0000000142e1', 'ib@qa.test', 'viewer', '00000000-0000-4000-8000-0000000142f0', sha256('ib'::bytea), now() + interval '1 day') RETURNING issued_via$q$),
   'owner', 'C13: an owner-issued row reads issued_via = owner');
 SELECT is((SELECT coalesce(string_agg(rolname::text, ',' ORDER BY rolname COLLATE "C"), '') FROM pg_roles WHERE has_column_privilege(oid, 'public.invitation', 'issued_via', 'UPDATE') AND NOT rolsuper AND rolname NOT LIKE 'pg\_%' AND oid <> (SELECT relowner FROM pg_class WHERE oid = 'public.invitation'::regclass)), '', 'C13: no role can UPDATE issued_via');
-SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (entity_id, email, role, token_hash, expires_at, issued_via) VALUES ('00000000-0000-4000-8000-0000000142e1', 'sh1@qa.test', 'viewer', sha256('sh1'::bytea), now() + interval '1 day', 'operator')$f$), 'ERR:23514', 'C13: an operator row with an entity_id fails 23514');
+-- POLY-89: invitation_05_second_step refuses an entity invitation with no enrolled inviter (42501) before the CHECK runs; the enrolled
+-- owner is the inviter here so the row reaches the constraint that this test is about.
+SELECT pg_temp.set_id('00000000-0000-4000-8000-0000000142f0');
+SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at, issued_via) VALUES ('00000000-0000-4000-8000-0000000142e1', 'sh1@qa.test', 'viewer', '00000000-0000-4000-8000-0000000142f0', sha256('sh1'::bytea), now() + interval '1 day', 'operator')$f$), 'ERR:23514', 'C13: an operator row with an entity_id fails 23514');
+SELECT pg_temp.set_id('');
 SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (email, role, inviter_user_id, token_hash, expires_at, issued_via) VALUES ('sh2@qa.test', 'viewer', '00000000-0000-4000-8000-0000000142f0', sha256('sh2'::bytea), now() + interval '1 day', 'operator')$f$), 'ERR:23514', 'C13: an operator row with an inviter_user_id fails 23514');
 SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (email, role, token_hash, expires_at, issued_via) VALUES ('sh3@qa.test', 'owner', sha256('sh3'::bytea), now() + interval '1 day', 'operator')$f$), 'ERR:23514', 'C13: an operator row with role owner fails 23514');
 SELECT is(pg_temp.sx($f$INSERT INTO public.invitation (email, role, token_hash, expires_at, issued_via) VALUES ('sh4@qa.test', 'viewer', sha256('sh4'::bytea), now() + interval '1 day', 'bootstrap')$f$), 'ERR:23505', 'C13: a second live bootstrap row fails 23505 (mutation: the unique index is missing)');
@@ -140,7 +147,7 @@ SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_
 SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_proc WHERE pronamespace = 'app'::regnamespace
     AND prosrc ~* 'insert\s+into\s+("?public"?\.)?"?user"?([^a-z_]|$)'), NULL::text[], 'C15: no app function inserts into user');
 SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_proc WHERE pronamespace = 'app'::regnamespace
-    AND prosrc ~* 'set\s[^;]*revoked_at\s*='), ARRAY['issue_operator_invitation'], 'G1/C15: exactly one app function writes revoked_at');
+    AND prosrc ~* 'set\s[^;]*revoked_at\s*='), ARRAY['confirm_email_challenge', 'issue_operator_invitation'], 'G1/C15: the app functions that write revoked_at: the issuer (invitation) and, from POLY-89 R2, confirm_email_challenge (enrolment_grant, never invitation)');
 
 -- ---------------------------------------------------------------- C13 (POLY-146 AC3): poly_operator, catalog-exact (ruling R2)
 SELECT results_eq($$SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls, rolconnlimit, rolinherit FROM pg_roles WHERE rolname = 'poly_operator'$$,
@@ -149,7 +156,7 @@ SELECT is((SELECT count(*)::int FROM pg_db_role_setting s JOIN pg_roles r ON r.o
 SELECT is((SELECT count(*)::int FROM pg_auth_members m, pg_roles r WHERE r.rolname = 'poly_operator' AND (m.member = r.oid OR m.roleid = r.oid)), 0, 'POLY-146 AC3: poly_operator is in no role and holds no member (mutation: a membership grants the issuer or more)');
 SELECT is((SELECT coalesce(string_agg(a.privilege_type, ',' ORDER BY a.privilege_type), '') FROM pg_database d, aclexplode(d.datacl) a WHERE d.datname = current_database() AND a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'poly_operator')), 'CONNECT', 'POLY-146 AC3: the database ACL gives poly_operator CONNECT and nothing else');
 SELECT is((SELECT coalesce(string_agg(n.nspname || ':' || a.privilege_type, ',' ORDER BY n.nspname, a.privilege_type), '') FROM pg_namespace n, aclexplode(n.nspacl) a WHERE a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'poly_operator')), 'app:USAGE', 'POLY-146 AC3: the only schema ACL entry for poly_operator is USAGE on app (mutation: USAGE on public or drizzle)');
-SELECT is((SELECT coalesce(string_agg(p.oid::regprocedure::text, ',' ORDER BY p.oid::regprocedure::text), '') FROM pg_proc p, aclexplode(p.proacl) a WHERE a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'poly_operator') AND a.privilege_type = 'EXECUTE'), 'app.issue_operator_invitation(text,bytea,boolean)', 'POLY-146 AC3: EXECUTE on the issuer alone');
+SELECT is((SELECT coalesce(string_agg(p.oid::regprocedure::text, ',' ORDER BY p.oid::regprocedure::text), '') FROM pg_proc p, aclexplode(p.proacl) a WHERE a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'poly_operator') AND a.privilege_type = 'EXECUTE'), 'app.issue_operator_invitation(text,bytea,boolean),app.reset_second_step(text)', 'POLY-146 AC3: EXECUTE on the issuer and, from POLY-89 R6, reset_second_step alone');
 SELECT is((SELECT count(*)::int FROM pg_class c, aclexplode(c.relacl) a WHERE a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'poly_operator')), 0, 'POLY-146 AC3: no relation or sequence ACL entry names poly_operator');
 SELECT is((SELECT count(*)::int FROM pg_attribute at, aclexplode(at.attacl) a WHERE a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'poly_operator')), 0, 'POLY-146 AC3: no column ACL entry names poly_operator');
 SELECT is((SELECT count(*)::int FROM pg_default_acl d, aclexplode(d.defaclacl) a WHERE a.grantee = (SELECT oid FROM pg_roles WHERE rolname = 'poly_operator')), 0, 'POLY-146 AC3: no default ACL names poly_operator');
@@ -159,7 +166,7 @@ SELECT is(pg_temp.run_as('poly_operator', '', NULL, $q$SELECT count(*)::text FRO
 SELECT is(pg_temp.run_as('poly_operator', '', NULL, $q$SELECT count(*)::text FROM drizzle.__drizzle_migrations$q$), 'ERR:42501', 'POLY-146 AC3: poly_operator cannot read the migrations table');
 -- A1.2: effective privileges (an ACL naming PUBLIC slips past the named-ACL checks above)
 SELECT is((SELECT coalesce(string_agg(p.oid::regprocedure::text, ',' ORDER BY p.oid::regprocedure::text), '') FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-    WHERE n.nspname IN ('app', 'public') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e') AND has_function_privilege('poly_operator', p.oid, 'EXECUTE')), 'app.issue_operator_invitation(text,bytea,boolean)', 'POLY-146 A1.2: effective EXECUTE over app and public functions (extension members aside: pgTAP itself) is the issuer alone (mutation: a PUBLIC grant)');
+    WHERE n.nspname IN ('app', 'public') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e') AND has_function_privilege('poly_operator', p.oid, 'EXECUTE')), 'app.issue_operator_invitation(text,bytea,boolean),app.reset_second_step(text)', 'POLY-146 A1.2: effective EXECUTE over app and public functions (extension members aside: pgTAP itself) is the issuer alone (mutation: a PUBLIC grant)');
 SELECT is((SELECT coalesce(string_agg(nspname::text, ',' ORDER BY nspname::text), '') FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema' AND has_schema_privilege('poly_operator', oid, 'USAGE')), 'app', 'POLY-146 A1.2: effective USAGE is on app alone');
 SELECT is((SELECT count(*)::int FROM pg_namespace WHERE nspname !~ '^pg_' AND nspname <> 'information_schema' AND has_schema_privilege('poly_operator', oid, 'CREATE')), 0, 'POLY-146 A1.2: no effective CREATE on any schema');
 SELECT is(has_database_privilege('poly_operator', current_database(), 'TEMP') OR has_database_privilege('poly_operator', current_database(), 'CREATE'), false, 'POLY-146 A1.2: no effective TEMP or CREATE on the database');

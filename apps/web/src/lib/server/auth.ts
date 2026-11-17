@@ -23,6 +23,9 @@ export async function startAuth(): Promise<void> {
         sendMagicLink: async () => {
           throw new Error('mailer not configured');
         },
+        sendSecondStepCode: async () => {
+          throw new Error('mailer not configured');
+        },
       }),
     ),
   );

@@ -39,6 +39,9 @@ function assertFieldsMapped(options: Options): void {
 
 /** Builds BetterAuth from `authOptions(input)` and starts it. Throws if the fields map or the second-step hold does not fit. */
 export async function createAuth(options: Options) {
+  // S17: a one-time code by mail or SMS is not a factor we offer; BetterAuth's method=otp would flip the flag unverified.
+  const tf = (options.plugins as unknown as { id: string; options?: { otpOptions?: unknown } }[]).find((p) => p.id === 'two-factor');
+  if (tf?.options?.otpOptions !== undefined) throw new Error('second step: twoFactor otpOptions are refused (S17)');
   widenTwoFactorMatcher(options.plugins);
   assertFieldsMapped(options);
   const auth = betterAuth(options as never);

@@ -544,6 +544,14 @@
       "reason": "recipient-scoped, not role-scoped; covered by its per-table cross-tenant test in tests/db/tenancy.test.ts (POLY-62 ruling R7)"
     },
     {
+      "table": "app.email_challenge",
+      "reason": "user-scoped, not role-scoped: RLS user_id = app.current_user_id(), six columns readable, written only by the second-step definers; covered by tests/db/second-step-challenge.test.ts (POLY-89 ruling R2)"
+    },
+    {
+      "table": "app.enrolment_grant",
+      "reason": "no login role holds any privilege; read and written only by the second-step definers; covered by tests/db/second-step-challenge.test.ts (POLY-89 ruling R2)"
+    },
+    {
       "table": "public.entity_type",
       "reason": "type metadata, label-only read; covered by its per-table cross-tenant test in tests/db/tenancy.test.ts (ARCH 3.1, POLY-62 ruling R7)"
     }

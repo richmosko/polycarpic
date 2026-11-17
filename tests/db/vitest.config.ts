@@ -10,7 +10,9 @@ import { defineConfig } from 'vitest/config';
 //   runner         role-membership GRANT/REVOKE and cluster-wide pg_locks reads
 //   template-clone asserts the login roles' stored password hashes
 //   ops-hardening  a 4.8 s production timeout, not measured under contention
-export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts'];
+//   second-step-gates, second-step-challenge  create the stage-2 fixture role poly_auth for their run and drop it (POLY-89c, R1.3),
+//                  so the pgTAP role-hygiene suites never see a fifth login role
+export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/second-step-gates.test.ts', 'tests/db/second-step-challenge.test.ts'];
 
 export default defineConfig({
   test: {
