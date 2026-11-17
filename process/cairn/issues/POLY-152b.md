@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-152
 blocked_by: [POLY-152a]
 assignee: seceng
-paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, process/cairn/issues/POLY-152b.md, docs/SECURITY/**]
+paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, process/cairn/issues/POLY-152b.md, docs/SECURITY/**, process/cairn/issues/POLY-149.md, process/cairn/issues/POLY-137.md]
 stage: plan
 estimate.cost_usd: "10.00"
 estimate.gate_cycles: 2
