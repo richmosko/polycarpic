@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: null
 blocked_by: [POLY-148, POLY-89]
 assignee: backend-lead
-paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, apps/auth/**, apps/web/**, apps/worker/**, packages/**, infra/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**]
+paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, apps/auth/**, apps/web/**, apps/worker/**, packages/**, infra/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**, bin/**]
 labels: [security, auth]
 priority: P1
 pr: null
