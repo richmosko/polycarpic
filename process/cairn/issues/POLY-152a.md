@@ -1,7 +1,7 @@
 ---
 id: POLY-152a
 title: Sign-in service ruling
-status: backlog
+status: done
 milestone: POLY-M1
 parent: POLY-152
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, pro
 stage: plan
 estimate.cost_usd: "9.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "4.4728"
+actual.tokens: 7590692
+actual.gate_cycles: 2
+actual.wall_clock: 15
+ratio: "0.50"
 labels: [security, auth]
 priority: null
 pr: null
