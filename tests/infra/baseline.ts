@@ -35,7 +35,8 @@ export function giveSecret(proj: Y, prod: boolean, service: string, name: string
 
 const MATRIX_PROD: Record<string, string[]> = {
   postgres: ['db_superuser_password'],
-  web: ['db_password_app', 'auth_secret', 'resend_api_key', 'plaid_secret'],
+  web: ['db_password_app', 'plaid_secret'], // POLY-152 R1.3: the auth secret and the mailer key moved to auth
+  auth: ['db_password_auth', 'auth_secret', 'resend_api_key'],
   worker: ['db_password_worker', 'credential_keyring', 'resend_api_key'],
   migrate: ['db_password_migrator'],
   operator: ['db_password_operator'],
@@ -64,7 +65,8 @@ function project(kind: 'prod' | 'staging'): Y {
         ...(prod ? ['/etc/polycarpic/age-recipients.txt:/etc/postgresql/age-recipients.txt:ro', '/srv/polycarpic/spool/wal:/spool/wal'] : []),
       ],
     }),
-    web: hard(10001, { image: APP, networks: ['default', E] }),
+    web: hard(10001, { image: APP, networks: ['default', E, 'web-auth'] }),
+    auth: hard(prod ? 10007 : 10107, { image: APP, command: ['auth'], networks: { default: {}, 'web-auth': { ipv4_address: prod ? '10.201.40.3' : '10.202.40.3' }, [E]: { aliases: [`${kind}-auth`] } } }),
     worker: hard(10002, { image: APP, networks: ['default'] }),
     migrate: hard(10003, { image: APP, networks: ['default'] }),
     // POLY-146 R3: the one-shot operator service. Its own profile, restart "no", the one secret; no long-running service holds it.
@@ -80,6 +82,7 @@ function project(kind: 'prod' | 'staging'): Y {
     networks: {
       default: { name: `polycarpic-${kind}_default`, ipam: { config: [{ subnet }] } },
       [E]: { name: `polycarpic-${E}`, external: true },
+      'web-auth': { internal: true, ipam: { config: [{ subnet: prod ? '10.201.40.0/29' : '10.202.40.0/29' }] } },
       ...(prod ? {
         'backup-net': { internal: true, ipam: { config: [{ subnet: '10.201.10.0/29' }] } },
         'upload-net': {},
@@ -99,6 +102,7 @@ host  polycarpic   poly_backup    10.201.10.0/29  scram-sha-256
 host  all          poly_backup    all             reject
 host  replication  all            all             reject
 host  polycarpic   poly_app       10.201.1.0/24   scram-sha-256
+host  polycarpic   poly_auth      10.201.1.0/24   scram-sha-256
 host  polycarpic   poly_worker    10.201.1.0/24   scram-sha-256
 host  polycarpic   poly_migrator  10.201.1.0/24   scram-sha-256
 host  polycarpic   poly_operator  10.201.1.0/24   scram-sha-256
@@ -108,6 +112,7 @@ local all          postgres                       peer
 const HBA_STAGING = `host  all          poly_backup    all             reject
 host  replication  all            all             reject
 host  polycarpic   poly_app       10.202.1.0/24   scram-sha-256
+host  polycarpic   poly_auth      10.202.1.0/24   scram-sha-256
 host  polycarpic   poly_worker    10.202.1.0/24   scram-sha-256
 host  polycarpic   poly_migrator  10.202.1.0/24   scram-sha-256
 host  polycarpic   poly_operator  10.202.1.0/24   scram-sha-256

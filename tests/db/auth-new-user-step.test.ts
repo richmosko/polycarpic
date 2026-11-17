@@ -66,9 +66,10 @@ describe('condition 13: enter_new_user refuses (each on its own transaction), wi
   it('a user that already has a Person is refused even when the stamp matches  [red if: the self_user_id check is missing]', () => {
     // Superuser plays poly_app and clears the marker (no production role can), so the Person check is reached, not the marker check.
     const id = uid();
-    const r = psql(`BEGIN; SET LOCAL ROLE poly_app; ${ins(id)} ${step(id)}
+    const r = psql(`BEGIN; SET LOCAL ROLE poly_auth; ${ins(id)} ${step(id)}
+      RESET ROLE;
       INSERT INTO public.entity (type_id, name, self_user_id) SELECT t.id, 'P', '${id}' FROM public.entity_type t WHERE t.system_key = 'person';
-      RESET ROLE; DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id(); SET LOCAL ROLE poly_app; ${step(id)} ROLLBACK;`, e.db);
+      DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id(); SET LOCAL ROLE poly_auth; ${step(id)} ROLLBACK;`, e.db);
     expect(r.sqlstate).toBe('42501');
     expect(r.err).toMatch(/already has a Person/);
   });
@@ -81,7 +82,10 @@ describe('condition 13: enter_new_user refuses (each on its own transaction), wi
     const old = uid();
     const fresh = uid();
     must(ins(old), e.db);
-    const r = app(`BEGIN; ${asUserSql(old)} ${ins(fresh)} ${step(fresh)} ROLLBACK;`);
+    const tok = `tok-${old}`;
+    must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${old}', '${tok}', now() + interval '1 day')`, e.db);
+    // POLY-152: poly_auth enters by its own definer, from a live session row (it has no enter_asserted_user)
+    const r = app(`BEGIN; \nSELECT app.enter_auth_session($1) \\bind '${tok}' \\g /dev/null\n ${ins(fresh)} ${step(fresh)} ROLLBACK;`);
     expect(r.sqlstate).toBe('42501');
     expect(r.err).toMatch(/a user is already in context/);
   });
@@ -253,11 +257,13 @@ describe('condition 30 (S4): claim_invitations from a signed-in transaction take
 });
 
 describe('condition 33 (S14): while the stamp is set, email and email_verified are fixed', () => {
-  const person = (id: string) => `INSERT INTO public.entity (type_id, name, self_user_id) SELECT t.id, 'P', '${id}' FROM public.entity_type t WHERE t.system_key = 'person';`;
+  // POLY-152 R3: poly_auth holds no tenancy write; the Person comes from the definer, called the way the service calls it (extended mode).
+  const person = (_id: string) => `\nSELECT app.provision_person() \\bind \\g /dev/null\n`;
   it('P10: insert, enter_new_user, provision, then UPDATE email and email_verified raises 42501 and no membership remains  [red if: signup_email_fixed is absent, so a sign-up can verify an invited address]', () => {
     const id = uid();
     const head = `BEGIN; ${ins(id)} ${step(id)} ${person(id)}`;
-    const ctl = app(`${head} UPDATE public."user" SET name = 'renamed' WHERE id = '${id}'; SELECT count(*) FROM public.membership WHERE user_id = '${id}'; ROLLBACK;`);
+    // poly_auth reads no tenancy table (R2), so the membership count is read as superuser after RESET ROLE
+    const ctl = psql(`BEGIN; SET LOCAL ROLE poly_auth; ${ins(id)} ${step(id)} ${person(id)} UPDATE public."user" SET name = 'renamed' WHERE id = '${id}'; RESET ROLE; SELECT count(*) FROM public.membership WHERE user_id = '${id}'; ROLLBACK;`, e.db);
     expect(ctl.ok, `control (other columns pass): ${ctl.err}`).toBe(true);
     expect(ctl.rows.flat()).toContain('1');
     const r = app(`${head} UPDATE public."user" SET email = 'victim@qa.test', email_verified = true WHERE id = '${id}'; ROLLBACK;`); // ROLLBACK, not COMMIT: the C32 commit check would also say 42501

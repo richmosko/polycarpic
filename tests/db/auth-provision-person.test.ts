@@ -2,6 +2,7 @@
 // asserts entity and membership counts unchanged (a permission error and a guard refusal are both 42501). Red today: no definer.
 import { beforeAll, describe, expect, it } from 'vitest';
 import { cloneMigrated } from './helpers/api';
+import { seedInvitation, tokenHash } from './helpers/invitation';
 import { count, signUpEntry, snapshot, tx } from './helpers/auth-tx';
 import { codeOf, fails, msgOf } from './helpers/second-step';
 import { must } from './helpers/sql';
@@ -15,11 +16,14 @@ const PROV = 'SELECT app.provision_person()';
 describe('R3 the exact call, in a sign-up transaction', () => {
   it('provisions the Person: type person, name from user.name, self_user_id the new user, owner membership seated [red if: the definer is absent]', async () => {
     const id = uid();
+    const email = `${id}@qa.test`;
+    const tok = seedInvitation({ db, email }); // sign-up is by invitation: claim first, then insert, enter, provision, accept (the service's order)
     await tx(db, 'poly_auth', async (q) => {
-      await signUpEntry(q, id, `${id}@qa.test`, 'Ada Lovelace');
+      await q('SELECT app.claim_invitations($1::bytea, $2::text)', [tokenHash(tok), email]);
+      await signUpEntry(q, id, email, 'Ada Lovelace');
       const r = await q(PROV);
       expect(r.rows[0].provision_person).toMatch(/^[0-9a-f-]{36}$/);
-      await q('SELECT app.accept_invitations($1::bytea)', [null]); // a sign-up must end by accepting its invitation (signup_stamp_cleared)
+      await q('SELECT app.accept_invitations($1::bytea)', [tokenHash(tok)]); // a sign-up must end by accepting its invitation (signup_stamp_cleared)
     }, true);
     expect(must(`SELECT e.name, t.system_key, e.self_user_id::text, m.role FROM public.entity e JOIN public.entity_type t ON t.id = e.type_id JOIN public.membership m ON m.entity_id = e.id AND m.user_id = e.self_user_id WHERE e.self_user_id = '${id}'`, db).rows[0])
       .toEqual(['Ada Lovelace', 'person', id, 'owner']);

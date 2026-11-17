@@ -60,3 +60,29 @@ The db and tests/ci rows are the per-config full runs. The unit rows below them 
 ### Real-tree plant, two hops down (removed after)
 
 `packages/auth/src/web.ts` -> `web/a.ts` -> `web/b.ts` importing `better-auth` and `@poly/db/auth`. The repo check failed and named the plant: `better-auth imported by packages/auth/src/web/b.ts`. (`@poly/db/auth` was already reported once via the existing web chain; each file is visited once.) The plant files are deleted; `git status` clean of them.
+
+## Build milestone 1 (6fb0d4be, 0014 + roles.sql) — rulings on backend-lead-152's test objections, at ruling 646e35ed
+
+Counts: 4 accepted, 0 refused (backend-lead's four items) + 2 accepted (devops's stale infra items).
+
+| # | Item | Decision | Reason (ruling section) |
+|---|---|---|---|
+| 1 | `auth-enter-session` asserted `markers() === '0'` | **Accept** | R5 writes kind `auth`; committed fixtures (`f.user`, `f.session`) leave kind `web` rows, which say nothing about the attempt. The count is now `kind = 'auth'` only, so a stray marker from a refused entry still fails. |
+| 2 | `auth-provision-person` commit lacked `accept_invitations` | **Accept** | R3 + the sign-up order of 0007 (commit-time `signup_stamp_cleared`): a sign-up ends by accepting its invitation. The test now seeds an invitation and runs claim, insert, enter, provision, accept, commit. |
+| 3a | pgTAP 08 effective checks counted pgTAP's own objects | **Accept** | R2 scopes the pin to what the roles.sql owners create in public/app/drizzle; extension members (pgTAP lives in `public`) are not ours. seceng §5.3's PUBLIC condition is kept: the new 'planted grant' tests in `pgtap.test.ts` show the file fails on 8 planted grants (table SELECT, column SELECT outside the set, SELECT through PUBLIC, TRUNCATE on an allowed table, `recent_auth_at` UPDATE, `enter_asserted_user` EXECUTE, a PUBLIC-executable function, a sequence) and passes the control. The membership plant (`GRANT poly_app TO poly_auth`) is NOT in that list: `tests/ci/db-harness` forbids role-membership statements in a parallel file. Membership stays pinned by 08's `pg_auth_members` check but is not shown to bite. |
+| 3b | `role_column_grants` lists table-level grants per column | **Accept** | R2's table lists table-level grants on account, verification, two_factor, passkey, tx_identity, `__drizzle_migrations`; the check now allows column rows for exactly those tables and `user`/`session`. Extras are still caught by the effective column check. |
+| 4 | identity-marker, pgTAP 05, 07 test 8, 03 test 8 not retargeted | **Accept** | R8 moves the three sign-up definers to poly_auth; R2 adds poly_auth to `tx_identity` SELECT and the readers (`current_session_id`); R2 makes it a sixth login role. identity-marker uses a superuser connection that switches between `poly_auth` and `poly_app`; pgTAP 07 also expects `enter_auth_session` and (R3) `provision_person` among the marker readers. |
+| 5 | stale `tests/infra/baseline.ts` (web mounts `auth_secret`, `resend_api_key`) | **Accept** | R1.3: `AUTH_SECRET_FILE` and the OAuth secrets are auth's alone, and `RESEND_API_KEY_FILE` moves web→auth (the worker keeps it; `plaid_secret` stays on web). The fixture gains the `auth` service, the internal `web-auth` network and poly_auth's hba lines; the mutation fixtures that used `auth_secret__web` use `plaid_secret__web`. |
+| 6 | `lint.test.ts:265` asserts web has `auth_secret` | **Accept** | Contradicts R1.3 and seceng #17. Now: web and the worker mount no auth secret; auth does. |
+
+Also changed by me, each under the ruling named: `second-step-gates` tenancy refusals assert the guard's message for poly_app and a bare 42501 for poly_auth (R2: no tenancy privilege, so poly_auth is refused by permission first); forge (b) is refused at entry and (c) cannot be built, because the marker takes its user from the row (R5, R8); poly_app's marked-helper positives became refusals with the row unchanged (R8); N1's pin is the 0013 set minus exactly the twelve; challenge's "marker with no session" is an entry refusal. The extra `SELECT (id, name, signup_txid)` on `user` for poly_govern: no test of mine admits or forbids it (the pin is about poly_auth); not touched.
+
+### Counts at this tree
+
+| Suite | Files | Passed | Failed | Skipped | Total |
+|---|---|---|---|---|---|
+| tests/db | 34 | 594 | 148 | 0 | 742 |
+| tests/ci | 19 | 536 | 0 | 0 | 536 |
+| tests/infra | 4 | 180 | 0 | 0 | 180 |
+
+All 148 db failures are in files whose handler path is still the poly_app pool, i.e. milestone 2 (`configure({auth})`, `withAuthSession`/`withSignInTx`, `apps/auth`): auth-client-ip (4), auth-fields (3), auth-internal-session (23), auth-new-user-step (2: `enterNewUser` through the app pool), auth-refresh (6), auth-route-policy (20), auth-second-step (10), auth-service-main (8), auth-session (14), auth-signin-tx (8), auth-signup-invite (17), auth-signup-wrap (3), operator-invite (12), second-step-flow (18). All of pgTAP (01 to 08), identity-marker, auth-enter-session, auth-provision-person, auth-service-grants, second-step-gates, second-step-challenge, second-step-reset and matrix are green.

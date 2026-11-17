@@ -87,20 +87,20 @@ $f$), 'ok', 'fixtures: sign-up stamps (mutation: signup_txid absent)');
 
 -- ---------------------------------------------------------------- C15: the membership write path
 SELECT is(has_any_column_privilege('poly_app', 'public.membership', 'INSERT'), false, 'C15: poly_app holds no INSERT on membership (POLY-62 R4)');
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f1', NULL,
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f1', NULL,
     $q$SELECT app.accept_invitations(sha256('t1'::bytea))::text$q$), '00000000-0000-4000-8000-0000000000e1',
   'C15: accept_invitations seats the new user against their live viewer invitation and returns that entity (mutation: no accept definer)');
 SELECT is((SELECT role FROM public.membership WHERE entity_id = '00000000-0000-4000-8000-0000000000e1' AND user_id = '00000000-0000-4000-8000-0000000000f1'), 'viewer', 'C15: seated as viewer');
 SELECT isnt((SELECT accepted_at FROM public.invitation WHERE id = '00000000-0000-4000-8000-0000000000b1'), NULL, 'C15: accepted_at set on the seated row');
 SELECT is(pg_temp.q1($q$SELECT claimed_user_id::text FROM public.invitation WHERE id = '00000000-0000-4000-8000-0000000000b1'$q$), '00000000-0000-4000-8000-0000000000f1', 'C15: claimed_user_id bound to the new user');
 SELECT is(pg_temp.q1($q$SELECT (signup_txid IS NULL)::text FROM public."user" WHERE id = '00000000-0000-4000-8000-0000000000f1'$q$), 'true', 'S13: accept_invitations clears the sign-up stamp before it returns (mutation: the stamp stays)');
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f2', NULL,
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f2', NULL,
     $q$SELECT app.accept_invitations(sha256('t2'::bytea))::text$q$), '',
   'C15: an owner invitation is claimed and not seated, even with second_step_at set by a superuser (S6; POLY-89 seats it)');
 SELECT is((SELECT count(*)::int FROM public.membership WHERE user_id = '00000000-0000-4000-8000-0000000000f2'), 0, 'C15: no membership for the owner invitee');
 SELECT is(pg_temp.q1($q$SELECT claimed_user_id::text FROM public.invitation WHERE id = '00000000-0000-4000-8000-0000000000b2'$q$), '00000000-0000-4000-8000-0000000000f2', 'C15: the owner row is claimed');
 SELECT is((SELECT accepted_at FROM public.invitation WHERE id = '00000000-0000-4000-8000-0000000000b2'), NULL, 'C15: and accepted_at stays null');
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f5', NULL,
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f5', NULL,
     $q$SELECT app.accept_invitations(sha256('no such token'::bytea))::text$q$), 'ERR:42501', 'C15: no matching live invitation: refused 42501');
 SELECT is((SELECT count(*)::int FROM public.membership WHERE user_id = '00000000-0000-4000-8000-0000000000f5'), 0, 'C15: and nothing is seated');
 SELECT is(pg_temp.run_as('poly_govern', '00000000-0000-4000-8000-0000000000f5', NULL,
@@ -143,7 +143,7 @@ SELECT is((SELECT array_agg(polname::text ORDER BY polname COLLATE "C") FROM pg_
 -- ---------------------------------------------------------------- C17: accept_invitations outside a sign-up transaction
 SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501',
   'C17: a signed-in existing user (a marker in place, row inserted by an earlier transaction) is refused (mutation: accept trusts the marker)');
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', $q$UPDATE public."user" SET name = 'touched' WHERE id = '00000000-0000-4000-8000-0000000000f8'$q$,
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f8', $q$UPDATE public."user" SET name = 'touched' WHERE id = '00000000-0000-4000-8000-0000000000f8'$q$,
     $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501', 'C17: the same forgery after this transaction UPDATEd the row (the xmin test would pass it)');
 SELECT is(pg_temp.run_as('poly_auth', '', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501', 'C17: with no user set at all');
 SELECT is((SELECT count(*)::int FROM public.membership WHERE user_id = '00000000-0000-4000-8000-0000000000f8'), 0, 'C17: and no membership is written for the existing user');

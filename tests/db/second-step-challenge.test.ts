@@ -32,12 +32,12 @@ describe('C8 the emailed code (R2)', () => {
       const read = await f.marked(role, u.id, s, (q) => fails(q('SELECT code_hash FROM app.email_challenge')));
       expect(read).not.toBeNull();
     });
-    it(`${role}: the issuer refuses a marker with no session (a user marker alone is not enough) [red if: issue_email_challenge works without a session in the marker]`, async () => {
+    it(`${role}: no marker without a live session exists: entry with a session id that has no row is refused before the issuer can run [red if: issue_email_challenge works without a session in the marker]`, async () => {
       const u = await f.user();
-      const x = await f.marked(role, u.id, null, async (q) => fails(q('SELECT app.issue_email_challenge($1)', ['first_enrolment'])));
-      // enter_asserted_user with the default session id names no session row: the definer must refuse, not mint
+      const x = await fails(f.marked(role, u.id, '00000000-0000-4000-8000-0000000089ff', async (q) => q('SELECT app.issue_email_challenge($1)', ['first_enrolment'])));
+      // R5: enter_auth_session takes its user and session from a live row, so the marker the issuer needs always has a session; a row-less id never gets a marker
       expect(x).not.toBeNull();
-      expect(msgOf(x)).not.toMatch(/does not exist/);
+      expect(msgOf(x)).toMatch(/no live session/);
     });
     it(`${role}: a right code confirms once; a second confirm of the same code is false (single use) [red if: used_at is not set or not checked]`, async () => {
       const u = await f.user();

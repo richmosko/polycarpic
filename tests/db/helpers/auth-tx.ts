@@ -17,7 +17,7 @@ export async function tx<T>(db: string, role: string, fn: (q: Q) => Promise<T>, 
 }
 /** Inside `tx`: insert a user (poly_auth stamps it) and enter as the new user. */
 export async function signUpEntry(q: Q, id: string, email = `${id}@qa.test`, name = 'Signup'): Promise<void> {
-  await q(`INSERT INTO public."user" (id, name, email) VALUES ($1, $2, $3)`, [id, name, email]);
+  await q(`INSERT INTO public."user" (id, name, email, email_verified) VALUES ($1, $2, $3, true)`, [id, name, email]);
   await q('SELECT app.enter_new_user($1)', [id]);
 }
 export const count = (db: string, sql: string) => Number(must(`SELECT count(*) FROM (${sql}) q`, db).rows[0]![0]);
