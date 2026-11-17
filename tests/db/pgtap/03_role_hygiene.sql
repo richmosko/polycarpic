@@ -9,7 +9,7 @@ SELECT is((SELECT count(*)::int FROM pg_class c WHERE pg_get_userbyid(c.relowner
 -- login roles hold no TRUNCATE, REFERENCES or TRIGGER on any relation outside pg_catalog / information_schema (directly, via PUBLIC, via membership)
 CREATE FUNCTION pg_temp.login_priv_gaps() RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(r || ' ' || p || ' ' || c.oid::regclass::text ORDER BY r, p, c.oid::regclass::text), '{}')
-  FROM unnest(ARRAY['poly_app', 'poly_worker', 'poly_migrator', 'poly_backup', 'poly_operator']) r
+  FROM unnest(ARRAY['poly_app', 'poly_worker', 'poly_migrator', 'poly_backup', 'poly_operator', 'poly_auth']) r
   CROSS JOIN unnest(ARRAY['TRUNCATE', 'REFERENCES', 'TRIGGER']) p
   CROSS JOIN pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
   WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND c.relkind IN ('r', 'p', 'v', 'm', 'f') AND c.relpersistence <> 't'
@@ -27,7 +27,7 @@ $f$;
 SELECT is(pg_temp.temp_holders(), '{}'::text[],
   'no poly_* role but the database owner holds TEMP');
 SELECT is((SELECT rolcanlogin FROM pg_roles WHERE rolname = 'poly_owner'), false, 'the database owner poly_owner cannot log in');
-SELECT is((SELECT count(*)::int FROM pg_roles WHERE rolname ~ '^poly_'), 13, 'thirteen poly_* roles are checked');
+SELECT is((SELECT count(*)::int FROM pg_roles WHERE rolname ~ '^poly_'), 14, 'fourteen poly_* roles are checked (POLY-152: poly_auth)');
 
 -- the installed extensions are exactly plpgsql and the harness's pgTAP, so the extension-member exclusion cannot hide another
 SELECT is((SELECT array_agg(extname::text ORDER BY extname) FROM pg_extension), ARRAY['pgtap', 'plpgsql'], 'extensions are exactly {plpgsql, pgtap}');

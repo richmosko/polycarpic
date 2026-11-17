@@ -204,7 +204,7 @@ describe('(iii) every enter_* refuses when a marker already exists; the interim 
       expect(codeOf(j), msgOf(j)).toBe('42501');
       expect(msgOf(j)).toContain(HAS_ID);
       const id = uid();
-      const n = await attempt(async (cc) => { await cc.query(ins(id)); await mark(cc); }, 'poly_app', 'SELECT app.enter_new_user($1)', [id]);
+      const n = await attempt(async (cc) => { await cc.query(ins(id)); await mark(cc); }, 'poly_auth', 'SELECT app.enter_new_user($1)', [id]);
       expect(codeOf(n), msgOf(n)).toBe('42501');
       expect(msgOf(n)).toContain('a user is already in context');
     } finally { await c.end(); }
@@ -285,10 +285,10 @@ describe('(ii, sign-up) rolling back to BetterAuth\'s savepoint takes the marker
     const existing = uid();
     must(ins(existing), db);
     const id = uid();
-    const a = await inTx('poly_app', async (c) => { await setup(c, id); return fails(q(c, 'SELECT app.enter_new_user($1)', [id])); });
+    const a = await inTx('poly_auth', async (c) => { await setup(c, id); return fails(q(c, 'SELECT app.enter_new_user($1)', [id])); });
     expect(codeOf(a), msgOf(a)).toBe('42501');
     expect(msgOf(a)).toContain('not a user created by this transaction');
-    const b = await inTx('poly_app', async (c) => { await setup(c, uid()); return fails(q(c, 'SELECT app.enter_new_user($1)', [existing])); });
+    const b = await inTx('poly_auth', async (c) => { await setup(c, uid()); return fails(q(c, 'SELECT app.enter_new_user($1)', [existing])); });
     expect(codeOf(b), msgOf(b)).toBe('42501');
     expect(msgOf(b)).toContain('not a user created by this transaction');
     const d = await inTx('poly_app', async (c) => { await setup(c, uid()); return fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [existing, S])); });

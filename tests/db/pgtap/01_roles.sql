@@ -3,15 +3,15 @@ BEGIN;
 SELECT no_plan();
 
 SELECT has_role(r) FROM unnest(ARRAY['poly_owner','poly_migrator','poly_app','poly_worker','poly_authz','poly_purge',
-  'poly_rollup','poly_graph','poly_stake','poly_govern','poly_journal','poly_backup','poly_operator']) r;
+  'poly_rollup','poly_graph','poly_stake','poly_govern','poly_journal','poly_backup','poly_operator','poly_auth']) r;
 
-SELECT is((SELECT count(*)::int FROM pg_roles WHERE rolname ~ '^poly_' AND rolname <> 'poly_backup'), 12,
-  'exactly twelve poly_* roles besides poly_backup');
+SELECT is((SELECT count(*)::int FROM pg_roles WHERE rolname ~ '^poly_' AND rolname <> 'poly_backup'), 13,
+  'exactly thirteen poly_* roles besides poly_backup (POLY-152: poly_auth)');
 SELECT is((SELECT count(*)::int FROM pg_roles WHERE rolname ~ '^poly_' AND (rolbypassrls OR rolsuper)
   AND rolname <> 'poly_backup'), 0, 'no poly_* role other than poly_backup bypasses RLS or is superuser');
 SELECT is((SELECT array_agg(rolname::text ORDER BY rolname) FROM pg_roles WHERE rolname ~ '^poly_' AND rolcanlogin
-  AND rolname <> 'poly_backup'), ARRAY['poly_app','poly_migrator','poly_operator','poly_worker'],
-  'LOGIN roles are poly_migrator, poly_app, poly_worker, poly_operator');
+  AND rolname <> 'poly_backup'), ARRAY['poly_app','poly_auth','poly_migrator','poly_operator','poly_worker'],
+  'LOGIN roles are poly_migrator, poly_app, poly_worker, poly_operator, poly_auth');
 SELECT is((SELECT array_agg(rolname::text ORDER BY rolname) FROM pg_roles WHERE rolname ~ '^poly_' AND NOT rolcanlogin),
   ARRAY['poly_authz','poly_govern','poly_graph','poly_journal','poly_owner','poly_purge','poly_rollup','poly_stake'],
   'NOLOGIN roles are the eight owner/definer roles');

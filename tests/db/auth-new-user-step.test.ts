@@ -12,7 +12,7 @@ let e: Env;
 beforeAll(async () => { e = await boot(); });
 afterAll(() => teardown(e));
 
-const app = (sql: string) => psql(sql, e.db, { role: 'poly_app' });
+const app = (sql: string) => psql(sql, e.db, { role: 'poly_auth' });
 const uid = () => crypto.randomUUID();
 const ins = (id: string, email = `${id}@qa.test`) => `INSERT INTO public."user" (id, name, email) VALUES ('${id}', 'N', '${email}');`;
 // POLY-147 (R6): the step is the definer's exact call, bound; a call with literals is refused by the exact-call check.
@@ -20,7 +20,7 @@ const step = (id: string) => newUserSql(id);
 const marker = `SELECT user_id::text || '/' || kind FROM app.tx_identity WHERE xid = pg_current_xact_id_if_assigned();`;
 
 describe('condition 5: after the step, the identity marker holds the new id (kind signup) until the end of the transaction', () => {
-  it('insert, enter_new_user, then current_user_id() and the marker read the id; the step works as poly_app  [red if: the function does not write the marker, or writes another kind]', () => {
+  it('insert, enter_new_user, then current_user_id() and the marker read the id; the step works as poly_auth  [red if: the function does not write the marker, or writes another kind]', () => {
     const id = uid();
     const r = app(`BEGIN; ${ins(id)} ${step(id)} ${marker} SELECT app.current_user_id()::text; ROLLBACK;`);
     expect(r.ok, r.err).toBe(true);
@@ -205,11 +205,11 @@ describe('condition 14: the step is not on the db index, db/auth or db/session, 
 
 // ---------------------------------------------------------------- step 4 (TypeScript side): allowlist, commit-time stamp, S4 lock
 describe('condition 18: the new definers are on packages/db/sql/definers.json with the ruled owner and EXECUTE', () => {
-  it('enter_new_user (poly_authz), claim_invitations and accept_invitations (poly_govern) each execute for poly_app alone  [red if: a definer is added without its allowlist entry]', () => {
+  it('enter_new_user (poly_authz), claim_invitations and accept_invitations (poly_govern) each execute for poly_auth alone (POLY-152 R8)  [red if: a definer is added without its allowlist entry]', () => {
     const got = Object.fromEntries(loadAllow().map((a) => [a.function, [a.owner, ...a.execute].join('>')]));
-    expect(got['app.enter_new_user(uuid)']).toBe('poly_authz>poly_app');
-    expect(got['app.claim_invitations(bytea, text)']).toBe('poly_govern>poly_app');
-    expect(got['app.accept_invitations(bytea)']).toBe('poly_govern>poly_app');
+    expect(got['app.enter_new_user(uuid)']).toBe('poly_authz>poly_auth');
+    expect(got['app.claim_invitations(bytea, text)']).toBe('poly_govern>poly_auth');
+    expect(got['app.accept_invitations(bytea)']).toBe('poly_govern>poly_auth');
   });
 });
 

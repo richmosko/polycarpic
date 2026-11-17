@@ -30,7 +30,7 @@ describe('criterion 8: the fields map', () => {
     expect(await a.$context).toBeTruthy();
     expect(must('SELECT current_user', e.db).rows[0][0]).toBeTruthy();
     const who = await e.dba.authPool().query('select current_user u');
-    expect(who.rows[0].u).toBe('poly_app');
+    expect(who.rows[0].u).toBe('poly_auth');
   });
 
   for (const m of MODELS)

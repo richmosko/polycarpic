@@ -29,7 +29,7 @@ const FILES = readdirSync(join(ROOT, 'tests/db')).filter((f) => f.endsWith('.tes
 
 // The ruling's table, pinned: which file belongs to which area.
 const TABLE: Record<(typeof AREAS)[number], string[]> = {
-  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker'],
+  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-internal-session', 'auth-signin-tx', 'auth-refresh'],
   tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap'],
   migrate: ['checks', 'connection', 'migrate-run-helper', 'runner', 'template-clone'],
   ops: ['ops-status', 'ops-hardening'],
@@ -49,11 +49,11 @@ describe('C7 one area, one project', () => {
     for (const f of all) expect(existsSync(join(ROOT, f)), f).toBe(true);
     expect([...all].sort()).toEqual(FILES);
   });
-  it('every file is in exactly one project: SERIAL or the parallel remainder; SERIAL files are in migrate, ops and the two poly_auth fixture files only', async () => {
+  it('every file is in exactly one project: SERIAL or the parallel remainder; SERIAL files are in migrate and ops only (POLY-152: the poly_auth fixture is gone)', async () => {
     const cfg: any = await import(pathToFileURL(join(ROOT, 'tests/db/vitest.config.ts')).href);
     if (!Array.isArray(cfg.SERIAL)) throw new Error('tests/db/vitest.config.ts does not export SERIAL');
     const { DB_AREAS } = await ch();
-    for (const s of cfg.SERIAL as string[]) expect([...DB_AREAS.migrate!.tests, ...DB_AREAS.ops!.tests, 'tests/db/second-step-gates.test.ts', 'tests/db/second-step-challenge.test.ts'], s).toContain(s);
+    for (const s of cfg.SERIAL as string[]) expect([...DB_AREAS.migrate!.tests, ...DB_AREAS.ops!.tests], s).toContain(s);
   });
   it('each area\'s own test files match its own paths and no other area\'s  [red if: a test file is not covered by its area]', async () => {
     const { classify, DB_AREAS } = await ch();
@@ -241,5 +241,17 @@ describe('C25 the files the db job runs set every area', () => {
     }
     const budgets = body.includes('job-report.mjs') ? ['infra/ci/budgets.json'] : [];
     for (const p of budgets) expect(classify([p]).db_auth, p).toBe(true);
+  });
+});
+
+// POLY-152: the sign-in service is the auth area's code. A change under apps/auth must select the auth db tests, not none.
+describe('POLY-152 apps/auth is in the auth area', () => {
+  it('a path under apps/auth turns db_auth on  [red if: the auth area\'s paths do not cover apps/auth]', async () => {
+    const { classify } = await ch();
+    expect(classify(['apps/auth/src/main.ts']).db_auth).toBe(true);
+  });
+  it('the six POLY-152 db suites are in the auth area  [red if: a new tests/db file is in no area]', async () => {
+    const { DB_AREAS } = await ch();
+    for (const f of ['auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-internal-session', 'auth-signin-tx', 'auth-refresh']) expect(DB_AREAS.auth!.tests).toContain(`tests/db/${f}.test.ts`);
   });
 });

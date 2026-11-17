@@ -217,3 +217,14 @@ describe('criterion 13: provisionPerson in the loader, one retry on entity_self_
     });
   });
 });
+
+// POLY-152 C9: every in-process handleAuthRequest suite runs as poly_auth. A trigger records who inserted the session row.
+describe('POLY-152 handleAuthRequest runs as poly_auth, not poly_app', () => {
+  it('a real /sign-in/email session INSERT is made by current_user poly_auth  [red if: the handler still uses the poly_app pool]', async () => {
+    const { must: m } = await import('./helpers/sql');
+    m(`CREATE TABLE IF NOT EXISTS public.qa_who152 (u text); CREATE OR REPLACE FUNCTION public.qa_who152_f() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN INSERT INTO public.qa_who152 VALUES (current_user); RETURN NEW; END $$; DROP TRIGGER IF EXISTS qa_who152_t ON public.session; CREATE TRIGGER qa_who152_t AFTER INSERT ON public.session FOR EACH ROW EXECUTE FUNCTION public.qa_who152_f(); GRANT INSERT ON public.qa_who152 TO PUBLIC;`, e.db);
+    const u = e.seedUser();
+    await e.signIn(u.email);
+    expect(m(`SELECT DISTINCT u FROM public.qa_who152`, e.db).rows).toEqual([['poly_auth']]);
+  });
+});

@@ -274,7 +274,7 @@ describe('conditions 9, 10: any failure leaves no user, entity, membership or ac
 describe('condition 11: the pooled backend carries no identity after a sign-up', () => {
   it('after a commit, and after a rollback, the next checkout of the same backend (max: 1) reads no marker identity and sees zero tenant rows  [red if: the marker is not per transaction, so it rides the backend into the pool]', async () => {
     await e.dbm.close();
-    e.dbm.configure({ app: dbEnv('poly_app', e.db), worker: dbEnv('poly_worker', e.db), max: 1 });
+    e.dbm.configure({ app: dbEnv('poly_app', e.db), auth: dbEnv('poly_auth', e.db), worker: dbEnv('poly_worker', e.db), max: 1 });
     const a = await e.mk();
     const probe = async () => e.dba.withContextFreeTx(async (tx: any) => {
       const s = (await tx.execute(e.dbm.sql`SELECT coalesce(app.current_user_id()::text, '') AS v, pg_backend_pid() AS pid, (SELECT count(*) FROM public.entity) AS n`)).rows[0];

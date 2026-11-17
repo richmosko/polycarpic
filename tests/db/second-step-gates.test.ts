@@ -4,10 +4,10 @@
 // Each test works in its own rolled-back transaction on unique ids, so none depends on another's rows.
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { cloneMigrated } from './helpers/api';
 import { DB_PKG, server, url } from './helpers/pg';
-import { createAuthRole, dropAuthRole } from './helpers/second-step';
+import { enterAs } from './helpers/second-step';
 import { must } from './helpers/sql';
 
 const pgmod = createRequire(join(DB_PKG, 'package.json'))('pg');
@@ -19,13 +19,7 @@ const uid = (k: number) => `00000000-0000-4000-8000-00000089${String(k).padStart
 const SID = '00000000-0000-4000-8000-0000000089e1';
 const NO_SESSION = '00000000-0000-4000-8000-0000000089ff';
 
-beforeAll(() => {
-  db = cloneMigrated();
-  // poly_auth (the stage-2 fixture role) is cluster-wide state: this file is in SERIAL (vitest.config.ts), creates it here and drops it
-  // in afterAll, so no parallel file and no pgtap role-hygiene suite ever sees it.
-  createAuthRole();
-});
-afterAll(() => { dropAuthRole(); });
+beforeAll(() => { db = cloneMigrated(); });
 
 const codeOf = (x: any): string | undefined => x?.code ?? x?.cause?.code;
 const msgOf = (x: any): string => String(x?.cause?.message ?? x?.message ?? x);
@@ -69,7 +63,7 @@ async function marked<T>(role: Role, user: string | null, session: string | null
   const q = (text: string, values?: unknown[]) => c.query({ text, values, queryMode: 'extended' });
   try {
     await q('BEGIN');
-    if (user) await q('SELECT app.enter_asserted_user($1, $2)', [user, session ?? SID]);
+    if (user) await enterAs(q, db, role, user, session);
     return await fn(q);
   } finally {
     await c.query('ROLLBACK').catch(() => {});

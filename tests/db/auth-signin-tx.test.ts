@@ -1,0 +1,159 @@
+// POLY-152 R9, seceng F1 / §6.1: the session-creating paths commit in one transaction (withSignInTx), and a refused second-step code
+// commits only what it may. Red today: withSignInTx does not exist, so a late failure leaves the session row (no outer transaction).
+import { createAuthMiddleware } from 'better-auth/api';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
+import { capture, enrolTotp, hasSessionCookie, heldSignIn } from './helpers/auth-service';
+import { softAuthenticator } from './helpers/webauthn';
+import { totp } from './helpers/second-step';
+import { must } from './helpers/sql';
+
+vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o as any));
+
+let e: Env;
+const mails: { email: string; code: string }[] = [];
+beforeAll(async () => { e = await boot(); });
+afterAll(() => teardown(e));
+
+/** The ruling's forced failure: a final after-hook, last in plugins[], that throws once a session exists. */
+const failing = () => ({ id: 'qa-fail-after-session', hooks: { after: [{ matcher: () => true, handler: createAuthMiddleware(async (ctx: any) => { if (ctx.context.newSession) throw new Error('qa: forced failure after the session INSERT'); }) }] } });
+async function withFailingLast(): Promise<any> {
+  const o: any = { ...e.optionsOf('real-domain'), rateLimit: { enabled: false } };
+  o.plugins = [...o.plugins, failing()];
+  return e.A.createAuth(o);
+}
+const sessions = (uid: string) => e.count(`SELECT 1 FROM public.session WHERE user_id = '${uid}'`);
+
+describe('F1 a failure after the session INSERT leaves no session row and sets no cookie, on each path', () => {
+  it('/sign-in/email [red if: the session commits before the later failure]', async () => {
+    const auth = await withFailingLast();
+    const u = e.seedUser();
+    const r = await e.handle(post('/sign-in/email', { email: u.email, password: PW }), auth);
+    expect(r.status).toBeGreaterThanOrEqual(400);
+    expect(hasSessionCookie(r)).toBe(false);
+    expect(sessions(u.id)).toBe(0);
+  });
+  it('/magic-link/verify [red if: same]', async () => {
+    const u = e.seedUser();
+    const sent: { token: string }[] = [];
+    const a2 = await (async () => { const o: any = e.optionsOf('real-domain', { sendMagicLink: async (m: any) => { sent.push(m); } }); o.rateLimit = { enabled: false }; o.plugins = [...o.plugins, failing()]; return e.A.createAuth(o); })();
+    await e.handle(post('/sign-in/magic-link', { email: u.email }), a2);
+    const r = await e.handle(get(`/magic-link/verify?token=${sent[0]!.token}&callbackURL=/`), a2);
+    expect(hasSessionCookie(r)).toBe(false);
+    expect(sessions(u.id)).toBe(0);
+  });
+  it('/callback/:id (Google) [red if: same]', async () => {
+    const auth = await withFailingLast();
+    const u = e.seedUser({ password: false });
+    const r = await e.oauth(u.email, auth);
+    expect(hasSessionCookie(r)).toBe(false);
+    expect(sessions(u.id)).toBe(0);
+  });
+  it('/passkey/verify-authentication [red if: same; the counter update also rolls back]', async () => {
+    const auth = await withFailingLast();
+    const u = e.seedUser();
+    const k = softAuthenticator();
+    must(`INSERT INTO public.passkey (public_key, user_id, credential_id, counter, device_type, backed_up, transports) VALUES ('${k.publicKey}', '${u.id}', '${k.credentialId}', 0, 'singleDevice', false, 'internal')`, e.db);
+    must(`UPDATE public."user" SET second_step_at = now() WHERE id = '${u.id}'`, e.db);
+    const g = await e.handle(get('/passkey/generate-authenticate-options'), auth);
+    const opt: any = await g.clone().json();
+    const r = await e.handle(post('/passkey/verify-authentication', { response: k.assert(opt, 1) }, jar('', g)), auth);
+    expect(hasSessionCookie(r)).toBe(false);
+    expect(sessions(u.id)).toBe(0);
+    expect(must(`SELECT counter FROM public.passkey WHERE credential_id = '${k.credentialId}'`, e.db).rows[0]![0]).toBe('0');
+  });
+  it('/two-factor/verify-totp and /two-factor/verify-backup-code from a held sign-in: no session row, no cookie, and the backup code is not consumed [red if: same]', async () => {
+    const good = await e.A.createAuth({ ...e.optionsOf('real-domain', { sendSecondStepCode: async (m: any) => { mails.push({ email: String(m.email ?? m.to ?? ''), code: Object.values(m).find((v) => typeof v === 'string' && /^\d{6}$/.test(v as string)) as string }); } }), rateLimit: { enabled: false } });
+    const u = e.seedUser();
+    const { secret, backupCodes } = await enrolTotp(e, good, u, mails);
+    const o: any = { ...e.optionsOf('real-domain', { sendSecondStepCode: async () => {} }), rateLimit: { enabled: false } };
+    o.plugins = [...o.plugins, failing()];
+    const bad = await e.A.createAuth(o);
+    const before = must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0];
+    const n0 = sessions(u.id);
+    const h1 = await heldSignIn(e, bad, u.email);
+    const t = await e.handle(post('/two-factor/verify-totp', { code: totp(secret, Date.now() + 30_000) }, h1.cookie), bad);
+    expect(hasSessionCookie(t)).toBe(false);
+    const h2 = await heldSignIn(e, bad, u.email);
+    const b = await e.handle(post('/two-factor/verify-backup-code', { code: backupCodes[0] }, h2.cookie), bad);
+    expect(hasSessionCookie(b)).toBe(false);
+    expect(sessions(u.id)).toBe(n0);
+    expect(must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0]).toBe(before);
+  });
+});
+
+describe('§6.1 a refused second-step code commits its count, and only what it may', () => {
+  let auth: any;
+  let u: { id: string; email: string };
+  let secret: string;
+  const holdRow = () => must(`SELECT id, identifier, value, expires_at FROM public.verification ORDER BY identifier`, e.db).rows;
+  const wrong = (s: string) => { const c = totp(s); return c === '000000' ? '000001' : '000000'; };
+  async function setup() {
+    auth = await e.A.createAuth({ ...e.optionsOf('real-domain', { sendSecondStepCode: async (m: any) => { mails.push({ email: String(m.email ?? m.to ?? ''), code: Object.values(m).find((v) => typeof v === 'string' && /^\d{6}$/.test(v as string)) as string }); } }), rateLimit: { enabled: false } });
+    u = e.seedUser();
+    ({ secret } = await enrolTotp(e, auth, u, mails));
+  }
+  const paths: [string, (s: string) => unknown][] = [['/two-factor/verify-totp', (s) => ({ code: wrong(s) })], ['/two-factor/verify-backup-code', () => ({ code: 'wrong-code-000' })]];
+  for (const [path, mk] of paths) {
+    it(`${path}: the hold keeps its identifier and user, no other verification row is added, only expired rows or the hold are deleted, backup_codes untouched, and the count lands [red if: the refusal rolls back, re-points the hold, or leaves a stray row]`, async () => {
+      await setup();
+      const held = await heldSignIn(e, auth, u.email);
+      const holdBefore = must(`SELECT id, identifier, value FROM public.verification WHERE value LIKE '%${u.id}%' OR identifier LIKE '%${u.id}%'`, e.db).rows;
+      const all0 = holdRow();
+      const bc0 = must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0];
+      must(`INSERT INTO public.verification (identifier, value, expires_at) VALUES ('qa-expired', 'x', now() - interval '1 hour')`, e.db);
+      const { result: r, sql } = await capture(() => e.handle(post(path, mk(secret), held.cookie), auth));
+      expect(r.status).toBeGreaterThanOrEqual(400);
+      expect(r.status).toBeLessThan(500);
+      const holdAfter = must(`SELECT id, identifier, value FROM public.verification WHERE value LIKE '%${u.id}%' OR identifier LIKE '%${u.id}%'`, e.db).rows;
+      expect(holdAfter.map((x) => [x[1], x[2]])).toEqual(holdBefore.map((x) => [x[1], x[2]])); // same identifier, same user
+      const after = holdRow();
+      expect(after.length).toBeLessThanOrEqual(all0.length); // no verification row added; the expired one is the only other deletion
+      expect(after.some((x) => x[1] === 'qa-expired')).toBe(false);
+      expect(must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0]).toBe(bc0);
+      expect(Number(must(`SELECT failed_verification_count FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0])).toBe(1);
+      // the write set (statement log): verification and two_factor.failed_verification_count / locked_until only
+      const writes = sql.filter((s) => /^\s*(insert|update|delete)\b/i.test(s));
+      for (const w of writes) {
+        if (/^\s*(insert into|delete from)\s+"?(public"?\."?)?"?verification/i.test(w)) continue;
+        expect(w, 'a refusal writes only verification and the failure count').toMatch(/^\s*update\s+"?(public"?\."?)?"?two_factor"?\s+set\s+"?failed_verification_count"?|locked_until/i);
+      }
+      expect(writes.every((w) => !/\b(session|account|user|passkey)\b/i.test(w.replace(/"?user_id"?/gi, '')))).toBe(true);
+    });
+    it(`${path}: five refused codes lock the factor and the sixth fails after the lock, hold row intact [red if: the count is rolled back with the refusal]`, async () => {
+      await setup();
+      for (let i = 0; i < 5; i++) {
+        const held = await heldSignIn(e, auth, u.email);
+        const r = await e.handle(post(path, mk(secret), held.cookie), auth);
+        expect(r.status, `try ${i + 1}`).toBeLessThan(500);
+        expect(hasSessionCookie(r)).toBe(false);
+      }
+      const row = must(`SELECT failed_verification_count, locked_until IS NOT NULL FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]!;
+      expect(row[1]).toBe('t');
+      const held6 = await heldSignIn(e, auth, u.email);
+      const good = path.endsWith('totp') ? { code: totp(secret) } : { code: 'any' };
+      const r6 = await e.handle(post(path, good, held6.cookie), auth);
+      expect(r6.status).toBeGreaterThanOrEqual(400);
+      expect(hasSessionCookie(r6)).toBe(false);
+      expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`)).toBe(1); // only the enrolment session; the sixth made none
+    });
+  }
+  it('a 5xx on the second-step path rolls the whole request back, count included [red if: the commit rule commits a 5xx]', async () => {
+    await setup();
+    const o: any = { ...e.optionsOf('real-domain', { sendSecondStepCode: async () => {} }), rateLimit: { enabled: false } };
+    const boom = { id: 'qa-5xx', hooks: { before: [{ matcher: (c: any) => /verify-totp/.test(c.path ?? ''), handler: createAuthMiddleware(async () => { throw new Error('qa 5xx'); }) }] } };
+    o.plugins = [...o.plugins, boom];
+    const b = await e.A.createAuth(o);
+    const held = await heldSignIn(e, b, u.email);
+    const r = await e.handle(post('/two-factor/verify-totp', { code: wrong(secret) }, held.cookie), b);
+    expect(r.status).toBeGreaterThanOrEqual(500);
+    expect(Number(must(`SELECT failed_verification_count FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0])).toBe(0);
+  });
+  it('a held sign-in creates and deletes its session inside the one transaction: the statement log shows one BEGIN and no committed session row [red if: the hold commits then deletes]', async () => {
+    await setup();
+    const { result, sql } = await capture(() => e.handle(post('/sign-in/email', { email: u.email, password: PW }), auth));
+    expect(hasSessionCookie(result)).toBe(false);
+    expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`)).toBe(1); // only the enrolment session
+    expect(sql.filter((s) => /^\s*commit\b/i.test(s)).length).toBeLessThanOrEqual(1);
+  });
+});

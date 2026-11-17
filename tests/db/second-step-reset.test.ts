@@ -74,7 +74,7 @@ describe('C6 reset_second_step (R6)', () => {
     const mod: any = await import('../../apps/worker/src/cli/user-reset-mfa.ts');
     const { configure, close } = (await import('../../packages/db/src/index.ts')) as any;
     await close();
-    configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
+    configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
     const out: string[] = [];
     const code = await mod.runUserResetMfa({ email: `DUP${tag}@qa.test` }, { stdout: { write: (s: string) => { out.push(s); } }, stderr: { write: (s: string) => { out.push(s); } }, origin: 'https://app.qa.test' });
     await close();
@@ -114,7 +114,7 @@ describe('C6 the command (apps/worker/src/cli/user-reset-mfa.ts)', () => {
     const { configure, close } = (await import('../../packages/db/src/index.ts')) as any;
     const { dbEnv } = await import('./helpers/api');
     await close();
-    configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
+    configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
     const u = await enrolled();
     const a = io();
     expect(await mod.runUserResetMfa({ email: u.email }, a.io)).toBe(0);
