@@ -39,21 +39,20 @@ const authEnv = { ...dbEnv('poly_auth', db), ...common, AUTH_SECRET_FILE: secret
 Object.assign(process.env, appEnv);
 
 // In-process sign-in through the same exported configuration the app uses.
-const { authOptions, createAuth } = await import('@poly/auth');
-const { close, configure } = await import('@poly/db');
-configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db) });
-const auth = await createAuth(authOptions({ secret: 'e2e-auth-secret-0123456789abcdef0123456789abcdef', baseURL: origin, tlsMode: 'private-ca', requireClientIp: false, sendMagicLink: async () => {} }));
-const hash = await (await auth.$context).password.hash(PASSWORD);
+const { e2eAuth } = await import('../../../../tests/db/helpers/e2e-auth.ts');
+const auth = await e2eAuth(db, origin, 'e2e-auth-secret-0123456789abcdef0123456789abcdef');
+const { close } = auth;
+const hash = await auth.hash(PASSWORD);
 const id = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('${NAME}', '${EMAIL}', true) RETURNING id`, db).rows[0]![0];
 must(`INSERT INTO public.account (account_id, provider_id, user_id, password) VALUES ('${id}', 'credential', '${id}', '${hash}')`, db);
-const signed = await auth.api.signInEmail({ body: { email: EMAIL, password: PASSWORD }, returnHeaders: true });
+const signed = await auth.signIn(EMAIL, PASSWORD);
 const cookies = signed.headers.getSetCookie().map((c: string) => {
   const [pair = ''] = c.split(';');
   const eq = pair.indexOf('=');
   return { name: pair.slice(0, eq), value: pair.slice(eq + 1), domain: 'localhost', path: '/', expires: -1, httpOnly: true, secure: true, sameSite: 'Lax' as const };
 });
 // A second session and a step-up stamp (what POLY-89's definers will write), so the Sessions spec can revoke another session.
-await auth.api.signInEmail({ body: { email: EMAIL, password: PASSWORD } });
+await auth.signIn(EMAIL, PASSWORD);
 must(`UPDATE public.session SET recent_auth_at = now() WHERE user_id = '${id}'`, db);
 // POLY-89 (R7): a manager with no second step, which is the state `polycarpic cli user reset-mfa` leaves behind. The entity belongs to an
 // enrolled owner (a verified factor and the flag as superuser, then the Business as poly_app under the marker, as the db fixtures do).
