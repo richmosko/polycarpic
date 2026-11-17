@@ -90,6 +90,6 @@ Added to the plan since it was written, each with its file:
 | Lockout (seceng §8, §9; architect 322c6174) | 9 refusals no lock, 10th locks 900 s ± 60, 11th with the right code refused; per-hold cap of 5; the 6th answer's write set and commit; counter-only-goes-up; lapse resets the count (recorded) | `tests/db/auth-signin-tx.test.ts` |
 | TOTP window (seceng) | t ± 30 s accepted, t ± 60 s and t ± 90 s refused; clock controlled | `tests/db/auth-signin-tx.test.ts` |
 | e2e with the service up | seed signs in through a repo helper; `apps/auth` started before `vite preview` | `apps/web/tests/e2e/serve.ts`, `tests/db/helpers/e2e-auth.ts` |
-| Web, config, bind, cookie-lifetime, web client | unit suites | `apps/web/src/hooks.server.*.test.ts`, `packages/config/src/auth-service.test.ts`, `tests/config/auth-bind.test.ts`, `packages/auth/src/{cookie-lifetime,web}.test.ts` |
+| Web, config, bind, cookie-lifetime, web client | unit suites | `apps/web/src/hooks.server.*.test.ts`, `packages/config/src/auth-service.test.ts`, `apps/auth/src/bind.test.ts`, `packages/auth/src/{cookie-lifetime,web}.test.ts` |
 
 Written differently from the plan: D2 (secret not in the service's log) is in `auth-service-main`, not the config canary file. Seceng #19 stays with POLY-153.
