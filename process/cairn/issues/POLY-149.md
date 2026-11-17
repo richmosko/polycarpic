@@ -25,7 +25,7 @@ Split on 2026-11-17 (the Principal confirmed): the service is POLY-152, web ente
 
 **Growing second-step lock (deploy gate; `process/DECISIONS.md` 2026-11-17)**
 - [ ] On a fake clock, consecutive locks of one factor last 15, 30, 60, 120, 240, 480 and 960 minutes, then 1440 minutes for every later one (±1 minute), on the TOTP path and the backup-code path. Each lock is reached by 10 counted wrong codes, as today.
-- [ ] Only a correct TOTP or backup code resets the doubling: after one, the next lock lasts 15 minutes. A lock that lapses, a passkey sign-in, a password reset or a new session leaves the doubling where it was. (Lead: confirm that the Principal's "only a correct code" excludes a passkey sign-in.)
+- [ ] Only a correct TOTP or backup code resets the doubling: after one, the next lock lasts 15 minutes. A lock that lapses, a passkey sign-in, a password reset or a new session leaves the doubling where it was.
 - [ ] While a lock is in force the right code is refused and creates no session, on both paths, at every lock length.
 - [ ] The doubling state lives in the database, so restarting `auth` leaves it unchanged (test: a restart between two locks).
 - [ ] The database refuses any write that shortens or clears `locked_until` while it is in the future, and any write to the doubling state, except BetterAuth's lock and lazy-clear writes as the guard computes them, a correct-code reset, and `reset-mfa`. pgTAP pins it: no login role holds a direct privilege on the doubling state. A test as poly_auth tries `UPDATE two_factor SET locked_until = NULL` during a lock and is refused.
@@ -36,7 +36,12 @@ Split on 2026-11-17 (the Principal confirmed): the service is POLY-152, web ente
 - [ ] Every committed `session` INSERT leaves exactly one row in an append-only record: user id, session id, `created_at` from the database clock, `ip_address` and `user_agent` copied from the new row. An AFTER INSERT trigger owned by a NOLOGIN definer role writes it, from `NEW` only, so no caller supplies a value. This covers every sign-in path, rotations included.
 - [ ] As poly_auth: insert a session, delete it, commit. The record row remains. A rolled-back insert leaves none.
 - [ ] No login role (poly_app, poly_auth, poly_worker, poly_operator, poly_migrator, poly_backup) holds INSERT, UPDATE, DELETE or TRUNCATE on the record, checked by effective has_*_privilege, both ways, as pgTAP 08 does. UPDATE, DELETE and TRUNCATE are also refused by a trigger, even for the owner. A deletion path for retention runs only as a NOLOGIN purge owner (see the next item).
-- [ ] Retention: rows older than 400 days, and a deleted account's rows, are removed only by the purge path (a NOLOGIN owner, as `app.purge_tx_identity`). No other delete exists. (Lead: 400 days is seceng's proposal; the Principal did not set a period.)
+- [ ] Retention: rows older than 400 days, and a deleted account's rows, are removed only by the purge path (a NOLOGIN owner, as `app.purge_tx_identity`). No other delete exists.
+- [ ] Each counted second-step refusal (one that raises `failed_verification_count`, TOTP or backup code) adds one record row of kind second-step failure: user id, time, address, browser.
+- [ ] Each lock adds one record row of kind second-step lock, with the lock's length.
+- [ ] A request without a valid held sign-in (no cookie, or a dead hold's 6th try) adds no row.
+- [ ] No column of the record holds the code that was typed (a test types a known code and searches every column for it).
+- [ ] As poly_auth, no record row of any kind can be changed or deleted (the same effective-privilege and trigger checks as above).
 - [ ] No login role reads the record in this issue. A later Settings screen gets its own grant review.
 - [ ] INFRA §7.1 step 16's check also refuses when the growing lock or the record is missing (devops; see seceng's note).
 
