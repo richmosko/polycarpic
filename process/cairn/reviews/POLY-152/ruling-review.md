@@ -1,8 +1,8 @@
-# POLY-152 — Sign-in service: security review of the ruling at `e7a18a51` (seceng; §1–§4 written at `839b99a5`, §5 is the delta)
+# POLY-152 — Sign-in service: security review of the ruling at `646e35ed` (seceng; §1–§4 written at `839b99a5`, §5 the delta at `e7a18a51`, §6 the delta at `646e35ed`)
 
 **Reviewed:** `process/cairn/reviews/POLY-152/ruling.md` at `839b99a5` (R0–R11). Read against POLY-152 and its sub-issues, POLY-153, POLY-149, the POLY-148 spike record §1–§7, the POLY-89 ruling R1–R5 and its build review, `infra/compose/{prod,edge,staging}.yml`, `packages/auth/src/{session,options,recent-auth}.ts` and migration 0013. Nothing here was run: the ruling is a design, and each item below is a test qa writes red before the build.
 
-**Verdict at `e7a18a51`: CHANGES REQUESTED, one addendum (§5.1, the internal listener's bind); ACCEPT once it lands.** At `839b99a5` it was ACCEPT. §2 lists what the tests must cover, and still holds at `e7a18a51` except where §5 says otherwise. §3 has the filings for the lead, and §4 a decision for the Principal.
+**Verdict at `646e35ed`: ACCEPT.** §5.1's required change is in, and §6 adds two test conditions, neither a ruling change. §2 lists what the tests must cover, as amended by §5 and §6. §3 and §5.4 have the filings for the lead, and §4 a decision for the Principal.
 
 ## 1. The four points the lead asked about
 
@@ -142,3 +142,41 @@ R6.2 says the listener is "reachable only on the network web and auth share" and
 - **F2 is narrowed.** The nine leave poly_app in this loop. Left for POLY-149: its revocation criterion names BetterAuth's tables and the `enter_*` functions. Its catalog test should pin poly_app's **complete** EXECUTE set after the revocation, not only the `enter_*`: `second_step_required`, POLY-153's session definers, and whatever web still needs by then. Then no grant is left behind by default. One line on POLY-149.
 - **F3:** unchanged (R-24 covers every OAuth callback; R9 is unchanged).
 - **New, for SECURITY at this loop's docs (POLY-149):** R6.2's own sentence — a database read of session tokens plus the auth secret (code execution in the service) gives a working cookie for every live session.
+
+## 6. Delta at `646e35ed`
+
+Read: `git diff e7a18a51 646e35ed -- process/cairn/reviews/POLY-152/ruling.md` (Basis, R2, R6.2, R7, R8, R9, R11). The four measured claims are backend-lead-152's live runs, as cited in the ruling's Basis. I did not re-run them. Each is re-measured by qa's tests and by my build review.
+
+| Change | Result |
+|---|---|
+| R6.2 bind and internal network (§5.1) | **In, as required:** the web–auth address or a socket, never `0.0.0.0` or `::`; `internal: true`; no `caddy`, `worker`, `operator`, `migrate` or staging service on it; no `ports:`. The probe from the Caddy container stays (unmeasured) until POLY-97, as stated. |
+| R6.2 bare or wrongly signed token | Measured: each returns null, and none deletes or slides the row. That closes my draft's B4 at the HTTP layer. |
+| R2 #16 effective privileges | **In, as §5.3 asked.** |
+| R7 expired row measured; match-all matcher | The expired-row claim my §1.1 rested on is now measured. The matcher is not a security change. The handler must set no cookie when `newSession` is absent, and R7 states that. Condition: the matcher-shape test also asserts that no `Set-Cookie` is added on `/get-session`. |
+| R8 refusals assert nothing written; the diff is exactly the twelve | **In, as §5.2 asked.** |
+| R11 the factor a user did not add is visible | In. |
+| R9 refusal write set | Ruled on below. |
+
+### 6.1 R9: a refused code may commit writes to `verification`. Safe, with one test condition.
+- **What is written (measured):**
+  - a sweep that deletes expired `verification` rows;
+  - a delete and re-insert of the hold's own `verification` row (the row that ties the `two_factor` cookie to the held user);
+  - then the failed-attempt count on `two_factor`.
+- **Why committing it is safe:**
+  - The sweep removes only rows that are already dead. Each one was refused at use anyway.
+  - The hold row grants nothing on its own. It only says that "this cookie may try a second-step code for this user". If the re-insert refreshes its expiry, each wrong code keeps the hold alive a little longer. That buys no extra guesses, because the attempt count and `locked_until` cap them, and both commit on the same refusal. The person holding that cookie already passed the password step, and could start a new hold by signing in again.
+  - So committing these writes adds nothing an attacker can use. Rolling them back would be worse: it would also roll back the attempt count, and that count is the brute-force limit.
+- **What must not happen, and is not covered by "writes to `verification` only":**
+  - a refusal re-points the hold to another user;
+  - a refusal leaves an extra verification row behind, such as a magic-link token.
+  - R2's full DML on `verification` would allow either one, and the table-and-column filter in the R9 test would pass both.
+- **Test condition (qa; not a ruling change):** after each refused code, on both paths:
+  - the hold row keeps the same `identifier` and the same `value` (the user);
+  - its `expires_at` is no later than the hold's lifetime from the original sign-in, or the test records how far it moves;
+  - no other `verification` row is inserted;
+  - every `verification` row deleted had `expires_at < now()`, except the hold row it re-inserts.
+  - A fifth refusal sets `locked_until`, and the hold row's survival lets no sixth attempt be checked.
+- **Code-read, left to the build review:** BetterAuth's inner BEGIN/COMMIT around the hold-row swap become savepoints inside `withSignInTx`. If one of them did a real COMMIT, the outer transaction's "roll back on a 5xx" would no longer cover the earlier writes. The routing-pool test covers this, and I will check it at the build.
+
+### 6.2 Filings
+F2 is on POLY-149 and F3 on POLY-137 (lead, `de945456`). Nothing new to file.
