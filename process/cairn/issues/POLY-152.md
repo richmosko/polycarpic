@@ -119,3 +119,27 @@ Ruling on the two build findings at 25fb2661 (backend-lead-152's findings items 
    - `packages/auth`: the row text says it runs in the sign-in service, and gains the public subpath `./web` (web's session client); consumes unchanged;
    - `apps/web`: consumes swaps `auth` for `auth/web`.
    - The other §3.1c, §3.3 and §7 lines stay for the verdict, as the ruling says.
+
+### @architect — 2026-11-17
+
+Correction to my comment of f16e92d1, part (a), from qa's measurement at 454660da (`auth-signin-tx`, `red-run.md`, better-auth 1.7.18). It replaces that part's test shape and its NIST sentence; the rest of (a) stands: no `accountLockout` option is set.
+
+**There are two counters, both measured.**
+- **Per hold: 5 wrong codes.** A hold is the two-factor cookie's `verification` row. Its 6th try answers 400 `TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE` without counting against the factor. The hold is then dead: a 7th try, even with the right code, is `INVALID_TWO_FACTOR_COOKIE`. The user signs in with the password again.
+- **Per factor: 10 wrong codes, across holds.** `two_factor.failed_verification_count` survives each hold. The 10th refusal sets `locked_until` to about 900 s ahead, and while it is set, the right code is refused and creates no session. So reaching the lock takes two password sign-ins.
+- **The count resets when the lock lapses.** The first wrong code after `locked_until` passes clears the lock and sets the count to 1 (10 → 1, measured on both the TOTP and the backup-code paths).
+- **The resulting budget** is 5 tries per password sign-in and 10 per factor per 900 s, about 960 a day against a six-digit code. That is gated by the password and by the in-memory rate limit on the sign-in routes.
+- My f16e92d1 sentence that 10 is "well inside NIST 800-63B's limit of 100" is withdrawn. NIST's limit is on consecutive failures without a reset, and this counter resets every 900 s. Whether the budget is acceptable, or needs a measured lower `maxFailedAttempts` or a longer lock, is seceng's call; neither option changes R9.
+
+**R9's test shape.** In place of "on one held sign-in":
+- two holds, opened by two password sign-ins, give 9 refusals → count 9, no lock;
+- the 10th → `locked_until` about 900 s ahead;
+- an 11th try with the right code is refused and creates no session;
+- the same for backup codes;
+- plus qa's per-hold test: 5 refusals, then the 6th is `TOO_MANY_ATTEMPTS` and the count stays 5.
+
+**R9's commit rule does not change.**
+- The dead hold's answer is a 400, so it commits under the rule like any refusal below 500. What it may write is the same allowed set: `verification` (the hold row deleted or left spent) and the two `two_factor` columns. Since it does not count, the measured case is a write to `verification` only, or nothing.
+- **The statement-log write-set test must also run on the 6th answer**, not only on counted refusals. A dead hold that wrote anywhere else would fail it, as for any refusal.
+- If that answer ever rolled back, the hold would survive and allow more tries. The per-hold test catches that: the 7th try must still be `INVALID_TWO_FACTOR_COOKIE`.
+- The reset is BetterAuth's own unmarked write to the same two columns, which POLY-89's carve-out (R3 #5) already allows. Nothing new is written.
