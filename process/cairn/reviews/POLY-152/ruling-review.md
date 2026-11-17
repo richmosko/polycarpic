@@ -180,3 +180,8 @@ Read: `git diff e7a18a51 646e35ed -- process/cairn/reviews/POLY-152/ruling.md` (
 
 ### 6.2 Filings
 F2 is on POLY-149 and F3 on POLY-137 (lead, `de945456`). Nothing new to file.
+
+## 7. The owner grant at 0014:57 (architect's ruling at `9f6dd25a`): ACCEPT
+- **`user`:** narrowing the grant to `SELECT (name)` is correct. poly_govern already holds `id, email, email_verified, signup_txid` (0007:11), so `name` is the only new column. Only a NOLOGIN owner gains it, and only `provision_person` uses it, for the marker's own new user, and it never returns the name. No login role gains a read.
+- **`entity` and `entity_type` (0014:54-63):** these are exactly R3's set and no wider. poly_govern held no privilege or policy on either before (grep of 0001–0013). `check_entity` and `seat_creator` are definers (0003:53, 0003:98), so they need nothing from it. A NULL `self_user_id` fails the insert policy.
+- **One addition to the pgTAP pin:** also pin poly_govern's privileges and policies on `entity` and `entity_type` to exactly 0014:54-63. Without that pin, a later widening of these two tables goes unnoticed, as the `user` pin prevents for `user`.
