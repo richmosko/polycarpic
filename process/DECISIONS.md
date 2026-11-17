@@ -687,3 +687,23 @@ Add new decisions ABOVE this comment, newest first.
 **Cost:** no real data until stage 2 is done, which POLY-149 estimates at 11.5–15.5 loop-days over 3 loops.
 **Approved by:** the Principal (2026-11-16), on seceng's recommendation.
 
+
+### 2026-11-17 — The second-step lock grows, then shuts until an emailed code is confirmed
+**Decision:** two changes to the second sign-in step. (1) In POLY-149, each lock in a row lasts twice as long as the last (15 minutes, doubling to a 24-hour cap), and only a correct second-step code resets the doubling. This joins the deploy gate: no real household data is deployed without it. (2) In POLY-137, once the mailer exists, the second step shuts after 3 locks in 24 hours and stays shut until the person confirms a code sent to their email, and the person is emailed at the first lock too. Two conditions bind (2): the emailed code is an extra requirement and never shortens or clears the growing lock; a passkey still passes the second step while it is shut, and the operator's `reset-mfa` stays.
+**Why:** measured on better-auth 1.7.18 (POLY-152, `process/cairn/reviews/POLY-152/red-run.md`), the 10th wrong code locks the step for 15 minutes and the count then starts again from zero. Someone past the first step (the password, the inbox, or the Google or GitHub account) gets 960 guesses a day at 3 valid codes in a million, about 65% in a year, and nobody is told (SECURITY R-26). The growing lock cuts that to about 10 guesses a day (about 1% a year) and needs no mailer. The cap then stops an attacker without the inbox at 30 guesses in total and tells the person. Against an attacker who holds the inbox only the growing lock works, which is why the emailed code must never clear it.
+**Alternatives considered:**
+- Accept until the mailer exists — tolerable only while nothing real is deployed.
+- The growing lock alone (seceng's recommendation in its brief) — leaves about 1% a year and no signal until the email-on-lock lands.
+- Passkey required for owners — the strongest; a product change (DESIGN, PRD), not priced.
+**Cost:** 0.5 to 1 day for the growing lock and about 0.5 day for the cap (seceng's guesses). Someone holding the password can lock the real person out for up to a day at a time; today they can re-lock every 15 minutes.
+**Approved by:** the Principal (2026-11-17), on seceng's brief (measured by qa at `454660da`) and the lead's two conditions.
+
+### 2026-11-17 — A sign-in record the sign-in service cannot edit or delete
+**Decision:** POLY-149 adds a record of every new session, written by the database: who, when, from which address and browser. `poly_auth` can add lines and can neither change nor remove them. It is in place before any real household data is deployed.
+**Why:** after POLY-152 the sign-in service can create any session and delete it again, and reading data leaves no other trace, so a break-in to that service (a bug, or its stolen database password) could be erased completely (SECURITY R-2; `process/cairn/reviews/POLY-152/ruling-review.md` §4; verdict V2). The record turns that into a trace the attacker cannot remove.
+**Limits accepted:** reusing a session that is already open creates no new line; someone with full control of the database server can still erase the record.
+**Alternatives considered:**
+- Accept and document — free; a break-in would leave nothing.
+- Also copy the record off the server — covers the database-server case; needs log shipping that does not exist; reconsider when off-site logging arrives.
+**Cost:** about half a day (the architect's guess); one small row per sign-in.
+**Approved by:** the Principal (2026-11-17), on seceng's recommendation.
