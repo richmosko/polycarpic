@@ -1,7 +1,7 @@
 ---
 id: POLY-152
 title: Sign-in service process
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-148, POLY-89]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, apps/auth/**, apps/web/**, apps/worker/**, packages/**, infra/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**, bin/**]
 labels: [security, auth]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/133
 created: 2026-11-17
 updated: 2026-11-17
 ---
@@ -143,3 +143,7 @@ Correction to my comment of f16e92d1, part (a), from qa's measurement at 454660d
 - **The statement-log write-set test must also run on the 6th answer**, not only on counted refusals. A dead hold that wrote anywhere else would fail it, as for any refusal.
 - If that answer ever rolled back, the hold would survive and allow more tries. The per-hold test catches that: the 7th try must still be `INVALID_TWO_FACTOR_COOKIE`.
 - The reset is BetterAuth's own unmarked write to the same two columns, which POLY-89's carve-out (R3 #5) already allows. Nothing new is written.
+
+### @team-lead — 2026-11-17
+
+PR opened: https://github.com/richmosko/polycarpic/pull/133. Gate sha af6f69de (qa clean-tree run, seceng ACCEPT, architect APPROVE). Awaiting CI and the Principal's merge decision.

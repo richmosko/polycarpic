@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 were approved at the gate; ARCH is now v1.17.0 (layer map and its enforcement; Drizzle Kit confirmed by the POLY-76 spike, §6.2; sign-up inside our own transaction, §3.1), SECURITY v1.9.22 and INFRA v1.3.13. `POLY-C` closed and archived. The first session's issues (POLY-76, 82, 83, 84, 85) are done; the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
+**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 were approved at the gate; ARCH is now v1.19.0 (layer map and its enforcement; Drizzle Kit confirmed by the POLY-76 spike, §6.2; sign-up inside our own transaction, §3.1), SECURITY v1.10.0 and INFRA v1.3.14. `POLY-C` closed and archived. The first session's issues (POLY-76, 82, 83, 84, 85) are done; the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
 **Started:** 2026-11-09  
 **Driver agent:** backend-lead (qa-engineer drives Validate)  
 **Gate criteria:** _see [`WORKFLOW.md`](WORKFLOW.md)_
@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-152-sign-in-service`
 - **Started:** 2026-11-17
 - **Goal:** BetterAuth, the auth secret and every grant on BetterAuth's tables move to a third process, `polycarpic auth`, on its own role poly_auth at `/api/auth/*`; sign-up and the second-step guards run in its transactions. Loop 1 of 3 of stage 2 (then POLY-153, then POLY-149, the revocation).
-- **Status:** In Progress
+- **Status:** In Review — PR [#133](https://github.com/richmosko/polycarpic/pull/133)
 
 _Standing context. POLY-89 (Second sign-in step) merged 2026-11-17 via PR [#131](https://github.com/richmosko/polycarpic/pull/131) — ARCH 1.17.0, SECURITY 1.9.22. Owners and managers need a second factor, enforced by database guards read from the POLY-147 marker; enrolment is anchored on the password plus an emailed code; `polycarpic cli user reset-mfa` is the operator reset. The record is `process/cairn/reviews/POLY-89/`. Open after it: no enrolment screens exist, so nobody can enrol in a browser and no one can create a non-Person entity or send an invitation (fails closed); nothing writes `recent_auth_at` after first enrolment, so an enrolled user cannot add or remove a method after 5 minutes; the emailed code cannot be sent until the mailer exists (POLY-137); backup codes stay on with the copy risk accepted until POLY-149's revocation (`process/DECISIONS.md`, 2026-11-16). Follow-ups are on POLY-150 (second-step screens), POLY-151 (the Confirm it's you route), POLY-91, POLY-115, POLY-137, POLY-143 and POLY-149._
 
