@@ -56,3 +56,7 @@ The db and tests/ci rows are the per-config full runs. The unit rows below them 
 - `tests/layers/auth-service.test.ts` now walks imports transitively from web entry points and `packages/auth/src/web.ts`; it is shown to fail on 7 planted imports (direct, `@better-auth/*`, two-hop relative chain to the root, `@poly/db/auth` through tenancy, a non-`web*` auth file, dynamic import, `.svelte` script) before it counts, with a clean control. The 8 plant tests pass today by design; the 7 repo checks in that file are red.
 - Passes today on purpose, one more: `auth-internal-session` day-8 idle through the direct `/api/auth` door (handleAuthRequest already refuses an expired row).
 - Open for the build: `loadSession` leaves the `@poly/auth` root, so the `auth-session.test.ts` `load()` calls (12) and `helpers/auth.ts` need retargeting to `handleSessionRequest` (first-load provisioning and the gate move to web). I retarget them when the build lands, so the new shape is not guessed.
+
+### Real-tree plant, two hops down (removed after)
+
+`packages/auth/src/web.ts` -> `web/a.ts` -> `web/b.ts` importing `better-auth` and `@poly/db/auth`. The repo check failed and named the plant: `better-auth imported by packages/auth/src/web/b.ts`. (`@poly/db/auth` was already reported once via the existing web chain; each file is visited once.) The plant files are deleted; `git status` clean of them.
