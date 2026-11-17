@@ -11,7 +11,7 @@ labels: [ops, deploy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-11
+updated: 2026-11-16
 ---
 
 INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh attestation verify pinned to the repo and signer workflow, prod git verify-tag against operator-installed allowed_signers, the tag-to-digest label check, ops-bundle extraction, check-config then migrate --plan, a pre-migration encrypted backup via the backup container, migrate under advisory lock, up -d, a 120 s health poll, automatic rollback, quarantine and heartbeat. A bad migration is recovered off the box from the operator's laptop within 60 minutes; no plaintext dump is written on the box (Principal Q8, 2026-11-08).
@@ -62,3 +62,7 @@ Before the first `v1.*` tag (user action, from POLY-96): set the repository vari
 ### @team-lead — 2026-11-11
 
 From the POLY-95 loop (`process/cairn/reviews/POLY-95/`): (F3) `build.yml` publishes and attests the Postgres derivative, the Caddy image and the tools image; none is published today. The home-box DNS-plugin Caddy build goes with it. (F5) The ops bundle carries `infra/compose/**`, `infra/caddy/Caddyfile` and the `infra/postgres/**` config into the verified image. (F8) The deploy uses explicit `-f` files from the verified bundle only and runs the compose-policy lint, or checks the bundle digest, before `up`. (F10) `POLY_APP_IMAGE`, `POLY_TOOLS_IMAGE` and `POLY_CADDY_IMAGE` become `${…:?}` like `POLY_POSTGRES_IMAGE`; they default to an all-zero digest today.
+
+### @team-lead — 2026-11-16
+
+Noted in the POLY-89 loop (2026-11-17): the two `it.fails` pins in `tests/db/runner.test.ts` (line 196 on) still stand; they predate that loop.

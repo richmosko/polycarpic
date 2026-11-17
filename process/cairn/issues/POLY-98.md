@@ -11,7 +11,7 @@ labels: [ops, cli]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-15
+updated: 2026-11-16
 ---
 
 The operator subcommands INFRA §7 and §8 name (set-secret through cli pass-through). status prints digest, last deploy, last backup from last-upload (never from the app), certificate days, disk, unaccounted poly_backup connections in 24 h, and non-temporary replication slots. Secrets are read without echo and written 0400.
@@ -41,3 +41,7 @@ From POLY-146's security review (`process/cairn/reviews/POLY-146/security-review
 ### @team-lead — 2026-11-15
 
 Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `process/cairn/reviews/POLY-147/` (ruling, security-review, verdict) and devops-147's findings.
+
+### @team-lead — 2026-11-16
+
+From the POLY-89 follow-ups (seceng, 2026-11-17): add a `polycarpic-ops gate-check` subcommand that runs the deploy-gate query in INFRA §7.1 step 16 (poly_app holds no privilege on BetterAuth's tables and no EXECUTE on any `enter_*` except `enter_session`) and exits non-zero on any row. Step 16 then calls it in place of the raw `psql` command, which is tagged unmeasured until POLY-97's staging deploy runs it. The gate is the Principal's decision of 2026-11-16 (`process/DECISIONS.md`).
