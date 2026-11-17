@@ -1,10 +1,9 @@
 // POLY-152 R6.2 (seceng §5.1, E2): the internal listener binds only to the service's address on the web–auth network, or to a Unix
-// socket on a volume that only web and auth mount; never 0.0.0.0 or ::. ASSUMED export: internalBind(env) -> { host } | { socket };
-// env names AUTH_INTERNAL_HOST / AUTH_INTERNAL_PORT / AUTH_INTERNAL_SOCKET are ASSUMED and reconciled here only.
+// socket on a volume that only web and auth mount; never 0.0.0.0 or ::. internalBind(env) returns { host } or { path }.
 import { describe, expect, it } from 'vitest';
 
 // The module is loaded OUTSIDE the refusal catch, so a missing file is a red test, never a vacuous "refused".
-const load = async (): Promise<(env: Record<string, string>) => { host?: string; socket?: string; port?: number }> => ((await import('../../apps/auth/src/bind.ts')) as any).internalBind;
+const load = async (): Promise<(env: Record<string, string>) => { host?: string; socket?: string; port?: number }> => ((await import('./bind.ts')) as any).internalBind;
 const bind = async (env: Record<string, string>) => (await load())(env);
 const refuses = async (env: Record<string, string>) => { const f = await load(); try { f(env); return null; } catch (e) { return e as Error; } };
 

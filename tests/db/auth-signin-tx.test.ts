@@ -1,6 +1,5 @@
 // POLY-152 R9, seceng F1 / §6.1: the session-creating paths commit in one transaction (withSignInTx), and a refused second-step code
 // commits only what it may. Red today: withSignInTx does not exist, so a late failure leaves the session row (no outer transaction).
-import { writeFileSync } from 'node:fs';
 import { createAuthMiddleware } from 'better-auth/api';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
@@ -160,7 +159,6 @@ describe('§6.1 a refused second-step code commits its count, and only what it m
       const row = must(`SELECT failed_verification_count, locked_until FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]!;
       const line = `${path}: lapsed lock, then one wrong code -> status ${after.status}; failed_verification_count ${countBefore} -> ${row[0]}; locked_until ${row[1] === '' ? 'NULL' : 'set'}`;
       console.log(`[lock-expiry] ${line}`);
-      writeFileSync(`temp/lock-expiry-${path.replace(/\W+/g, '_')}.txt`, line + '\n');
     });
   }
   it('a hold allows 5 wrong codes: the 6th answers TOO_MANY_ATTEMPTS without counting, and the hold is then dead (measured, 1.7.18; the factor count is separate) [red if: the per-hold cap is removed or counted twice]', async () => {
@@ -230,6 +228,6 @@ describe('the TOTP acceptance window is one step either side', () => {
         expect(hasSessionCookie(r), `offset ${offset}s -> ${r.status}`).toBe(accepted);
       }
     } finally { vi.useRealTimers(); }
-    writeFileSync('temp/totp-window.txt', JSON.stringify(verdicts) + '\n');
+    console.log(`[totp-window] ${JSON.stringify(verdicts)}`); // recorded in red-run.md; a test never writes into temp/ (it does not exist in CI)
   });
 });
