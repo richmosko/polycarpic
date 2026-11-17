@@ -1,8 +1,8 @@
-# POLY-152 — Sign-in service: security review of the ruling (seceng)
+# POLY-152 — Sign-in service: security review of the ruling at `e7a18a51` (seceng; §1–§4 written at `839b99a5`, §5 is the delta)
 
 **Reviewed:** `process/cairn/reviews/POLY-152/ruling.md` at `839b99a5` (R0–R11). Read against POLY-152 and its sub-issues, POLY-153, POLY-149, the POLY-148 spike record §1–§7, the POLY-89 ruling R1–R5 and its build review, `infra/compose/{prod,edge,staging}.yml`, `packages/auth/src/{session,options,recent-auth}.ts` and migration 0013. Nothing here was run: the ruling is a design, and each item below is a test qa writes red before the build.
 
-**Verdict: ACCEPT.** No ruling change is required before the tests are written. §2 lists what the tests must cover. §3 has three filings for the lead and one decision for the Principal.
+**Verdict at `e7a18a51`: CHANGES REQUESTED, one addendum (§5.1, the internal listener's bind); ACCEPT once it lands.** At `839b99a5` it was ACCEPT. §2 lists what the tests must cover, and still holds at `e7a18a51` except where §5 says otherwise. §3 has the filings for the lead, and §4 a decision for the Principal.
 
 ## 1. The four points the lead asked about
 
@@ -103,3 +103,42 @@ Plain-language brief: §4.
 **Recommendation: (b), added to POLY-149, so that it is in place before any real household data is deployed.** It turns "no trace" into "a trace the attacker cannot remove" in most cases, for half a day of work and no daily cost. Revisit (c) when off-site logging arrives.
 
 Refs: ruling.md R11 and open question 1 @ 839b99a5; SECURITY R-2; POLY-137 (sign-in emails); POLY-149; DECISIONS 2026-11-16 (deploy gate).
+
+## 5. Delta at `e7a18a51`
+
+Read: `git diff 839b99a5 e7a18a51 -- process/cairn/reviews/POLY-152/ruling.md` (R0, R2, R6.2, R7, R8, R10, R11 and open questions 4–5), plus `packages/db/sql/roles.sql:86-88` for the default privileges. The lead's four asks, against this sha:
+
+| Ask | At `e7a18a51` | Result |
+|---|---|---|
+| 1. R7 refresh | Unchanged apart from the #19 sentence | **Confirmed**, as in §1.1, with the same conditions |
+| 2. R6.2 the listener | Its contract is stated: the signed cookie is the only input; 404 to anything else; a bare, hex or wrongly signed token gets 204 | **The contract is accepted.** The bind is not stated (§5.1): **required change** |
+| 3. Q3 and the tenant reads | R8 revokes the nine POLY-89 EXECUTEs and the three sign-up definers from poly_app in 0014. R2: no privilege of any kind, SELECT included, outside the allowed eight | **Both are in, as I need them** |
+| 4. The sign-in record | Open question 1 unchanged | §4 stands: recommend (b) on POLY-149 |
+
+### 5.1 Required: state where the internal listener listens (R6.2)
+R6.2 says the listener is "reachable only on the network web and auth share" and that Caddy has no *route* to it. Neither sentence says what the listener binds to.
+- **Why it matters.** Caddy sits on `edge-prod` and `edge-staging` (`edge.yml:21`). The service must join `edge-prod` so that Caddy can reach its public port. A listener on `0.0.0.0` is then reachable by address from Caddy's container, and from anything else that ever joins `edge-prod`, whatever Caddy's routes say.
+- **Not a hole today.** The contract above makes the listener equal to the public `get-session`, so what it reaches is the same. But the ruling relies on reachability ("reachable only on"), and that claim is untrue unless the bind makes it true.
+- **The addendum (one or two lines):**
+  - the internal listener binds only to the service's address on the web–auth network, or to a Unix socket on a volume that only web and auth mount; never `0.0.0.0` or `::`;
+  - that network is `internal: true`, and `caddy`, `worker`, `operator`, `migrate` and every staging service are not on it;
+  - it publishes no `ports:`.
+- **Tests:** §2 E2, as written there (the bind address in a unit test; network membership and no `ports:` in the rendered compose). A live probe from the Caddy container waits on the first `docker compose up` (POLY-97); until then that half is (unmeasured).
+
+### 5.2 New in R8: the twelve revocations, checked
+- **What a stolen poly_app password loses:** drawing or confirming an emailed code; flipping the second factor (its UPDATE column grant was never poly_app's, and the definer is now gone); finishing a sign-up. My §1.3 C-c case (flipping the factor off within 5 minutes of the victim's step-up) is closed for poly_app.
+- **What it keeps, correctly stated in R11:** `enter_asserted_user`, BetterAuth's tables, and the unmarked factor writes, the D1 backup-code copy among them, until POLY-149.
+- **Fails closed, with one condition for the tests.** The guard triggers are invokers, so a guard that calls a helper (`check_factor_removal`, `take_recent_auth_stamp`, `consume_passkey_grant`) now raises "permission denied" for poly_app. R8 accepts any `42501`. Each refusal test must also assert that nothing was written, not only the error code: a permission error and a guard refusal look the same in the result, and only the unchanged row proves the write failed.
+- **Unmeasured (R8 says so):** that web calls none of the twelve. The measurement is that web's whole test suite and e2e pass at the green sha with the revocations in place. If anything in web needs one, the build reports it and does not re-grant it (R2's rule applies to poly_app too).
+- **§2 A1 changes:** the before/after diff of poly_app's privileges shows exactly the twelve EXECUTE removals and nothing else (R8's test), not an empty diff.
+
+### 5.3 New in R2: no reads outside the eight, checked
+- **Accepted.** The ruling also lists what each definer granted to poly_auth reads on its behalf. None returns a tenant row; under an `auth` marker every sign-up definer except `claim_invitations` refuses. That is the §2 B1 test, and R2 now names it.
+- **One condition on how the #16 test reads the catalog.** `information_schema.role_table_grants` and `routine_privileges` list grants made *to the role*. They do not show what poly_auth gets through `PUBLIC`. `roles.sql:86-88` revokes PUBLIC's EXECUTE on functions created by eight owner roles, but not on functions created by any other role, and not on what extensions create. So the test also runs `has_table_privilege('poly_auth', …)`, `has_column_privilege`, `has_sequence_privilege` and `has_function_privilege` over every relation, sequence and function in `public`, `app` and `drizzle`, and asserts true exactly for the allowed list. That way a grant through PUBLIC also fails CI. pg_catalog is out of scope; the stage-1 revoke of the 17 functions that run a SQL string already covers its dangerous part.
+- **Non-blocking:** R11 says that poly_auth entering as a victim it has read can draw a code and enrol a factor for a user who has no second step. That is visible to the user (a factor they did not add appears in Settings), and poly_auth could already do it through its direct DML. SECURITY's R-2 residual for the sign-in service should say it.
+
+### 5.4 Filings, updated
+- **F1:** done at `8129f982` (see §3).
+- **F2 is narrowed.** The nine leave poly_app in this loop. Left for POLY-149: its revocation criterion names BetterAuth's tables and the `enter_*` functions. Its catalog test should pin poly_app's **complete** EXECUTE set after the revocation, not only the `enter_*`: `second_step_required`, POLY-153's session definers, and whatever web still needs by then. Then no grant is left behind by default. One line on POLY-149.
+- **F3:** unchanged (R-24 covers every OAuth callback; R9 is unchanged).
+- **New, for SECURITY at this loop's docs (POLY-149):** R6.2's own sentence — a database read of session tokens plus the auth secret (code execution in the service) gives a working cookie for every live session.
