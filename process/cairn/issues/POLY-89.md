@@ -1,7 +1,7 @@
 ---
 id: POLY-89
 title: Second sign-in step
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-86, POLY-62, POLY-87, POLY-147]
@@ -176,3 +176,7 @@ Criterion 14's wording predates ruling R1.4: no role holds UPDATE on `two_factor
 ### @team-lead — 2026-11-16
 
 PR opened: https://github.com/richmosko/polycarpic/pull/131. Awaiting Validate.
+
+### @team-lead — 2026-11-16
+
+Validate passed; merging via PR #131. Closing. CI green on head e38d73e7 (app, lint, unit, db, image, cairn, changes, guard). Follow-ups go in one post-merge docs PR.
