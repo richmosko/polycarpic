@@ -27,6 +27,14 @@ Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict an
 - [ ] The Resend mailer for `sendMagicLink`; apps/web passes one that answers 503 until it exists (ruling follow-up 3).
 - [ ] Avatar upload to our own origin, with the same-origin rule on `/update-user` image (ruling follow-up 2; seceng).
 
+- [ ] **Second-step cap and lock notice (`process/DECISIONS.md` 2026-11-17).** Needs the mailer above. Each sub-item is shown red first:
+  - On a fake clock, the 3rd lock of one factor within a rolling 24 hours shuts the code step. While it is shut, a correct TOTP or backup code is refused, creates no session, and counts toward nothing.
+  - It opens only when the user confirms a code emailed to their account's address (the `app.email_challenge` machinery, its own purpose, single use, 15-minute expiry, 5 wrong entries end it).
+  - The emailed code never shortens or clears the growing lock: confirming it during a lock leaves `locked_until` and the doubling unchanged, and the right TOTP is refused until the lock lapses.
+  - A passkey sign-in passes the second step while it is shut and while it is locked. `reset-mfa` still clears a shut user.
+  - At the first lock of a run, the user is emailed once. The mail holds no code and no link that changes anything, and says that someone with their first step tried codes. Later locks in the same run send no further notice; the shut mail is the next.
+  - The shut state lives in the database. A write by poly_auth that clears it is refused, except the confirmation definer, by its exact call.
+
 ## Comments
 
 ### @team-lead — 2026-11-12
