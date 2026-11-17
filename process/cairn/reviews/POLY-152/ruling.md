@@ -9,7 +9,7 @@
 
 ## R0. What this loop is, and what it is not
 
-This loop stands up `polycarpic auth` on poly_auth and moves BetterAuth, its secrets and the sign-up and second-step writes into it. Web stops running BetterAuth. **It narrows nothing for poly_app**: poly_app keeps every grant it holds today until POLY-149, and web still enters by `app.enter_asserted_user`. Web entering by handle (the handle cookie, `app.session_handle`, `app.enter_session`, cookie path scoping) is POLY-153. The revocation and the docs are POLY-149.
+This loop stands up `polycarpic auth` on poly_auth and moves BetterAuth, its secrets and the sign-up and second-step writes into it. Web stops running BetterAuth. **For poly_app it narrows only the definers web no longer calls** (R8): poly_app keeps its grants on BetterAuth's tables and `app.enter_asserted_user` until POLY-149, and web still enters by `enter_asserted_user`. Web entering by handle (the handle cookie, `app.session_handle`, `app.enter_session`, cookie path scoping) is POLY-153. The revocation and the docs are POLY-149.
 
 ## R1. The process and its mounts (C1)
 
@@ -38,7 +38,14 @@ This loop stands up `polycarpic auth` on poly_auth and moves BetterAuth, its sec
 | `app.tx_identity` | SELECT, with `tx_identity_own` extended `TO … poly_auth` |
 | `drizzle.__drizzle_migrations` | SELECT |
 
-**Not granted, pinned absent:** `session.recent_auth_at` INSERT or UPDATE (R4); `user.two_factor_enabled` UPDATE and `user.second_step_at` anything but SELECT; any privilege or policy on `entity`, `membership`, `entity_type`, `invitation`, `notification`, `audit_event`, `app.email_challenge`, `app.enrolment_grant` (C3).
+**Not granted, pinned absent:** `session.recent_auth_at` INSERT or UPDATE (R4); `user.two_factor_enabled` UPDATE and `user.second_step_at` anything but SELECT.
+
+**No tenant reach, reads included (C3, seceng B1).** poly_auth holds **no privilege of any kind, SELECT included**, on any table or view outside the six BetterAuth tables, `app.tx_identity` and `drizzle.__drizzle_migrations`. That covers every tenant table that exists (`entity`, `membership`, `entity_type`, `invitation`, `notification`, `audit_event`) and every one a later migration adds. It also covers `app.email_challenge` and `app.enrolment_grant`. No policy on any of those tables names poly_auth. The catalog test enumerates every table in `public` and `app` and fails on any grant to poly_auth outside the allowed eight, so a new tenant table cannot leak to it by default (default privileges grant nothing to poly_auth).
+
+The reason this is stricter than "no writes": poly_auth must SELECT `session.token`, so SQL as poly_auth can enter as any user who has a live session, with no new session row (R11). That entry must reach no tenant data. **What the definers read on its behalf**, and so all that such an entry yields:
+- `enter_new_user`, `claim_invitations`, `accept_invitations`, `provision_person`: they read `user` (signup stamp, email, verified), `invitation` and `entity.self_user_id`. Every one except `claim_invitations` refuses unless the user was created by this transaction, so under an `auth` marker each refuses. `claim_invitations` runs before any marker and matches by the invitation token's hash and email; it returns nothing, and it is the same for poly_auth as it is for poly_app today.
+- The POLY-89 readers and writers: they read the marker user's own `second_step_at`, factor rows, challenge and grant rows, and memberships and invitations only to compute `own_person_exempt`. They return a boolean, an emailed code (`issue_email_challenge`), or nothing. None returns a tenant row.
+- Test (seceng B3): as poly_auth, read another user's `session.token`, enter with it, then SELECT from each tenant table → permission denied. Also call each granted definer and show that none returns a tenant row.
 
 **EXECUTE**, and nothing else:
 - readers: `app.current_user_id()`, `app.current_session_id()`;
@@ -50,7 +57,7 @@ This loop stands up `polycarpic auth` on poly_auth and moves BetterAuth, its sec
 
 **The test (seceng #16).** A pgTAP file lists poly_auth's full table, column, function and policy privileges from the catalog (`information_schema.role_table_grants`, `role_column_grants`, `routine_privileges`, `pg_policies.roles`, `pg_auth_members`) and compares them with the lists above, both ways: a missing or an extra privilege fails. pgTAP 01 and 03 gain poly_auth. **A build that finds the list short does not add the grant**: it reports the failing statement to me and the ruling is re-issued whole. The read grants the spike needed beyond this list (`entity`, `membership`, `entity_type`, `invitation` SELECT, the `has_role` family) were for the invoker Person insert and `landingEntity`; R3 and R6 remove both from the service (unmeasured that nothing else needs them; the poly_auth run of every auth test is the measurement).
 
-**The sign-up stamp (C2).** `app.stamp_signup_user()` (0007:139) tests `current_user <> 'poly_auth'`. From this migration a poly_app user insert gets a NULL stamp, so poly_app can no longer complete a sign-up (`enter_new_user` refuses it); a test shows that. poly_app's EXECUTE on the three sign-up definers stays, inert, until POLY-149 revokes it.
+**The sign-up stamp (C2).** `app.stamp_signup_user()` (0007:139) tests `current_user <> 'poly_auth'`. From this migration a poly_app user insert gets a NULL stamp, so poly_app can no longer complete a sign-up (`enter_new_user` refuses it); a test shows that. poly_app also loses EXECUTE on the three sign-up definers in this loop (R8).
 
 ## R3. `app.provision_person()` (C3)
 
@@ -87,7 +94,10 @@ Stays as POLY-89 R3 #3 ships it: `sessionCreateBefore` returns `recentAuthAt: un
 ## R6. What web does until POLY-153
 
 1. **No BetterAuth, no secret.** `apps/web/src/lib/server/auth.ts` (`startAuth`) is deleted. Web imports only `@poly/auth/web`, which imports neither `better-auth` nor `@poly/db/auth`.
-2. **The session lookup is a call to the service.** `loadSession` (in `@poly/auth/web`) sends `GET <AUTH_INTERNAL_ORIGIN>/session` with the request's `cookie` header filtered to BetterAuth's cookie names, a 2-second timeout, and nothing else. The service runs, on its plain pool and outside any transaction of ours, exactly today's steps: `auth.api.getSession` (which slides the row), and the 30-day cap check, which deletes a capped row. It answers `200 {userId, sessionId, name, image, expiresAt}` or `204`. It returns no `Set-Cookie` (R7). Web then does what it does today: `provisionPerson` as poly_app on first load, `app.second_step_required()`, the sign-in gate, `withTenant` → `enter_asserted_user`. An unreachable service answers 503, never a redirect to `/sign-in`.
+2. **The session lookup is a call to the service (seceng Q1, option c).** Today `loadSession` verifies the signed cookie with the auth secret (`session.ts:61`). From this loop the verification stays with the secret, in the service. Web never parses the cookie or looks a session up by its token. `loadSession` (in `@poly/auth/web`) sends `GET <AUTH_INTERNAL_ORIGIN>/session` with the request's `cookie` header filtered to BetterAuth's cookie names, a 2-second timeout, and nothing else.
+   - The endpoint takes **no user id, session id or token parameter**: its only input is the signed cookie. It answers 404 to any other path, method or query string.
+   - It is reachable only on the network web and auth share. Caddy has no route to it, and a test through Caddy (`/session`, `/api/auth/../session` and the spike's 9 spellings) never reaches it.
+   - **What a database read of `session.token` buys at web:** nothing over HTTP. The service's `getSession` checks the cookie's HMAC, so a bare or hex token, or a token with a wrong signature, gets `204`; a test sends each. With the auth secret as well (code execution in the service), the read becomes a cookie for every live session (SECURITY to state). SQL as poly_app needs no cookie, because it holds `enter_asserted_user` until POLY-149. The service runs, on its plain pool and outside any transaction of ours, exactly today's steps: `auth.api.getSession` (which slides the row), and the 30-day cap check, which deletes a capped row. It answers `200 {userId, sessionId, name, image, expiresAt}` or `204`. It returns no `Set-Cookie` (R7). Web then does what it does today: `provisionPerson` as poly_app on first load, `app.second_step_required()`, the sign-in gate, `withTenant` → `enter_asserted_user`. An unreachable service answers 503, never a redirect to `/sign-in`.
 3. **Unchanged in web:** Settings → Sessions (`listMySessions`, `revokeMySession`), the step-up check web makes (`requireRecentAuth`, now a plain poly_app query in `@poly/auth/web`, not the routing pool), the landing entity, and the sign-in and sign-up pages, whose forms post to `/api/auth/*` on the same origin.
 4. **This is throwaway.** POLY-153 replaces the call with `app.enter_session(handle)`. It costs about 0.25–0.5 loop-day (guess) inside this loop. The two other ways to keep web working were worse: web keeping BetterAuth and the secret fails C1 and seceng #17, and pulling the handle and `enter_session` forward undoes the split.
 
@@ -101,7 +111,7 @@ Stays as POLY-89 R3 #3 ships it: `sessionCreateBefore` returns `recentAuthAt: un
 
 **Why not seceng's re-issue on refresh (§7.6).** It works only while the service sees the request. In POLY-153's end state page loads reach web alone, and web cannot re-issue a cookie scoped to `/api/auth` whose value it never sees. A daily user who only views pages would then still be signed out on day 7. With the cookie living to the cap, how long the browser keeps it is not the control: the row is. The cost is a dead cookie left in an idle browser until the cap; it reaches nothing, because the row has expired. seceng to confirm at the ruling review.
 
-**The cap's clearing cookie (C7).** `handleAuthRequest`'s cap branch builds the cookie from `c.attributes`: path, `Secure`, `SameSite` and `HttpOnly` as BetterAuth set them, never a literal `Path=/`. This loop keeps BetterAuth's cookie at `Path=/` and its current name; the `__Secure-` prefix and `Path=/api/auth` land in POLY-153 with the handle, because web needs the cookie until then. The test configures `Path=/api/auth` through `AuthInput` and shows the clearing cookie carries it.
+**The cap's clearing cookie (C7).** `handleAuthRequest`'s cap branch builds the cookie from `c.attributes`: path, `Secure`, `SameSite` and `HttpOnly` as BetterAuth set them, never a literal `Path=/`. This loop keeps BetterAuth's cookie at `Path=/` and its current name. **Cookie scope (seceng #19) lands in POLY-153**, in the same PR as the handle: the `__Secure-` prefix, `Path=/api/auth`, and a test that web never receives a BetterAuth cookie. It cannot land earlier, because web reads that cookie (through R6.2) until the handle replaces it, and `Path=/api/auth` now would sign every user out of web. The seeded e2e `storageState` changes there too. The test configures `Path=/api/auth` through `AuthInput` and shows the clearing cookie carries it.
 
 **Tests (C8).** On a fake clock:
 - sign in at day 0: `Max-Age` within 60 s of 30 days;
@@ -115,11 +125,15 @@ Stays as POLY-89 R3 #3 ships it: `sessionCreateBefore` returns `recentAuthAt: un
 
 - **Guard bodies do not change.** POLY-89 R1.3 made every guard role-indifferent; the catalog test that no POLY-89 body names `poly_app` or `poly_auth` stays.
 - **Marker.** Every signed-in `/api/auth` request becomes `BEGIN; SELECT app.enter_auth_session($1); …; COMMIT` as poly_auth, in place of `enter_asserted_user` as poly_app. The guards read `app.current_user_id()` and `app.current_session_id()` from that marker. The session id is now taken from a live row, but **no guard is changed to rely on it**: web's `web` markers still carry an asserted id until POLY-149, and R1.2's rule stands.
-- **Definer grants.** EXECUTE on the nine POLY-89 functions in R2 is granted to poly_auth. poly_app keeps its EXECUTE until POLY-149, including `set_two_factor_enabled`, `issue_email_challenge` and `confirm_email_challenge`; with the exact-call check those need a poly_app marker, which `enter_asserted_user` still gives it (R10).
+- **Definer grants move this loop (seceng Q3).** EXECUTE on the nine POLY-89 functions in R2 is granted to poly_auth and **revoked from poly_app** in the same migration. These are `step_up_fresh`, `enrol_proof`, `enrolment_grant_live`, `check_factor_removal`, `set_two_factor_enabled`, `consume_passkey_grant`, `take_recent_auth_stamp`, `issue_email_challenge` and `confirm_email_challenge`. So are the sign-up three: `enter_new_user`, `claim_invitations` and `accept_invitations`.
+  - Web has no caller of any of them once it stops serving `/api/auth/*`: its step-up check reads `session.recent_auth_at` directly (R6.3), and its gate calls only `second_step_required`, which poly_app keeps.
+  - Effect on a stolen poly_app password: it can no longer draw an emailed code or flip the factor flag. A direct write to a factor table as poly_app now fails at the guard's helper call, or at the guard, so it fails closed (unmeasured: poly_app's refusal half in R8 measures it).
+  - It keeps the unmarked writes the guards allow without a helper (the D1 backup-code copy; failed counts). Those, its BetterAuth table grants and `enter_asserted_user` stay until POLY-149.
+  - Test (seceng A3): poly_app's catalog privileges after 0014, compared with before, show only removals: exactly these twelve EXECUTEs.
 - **Fixtures.**
   - `tests/db/helpers/second-step.ts` stops creating `poly_auth IN ROLE poly_app`; the role comes from `roles.sql` in the harness, with its own password. `helpers/api.ts`'s `DROP ROLE poly_auth` goes.
   - **Positive paths run as poly_auth**, entering by `enter_auth_session` with a seeded session's token.
-  - **Refusal paths run as both roles**: poly_auth entering by token, poly_app entering by `enter_asserted_user`, until POLY-149 removes the poly_app half.
+  - **Refusal paths run as both roles**: poly_auth entering by token, and poly_app entering by `enter_asserted_user`, until POLY-149 removes the poly_app half. For poly_app the expected answer is any `42501`, a permission refusal included.
   - R1.2's forge cases change shape for poly_auth: (b), a session with no row, is now refused at entry, and the test asserts that. (a) and (c) enter with another real session's token and must still refuse. The fourth case still passes by design.
   - Every in-process `handleAuthRequest` suite (`tests/db/auth-*`, `second-step-*`) runs its pool as poly_auth. A suite that only passes as poly_app is a red finding for qa, not a test to keep.
 - **The sign-in carve-out** (POLY-89 R8 [C-a]: TOTP sign-in, wrong-code lockout, passkey sign-in, backup-code sign-in) runs as poly_auth, inside R9's transaction where R9 says.
@@ -145,27 +159,34 @@ Stays as POLY-89 R3 #3 ships it: `sessionCreateBefore` returns `recentAuthAt: un
    3. `CREATE OR REPLACE app.stamp_signup_user()` (poly_auth only);
    4. the owner grants and policies for R3 and R5;
    5. `SET ROLE poly_authz`: `enter_auth_session`; `SET ROLE poly_govern`: `provision_person`, and `audit_membership` with `auth`;
-   6. `SET ROLE poly_owner`: EXECUTE grants to poly_auth (R2), with REVOKE FROM PUBLIC first.
+   6. `SET ROLE poly_owner`: EXECUTE grants to poly_auth (R2), with REVOKE FROM PUBLIC first; then the twelve REVOKEs from poly_app (R8).
 3. `packages/db/sql/definers.json` lists `enter_auth_session` and `provision_person`.
 4. Nothing is deployed, so no data moves. The first staging deploy (POLY-97) runs `roles.sql` before `migrate` as it does today.
 
 ## R11. What an attacker reaches at the end of this loop
 
-**As poly_app** (SQL injection in web, the poly_app password, code execution in web): **the same as today.** That is: name any user by `enter_asserted_user` and act as them in every tenant table; plant a `verification` row and sign in as anyone through the service's magic link; read session tokens and every BetterAuth table; write factor rows, subject to POLY-89's guards. Two things change:
+**As poly_app** (SQL injection in web, the poly_app password, code execution in web): **nearly the same as today.** It can still:
+- name any user by `enter_asserted_user` and act as them in every tenant table;
+- plant a `verification` row and sign in as anyone through the service's magic link;
+- read session tokens and every BetterAuth table;
+- make the unmarked factor writes (the D1 backup-code copy).
+
+What changes:
 - code execution in web no longer finds the auth secret or the OAuth client secrets, and web no longer holds the mailer key;
-- poly_app can no longer finish a sign-up (R2).
+- poly_app can no longer finish a sign-up, draw or confirm an emailed code, or flip the factor flag (R2, R8).
 
 **As poly_auth** (SQL injection in the service, its password, code execution in the service):
 - BetterAuth's tables: everything poly_app can do on them, which is everything the service does by design. That means create a session for any user, read password hashes, TOTP secrets, backup codes and provider tokens, change a user's email, delete sessions.
 - **Tenancy: nothing directly.** It holds no grant or policy on a tenant table. It cannot name a user: `enter_auth_session` needs a live session row. It cannot provision outside a sign-up.
-- **It can reach any user indirectly.** It reads a live session's token, or inserts a session row, then enters by `enter_auth_session` (factor and enrolment definers as that user) or presents the session's cookie to web (tenant reach through web's `enter_asserted_user`). With code execution it also holds the secret that signs the cookie.
+- **Entering as a user it has read** (a live session's token, no new row) is **silent but reaches no tenant data** (R2). It reaches that user's factor state through the POLY-89 definers. Within POLY-89's guards it can, for example, draw an emailed code for a user with no second step and enrol a factor. It could already do the same with its direct DML on the factor tables.
+- **It reaches any user's tenant data only through web.** It must present a signed cookie at web, which needs the auth secret (code execution in the service), or create a session and sign in through the browser path. Either way web then enters as that user by `enter_asserted_user`.
 
 **What makes that visible is weaker than seceng's §7 assumes.** The session row shows in the victim's Sessions list only while it exists, and poly_auth can DELETE it afterwards. Sign-in emails do not exist until POLY-137. No append-only record of session creation exists. See open question 1.
 
 ## Not in this loop
 
 - The handle cookie, `app.session_handle`, `app.enter_session`, the `__Secure-` prefix and `Path=/api/auth`, the session definers for Settings → Sessions, and removing `loadSession` and `SessionUserId`: POLY-153.
-- Revoking poly_app's grants and `enter_asserted_user`, and every doc: POLY-149.
+- Revoking poly_app's grants on BetterAuth's tables and `enter_asserted_user`, and every doc: POLY-149.
 - The ARCH lines this loop makes stale: §3.1c (the routing-pool items: which requests run inside, the role BetterAuth runs as), §3.3 (the roles list and the ways into the marker), the `packages/auth` row of §2 and §7's service list. The ruling contradicts none of them as they stand; they are edited at this loop's verdict.
 
 ## Open questions (for the lead; none blocks the tests)
@@ -173,3 +194,5 @@ Stays as POLY-89 R3 #3 ships it: `sessionCreateBefore` returns `recentAuthAt: un
 1. **A durable record of session creation (Principal).** Today the only trace of a session poly_auth forged is the row it can delete. An AFTER INSERT trigger on `session` owned by `poly_govern` could append to `app.session_event` (user, session id, time, IP, user agent). No login role would hold UPDATE or DELETE on it, and Settings → Sessions would show it later. Day to day it is invisible to users, costs one row per sign-in, and is about 0.5 loop-day (guess). **Recommend: add it to POLY-149**, before the deploy gate lifts. Without it, R-2's residual should say that a forged session can be erased.
 2. **Price (lead).** R6.2's interim session call adds about 0.25–0.5 loop-day (guess) to this loop, and POLY-153 throws it away.
 3. **Criterion 6's wording (lead).** It names the handle, which this loop does not build. R9 tests the transaction with a test plugin and gives the handle test to POLY-153; POLY-153's criteria should carry it.
+4. **Move seceng #19 to POLY-153 (lead).** Cookie scope is on no issue since the split (R7).
+5. **The split stands.** Q1 is answered inside this loop by R6.2, with no handle, so there is no need to re-cut POLY-152 and POLY-153.
