@@ -168,3 +168,33 @@ Tree clean (`git status` empty); every suite from its own config. Passed + faile
 **The 6th answer on a hold** (the dead hold's 400): its statements are all `delete from verification` (the expired sweep and the cookie and attempts rows); no insert, no update, nothing outside `verification`; and it commits: the cookie row (names the user) and the attempts counter (value 5) are both gone afterwards, nothing added. The 7th try on the dead hold, even with the right code, is 401 with no session.
 
 **seceng §9 refusal conditions, checked against the refusal tests:** the cookie row keeping its `identifier` and `value`, no extra row, and the 10th-refusal lock were already asserted. Added: no new `verification` identifier appears after a refusal, and every numeric (attempts counter) value only goes up. Nothing in the §6.1 "fifth refusal locks" wording was left: those tests moved to the tenth at `d1941122`.
+
+## GATE RUN — one sha: af6f69de (supersedes every count above)
+
+Clean tree before and after (`git status` empty). Everything below ran at af6f69de, the e2e included. The only commit after it is this record (docs only, no code or test changed). Each suite from its own config; passed + failed + skipped = total.
+
+| Suite | Files | Passed | Failed | Skipped | Total |
+|---|---|---|---|---|---|
+| tests/db | 34 | 753 | 0 | 0 | 753 |
+| tests/ci | 19 | 536 | 0 | 0 | 536 |
+| tests/infra | 4 | 180 | 0 | 0 | 180 |
+| tests/config (with tests/image, tests/log) | 6 | 107 | 0 | 15 | 122 |
+| tests/layers | 6 | 551 | 0 | 0 | 551 |
+| packages/auth | 7 | 43 | 0 | 0 | 43 |
+| packages/config | 6 | 327 | 0 | 0 | 327 |
+| packages/db | 6 | 43 | 0 | 0 | 43 |
+| packages/tenancy | 1 | 3 | 0 | 0 | 3 |
+| apps/web unit | 9 | 89 | 0 | 0 | 89 |
+| apps/worker, apps/migrate | 2 | 2 | 0 | 0 | 2 |
+| **vitest sum** | **100** | **2634** | **0** | **15** | **2649** |
+| apps/web e2e (Playwright, auth service up) | 7 specs | 55 | 0 | 0 | 55 |
+| tests/workflow (python unittest) | 10 | 92 | 0 | 0 | 92 |
+
+Static checks at the same sha:
+- `pnpm lint` (layer check, eslint over packages, apps and scripts/layers, migrations check): exit 0, no output beyond the commands.
+- `pnpm typecheck --force` (turbo; tsc in every package and `svelte-check --fail-on-warnings` in web): 19 of 19 tasks, 0 cached, exit 0; svelte-check "0 errors and 0 warnings".
+
+Not run, with the reason:
+- The 15 skipped in tests/config are `tests/image` cases gated on `POLY_IMAGE_BUILD=1` (they build the app image).
+- `tests/infra/image` (the Docker image suite) was not run: it builds images and has unexplained failures on this macOS host (POLY-143); CI runs it.
+- A live probe from the Caddy container to the internal port waits for the first `docker compose up` (POLY-97), as the ruling says.
