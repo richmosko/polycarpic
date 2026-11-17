@@ -218,7 +218,7 @@ for (const [kind, cfg] of Object.entries(rendered)) {
       if (sn === 'caddy') for (const n of names) if (!EDGE_NET.test(n)) v('edge-network', rel, `caddy joins ${n}; only the edge networks`);
     } else {
       if (projects.size > 1 || [...projects].some((p) => p !== kind)) v('cross-project', rel, `${at}: on networks of another project (${names.join(', ')})`);
-      for (const n of names) if (EDGE_NET.test(n) && sn !== 'web') v('edge-network', rel, `${at}: only web joins ${n}`);
+      for (const n of names) if (EDGE_NET.test(n) && sn !== 'web' && sn !== 'auth') v('edge-network', rel, `${at}: only web and auth join ${n}`);
     }
   }
   {

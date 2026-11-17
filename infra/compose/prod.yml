@@ -46,20 +46,48 @@ services:
     user: "10001:10001"
     environment:
       DB_PASSWORD_FILE: /run/secrets/db_password_app
-      AUTH_SECRET_FILE: /run/secrets/auth_secret
+      AUTH_INTERNAL_URL: http://10.201.40.3:3001
     secrets:
       - {source: db_password_app__web, target: db_password_app}
-      - {source: auth_secret__web, target: auth_secret}
-      - {source: resend_api_key__web, target: resend_api_key}
       - {source: plaid_secret__web, target: plaid_secret}
     networks:
       default: {}
+      web-auth: {}
       edge-prod:
         aliases: [prod-web]
     mem_limit: 768m
     tmpfs: [/tmp]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+
+  auth:
+    <<: *hardened
+    image: *app-image
+    user: "10007:10007"
+    command: ["auth"]
+    environment:
+      DB_PASSWORD_FILE: /run/secrets/db_password_auth
+      AUTH_SECRET_FILE: /run/secrets/auth_secret
+      RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+      AUTH_PUBLIC_PORT: "3000"
+      AUTH_INTERNAL_HOST: 10.201.40.3
+      AUTH_INTERNAL_PORT: "3001"
+    secrets:
+      - {source: db_password_auth__auth, target: db_password_auth}
+      - {source: auth_secret__auth, target: auth_secret}
+      - {source: resend_api_key__auth, target: resend_api_key}
+    networks:
+      default: {}
+      web-auth:
+        ipv4_address: 10.201.40.3
+      edge-prod:
+        aliases: [prod-auth]
+    mem_limit: 256m
+    tmpfs: [/tmp]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/auth/ok').then(r=>process.exit(r.status<500?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
 
@@ -173,6 +201,10 @@ networks:
   upload-net:
     ipam:
       config: [{subnet: 10.201.20.0/29}]
+  web-auth:
+    internal: true
+    ipam:
+      config: [{subnet: 10.201.40.0/29}]
   edge-prod:
     name: polycarpic-edge-prod
     external: true
@@ -180,9 +212,10 @@ networks:
 secrets:
   db_superuser_password__postgres: {file: /etc/polycarpic/secrets/postgres/db_superuser_password}
   db_password_app__web: {file: /etc/polycarpic/secrets/web/db_password_app}
-  auth_secret__web: {file: /etc/polycarpic/secrets/web/auth_secret}
-  resend_api_key__web: {file: /etc/polycarpic/secrets/web/resend_api_key}
   plaid_secret__web: {file: /etc/polycarpic/secrets/web/plaid_secret}
+  db_password_auth__auth: {file: /etc/polycarpic/secrets/auth/db_password_auth}
+  auth_secret__auth: {file: /etc/polycarpic/secrets/auth/auth_secret}
+  resend_api_key__auth: {file: /etc/polycarpic/secrets/auth/resend_api_key}
   db_password_worker__worker: {file: /etc/polycarpic/secrets/worker/db_password_worker}
   credential_keyring__worker: {file: /etc/polycarpic/secrets/worker/credential_keyring}
   resend_api_key__worker: {file: /etc/polycarpic/secrets/worker/resend_api_key}

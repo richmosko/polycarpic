@@ -62,9 +62,9 @@ case "$cmd" in
       if [ -n "$found" ]; then echo "image check: build tooling in the image:" >&2; echo "$found" >&2; bad=1; fi
       [ "$(id -un)" = node ] || { echo "image check: process user is $(id -un)" >&2; bad=1; }
       exit $bad'
-    # POLY-86 S20: the app's auth still starts with the build tooling gone (a removed package that better-auth imports at load
+    # POLY-86 S20: the sign-in service's auth still starts with the build tooling gone (a removed package that better-auth imports at load
     # fails here, not in production). No database: the schema probe logs an error and createAuth still resolves.
-    smoke="const m = await import('/app/apps/web/node_modules/@poly/auth/src/index.ts');
+    smoke="const m = await import('/app/apps/auth/node_modules/@poly/auth/src/index.ts');
       const a = await m.createAuth(m.authOptions({ secret: 'smoke-'.repeat(8), baseURL: 'https://smoke.invalid', tlsMode: 'real-domain', requireClientIp: true, sendMagicLink: async () => {} }));
       if (typeof a.handler !== 'function' || Object.keys(m.AUTH_ROUTES).length !== 49) process.exit(1);"
     docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges --entrypoint node "$ref" --input-type=module --eval "$smoke" >/dev/null 2>&1 \
