@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-152
 blocked_by: [POLY-152b]
 assignee: qa-engineer
-paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, process/cairn/issues/POLY-152c.md, tests/**, apps/web/tests/e2e/**, apps/web/src/**/*.test.ts, infra/ci/**, packages/**/*.test.ts]
+paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, process/cairn/issues/POLY-152c.md, tests/**, apps/web/tests/e2e/**, apps/web/src/**/*.test.ts, infra/ci/**, packages/**/*.test.ts, apps/**/*.test.ts]
 stage: execute
 estimate.cost_usd: "16.00"
 estimate.gate_cycles: 3
