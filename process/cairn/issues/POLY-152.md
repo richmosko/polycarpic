@@ -72,3 +72,20 @@ Layer boundaries for the build, checked against `layers.json` at the branch tip 
    - No `confined` entry is needed: only `@poly/auth` holds `db/auth`.
 
 No security change: the auth secret is read only by `apps/auth` through `@poly/config`, and nothing above gives web or any other package a path to it, to BetterAuth or to the poly_auth pool.
+
+### @architect — 2026-11-17
+
+Ruling on the owner grant in 0014 at 6fb0d4be (line 57): `GRANT SELECT (id, name, signup_txid) ON public."user" TO poly_govern`.
+
+**It is not a grant beyond R3 in effect, but it is written wider than it is. Narrow the statement to `GRANT SELECT (name) ON public."user" TO poly_govern`, as R3 states.**
+- poly_govern has held `SELECT (id, email, email_verified, signup_txid)` on `user` since 0007:11, for `accept_invitations`' "created by this transaction" check. 0013:10 added `two_factor_enabled, second_step_at, email`. So `id` and `signup_txid` in line 57 re-grant what poly_govern already holds; Postgres records the privilege once, and the catalog is the same either way.
+- The only privilege the line adds is `name`, which R3 already lists. `provision_person` reads `user.name` for the Person's name, and `id` and `signup_txid` for the check.
+- Why narrow it anyway: written as it stands, a reader of 0014 concludes that the check needed a new grant. If 0007's grant were ever narrowed, this line would silently keep the columns alive. With `(name)` alone each column has one grant, in the migration whose definer first needed it, and a comment can point the check at 0007:11.
+- The other ways were weighed and are not better:
+  - poly_authz owns `enter_new_user`, which already reads `signup_txid` (0007:7), but it holds no write on `entity` and must not, because it is the readers' role.
+  - Reusing `enter_new_user`'s check by calling it is impossible, because the marker already exists by then.
+  - Fewer columns is not possible: the Person needs the name.
+
+**What poly_govern's definers could newly read on a caller's behalf: `user.name`, of any user** (the table has no RLS), and nothing else. The only definer that reads it is `provision_person`. It reads only the marker's own user, created in this transaction, and returns the new entity's id, never the name. No other poly_govern definer selects `name`, and a NOLOGIN owner's grant cannot be used except through its definers. Its one caller, poly_auth, already reads `user.name` directly, and so does poly_app. **No login role gains a read.**
+
+Build: amend line 57 to `(name)` with that comment, in 0014 (not yet merged, so editing it is safe). A pgTAP line pins poly_govern's column privileges on `user` to exactly `id, email, email_verified, signup_txid, two_factor_enabled, second_step_at, name` for SELECT, and `signup_txid, two_factor_enabled, second_step_at` for UPDATE.
