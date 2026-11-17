@@ -116,9 +116,9 @@ SELECT is((SELECT count(*)::int FROM pg_policy WHERE polrelid = 'public.membersh
     AND pg_get_expr(polwithcheck, polrelid) ~ 'viewer' AND pg_get_expr(polwithcheck, polrelid) ~ 'current_user_id'), 1, 'S6: one of them is limited to role = viewer for app.current_user_id()');
 
 -- ---------------------------------------------------------------- S2: token-less accept needs a verified email
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f6', NULL, $q$SELECT app.accept_invitations(NULL)::text$q$), 'ERR:42501',
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f6', NULL, $q$SELECT app.accept_invitations(NULL)::text$q$), 'ERR:42501',
   'S2: a token-less accept for an unverified email is refused (mutation: the verified check missing)');
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f7', NULL, $q$SELECT app.accept_invitations(NULL)::text$q$), '00000000-0000-4000-8000-0000000000e1',
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f7', NULL, $q$SELECT app.accept_invitations(NULL)::text$q$), '00000000-0000-4000-8000-0000000000e1',
   'S2: a token-less accept for a verified email seats the matching invitation');
 
 -- ---------------------------------------------------------------- C16: no-entity invitations
@@ -129,7 +129,7 @@ SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f0', NUL
 SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f0', NULL,
     $q$WITH i AS (INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at) VALUES (NULL, 'x@qa.test', 'viewer', '00000000-0000-4000-8000-0000000000f0', sha256('x'::bytea), now() + interval '1 day') RETURNING 1) SELECT count(*)::text FROM i$q$),
   'ERR:42501', 'C16: a poly_app INSERT of a no-entity invitation is refused 42501 (gate_owner_changes)');
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f4', NULL, $q$SELECT app.accept_invitations(sha256('t3'::bytea))::text$q$), '',
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f4', NULL, $q$SELECT app.accept_invitations(sha256('t3'::bytea))::text$q$), '',
   'C16: accept_invitations handles the no-entity row: the invitee gets no entity back');
 SELECT isnt((SELECT accepted_at FROM public.invitation WHERE id = '00000000-0000-4000-8000-0000000000b3'), NULL, 'C16: the no-entity row is claimed and accepted');
 SELECT is((SELECT count(*)::int FROM public.membership WHERE user_id = '00000000-0000-4000-8000-0000000000f4'), 0, 'C16: and seats no membership');
@@ -141,11 +141,11 @@ SELECT is((SELECT array_agg(polname::text ORDER BY polname COLLATE "C") FROM pg_
   ARRAY['invitation_insert', 'invitation_select', 'invitation_update'], 'C16: the policies that apply to poly_app on invitation are exactly invitation_select, invitation_insert, invitation_update');
 
 -- ---------------------------------------------------------------- C17: accept_invitations outside a sign-up transaction
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501',
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501',
   'C17: a signed-in existing user (a marker in place, row inserted by an earlier transaction) is refused (mutation: accept trusts the marker)');
 SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', $q$UPDATE public."user" SET name = 'touched' WHERE id = '00000000-0000-4000-8000-0000000000f8'$q$,
     $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501', 'C17: the same forgery after this transaction UPDATEd the row (the xmin test would pass it)');
-SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501', 'C17: with no user set at all');
+SELECT is(pg_temp.run_as('poly_auth', '', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501', 'C17: with no user set at all');
 SELECT is((SELECT count(*)::int FROM public.membership WHERE user_id = '00000000-0000-4000-8000-0000000000f8'), 0, 'C17: and no membership is written for the existing user');
 
 -- ---------------------------------------------------------------- C18: the trigger functions
@@ -162,7 +162,7 @@ SELECT is((SELECT array_agg(proname::text || ':' || pg_get_userbyid(proowner) OR
 SELECT is((SELECT array_agg(g ORDER BY g COLLATE "C") FROM (SELECT p.proname::text || '=>' || pg_get_userbyid(a.grantee) AS g
     FROM pg_proc p CROSS JOIN LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
     WHERE p.pronamespace = 'app'::regnamespace AND p.proname IN ('enter_new_user', 'claim_invitations', 'accept_invitations') AND a.privilege_type = 'EXECUTE' AND a.grantee <> p.proowner) x),
-  ARRAY['accept_invitations=>poly_app', 'claim_invitations=>poly_app', 'enter_new_user=>poly_app'], 'C18: EXECUTE goes to poly_app alone, not PUBLIC');
+  ARRAY['accept_invitations=>poly_auth', 'claim_invitations=>poly_auth', 'enter_new_user=>poly_auth'], 'C18: EXECUTE goes to poly_auth alone (POLY-152 R8), not PUBLIC');
 SELECT is((SELECT array_agg(proname::text ORDER BY proname COLLATE "C") FROM pg_proc WHERE pronamespace = 'app'::regnamespace
     AND proname IN ('enter_new_user', 'claim_invitations', 'accept_invitations') AND prosecdef AND 'search_path=""' = ANY (proconfig)),
   ARRAY['accept_invitations', 'claim_invitations', 'enter_new_user'], 'C18: SECURITY DEFINER with search_path = ''''');
@@ -180,13 +180,13 @@ SELECT ok(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f0', NUL
 
 -- ---------------------------------------------------------------- C29/C30: claim_invitations
 SELECT is((SELECT pg_get_function_result(oid) FROM pg_proc WHERE pronamespace = 'app'::regnamespace AND proname = 'claim_invitations'), 'void', 'C30: claim_invitations returns void (no oracle in its result)');
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.claim_invitations(sha256('t4'::bytea), 'p@qa.test')::text$q$), 'ERR:42501',
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.claim_invitations(sha256('t4'::bytea), 'p@qa.test')::text$q$), 'ERR:42501',
   'C30: claim_invitations with a marker in place raises 42501 (mutation: no signed-in check)');
-SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.claim_invitations(sha256('t4'::bytea), 'p@qa.test')::text$q$), '',
+SELECT is(pg_temp.run_as('poly_auth', '', NULL, $q$SELECT app.claim_invitations(sha256('t4'::bytea), 'p@qa.test')::text$q$), '',
   'C30 control: the same claim with no user set succeeds, so the 42501 above is the marker check');
-SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.claim_invitations(sha256('t4'::bytea), 'someone.else@qa.test')::text$q$), 'ERR:42501', 'C29: a mismatched email is refused 42501');
-SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.claim_invitations(sha256('unknown'::bytea), 'p@qa.test')::text$q$), 'ERR:42501', 'C29: an unknown token is refused 42501');
-SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.claim_invitations(NULL, 'u1@qa.test')::text$q$), 'ERR:42501', 'C29: a token-less claim for an email whose invitation is already claimed is refused');
+SELECT is(pg_temp.run_as('poly_auth', '', NULL, $q$SELECT app.claim_invitations(sha256('t4'::bytea), 'someone.else@qa.test')::text$q$), 'ERR:42501', 'C29: a mismatched email is refused 42501');
+SELECT is(pg_temp.run_as('poly_auth', '', NULL, $q$SELECT app.claim_invitations(sha256('unknown'::bytea), 'p@qa.test')::text$q$), 'ERR:42501', 'C29: an unknown token is refused 42501');
+SELECT is(pg_temp.run_as('poly_auth', '', NULL, $q$SELECT app.claim_invitations(NULL, 'u1@qa.test')::text$q$), 'ERR:42501', 'C29: a token-less claim for an email whose invitation is already claimed is refused');
 
 -- ---------------------------------------------------------------- C31: set once
 SELECT is(pg_temp.sx($f$UPDATE public.invitation SET revoked_at = now() WHERE id = '00000000-0000-4000-8000-0000000000b6'$f$), 'ok', 'fixture: revoke b6 (a first set is allowed)');
@@ -212,11 +212,11 @@ SELECT is(pg_temp.q1($q$SELECT coalesce(string_agg(rolname::text, ',' ORDER BY r
 SELECT is((SELECT count(*)::int FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
     WHERE p.proname = 'signup_stamp_cleared' AND t.tgrelid = 'public.user'::regclass AND t.tgdeferrable AND t.tginitdeferred AND t.tgconstraint <> 0), 1,
   'C32: signup_stamp_cleared is a DEFERRABLE INITIALLY DEFERRED constraint trigger on user');
-SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.enter_new_user('00000000-0000-4000-8000-0000000000f8')::text$q$), 'ERR:42501',
+SELECT is(pg_temp.run_as('poly_auth', '', NULL, $q$SELECT app.enter_new_user('00000000-0000-4000-8000-0000000000f8')::text$q$), 'ERR:42501',
   'C32: a row stamped with another transaction''s id (a restored row) passes neither enter_new_user...');
 SELECT is(pg_temp.sx($f$UPDATE public."user" SET signup_txid = pg_current_xact_id()::text::bigint + 50 WHERE id = '00000000-0000-4000-8000-0000000000f8'$f$), 'ok', 'fixture: a future stamp');
-SELECT is(pg_temp.run_as('poly_app', '', NULL, $q$SELECT app.enter_new_user('00000000-0000-4000-8000-0000000000f8')::text$q$), 'ERR:42501', 'C32: ...a future stamp passes neither enter_new_user...');
-SELECT is(pg_temp.run_as('poly_app', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501', 'C32: ...nor accept_invitations');
+SELECT is(pg_temp.run_as('poly_auth', '', NULL, $q$SELECT app.enter_new_user('00000000-0000-4000-8000-0000000000f8')::text$q$), 'ERR:42501', 'C32: ...a future stamp passes neither enter_new_user...');
+SELECT is(pg_temp.run_as('poly_auth', '00000000-0000-4000-8000-0000000000f8', NULL, $q$SELECT app.accept_invitations(sha256('t4'::bytea))::text$q$), 'ERR:42501', 'C32: ...nor accept_invitations');
 
 -- ---------------------------------------------------------------- C23 (pgTAP part): no way to write an invitation or a user except poly_app
 SELECT is((SELECT array_agg(rolname::text ORDER BY rolname COLLATE "C") FROM pg_roles

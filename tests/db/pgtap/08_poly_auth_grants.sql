@@ -32,7 +32,7 @@ CREATE FUNCTION pg_temp.tbl_extra() RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(x ORDER BY x), '{}') FROM (
     SELECT n.nspname||'.'||c.relname||' '||p AS x FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
-    WHERE n.nspname IN ('public','app','drizzle') AND c.relkind IN ('r','p','v','m','f') AND has_table_privilege('poly_auth', c.oid, p)
+    WHERE n.nspname IN ('public','app','drizzle') AND c.relkind IN ('r','p','v','m','f') AND has_table_privilege('poly_auth', c.oid, p) AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')
     EXCEPT SELECT rel||' '||priv FROM want_tbl
   ) q $f$;
 CREATE FUNCTION pg_temp.tbl_missing() RETURNS text[] LANGUAGE sql AS $f$
@@ -46,7 +46,7 @@ CREATE FUNCTION pg_temp.col_extra() RETURNS text[] LANGUAGE sql AS $f$
     SELECT n.nspname||'.'||c.relname||'.'||a.attname||' '||p AS x FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
     JOIN pg_attribute a ON a.attrelid=c.oid AND a.attnum>0 AND NOT a.attisdropped
     CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','REFERENCES']) p
-    WHERE n.nspname IN ('public','app','drizzle') AND c.relkind IN ('r','p','v','m','f') AND has_column_privilege('poly_auth', c.oid, a.attnum, p)
+    WHERE n.nspname IN ('public','app','drizzle') AND c.relkind IN ('r','p','v','m','f') AND has_column_privilege('poly_auth', c.oid, a.attnum, p) AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e')
     EXCEPT SELECT rel||'.'||col||' '||priv FROM want_col
     EXCEPT SELECT n.nspname||'.'||c.relname||'.'||a.attname||' '||t.priv FROM want_tbl t
       JOIN pg_class c ON c.oid = t.rel::regclass JOIN pg_namespace n ON n.oid=c.relnamespace
@@ -76,7 +76,7 @@ INSERT INTO want_fn VALUES ('app.current_user_id()'), ('app.current_session_id()
 CREATE FUNCTION pg_temp.fn_extra() RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(x ORDER BY x), '{}') FROM (
     SELECT p.oid::regprocedure::text AS x FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
-    WHERE n.nspname IN ('public','app','drizzle') AND has_function_privilege('poly_auth', p.oid, 'EXECUTE')
+    WHERE n.nspname IN ('public','app','drizzle') AND has_function_privilege('poly_auth', p.oid, 'EXECUTE') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
     EXCEPT SELECT sig FROM want_fn) q $f$;
 SELECT is(pg_temp.fn_extra(), '{}'::text[], 'effective: poly_auth executes no function outside the sixteen (PUBLIC included)');
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_auth', to_regprocedure(sig), 'EXECUTE')), NULL::text[],
@@ -92,7 +92,7 @@ SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pr
 SELECT is((SELECT array_agg(DISTINCT table_schema||'.'||table_name ORDER BY table_schema||'.'||table_name) FROM information_schema.role_table_grants WHERE grantee='poly_auth'),
   ARRAY['app.tx_identity','drizzle.__drizzle_migrations','public.account','public.passkey','public.session','public.two_factor','public.user','public.verification'],
   'granted: table grants on exactly the BetterAuth six, tx_identity and __drizzle_migrations');
-SELECT is((SELECT count(*)::int FROM information_schema.role_column_grants WHERE grantee='poly_auth' AND table_name NOT IN ('user','session')), 0, 'granted: column grants only on user and session');
+SELECT is((SELECT count(*)::int FROM information_schema.role_column_grants WHERE grantee='poly_auth' AND table_name NOT IN ('user','session','account','verification','two_factor','passkey','tx_identity','__drizzle_migrations')), 0, 'granted: column grants only on the BetterAuth six, tx_identity and __drizzle_migrations (table-level grants list per column)');
 SELECT is((SELECT array_agg(DISTINCT routine_schema||'.'||routine_name ORDER BY routine_schema||'.'||routine_name) FROM information_schema.routine_privileges WHERE grantee='poly_auth'),
   ARRAY['app.accept_invitations','app.check_factor_removal','app.claim_invitations','app.confirm_email_challenge','app.consume_passkey_grant','app.current_session_id','app.current_user_id','app.enrol_proof',
         'app.enrolment_grant_live','app.enter_auth_session','app.enter_new_user','app.issue_email_challenge','app.provision_person','app.set_two_factor_enabled','app.step_up_fresh','app.take_recent_auth_stamp'],

@@ -37,6 +37,8 @@ async function open(role: string | null = null): Promise<any> {
 const q = (c: any, text: string, values?: unknown[]) => c.query({ text, values, queryMode: 'extended' });
 const fails = async (p: Promise<unknown>) => { try { await p; return null; } catch (x) { return x as any; } };
 const markers = (userId: string) => Number(must(`SELECT count(*) FROM app.tx_identity WHERE user_id = '${userId}'`, db).rows[0]![0]);
+// POLY-152 R8: the sign-up step is poly_auth's and enter_asserted_user is poly_app's; a superuser connection switches between them.
+const as = (c: any, role: string) => c.query(`SET LOCAL ROLE ${role}`);
 const ins = (id: string) => `INSERT INTO public."user" (id, name, email) VALUES ('${id}', 'N', '${id}@qa.test')`;
 const uid = () => crypto.randomUUID();
 const jobTargets = (body: string) => must(`CREATE OR REPLACE FUNCTION app.job_targets(job text) RETURNS TABLE (entity_id uuid, principal_user_id uuid, connection_id uuid)
@@ -132,7 +134,7 @@ describe('R2 the exact-call check: an identity definer answers only its own call
   });
   it('enter_new_user refuses the same shapes as poly_app, and its canonical call succeeds after the user insert  [red if: enter_new_user lacks the check]', async () => {
     const id = uid();
-    await inTx('poly_app', async (c) => {
+    await inTx('poly_auth', async (c) => {
       await c.query(ins(id));
       await q(c, 'SELECT app.enter_new_user($1)', [id]);
       expect((await q(c, 'SELECT app.current_user_id()::text AS u')).rows[0].u).toBe(id);
@@ -143,7 +145,7 @@ describe('R2 the exact-call check: an identity definer answers only its own call
       (c: any, i: string) => q(c, 'SELECT * FROM (SELECT app.enter_new_user($1)) s', [i]),
     ]) {
       const i = uid();
-      const x = await inTx('poly_app', async (c) => { await c.query(ins(i)); return fails(run(c, i)); });
+      const x = await inTx('poly_auth', async (c) => { await c.query(ins(i)); return fails(run(c, i)); });
       expect(codeOf(x), msgOf(x)).toBe('42501');
       expect(msgOf(x)).toContain(NOT_ALONE);
     }
@@ -277,8 +279,7 @@ describe('(ii) the marker survives any later savepoint rollback', () => {
 describe('(ii, sign-up) rolling back to BetterAuth\'s savepoint takes the marker and the user, and no later definer can mark anyone', () => {
   const setup = async (c: any, id: string) => {
     await c.query('SAVEPOINT ba_1');
-    await c.query(ins(id));
-    await q(c, 'SELECT app.enter_new_user($1)', [id]);
+    await as(c, 'poly_auth'); await c.query(ins(id)); await q(c, 'SELECT app.enter_new_user($1)', [id]); await c.query('RESET ROLE');
     await c.query('ROLLBACK TO SAVEPOINT ba_1');
   };
   it('enter_new_user for that id, and for an existing id, then enter_asserted_user, each 42501 with the ruled message; current_user_id() is null  [red if: the marker or the user row survives the rollback]', async () => {
@@ -291,22 +292,23 @@ describe('(ii, sign-up) rolling back to BetterAuth\'s savepoint takes the marker
     const b = await inTx('poly_auth', async (c) => { await setup(c, uid()); return fails(q(c, 'SELECT app.enter_new_user($1)', [existing])); });
     expect(codeOf(b), msgOf(b)).toBe('42501');
     expect(msgOf(b)).toContain('not a user created by this transaction');
-    const d = await inTx('poly_app', async (c) => { await setup(c, uid()); return fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [existing, S])); });
+    const d = await inTx(null, async (c) => { await setup(c, uid()); await as(c, 'poly_app'); return fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [existing, S])); });
     expect(codeOf(d), msgOf(d)).toBe('42501');
     expect(msgOf(d)).toContain(FIRST_WRITE);
-    const n = await inTx('poly_app', async (c) => { await setup(c, uid()); return (await q(c, 'SELECT app.current_user_id()::text AS u')).rows[0].u; });
+    const n = await inTx('poly_auth', async (c) => { await setup(c, uid()); return (await q(c, 'SELECT app.current_user_id()::text AS u')).rows[0].u; });
     expect(n).toBeNull();
   });
   it('with RELEASE instead, the marker stays: a second enter_new_user and enter_asserted_user are refused  [red if: RELEASE drops the marker]', async () => {
     const id = uid();
-    const run = async (again: (c: any) => Promise<unknown>) => inTx('poly_app', async (c) => {
-      await c.query('SAVEPOINT ba_1'); await c.query(ins(id)); await q(c, 'SELECT app.enter_new_user($1)', [id]); await c.query('RELEASE SAVEPOINT ba_1');
+    const run = async (role: string, again: (c: any) => Promise<unknown>) => inTx(null, async (c) => {
+      await c.query('SAVEPOINT ba_1'); await as(c, 'poly_auth'); await c.query(ins(id)); await q(c, 'SELECT app.enter_new_user($1)', [id]); await c.query('RESET ROLE'); await c.query('RELEASE SAVEPOINT ba_1');
+      await as(c, role);
       return fails(again(c));
     });
-    const a = await run((c) => q(c, 'SELECT app.enter_new_user($1)', [id]));
+    const a = await run('poly_auth', (c) => q(c, 'SELECT app.enter_new_user($1)', [id]));
     expect(codeOf(a), msgOf(a)).toBe('42501');
     expect(msgOf(a)).toContain('a user is already in context');
-    const b = await run((c) => q(c, 'SELECT app.enter_asserted_user($1, $2)', [id, S]));
+    const b = await run('poly_app', (c) => q(c, 'SELECT app.enter_asserted_user($1, $2)', [id, S]));
     expect(codeOf(b), msgOf(b)).toBe('42501');
     expect(msgOf(b)).toContain(HAS_ID);
   });

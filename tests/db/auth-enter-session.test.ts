@@ -14,7 +14,8 @@ let db: string;
 let f: ReturnType<typeof fixture>;
 beforeAll(() => { db = cloneMigrated(); f = fixture(db, 152); });
 
-const markers = () => must(`SELECT count(*) FROM app.tx_identity`, db).rows[0]![0];
+// Committed fixtures (f.user, f.session) leave kind 'web' marker rows; an attempt under test would write kind 'auth', so count those only.
+const markers = () => must(`SELECT count(*) FROM app.tx_identity WHERE kind = 'auth'`, db).rows[0]![0];
 /** One poly_auth transaction (extended mode): BEGIN; fn; ROLLBACK. */
 async function asAuth<T>(fn: (q: Q, c: any) => Promise<T>, role = 'poly_auth'): Promise<T> {
   const c = new pgmod.Client({ connectionString: url(role, db) });

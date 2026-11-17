@@ -38,7 +38,7 @@ GRANT TRUNCATE ON public.qa_canary_priv TO poly_app;
 SELECT is(pg_temp.login_priv_gaps(), ARRAY['poly_app TRUNCATE qa_canary_priv'], 'canary: TRUNCATE granted to poly_app is caught');
 REVOKE TRUNCATE ON public.qa_canary_priv FROM poly_app;
 GRANT REFERENCES ON public.qa_canary_priv TO PUBLIC;
-SELECT is(cardinality(pg_temp.login_priv_gaps()), 5, 'canary: REFERENCES granted to PUBLIC reaches all five login roles');
+SELECT is(cardinality(pg_temp.login_priv_gaps()), 6, 'canary: REFERENCES granted to PUBLIC reaches all six login roles');
 REVOKE REFERENCES ON public.qa_canary_priv FROM PUBLIC;
 CREATE ROLE qa_canary_grp NOLOGIN;
 GRANT TRUNCATE ON public.qa_canary_priv TO qa_canary_grp;

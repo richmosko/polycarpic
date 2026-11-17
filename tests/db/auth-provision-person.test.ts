@@ -19,6 +19,7 @@ describe('R3 the exact call, in a sign-up transaction', () => {
       await signUpEntry(q, id, `${id}@qa.test`, 'Ada Lovelace');
       const r = await q(PROV);
       expect(r.rows[0].provision_person).toMatch(/^[0-9a-f-]{36}$/);
+      await q('SELECT app.accept_invitations($1::bytea)', [null]); // a sign-up must end by accepting its invitation (signup_stamp_cleared)
     }, true);
     expect(must(`SELECT e.name, t.system_key, e.self_user_id::text, m.role FROM public.entity e JOIN public.entity_type t ON t.id = e.type_id JOIN public.membership m ON m.entity_id = e.id AND m.user_id = e.self_user_id WHERE e.self_user_id = '${id}'`, db).rows[0])
       .toEqual(['Ada Lovelace', 'person', id, 'owner']);
