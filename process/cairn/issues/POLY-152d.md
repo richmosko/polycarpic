@@ -1,7 +1,7 @@
 ---
 id: POLY-152d
 title: Sign-in service build
-status: backlog
+status: done
 milestone: POLY-M1
 parent: POLY-152
 blocked_by: [POLY-152c]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, pro
 stage: execute
 estimate.cost_usd: "26.00"
 estimate.gate_cycles: 3
+actual.cost_usd: "8.2678"
+actual.tokens: 51904123
+actual.gate_cycles: 3
+actual.wall_clock: 58
+ratio: "0.32"
 labels: [security, auth]
 priority: null
 pr: null

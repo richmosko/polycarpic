@@ -1,7 +1,7 @@
 ---
 id: POLY-152b
 title: Sign-in service security review
-status: backlog
+status: done
 milestone: POLY-M1
 parent: POLY-152
 blocked_by: [POLY-152a]
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, pro
 stage: plan
 estimate.cost_usd: "10.00"
 estimate.gate_cycles: 2
-labels: [security, auth]
+actual.cost_usd: "7.8943"
+actual.tokens: 21447482
+actual.gate_cycles: 6
+actual.wall_clock: 80
+ratio: "0.79"
+labels: [security, auth, bloat]
 priority: null
 pr: null
 created: 2026-11-17

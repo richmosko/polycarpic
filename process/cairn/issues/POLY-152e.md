@@ -1,7 +1,7 @@
 ---
 id: POLY-152e
 title: Sign-in service compose and Caddy
-status: backlog
+status: done
 milestone: POLY-M1
 parent: POLY-152
 blocked_by: [POLY-152a]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, pro
 stage: execute
 estimate.cost_usd: "9.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "0.8358"
+actual.tokens: 2684334
+actual.gate_cycles: 1
+actual.wall_clock: 36
+ratio: "0.09"
 labels: [security, auth]
 priority: null
 pr: null
