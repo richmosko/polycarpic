@@ -1,7 +1,7 @@
 ---
 id: POLY-152f
 title: Sign-in service verdict
-status: backlog
+status: done
 milestone: POLY-M1
 parent: POLY-152
 blocked_by: [POLY-152d]
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-152.md, process/cairn/reviews/POLY-152/**, pro
 stage: review
 estimate.cost_usd: "6.00"
 estimate.gate_cycles: 1
-labels: [security, auth]
+actual.cost_usd: "4.0892"
+actual.tokens: 13075955
+actual.gate_cycles: 6
+actual.wall_clock: 68
+ratio: "0.68"
+labels: [security, auth, bloat]
 priority: null
 pr: null
 created: 2026-11-17
