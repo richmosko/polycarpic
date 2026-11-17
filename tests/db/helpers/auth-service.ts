@@ -16,9 +16,8 @@ export const internalReq = (cookie: string, path = '/session', init: RequestInit
   new Request(`${INTERNAL}${path}`, { method: 'GET', ...init, headers: { ...(cookie ? { cookie } : {}), ...(init.headers ?? {}) } });
 
 export async function internal(): Promise<{ handleInternal: (r: Request, a: any) => Promise<Response>; handlePublic: (r: Request, a: any) => Promise<Response> }> {
-  const i: any = await import('../../../apps/auth/src/internal.ts');
-  const p: any = await import('../../../apps/auth/src/public.ts');
-  return { handleInternal: i.handleInternal, handlePublic: p.handlePublic };
+  const A: any = await import('../../../packages/auth/src/index.ts'); // handleSessionRequest: the internal listener's handler (contract names, point 4)
+  return { handleInternal: A.handleSessionRequest, handlePublic: A.handleAuthRequest };
 }
 
 /** The signed-cookie value better-call builds for a token. */

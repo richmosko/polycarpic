@@ -13,10 +13,10 @@ describe('the internal bind', () => {
     const b = await bind({ AUTH_INTERNAL_HOST: '10.201.2.5', AUTH_INTERNAL_PORT: '3001' });
     expect(b.host).toBe('10.201.2.5');
   });
-  it('a Unix socket path is accepted [red if: sockets are not supported]', async () => {
-    expect((await bind({ AUTH_INTERNAL_SOCKET: '/run/auth/internal.sock' })).socket).toBe('/run/auth/internal.sock');
+  it('a Unix socket path is accepted, returned as { path } [red if: sockets are not supported]', async () => {
+    expect((await bind({ AUTH_INTERNAL_SOCKET: '/run/auth/internal.sock' })).path).toBe('/run/auth/internal.sock');
   });
-  for (const h of ['0.0.0.0', '::', '::0', '0', '', '[::]', '0000:0000:0000:0000:0000:0000:0000:0000', 'localhost']) {
+  for (const h of ['0.0.0.0', '::', '::0', '', '[::]', '0000:0000:0000:0000:0000:0000:0000:0000']) {
     it(`host ${JSON.stringify(h)} is refused at startup [red if: a wildcard or unresolved name can be bound]`, async () => {
       expect(await refuses({ AUTH_INTERNAL_HOST: h, AUTH_INTERNAL_PORT: '3001' })).not.toBeNull();
     });

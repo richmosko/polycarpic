@@ -29,7 +29,7 @@ const FILES = readdirSync(join(ROOT, 'tests/db')).filter((f) => f.endsWith('.tes
 
 // The ruling's table, pinned: which file belongs to which area.
 const TABLE: Record<(typeof AREAS)[number], string[]> = {
-  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-internal-session', 'auth-signin-tx', 'auth-refresh'],
+  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-internal-session', 'auth-signin-tx', 'auth-refresh', 'auth-service-main'],
   tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap'],
   migrate: ['checks', 'connection', 'migrate-run-helper', 'runner', 'template-clone'],
   ops: ['ops-status', 'ops-hardening'],
@@ -252,6 +252,6 @@ describe('POLY-152 apps/auth is in the auth area', () => {
   });
   it('the six POLY-152 db suites are in the auth area  [red if: a new tests/db file is in no area]', async () => {
     const { DB_AREAS } = await ch();
-    for (const f of ['auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-internal-session', 'auth-signin-tx', 'auth-refresh']) expect(DB_AREAS.auth!.tests).toContain(`tests/db/${f}.test.ts`);
+    for (const f of ['auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-internal-session', 'auth-signin-tx', 'auth-refresh', 'auth-service-main']) expect(DB_AREAS.auth!.tests).toContain(`tests/db/${f}.test.ts`);
   });
 });

@@ -79,11 +79,6 @@ describe('E3 what the listener answers', () => {
       const r = await I.handleInternal(internalReq(a.cookie, p, { method: m }), e.auth);
       expect(r.status).toBe(404);
     });
-  it('the public listener serves nothing but /api/auth/*: /session, /, /healthz and /api/authx answer 404; /api/auth/ok answers 200 [red if: the public listener is not path-limited]', async () => {
-    for (const p of ['/session', '/', '/api/session', '/api/authx', '/api/auth/../session'])
-      expect((await I.handlePublic(new Request(`https://app.qa.test${p}`), e.auth)).status, p).toBe(404);
-    expect((await I.handlePublic(new Request('https://app.qa.test/api/auth/ok'), e.auth)).status).toBe(200);
-  });
 });
 
 describe('C8/§1.1 the idle bound, the cap and the slide, through the internal door', () => {

@@ -49,3 +49,10 @@ The db and tests/ci rows are the per-config full runs. The unit rows below them 
 - **R7 day-10 rotation Max-Age**: unmeasured by the ruling; `auth-refresh` asserts the fresh-row case and does not guess the rotation value.
 - **poly_app positives in `second-step-gates`**: the refusal loops still run both roles (right), but I did not audit every positive step in the 595-line file for a poly_app call that loses EXECUTE. The green run will show any; a failing poly_app positive there is a test to move to poly_auth, not a ruling issue.
 - A live probe from the Caddy container (R6.2): waits for POLY-97.
+
+## Addendum (after backend-lead-152 contract names and the architect's layer condition)
+
+- Internal handler is `handleSessionRequest` from the `@poly/auth` root; public is `handleAuthRequest`. `startAuthService(env)` and `internalBind(env)` (`{host}|{path}`) are exercised by the new `tests/db/auth-service-main.test.ts` (listeners, path limits, three startup refusals, secret not in logs = D2) and `tests/config/auth-bind.test.ts`.
+- `tests/layers/auth-service.test.ts` now walks imports transitively from web entry points and `packages/auth/src/web.ts`; it is shown to fail on 7 planted imports (direct, `@better-auth/*`, two-hop relative chain to the root, `@poly/db/auth` through tenancy, a non-`web*` auth file, dynamic import, `.svelte` script) before it counts, with a clean control. The 8 plant tests pass today by design; the 7 repo checks in that file are red.
+- Passes today on purpose, one more: `auth-internal-session` day-8 idle through the direct `/api/auth` door (handleAuthRequest already refuses an expired row).
+- Open for the build: `loadSession` leaves the `@poly/auth` root, so the `auth-session.test.ts` `load()` calls (12) and `helpers/auth.ts` need retargeting to `handleSessionRequest` (first-load provisioning and the gate move to web). I retarget them when the build lands, so the new shape is not guessed.
