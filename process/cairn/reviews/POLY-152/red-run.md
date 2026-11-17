@@ -122,7 +122,7 @@ Also, found running the whole db suite on the build, each under the ruling named
 | packages/tenancy | 1 | 3 | 0 | 0 | 3 |
 | apps/web | 9 | 89 | 0 | 0 | 89 |
 
-The 15 skipped in tests/config are `tests/image` cases gated on `POLY_IMAGE_BUILD=1` (the image build; not run here). The three red tests: the two lockout tests (held for seceng) and the `@poly/auth` lint fixture (9b, a build fix).
+The 15 skipped in tests/config are `tests/image` cases gated on `POLY_IMAGE_BUILD=1` (the image build; not run here). At that sha three tests were red: the two lockout tests (held for seceng) and the `@poly/auth` lint fixture (9b, a build fix). All three are green since (lockout at d1941122, the lint fix at 6fa9896f); the gate run at the end of this file supersedes every count above.
 
 ## Lockout (item 6) — accepted by seceng (ruling-review §8 @ 074f5491) and the architect (f16e92d1)
 

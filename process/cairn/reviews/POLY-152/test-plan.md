@@ -75,3 +75,21 @@ Written against `ruling.md` @ 646e35ed (R0–R11) and `ruling-review.md` §2, §
 - Rotation `Max-Age` (day 10): the test records the value.
 - "Nothing beyond the R2 list is needed": the poly_auth run of every auth test is the measurement.
 - Contract names the tests assume and `tests/db/helpers` isolates: `configure({ auth })`, `withAuthSession`/`withSignInTx` on `@poly/db/auth`, `apps/auth/src/{main,bind}.ts`, `packages/auth/src/{cookie-lifetime,web}.ts`. A name that differs changes only the helper.
+
+## As built (addendum at the gate; the plan above is the intent, this is the file list)
+
+Added to the plan since it was written, each with its file:
+
+| Item | Test | File |
+|---|---|---|
+| Transitive web boundary (architect c36bf83e) | scan from every web file and `packages/auth/src/web.ts` for `better-auth`, `@better-auth/*`, `@poly/db/auth` and any auth file outside `web*`; shown to fail on 7 planted imports and on a two-hop plant in the real tree | `tests/layers/auth-service.test.ts` |
+| Service startup and listeners | `startAuthService`: both listeners, path limits, three startup refusals, secret absent from logs (D2) | `tests/db/auth-service-main.test.ts` |
+| poly_govern's grants (architect 9f6dd25a, seceng §7) | exact column and policy pin on `user`, `entity`, `entity_type`, with 8 planted-change proofs | `tests/db/pgtap/09_poly_govern_grants.sql`, `tests/db/pgtap.test.ts` |
+| poly_auth grant pin shown to bite | 8 planted grants fail 08; clean control | `tests/db/pgtap.test.ts` |
+| Layer checker and names (architect f16e92d1) | subpath-only allow cases; web lint fixtures; names read from layers.json | `tests/layers/check.test.ts`, `fixtures/34-web-auth-subpath/`, `tests/layers/relative-structure.test.ts` |
+| Lockout (seceng §8, §9; architect 322c6174) | 9 refusals no lock, 10th locks 900 s ± 60, 11th with the right code refused; per-hold cap of 5; the 6th answer's write set and commit; counter-only-goes-up; lapse resets the count (recorded) | `tests/db/auth-signin-tx.test.ts` |
+| TOTP window (seceng) | t ± 30 s accepted, t ± 60 s and t ± 90 s refused; clock controlled | `tests/db/auth-signin-tx.test.ts` |
+| e2e with the service up | seed signs in through a repo helper; `apps/auth` started before `vite preview` | `apps/web/tests/e2e/serve.ts`, `tests/db/helpers/e2e-auth.ts` |
+| Web, config, bind, cookie-lifetime, web client | unit suites | `apps/web/src/hooks.server.*.test.ts`, `packages/config/src/auth-service.test.ts`, `tests/config/auth-bind.test.ts`, `packages/auth/src/{cookie-lifetime,web}.test.ts` |
+
+Written differently from the plan: D2 (secret not in the service's log) is in `auth-service-main`, not the config canary file. Seceng #19 stays with POLY-153.
