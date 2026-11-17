@@ -46,3 +46,7 @@ Loop 1 of stage 2 (split from POLY-149 on 2026-11-17; the Principal confirmed th
 ### @team-lead — 2026-11-17
 
 Feature started. Branch: `feature/poly-152-sign-in-service`. Split from POLY-149 with the Principal's confirmation (2026-11-17): this loop is the service (S) and the POLY-89 retarget; POLY-153 is web entering by handle; POLY-149 is the revocation and docs.
+
+### @team-lead — 2026-11-17
+
+Reading of criterion 6 for this loop (ruling R9, e7a18a51): the handle is POLY-153's, so this loop proves the one-transaction rule on the session-creating paths with a test plugin whose forced failure leaves no session row. The handle half, cookie scope (seceng #19) and the removal of the interim `/session` call are now criteria on POLY-153.

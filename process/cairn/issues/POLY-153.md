@@ -22,6 +22,10 @@ Loop 2 of stage 2 (split from POLY-149 on 2026-11-17). Web enters a transaction 
 - [ ] No column in the database equals a live cookie's handle, checked by query in the test. Deleting a session kills its handle in the same transaction.
 - [ ] Settings → Sessions, revoke and `requireRecentAuth` are definers that read the marker's session. `loadSession` and the `SessionUserId` brand are removed from web.
 
+- [ ] **Cookie scope (seceng #19).** BetterAuth's cookies become `__Secure-` with `Path=/api/auth`; the handle stays `__Host-` with `Path=/`. A test shows web never receives BetterAuth's cookies (spike §1 C, §7.9; moved here by POLY-152's ruling R7, since web reads BetterAuth's cookie until the handle exists).
+- [ ] **The session and its handle commit together** on the sign-in paths that have no session yet (email, magic link, OAuth callback, passkey sign-in); a forced handle-INSERT failure leaves no session row (spike §7.8). POLY-152 proves the one-transaction rule with a test plugin (its ruling R9); this is the handle half.
+- [ ] **The interim session call is removed.** Web no longer asks the service's internal `/session` listener who is signed in (POLY-152's ruling R6), and the listener is gone or refuses web.
+
 ## Estimate
 
 3–4.5 loop-days (E 2–3, H 1–1.5; from POLY-149's estimate)
