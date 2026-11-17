@@ -135,3 +135,28 @@ The two `auth-signin-tx` lockout tests now assert, per path (TOTP, backup code):
 ## Gate run: tests/db at 1f5b8650 + this commit
 
 tests/db: 34 files, 752 passed, 0 failed, 0 skipped (752). The lockout tests above are in it.
+
+## Clean-tree gate run at 43adb5bb (for seceng)
+
+Tree clean (`git status` empty); every suite from its own config. Passed + failed + skipped = total, files counted per suite.
+
+| Suite | Files | Passed | Failed | Skipped | Total |
+|---|---|---|---|---|---|
+| tests/db | 34 | 752 | 0 | 0 | 752 |
+| tests/ci | 19 | 536 | 0 | 0 | 536 |
+| tests/infra | 4 | 180 | 0 | 0 | 180 |
+| tests/config (with tests/image, tests/log) | 6 | 107 | 0 | 15 | 122 |
+| tests/layers | 6 | 551 | 0 | 0 | 551 |
+| packages/auth | 7 | 43 | 0 | 0 | 43 |
+| packages/config | 6 | 327 | 0 | 0 | 327 |
+| packages/db | 6 | 43 | 0 | 0 | 43 |
+| packages/tenancy | 1 | 3 | 0 | 0 | 3 |
+| apps/web unit | 9 | 89 | 0 | 0 | 89 |
+| apps/worker, apps/migrate | 2 | 2 | 0 | 0 | 2 |
+| **Sum** | **100** | **2633** | **0** | **15** | **2648** |
+| apps/web e2e (Playwright, auth service up) | 8 specs | 55 | 0 | 0 | 55 |
+| tests/workflow (python unittest) | 10 | 92 | 0 | 0 | 92 |
+
+- The 15 skipped are `tests/image` cases gated on `POLY_IMAGE_BUILD=1` (the image build; not run here). `tests/infra/image` (the Docker image suite, POLY-143) was not run.
+- e2e ran at the same file content as 43adb5bb, one commit earlier (the only difference is the commit); the harness now starts `apps/auth` before `vite preview`, the seed signs in through `tests/db/helpers/e2e-auth.ts`, and web imports no BetterAuth.
+- **db suite time against a same-day control on main** (`abe774a9`, same machine, two runs each, wall time of the vitest run): main 27 files / 660 tests, 67.8 s and 67.9 s; this branch 34 files / 752 tests, 67.5 s and 67.1 s. Seven more files and 92 more tests cost no measurable time.
