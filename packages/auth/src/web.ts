@@ -41,7 +41,7 @@ const KEYS = ['expiresAt', 'image', 'name', 'sessionId', 'userId'];
 const SESSION_COOKIE = /better-auth\.session_token$/;
 
 let origin: string | undefined;
-/** Web's start-up hands the service's internal origin over (AUTH_INTERNAL_ORIGIN, from loadConfig('web')). */
+/** Web's start-up hands the service's internal origin over (AUTH_INTERNAL_URL, from loadConfig('web')). */
 export function setAuthInternalOrigin(o: string | undefined): void {
   origin = o;
 }

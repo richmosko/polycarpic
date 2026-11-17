@@ -160,13 +160,13 @@ function evaluate(service: Service, env: Env): { problems: Problem[]; secrets: R
     else add('STATUS_PORT', 'invalid', 'STATUS_PORT must be an integer from 1024 to 65535');
   }
 
-  // AUTH_INTERNAL_ORIGIN (web only): where web asks the sign-in service who the session is (POLY-152 R6.2). An origin, nothing else.
+  // AUTH_INTERNAL_URL (web only): where web asks the sign-in service who the session is (POLY-152 R6.2). An origin, nothing else.
   let authInternalOrigin: string | undefined;
-  if (service === 'web' && set('AUTH_INTERNAL_ORIGIN') !== undefined) {
-    const raw = env.AUTH_INTERNAL_ORIGIN!;
+  if (service === 'web' && set('AUTH_INTERNAL_URL') !== undefined) {
+    const raw = env.AUTH_INTERNAL_URL!;
     let u: URL | undefined;
     try { u = new URL(raw); } catch { /* refused below */ }
-    if (!u || u.origin !== raw || (u.protocol !== 'http:' && u.protocol !== 'https:')) add('AUTH_INTERNAL_ORIGIN', 'invalid', 'AUTH_INTERNAL_ORIGIN must be an http(s) origin with no path, query, fragment or credentials');
+    if (!u || u.origin !== raw || (u.protocol !== 'http:' && u.protocol !== 'https:')) add('AUTH_INTERNAL_URL', 'invalid', 'AUTH_INTERNAL_URL must be an http(s) origin with no path, query, fragment or credentials');
     else authInternalOrigin = raw;
   }
 

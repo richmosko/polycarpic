@@ -54,7 +54,8 @@ GRANT SELECT (id, user_id, token, expires_at, created_at) ON public.session TO p
 GRANT INSERT (type_id, name, self_user_id) ON public.entity TO poly_govern;--> statement-breakpoint
 GRANT SELECT (id, self_user_id) ON public.entity TO poly_govern;--> statement-breakpoint
 GRANT SELECT (id, system_key) ON public.entity_type TO poly_govern;--> statement-breakpoint
-GRANT SELECT (id, name, signup_txid) ON public."user" TO poly_govern;--> statement-breakpoint
+-- Only the name is new: the "created by this transaction" check rests on the (id, email, email_verified, signup_txid) grant at 0007:11.
+GRANT SELECT (name) ON public."user" TO poly_govern;--> statement-breakpoint
 CREATE POLICY entity_provision_insert ON public.entity FOR INSERT TO poly_govern
   WITH CHECK (self_user_id = app.current_user_id());--> statement-breakpoint
 CREATE POLICY entity_provision_read ON public.entity FOR SELECT TO poly_govern

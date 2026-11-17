@@ -34,7 +34,7 @@ const authPort = port + 1000; // the sign-in service's public listener; the inte
 const authInternalPort = port + 1001;
 const common = { APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: origin };
 // Web holds no auth secret (R1.3): it learns where the service's internal listener is, nothing else.
-const appEnv = { ...dbEnv('poly_app', db), ...common, AUTH_INTERNAL_ORIGIN: `http://127.0.0.1:${authInternalPort}`, AUTH_PUBLIC_PORT: String(authPort) };
+const appEnv = { ...dbEnv('poly_app', db), ...common, AUTH_INTERNAL_URL: `http://127.0.0.1:${authInternalPort}`, AUTH_PUBLIC_PORT: String(authPort) };
 const authEnv = { ...dbEnv('poly_auth', db), ...common, AUTH_SECRET_FILE: secretFile, AUTH_PUBLIC_PORT: String(authPort), AUTH_INTERNAL_HOST: '127.0.0.1', AUTH_INTERNAL_PORT: String(authInternalPort) };
 Object.assign(process.env, appEnv);
 
