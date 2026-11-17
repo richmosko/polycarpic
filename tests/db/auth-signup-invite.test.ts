@@ -277,7 +277,11 @@ describe('condition 11: the pooled backend carries no identity after a sign-up',
     e.dbm.configure({ app: dbEnv('poly_app', e.db), auth: dbEnv('poly_auth', e.db), worker: dbEnv('poly_worker', e.db), max: 1 });
     const a = await e.mk();
     const probe = async () => e.dba.withContextFreeTx(async (tx: any) => {
-      const s = (await tx.execute(e.dbm.sql`SELECT coalesce(app.current_user_id()::text, '') AS v, pg_backend_pid() AS pid, (SELECT count(*) FROM public.entity) AS n`)).rows[0];
+      const s = (await tx.execute(e.dbm.sql`SELECT coalesce(app.current_user_id()::text, '') AS v, pg_backend_pid() AS pid, 0 AS n`)).rows[0]; // POLY-152: poly_auth reads no tenant table (R2); the next line proves it
+      await tx.execute(e.dbm.sql`SAVEPOINT qa_probe`);
+      const denied = await tx.execute(e.dbm.sql`SELECT count(*) FROM public.entity`).then(() => false, () => true);
+      await tx.execute(e.dbm.sql`ROLLBACK TO SAVEPOINT qa_probe`);
+      s.n = denied ? 0 : 1;
       return { v: s.v as string, pid: s.pid as number, n: Number(s.n) };
     });
     const before = await probe();
@@ -316,7 +320,7 @@ describe('conditions 12, 32: a sign-up missing a step is refused and leaves no u
             after: async (user: { id: string }, ctx: { body?: { invitationToken?: string } } | null) => {
               const tx: any = e.dba.currentTx();
               if (steps.enter) await tx.enterNewUser(user.id);
-              if (steps.provision) await T.provisionPerson(tx);
+              if (steps.provision) await T.provisionOwnPerson(tx); // POLY-152 R3: the Person insert is the definer's
               if (steps.accept) await T.acceptInvitations(tx, { token: ctx?.body?.invitationToken ?? null });
             },
           },

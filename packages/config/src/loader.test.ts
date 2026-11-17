@@ -13,7 +13,7 @@ import { ConfigError, SECRET_NAME_RE, Secret, checkConfig, loadConfig } from './
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-type Svc = 'web' | 'worker' | 'migrate';
+type Svc = 'web' | 'auth' | 'worker' | 'migrate';
 type Env = Record<string, string | undefined>;
 
 const secretOf = (cfg: any, v: string): Secret => cfg.secrets[v];
@@ -26,7 +26,7 @@ const file = (content: string): string => {
   writeFileSync(p, content);
   return p;
 };
-const DBUSER: Record<Svc, string> = { web: 'poly_app', worker: 'poly_worker', migrate: 'poly_migrator' };
+const DBUSER: Record<Svc, string> = { web: 'poly_app', auth: 'poly_auth', worker: 'poly_worker', migrate: 'poly_migrator' };
 /** A fully valid environment for the service, APP_ENV=development. */
 const good = (svc: Svc, over: Env = {}): Env => {
   const e: Env = {
@@ -34,7 +34,7 @@ const good = (svc: Svc, over: Env = {}): Env => {
     DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '5432', DATABASE_NAME: 'polycarpic', DATABASE_USER: DBUSER[svc],
     DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: file('pw\n'),
   };
-  if (svc === 'web') e.AUTH_SECRET_FILE = file('auth-secret\n');
+  if (svc === 'auth') e.AUTH_SECRET_FILE = file('auth-secret\n');
   return { ...e, ...over };
 };
 const prod = (svc: Svc, over: Env = {}): Env =>
@@ -44,7 +44,7 @@ const stage = (svc: Svc, over: Env = {}): Env => prod(svc, { APP_ENV: 'staging',
 const vars = (svc: Svc, env: Env) => checkConfig(svc, env).map((p) => p.var);
 
 describe('good environments', () => {
-  for (const svc of ['web', 'worker', 'migrate'] as Svc[]) {
+  for (const svc of ['web', 'auth', 'worker', 'migrate'] as Svc[]) {
     it(`${svc}: development, staging and production configs are clean`, () => {
       expect(checkConfig(svc, good(svc))).toEqual([]);
       expect(checkConfig(svc, stage(svc))).toEqual([]);
@@ -54,7 +54,7 @@ describe('good environments', () => {
   it('loadConfig returns for a good config and throws ConfigError carrying the problem list for a bad one', () => {
     expect(() => loadConfig('web', good('web'))).not.toThrow();
     try {
-      loadConfig('web', good('web', { AUTH_SECRET_FILE: undefined }));
+      loadConfig('auth', good('auth', { AUTH_SECRET_FILE: undefined }));
       expect.unreachable();
     } catch (e) {
       expect(e).toBeInstanceOf(ConfigError);
@@ -64,7 +64,7 @@ describe('good environments', () => {
 });
 
 describe('R3 *_FILE semantics (criterion 1: a missing or empty file refuses start, naming the variable)', () => {
-  const required: [Svc, string][] = [['web', 'DATABASE_PASSWORD_FILE'], ['worker', 'DATABASE_PASSWORD_FILE'], ['migrate', 'DATABASE_PASSWORD_FILE'], ['web', 'AUTH_SECRET_FILE']];
+  const required: [Svc, string][] = [['web', 'DATABASE_PASSWORD_FILE'], ['worker', 'DATABASE_PASSWORD_FILE'], ['migrate', 'DATABASE_PASSWORD_FILE'], ['auth', 'AUTH_SECRET_FILE']];
   for (const [svc, v] of required) {
     it(`${svc}: ${v} unset refuses, naming it`, () => expect(vars(svc, good(svc, { [v]: undefined }))).toContain(v));
     it(`${svc}: ${v} set to '' refuses, naming it`, () => expect(vars(svc, good(svc, { [v]: '' }))).toContain(v));
@@ -79,20 +79,20 @@ describe('R3 *_FILE semantics (criterion 1: a missing or empty file refuses star
   }
 
   it('there is no env-var fallback: AUTH_SECRET in the environment does not satisfy a missing AUTH_SECRET_FILE', () => {
-    const env = good('web', { AUTH_SECRET_FILE: undefined, AUTH_SECRET: CANARIES.secretFile });
-    expect(vars('web', env)).toContain('AUTH_SECRET_FILE');
-    expect(() => loadConfig('web', env)).toThrow(ConfigError);
+    const env = good('auth', { AUTH_SECRET_FILE: undefined, AUTH_SECRET: CANARIES.secretFile });
+    expect(vars('auth', env)).toContain('AUTH_SECRET_FILE');
+    expect(() => loadConfig('auth', env)).toThrow(ConfigError);
   });
   it('a missing file and an unreadable path are different faults (ENOENT vs other read error)', () => {
-    const missing = checkConfig('web', good('web', { AUTH_SECRET_FILE: join(dir, 'nope') })).find((x) => x.var === 'AUTH_SECRET_FILE')!;
+    const missing = checkConfig('auth', good('auth', { AUTH_SECRET_FILE: join(dir, 'nope') })).find((x) => x.var === 'AUTH_SECRET_FILE')!;
     const adir = join(dir, 'adir');
     mkdirSync(adir);
-    const unreadable = checkConfig('web', good('web', { AUTH_SECRET_FILE: adir })).find((x) => x.var === 'AUTH_SECRET_FILE')!;
+    const unreadable = checkConfig('auth', good('auth', { AUTH_SECRET_FILE: adir })).find((x) => x.var === 'AUTH_SECRET_FILE')!;
     expect(unreadable).toBeDefined();
     expect(unreadable.fault).not.toBe(missing.fault);
   });
   it('the four fault kinds for one variable are four distinct fault codes', () => {
-    const f = (c: string | null) => checkConfig('web', good('web', { AUTH_SECRET_FILE: c === null ? undefined : c === 'MISSING' ? join(dir, 'zz') : file(c) })).find((x) => x.var === 'AUTH_SECRET_FILE')!.fault;
+    const f = (c: string | null) => checkConfig('auth', good('auth', { AUTH_SECRET_FILE: c === null ? undefined : c === 'MISSING' ? join(dir, 'zz') : file(c) })).find((x) => x.var === 'AUTH_SECRET_FILE')!.fault;
     const codes = [f(null), f('MISSING'), f(''), f('a\nb\n')];
     expect(new Set(codes).size).toBe(4);
     codes.forEach((c) => expect(typeof c).toBe('string'));
@@ -100,12 +100,12 @@ describe('R3 *_FILE semantics (criterion 1: a missing or empty file refuses star
 
   describe('line secrets', () => {
     it('exactly one trailing newline is removed', () => {
-      const cfg = loadConfig('web', good('web', { AUTH_SECRET_FILE: file('abc\n') }));
+      const cfg = loadConfig('auth', good('auth', { AUTH_SECRET_FILE: file('abc\n') }));
       expect(secretOf(cfg, 'AUTH_SECRET_FILE').reveal()).toBe('abc');
     });
-    it('a file without a trailing newline is taken as is', () => expect(secretOf(loadConfig('web', good('web', { AUTH_SECRET_FILE: file('abc') })), 'AUTH_SECRET_FILE').reveal()).toBe('abc'));
+    it('a file without a trailing newline is taken as is', () => expect(secretOf(loadConfig('auth', good('auth', { AUTH_SECRET_FILE: file('abc') })), 'AUTH_SECRET_FILE').reveal()).toBe('abc'));
     for (const [name, content] of [['an interior newline', 'a\nb\n'], ['two trailing newlines', 'abc\n\n'], ['leading whitespace', ' abc\n'], ['trailing whitespace', 'abc \n'], ['CRLF', 'abc\r\n'], ['a tab', '\tabc']] as const) {
-      it(`refuses ${name}`, () => expect(vars('web', good('web', { AUTH_SECRET_FILE: file(content) }))).toContain('AUTH_SECRET_FILE'));
+      it(`refuses ${name}`, () => expect(vars('auth', good('auth', { AUTH_SECRET_FILE: file(content) }))).toContain('AUTH_SECRET_FILE'));
     }
   });
   describe('text secrets (CREDENTIAL_KEYRING_FILE, worker)', () => {
@@ -117,7 +117,7 @@ describe('R3 *_FILE semantics (criterion 1: a missing or empty file refuses star
   });
 
   describe('optional secrets', () => {
-    const optional: [Svc, string][] = [['web', 'OAUTH_GOOGLE_SECRET_FILE'], ['web', 'OAUTH_GITHUB_SECRET_FILE'], ['web', 'RESEND_API_KEY_FILE'], ['worker', 'RESEND_API_KEY_FILE'], ['web', 'PLAID_SECRET_FILE'], ['worker', 'PLAID_SECRET_FILE'], ['worker', 'PRICE_API_KEY_FILE'], ['worker', 'BLS_API_KEY_FILE'], ['worker', 'CREDENTIAL_KEYRING_FILE']];
+    const optional: [Svc, string][] = [['auth', 'OAUTH_GOOGLE_SECRET_FILE'], ['auth', 'OAUTH_GITHUB_SECRET_FILE'], ['auth', 'RESEND_API_KEY_FILE'], ['worker', 'RESEND_API_KEY_FILE'], ['web', 'PLAID_SECRET_FILE'], ['worker', 'PLAID_SECRET_FILE'], ['worker', 'PRICE_API_KEY_FILE'], ['worker', 'BLS_API_KEY_FILE'], ['worker', 'CREDENTIAL_KEYRING_FILE']];
     for (const [svc, v] of optional) {
       it(`${svc}: ${v} absent is fine`, () => expect(vars(svc, good(svc))).not.toContain(v));
       it(`${svc}: ${v} set to a good file is fine`, () => expect(checkConfig(svc, good(svc, { [v]: file('x\n') }))).toEqual([]));
@@ -134,19 +134,19 @@ describe('R3 *_FILE semantics (criterion 1: a missing or empty file refuses star
     it('PRICE_API_KEY_FILE is refused in web', () => expect(vars('web', good('web', { PRICE_API_KEY_FILE: file('a\n') }))).toContain('PRICE_API_KEY_FILE'));
     for (const env of [good, stage, prod] as const) {
       it(`an unregistered *_FILE (a typo) is refused, naming it (${env === good ? 'development' : env === stage ? 'staging' : 'production'})`, () =>
-        expect(vars('web', env('web', { AUTH_SECRET_FIEL: undefined, AUHT_SECRET_FILE: file('x\n') }))).toContain('AUHT_SECRET_FILE'));
+        expect(vars('auth', env('auth', { AUTH_SECRET_FIEL: undefined, AUHT_SECRET_FILE: file('x\n') }))).toContain('AUHT_SECRET_FILE'));
     }
   });
 
   it('reports every fault, one problem each, and does not stop at the first', () => {
-    const env = good('web', { DATABASE_PASSWORD_FILE: join(dir, 'a'), AUTH_SECRET_FILE: file(''), TLS_MODE: undefined, PLAID_SECRET_FILE: join(dir, 'b') });
-    const v = vars('web', env);
+    const env = good('auth', { DATABASE_PASSWORD_FILE: join(dir, 'a'), AUTH_SECRET_FILE: file(''), TLS_MODE: undefined, PLAID_SECRET_FILE: join(dir, 'b') });
+    const v = vars('auth', env);
     for (const k of ['DATABASE_PASSWORD_FILE', 'AUTH_SECRET_FILE', 'TLS_MODE', 'PLAID_SECRET_FILE']) expect(v.filter((x) => x === k)).toHaveLength(1);
   });
 });
 
 describe('R3 Secret objects never render', () => {
-  const cfg = () => loadConfig('web', good('web', { AUTH_SECRET_FILE: file(CANARIES.secretFile + '\n') }));
+  const cfg = () => loadConfig('auth', good('auth', { AUTH_SECRET_FILE: file(CANARIES.secretFile + '\n') }));
   it('reveal() returns the value', () => expect(secretOf(cfg(), 'AUTH_SECRET_FILE').reveal()).toBe(CANARIES.secretFile));
   it('toString, String(), template, toJSON all give [secret]', () => {
     const s = secretOf(cfg(), 'AUTH_SECRET_FILE');
@@ -161,11 +161,11 @@ describe('R3 Secret objects never render', () => {
     assertNoCanary(inspect(secretOf(c, 'AUTH_SECRET_FILE')), 'util.inspect(secret)');
   });
   it('problems and ConfigError text never contain file content or the value of a refused variable', () => {
-    const env = good('web', { AUTH_SECRET_FILE: file(CANARIES.secretFile + '\nsecond line\n'), DATABASE_PASSWORD: CANARIES.token, DATABASE_URL: CANARIES.url });
-    const problems = checkConfig('web', env);
+    const env = good('auth', { AUTH_SECRET_FILE: file(CANARIES.secretFile + '\nsecond line\n'), DATABASE_PASSWORD: CANARIES.token, DATABASE_URL: CANARIES.url });
+    const problems = checkConfig('auth', env);
     expect(problems.length).toBeGreaterThan(0);
     assertNoCanary(JSON.stringify(problems), 'problems');
-    try { loadConfig('web', env); } catch (e) { assertNoCanary(String(e) + ((e as Error).stack ?? '') + JSON.stringify(e), 'ConfigError'); }
+    try { loadConfig('auth', env); } catch (e) { assertNoCanary(String(e) + ((e as Error).stack ?? '') + JSON.stringify(e), 'ConfigError'); }
   });
 });
 
@@ -226,7 +226,7 @@ describe('R2 environment', () => {
   });
 
   describe('DATABASE_* per service (POLY-83 addendum 1)', () => {
-    for (const svc of ['web', 'worker', 'migrate'] as Svc[]) {
+    for (const svc of ['web', 'auth', 'worker', 'migrate'] as Svc[]) {
       for (const other of Object.values(DBUSER).filter((u) => u !== DBUSER[svc])) {
         it(`${svc} refuses DATABASE_USER=${other}`, () => expect(vars(svc, good(svc, { DATABASE_USER: other }))).toContain('DATABASE_USER'));
       }

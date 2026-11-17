@@ -20,7 +20,7 @@ const seen: { kind: string | undefined; txid: string; email: string; token: stri
 beforeAll(async () => {
   e = await boot();
   auth = await e.mk();
-  must(`CREATE TABLE public.qa_user_tx (user_id uuid, txid bigint); GRANT SELECT, INSERT ON public.qa_user_tx TO poly_app;
+  must(`CREATE TABLE public.qa_user_tx (user_id uuid, txid bigint); GRANT SELECT, INSERT ON public.qa_user_tx TO poly_app, poly_auth; /* POLY-152: the user INSERT runs as poly_auth, so its trigger's table is granted to it */
     CREATE FUNCTION public.qa_log_user_tx() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN INSERT INTO public.qa_user_tx VALUES (NEW.id, txid_current()); RETURN NEW; END $$;
     CREATE TRIGGER qa_user_tx AFTER INSERT ON public."user" FOR EACH ROW EXECUTE FUNCTION public.qa_log_user_tx();
     CREATE FUNCTION public.qa_refuse_session() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN

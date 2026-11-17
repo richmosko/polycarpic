@@ -45,6 +45,10 @@ beforeAll(async () => {
     CREATE POLICY u ON public.qa_canary_wc FOR UPDATE USING (owner_user_id = app.current_user_id()) WITH CHECK (owner_user_id = app.current_user_id());
     GRANT SELECT, INSERT, UPDATE ON public.qa_canary_open, public.qa_canary_rls, public.qa_canary_wc TO poly_app;
     GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO poly_app;
+    -- POLY-152: the context-free kind runs as poly_auth, which holds no tenant privilege in production (pgTAP 08). These throwaway canary tables are
+    -- granted to it HERE so the test still asks what RLS shows a role that has a grant and no identity: nothing.
+    GRANT SELECT, INSERT, UPDATE ON public.qa_canary_open, public.qa_canary_rls, public.qa_canary_wc TO poly_auth;
+    GRANT USAGE ON ALL SEQUENCES IN SCHEMA public TO poly_auth;
     INSERT INTO public.qa_canary_open (owner_user_id) VALUES ('${A}'), ('${B}');
     INSERT INTO public.qa_canary_rls (owner_user_id) VALUES ('${A}'), ('${B}');
     INSERT INTO public.qa_canary_wc (owner_user_id) VALUES ('${A}'), ('${B}');`, db);
@@ -52,7 +56,7 @@ beforeAll(async () => {
   const m0 = await import('../../packages/db/src/index.ts');
   await m0.close();
   // S-3: a one-connection pool, so every checkout is the same dirty backend (the pid assertions stay as the second check)
-  m0.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), max: 1 });
+  m0.configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), max: 1 });
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
   session = await import('../../packages/db/src/session.ts');
@@ -81,7 +85,8 @@ describe('pool reuse on a dirty backend (criterion 6, C-12)', () => {
       all: (await q(tx, 'select count(*)::int n from public.qa_canary_rls'))[0].n }));
     const p3 = await free(async (tx) => ({ pid: await pid(tx), n: (await q(tx, 'select count(*)::int n from public.qa_canary_rls'))[0].n,
       ctx: (await q(tx, `select coalesce(app.current_user_id()::text, '<null>') c`))[0].c }));
-    expect([p2.pid, p3.pid], 'precondition: one physical backend serves all three checkouts').toEqual([p1.pid, p1.pid]);
+    expect(p2.pid, 'precondition: one physical backend serves both tenant checkouts').toBe(p1.pid);
+    expect(p3.pid, 'POLY-152: the context-free kind has its own pool (poly_auth), so its backend is not the tenants\'').not.toBe(p1.pid);
     expect(p1.own).toBe(1);
     expect(p2.a).toBe(0);
     expect(p2.all).toBe(1);
@@ -95,7 +100,8 @@ describe('pool reuse on a dirty backend (criterion 6, C-12)', () => {
     await expect(tenant(A, async (tx) => { thrown = await pid(tx); await q(tx, 'select count(*) from public.qa_canary_rls'); throw new Error('boom'); })).rejects.toThrow('boom');
     const after = await tenant(B, async (tx) => ({ pid: await pid(tx), a: (await q(tx, 'select count(*)::int n from public.qa_canary_rls where owner_user_id = $1', [A]))[0].n }));
     const none = await free(async (tx) => ({ pid: await pid(tx), n: (await q(tx, 'select count(*)::int n from public.qa_canary_rls'))[0].n }));
-    expect([thrown, after.pid, none.pid], 'precondition: same backend after a rollback').toEqual([first, first, first]);
+    expect([thrown, after.pid], 'precondition: same backend after a rollback').toEqual([first, first]);
+    expect(none.pid, 'POLY-152: the context-free kind has its own pool (poly_auth)').not.toBe(first);
     expect(after.a).toBe(0);
     expect(none.n).toBe(0);
   });

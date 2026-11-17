@@ -66,7 +66,7 @@ beforeAll(async () => {
   vi.resetModules();
   dbm = await import('../../packages/db/src/index.ts');
   await dbm.close();
-  dbm.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
+  dbm.configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
   dba = await import('../../packages/db/src/auth.ts');
   dbs = await import('../../packages/db/src/session.ts');
   dbo = await import('../../packages/db/src/operator.ts');
@@ -164,8 +164,9 @@ describe('R2 the exact-call check: an identity definer answers only its own call
 
 describe('R2 the query_to_xml route: one fragment on an unmarked path cannot mark a victim and read as them', () => {
   const frag = `SELECT 1 WHERE app.enter_asserted_user('${V}', '${S}') IS NOT NULL AND query_to_xml('SELECT count(*) FROM public.entity', true, false, '') IS NOT NULL`;
+  // POLY-152: the plain pool is poly_auth now, which holds no enter_asserted_user (R2, pinned absent), so that refusal is the third accepted message.
   // R11: the built-in's EXECUTE may refuse the fragment before the exact-call check runs, so either message is accepted; no marker either way.
-  const either = (x: any) => expect([NOT_ALONE, 'permission denied for function query_to_xml'].some((m) => msgOf(x).includes(m)), msgOf(x)).toBe(true);
+  const either = (x: any) => expect([NOT_ALONE, 'permission denied for function query_to_xml', 'permission denied for function enter_asserted_user'].some((m) => msgOf(x).includes(m)), msgOf(x)).toBe(true);
   it("through BetterAuth's plain pool (outside any transaction), the fragment is refused and no marker results  [red if: neither the exact-call check nor the R11 revoke exists]", async () => {
     const x = await fails(pool.query(frag));
     expect(codeOf(x), msgOf(x)).toBe('42501');

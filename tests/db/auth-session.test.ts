@@ -109,7 +109,7 @@ describe('Settings → Sessions', () => {
 });
 
 describe('loadSession: projection, cache, caps (S14, S15)', () => {
-  it('returns the token-free ShellSession and only Set-Cookie strings; a revoked session stops at once  [red if: the projection carries token or session id (S1/S15), or cookieCache keeps a revoked session alive]', async () => {
+  it('returns the token-free ShellSession and no Set-Cookie (R7); a revoked session stops at once  [red if: the projection carries token or session id (S1/S15), or cookieCache keeps a revoked session alive]', async () => {
     const u = e.seedUser({ name: 'Shell Person' });
     const { cookie } = await e.signIn(u.email, auth);
     const token = must(`SELECT token FROM public.session WHERE user_id = '${u.id}'`, e.db).rows[0][0];
@@ -121,7 +121,7 @@ describe('loadSession: projection, cache, caps (S14, S15)', () => {
     expect(wire).not.toContain(token);
     expect(wire).not.toContain(s.sessionId);
     expect(wire).not.toContain(decodeURIComponent(cookie.split('=').slice(1).join('=')));
-    expect(Array.isArray(s.setCookie) && s.setCookie.every((c: string) => typeof c === 'string')).toBe(true);
+    expect('setCookie' in s, 'R7: no cookie is relayed, so the loader returns none').toBe(false);
     must(`DELETE FROM public.session WHERE user_id = '${u.id}'`, e.db);
     expect(await load(cookie)).toBeNull();
   });
@@ -181,7 +181,7 @@ describe('criterion 13: provisionPerson in the loader, one retry on entity_self_
   describe('failure shapes (a trigger raises; nextval counts attempts outside the transaction)', () => {
     beforeAll(() => {
       must(`CREATE SEQUENCE public.qa_attempts;
-        GRANT USAGE ON SEQUENCE public.qa_attempts TO poly_app;
+        GRANT USAGE ON SEQUENCE public.qa_attempts TO poly_app, poly_auth;
         CREATE FUNCTION public.qa_fail_person() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
           PERFORM nextval('public.qa_attempts');
           IF NEW.name = 'Doomed' THEN RAISE EXCEPTION 'dup' USING ERRCODE = '23505', CONSTRAINT = 'entity_self_user_id_unique'; END IF;

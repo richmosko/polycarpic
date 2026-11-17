@@ -1,3 +1,4 @@
+// POLY-152 R1.3: every secret-bearing case here runs as the 'auth' service (AUTH_SECRET_FILE and the OAuth files are auth's alone).
 // POLY-85 seceng conditions S-1 .. S-4, S-9 (a, b) on the loader. One describe per condition; the name carries the S-n.
 // Same assumed surface as loader.test.ts, plus: SECRET_NAME_RE exported from ./index.ts (S-1 says "export the regex").
 import { mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
@@ -16,12 +17,12 @@ let n = 0;
 const file = (c: string) => { const p = join(dir, `f${n++}`); writeFileSync(p, c); return p; };
 const good = (over: Env = {}): Env => ({
   APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173', DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '5432', DATABASE_NAME: 'polycarpic',
-  DATABASE_USER: 'poly_app', DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: file('pw\n'), AUTH_SECRET_FILE: file('auth\n'), ...over,
+  DATABASE_USER: 'poly_auth', DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: file('pw\n'), AUTH_SECRET_FILE: file('auth\n'), ...over,
 });
 const prod = (over: Env = {}): Env => good({ APP_ENV: 'production', TLS_MODE: 'real-domain', PUBLIC_ORIGIN: 'https://app.example.com', PLAID_ENV: 'production', DATABASE_SSLMODE: 'verify-full', ...over });
 const stage = (over: Env = {}): Env => prod({ APP_ENV: 'staging', PLAID_ENV: 'sandbox', ...over });
-const vars = (env: Env, svc: 'web' | 'worker' | 'migrate' = 'web') => checkConfig(svc, env).map((p) => p.var);
-const authSecret = (c: string): any => (loadConfig('web', good({ AUTH_SECRET_FILE: file(c) })) as any).secrets.AUTH_SECRET_FILE;
+const vars = (env: Env, svc: 'auth' | 'worker' | 'migrate' = 'auth') => checkConfig(svc, env).map((p) => p.var);
+const authSecret = (c: string): any => (loadConfig('auth', good({ AUTH_SECRET_FILE: file(c) })) as any).secrets.AUTH_SECRET_FILE;
 
 describe('S-1 the secret-looking pattern: one exported source, wider than R2 (KEY, PASS, PWD, DSN as name parts)', () => {
   it('SECRET_NAME_RE matches the S-1 additions and the R2 originals', () => {
@@ -32,7 +33,7 @@ describe('S-1 the secret-looking pattern: one exported source, wider than R2 (KE
   });
   for (const name of ['B2_APPLICATION_KEY', 'RESEND_KEY', 'DB_PASS']) {
     it(`${name} is refused in staging, naming the variable and not the value`, () => {
-      const problems = checkConfig('web', stage({ [name]: CANARIES.token }));
+      const problems = checkConfig('auth', stage({ [name]: CANARIES.token }));
       expect(problems.map((p) => p.var)).toContain(name);
       assertNoCanary(JSON.stringify(problems));
     });
@@ -49,7 +50,7 @@ describe('S-2 no plain-variable fallback, in every APP_ENV', () => {
   for (const stem of stems) {
     for (const [label, mk] of [['development', good], ['staging', stage], ['production', prod]] as const) {
       it(`${label}: ${stem} set as a plain variable is refused, naming it; canary absent`, () => {
-        const problems = checkConfig('web', mk({ [stem]: CANARIES.secretFile }));
+        const problems = checkConfig('auth', mk({ [stem]: CANARIES.secretFile }));
         expect(problems.map((p) => p.var), stem).toContain(stem);
         assertNoCanary(JSON.stringify(problems));
       });
@@ -59,7 +60,7 @@ describe('S-2 no plain-variable fallback, in every APP_ENV', () => {
     expect(vars(good({ AUTH_SECRET_FILE: undefined, AUTH_SECRET: CANARIES.secretFile }))).toEqual(expect.arrayContaining(['AUTH_SECRET', 'AUTH_SECRET_FILE']));
   });
   it('the DATABASE_PASSWORD stem stays refused in every service', () => {
-    for (const svc of ['web', 'worker', 'migrate'] as const) expect(vars(good({ DATABASE_PASSWORD: 'x' }), svc)).toContain('DATABASE_PASSWORD');
+    for (const svc of ['auth', 'worker', 'migrate'] as const) expect(vars(good({ DATABASE_PASSWORD: 'x' }), svc)).toContain('DATABASE_PASSWORD');
   });
 });
 
@@ -74,8 +75,8 @@ describe('S-3 every fault with the canary as content: nothing in problems, Confi
   for (const [name, c] of contents) {
     it(name, () => {
       const env = good({ AUTH_SECRET_FILE: file(c), DATABASE_PASSWORD_FILE: file(c) });
-      assertNoCanary(JSON.stringify(checkConfig('web', env)), 'problems');
-      try { loadConfig('web', env); } catch (e: any) {
+      assertNoCanary(JSON.stringify(checkConfig('auth', env)), 'problems');
+      try { loadConfig('auth', env); } catch (e: any) {
         assertNoCanary([e.message, String(e.cause ?? ''), e.stack ?? '', JSON.stringify(e)].join('\n'), 'ConfigError');
       }
     });
@@ -83,9 +84,9 @@ describe('S-3 every fault with the canary as content: nothing in problems, Confi
   it('a directory path (cannot be read) leaks nothing', () => {
     const d = join(dir, 'cdir'); mkdirSync(d, { recursive: true }); writeFileSync(join(d, 'x'), CANARIES.secretFile);
     const env = good({ AUTH_SECRET_FILE: d });
-    assertNoCanary(JSON.stringify(checkConfig('web', env)));
-    expect(() => loadConfig('web', env)).toThrow();
-    try { loadConfig('web', env); } catch (e: any) { assertNoCanary([e.message, String(e.cause ?? ''), e.stack ?? ''].join('\n')); }
+    assertNoCanary(JSON.stringify(checkConfig('auth', env)));
+    expect(() => loadConfig('auth', env)).toThrow();
+    try { loadConfig('auth', env); } catch (e: any) { assertNoCanary([e.message, String(e.cause ?? ''), e.stack ?? ''].join('\n')); }
   });
 });
 
@@ -106,7 +107,7 @@ describe('S-4 Secret holds its value in a #private field', () => {
     assertNoCanary(cloned, 'structuredClone');
   });
   it('util.inspect(cfg, { showHidden: true, depth: Infinity }) contains no canary', () => {
-    assertNoCanary(inspect(loadConfig('web', good({ AUTH_SECRET_FILE: file(CANARIES.secretFile + '\n') })), { showHidden: true, depth: Infinity }), 'inspect');
+    assertNoCanary(inspect(loadConfig('auth', good({ AUTH_SECRET_FILE: file(CANARIES.secretFile + '\n') })), { showHidden: true, depth: Infinity }), 'inspect');
   });
   it('the source declares a #private field in class Secret', () => {
     const src = readdirSync(HERE).filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts')).map((f) => readFileSync(join(HERE, f), 'utf8')).join('\n');
@@ -123,7 +124,7 @@ describe('S-9 (a, b)', () => {
     expect(vars(good({ POLY_IMAGE_REVISION: 'a'.repeat(40) }))).toContain('APP_ENV');
   });
   it('(b) ...and staging and production are accepted with it set', () => {
-    for (const mk of [stage, prod]) expect(checkConfig('web', mk({ POLY_IMAGE_REVISION: 'a'.repeat(40) }))).toEqual([]);
+    for (const mk of [stage, prod]) expect(checkConfig('auth', mk({ POLY_IMAGE_REVISION: 'a'.repeat(40) }))).toEqual([]);
   });
   it('(b) without it, development is fine', () => expect(vars(good())).not.toContain('APP_ENV'));
 });

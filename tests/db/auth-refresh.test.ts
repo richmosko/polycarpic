@@ -76,7 +76,7 @@ describe('C8 the day tests (the row is the control)', () => {
 
 describe('C7 the cap\'s clearing cookie', () => {
   it('carries the Path, Secure, SameSite and HttpOnly BetterAuth set it with, never a literal Path=/ when the cookie was set at /api/auth [red if: handler.ts hardcodes Path=/]', async () => {
-    const auth = await e.mk('real-domain', (o) => { o.advanced = { ...(o.advanced ?? {}), defaultCookieAttributes: { ...(o.advanced?.defaultCookieAttributes ?? {}), path: '/api/auth' } }; return o; });
+    const auth = await e.mk('real-domain', (o) => { o.advanced = { ...(o.advanced ?? {}), cookiePrefix: 'qa-better-auth', /* better-call forces Path=/ on any __Host- name; POLY-153 changes the prefix with the path */ defaultCookieAttributes: { ...(o.advanced?.defaultCookieAttributes ?? {}), path: '/api/auth' } }; return o; });
     const u = e.seedUser();
     const { cookie, res } = await e.signIn(u.email, auth);
     const set = sessionCookie(res)!;

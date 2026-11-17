@@ -86,3 +86,40 @@ Also changed by me, each under the ruling named: `second-step-gates` tenancy ref
 | tests/infra | 4 | 180 | 0 | 0 | 180 |
 
 All 148 db failures are in files whose handler path is still the poly_app pool, i.e. milestone 2 (`configure({auth})`, `withAuthSession`/`withSignInTx`, `apps/auth`): auth-client-ip (4), auth-fields (3), auth-internal-session (23), auth-new-user-step (2: `enterNewUser` through the app pool), auth-refresh (6), auth-route-policy (20), auth-second-step (10), auth-service-main (8), auth-session (14), auth-signin-tx (8), auth-signup-invite (17), auth-signup-wrap (3), operator-invite (12), second-step-flow (18). All of pgTAP (01 to 08), identity-marker, auth-enter-session, auth-provision-person, auth-service-grants, second-step-gates, second-step-challenge, second-step-reset and matrix are green.
+
+## Build at bafd87e3..10c7b21e — rulings on backend-lead-152's items 1-12 (build-findings), at ruling 646e35ed and architect f16e92d1
+
+| # | Item | Decision | Reason |
+|---|---|---|---|
+| 1 | `options.test` plugin list lacks `cookie-lifetime` | **Accept** | R7: the plugin is last in `plugins[]`. The test now pins the five ids and that `cookie-lifetime` is last. |
+| 2 | `pg-seam-scan` pins 3 pools | **Accept** | R2 / contract point 1: a fourth, poly_auth-only pool. Pinned at 4, every one on `ExtendedClient`. |
+| 3 | routing-pool test expects `poly_app` outside a transaction | **Accept** | R8: the routing pool is poly_auth's. `cu` is `poly_auth`. |
+| 4 | `loadSession` returns no `setCookie` | **Accept** | R7: web relays no cookie. The test asserts the key is absent. |
+| 5 | C7 test keeps the `__Host-` prefix | **Accept** | better-call forces `Path=/` on any `__Host-` name; R7 says the scope changes in POLY-153 with the prefix. The test sets a non-`__Host-` prefix and `Path=/api/auth`, and still asserts the clearing cookie carries the path it was set with. |
+| 6 | lockout is 10, not 5 | **Held, then accepted in principle** (architect f16e92d1: keep 10) | The two `auth-signin-tx` lockout tests still assert five and stay red until the lead confirms seceng accepted 10; then they become 9 refusals (count 9, `locked_until` NULL), the 10th locks, an 11th try with the right code is refused and makes no session, same for backup codes, lock duration recorded not asserted. |
+| 7 | web hook tests mock the old `@poly/auth` | **Accept** | R1.6, R6.2, R7. Rewritten to mock `@poly/auth/web`: the whole `/api/auth` tree is 404 with no lookup; a 503 from the service is a 503 page, never a redirect; no cookie is relayed; the gate redirect sets none. |
+| 8 | config tests treat the auth secret, OAuth files and `RESEND_API_KEY_FILE` as web's | **Accept** | R1.3. Secret-bearing cases run as service `auth` (poly_auth); web refuses `AUTH_SECRET_FILE` as forbidden. |
+| 9 | layer checker demands the base for a subpath allow | **Accept (architect f16e92d1, 1)** | `tests/layers/check.test.ts` gains the two subpath-only cases and a still-refused unknown subpath; green on the build (10c7b21e). |
+| 9b | web may not import `@poly/auth` once its list says `auth/web` | **RED, build finding** | New lint fixtures `34-web-auth-subpath`: `import '@poly/auth/web'` from web passes; `import '@poly/auth'` from web is NOT refused (0 errors). Cause: `scripts/layers/generate.mjs:37` builds the boundaries allow list from `a.split('/')[0]`, so `auth/web` grants the `auth` index. Fails `lint.test.ts`, the only red in tests/layers. |
+| 10 | ARCH §2.2 | done by the architect (b7f5440c); `check.test.ts` "passes on the unmodified file" is green. |
+| 11 | package name collision | **Accept (architect f16e92d1, 2)** | `relative-structure` now compares every `package.json` name with the name layers.json gives its dir, unique, `@poly/` prefixed; `apps/auth` is `@poly/auth-app`. |
+| 12 | `structure.test` "tests run alone" | green after 1, 2, 7, 8. |
+
+Also, found running the whole db suite on the build, each under the ruling named: the context-free kind is poly_auth (R2), so tests that used it as a tenant-table or `has_role` reader moved: `battery` grants its throwaway canary tables to poly_auth (the question is still "what does RLS show a role with a grant and no identity") and its same-backend precondition now covers the tenant pool only; `tenancy` asks `has_role`, `visible_entities` and `owner_count` of poly_app with no marker; `wrappers` sets the session-level setting on poly_auth; `identity-marker` also accepts `permission denied for function enter_asserted_user` for the plain pool; `ops-hardening` starts web without `AUTH_SECRET_FILE` (forbidden) and with `AUTH_INTERNAL_URL`; `auth-signup-wrap` grants its trigger table to poly_auth; `auth-signup-invite` calls `provisionOwnPerson` (R3) and probes tenant visibility as a refused read; `auth-session` grants its sequence to poly_auth.
+
+### Counts at 10c7b21e + this commit
+
+| Suite | Files | Passed | Failed | Skipped | Total |
+|---|---|---|---|---|---|
+| tests/db | 34 | 749 | 2 | 0 | 751 |
+| tests/ci | 19 | 536 | 0 | 0 | 536 |
+| tests/infra | 4 | 180 | 0 | 0 | 180 |
+| tests/layers | 6 | 550 | 1 | 0 | 551 |
+| tests/config | 6 | 107 | 0 | 15 | 122 |
+| packages/auth | 7 | 43 | 0 | 0 | 43 |
+| packages/config | 6 | 327 | 0 | 0 | 327 |
+| packages/db | 6 | 43 | 0 | 0 | 43 |
+| packages/tenancy | 1 | 3 | 0 | 0 | 3 |
+| apps/web | 9 | 89 | 0 | 0 | 89 |
+
+The 15 skipped in tests/config are `tests/image` cases gated on `POLY_IMAGE_BUILD=1` (the image build; not run here). The three red tests: the two lockout tests (held for seceng) and the `@poly/auth` lint fixture (9b, a build fix).

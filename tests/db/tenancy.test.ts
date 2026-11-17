@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { REAL_MIGRATIONS, dbEnv, freshDb, migrateCli } from './helpers/api';
 import { crossTenantRows } from './helpers/cross-tenant';
 import { activeRows, checkProbe, loadMatrix, runAs, runnableEntries, type Actor, type Fixture } from './helpers/matrix';
-import { must, psql } from './helpers/pg';
+import { must, psql, url } from './helpers/pg';
+import { pgmod } from './helpers/second-step';
 import { ID, seedTenancy, type Seed } from './helpers/tenancy';
 
 const SID = '22222222-2222-4222-8222-222222222222';
@@ -21,6 +22,13 @@ const q = (tx: any, text: string, p?: unknown[]) => auth.clientOf(tx).query(text
 const raw = (tx: any, text: string, p?: unknown[]) => auth.clientOf(tx).query(text, p);
 const tenant = (uid: string, fn: (tx: any) => Promise<any>) => m.withTenant(session.sessionUserId(uid), SID, fn);
 const free = (fn: (tx: any) => Promise<any>) => auth.withContextFreeTx(fn);
+// POLY-152: the context-free kind runs as poly_auth, which holds no has_role / visible_entities / owner_count (R2). The no-identity read of those
+// definers is asked of poly_app itself: a plain connection, in a transaction, with no marker.
+const bare = async <T>(text: string, p?: unknown[]): Promise<T> => {
+  const c = new pgmod.Client({ connectionString: url('poly_app', db) });
+  await c.connect();
+  try { await c.query('BEGIN'); return (await c.query({ text, values: p, queryMode: 'extended' })).rows[0] as T; } finally { await c.query('ROLLBACK').catch(() => {}); await c.end(); }
+};
 const code = (e: any): string => e?.code ?? e?.cause?.code ?? String(e);
 const sqlstate = async (p: Promise<unknown>) => p.then(() => 'no error', code);
 const O = ID.owner, M = ID.manager, V = ID.viewer, X = ID.outsider, O2 = ID.owner2;
@@ -53,7 +61,7 @@ beforeAll(async () => {
   vi.resetModules();
   const m0 = await import('../../packages/db/src/index.ts');
   await m0.close();
-  m0.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), max: 4 });
+  m0.configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), max: 4 });
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
   session = await import('../../packages/db/src/session.ts');
@@ -106,7 +114,7 @@ describe('the authz functions (criterion 4)', () => {
     expect(await vis(M)).toContain(E);
     expect(await vis(M)).not.toContain(F);
     expect(await vis(X)).toEqual([F]);
-    expect(await free(async (tx: any) => (await q(tx, `select cardinality(app.visible_entities()) c`))[0].c), 'no user, no entities').toBe(0);
+    expect((await bare<{ c: number }>(`select cardinality(app.visible_entities()) c`)).c, 'no user, no entities').toBe(0);
   });
 
   // Mutation: owner_count counts for non-members (a membership-count oracle), or returns 0 instead of null.
@@ -118,7 +126,7 @@ describe('the authz functions (criterion 4)', () => {
 
   // Mutation: let has_role / owner_count answer without a user in context.
   it('an unauthenticated transaction gets false from has_role and null from owner_count', async () => {
-    expect(await free(async (tx: any) => (await q(tx, `select app.has_role($1, 'viewer') h, app.owner_count($1) c`, [E]))[0])).toEqual({ h: false, c: null });
+    expect(await bare(`select app.has_role($1, 'viewer') h, app.owner_count($1) c`, [E])).toEqual({ h: false, c: null });
   });
 });
 

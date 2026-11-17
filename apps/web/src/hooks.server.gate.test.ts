@@ -1,17 +1,14 @@
-// POLY-89 build review N5 (seceng): the sign-in gate's 303 to /settings/second-step must carry the refreshed session cookie, so a gated
-// user's session is extended like any other. Titles end with [red if: <mutation>].
+// POLY-89 build review N5 (seceng), retargeted by POLY-152 R7: the sign-in gate's 303 to /settings/second-step. Web relays no cookie any
+// more (the service re-sets nothing on a page load; the row is the idle bound), so neither the redirect nor the page carries a Set-Cookie.
+// Titles end with [red if: <mutation>].
 import { describe, expect, it, vi } from 'vitest';
 
-const REFRESHED = 'poly_session_token=refreshed.abc; Path=/; HttpOnly; Secure; SameSite=Lax';
 let required = true;
-vi.mock('@poly/auth', () => ({
-  handleAuthRequest: async () => new Response(null),
-  matchAuthPath: () => null,
-  loadSession: async () => ({
-    userId: 'u', sessionId: 's', shell: { name: 'Gated' }, setCookie: [REFRESHED], secondStepRequired: required,
-  }),
+vi.mock('@poly/auth/web', () => ({
+  HttpError: class extends Error {},
+  setAuthInternalOrigin: () => {},
+  loadSession: async () => ({ userId: 'u', sessionId: 's', shell: { user: { id: 'u', name: 'Gated', image: null }, expiresAt: '2030-01-01T00:00:00Z' }, secondStepRequired: required }),
 }));
-vi.mock('./lib/server/auth.ts', () => ({ startAuth: () => {} }));
 
 const { handle } = await import('./hooks.server.ts');
 
@@ -23,21 +20,21 @@ async function request(path: string): Promise<Response> {
 }
 
 describe('the sign-in gate (R5)', () => {
-  it('a gated user\'s 303 to /settings/second-step still carries the refreshed session cookie [red if: the redirect is returned before loaded.setCookie is appended (N5)]', async () => {
+  it('a gated user is redirected 303 to /settings/second-step, and the redirect sets no cookie [red if: the gate is gone, or web relays a cookie]', async () => {
     required = true;
     const res = await request('/dashboard');
     expect(res.status).toBe(303);
     expect(res.headers.get('location')).toBe('/settings/second-step');
-    expect(res.headers.getSetCookie()).toEqual([REFRESHED]);
+    expect(res.headers.getSetCookie()).toEqual([]);
   });
-  it('an ungated page still carries it, and the placeholder itself is not redirected [red if: the fix breaks the pass-through]', async () => {
+  it('the placeholder itself is not redirected while gated, an ungated user reaches any page, and neither answer sets a cookie [red if: the gate loops or relays a cookie]', async () => {
     required = true;
     const placeholder = await request('/settings/second-step');
     expect(placeholder.status).toBe(200);
-    expect(placeholder.headers.getSetCookie()).toEqual([REFRESHED]);
+    expect(placeholder.headers.getSetCookie()).toEqual([]);
     required = false;
     const dash = await request('/dashboard');
     expect(dash.status).toBe(200);
-    expect(dash.headers.getSetCookie()).toEqual([REFRESHED]);
+    expect(dash.headers.getSetCookie()).toEqual([]);
   });
 });

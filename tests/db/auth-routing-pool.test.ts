@@ -142,9 +142,9 @@ describe('serialisation (criterion 1)', () => {
 });
 
 describe('outside a transaction', () => {
-  it('a plain poly_app pool with no marker  [red if: it returns a client still carrying an identity]', async () => {
+  it('the plain pool (poly_auth since POLY-152) with no marker  [red if: it returns a client still carrying an identity]', async () => {
     const r = await pool.query(`select coalesce(app.current_user_id()::text, '') u, coalesce(app.current_session_id()::text, '') s, current_user cu`);
-    expect(r.rows[0]).toEqual({ u: '', s: '', cu: 'poly_app' });
+    expect(r.rows[0]).toEqual({ u: '', s: '', cu: 'poly_auth' });
   });
 
   it('P7: a backend that served a withTenant, checked out next on the plain path, reads no identity  [red if: an identity leaks onto the backend]', async () => {
