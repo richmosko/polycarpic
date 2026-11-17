@@ -89,3 +89,33 @@ Ruling on the owner grant in 0014 at 6fb0d4be (line 57): `GRANT SELECT (id, name
 **What poly_govern's definers could newly read on a caller's behalf: `user.name`, of any user** (the table has no RLS), and nothing else. The only definer that reads it is `provision_person`. It reads only the marker's own user, created in this transaction, and returns the new entity's id, never the name. No other poly_govern definer selects `name`, and a NOLOGIN owner's grant cannot be used except through its definers. Its one caller, poly_auth, already reads `user.name` directly, and so does poly_app. **No login role gains a read.**
 
 Build: amend line 57 to `(name)` with that comment, in 0014 (not yet merged, so editing it is safe). A pgTAP line pins poly_govern's column privileges on `user` to exactly `id, email, email_verified, signup_txid, two_factor_enabled, second_step_at, name` for SELECT, and `signup_txid, two_factor_enabled, second_step_at` for UPDATE.
+
+### @architect — 2026-11-17
+
+Ruling on the two build findings at 25fb2661 (backend-lead-152's findings items 6, 9, 10 and 11). This corrects R9 and R1.8 in place; the rest of ruling 646e35ed stands.
+
+**(a) The second-step lockout: keep BetterAuth's 10, correct the ruling's "five".**
+- POLY-89's ruling promised no TOTP or backup-code lockout count. Its "5th wrong entry" (R2) is the emailed enrolment code, a different counter in `app.email_challenge`. The "five" in R9's test was mine, unmeasured, and wrong.
+- What stands: 1.7.18 locks the `two_factor` row at `accountLockout.maxFailedAttempts`, default 10 (code-read, verify-two-factor.mjs:121). It was measured that five refusals leave the count at 5 and no `locked_until`.
+- No option is set. Setting `accountLockout` could replace its other defaults (the lock duration) rather than merge with them (unmeasured). Lowering the count also makes it cheaper for someone who already has the password to lock the user out. 10 tries against a 6-digit code are well inside NIST 800-63B's limit of 100.
+- The R9 test becomes, on one held sign-in, all inside `withSignInTx`:
+  - 9 refusals: `failed_verification_count = 9`, `locked_until` NULL;
+  - the 10th: `locked_until > now()`;
+  - an 11th try with the **right** code is refused and creates no session;
+  - the same for backup codes.
+  The test records `locked_until - now()` and does not assert it. A pin bump that changes the default then fails the test instead of passing silently.
+- For seceng: whether to accept 10 or require a lower count with a measured option.
+
+**(b) Layers: the checker follows ARCH, the name comes from layers.json.**
+1. **Subpath-only allows are valid.** ARCH §2 already says an entry naming the package grants its index only, and a subpath is importable by a package whose list names it. It does not require the base, and `check.mjs:39`'s `!v.allow.includes(baseOf(a))` is stricter than ARCH.
+   - backend-lead drops that clause (`scripts/layers/**` is in POLY-152d's paths).
+   - qa adds two cases to `tests/layers/check.test.ts`: `web → auth/web` with no `auth` passes the checker; and the import lint refuses `import '@poly/auth'` from `apps/web`. The second is what makes a subpath-only allow mean "not the index".
+   - `auth-app → db/startup` without `db` is then valid as well.
+2. **Package names.** `apps/auth` stays, with the layers key `auth-app` and the name `@poly/auth-app`.
+   - qa changes `relative-structure.test.ts` to: every package's `package.json` name equals the `name` layers.json gives its `dir`; every name is unique and starts with `@poly/`.
+   - `layers.json`, which ARCH makes the authority, then fixes the name, and the workspace collision cannot recur.
+3. **ARCH §2.2 lands before build green, not at the verdict.** `check.test.ts` reads §2.2's `data-consumes`, so gate 3 needs it. I edit it when you release me, current state only:
+   - a new row `apps/auth`: polycarpic auth, the sign-in service, as poly_auth; consumes `config config/log db/startup auth`; owner backend-lead / devops-engineer;
+   - `packages/auth`: the row text says it runs in the sign-in service, and gains the public subpath `./web` (web's session client); consumes unchanged;
+   - `apps/web`: consumes swaps `auth` for `auth/web`.
+   - The other §3.1c, §3.3 and §7 lines stay for the verdict, as the ruling says.
