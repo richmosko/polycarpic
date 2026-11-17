@@ -1,5 +1,6 @@
 // POLY-152 R9, seceng F1 / §6.1: the session-creating paths commit in one transaction (withSignInTx), and a refused second-step code
 // commits only what it may. Red today: withSignInTx does not exist, so a late failure leaves the session row (no outer transaction).
+import { writeFileSync } from 'node:fs';
 import { createAuthMiddleware } from 'better-auth/api';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
@@ -86,12 +87,13 @@ describe('§6.1 a refused second-step code commits its count, and only what it m
   let auth: any;
   let u: { id: string; email: string };
   let secret: string;
+  let backupCodes: string[];
   const holdRow = () => must(`SELECT id, identifier, value, expires_at FROM public.verification ORDER BY identifier`, e.db).rows;
   const wrong = (s: string) => { const c = totp(s); return c === '000000' ? '000001' : '000000'; };
   async function setup() {
     auth = await e.A.createAuth({ ...e.optionsOf('real-domain', { sendSecondStepCode: async (m: any) => { mails.push({ email: String(m.email ?? m.to ?? ''), code: Object.values(m).find((v) => typeof v === 'string' && /^\d{6}$/.test(v as string)) as string }); } }), rateLimit: { enabled: false } });
     u = e.seedUser();
-    ({ secret } = await enrolTotp(e, auth, u, mails));
+    ({ secret, backupCodes } = await enrolTotp(e, auth, u, mails));
   }
   const paths: [string, (s: string) => unknown][] = [['/two-factor/verify-totp', (s) => ({ code: wrong(s) })], ['/two-factor/verify-backup-code', () => ({ code: 'wrong-code-000' })]];
   for (const [path, mk] of paths) {
@@ -120,24 +122,55 @@ describe('§6.1 a refused second-step code commits its count, and only what it m
       }
       expect(writes.every((w) => !/\b(session|account|user|passkey)\b/i.test(w.replace(/"?user_id"?/gi, '')))).toBe(true);
     });
-    it(`${path}: five refused codes lock the factor and the sixth fails after the lock, hold row intact [red if: the count is rolled back with the refusal]`, async () => {
+    it(`${path}: across held sign-ins (a hold allows 5 tries, measured), 9 refusals leave count 9 and no lock; the 10th locks for 900 s ± 60; an 11th try with the RIGHT code is refused and makes no session [red if: a refusal rolls its count back, the lock is not committed, or a pin bump shortens or removes it]`, async () => {
       await setup();
-      for (let i = 0; i < 5; i++) {
-        const held = await heldSignIn(e, auth, u.email);
+      // MEASURED against 1.7.18: each hold (the two_factor cookie's verification row) allows 5 wrong codes; the 6th is TOO_MANY_ATTEMPTS and the hold is
+      // dead. So the 10 tries that lock the FACTOR need two holds, each opened by a fresh password sign-in. The count is the factor's, not the hold's.
+      let held = await heldSignIn(e, auth, u.email);
+      const sessionsBefore = sessions(u.id);
+      const state = () => must(`SELECT failed_verification_count, locked_until IS NOT NULL FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]!;
+      for (let i = 1; i <= 9; i++) {
+        if (i > 1 && (i - 1) % 5 === 0) held = await heldSignIn(e, auth, u.email);
         const r = await e.handle(post(path, mk(secret), held.cookie), auth);
-        expect(r.status, `try ${i + 1}`).toBeLessThan(500);
+        if (process.env.QA_DEBUG) console.log('[try]', i, r.status, await r.clone().text());
+        expect(r.status, `try ${i}`).toBeLessThan(500);
+        expect(r.status, `try ${i}`).toBeGreaterThanOrEqual(400);
         expect(hasSessionCookie(r)).toBe(false);
       }
-      const row = must(`SELECT failed_verification_count, locked_until IS NOT NULL FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]!;
-      expect(row[1]).toBe('t');
-      const held6 = await heldSignIn(e, auth, u.email);
-      const good = path.endsWith('totp') ? { code: totp(secret) } : { code: 'any' };
-      const r6 = await e.handle(post(path, good, held6.cookie), auth);
-      expect(r6.status).toBeGreaterThanOrEqual(400);
-      expect(hasSessionCookie(r6)).toBe(false);
-      expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`)).toBe(1); // only the enrolment session; the sixth made none
+      expect(state(), 'after 9 refusals: the count survived each refusal and nothing is locked').toEqual(['9', 'f']);
+      const tenth = await e.handle(post(path, mk(secret), held.cookie), auth);
+      held = await heldSignIn(e, auth, u.email); // the hold the 11th try uses
+      expect(hasSessionCookie(tenth)).toBe(false);
+      expect(state()[1], 'the 10th refusal sets locked_until').toBe('t');
+      const secs = Number(must(`SELECT extract(epoch FROM (locked_until - now())) FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0]);
+      expect(Math.abs(secs - 900), `locked_until - now() = ${secs} s`).toBeLessThan(60); // seceng §8: the duration is pinned
+      const right = path.endsWith('totp') ? { code: totp(secret) } : { code: backupCodes[0] };
+      const eleventh = await e.handle(post(path, right, held.cookie), auth);
+      expect(eleventh.status).toBeGreaterThanOrEqual(400);
+      expect(hasSessionCookie(eleventh)).toBe(false);
+      expect(sessions(u.id), 'the locked factor made no session').toBe(sessionsBefore);
+      // MEASURED, not asserted (seceng §8): once the lock lapses, does the count reset, giving 10 fresh tries? Recorded in red-run.md.
+      must(`UPDATE public.two_factor SET locked_until = now() - interval '1 second' WHERE user_id = '${u.id}'`, e.db);
+      const countBefore = state()[0];
+      const after = await e.handle(post(path, mk(secret), held.cookie), auth);
+      const row = must(`SELECT failed_verification_count, locked_until FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]!;
+      const line = `${path}: lapsed lock, then one wrong code -> status ${after.status}; failed_verification_count ${countBefore} -> ${row[0]}; locked_until ${row[1] === '' ? 'NULL' : 'set'}`;
+      console.log(`[lock-expiry] ${line}`);
+      writeFileSync(`temp/lock-expiry-${path.replace(/\W+/g, '_')}.txt`, line + '\n');
     });
   }
+  it('a hold allows 5 wrong codes: the 6th answers TOO_MANY_ATTEMPTS without counting, and the hold is then dead (measured, 1.7.18; the factor count is separate) [red if: the per-hold cap is removed or counted twice]', async () => {
+    await setup();
+    const held = await heldSignIn(e, auth, u.email);
+    for (let i = 1; i <= 5; i++) expect((await e.handle(post('/two-factor/verify-totp', { code: wrong(secret) }, held.cookie), auth)).status).toBe(401);
+    const sixth = await e.handle(post('/two-factor/verify-totp', { code: wrong(secret) }, held.cookie), auth);
+    expect(sixth.status).toBe(400);
+    expect(await sixth.clone().text()).toMatch(/TOO_MANY_ATTEMPTS/);
+    const seventh = await e.handle(post('/two-factor/verify-totp', { code: totp(secret) }, held.cookie), auth);
+    expect(seventh.status).toBe(401); // the dead hold refuses even the right code
+    expect(hasSessionCookie(seventh)).toBe(false);
+    expect(Number(must(`SELECT failed_verification_count FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0])).toBe(5);
+  });
   it('a 5xx on the second-step path rolls the whole request back, count included [red if: the commit rule commits a 5xx]', async () => {
     await setup();
     const o: any = { ...e.optionsOf('real-domain', { sendSecondStepCode: async () => {} }), rateLimit: { enabled: false } };

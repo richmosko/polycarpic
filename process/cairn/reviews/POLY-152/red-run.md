@@ -123,3 +123,15 @@ Also, found running the whole db suite on the build, each under the ruling named
 | apps/web | 9 | 89 | 0 | 0 | 89 |
 
 The 15 skipped in tests/config are `tests/image` cases gated on `POLY_IMAGE_BUILD=1` (the image build; not run here). The three red tests: the two lockout tests (held for seceng) and the `@poly/auth` lint fixture (9b, a build fix).
+
+## Lockout (item 6) — accepted by seceng (ruling-review §8 @ 074f5491) and the architect (f16e92d1)
+
+The two `auth-signin-tx` lockout tests now assert, per path (TOTP, backup code): 9 refusals leave `failed_verification_count = 9` and `locked_until` NULL; the 10th sets it; `locked_until - now()` is 900 s ± 60 (pinned, seceng §8); an 11th try with the RIGHT code is refused and makes no session.
+
+**Deviation from the ruling's wording, measured (1.7.18):** "on one held sign-in" is not possible. A hold (the two-factor cookie's verification row) allows 5 wrong codes; the 6th answers `TOO_MANY_ATTEMPTS_REQUEST_NEW_CODE` (400) without counting, and the hold is then dead (a 7th try, even with the right code, is `INVALID_TWO_FACTOR_COOKIE`). The factor's counter is separate and survives holds, so the 10 tries that lock the factor take two holds, each opened by a fresh password sign-in. The test does that, and a new test pins the per-hold cap of 5 (count stays 5). The lock is therefore reachable only with the password plus two sign-ins; seceng should read that for the brute-force budget (10 tries per 900 s per factor, 5 per hold).
+
+**Measured, not asserted (seceng §8): after the lock lapses the count RESETS.** With `locked_until` moved to one second ago, one wrong code on either path leaves `failed_verification_count` 10 → 1 and `locked_until` NULL (code: the lock is cleared lazily, the counter set to 0, then the new failure counted). So the budget is 10 fresh tries every 900 s per factor: about 960 tries per day against a six-digit code, still inside NIST 800-63B's 100-per-... only per-account throttle terms the architect cited; seceng owns the risk call.
+
+## Gate run: tests/db at 1f5b8650 + this commit
+
+tests/db: 34 files, 752 passed, 0 failed, 0 skipped (752). The lockout tests above are in it.
