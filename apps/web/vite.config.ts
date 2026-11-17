@@ -3,9 +3,14 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 
+// The sign-in service owns /api/auth/* (POLY-152 R1.7): dev and preview proxy it; in production Caddy routes it.
+const authProxy = { '/api/auth': { target: `http://127.0.0.1:${process.env.AUTH_PUBLIC_PORT ?? 3000}`, changeOrigin: false } };
+
 // Kit 3 takes its configuration here; there is no svelte.config.js.
 // kit.csp is SECURITY C-07's home.
 export default defineConfig({
+  server: { proxy: authProxy },
+  preview: { proxy: authProxy },
   plugins: [
     tailwindcss(),
     sveltekit({

@@ -4,14 +4,14 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { drizzle, NodePgTransaction, type NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { PgDialect } from 'drizzle-orm/pg-core';
 import type pg from 'pg';
-import { appPool, operatorPool, workerPool } from './pool.ts';
+import { appPool, authPool, operatorPool, workerPool } from './pool.ts';
 import { enterNewUserOn } from './new-user.ts';
 import type { SessionUserId } from './session.ts';
 
 export type Tx = NodePgDatabase;
 /** The handle withContextFreeTx passes: the one transaction kind that can enter a user it just inserted (R4). */
 export type ContextFreeTx = Tx & { enterNewUser(id: string): Promise<void> };
-type Kind = 'withTenant' | 'withSystem' | 'withContextFreeTx' | 'withOperatorTx';
+type Kind = 'withTenant' | 'withSystem' | 'withContextFreeTx' | 'withOperatorTx' | 'withAuthSession' | 'withSignInTx';
 
 export class NestedContextError extends Error {
   constructor(inner: Kind, outer: Kind) {
@@ -190,6 +190,29 @@ export async function withTenant<T>(userId: SessionUserId, sessionId: string, fn
   }, fn);
 }
 
+/**
+ * A signed-in request to the sign-in service (POLY-152 R5). The marker is written from a live session row by app.enter_auth_session;
+ * poly_auth never names a user. Exported on db/auth only. The routing pool treats it as withTenant.
+ */
+export async function withAuthSession<T>(token: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
+  if (typeof token !== 'string' || token.length === 0) throw new TypeError('withAuthSession: token is required');
+  return inTransaction('withAuthSession', authPool, async (c, store) => {
+    const res = await c.query('SELECT app.enter_auth_session($1)', [token]);
+    store.marked = markedOf(res.rows[0]?.enter_auth_session);
+  }, fn);
+}
+
+/**
+ * A context-free transaction for the paths that create a session (POLY-152 R9): no marker, poly_auth. Every row the request writes
+ * commits or rolls back together. Exported on db/auth only.
+ */
+export async function withSignInTx<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+  return inTransaction('withSignInTx', authPool, async (c) => {
+    const res = await c.query('SELECT app.current_user_id() IS NULL AS ok');
+    if (res.rows[0].ok !== true) throw new ContextNotEmptyError();
+  }, fn);
+}
+
 export interface JobTarget {
   entityId: string;
   connectionId?: string | null;
@@ -211,7 +234,7 @@ export async function withSystem<T>(job: string, target: JobTarget, fn: (tx: Tx)
 
 /** Sign-up and other pre-identity work. Exported to packages/auth alone (db/auth). C-84: asserts first that no identity is set. */
 export async function withContextFreeTx<T>(fn: (tx: ContextFreeTx) => Promise<T>): Promise<T> {
-  return inTransaction('withContextFreeTx', appPool, async (c) => {
+  return inTransaction('withContextFreeTx', authPool, async (c) => {
     const res = await c.query('SELECT app.current_user_id() IS NULL AS ok');
     if (res.rows[0].ok !== true) throw new ContextNotEmptyError();
   }, fn as (tx: Tx) => Promise<T>);

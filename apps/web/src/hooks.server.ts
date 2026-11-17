@@ -1,9 +1,10 @@
-import { handleAuthRequest, loadSession, matchAuthPath } from '@poly/auth';
+import { HttpError, loadSession, setAuthInternalOrigin } from '@poly/auth/web';
+import { loadConfig } from '@poly/config';
 import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
-import { startAuth } from './lib/server/auth.ts';
 
 export const init: ServerInit = () => {
-  startAuth();
+  // The sign-in service's internal listener (POLY-152 R6.2). Web holds no BetterAuth instance and no secret.
+  setAuthInternalOrigin(loadConfig('web').authInternalOrigin);
 };
 
 const notFound = () => new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
@@ -26,28 +27,27 @@ export const handle: Handle = async ({ event, resolve }) => {
       transformPageChunk: ({ html }) => html.replace('%poly.theme%', look).replace('%poly.sidebar%', sidebar),
     });
 
-  if (isAuthTree(pathname)) {
-    // Unlisted and blocked paths are 404 here, before BetterAuth is reached (SECURITY A-34, A-38).
-    const hit = matchAuthPath(pathname);
-    if (!hit || hit.rule.class === 'blocked') return notFound();
-    return handleAuthRequest(event.request);
-  }
+  // The /api/auth tree belongs to the sign-in service; Caddy routes it there and web refuses it, listed or not (POLY-152 R1.6).
+  if (isAuthTree(pathname)) return notFound();
   if (isPublic(pathname)) return page();
 
-  const loaded = await loadSession(event.request);
+  let loaded;
+  try {
+    loaded = await loadSession(event.request);
+  } catch (e) {
+    // The service is unreachable or answered oddly: never a redirect to /sign-in, which would read as signed out (R6.2).
+    if (e instanceof HttpError && e.status === 503) return new Response('Sign-in service unavailable', { status: 503, headers: { 'retry-after': '5' } });
+    throw e;
+  }
   if (!loaded) {
     const to = new URLSearchParams({ next: safeNext(pathname + search) });
     return new Response(null, { status: 303, headers: { location: `/sign-in?${to}` } });
   }
   // The sign-in gate (POLY-89 R5): while the database says a second step is required, every page but the placeholder redirects to it.
   if (loaded.secondStepRequired && pathname !== '/settings/second-step') {
-    const redirect = new Response(null, { status: 303, headers: { location: '/settings/second-step' } });
-    for (const c of loaded.setCookie) redirect.headers.append('set-cookie', c); // the refreshed session cookie rides the redirect too
-    return redirect;
+    return new Response(null, { status: 303, headers: { location: '/settings/second-step' } });
   }
   event.locals.session = loaded.shell;
   event.locals.identity = { userId: loaded.userId, sessionId: loaded.sessionId };
-  const res = await page();
-  for (const c of loaded.setCookie) res.headers.append('set-cookie', c);
-  return res;
+  return page();
 };

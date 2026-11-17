@@ -3,7 +3,7 @@
 // imported as JSON so it ships in every bundle. Hash comparison stays in the runner; this is a read-only prefix test.
 // POLY-85 R7: schemaStatus is the one read; the guard and the status/health probe both sit on it.
 import journal from '../migrations/meta/_journal.json' with { type: 'json' };
-import { appPool, workerPool } from './pool.ts';
+import { appPool, authPool, close, configure, workerPool } from './pool.ts';
 
 export class SchemaBehindError extends Error {
   constructor(detail: string) {
@@ -31,8 +31,8 @@ export const EXPECTED_TAG = EXPECTED;
 /** Why the guard refuses, in the POLY-83 words. Internal: the status payload never carries it. */
 const detailOf = new WeakMap<SchemaStatus, string>();
 
-/** web passes nothing (poly_app); the worker passes 'worker' (poly_worker). Never throws: a connection error is `unreachable`. */
-export async function schemaStatus(role: 'app' | 'worker' = 'app'): Promise<SchemaStatus> {
+/** web passes nothing (poly_app); the worker passes 'worker' (poly_worker); the sign-in service passes 'auth' (poly_auth). Never throws: a connection error is `unreachable`. */
+export async function schemaStatus(role: 'app' | 'auth' | 'worker' = 'app'): Promise<SchemaStatus> {
   const mk = (state: SchemaState, applied: string | null, detail?: string): SchemaStatus => {
     const s = { state, expected: EXPECTED, applied };
     if (detail) detailOf.set(s, detail);
@@ -40,7 +40,7 @@ export async function schemaStatus(role: 'app' | 'worker' = 'app'): Promise<Sche
   };
   let client;
   try {
-    client = await (role === 'app' ? appPool() : workerPool()).connect();
+    client = await (role === 'app' ? appPool() : role === 'auth' ? authPool() : workerPool()).connect();
   } catch {
     return mk('unreachable', null);
   }
@@ -64,8 +64,35 @@ export async function schemaStatus(role: 'app' | 'worker' = 'app'): Promise<Sche
 }
 
 /** Throws SchemaBehindError; the caller exits non-zero. `ahead` passes: the previous release must run on the newer schema. */
-export async function assertSchemaNotBehind(role: 'app' | 'worker' = 'app'): Promise<void> {
+export async function assertSchemaNotBehind(role: 'app' | 'auth' | 'worker' = 'app'): Promise<void> {
   const s = await schemaStatus(role);
   if (s.state === 'unreachable') throw new SchemaBehindError('the database is not reachable');
   if (s.state === 'behind' || s.state === 'diverged') throw new SchemaBehindError(detailOf.get(s) ?? s.state);
 }
+
+export class WrongRoleError extends Error {
+  constructor(want: string, got: string | null) {
+    super(`this process must run as ${want}; the database login is ${got ?? 'unknown'}`);
+    this.name = 'WrongRoleError';
+  }
+}
+
+/** The sign-in service's start-up check (POLY-152 R1.2): `SELECT current_user` on its own pool must be the named role. */
+export async function assertRole(role: 'poly_auth'): Promise<void> {
+  let got: string | null = null;
+  try {
+    got = (await authPool().query('SELECT current_user AS u')).rows[0]?.u ?? null;
+  } catch (e) {
+    if ((e as Error).name === 'AuthPoolRefused') throw new WrongRoleError(role, process.env.DATABASE_USER ?? null);
+    throw new WrongRoleError(role, null);
+  }
+  if (got !== role) throw new WrongRoleError(role, got);
+}
+
+/** The sign-in service hands its environment to the auth pool (POLY-152): apps/auth may import db/startup alone, so it cannot call configure. */
+export function configureAuthPool(env: Record<string, string | undefined>): void {
+  configure({ auth: env });
+}
+
+/** Ends the pools the process opened (the sign-in service's shutdown). */
+export const closePools = close;

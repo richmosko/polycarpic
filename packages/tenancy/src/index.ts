@@ -45,4 +45,15 @@ export async function provisionPerson(tx: Tx): Promise<{ personId: string; creat
   return { personId: row.id, created: true };
 }
 
+/**
+ * A sign-up's own Person (POLY-152 R3), for the sign-in service: poly_auth holds no write on entity, so the insert is the definer's.
+ * It must be the exact call, inside the transaction that created the user. Returns the new Person's id.
+ */
+export async function provisionOwnPerson(tx: Tx): Promise<string> {
+  const res = await tx.execute<{ provision_person: string }>(sql`SELECT app.provision_person()`);
+  const id = res.rows[0]?.provision_person;
+  if (typeof id !== 'string') throw new Error('provisionOwnPerson: the definer returned no id');
+  return id;
+}
+
 export { InvitationRequired, claimInvitation, acceptInvitations, landingEntity, hashInvitationToken, decodeInvitationToken, newInvitationToken, invitationLink, validOperatorEmail } from './invitation.ts';

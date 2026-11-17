@@ -1,4 +1,4 @@
-import { myLandingEntity } from '@poly/auth';
+import { myLandingEntity } from '@poly/auth/web';
 import { redirect } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
 

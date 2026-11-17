@@ -30,18 +30,18 @@ const db = cloneMigrated();
 
 const secretFile = join(mkdtempSync(join(tmpdir(), 'poly86-e2e-')), 'auth_secret');
 writeFileSync(secretFile, 'e2e-auth-secret-0123456789abcdef0123456789abcdef\n');
-const appEnv = {
-  ...dbEnv('poly_app', db),
-  AUTH_SECRET_FILE: secretFile,
-  APP_ENV: 'development',
-  TLS_MODE: 'private-ca',
-  PUBLIC_ORIGIN: origin,
-};
+const authPort = port + 1000; // the sign-in service's public listener; the internal one is the next port (POLY-152 R1.7)
+const authInternalPort = port + 1001;
+const common = { APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: origin };
+// Web holds no auth secret (R1.3): it learns where the service's internal listener is, nothing else.
+const appEnv = { ...dbEnv('poly_app', db), ...common, AUTH_INTERNAL_ORIGIN: `http://127.0.0.1:${authInternalPort}`, AUTH_PUBLIC_PORT: String(authPort) };
+const authEnv = { ...dbEnv('poly_auth', db), ...common, AUTH_SECRET_FILE: secretFile, AUTH_PUBLIC_PORT: String(authPort), AUTH_INTERNAL_HOST: '127.0.0.1', AUTH_INTERNAL_PORT: String(authInternalPort) };
 Object.assign(process.env, appEnv);
 
 // In-process sign-in through the same exported configuration the app uses.
 const { authOptions, createAuth } = await import('@poly/auth');
-const { close } = await import('@poly/db');
+const { close, configure } = await import('@poly/db');
+configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db) });
 const auth = await createAuth(authOptions({ secret: 'e2e-auth-secret-0123456789abcdef0123456789abcdef', baseURL: origin, tlsMode: 'private-ca', requireClientIp: false, sendMagicLink: async () => {} }));
 const hash = await (await auth.$context).password.hash(PASSWORD);
 const id = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('${NAME}', '${EMAIL}', true) RETURNING id`, db).rows[0]![0];
@@ -72,12 +72,19 @@ await close();
 
 const web = join(here, '..', '..');
 const run = (args: string[]) => spawn('pnpm', ['exec', ...args], { cwd: web, stdio: 'inherit', env: { ...process.env, ...appEnv } });
+// The sign-in service starts before `vite preview` and is waited for on /api/auth/ok (R1.7).
+const service = spawn('node', [join(here, '..', '..', '..', 'auth', 'src', 'main.ts')], { stdio: 'inherit', env: { ...process.env, ...authEnv } });
+for (let i = 0; ; i++) {
+  if (i > 100) { service.kill(); stop(); throw new Error('the sign-in service did not start'); }
+  if (await fetch(`http://127.0.0.1:${authPort}/api/auth/ok`).then((r) => r.ok, () => false)) break;
+  await new Promise((r) => setTimeout(r, 200));
+}
 const build = run(['vite', 'build']);
 build.on('exit', (code) => {
-  if (code !== 0) { stop(); process.exit(code ?? 1); }
+  if (code !== 0) { service.kill(); stop(); process.exit(code ?? 1); }
   const preview = run(['vite', 'preview', '--port', String(port), '--strictPort']);
-  const done = () => { preview.kill(); stop(); process.exit(0); };
+  const done = () => { preview.kill(); service.kill(); stop(); process.exit(0); };
   process.on('SIGTERM', done);
   process.on('SIGINT', done);
-  preview.on('exit', () => { stop(); process.exit(0); });
+  preview.on('exit', () => { service.kill(); stop(); process.exit(0); });
 });
