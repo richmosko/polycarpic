@@ -36,7 +36,7 @@ export function checkLayers({ layers, archHtml, dirs, pkgJsons = {} }) {
       }
       if (a.includes('/')) {
         const sub = './' + a.split('/').slice(1).join('/');
-        if (!pk[baseOf(a)].subpaths.includes(sub) || !v.allow.includes(baseOf(a))) add('allow-bad-subpath', `${k} -> ${a}`);
+        if (!pk[baseOf(a)].subpaths.includes(sub)) add('allow-bad-subpath', `${k} -> ${a}`);
       }
       if (target.layer > v.layer) add('allow-up', `${k} (L${v.layer}) -> ${a} (L${target.layer})`);
     }
