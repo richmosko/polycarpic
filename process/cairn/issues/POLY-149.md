@@ -21,7 +21,7 @@ Split on 2026-11-17 (the Principal confirmed): the service is POLY-152, web ente
 ## Acceptance criteria
 
 **Revocation (one migration)**
-- [ ] poly_app holds no grant on any BetterAuth table and no EXECUTE on any `enter_*` except `enter_session`. A catalog test pins this.
+- [ ] poly_app holds no grant on any BetterAuth table and no EXECUTE on any `enter_*` except `enter_session`. A catalog test pins poly_app's complete EXECUTE set on `app` functions after the revocation, not only the `enter_*` ones (seceng F2, `process/cairn/reviews/POLY-152/ruling-review.md` §5).
 
 **D: docs**
 - [ ] ARCH §2.2, §3.1, §3.1c, §3.3 and §7; SECURITY R-2 re-worded to its residual, never retired (seceng #15). The residual stays: the sign-in service can create any session, code execution in web reaches the users active while it runs, and the worker's reach lasts until POLY-64's scoping lands. Also T-18, A-31, A-39, C-84 and the secrets table; INFRA §2.2 and §7.5. All of them state the current state only.

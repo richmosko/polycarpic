@@ -10,7 +10,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-16
+updated: 2026-11-17
 ---
 
 Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict and seceng reviews under `process/cairn/reviews/POLY-86/`). One loop for the batch; add later auth nits here.
@@ -50,3 +50,7 @@ From POLY-146 (seceng-146's read of better-auth 1.7.18; architect-146's gate-1 r
 ### @team-lead — 2026-11-16
 
 From the POLY-89 loop (merged 2026-11-17, PR #131). `sendSecondStepCode` throws "mailer not configured" until the Resend mailer lands, so second-step enrolment in production waits on this issue. Also email the user when an emailed code is voided at five wrong tries, and when an operator resets their second step (seceng C-f and build review N6, `process/cairn/reviews/POLY-89/build-review.md`).
+
+### @team-lead — 2026-11-17
+
+From POLY-152's ruling review (seceng F3, 2026-11-17): SECURITY R-24 now covers every OAuth callback, not only a first sign-in, because the sign-in service holds one transaction across the provider exchange on every callback (ruling R9). The rate limit and the idle-in-transaction timeout here must cover every callback; say so in the criterion when this issue is started.
