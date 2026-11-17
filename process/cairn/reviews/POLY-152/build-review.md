@@ -89,3 +89,8 @@ No SECURITY edit in this loop: the docs are POLY-149's. What POLY-149 must state
 - a database read of session tokens plus the auth secret gives every live session (R6.2);
 - R-24 covers every OAuth callback;
 - the lock-cycle guessing budget, once the Principal decides (my brief).
+
+## 5. Delta at `adfea672`
+Read: `git diff -M af6f69de adfea672 -- . ':!process' ':!docs'`, 2 files, +3/−6. **No assertion was removed or weakened.**
+- `bind.test.ts` moved to `apps/auth/src/`. Only its header comment and its import path changed.
+- `auth-signin-tx` lost two `writeFileSync` lines into `temp/` and its `fs` import. One measurement is now a `console.log`, and the lock-expiry line is no longer recorded. No `expect` changed.
