@@ -50,3 +50,25 @@ Feature started. Branch: `feature/poly-152-sign-in-service`. Split from POLY-149
 ### @team-lead — 2026-11-17
 
 Reading of criterion 6 for this loop (ruling R9, e7a18a51): the handle is POLY-153's, so this loop proves the one-transaction rule on the session-creating paths with a test plugin whose forced failure leaves no session row. The handle half, cookie scope (seceng #19) and the removal of the interim `/session` call are now criteria on POLY-153.
+
+### @architect — 2026-11-17
+
+Layer boundaries for the build, checked against `layers.json` at the branch tip and backend-lead-152's contract note. The ruling at 646e35ed stands; this clarifies R1.8 and R6 and changes no security claim.
+
+1. **`apps/auth` imports no `db` beyond `db/startup`: confirmed.**
+   - That is R1.8's allow list: `config`, `config/log`, `db/startup`, `auth`.
+   - The service reaches `@poly/db/auth` (`withAuthSession`, `withSignInTx`, `authPool`) only through `@poly/auth`, whose own allow list already holds `db/auth`.
+   - The role and schema checks go through `db/startup` (`assertRole('poly_auth')`, `schemaStatus` gaining `'auth'`).
+   - The `authPool` seatbelt (refuses unless `DATABASE_USER === 'poly_auth'`) is adopted. Web cannot reach that pool: web's allow list has no `db/auth`.
+2. **`@poly/auth/web` cannot reach `session.ts` as it stands, and `loadSession` leaves the root: confirmed.**
+   - `loadSession` (the internal `/session` client), `requireRecentAuth` (web's plain poly_app query, R6.3), `listMySessions` and `revokeMySession` live in web-only files under `packages/auth/src/web/`. Those files may import `@poly/db`, `@poly/db/session` and `@poly/tenancy` only.
+   - The service side is `handleSessionRequest(request, auth)`, exported from the root for `apps/auth/src/main.ts`.
+   - The layer check works per package, not per subpath, so it cannot stop `web/*` importing `better-auth` or `@poly/db/auth`. R1.8's boundary test is the guard. It must resolve **transitively** from `apps/web`'s entry points and from `packages/auth/src/web.ts`, and fail on `better-auth`, `@better-auth/*`, `@poly/db/auth` or any file outside `packages/auth/src/web*`.
+3. **`layers.json` needs these entries.** All are in POLY-152d's paths.
+   - New package `"auth-app": { "dir": "apps/auth", "name": "@poly/auth-app", "layer": 6, "subpaths": [], "allow": ["config", "config/log", "db/startup", "auth"] }`.
+   - `auth.subpaths` becomes `["./web"]`, with `exports["./web"]` in `packages/auth/package.json`.
+   - `web.allow` swaps `auth` for `auth/web`.
+   - `reservedLiterals`: `enter_auth_session` → `["packages/db/src/context.ts"]`, and `provision_person` → the one tenancy file that names it.
+   - No `confined` entry is needed: only `@poly/auth` holds `db/auth`.
+
+No security change: the auth secret is read only by `apps/auth` through `@poly/config`, and nothing above gives web or any other package a path to it, to BetterAuth or to the poly_auth pool.
