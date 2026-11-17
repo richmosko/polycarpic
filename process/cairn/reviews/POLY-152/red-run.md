@@ -160,3 +160,11 @@ Tree clean (`git status` empty); every suite from its own config. Passed + faile
 - The 15 skipped are `tests/image` cases gated on `POLY_IMAGE_BUILD=1` (the image build; not run here). `tests/infra/image` (the Docker image suite, POLY-143) was not run.
 - e2e ran at the same file content as 43adb5bb, one commit earlier (the only difference is the commit); the harness now starts `apps/auth` before `vite preview`, the seed signs in through `tests/db/helpers/e2e-auth.ts`, and web imports no BetterAuth.
 - **db suite time against a same-day control on main** (`abe774a9`, same machine, two runs each, wall time of the vitest run): main 27 files / 660 tests, 67.8 s and 67.9 s; this branch 34 files / 752 tests, 67.5 s and 67.1 s. Seven more files and 92 more tests cost no measurable time.
+
+## TOTP window and the 6th answer (seceng §9, architect 322c6174)
+
+**TOTP acceptance window: 1 step, as read from `@better-auth/utils` 0.5.1 `otp.mjs` (`window = 1`), now measured and pinned.** Only `Date` is faked (`vi.useFakeTimers({ toFake: ['Date'] })`), set to the middle of a 30 s step; a fresh hold per code. Observed through `/two-factor/verify-totp`: t-90 s 401, t-60 s 401, t-30 s 200, t 200, t+30 s 200, t+60 s 401, t+90 s 401. So a code from the previous step and from the next step is accepted, two steps away is refused. The test asserts exactly that; a pin bump that widens or narrows the window fails it.
+
+**The 6th answer on a hold** (the dead hold's 400): its statements are all `delete from verification` (the expired sweep and the cookie and attempts rows); no insert, no update, nothing outside `verification`; and it commits: the cookie row (names the user) and the attempts counter (value 5) are both gone afterwards, nothing added. The 7th try on the dead hold, even with the right code, is 401 with no session.
+
+**seceng §9 refusal conditions, checked against the refusal tests:** the cookie row keeping its `identifier` and `value`, no extra row, and the 10th-refusal lock were already asserted. Added: no new `verification` identifier appears after a refusal, and every numeric (attempts counter) value only goes up. Nothing in the §6.1 "fifth refusal locks" wording was left: those tests moved to the tenth at `d1941122`.

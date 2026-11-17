@@ -102,11 +102,15 @@ describe('§6.1 a refused second-step code commits its count, and only what it m
       const held = await heldSignIn(e, auth, u.email);
       const holdBefore = must(`SELECT id, identifier, value FROM public.verification WHERE value LIKE '%${u.id}%' OR identifier LIKE '%${u.id}%'`, e.db).rows;
       const all0 = holdRow();
+      const verBefore = new Map(must(`SELECT identifier, value FROM public.verification WHERE expires_at > now()`, e.db).rows.map((r) => [r[0]!, r[1]!] as const));
       const bc0 = must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]![0];
       must(`INSERT INTO public.verification (identifier, value, expires_at) VALUES ('qa-expired', 'x', now() - interval '1 hour')`, e.db);
       const { result: r, sql } = await capture(() => e.handle(post(path, mk(secret), held.cookie), auth));
       expect(r.status).toBeGreaterThanOrEqual(400);
       expect(r.status).toBeLessThan(500);
+      const verAfter = new Map(must(`SELECT identifier, value FROM public.verification WHERE expires_at > now()`, e.db).rows.map((r) => [r[0]!, r[1]!] as const));
+      expect([...verAfter.keys()].filter((id) => !verBefore.has(id)), 'seceng §9: no verification row is added by a refusal').toEqual([]);
+      for (const [id, v] of verBefore) if (/^\d+$/.test(v) && verAfter.has(id)) expect(Number(verAfter.get(id)), `seceng §9: the attempts counter ${id.slice(0, 6)} only goes up`).toBeGreaterThanOrEqual(Number(v));
       const holdAfter = must(`SELECT id, identifier, value FROM public.verification WHERE value LIKE '%${u.id}%' OR identifier LIKE '%${u.id}%'`, e.db).rows;
       expect(holdAfter.map((x) => [x[1], x[2]])).toEqual(holdBefore.map((x) => [x[1], x[2]])); // same identifier, same user
       const after = holdRow();
@@ -163,7 +167,18 @@ describe('§6.1 a refused second-step code commits its count, and only what it m
     await setup();
     const held = await heldSignIn(e, auth, u.email);
     for (let i = 1; i <= 5; i++) expect((await e.handle(post('/two-factor/verify-totp', { code: wrong(secret) }, held.cookie), auth)).status).toBe(401);
-    const sixth = await e.handle(post('/two-factor/verify-totp', { code: wrong(secret) }, held.cookie), auth);
+    const ver = () => new Map(must(`SELECT identifier, value FROM public.verification WHERE expires_at > now()`, e.db).rows.map((r) => [r[0]!, r[1]!] as const));
+    const before6 = ver();
+    const { result: sixth, sql: sixthSql } = await capture(() => e.handle(post('/two-factor/verify-totp', { code: wrong(secret) }, held.cookie), auth));
+    // seceng §9 / architect 322c6174: the dead hold's 400 writes inside the allowed set (verification, failure count, lock) and COMMITS
+    const writes6 = sixthSql.filter((q) => /^\s*(insert|update|delete)\b/i.test(q));
+    expect(writes6.length, 'the 6th answer deletes the dead hold').toBeGreaterThan(0);
+    for (const w of writes6) expect(w, 'the 6th answer writes only verification (or the failure count / lock)').toMatch(/^\s*(insert into|delete from|update)\s+"?(public"?\.")?(verification|two_factor)"?/i);
+    expect(writes6.every((w) => !/\b(session|account|passkey)\b/i.test(w)), writes6.join('\n')).toBe(true);
+    const gone = [...before6].filter(([id]) => !ver().has(id));
+    expect(gone.length, 'committed: the cookie row and the attempts counter are both gone').toBe(2);
+    expect(gone.some(([, v]) => v.includes(u.id)) && gone.some(([, v]) => v === '5'), JSON.stringify(gone)).toBe(true);
+    expect([...ver().keys()].filter((id) => !before6.has(id)), 'nothing was added').toEqual([]);
     expect(sixth.status).toBe(400);
     expect(await sixth.clone().text()).toMatch(/TOO_MANY_ATTEMPTS/);
     const seventh = await e.handle(post('/two-factor/verify-totp', { code: totp(secret) }, held.cookie), auth);
@@ -188,5 +203,33 @@ describe('§6.1 a refused second-step code commits its count, and only what it m
     expect(hasSessionCookie(result)).toBe(false);
     expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`)).toBe(1); // only the enrolment session
     expect(sql.filter((s) => /^\s*commit\b/i.test(s)).length).toBeLessThanOrEqual(1);
+  });
+});
+
+// seceng (risk figure scales with it): the TOTP acceptance window, measured against @better-auth/utils 0.5.1 (otp.mjs: window 1) and pinned.
+// The clock is controlled, not slept: only Date is faked, set to the middle of a 30 s step, so the server's step is known.
+describe('the TOTP acceptance window is one step either side', () => {
+  const STEP = 30_000;
+  const T = (Math.floor(Date.UTC(2026, 10, 17, 12, 0, 0) / STEP) * STEP) + 15_000;
+  it('accepted: the current step and the steps at t-30 s and t+30 s; refused: t-60 s, t+60 s and t±90 s [red if: a pin bump widens (or narrows) the window]', async () => {
+    const auth = await e.A.createAuth({ ...e.optionsOf('real-domain', { sendSecondStepCode: async (m: any) => { mails.push({ email: String(m.email ?? m.to ?? ''), code: Object.values(m).find((v) => typeof v === 'string' && /^\d{6}$/.test(v as string)) as string }); } }), rateLimit: { enabled: false } });
+    const u = e.seedUser();
+    const { secret } = await enrolTotp(e, auth, u, mails);
+    const verdicts: Record<string, number> = {};
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(T);
+      for (const offset of [-90, -60, -30, 0, 30, 60, 90]) {
+        vi.setSystemTime(T);
+        const held = await heldSignIn(e, auth, u.email);
+        const code = totp(secret, T + offset * 1000);
+        const r = await e.handle(post('/two-factor/verify-totp', { code }, held.cookie), auth);
+        verdicts[`${offset >= 0 ? '+' : ''}${offset}s`] = r.status;
+        const accepted = Math.abs(offset) <= 30;
+        // a code equal to the current one can coincide with a neighbour's by chance (1 in 10^6); the offsets are fixed, so the run is deterministic
+        expect(hasSessionCookie(r), `offset ${offset}s -> ${r.status}`).toBe(accepted);
+      }
+    } finally { vi.useRealTimers(); }
+    writeFileSync('temp/totp-window.txt', JSON.stringify(verdicts) + '\n');
   });
 });
