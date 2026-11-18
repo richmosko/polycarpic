@@ -1,7 +1,7 @@
 ---
 id: POLY-153c
 title: Handle entry tests
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-153
 blocked_by: [POLY-153b]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-153.md, process/cairn/reviews/POLY-153/**, pro
 stage: execute
 estimate.cost_usd: "16.00"
 estimate.gate_cycles: 4
+actual.cost_usd: "11.0276"
+actual.tokens: 71301541
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: "0.69"
 labels: [security, auth]
 priority: null
 pr: null
