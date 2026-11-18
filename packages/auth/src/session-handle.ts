@@ -26,10 +26,9 @@ export async function handleAfter(ctx: HookCtx): Promise<Record<string, never>> 
   const tokenCookie = rh.getSetCookie().find((c) => c.startsWith(`${name}=`));
   const sessionId = ctx?.context?.newSession?.session?.id;
   if (!sessionId) {
-    // A cleared session cookie clears the handle with it (sign-out, a revoke of the current session). A second-step hold also clears the
-    // session cookie, but it sets the two-factor cookie and signs nobody out: the handle of an existing session stays.
-    const hold = rh.getSetCookie().some((c) => /two_factor/.test(c.split('=')[0]!));
-    if (tokenCookie && !hold && /;\s*Max-Age=0(;|$)/i.test(tokenCookie)) rh.append('set-cookie', `${BASE}; Path=/; Max-Age=0; ${ATTRS}`);
+    // A cleared session cookie clears the handle with it: sign-out, a revoke of the current session, and a second-step hold (which also
+    // clears the session cookie, so a browser's earlier web session must not stay signed in to web while /api/auth has none; R5.1).
+    if (tokenCookie && /;\s*Max-Age=0(;|$)/i.test(tokenCookie)) rh.append('set-cookie', `${BASE}; Path=/; Max-Age=0; ${ATTRS}`);
     return {};
   }
   // getSession only refreshes a session that exists (handleAuthRequest calls it before it opens a transaction); it never issues one.
