@@ -1,7 +1,7 @@
 ---
 id: POLY-153e
 title: Handle entry compose and Caddy
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-153
 blocked_by: [POLY-153a]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-153.md, process/cairn/reviews/POLY-153/**, pro
 stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "0.2090"
+actual.tokens: 515250
+actual.gate_cycles: 1
+actual.wall_clock: 44
+ratio: "0.05"
 labels: [security, auth]
 priority: null
 pr: null
