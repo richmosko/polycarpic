@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
-import { age, heldSignIn } from './helpers/auth-service';
+import { age, hasSessionCookie as hasSession, heldSignIn } from './helpers/auth-service';
 import { HANDLE_COOKIE, ENTER_SESSION, handleOf, handleSetCookie } from './helpers/handle';
 import { tx } from './helpers/auth-tx';
 import { seedInvitation } from './helpers/invitation';
@@ -115,11 +115,24 @@ describe('second factor after a hold: the hold sets no handle and leaves no row;
     expect(nh).not.toBe(old);
     expect(await enters(old)).toBeNull();
   });
-  it('a held sign-in answered with the TOTP hold sets no handle cookie at all (hold only) [red if: a hold carries a handle]', async () => {
+  it('a held sign-in answered with the TOTP hold issues no handle (a clearing cookie is allowed, R5.1) [red if: a hold carries a handle]', async () => {
     const { auth, u } = await enrolled();
     const held = await heldSignIn(e, auth, u.email);
     expect(betterAuthCookies(held.res).some((c) => /two_factor/.test(c))).toBe(true);
-    expect(handleSetCookie(held.res)).toBeUndefined();
+    expect(handleOf(held.res)).toBeNull();
+  });
+  it('a hold clears an EARLIER handle cookie: A signs in, then B\'s sign-in in the same jar stops at the second step; the response clears __Host-poly_handle and the browser jar no longer holds A\'s handle, so web cannot enter [red if: the hold leaves the earlier handle cookie in the browser, which keeps A signed in to web]', async () => {
+    const { auth, u: b } = await enrolled();
+    const a = e.seedUser();
+    const first = await e.signIn(a.email, auth);
+    const aHandle = handleOf(first.res)!;
+    expect(await enters(aHandle)).toBe(latestSession(a.email));
+    const held = await e.handle(post('/sign-in/email', { email: b.email, password: PW }, first.cookie), auth);
+    expect(betterAuthCookies(held).some((c) => /two_factor/.test(c)), 'B must be held at the second step').toBe(true);
+    expect(hasSession(held)).toBe(false);
+    expect(handleSetCookie(held), 'the hold clears the handle cookie').toMatch(/^__Host-poly_handle=;.*Max-Age=0/i);
+    // the browser applies the response to its jar: with the handle cookie gone, web has nothing to enter by, so A is signed out of web
+    expect(jar(first.cookie, held), 'A\'s browser jar after the hold must hold no handle cookie').not.toContain('__Host-poly_handle');
   });
 });
 

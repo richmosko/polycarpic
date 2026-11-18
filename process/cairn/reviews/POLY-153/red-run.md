@@ -115,3 +115,7 @@ db at 943a8fd0 + these fixes: 901 of 901. Every plant that waited on 0015 now bi
 | 10 | `provisionPerson.length` | states the contract: `(tx, name?)`, length 2, a plain signature. Red until the builder drops the rest tuple. | no |
 
 Deleted tests and their R-items: only the two loader failure-shape db tests (3b, R7.2). Nothing else was deleted.
+
+## Architect correction (a) (comment on POLY-153 @ 4008607d)
+
+A second-step hold must also clear the handle cookie (R5.1). `session-handle-paths.test.ts`: the hold test now asserts "no handle issued" (a clearing cookie is allowed), and a new test signs in as A, then starts B's sign-in in the same jar and stops at the second step; the response must carry `__Host-poly_handle=; Max-Age=0` and the browser jar after the response must hold no handle cookie. **Red at the build (210bb094, which clears nothing on a hold):** `handleSetCookie(held)` is undefined. The test asserts at the jar, not at `enter_session`: clearing a cookie cannot make the database refuse A's still-live handle, so what the ruling secures is that the browser stops presenting it. `/get-session` stays blocked by the route policy: pinned by `auth-route-policy.test.ts` (HTTP `/get-session` is 404 while `auth.api.getSession` still answers in process); no new test needed. `packages/tenancy/src/index.test.ts` passes at 210bb094 (item 10).
