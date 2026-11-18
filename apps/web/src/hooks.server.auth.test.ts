@@ -114,6 +114,20 @@ describe('page requests (criterion 14, POLY-153 R7.2)', () => {
     expect(r.status).toBe(200);
     expect(m.provisionPerson).toHaveBeenCalledTimes(2);
   });
+  it('a second 23505 on entity_self_user_id_unique fails the request after exactly two attempts, and the error carries no handle (was the loadSession failure-shape test; R7.2 moved the retry here)  [red if: an unbounded loop or a swallowed error]', async () => {
+    const race = Object.assign(new Error('dup'), { code: '23505', constraint: 'entity_self_user_id_unique' });
+    m.provisionPerson.mockRejectedValue(race);
+    const { res } = run('/dashboard', { cookies: { '__Host-poly_handle': HANDLE } });
+    await expect(res).rejects.toThrow('dup');
+    expect(m.provisionPerson).toHaveBeenCalledTimes(2);
+  });
+  it('a 23505 on any other constraint, and any other error, is not retried  [red if: the retry matches on code alone, or on any error]', async () => {
+    for (const err of [Object.assign(new Error('dup'), { code: '23505', constraint: 'some_other_unique' }), Object.assign(new Error('other'), { code: 'P0001' })]) {
+      m.provisionPerson.mockReset().mockRejectedValue(err);
+      await expect(run('/dashboard', { cookies: { '__Host-poly_handle': HANDLE } }).res).rejects.toThrow();
+      expect(m.provisionPerson).toHaveBeenCalledTimes(1);
+    }
+  });
   it('NoLiveSession: the handle cookie is cleared and the answer is a 303 to /sign-in  [red if: a dead handle leaves a signed-in-looking browser]', async () => {
     const { res, deleted } = run('/dashboard', { cookies: { '__Host-poly_handle': 'z'.repeat(43) } });
     const r = await res;

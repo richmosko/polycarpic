@@ -144,7 +144,7 @@ describe('rotations by password change, passkey registration, refresh and sign-o
   it('refresh: an /api/auth request after updateAge sets no handle cookie and the existing handle still enters [red if: refresh re-issues or loses the handle]', async () => {
     const u = e.seedUser(); const a = await e.signIn(u.email); const h = handleOf(a.res)!;
     age(e, u.id, { updatedDaysAgo: 2 });
-    const r = await e.handle(get('/get-session', a.cookie));
+    const r = await e.handle(get('/list-accounts', a.cookie));
     expect(r.status).toBe(200);
     expect(handleSetCookie(r)).toBeUndefined();
     expect(await enters(h)).toBe(latestSession(u.email));

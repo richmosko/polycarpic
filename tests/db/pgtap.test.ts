@@ -117,7 +117,7 @@ describe('POLY-153 10_session_handle.sql fails on a planted change', () => {
   const plants: [string, string][] = [
     ['the deferred check dropped', 'DROP TRIGGER session_needs_handle ON public.session'],
     ['the deferred check disabled', 'ALTER TABLE public.session DISABLE TRIGGER session_needs_handle'],
-    ['the deferred check made immediate-only (not deferred)', 'ALTER TABLE public.session DISABLE TRIGGER session_needs_handle; CREATE CONSTRAINT TRIGGER session_needs_handle AFTER INSERT ON public.session FOR EACH ROW EXECUTE FUNCTION app.session_needs_handle()'],
+    ['the deferred check made immediate-only (not deferred)', 'DROP TRIGGER session_needs_handle ON public.session; CREATE CONSTRAINT TRIGGER session_needs_handle AFTER INSERT ON public.session FOR EACH ROW EXECUTE FUNCTION app.session_needs_handle()'],
     ['the check function executable by poly_app', 'GRANT EXECUTE ON FUNCTION app.session_needs_handle() TO poly_app'],
     ['a SELECT on session_handle for poly_app', 'GRANT SELECT ON app.session_handle TO poly_app'],
     ['a SELECT on session_handle through PUBLIC', 'GRANT SELECT ON app.session_handle TO PUBLIC'],

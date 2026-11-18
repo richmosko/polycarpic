@@ -604,7 +604,9 @@ describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect:
     const twelve = [...forTriggers, ...exactCall, 'app.enrolment_grant_live()', 'app.enter_new_user(uuid)', 'app.claim_invitations(bytea,text)', 'app.accept_invitations(bytea)'];
     expect(twelve).toHaveLength(12);
     expect(got.filter((g) => twelve.includes(g))).toEqual([]);
-    expect([...got].sort()).toEqual([...before89, ...readOnly].filter((f) => !twelve.includes(f)).sort());
+    // POLY-153 R2: poly_app gains exactly four, the web-entry and Settings -> Sessions definers (each refuses unless the marker is kind session).
+    const handleFour = ['app.enter_session(text)', 'app.my_sessions()', 'app.recent_auth_ok()', 'app.revoke_my_session(uuid)'];
+    expect([...got].sort()).toEqual([...before89, ...readOnly, ...handleFour].filter((f) => !twelve.includes(f)).sort());
     expect(must(`SELECT has_function_privilege('poly_auth', 'app.reset_second_step(text)', 'EXECUTE')`, db).rows[0]![0]).toBe('f');
     // R1.5 (d88aa7ae): the group a function is in is part of the pin. The three (and reset_second_step) carry the exact-call check, which
     // reads current_query(); the seven helpers do not, so a function that moves between groups fails here.

@@ -95,3 +95,23 @@ Items 1–6 were test mechanics and are fixed without weakening: (1) the attach 
 | 9d | `07` marker readers | nine functions | thirteen: adds enter_session, my_sessions, recent_auth_ok, revoke_my_session (the ones reading tx_identity; `session_needs_handle` is not listed) | R4, R6 |
 
 Items 7, 8, 9 were set from the ruling before 0015 was pushed; they are re-run against the real migration and any difference is reported, not adjusted to fit.
+
+## Second round: ten more items from the builder (at 943a8fd0) and what was done
+
+db at 943a8fd0 + these fixes: 901 of 901. Every plant that waited on 0015 now bites: pgtap.test passes with each pgTAP-10 plant reported (trigger dropped, disabled, replaced by an immediate-only one, extra grants, a hash overload, a second SET clause) and each plant test asserts the unplanted file clean first. e2e 57 of 57 under the R7.4 revoke.
+
+| # | Item | Done | Contested |
+|---|---|---|---|
+| 1 | refresh path used blocked `/get-session` | uses `/list-accounts` | no |
+| 2 | `auth-refresh` day tests called `handleInternal` | **retargeted**: day 6 slides by `withSession` (enter_session), day 8 enters with no cookie, an idle row is refused by handle and deleted by the next `/api/auth` request | no |
+| 3 | `auth-session`, `auth-client-ip` used `loadSession`, `listSessions` under `withTenant` | **retargeted** onto `withSession(handle)` and the three definers (list, B-cannot-touch-A, step-up revoke, current-session revoke, `revokeMySession` result, shell row, cap, idle, provision). `helpers/auth-service.ts` lost the `handleInternal` helpers. | no |
+| 3b | deleted | the loader's "two attempts, logged without cookie/token/email" and "other constraint not retried" db tests: **R7.2 moved the retry into hooks.server.ts**; both are now unit tests in `hooks.server.auth.test.ts`. The concurrent-first-load db test stays, asserting one Person and a loser that fails only on `entity_self_user_id_unique`. | no |
+| 4 | matrix: `app.session_handle` unlisted | added to `permission-matrix.json` `unlisted` (not role-scoped, no login role holds a privilege, cover = `session-handle-attach.test.ts`), and `matrix.test.ts` expects it | **for seceng**: R1 |
+| 5 | poly_app's EXECUTE set | gains exactly `enter_session(text)`, `my_sessions()`, `recent_auth_ok()`, `revoke_my_session(uuid)` | **for seceng**: R2 |
+| 6 | immediate-only plant errored | `DROP TRIGGER` before the recreate | no |
+| 7 | layers tsc probe refused any `ession` export | refuses only `sessionUserId` / `SessionUserId` | no |
+| 8 | `page.server.test` used `withTenant`, `locals.identity` | retargeted to `locals.handle` and `withSession`, plus a no-handle case | no |
+| 9 | e2e waited on `**/dashboard` | `waitForURL((u) => u.pathname === '/dashboard')`, and the jar is read at both paths. **Measured myself**: the specs pass with it. The cookie assertions moved into `sign-in-flow.spec.ts` on its existing sign-in: a second UI sign-in starved the specs after it (the service limits `/sign-in/email` to 5 a minute, one shared bucket with no client IP), which was my flake. `handle-cookie.spec.ts` keeps the seeded-state specs. | no |
+| 10 | `provisionPerson.length` | states the contract: `(tx, name?)`, length 2, a plain signature. Red until the builder drops the rest tuple. | no |
+
+Deleted tests and their R-items: only the two loader failure-shape db tests (3b, R7.2). Nothing else was deleted.

@@ -8,50 +8,8 @@ const base = `http://localhost:${process.env.E2E_PORT ?? 4173}`;
 const EMAIL = 'ada@e2e.test';
 const PASSWORD = 'e2e correct horse battery staple';
 
-test.describe('a real sign-in', () => {
-  test.use({ storageState: { cookies: [], origins: [] } });
-
-  test('sets __Host-poly_handle at Path=/ and BetterAuth\'s cookies __Secure- at Path=/api/auth [red if: BetterAuth\'s cookie is still __Host- at /, or no handle is set]', async ({ page, context }) => {
-    await page.goto(`${base}/sign-in?next=/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.getByLabel(/email/i).fill(EMAIL);
-    await page.getByLabel(/password/i).fill(PASSWORD);
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    await page.waitForURL('**/dashboard');
-    const jar = await context.cookies(base);
-    const handle = jar.find((c) => c.name === '__Host-poly_handle');
-    expect(handle, 'the handle cookie').toBeDefined();
-    expect(handle!.path).toBe('/');
-    expect(handle!.httpOnly).toBe(true);
-    expect(handle!.secure).toBe(true);
-    expect(handle!.value).toMatch(/^[A-Za-z0-9_-]{43}$/);
-    const ba = jar.filter((c) => /better-auth/.test(c.name));
-    expect(ba.length).toBeGreaterThan(0);
-    for (const c of ba) {
-      expect(c.name, c.name).toMatch(/^__Secure-better-auth\./);
-      expect(c.path, c.name).toBe('/api/auth');
-    }
-  });
-
-  test('a page request carries __Host-poly_handle and no cookie whose name contains better-auth [red if: web still receives BetterAuth\'s cookie]', async ({ page }) => {
-    await page.goto(`${base}/sign-in?next=/dashboard`);
-    await page.waitForLoadState('networkidle');
-    await page.getByLabel(/email/i).fill(EMAIL);
-    await page.getByLabel(/password/i).fill(PASSWORD);
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    await page.waitForURL('**/dashboard');
-    const sent: string[] = [];
-    page.on('request', async (r) => { if (r.resourceType() === 'document') sent.push((await r.allHeaders()).cookie ?? ''); });
-    await page.goto(`${base}/settings/sessions`);
-    await page.waitForLoadState('networkidle');
-    expect(sent.length).toBeGreaterThan(0);
-    for (const cookie of sent) {
-      expect(cookie).toMatch(/__Host-poly_handle=[A-Za-z0-9_-]{43}/);
-      expect(cookie).not.toMatch(/better-auth/);
-    }
-    await expect(page.getByTestId('sidebar')).toBeVisible();
-  });
-});
+// The real-sign-in assertions (cookie names, paths, what a page request carries) are in sign-in-flow.spec.ts, on its existing sign-in: the service
+// rate-limits /sign-in/email to 5 a minute for every caller here, so a further UI sign-in in this file starves the specs around it.
 
 test.describe('the seeded browser state (R10)', () => {
   test('a signed-in page request with the seeded storageState carries the handle and no better-auth cookie [red if: the seed signs in outside handleAuthRequest, so no handle exists]', async ({ page }) => {
