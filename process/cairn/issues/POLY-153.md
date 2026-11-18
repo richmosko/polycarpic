@@ -1,7 +1,7 @@
 ---
 id: POLY-153
 title: Web enters by handle
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-152]
@@ -39,3 +39,7 @@ Follow-ups from POLY-152 (seceng's build review, `process/cairn/reviews/POLY-152
 - **N2 (qa):** add `GRANT poly_app TO poly_auth` and the `WITH INHERIT FALSE, SET TRUE` variant to pgTAP 08's planted-grant list.
 - **N3 (backend-lead):** eslint refuses `better-auth` and `@better-auth/*` in apps/web; today only the transitive scan does, at test time.
 - **N6 (qa):** stale comment at `tests/db/second-step-gates.test.ts:2-3`.
+
+### @team-lead — 2026-11-18
+
+Feature started. Branch: `feature/poly-153-web-enters-by-handle`.
