@@ -93,7 +93,7 @@ describe('second factor after a hold: the hold sets no handle and leaves no row;
     const { auth, u, secret } = await enrolled();
     const n0 = handleRows();
     const held = await heldSignIn(e, auth, u.email);
-    expect(handleSetCookie(held.res)).toBeUndefined();
+    expect(handleOf(held.res)).toBeNull(); // no handle issued; a clearing cookie is allowed (R5.1)
     expect(handleRows()).toBe(n0);
     const r = await e.handle(post('/two-factor/verify-totp', { code: totp(secret, Date.now() + 30_000) }, held.cookie), auth);
     await expectNewHandle(r, u.email);
@@ -102,7 +102,7 @@ describe('second factor after a hold: the hold sets no handle and leaves no row;
     const { auth, u, backupCodes } = await enrolled();
     const n0 = handleRows();
     const held = await heldSignIn(e, auth, u.email);
-    expect(handleSetCookie(held.res)).toBeUndefined();
+    expect(handleOf(held.res)).toBeNull(); // no handle issued; a clearing cookie is allowed (R5.1)
     expect(handleRows()).toBe(n0);
     await expectNewHandle(await e.handle(post('/two-factor/verify-backup-code', { code: backupCodes[0] }, held.cookie), auth), u.email);
   });
