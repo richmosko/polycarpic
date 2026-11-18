@@ -12,7 +12,7 @@ let e: Env;
 beforeAll(async () => { e = await boot(); });
 afterAll(() => teardown(e));
 
-const app = (sql: string) => psql(sql, e.db, { role: 'poly_app' });
+const app = (sql: string) => psql(sql, e.db, { role: 'poly_auth' });
 const uid = () => crypto.randomUUID();
 const ins = (id: string, email = `${id}@qa.test`) => `INSERT INTO public."user" (id, name, email) VALUES ('${id}', 'N', '${email}');`;
 // POLY-147 (R6): the step is the definer's exact call, bound; a call with literals is refused by the exact-call check.
@@ -20,7 +20,7 @@ const step = (id: string) => newUserSql(id);
 const marker = `SELECT user_id::text || '/' || kind FROM app.tx_identity WHERE xid = pg_current_xact_id_if_assigned();`;
 
 describe('condition 5: after the step, the identity marker holds the new id (kind signup) until the end of the transaction', () => {
-  it('insert, enter_new_user, then current_user_id() and the marker read the id; the step works as poly_app  [red if: the function does not write the marker, or writes another kind]', () => {
+  it('insert, enter_new_user, then current_user_id() and the marker read the id; the step works as poly_auth  [red if: the function does not write the marker, or writes another kind]', () => {
     const id = uid();
     const r = app(`BEGIN; ${ins(id)} ${step(id)} ${marker} SELECT app.current_user_id()::text; ROLLBACK;`);
     expect(r.ok, r.err).toBe(true);
@@ -66,9 +66,10 @@ describe('condition 13: enter_new_user refuses (each on its own transaction), wi
   it('a user that already has a Person is refused even when the stamp matches  [red if: the self_user_id check is missing]', () => {
     // Superuser plays poly_app and clears the marker (no production role can), so the Person check is reached, not the marker check.
     const id = uid();
-    const r = psql(`BEGIN; SET LOCAL ROLE poly_app; ${ins(id)} ${step(id)}
+    const r = psql(`BEGIN; SET LOCAL ROLE poly_auth; ${ins(id)} ${step(id)}
+      RESET ROLE;
       INSERT INTO public.entity (type_id, name, self_user_id) SELECT t.id, 'P', '${id}' FROM public.entity_type t WHERE t.system_key = 'person';
-      RESET ROLE; DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id(); SET LOCAL ROLE poly_app; ${step(id)} ROLLBACK;`, e.db);
+      DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id(); SET LOCAL ROLE poly_auth; ${step(id)} ROLLBACK;`, e.db);
     expect(r.sqlstate).toBe('42501');
     expect(r.err).toMatch(/already has a Person/);
   });
@@ -81,7 +82,10 @@ describe('condition 13: enter_new_user refuses (each on its own transaction), wi
     const old = uid();
     const fresh = uid();
     must(ins(old), e.db);
-    const r = app(`BEGIN; ${asUserSql(old)} ${ins(fresh)} ${step(fresh)} ROLLBACK;`);
+    const tok = `tok-${old}`;
+    must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${old}', '${tok}', now() + interval '1 day')`, e.db);
+    // POLY-152: poly_auth enters by its own definer, from a live session row (it has no enter_asserted_user)
+    const r = app(`BEGIN; \nSELECT app.enter_auth_session($1) \\bind '${tok}' \\g /dev/null\n ${ins(fresh)} ${step(fresh)} ROLLBACK;`);
     expect(r.sqlstate).toBe('42501');
     expect(r.err).toMatch(/a user is already in context/);
   });
@@ -205,11 +209,11 @@ describe('condition 14: the step is not on the db index, db/auth or db/session, 
 
 // ---------------------------------------------------------------- step 4 (TypeScript side): allowlist, commit-time stamp, S4 lock
 describe('condition 18: the new definers are on packages/db/sql/definers.json with the ruled owner and EXECUTE', () => {
-  it('enter_new_user (poly_authz), claim_invitations and accept_invitations (poly_govern) each execute for poly_app alone  [red if: a definer is added without its allowlist entry]', () => {
+  it('enter_new_user (poly_authz), claim_invitations and accept_invitations (poly_govern) each execute for poly_auth alone (POLY-152 R8)  [red if: a definer is added without its allowlist entry]', () => {
     const got = Object.fromEntries(loadAllow().map((a) => [a.function, [a.owner, ...a.execute].join('>')]));
-    expect(got['app.enter_new_user(uuid)']).toBe('poly_authz>poly_app');
-    expect(got['app.claim_invitations(bytea, text)']).toBe('poly_govern>poly_app');
-    expect(got['app.accept_invitations(bytea)']).toBe('poly_govern>poly_app');
+    expect(got['app.enter_new_user(uuid)']).toBe('poly_authz>poly_auth');
+    expect(got['app.claim_invitations(bytea, text)']).toBe('poly_govern>poly_auth');
+    expect(got['app.accept_invitations(bytea)']).toBe('poly_govern>poly_auth');
   });
 });
 
@@ -253,11 +257,13 @@ describe('condition 30 (S4): claim_invitations from a signed-in transaction take
 });
 
 describe('condition 33 (S14): while the stamp is set, email and email_verified are fixed', () => {
-  const person = (id: string) => `INSERT INTO public.entity (type_id, name, self_user_id) SELECT t.id, 'P', '${id}' FROM public.entity_type t WHERE t.system_key = 'person';`;
+  // POLY-152 R3: poly_auth holds no tenancy write; the Person comes from the definer, called the way the service calls it (extended mode).
+  const person = (_id: string) => `\nSELECT app.provision_person() \\bind \\g /dev/null\n`;
   it('P10: insert, enter_new_user, provision, then UPDATE email and email_verified raises 42501 and no membership remains  [red if: signup_email_fixed is absent, so a sign-up can verify an invited address]', () => {
     const id = uid();
     const head = `BEGIN; ${ins(id)} ${step(id)} ${person(id)}`;
-    const ctl = app(`${head} UPDATE public."user" SET name = 'renamed' WHERE id = '${id}'; SELECT count(*) FROM public.membership WHERE user_id = '${id}'; ROLLBACK;`);
+    // poly_auth reads no tenancy table (R2), so the membership count is read as superuser after RESET ROLE
+    const ctl = psql(`BEGIN; SET LOCAL ROLE poly_auth; ${ins(id)} ${step(id)} ${person(id)} UPDATE public."user" SET name = 'renamed' WHERE id = '${id}'; RESET ROLE; SELECT count(*) FROM public.membership WHERE user_id = '${id}'; ROLLBACK;`, e.db);
     expect(ctl.ok, `control (other columns pass): ${ctl.err}`).toBe(true);
     expect(ctl.rows.flat()).toContain('1');
     const r = app(`${head} UPDATE public."user" SET email = 'victim@qa.test', email_verified = true WHERE id = '${id}'; ROLLBACK;`); // ROLLBACK, not COMMIT: the C32 commit check would also say 42501

@@ -2,23 +2,23 @@
 // against the ruled names: app.issue_email_challenge(text) RETURNS text, app.confirm_email_challenge(text) RETURNS boolean,
 // app.enrolment_grant_live(), app.set_two_factor_enabled(boolean). Red today because they are absent. Titles end [red if: ...].
 import { createHash } from 'node:crypto';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { cloneMigrated } from './helpers/api';
-import { createAuthRole, dropAuthRole, fixture, fails, msgOf, ROLES } from './helpers/second-step';
+import { codeOf, fixture, fails, msgOf } from './helpers/second-step';
 import { must } from './helpers/sql';
 
 let db: string;
 let f: ReturnType<typeof fixture>;
-// poly_auth is cluster-wide state: this file is in SERIAL (vitest.config.ts); it creates the role here and drops it in afterAll.
-beforeAll(() => { createAuthRole(); db = cloneMigrated(); f = fixture(db, 893); });
-afterAll(() => { dropAuthRole(); });
+beforeAll(() => { db = cloneMigrated(); f = fixture(db, 893); });
 
+// POLY-152 R8: positive paths run as poly_auth; poly_app lost EXECUTE on the nine helpers (its refusals are in the last describe).
+const AUTH = ['poly_auth'] as const;
 const issue = (q: any) => q(`SELECT app.issue_email_challenge($1)`, ['first_enrolment']).then((r: any) => r.rows[0].issue_email_challenge as string | null);
 const confirm = (q: any, code: string) => q(`SELECT app.confirm_email_challenge($1)`, [code]).then((r: any) => r.rows[0].confirm_email_challenge as boolean);
 const wrong = (code: string) => (code === '000000' ? '000001' : '000000');
 
 describe('C8 the emailed code (R2)', () => {
-  for (const role of ROLES) {
+  for (const role of AUTH) {
     it(`${role}: a code is six digits, stored as sha256(code || ':' || id), session-bound, expires in 10 minutes, and never readable by the role [red if: the issuer is absent, stores the code, or the hash is not salted by the row id]`, async () => {
       const u = await f.user();
       const s = f.session(u.id);
@@ -32,12 +32,12 @@ describe('C8 the emailed code (R2)', () => {
       const read = await f.marked(role, u.id, s, (q) => fails(q('SELECT code_hash FROM app.email_challenge')));
       expect(read).not.toBeNull();
     });
-    it(`${role}: the issuer refuses a marker with no session (a user marker alone is not enough) [red if: issue_email_challenge works without a session in the marker]`, async () => {
+    it(`${role}: no marker without a live session exists: entry with a session id that has no row is refused before the issuer can run [red if: issue_email_challenge works without a session in the marker]`, async () => {
       const u = await f.user();
-      const x = await f.marked(role, u.id, null, async (q) => fails(q('SELECT app.issue_email_challenge($1)', ['first_enrolment'])));
-      // enter_asserted_user with the default session id names no session row: the definer must refuse, not mint
+      const x = await fails(f.marked(role, u.id, '00000000-0000-4000-8000-0000000089ff', async (q) => q('SELECT app.issue_email_challenge($1)', ['first_enrolment'])));
+      // R5: enter_auth_session takes its user and session from a live row, so the marker the issuer needs always has a session; a row-less id never gets a marker
       expect(x).not.toBeNull();
-      expect(msgOf(x)).not.toMatch(/does not exist/);
+      expect(msgOf(x)).toMatch(/no live session/);
     });
     it(`${role}: a right code confirms once; a second confirm of the same code is false (single use) [red if: used_at is not set or not checked]`, async () => {
       const u = await f.user();
@@ -108,7 +108,7 @@ describe('C8 the emailed code (R2)', () => {
 
 describe('C3/C15 first enrolment in SQL, in BetterAuth\'s measured order (R3 #1 #3 #5 #8 #9)', () => {
   /** The measured first-TOTP-verify order in one marked transaction: unverified factor row, flip, session INSERT (copy), old DELETE, verified last. */
-  async function enrolTotp(role: (typeof ROLES)[number], u: { id: string }, s: string, opts: { confirmCode?: boolean } = {}) {
+  async function enrolTotp(role: (typeof AUTH)[number], u: { id: string }, s: string, opts: { confirmCode?: boolean } = {}) {
     return f.committed(role, u.id, s, async (q) => {
       if (opts.confirmCode !== false) expect(await confirm(q, (await issue(q))!)).toBe(true);
       await q(`INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('sec', 'bk', $1, false)`, [u.id]);
@@ -119,7 +119,7 @@ describe('C3/C15 first enrolment in SQL, in BetterAuth\'s measured order (R3 #1 
       return copy.rows[0];
     });
   }
-  for (const role of ROLES) {
+  for (const role of AUTH) {
     it(`${role}: with a confirmed emailed code the factor activates: flag on, verified, second_step_at set, the rotated session is stamped (recent_auth_at not null), the grant records consumed_xid and consumed_by totp [red if: any guard in R3 #1/#3/#5/#8 is absent]`, async () => {
       const u = await f.user();
       const s = f.session(u.id);
@@ -182,7 +182,7 @@ describe('C2 an owner or manager invitation seats only at enrolment (R3 #8, #12;
     must(`INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at, claimed_user_id, claimed_at) VALUES ('${ent}', '${u.email}', 'manager', '${owner.id}', decode(repeat('af', 32), 'hex'), now() + interval '1 day', '${u.id}', now())`, db);
     expect(f.one(`SELECT count(*) FROM public.membership WHERE entity_id = '${ent}' AND user_id = '${u.id}'`)).toBe('0');
     const s = f.session(u.id);
-    await f.committed('poly_app', u.id, s, async (q) => {
+    await f.committed('poly_auth', u.id, s, async (q) => {
       expect((await q(`SELECT app.confirm_email_challenge($1)`, [(await q(`SELECT app.issue_email_challenge($1)`, ['first_enrolment'])).rows[0].issue_email_challenge])).rows[0].confirm_email_challenge).toBe(true);
       await q(`INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('sec', 'bk', $1, false)`, [u.id]);
       await q('SELECT app.set_two_factor_enabled($1)', [true]);
@@ -224,4 +224,22 @@ describe('C-b the race on the exemption (two connections)', () => {
     const ent = Number(must(`SELECT count(*) FROM public.entity WHERE name = 'race2-${u.id}'`, db).rows[0]![0]);
     expect(factor === 0 && ent === 0 ? 'a' : factor === 1 && ent === 1 ? 'b' : `both-or-neither:${factor}/${ent}`).toMatch(/^(a|b)$/);
   });
+});
+
+describe('POLY-152 R8: poly_app lost the nine POLY-89 helpers and cannot draw or confirm an emailed code [red if: poly_app still executes them]', () => {
+  const HELPERS: [string, unknown[]][] = [
+    ['app.issue_email_challenge($1)', ['first_enrolment']], ['app.confirm_email_challenge($1)', ['123456']], ['app.set_two_factor_enabled($1)', [true]],
+    ['app.step_up_fresh()', []], ['app.enrol_proof($1)', ['x']], ['app.enrolment_grant_live()', []], ['app.consume_passkey_grant()', []],
+  ];
+  for (const [call, args] of HELPERS) {
+    it(`poly_app: SELECT ${call} is refused 42501 and writes nothing`, async () => {
+      const u = await f.user();
+      const s = f.session(u.id);
+      const snap = () => must(`SELECT (SELECT count(*) FROM app.email_challenge), (SELECT count(*) FROM app.enrolment_grant), (SELECT two_factor_enabled FROM public."user" WHERE id = '${u.id}')`, db).rows;
+      const before = JSON.stringify(snap());
+      const x = await f.marked('poly_app', u.id, s, (q) => fails(q(`SELECT ${call}`, args)));
+      expect(codeOf(x)).toBe('42501');
+      expect(JSON.stringify(snap())).toBe(before);
+    });
+  }
 });

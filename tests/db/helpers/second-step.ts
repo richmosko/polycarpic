@@ -2,6 +2,7 @@
 // app.enter_asserted_user($1,$2) as its own extended-mode statement, then the test's statements. `poly_auth` is the stage-2
 // fixture role created once per run in helpers/api.ts setRolePasswords (R1.3).
 import { createHmac } from 'node:crypto';
+import { expect } from 'vitest';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { DB_PKG, url } from './pg';
@@ -16,15 +17,24 @@ export const msgOf = (x: any): string => String(x?.cause?.message ?? x?.message 
 export const codeOf = (x: any): string | undefined => x?.code ?? x?.cause?.code;
 
 /**
- * The stage-2 fixture role (ruling R1.3): poly_auth with poly_app's grants by membership; roles.sql gains the real role only in
- * POLY-149. It is cluster-wide state, so only SERIAL files call these (tests/db/vitest.config.ts): the role exists while they run
- * and is gone before any pgtap role-hygiene suite reads pg_roles.
+ * POLY-152: poly_auth is the real role from roles.sql (harness password set in api.ts setRolePasswords); the `IN ROLE poly_app`
+ * fixture of POLY-89c is gone. A marked transaction as poly_auth enters by `app.enter_auth_session(token)` from a live session row
+ * (ruling R5, R8); as poly_app it enters by `app.enter_asserted_user` as before until POLY-149.
  */
-export function createAuthRole(): void {
-  must(`DO $$ BEGIN CREATE ROLE poly_auth LOGIN PASSWORD 'qa-poly_auth' IN ROLE poly_app; EXCEPTION WHEN duplicate_object THEN NULL; END $$;`);
+/** Enter the marker as `role` for `userId`. poly_auth needs a live session row: `sessionId` names one, or a fresh row is made. */
+export async function enterAs(q: Q, db: string, role: Role, userId: string, sessionId: string | null): Promise<void> {
+  if (role === 'poly_app') { await q('SELECT app.enter_asserted_user($1, $2)', [userId, sessionId ?? '00000000-0000-4000-8000-0000000089e1']); return; }
+  const rows = sessionId ? must(`SELECT token FROM public.session WHERE id = '${sessionId}'`, db).rows : [];
+  const token: string = rows[0]?.[0] ?? (sessionId ? `no-such-session-${sessionId}` : must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${userId}', 'tk-auto-${Math.random()}', now() + interval '1 day') RETURNING token`, db).rows[0]![0]!);
+  await q('SELECT app.enter_auth_session($1)', [token]);
 }
-export function dropAuthRole(): void {
-  must(`DROP ROLE IF EXISTS poly_auth`);
+/** A refusal that changed nothing: `snap` is read before and after, and the two must be equal (seceng §5.2: 42501 alone proves nothing). */
+export async function refusedUnchanged(snap: () => unknown, attempt: () => Promise<unknown>): Promise<any> {
+  const before = JSON.stringify(await snap());
+  const x = await fails(attempt());
+  expect(x, 'the statement must be refused').not.toBeNull();
+  expect(JSON.stringify(await snap()), 'the refusal must leave the row(s) unchanged').toBe(before);
+  return x;
 }
 
 let counter = 0;
@@ -49,7 +59,7 @@ export function fixture(db: string, tag: number) {
     const q: Q = (text, values) => c.query({ text, values, queryMode: 'extended' });
     try {
       await q('BEGIN');
-      if (userId) await q('SELECT app.enter_asserted_user($1, $2)', [userId, sessionId ?? '00000000-0000-4000-8000-0000000089e1']);
+      if (userId) await enterAs(q, db, role, userId, sessionId);
       const r = await fn(q);
       if (commit) await q('COMMIT');
       return r;

@@ -24,6 +24,8 @@ app.{$POLY_DOMAIN} {
 	handle_errors {
 		import security_headers
 	}
+	@auth path /api/auth /api/auth/*
+	reverse_proxy @auth prod-auth:3000
 	reverse_proxy prod-web:3000
 }
 
@@ -41,6 +43,8 @@ staging.{$POLY_DOMAIN} {
 		basic_auth {
 			import /run/secrets/staging_basic_auth
 		}
+		@auth path /api/auth /api/auth/*
+		reverse_proxy @auth staging-auth:3000
 		reverse_proxy staging-web:3000
 	}
 }

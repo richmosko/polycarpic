@@ -205,8 +205,18 @@ describe('no package-level indirection (condition 16)', () => {
   it('green on: plain workspace specs ("workspace:*", "workspace:^") under their own @poly name', () => {
     expect(mutate((p) => ((auth(p).dependencies ??= {})['@poly/ledger'] = 'workspace:^'))).toEqual([]);
   });
-  it('every package declares itself as @poly/<its dir name>', () => {
-    for (const p of realPkgs()) expect(p.json.name, p.path).toBe(`@poly/${basename(p.path.replace(/\/package\.json$/, ''))}`);
+  it('every package.json name equals the name layers.json gives its dir; names are unique and start with @poly/ (POLY-152: apps/auth is @poly/auth-app, packages/auth is @poly/auth)', () => {
+    const byDir = new Map<string, string>(Object.values<any>(layers.packages).map((e) => [e.dir, e.name]));
+    const seen = new Set<string>();
+    for (const p of realPkgs()) {
+      const dir = p.path.replace(/\/package\.json$/, '');
+      expect(byDir.has(dir), `${dir} is in layers.json`).toBe(true);
+      expect(p.json.name, p.path).toBe(byDir.get(dir));
+      expect(p.json.name, p.path).toMatch(/^@poly\//);
+      expect(seen.has(p.json.name), `${p.json.name} is unique`).toBe(false);
+      seen.add(p.json.name);
+    }
+    expect(layers.packages['auth-app']?.name).toBe('@poly/auth-app');
   });
 });
 

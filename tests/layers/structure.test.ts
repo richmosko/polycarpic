@@ -20,7 +20,7 @@ const SPEC_PKGS = ['config', 'db', 'auth', 'tenancy', 'secrets', 'import', 'refd
 describe('workspace (criterion 1)', () => {
   it('holds exactly the ARCH 2.2 packages and apps', () => {
     const real = [...readdirSync(join(root, 'packages')), ...readdirSync(join(root, 'apps'))].sort();
-    expect(real).toEqual([...SPEC_PKGS].sort());
+    expect(real).toEqual([...SPEC_PKGS, 'auth'].sort()); // POLY-152: packages/auth and apps/auth (the sign-in service)
   });
   for (const n of SPEC_PKGS) {
     it(`${n}: its vitest tests run alone`, () => {
@@ -36,7 +36,7 @@ describe('workspace (criterion 1)', () => {
 
 describe('layers.json (criteria 2, 21, 22, 23)', () => {
   it('lists every package and app with layer, subpaths and allow-list', () => {
-    expect(all()).toEqual([...SPEC_PKGS].sort());
+    expect(all()).toEqual([...SPEC_PKGS, 'auth-app'].sort()); // POLY-152 R1.8: layers.json key auth-app = apps/auth
     for (const n of names) {
       const e = layers.packages[n];
       expect(typeof e.layer, n).toBe('number');

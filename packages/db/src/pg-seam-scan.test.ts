@@ -42,8 +42,8 @@ describe('the source scan: nothing outside the seam can reach pg', () => {
     const src = readFileSync(join(ROOT, 'packages/db/src/pool.ts'), 'utf8');
     const pools = src.match(/new pg\.Pool\(/g) ?? [];
     const withClient = src.match(/new pg\.Pool\(\{[^}]*Client:\s*ExtendedClient/g) ?? [];
-    expect(pools.length).toBe(3);
-    expect(withClient.length).toBe(3);
+    expect(pools.length).toBe(4); // POLY-152: the poly_auth pool is the fourth
+    expect(withClient.length).toBe(4);
   });
   it('pg-pool is imported nowhere (it would build clients that skip ExtendedClient)  [red if: a module imports pg-pool, in packages/db or elsewhere]', () => {
     expect(where(PG_POOL)).toEqual([]);

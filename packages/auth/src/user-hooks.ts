@@ -2,7 +2,7 @@
 // image rule, and the hook that keeps the IdP's idToken out of the account table.
 import { currentClient, currentTx, type ContextFreeTx } from '@poly/db/auth';
 import { setTwoFactorEnabled } from './anchor.ts';
-import { acceptInvitations, claimInvitation, InvitationRequired, provisionPerson } from '@poly/tenancy';
+import { acceptInvitations, claimInvitation, InvitationRequired, provisionOwnPerson } from '@poly/tenancy';
 import { APIError } from 'better-auth/api';
 
 export class SignUpOutsideTransaction extends Error {
@@ -72,7 +72,7 @@ export async function userCreateAfter(user: { id: string }, ctx?: HookCtx): Prom
   const tx = contextFree();
   const { token } = tokenFor(ctx);
   await tx.enterNewUser(user.id);
-  await provisionPerson(tx);
+  await provisionOwnPerson(tx);
   await refusing(() => acceptInvitations(tx, { token }));
 }
 
@@ -80,13 +80,13 @@ export async function userCreateAfter(user: { id: string }, ctx?: HookCtx): Prom
 export async function userUpdateBefore(data: Data): Promise<Hooked> {
   const out = 'image' in data ? stripImage(data) : data;
   if (data.twoFactorEnabled === undefined) return { data: out };
-  // R3 #1: poly_app holds no UPDATE on the column. The definer flips it (and applies the grant and step-up rules); the key goes out of
+  // R3 #1: no login role holds UPDATE on the column. The definer flips it (and applies the grant and step-up rules); the key goes out of
   // BetterAuth's UPDATE as undefined, because the adapter merges hook data over the original, so omitting it would not remove it.
   await setTwoFactorEnabled(data.twoFactorEnabled === true);
   return { data: { ...out, twoFactorEnabled: undefined } };
 }
 
-/** R3 #3: poly_app cannot INSERT recent_auth_at; BetterAuth copies it on a rotation. The database stamps the one enrolment session. */
+/** R3 #3: no login role can INSERT recent_auth_at; BetterAuth copies it on a rotation. The database stamps the one enrolment session. */
 export async function sessionCreateBefore(data: Data): Promise<Hooked> {
   return { data: { ...data, recentAuthAt: undefined } };
 }

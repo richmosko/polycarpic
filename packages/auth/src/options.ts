@@ -6,6 +6,7 @@ import { magicLink, twoFactor } from 'better-auth/plugins';
 import { githubUserInfo } from './github.ts';
 import { secondStepAnchor, type SendSecondStepCode } from './anchor.ts';
 import { passkeyOnlyHold } from './second-step.ts';
+import { cookieLifetime } from './cookie-lifetime.ts';
 import { routePolicyHook, type TlsMode } from './route-policy.ts';
 import { createRoutingPool } from './routing-pool.ts';
 import { accountDropIdToken, sessionCreateBefore, userCreateAfter, userCreateBefore, userUpdateBefore } from './user-hooks.ts';
@@ -169,6 +170,8 @@ export function authOptions(input: AuthInput) {
           },
         },
       }),
+      // Last (R7): rewrites the session-token Set-Cookie to the 30-day cap.
+      cookieLifetime(),
     ],
   };
 }

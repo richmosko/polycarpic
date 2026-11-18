@@ -104,12 +104,12 @@ const ROWS: Row[] = [
   ['env_file', (s) => { svc(s, 'prod', 'worker').env_file = ['/etc/polycarpic/host.env']; }, 'env-file', 'env_file not checked'],
   ['secret-looking environment key', (s) => { svc(s, 'prod', 'web').environment = { DB_PASSWORD: 'x' }; }, 'env-secret', 'secret-looking env not checked'],
   ['API key in environment', (s) => { svc(s, 'prod', 'web').environment = { RESEND_API_KEY: 'x' }; }, 'env-secret', 'only PASSWORD matched'],
-  ['secret with environment source', (s) => { s.prod.secrets.auth_secret__web = { environment: 'AUTH' }; }, 'secret-source', 'environment-sourced secret accepted'],
+  ['secret with environment source', (s) => { s.prod.secrets.plaid_secret__web = { environment: 'AUTH' }; }, 'secret-source', 'environment-sourced secret accepted'],
   ['config with inline content', (s) => { s.prod.configs = { c: { content: 'k=v' } }; svc(s, 'prod', 'web').configs = ['c']; }, 'config-inline', 'inline config content accepted'],
   ['${VAR} in ports', (s) => { svc(s, 'edge', 'caddy').ports = ['${BIND:-0.0.0.0}:443:443']; }, 'raw-interpolation', 'interpolation in ports allowed'],
   ['${VAR} in volumes', (s) => { svc(s, 'prod', 'web').volumes = ['${DATA}:/data']; }, 'raw-interpolation', 'interpolation in volumes allowed'],
   ['${VAR} in networks', (s) => { s.prod.networks.default.name = '${EDGE}'; }, 'raw-interpolation', 'interpolation in networks allowed'],
-  ['${VAR} in secrets', (s) => { s.prod.secrets.auth_secret__web.file = '${DIR}/auth_secret'; }, 'raw-interpolation', 'interpolation in secrets allowed'],
+  ['${VAR} in secrets', (s) => { s.prod.secrets.plaid_secret__web.file = '${DIR}/auth_secret'; }, 'raw-interpolation', 'interpolation in secrets allowed'],
   ['compose.override.yml present', (s) => { s.text['infra/compose/compose.override.yml'] = 'services: {}\n'; }, 'override-file', 'override file tolerated'],
   ['extra -c flag on postgres', (s) => { svc(s, 'prod', 'postgres').command.push('-c', "log_statement='all'"); }, 'extra-c-flag', 'any -c accepted, bypassing the config file'],
   // ports, networks, edge
@@ -135,7 +135,7 @@ const ROWS: Row[] = [
   ['${VAR} in security_opt', (s) => { svc(s, 'prod', 'web').security_opt = ['${SO}']; }, 'raw-interpolation', 'security_opt not scanned'],
   ['root service hidden behind a profile', (s) => { s.prod.services.dbg = { ...svc(s, 'prod', 'worker'), user: '0:0', profiles: ['debug'] }; }, 'user-nonroot', 'profiled services skipped (--profile * not used)'],
   ['FOO_FILE env pointing outside /run/secrets', (s) => { svc(s, 'prod', 'web').environment = { FOO_FILE: '/etc/x' }; }, 'env-secret', '*_FILE accepted without the path check'],
-  ['two services share one host secret file', (s) => { s.prod.secrets.resend_api_key__worker.file = s.prod.secrets.resend_api_key__web.file; }, 'secret-path', 'one file with two readers accepted'],
+  ['two services share one host secret file', (s) => { s.prod.secrets.resend_api_key__worker.file = s.prod.secrets.resend_api_key__auth.file; }, 'secret-path', 'one file with two readers accepted'],
   ['ports: on web', (s) => { svc(s, 'prod', 'web').ports = ['3000:3000']; }, 'ports-caddy-only', 'ports allowed outside caddy'],
   ['ports: on postgres', (s) => { svc(s, 'staging', 'postgres').ports = ['5432:5432']; }, 'ports-caddy-only', 'staging not scanned'],
   ['caddy on a project default network', (s) => {
@@ -174,10 +174,10 @@ const ROWS: Row[] = [
   ['unknown secret not in the matrix', (s) => { giveSecret(s.prod, true, 'web', 'extra'); }, 'secret-matrix', 'unlisted secrets pass'],
   ['staging secret not in the staging matrix', (s) => { giveSecret(s.staging, false, 'web', 'db_password_backup'); }, 'secret-matrix', 'staging matrix not applied'],
   ['web secret sourced from worker\'s directory', (s) => { s.prod.secrets.db_password_app__web.file = secretFile(true, 'worker', 'db_password_app'); }, 'secret-path', 'service-own directory not enforced'],
-  ['flat secret path (no service directory)', (s) => { s.prod.secrets.auth_secret__web.file = '/etc/polycarpic/secrets/auth_secret'; }, 'secret-path', 'flat layout accepted'],
-  ['prod secret under staging-secrets', (s) => { s.prod.secrets.auth_secret__web.file = secretFile(false, 'web', 'auth_secret'); }, 'secret-path', 'prod path prefix not checked'],
-  ['staging secret under secrets', (s) => { s.staging.secrets.auth_secret__web.file = secretFile(true, 'web', 'auth_secret'); }, 'secret-path', 'staging path prefix not checked'],
-  ['secret path outside /etc/polycarpic', (s) => { s.prod.secrets.auth_secret__web.file = '/tmp/web/auth_secret'; }, 'secret-path', 'any absolute path accepted'],
+  ['flat secret path (no service directory)', (s) => { s.prod.secrets.plaid_secret__web.file = '/etc/polycarpic/secrets/auth_secret'; }, 'secret-path', 'flat layout accepted'],
+  ['prod secret under staging-secrets', (s) => { s.prod.secrets.plaid_secret__web.file = secretFile(false, 'web', 'plaid_secret'); }, 'secret-path', 'prod path prefix not checked'],
+  ['staging secret under secrets', (s) => { s.staging.secrets.plaid_secret__web.file = secretFile(true, 'web', 'plaid_secret'); }, 'secret-path', 'staging path prefix not checked'],
+  ['secret path outside /etc/polycarpic', (s) => { s.prod.secrets.plaid_secret__web.file = '/tmp/web/auth_secret'; }, 'secret-path', 'any absolute path accepted'],
   ['caddy secret from another service\'s directory', (s) => { s.edge.secrets.staging_basic_auth__caddy.file = secretFile(true, 'web', 'staging_basic_auth'); }, 'secret-path', 'edge project not checked'],
   // per-service identities
   ['two services share a uid', (s) => { svc(s, 'prod', 'worker').user = '10001:10002'; }, 'user-distinct', 'uid uniqueness not checked'],
@@ -258,11 +258,13 @@ describe('POLY-146: the repo\'s compose and pg_hba files', () => {
         expect(JSON.stringify(services[n]), `${n} names no operator secret`).not.toMatch(/operator/i);
       }
     });
-    it(`${f}: the worker mounts no auth secret and sets no AUTH_SECRET_FILE; web still does  [red if: the worker keeps the secret]`, () => {
+    it(`${f}: the worker and web mount no auth secret and set no AUTH_SECRET_FILE; only auth does (POLY-152 R1.3)  [red if: the worker or web keeps the secret]`, () => {
       const services = doc(f).services as Record<string, any>;
       expect(secretNames(services.worker)).not.toContain('auth_secret');
       expect(JSON.stringify(services.worker.environment ?? {})).not.toContain('AUTH_SECRET_FILE');
-      expect(secretNames(services.web)).toContain('auth_secret');
+      expect(secretNames(services.web)).not.toContain('auth_secret');
+      expect(JSON.stringify(services.web.environment ?? {})).not.toContain('AUTH_SECRET_FILE');
+      expect(secretNames(services.auth)).toContain('auth_secret');
     });
   }
   for (const [f, cidr] of [['pg_hba.prod.conf', '10.201.1.0/24'], ['pg_hba.staging.conf', '10.202.1.0/24']] as const) {

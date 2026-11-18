@@ -687,3 +687,33 @@ Add new decisions ABOVE this comment, newest first.
 **Cost:** no real data until stage 2 is done, which POLY-149 estimates at 11.5–15.5 loop-days over 3 loops.
 **Approved by:** the Principal (2026-11-16), on seceng's recommendation.
 
+
+### 2026-11-17 — The second-step lock grows, then shuts until an emailed code is confirmed
+**Decision:** two changes to the second sign-in step. (1) In POLY-149, each lock in a row lasts twice as long as the last (15 minutes, doubling to a 24-hour cap), and only a correct second-step code resets the doubling; a passkey sign-in does not. This joins the deploy gate: no real household data is deployed without it. (2) In POLY-137, once the mailer exists, the second step shuts after 3 locks in 24 hours and stays shut until the person confirms a code sent to their email, and the person is emailed at the first lock too. Two conditions bind (2): the emailed code is an extra requirement and never shortens or clears the growing lock; a passkey still passes the second step while it is shut, and the operator's `reset-mfa` stays.
+**Why:** measured on better-auth 1.7.18 (POLY-152, `process/cairn/reviews/POLY-152/red-run.md`), the 10th wrong code locks the step for 15 minutes and the count then starts again from zero. Someone past the first step (the password, the inbox, or the Google or GitHub account) gets 960 guesses a day at 3 valid codes in a million, about 65% in a year, and nobody is told (SECURITY R-26). The growing lock cuts that to about 10 guesses a day (about 1% a year) and needs no mailer. The cap then stops an attacker without the inbox at 30 guesses in total and tells the person. Against an attacker who holds the inbox only the growing lock works, which is why the emailed code must never clear it.
+**Alternatives considered:**
+- Accept until the mailer exists — tolerable only while nothing real is deployed.
+- The growing lock alone (seceng's recommendation in its brief) — leaves about 1% a year and no signal until the email-on-lock lands.
+- Passkey required for owners — the strongest; a product change (DESIGN, PRD), not priced.
+**Cost:** 0.5 to 1 day for the growing lock and about 0.5 day for the cap (seceng's guesses). Someone holding the password can lock the real person out for up to a day at a time; today they can re-lock every 15 minutes.
+**Approved by:** the Principal (2026-11-17), on seceng's brief (measured by qa at `454660da`) and the lead's two conditions.
+
+### 2026-11-17 — A sign-in record the sign-in service cannot edit or delete
+**Decision:** POLY-149 adds a record of every new session, written by the database: who, when, from which address and browser. `poly_auth` can add lines and can neither change nor remove them. It is in place before any real household data is deployed. The same record takes one line for each wrong second-step code that counts toward a lock and one for each lock (user, time, address, browser); the typed code is never stored, and a request that has not passed the first step adds no line. Rows are kept 400 days and are removed only by a purge path, and with the person's account.
+**Why:** after POLY-152 the sign-in service can create any session and delete it again, and reading data leaves no other trace, so a break-in to that service (a bug, or its stolen database password) could be erased completely (SECURITY R-2; `process/cairn/reviews/POLY-152/ruling-review.md` §4; verdict V2). The record turns that into a trace the attacker cannot remove.
+**Limits accepted:** reusing a session that is already open creates no new line; someone with full control of the database server can still erase the record.
+**Alternatives considered:**
+- Accept and document — free; a break-in would leave nothing.
+- Also copy the record off the server — covers the database-server case; needs log shipping that does not exist; reconsider when off-site logging arrives.
+**Cost:** about half a day for the sign-in lines (the architect's guess) and about a quarter day for the failed tries (seceng's guess); one small row per sign-in, and about 11 rows a day per person under attack (about 6 MB a year for ten people under constant attack).
+**Why failed tries and 400 days:** the per-address limit lives in memory and sees one address at a time, so nothing durable shows a guessing attack or one address trying several people; alerts and any later blocking need that data. Addresses are personal data, so the record has a retention period: 400 days covers a full year plus a margin (the lead's reading of seceng's proposal); a shorter period was offered and not taken.
+**Approved by:** the Principal (2026-11-17), on seceng's recommendation.
+
+### 2026-11-17 — The picomatch advisory is exempted from the dependency audit until 2026-12-17
+**Decision:** CI's dependency audit ignores GHSA-fc5q-39xc-vjpf (`picomatch`, high, no patched release) and nothing else, through `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml` (PR #134). `tests/ci/audit-exemption.test.ts` fails if the ignore list is anything but that one advisory, if the date is after 2026-12-17, or if `picomatch` appears in the production install. On or before that date someone checks for a fixed release and either removes the entry or moves the date.
+**Why:** the advisory failed the `lint` job on every pull request and on `main`. `picomatch` is in development and CI tools only; the app image installs production dependencies and has none (`pnpm audit --prod --audit-level high` exits 0, checked by the lead and seceng). The attack needs an attacker-written pattern, and ours are in our own config files, so the worst case is a hung CI job.
+**Alternatives considered:**
+- Force a fixed version — none exists; an unreleased patch would run unreviewed code in CI.
+- Audit production dependencies only — hides every future advisory in the tools that build the images.
+- Wait for a fix — every pull request stays blocked with no date known.
+**Approved by:** the Principal (2026-11-17), on seceng's brief.

@@ -14,6 +14,7 @@ BEGIN
       ('poly_app',      true),
       ('poly_worker',   true),
       ('poly_operator', true),
+      ('poly_auth',     true),
       ('poly_authz',    false),
       ('poly_purge',    false),
       ('poly_rollup',   false),
@@ -79,7 +80,7 @@ DO $db$
 BEGIN
   EXECUTE format('ALTER DATABASE %I OWNER TO poly_owner', current_database());
   EXECUTE format('REVOKE ALL ON DATABASE %I FROM PUBLIC', current_database());
-  EXECUTE format('GRANT CONNECT ON DATABASE %I TO poly_migrator, poly_app, poly_worker, poly_operator, poly_backup', current_database());
+  EXECUTE format('GRANT CONNECT ON DATABASE %I TO poly_migrator, poly_app, poly_worker, poly_operator, poly_auth, poly_backup', current_database());
 END
 $db$;
 
@@ -90,4 +91,4 @@ ALTER DEFAULT PRIVILEGES FOR ROLE poly_owner, poly_authz, poly_purge, poly_rollu
 -- public: owned by poly_owner, no CREATE for anyone else (SecEng addition (b)).
 ALTER SCHEMA public OWNER TO poly_owner;
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
-GRANT USAGE ON SCHEMA public TO poly_app, poly_worker, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal;
+GRANT USAGE ON SCHEMA public TO poly_app, poly_auth, poly_worker, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal;

@@ -10,7 +10,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-16
+updated: 2026-11-17
 ---
 
 Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict and seceng reviews under `process/cairn/reviews/POLY-86/`). One loop for the batch; add later auth nits here.
@@ -26,6 +26,14 @@ Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict an
 - [ ] qa: write the e2e step-up stamp inside the revoke spec, not in `serve.ts` before `vite build`; the spec fails if a run takes over 5 minutes to reach it (verdict follow-up 12).
 - [ ] The Resend mailer for `sendMagicLink`; apps/web passes one that answers 503 until it exists (ruling follow-up 3).
 - [ ] Avatar upload to our own origin, with the same-origin rule on `/update-user` image (ruling follow-up 2; seceng).
+
+- [ ] **Second-step cap and lock notice (`process/DECISIONS.md` 2026-11-17).** Needs the mailer above. Each sub-item is shown red first:
+  - On a fake clock, the 3rd lock of one factor within a rolling 24 hours shuts the code step. While it is shut, a correct TOTP or backup code is refused, creates no session, and counts toward nothing.
+  - It opens only when the user confirms a code emailed to their account's address (the `app.email_challenge` machinery, its own purpose, single use, 15-minute expiry, 5 wrong entries end it).
+  - The emailed code never shortens or clears the growing lock: confirming it during a lock leaves `locked_until` and the doubling unchanged, and the right TOTP is refused until the lock lapses.
+  - A passkey sign-in passes the second step while it is shut and while it is locked. `reset-mfa` still clears a shut user.
+  - At the first lock of a run, the user is emailed once. The mail holds no code and no link that changes anything, and says that someone with their first step tried codes. Later locks in the same run send no further notice; the shut mail is the next.
+  - The shut state lives in the database. A write by poly_auth that clears it is refused, except the confirmation definer, by its exact call.
 
 ## Comments
 
@@ -50,3 +58,7 @@ From POLY-146 (seceng-146's read of better-auth 1.7.18; architect-146's gate-1 r
 ### @team-lead — 2026-11-16
 
 From the POLY-89 loop (merged 2026-11-17, PR #131). `sendSecondStepCode` throws "mailer not configured" until the Resend mailer lands, so second-step enrolment in production waits on this issue. Also email the user when an emailed code is voided at five wrong tries, and when an operator resets their second step (seceng C-f and build review N6, `process/cairn/reviews/POLY-89/build-review.md`).
+
+### @team-lead — 2026-11-17
+
+From POLY-152's ruling review (seceng F3, 2026-11-17): SECURITY R-24 now covers every OAuth callback, not only a first sign-in, because the sign-in service holds one transaction across the provider exchange on every callback (ruling R9). The rate limit and the idle-in-transaction timeout here must cover every callback; say so in the criterion when this issue is started.

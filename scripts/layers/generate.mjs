@@ -74,10 +74,13 @@ export function generateConfig(layers, opts = {}) {
     const isSecrets = n === 'secrets';
     const inPackages = e.dir.startsWith('packages/');
     const allowedSubs = e.allow.filter((a) => a.includes('/')).map((a) => `@poly/${a}`);
+    // A subpath-only allow ('auth/web' without 'auth') means "not the index": the package's root specifier is refused (POLY-152, f16e92d1).
+    const subOnly = [...new Set(e.allow.filter((a) => a.includes('/')).map((a) => a.split('/')[0]))].filter((b) => !e.allow.includes(b));
 
     const paths = [];
     const patterns = [];
     const banned = [];
+    for (const b of subOnly) paths.push({ name: `@poly/${b}`, message: `${e.dir} may import @poly/${b} only through its allowed subpaths, never the index (layers.json).` });
     if (!isDb) {
       for (const d of PG_DRIVERS) paths.push({ name: d, message: 'Only packages/db opens a Postgres connection (ARCH §2.1).' });
       patterns.push({ group: DRIZZLE_PG, message: 'Only packages/db imports a Postgres driver (ARCH §2.1).' });
@@ -110,7 +113,7 @@ export function generateConfig(layers, opts = {}) {
     });
 
     // import() and require() bypass no-restricted-imports, so the subpath and SvelteKit bans repeat there.
-    banned.push('@poly/*/*', ...allowedSubs.map((x) => `!${x}`));
+    banned.push('@poly/*/*', ...allowedSubs.map((x) => `!${x}`), ...subOnly.map((b) => `@poly/${b}`));
     if (inPackages) banned.push(...SVELTEKIT);
     const rules = {
       'no-restricted-imports': [2, { paths, patterns }],

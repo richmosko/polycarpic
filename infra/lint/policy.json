@@ -21,9 +21,12 @@
       ],
       "web": [
         "db_password_app",
-        "auth_secret",
-        "resend_api_key",
         "plaid_secret"
+      ],
+      "auth": [
+        "db_password_auth",
+        "auth_secret",
+        "resend_api_key"
       ],
       "worker": [
         "db_password_worker",
@@ -50,9 +53,12 @@
       ],
       "web": [
         "db_password_app",
-        "auth_secret",
-        "resend_api_key",
         "plaid_secret"
+      ],
+      "auth": [
+        "db_password_auth",
+        "auth_secret",
+        "resend_api_key"
       ],
       "worker": [
         "db_password_worker",

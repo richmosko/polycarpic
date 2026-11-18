@@ -65,3 +65,40 @@ describe('pgTAP catalog invariants', () => {
     });
   }
 });
+
+// POLY-152 seceng #16: the poly_auth grant pin is shown to bite. Each plant is added inside 08's own transaction (rolled back with it),
+// and the file must then report a `not ok`; the control without a plant reports none.
+describe('POLY-152 08_poly_auth_grants.sql fails on a planted grant', () => {
+  const body = readFileSync(join(dir, '08_poly_auth_grants.sql'), 'utf8');
+  const run = (plant: string) => psql(body.replace('BEGIN;', () => `BEGIN;\n${plant};`), db).out.split('\n').filter((l) => /^not ok/.test(l));
+  it('control: no plant, no failure', () => { expect(run('SELECT 1')).toEqual([]); });
+  const plants: [string, string][] = [
+    ['a table SELECT outside the allowed set', 'GRANT SELECT ON public.entity TO poly_auth'],
+    ['a column SELECT on a table outside the allowed set', 'GRANT SELECT (name) ON public.entity TO poly_auth'],
+    ['a SELECT through PUBLIC', 'GRANT SELECT ON public.entity TO PUBLIC'],
+    ['an extra privilege on an allowed table', 'GRANT TRUNCATE ON public.account TO poly_auth'],
+    ['UPDATE on session.recent_auth_at', 'GRANT UPDATE (recent_auth_at) ON public.session TO poly_auth'],
+    ['EXECUTE on enter_asserted_user', 'GRANT EXECUTE ON FUNCTION app.enter_asserted_user(uuid, uuid) TO poly_auth'],
+    ['a function with EXECUTE granted through PUBLIC', 'CREATE FUNCTION public.qa_plant152() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$; GRANT EXECUTE ON FUNCTION public.qa_plant152() TO PUBLIC'],
+    ['a sequence privilege', 'CREATE SEQUENCE public.qa_seq152; GRANT USAGE ON SEQUENCE public.qa_seq152 TO poly_auth'],
+  ];
+  for (const [name, plant] of plants) it(`${name}: reported`, () => { expect(run(plant).length, plant).toBeGreaterThan(0); });
+});
+
+// POLY-152 (architect 9f6dd25a, seceng §7): poly_govern's grants on user, entity and entity_type are pinned both ways; each plant must fail 09.
+describe('POLY-152 09_poly_govern_grants.sql fails on a planted change', () => {
+  const body = readFileSync(join(dir, '09_poly_govern_grants.sql'), 'utf8');
+  const run = (plant: string) => psql(body.replace('BEGIN;', () => `BEGIN;\n${plant};`), db).out.split('\n').filter((l) => /^not ok/.test(l));
+  it('control: no plant, no failure', () => { expect(run('SELECT 1')).toEqual([]); });
+  const plants: [string, string][] = [
+    ['an extra column SELECT on user (image)', 'GRANT SELECT (image) ON public."user" TO poly_govern'],
+    ['an extra column UPDATE on user (email)', 'GRANT UPDATE (email) ON public."user" TO poly_govern'],
+    ['a column SELECT through PUBLIC on user', 'GRANT SELECT (image) ON public."user" TO PUBLIC'],
+    ['a missing grant: SELECT (name) on user revoked', 'REVOKE SELECT (name) ON public."user" FROM poly_govern'],
+    ['an extra column on entity', 'GRANT SELECT (name) ON public.entity TO poly_govern'],
+    ['a table-level DELETE on entity', 'GRANT DELETE ON public.entity TO poly_govern'],
+    ['an extra column on entity_type', 'GRANT SELECT (name) ON public.entity_type TO poly_govern'],
+    ['an extra policy for poly_govern on entity', 'CREATE POLICY qa_plant152 ON public.entity FOR SELECT TO poly_govern USING (true)'],
+  ];
+  for (const [name, plant] of plants) it(`${name}: reported`, () => { expect(run(plant).length, plant).toBeGreaterThan(0); });
+});

@@ -1,4 +1,4 @@
-import { listMySessions, revokeMySession } from '@poly/auth';
+import { listMySessions, revokeMySession } from '@poly/auth/web';
 import { error, fail } from '@sveltejs/kit';
 import type { Actions, PageServerLoad } from './$types';
 

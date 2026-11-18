@@ -9,6 +9,8 @@ import { ExtendedClient } from './extended-client.ts';
 export interface PoolConfig {
   /** DATABASE_* settings for the tenant / context-free pool (default: process.env). */
   app?: Env;
+  /** DATABASE_* settings for the sign-in service's pool (default: process.env). DATABASE_USER must be poly_auth. */
+  auth?: Env;
   /** DATABASE_* settings for withSystem's pool (default: process.env). */
   worker?: Env;
   /** DATABASE_* settings for withOperatorTx's pool (default: process.env). DATABASE_USER must be poly_operator. */
@@ -19,6 +21,7 @@ export interface PoolConfig {
 
 let config: PoolConfig = {};
 let app: pg.Pool | undefined;
+let auth: pg.Pool | undefined;
 let worker: pg.Pool | undefined;
 let operator: pg.Pool | undefined;
 
@@ -30,6 +33,14 @@ export class OperatorPoolRefused extends Error {
   constructor() {
     super('the operator pool requires DATABASE_USER=poly_operator');
     this.name = 'OperatorPoolRefused';
+  }
+}
+
+/** The auth pool refuses before any connection unless the configured user is poly_auth (POLY-152 R1): a seatbelt, not the boundary. */
+export class AuthPoolRefused extends Error {
+  constructor() {
+    super('the auth pool requires DATABASE_USER=poly_auth');
+    this.name = 'AuthPoolRefused';
   }
 }
 
@@ -45,6 +56,13 @@ export function appPool(): pg.Pool {
   return (app ??= new pg.Pool({ ...connectionFrom(config.app ?? process.env), Client: ExtendedClient, ...maxOpt() }));
 }
 
+export function authPool(): pg.Pool {
+  const env = config.auth ?? process.env;
+  if (env.DATABASE_USER !== 'poly_auth') throw new AuthPoolRefused();
+  if (auth) return auth;
+  return (auth = new pg.Pool({ ...connectionFrom(env), Client: ExtendedClient, ...maxOpt() }));
+}
+
 export function workerPool(): pg.Pool {
   return (worker ??= new pg.Pool({ ...connectionFrom(config.worker ?? process.env), Client: ExtendedClient, ...maxOpt() }));
 }
@@ -57,8 +75,8 @@ export function operatorPool(): pg.Pool {
 }
 
 export async function close(): Promise<void> {
-  const open = [app, worker, operator].filter((p): p is pg.Pool => p !== undefined);
-  app = worker = operator = undefined;
+  const open = [app, auth, worker, operator].filter((p): p is pg.Pool => p !== undefined);
+  app = auth = worker = operator = undefined;
   config = {};
   await Promise.all(open.map((p) => p.end()));
 }

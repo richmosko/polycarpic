@@ -1,9 +1,7 @@
 // handleAuthRequest (POLY-86 ruling R4; seceng S1, S14): runs BetterAuth for one /api/auth/* request inside the right
 // transaction of ours, and commits only when BetterAuth's answer is a success.
 import { isIP } from 'node:net';
-import { withContextFreeTx } from '@poly/db/auth';
-import { withTenant } from '@poly/db';
-import { sessionUserId } from '@poly/db/session';
+import { withAuthSession, withContextFreeTx, withSignInTx } from '@poly/db/auth';
 import type { createAuth } from './index.ts';
 import { matchAuthPath, USER_INSERTING } from './route-policy.ts';
 import { cappedOut } from './recent-auth.ts';
@@ -56,11 +54,18 @@ function withoutCommitHeader(res: Response): Response {
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }
 
+/** The paths that create a session on a single factor and have no handle yet: one transaction for every row (R9). */
+const SIGN_IN_TX = new Set(['/sign-in/email', '/passkey/verify-authentication', '/two-factor/verify-totp', '/two-factor/verify-backup-code']);
+/** The second-step paths also commit a refusal below 500: the wrong-code count and the lockout survive a refused code (R9). */
+const COMMITS_REFUSAL = new Set(['/two-factor/verify-totp', '/two-factor/verify-backup-code']);
+
 async function inTransaction(request: Request, auth: AnyAuth, run: <T>(fn: () => Promise<T>) => Promise<T>, contextFree = false): Promise<Response> {
   // The header commits only the wrong-code answer of /second-step/confirm-code, a 403 (it records the attempt). Anywhere else it is
   // ignored: a failure rolls back as before.
   const template = matchAuthPath(new URL(request.url).pathname)?.template;
-  const keeps = (res: Response): boolean => res.headers.has(COMMIT_HEADER) && res.status === 403 && template === '/second-step/confirm-code';
+  const keeps = (res: Response): boolean =>
+    (res.headers.has(COMMIT_HEADER) && res.status === 403 && template === '/second-step/confirm-code') ||
+    (template !== undefined && COMMITS_REFUSAL.has(template) && res.status >= 400 && res.status < 500);
   try {
     const res = await run(async () => {
       const res = await auth.handler(request);
@@ -87,6 +92,14 @@ const clientIpResolved = (request: Request): boolean => {
 
 const notFound = () => new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
 
+/** The cap's clearing cookie carries the path, Secure, SameSite and HttpOnly BetterAuth set the cookie with, never a literal Path=/ (C7). */
+function clearingCookie(c: { name: string; attributes: { path?: string; domain?: string; secure?: boolean; httpOnly?: boolean; sameSite?: string } }): string {
+  const a = c.attributes;
+  const same = a.sameSite ? a.sameSite[0]!.toUpperCase() + a.sameSite.slice(1).toLowerCase() : 'Lax';
+  const parts = [`${c.name}=`, `Path=${a.path ?? '/'}`, ...(a.domain ? [`Domain=${a.domain}`] : []), 'Max-Age=0', ...(a.httpOnly === false ? [] : ['HttpOnly']), `SameSite=${same}`, ...(a.secure ? ['Secure'] : [])];
+  return parts.join('; ');
+}
+
 export async function handleAuthRequest(request: Request, given: Promise<AnyAuth> | AnyAuth = defaultAuth()): Promise<Response> {
   const route = matchAuthPath(new URL(request.url).pathname);
   if (!route || route.rule.class === 'blocked') return notFound(); // the same answer for an unlisted and a blocked path
@@ -101,17 +114,16 @@ export async function handleAuthRequest(request: Request, given: Promise<AnyAuth
   if (session && cappedOut(session.session.createdAt)) {
     await ctx.internalAdapter.deleteSession(session.session.token);
     session = null;
-    const c = ctx.authCookies.sessionToken;
-    const attrs = ['Path=/', 'Max-Age=0', 'HttpOnly', 'SameSite=Lax', ...(c.attributes.secure ? ['Secure'] : [])];
     return new Response(JSON.stringify({ message: 'Unauthorized' }), {
       status: 401,
-      headers: { 'content-type': 'application/json', 'set-cookie': `${c.name}=; ${attrs.join('; ')}` },
+      headers: { 'content-type': 'application/json', 'set-cookie': clearingCookie(ctx.authCookies.sessionToken) },
     });
   }
   if (session) {
-    const { id: sessionId } = session.session;
-    return inTransaction(request, auth, (fn) => withTenant(sessionUserId(session!.user.id), sessionId, fn));
+    const token = session.session.token;
+    return inTransaction(request, auth, (fn) => withAuthSession(token, fn));
   }
   if (USER_INSERTING.has(route.template)) return inTransaction(request, auth, (fn) => withContextFreeTx(fn), true);
+  if (SIGN_IN_TX.has(route.template)) return inTransaction(request, auth, (fn) => withSignInTx(fn));
   return auth.handler(request);
 }

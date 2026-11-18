@@ -148,7 +148,7 @@ describe('C3/C9 the enrolment class and the route policy (R3, R5)', () => {
     expect(r.headers.getSetCookie().some((c) => /session_token=[^;]/.test(c) && !/max-age=0/i.test(c))).toBe(false);
     expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${en.id}'`)).toBe(0);
   });
-  it('C5/C-a: a passkey assertion signs in as poly_app: 200, a session cookie, and the unmarked passkey.counter update commits (0 -> 1) [red if: guard_passkey refuses the unmarked counter update, or the commit-time check uses the marker]', async () => {
+  it('C5/C-a: a passkey assertion signs in as poly_auth: 200, a session cookie, and the unmarked passkey.counter update commits (0 -> 1) [red if: guard_passkey refuses the unmarked counter update, or the commit-time check uses the marker]', async () => {
     const auth = await mkWithMailer();
     const u = e.seedUser();
     const k = softAuthenticator();

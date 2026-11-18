@@ -221,6 +221,18 @@ importers:
         specifier: ^2.9.1
         version: 2.9.1
 
+  apps/auth:
+    dependencies:
+      '@poly/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@poly/config':
+        specifier: workspace:*
+        version: link:../../packages/config
+      '@poly/db':
+        specifier: workspace:*
+        version: link:../../packages/db
+
   apps/migrate:
     dependencies:
       '@poly/config':

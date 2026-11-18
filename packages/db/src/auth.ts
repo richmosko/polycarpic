@@ -3,8 +3,8 @@
 import { getTableColumns, type Table } from 'drizzle-orm';
 import * as schema from './schema/auth.ts';
 
-export { withContextFreeTx, clientOf, currentClient, currentTx, NestedContextError, ContextNotEmptyError, TransactionAborted, TransactionEnded, TransactionClosed, type AuthClient, type Tx, type ContextFreeTx } from './context.ts';
-export { appPool as authPool, close } from './pool.ts';
+export { withContextFreeTx, withAuthSession, withSignInTx, clientOf, currentClient, currentTx, NestedContextError, ContextNotEmptyError, TransactionAborted, TransactionEnded, TransactionClosed, type AuthClient, type Tx, type ContextFreeTx } from './context.ts';
+export { authPool, close } from './pool.ts';
 
 type Fields<T extends Table> = { [K in keyof T['_']['columns']]: string };
 

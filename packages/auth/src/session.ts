@@ -1,143 +1,49 @@
-// The session loader, Settings → Sessions and the 30-day cap (POLY-86 ruling R5; seceng S13-S15).
-import { sql, withTenant, type Tx } from '@poly/db';
-import { sessionUserId, type SessionUserId } from '@poly/db/session';
-import { landingEntity, provisionPerson } from '@poly/tenancy';
-import { APIError } from 'better-auth/api';
+// The service side of the session lookup (POLY-152 R6.2) and the 30-day cap. apps/auth serves handleSessionRequest on its internal
+// listener; web calls it over HTTP through @poly/auth/web. loadSession here is the in-process composition for tests: the same
+// service answer, then web's own provisioning and gate, with no HTTP between them.
 import { defaultAuth, type AnyAuth } from './handler.ts';
-import { cappedOut, requireRecentAuth } from './recent-auth.ts';
+import { cappedOut } from './recent-auth.ts';
+import { completeSession, loadSessionFromService, type LoadedSession, type Logger } from './web.ts';
 
-export type ShellSession = {
-  user: { id: string; name: string; image: string | null };
-  expiresAt: string;
-};
-export interface LoadedSession {
-  userId: SessionUserId;
-  sessionId: string;
-  shell: ShellSession;
-  /** app.second_step_required(): the sign-in gate (POLY-89 R4, R5). One answer from the database; nothing here re-derives it. */
-  secondStepRequired: boolean;
-  /** BetterAuth's own refreshed Set-Cookie headers, and nothing else. */
-  setCookie: string[];
-}
-export interface Logger {
-  error(event: string, fields: Record<string, unknown>): void;
-}
+export { HttpError, listSessions, revokeSession, listMySessions, revokeMySession, myLandingEntity, type ShellSession, type LoadedSession, type Identity, type SessionRow } from './web.ts';
 
-export class HttpError extends Error {
-  readonly status: number;
-  readonly code: string;
-  constructor(status: number, code: string) {
-    super(code);
-    this.name = 'HttpError';
-    this.status = status;
-    this.code = code;
+const ORIGIN = 'http://auth.in-process';
+
+/**
+ * GET /session on the internal listener: the signed cookie is the only input. BetterAuth checks the cookie's HMAC and slides the row
+ * (`getSession`), the cap check deletes a row past 30 days. Answers 200 with exactly five keys, or 204. Never a Set-Cookie (R7).
+ */
+export async function handleSessionRequest(request: Request, given: Promise<AnyAuth> | AnyAuth = defaultAuth()): Promise<Response> {
+  // The listener's one route: any other path, method or query string is 404 (a bare '?' parses to an empty search, so the text is tested).
+  if (request.method !== 'GET' || request.url.includes('?') || new URL(request.url).pathname !== '/session') {
+    return new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
   }
-}
-
-const consoleLogger: Logger = { error: (event, fields) => console.error(JSON.stringify({ event, ...fields })) };
-
-interface PgLike {
-  code?: string;
-  constraint?: string;
-  cause?: unknown;
-}
-/** Drizzle may wrap the pg error: walk .cause for the one carrying the code. */
-function pgError(e: unknown): PgLike | null {
-  for (let cur: unknown = e, n = 0; cur && typeof cur === 'object' && n < 5; cur = (cur as PgLike).cause, n++) {
-    if (typeof (cur as PgLike).code === 'string') return cur as PgLike;
-  }
-  return null;
-}
-const isSelfUniqueRace = (e: unknown): boolean => {
-  const p = pgError(e);
-  return p?.code === '23505' && p.constraint === 'entity_self_user_id_unique';
-};
-
-const provision = (userId: SessionUserId, sessionId: string) => withTenant(userId, sessionId, (tx) => provisionPerson(tx));
-
-/** The signed-in user for a page request, or null. Gives the user their own Person on first load (retry once on the race). */
-export async function loadSession(request: Request, given: Promise<AnyAuth> | AnyAuth = defaultAuth(), logger: Logger = consoleLogger): Promise<LoadedSession | null> {
   const auth = await given;
-  const got = (await auth.api.getSession({ headers: request.headers, returnHeaders: true })) as {
-    headers: Headers;
-    response: { session: { id: string; token: string; createdAt: Date; expiresAt: Date }; user: { id: string; name: string; image?: string | null } } | null;
+  // Only the cookie goes to BetterAuth: no other header of the request can name a user, a session or an address.
+  const headers = new Headers();
+  const cookie = request.headers.get('cookie');
+  if (cookie) headers.set('cookie', cookie);
+  const got = (await auth.api.getSession({ headers })) as null | {
+    session: { id: string; token: string; createdAt: Date; expiresAt: Date };
+    user: { id: string; name: string; image?: string | null };
   };
-  const found = got.response;
-  if (!found) return null;
-  if (cappedOut(found.session.createdAt)) {
-    await (await auth.$context).internalAdapter.deleteSession(found.session.token);
-    return null;
+  if (!got) return new Response(null, { status: 204 });
+  if (cappedOut(got.session.createdAt)) {
+    await (await auth.$context).internalAdapter.deleteSession(got.session.token);
+    return new Response(null, { status: 204 });
   }
-  const userId = sessionUserId(found.user.id);
-  const sessionId = found.session.id;
-  try {
-    await provision(userId, sessionId);
-  } catch (e) {
-    if (!isSelfUniqueRace(e)) {
-      logger.error('session.provision_failed', { code: pgError(e)?.code ?? 'unknown', constraint: pgError(e)?.constraint, userId });
-      throw e;
-    }
-    try {
-      await provision(userId, sessionId); // the whole transaction again, fresh; it finds the winner's Person
-    } catch (again) {
-      logger.error('session.provision_failed', { code: pgError(again)?.code ?? 'unknown', constraint: pgError(again)?.constraint, userId });
-      throw again;
-    }
-  }
-  const gate = await withTenant(userId, sessionId, (tx) => tx.execute<{ r: boolean }>(sql`SELECT app.second_step_required() AS r`));
-  return {
-    userId,
-    sessionId,
-    secondStepRequired: gate.rows[0]?.r === true,
-    shell: { user: { id: found.user.id, name: found.user.name, image: found.user.image ?? null }, expiresAt: new Date(found.session.expiresAt).toISOString() },
-    setCookie: got.headers.getSetCookie(),
-  };
+  return Response.json({
+    userId: got.user.id,
+    sessionId: got.session.id,
+    name: got.user.name,
+    image: got.user.image ?? null,
+    expiresAt: new Date(got.session.expiresAt).toISOString(),
+  });
 }
 
-export interface SessionRow {
-  id: string;
-  userAgent: string | null;
-  ipAddress: string | null;
-  createdAt: Date;
-  updatedAt: Date;
-  current: boolean;
+/** In-process loader for tests: the service's answer (no HTTP), then web's provisioning and gate. */
+export async function loadSession(request: Request, given: Promise<AnyAuth> | AnyAuth = defaultAuth(), logger?: Logger): Promise<LoadedSession | null> {
+  const inProcess = (async (_url: unknown, init: RequestInit) => handleSessionRequest(new Request(`${ORIGIN}/session`, { headers: init.headers }), given)) as unknown as typeof fetch;
+  const found = await loadSessionFromService(request, { origin: ORIGIN, fetch: inProcess });
+  return found ? completeSession(found, logger) : null;
 }
-
-/** The caller's sessions: never the token. The session table has no RLS, so the filter is explicit. */
-export async function listSessions(tx: Tx): Promise<SessionRow[]> {
-  const res = await tx.execute<{ id: string; user_agent: string | null; ip_address: string | null; created_at: Date | string; updated_at: Date | string; current: boolean }>(sql`
-    SELECT id, user_agent, ip_address, created_at, updated_at,
-           (id::text = coalesce(app.current_session_id()::text, '')) AS current
-    FROM public.session WHERE user_id = app.current_user_id() ORDER BY created_at`);
-  return res.rows.map((r) => ({ id: r.id, userAgent: r.user_agent, ipAddress: r.ip_address, createdAt: new Date(r.created_at), updatedAt: new Date(r.updated_at), current: r.current }));
-}
-
-/** Revokes by id for the caller. Another session than the current one is a step-up action; the current one is sign-out. */
-export async function revokeSession(tx: Tx, id: string): Promise<void> {
-  const own = await tx.execute<{ current: boolean }>(sql`
-    SELECT (id::text = coalesce(app.current_session_id()::text, '')) AS current
-    FROM public.session WHERE id = ${id}::uuid AND user_id = app.current_user_id()`);
-  if (own.rows.length === 0) throw new HttpError(404, 'not_found');
-  if (!own.rows[0]!.current) {
-    const cur = await tx.execute<{ s: string }>(sql`SELECT coalesce(app.current_session_id()::text, '') AS s`);
-    try {
-      await requireRecentAuth(cur.rows[0]!.s);
-    } catch (e) {
-      if (e instanceof APIError) throw new HttpError(403, 'step_up_required');
-      throw e;
-    }
-  }
-  await tx.execute(sql`DELETE FROM public.session WHERE id = ${id}::uuid AND user_id = app.current_user_id()`);
-}
-
-export interface Identity {
-  userId: string;
-  sessionId: string;
-}
-
-/** Settings → Sessions for the request's identity (apps/web holds no SessionUserId brand). */
-export const listMySessions = (who: Identity): Promise<SessionRow[]> => withTenant(sessionUserId(who.userId), who.sessionId, (tx) => listSessions(tx));
-export const revokeMySession = (who: Identity, id: string): Promise<void> => withTenant(sessionUserId(who.userId), who.sessionId, (tx) => revokeSession(tx, id));
-
-/** The entity the signed-in user lands on at "/": the newest one an invitation seated, else their own Person (POLY-87 R3). */
-export const myLandingEntity = (who: Identity): Promise<string | null> => withTenant(sessionUserId(who.userId), who.sessionId, (tx) => landingEntity(tx));

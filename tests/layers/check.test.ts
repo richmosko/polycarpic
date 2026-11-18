@@ -82,3 +82,28 @@ describe('layers.json structural checks', () => {
     arch: readFileSync(realArch, 'utf8').replace('data-consumes="db tenancy"', 'data-consumes="db tenancy refdata"'),
   });
 });
+
+// POLY-152 (architect f16e92d1): a subpath-only allow entry is valid; ARCH says an entry naming a subpath grants that subpath, with no base.
+describe('subpath-only allow entries', () => {
+  const only = () => {
+    const l = clone();
+    l.packages.web.allow = [...l.packages.web.allow.filter((a: string) => a !== 'auth'), 'auth/web'];
+    return l;
+  };
+  it('web -> auth/web with no auth is not an allow-bad-subpath  [red if: the checker demands the base in the same list]', () => {
+    const r = run({ layers: only() });
+    expect(r.out.filter((l) => l.includes('allow-bad-subpath')), r.out.join('\n')).toEqual([]);
+  });
+  it('auth-app -> db/startup with no db is not an allow-bad-subpath either  [red if: the same clause]', () => {
+    const l = clone();
+    l.packages['auth-app'].allow = [...l.packages['auth-app'].allow.filter((a: string) => a !== 'db'), 'db/startup'];
+    const r = run({ layers: l });
+    expect(r.out.filter((x) => x.includes('allow-bad-subpath')), r.out.join('\n')).toEqual([]);
+  });
+  it('a subpath the target does not export is still refused  [red if: the subpath check is removed with the clause]', () => {
+    const l = only();
+    l.packages.web.allow.push('auth/nonexistent');
+    const r = run({ layers: l });
+    expect(r.out.filter((x) => x.includes('allow-bad-subpath'))).not.toEqual([]);
+  });
+});

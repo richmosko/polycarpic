@@ -4,14 +4,16 @@
 // Each test works in its own rolled-back transaction on unique ids, so none depends on another's rows.
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { cloneMigrated } from './helpers/api';
 import { DB_PKG, server, url } from './helpers/pg';
-import { createAuthRole, dropAuthRole } from './helpers/second-step';
+import { enterAs } from './helpers/second-step';
 import { must } from './helpers/sql';
 
 const pgmod = createRequire(join(DB_PKG, 'package.json'))('pg');
 const ROLES = ['poly_app', 'poly_auth'] as const;
+// POLY-152 R8: positive paths through the nine POLY-89 helpers run as poly_auth alone; poly_app lost EXECUTE (its refusals: second-step-challenge.test.ts).
+const AUTH_ONLY = ['poly_auth'] as const;
 type Role = (typeof ROLES)[number];
 let db: string;
 let n = 0;
@@ -19,13 +21,7 @@ const uid = (k: number) => `00000000-0000-4000-8000-00000089${String(k).padStart
 const SID = '00000000-0000-4000-8000-0000000089e1';
 const NO_SESSION = '00000000-0000-4000-8000-0000000089ff';
 
-beforeAll(() => {
-  db = cloneMigrated();
-  // poly_auth (the stage-2 fixture role) is cluster-wide state: this file is in SERIAL (vitest.config.ts), creates it here and drops it
-  // in afterAll, so no parallel file and no pgtap role-hygiene suite ever sees it.
-  createAuthRole();
-});
-afterAll(() => { dropAuthRole(); });
+beforeAll(() => { db = cloneMigrated(); });
 
 const codeOf = (x: any): string | undefined => x?.code ?? x?.cause?.code;
 const msgOf = (x: any): string => String(x?.cause?.message ?? x?.message ?? x);
@@ -69,7 +65,7 @@ async function marked<T>(role: Role, user: string | null, session: string | null
   const q = (text: string, values?: unknown[]) => c.query({ text, values, queryMode: 'extended' });
   try {
     await q('BEGIN');
-    if (user) await q('SELECT app.enter_asserted_user($1, $2)', [user, session ?? SID]);
+    if (user) await enterAs(q, db, role, user, session);
     return await fn(q);
   } finally {
     await c.query('ROLLBACK').catch(() => {});
@@ -80,6 +76,9 @@ const mkEntity = (q: (t: string, v?: unknown[]) => Promise<any>, key: string) =>
   q(`INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = $1), $2, $3)`,
     [key, `E${key}${++n}`, ({ person: 'individual', trust: 'trust_grantor', business: 'business_pass_through', household: 'parent_pass_through', holding: 'parent_pass_through' } as Record<string, string>)[key]]);
 const REFUSED = /second_step_required/;
+// POLY-152 R2: poly_auth holds no tenancy privilege, so a tenancy write as poly_auth is refused by permission (42501, nothing written) before any
+// guard runs; the guard's own message is asserted for poly_app, the role that reaches the guard.
+const refusedAs = (role: string, x: any) => { if (role === 'poly_app') expect(msgOf(x)).toMatch(REFUSED); else expect(codeOf(x)).toBe('42501'); };
 
 describe('C1/C2 the own-Person exemption and the forcing actions (R3 #10, #11; R4)', () => {
   it('C1: a user with only an unshared own Person is not required to enrol, and the own Person is created without a second step [red if: app.second_step_required() is missing or true for the own Person]', async () => {
@@ -94,19 +93,19 @@ describe('C1/C2 the own-Person exemption and the forcing actions (R3 #10, #11; R
       it(`C2: ${role} creating a ${key} while unenrolled is refused second_step_required [red if: membership_05_second_step is absent or seat_creator still seats the creator]`, async () => {
         const u = await seed();
         const x = await marked(role, u.id, null, (q) => fails(mkEntity(q, key)));
-        expect(msgOf(x)).toMatch(REFUSED);
+        refusedAs(role, x);
       });
     }
     it(`C2: ${role} creating a second Person (not the own Person) while unenrolled is refused [red if: the exemption is a type test and not own_person_exempt]`, async () => {
       const u = await seed();
       const x = await marked(role, u.id, null, (q) => fails(mkEntity(q, 'person')));
-      expect(msgOf(x)).toMatch(REFUSED);
+      refusedAs(role, x);
     });
     it(`C2: ${role} sharing the own Person (first invitation) while unenrolled is refused [red if: invitation_05_second_step is absent]`, async () => {
       const u = await seed();
       const x = await marked(role, u.id, null, (q) => fails(q(
         `INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at) VALUES ($1, 'x@qa.test', 'viewer', $2, decode(repeat('ab', 32), 'hex'), now() + interval '1 day')`, [u.person, u.id])));
-      expect(msgOf(x)).toMatch(REFUSED);
+      refusedAs(role, x);
     });
     it(`C2: ${role} raising a viewer to manager on a shared entity while unenrolled is refused [red if: membership_05 does not cover UPDATE OF role]`, async () => {
       const owner = await seed({ enrolled: true });
@@ -114,7 +113,7 @@ describe('C1/C2 the own-Person exemption and the forcing actions (R3 #10, #11; R
       const ent = await shared(owner.id, `sh${v.id}`);
       must(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ('${ent}', '${owner.id}', 'owner'), ('${ent}', '${v.id}', 'viewer') ON CONFLICT DO NOTHING`, db);
       const x = await marked(role, owner.id, null, (q) => fails(q(`UPDATE public.membership SET role = 'manager' WHERE entity_id = $1 AND user_id = $2`, [ent, v.id])));
-      expect(msgOf(x)).toMatch(REFUSED);
+      refusedAs(role, x);
     });
   }
   it('C2: an enrolled user creates a Trust and shares the own Person [red if: the refusals are unconditional]', async () => {
@@ -223,6 +222,12 @@ describe('C13/R1.2 the session id never proves a session (forge cases)', () => {
     });
     it(`(b) ${role}: marker names a uuid with no session row: refused [red if: a guard accepts an unknown session id]`, async () => {
       const u = await seed({ enrolled: true });
+      if (role === 'poly_auth') { // R8: a session with no row is refused AT ENTRY by enter_auth_session
+        const e = await fails(marked(role, u.id, NO_SESSION, async () => 'entered'));
+        expect(codeOf(e)).toBe('42501');
+        expect(msgOf(e)).toMatch(/no live session/);
+        return;
+      }
       const x = await marked(role, u.id, NO_SESSION, (q) => stepUpAttempt(q, u.id, false));
       expect(x).not.toBeNull();
       expect(msgOf(x)).not.toMatch(/does not exist/);
@@ -232,6 +237,12 @@ describe('C13/R1.2 the session id never proves a session (forge cases)', () => {
       const attacker = await seed({ enrolled: true });
       const s = must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${victim.id}', 'tk${n}${Math.random()}', now() + interval '1 day') RETURNING id`, db).rows[0]![0]!;
       must(`UPDATE public.session SET recent_auth_at = now() WHERE id = '${s}'`, db);
+      if (role === 'poly_auth') { // R5: the marker's user is the ROW's user, so this pairing cannot be forged; entering with the victim's token IS the victim (case d)
+        const who = await marked(role, attacker.id, s, async (q) => (await q('SELECT app.current_user_id()::text AS u')).rows[0].u);
+        expect(who).toBe(victim.id);
+        expect(who).not.toBe(attacker.id);
+        return;
+      }
       const x = await marked(role, attacker.id, s, (q) => stepUpAttempt(q, attacker.id, false));
       expect(x).not.toBeNull();
       expect(msgOf(x)).not.toMatch(/does not exist/);
@@ -306,7 +317,7 @@ describe('C8 email_challenge and enrolment_grant (R2)', () => {
     expect(must(`SELECT has_table_privilege('poly_app', 'app.enrolment_grant', 'SELECT,INSERT,UPDATE,DELETE')`, db).rows[0]![0]).toBe('f');
     expect(must(`SELECT count(*) FROM pg_indexes WHERE schemaname = 'app' AND tablename = 'enrolment_grant' AND indexdef ILIKE '%UNIQUE%' AND indexdef ILIKE '%WHERE%'`, db).rows[0]![0]).toBe('1');
   });
-  for (const role of ROLES) {
+  for (const role of AUTH_ONLY) {
     it(`${role}: issue_email_challenge needs a marker that carries a session, and a code is six digits, stored hashed, returned once [red if: issue_email_challenge is absent or stores the code]`, async () => {
       const u = await seed();
       must(`INSERT INTO public.session (id, user_id, token, expires_at) VALUES ('${SID}', '${u.id}', 'tkc${n}${Math.random()}', now() + interval '1 day') ON CONFLICT DO NOTHING`, db);
@@ -317,7 +328,7 @@ describe('C8 email_challenge and enrolment_grant (R2)', () => {
 });
 
 describe('R3 #3/#6/#5 guards on session, passkey, two_factor (C9, C15)', () => {
-  for (const role of ROLES) {
+  for (const role of AUTH_ONLY) {
     it(`${role}: a session INSERT that names recent_auth_at is refused by the column grant, and one that omits it gets NULL [red if: poly_app can INSERT recent_auth_at or stamp_recent_auth stamps without a grant]`, async () => {
       const u = await seed({ enrolled: true });
       const named = await marked(role, u.id, null, (q) => fails(q(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ($1, $2, now() + interval '1 day', now())`, [u.id, `tkn${n}${Math.random()}`])));
@@ -415,6 +426,13 @@ describe('C-a sign-in under the carve-out (poly_app, 0013 applied)', () => {
     it(`D1(b) ${role}: a MARKED backup_codes change with a fresh step-up commits, and a stamp older than 300 s does not [red if: the regenerate clause is absent or the window is wrong]`, async () => {
       const u = await seed({ enrolled: true });
       const s = must(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tkb${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`, db).rows[0]![0]!;
+      if (role === 'poly_app') { // R8: step_up_fresh left poly_app, so the guard's helper call is a permission refusal; the row must be unchanged
+        const before = must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows;
+        const x = await marked(role, u.id, s, (q) => fails(q(`UPDATE public.two_factor SET backup_codes = 'regen' WHERE user_id = $1`, [u.id])));
+        expect(codeOf(x)).toBe('42501');
+        expect(must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows).toEqual(before);
+        return;
+      }
       await marked(role, u.id, s, (q) => q(`UPDATE public.two_factor SET backup_codes = 'regen' WHERE user_id = $1`, [u.id]));
       must(`UPDATE public.session SET recent_auth_at = now() - interval '301 seconds' WHERE id = '${s}'`, db);
       const stale = await marked(role, u.id, s, (q) => fails(q(`UPDATE public.two_factor SET backup_codes = 'regen' WHERE user_id = $1`, [u.id])));
@@ -424,7 +442,7 @@ describe('C-a sign-in under the carve-out (poly_app, 0013 applied)', () => {
 });
 
 describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
-  for (const role of ROLES) {
+  for (const role of AUTH_ONLY) {
     it(`${role}: removing the last factor of a user who holds manager or owner outside the exemption is refused; a viewer's is refused without a fresh step-up [red if: refuse_last_method is absent]`, async () => {
       const owner = await seed({ enrolled: true });
       const ent = await shared(owner.id, `lm${owner.id}${role}`);
@@ -440,7 +458,7 @@ describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
   it('the own-Person user with only an exempt Person may remove the last factor after a fresh step-up, and second_step_at clears [red if: refuse_last_method does not call own_person_exempt]', async () => {
     const u = await seed({ enrolled: true });
     const s = must(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tke${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`, db).rows[0]![0]!;
-    await marked('poly_app', u.id, s, async (q) => {
+    await marked('poly_auth', u.id, s, async (q) => {
       await q(`DELETE FROM public.two_factor WHERE user_id = $1`, [u.id]);
       await q('SELECT app.set_two_factor_enabled($1)', [false]);
       expect((await q(`SELECT second_step_at IS NULL AS c FROM public."user" WHERE id = $1`, [u.id])).rows[0].c).toBe(true);
@@ -558,7 +576,7 @@ describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect:
     `SELECT ${f}($1) WHERE true`,
     `SELECT * FROM ${f}($1)`,
   ];
-  for (const role of ROLES) {
+  for (const role of AUTH_ONLY) {
     it(`${role}: set_two_factor_enabled, issue_email_challenge and confirm_email_challenge refuse every text that is not exactly "SELECT app.<name>($1)": an alias, lower case, a comment, an extra column, a suffix, FROM [red if: the exact-call check admits an alias or is a regex that fails open on NULL]`, async () => {
       const u = await seed({ enrolled: false });
       const s = must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tkx${n}${Math.random()}', now() + interval '1 day') RETURNING id`, db).rows[0]![0]!;
@@ -581,7 +599,11 @@ describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect:
     const readOnly = ['app.second_step_required()', 'app.enrolment_grant_live()']; // R1.5 exempt: no exact-call check
     const forTriggers = ['app.step_up_fresh()', 'app.enrol_proof(text)', 'app.check_factor_removal(uuid,text,uuid)', 'app.consume_passkey_grant()', 'app.take_recent_auth_stamp(uuid)']; // invoker triggers call them (seceng N1)
     const exactCall = ['app.set_two_factor_enabled(boolean)', 'app.issue_email_challenge(text)', 'app.confirm_email_challenge(text)']; // app.reset_second_step is poly_operator's, not poly_app's
-    expect([...got].sort()).toEqual([...before89, ...readOnly, ...forTriggers, ...exactCall].sort());
+    // POLY-152 R8: after 0014 poly_app keeps only second_step_required of the POLY-89 set, and loses the three sign-up definers; the diff is exactly the twelve.
+    const twelve = [...forTriggers, ...exactCall, 'app.enrolment_grant_live()', 'app.enter_new_user(uuid)', 'app.claim_invitations(bytea,text)', 'app.accept_invitations(bytea)'];
+    expect(twelve).toHaveLength(12);
+    expect(got.filter((g) => twelve.includes(g))).toEqual([]);
+    expect([...got].sort()).toEqual([...before89, ...readOnly].filter((f) => !twelve.includes(f)).sort());
     expect(must(`SELECT has_function_privilege('poly_auth', 'app.reset_second_step(text)', 'EXECUTE')`, db).rows[0]![0]).toBe('f');
     // R1.5 (d88aa7ae): the group a function is in is part of the pin. The three (and reset_second_step) carry the exact-call check, which
     // reads current_query(); the seven helpers do not, so a function that moves between groups fails here.
