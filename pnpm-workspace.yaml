@@ -21,3 +21,11 @@ overrides:
 # Install build scripts are declined by name. An allowed build is a C-80 change; tests/ci/strict-builds.test.ts holds every value at false.
 allowBuilds:
   esbuild: false
+
+# GHSA-fc5q-39xc-vjpf (picomatch ReDoS through extglob patterns, <=4.0.7, no patched release) is the only advisory ignored.
+# picomatch is in dev and CI tools only; the production install has none (tests/ci/audit-exemption.test.ts holds that).
+# Re-check for a fixed release by 2026-12-17: remove this entry, or move the date with a note in the issue.
+# The same test fails after that date.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf
