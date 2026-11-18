@@ -127,6 +127,7 @@ describe('POLY-153 10_session_handle.sql fails on a planted change', () => {
     ['a missing grant: enter_session revoked from poly_app', 'REVOKE EXECUTE ON FUNCTION app.enter_session(text) FROM poly_app'],
     ['UPDATE (id) on session for poly_auth', 'GRANT UPDATE (id) ON public.session TO poly_auth'],
     ['recent_auth_at writable by poly_authz', 'GRANT UPDATE (recent_auth_at) ON public.session TO poly_authz'],
+    ['a second SET clause on a definer (proconfig has two entries)', "ALTER FUNCTION app.my_sessions() SET statement_timeout = '5s'"],
     ['a second overload of enter_session taking a hash', 'CREATE FUNCTION app.enter_session(bytea) RETURNS int LANGUAGE sql AS $$ SELECT 1 $$; GRANT EXECUTE ON FUNCTION app.enter_session(bytea) TO poly_app'],
   ];
   for (const [name, plant] of plants) it(`${name}: reported (and the unplanted file is clean, so a failure is the plant's)`, () => { expect(run('SELECT 1'), 'an unplanted failure would make every plant pass vacuously').toEqual([]); expect(run(plant).length, plant).toBeGreaterThan(0); });

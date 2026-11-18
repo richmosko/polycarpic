@@ -135,9 +135,21 @@ describe('who may call them', () => {
       });
     }
   }
-  it('the three are SECURITY DEFINER owned by poly_authz with search_path = \'\' [red if: owner or search_path differs]', () => {
-    const rows = must(`SELECT p.proname, pg_get_userbyid(p.proowner), p.prosecdef, ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname IN ('my_sessions','recent_auth_ok','revoke_my_session') ORDER BY 1`, db).rows;
+  it('the three are SECURITY DEFINER owned by poly_authz with search_path = \'\' and no other SET [red if: owner or search_path differs, or an extra SET clause rides along]', () => {
+    const rows = must(`SELECT p.proname, pg_get_userbyid(p.proowner), p.prosecdef, ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))::text, coalesce(array_length(p.proconfig, 1), 0) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname IN ('my_sessions','recent_auth_ok','revoke_my_session') ORDER BY 1`, db).rows;
     expect(rows.map((r) => r[0])).toEqual(['my_sessions', 'recent_auth_ok', 'revoke_my_session']);
-    for (const r of rows) { expect(r[1]).toBe('poly_authz'); expect(r[2]).toBe('t'); expect(r[3]).toBe('true'); }
+    for (const r of rows) { expect(r[1]).toBe('poly_authz'); expect(r[2]).toBe('t'); expect(r[3]).toBe('true'); expect(r[4], `${r[0]}: exactly one SET clause`).toBe('1'); }
+  });
+});
+
+describe('the proconfig pin bites (seceng)', () => {
+  it('a plant: a second SET clause on a definer is reported by the same query and the pin would fail [red if: ANY() alone is the check]', () => {
+    const q = (sql: string) => must(sql, db).rows[0]!;
+    const probe = `SELECT ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))::text, coalesce(array_length(p.proconfig, 1), 0) FROM pg_proc p WHERE p.oid = 'app.my_sessions()'::regprocedure`;
+    expect(q(probe)).toEqual(['true', '1']);
+    must(`BEGIN; ALTER FUNCTION app.my_sessions() SET statement_timeout = '5s'; CREATE TEMP TABLE qa_probe AS ${probe}; COMMIT;`, db);
+    // the temp table lives on the worker connection; read it back there
+    expect(must('SELECT * FROM qa_probe', db).rows[0]).toEqual(['true', '2']);
+    must(`ALTER FUNCTION app.my_sessions() RESET statement_timeout; DROP TABLE qa_probe`, db);
   });
 });

@@ -55,11 +55,11 @@ SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND pg_get_function_identity_arguments(p.oid) ~ 'bytea'
   AND (has_function_privilege('poly_app', p.oid, 'EXECUTE') OR has_function_privilege('poly_auth', p.oid, 'EXECUTE')) AND p.proname NOT IN ('claim_invitations','accept_invitations')), 0,
   'no function a login role can execute takes a bytea other than the two invitation definers (no entry by hash)');
-SELECT is((SELECT array_agg(p.proname || ':' || pg_get_userbyid(p.proowner) || ':' || p.prosecdef::text || ':' || ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))::text ORDER BY p.proname)
+SELECT is((SELECT array_agg(p.proname || ':' || pg_get_userbyid(p.proowner) || ':' || p.prosecdef::text || ':' || ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))::text || ':' || coalesce(array_length(p.proconfig, 1), 0)::text ORDER BY p.proname)
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname IN ('enter_session','my_sessions','revoke_my_session','recent_auth_ok','attach_session_handle','session_needs_handle')),
-  ARRAY['attach_session_handle:poly_authz:true:true','enter_session:poly_authz:true:true','my_sessions:poly_authz:true:true',
-        'recent_auth_ok:poly_authz:true:true','revoke_my_session:poly_authz:true:true','session_needs_handle:poly_authz:true:true'],
-  'the six are SECURITY DEFINER, owned by poly_authz, search_path = ''''');
+  ARRAY['attach_session_handle:poly_authz:true:true:1','enter_session:poly_authz:true:true:1','my_sessions:poly_authz:true:true:1',
+        'recent_auth_ok:poly_authz:true:true:1','revoke_my_session:poly_authz:true:true:1','session_needs_handle:poly_authz:true:true:1'],
+  'the six are SECURITY DEFINER, owned by poly_authz, search_path = '''' and no other SET clause (proconfig has exactly one entry)');
 
 -- R2: poly_authz's added grants (and the two it must not get).
 SELECT ok(has_table_privilege('poly_authz', 'public.session', 'DELETE'), 'poly_authz may DELETE sessions (revoke)');
