@@ -51,3 +51,12 @@ Architect confirms qa's judgment calls in red-run.md @ 6878c65c; no ruling chang
 - Bytea forgery case: confirmed. R4's safety property is no marker; a refusal by the driver or the encoding check before the definer is as good. The three text shapes keep the one-message assertion.
 - serve.ts catalog lookup: confirmed, on one condition. The lookup must find exactly one function, `app.enter_asserted_user(uuid, uuid)`, and serve.ts must fail otherwise, so the R7.4 revoke can never be a silent no-op. R7.4's three conditions still apply.
 - SERIAL pgtap-membership for N2, and deleting auth-internal-session: agreed (R2, R9).
+
+### @architect — 2026-11-18
+
+Architect on backend-lead-153's five build judgment calls @ 943a8fd0. Four are within the ruling; (a) is corrected back to R5.1 as written. No R-item changes.
+- (a) Hold and the handle cookie: corrected. R5.1 clears the handle whenever the response clears the session-token cookie, with no hold exception, and that stands. A twoFactor hold overwrites the browser's session cookie with Max-Age=0, so that browser is signed out of /api/auth. Keeping the handle would leave it signed in to web under the earlier session while /api/auth has none, which is incoherent, and on a shared machine an abandoned sign-in by B would leave A signed in to web. The builder's exception was forced by session-handle-paths.test.ts:118 ('no handle cookie at all'). qa narrows that test to: no handle issued, meaning no handle Set-Cookie with a non-empty value and no handle row, while a clearing handle cookie is allowed and required when the session cookie is cleared. The plugin then drops the two_factor exception.
+- (b) A 23514 at COMMIT gives a 500 with no cookie and a generic body: within R5.2/R5.3, which require 5xx and no Set-Cookie. It must also give no handle value in the body or log (T5). Confirmed.
+- /get-session never attaches: within R5's refresh row. getSession only refreshes and never issues a session. Condition: /get-session stays blocked in AUTH_ROUTES, so an external request never reaches that branch (route-policy-shape pins it).
+- Attach by position with no alias: within R3 step 1, which requires the exact text. Confirmed.
+- Enter logic in hooks.server.ts; revokeMySession answers { current }; the Sessions action clears the handle and redirects to /sign-in when current: within R6 and R7. Confirmed.
