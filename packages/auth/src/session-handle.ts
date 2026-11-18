@@ -11,6 +11,7 @@ const BASE = `${HANDLE_COOKIE}=`;
 const ATTRS = 'HttpOnly; Secure; SameSite=Lax';
 
 interface HookCtx {
+  path?: string;
   context?: {
     responseHeaders?: Headers;
     newSession?: { session?: { id?: string } } | null;
@@ -25,10 +26,14 @@ export async function handleAfter(ctx: HookCtx): Promise<Record<string, never>> 
   const tokenCookie = rh.getSetCookie().find((c) => c.startsWith(`${name}=`));
   const sessionId = ctx?.context?.newSession?.session?.id;
   if (!sessionId) {
-    // A cleared session cookie clears the handle with it.
-    if (tokenCookie && /;\s*Max-Age=0(;|$)/i.test(tokenCookie)) rh.append('set-cookie', `${BASE}; Path=/; Max-Age=0; ${ATTRS}`);
+    // A cleared session cookie clears the handle with it (sign-out, a revoke of the current session). A second-step hold also clears the
+    // session cookie, but it sets the two-factor cookie and signs nobody out: the handle of an existing session stays.
+    const hold = rh.getSetCookie().some((c) => /two_factor/.test(c.split('=')[0]!));
+    if (tokenCookie && !hold && /;\s*Max-Age=0(;|$)/i.test(tokenCookie)) rh.append('set-cookie', `${BASE}; Path=/; Max-Age=0; ${ATTRS}`);
     return {};
   }
+  // getSession only refreshes a session that exists (handleAuthRequest calls it before it opens a transaction); it never issues one.
+  if (ctx.path === '/get-session') return {};
   const cur = currentClient();
   if (!cur) throw new Error('session handle: no request transaction'); // fail closed: a 500, never a session without its handle
   const handle = randomBytes(32).toString('base64url');

@@ -76,6 +76,11 @@ async function inTransaction(request: Request, auth: AnyAuth, run: <T>(fn: () =>
     return withoutCommitHeader(res);
   } catch (e) {
     if (e instanceof RollbackWith) return withoutCommitHeader(withoutCookies(e.response));
+    // R5.2: a session that would commit without its handle is refused by the database at COMMIT. Nothing of the answer survives: a 5xx, no cookie.
+    if ((e as { code?: string }).code === '23514') {
+      console.error(JSON.stringify({ event: 'session_handle_missing', path: template }));
+      return new Response(JSON.stringify({ message: 'Internal server error' }), { status: 500, headers: { 'content-type': 'application/json' } });
+    }
     // A refusal the database raises at COMMIT (the stamp check, C32) surfaces after BetterAuth answered 200: the same 403.
     if (contextFree && (e as { code?: string }).code === '42501') {
       return new Response(JSON.stringify({ code: 'invitation_required', message: 'invitation_required' }), { status: 403, headers: { 'content-type': 'application/json' } });
