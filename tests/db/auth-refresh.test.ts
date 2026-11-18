@@ -1,6 +1,6 @@
 // POLY-152 R7, seceng F2 / F3: a session cookie lives to the 30-day cap, the row is the 7-day idle bound, and the cap's clearing cookie
 // carries the path the cookie was set on. Ages are row facts set through SQL (a fake clock would not move Postgres' now()).
-// Red today: the cookie is 7 days (Max-Age 604800) and the cap branch hardcodes Path=/.
+// POLY-153 R8: with the real authOptions, BetterAuth's cookies are __Secure- at Path=/api/auth, and so is the cap's clearing cookie.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
 import { age, expiresInDays, internal, internalReq, sessionRows } from './helpers/auth-service';
@@ -75,8 +75,8 @@ describe('C8 the day tests (the row is the control)', () => {
 });
 
 describe('C7 the cap\'s clearing cookie', () => {
-  it('carries the Path, Secure, SameSite and HttpOnly BetterAuth set it with, never a literal Path=/ when the cookie was set at /api/auth [red if: handler.ts hardcodes Path=/]', async () => {
-    const auth = await e.mk('real-domain', (o) => { o.advanced = { ...(o.advanced ?? {}), cookiePrefix: 'qa-better-auth', /* better-call forces Path=/ on any __Host- name; POLY-153 changes the prefix with the path */ defaultCookieAttributes: { ...(o.advanced?.defaultCookieAttributes ?? {}), path: '/api/auth' } }; return o; });
+  it('carries the Path, Secure, SameSite and HttpOnly BetterAuth set it with, never a literal Path=/; the real authOptions set it at /api/auth [red if: handler.ts hardcodes Path=/ or authOptions leaves the default path]', async () => {
+    const auth = await e.mk(); // R8: authOptions itself fixes the prefix and Path=/api/auth, nothing is patched in here
     const u = e.seedUser();
     const { cookie, res } = await e.signIn(u.email, auth);
     const set = sessionCookie(res)!;

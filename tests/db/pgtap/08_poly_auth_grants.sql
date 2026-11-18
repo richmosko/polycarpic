@@ -7,7 +7,13 @@ SELECT no_plan();
 SELECT has_role('poly_auth');
 SELECT results_eq($$SELECT rolcanlogin, rolsuper, rolcreatedb, rolcreaterole, rolreplication, rolbypassrls FROM pg_roles WHERE rolname='poly_auth'$$,
   $$VALUES (true,false,false,false,false,false)$$, 'poly_auth: LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS');
-SELECT is((SELECT count(*)::int FROM pg_auth_members m JOIN pg_roles u ON u.oid=m.member WHERE u.rolname='poly_auth'), 0, 'poly_auth is a member of no role');
+CREATE FUNCTION pg_temp.auth_memberships() RETURNS int LANGUAGE sql AS $f$
+  SELECT count(*)::int FROM pg_auth_members m JOIN pg_roles u ON u.oid = m.member WHERE u.rolname = 'poly_auth' $f$;
+CREATE FUNCTION pg_temp.auth_can_become() RETURNS text[] LANGUAGE sql AS $f$
+  SELECT coalesce(array_agg(r.rolname::text ORDER BY r.rolname), '{}') FROM pg_roles r
+  WHERE r.rolname <> 'poly_auth' AND (pg_has_role('poly_auth', r.oid, 'MEMBER') OR pg_has_role('poly_auth', r.oid, 'USAGE') OR pg_has_role('poly_auth', r.oid, 'SET')) $f$;
+SELECT is(pg_temp.auth_memberships(), 0, 'poly_auth is a member of no role');
+SELECT is(pg_temp.auth_can_become(), '{}'::text[], 'poly_auth can neither be, inherit nor SET ROLE to any other role (INHERIT FALSE, SET TRUE included)');
 SELECT ok(has_database_privilege('poly_auth', current_database(), 'CONNECT'), 'poly_auth has CONNECT');
 SELECT ok(NOT has_database_privilege('poly_auth', current_database(), 'TEMPORARY'), 'poly_auth holds no TEMP');
 SELECT ok(NOT has_database_privilege('poly_auth', current_database(), 'CREATE'), 'poly_auth holds no CREATE on the database');
@@ -67,20 +73,20 @@ SELECT is((SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.r
   AND (has_sequence_privilege('poly_auth', c.oid, 'USAGE') OR has_sequence_privilege('poly_auth', c.oid, 'SELECT') OR has_sequence_privilege('poly_auth', c.oid, 'UPDATE'))), 0,
   'effective: poly_auth holds no sequence privilege in public, app, drizzle');
 
--- EFFECTIVE EXECUTE over every function in public, app, drizzle (PUBLIC included): exactly the sixteen.
+-- EFFECTIVE EXECUTE over every function in public, app, drizzle (PUBLIC included): exactly the seventeen.
 CREATE TEMP TABLE want_fn (sig text);
 INSERT INTO want_fn VALUES ('app.current_user_id()'), ('app.current_session_id()'),
   ('app.enter_new_user(uuid)'), ('app.claim_invitations(bytea,text)'), ('app.accept_invitations(bytea)'), ('app.provision_person()'), ('app.enter_auth_session(text)'),
   ('app.step_up_fresh()'), ('app.enrol_proof(text)'), ('app.enrolment_grant_live()'), ('app.check_factor_removal(uuid,text,uuid)'), ('app.set_two_factor_enabled(boolean)'),
-  ('app.consume_passkey_grant()'), ('app.take_recent_auth_stamp(uuid)'), ('app.issue_email_challenge(text)'), ('app.confirm_email_challenge(text)');
+  ('app.consume_passkey_grant()'), ('app.take_recent_auth_stamp(uuid)'), ('app.issue_email_challenge(text)'), ('app.confirm_email_challenge(text)'), ('app.attach_session_handle(uuid,text)');
 CREATE FUNCTION pg_temp.fn_extra() RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(x ORDER BY x), '{}') FROM (
     SELECT p.oid::regprocedure::text AS x FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname IN ('public','app','drizzle') AND has_function_privilege('poly_auth', p.oid, 'EXECUTE') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
     EXCEPT SELECT sig FROM want_fn) q $f$;
-SELECT is(pg_temp.fn_extra(), '{}'::text[], 'effective: poly_auth executes no function outside the sixteen (PUBLIC included)');
+SELECT is(pg_temp.fn_extra(), '{}'::text[], 'effective: poly_auth executes no function outside the seventeen (PUBLIC included)');
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_auth', to_regprocedure(sig), 'EXECUTE')), NULL::text[],
-  'effective: poly_auth executes every one of the sixteen (a missing or ungranted function is listed)');
+  'effective: poly_auth executes every one of the seventeen (a missing or ungranted function is listed)');
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='app'
   AND p.proname IN ('enter_asserted_user','enter_job','has_role','visible_entities','owner_count','second_step_required','issue_operator_invitation','reset_second_step','purge_tx_identity')
   AND has_function_privilege('poly_auth', p.oid, 'EXECUTE')), 0, 'pinned absent: enter_asserted_user, enter_job, has_role, visible_entities, owner_count, second_step_required, issue_operator_invitation, reset_second_step, purge_tx_identity');
@@ -88,15 +94,20 @@ SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pr
   AND (has_function_privilege('poly_app', p.oid, 'EXECUTE') OR has_function_privilege('poly_worker', p.oid, 'EXECUTE') OR has_function_privilege('poly_operator', p.oid, 'EXECUTE'))), 0,
   'poly_app, poly_worker, poly_operator never execute enter_auth_session or provision_person');
 
+-- POLY-153: the handle table and its readers are not poly_auth's; it attaches a handle only through the definer (R1, R3).
+SELECT ok(NOT has_table_privilege('poly_auth', 'app.session_handle', 'SELECT') AND NOT has_table_privilege('poly_auth', 'app.session_handle', 'INSERT'), 'pinned absent: any privilege on app.session_handle (the spike gave SELECT and INSERT; the definer removes both)');
+SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='app' AND p.proname IN ('enter_session','my_sessions','revoke_my_session','recent_auth_ok','session_needs_handle') AND has_function_privilege('poly_auth', p.oid, 'EXECUTE')), 0,
+  'pinned absent: enter_session, my_sessions, revoke_my_session, recent_auth_ok, session_needs_handle');
+
 -- Granted to the role itself (the second reading).
 SELECT is((SELECT array_agg(DISTINCT table_schema||'.'||table_name ORDER BY table_schema||'.'||table_name) FROM information_schema.role_table_grants WHERE grantee='poly_auth'),
   ARRAY['app.tx_identity','drizzle.__drizzle_migrations','public.account','public.passkey','public.session','public.two_factor','public.user','public.verification'],
   'granted: table grants on exactly the BetterAuth six, tx_identity and __drizzle_migrations');
 SELECT is((SELECT count(*)::int FROM information_schema.role_column_grants WHERE grantee='poly_auth' AND table_name NOT IN ('user','session','account','verification','two_factor','passkey','tx_identity','__drizzle_migrations')), 0, 'granted: column grants only on the BetterAuth six, tx_identity and __drizzle_migrations (table-level grants list per column)');
 SELECT is((SELECT array_agg(DISTINCT routine_schema||'.'||routine_name ORDER BY routine_schema||'.'||routine_name) FROM information_schema.routine_privileges WHERE grantee='poly_auth'),
-  ARRAY['app.accept_invitations','app.check_factor_removal','app.claim_invitations','app.confirm_email_challenge','app.consume_passkey_grant','app.current_session_id','app.current_user_id','app.enrol_proof',
+  ARRAY['app.accept_invitations','app.attach_session_handle','app.check_factor_removal','app.claim_invitations','app.confirm_email_challenge','app.consume_passkey_grant','app.current_session_id','app.current_user_id','app.enrol_proof',
         'app.enrolment_grant_live','app.enter_auth_session','app.enter_new_user','app.issue_email_challenge','app.provision_person','app.set_two_factor_enabled','app.step_up_fresh','app.take_recent_auth_stamp'],
-  'granted: routine_privileges lists exactly the sixteen functions');
+  'granted: routine_privileges lists exactly the seventeen functions');
 SELECT is((SELECT array_agg(tablename::text ORDER BY tablename) FROM pg_policies WHERE 'poly_auth' = ANY (roles)), ARRAY['tx_identity'],
   'no policy names poly_auth except tx_identity_own');
 SELECT is((SELECT count(*)::int FROM pg_default_acl d WHERE d.defaclacl::text LIKE '%poly_auth=%'), 0, 'no default privilege grants anything to poly_auth');

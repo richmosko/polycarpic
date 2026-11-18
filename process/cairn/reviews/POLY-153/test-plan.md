@@ -74,6 +74,12 @@ Written against `ruling.md` @ 0cd43441 (R0–R13) and `ruling-review.md` (§2.1,
 
 Claims 1 and 2 need the 0015 objects, so they cannot be measured on the tree as it stands. `red-run.md` measures them on a throwaway prototype of 0015 in a scratch clone (never committed) so a contradiction reaches the lead before the build.
 
-## As built
+## As built (the plan above is the intent; this is where it landed)
 
-(Filled in at the gate: the final file list and counts.)
+- **R7.4 scope tests** are `tests/ci/e2e-revoke-scope.test.ts`, not a db file: they read `serve.ts`, which a db area may not (`db-filter-imports`). `serve.ts` looks the reserved definer up in the catalog (`proname LIKE 'enter_asserted%'`) because `poly/reserved-literal` bans the name outside `packages/db/src/context.ts`.
+- **N2 plants** are `tests/db/pgtap-membership.test.ts`, a new SERIAL file in the migrate area (a role-membership GRANT is cluster-wide; `db-harness` C5). The plants fail 08 at HEAD too (7 and 1 `not ok`); the new `auth_can_become()` assertion also catches the SET-only form by SET ROLE.
+- **Plants for pgTAP 10** are in `tests/db/pgtap.test.ts` (each also asserts the unplanted file is clean); the plan's `session-handle-pins.test.ts` plant runner became that. `session-handle-pins.test.ts` holds R0, R11, R6 service side and `withSession`.
+- **H3 canary** is in `session-handle-signin.test.ts` (console spies, headers, body), not `log-seceng`.
+- **Hooks contract chosen** (the ruling is silent): `withSession(handle, fn)` calls `fn(tx, row)` with the flat camelCase row `{ userId, sessionId, name, image, expiresAt }`; hooks builds `locals.session = { user: { id, name, image }, expiresAt }` from it. The gate is `tx.execute(sql\`SELECT app.second_step_required()\`)`.
+- **Plugin contract chosen**: the handle hook is `cookieLifetime().hooks.after[1]`; the attach call is `SELECT app.attach_session_handle($1, $2)` on `currentClient().client.query`, with an optional alias.
+- Files: `tests/db/{session-handle-enter,-attach,-definers,-signin,-paths,-pins}.test.ts`, `pgtap-membership.test.ts`, `pgtap/10_session_handle.sql`, `helpers/handle.ts`; `packages/auth/src/session-handle.test.ts`; `packages/tenancy/src/provision-person.test.ts`; `tests/layers/web-no-betterauth-sql.test.ts` and `fixtures/35-web-handle-entry/`; `apps/web/tests/e2e/handle-cookie.spec.ts`. `tests/db/auth-internal-session.test.ts` is deleted with the listener.

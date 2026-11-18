@@ -1,6 +1,6 @@
 // POLY-89c red gate (ruling 6eed53f8 (D1 = b); seceng conditions C-a..C-f). The database guards of R1, R3, R4, R6. Every title ends
-// [red if: <mutation>]. A refusal runs as poly_app and as the fixture login role poly_auth (R1.3: the harness creates it
-// with poly_app's grants by membership; roles.sql gains it only in POLY-149). A positive path runs as poly_app.
+// [red if: <mutation>]. A refusal runs as poly_app and as poly_auth, the real role from roles.sql (POLY-152: the old fixture role that
+// inherited poly_app's grants is gone; the harness only sets its password). A positive path runs as poly_app.
 // Each test works in its own rolled-back transaction on unique ids, so none depends on another's rows.
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
@@ -9,6 +9,7 @@ import { cloneMigrated } from './helpers/api';
 import { DB_PKG, server, url } from './helpers/pg';
 import { enterAs } from './helpers/second-step';
 import { must } from './helpers/sql';
+import { withHandle } from './helpers/handle';
 
 const pgmod = createRequire(join(DB_PKG, 'package.json'))('pg');
 const ROLES = ['poly_app', 'poly_auth'] as const;
@@ -215,7 +216,7 @@ describe('C13/R1.2 the session id never proves a session (forge cases)', () => {
   for (const role of ROLES) {
     it(`(a) ${role}: marker names another real session of the same user holding no grant and no fresh stamp: turning the flag off is refused [red if: a guard accepts the session id alone]`, async () => {
       const u = await seed({ enrolled: true });
-      const s = must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tk${n}${Math.random()}', now() + interval '1 day') RETURNING id`, db).rows[0]![0]!;
+      const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tk${n}${Math.random()}', now() + interval '1 day') RETURNING id`), db).rows[0]![0]!;
       const x = await marked(role, u.id, s, (q) => stepUpAttempt(q, u.id, false));
       expect(x).not.toBeNull();
       expect(msgOf(x)).not.toMatch(/does not exist/);
@@ -235,7 +236,7 @@ describe('C13/R1.2 the session id never proves a session (forge cases)', () => {
     it(`(c) ${role}: marker names another user's session that holds a fresh stamp: refused [red if: the stamp check omits user_id = app.current_user_id()]`, async () => {
       const victim = await seed({ enrolled: true });
       const attacker = await seed({ enrolled: true });
-      const s = must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${victim.id}', 'tk${n}${Math.random()}', now() + interval '1 day') RETURNING id`, db).rows[0]![0]!;
+      const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${victim.id}', 'tk${n}${Math.random()}', now() + interval '1 day') RETURNING id`), db).rows[0]![0]!;
       must(`UPDATE public.session SET recent_auth_at = now() WHERE id = '${s}'`, db);
       if (role === 'poly_auth') { // R5: the marker's user is the ROW's user, so this pairing cannot be forged; entering with the victim's token IS the victim (case d)
         const who = await marked(role, attacker.id, s, async (q) => (await q('SELECT app.current_user_id()::text AS u')).rows[0].u);
@@ -250,7 +251,7 @@ describe('C13/R1.2 the session id never proves a session (forge cases)', () => {
   }
   it('(d) passes BY DESIGN (seceng C-c, SECURITY R-2): the marker names the victim and the victim\'s own session stamped within 5 minutes, so the step-up check passes; web\'s word until POLY-149 [red if: the check starts demanding a proof only web could give, or the fresh window is not 300 s]', async () => {
     const victim = await seed({ enrolled: true });
-    const s = must(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${victim.id}', 'tk${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`, db).rows[0]![0]!;
+    const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${victim.id}', 'tk${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`), db).rows[0]![0]!;
     // the stamp is a superuser fixture write; no login role can make it (see the R1.4 grants test)
     const ok = await marked('poly_app', victim.id, s, async (q) => (await fails(q('SELECT app.set_two_factor_enabled($1)', [false]))));
     // allowed to refuse only for the last-method rule, never for freshness
@@ -320,7 +321,7 @@ describe('C8 email_challenge and enrolment_grant (R2)', () => {
   for (const role of AUTH_ONLY) {
     it(`${role}: issue_email_challenge needs a marker that carries a session, and a code is six digits, stored hashed, returned once [red if: issue_email_challenge is absent or stores the code]`, async () => {
       const u = await seed();
-      must(`INSERT INTO public.session (id, user_id, token, expires_at) VALUES ('${SID}', '${u.id}', 'tkc${n}${Math.random()}', now() + interval '1 day') ON CONFLICT DO NOTHING`, db);
+      must(withHandle(`INSERT INTO public.session (id, user_id, token, expires_at) VALUES ('${SID}', '${u.id}', 'tkc${n}${Math.random()}', now() + interval '1 day') ON CONFLICT DO NOTHING`), db);
       const code = await marked(role, u.id, SID, async (q) => (await q(`SELECT app.issue_email_challenge($1)`, ['first_enrolment'])).rows[0].issue_email_challenge);
       expect(code).toMatch(/^\d{6}$/);
     });
@@ -338,13 +339,13 @@ describe('R3 #3/#6/#5 guards on session, passkey, two_factor (C9, C15)', () => {
     });
     it(`${role}: UPDATE OF session.recent_auth_at is refused [red if: guard_recent_auth is absent]`, async () => {
       const u = await seed();
-      const s = must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tku${n}${Math.random()}', now() + interval '1 day') RETURNING id`, db).rows[0]![0]!;
+      const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tku${n}${Math.random()}', now() + interval '1 day') RETURNING id`), db).rows[0]![0]!;
       const x = await marked(role, u.id, s, (q) => fails(q(`UPDATE public.session SET recent_auth_at = now() WHERE id = $1`, [s])));
       expect(x).not.toBeNull();
     });
     it(`${role}: the unmarked sliding refresh (UPDATE session SET expires_at, updated_at) still commits and never stamps [red if: a session UPDATE guard needs the marker]`, async () => {
       const u = await seed();
-      const s = must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tkr${n}${Math.random()}', now() + interval '1 day') RETURNING id`, db).rows[0]![0]!;
+      const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tkr${n}${Math.random()}', now() + interval '1 day') RETURNING id`), db).rows[0]![0]!;
       const c = new pgmod.Client({ connectionString: url(role, db) });
       await c.connect();
       try {
@@ -425,7 +426,7 @@ describe('C-a sign-in under the carve-out (poly_app, 0013 applied)', () => {
     });
     it(`D1(b) ${role}: a MARKED backup_codes change with a fresh step-up commits, and a stamp older than 300 s does not [red if: the regenerate clause is absent or the window is wrong]`, async () => {
       const u = await seed({ enrolled: true });
-      const s = must(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tkb${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`, db).rows[0]![0]!;
+      const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tkb${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`), db).rows[0]![0]!;
       if (role === 'poly_app') { // R8: step_up_fresh left poly_app, so the guard's helper call is a permission refusal; the row must be unchanged
         const before = must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows;
         const x = await marked(role, u.id, s, (q) => fails(q(`UPDATE public.two_factor SET backup_codes = 'regen' WHERE user_id = $1`, [u.id])));
@@ -447,7 +448,7 @@ describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
       const owner = await seed({ enrolled: true });
       const ent = await shared(owner.id, `lm${owner.id}${role}`);
       must(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ('${ent}', '${owner.id}', 'owner') ON CONFLICT DO NOTHING`, db);
-      const s = must(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${owner.id}', 'tkl${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`, db).rows[0]![0]!;
+      const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${owner.id}', 'tkl${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`), db).rows[0]![0]!;
       const x = await marked(role, owner.id, s, (q) => fails(q(`DELETE FROM public.two_factor WHERE user_id = $1`, [owner.id])));
       expect(x).not.toBeNull();
       const viewer = await seed({ enrolled: true });
@@ -457,7 +458,7 @@ describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
   }
   it('the own-Person user with only an exempt Person may remove the last factor after a fresh step-up, and second_step_at clears [red if: refuse_last_method does not call own_person_exempt]', async () => {
     const u = await seed({ enrolled: true });
-    const s = must(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tke${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`, db).rows[0]![0]!;
+    const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tke${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`), db).rows[0]![0]!;
     await marked('poly_auth', u.id, s, async (q) => {
       await q(`DELETE FROM public.two_factor WHERE user_id = $1`, [u.id]);
       await q('SELECT app.set_two_factor_enabled($1)', [false]);
@@ -466,7 +467,7 @@ describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
   });
   it('race 1 (C-b): a last-factor delete racing a first invitation on the own Person: exactly one commits [red if: refuse_last_method does not lock the user row or reads before its lock]', async () => {
     const u = await seed({ enrolled: true });
-    const s = must(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tkx${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`, db).rows[0]![0]!;
+    const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tkx${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`), db).rows[0]![0]!;
     const open = async () => { const c = new pgmod.Client({ connectionString: url('poly_app', db) }); await c.connect(); const q = (t: string, v?: unknown[]) => c.query({ text: t, values: v, queryMode: 'extended' }); await q('BEGIN'); await q('SELECT app.enter_asserted_user($1, $2)', [u.id, s]); return { c, q }; };
     const a = await open();
     const b = await open();
@@ -579,7 +580,7 @@ describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect:
   for (const role of AUTH_ONLY) {
     it(`${role}: set_two_factor_enabled, issue_email_challenge and confirm_email_challenge refuse every text that is not exactly "SELECT app.<name>($1)": an alias, lower case, a comment, an extra column, a suffix, FROM [red if: the exact-call check admits an alias or is a regex that fails open on NULL]`, async () => {
       const u = await seed({ enrolled: false });
-      const s = must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tkx${n}${Math.random()}', now() + interval '1 day') RETURNING id`, db).rows[0]![0]!;
+      const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u.id}', 'tkx${n}${Math.random()}', now() + interval '1 day') RETURNING id`), db).rows[0]![0]!;
       for (const [f, args] of CALLS) {
         for (const text of variants(f)) {
           const x = await marked(role, u.id, s, (q) => fails(q(text, args)));

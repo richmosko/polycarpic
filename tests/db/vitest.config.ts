@@ -10,7 +10,8 @@ import { defineConfig } from 'vitest/config';
 //   runner         role-membership GRANT/REVOKE and cluster-wide pg_locks reads
 //   template-clone asserts the login roles' stored password hashes
 //   ops-hardening  a 4.8 s production timeout, not measured under contention
-export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts'];
+//   pgtap-membership role-membership GRANTs planted in pgTAP 08's rolled-back transaction (POLY-152 N2)
+export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts'];
 
 export default defineConfig({
   test: {

@@ -6,6 +6,7 @@ import { seedInvitation, tokenHash } from './helpers/invitation';
 import { count, signUpEntry, snapshot, tx } from './helpers/auth-tx';
 import { codeOf, fails, msgOf } from './helpers/second-step';
 import { must } from './helpers/sql';
+import { withHandle } from './helpers/handle';
 
 let db: string;
 beforeAll(() => { db = cloneMigrated(); });
@@ -56,7 +57,7 @@ describe('B3 refusals, each leaving entity and membership unchanged', () => {
     const u = uid();
     must(`INSERT INTO public."user" (id, name, email, email_verified) VALUES ('${u}', 'X', '${u}@qa.test', true)`, db);
     const tok = `t-${u}`;
-    must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u}', '${tok}', now() + interval '1 day')`, db);
+    must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${u}', '${tok}', now() + interval '1 day')`), db);
     await refused(() => tx(db, 'poly_auth', async (q) => { await q('SELECT app.enter_auth_session($1)', [tok]); return fails(q(PROV)); }));
   });
   it('under a web marker (poly_app) and with no marker at all [red if: provision_person is callable outside a sign-up]', async () => {

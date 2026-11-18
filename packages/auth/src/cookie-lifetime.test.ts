@@ -15,8 +15,8 @@ const ctxOf = (cookie: string, createdAt: Date) => {
 describe('the plugin', () => {
   it('its after-hook matcher accepts every path, including the sentinel path widenTwoFactorMatcher probes [red if: path-specific, which makes startup throw]', async () => {
     const h = (await load()).cookieLifetime().hooks.after;
-    expect(h).toHaveLength(1);
-    for (const p of ['/sign-in/email', '/get-session', '/sign-in/magic-link', '/__qa_sentinel__', '/']) expect(h[0]!.matcher({ path: p }), p).toBe(true);
+    expect(h).toHaveLength(2); // POLY-153 R5.1: [lifetime, handle], the handle hook joins the same plugin
+    for (const hook of h) for (const p of ['/sign-in/email', '/get-session', '/sign-in/magic-link', '/__qa_sentinel__', '/']) expect(hook.matcher({ path: p }), p).toBe(true);
   });
   it('it is the LAST plugin of authOptions and the service still starts with it [red if: not last]', () => {
     const o: any = authOptions({ secret: 'x'.repeat(40), baseURL: 'https://app.qa.test', tlsMode: 'real-domain', requireClientIp: false, sendMagicLink: async () => {} } as never);

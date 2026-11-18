@@ -9,6 +9,7 @@ import { signUpEntry, snapshot, tx } from './helpers/auth-tx';
 import { loadAllow } from './helpers/definers';
 import { codeOf, fails } from './helpers/second-step';
 import { must } from './helpers/sql';
+import { withHandle } from './helpers/handle';
 
 let db: string;
 beforeAll(() => { db = cloneMigrated(); });
@@ -101,7 +102,7 @@ describe('B1 no tenant reach through a victim\'s token (poly_auth reads session.
   it('as poly_auth: read another user\'s token, enter with it, each tenant table is refused 42501 and nothing changed [red if: any SELECT is granted or a policy names poly_auth]', async () => {
     const victim = uid();
     must(`INSERT INTO public."user" (id, name, email, email_verified) VALUES ('${victim}', 'V', '${victim}@qa.test', true)`, db);
-    must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${victim}', 'victim-${victim}', now() + interval '1 day')`, db);
+    must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${victim}', 'victim-${victim}', now() + interval '1 day')`), db);
     const before = snapshot(db, `SELECT (SELECT count(*) FROM public.entity), (SELECT count(*) FROM public.membership), (SELECT count(*) FROM public.session)`);
     await tx(db, 'poly_auth', async (q) => {
       const tok = (await q(`SELECT token FROM public.session WHERE user_id = $1`, [victim])).rows[0].token;
@@ -120,7 +121,7 @@ describe('B1 no tenant reach through a victim\'s token (poly_auth reads session.
   it('each granted definer called under that entry returns no tenant row [red if: a definer returns tenancy data]', async () => {
     const victim = uid();
     must(`INSERT INTO public."user" (id, name, email, email_verified) VALUES ('${victim}', 'V', '${victim}@qa.test', true)`, db);
-    must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${victim}', 'v2-${victim}', now() + interval '1 day')`, db);
+    must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${victim}', 'v2-${victim}', now() + interval '1 day')`), db);
     await tx(db, 'poly_auth', async (q) => {
       await q('SELECT app.enter_auth_session($1)', [`v2-${victim}`]);
       for (const call of ['SELECT app.step_up_fresh()', 'SELECT app.enrolment_grant_live()', 'SELECT app.current_user_id()', 'SELECT app.current_session_id()']) {

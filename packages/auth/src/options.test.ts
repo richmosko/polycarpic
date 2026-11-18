@@ -39,6 +39,13 @@ describe('pinned options (criterion 2)', () => {
     expect(ids.at(-1)).toBe('cookie-lifetime'); // R7: last in plugins[]
   });
 
+  it('R8: authOptions fixes the cookie prefix and attributes itself: __Secure-better-auth, secure, lax, Path=/api/auth, httpOnly; useSecureCookies stays false; cookieCache off  [red if: the defaults leak, or an input can change them]', () => {
+    expect(o.advanced?.cookiePrefix).toBe('__Secure-better-auth');
+    expect(o.advanced?.defaultCookieAttributes).toMatchObject({ secure: true, sameSite: 'lax', path: '/api/auth', httpOnly: true });
+    expect(o.advanced?.useSecureCookies ?? false).toBe(false);
+    expect(o.session.cookieCache?.enabled ?? false).toBe(false);
+  });
+
   it('deleteUser is off; sign-in with password on; a password reset revokes sessions; autoSignInAfterVerification unset  [red if: deleteUser enabled, revokeSessionsOnPasswordReset false, or auto sign-in on verify (H2)]', () => {
     expect(o.user?.deleteUser?.enabled ?? false).toBe(false);
     expect(o.emailAndPassword.enabled).toBe(true);

@@ -5,6 +5,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { BASE, boot, get, jar, post, teardown, url, PW, type Env, type Mode } from './helpers/auth';
 import { must } from './helpers/sql';
+import { withHandle } from './helpers/handle';
 
 vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o as any));
 
@@ -150,7 +151,7 @@ describe.each(modes)('route policy, %s mode', (mode) => {
     const u = e.seedUser({ twoFactor: true });
     // an enrolled user cannot finish /sign-in/email (held), so give them a session directly via the row and sign in unheld test path
     const t = `qa-tok-${Date.now()}`;
-    must(`INSERT INTO public.session (user_id, token, expires_at, created_at, updated_at) VALUES ('${u.id}', '${t}', now() + interval '1 day', now(), now())`, e.db);
+    must(withHandle(`INSERT INTO public.session (user_id, token, expires_at, created_at, updated_at) VALUES ('${u.id}', '${t}', now() + interval '1 day', now(), now())`), e.db);
     const cookie = await e.cookieForToken(t, auth);
     const r = await e.handle(get('/passkey/generate-register-options', cookie), auth);
     expect(r.status).toBe(403);
@@ -163,7 +164,7 @@ describe.each(modes)('route policy, %s mode', (mode) => {
     const u = e.seedUser({ password: false, secondStepAt: true });
     must(`INSERT INTO public.account (account_id, provider_id, user_id) VALUES ('g-${u.id}', 'google', '${u.id}')`, e.db);
     const t = `qa-tok2-${Date.now()}`;
-    must(`INSERT INTO public.session (user_id, token, expires_at, created_at, updated_at) VALUES ('${u.id}', '${t}', now() + interval '1 day', now(), now())`, e.db);
+    must(withHandle(`INSERT INTO public.session (user_id, token, expires_at, created_at, updated_at) VALUES ('${u.id}', '${t}', now() + interval '1 day', now(), now())`), e.db);
     const cookie = await e.cookieForToken(t, auth);
     const stepUp = Object.entries(e.A.AUTH_ROUTES as Record<string, any>).filter(([, r]) => r.class === 'step-up').map(([p]) => p);
     expect(stepUp.sort()).toEqual(['/change-email', '/link-social', '/passkey/delete-passkey', '/revoke-other-sessions', '/two-factor/disable', '/two-factor/generate-backup-codes', '/unlink-account'].sort());
@@ -199,16 +200,16 @@ describe.each(modes)('route policy, %s mode', (mode) => {
     expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`)).toBe(0);
   });
 
-  it('S17: the session cookie is __Host- prefixed, HttpOnly, Secure, SameSite=Lax, Path=/, no Domain  [red if: any attribute differs; if 1.7.18 cannot emit __Host- the builder reports it, seceng rules]', async () => {
+  it('S17/R8: the session cookie is __Secure- prefixed, HttpOnly, Secure, SameSite=Lax, Path=/api/auth, no Domain  [red if: any attribute differs]', async () => {
     const u = e.seedUser();
     const { res } = await e.signIn(u.email, auth);
     const sc = res.headers.getSetCookie().find((c) => /session_token/.test(c));
     expect(sc, 'no session cookie').toBeDefined();
-    expect(sc!).toMatch(/^__Host-/);
+    expect(sc!).toMatch(/^__Secure-better-auth\./);
     expect(sc!).toMatch(/;\s*HttpOnly/i);
     expect(sc!).toMatch(/;\s*Secure/i);
     expect(sc!).toMatch(/;\s*SameSite=Lax/i);
-    expect(sc!).toMatch(/;\s*Path=\//i);
+    expect(sc!).toMatch(/;\s*Path=\/api\/auth(;|$)/i);
     expect(sc!).not.toMatch(/;\s*Domain=/i);
   });
 });

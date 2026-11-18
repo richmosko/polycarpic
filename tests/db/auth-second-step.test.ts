@@ -97,13 +97,13 @@ describe('S10: the matcher patch finds its hook by behaviour', () => {
 });
 
 describe('S17: the two_factor cookie attributes', () => {
-  it('__Host- prefix, HttpOnly, Secure, SameSite=Lax, Path=/, no Domain  [red if: any attribute differs; the builder reports if 1.7.18 cannot, seceng rules]', async () => {
+  it('__Secure- prefix, HttpOnly, Secure, SameSite=Lax, Path=/api/auth, no Domain (R8)  [red if: any attribute differs or the prefix stays __Host-]', async () => {
     const u = e.seedUser({ twoFactor: true });
     const res = await paths['/sign-in/email'](u.email);
     const sc = res.headers.getSetCookie().find((c) => /two_factor/.test(c));
     expect(sc, 'no two_factor cookie').toBeDefined();
-    expect(sc!).toMatch(/^__Host-/);
-    for (const re of [/;\s*HttpOnly/i, /;\s*Secure/i, /;\s*SameSite=Lax/i, /;\s*Path=\//i]) expect(sc!).toMatch(re);
+    expect(sc!).toMatch(/^__Secure-better-auth\./);
+    for (const re of [/;\s*HttpOnly/i, /;\s*Secure/i, /;\s*SameSite=Lax/i, /;\s*Path=\/api\/auth(;|$)/i]) expect(sc!).toMatch(re);
     expect(sc!).not.toMatch(/;\s*Domain=/i);
   });
 });

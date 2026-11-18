@@ -7,6 +7,7 @@ import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { DB_PKG, url } from './pg';
 import { must } from './sql';
+import { withHandle } from './handle';
 
 export const pgmod = createRequire(join(DB_PKG, 'package.json'))('pg');
 export const ROLES = ['poly_app', 'poly_auth'] as const;
@@ -25,7 +26,7 @@ export const codeOf = (x: any): string | undefined => x?.code ?? x?.cause?.code;
 export async function enterAs(q: Q, db: string, role: Role, userId: string, sessionId: string | null): Promise<void> {
   if (role === 'poly_app') { await q('SELECT app.enter_asserted_user($1, $2)', [userId, sessionId ?? '00000000-0000-4000-8000-0000000089e1']); return; }
   const rows = sessionId ? must(`SELECT token FROM public.session WHERE id = '${sessionId}'`, db).rows : [];
-  const token: string = rows[0]?.[0] ?? (sessionId ? `no-such-session-${sessionId}` : must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${userId}', 'tk-auto-${Math.random()}', now() + interval '1 day') RETURNING token`, db).rows[0]![0]!);
+  const token: string = rows[0]?.[0] ?? (sessionId ? `no-such-session-${sessionId}` : must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${userId}', 'tk-auto-${Math.random()}', now() + interval '1 day') RETURNING token`), db).rows[0]![0]!);
   await q('SELECT app.enter_auth_session($1)', [token]);
 }
 /** A refusal that changed nothing: `snap` is read before and after, and the two must be equal (seceng §5.2: 42501 alone proves nothing). */
@@ -52,7 +53,7 @@ export function fixture(db: string, tag: number) {
   };
   /** A real session row (superuser fixture); `fresh` stamps recent_auth_at now. */
   const session = (userId: string, fresh = false): string =>
-    must(`INSERT INTO public.session (user_id, token, expires_at${fresh ? ', recent_auth_at' : ''}) VALUES ('${userId}', 'tk${next()}${Math.random()}', now() + interval '1 day'${fresh ? ', now()' : ''}) RETURNING id`, db).rows[0]![0]!;
+    must(withHandle(`INSERT INTO public.session (user_id, token, expires_at${fresh ? ', recent_auth_at' : ''}) VALUES ('${userId}', 'tk${next()}${Math.random()}', now() + interval '1 day'${fresh ? ', now()' : ''}) RETURNING id`), db).rows[0]![0]!;
   async function run<T>(role: Role, userId: string | null, sessionId: string | null, fn: (q: Q) => Promise<T>, commit: boolean): Promise<T> {
     const c = new pgmod.Client({ connectionString: url(role, db) });
     await c.connect();
