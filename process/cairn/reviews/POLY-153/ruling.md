@@ -4,7 +4,8 @@
 - Branch `feature/poly-153-web-enters-by-handle` @ 4cf108ca. better-auth and @better-auth/passkey 1.7.18; no pin changes.
 - The spike record `process/cairn/reviews/POLY-148/spike.md` (§1 H and C, §4, §7), `process/cairn/reviews/POLY-145/pricing.md` §1 blocks E and H, POLY-152's ruling (R5, R6, R7, R9) and verdict, and `process/DECISIONS.md` from 2026-11-13.
 - The tree as read today: `packages/auth/src/{handler,cookie-lifetime,session,web,recent-auth,options,route-policy,second-step}.ts`, `packages/auth/src/web/sessions.ts`, `apps/auth/src/*`, `apps/web/src/hooks.server.ts`, `packages/db/src/context.ts`, migrations 0011 and 0014, `apps/web/tests/e2e/serve.ts`, `tests/db/helpers/{e2e-auth,second-step}.ts`, the spike's `checks/check-handle.mjs`.
-- Criteria are C1–C6 in POLY-153's order.
+- seceng-153's review `process/cairn/reviews/POLY-153/ruling-review.md` @ 10bb1429 (ACCEPT on §2.1). This file replaces the ruling at 6c31284f whole. It takes in §2.1, §2.2, the lead's and seceng's condition on the harness revoke (R7.4), and the answers to the open questions.
+- Criteria are C1–C6 in POLY-153's order. qa's test conditions T1–T6 are in `ruling-review.md` §3 and bind like the tests named here.
 
 **Tags.** "(spike)" means measured in POLY-148. "(152)" means measured live in POLY-152 by backend-lead-152. "(code-read)" means read, not run. "(unmeasured)" means qa's red test measures it first; nothing below drops a control on an unmeasured claim, and a red test that contradicts one reopens this ruling (re-issued whole), it is not worked around.
 
@@ -12,7 +13,7 @@
 
 Web enters every transaction by `app.enter_session(handle)`, where the handle is the `__Host-poly_handle` cookie and the database holds only its SHA-256. Web stops calling the service's `/session` listener and stops calling `enter_asserted_user`. BetterAuth's cookies move to `__Secure-` and `Path=/api/auth`.
 
-**Not here (POLY-149):** revoking poly_app's EXECUTE on `enter_asserted_user` and its grants on BetterAuth's tables; dropping `enter_asserted_user`, `withTenant` and the `SessionUserId` brand from `packages/db`; the sign-in record; the growing lock; every doc but ARCH. This loop leaves all of poly_app's existing grants as they are. It only adds the four EXECUTEs in R2.
+**Not here (POLY-149):** revoking poly_app's EXECUTE on `enter_asserted_user` and its grants on BetterAuth's tables; dropping `enter_asserted_user`, `withTenant` and the `SessionUserId` brand from `packages/db`; the sign-in record; the growing lock; the docs, except ARCH (at the verdict) and SECURITY's current-state items this loop makes false (TB-15, R-2's `/session` sentence, the handle), which seceng edits at the build review (`ruling-review.md` §2.3). This loop leaves all of poly_app's existing grants as they are. It only adds the four EXECUTEs in R2.
 
 ## R1. `app.session_handle` (C1, C2)
 
@@ -51,7 +52,7 @@ app.session_handle (
   4. a handle row for `p_session` already exists → return **false** (refresh: the session keeps its handle);
   5. insert `(p_session, sha256(convert_to(p_handle,'UTF8')))`; return **true**.
 - **Why this is safe from poly_auth.** At rest every committed session has a handle (R5's deferred check), so step 4 refuses every committed session, including a victim's. The only sessions it can attach to are ones created in the caller's own transaction. So SQL as poly_auth can mint a web entry only by creating a new session row, which the POLY-149 sign-in record will log. It cannot read a hash (R1).
-- **This is my answer to seceng H2's "session created by this transaction".** Step 4 plus R5.2 gives the same result as a per-row stamp: a session that has no handle and is visible to the caller can only be one created in the caller's own transaction, since another transaction's uncommitted row is invisible and every committed row has a handle. It needs no new column on BetterAuth's table and no xid arithmetic across savepoints. The per-session uniqueness seceng asks for is the primary key on `session_id`. If seceng still wants an explicit stamp, see open question 6.
+- **This stands in for a per-session stamp (seceng H2; equivalence accepted, `ruling-review.md` §4 Q6).** Step 4 plus R5.2 gives the same result as a stamp: a session that has no handle and is visible to the caller can only be one created in the caller's own transaction, since another transaction's uncommitted row is invisible and every committed row has a handle. It needs no new column on BetterAuth's table and no xid arithmetic across savepoints. The per-session uniqueness is the primary key on `session_id`. Its condition is R5.2's catalog pin.
 - **Pinned with it (H2):** poly_auth holds no `UPDATE (id)` or `UPDATE (user_id)` on `session`, so it cannot re-point a session that has a handle to a victim. 0014 grants neither; pgTAP 08 keeps it so.
 - **Tests:**
   - attach to a committed session that has a handle → false, and its handle is unchanged;
@@ -92,6 +93,12 @@ app.session_handle (
 2. **The deferred check.** `CREATE CONSTRAINT TRIGGER session_needs_handle AFTER INSERT ON public.session DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION app.session_needs_handle()`. The function is owned by poly_authz, SECURITY DEFINER, with no EXECUTE for any login role. At commit it raises 23514 (`a session needs its handle`) if the session row still exists and has no handle row. **No role is exempt**, superuser fixtures included (R10).
    - It makes C5 structural on every path, listed or not: a session can never commit without its handle, and a held sign-in whose session was created and deleted in one transaction passes.
    - `SET CONSTRAINTS … IMMEDIATE` only makes it fire sooner, which refuses the insert; no runtime role can disable it.
+   - **Catalog pin (H2 rests on it).** A pgTAP block asserts:
+     - `session_needs_handle` exists on `public.session` and is a constraint trigger (`tgconstraint <> 0`);
+     - it is `DEFERRABLE INITIALLY DEFERRED`, with `tgenabled = 'O'`;
+     - its function `app.session_needs_handle()` is owned by poly_authz and executable by no login role (granted and effective).
+     
+     Two plants, each shown to fail it: the trigger dropped, and the trigger disabled.
    - That a deferred constraint trigger sees the hold's delete and the handle insert made under BetterAuth's savepoints is (unmeasured); the held sign-in tests measure it.
 3. **The four no-session sign-in paths** already run in one transaction of ours (code-read, `handler.ts`): `/sign-in/email` and `/passkey/verify-authentication` in `withSignInTx`; `/magic-link/verify` and `/callback/:id` in `withContextFreeTx`, as `USER_INSERTING`. Nothing changes there. **Test (C5):** a BEFORE INSERT trigger on `app.session_handle` that raises, planted by the test superuser. On each of the four paths and on `/sign-up/email`: the answer is 5xx; no `Set-Cookie` of either cookie; no `session` row for the user; the trigger dropped afterwards. Then the same with the plugin's attach call stubbed out (no insert): the commit fails 23514 and no session row stays.
 
@@ -113,15 +120,19 @@ All owned by poly_authz, SECURITY DEFINER, `SET search_path = ''`, EXECUTE poly_
 - `app.my_sessions() RETURNS TABLE (id uuid, user_agent text, ip_address text, created_at timestamptz, updated_at timestamptz, current boolean)`: the marker user's sessions, `current = (id = current_session_id())`. It returns **no token and no handle**.
 - `app.recent_auth_ok() RETURNS boolean`: the marker session's `recent_auth_at` is `<= now()` and `>= now() - interval '300 seconds'` (`step_up_fresh`'s predicate, which poly_app no longer holds after POLY-152 R8).
 - `app.revoke_my_session(p_id uuid) RETURNS void`: not the marker user's → P0002. Not the current session and not `recent_auth_ok()` → 42501 with message `step_up_required`. Otherwise `DELETE FROM public.session WHERE id = p_id AND user_id = current_user_id()`; the handle goes by cascade. Web maps P0002 → 404 and 42501 → 403 `step_up_required`. Revoking the current session also clears the handle cookie.
-- `packages/auth/src/web/sessions.ts` becomes calls to these three; its SQL on `public.session` is removed. **Web sends no SQL that names `public.session`, `public.account`, `public.verification`, `public.two_factor`, `public.passkey` or `app.session_handle`**; the boundary test greps the files reachable from `apps/web`.
+- `packages/auth/src/web/sessions.ts` becomes calls to these three; its SQL on `public.session` is removed. **Web sends no SQL that names `public.session`, `public.account`, `public.verification`, `public.two_factor`, `public.passkey`, `public."user"` or `app.session_handle`**; the boundary test greps the files reachable from `apps/web`.
 - **Service side.** `packages/auth`'s `requireRecentAuth(sessionId)` becomes `SELECT app.step_up_fresh()` on the request's transaction (poly_auth holds it). That every caller runs inside `withAuthSession` is (unmeasured); the step-up route tests measure it, and outside one the answer is false, so it fails closed.
 
 ## R7. Web (C3, C6)
 
 1. **`withSession(handle, fn)`** in `packages/db` (root export, kind `withSession`, the poly_app pool). Its setup is the one statement `SELECT * FROM app.enter_session($1)`; `store.marked` is the row's `xid`, and the S6 pre-COMMIT check applies. `fn` receives `(tx, shell)`. A 42501 from the entry statement throws `NoLiveSession`. Extended mode only; the extended-mode test covers it and poly_auth's pools (the attach call).
-2. **`hooks.server.ts`.** It reads only `__Host-poly_handle`. If the cookie is absent → 303 to `/sign-in`. Otherwise one transaction, `withSession(handle, …)`: `provisionPerson(tx)` (it survives, now under a `session` marker, with today's retry-once on the unique race), then `app.second_step_required()`. `NoLiveSession` → clear the handle cookie, then 303 to `/sign-in`. The 503 "service unavailable" branch is removed. `event.locals.session = shell` and `event.locals.handle = handle`. `locals.identity` is removed.
+2. **`hooks.server.ts`.** It reads only `__Host-poly_handle`. If the cookie is absent → 303 to `/sign-in`. Otherwise one transaction, `withSession(handle, …)`: `provisionPerson(tx, shell.name)`. It survives, now under a `session` marker, with today's retry-once on the unique race. **It takes the name from `enter_session`'s returned row** and no longer reads `public."user"` (`packages/tenancy/src/index.ts:40`); a NULL or empty name gives `'Person'`, as today. So web's SQL names no BetterAuth table (`ruling-review.md` §2.1), then `app.second_step_required()`. `NoLiveSession` → clear the handle cookie, then 303 to `/sign-in`. The 503 "service unavailable" branch is removed. `event.locals.session = shell` and `event.locals.handle = handle`. `locals.identity` is removed.
 3. **Removed from web:** `loadSession`, `loadSessionFromService`, `completeSession`, `setAuthInternalOrigin`, the `SESSION_COOKIE` filter, every `withTenant` call and every `sessionUserId` import. `listMySessions`, `revokeMySession` and `myLandingEntity` take the handle and run in `withSession`. **eslint** refuses, in `apps/web/**` and `packages/auth/src/web*`: `@poly/db/session`, the import names `withTenant` and `sessionUserId`, and (N3) `better-auth` and `@better-auth/*`. The layer fixtures gain one failing case each.
-4. **Proof that web needs neither `enter_asserted_user` nor BetterAuth's tables.** In the e2e harness only, after seeding and before web starts, `serve.ts` runs as superuser: `REVOKE EXECUTE ON FUNCTION app.enter_asserted_user(uuid, uuid) FROM poly_app; REVOKE ALL ON public.session, public.account, public.verification, public.two_factor, public.passkey FROM poly_app;`. Every e2e spec must pass under it. This is a test-only measurement for POLY-149; **no migration revokes anything in this loop**.
+4. **Proof that web needs neither `enter_asserted_user` nor BetterAuth's tables.** In the e2e harness only, after seeding and before web starts, `serve.ts` runs as superuser: `REVOKE EXECUTE ON FUNCTION app.enter_asserted_user(uuid, uuid) FROM poly_app; REVOKE ALL ON public."user", public.session, public.account, public.verification, public.two_factor, public.passkey FROM poly_app;`. All six of BetterAuth's tables are covered. Every e2e spec must pass under it.
+   - **It is a measurement, not POLY-149's revocation. That holds only while all three of these do** (lead's condition; `ruling-review.md` §4 Q3):
+     1. The revoke lives only in `apps/web/tests/e2e/serve.ts`. It is never in `packages/db/sql/`, a migration, `roles.sql` or a fixture shared with `tests/db`.
+     2. No catalog test, pgTAP file or deploy-gate check runs against the e2e database or cites the e2e run as evidence of a revocation. pgTAP 08 and POLY-149's catalog test keep reading the migrated chain. INFRA §7.1 step 16's check must still fail on the real schema after this loop.
+     3. No migration, doc, STATE line or deploy-gate check says anything was revoked in this loop.
 
 ## R8. Cookie scope (C4)
 
@@ -172,18 +183,18 @@ All owned by poly_authz, SECURITY DEFINER, `SET search_path = ''`, EXECUTE poly_
 | Item | Ruled in | Disagreement |
 |---|---|---|
 | H1 stored hash replayed | R4 (plain-handle definer, one overload, tests), R3 (handle independent of the token) | none |
-| H2 handle minted for an existing session | R1 (no login role holds anything on the table), R3 (definer, PK on `session_id`, `UPDATE(id, user_id)` pinned absent), R5.2 | by mechanism only: a deferred check in place of a stamp (open question 6) |
+| H2 handle minted for an existing session | R1 (no login role holds anything on the table), R3 (definer, PK on `session_id`, `UPDATE(id, user_id)` pinned absent), R5.2 | none: the deferred check is accepted in place of a stamp, on R5.2's catalog pin |
 | H3 handle outliving its session; the slide | R1 (cascade, tested on each delete), R4 (cap and expiry checked in the definer; `enter_session` slides within the cap), R5.1 (never logged), C2 query (R1) | none |
 | H4 web receives BetterAuth's cookies | R8 | none |
 | H5 session without a handle | R5 (deferred check, the real INSERT forced to fail, the plugin pinned last, holds), R3 (refresh keyed on session id) | none |
-| H6 interim listener | R9 | none. The SECURITY TB-15 and R-2 text is POLY-149's docs |
+| H6 interim listener | R9 | none. seceng edits SECURITY TB-15 and R-2's `/session` sentence in this loop (R0) |
 | H7 session_id as proof | R4 (kind `session`; POLY-89 guards unchanged), R6 (the three definers require kind `session`; revoke checks the owner), R7.3 (`withTenant` unreachable from web) | none |
 
-## Open questions (for seceng unless marked; none blocks the tests)
+## Questions answered (none open)
 
-1. **R5.2 has no superuser exemption**, so eight fixture files change (about +0.25 loop-day, a guess). An exemption keyed on `session_user` being a superuser would grant no runtime role anything. I rule against it so that the check has no branch. Confirm.
-2. **R4's proof rule.** The marker's `session_id` is relied on only under kind `session`, and only by R6's three definers. Confirm that this, plus the explicit "POLY-89 guards unchanged", meets the standing constraint.
-3. **R7.4's harness revoke** is a measurement, not POLY-149's revocation. Lead to confirm it does not cross that line.
-4. **R3 generates the handle in Node** and sends it once to the definer. A definer-generated handle would keep it out of Node until the cookie is written, but it adds a random source in SQL (no migration installs pgcrypto; code-read). I prefer Node; confirm.
-5. **ARCH** (§3.1c, §3.3, §7, the `packages/auth` row of §2) is edited at the verdict, not before. The ruling contradicts none of it, except the interim items it marks as interim.
-6. **H2's stamp versus R5.2's deferred check.** I use the deferred "every session commits with its handle" check, together with step 4's "no handle yet", in place of a per-session stamp (R3). It needs no change to BetterAuth's table, and it also makes C5 structural. A stamp (`session.created_txid`, set by a trigger) would work too, but it has to compare a 32-bit `xmin`-style id across BetterAuth's savepoints, or add a column BetterAuth's adapter must ignore. Accept the equivalence, or name the stamp you want.
+1. **No superuser exemption in R5.2:** confirmed by seceng. The eight fixture files change (about +0.25 loop-day, a guess).
+2. **The proof rule (R4):** confirmed by seceng. T3 tests it: R6's definers refuse markers of kind `web` and `auth`.
+3. **R7.4's harness revoke:** allowed by the lead as a measurement, on R7.4's three conditions.
+4. **Handle generated in Node (R3, R5.1):** confirmed by seceng.
+5. **ARCH** (§3.1c, §3.3, §7, the `packages/auth` row of §2): agreed by the lead; edited at the verdict. The ruling contradicts none of it, except the interim items it marks as interim.
+6. **The deferred check in place of a stamp (R3):** accepted by seceng, on R5.2's catalog pin.
