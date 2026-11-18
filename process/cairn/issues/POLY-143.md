@@ -10,7 +10,7 @@ labels: [ci, tooling]
 priority: null
 pr: null
 created: 2026-11-12
-updated: 2026-11-16
+updated: 2026-11-18
 ---
 
 An umbrella for small CI and test-time items found in the POLY-141 and POLY-87 loops. None blocks a feature; each is taken when the `db` job's same-day median on `main` nears its 100 s warning budget, or when a loop is already in the files concerned. The timing rule these serve: a loop's cost is the branch's battery-step median minus `main`'s at the merge base, same session, at least three runs each (POLY-87 ruling, "Timing guard").
@@ -41,3 +41,10 @@ Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cair
 ### @team-lead — 2026-11-16
 
 From the POLY-89 loop (merged 2026-11-17, PR #131). (1) `ops-status` (30 tests) and `ops-hardening` (3) fail on a fresh checkout with `Failed to load tsconfig '$app/tsconfig': Tsconfig not found` (apps/web/src/ops/status.ts): `.svelte-kit/tsconfig.json` comes from `svelte-kit sync`, which a fresh worktree lacks. Run the sync before `tests/db`. (2) POLY-89 added about 17 s (32%) to the db suite: 70 s against 53 s on main, same day, two runs each, for 147 more tests in 4 files. Two of those files run serial because they share the poly_auth fixture role.
+
+### @team-lead — 2026-11-18
+
+From POLY-152 and PR #134:
+- **N5 (second sighting):** `svelte-kit sync` has to run before `tests/db` in a fresh worktree.
+- **Re-check by 2026-12-17:** the dependency audit ignores GHSA-fc5q-39xc-vjpf (`picomatch`, no patched release; `process/DECISIONS.md` 2026-11-17). `tests/ci/audit-exemption.test.ts` fails after that date. On or before it: check for a fixed release, then remove the `auditConfig.ignoreGhsas` entry in `pnpm-workspace.yaml` or move the date with a note here.
+- seceng's note on PR #134: the pin checks that the audit step and the guard step carry the same condition; narrowing both together would pass it.

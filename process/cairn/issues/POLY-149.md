@@ -11,7 +11,7 @@ labels: [security, auth]
 priority: P1
 pr: null
 created: 2026-11-13
-updated: 2026-11-17
+updated: 2026-11-18
 ---
 
 Stage 2 of POLY-145's decision (`process/cairn/reviews/POLY-145/pricing.md` §1 blocks S, E, H and D). BetterAuth, the auth secret and every grant on BetterAuth's tables move to a third process, `polycarpic auth`, on its own login role poly_auth, served on the same origin at `/api/auth/*`. Web enters a transaction only by handing the database a session handle. The database holds just a hash of that handle and checks it in `app.enter_session`; the interim definer from stage 1 is revoked. Once this ships, SQL injection in web, a stolen poly_app password and a read of the database at rest each reach no user, or only the requesting user. Code execution in web still reaches the users active while it runs (`comparison.md` §1). Because POLY-89 lands first, its guards and their fixtures move from poly_app to poly_auth transactions here.
@@ -67,3 +67,7 @@ Deploy gate (Principal, 2026-11-16; `process/DECISIONS.md`): no real household d
 ### @team-lead — 2026-11-16
 
 From the POLY-89 loop (merged 2026-11-17, PR #131). The poly_auth test fixture is created IN ROLE poly_app, so it does not model this stage's narrower role; replace it with the real role here (seceng, 2026-11-16).
+
+### @team-lead — 2026-11-18
+
+From POLY-152's close: INFRA §7.1 step 16 (the deploy-gate check) must also refuse when the growing lock or the sign-in record is missing, or when any login role can write to the record. devops-engineer adds it once this issue's ruling names the objects (seceng asked on 2026-11-18; criterion already listed above).
