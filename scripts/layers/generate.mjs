@@ -106,6 +106,19 @@ export function generateConfig(layers, opts = {}) {
     // POLY-140 condition 15(b): nothing builds a require function, so `module` is imported nowhere.
     for (const m of ['module', 'node:module']) paths.push({ name: m, message: 'node:module builds require functions that hide imports from the layer lint (POLY-140).' });
     banned.push('module', 'node:module');
+    // POLY-153 R7.3 (and POLY-152's N3): web enters by withSession alone and holds no BetterAuth. The same refusals cover the web-side
+    // files of packages/auth, which layers.json lets import db/session for other files.
+    const webSide = [
+      { name: '@poly/db/session', message: 'Web has no SessionUserId brand: it enters by withSession (POLY-153 R7.3).' },
+      { name: '@poly/db', importNames: ['withTenant', 'sessionUserId'], message: 'Web enters by withSession alone; withTenant and sessionUserId are not for web (POLY-153 R7.3).' },
+      { name: 'better-auth', message: 'Web holds no BetterAuth: the sign-in service is a separate process (POLY-152 N3, POLY-153 R7.3).' },
+    ];
+    const webSidePatterns = [{ group: ['better-auth/*', '@better-auth/*'], message: 'Web holds no BetterAuth: the sign-in service is a separate process (POLY-152 N3, POLY-153 R7.3).' }];
+    if (n === 'web') {
+      paths.push(...webSide);
+      patterns.push(...webSidePatterns);
+      banned.push('better-auth', 'better-auth/*', '@better-auth/*');
+    }
     // Every subpath is restricted by construction: only an explicit allow entry (db/auth) grants it.
     patterns.push({
       group: ['@poly/*/*', ...allowedSubs.map((s) => `!${s}`)],
@@ -134,6 +147,15 @@ export function generateConfig(layers, opts = {}) {
     rules['poly/no-require-factory'] = 2;
     rules['import-x/no-extraneous-dependencies'] = [2, { packageDir: [path.join(root, e.dir), root], devDependencies: true }];
     cfg.push({ name: `poly/restrictions/${n}`, files: [base(n)], plugins: { poly }, rules });
+    if (n === 'auth') {
+      // A later block replaces the rule whole, so it repeats the auth lists and adds web's refusals for packages/auth/src/web*.
+      cfg.push({
+        name: 'poly/restrictions/auth-web',
+        files: [`${e.dir}/src/web.ts`, `${e.dir}/src/web/**/*.ts`],
+        plugins: { poly },
+        rules: { 'no-restricted-imports': [2, { paths: [...paths, ...webSide], patterns: [...patterns, ...webSidePatterns] }] },
+      });
+    }
   }
 
   // POLY-128 R7 (SECURITY C-41, A-39): {@html} is refused in every .svelte file. noInlineConfig makes every inline

@@ -114,11 +114,12 @@ export function authOptions(input: AuthInput) {
     rateLimit: { enabled: true, storage: 'memory' as const, customRules },
     requireClientIp: input.requireClientIp,
     advanced: {
-      // __Host-: Secure, Path=/, no Domain. BetterAuth's own secure prefix is __Secure-, so the secure prefix is turned off
-      // and Secure forced on, with the prefix carried in the cookie name.
+      // POLY-153 R8: BetterAuth's six cookies are __Secure- and Path=/api/auth, so a page request to web never carries them. The
+      // web entry is the separate __Host-poly_handle cookie. BetterAuth's own secure prefix is turned off and Secure forced on, with
+      // the prefix carried in the cookie name. Fixed here, not in AuthInput.
       useSecureCookies: false,
-      cookiePrefix: '__Host-better-auth',
-      defaultCookieAttributes: { secure: true, sameSite: 'lax' as const, path: '/', httpOnly: true },
+      cookiePrefix: '__Secure-better-auth',
+      defaultCookieAttributes: { secure: true, sameSite: 'lax' as const, path: '/api/auth', httpOnly: true },
       database: { generateId: 'uuid' as const },
       // S19: one header, as Caddy writes it, one entry; no trustedProxies so BetterAuth's single-entry rule applies.
       ipAddress: { ipAddressHeaders: ['x-forwarded-for'], ipv6Subnet: 64 },

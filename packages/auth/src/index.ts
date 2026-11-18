@@ -12,7 +12,7 @@ export { AUTH_ROUTES, USER_INSERTING, SIGN_IN_PATHS, matchAuthPath, refusedByHan
 export { createRoutingPool } from './routing-pool.ts';
 export { requireRecentAuth } from './recent-auth.ts';
 export { handleAuthRequest, setDefaultAuth } from './handler.ts';
-export { handleSessionRequest, loadSession, listSessions, revokeSession, listMySessions, revokeMySession, myLandingEntity, HttpError, type ShellSession, type LoadedSession, type Identity } from './session.ts';
+export { listSessions, revokeSession, listMySessions, revokeMySession, myLandingEntity, HttpError, type ShellSession } from './session.ts';
 export { cookieLifetime } from './cookie-lifetime.ts';
 
 type Options = ReturnType<typeof authOptions>;

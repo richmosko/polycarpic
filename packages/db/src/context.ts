@@ -11,13 +11,28 @@ import type { SessionUserId } from './session.ts';
 export type Tx = NodePgDatabase;
 /** The handle withContextFreeTx passes: the one transaction kind that can enter a user it just inserted (R4). */
 export type ContextFreeTx = Tx & { enterNewUser(id: string): Promise<void> };
-type Kind = 'withTenant' | 'withSystem' | 'withContextFreeTx' | 'withOperatorTx' | 'withAuthSession' | 'withSignInTx';
+type Kind = 'withTenant' | 'withSession' | 'withSystem' | 'withContextFreeTx' | 'withOperatorTx' | 'withAuthSession' | 'withSignInTx';
 
 export class NestedContextError extends Error {
   constructor(inner: Kind, outer: Kind) {
     super(`${inner} cannot nest inside ${outer}`);
     this.name = 'NestedContextError';
   }
+}
+/** app.enter_session refused the handle (42501, one message for every case): no live session. */
+export class NoLiveSession extends Error {
+  constructor() {
+    super('no live session');
+    this.name = 'NoLiveSession';
+  }
+}
+/** What app.enter_session returns for the live session, camelCased (POLY-153 R4, R7.1). */
+export interface SessionShell {
+  userId: string;
+  sessionId: string;
+  name: string | null;
+  image: string | null;
+  expiresAt: Date;
 }
 export class NoPrincipalError extends Error {
   constructor(job: string) {
@@ -188,6 +203,28 @@ export async function withTenant<T>(userId: SessionUserId, sessionId: string, fn
     const res = await c.query('SELECT app.enter_asserted_user($1, $2)', [userId, sessionId]);
     store.marked = markedOf(res.rows[0]?.enter_asserted_user);
   }, fn);
+}
+
+/**
+ * A signed-in web request (POLY-153 R7.1): the cookie's plain handle goes to app.enter_session, which hashes it and writes the marker.
+ * The setup is that one statement; the row is the shell fn receives. A refusal is NoLiveSession.
+ */
+export async function withSession<T>(handle: string, fn: (tx: Tx, shell: SessionShell) => Promise<T>): Promise<T> {
+  if (typeof handle !== 'string') throw new TypeError('withSession: handle is required');
+  let shell: SessionShell | undefined;
+  return inTransaction('withSession', appPool, async (c, store) => {
+    let res: pg.QueryResult;
+    try {
+      // The canonical text, byte for byte (R4's exact-call check).
+      res = await c.query('SELECT * FROM app.enter_session($1)', [handle]);
+    } catch (e) {
+      if ((e as { code?: string }).code === '42501') throw new NoLiveSession();
+      throw e;
+    }
+    const row = res.rows[0] as { xid?: unknown; user_id: string; session_id: string; name: string | null; image: string | null; expires_at: Date | string } | undefined;
+    store.marked = markedOf(row?.xid);
+    shell = { userId: row!.user_id, sessionId: row!.session_id, name: row!.name, image: row!.image, expiresAt: new Date(row!.expires_at) };
+  }, (tx) => fn(tx, shell!));
 }
 
 /**

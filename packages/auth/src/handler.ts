@@ -6,6 +6,7 @@ import type { createAuth } from './index.ts';
 import { matchAuthPath, USER_INSERTING } from './route-policy.ts';
 import { cappedOut } from './recent-auth.ts';
 import { COMMIT_HEADER } from './anchor.ts';
+import { HANDLE_COOKIE } from './session-handle.ts';
 
 export type AnyAuth = Awaited<ReturnType<typeof createAuth>>;
 
@@ -114,9 +115,13 @@ export async function handleAuthRequest(request: Request, given: Promise<AnyAuth
   if (session && cappedOut(session.session.createdAt)) {
     await ctx.internalAdapter.deleteSession(session.session.token);
     session = null;
+    // The session cookie and the handle cookie are cleared together; the session row's delete took the handle row by cascade.
+    const headers = new Headers({ 'content-type': 'application/json' });
+    headers.append('set-cookie', clearingCookie(ctx.authCookies.sessionToken));
+    headers.append('set-cookie', `${HANDLE_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`);
     return new Response(JSON.stringify({ message: 'Unauthorized' }), {
       status: 401,
-      headers: { 'content-type': 'application/json', 'set-cookie': clearingCookie(ctx.authCookies.sessionToken) },
+      headers,
     });
   }
   if (session) {

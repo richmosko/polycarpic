@@ -1,6 +1,6 @@
-// Settings → Sessions and the step-up check, for web (POLY-152 R6.3). A web-side file: it imports `@poly/db` and `sql` only, never
-// better-auth and never `@poly/db/auth` (the boundary test resolves this file's imports transitively). The root of `@poly/auth`
-// re-exports listSessions and revokeSession for the in-process tests.
+// Settings → Sessions and the step-up check, for web (POLY-153 R6). A web-side file: it imports `@poly/db` and `sql` only, never
+// better-auth and never `@poly/db/auth`, and its SQL names no BetterAuth table: it calls the three definers (app.my_sessions,
+// app.recent_auth_ok through revoke_my_session, app.revoke_my_session), each of which requires a marker of kind `session`.
 import { sql, type Tx } from '@poly/db';
 
 export class HttpError extends Error {
@@ -23,33 +23,38 @@ export interface SessionRow {
   current: boolean;
 }
 
-const WINDOW_SECONDS = 300;
+interface PgLike {
+  code?: string;
+  message?: string;
+  cause?: unknown;
+}
+/** Drizzle may wrap the pg error: walk .cause for the one carrying the code. */
+function pgError(e: unknown): PgLike | null {
+  for (let cur: unknown = e, n = 0; cur && typeof cur === 'object' && n < 5; cur = (cur as PgLike).cause, n++) {
+    if (typeof (cur as PgLike).code === 'string') return cur as PgLike;
+  }
+  return null;
+}
 
-/** The caller's sessions: never the token. The session table has no RLS, so the filter is explicit. */
+/** The caller's sessions: never the token and never the handle. The definer scopes them to the marker's user. */
 export async function listSessions(tx: Tx): Promise<SessionRow[]> {
-  const res = await tx.execute<{ id: string; user_agent: string | null; ip_address: string | null; created_at: Date | string; updated_at: Date | string; current: boolean }>(sql`
-    SELECT id, user_agent, ip_address, created_at, updated_at,
-           (id::text = coalesce(app.current_session_id()::text, '')) AS current
-    FROM public.session WHERE user_id = app.current_user_id() ORDER BY created_at`);
+  const res = await tx.execute<{ id: string; user_agent: string | null; ip_address: string | null; created_at: Date | string; updated_at: Date | string; current: boolean }>(
+    sql`SELECT * FROM app.my_sessions()`,
+  );
   return res.rows.map((r) => ({ id: r.id, userAgent: r.user_agent, ipAddress: r.ip_address, createdAt: new Date(r.created_at), updatedAt: new Date(r.updated_at), current: r.current }));
 }
 
-/** Step-up: a session passes only within 5 minutes of its recent_auth_at, by the database's clock. A stamp in the future, or none, is refused. */
-async function requireFresh(tx: Tx, sessionId: string): Promise<void> {
-  const res = await tx.execute<{ age: number | null }>(sql`SELECT extract(epoch FROM (now() - recent_auth_at))::float8 AS age FROM public.session WHERE id = ${sessionId}::uuid`);
-  const age = res.rows[0]?.age;
-  if (age == null || age < 0 || age > WINDOW_SECONDS) throw new HttpError(403, 'step_up_required');
-}
-
-/** Revokes by id for the caller. Another session than the current one is a step-up action; the current one is sign-out. */
+/**
+ * Revokes by id for the caller. Another session than the current one is a step-up action; the current one is sign-out. P0002 (not the
+ * caller's, or unknown) is 404; 42501 step_up_required is 403. Anything else is thrown as it came.
+ */
 export async function revokeSession(tx: Tx, id: string): Promise<void> {
-  const own = await tx.execute<{ current: boolean }>(sql`
-    SELECT (id::text = coalesce(app.current_session_id()::text, '')) AS current
-    FROM public.session WHERE id = ${id}::uuid AND user_id = app.current_user_id()`);
-  if (own.rows.length === 0) throw new HttpError(404, 'not_found');
-  if (!own.rows[0]!.current) {
-    const cur = await tx.execute<{ s: string }>(sql`SELECT coalesce(app.current_session_id()::text, '') AS s`);
-    await requireFresh(tx, cur.rows[0]!.s);
+  try {
+    await tx.execute(sql`SELECT app.revoke_my_session(${id}::uuid)`);
+  } catch (e) {
+    const p = pgError(e);
+    if (p?.code === 'P0002') throw new HttpError(404, 'not_found');
+    if (p?.code === '42501' && /step_up_required/.test(p.message ?? '')) throw new HttpError(403, 'step_up_required');
+    throw e;
   }
-  await tx.execute(sql`DELETE FROM public.session WHERE id = ${id}::uuid AND user_id = app.current_user_id()`);
 }
