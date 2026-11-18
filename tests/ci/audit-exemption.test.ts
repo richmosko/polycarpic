@@ -14,6 +14,12 @@ const text = readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8');
 const scratch = mkdtempSync(join(tmpdir(), 'poly-audit-exemption-'));
 afterAll(() => rmSync(scratch, { recursive: true, force: true }));
 
+// The override (used to show the date check fail) moves the clock forward only: the later of the real date and the override.
+const effectiveToday = (override?: string): string => {
+  const real = new Date().toISOString().slice(0, 10);
+  return override && override > real ? override : real;
+};
+
 describe('the audit exemption', () => {
   it('pnpm-workspace.yaml ignores exactly this one advisory  [red if: another GHSA is added or this one is dropped from the list]', () => {
     expect(parse(text).auditConfig).toEqual({ ignoreGhsas: [GHSA] });
@@ -22,8 +28,36 @@ describe('the audit exemption', () => {
   it('the re-check date has not passed  [red if: today is after the date in the comment; remove the entry or move the date with a note in the issue]', () => {
     const m = text.match(/Re-check for a fixed release by (\d{4}-\d{2}-\d{2})/);
     expect(m, 'the re-check date comment is missing').not.toBeNull();
-    const today = process.env.AUDIT_EXEMPTION_TODAY ?? new Date().toISOString().slice(0, 10); // the override exists to show the test fail
+    const today = effectiveToday(process.env.AUDIT_EXEMPTION_TODAY);
     expect(today <= m![1]!, `${GHSA} was to be re-checked by ${m![1]} (today ${today})`).toBe(true);
+  });
+
+  it('the override can move the clock forward only  [red if: a past AUDIT_EXEMPTION_TODAY silences the date check]', () => {
+    const real = new Date().toISOString().slice(0, 10);
+    expect(effectiveToday('2000-01-01')).toBe(real);
+    expect(effectiveToday('2999-01-01')).toBe('2999-01-01');
+    expect(effectiveToday(undefined)).toBe(real);
+  });
+
+  it('package.json carries no pnpm.auditConfig  [red if: a second ignore list is added where the test does not look]', () => {
+    const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'));
+    expect(pkg.pnpm?.auditConfig).toBeUndefined();
+    expect(pkg.auditConfig).toBeUndefined();
+  });
+
+  it('ci.yml runs the audit exactly as `pnpm audit --audit-level high` and these guards under the same condition  [red if: the guard step is dropped, its condition narrows, or the audit command gains a flag]', () => {
+    const ci = parse(readFileSync(join(ROOT, '.github/workflows/ci.yml'), 'utf8'));
+    const jobs = Object.values<any>(ci.jobs).filter((j) => (j.steps ?? []).some((s: any) => /\bpnpm audit\b/.test(s.run ?? '')));
+    expect(jobs.length).toBe(1);
+    const steps: any[] = jobs[0].steps;
+    const audits = steps.filter((s) => /\bpnpm audit\b/.test(s.run ?? ''));
+    expect(audits.length).toBe(1);
+    expect(audits[0].run.trim()).toBe('pnpm audit --audit-level high');
+    const guards = steps.filter((s) => /audit-exemption\.test\.ts/.test(s.run ?? ''));
+    expect(guards.length).toBe(1);
+    expect(guards[0].if).toBe(audits[0].if);
+    expect(guards[0].run).toMatch(/vitest run .*tests\/ci\/audit-exemption\.test\.ts/);
+    expect(guards[0]['continue-on-error']).toBeUndefined();
   });
 
   it('the production install holds no picomatch  [red if: a production dependency pulls picomatch into the image]', () => {
