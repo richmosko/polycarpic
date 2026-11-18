@@ -27,7 +27,7 @@ export const TAX_BY_KIND: Record<EntityKind, readonly TaxClassification[]> = {
  * app.current_user_id(); the Person takes `name` (a NULL or empty one gives 'Person'); with no user set the insert is refused (42501). No RETURNING: the new row's SELECT policy
  * cannot see the AFTER trigger's membership, so the id is read back in a second statement.
  */
-export async function provisionPerson(tx: Tx, ...[name]: [name?: string | null]): Promise<{ personId: string; created: boolean }> {
+export async function provisionPerson(tx: Tx, name?: string | null): Promise<{ personId: string; created: boolean }> {
   // The name is the marker user's own, from app.enter_session's row (POLY-153 R7.2): this function reads no BetterAuth table.
   const personName = typeof name === 'string' && name.trim() !== '' ? name : 'Person';
   const find = () =>
