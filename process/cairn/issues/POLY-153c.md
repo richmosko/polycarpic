@@ -1,7 +1,7 @@
 ---
 id: POLY-153c
 title: Handle entry tests
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-153
 blocked_by: [POLY-153b]
