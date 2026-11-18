@@ -45,3 +45,23 @@ describe('R7.4 the e2e harness revoke is a measurement, never a revocation (the 
   });
 });
 
+
+// The architect's condition (POLY-153 @ 1c317102): the catalog lookup must find exactly one function, the (uuid, uuid) asserted-user
+// entry, or serve.ts fails. Plants: zero matches, two matches, a wrong signature.
+describe('R7.4 the revoke target is exactly one function', () => {
+  it('serve.ts takes its target through revokeTarget and revokes only that [red if: the loop revokes whatever matches, or nothing]', () => {
+    const serve = readFileSync(join(ROOT, 'apps/web/tests/e2e/serve.ts'), 'utf8');
+    expect(serve).toMatch(/revokeTarget\(/);
+    expect(serve).not.toMatch(/for \(const \[fn\] of/);
+  });
+  it('the real signature passes; the plants (no row, two rows, another signature, the right name with other arguments) throw [red if: the revoke can silently do nothing]', async () => {
+    const { revokeTarget } = (await import('../../apps/web/tests/e2e/revoke-target.ts')) as { revokeTarget: (r: string[][]) => string };
+    const good = 'app.enter_asserted_user(uuid,uuid)';
+    expect(revokeTarget([[good]])).toBe(good);
+    expect(() => revokeTarget([])).toThrow(/found 0/);
+    expect(() => revokeTarget([[good], [good]])).toThrow(/found 2/);
+    expect(() => revokeTarget([[good], ['app.enter_asserted_other(uuid,uuid)']])).toThrow(/found 2/);
+    expect(() => revokeTarget([['app.enter_asserted_user(uuid)']])).toThrow(/not the/);
+    expect(() => revokeTarget([['app.enter_asserted_job(uuid,uuid)']])).toThrow(/not the/);
+  });
+});

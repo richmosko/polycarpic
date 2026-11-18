@@ -12,6 +12,7 @@ import { cloneMigrated, dbEnv, setRolePasswords } from '../../../../tests/db/hel
 import { ensureBootstrapLockDir, releaseBootstrapLockDir } from '../../../../tests/db/helpers/bootstrap-lock.ts';
 import { asUserSql } from '../../../../tests/db/helpers/marker.ts';
 import { must, startServer } from '../../../../tests/db/helpers/pg.ts';
+import { revokeTarget } from './revoke-target.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.E2E_PORT ?? 4173);
@@ -69,9 +70,8 @@ await close();
 // both here, after seeding and before web starts. This lives only in this file (never in a migration, roles.sql or a shared fixture),
 // and no catalog test reads this database.
 // The definer's name is reserved to packages/db/src/context.ts (poly/reserved-literal), so it is found in the catalog, not spelled here.
-for (const [fn] of must(`SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname LIKE 'enter_asserted%'`, db).rows) {
-  must(`REVOKE EXECUTE ON FUNCTION ${fn} FROM poly_app`, db);
-}
+const fn = revokeTarget(must(`SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname LIKE 'enter_asserted%'`, db).rows); // exactly one function, or this throws
+must(`REVOKE EXECUTE ON FUNCTION ${fn} FROM poly_app`, db);
 if (must(`SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname LIKE 'enter_asserted%' AND has_function_privilege('poly_app', p.oid, 'EXECUTE')`, db).rows[0]![0] !== '0') throw new Error('R7.4: poly_app still executes the asserted-user entry');
 must(`REVOKE ALL ON public."user", public.session, public.account, public.verification, public.two_factor, public.passkey FROM poly_app`, db);
 
