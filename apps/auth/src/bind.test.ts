@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 
 // The module is loaded OUTSIDE the refusal catch, so a missing file is a red test, never a vacuous "refused".
-const load = async (): Promise<(env: Record<string, string>) => { host?: string; socket?: string; port?: number }> => ((await import('./bind.ts')) as any).internalBind;
+const load = async (): Promise<(env: Record<string, string>) => { host?: string; path?: string; port?: number }> => ((await import('./bind.ts')) as any).internalBind;
 const bind = async (env: Record<string, string>) => (await load())(env);
 const refuses = async (env: Record<string, string>) => { const f = await load(); try { f(env); return null; } catch (e) { return e as Error; } };
 
