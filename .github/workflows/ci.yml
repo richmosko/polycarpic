@@ -310,6 +310,10 @@ jobs:
         if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true'
         run: pnpm audit --audit-level high
 
+      - name: Audit exemption guards
+        if: needs.changes.outputs.node == 'true' || needs.changes.outputs.image == 'true'
+        run: pnpm exec vitest run -c tests/ci/vitest.config.ts tests/ci/audit-exemption.test.ts
+
       - name: CI scripts and workflow-structure suite
         if: needs.changes.outputs.ci == 'true'
         run: pnpm exec vitest run -c tests/ci/vitest.config.ts
