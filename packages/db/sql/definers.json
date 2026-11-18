@@ -33,5 +33,11 @@
   { "function": "app.signup_stamp_cleared()", "owner": "poly_govern", "execute": [] },
   { "function": "app.reset_second_step(p_email text)", "owner": "poly_govern", "execute": ["poly_operator"] },
   { "function": "app.enter_auth_session(text)", "owner": "poly_authz", "execute": ["poly_auth"] },
-  { "function": "app.provision_person()", "owner": "poly_govern", "execute": ["poly_auth"] }
+  { "function": "app.provision_person()", "owner": "poly_govern", "execute": ["poly_auth"] },
+  { "function": "app.attach_session_handle(p_session uuid, p_handle text)", "owner": "poly_authz", "execute": ["poly_auth"] },
+  { "function": "app.enter_session(p_handle text)", "owner": "poly_authz", "execute": ["poly_app"] },
+  { "function": "app.session_needs_handle()", "owner": "poly_authz", "execute": [] },
+  { "function": "app.recent_auth_ok()", "owner": "poly_authz", "execute": ["poly_app"] },
+  { "function": "app.my_sessions()", "owner": "poly_authz", "execute": ["poly_app"] },
+  { "function": "app.revoke_my_session(p_id uuid)", "owner": "poly_authz", "execute": ["poly_app"] }
 ]
