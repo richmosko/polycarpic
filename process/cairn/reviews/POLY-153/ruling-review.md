@@ -55,3 +55,17 @@ R0 and the H6 row put every doc but ARCH on POLY-149. POLY-153b's own criterion,
 ## 5. Filings for the lead
 - **F1 (POLY-149, the sign-in record).** After this loop the web-entry credential is created in exactly one place, `app.attach_session_handle`. The record that no login role can change (DECISIONS 2026-11-17) should be written there, or by a trigger on `app.session_handle` INSERT, not by the service's code. SQL as poly_auth can skip code, but it cannot skip the definer. Then every session that can enter web leaves a line, including one minted by injected SQL. R12's "will be on POLY-149's record" holds only if the record is written that way.
 - **F2 (INFRA, a note for POLY-97 or §8.10).** A data-only `pg_restore --disable-triggers` skips R5.2's check. A restore must bring `app.session_handle` with `public.session`, or drop all sessions, so that no handle-less session survives one. This is not urgent: nothing is deployed, and a full restore creates the trigger after loading consistent data.
+
+## 6. The replacement ruling at `0cd43441`
+
+Read: `git diff 6c31284f 0cd43441 -- process/cairn/reviews/POLY-153/ruling.md`, plus INFRA §7.1 step 16's gate query and `packages/tenancy/src/index.ts:40`. **Verdict: ACCEPT `0cd43441`.** No finding.
+
+| Check | At `0cd43441` | Result |
+|---|---|---|
+| §2.1 web reads no BetterAuth table | R7.2: `provisionPerson(tx, shell.name)`, the name from `enter_session`'s row, `'Person'` on NULL or empty; R6's grep adds `public."user"`; R7.4 revokes all six tables | **Met.** The name web passes is the marker user's own, and `entity`'s insert policy still pins `self_user_id = current_user_id()`, so a caller-chosen name reaches only the caller's own Person. That is the same as today. |
+| §2.2 the catalog pin | R5.2: the trigger exists, is a constraint trigger, `DEFERRABLE INITIALLY DEFERRED`, `tgenabled = 'O'`; its function is owned by poly_authz and executable by no login role (granted and effective); two plants (dropped, disabled) each shown to fail | **Met**, as asked. |
+| Q3 condition 1: only in `serve.ts` | R7.4.1 | **Met.** |
+| Q3 condition 2: no check reads the e2e DB; the real gate still fails | R7.4.2, naming INFRA §7.1 step 16 | **Met.** I read the gate query. It counts poly_app's privileges on the six tables and on every `enter_*` except `enter_session`. On the migrated schema after this loop, poly_app still holds `enter_asserted_user` and its table grants, so the gate still prints a number above 0 and fails, as it must until POLY-149. |
+| Q3 condition 3: nothing claims a revocation | R7.4.3 | **Met.** My SECURITY edits at the build review will say nothing was revoked (R0, §2.3). |
+
+Also in this sha: R0 now places SECURITY's current-state items (TB-15, R-2's `/session` sentence, the handle) in this loop at my build review; §3's T1–T6 bind as tests; open questions 1–6 are closed as I answered them. Nothing else in the ruling changed.
