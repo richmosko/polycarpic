@@ -41,7 +41,7 @@ describe('the handle hook', () => {
     const c = ctxOf(`${SESSION}=v; Max-Age=604800; Path=/api/auth; HttpOnly`);
     await (await load()).hooks.after[1]!.handler(c);
     expect(queries).toHaveLength(1);
-    expect(queries[0]!.text.replace(/\s+/g, ' ').trim()).toMatch(/^SELECT app\.attach_session_handle\(\$1, \$2\)( AS \w+)?;?$/); // the exact call the definer compares
+    expect(queries[0]!.text.replace(/\s+/g, ' ').trim()).toMatch(/^SELECT app\.attach_session_handle\(\$1, \$2\);?$/); // the exact call the definer compares (R3 step 1: no alias)
     expect(queries[0]!.values[0]).toBe('sid-1');
     expect(queries[0]!.values[1]).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(queries[0]!.values[1]).not.toBe('t');

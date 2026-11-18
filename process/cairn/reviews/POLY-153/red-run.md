@@ -78,3 +78,20 @@ The forced handle-INSERT failure (`session-handle-signin`) and the forgery cases
 - **`serve.ts` finds the reserved definer in the catalog** (`proname LIKE 'enter_asserted%'`), not by name: `poly/reserved-literal` refuses the name outside `packages/db/src/context.ts`.
 - **A new SERIAL file** (`pgtap-membership`) for N2: role-membership GRANTs are cluster-wide state and `db-harness` C5 refuses them in a parallel file.
 - **Deleted:** `tests/db/auth-internal-session.test.ts` (the listener it tested is removed by R9); `DB_AREAS` and `db-areas.test.ts` follow.
+
+## Test fixes after the builder's 0015 report (nine defects; qa-engineer-153)
+
+Items 1–6 were test mechanics and are fixed without weakening: (1) the attach call is the exact text `SELECT app.attach_session_handle($1, $2)`, no alias (plugin unit test too); (2) `search_path` is matched by `'search_path=""' = ANY (proconfig)`; (3) the trailing-clause shape replaces the syntax-error one; (4) the second-marker test uses a savepoint; (5) and every marker count in `session-handle-enter` now compares before and after; (6) `::regprocedure`.
+
+**Expectations changed in pgTAP, for seceng's build review (each checked against the ruling):**
+
+| # | File | Was | Now | Ruling basis |
+|---|---|---|---|---|
+| 7 | `10_session_handle.sql` | no login role incl. poly_backup holds any privilege on `app.session_handle` | the four runtime roles and poly_migrator hold none; **poly_backup may SELECT (pg_read_all_data), holds no write** | R1 names poly_app, poly_auth, poly_worker, poly_operator; R12 "a backup reader holds hashes". Not loosened for anyone else. |
+| 8 | `10_session_handle.sql` | poly_authz holds nothing on the tenant tables | no write privilege on the five tables, no SELECT on entity, invitation, audit_event, notification; SELECT on `membership` allowed | `membership` SELECT is from 0003, not from this loop; R2 lists tenant tables as "gains none". Builder to confirm no new grant of 0015 reaches them. |
+| 9a | `04_tenancy.sql` #18 | BEFORE TRUNCATE trigger on 9 tables | 10 (adds `app.session_handle`) | R1 truncate trigger |
+| 9b | `07_identity_marker.sql` current_session_id EXECUTE | poly_app, poly_auth, poly_govern | adds poly_authz | R2 |
+| 9c | `07` enter_* set | four functions | adds `enter_session=>poly_app` | R2, R4 |
+| 9d | `07` marker readers | nine functions | thirteen: adds enter_session, my_sessions, recent_auth_ok, revoke_my_session (the ones reading tx_identity; `session_needs_handle` is not listed) | R4, R6 |
+
+Items 7, 8, 9 were set from the ruling before 0015 was pushed; they are re-run against the real migration and any difference is reported, not adjusted to fit.

@@ -20,10 +20,13 @@ SELECT ok(EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = 'app.session_hand
 SELECT ok(EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = 'app.session_handle'::regclass AND NOT tgisinternal AND tgtype & 32 = 32), 'a BEFORE TRUNCATE trigger is attached (refuse_truncate)');
 
 -- R1/R2: no login role holds anything on the table, effective (PUBLIC included); poly_authz holds SELECT and INSERT and nothing else.
-SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app','poly_auth','poly_worker','poly_operator','poly_backup','poly_migrator']) r
+SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app','poly_auth','poly_worker','poly_operator','poly_migrator']) r
   CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p
   WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = r) AND has_table_privilege(r, 'app.session_handle', p)), 0,
-  'effective: no login role holds any privilege on app.session_handle');
+  'effective: no runtime login role holds any privilege on app.session_handle (R1)');
+-- R12: a backup reader holds hashes (poly_backup reads every table through pg_read_all_data), which no function accepts as a handle; it never writes.
+SELECT is((SELECT count(*)::int FROM unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p WHERE has_table_privilege('poly_backup', 'app.session_handle', p)), 0,
+  'effective: poly_backup holds no write privilege on app.session_handle (SELECT only, as a backup reader, R12)');
 SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app','poly_auth','poly_worker','poly_operator']) r
   CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','REFERENCES']) p
   JOIN pg_attribute a ON a.attrelid = 'app.session_handle'::regclass AND a.attnum > 0 AND NOT a.attisdropped
@@ -52,10 +55,10 @@ SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND pg_get_function_identity_arguments(p.oid) ~ 'bytea'
   AND (has_function_privilege('poly_app', p.oid, 'EXECUTE') OR has_function_privilege('poly_auth', p.oid, 'EXECUTE')) AND p.proname NOT IN ('claim_invitations','accept_invitations')), 0,
   'no function a login role can execute takes a bytea other than the two invitation definers (no entry by hash)');
-SELECT is((SELECT array_agg(p.proname || ':' || pg_get_userbyid(p.proowner) || ':' || p.prosecdef::text || ':' || coalesce(p.proconfig::text, '') ORDER BY p.proname)
+SELECT is((SELECT array_agg(p.proname || ':' || pg_get_userbyid(p.proowner) || ':' || p.prosecdef::text || ':' || ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))::text ORDER BY p.proname)
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname IN ('enter_session','my_sessions','revoke_my_session','recent_auth_ok','attach_session_handle','session_needs_handle')),
-  ARRAY['attach_session_handle:poly_authz:true:{search_path=""}','enter_session:poly_authz:true:{search_path=""}','my_sessions:poly_authz:true:{search_path=""}',
-        'recent_auth_ok:poly_authz:true:{search_path=""}','revoke_my_session:poly_authz:true:{search_path=""}','session_needs_handle:poly_authz:true:{search_path=""}'],
+  ARRAY['attach_session_handle:poly_authz:true:true','enter_session:poly_authz:true:true','my_sessions:poly_authz:true:true',
+        'recent_auth_ok:poly_authz:true:true','revoke_my_session:poly_authz:true:true','session_needs_handle:poly_authz:true:true'],
   'the six are SECURITY DEFINER, owned by poly_authz, search_path = ''''');
 
 -- R2: poly_authz's added grants (and the two it must not get).
@@ -69,7 +72,8 @@ SELECT is((SELECT array_agg(c ORDER BY c) FROM unnest(ARRAY['id','user_id','toke
 SELECT ok(has_column_privilege('poly_authz', 'public.user', 'id', 'SELECT') AND has_column_privilege('poly_authz', 'public.user', 'name', 'SELECT') AND has_column_privilege('poly_authz', 'public.user', 'image', 'SELECT'), 'poly_authz reads user (id, name, image)');
 SELECT ok(has_function_privilege('poly_authz', 'app.current_session_id()', 'EXECUTE'), 'poly_authz executes current_session_id');
 SELECT is((SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) p
-  WHERE n.nspname = 'public' AND c.relname IN ('entity','membership','invitation','audit_event','notification') AND has_table_privilege('poly_authz', c.oid, p)), 0, 'poly_authz holds nothing on the tenant tables');
+  WHERE n.nspname = 'public' AND ((c.relname IN ('entity','membership','invitation','audit_event','notification') AND p <> 'SELECT') OR (c.relname IN ('entity','invitation','audit_event','notification') AND p = 'SELECT'))
+  AND has_table_privilege('poly_authz', c.oid, p)), 0, 'poly_authz gains nothing on the tenant tables: no write anywhere, and SELECT only on membership, which 0003 gave it (R2: this loop adds none)');
 
 -- H2 (R3): poly_auth cannot re-point a session that has a handle; no login role may rewrite a session's id or user.
 SELECT ok(NOT has_column_privilege('poly_auth', 'public.session', 'id', 'UPDATE') AND NOT has_column_privilege('poly_auth', 'public.session', 'user_id', 'UPDATE'), 'pinned absent: poly_auth UPDATE (id) and UPDATE (user_id) on session');
@@ -83,7 +87,7 @@ SELECT ok((SELECT tgdeferrable AND tginitdeferred FROM pg_trigger WHERE tgrelid 
 SELECT is((SELECT tgenabled::text FROM pg_trigger WHERE tgrelid = 'public.session'::regclass AND tgname = 'session_needs_handle'), 'O', 'session_needs_handle is enabled (tgenabled = O, fires in every session_replication_role origin)');
 SELECT ok((SELECT (tgtype & 1) = 1 AND (tgtype & 4) = 4 AND (tgtype & 2) = 0 FROM pg_trigger WHERE tgrelid = 'public.session'::regclass AND tgname = 'session_needs_handle'), 'it fires AFTER INSERT FOR EACH ROW');
 SELECT is((SELECT p.oid::regprocedure::text FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid WHERE t.tgrelid = 'public.session'::regclass AND t.tgname = 'session_needs_handle'), 'app.session_needs_handle()', 'it calls app.session_needs_handle()');
-SELECT is((SELECT pg_get_userbyid(p.proowner) FROM pg_proc p WHERE p.oid = 'app.session_needs_handle()'::regproc), 'poly_authz', 'session_needs_handle() is owned by poly_authz');
+SELECT is((SELECT pg_get_userbyid(p.proowner) FROM pg_proc p WHERE p.oid = 'app.session_needs_handle()'::regprocedure), 'poly_authz', 'session_needs_handle() is owned by poly_authz');
 SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app','poly_auth','poly_worker','poly_operator','poly_backup']) r WHERE has_function_privilege(r, 'app.session_needs_handle()', 'EXECUTE')), 0, 'effective: no login role executes session_needs_handle()');
 SELECT is((SELECT count(*)::int FROM information_schema.routine_privileges WHERE routine_schema = 'app' AND routine_name = 'session_needs_handle' AND grantee NOT IN ('poly_authz')), 0, 'granted: session_needs_handle() is granted to no role but its owner');
 

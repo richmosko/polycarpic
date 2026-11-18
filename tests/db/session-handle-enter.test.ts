@@ -109,7 +109,7 @@ describe('H1 a value that is not the plain live handle yields no marker and the 
 
 describe('the exact-call set (seceng #18 as stage 1)', () => {
   const shapes: [string, (h: string) => [string, unknown[]]][] = [
-    ['a second select item', (h) => ['SELECT * FROM app.enter_session($1), 1', [h]]],
+    ['a trailing clause', (h) => ['SELECT * FROM app.enter_session($1) LIMIT 1', [h]]],
     ['a subquery form', (h) => ['SELECT * FROM (SELECT * FROM app.enter_session($1)) s', [h]]],
     ['the literal form (no bound parameter)', (h) => [`SELECT * FROM app.enter_session('${h}')`, []]],
     ['a CTE form', (h) => ['WITH x AS (SELECT * FROM app.enter_session($1)) SELECT * FROM x', [h]]],
@@ -125,22 +125,24 @@ describe('the exact-call set (seceng #18 as stage 1)', () => {
     });
   }
   it('a superuser DO … SET LOCAL ROLE poly_app form is refused [red if: current_query() is not compared with the exact text]', async () => {
-    const { handle } = await live();
+    const { handle } = await live(); const m0 = markers();
     const r = psql(`BEGIN; SET LOCAL ROLE poly_app; DO $$ BEGIN PERFORM * FROM app.enter_session('${handle}'); END $$; ROLLBACK;`, db);
     expect(r.ok).toBe(false);
     expect(r.sqlstate).toBe('42501');
-    expect(markers()).toBe('0');
+    expect(markers()).toBe(m0);
   });
   it('a second marker in one transaction is refused and the first stays unique [red if: the marker check is absent]', async () => {
-    const a = await live(); const b = await live();
+    const a = await live(); const b = await live(); const before = markers();
     await asApp(async (q) => {
       await q(ENTER_SESSION, [a.handle]);
+      await q('SAVEPOINT second');
       const x = await fails(q(ENTER_SESSION, [b.handle]));
       expect(codeOf(x)).toBe('42501');
+      await q('ROLLBACK TO second'); // the refused statement aborted the transaction; the first marker is still the only one
       expect((await q('SELECT app.current_user_id() AS u')).rows[0].u).toBe(a.u.id);
-      await q('ROLLBACK');
+      expect((await q('SELECT count(*)::int AS n FROM app.tx_identity WHERE xid = pg_current_xact_id()')).rows[0].n).toBe(1);
     });
-    expect(markers()).toBe('0');
+    expect(markers()).toBe(before);
   });
   it('an entry after a write in the transaction is refused and the write is not kept [red if: the first-write check is absent]', async () => {
     const { u, handle } = await live();
@@ -153,16 +155,16 @@ describe('the exact-call set (seceng #18 as stage 1)', () => {
   });
   for (const role of ['poly_worker', 'poly_operator', 'poly_auth']) {
     it(`${role} has no EXECUTE and writes no marker [red if: EXECUTE is granted to ${role}]`, async () => {
-      const { handle } = await live();
+      const { handle } = await live(); const m0 = markers();
       const x = await asApp(async (q) => fails(q(ENTER_SESSION, [handle])), role);
       expect(codeOf(x)).toBe('42501');
       expect(msgOf(x)).toMatch(/permission denied/);
-      expect(markers()).toBe('0');
+      expect(markers()).toBe(m0);
     });
   }
   for (const role of ['poly_app', 'poly_auth']) {
     it(`a two-statement string is refused on ${role}'s plain pool path (simple protocol) [red if: extended mode only is not enforced]`, async () => {
-      const { handle } = await live();
+      const { handle } = await live(); const m0 = markers();
       const c = new pgmod.Client({ connectionString: url(role, db) });
       await c.connect();
       try {
@@ -171,7 +173,7 @@ describe('the exact-call set (seceng #18 as stage 1)', () => {
         expect(x).not.toBeNull();
         await c.query('ROLLBACK').catch(() => {});
       } finally { await c.end(); }
-      expect(markers()).toBe('0');
+      expect(markers()).toBe(m0);
     });
   }
 });
@@ -203,9 +205,10 @@ describe('T1 / T2 the slide', () => {
   it('the slide runs after the marker insert: the entry succeeds as the first write, and a rolled-back entry leaves expires_at unchanged (T2) [red if: slide before the marker or a partial write survives]', async () => {
     const { id, handle } = await live({ expiresInDays: 1 });
     const before = row(id);
+    const markersBefore = markers();
     await asApp(async (q) => { await q(ENTER_SESSION, [handle]); }); // asApp rolls back
     expect(row(id)).toEqual(before);
-    expect(markers()).toBe('0');
+    expect(markers()).toBe(markersBefore);
   });
   it('a capped session is refused and is not deleted by the definer [red if: the definer deletes]', async () => {
     const { id, handle } = await live({ createdDaysAgo: 31, expiresInDays: 3 });

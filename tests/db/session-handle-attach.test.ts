@@ -12,7 +12,7 @@ let db: string;
 let f: ReturnType<typeof fixture>;
 beforeAll(() => { db = cloneMigrated(); f = fixture(db, 1531); });
 
-const ATTACH = 'SELECT app.attach_session_handle($1, $2) AS ok';
+const ATTACH = 'SELECT app.attach_session_handle($1, $2)';
 const asAuth = <T>(fn: (q: Q) => Promise<T>, commit = false) => tx(db, 'poly_auth', fn, commit);
 const hashOfSession = (id: string) => must(`SELECT encode(handle_hash, 'hex') FROM app.session_handle WHERE session_id = '${id}'`, db).rows[0]?.[0] ?? null;
 const sessionCount = (id: string) => Number(must(`SELECT count(*) FROM public.session WHERE id = '${id}'`, db).rows[0]![0]);
@@ -23,23 +23,23 @@ describe('R3 attach_session_handle(session, handle): poly_auth only, new session
     const u = await f.user(); const h = newHandle(); let sid = '';
     await asAuth(async (q) => {
       sid = await newSession(q, u.id);
-      expect((await q(ATTACH, [sid, h])).rows[0].ok).toBe(true);
+      expect((await q(ATTACH, [sid, h])).rows[0].attach_session_handle).toBe(true);
     }, true);
     expect(hashOfSession(sid)).toBe(hashHex(h));
   });
   it('a committed session that has a handle: returns false and its hash is unchanged (refresh keeps its handle) [red if: step 4 is missing]', async () => {
     const u = await f.user(); const s = sessionWithHandle(db, u.id);
     const before = hashOfSession(s.id);
-    await asAuth(async (q) => { expect((await q(ATTACH, [s.id, newHandle()])).rows[0].ok).toBe(false); });
-    await asAuth(async (q) => { expect((await q(ATTACH, [s.id, newHandle()])).rows[0].ok).toBe(false); }, true);
+    await asAuth(async (q) => { expect((await q(ATTACH, [s.id, newHandle()])).rows[0].attach_session_handle).toBe(false); });
+    await asAuth(async (q) => { expect((await q(ATTACH, [s.id, newHandle()])).rows[0].attach_session_handle).toBe(false); }, true);
     expect(hashOfSession(s.id)).toBe(before);
   });
   it('T4: twice in one sign-in transaction for the same new session: the second is false and the first hash stays [red if: a second handle can be attached]', async () => {
     const u = await f.user(); const h1 = newHandle(); let sid = '';
     await asAuth(async (q) => {
       sid = await newSession(q, u.id);
-      expect((await q(ATTACH, [sid, h1])).rows[0].ok).toBe(true);
-      expect((await q(ATTACH, [sid, newHandle()])).rows[0].ok).toBe(false);
+      expect((await q(ATTACH, [sid, h1])).rows[0].attach_session_handle).toBe(true);
+      expect((await q(ATTACH, [sid, newHandle()])).rows[0].attach_session_handle).toBe(false);
     }, true);
     expect(hashOfSession(sid)).toBe(hashHex(h1));
   });
@@ -47,12 +47,12 @@ describe('R3 attach_session_handle(session, handle): poly_auth only, new session
     const u = await f.user();
     await asAuth(async (q1) => {
       const sid = await newSession(q1, u.id);
-      await asAuth(async (q2) => { expect((await q2(ATTACH, [sid, newHandle()])).rows[0].ok).toBe(false); });
+      await asAuth(async (q2) => { expect((await q2(ATTACH, [sid, newHandle()])).rows[0].attach_session_handle).toBe(false); });
       expect(hashOfSession(sid)).toBeNull();
     });
   });
   it('an unknown session id returns false (a held sign-in already deleted its session) [red if: step 3 raises or inserts]', async () => {
-    await asAuth(async (q) => { expect((await q(ATTACH, ['00000000-0000-4000-8000-000000153999', newHandle()])).rows[0].ok).toBe(false); });
+    await asAuth(async (q) => { expect((await q(ATTACH, ['00000000-0000-4000-8000-000000153999', newHandle()])).rows[0].attach_session_handle).toBe(false); });
   });
   it('a bad format is 22023 and NULL is 22004, each writing nothing [red if: the format or NULL check is absent]', async () => {
     const u = await f.user();

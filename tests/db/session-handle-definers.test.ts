@@ -136,8 +136,8 @@ describe('who may call them', () => {
     }
   }
   it('the three are SECURITY DEFINER owned by poly_authz with search_path = \'\' [red if: owner or search_path differs]', () => {
-    const rows = must(`SELECT p.proname, pg_get_userbyid(p.proowner), p.prosecdef, coalesce(p.proconfig::text, '') FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname IN ('my_sessions','recent_auth_ok','revoke_my_session') ORDER BY 1`, db).rows;
+    const rows = must(`SELECT p.proname, pg_get_userbyid(p.proowner), p.prosecdef, ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname IN ('my_sessions','recent_auth_ok','revoke_my_session') ORDER BY 1`, db).rows;
     expect(rows.map((r) => r[0])).toEqual(['my_sessions', 'recent_auth_ok', 'revoke_my_session']);
-    for (const r of rows) { expect(r[1]).toBe('poly_authz'); expect(r[2]).toBe('t'); expect(r[3]).toMatch(/search_path=""/); }
+    for (const r of rows) { expect(r[1]).toBe('poly_authz'); expect(r[2]).toBe('t'); expect(r[3]).toBe('true'); }
   });
 });
