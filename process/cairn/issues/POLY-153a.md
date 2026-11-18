@@ -1,7 +1,7 @@
 ---
 id: POLY-153a
 title: Handle entry ruling
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-153
 blocked_by: []
