@@ -1,7 +1,7 @@
 ---
 id: POLY-153a
 title: Handle entry ruling
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-153
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-153.md, process/cairn/reviews/POLY-153/**, pro
 stage: plan
 estimate.cost_usd: "6.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "4.1924"
+actual.tokens: 7948892
+actual.gate_cycles: 2
+actual.wall_clock: 21
+ratio: "0.70"
 labels: [security, auth]
 priority: null
 pr: null
