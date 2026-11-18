@@ -1,7 +1,7 @@
 ---
 id: POLY-152
 title: Sign-in service process
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-148, POLY-89]
@@ -11,7 +11,7 @@ labels: [security, auth]
 priority: P1
 pr: https://github.com/richmosko/polycarpic/pull/133
 created: 2026-11-17
-updated: 2026-11-17
+updated: 2026-11-18
 ---
 
 Loop 1 of stage 2 (split from POLY-149 on 2026-11-17; the Principal confirmed the split). BetterAuth, the auth secret and every grant on BetterAuth's tables move to a third process, `polycarpic auth`, on its own login role poly_auth, served on the same origin at `/api/auth/*`. Sign-up (POLY-87) and the second-step guards (POLY-89) and their fixtures move from poly_app to poly_auth transactions here. Web still enters by the stage-1 definer until POLY-153; poly_app's grants are revoked in POLY-149. Design source: `process/cairn/reviews/POLY-145/pricing.md` §1 block S and `process/cairn/reviews/POLY-148/spike.md`; the architect rules from the spike.
@@ -147,3 +147,7 @@ Correction to my comment of f16e92d1, part (a), from qa's measurement at 454660d
 ### @team-lead — 2026-11-17
 
 PR opened: https://github.com/richmosko/polycarpic/pull/133. Gate sha af6f69de (qa clean-tree run, seceng ACCEPT, architect APPROVE). Awaiting CI and the Principal's merge decision.
+
+### @team-lead — 2026-11-18
+
+Validate passed; merging via PR #133. Closing.

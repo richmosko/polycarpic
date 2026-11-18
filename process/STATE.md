@@ -15,13 +15,9 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** Sign-in service process
-- **Issue:** `POLY-152` (cairn)
-- **Milestone:** `POLY-M1`
-- **Branch:** `feature/poly-152-sign-in-service`
-- **Started:** 2026-11-17
-- **Goal:** BetterAuth, the auth secret and every grant on BetterAuth's tables move to a third process, `polycarpic auth`, on its own role poly_auth at `/api/auth/*`; sign-up and the second-step guards run in its transactions. Loop 1 of 3 of stage 2 (then POLY-153, then POLY-149, the revocation).
-- **Status:** In Review — PR [#133](https://github.com/richmosko/polycarpic/pull/133)
+_None. POLY-152 (Sign-in service process) merged 2026-11-18 via PR [#133](https://github.com/richmosko/polycarpic/pull/133) — ARCH 1.19.0, SECURITY 1.10.2, INFRA 1.3.14; follow-ups on POLY-153, POLY-149, POLY-137, POLY-97 and POLY-143._
+
+_Standing context. POLY-152 is loop 1 of 3 of stage 2. BetterAuth, the auth secret and every grant on BetterAuth's tables are in a third process, `polycarpic auth`, on role `poly_auth` at `/api/auth/*`; web imports only `@poly/auth/web` and asks the service's internal `/session` listener who a cookie belongs to. Web still enters by `enter_asserted_user` until POLY-153, and `poly_app`'s old grants are revoked in POLY-149, so SECURITY R-2 and the deploy gate stand unchanged. The record is `process/cairn/reviews/POLY-152/`. Decided by the Principal on 2026-11-17 (`process/DECISIONS.md`) and not yet built: the second-step lock grows (15 minutes doubling to 24 hours) and an uneditable record keeps sign-ins, failed second-step tries and locks for 400 days, both on POLY-149 and both in the deploy gate; a cap after 3 locks with an emailed code, and a notice at the first lock, on POLY-137. The `picomatch` advisory is exempted from the dependency audit until 2026-12-17 (PR [#134](https://github.com/richmosko/polycarpic/pull/134)); a CI test fails after that date. Not yet done: no live Caddy probe of the new routing, and the auth container's memory caps are estimates (POLY-97)._
 
 _Standing context. POLY-89 (Second sign-in step) merged 2026-11-17 via PR [#131](https://github.com/richmosko/polycarpic/pull/131) — ARCH 1.17.0, SECURITY 1.9.22. Owners and managers need a second factor, enforced by database guards read from the POLY-147 marker; enrolment is anchored on the password plus an emailed code; `polycarpic cli user reset-mfa` is the operator reset. The record is `process/cairn/reviews/POLY-89/`. Open after it: no enrolment screens exist, so nobody can enrol in a browser and no one can create a non-Person entity or send an invitation (fails closed); nothing writes `recent_auth_at` after first enrolment, so an enrolled user cannot add or remove a method after 5 minutes; the emailed code cannot be sent until the mailer exists (POLY-137); backup codes stay on with the copy risk accepted until POLY-149's revocation (`process/DECISIONS.md`, 2026-11-16). Follow-ups are on POLY-150 (second-step screens), POLY-151 (the Confirm it's you route), POLY-91, POLY-115, POLY-137, POLY-143 and POLY-149._
 
