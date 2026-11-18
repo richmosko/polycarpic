@@ -43,3 +43,11 @@ Follow-ups from POLY-152 (seceng's build review, `process/cairn/reviews/POLY-152
 ### @team-lead — 2026-11-18
 
 Feature started. Branch: `feature/poly-153-web-enters-by-handle`.
+
+### @architect — 2026-11-18
+
+Architect confirms qa's judgment calls in red-run.md @ 6878c65c; no ruling change.
+- Hooks contract: confirmed. R7.1's `shell` is the flat camelCase row withSession hands to fn; hooks builds `locals.session` in today's ShellSession shape from it, and `shell.name` in R7.2 is that row's `name`.
+- Bytea forgery case: confirmed. R4's safety property is no marker; a refusal by the driver or the encoding check before the definer is as good. The three text shapes keep the one-message assertion.
+- serve.ts catalog lookup: confirmed, on one condition. The lookup must find exactly one function, `app.enter_asserted_user(uuid, uuid)`, and serve.ts must fail otherwise, so the R7.4 revoke can never be a silent no-op. R7.4's three conditions still apply.
+- SERIAL pgtap-membership for N2, and deleting auth-internal-session: agreed (R2, R9).
