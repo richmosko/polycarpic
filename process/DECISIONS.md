@@ -708,3 +708,12 @@ Add new decisions ABOVE this comment, newest first.
 **Cost:** about half a day for the sign-in lines (the architect's guess) and about a quarter day for the failed tries (seceng's guess); one small row per sign-in, and about 11 rows a day per person under attack (about 6 MB a year for ten people under constant attack).
 **Why failed tries and 400 days:** the per-address limit lives in memory and sees one address at a time, so nothing durable shows a guessing attack or one address trying several people; alerts and any later blocking need that data. Addresses are personal data, so the record has a retention period: 400 days covers a full year plus a margin (the lead's reading of seceng's proposal); a shorter period was offered and not taken.
 **Approved by:** the Principal (2026-11-17), on seceng's recommendation.
+
+### 2026-11-17 — The picomatch advisory is exempted from the dependency audit until 2026-12-17
+**Decision:** CI's dependency audit ignores GHSA-fc5q-39xc-vjpf (`picomatch`, high, no patched release) and nothing else, through `auditConfig.ignoreGhsas` in `pnpm-workspace.yaml` (PR #134). `tests/ci/audit-exemption.test.ts` fails if the ignore list is anything but that one advisory, if the date is after 2026-12-17, or if `picomatch` appears in the production install. On or before that date someone checks for a fixed release and either removes the entry or moves the date.
+**Why:** the advisory failed the `lint` job on every pull request and on `main`. `picomatch` is in development and CI tools only; the app image installs production dependencies and has none (`pnpm audit --prod --audit-level high` exits 0, checked by the lead and seceng). The attack needs an attacker-written pattern, and ours are in our own config files, so the worst case is a hung CI job.
+**Alternatives considered:**
+- Force a fixed version — none exists; an unreleased patch would run unreviewed code in CI.
+- Audit production dependencies only — hides every future advisory in the tools that build the images.
+- Wait for a fix — every pull request stays blocked with no date known.
+**Approved by:** the Principal (2026-11-17), on seceng's brief.
