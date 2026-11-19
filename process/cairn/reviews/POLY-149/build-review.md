@@ -96,3 +96,15 @@ Edited to the current state, with no history:
   - T-103 (an erased break-in) and T-104 (second-step guessing);
   - the §9 sign-in-record bullet.
 - **R-26:** the lock is in place, with its lengths. The cap waits on POLY-137.
+
+## 6. The architect's N1: `app.sign_in_address` is labelled IMMUTABLE but calls a STABLE function. I agree it does not block.
+
+**It has no security consequence** (code-read and spec):
+- **The result cannot change with a setting.** `pg_input_is_valid` is STABLE because some types' input depends on settings, such as `DateStyle` for dates. `inet` input reads no setting, so for this call the result depends on the argument alone. The label is wrong in general but true for this use.
+- **Nothing relies on the label in a way that matters here.**
+  - Both callers pass a runtime value: `NEW.ip_address`, or the transaction setting. The planner has no constant to fold.
+  - The function has a `SET search_path` clause, and a SQL function with one is never inlined.
+  - No index, generated column or constraint uses it, so there is nothing a wrong label could leave stale.
+- **The worst a wrong label could do** is make the record store, or drop, an address that a strictly computed check would have treated differently. The address is the service's word in any case (C-89). It never affects whether a row is written, its kind, user, time or lock length, or anything the lock guard decides.
+
+**Agreed:** relabel it STABLE when it is next touched, and move pgTAP 12's pin with it. This is not a change for this PR.
