@@ -180,7 +180,7 @@ The deploy-gate check (devops, in this loop) exits non-zero and prints each fail
    6. `SET ROLE poly_authz`: `enter_session` (R4);
    7. `SET ROLE poly_owner`: triggers `session_80_sign_in_record`, `two_factor_15_lock` and `two_factor_16_lock_delete`; revoke the temporary EXECUTEs.
 2. **`0017_revocation`** (custom), as poly_owner: the REVOKEs and the policy drop (R1); `SET ROLE poly_authz`: `DROP FUNCTION app.enter_asserted_user(uuid, uuid)`; `SET ROLE poly_owner`: delete `web` markers, the kind CHECK; `SET ROLE poly_govern`: `audit_membership`; ends on poly_owner.
-3. `definers.json`: adds `record_session_sign_in`, `guard_second_step_lock`, `guard_second_step_lock_delete`, `purge_sign_in_record`; drops `enter_asserted_user`.
+3. `definers.json`: adds `record_session_sign_in`, `guard_second_step_lock`, `purge_sign_in_record` (the two invokers are pinned in pgTAP 12 instead, Addendum 1); drops `enter_asserted_user`.
 4. Nothing is deployed, so no data moves. Two files so the controls stand alone if the loop is cut (R9).
 5. R9 of POLY-152 (what a refused code commits) now also commits trigger writes to `app.sign_in_record` and `app.second_step_streak`. The statement-log test is unaffected: those writes are not statements the service sends.
 
@@ -214,3 +214,8 @@ All guesses, scaled from POLY-153 ($27, about 3.5 h, one new mechanism); this lo
 3. **(lead)** R1 also revokes poly_app's read of `app.email_challenge`, beyond the criterion. Web has no reader.
 4. **(lead)** File a follow-up: schedule `purge_sign_in_record` and `purge_tx_identity` in the worker, logging each run's count (seceng A3.6). Neither has a caller.
 5. **(lead)** POLY-89's guards keep treating `current_session_id()` as narrowing only. With kind `web` gone every marker's session comes from a live row, so a later issue may rely on it; not in this loop.
+
+## Addendum 1 (qa's test plan at d3e72812, open points)
+
+1. **T-L3: step 1 holds.** During a lock, `UPDATE two_factor SET failed_verification_count = 0` (or any lower count) as poly_auth → 42501 `second_step_locked`, and the row reads back unchanged: count, `locked_until`, and the streak. That is one outcome, and the test pins it. seceng's own checklist asked for the same refusal (prep §A2.3: "any lowering of `failed_verification_count`" during a lock), so this changes nothing seceng accepted at 3725d22e. Outside a lock a lower count is allowed, and only the step-4 shape (count 0, both `locked_until` NULL) resets the streak.
+2. **`guard_second_step_lock_delete` is an invoker, so it leaves `definers.json`.** It must see the deleting role in `current_user` (poly_govern inside `reset_second_step`, poly_auth otherwise), and inside a definer `current_user` is always the owner. `definerGaps` lists `prosecdef` functions only, so listing it would fail with "on the allowlist, not in the catalog". R6.3 now adds three entries: `record_session_sign_in`, `guard_second_step_lock` and `purge_sign_in_record`. `sign_in_record_immutable` is an invoker for the same reason and was never listed. Instead, pgTAP 12 pins both invokers: owner poly_govern (delete guard) or poly_owner (immutable), `prosecdef = false`, search_path pinned to `''`, and no login role can execute them (granted and effective). This corrects a list; it does not change what seceng accepted.
