@@ -90,9 +90,9 @@ export const handle: Handle = async ({ event, resolve }) => {
     throw e;
   }
   // The sign-in gate (POLY-89 R5, POLY-150 R1.3): while the database says a second step is required, every page redirects to the Settings panel
-  // (where the set-up dialog opens) except exactly two paths: that page and its __data.json. Never a prefix: the rest of /settings stays gated.
+  // (where the set-up dialog opens, and returns to `next` after Finish, P2) except exactly two paths: that page and its __data.json. Never a prefix: the rest of /settings stays gated.
   if (entered.secondStepRequired && !SETUP_PATHS.has(pathname)) {
-    return new Response(null, { status: 303, headers: { location: `${SETUP_PATH}?setup=1` } });
+    return new Response(null, { status: 303, headers: { location: `${SETUP_PATH}?${new URLSearchParams({ setup: '1', next: safeNext(pathname + search) })}` } });
   }
   event.locals.session = entered.shell;
   event.locals.handle = handleValue;

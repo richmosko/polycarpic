@@ -15,7 +15,7 @@
 
   const go = () => location.assign(safeNext(new URLSearchParams(location.search).get('next')));
 
-  /** One verify call; the answer decides the next view. 401: no hold (expired); 429 with the lock code: locked; anything else wrong: one message. */
+  /** One verify call; the answer decides the next view. 401 with no valid hold cookie: expired; 429 with the lock code: locked; anything else wrong: one message. */
   async function verify(path: '/two-factor/verify-totp' | '/two-factor/verify-backup-code', value: string) {
     if (busy) return;
     busy = true;
@@ -23,7 +23,7 @@
     try {
       const r = await api('POST', path, { code: value });
       if (r.ok) return go();
-      if (r.status === 401) view = 'expired';
+      if (r.status === 401 && r.body.code === 'INVALID_TWO_FACTOR_COOKIE') view = 'expired';
       else if (r.status === 429 && r.body.code === 'ACCOUNT_TEMPORARILY_LOCKED') view = 'locked';
       else if (r.status === 429) error = 'Too many attempts. Wait a minute and try again.';
       else error = "That code didn't work. Check it and try again.";
