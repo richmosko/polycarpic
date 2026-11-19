@@ -120,6 +120,18 @@ must(`INSERT INTO public.passkey (name, public_key, user_id, credential_id, coun
 must(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE public.session SET recent_auth_at = now() - interval '1 hour' WHERE user_id = '${unaId}'; COMMIT;`, db);
 writeFileSync(join(here, '.auth', 'una.json'), JSON.stringify(state(una.verified)));
 writeSecret('una-secrets.json', { email: 'una@e2e.test', secret: una.secret, backupCodes: una.backupCodes, credentialId: unaKey.credentialId, publicKey: unaKey.publicKey, passkeyName: XSS });
+// Locked users for the lock-band checks (R7, D6 b): a TOTP factor whose lock has the given minutes left, set by a superuser statement in replica mode (the
+// guard does not fire), one user per band plus one for the fallback (the spec removes the band from the response).
+const lockUsers: Record<string, { email: string; secret: string }> = {};
+for (const [key, minutes] of [['lock30', 30], ['lock120', 120], ['lock600', 600], ['lockfb', 30]] as const) {
+  const email = `${key}@e2e.test`;
+  const id = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('${key}', '${email}', true) RETURNING id`, db).rows[0]![0]!;
+  must(`INSERT INTO public.account (account_id, provider_id, user_id, password) VALUES ('${id}', 'credential', '${id}', '${hash}')`, db);
+  const f = await enrolTotp(email);
+  must(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE public.two_factor SET locked_until = clock_timestamp() + interval '${minutes} minutes' WHERE user_id = '${id}'; COMMIT;`, db);
+  lockUsers[key] = { email, secret: f.secret };
+}
+writeSecret('lock-users.json', lockUsers);
 writeSecret('seeds.json', { password: PASSWORD, forgedAddress: '198.51.100.9', sharedEntityId: SHARED, sharedEntityName: 'Shared Co', testServer: server, db }); // the superuser read the address spec (R8) and the expiry checks use
 writeFileSync(join(here, '.auth', 'user.json'), JSON.stringify({ cookies, origins: [] }));
 await close();
