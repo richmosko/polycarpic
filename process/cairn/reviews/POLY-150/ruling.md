@@ -437,3 +437,8 @@ The rise over the earlier $72 is the extra design and review cycles, plus the di
   - R9 spec 1: Enid asks for `/dashboard`, is sent to the dialog, and lands on `/dashboard` after Finish;
   - a gate redirect for `//evil.example` carries `next=/`;
   - R1.2's unit test covers both callers.
+
+**R9 seeds and spec 2, corrected.**
+- **The seed.** Pia is not a manager. She is a non-held user whose only entity is her own Person, with no second step. R9's seed line becomes: "Enid: a manager with no second step who also manages 'Shared Co'. Pia: a user who owns only her own Person, with no second step and never held."
+- **Why spec 2 needs that.** A manager would be sent to Settings by the gate and would never see Entities' message. Spec 2 runs unchanged for Pia: `/entities` shows the message, and the dialog enrols her by passkey.
+- **The held case** stays Enid's, in spec 1.
