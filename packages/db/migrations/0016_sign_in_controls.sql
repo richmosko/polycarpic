@@ -254,12 +254,15 @@ CREATE OR REPLACE FUNCTION app.enter_session(p_handle text)
       RAISE EXCEPTION 'no live session' USING ERRCODE = '42501';
     END IF;
     INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_catalog.pg_current_xact_id(), v_user, v_session, 'session');
-    -- The slide (POLY-152 R7): at most once a day, never past the 30-day cap, and only when the expiry moves forward (N1).
+    -- The slide (POLY-152 R7): at most once a day, never past the 30-day cap, and only when the expiry moves forward (N1, Addendum 2).
     -- After the marker insert, so the first-write check holds.
     IF v_expires <= pg_catalog.now() + interval '6 days' THEN
       v_new := LEAST(pg_catalog.now() + interval '7 days', v_created + interval '30 days');
-      IF v_new > v_expires THEN
-        UPDATE public.session s SET expires_at = v_new, updated_at = pg_catalog.now() WHERE s.id = v_session;
+      -- Addendum 2: non-blocking and at most one write. The locked row's own expiry is compared (not the one read above), and a row
+      -- another transaction is sliding is skipped: this entry returns the expiry it read.
+      UPDATE public.session s SET expires_at = v_new, updated_at = pg_catalog.now()
+        WHERE s.id = (SELECT s2.id FROM public.session s2 WHERE s2.id = v_session AND s2.expires_at < v_new FOR UPDATE SKIP LOCKED);
+      IF FOUND THEN
         v_expires := v_new;
       END IF;
     END IF;
