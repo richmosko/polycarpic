@@ -87,18 +87,29 @@ SELECT is((SELECT array_agg(r ORDER BY r) FROM logins WHERE has_table_privilege(
 SELECT is((SELECT array_agg(r ORDER BY r) FROM logins WHERE has_column_privilege(r, 'public."user"', 'id', 'UPDATE')), NULL::text[], 'effective: no login role may UPDATE user.id');
 SELECT is((SELECT array_agg(r ORDER BY r) FROM logins WHERE has_table_privilege(r, 'public."user"', 'TRUNCATE')), NULL::text[], 'effective: no login role may TRUNCATE public."user"');
 
--- ===== T-L5: no clock a role can change =====
--- In public and app: every call of current_setting names one of three settings, none of them a clock; no function calls set_config.
-CREATE FUNCTION pg_temp.setting_reads() RETURNS text[] LANGUAGE sql AS $f$
-  SELECT coalesce(array_agg(DISTINCT p.oid::regprocedure::text || ' reads ' || m[1] ORDER BY p.oid::regprocedure::text || ' reads ' || m[1]), '{}')
-  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace, LATERAL regexp_matches(p.prosrc, 'current_setting\s*\(\s*''([^'']+)''', 'g') m
-  WHERE n.nspname = 'app' AND m[1] NOT IN ('app.actor','poly.client_ip','poly.user_agent','role') $f$; -- 'role' is read by three trigger helpers (measured, not a clock)
-SELECT is(pg_temp.setting_reads(), '{}'::text[], 'no function in app reads a setting other than app.actor, poly.client_ip, poly.user_agent and role (a clock override would be one)');
-SELECT is((SELECT array_agg(p.oid::regprocedure::text ORDER BY p.oid::regprocedure::text) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-  WHERE n.nspname = 'app' AND p.prosrc ~* 'current_setting' AND (SELECT count(*) FROM regexp_matches(p.prosrc, 'current_setting', 'gi')) <> (SELECT count(*) FROM regexp_matches(p.prosrc, 'current_setting\s*\(\s*''[^'']+''', 'gi'))), NULL::text[],
-  'every current_setting call in app has a literal name (no dynamic setting name)');
-SELECT is((SELECT array_agg(p.oid::regprocedure::text ORDER BY p.oid::regprocedure::text) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.prosrc ~* 'set_config'), NULL::text[],
-  'no function in app calls set_config (a clock override would need it)');
+-- ===== T-L5: no clock a role can change (Addendum 5) =====
+-- Scope: every function outside pg_catalog and information_schema, minus extension members (so pgTAP's own functions, and this file's pg_temp helpers, do not count).
+CREATE VIEW pg_temp.scope_fn AS
+  SELECT p.oid, p.oid::regprocedure::text AS sig, p.prosrc FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname NOT IN ('pg_catalog', 'information_schema') AND n.nspname NOT LIKE 'pg_temp%' AND n.nspname NOT LIKE 'pg_toast%'
+    AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e');
+-- 1. every current_setting call names one of four settings; the name is a literal
+SELECT is((SELECT coalesce(array_agg(DISTINCT sig || ' reads ' || m[1] ORDER BY sig || ' reads ' || m[1]), '{}') FROM pg_temp.scope_fn f, LATERAL regexp_matches(f.prosrc, 'current_setting\s*\(\s*''([^'']+)''', 'g') m
+  WHERE m[1] NOT IN ('app.actor','poly.client_ip','poly.user_agent','role')), '{}'::text[], 'no function reads a setting other than app.actor, poly.client_ip, poly.user_agent and role (a clock override would be one)');
+SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn f WHERE prosrc ~* 'current_setting' AND (SELECT count(*) FROM regexp_matches(prosrc, 'current_setting', 'gi')) <> (SELECT count(*) FROM regexp_matches(prosrc, 'current_setting\s*\(\s*''[^'']+''', 'gi'))), NULL::text[],
+  'every current_setting call has a literal name (no dynamic setting name)');
+-- 2. `role` is read by exactly the three POLY-89 commit-time trigger functions
+SELECT is((SELECT coalesce(array_agg(sig ORDER BY sig), '{}') FROM pg_temp.scope_fn WHERE prosrc ~* 'current_setting\s*\(\s*''role''' ),
+  ARRAY['app.require_enrolled_inviter()','app.require_second_step_for_role()','app.two_factor_consistent()'], 'current_setting(''role'') is read only by two_factor_consistent, require_second_step_for_role and require_enrolled_inviter');
+-- 3. the lock's own path reads only poly.client_ip and poly.user_agent
+SELECT is((SELECT coalesce(array_agg(sig || ' reads ' || m[1] ORDER BY sig || ' reads ' || m[1]), '{}') FROM pg_temp.scope_fn f, LATERAL regexp_matches(f.prosrc, 'current_setting\s*\(\s*''([^'']+)''', 'g') m
+  WHERE sig IN ('app.guard_second_step_lock()','app.guard_second_step_lock_delete()','app.record_session_sign_in()','app.sign_in_address(text)') AND m[1] NOT IN ('poly.client_ip','poly.user_agent')), '{}'::text[],
+  'the guard, the delete guard, the record writer and sign_in_address read only poly.client_ip and poly.user_agent');
+-- 4. no set_config, no pg_settings, no pg_show_all_settings anywhere in scope; no dynamic EXECUTE in the four
+SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn WHERE prosrc ~* 'set_config'), NULL::text[], 'no function calls set_config (a clock override would need it)');
+SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn WHERE prosrc ~* 'pg_settings|pg_show_all_settings'), NULL::text[], 'no function reads pg_settings or pg_show_all_settings');
+SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn WHERE sig IN ('app.guard_second_step_lock()','app.guard_second_step_lock_delete()','app.record_session_sign_in()','app.sign_in_address(text)') AND prosrc ~* '\mexecute\M'), NULL::text[],
+  'the four lock and record functions contain no dynamic EXECUTE (a string run that way escapes every text scan)');
 SELECT is((SELECT p.prosrc !~* 'clock_timestamp' FROM pg_proc p WHERE p.oid = to_regprocedure('app.guard_second_step_lock()')), false, 'the guard reads clock_timestamp(), not now() and no setting');
 
 ROLLBACK;
