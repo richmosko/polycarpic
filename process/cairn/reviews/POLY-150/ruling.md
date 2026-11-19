@@ -274,7 +274,10 @@ It takes a `confirm` function prop and has a component test with a stub. It foll
 **Wrong codes [S16].** One message each for a wrong TOTP code and a wrong backup code, with no count (D1).
 
 **The lock [S14].**
-- The screen shows what D6 picks. Under D6 (a) and as DESIGN draws it today, that is one `#locked` state: "Codes are paused for this account. Each pause lasts longer, from 15 minutes up to a day. Use a passkey, or try again later."
+- **D6 (b) is decided.** The lock refusal to a held sign-in carries `pausedFor` (`under_an_hour` | `a_few_hours` | `up_to_a_day`), returned as D6 sets out under its conditions.
+- The one `#locked` state reads: "Codes are paused for this account. Try again in under an hour" (or "in a few hours", or "within a day"), ". Use a passkey, or try again then."
+- With no `pausedFor` (a forged, expired or missing hold never gets one), it falls back to "Codes are paused for this account. Use a passkey, or try again later."
+- Tests are D6's list, plus a browser check that each band shows its wording.
 - The page never retries by itself and never offers anything that shortens a lock [S15].
 
 **`trustDevice`** is refused under D2 (a), the recommended option:
@@ -364,25 +367,27 @@ It takes a `confirm` function prop and has a component test with a stub. It foll
 
 The rise over the earlier $72 is the extra design and review cycles, plus the dialog. The main remaining time risk is e2e pacing under the shared rate limit.
 
-## Decisions for the Principal (still open; the build follows the recommended option unless told otherwise)
+## Decisions for the Principal (status as of 2026-11-19; `process/DECISIONS.md` @ 6f30441a)
 
-- **D1. Tries left.**
+Decided: D1 (a), D3 (a, Addendum 3), D4 (a), D5 (a), D6 (b). D2 goes to POLY-154; R7's refusal stands here. D7 (Addendum 3) is still open, pending seceng's assessment. A decided option is a rule the build follows.
+
+- **D1. Tries left. Decided: (a).**
   - **(a, recommended)** Show no count of wrong tries, as built: R2 returns no attempt count, and the hold page shows none. A count helps someone guessing more than the owner. Cost nil.
   - **(b)** Show "3 tries left". R2 returns `5 − attempts` for the emailed code, and the service adds the hold's remaining tries to the verify refusal. It reveals to a password holder how close the hold is to ending. About +$5 and 15 minutes (guess).
-- **D2. Trust this device.**
+- **D2. Trust this device. Decided:** offered, unticked, as its own issue POLY-154 (Addendum 2). Not built here; R7's refusal stands.
   - **(a, recommended)** No checkbox, and the service refuses `trustDevice` (R7). A device counts as known while its session lasts. Cost nil.
   - **(b)** A "Trust this device for 30 days" option. That browser then skips the second step on every new sign-in for 30 days, so a stolen browser profile or trust cookie bypasses it. SECURITY's session story changes, and the refusal goes. About +$4 and 15 minutes (guess).
-- **D3. Confirm it's you.**
+- **D3. Confirm it's you. Decided: (a).** Built in this loop, per Addendum 3, which replaces R6.
   - **(a)** Bring POLY-151 into this loop. It needs its own ruling first, because the database cannot check a TOTP code, so a stamp is the service's word. About +$35 and 1 h 45 min (guess), with a second ruling cycle on the critical path.
   - **(b, recommended)** The dialog in its interim state (R6): it says plainly it cannot confirm yet and has no inputs. About +$3, included in R11.
   - The failure is closed either way: until POLY-151, an enrolled user changes methods only in the first 5 minutes or by `reset-mfa`.
-- **D4. Sign-up asks for the emailed code.**
+- **D4. Sign-up asks for the emailed code. Decided: (a).**
   - **(a, recommended)** Like every first enrolment, because the database mints a grant only from a confirmed code. It costs an invitee one extra email, and nothing else.
   - **(b)** A grant minted from the invitation proof in the sign-up transaction: a new definer path with its own seceng review. About +$12 and 40 minutes (guess).
-- **D5. Passkey users get no backup codes.**
+- **D5. Passkey users get no backup codes. Decided: (a).** The passkey path ends with no codes, and one line says to add an authenticator app to get them.
   - **(a, recommended)** BetterAuth's codes belong to TOTP and work only inside a twoFactor hold, which a passkey-only user never meets. The dialog says "add an authenticator app to get backup codes". Cost nil.
   - **(b)** Our own codes for passkey users: a table, routes and a hold. That is its own issue, about one loop.
-- **D6. What a locked person is told.** Locks run 15 minutes, doubling up to 24 hours. A refusal during a lock does not count, so a password holder can already find the end by retrying, one sign-in per try under 5 a minute. The wording changes the effort, not the exposure, and the guess count is capped either way.
+- **D6. What a locked person is told. Decided: (b), three bands. This is a rule the build follows**, with seceng's conditions below: the band is read only through the signed-cookie check, and appears only on the lock refusal. No field is added with no hold, a forged hold, an expired hold, or a session. Locks run 15 minutes, doubling up to 24 hours. A refusal during a lock does not count, so a password holder can already find the end by retrying, one sign-in per try under 5 a minute. The wording changes the effort, not the exposure, and the guess count is capped either way.
   - **(a)** "Try again later", as drawn now. It reveals nothing and costs nothing. The usability cost is that a person locked for up to a day gets no idea how long to wait, and may retry or ask for a reset they do not need.
   - **(b, recommended)** A coarse band. On the lock refusal only, the service adds `pausedFor: 'under_an_hour' | 'a_few_hours' | 'up_to_a_day'` (under 60 minutes, under 6 hours, or longer). It reveals three bands, and so a rough doubling level for long locks. DESIGN's "later today" and "tomorrow" would need the user's time zone, which the service does not have, so the wording uses the bands. About +$6 and 20 minutes (guess).
   - **(c)** The exact end time, `pausedUntil`. It reveals the minute to resume, and from successive lengths whether the real user signed in correctly in between. About +$5 and 20 minutes (guess).
