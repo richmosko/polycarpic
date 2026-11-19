@@ -151,7 +151,10 @@ test.describe('R1.3 the gate while held (Lou)', () => {
       const r = await request.get(`${base}${p}`, { maxRedirects: 0 });
       expect([200, 303], `${p} answered ${r.status()}`).toContain(r.status());
       if (r.status() === 303) { held(r.headers()['location'], p.replace('/__data.json', ''), p); continue; }
-      const body = (await r.json()) as { type?: string; location?: string; nodes?: unknown };
+      const raw = await r.text();
+      const body = JSON.parse(raw) as { type?: string; location?: string; nodes?: unknown };
+      expect(Object.keys(body).sort(), `${p}: only type, location and status`).toEqual(['location', 'status', 'type']);
+      expect(raw, `${p}: no entity data in the body`).not.toContain(seed<{ sharedEntityName: string }>('seeds.json').sharedEntityName);
       expect(body.type, `${p}: the body is a redirect`).toBe('redirect');
       const to = new URL(body.location ?? '', base);
       expect(to.pathname, `${p}: to the set-up route`).toBe('/settings/second-step');
