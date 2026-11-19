@@ -114,7 +114,7 @@
 </section>
 
 {#if open === 'setup'}
-  <SecondStepSetup resume={s.step} next={page.url.searchParams.get('next')} onclose={() => (open = null)} />
+  <SecondStepSetup resume={s.step} next={page.url.searchParams.get('next')} offered={!data.held && page.url.searchParams.get('setup') === '1'} onclose={() => (open = null)} />
 {:else if open === 'newcodes'}
   <SecondStepSetup mode="newcodes" onclose={() => (open = null)} />
 {:else if open === 'removeApp' || open === 'addPasskey'}

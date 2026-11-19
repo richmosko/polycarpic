@@ -17,6 +17,7 @@
     title = mode === 'newcodes' ? 'Make new backup codes' : 'Set up a second step',
     subtitle = mode === 'newcodes' ? 'New codes replace the ones you have now.' : 'A second step keeps a stolen password from reaching your books. Owners and managers of shared entities need one.',
     next,
+    offered = false,
     onclose,
   }: {
     mode?: 'setup' | 'newcodes';
@@ -26,6 +27,8 @@
     subtitle?: string;
     /** After Done, go here (through safeNext). Absent: stay on the page that opened the dialog. */
     next?: string | null;
+    /** A viewer just after Sign up: set-up is optional, so step 1 offers Skip for now. */
+    offered?: boolean;
     onclose: () => void;
   } = $props();
 
@@ -256,10 +259,11 @@
                 <label for="ssd-pw">Password</label>
                 <input id="ssd-pw" class={field} type="password" autocomplete="current-password" placeholder="Password" bind:value={password} required />
               </div>
+              {#if offered}<p>You joined as a viewer, so this is optional for now. Owners and managers need one, and the first action that needs it asks again.</p>{/if}
               {#if mode === 'setup'}<p class="text-muted-foreground text-xs">Next we email you a code, then you choose an authenticator app or a passkey.</p>{/if}
               {#if error}<p role="alert" class="text-destructive text-sm">{error}{#if signInAgain} <a class="underline" href="/sign-in">Sign in again</a>{/if}</p>{/if}
               <div class="flex justify-end gap-2">
-                <button type="button" class={ghost} onclick={close}>Cancel</button>
+                <button type="button" class={ghost} onclick={close}>{offered ? 'Skip for now' : 'Cancel'}</button>
                 <button type="submit" class={primary} disabled={busy}>{mode === 'newcodes' ? 'Make new codes' : 'Continue'}</button>
               </div>
             </form>
@@ -332,7 +336,7 @@
                   <input id="ssd-pk" class={field} type="text" bind:value={passkeyName} />
                   <p class="text-muted-foreground text-xs">So you can tell your passkeys apart in Settings.</p>
                 </div>
-                <p class="text-muted-foreground text-xs">Your browser asks for Touch ID, Face ID or your security key next.</p>
+                <p class="text-muted-foreground text-xs">Your browser asks for Touch ID, Face ID or your security key next. A passkey comes with no backup codes; add an authenticator app in Settings to get them.</p>
                 {#if error}<p role="alert" class="text-destructive text-sm">{error}</p>{/if}
                 <div class="flex justify-end gap-2">
                   <button type="button" class={ghost} onclick={close}>Cancel</button>
@@ -385,6 +389,7 @@
             </div>
           {:else if step === 'done'}
             <div role="status" class="border-border bg-background rounded-md border p-3">Your second step is on. From now on every new sign-in asks for it after your password.</div>
+            {#if method === 'passkey' && mode === 'setup'}<p class="text-muted-foreground text-center text-xs">A passkey has no backup codes. To get them, add an authenticator app in Settings.</p>{/if}
             <div class="flex justify-end"><button type="button" class={primary} onclick={finish}>Done</button></div>
           {/if}
         </div>

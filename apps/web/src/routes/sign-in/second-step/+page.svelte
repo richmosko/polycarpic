@@ -59,7 +59,7 @@
     }
   }
 
-  const when = $derived(band === 'under_an_hour' ? 'in under an hour' : band === 'a_few_hours' ? 'in a few hours' : band === 'up_to_a_day' ? 'within a day' : 'later');
+  const when = $derived(band === 'under_an_hour' ? 'in under an hour' : band === 'a_few_hours' ? 'in a few hours' : band === 'up_to_a_day' ? 'within a day' : '');
   const field = 'border-input bg-card text-foreground focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none';
   const primary = 'bg-primary text-primary-foreground focus-visible:ring-ring w-full rounded-md px-3 py-2 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50';
   const link = 'text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded text-left text-sm underline focus-visible:ring-2 focus-visible:outline-none';
@@ -116,7 +116,7 @@
   {:else if view === 'locked'}
     <h1 class="font-heading text-xl font-semibold">Codes are paused</h1>
     <p class="text-muted-foreground text-sm">Too many wrong codes were entered.</p>
-    <div role="status" class="border-border bg-card rounded-md border p-3 text-sm"><strong>Codes are paused for this account.</strong> Use a passkey, or try again {when}.</div>
+    <div role="status" class="border-border bg-card rounded-md border p-3 text-sm"><strong>Codes are paused for this account.</strong> {#if when}They work again {when}. Use a passkey, or try again then.{:else}Use a passkey, or try again later.{/if}</div>
     {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
     <button type="button" class={primary} onclick={usePasskey}>Use a passkey</button>
     <p class={reset}>If this wasn't you, someone may know your password. Once you're in, change it in Settings.</p>
