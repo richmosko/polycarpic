@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-153-web-enters-by-handle`
 - **Started:** 2026-11-18
 - **Goal:** web enters a transaction only by handing Postgres a session handle from a second cookie; the database stores only its hash and checks it in `app.enter_session`. Loop 2 of 3 of stage 2 (then POLY-149, the revocation).
-- **Status:** In Progress
+- **Status:** In Review — PR [#136](https://github.com/richmosko/polycarpic/pull/136)
 
 _Standing context. POLY-152 (Sign-in service process) merged 2026-11-18 via PR [#133](https://github.com/richmosko/polycarpic/pull/133) — ARCH 1.19.0, SECURITY 1.10.2, INFRA 1.3.14._
 

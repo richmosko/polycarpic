@@ -1,7 +1,7 @@
 ---
 id: POLY-153
 title: Web enters by handle
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-152]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [process/cairn/issues/POLY-153.md, process/cairn/reviews/POLY-153/**, apps/auth/**, apps/web/**, apps/worker/**, packages/**, infra/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**]
 labels: [security, auth]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/136
 created: 2026-11-17
 updated: 2026-11-18
 ---
@@ -60,3 +60,7 @@ Architect on backend-lead-153's five build judgment calls @ 943a8fd0. Four are w
 - /get-session never attaches: within R5's refresh row. getSession only refreshes and never issues a session. Condition: /get-session stays blocked in AUTH_ROUTES, so an external request never reaches that branch (route-policy-shape pins it).
 - Attach by position with no alias: within R3 step 1, which requires the exact text. Confirmed.
 - Enter logic in hooks.server.ts; revokeMySession answers { current }; the Sessions action clears the handle and redirects to /sign-in when current: within R6 and R7. Confirmed.
+
+### @team-lead — 2026-11-18
+
+PR opened: https://github.com/richmosko/polycarpic/pull/136. Gate sha 13af0fad; docs and tracker only since.
