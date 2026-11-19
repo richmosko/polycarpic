@@ -14,7 +14,7 @@ const EXCEPT = [
   /^packages\/db\/migrations\/(0011|0014|0017)_/, // history; 0017 drops the function
   /^tests\/db\/revocation\.test\.ts$/, /^tests\/db\/pgtap\/(07|1[12])_/,
   // tests that assert the names ABSENT from web and its packages, by name
-  /^apps\/web\/src\/hooks\.server\.auth\.test\.ts$/, /^packages\/auth\/src\/web\.test\.ts$/, /^tests\/layers\/web-no-betterauth-sql\.test\.ts$/, /^tests\/layers\/auth-service\.test\.ts$/, /^tests\/db\/sign-in-controls-pins\.test\.ts$/, /^tests\/layers\/revoked-names\.test\.ts$/,
+  /^apps\/web\/src\/hooks\.server\.auth\.test\.ts$/, /^packages\/auth\/src\/web\.test\.ts$/, /^tests\/layers\/web-no-betterauth-sql\.test\.ts$/, /^tests\/layers\/auth-service\.test\.ts$/, /^tests\/db\/sign-in-controls-pins\.test\.ts$/, /^tests\/layers\/revoked-names\.test\.ts$/, /^tests\/db\/gate-check\.test\.ts$/, // the deploy-gate check asserts enter_asserted_user absent, by name
 ];
 
 describe('the names that existed only for the asserted-user entry are absent', () => {
