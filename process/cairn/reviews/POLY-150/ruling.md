@@ -301,11 +301,13 @@ seceng reviewed 56eec7fa. Its D1 and D2 are this file's D2 and D3. It has not ye
 
 **RC2 (withdrawn by seceng at 82caa505), replaced by a prerender ban.**
 - Web already sends `frame-ancestors 'none'` in the CSP response header on every page it renders, in dev, `vite preview`, e2e and production (`vite.config.ts:30`; `shell.spec.ts:92`).
-- Caddy sets no CSP (`compose-policy.mjs:308`) and gains no header in this loop.
+- Caddy sets no CSP (`compose-policy.mjs:308`), so web owns the one policy.
 - **Ruled:**
   - R10's header test stands: it reads `frame-ancestors 'none'` from the HTTP header of `/settings/second-step`, `/sign-in/second-step` and the Settings panel.
   - **The R1 boundary test also refuses `prerender`** in any file under `apps/web/src/routes/{settings,sign-in}/**`, whether `export const prerender` or a `+layout` that sets it. A prerendered page would carry the policy only in a `<meta>` tag, where browsers ignore `frame-ancestors`.
   - The test fails on a plant: one `export const prerender = true` added in a fixture copy.
+  - Caddy's `(security_headers)` gains `X-Frame-Options "DENY"`, for old browsers, and the lint's `need` list (`compose-policy.mjs`) gains it. This applies behind Caddy only, in staging and production; in dev and e2e the CSP header covers it.
+  - **Who builds it:** the build lead, in this loop (`infra/**` is in the paths). seceng reads it at the build review; devops is not needed.
 
 **RC3. The codes must not come back.** R10 did not cover the back-forward cache, so this is new:
 - `/settings/second-step`'s `load` sets `Cache-Control: no-store`.
@@ -332,5 +334,10 @@ seceng reviewed 56eec7fa. Its D1 and D2 are this file's D2 and D3. It has not ye
   - An after-hook in the existing last plugin, on `/two-factor/verify-totp` and `/two-factor/verify-backup-code`, runs only when the response is BetterAuth's lock refusal and the request carries no session.
   - It reads the signed hold cookie, finds its live `verification` row, takes that row's user, and reads `two_factor.locked_until` as poly_auth, which already holds SELECT on both tables.
   - A caller reaches this only after passing the password. With no hold, a dead hold or a session, nothing is added. That BetterAuth's after-hooks see a thrown lock refusal is (unmeasured); if they do not, the code goes in `handleAuthRequest`.
-  - Tests: one field value per band (or the exact time) with `locked_until` set by a superuser helper; and no field with no hold cookie, with a forged one, or with a session.
+  - **The hook reads the hold cookie only through BetterAuth's signed-cookie check** (`ctx.getSignedCookie` with the auth secret). An unsigned or wrongly signed value counts as no hold, and so does a `verification` row past `expiresAt` (seceng's condition on (b), which holds for (c) too).
+  - Tests: one field value per band (or the exact time), with `locked_until` set by a superuser helper. No field is added in any of these cases:
+    - no hold cookie;
+    - a forged hold cookie: unsigned, signed with the wrong secret, or a valid signature over another identifier;
+    - an expired hold: the row moved past `expiresAt`;
+    - a request with a session.
 - **Why (b):** it answers the real user's question ("today or tomorrow?") without handing a password holder minutes or the reset signal. (a) is the stronger option but leaves a locked user with no guidance for up to a day. seceng names coarse as stronger than exact.
