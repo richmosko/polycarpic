@@ -237,3 +237,5 @@
 - the QR encoder's exact pin (N3);
 - SECURITY brought to the current state (§6), with D1 and D5 as the Principal decides;
 - R8's forged-address reach added to R-2.
+
+**Accepted tip: `e3e2b003`.** I read `git diff ee09c8d9 e3e2b003`. It keeps the Caddy `X-Frame-Options: DENY` line, which I accept: it is harmless and reverses §8's withdrawal of it. It adds the direct prerender ban with its plant. D5 (b) now carries my §7.4 conditions in full. ACCEPT.
