@@ -11,7 +11,7 @@ labels: [ops, infra]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-18
+updated: 2026-11-19
 ---
 
 The committed, idempotent scripts INFRA §7.1 steps 7–11 call (D-7): create.sh, cloud-init, provision.sh and provision-check.sh. provision-check is the evidence for C-70, C-71, C-72, C-76, C-77 and C-79 (sshd from sshd -T, the C-79 set, spool holds only .age, Docker pools vs fixed subnets).
@@ -59,3 +59,7 @@ Follow-ups from POLY-152:
 From the POLY-153 loop (`process/DECISIONS.md`, 2026-11-19; SECURITY Open Risks). **Gates the first deploy with real household data.** Two additions to this issue:
 - The operator guide states the domain rule: under the app's domain there are only `app` and `staging`, no wildcard record and no alias (CNAME) to an outside service.
 - A check lists the domain's DNS records through Cloudflare's API and fails, naming each record, if it finds a wildcard, an outside alias, or any name other than `app` and `staging`. It runs in the deploy gate (INFRA §7.1, with step 16) and in the monthly window. The check must be shown to fail on a planted extra record before it is trusted. The Cloudflare token it uses is read-only for DNS.
+
+### @team-lead — 2026-11-19
+
+From the POLY-153 loop (architect's verdict §4, `process/cairn/reviews/POLY-153/verdict.md`). **F4:** a data-only `pg_restore --disable-triggers` skips the deferred check that every session has a handle. The restore runbook (INFRA §8.10) must restore `app.session_handle` together with `session`, or delete all sessions after the restore so everyone signs in again.
