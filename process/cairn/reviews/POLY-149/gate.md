@@ -1,6 +1,35 @@
 # POLY-149c — gate run (qa-engineer-149)
 
-**FINAL: one run, one sha `9fc167f4`** (`feature/poly-149-stage-2-revocation-and-docs`, after Addenda 1 to 6; `git status` empty before and after; nobody else ran tests, load 3.8 to 5.9 throughout). The earlier run below is superseded and kept for its main control and history.
+**FINAL: one run, one sha `ff6e2a94`** (`feature/poly-149-stage-2-revocation-and-docs`; code identical to `1e832bbc`, which is the build with Addendum 7 (sign_in_address STABLE; 0017's lock, temporary policies and delete), plus one docs-only commit; `git status` empty before and after; nobody else ran tests, load 3 to 7). The run at 9fc167f4 is superseded and kept below for history.
+
+| Step | Files | Passed | Failed | Skipped | Total |
+|---|---|---|---|---|---|
+| `pnpm lint` | — | exit 0 | | | |
+| `pnpm typecheck` (19 tasks, turbo-cached) | — | exit 0 | | | |
+| tests/db (parallel + serial) | 48 | 1059 | 0 | 0 | 1059 |
+| e2e (Chromium, no harness revoke) | 8 | 57 | 0 | 0 | 57 |
+| tests/ci | 20 | 542 | 0 | 0 | 542 |
+| tests/layers (root run) | 8 | 545 | 0 | 0 | 545 |
+| tests/infra | 4 | 184 | 0 | 0 | 184 |
+| tests/config | 5 | 97 | 0 | 15 | 112 |
+| packages/auth | 8 | 58 | 0 | 0 | 58 |
+| packages/config | 6 | 334 | 0 | 0 | 334 |
+| packages/tenancy | 2 | 6 | 0 | 0 | 6 |
+| packages/db | 6 | 43 | 0 | 0 | 43 |
+| apps/auth | 1 | 3 | 0 | 0 | 3 |
+| apps/web unit | 9 | 97 | 0 | 0 | 97 |
+
+Not run: `tests/infra/image` (Docker image build, POLY-143) and `tests/log`. tests/config's 15 skipped are POLY-152's. The Addendum 7 tests (`migration-0017.test.ts`, pgTAP 12's STABLE pin, pgTAP 07's policy line) are green here; they were red at 9fc167f4.
+
+**db time against the same-day main control (be41b202, 902 tests, 40 files, 76 s, load under 6): 1059 tests, 48 files, 97 s at load 5 to 7 (+21 s, +28 %) for +157 tests and +8 files.**
+
+**Order and times (local, 2026-11-19), one sequential script, a saved log and start/end stamp per suite** (`temp/gate/timeline.txt` and one `<suite>.log` each in the qa worktree, `db.json` for db; `temp/` is gitignored, so the stamps are copied here): lint 13:31:55-13:31:57; typecheck 13:31:57-13:31:58 (turbo-cached); ci 13:31:58-13:32:07; infra 13:32:07-13:32:17; config 13:32:17-13:32:25; layers 13:32:25-13:32:35; packages/auth, config, tenancy, db and apps/auth, web 13:32:35-13:32:39; e2e 13:32:39-13:33:02 (22.3 s); db 13:33:02-13:34:41. Nothing in parallel, no count carried from another sha. The e2e server leaked one container (`poly83-qa-710bdc49`, POLY-143); it was removed after the run and none remain.
+
+---
+
+## Superseded run at `9fc167f4`
+
+**SUPERSEDED by the run at `ff6e2a94` above (Addendum 7 changed 0016 and 0017 after this one): one run, one sha `9fc167f4`** (`feature/poly-149-stage-2-revocation-and-docs`, after Addenda 1 to 6; `git status` empty before and after; nobody else ran tests, load 3.8 to 5.9 throughout). The earlier run below is superseded and kept for its main control and history.
 
 | Step | Files | Passed | Failed | Skipped | Total |
 |---|---|---|---|---|---|
