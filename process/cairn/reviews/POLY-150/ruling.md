@@ -417,3 +417,23 @@ The rise over the earlier $72 is the extra design and review cycles, plus the di
 2. **The first-method email** needs POLY-137's mailer, and it is a security notice the user must see (SECURITY §9). POLY-137's criteria should carry it.
 3. **"Backup codes left"** needs the service to decrypt and count. A later issue adds a count-only route to the anchor plugin.
 4. **The reset-mfa runbook's identity check** (INFRA, devops-engineer) carries more weight until POLY-91's per-entity lock lands, because a reset is the one way into the held state.
+
+## Addendum 1 (seceng's review §9 at 0ded5af6: P1, P2; the Principal's D1)
+
+**D1 is decided: (a).** The Principal chose to show no count of tries left, so R2 and R7 stand as written.
+
+**P1. Where the held page's own-Person label comes from.**
+- While `locals.secondStepRequired` is true, the shell's entity selector shows one label, "<name> (Person)". The name is taken from `locals.session.user.name`, the row `enter_session` returned.
+- On that route, no `load` runs an entity query, filtered or not, and the label carries no entity id. Every link it could offer leads back through the gate anyway.
+- R1.3's rule (no entity id, name or type in that page's data) stands, and the user's own name is not entity data.
+- Test: R1.3's `__data.json` check is unchanged. In addition, Enid's held page shows her name as the selector's only label.
+
+**P2. `next` after set-up.** The gate carries the page the user asked for:
+- **The gate's redirect** becomes `/settings/second-step?setup=1&next=<safeNext(path + search)>`, through `apps/web/src/lib/safe-next.ts`.
+- **When the dialog finishes,** it runs `goto(safeNext(next))` after R3.6's `invalidateAll()`, using the same module in the browser. With no `next`, it stays on the page that opened it.
+- **Replaced in R1.2:** the line "the dialog needs no `next`".
+- **Unchanged:** opened from Settings, or from Entities' message, the dialog returns to its own page. Opened from an action, it carries on with the action (R3.6).
+- **Tests:**
+  - R9 spec 1: Enid asks for `/dashboard`, is sent to the dialog, and lands on `/dashboard` after Finish;
+  - a gate redirect for `//evil.example` carries `next=/`;
+  - R1.2's unit test covers both callers.
