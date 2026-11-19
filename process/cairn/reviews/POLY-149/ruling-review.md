@@ -158,3 +158,23 @@ That is §2.1(3), and with it §2.1 is closed. **The ruling is accepted at `4b42
 - **Privilege.** `FOR UPDATE` needs UPDATE on at least one column of the table (spec). poly_authz holds `UPDATE (expires_at, updated_at)`. No grant is added, and the build measures it.
 
 **Accepted at `30552d2a`.** Nothing is outstanding.
+
+## 11. Addenda 3 and 4 at `8de05776`: accepted. This is the final sha.
+
+Read: `git diff 30552d2a 8de05776 -- process/cairn/reviews/POLY-149/ruling.md`.
+- **Addendum 3.1, `sign_in_record_05_refuse`:** it matches my early read of `002cda1f`. A statement trigger refuses even when RLS would hide every row from the owner, so the refusal does not depend on which policies exist. It is in R5's trigger row and in pgTAP 12, with a plant that drops it.
+- **Addendum 3.2–3.3:**
+  - Dropping the dead brand-cast rule is right. A rule kept for a type that no longer exists would suggest the brand still guards something.
+  - The fixture move keeps the coverage of the other reserved literals.
+  - Neither changes what any role can reach.
+- **Addendum 4.1, the membership row:** this closes item 4 of my early read.
+  - The row is the exact `pg_auth_members` set, checked both ways, so it covers every `poly_*` member and grant and every login member.
+  - poly_migrator's eight grants must each be false / true / false (inherit / set / admin), and poly_backup's one grant must be `pg_read_all_data`. Anything else fails, `pg_*` predefined roles included.
+  - Its three plants are a SET-only grant to poly_auth, `pg_write_all_data` to poly_worker, and an ADMIN option. Together they cover the three ways the effective checks miss a fault.
+  - poly_migrator's own reach is the accepted limit. Decision 3 (DECISIONS 2026-11-19) names it in SECURITY beside the database server.
+- **Addendum 4.2:** the owner test must see 42501. A result of `UPDATE 0` or `DELETE 0` fails it. That is exactly what I asked.
+- **Addendum 4.3, `app.sign_in_address`:** the inet check is better than the length cap I suggested. It bounds the length and refuses non-addresses with one rule, for both kinds of row.
+  - The helper is an invoker, owned by poly_govern and called only inside poly_govern definers, and no login role can execute it. It reads nothing and writes nothing.
+  - Its tests (10 000 characters, `'not-an-ip'`, `'::1'`, `'203.0.113.7'`, on both kinds of row) are the T-S1 and T-S2 I asked for.
+
+**The ruling is accepted at `8de05776`.** Nothing is outstanding. The build review is at qa's gate sha.
