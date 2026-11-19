@@ -149,3 +149,12 @@ That is §2.1(3), and with it §2.1 is closed. **The ruling is accepted at `4b42
   - Postgres checks EXECUTE on a trigger function when the trigger is created, not when it fires (spec). "No login role can execute it" therefore guards direct calls, and the trigger still fires for every role.
 
 **The ruling is accepted at `44ef4ed4`.** Nothing is outstanding.
+
+## 10. Addendum 2 at `30552d2a`: the slide skips a locked row. Accepted.
+
+- **Only the write changes.** The lookup, the expiry and cap checks, the single refusal and the marker are unchanged. The UPDATE now locks the row with `FOR UPDATE SKIP LOCKED` and writes only if `expires_at < v_new` on the locked row. So the cap case (N1) still writes nothing, and a slide happens at most once.
+- **It fails closed.** A skipped or lost slide leaves `expires_at` where it was, so the session ends sooner, never later. `v_new` is still `least(now() + 7 days, created_at + 30 days)`, so nothing can pass the cap.
+- **A revoke racing an entry.** A DELETE in progress holds the row lock, and the entry skips its slide. That entry was already admitted by its own snapshot's lookup. Before this addendum it would have waited, updated 0 rows and been admitted all the same (code-read). So this changes nothing: one request in flight during a revoke gets through, then the session is gone. The next entry is refused.
+- **Privilege.** `FOR UPDATE` needs UPDATE on at least one column of the table (spec). poly_authz holds `UPDATE (expires_at, updated_at)`. No grant is added, and the build measures it.
+
+**Accepted at `30552d2a`.** Nothing is outstanding.
