@@ -160,7 +160,7 @@ The deploy-gate check (devops, in this loop) exits non-zero and prints each fail
 | Object | Must be |
 |---|---|
 | `app.second_step_streak`, `app.sign_in_record` | exist, RLS enabled and forced |
-| triggers `two_factor_15_lock` and `two_factor_16_lock_delete` on `public.two_factor`, `session_80_sign_in_record` on `public.session`, `sign_in_record_10_immutable` and `sign_in_record_no_truncate` on `app.sign_in_record` | exist, `tgenabled = 'O'` |
+| triggers `two_factor_15_lock` and `two_factor_16_lock_delete` on `public.two_factor`, `session_80_sign_in_record` on `public.session`, `sign_in_record_05_refuse`, `sign_in_record_10_immutable` and `sign_in_record_no_truncate` on `app.sign_in_record` | exist, `tgenabled = 'O'` |
 | `app.guard_second_step_lock()`, `app.record_session_sign_in()` | owner poly_govern, SECURITY DEFINER, no login role can execute |
 | `app.purge_sign_in_record()` | owner poly_purge, executable by poly_worker only |
 | both tables | no login role has INSERT, UPDATE, DELETE or TRUNCATE (`has_table_privilege`, effective) |
@@ -248,3 +248,13 @@ UPDATE public.session s SET expires_at = v_new, updated_at = pg_catalog.now()
 - The two C-b race fixtures need no change once this lands. Until then, give each its own session, or set `expires_at = now() + 7 days` so no slide is due.
 
 **seceng:** a short look is enough. This is a change to a definer's write, not to what it checks. The refusals, the marker and the cap are unchanged. The only new behaviour is that a slide can be skipped, which shortens a session and never lengthens it.
+
+## Addendum 3 (the build at 002cda1f, backend-lead's three judgment calls)
+
+1. **`sign_in_record_05_refuse` stays and is part of R3.** RLS is forced and no policy names poly_owner, so an UPDATE or DELETE by the owner sees no rows, and a row trigger never fires. R3's "refused for the owner" therefore needs a statement-level trigger. As built, `BEFORE UPDATE OR DELETE … FOR EACH STATEMENT`, with the same function branching on `TG_LEVEL`. It refuses every UPDATE statement, and every DELETE statement unless `current_user = 'poly_purge'`. The row trigger still checks that each purged row is purgeable. Two reasons it is the right layer:
+   - It refuses the statement even when it would match nothing, so the refusal no longer depends on what RLS lets the owner see. A later policy that showed rows to the owner would not open a gap.
+   - A superuser, who bypasses RLS, meets both triggers.
+   
+   R5's deploy-gate table now lists it (enabled `'O'`). pgTAP 12 pins it, with a plant that drops it. The test: as poly_owner (`SET ROLE`), `UPDATE app.sign_in_record SET kind = kind` and `DELETE FROM app.sign_in_record` each give 42501.
+2. **Drop `poly/no-session-user-id-cast`, together with its pin in `relative-structure.test.ts`.** The brand type no longer exists, so the rule guards nothing, and R1 already rules that the rules existing only for those names go. A dead rule invites a later reader to think the brand still exists. Whoever edits the test (qa or backend-lead) removes both in one commit; the layers suite is the check.
+3. **The fixture move to `36-reserved-literal` is accepted.** Dir 31 covered the other reserved literals too. Deleting only the three `enter_asserted` fixtures keeps that coverage. The ruling's "fixture dir 31 goes" meant its `enter_asserted_user` cases.
