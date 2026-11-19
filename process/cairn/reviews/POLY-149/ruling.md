@@ -141,7 +141,7 @@ CHECK ((kind = 'session') = (session_id IS NOT NULL))
 
 **Tests (S):**
 - As poly_auth: insert a session (with its handle), delete it, commit → one `session` row remains with the session's id, address and browser and a `created_at` within 5 s of `now()`. A rolled-back insert leaves none. Each of POLY-153's 13 paths adds exactly one row per session it inserts.
-- Each login role (poly_app, poly_auth, poly_worker, poly_operator, poly_migrator, poly_backup): no INSERT, UPDATE, DELETE or TRUNCATE on the record, granted and effective, both ways; the five runtime roles have no SELECT either.
+- Each login role (poly_app, poly_auth, poly_worker, poly_operator, poly_migrator, poly_backup): no INSERT, UPDATE, DELETE or TRUNCATE on the record, granted and effective, both ways; the five runtime roles (poly_app, poly_auth, poly_worker, poly_operator, poly_migrator) have no SELECT either, effective, with a plant (`GRANT SELECT ON app.sign_in_record TO poly_worker`) shown to fail it.
 - As the owner and as superuser: UPDATE and a DELETE of a fresh row → 42501; TRUNCATE → refused.
 - Purge, as poly_worker: rows planted by superuser at 401 days and a deleted user's rows go; a 399-day row and a live user's row stay. `SET ROLE poly_purge` then a DELETE of a fresh row → 42501.
 - Each counted wrong code (TOTP and backup code) adds one `second_step_failure` row with the settings' address and browser; each lock one `second_step_lock` row with R2's length. No cookie, a dead hold's 6th try, and an unknown hold add none.
@@ -164,6 +164,7 @@ The deploy-gate check (devops, in this loop) exits non-zero and prints each fail
 | `app.guard_second_step_lock()`, `app.record_session_sign_in()` | owner poly_govern, SECURITY DEFINER, no login role can execute |
 | `app.purge_sign_in_record()` | owner poly_purge, executable by poly_worker only |
 | both tables | no login role has INSERT, UPDATE, DELETE or TRUNCATE (`has_table_privilege`, effective) |
+| `app.sign_in_record` | poly_app, poly_auth, poly_worker, poly_operator and poly_migrator have no SELECT (`has_table_privilege`, effective). poly_backup's read through `pg_read_all_data` is the one exception, pending Decision 1 |
 | `app.enter_asserted_user` | absent |
 | poly_app | no privilege on the six BetterAuth tables, `app.session_handle`, `app.sign_in_record` or `app.second_step_streak` (effective); its EXECUTE set on `app` is exactly R1's ten |
 | `public."user"` | no login role has DELETE (effective) |
