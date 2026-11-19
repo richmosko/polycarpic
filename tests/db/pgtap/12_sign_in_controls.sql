@@ -108,8 +108,8 @@ SELECT is((SELECT coalesce(array_agg(sig || ' reads ' || m[1] ORDER BY sig || ' 
 -- 4. no set_config, no pg_settings, no pg_show_all_settings anywhere in scope; no dynamic EXECUTE in the four
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn WHERE prosrc ~* 'set_config'), NULL::text[], 'no function calls set_config (a clock override would need it)');
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn WHERE prosrc ~* 'pg_settings|pg_show_all_settings'), NULL::text[], 'no function reads pg_settings or pg_show_all_settings');
-SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn WHERE sig IN ('app.guard_second_step_lock()','app.guard_second_step_lock_delete()','app.record_session_sign_in()','app.sign_in_address(text)') AND prosrc ~* '\mexecute\M'), NULL::text[],
-  'the four lock and record functions contain no dynamic EXECUTE (a string run that way escapes every text scan)');
+SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn WHERE prosrc ~* '\mexecute\M'), NULL::text[],
+  'no function in scope contains a dynamic EXECUTE (a string run that way escapes every text scan; seceng review section 14)');
 SELECT is((SELECT p.prosrc !~* 'clock_timestamp' FROM pg_proc p WHERE p.oid = to_regprocedure('app.guard_second_step_lock()')), false, 'the guard reads clock_timestamp(), not now() and no setting');
 
 ROLLBACK;
