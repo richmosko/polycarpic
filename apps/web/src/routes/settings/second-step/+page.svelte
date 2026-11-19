@@ -128,6 +128,7 @@
   <ConfirmItsYou
     action={confirming.action}
     hasApp={s.totpAddedAt !== null}
+    hasPasskey={s.passkeys.length > 0}
     onconfirmed={() => {
       const run = confirming?.run;
       open = null;

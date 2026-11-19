@@ -12,6 +12,7 @@
   let {
     action,
     hasApp,
+    hasPasskey,
     onconfirmed,
     onclose,
   }: {
@@ -19,6 +20,8 @@
     action: string;
     /** The user has an authenticator app (my_second_step's totp_added_at); without one the dialog is the passkey-only variant. */
     hasApp: boolean;
+    /** The user has a passkey: the paused state offers it only then. */
+    hasPasskey: boolean;
     /** Runs after a pass, once the data has reloaded. */
     onconfirmed: () => void;
     onclose: () => void;
@@ -33,6 +36,7 @@
   let code = $state('');
   let error = $state('');
   let paused = $state(false);
+  let signInAgain = $state(false);
   let busy = $state(false);
 
   const clear = () => {
@@ -55,7 +59,7 @@
     if (r.ok && typeof r.body.challengeId === 'string') {
       challengeId = r.body.challengeId;
       options = r.body.options ?? null;
-    } else error = 'That did not work. Close this and try again.';
+    } else refused(r);
   }
   onMount(() => void begin(method));
 
@@ -64,11 +68,25 @@
     await invalidateAll();
     onconfirmed();
   }
-  /** A refusal: the lock is its own state; everything else is the one message, with no count. */
+  /** A refusal, by status and code only (Addendum 4); the service's message is never shown. */
   function refused(r: { status: number; body: { code?: string } }) {
-    if (r.status === 429 && r.body.code === 'ACCOUNT_TEMPORARILY_LOCKED') paused = true;
+    if (r.status === 401) location.assign('/sign-in');
+    else if (r.status === 429 && r.body.code === 'ACCOUNT_TEMPORARILY_LOCKED') paused = true;
     else if (r.status === 429) error = 'Too many attempts. Wait a minute and try again.';
-    else error = method === 'passkey' ? "That passkey didn't work. Try again." : "That password or code didn't work. Check both and try again.";
+    else if (r.status === 403 && r.body.code === 'challenge_expired') {
+      error = 'Try again.';
+      void renew();
+    } else if (r.status === 403 && r.body.code === 'password_required') {
+      signInAgain = true;
+      error = 'Sign in again to confirm it\'s you.';
+    } else if (r.status === 403 && r.body.code === 'step_up_failed') error = method === 'passkey' ? "That passkey didn't work. Try again." : "That password or code didn't work. Check both and try again.";
+    else error = 'That did not work. Close this and try again.';
+  }
+  /** A new challenge for the method on screen, keeping the message that asked for it. */
+  async function renew() {
+    const keep = error;
+    await begin(method);
+    if (!error && !paused) error = keep;
   }
 
   async function submit(e: SubmitEvent) {
@@ -81,8 +99,7 @@
       password = '';
       code = '';
       if (r.ok) return await passed();
-      refused(r);
-      if (!paused) await begin('totp');
+      refused(r); // a wrong password or code does not consume the challenge: the same one is retried
     } finally {
       busy = false;
     }
@@ -100,7 +117,8 @@
       if (r?.ok) return await passed();
       if (r) refused(r);
       else error = "That passkey didn't work. Try again.";
-      await begin('passkey');
+      if (!paused && !(r?.status === 403 && r.body.code === 'challenge_expired')) await begin('passkey'); // a failed assertion consumed the challenge
+      if (!error) error = "That passkey didn't work. Try again.";
     } finally {
       busy = false;
     }
@@ -123,14 +141,14 @@
       <div class="mt-4 flex flex-col gap-3 text-sm">
         {#if paused}
           <div role="status" class="border-border bg-background rounded-md border p-3"><strong>Codes are paused</strong> after too many wrong codes. Try again later.</div>
-          <p class="text-muted-foreground text-xs">Use a passkey if you have one; it still works.</p>
+          {#if hasPasskey}<p class="text-muted-foreground text-xs">Use a passkey if you have one; it still works.</p>{/if}
           <div class="flex justify-end gap-2">
             <button type="button" class={ghost} onclick={close}>Cancel</button>
-            <button type="button" class={primary} disabled={busy} onclick={() => { paused = false; void usePasskey(); }}>Use a passkey</button>
+            {#if hasPasskey}<button type="button" class={primary} disabled={busy} onclick={() => { paused = false; void usePasskey(); }}>Use a passkey</button>{/if}
           </div>
         {:else if method === 'passkey'}
           <p>Your browser asks for Touch ID, Face ID or your security key.</p>
-          {#if error}<p role="alert" class="text-destructive text-sm">{error}</p>{/if}
+          {#if error}<p role="alert" class="text-destructive text-sm">{error}{#if signInAgain} <a class="underline" href="/sign-in">Sign in again</a>{/if}</p>{/if}
           <div class="flex items-center justify-between gap-2">
             {#if hasApp}<button type="button" class={link} onclick={() => begin('totp')}>Use your authenticator app</button>{:else}<span></span>{/if}
             <div class="flex gap-2">
