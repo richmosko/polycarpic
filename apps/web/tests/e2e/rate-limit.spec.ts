@@ -3,28 +3,29 @@
 //    page shows its rate-limit message (S26). It waits for the bucket to empty first (support.quiet) and never raises the limit, forges an address or resets it.
 //  - no log line of web or the service holds a code, a secret or a password from any spec of this run (R10, S3).
 import { expect, test } from '@playwright/test';
-import { allEmailedCodes, base, flows, PASSWORD, quiet, readLog, seed, outboxMark, codeFor, slot } from './support.ts';
+import { allEmailedCodes, base, flows, PASSWORD, quiet, readLog, seed, outboxMark, codeFor, slot, openSetup } from './support.ts';
 
 test('the 6th wrong confirm-code is 429, the page says so, and the limit is the real one  [red if: the limit is off, raised or per-user, or the page shows nothing for a 429]', async ({ page }) => {
   test.setTimeout(180_000);
   await page.goto(`${base}/settings/second-step`);
-  await page.getByLabel('Password').fill(PASSWORD);
+  const dlg = await openSetup(page);
+  await dlg.getByLabel('Password', { exact: true }).fill(PASSWORD);
   const mark = outboxMark();
   await quiet('/second-step/confirm-code'); // every other spec is done; let their calls age out so all six fall in one window
   await slot('/second-step/send-code');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await dlg.getByRole('button', { name: 'Continue' }).click();
   await codeFor('ada@e2e.test', mark); // the code exists; the spec never uses it
   const statuses: { status: number; body: string }[] = [];
   page.on('response', async (r) => { if (r.url().endsWith('/api/auth/second-step/confirm-code')) statuses.push({ status: r.status(), body: await r.text().catch(() => '') }); });
   for (let i = 1; i <= 6; i++) {
-    await page.getByLabel('Code from the email').fill('000000');
-    await page.getByRole('button', { name: 'Continue' }).click();
+    await dlg.getByLabel('Code from the email').fill('000000');
+    await dlg.getByRole('button', { name: 'Continue' }).click();
     await expect.poll(() => statuses.length, { timeout: 10_000 }).toBe(i);
   }
   expect(statuses.slice(0, 5).map((s) => s.status), 'five counted calls').toEqual([403, 403, 403, 403, 403]);
   expect(statuses[5]!.status, 'the sixth').toBe(429);
   expect(statuses[5]!.body).toMatch(/too many requests/i);
-  await expect(page.getByRole('alert')).toContainText(/too many|try again|wait/i);
+  await expect(dlg.getByRole('alert')).toContainText(/too many|try again|wait/i);
 });
 
 test('no log line of web or the service holds a password, an emailed code, a TOTP key or a backup code from this run  [red if: a secret reaches a log (R10, S3)]', async () => {

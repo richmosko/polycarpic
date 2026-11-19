@@ -15,6 +15,14 @@ Run on the tree at the test commit, before any build. Every file is shown red fo
 | `tests/db/gate-check.test.ts` | 1 / (all plants) | the new plant `poly_app loses my_second_step` errors on the missing function. `infra/postgres/gate-check.sql`'s own list of ten is the builder's to move to eleven; the plant names the object the gate must print |
 | `tests/db/second-step-flow.test.ts`, `tests/ci/*` | 0 | green: the `totp` helper moved to `helpers/totp.ts` and is re-exported, and `infra/ci/changes.mjs` gained `second-step-screens` (DB_AREAS and the `db-areas.test.ts` row) and `apps/auth/src/` in `TABLE.e2e` (the e2e entry now imports it; 542 / 542) |
 
+## Re-issue fbf9a527 (set-up is a dialog), run on the tree at fad5c4a2 + the tests
+
+- **Unit:** `hooks.server.gate.test.ts` 2 red (the redirect lacks `?setup=1`; `/settings/second-step/__data.json` is not exempt). `web-boundary.test.ts` 2 red of 5 (dialog missing; the held page has no server file yet), its plant test passes. `second-step-rc.test.ts` 7 red of 9 (dialog, `pagehide`/`beforeNavigate`, form attributes, no `no-store` in hooks, `{@html` scan not vacuous); the two plant tests (prerender, `{@html`) pass, showing the rules bite.
+- **e2e:** 57 pass, 11 red, 4 not run (specs 4 and 5 after spec 3 failed; the two `rate-limit` tests after the failed dependency). Red reasons: C6 and spec 1 get the gate's redirect without `?setup=1`; the R1.3 table gets `/settings/second-step` for `/settings` (no query); spec 6b and spec 2 find no dialog and no Entities message; specs 3, 7, 8, 9 and the header test as before. Spec 7b now fails only on my pattern: the service records `::1` masked to its /64 (`0000:…:0000`), and the forged address is ignored (the proxy fix is in); the pattern accepts the masked form.
+- **Seeds:** the shared entity is "Shared Co" (its id is in `seeds.json`); Enid and Lou manage it; Pia and Vic hold no manager seat; Rae is gone.
+- **Selector contract added for the dialog:** `role="dialog"`; buttons `Set up second step`, `Continue`, `Close`/`Cancel`, `Turn on second step`, `Create passkey`, `Finish`, `Done`, `Show the QR code`; labels `Password` (step 1), `Code from the email`, `Your password, again`, `Enter the 6-digit code it shows`, `Name this passkey`; `data-testid` `totp-key`, `backup-code`. Leaving the codes screen by a sidebar link shows text matching `leave|discard|before you go|not saved` and a button `leave|discard|yes`; the spec reads that wording as a contract, so the builder can name the real one in one place (`second-step.spec.ts`).
+- Passkey path: spec 2 asserts no backup-code step (R9 says so under D5 (a)); the lead lists it as still open.
+
 ## Addendum 1 additions (ruling e3e2b003)
 
 | File | Red | Reason |

@@ -1,10 +1,12 @@
-// POLY-89 criteria 1 and 6 (the sign-in gate) and POLY-150 criterion C5 (ruling R9 specs 1 and 2, R10, RC3): an unenrolled manager is sent to
-// /settings/second-step and enrols end to end against the real handler, by authenticator app and by passkey. Titles end [red if: <mutation>].
+// POLY-89 criteria 1 and 6 (the sign-in gate) and POLY-150 criterion C5 (ruling R9 specs 1 and 2, R1.3, R3.0, R3.5, R3.6, R10): a held manager is sent to the one
+// Settings page and enrols in the set-up DIALOG, end to end against the real handler, by authenticator app and by passkey. Titles end [red if: <mutation>].
 // Ada is serve.ts's user: her only entity is her own Person, so no step is asked. Manny is the state `reset-mfa` leaves a manager in.
-// Enid, Pia and Lou are managers with no second step, each used by one spec only; their signed-in state is written by serve.ts (the sign-in limiter
-// is the sign-in service's real one, 5 a minute for the one address every request here shares, so a spec that is not about signing in does not spend it).
+// Enid (manages "Shared Co") and Pia (no manager seat, so never held) are used by one spec each; their signed-in state is written by serve.ts, because the
+// sign-in limiter is the service's real one (5 a minute for the one address every request here shares) and a spec that is not about signing in does not spend it.
 import { expect, test } from '@playwright/test';
-import { appendFlow, base, cookieNames, enrolByAppToCodes, expectNoSecretsKept, outboxMark, codeFor, PASSWORD, signInUi, slot, watchUrls } from './support.ts';
+import { appendFlow, base, cookieNames, enrolByAppToCodes, expectNoSecretsKept, openSetup, outboxMark, codeFor, PASSWORD, seed, signInUi, slot, watchUrls, watchWebWrites } from './support.ts';
+
+const SETUP = '/settings/second-step?setup=1';
 
 test.describe('C1: a new user with only the own Person', () => {
   test('signs in and reaches /dashboard with no redirect and no enrolment prompt  [red if: the gate fires for the own-Person exemption]', async ({ page }) => {
@@ -18,71 +20,88 @@ test.describe('C1: a new user with only the own Person', () => {
 test.describe('C6: a manager with no second step (after reset-mfa)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test('signs in, and every page redirects to /settings/second-step, carrying next  [red if: the gate is not in the session loader, or drops next (R1)]', async ({ page }) => {
+  test('signs in, and every page redirects to /settings/second-step?setup=1  [red if: the gate is not in the session loader, or drops the setup hint (R1.3)]', async ({ page }) => {
     await signInUi(page, 'manager@e2e.test', PASSWORD, '/dashboard');
     await page.waitForURL('**/settings/second-step**');
-    expect(new URL(page.url()).searchParams.get('next'), 'the gate carries where the user was going').toBe('/dashboard');
-    for (const [path, next] of [['/dashboard', '/dashboard'], ['/settings/sessions', '/settings/sessions']] as const) {
+    for (const path of ['/dashboard', '/settings/sessions', '/entities', '/']) {
       await page.goto(`${base}${path}`);
-      expect(new URL(page.url()).pathname, path).toBe('/settings/second-step');
-      expect(new URL(page.url()).searchParams.get('next'), path).toBe(next);
+      expect(new URL(page.url()).pathname + new URL(page.url()).search, path).toBe(SETUP);
     }
   });
 });
 
-test.describe('C5 spec 1: enrol by authenticator app (Enid)', () => {
+test.describe('C5 spec 1: enrol by authenticator app from the gate (Enid)', () => {
   test.use({ storageState: 'tests/e2e/.auth/enid.json' });
 
-  test('held page, password, emailed code, password again, TOTP, ten codes, Finish only after the check, then next; a reload and back show no code; a re-sign-in is held  [red if: any screen of the set-up is missing or out of order]', async ({ page, browser }) => {
+  test('the gate, the dialog, password, emailed code, password again, TOTP, ten codes, leaving by a sidebar link, back and forward, the panel, Make new codes  [red if: any step of the set-up is missing, or a code survives a way out]', async ({ page, browser }) => {
+    const shared = seed<{ sharedEntityId: string; sharedEntityName: string }>('seeds.json');
     const urls = watchUrls(page);
+    const writes = watchWebWrites(page);
     const responses: { url: string; cache: string | null }[] = [];
     page.on('response', (r) => responses.push({ url: r.url(), cache: r.headers()['cache-control'] ?? null }));
+    // Held: every page answers 303 to the one Settings page, and its __data.json names no shared entity (R1.3, GA).
+    for (const path of ['/dashboard', '/entities', '/settings/sessions']) {
+      const r = await page.request.get(`${base}${path}`, { maxRedirects: 0 });
+      expect(r.status(), path).toBe(303);
+      expect(r.headers()['location'], path).toBe(SETUP);
+    }
+    const data = await (await page.request.get(`${base}/settings/second-step/__data.json`)).text();
+    expect(data, 'the held page loads no entity data, the shell included').not.toContain(shared.sharedEntityName);
+    expect(data).not.toContain(shared.sharedEntityId);
     await page.goto(`${base}/dashboard`);
-    await page.waitForURL('**/settings/second-step**');
-    expect(new URL(page.url()).searchParams.get('next')).toBe('/dashboard');
-    await expect(page.getByText(/needs a second step|before you can go on/i)).toBeVisible(); // #held: the gate sent her
+    await page.waitForURL('**/settings/second-step?setup=1');
+    await expect(page.getByRole('dialog')).toBeVisible(); // ?setup=1 opens it
     const { key, codes } = await enrolByAppToCodes(page, 'enid@e2e.test');
     appendFlow('flows.jsonl', { user: 'enid', key, codes });
-    await expect(page.getByRole('button', { name: 'Finish' })).toBeDisabled();
-    await page.getByLabel(/I have saved these codes/i).check();
-    await expect(page.getByRole('button', { name: 'Finish' })).toBeEnabled();
-    await page.getByRole('button', { name: 'Finish' }).click();
-    await page.getByRole('link', { name: 'Continue' }).click(); // #done
+    const dlg = page.getByRole('dialog');
+    await expect(dlg.getByRole('button', { name: 'Finish' })).toBeDisabled();
+    // A sidebar link with the codes on screen: the dialog asks first (G2); on confirming, the link is followed (client-side: no pagehide fires).
+    await page.getByRole('link', { name: 'Dashboard' }).first().dispatchEvent('click');
+    await expect(page.getByText(/leave|discard|before you go|not saved/i).first()).toBeVisible();
+    expect(new URL(page.url()).pathname, 'not followed yet').toBe('/settings/second-step');
+    await page.getByRole('button', { name: /leave|discard|yes/i }).first().click();
     await page.waitForURL('**/dashboard');
-    // The key, the URI and the codes are gone from the page, and nothing the browser keeps holds them (R3.3, R10, RC3).
-    await expectNoSecretsKept(page, urls, [key, ...codes, PASSWORD], 'after Finish');
-    await page.goto(`${base}/settings/second-step`);
-    await expect(page.getByText(key)).toHaveCount(0);
-    for (const c of codes) await expect(page.locator('body')).not.toContainText(c);
-    await page.reload();
-    for (const c of codes) await expect(page.locator('body')).not.toContainText(c);
+    const noCodes = async (where: string, list: string[]) => { for (const c of list) await expect(page.locator('body'), where).not.toContainText(c); };
+    await noCodes('after the link', codes);
     await page.goBack();
+    await noCodes('after back', codes);
     await page.goForward();
-    for (const c of codes) await expect(page.locator('body')).not.toContainText(c);
-    // /api/auth/two-factor/enable answered no-store, and /settings/second-step is not storable (RC3, S6).
-    const enable = responses.find((r) => r.url.endsWith('/api/auth/two-factor/enable'));
-    expect(enable?.cache ?? '', 'enable: Cache-Control').toContain('no-store');
-    const settings = await page.request.get(`${base}/settings/second-step`);
-    expect(settings.headers()['cache-control'] ?? '', '/settings/second-step: Cache-Control').toContain('no-store');
-    // Make new codes (Addendum 2.3), inside her 5-minute window: it asks her password, shows ten codes that differ from the first set,
-    // RC3's leave, back and forward steps find none of them in the DOM, and an old code is refused at a held sign-in.
+    await noCodes('after forward', codes);
+    // The panel now: Settings shows the methods, no code; a full reload, then back, shows none.
     await page.goto(`${base}/settings/second-step`);
+    await expect(page.getByText(/authenticator app/i).first()).toBeVisible();
+    await page.reload();
+    await noCodes('after reload', codes);
+    await page.goBack();
+    await noCodes('after reload then back', codes);
+    await page.goto(`${base}/settings/second-step`);
+    // Make new codes, inside her 5-minute window: it asks her password and shows ten codes that differ from the first set (Addendum 2.3).
     await page.getByRole('button', { name: /make new codes/i }).click();
-    await page.getByLabel('Password').fill(PASSWORD);
+    await page.getByLabel(/password/i).fill(PASSWORD);
     await page.getByRole('button', { name: /^(continue|make new codes)$/i }).last().click();
     await expect(page.getByTestId('backup-code')).toHaveCount(10);
     const fresh10 = (await page.getByTestId('backup-code').allTextContents()).map((c) => c.trim());
     expect(fresh10.filter((c) => codes.includes(c)), 'the new codes differ from the first set').toEqual([]);
     appendFlow('flows.jsonl', { user: 'enid-new-codes', codes: fresh10 });
-    await page.goto(`${base}/dashboard`);
+    await page.getByRole('link', { name: 'Dashboard' }).first().dispatchEvent('click');
+    await page.getByRole('button', { name: /leave|discard|yes/i }).first().click().catch(() => {}); // asks again if the codes are still on screen
+    await page.waitForURL('**/dashboard');
     await page.goBack();
-    for (const c of fresh10) await expect(page.locator('body')).not.toContainText(c);
+    await noCodes('new codes after back', fresh10);
     await page.goForward();
     await page.goBack();
     await page.reload();
-    for (const c of fresh10) await expect(page.locator('body')).not.toContainText(c);
-    await expectNoSecretsKept(page, urls, fresh10, 'after Make new codes');
-    // A re-sign-in as Enid is held: the second step is on now. One of the OLD codes no longer works.
+    await noCodes('new codes after reload', fresh10);
+    // `/dashboard` loads with no redirect now that she is enrolled (R3.6: carry-on is a new request on the rotated session).
+    const r = await page.request.get(`${base}/dashboard`, { maxRedirects: 0 });
+    expect(r.status(), '/dashboard after enrolment').toBe(200);
+    // Nothing the dialog did wrote to web: only /api/auth/* (R3.0, G1); nothing secret survives in the browser (R10).
+    expect(writes, 'non-GET requests to web outside /api/auth').toEqual([]);
+    await expectNoSecretsKept(page, urls, [key, ...codes, ...fresh10, PASSWORD], 'after the flow');
+    // `/api/auth` responses and web's signed-in pages are not storable (R10).
+    for (const p of ['/two-factor/enable', '/two-factor/generate-backup-codes', '/two-factor/verify-totp']) expect(responses.find((x) => x.url.endsWith(`/api/auth${p}`))?.cache ?? '', p).toContain('no-store');
+    expect((await page.request.get(`${base}/settings/second-step`)).headers()['cache-control'] ?? '', '/settings/second-step').toContain('no-store');
+    // A later held sign-in refuses one of the FIRST codes: Make new codes replaced them.
     const fresh = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const p2 = await fresh.newPage();
     await signInUi(p2, 'enid@e2e.test', PASSWORD);
@@ -98,54 +117,34 @@ test.describe('C5 spec 1: enrol by authenticator app (Enid)', () => {
   });
 });
 
-test.describe('RC3: backup codes do not come back (Rae)', () => {
-  test.use({ storageState: 'tests/e2e/.auth/rae.json' });
-
-  test('leaving the codes screen by any way but Finish, then back, forward or reload, shows no code  [red if: the codes are kept in page data, history or the page cache]', async ({ page }) => {
-    const urls = watchUrls(page);
-    await page.goto(`${base}/dashboard`);
-    await page.waitForURL('**/settings/second-step**');
-    const { key, codes } = await enrolByAppToCodes(page, 'rae@e2e.test');
-    appendFlow('flows.jsonl', { user: 'rae', key, codes });
-    await page.goto(`${base}/dashboard`); // away, never pressing Finish
-    await page.goBack(); // the browser's back button (and its back-forward cache)
-    for (const c of codes) await expect(page.locator('body')).not.toContainText(c);
-    await expect(page.getByTestId('backup-code')).toHaveCount(0);
-    await page.goForward();
-    await page.goBack();
-    await page.reload();
-    for (const c of codes) await expect(page.locator('body')).not.toContainText(c);
-    await expect(page.getByTestId('backup-code')).toHaveCount(0);
-    await expectNoSecretsKept(page, urls, [key, ...codes], 'after leaving the codes screen');
-  });
-});
-
-test.describe('C5 spec 2: enrol by passkey (Pia)', () => {
+test.describe('C5 spec 2: enrol by passkey from the Entities message (Pia)', () => {
   test.use({ storageState: 'tests/e2e/.auth/pia.json' });
 
-  test('password, emailed code, a Chromium virtual authenticator makes the passkey, and the request carries no createSession  [red if: the passkey path is missing or asks for a session (POLY-89 S16)]', async ({ page }) => {
-    // D2 (does the passkey path show backup codes) is held until the Principal answers; this spec asserts nothing about it.
+  test('Pia opens /entities, sees the message, opens the dialog and makes a passkey in a Chromium virtual authenticator; no backup-code step, no createSession, no write to web  [red if: the Entities message or the passkey path is missing, or it asks for a session (POLY-89 S16)]', async ({ page }) => {
     const client = await page.context().newCDPSession(page);
     await client.send('WebAuthn.enable');
     await client.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
     const registrations: string[] = [];
     page.on('request', (r) => { if (r.url().endsWith('/api/auth/passkey/verify-registration')) registrations.push(r.postData() ?? ''); });
-    await page.goto(`${base}/dashboard`);
-    await page.waitForURL('**/settings/second-step**');
-    await page.getByLabel('Password').fill(PASSWORD);
+    const writes = watchWebWrites(page);
+    await page.goto(`${base}/entities`);
+    expect(new URL(page.url()).pathname, 'Pia is not held').toBe('/entities');
+    await expect(page.getByText(/second step/i).first()).toBeVisible(); // DESIGN's message
+    const dlg = await openSetup(page);
+    await dlg.getByLabel('Password', { exact: true }).fill(PASSWORD);
     const mark = outboxMark();
     await slot('/second-step/send-code');
-    await page.getByRole('button', { name: 'Continue' }).click();
-    await page.getByLabel('Code from the email').fill(await codeFor('pia@e2e.test', mark));
+    await dlg.getByRole('button', { name: 'Continue' }).click();
+    await dlg.getByLabel('Code from the email').fill(await codeFor('pia@e2e.test', mark));
     await slot('/second-step/confirm-code');
-    await page.getByRole('button', { name: 'Continue' }).click();
-    await page.getByText(/passkey/i).first().click();
-    await page.getByLabel('Name this passkey').fill('Pia laptop');
-    await page.getByRole('button', { name: 'Create passkey' }).click();
+    await dlg.getByRole('button', { name: 'Continue' }).click();
+    await dlg.getByLabel('Name this passkey').fill('Pia laptop');
+    await dlg.getByRole('button', { name: 'Create passkey' }).click();
     await expect.poll(() => registrations.length, { timeout: 15_000 }).toBeGreaterThan(0);
-    for (const b of registrations) expect(b, 'the page never sends createSession').not.toMatch(/createSession/);
-    await expect(page.getByRole('link', { name: 'Continue' })).toBeVisible({ timeout: 15_000 });
-    await page.getByRole('link', { name: 'Continue' }).click();
-    await page.waitForURL('**/dashboard');
+    for (const b of registrations) expect(b, 'the dialog never sends createSession').not.toMatch(/createSession/);
+    await expect(dlg.getByTestId('backup-code'), 'no backup-code step on the passkey path (D5 a)').toHaveCount(0);
+    await dlg.getByRole('button', { name: 'Done' }).click();
+    await expect(dlg).toBeHidden();
+    expect(writes, 'non-GET requests to web outside /api/auth').toEqual([]);
   });
 });

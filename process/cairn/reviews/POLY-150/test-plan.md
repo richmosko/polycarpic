@@ -9,6 +9,23 @@ Written against `ruling.md` @ 48acb75c (R0–R11, D1–D4) and `ruling-review.md
 - Refusals assert the state they leave (no session, no handle, no row), not the status alone.
 - The e2e specs run in one worker per file; each state-changing spec has its own seeded user (R9). The shared-address limit is measured in `red-run.md` (R8, unmeasured).
 
+## Re-issue fbf9a527: set-up is a dialog (this section wins over any row below that says "page")
+
+Set-up is one dialog (`SecondStepSetup.svelte`, a portal on `document.body`) opened from Settings and from an Entities message; a held user is sent to the one Settings page (`/settings/second-step?setup=1`). The rows below that mention "the set-up page" now read "the dialog". Tests added or changed:
+
+| Ruling | Test | File |
+|---|---|---|
+| R1.3 exempt exactly `/settings/second-step` and its `__data.json`; the rest of `/settings`, `/entities`, `__data.json`, a longer path and a POST elsewhere 303 to `?setup=1` | unit table over the real `handle`; e2e as held Lou against the built server | `hooks.server.gate.test.ts`; `second-step-misc.spec.ts` › "R1.3 the gate while held" |
+| R1.3 a held page loads no entity data, shell included | Enid (manages "Shared Co", seeded with its id): `/settings/second-step/__data.json` holds neither name nor id | `second-step.spec.ts` spec 1 |
+| R1.4 whole-of-web: no server file names `/api/auth` (but hooks), no `{@html` in any `.svelte`, no `prerender` under `routes/**`; each shown to fail on a plant | `web-boundary.test.ts`, `second-step-rc.test.ts` | |
+| R3.0 dialog outside any form, fetch only, tested on Settings **and** Entities | source: forms carry no action or method, `preventDefault`, mounts on `document.body`, not rendered inside a `<form>` (`second-step-rc.test.ts`); browser: no non-GET request to web outside `/api/auth/*` while enrolling, on Settings (spec 1) and on Entities (spec 2) | |
+| R3.5 cleared on close, Escape, backdrop, `beforeNavigate`, destroy, `pagehide`; sidebar navigation | source check for `pagehide`, `beforeNavigate`, destroy; spec 1: a sidebar link with the codes on screen asks first, then the link is followed, back, forward: no code in the DOM; spec 6b: Close, Escape, backdrop each empty a typed password on reopen | `second-step-rc.test.ts`; `second-step.spec.ts`; `second-step-misc.spec.ts` |
+| R3.6 carry-on is a new request on the rotated session | spec 1: after the verify, `/dashboard` is 200 and every post-enrolment request is made under the new handle (the `/dashboard` request, Make new codes, the later held sign-in); the dialog's host `invalidateAll()` is a GET (`writes` stays empty) | `second-step.spec.ts` |
+| R10 every signed-in HTML and `__data.json` is `no-store`; `/entities` joins the page-data and header scans | misc spec | `second-step-misc.spec.ts` |
+| R9 seeds | Enid and Lou are managers of "Shared Co"; **Pia and Vic hold no manager seat** (see note); Rae is gone (spec 6b and spec 1 cover what her test did) | `serve.ts` |
+
+Note for the lead: R9 spec 2 has Pia open `/entities` and see the message, but R9's seeds make her a manager, whom the gate redirects away from `/entities`. I seeded Pia as a non-held user.
+
 ## Criteria
 
 | Criterion | Test | Red because |

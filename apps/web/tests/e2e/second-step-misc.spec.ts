@@ -27,7 +27,7 @@ test.describe('spec 6: a step out of order (Lou)', () => {
 test.describe('spec 7: the held page is the same for every caller (S10)', () => {
   test('an anonymous visitor, an enrolled user and an unenrolled user open /sign-in/second-step with no hold: the same status, headers that matter, text and states  [red if: the page tells callers apart]', async ({ browser }) => {
     const seen: { status: number; text: string }[] = [];
-    for (const state of [{ cookies: [], origins: [] }, 'tests/e2e/.auth/una.json', 'tests/e2e/.auth/lou.json'] as const) {
+    for (const state of [{ cookies: [], origins: [] }, 'tests/e2e/.auth/una.json', 'tests/e2e/.auth/vic.json'] as const) {
       const ctx = await browser.newContext({ storageState: state as never });
       const page = await ctx.newPage();
       const res = await page.goto(`${base}/sign-in/second-step`);
@@ -58,7 +58,7 @@ test.describe('spec 7b / R8: the address the service records is the proxy\'s', (
     const row = must(`SELECT r.ip_address FROM app.sign_in_record r JOIN public."user" u ON u.id = r.user_id WHERE u.email = 'ada@e2e.test' ORDER BY r.id DESC LIMIT 1`, s.db).rows[0];
     expect(row, 'a sign-in record exists').toBeTruthy();
     expect(row![0]).not.toBe(s.forgedAddress);
-    expect(row![0]).toMatch(/^(127\.0\.0\.1|::1)$/);
+    expect(row![0]).toMatch(/^(127\.0\.0\.1|::1|(0{1,4}:){7}0{1,4})$/);
     // And no browser request carries a trusted header of its own: the service answers a bare request with no address 503 (R8), so the proxy sets one.
     const bare = await pwRequest.newContext({ baseURL: `http://127.0.0.1:${Number(process.env.E2E_PORT ?? 4173) + 1000}` });
     expect((await bare.get('/api/auth/ok')).status(), 'the service itself requires an address').toBe(503);
@@ -102,7 +102,7 @@ test.describe('Settings → Sign-in and second step (Una: an app, and a passkey 
     await page.goto(`${base}/settings/second-step`);
     const handle = (await page.context().cookies()).find((c) => c.name === '__Host-poly_handle')?.value;
     expect(handle, 'the seeded handle').toBeTruthy();
-    for (const path of ['/settings/second-step', '/settings/second-step/__data.json', '/sign-in/second-step', '/sign-in/second-step/__data.json', '/settings/second-step/__data.json?x-sveltekit-invalidated=01']) {
+    for (const path of ['/entities', '/entities/__data.json', '/settings/second-step', '/settings/second-step/__data.json', '/sign-in/second-step', '/sign-in/second-step/__data.json', '/settings/second-step/__data.json?x-sveltekit-invalidated=01']) {
       const res = await page.request.get(`${base}${path}`);
       const text = await res.text();
       for (const n of [u.secret, u.credentialId, u.publicKey, handle!, ...u.backupCodes]) expect(text, `${path} holds a secret`).not.toContain(n);
@@ -112,7 +112,7 @@ test.describe('Settings → Sign-in and second step (Una: an app, and a passkey 
 
 test.describe('RC2 / R10: headers on the new pages', () => {
   test('both pages answer frame-ancestors \'none\' and script-src \'self\' in the HTTP Content-Security-Policy header, and the Settings page is no-store  [red if: the pages can be framed or cached]', async ({ request }) => {
-    for (const path of ['/settings/second-step', '/sign-in/second-step']) {
+    for (const path of ['/settings/second-step', '/entities', '/sign-in/second-step']) {
       const res = await request.get(`${base}${path}`, { maxRedirects: 0 });
       expect([200, 303], path).toContain(res.status());
       const csp = res.headers()['content-security-policy'] ?? '';
@@ -122,5 +122,48 @@ test.describe('RC2 / R10: headers on the new pages', () => {
     }
     const settings = await request.get(`${base}/settings/second-step`, { maxRedirects: 0 });
     expect(settings.headers()['cache-control'] ?? '', 'the set-up page is not storable (RC3)').toContain('no-store');
+    // Every signed-in HTML and __data.json response carries it (R10, set once in hooks.server.ts), so a page that mounts the dialog later is covered.
+    for (const path of ['/dashboard', '/entities', '/entities/__data.json', '/settings/second-step/__data.json']) {
+      expect((await request.get(`${base}${path}`, { maxRedirects: 0 })).headers()['cache-control'] ?? '', path).toContain('no-store');
+    }
+  });
+});
+
+test.describe('R1.3 the gate while held (Lou)', () => {
+  test.use({ storageState: 'tests/e2e/.auth/lou.json' });
+
+  test('the two exempt paths answer 200; every other path, a trailing slash, a longer path and a POST to a form action elsewhere answer 303 to /settings/second-step?setup=1  [red if: the exemption is a prefix of /settings, or the redirect lacks setup=1]', async ({ request }) => {
+    const SETUP = '/settings/second-step?setup=1';
+    for (const p of ['/settings/second-step', '/settings/second-step/__data.json']) expect((await request.get(`${base}${p}`, { maxRedirects: 0 })).status(), p).toBe(200);
+    for (const p of ['/settings', '/settings/sessions', '/settings/sessions/__data.json', '/settings/second-step/x', '/entities', '/entities/__data.json', '/dashboard']) {
+      const r = await request.get(`${base}${p}`, { maxRedirects: 0 });
+      expect(r.status(), p).toBe(303);
+      expect(r.headers()['location'], p).toBe(SETUP);
+    }
+    const slash = await request.get(`${base}/settings/second-step/`, { maxRedirects: 0 });
+    expect([200, 303, 308], 'trailing slash: normalised to the exempt path, or held').toContain(slash.status());
+    if (slash.status() === 303) expect(slash.headers()['location']).toBe(SETUP);
+    const post = await request.post(`${base}/settings/sessions?/revoke`, { maxRedirects: 0, form: { id: 'x' }, headers: { origin: base } });
+    expect(post.status(), 'a POST to a form action elsewhere').toBe(303);
+    expect(post.headers()['location']).toBe(SETUP);
+  });
+});
+
+test.describe('spec 6b: closing the dialog four ways leaves no state (Lou)', () => {
+  test.use({ storageState: 'tests/e2e/.auth/lou.json' });
+
+  test('Close, Escape and a backdrop click each empty the dialog: reopened, the password field is empty  [red if: a typed password survives a way out (R3.5)]', async ({ page }) => {
+    for (const how of ['close', 'escape', 'backdrop'] as const) {
+      await page.goto(`${base}/settings/second-step?setup=1`);
+      const dlg = page.getByRole('dialog');
+      await expect(dlg).toBeVisible();
+      await dlg.getByLabel('Password', { exact: true }).fill(`typed-${how}-${PASSWORD}`);
+      if (how === 'close') await dlg.getByRole('button', { name: /^(close|cancel)$/i }).first().click();
+      else if (how === 'escape') await page.keyboard.press('Escape');
+      else await page.mouse.click(2, 2);
+      await expect(dlg).toBeHidden();
+      await page.getByRole('button', { name: 'Set up second step' }).first().click(); // reopened in the same page: no reload to wipe the state for it
+      await expect(page.getByRole('dialog').getByLabel('Password', { exact: true })).toHaveValue('');
+    }
   });
 });

@@ -60,8 +60,8 @@ must(`UPDATE public.session SET recent_auth_at = now() WHERE user_id = '${id}'`,
 const OWNER_ID = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('Grace Owner', 'owner@e2e.test', true) RETURNING id`, db).rows[0]![0]!;
 must(`BEGIN; INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '${OWNER_ID}', true); UPDATE public."user" SET two_factor_enabled = true WHERE id = '${OWNER_ID}'; COMMIT;`, db);
 const SHARED = must(`BEGIN; ${asUserSql(OWNER_ID, db)}
-  INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), 'E2E Shared', 'business_pass_through');
-  SELECT id FROM public.entity WHERE name = 'E2E Shared'; COMMIT;`, db, { role: 'poly_app' }).rows.at(-1)![0]!;
+  INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), 'Shared Co', 'business_pass_through');
+  SELECT id FROM public.entity WHERE name = 'Shared Co'; COMMIT;`, db, { role: 'poly_app' }).rows.at(-1)![0]!;
 // A manager with no second step, seated by a superuser statement (R1.3 as amended).
 const addManager = (name: string, email: string): string => {
   const uid = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('${name}', '${email}', true) RETURNING id`, db).rows[0]![0]!;
@@ -79,8 +79,13 @@ const need = (r: Response, what: string): Response => { if (!r.ok) { stop(); thr
 
 // POLY-150 R9: one user per state-changing spec, so specs share no state. Enid, Pia, Lou: managers with no second step, signed in here
 // (the sign-in limiter is 5 a minute for one address across the suite, so a spec that is not about signing in starts from a state file).
-for (const [key, name] of [['enid', 'Enid Enrol'], ['pia', 'Pia Passkey'], ['lou', 'Lou Order'], ['rae', 'Rae Recover']] as const) {
-  addManager(name, `${key}@e2e.test`);
+// Pia and Vic hold no manager seat, so the gate never holds them (R9 spec 2 has Pia open /entities and see the message; a held manager is redirected away from it).
+const addPlain = (name: string, email: string): void => {
+  const uid = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('${name}', '${email}', true) RETURNING id`, db).rows[0]![0]!;
+  must(`INSERT INTO public.account (account_id, provider_id, user_id, password) VALUES ('${uid}', 'credential', '${uid}', '${hash}')`, db);
+};
+for (const [key, name, held] of [['enid', 'Enid Enrol', true], ['pia', 'Pia Passkey', false], ['vic', 'Vic Viewer', false], ['lou', 'Lou Order', true]] as const) {
+  if (held) addManager(name, `${key}@e2e.test`); else addPlain(name, `${key}@e2e.test`);
   writeFileSync(join(here, '.auth', `${key}.json`), JSON.stringify(state(need(await auth.signIn(`${key}@e2e.test`, PASSWORD), `${key} sign-in`))));
 }
 // A TOTP factor enrolled through the real handler: password, emailed code (the in-process stand-in), enable, verify.
@@ -115,7 +120,7 @@ must(`INSERT INTO public.passkey (name, public_key, user_id, credential_id, coun
 must(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE public.session SET recent_auth_at = now() - interval '1 hour' WHERE user_id = '${unaId}'; COMMIT;`, db);
 writeFileSync(join(here, '.auth', 'una.json'), JSON.stringify(state(una.verified)));
 writeSecret('una-secrets.json', { email: 'una@e2e.test', secret: una.secret, backupCodes: una.backupCodes, credentialId: unaKey.credentialId, publicKey: unaKey.publicKey, passkeyName: XSS });
-writeSecret('seeds.json', { password: PASSWORD, forgedAddress: '198.51.100.9', testServer: server, db }); // the superuser read the address spec (R8) and the expiry checks use
+writeSecret('seeds.json', { password: PASSWORD, forgedAddress: '198.51.100.9', sharedEntityId: SHARED, sharedEntityName: 'Shared Co', testServer: server, db }); // the superuser read the address spec (R8) and the expiry checks use
 writeFileSync(join(here, '.auth', 'user.json'), JSON.stringify({ cookies, origins: [] }));
 await close();
 const web = join(here, '..', '..');

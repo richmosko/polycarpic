@@ -27,8 +27,17 @@ describe('the sign-in gate (R5)', () => {
     required = true;
     const res = await request('/dashboard');
     expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toBe('/settings/second-step');
+    expect(res.headers.get('location')).toBe('/settings/second-step?setup=1');
     expect(res.headers.getSetCookie()).toEqual([]);
+  });
+  it('R1.3: while held, exactly two paths are exempt; the rest of /settings, /entities and a POST elsewhere answer 303 to /settings/second-step?setup=1 [red if: the exemption is a prefix, or the redirect lacks setup=1]', async () => {
+    required = true;
+    for (const p of ['/settings/second-step', '/settings/second-step/__data.json']) expect((await request(p)).status, p).toBe(200);
+    for (const p of ['/settings', '/settings/sessions', '/settings/sessions/__data.json', '/settings/second-step/x', '/settings/second-step/y/z', '/settings/second-stepper', '/entities', '/entities/__data.json', '/settings/second-step/__data.jsonx']) {
+      const res = await request(p);
+      expect(res.status, p).toBe(303);
+      expect(res.headers.get('location'), p).toBe('/settings/second-step?setup=1');
+    }
   });
   it('the placeholder itself is not redirected while gated, an ungated user reaches any page, and neither answer sets a cookie [red if: the gate loops or relays a cookie]', async () => {
     required = true;

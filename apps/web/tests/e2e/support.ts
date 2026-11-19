@@ -8,7 +8,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { expect, type Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 import { totp } from '../../../../tests/db/helpers/totp.ts';
 
 export const base = `http://localhost:${process.env.E2E_PORT ?? 4173}`;
@@ -114,24 +114,40 @@ export const flows = (name: string): any[] => (existsSync(join(AUTH_DIR, name)) 
 // Selector contract for the build: labels and button names as DESIGN has them; `data-testid="totp-key"` on the typed-out key and
 // `data-testid="backup-code"` on each of the ten codes (DESIGN draws both but names no hook).
 
-/** Password, emailed code, password again, TOTP: stops with the ten codes on screen. Returns the key and the codes. */
+/** Opens the set-up dialog if it is not already open (the gate's `?setup=1` opens it on load; Settings has a button). */
+export async function openSetup(page: Page): Promise<Locator> {
+  const dlg = page.getByRole('dialog');
+  if (!(await dlg.isVisible().catch(() => false))) await page.getByRole('button', { name: 'Set up second step' }).first().click();
+  await expect(dlg).toBeVisible();
+  return dlg;
+}
+
+/** Any non-GET request to web's own origin that is not /api/auth/* (R3.0, G1): the dialog posts by fetch to the service only. */
+export function watchWebWrites(page: Page): string[] {
+  const bad: string[] = [];
+  page.on('request', (r) => { const u = new URL(r.url()); if (u.origin === new URL(base).origin && r.method() !== 'GET' && !u.pathname.startsWith('/api/auth/')) bad.push(`${r.method()} ${u.pathname}`); });
+  return bad;
+}
+
+/** In the dialog: password, emailed code, password again, TOTP: stops with the ten codes on screen. Returns the key and the codes. */
 export async function enrolByAppToCodes(page: Page, email: string): Promise<{ key: string; codes: string[] }> {
-  await page.getByLabel('Password').fill(PASSWORD);
+  const dlg = await openSetup(page);
+  await dlg.getByLabel('Password', { exact: true }).fill(PASSWORD);
   const mark = outboxMark();
   await slot('/second-step/send-code');
-  await page.getByRole('button', { name: 'Continue' }).click();
+  await dlg.getByRole('button', { name: 'Continue' }).click();
   const code = await codeFor(email, mark);
-  await page.getByLabel('Code from the email').fill(code);
+  await dlg.getByLabel('Code from the email').fill(code);
   await slot('/second-step/confirm-code');
-  await page.getByRole('button', { name: 'Continue' }).click();
-  await page.getByText(/authenticator app/i).first().click();
-  await page.getByLabel('Password').fill(PASSWORD); // step 3 asks it again for /two-factor/enable (R3.3)
-  const key = ((await page.getByTestId('totp-key').textContent()) ?? '').replace(/\s/g, '');
+  await dlg.getByRole('button', { name: 'Continue' }).click();
+  await dlg.getByRole('button', { name: /show the qr code|authenticator app/i }).first().click();
+  await dlg.getByLabel('Your password, again').fill(PASSWORD); // step 3 asks it again for /two-factor/enable (R3.3)
+  const key = ((await dlg.getByTestId('totp-key').textContent()) ?? '').replace(/\s/g, '');
   expect(key, 'the typed-out key').toMatch(/^[A-Z2-7]{16,}$/);
-  await page.getByLabel('Enter the 6-digit code it shows').fill(totp(key));
+  await dlg.getByLabel('Enter the 6-digit code it shows').fill(totp(key));
   await slot('/two-factor/verify-totp');
-  await page.getByRole('button', { name: 'Turn on second step' }).click();
-  await expect(page.getByTestId('backup-code')).toHaveCount(10);
-  const codes = (await page.getByTestId('backup-code').allTextContents()).map((c) => c.trim());
+  await dlg.getByRole('button', { name: 'Turn on second step' }).click();
+  await expect(dlg.getByTestId('backup-code')).toHaveCount(10);
+  const codes = (await dlg.getByTestId('backup-code').allTextContents()).map((c) => c.trim());
   return { key, codes };
 }
