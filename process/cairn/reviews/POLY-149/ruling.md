@@ -4,6 +4,7 @@
 - Branch `feature/poly-149-stage-2-revocation-and-docs` @ 8aa8275e. better-auth and @better-auth/passkey 1.7.18; no pin changes.
 - POLY-149's criteria and comments; POLY-153's ruling (R4, R7.4, R11) and verdict (N1, F3); POLY-152's ruling (R2, R8, R9) and seceng's review §4, §5.4 (F2), §8, §9; `process/cairn/reviews/POLY-145/pricing.md` §1 block D; `process/DECISIONS.md` 2026-11-16 (×2), 2026-11-17 (lock, record) and 2026-11-19.
 - The tree as read today: migrations 0000–0015, `packages/db/sql/{roles.sql,definers.json}`, `packages/db/src/{context,session,index,auth}.ts`, `packages/auth/src/{session,routing-pool,handler}.ts`, `tests/db/helpers/{second-step,marker,tenancy}.ts`, `packages/tenancy/permission-matrix.json`, and better-auth 1.7.18's `plugins/two-factor/verify-two-factor.mjs:119-205` (`assertTwoFactorNotLocked`, `recordTwoFactorFailure`, `resetTwoFactorFailures`).
+- seceng-149's pre-review checklist (`seceng-149/temp/2026-11-19-seceng-149-prep.md`, §A) and the lead's four must-settle points. This file replaces the ruling at `b31be909` whole.
 - Criteria are named by block: **V** revocation, **L** growing lock, **S** sign-in record, **D** docs. N1 and F1 are the 2026-11-19 comment.
 
 **Tags.** "(code-read)" means read, not run. "(unmeasured)" means qa's red test measures it first. Nothing below drops a control on an unmeasured claim; a red test that contradicts one reopens this ruling, re-issued whole.
@@ -44,12 +45,13 @@ Ten functions, nothing else in `app` (code-read from the grants in 0001–0015; 
 - pgTAP `11_poly_app_grants.sql`: poly_app's privileges compared with the lists above, both ways (a missing or an extra one fails), read twice as pgTAP 08 does: granted (`role_table_grants`, `role_column_grants`, `routine_privileges`, `pg_policies.roles`, `pg_auth_members`) and effective (`has_table_privilege`, `has_column_privilege`, `has_sequence_privilege`, `has_function_privilege` over every relation, sequence and function in `public`, `app`, `drizzle`). Plants, each shown to fail it: `GRANT SELECT ON public.session TO poly_app`; `GRANT EXECUTE ON FUNCTION app.enter_auth_session(text) TO poly_app`; a new function in `app` created by poly_owner with `GRANT EXECUTE … TO PUBLIC`.
 - `enter_asserted_user` does not exist (`to_regprocedure` is NULL); an insert of a `web` marker as poly_authz fails the CHECK.
 - Behaviour, as poly_app: `SELECT token FROM public.session`, an INSERT into `public.verification`, an UPDATE of `public.two_factor` each give 42501 and change nothing.
-- **A build that finds a list short does not add the grant**: it reports the failing statement to me and the ruling is re-issued whole (POLY-152 R2's rule). The measurement that web needs nothing else is web's suite and the e2e suite passing on the migrated chain with no harness revoke.
+- **A build that finds a list short does not add the grant**: it reports the failing statement to me and the ruling is re-issued whole (POLY-152 R2's rule). The measurement that web needs nothing else exists: POLY-153's e2e ran 57/0/0 under the R7.4 harness revoke of the same grants (`process/cairn/reviews/POLY-153/gate.md`). It is repeated here on the migrated chain with no harness revoke.
 
 **Test fixtures that ran as poly_app.**
 - Every `tests/db` caller of `withTenant` or `enter_asserted_user` (about 70 call sites in 20 files, `tests/db/helpers/{marker,tenancy,matrix,cross-tenant,second-step}.ts` central; code-read count) enters by `app.enter_session` with a handle from POLY-153's `sessionWithHandle`. `identity-marker.test.ts`'s asserted-user cases are replaced by the absence test above; pgTAP 07's `enter_asserted_user` rows go.
 - `tests/db/helpers/second-step.ts`: `ROLES` becomes `['poly_auth']`. The poly_app refusal half is replaced by the catalog pin (poly_app holds nothing on the factor tables).
 - **The poly_auth fixture is already the real role** (POLY-152 R8; `second-step.ts:21`). pgTAP 08's N2 plant (`GRANT poly_app TO poly_auth`) pins that it stays so. Nothing to build; the criterion is met by the pin.
+- **How qa finds a test that no longer tests anything:** every test that writes a BetterAuth table through a poly_app pool now fails 42501 at the red run. Each one either moves to poly_auth or becomes a refusal that also asserts the row is unchanged. None is kept passing as poly_app.
 - The test harness must not truncate `app.sign_in_record` between tests (R3 refuses it); qa checks `template-clone` resets by clone, not by TRUNCATE.
 
 ## R2. The growing second-step lock (L)
@@ -61,11 +63,12 @@ Ten functions, nothing else in `app` (code-read from the grants in 0001–0015; 
 
 **State.** `app.second_step_streak (user_id uuid PRIMARY KEY REFERENCES public."user"(id) ON DELETE CASCADE, locks integer NOT NULL DEFAULT 0 CHECK (locks >= 0), updated_at timestamptz NOT NULL DEFAULT now())`.
 - Owner poly_owner. RLS enabled and forced; `REVOKE ALL … FROM PUBLIC`. **poly_govern only**: SELECT, INSERT, UPDATE, DELETE, with policies `second_step_streak_govern FOR ALL TO poly_govern USING (true) WITH CHECK (true)`. **No login role holds any privilege on it.** `BEFORE TRUNCATE … app.refuse_truncate()`.
-- Keyed by user, not by `two_factor.id`: a user has one TOTP row, which carries the backup codes too, so one streak counts both paths. Disabling and re-enrolling TOTP does not reset it.
+- **Keyed by user, not by `two_factor.id`.** poly_auth holds DELETE and INSERT on `two_factor` (0014:17), so a per-row count would reset on delete and re-insert. A user has one TOTP row, which carries the backup codes too, so one streak counts both paths. Disabling and re-enrolling TOTP does not reset it.
+- **The cascade from `user` is safe:** no login role holds DELETE on `public."user"` (code-read, 0000–0015: no DELETE grant on it to anyone but the owner). pgTAP 12 pins that, so a later grant fails CI before deleting a user can become a way to reset the doubling.
 - In the database, so a restart of `auth` leaves it unchanged.
 
 **The guard.** `app.guard_second_step_lock()`, owner poly_govern, SECURITY DEFINER, `SET search_path = ''`, EXECUTE for no login role. Trigger `two_factor_15_lock BEFORE UPDATE OF failed_verification_count, locked_until ON public.two_factor FOR EACH ROW`. It fires after `two_factor_10_guard` (name order), which already limits an unmarked write to a verified row's counters and codes. **No role is exempt**, superuser included. With `t = clock_timestamp()` (not `now()`: the transaction began before BetterAuth read Node's clock, and on one host `clock_timestamp()` is never behind it), in this order:
-1. **Lock in force** (`OLD.locked_until > t`): if `NEW.locked_until IS DISTINCT FROM OLD.locked_until` → 42501 `second_step_locked`. Nothing shortens, clears, extends or replaces a lock while it runs. BetterAuth never writes during a lock except in a race (two wrong codes read the row before either locks it); the loser's request then fails with 500 and rolls back, so it fails closed.
+1. **Lock in force** (`OLD.locked_until > t`): if `NEW.locked_until IS DISTINCT FROM OLD.locked_until`, or `NEW.failed_verification_count < OLD.failed_verification_count` → 42501 `second_step_locked`. Nothing shortens, clears, extends or replaces a lock while it runs, and nothing lowers its count. BetterAuth never writes during a lock except in a race (two wrong codes read the row before either locks it); the loser's request then fails with 500 and rolls back, so it fails closed.
 2. **Lazy clear** (`OLD.locked_until IS NOT NULL`, `NEW.locked_until IS NULL`): allowed. The streak is unchanged.
 3. **A new lock** (`NEW.locked_until IS NOT NULL` and distinct from OLD): `n := locks` for the user (row locked `FOR UPDATE`, 0 if absent); `len := least(15 * 2^least(n, 7), 1440)` minutes; **`NEW.locked_until := t + len`**, whatever BetterAuth sent; upsert `locks = n + 1`; append a `second_step_lock` record row with `lock_minutes = len` (R3). So locks run 15, 30, 60, 120, 240, 480, 960, then 1440 for every later one.
 4. **The correct-code reset** (`OLD.locked_until IS NULL`, `NEW.locked_until IS NULL`, `NEW.failed_verification_count = 0`, and the statement listed one of the two columns, which the `UPDATE OF` trigger guarantees): set `locks = 0`. This is the shape of `resetTwoFactorFailures` only: the lazy clear always has a non-NULL `OLD.locked_until`, and a failure never writes 0.
@@ -73,9 +76,18 @@ Ten functions, nothing else in `app` (code-read from the grants in 0001–0015; 
 - Steps 3–5 can combine in one row update only if a caller sends them together; BetterAuth never does. Each applies on its own.
 - That no other BetterAuth write on any path (enrolment, first verify, disable, backup-code regeneration, password reset, passkey) lists either column with 0 and NULL on an unlocked row is (unmeasured). qa runs every R5 path of POLY-153 and the enrolment routes with statement logging and fails on any such statement outside a correct code.
 
-**`reset-mfa`.** `app.reset_second_step(text)` (poly_govern, CREATE OR REPLACE) also `DELETE`s the user's streak row. It already deletes the `two_factor` row, so the guard is not involved; it works on a locked user.
+**Deleting the factor during a lock.** A second trigger, `two_factor_16_lock_delete BEFORE DELETE ON public.two_factor FOR EACH ROW`, runs `app.guard_second_step_lock_delete()`: owner poly_govern, an **invoker** (so `current_user` is the deleting role), EXECUTE for no login role. If `OLD.locked_until > clock_timestamp()` and `current_user <> 'poly_govern'` → 42501 `second_step_locked`. So poly_auth cannot delete a locked row and re-insert a fresh one, and only `reset-mfa` removes a locked factor. The cost: the real user cannot disable TOTP while it is locked; they wait for the lock or ask for `reset-mfa`. A cascade from deleting the user during a lock is refused as well; no login role can delete a user (above).
 
-**What the guard does not cover, stated for SECURITY.** The database cannot check a TOTP or backup code (the secret is encrypted with the auth secret). It recognises the reset by its shape. SQL as poly_auth can send that shape on an unlocked row and zero the streak. That gains it nothing: the same SQL can insert a session for the user outright, and R3 records that. During a lock it can do nothing to the lock. A superuser can bypass the guard with `session_replication_role = replica`, which is the database-server control the Principal already accepted as out of reach.
+**`reset-mfa`.** It runs as poly_operator, through `app.reset_second_step(text)`, a poly_govern definer, and it is the only path that clears the doubling. `app.reset_second_step(text)` (poly_govern, CREATE OR REPLACE) also `DELETE`s the user's streak row. It already deletes the `two_factor` row, so the guard is not involved; it works on a locked user.
+
+**The correct-code reset is the sign-in service's word, stated for SECURITY.** The database cannot check a TOTP or backup code: the secret is encrypted with the auth secret. It recognises the reset only by the shape of BetterAuth's write. **So SQL as poly_auth can reset the doubling whenever no lock is in force**, by sending that shape. What limits it:
+- during a lock it can neither shorten, clear nor lower the lock (step 1), nor delete the factor row (the delete guard);
+- the streak survives deleting and re-enrolling the factor (keyed by user);
+- it gains nothing over what it already holds: the same SQL can insert a session for the user outright, and R3 records that;
+- the lazy clear at a lapse never resets the doubling (step 2).
+The guard's real targets are a BetterAuth upgrade or bug that shortens or clears a lock, a lock in force, and anyone working through the web pages. A superuser can bypass the guard with `session_replication_role = replica`, which is the database-server control the Principal already accepted as out of reach.
+
+**No clock a role can change.** The guard reads only `clock_timestamp()`; no function in the chain reads a clock from a setting or a table. pgTAP 12 pins it: no function in `app` calls `current_setting` except for the names `app.actor`, `poly.client_ip` and `poly.user_agent`, and no function in `app` calls `set_config`, `set_config` being what a clock override would need. A plant (a function reading `current_setting('app.now')`) fails it. The two `poly.*` settings carry an address and a browser string only (R3), never a time.
 
 **The clock in tests.** Postgres' clock cannot be faked, so "a fake clock" means row facts moved by a superuser helper, as `auth-refresh.test.ts` does. `lapseLock(userId)` in `tests/db/helpers/second-step.ts`, as superuser, in its own transaction with `SET LOCAL session_replication_role = replica`: `UPDATE public.two_factor SET locked_until = clock_timestamp() - interval '1 second'`. Node's `Date` is not faked for lock tests. The existing direct lapse at `auth-signin-tx.test.ts:156` and the unmarked lock write at `second-step-gates.test.ts:399` change to the helper and to the guard's lengths.
 
@@ -84,9 +96,10 @@ Ten functions, nothing else in `app` (code-read from the grants in 0001–0015; 
 - After a correct code, the next lock is 15 minutes. After a lapse, a passkey sign-in, a password reset, or a new session by email or magic link, the next lock continues the doubling.
 - At each lock length, the right code is refused and no `session` row is created.
 - A restart between two locks: a fresh `createAuth` and pool, then the next lock is the doubled one.
-- As poly_auth during a lock: `UPDATE two_factor SET locked_until = NULL`, `SET locked_until = now()`, and the lazy-clear statement each → 42501 and the row is unchanged. Any statement on `app.second_step_streak` as each login role → permission denied.
+- BetterAuth's own 900 s write loses: the 2nd lock is 30 minutes, not 15.
+- As poly_auth during a lock: `UPDATE two_factor SET locked_until = NULL`, `SET locked_until = now()`, `SET failed_verification_count = 0`, the lazy-clear statement, and `DELETE FROM two_factor` each → 42501, and **the row is read back unchanged** (42501 alone is not proof, POLY-152 review §5.2). Any statement on `app.second_step_streak` as each login role → permission denied.
 - A passkey sign-in passes during a lock; `polycarpic cli user reset-mfa` works on a locked user and deletes the streak row.
-- pgTAP `12_sign_in_controls.sql`: no login role holds any privilege on the streak table (granted and effective); `two_factor_15_lock` exists, `tgenabled = 'O'`, fires BEFORE UPDATE OF the two columns; its function is owned by poly_govern and executable by no login role. Plants: the trigger dropped; disabled; a grant of UPDATE on the streak to poly_auth.
+- pgTAP `12_sign_in_controls.sql`: no login role holds any privilege on the streak table (granted and effective); `two_factor_15_lock` exists, `tgenabled = 'O'`, fires BEFORE UPDATE OF the two columns; its function is owned by poly_govern and executable by no login role. Plants: the trigger dropped; disabled; a grant of UPDATE on the streak to poly_auth; `two_factor_16_lock_delete` dropped; `GRANT DELETE ON public."user" TO poly_auth`.
 - Each red against the chain at 8aa8275e.
 
 ## R3. The sign-in record (S, F1)
@@ -106,7 +119,8 @@ CHECK ((kind = 'session') = (session_id IS NOT NULL))
 - Index on `(user_id, created_at)` and on `(created_at)`.
 - Owner poly_owner; RLS enabled and forced; `REVOKE ALL … FROM PUBLIC`.
 - Grants: **poly_govern** INSERT with policy `sign_in_record_append FOR INSERT TO poly_govern WITH CHECK (true)`; **poly_purge** SELECT `(user_id, created_at)` and DELETE, with policies `sign_in_record_purge_read FOR SELECT TO poly_purge USING (true)` and `sign_in_record_purge FOR DELETE TO poly_purge USING (true)`. poly_purge also gains SELECT `(id)` on `public."user"`.
-- **No login role holds any privilege on it**: not poly_app, poly_auth, poly_worker, poly_operator, poly_migrator. poly_backup reads it through `pg_read_all_data`, as it reads every table; see Decision 1.
+- **No login role holds any privilege on it**: not poly_app, poly_auth, poly_worker, poly_operator, poly_migrator.
+- **No FK to `user`, so no cascade.** Deleting a user leaves its rows until the purge removes them; deleting a user can never erase the record. poly_backup reads it through `pg_read_all_data`, as it reads every table; see Decision 1.
 
 **Written by the database, from NEW only.**
 - `app.record_session_sign_in()`, owner poly_govern, SECURITY DEFINER, `SET search_path = ''`, EXECUTE for no login role. Trigger `session_80_sign_in_record AFTER INSERT ON public.session FOR EACH ROW`. It inserts `('session', NEW.user_id, NEW.id, now(), NEW.ip_address, left(NEW.user_agent, 512))`. No caller passes a value, and `created_at` is the database clock, not BetterAuth's `NEW.created_at`.
@@ -141,17 +155,18 @@ CHECK ((kind = 'session') = (session_id IS NOT NULL))
 
 ## R5. INFRA §7.1 step 16: the objects to check
 
-The deploy-gate check (devops, in this loop) refuses unless every line holds on the target database:
+The deploy-gate check (devops, in this loop) exits non-zero and prints each failing line unless every line holds on the target database. Each line is shown to fail by a plant on a scratch database; a check that prints a count and exits 0 does not gate.
 
 | Object | Must be |
 |---|---|
 | `app.second_step_streak`, `app.sign_in_record` | exist, RLS enabled and forced |
-| triggers `two_factor_15_lock` on `public.two_factor`, `session_80_sign_in_record` on `public.session`, `sign_in_record_10_immutable` and `sign_in_record_no_truncate` on `app.sign_in_record` | exist, `tgenabled = 'O'` |
+| triggers `two_factor_15_lock` and `two_factor_16_lock_delete` on `public.two_factor`, `session_80_sign_in_record` on `public.session`, `sign_in_record_10_immutable` and `sign_in_record_no_truncate` on `app.sign_in_record` | exist, `tgenabled = 'O'` |
 | `app.guard_second_step_lock()`, `app.record_session_sign_in()` | owner poly_govern, SECURITY DEFINER, no login role can execute |
 | `app.purge_sign_in_record()` | owner poly_purge, executable by poly_worker only |
 | both tables | no login role has INSERT, UPDATE, DELETE or TRUNCATE (`has_table_privilege`, effective) |
 | `app.enter_asserted_user` | absent |
-| poly_app | no privilege on the six BetterAuth tables (effective) |
+| poly_app | no privilege on the six BetterAuth tables, `app.session_handle`, `app.sign_in_record` or `app.second_step_streak` (effective); its EXECUTE set on `app` is exactly R1's ten |
+| `public."user"` | no login role has DELETE (effective) |
 
 ## R6. Migration order
 
@@ -159,12 +174,12 @@ The deploy-gate check (devops, in this loop) refuses unless every line holds on 
    1. `app.sign_in_record`, its indexes, RLS, policies and grants; poly_purge's `SELECT (id)` on `public."user"`;
    2. `app.sign_in_record_immutable()` and the two record triggers;
    3. `app.second_step_streak`, RLS, policies, grants, its truncate trigger;
-   4. `SET ROLE poly_govern`: `record_session_sign_in`, `guard_second_step_lock`, `reset_second_step` (replaced). REVOKE FROM PUBLIC; a temporary EXECUTE to poly_owner on the two trigger functions for CREATE TRIGGER (as 0015 did);
+   4. `SET ROLE poly_govern`: `record_session_sign_in`, `guard_second_step_lock`, `guard_second_step_lock_delete`, `reset_second_step` (replaced). REVOKE FROM PUBLIC; a temporary EXECUTE to poly_owner on the three trigger functions for CREATE TRIGGER (as 0015 did);
    5. `SET ROLE poly_purge`: `purge_sign_in_record`, EXECUTE poly_worker;
    6. `SET ROLE poly_authz`: `enter_session` (R4);
-   7. `SET ROLE poly_owner`: triggers `session_80_sign_in_record` and `two_factor_15_lock`; revoke the temporary EXECUTEs.
+   7. `SET ROLE poly_owner`: triggers `session_80_sign_in_record`, `two_factor_15_lock` and `two_factor_16_lock_delete`; revoke the temporary EXECUTEs.
 2. **`0017_revocation`** (custom), as poly_owner: the REVOKEs and the policy drop (R1); `SET ROLE poly_authz`: `DROP FUNCTION app.enter_asserted_user(uuid, uuid)`; `SET ROLE poly_owner`: delete `web` markers, the kind CHECK; `SET ROLE poly_govern`: `audit_membership`; ends on poly_owner.
-3. `definers.json`: adds `record_session_sign_in`, `guard_second_step_lock`, `purge_sign_in_record`; drops `enter_asserted_user`.
+3. `definers.json`: adds `record_session_sign_in`, `guard_second_step_lock`, `guard_second_step_lock_delete`, `purge_sign_in_record`; drops `enter_asserted_user`.
 4. Nothing is deployed, so no data moves. Two files so the controls stand alone if the loop is cut (R9).
 5. R9 of POLY-152 (what a refused code commits) now also commits trigger writes to `app.sign_in_record` and `app.second_step_streak`. The statement-log test is unaffected: those writes are not statements the service sends.
 
@@ -194,7 +209,7 @@ All guesses, scaled from POLY-153 ($27, about 3.5 h, one new mechanism); this lo
 ## Decisions for the lead (the Principal's where marked)
 
 1. **(Principal, recommend a)** The criterion says no login role reads the record. poly_backup reads every table through `pg_read_all_data`, this one included. (a) Accept: the backup must hold the record, or a restore loses it, and a backup reader already holds every session and factor row. Cost nil. (b) Replace `pg_read_all_data` with per-table grants that skip the record: the backup then cannot restore it. About $5, 45 min (guess), and the record no longer survives a restore.
-2. **(Principal, recommend a)** "Only a correct code resets the doubling" holds against anyone using the web pages; the sign-in service's own SQL can zero the streak on an unlocked row (R2). (a) Accept and state it in SECURITY: that SQL can already create a session for the user, and R3 records it. (b) Also require a new session for that user in the same transaction before a reset counts, so every reset leaves a record row. About $3, 20 min (guess), and it needs a measurement that every correct-code path creates a session; a path that does not would leave the doubling unreset after a correct code.
+2. **(Principal, recommend a)** "Only a correct code resets the doubling" holds against anyone using the web pages; the sign-in service's own SQL can zero the streak whenever no lock is in force (R2, with what limits it). (a) Accept and state it in SECURITY: that SQL can already create a session for the user, and R3 records it. (b) Also require a new session for that user in the same transaction before a reset counts, so every reset leaves a record row. About $3, 20 min (guess), and it needs a measurement that every correct-code path creates a session; a path that does not would leave the doubling unreset after a correct code.
 3. **(lead)** R1 also revokes poly_app's read of `app.email_challenge`, beyond the criterion. Web has no reader.
-4. **(lead)** File a follow-up: schedule `purge_sign_in_record` and `purge_tx_identity` in the worker. Neither has a caller.
+4. **(lead)** File a follow-up: schedule `purge_sign_in_record` and `purge_tx_identity` in the worker, logging each run's count (seceng A3.6). Neither has a caller.
 5. **(lead)** POLY-89's guards keep treating `current_session_id()` as narrowing only. With kind `web` gone every marker's session comes from a live row, so a later issue may rely on it; not in this loop.
