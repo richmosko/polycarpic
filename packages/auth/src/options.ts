@@ -13,7 +13,7 @@ import { accountDropIdToken, sessionCreateBefore, userCreateAfter, userCreateBef
 
 const DAY = 86400;
 /** C-04: five a minute per IP on the credential and verification paths (S19). */
-const LIMITED = ['/sign-in/email', '/sign-in/magic-link', '/sign-up/email', '/request-password-reset', '/two-factor/verify-totp', '/two-factor/verify-backup-code', '/passkey/verify-authentication', '/second-step/send-code', '/second-step/confirm-code'];
+const LIMITED = ['/sign-in/email', '/sign-in/magic-link', '/sign-up/email', '/request-password-reset', '/two-factor/verify-totp', '/two-factor/verify-backup-code', '/passkey/verify-authentication', '/second-step/send-code', '/second-step/confirm-code', '/second-step/reauth/begin', '/second-step/reauth', '/second-step/reauth/passkey'];
 const customRules = Object.fromEntries(LIMITED.map((p) => [p, { window: 60, max: 5 }]));
 
 export interface Provider {

@@ -58,7 +58,7 @@ function withoutCommitHeader(res: Response): Response {
 /** The paths that create a session on a single factor and have no handle yet: one transaction for every row (R9). */
 const SIGN_IN_TX = new Set(['/sign-in/email', '/passkey/verify-authentication', '/two-factor/verify-totp', '/two-factor/verify-backup-code']);
 /** The second-step paths also commit a refusal below 500: the wrong-code count and the lockout survive a refused code (R9). */
-const COMMITS_REFUSAL = new Set(['/two-factor/verify-totp', '/two-factor/verify-backup-code']);
+const COMMITS_REFUSAL = new Set(['/two-factor/verify-totp', '/two-factor/verify-backup-code', '/second-step/reauth', '/second-step/reauth/passkey']);
 
 async function inTransaction(request: Request, auth: AnyAuth, run: <T>(fn: () => Promise<T>) => Promise<T>, contextFree = false): Promise<Response> {
   // The header commits only the wrong-code answer of /second-step/confirm-code, a 403 (it records the attempt). Anywhere else it is

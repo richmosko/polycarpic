@@ -134,6 +134,13 @@
       "when": 1795202200000,
       "tag": "0018_my_second_step",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1795202300000,
+      "tag": "0019_step_up",
+      "breakpoints": true
     }
   ]
 }
