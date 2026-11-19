@@ -1,7 +1,7 @@
 ---
 id: POLY-149a
 title: Revocation ruling
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-149
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-149.md, process/cairn/reviews/POLY-149/**, pro
 stage: plan
 estimate.cost_usd: "6.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "2.9794"
+actual.tokens: 3533285
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: "0.50"
 labels: [security, auth]
 priority: null
 pr: null
@@ -21,6 +26,6 @@ The architect rules the design for POLY-149 before any test is written: the revo
 
 ## Acceptance criteria
 
-- [ ] A ruling at `process/cairn/reviews/POLY-149/ruling.md` covers every criterion of POLY-149 and names each database object, so devops can write the deploy-gate check against them.
-- [ ] It says whether the loop ships as one PR or is split, with a cost for each part.
-- [ ] seceng has reviewed the ruling at an exact sha before tests start.
+- [x] A ruling at `process/cairn/reviews/POLY-149/ruling.md` covers every criterion of POLY-149 and names each database object, so devops can write the deploy-gate check against them.
+- [x] It says whether the loop ships as one PR or is split, with a cost for each part.
+- [x] seceng has reviewed the ruling at an exact sha before tests start.
