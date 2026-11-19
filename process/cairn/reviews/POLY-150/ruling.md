@@ -518,213 +518,267 @@ R7's `trustDevice` refusal stands until the lead relays approval of a shape belo
 - Points 4–7 are database work with their own guards and tests, the shape of a POLY-149 loop. Folding them in would re-gate POLY-150's tests and build.
 - (i) is not recommended. It ships trust that slides forever and survives a password change, and the user cannot see or revoke it. That defeats the opt-out the Principal wants.
 
+
 ## Addendum 3: Confirm it's you (POLY-150h; POLY-151 in this loop, DECISIONS @ d5ec9130)
 
-This addendum replaces R6's interim state and R5's disabled actions. POLY-151's criteria are C1–C4 in its order. Line references are to better-auth 1.7.18 (code-read) unless measured.
+**This addendum replaces 3427c586's Addendum 3 whole.** It answers seceng's acceptance checklist (seceng's worktree, `temp/2026-11-19-seceng-150-confirm-its-you-checklist.md`) in place, cited as [M1]–[M15], [S1], [S2] and [T1]–[T10]. It replaces R6's interim state and R5's disabled actions.
+- POLY-151's criteria are C1–C4 in its order.
+- Line references are to better-auth 1.7.18 (code-read) unless measured.
+- **The Principal has decided D4 (a):** sign-up asks for the emailed code. R1.1 and R3 stand as written.
 
-### H. The hard parts, plainly (for seceng)
+### H. The hard parts, plainly
 
-1. **The database checks no factor.** The TOTP secret and the backup codes are encrypted with the auth secret, and a WebAuthn signature cannot be verified in SQL. So **a stamp is the sign-in service's word**, as the correct-code lock reset is (POLY-149 R2, accepted 2026-11-19). The design below does not pretend otherwise. What the database *does* enforce is in A3.4. What it cannot stop is SQL run as poly_auth (A3.4).
-2. **The password is the service's word too.** Postgres cannot check it.
-3. **Replay.** Each single-use challenge and the TOTP step guard (A3.2) are enforced in the database. A TOTP code first used at a sign-in is not in that guard, because BetterAuth's sign-in verify keeps no record of the step (Open 5).
-4. **Five minutes of freshness covers every step-up action,** including adding a factor. A passed re-check is therefore as strong as account takeover for 300 s. That is why every path takes the password and a factor, never one of them alone, and why the passkey path requires user verification.
-5. **The backup code (D7).** A password and a backup code already sign a user in anywhere. As a re-check, they let the holder remove the user's authenticator and add their own. That is the lost-phone path the codes exist for, and it is also the takeover path.
+1. **This adds reach for SQL run as poly_auth, and it is not designed away** [M1].
+   - **What that SQL reaches today:**
+     - It cannot make an enrolled user's session fresh. `recent_auth_at` is written only by the first-enrolment insert (0013, `take_recent_auth_stamp`), and `guard_recent_auth` refuses every other write.
+     - It can already create a session for any user, and reach web as them (R-2; POLY-153 R12). That session is never fresh.
+   - **What this route adds.** The database checks no factor: the TOTP secret and the backup codes are encrypted with the auth secret, and SQL cannot verify a WebAuthn signature. A stamp is therefore **the service's word**. SQL as poly_auth can begin and complete its own re-check for any session it holds or creates, and so pass every step-up guard (H.3) for every enrolled user.
+   - **The worst case** is that it **adds its own passkey or TOTP to a victim as a "later factor"**, then signs in with it through the ordinary HTTP routes. That is account takeover that outlasts the compromise.
+   - **What it cannot do:** remove the trace. Every stamp writes a `step_up` row (A4), and every created session writes a `session` row (C-89), and no login role can delete either.
+   - **SECURITY R-2 gains:** "SQL as poly_auth can mark any session it holds or creates as freshly confirmed, which unlocks the step-up actions for every enrolled user, including adding a factor. Each stamp leaves a `step_up` row it cannot remove."
+2. **What would design it away, and why each is declined:**
+   - **[S1] The database checks the TOTP code itself.** It needs a seed copy in a poly_govern-only table and HMAC-SHA1 in SQL (pgcrypto, about $15 and 50 minutes, guess).
+     - **Declined:** the seed becomes readable to the database server and to every backup (`poly_backup` reads all data), where today it is encrypted under the auth secret. That trades a service compromise for a backup leak, and a backup is the likelier to leak.
+     - It also leaves the passkey path as the service's word, because SQL cannot verify a WebAuthn signature. So it would not close the gap.
+   - **Binding the stamp to the session's web handle,** which no login role can read.
+     - **Declined:** SQL as poly_auth can create a victim session and attach its own handle (POLY-153 R3), then stamp that. So the binding only forces a new `session` row, and the `step_up` row is written anyway.
+     - About $4 (guess), for nothing new.
+3. **Every step-up the stamp unlocks today** [M13], for 300 s on the database clock, on that one session [M12]:
+   - **The service's step-up class:** `/passkey/delete-passkey`, `/two-factor/disable`, `/two-factor/generate-backup-codes`, `/unlink-account`, `/link-social` (real domain only), `/change-email` and `/revoke-other-sessions`;
+   - **the enrolment class once `second_step_at` is set:** `/two-factor/enable`, `/passkey/generate-register-options` and `/passkey/verify-registration`, which add a later factor;
+   - **the database's own guards,** which read the stamp:
+     - a later factor's `two_factor` and `passkey` INSERTs (POLY-89 R3 #5, #6);
+     - a marked change of `backup_codes` (#5);
+     - the method deletes (#7), which still pass `refuse_last_method`, so the stamp never removes the last method while it is needed [M14];
+   - **web:** `app.revoke_my_session` of another session, and `recent_auth_ok()` for R5's actions;
+   - **nothing else.**
+   - **What later actions will do with it.** Export, purge, bank link and account deletion will read it. **Purge and account deletion should consume it,** through a single-use `consumed_at`, so that one check is never spent on two irreversible actions. That is ruled when they land, and named here.
+4. **`/change-email`** [M15]. `options.ts` does not enable BetterAuth's `changeEmail`, so the route answers BetterAuth's refusal today (code-read pending; qa reads the answer).
+   - Before anyone enables it: changing the email moves the first-enrolment anchor and the recovery address, and it writes no record row today.
+   - That is **Open 6**. Enabling it needs a security notice to the old address (SECURITY §9) and a record row.
+5. **The backup code (D7)** is the lost-phone path and also a takeover path for someone who holds the password and a code. The write order that passes guard #5 is A3.3 [M10].
 
-### A1. Routes (anchor plugin, `packages/auth/src/anchor.ts`), new route class `reauth`
+### A1. Routes (anchor plugin, `packages/auth/src/anchor.ts`), new route class `reauth` [M7]
 
 | Route | Body | Does |
 |---|---|---|
-| `POST /second-step/reauth` | `{password, code}` or `{password, backupCode}` | One request, one `withAuthSession` transaction |
-| `POST /second-step/reauth/passkey-options` | `{}` | Begins a passkey challenge for this session; answers WebAuthn request options |
-| `POST /second-step/reauth/passkey` | `{response}` | Verifies the assertion and completes the check |
+| `POST /second-step/reauth/begin` | `{method: 'totp' \| 'backup_code' \| 'passkey'}` | `app.begin_step_up` issues the challenge. Passkey: also answers WebAuthn request options |
+| `POST /second-step/reauth` | `{challengeId, password, code}` or `{challengeId, password, backupCode}` | The code check and the stamp, in one `withAuthSession` transaction |
+| `POST /second-step/reauth/passkey` | `{challengeId, response}` | The assertion check and the stamp |
 
 **The `reauth` class (`AUTH_ROUTES`):**
-- It needs a session and `second_step_at` set, and answers 403 `no_second_step` otherwise. A user with no second step meets the set-up dialog instead.
-- It runs in `withAuthSession`, so the marker has kind `auth`, the session is proven by its own token (POLY-152 R5), and the user is that session's.
+- It is POST only, under `routePolicyHook`'s origin check.
+- It needs a session, and answers 401 with none. It needs `second_step_at`, and answers 403 `no_second_step` without one.
+- It runs in `withAuthSession` (marker kind `auth`).
 - All three paths join `LIMITED` (5 per 60 s per address).
-- They also join the second-step commit rule (POLY-152 R9): a refusal below 500 commits, so that wrong-code counts and challenge consumption survive. This uses the existing `COMMIT_HEADER` response.
+- **The per-user cap is the shared counter and lock** (A4), so no second per-user limit is added [M9].
+- They join the second-step commit rule (POLY-152 R9): a refusal below 500 commits, through `COMMIT_HEADER`, so wrong-code counts and consumed challenges survive.
 
 **`POST /second-step/reauth`, in order:**
-1. **The password** (`ctx.context.password.verify`, as the anchor checks it). A wrong one answers 403 `step_up_failed` and touches no factor counter, so guessing codes needs the password first. A user with no password gets 403 `password_required`; the provider round trip is POLY-88.
-2. **Not during a lock.** If the verified `two_factor` row's `locked_until > now()`, answer BetterAuth's lock refusal. Under D6 (b) the refusal carries `pausedFor`; the passkey path stays open, as it does at sign-in.
-3. **The code.**
-   - For `code`: decrypt the secret (`symmetricDecrypt`, as `totp/index.mjs:20`) and find which of the steps `now − 1`, `now` and `now + 1` (30 s each) the code matches. Compare in constant time, against BetterAuth's own `createOTP` (`totp/index.mjs:157`).
-   - For `backupCode`: decrypt the list as `backup-codes/index.mjs:46` does, then find and remove the code.
-   - Which storage the list uses (`storeBackupCodes`, unset in `options.ts`) is (code-read pending). The builder reads it from BetterAuth and does not assume it.
-4. **A wrong code** writes `failed_verification_count + 1`, and at 10 the lock, with BetterAuth's own statements and shape (POLY-149 R2). It answers 403 `step_up_failed`.
-5. **A right code:**
-   - `SELECT app.complete_step_up($1, $2)` first, as A3 sets out;
-   - then, on the backup-code path, the shortened, re-encrypted list (`UPDATE two_factor SET backup_codes`). The order is fixed by A3.3;
-   - then the correct-code reset: `failed_verification_count = 0, locked_until = NULL`. That is the shape that resets the doubling.
+1. **Not during a lock** [M8]. If the verified `two_factor` row's `locked_until > now()`, answer the lock refusal before any check. Under D6 (b) it carries `pausedFor`; the passkey path stays open.
+2. **The password** (`ctx.context.password.verify`, against `session.user` from the cookie [M4]). Wrong → 403 `step_up_failed`, the same answer as a wrong code [M6], and no factor counter is touched.
+   - A user with no password → 403 `password_required`. There is no provider path until POLY-88 [M6].
+   - A password alone never passes: the code step is always required (C-03).
+3. **The code, checked against `session.user`'s own row and never against a user id in the body** [M4].
+   - **For `code`:** decrypt the secret as `totp/index.mjs:153` does, and find which of the steps `now − 1`, `now` and `now + 1` (30 s each) it matches, in constant time.
+     - BetterAuth's own `createOTP(…).verify(code)` (`totp/index.mjs:157-160`) returns only true or false and records no step. So **it accepts the same code again within its window** (code-read, the lines cited) [M3].
+   - **For `backupCode`:** decrypt the list as `backup-codes/index.mjs:46` does, then find and remove the code. Which storage the list uses (`storeBackupCodes` is unset in `options.ts`) is (code-read pending); the builder reads it and does not assume it.
+4. **A wrong code** → BetterAuth's own counter statements and shape (POLY-149 R2): `+1`, and the lock at 10. Then 403 `step_up_failed`.
+5. **A right code, in this order:**
+   1. `SELECT app.complete_step_up($1, $2, $3)`, as in A3.2;
+   2. on the backup-code path, `UPDATE two_factor SET backup_codes` with the shortened, re-encrypted list (A3.3);
+   3. the correct-code reset (`failed_verification_count = 0, locked_until = NULL`).
+   
+   Then `200 {status: true}`.
 
-   It answers `200 {status: true}`.
-
-**The passkey path:**
-- **Options:** user verification `required`, and `allowCredentials` set to the user's passkeys.
-  - The challenge is 32 random bytes. It is stored only as `sha256` by `app.begin_step_up('passkey', $hash)`, and expires in 5 minutes.
-- **Verify** uses `@simplewebauthn/server`'s `verifyAuthenticationResponse`, a direct dependency pinned to the version `@better-auth/passkey` already uses (13.3.3, measured from the lockfile directory).
-  - `expectedChallenge` is a function that compares `sha256` of the presented challenge with the stored hash.
+**The passkey path** [M5]:
+- **Options** (from `begin`):
+  - user verification `required`;
+  - `allowCredentials` set to `session.user`'s passkeys;
+  - a 32-byte challenge stored only as `sha256` on the challenge row.
+- **Verify:** `@simplewebauthn/server`'s `verifyAuthenticationResponse`, a direct dependency pinned to the version `@better-auth/passkey` uses (13.3.3, measured from the lockfile directory).
+  - `expectedChallenge` is a function comparing `sha256` with the stored hash.
   - `requireUserVerification` is `true`.
-  - The credential must be one of the user's passkeys, and the counter is written back as at sign-in.
-  - Then `SELECT app.complete_step_up('passkey', $challengeId)`.
-- **A failed assertion** consumes the challenge (committed) and answers 403 `step_up_failed`. A passkey has no failure counter, the same as at sign-in.
+  - The credential's `user_id` must be `session.user`'s [M4].
+  - The counter is written back, never lower (A3.5).
+  - Then `complete_step_up('passkey', $challengeId, NULL)`.
+- **It creates no session and no rotation.** BetterAuth's `/passkey/verify-authentication` signs in, so it is not used [M5].
+- **A failed assertion** consumes the challenge (committed), appends `step_up_failure` (A4) and answers 403 `step_up_failed`.
 
-**Not reused:** BetterAuth's `/two-factor/verify-totp` with a session. That is the enrolment verify: it rotates the session and is gated by the step-up it would grant (code-read; POLY-89 R3).
+**Not reused:** BetterAuth's `/two-factor/verify-totp` with a session. That is the enrolment verify: it rotates the session and is gated by the step-up it would grant (POLY-89 R3).
 
 ### A2. What web sends and where the dialog is mounted (replaces R6's interim state and R5's disabled actions)
 
-**What it is.** `ConfirmItsYou.svelte` follows R3.0's mounting (a portal, outside any page form, `fetch` only to `/api/auth`) and R3.5's clearing.
+**What it is.** `ConfirmItsYou.svelte` follows R3.0's rules: a portal, outside any page form, with `fetch` only to `/api/auth`. It follows R3.5's clearing.
 
-**Which options it offers.** They come from `mySecondStep`, the user's own facts:
-- **Authenticator app:** password and 6-digit code (`autocomplete="current-password"` and `"one-time-code"`), with "Use a backup code instead" if D7 (b);
-- **Passkey:** one button, which runs options → `navigator.credentials.get` → verify.
+**Opening it.** Opening the dialog sends `begin` for the method shown first:
+- the authenticator app if `totp_added_at` is set, else a passkey;
+- switching method sends `begin` again, which replaces the open challenge.
 
-**What happens after a pass:**
+**The methods** come from `mySecondStep`, the user's own facts:
+- **Authenticator app:** password and 6-digit code (`autocomplete="current-password"` and `"one-time-code"`). "Use a backup code instead" is shown under D7 (b).
+- **Passkey:** one button, which runs `navigator.credentials.get` and then verify.
+
+**After a pass:**
 - `invalidateAll()` runs, so `recentAuthOk` is true.
-- The action that opened the dialog then runs as a new request, never as a replay.
-- Failure shows DESIGN's single message, which names neither the password nor the code [S16].
+- The action that opened the dialog runs as a new request, never a replay.
+- A failure shows DESIGN's single message, "That password or code didn't work", with no count [M6, S16].
 
-**Where it is mounted:** on R5's step-up actions (Add passkey, Remove, Make new codes) whenever `recentAuthOk` is false. Later step-up actions (export, purge and the rest) mount the same component. While `recentAuthOk` is true, the actions run directly. R5's disabled state and R6's no-input interim state are removed.
+**Where it is mounted:**
+- on R5's step-up actions (Add passkey, Remove, Make new codes) whenever `recentAuthOk` is false;
+- on later step-up actions (export, purge and the rest), which mount the same component;
+- while `recentAuthOk` is true, the actions run directly.
 
-### A3. How the stamp is written (C2)
+### A3. How the stamp is written
 
-**Tables** (owner poly_owner, RLS forced, no privilege for any login role):
-- `app.step_up_challenge (id uuid PK, user_id → user CASCADE, session_id → session CASCADE, challenge_hash bytea CHECK (octet_length = 32), created_at, expires_at)`, with a unique index on `session_id`, so there is one open challenge per session. poly_govern holds SELECT, INSERT and DELETE.
-- `app.step_up_totp (user_id PK → user CASCADE, last_step bigint NOT NULL)`. poly_govern holds SELECT, INSERT and UPDATE.
-- `app.step_up_pending (xid xid8 PK, user_id)`. poly_govern holds INSERT and DELETE. It backs the backup-code check in A3.3.
+**Tables** (owner poly_owner; RLS forced; no privilege for any login role):
+- `app.step_up_challenge (id uuid PK, user_id → user CASCADE, session_id → session CASCADE, method text CHECK (method IN ('totp','backup_code','passkey')), webauthn_hash bytea NULL CHECK (octet_length = 32), created_at, expires_at)`.
+  - A unique index on `session_id` allows one open challenge per session.
+  - The CHECK `(method = 'passkey') = (webauthn_hash IS NOT NULL)`.
+  - poly_govern holds SELECT, INSERT and DELETE.
+- `app.step_up_totp (user_id PK → user CASCADE, last_step bigint NOT NULL)`. It is forward-only: poly_govern holds SELECT, INSERT and UPDATE, and `step_up_totp_10_forward` (BEFORE UPDATE) refuses `NEW.last_step < OLD.last_step` for every role [M3].
+- `app.step_up_pending (xid xid8 PK, user_id)`. poly_govern holds INSERT and DELETE (A3.3).
 
-**Definers** (owner poly_govern; SECURITY DEFINER; `SET search_path = ''`; EXECUTE **poly_auth only**; 0011's exact-call check; listed in `definers.json`):
+**Definers** (owner poly_govern; SECURITY DEFINER; `SET search_path = ''`; **EXECUTE poly_auth only**; 0011's exact-call check; listed in `definers.json`). None takes a session or user parameter.
 
-**A3.1 `app.begin_step_up(p_kind text, p_hash bytea) RETURNS uuid`**
-- **Refuses (42501)** unless every one of these holds:
-  - the marker exists with **kind `auth`** and a session;
-  - the user has `second_step_at`;
-  - `p_kind = 'passkey'`;
-  - the user has a passkey.
-- It deletes the session's open challenge, inserts the new one with `expires_at = now() + 5 minutes`, and returns its id.
+**A3.1 `app.begin_step_up(p_method text, p_webauthn_hash bytea) RETURNS uuid`** [M2]
+- **Refuses (42501)** unless all hold:
+  - a marker with kind `auth` and a session;
+  - the marker user has `second_step_at`;
+  - for `totp` and `backup_code`, a verified `two_factor` row;
+  - for `passkey`, a passkey and a hash.
+- It deletes the session's open challenge, then inserts the new one: `id = gen_random_uuid()` and `expires_at = now() + 5 minutes`. It returns the id.
 
-**A3.2 `app.complete_step_up(p_kind text, p_ref text) RETURNS boolean`**
-- **Common refusals (42501):**
-  - no marker of kind `auth` with a session;
-  - the user has no `second_step_at`;
-  - an earlier stamp in this transaction.
-- **Per kind:**
-  - **`totp`**, with `p_ref` the matched step as text:
-    - the user's verified `two_factor` row exists, and its `locked_until` is NULL or not later than `clock_timestamp()`;
-    - the step is within `floor(epoch(clock_timestamp()) / 30) ± 1`;
-    - the step is **greater than** `step_up_totp.last_step`, which is then set to it;
-    - so the same code, or an earlier one, never stamps twice.
-  - **`backup_code`**, with `p_ref` NULL:
-    - the same `two_factor` and lock conditions;
-    - it inserts `step_up_pending (pg_current_xact_id(), user)`, which A3.3 resolves.
-  - **`passkey`**, with `p_ref` the challenge id:
-    - the challenge exists for the marker user **and** the marker session, and is unexpired;
-    - it is deleted here, which makes it single-use.
-- **Then, for every kind:**
-  - `UPDATE public.session SET recent_auth_at = clock_timestamp() WHERE id = app.current_session_id() AND user_id = app.current_user_id()`. It must hit **exactly one row**, or it raises.
-  - poly_govern already holds `UPDATE (recent_auth_at)` (POLY-89 R1.4). Under R1.3, `session_11_recent_auth_fixed` lets a poly_govern definer through (unmeasured: the test stamps through `complete_step_up`, and is also refused writing the column directly as poly_auth).
-  - It appends a sign-in record row (A4) and returns true.
+**A3.2 `app.complete_step_up(p_method text, p_challenge uuid, p_step bigint) RETURNS boolean` — the one new writer of `recent_auth_at`** [M1]
+- **Refuses (42501), leaving everything unchanged,** unless all hold:
+  - a marker with kind `auth` and a session;
+  - the marker user has `second_step_at`;
+  - no earlier stamp in this transaction;
+  - **the challenge `p_challenge` exists for the marker user and the marker session, with `method = p_method`, and is unexpired.** It is then deleted, so it is single-use [M2];
+  - **for `totp` and `backup_code`:** the verified `two_factor` row's `locked_until` is NULL or not later than `clock_timestamp()` [M8];
+  - **for `totp`:** `p_step` is within `floor(extract(epoch FROM clock_timestamp()) / 30) ± 1`, and **greater than** `step_up_totp.last_step`. That row is then set to `p_step` [M3];
+  - **for `backup_code`:** it inserts `step_up_pending (pg_current_xact_id(), user)` (A3.3).
+- **Then:**
+  - `UPDATE public.session SET recent_auth_at = clock_timestamp() WHERE id = app.current_session_id() AND user_id = app.current_user_id()`. It must hit **exactly one row**, or it raises. That is the session row's own `user_id` [M4].
+  - It inserts the `step_up` record row (A4) in the same statement sequence, so no stamp exists without its row [M11].
+  - It returns true.
+- **Its grants.** poly_govern holds `UPDATE (recent_auth_at)` (POLY-89 R1.4). `guard_recent_auth` lets it through under R1.3 and refuses every other writer (unmeasured: qa stamps through it, and is refused writing the column directly as poly_auth).
+- **A catalog test pins it** as the only function, outside 0013's two, whose body assigns `recent_auth_at` [M1].
 
-**A3.3 The backup-code evidence.**
-- `two_factor_85_step_up_spent`, AFTER UPDATE OF `backup_codes` ON `two_factor`, run by a poly_govern function, deletes the `step_up_pending` row for `pg_current_xact_id()` when `OLD.backup_codes IS DISTINCT FROM NEW.backup_codes`.
-- `step_up_pending_resolved` is a CONSTRAINT trigger on `step_up_pending`, AFTER INSERT, DEFERRABLE INITIALLY DEFERRED. At commit it raises if its row still exists.
-- So a backup-code stamp commits only if the list changed in the same transaction.
-- **Order matters, and the route must keep it:** stamp first, then write the list.
-  - Guard #5 (POLY-89 R3) allows a marked change of `backup_codes` only with a fresh step-up, and the stamp is what makes it fresh.
-  - Writing the list first is refused by #5. Never writing it is refused at commit.
-- The guard and its deferred check are (unmeasured); qa runs both orders.
+**A3.3 The backup-code write order** [M10]
+- Guard #5 lets a **marked** change of `backup_codes` through only with a fresh step-up. So the code cannot be consumed before the stamp.
+- **The order is: stamp first, then write the list, in one transaction.** Guard #5 then sees the new stamp and passes the write.
+- **Two triggers keep a stamp from standing without the write:**
+  - `two_factor_85_step_up_spent` (AFTER UPDATE OF `backup_codes`, poly_govern) deletes this transaction's `step_up_pending` row when `OLD.backup_codes IS DISTINCT FROM NEW.backup_codes`;
+  - `step_up_pending_resolved` is a CONSTRAINT trigger, DEFERRABLE INITIALLY DEFERRED, that raises at commit if the row is still there.
+- **The result:** writing the list first is refused by #5, and never writing it is refused at commit. In both cases the whole transaction, stamp included, rolls back. Both orders are (unmeasured); qa runs them.
+- The guard gains no exception.
 
-**A3.4 What this enforces, and against whom**
+**A3.4 The sign-in TOTP step joins the guard** [M3]
+- `app.note_totp_step(p_user uuid, p_step bigint)` is a poly_govern definer, EXECUTE poly_auth, under the exact-call check. It sets `last_step = greatest(last_step, p_step)`, and refuses a step outside `now ± 1`.
+- It is called by an after-hook in the existing last plugin when `/two-factor/verify-totp` succeeds, at sign-in or at first enrolment. The hook recomputes the matched step from `ctx.body.code` against the user's secret.
+- **The result:** a code accepted at sign-in cannot then pass a re-check, across all sessions, because the step guard is per user.
+- **It does not make BetterAuth's sign-in refuse a reused code** (Open 5).
+- **Its reach for SQL as poly_auth:** it can only push `last_step` forward by at most one step, which can at worst refuse one honest re-check for 30 s.
 
-| Who | Can they stamp? |
-|---|---|
-| poly_app (web, web injection) | **No.** No EXECUTE on any of the four definers, and no privilege on the three tables. Pinned in pgTAP 11 (eleven functions, unchanged) and in pgTAP 08's absence checks. **No new grant for poly_app (C2).** |
-| A replayed HTTP request | **No.** TOTP: the step guard. Passkey: the challenge is gone. Backup code: the code is gone from the list, and the next decrypt does not find it. |
-| poly_auth SQL alone (injection in the service) | **Yes,** on any session whose token it can read, because the database cannot tell a checked code from an unchecked one. **What that buys:** freshness on a session it still cannot use. Using it needs the session cookie, which is the token signed with the auth secret, or the session's web handle, which no role can read (POLY-153 R1). |
-| Code execution in the service | **Yes, and more.** It holds the auth secret and every cookie, which is R-2's standing reach whatever is chosen here. |
+**A3.5 The passkey counter.**
+- Guard #6 (POLY-89 R3) already confines a marked UPDATE to the row's own user, and to `name` or `counter`.
+- 0019 replaces it so that **a marked `counter` change, like an unmarked one, never goes down**. A constant 0 still passes [M4].
 
 ### A4. The growing lock (C-88) and the sign-in record (C-89)
 
-**The lock.**
-- A wrong code on `/second-step/reauth` writes BetterAuth's own counter shape, so `two_factor_15_lock` doubles the lock exactly as at sign-in (POLY-149 R2).
-- A right code writes the correct-code reset shape, which resets the doubling. That reset is the service's word, as accepted.
-- During a lock, both the service (A1 step 2) and the database (`complete_step_up`'s `locked_until` test) refuse the code paths. The passkey path stays open.
-- That a marked counter write on a verified row passes guard #5 and reaches `two_factor_15_lock` is (unmeasured); qa measures it. POLY-149's lock tests run for this route too: 10 wrong codes lock it, and the 2nd lock is 30 minutes.
+**One counter, one lock [M8].**
+- A wrong code at a re-check writes `two_factor.failed_verification_count` with BetterAuth's shape. `two_factor_15_lock` then doubles the same streak and locks the same factor, and POLY-149's guard appends `second_step_failure` with the address and browser (from `poly.client_ip` and `poly.user_agent`, which `withAuthSession` sets).
+- A right code writes the correct-code reset, which is the service's word, as accepted.
+- During a lock, the code paths are refused by the service (A1 step 1) and again by the database (A3.2). The passkey path stays open.
+- That a marked counter write on a verified row passes guard #5 and reaches `two_factor_15_lock` is (unmeasured).
 
-**The sign-in record.**
-- Wrong codes already append `second_step_failure` rows, and locks append `second_step_lock` rows (POLY-149 R3's guard). Each row carries the address and browser from `poly.client_ip` and `poly.user_agent`, which `withAuthSession` sets.
-- A pass appends **`step_up`** with `method` (`totp` | `backup_code` | `passkey`). The kind CHECK gains it, and a nullable `method` column, CHECKed, is set only on `step_up` and `step_up_failure` rows.
-- A failed passkey assertion appends `step_up_failure` with `method = 'passkey'`. The service sends it through `app.record_step_up_failure()`: a poly_govern definer, EXECUTE poly_auth, exact-call, marker kind `auth`. That is the only failure the counters do not already record.
+**The record, written by the database [M11].**
+- `complete_step_up` appends `kind = 'step_up'` with `method`, `session_id`, and the address and browser from the transaction's settings.
+- `sign_in_record`'s kind CHECK gains `step_up` and `step_up_failure`, and a nullable `method` column, CHECKed, is set only on those two kinds.
+- **A failed passkey assertion**, which no counter records, appends `step_up_failure` through `app.record_step_up_failure()`: poly_govern, EXECUTE poly_auth, exact-call, marker kind `auth`. That row is the service's word; a forger gains nothing by writing it.
+- Wrong codes are recorded by the lock guard, as above.
 
 ### A5. Migration `0019_step_up` (custom, as poly_owner)
 
 In this order:
-1. the three tables, their RLS and the poly_govern grants;
+1. the three tables, their RLS, the poly_govern grants, and `step_up_totp_10_forward`;
 2. `sign_in_record`'s kind CHECK and the `method` column;
-3. `SET ROLE poly_govern`: the four functions (`begin_step_up`, `complete_step_up`, `record_step_up_failure`, and the A3.3 trigger function), then REVOKE FROM PUBLIC and the EXECUTE grants;
-4. `SET ROLE poly_owner`: the two triggers.
+3. `SET ROLE poly_govern`:
+   - `begin_step_up`, `complete_step_up`, `note_totp_step` and `record_step_up_failure`;
+   - the A3.3 trigger functions;
+   - `guard_passkey`, replaced (A3.5);
+   - then REVOKE FROM PUBLIC, the EXECUTE grants to poly_auth, and a temporary EXECUTE to poly_owner on the trigger functions (as 0016 did);
+4. `SET ROLE poly_owner`: the triggers, then the temporary EXECUTEs revoked.
 
-Afterwards, `definers.json` and pgTAP 08 (poly_auth gains three EXECUTEs), 09 and 12 move with it.
+**What moves with it:**
+- `definers.json`;
+- pgTAP 08: poly_auth gains four EXECUTEs, granted and effective;
+- pgTAP 09: poly_govern's grants on the three tables;
+- pgTAP 12: the new triggers, `tgenabled = 'O'`, and their owners;
+- pgTAP 11 and pgTAP 07 move only if their pins require it, each in its own commit [T4].
 
-### A6. Tests (POLY-151 C3, C4, and the above)
+### A6. Tests [T1–T10] (POLY-151 C3, C4)
 
-**`tests/db`, through the real handler on poly_auth:**
-- **C3:** an enrolled user whose stamp is 6 minutes old (moved by a superuser helper) is refused 403 on `/two-factor/disable`. They pass `/second-step/reauth` with the password and a code, and then remove a method and add a passkey. The same holds by passkey (`helpers/webauthn.ts`) and by backup code.
-- **C4, each leaving `recent_auth_at` unchanged** (read back):
-  - wrong password;
-  - wrong code;
-  - the same code twice in one window;
-  - an earlier step;
-  - a step outside ±1;
-  - a passkey challenge used twice;
-  - another session's challenge;
-  - an expired challenge;
-  - a backup code used twice;
-  - a backup-code stamp with the list unwritten;
-  - a backup-code stamp with the list written first;
-  - during a lock;
-  - a user with no second step.
-- **Database refusals,** each refused and the row read back unchanged:
-  - `complete_step_up` and `begin_step_up` called as poly_app (permission denied);
-  - the same as poly_auth under kind `session`, under kind `signup`, with no marker, and outside the exact call;
-  - a direct `UPDATE session SET recent_auth_at` as poly_auth.
-- **Lock and record:** 10 wrong codes on this route lock the factor, the 2nd lock is 30 minutes, and the sign-in record holds the `step_up`, `second_step_failure` and `step_up_failure` rows with the address.
+**`tests/db`, through the real handler on poly_auth**, each refusal reading `recent_auth_at` back unchanged:
 
-**E2E:**
-- Tess (TOTP), past her window, removes a passkey through Confirm it's you.
-- Kay (passkey only) does the same with the virtual authenticator, `isUserVerified: true`. That a virtual authenticator with user verification passes `requireUserVerification` is (unmeasured).
-- Wrong code: one message, and the action is not run.
+| # | Test |
+|---|---|
+| **T1 Replay** | The same `/second-step/reauth` request twice: the second answers 403, and the challenge row is gone after the first. |
+| **T2 Code reuse** | A code accepted at a held sign-in, then the same code at a re-check within 30 s → refused. The same between two sessions of one user, and an earlier step. |
+| **T3 Forgery and confusion** | `begin_step_up` and `complete_step_up` as poly_app → permission denied. As poly_auth under kinds `session` and `signup`, with no marker, and outside the exact call → 42501. Another session's challenge → refused. POLY-89 R1.2's cases: another user's session, and a session id with no row. A direct `UPDATE session SET recent_auth_at` as poly_auth → refused. |
+| **T4 Catalog** | The four definers' EXECUTE grants (poly_auth only), the exact-call check, and the single-writer pin (A3.2). |
+| **T5 Lock** | 10 wrong re-check codes lock the factor, the 2nd lock is 30 minutes, and `second_step_failure` rows are written. During the lock, a code re-check is refused and a passkey re-check passes. |
+| **T6 Backup code** | It is consumed once, and its record row says `backup_code`. Used twice → refused. A stamp with the list unwritten → the commit fails. The list written first → refused by #5. |
+| **T7 Passkey** | Through `helpers/webauthn.ts`: no new `session` row, no rotation, and the stamp lands on the existing session. An assertion for another user's credential → refused. A counter lower than stored → refused. |
+| **T8 Window** | With a superuser-set stamp: unlocked at 299 s, refused at 301 s. A rotation (first-verify, disable) leaves the new session with no stamp. |
+| **T9 Record** | One `step_up` row per success, with the method. It is written even when the route is bypassed and `complete_step_up` is called directly as SQL on poly_auth, which shows the row comes from the database. |
+| **C3** | After the 5-minute window: `/two-factor/disable` → 403. Then a re-check by code, by passkey and by backup code, and then remove a method and add a passkey. |
+
+**Further tests:**
+- the wrong password and the wrong code give the same answer;
+- `password_required` for a user with no password;
+- `no_second_step`.
+
+**E2E [T10]:**
+- Tess, past her window, opens Settings → Remove, re-checks with TOTP in the dialog, and the passkey is removed.
+- Kay does the same with a virtual authenticator, `isUserVerified: true`.
+- A wrong code shows the one message with no count, and the action does not run.
+- R3.0's request-log check and R3.5's clearing checks run for this dialog.
 
 **Unmeasured, for qa's red run:**
-- the TOTP step matching against `createOTP`;
+- the step matching against `createOTP`;
 - the backup-code storage format;
-- the deferred backup-code check, in both orders;
-- `session_11` letting the definer through;
+- A3.3 in both orders;
+- `guard_recent_auth` letting the definer through;
 - marked counter writes reaching the lock guard;
-- the commit of refusals;
-- the virtual authenticator's user verification.
+- refusals committing;
+- the virtual authenticator's user verification passing `requireUserVerification`;
+- `/change-email`'s answer.
 
 ### A7. Cost (guess), added to R11
 
 | Part | Cost | Time |
 |---|---|---|
-| This ruling (150h) and seceng's review | $10 | 40 min |
-| Tests (A6) | $16 | 45 min |
-| Build: routes, 0019, the dialog wired (150i) | $26 | 80 min |
-| **Added to the loop** | **$52** | **about 2 h 45 min** |
+| This ruling, its re-issue, and seceng's review | $13 | 50 min |
+| Tests (A6) | $18 | 50 min |
+| Build: routes, the step hook, 0019, the dialog wired (150i) | $29 | 90 min |
+| **Added to the loop** | **$60** | **about 3 h 10 min** |
 
-With R6's interim state removed (−$3), the loop total on the recommended options is about **$138 and 7 h 30 min**. That is above the earlier +$35 guess for D3 (a), because the backup-code evidence and the replay guard were not priced then.
+With R6's interim state removed (−$3), the loop total on the recommended options is about **$146 and 7 h 55 min**.
 
-### D7 (Principal, recommend b). The backup code as a re-check
+### D7 (Principal, recommend b). The backup code as a re-check [M10, S2]
 
-- **(a) Not accepted.** Only the password plus an authenticator code, or a passkey.
-  - It is the stronger option: a stolen backup code plus the password then signs the attacker in, but cannot change the user's methods.
-  - It is simpler: no A3.3.
-  - The cost falls on a user who lost their phone. They sign in with a backup code but cannot remove the lost authenticator, and need the operator's `reset-mfa`.
-  - It saves about $6 and 20 minutes (guess).
-- **(b) Accepted, with the password, as designed above.** It is what DESIGN draws and what the codes are for. The added reach is A3.3's evidence check plus the lock, against a holder who already signs in with the same two things.
-- **Why (b):** the step-up gives a password-and-backup-code holder nothing they cannot reach by signing in with the same two things, except changing methods. Without it, the only recovery is an operator's identity check.
+- **(a) [S2, the stronger option] No backup codes for a re-check; they stay for sign-in recovery only.**
+  - A stolen code plus the password then signs someone in, but cannot change the user's methods.
+  - There is no A3.3. It saves about $6 and 20 minutes (guess).
+  - A user who lost their phone signs in with a code, but needs the operator's `reset-mfa` to replace the lost authenticator.
+- **(b) Accepted with the password, as above.** It is what DESIGN draws and what the codes are for.
+  - Over signing in with the same two things, it adds one power: changing methods, which is H.1's takeover.
+- **Why (b):** without it, the only recovery is an operator's identity check, which is the weaker control (Open 4).
+- **If seceng or the Principal weigh takeover above recovery, (a) is the safer choice,** and costs only A3.3's removal.
 
 ### Open (Addendum 3)
 
-5. **A TOTP code first used at a sign-in can be replayed within its window** at BetterAuth's sign-in verify, because BetterAuth keeps no step. A later issue could feed `step_up_totp` from an after-hook on `/two-factor/verify-totp` to share one guard. It is not done here because it changes BetterAuth's sign-in path.
+5. **BetterAuth's sign-in verify still accepts a reused code within its window** (`totp/index.mjs:157-160`). A3.4 only records the step. Making sign-in refuse a reused step means a before-hook on `/two-factor/verify-totp` that reads `step_up_totp`. That is a change to BetterAuth's sign-in path, for its own issue.
+6. **`/change-email`** must not be enabled until it sends a security notice to the old address and writes a record row (H.4).
