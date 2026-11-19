@@ -1,7 +1,7 @@
 ---
 id: POLY-153b
 title: Handle entry security review
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-153
 blocked_by: [POLY-153a]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-153.md, process/cairn/reviews/POLY-153/**, pro
 stage: plan
 estimate.cost_usd: "9.00"
 estimate.gate_cycles: 3
+actual.cost_usd: "4.1481"
+actual.tokens: 8593675
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: "0.46"
 labels: [security, auth]
 priority: null
 pr: null
