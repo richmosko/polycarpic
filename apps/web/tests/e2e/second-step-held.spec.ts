@@ -67,7 +67,8 @@ test('spec 5: Kay (a passkey only) signs in by password and lands on ?with=passk
   const client = await page.context().newCDPSession(page);
   await client.send('WebAuthn.enable');
   const { authenticatorId } = await client.send('WebAuthn.addVirtualAuthenticator', { options: { protocol: 'ctap2', transport: 'internal', hasResidentKey: true, hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true } });
-  await client.send('WebAuthn.addCredential', { authenticatorId, credential: { credentialId: k.credentialId, isResidentCredential: true, rpId: k.rpId, privateKey: k.privateKey, userHandle: k.userHandle, signCount: 0 } });
+  await client.send('WebAuthn.addCredential', { authenticatorId, credential: { credentialId: Buffer.from(k.credentialId, 'base64url').toString('base64'), // CDP takes standard base64; the seed stores base64url
+    isResidentCredential: true, rpId: k.rpId, privateKey: k.privateKey, userHandle: k.userHandle, signCount: 0 } });
   await signInUi(page, k.email, k.password);
   await page.waitForURL('**/sign-in/second-step**');
   expect(new URL(page.url()).searchParams.get('with'), 'the display hint').toBe('passkey');
