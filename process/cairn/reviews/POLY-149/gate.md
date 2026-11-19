@@ -23,6 +23,8 @@ Not run: `tests/infra/image` (Docker image build, POLY-143) and `tests/log`. tes
 
 **db time against the same-day main control (be41b202, 902 tests, 40 files, 76 s, load under 6): 1057 tests, 47 files, 96 s at load about 5 (+20 s, +26 %) for +155 tests and +7 files.** The earlier runs on this branch took 93 s and 96 s at the same load; two runs at load 13 to 26 took 1048 s with 60 s timeouts, so a reading needs the load beside it.
 
+**Order and times (local, 2026-11-19).** One sequential run after the pull at 9fc167f4, nothing in parallel and no counts carried from another sha. Non-db suites (lint, typecheck, ci, infra, config, layers, the six package and app suites) and e2e ran in one chained command from 13:18 to 13:19; `pnpm typecheck` was turbo-cached; e2e took 22 s (13:18:44 to about 13:19:05). db ran 13:19:10 to 13:20:47 (96 s, from the saved `g8.json`). Only the db run saved a timestamped output file; the other suites' times are inferred from the `uptime` stamps either side. The e2e server leaked one container (`poly83-qa-1888499d`, created 13:18:44; POLY-143); it was removed after the run.
+
 ---
 
 ## Superseded run at `8d77a350`
