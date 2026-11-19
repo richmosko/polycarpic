@@ -75,6 +75,13 @@ CREATE TRIGGER second_step_streak_no_truncate BEFORE TRUNCATE ON app.second_step
 GRANT CREATE ON SCHEMA app TO poly_govern, poly_purge, poly_authz;--> statement-breakpoint
 SET ROLE poly_govern;--> statement-breakpoint
 
+-- Addendum 4: one rule for the address on every record row: kept as given when it is an inet (so at most 45 characters), else NULL.
+-- An invoker and immutable; only the two poly_govern definers below call it.
+CREATE FUNCTION app.sign_in_address(p_value text) RETURNS text
+  LANGUAGE sql IMMUTABLE
+  SET search_path = ''
+  AS $fn$ SELECT CASE WHEN p_value IS NOT NULL AND pg_catalog.pg_input_is_valid(p_value, 'inet') THEN p_value END $fn$;--> statement-breakpoint
+
 -- R3: one row per committed session insert, from NEW only. created_at is the database clock; nothing is passed by a caller.
 CREATE FUNCTION app.record_session_sign_in() RETURNS trigger
   LANGUAGE plpgsql SECURITY DEFINER
@@ -82,13 +89,13 @@ CREATE FUNCTION app.record_session_sign_in() RETURNS trigger
   AS $fn$
   BEGIN
     INSERT INTO app.sign_in_record (kind, user_id, session_id, ip_address, user_agent)
-    VALUES ('session', NEW.user_id, NEW.id, NEW.ip_address, pg_catalog.left(NEW.user_agent, 512));
+    VALUES ('session', NEW.user_id, NEW.id, app.sign_in_address(NEW.ip_address), pg_catalog.left(NEW.user_agent, 512));
     RETURN NULL;
   END
   $fn$;--> statement-breakpoint
 
 -- R2: the lock guard. Reads only clock_timestamp(); no role is exempt. The address and browser on a second-step row are the
--- sign-in service's word (two transaction settings); the address is kept only if it is an inet.
+-- sign-in service's word (two transaction settings); the address is kept only if it is an inet (app.sign_in_address).
 CREATE FUNCTION app.guard_second_step_lock() RETURNS trigger
   LANGUAGE plpgsql SECURITY DEFINER
   SET search_path = ''
@@ -108,11 +115,7 @@ CREATE FUNCTION app.guard_second_step_lock() RETURNS trigger
         RAISE EXCEPTION 'second_step_locked' USING ERRCODE = '42501';
       END IF;
     END IF;
-    BEGIN
-      v_ip := pg_catalog.host(nullif(pg_catalog.current_setting('poly.client_ip', true), '')::pg_catalog.inet);
-    EXCEPTION WHEN others THEN
-      v_ip := NULL;
-    END;
+    v_ip := app.sign_in_address(nullif(pg_catalog.current_setting('poly.client_ip', true), ''));
     v_ua := pg_catalog.left(nullif(pg_catalog.current_setting('poly.user_agent', true), ''), 512);
     -- 3. A new lock: the length is ours, whatever was sent.
     IF NEW.locked_until IS NOT NULL AND NEW.locked_until IS DISTINCT FROM OLD.locked_until THEN
@@ -190,6 +193,7 @@ CREATE OR REPLACE FUNCTION app.reset_second_step(p_email text) RETURNS boolean
   END
   $fn$;--> statement-breakpoint
 
+REVOKE EXECUTE ON FUNCTION app.sign_in_address(text) FROM PUBLIC;--> statement-breakpoint
 REVOKE EXECUTE ON FUNCTION app.record_session_sign_in(), app.guard_second_step_lock(), app.guard_second_step_lock_delete() FROM PUBLIC;--> statement-breakpoint
 -- CREATE TRIGGER checks EXECUTE for the creator (poly_owner, step 7); dropped again there.
 GRANT EXECUTE ON FUNCTION app.record_session_sign_in(), app.guard_second_step_lock(), app.guard_second_step_lock_delete() TO poly_owner;--> statement-breakpoint
