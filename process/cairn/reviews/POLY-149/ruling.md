@@ -278,3 +278,17 @@ UPDATE public.session s SET expires_at = v_new, updated_at = pg_catalog.now()
    - A value that is not an address loses nothing a cap would have kept. The session row still holds it while it lives, and the record's job is the existence of the row.
 
    **Tests:** a session inserted with `ip_address` of 10 000 characters, and one with `'not-an-ip'`, each leave a record row with a NULL address; `'::1'` and `'203.0.113.7'` are stored as given. The same four values as `poly.client_ip` behave the same on a second-step failure row.
+
+## Addendum 5 (qa's relaxed setting pin, pgTAP 12 at c507afd3)
+
+1. **`role` is a legitimate fourth setting.** `current_setting('role')` returns the name set by `SET ROLE`, or `none`. It is not a time, and no role can use it to move a clock. Three POLY-89 commit-time trigger functions read it (0013:360, 391, 420), all to tell a superuser login with no `SET ROLE` from one that switched to a runtime role (ARCH §3.1c, "They test for a superuser by `session_user`"):
+   - `app.two_factor_consistent()`;
+   - `app.require_second_step_for_role()`;
+   - `app.require_enrolled_inviter()`.
+   
+   The allowed set is therefore `app.actor`, `poly.client_ip`, `poly.user_agent` and `role`.
+2. **Tighter on the lock's own path.** The four-name allowance is for the schema-wide scan. The functions the lock and the record run, `app.guard_second_step_lock()`, `app.guard_second_step_lock_delete()`, `app.record_session_sign_in()` and `app.sign_in_address(text)`, may read **only** `poly.client_ip` and `poly.user_agent`. Of those, only the guard reads them. pgTAP 12 pins this per function, and a plant that adds `current_setting('role')` to the guard must fail it.
+3. **Scanning `app` only is not enough. Scan every schema a migration can create a function in.** That is every function in `pg_proc` outside `pg_catalog` and `information_schema`, excluding only extension members (`pg_depend.deptype = 'e'`, so pgTAP's own functions do not count). Today every definer and trigger function is in `app` (code-read: all 185 `SECURITY DEFINER` definitions in 0000–0017 are `app.*`). But the lock guard's safety cannot depend on where a later helper is put: a function in `public` that the guard came to call would be outside an `app`-only scan. The existing pins (literal names only; no `set_config`) apply over the same scope.
+4. **Two more ways to read a setting, pinned over the same scope:** no function reads `pg_settings` or `pg_show_all_settings`. And the four lock and record functions contain no dynamic `EXECUTE` (`prosrc !~* '\mexecute\M'`), because a string run that way escapes every text scan.
+
+seceng reviews this addendum; the pin guards the lock.
