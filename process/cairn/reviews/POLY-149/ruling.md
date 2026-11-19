@@ -219,3 +219,32 @@ All guesses, scaled from POLY-153 ($27, about 3.5 h, one new mechanism); this lo
 
 1. **T-L3: step 1 holds.** During a lock, `UPDATE two_factor SET failed_verification_count = 0` (or any lower count) as poly_auth → 42501 `second_step_locked`, and the row reads back unchanged: count, `locked_until`, and the streak. That is one outcome, and the test pins it. seceng's own checklist asked for the same refusal (prep §A2.3: "any lowering of `failed_verification_count`" during a lock), so this changes nothing seceng accepted at 3725d22e. Outside a lock a lower count is allowed, and only the step-4 shape (count 0, both `locked_until` NULL) resets the streak.
 2. **`guard_second_step_lock_delete` is an invoker, so it leaves `definers.json`.** It must see the deleting role in `current_user` (poly_govern inside `reset_second_step`, poly_auth otherwise), and inside a definer `current_user` is always the owner. `definerGaps` lists `prosecdef` functions only, so listing it would fail with "on the allowlist, not in the catalog". R6.3 now adds three entries: `record_session_sign_in`, `guard_second_step_lock` and `purge_sign_in_record`. `sign_in_record_immutable` is an invoker for the same reason and was never listed. Instead, pgTAP 12 pins both invokers: owner poly_govern (delete guard) or poly_owner (immutable), `prosecdef = false`, search_path pinned to `''`, and no login role can execute them (granted and effective). This corrects a list; it does not change what seceng accepted.
+
+## Addendum 2 (qa's red run at 3086301f, finding 3: entries on one session serialise)
+
+**When it happens.** Only when `enter_session`'s slide runs its UPDATE, since that statement is the one that takes the session row's lock. The UPDATE runs only when `expires_at <= now() + 6 days`:
+- on the chain at 8aa8275e: once a day per session (the first entry more than a day after the last slide), and on **every** entry in the last 6 days before the 30-day cap. That second case is N1;
+- after R4 (N1): once a day per session, and never at the cap.
+
+The red run's races hung because their fixture sessions were due a slide on every entry (code-read: an `expires_at` within 6 days). An entry that does not slide takes no row lock (`SELECT` only) and blocks nobody.
+
+**What a page sees today, and after R4 alone.** On the one entry a day that slides, parallel requests on the same session (a page load and its `fetch`es) queue on the row lock until the first transaction commits. That costs each waiting request the length of the first transaction: milliseconds for a normal load, but a slow request (an export, a long report) holds the others for its whole duration. Then each waiter slides the row again, because it compares against the expiry it read before waiting. Nothing is refused, nothing is wrong, and no lock can deadlock (one row each).
+
+**Changed in this loop (part of R4, same function, same migration).** The slide becomes non-blocking and writes at most once:
+```
+UPDATE public.session s SET expires_at = v_new, updated_at = pg_catalog.now()
+ WHERE s.id = (SELECT s2.id FROM public.session s2
+                WHERE s2.id = v_session AND s2.expires_at < v_new
+                FOR UPDATE SKIP LOCKED);
+```
+- If another transaction is sliding the row, this one skips its slide and goes on. It returns the expiry it read, which is at most a day stale and is only shown.
+- If that other transaction rolls back, the slide is lost until the next entry, which slides it then. A session can only end sooner than it would have, never later, so it fails closed.
+- `s2.expires_at < v_new` in the locked row replaces R4's `v_new > v_expires` test, so the cap case (N1) still writes nothing.
+- poly_authz already holds `UPDATE (expires_at, updated_at)`, which is enough for `FOR UPDATE` (code-read; the build measures it).
+
+**Tests (qa):**
+- Two transactions enter on one slide-due session. The second enters while the first is still open, and returns within `statement_timeout = 2s` instead of waiting. After both commit, `expires_at` has moved once.
+- The N1 cap test as ruled.
+- The two C-b race fixtures need no change once this lands. Until then, give each its own session, or set `expires_at = now() + 7 days` so no slide is due.
+
+**seceng:** a short look is enough. This is a change to a definer's write, not to what it checks. The refusals, the marker and the cap are unchanged. The only new behaviour is that a slide can be skipped, which shortens a session and never lengthens it.
