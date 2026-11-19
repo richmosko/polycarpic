@@ -764,3 +764,11 @@ Add new decisions ABOVE this comment, newest first.
 - Build it inside POLY-150 — about +$40 and 2 hours (guesses) and a re-review of a loop that is built and green.
 **Cost:** about $45 and 2 hours 15 minutes as its own issue (the architect's guess).
 **Approved by:** the Principal (2026-11-19), against the architect's and seceng's recommendation, on their assessments.
+
+### 2026-11-19 — The Confirm it's you route is built in the second-step screens loop
+**Decision:** POLY-151 (the Confirm it's you route) is brought into the POLY-150 loop and ships in the same PR, so the prompt works when the screens ship. It still gets its own ruling and seceng review before any test is written.
+**Why:** without it, an enrolled user can add or remove a second-step method, or make new backup codes, only in the first 5 minutes after set-up. Someone who loses a phone cannot remove it, and the operator's `reset-mfa` is the only way out. The Principal chose a working prompt over an interim dialog that says it cannot confirm yet.
+**Alternatives considered:**
+- Ship the interim dialog and build POLY-151 next — recommended by the architect, seceng and the lead; about $3 (already built). seceng's concern with the choice taken is rushing the proof design: the database cannot check a code itself, so a passed re-check is the sign-in service's word.
+**Cost:** about +$35 and 1 hour 45 minutes (the architect's guess), a second ruling cycle, and a re-gate of POLY-150.
+**Approved by:** the Principal (2026-11-19).
