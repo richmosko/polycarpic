@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { REAL_MIGRATIONS, dbEnv, freshDb, migrateCli } from './helpers/api';
 import { crossTenantRows } from './helpers/cross-tenant';
 import { must } from './helpers/pg';
+import { tenantBy } from './helpers/handle';
 
 const A = '00000000-0000-4000-8000-00000000000a';
 const B = '00000000-0000-4000-8000-00000000000b';
@@ -13,10 +14,9 @@ const SID = '22222222-2222-4222-8222-222222222222';
 let db: string;
 let m: any;
 let auth: any;
-let session: any;
 
 const q = (tx: any, text: string, p?: unknown[]) => auth.clientOf(tx).query(text, p).then((r: any) => r.rows);
-const tenant = (uid: string, fn: (tx: any) => Promise<any>) => m.withTenant(session.sessionUserId(uid), SID, fn);
+const tenant = (uid: string, fn: (tx: any) => Promise<any>) => tenantBy(m, db, SID)(uid, fn);
 const free = (fn: (tx: any) => Promise<any>) => auth.withContextFreeTx(fn);
 const pid = async (tx: any) => (await q(tx, 'select pg_backend_pid() p'))[0].p as number;
 const sqlstate = async (p: Promise<unknown>) => p.then(() => 'no error', (e: any) => e?.code ?? String(e));
@@ -59,7 +59,6 @@ beforeAll(async () => {
   m0.configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), max: 1 });
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
-  session = await import('../../packages/db/src/session.ts');
 });
 afterAll(async () => { await m?.close?.(); await auth?.close?.(); });
 

@@ -7,7 +7,6 @@
   { "function": "app.seat_creator()", "owner": "poly_govern", "execute": [] },
   { "function": "app.audit_membership()", "owner": "poly_govern", "execute": [] },
   { "function": "app.enter_new_user(uuid)", "owner": "poly_authz", "execute": ["poly_auth"] },
-  { "function": "app.enter_asserted_user(p_user uuid, p_session uuid)", "owner": "poly_authz", "execute": ["poly_app"] },
   { "function": "app.enter_job(p_job text, p_entity uuid, p_connection uuid)", "owner": "poly_authz", "execute": ["poly_worker"] },
   { "function": "app.purge_tx_identity()", "owner": "poly_purge", "execute": ["poly_worker"] },
   { "function": "app.claim_invitations(bytea, text)", "owner": "poly_govern", "execute": ["poly_auth"] },
@@ -39,5 +38,8 @@
   { "function": "app.session_needs_handle()", "owner": "poly_authz", "execute": [] },
   { "function": "app.recent_auth_ok()", "owner": "poly_authz", "execute": ["poly_app"] },
   { "function": "app.my_sessions()", "owner": "poly_authz", "execute": ["poly_app"] },
-  { "function": "app.revoke_my_session(p_id uuid)", "owner": "poly_authz", "execute": ["poly_app"] }
+  { "function": "app.revoke_my_session(p_id uuid)", "owner": "poly_authz", "execute": ["poly_app"] },
+  { "function": "app.record_session_sign_in()", "owner": "poly_govern", "execute": [] },
+  { "function": "app.guard_second_step_lock()", "owner": "poly_govern", "execute": [] },
+  { "function": "app.purge_sign_in_record()", "owner": "poly_purge", "execute": ["poly_worker"] }
 ]

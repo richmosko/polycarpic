@@ -43,7 +43,7 @@ describe('the §4.2.1 matrix data (criterion 10)', () => {
   it('reverse coverage: every real relation is named by a row, the exemption list or the unlisted list', () => {
     const m = loadMatrix();
     expect(coverageGaps(db, m.rows, m.unlisted ?? [], exemptions())).toEqual([]);
-    expect(m.unlisted?.map((u) => u.table).sort()).toEqual(['app.email_challenge', 'app.enrolment_grant', 'app.session_handle', 'app.tx_identity', 'public.entity_type', 'public.notification']);
+    expect(m.unlisted?.map((u) => u.table).sort()).toEqual(['app.email_challenge', 'app.enrolment_grant', 'app.second_step_streak', 'app.session_handle', 'app.sign_in_record', 'app.tx_identity', 'public.entity_type', 'public.notification']);
     // ruling N4: the cover for an unlisted table is its per-table cross-tenant test in tenancy.test.ts. POLY-147: the identity
     // marker is not role-scoped, so its cover is the K1 test in identity-marker.test.ts (one transaction sees only its own row).
     // Red-if: that test is deleted or renamed, or the table is unlisted-with-no-cover. The rule stays strict for the other two.
@@ -52,6 +52,8 @@ describe('the §4.2.1 matrix data (criterion 10)', () => {
       'app.email_challenge': { file: 'second-step-challenge.test.ts', needle: () => 'a code is six digits, stored as sha256', why: 'the code-storage and read-privilege test in second-step-challenge.test.ts' },
       'app.enrolment_grant': { file: 'second-step-challenge.test.ts', needle: () => 'a right code mints exactly one open grant', why: 'the grant test in second-step-challenge.test.ts' },
       'app.session_handle': { file: 'session-handle-attach.test.ts', needle: () => 'R1 no login role has any privilege on app.session_handle', why: 'the no-privilege test in session-handle-attach.test.ts (POLY-153 R1)' },
+      'app.sign_in_record': { file: 'sign-in-record.test.ts', needle: () => 'effective: no INSERT, UPDATE, DELETE, TRUNCATE for any of the six login roles', why: 'the no-privilege test in sign-in-record.test.ts (POLY-149 R3)' },
+      'app.second_step_streak': { file: 'second-step-lock.test.ts', needle: () => 'the streak table: no statement as any login role', why: 'the no-privilege test in second-step-lock.test.ts (POLY-149 R2)' },
       'app.tx_identity': { file: 'identity-marker.test.ts', needle: () => 'K1 readers see only their own transaction', why: 'the K1 own-row test in identity-marker.test.ts' },
     };
     for (const u of m.unlisted ?? []) {

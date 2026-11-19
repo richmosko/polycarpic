@@ -6,7 +6,7 @@ import { seedInvitation, tokenHash } from './helpers/invitation';
 import { count, signUpEntry, snapshot, tx } from './helpers/auth-tx';
 import { codeOf, fails, msgOf } from './helpers/second-step';
 import { must } from './helpers/sql';
-import { withHandle } from './helpers/handle';
+import { ENTER_SESSION, handleFor, withHandle } from './helpers/handle';
 
 let db: string;
 beforeAll(() => { db = cloneMigrated(); });
@@ -64,7 +64,7 @@ describe('B3 refusals, each leaving entity and membership unchanged', () => {
     const u = uid();
     must(`INSERT INTO public."user" (id, name, email, email_verified) VALUES ('${u}', 'X', '${u}@qa.test', true)`, db);
     await refused(() => tx(db, 'poly_auth', (q) => fails(q(PROV))));
-    await refused(() => tx(db, 'poly_app', async (q) => { await q('SELECT app.enter_asserted_user($1, $2)', [u, crypto.randomUUID()]); return fails(q(PROV)); }));
+    await refused(() => tx(db, 'poly_app', async (q) => { await q(ENTER_SESSION, [handleFor(db, u)]); return fails(q(PROV)); }));
   });
   it('poly_worker and poly_operator hold no EXECUTE [red if: granted]', async () => {
     for (const role of ['poly_worker', 'poly_operator']) await refused(() => tx(db, role, (q) => fails(q(PROV))));

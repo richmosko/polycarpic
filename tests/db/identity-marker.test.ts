@@ -1,6 +1,6 @@
 // POLY-147 red gate (ruling 2027afdb): the identity marker, its definers, and the three guards. Every test names, in its title,
 // the mutation that turns it red. Raw role sessions are node-pg clients in extended mode, so a definer's own check is what
-// answers (not a wrapper). The wrappers (withTenant, withSystem, withContextFreeTx, withOperatorTx, the routing pool) are
+// answers (not a wrapper). The wrappers (withSession, withSystem, withContextFreeTx, withOperatorTx, the routing pool) are
 // driven through the real packages. Each test builds on its own rolled-back transaction or on unique ids, so none depends
 // on another's rows.
 import { createRequire } from 'node:module';
@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { cloneMigrated, dbEnv } from './helpers/api';
 import { DB_PKG, psql, server, url } from './helpers/pg';
 import { must } from './helpers/sql';
+import { ENTER_SESSION, handleFor } from './helpers/handle';
 
 const pgmod = createRequire(join(DB_PKG, 'package.json'))('pg');
 const U = '00000000-0000-4000-8000-0000000147b1';
@@ -22,7 +23,6 @@ const FIRST_WRITE = 'the identity marker must be the first write of its transact
 let db: string;
 let dbm: any;
 let dba: any;
-let dbs: any;
 let dbo: any;
 let pool: any; // createRoutingPool()
 
@@ -37,7 +37,7 @@ async function open(role: string | null = null): Promise<any> {
 const q = (c: any, text: string, values?: unknown[]) => c.query({ text, values, queryMode: 'extended' });
 const fails = async (p: Promise<unknown>) => { try { await p; return null; } catch (x) { return x as any; } };
 const markers = (userId: string) => Number(must(`SELECT count(*) FROM app.tx_identity WHERE user_id = '${userId}'`, db).rows[0]![0]);
-// POLY-152 R8: the sign-up step is poly_auth's and enter_asserted_user is poly_app's; a superuser connection switches between them.
+// POLY-152 R8: the sign-up step is poly_auth's and the tenant entry is poly_app's; a superuser connection switches between them.
 const as = (c: any, role: string) => c.query(`SET LOCAL ROLE ${role}`);
 const ins = (id: string) => `INSERT INTO public."user" (id, name, email) VALUES ('${id}', 'N', '${id}@qa.test')`;
 const uid = () => crypto.randomUUID();
@@ -68,54 +68,30 @@ beforeAll(async () => {
   await dbm.close();
   dbm.configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
   dba = await import('../../packages/db/src/auth.ts');
-  dbs = await import('../../packages/db/src/session.ts');
   dbo = await import('../../packages/db/src/operator.ts');
   const { createRoutingPool } = await import('../../packages/auth/src/routing-pool.ts');
   pool = createRoutingPool();
 });
 afterAll(async () => { await dbm?.close?.(); await dba?.close?.(); });
 
-const tenant = <T>(id: string, fn: (tx: any) => Promise<T>) => dbm.withTenant(dbs.sessionUserId(id), S, fn);
+const tenant = <T>(id: string, fn: (tx: any) => Promise<T>) => dbm.withSession(handleFor(db, id, S), fn);
+/** POLY-149: the tenant entry's canonical call, with a live handle for `id`. */
+const enterAsUser = (c: any, id: string) => q(c, ENTER_SESSION, [handleFor(db, id)]);
 const system = <T>(job: string, fn: (tx: any) => Promise<T>) => dbm.withSystem(job, { entityId: E, connectionId: null }, fn);
 const rows = async (tx: any, text: string) => (await dba.clientOf(tx).query(text)).rows;
 const raw = (text: string) => dbm.sql.raw(text);
 
 // ---------------------------------------------------------------- R2: the exact-call check
 describe('R2 the exact-call check: an identity definer answers only its own call, and every refusal is 42501 with the exact message', () => {
-  const A = (c: any) => q(c, 'SELECT app.enter_asserted_user($1, $2)', [V, S]);
-  it('the canonical call succeeds and writes kind web  [red if: the definers are absent]', async () => {
+  const A = (c: any) => enterAsUser(c, V);
+  it('the canonical call succeeds and writes kind session  [red if: the definers are absent]', async () => {
     const r = await inTx('poly_app', async (c) => {
       await A(c);
       return (await q(c, `SELECT user_id::text, kind FROM app.tx_identity WHERE xid = pg_current_xact_id_if_assigned()`)).rows[0];
     });
-    expect(r).toEqual({ user_id: V, kind: 'web' });
+    expect(r).toEqual({ user_id: V, kind: 'session' });
   });
-  const variants: [string, (c: any) => Promise<unknown>][] = [
-    ['a second select item beside the call', (c) => q(c, 'SELECT app.enter_asserted_user($1, $2), 1', [V, S])],
-    ['the call wrapped in a subselect', (c) => q(c, 'SELECT * FROM (SELECT app.enter_asserted_user($1, $2)) s', [V, S])],
-    ['the literal form', (c) => q(c, `SELECT app.enter_asserted_user('${V}', '${S}')`)],
-    ['an alias on the result', (c) => q(c, 'SELECT app.enter_asserted_user($1, $2) AS x', [V, S])],
-    ['one space fewer after the comma', (c) => q(c, 'SELECT app.enter_asserted_user($1,$2)', [V, S])],
-  ];
-  for (const [name, run] of variants) {
-    it(`asserted_user refuses ${name}, and no marker results  [red if: the exact-call check is missing or loose]`, async () => {
-      const before = markers(V);
-      const x = await inTx('poly_app', (c) => fails(run(c)));
-      expect(codeOf(x), msgOf(x)).toBe('42501');
-      expect(msgOf(x)).toContain(NOT_ALONE);
-      expect(markers(V)).toBe(before);
-    });
-  }
-  it('a DO block run by the superuser that switches to poly_app and performs the call is refused  [red if: the check reads anything but the client statement]', async () => {
-    const c = await open();
-    try {
-      await c.query('BEGIN');
-      const x = await fails(c.query(`DO $$BEGIN SET LOCAL ROLE poly_app; PERFORM app.enter_asserted_user('${V}', '${S}'); END$$`));
-      expect(codeOf(x), msgOf(x)).toBe('42501');
-      expect(msgOf(x)).toContain(NOT_ALONE);
-    } finally { await c.query('ROLLBACK').catch(() => {}); await c.end(); }
-    expect(markers(V)).toBe(0);
-  });
+  // The shapes enter_session refuses (second item, subselect, literal, DO block) are pinned in session-handle-enter.test.ts.
   it('enter_job refuses the same shapes as poly_worker, and its canonical call succeeds (kind system:qa_job)  [red if: enter_job lacks the check]', async () => {
     const ok = await inTx('poly_worker', async (c) => {
       await q(c, 'SELECT app.enter_job($1, $2, $3)', ['qa_job', E, null]);
@@ -151,10 +127,7 @@ describe('R2 the exact-call check: an identity definer answers only its own call
     }
   });
   it('a null argument is refused 22004 identity is required, and a bad job name 22023  [red if: the argument checks are missing]', async () => {
-    const x = await inTx('poly_app', (c) => fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [V, null])));
-    expect(codeOf(x), msgOf(x)).toBe('22004');
-    expect(msgOf(x)).toContain('identity is required');
-    const y = await inTx('poly_app', (c) => fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [null, S])));
+    const y = await inTx('poly_app', (c) => fails(q(c, ENTER_SESSION, [null])));
     expect(codeOf(y)).toBe('22004');
     const z = await inTx('poly_worker', (c) => fails(q(c, 'SELECT app.enter_job($1, $2, $3)', ['Bad-Name', E, null])));
     expect(codeOf(z), msgOf(z)).toBe('22023');
@@ -163,10 +136,10 @@ describe('R2 the exact-call check: an identity definer answers only its own call
 });
 
 describe('R2 the query_to_xml route: one fragment on an unmarked path cannot mark a victim and read as them', () => {
-  const frag = `SELECT 1 WHERE app.enter_asserted_user('${V}', '${S}') IS NOT NULL AND query_to_xml('SELECT count(*) FROM public.entity', true, false, '') IS NOT NULL`;
-  // POLY-152: the plain pool is poly_auth now, which holds no enter_asserted_user (R2, pinned absent), so that refusal is the third accepted message.
+  const frag = `SELECT 1 WHERE (SELECT user_id FROM app.enter_session('${'A'.repeat(43)}')) IS NOT NULL AND query_to_xml('SELECT count(*) FROM public.entity', true, false, '') IS NOT NULL`;
+  // POLY-152: the plain pool is poly_auth now, which holds no enter_session (R2, pinned absent), so that refusal is the third accepted message.
   // R11: the built-in's EXECUTE may refuse the fragment before the exact-call check runs, so either message is accepted; no marker either way.
-  const either = (x: any) => expect([NOT_ALONE, 'permission denied for function query_to_xml', 'permission denied for function enter_asserted_user'].some((m) => msgOf(x).includes(m)), msgOf(x)).toBe(true);
+  const either = (x: any) => expect([NOT_ALONE, 'permission denied for function query_to_xml', 'permission denied for function enter_session'].some((m) => msgOf(x).includes(m)), msgOf(x)).toBe(true);
   it("through BetterAuth's plain pool (outside any transaction), the fragment is refused and no marker results  [red if: neither the exact-call check nor the R11 revoke exists]", async () => {
     const x = await fails(pool.query(frag));
     expect(codeOf(x), msgOf(x)).toBe('42501');
@@ -187,8 +160,8 @@ describe('R2 the query_to_xml route: one fragment on an unmarked path cannot mar
 });
 
 // ---------------------------------------------------------------- the refusals, per criterion (iii) and the interim definer
-describe('(iii) every enter_* refuses when a marker already exists; the interim definer refuses an assigned xid', () => {
-  it('each definer after a marker: asserted and job say already has an identity, new_user says a user is already in context  [red if: a definer skips the marker-exists check]', async () => {
+describe('(iii) every enter_* refuses when a marker already exists; the tenant entry refuses an assigned xid', () => {
+  it('each definer after a marker: session and job say already has an identity, new_user says a user is already in context  [red if: a definer skips the marker-exists check]', async () => {
     const c = await open();
     const attempt = async (setup: (c: any) => Promise<void>, role: string, text: string, values: unknown[]) => {
       await c.query('BEGIN');
@@ -199,8 +172,8 @@ describe('(iii) every enter_* refuses when a marker already exists; the interim 
       } finally { await c.query('ROLLBACK'); }
     };
     try {
-      const mark = async (cc: any) => { await cc.query(`INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), '${U}', NULL, 'web')`); };
-      const a = await attempt(mark, 'poly_app', 'SELECT app.enter_asserted_user($1, $2)', [V, S]);
+      const mark = async (cc: any) => { await cc.query(`INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), '${U}', NULL, 'session')`); };
+      const a = await attempt(mark, 'poly_app', ENTER_SESSION, [handleFor(db, V)]);
       expect(codeOf(a), msgOf(a)).toBe('42501');
       expect(msgOf(a)).toContain(HAS_ID);
       const j = await attempt(mark, 'poly_worker', 'SELECT app.enter_job($1, $2, $3)', ['qa_job', E, null]);
@@ -212,15 +185,15 @@ describe('(iii) every enter_* refuses when a marker already exists; the interim 
       expect(msgOf(n)).toContain('a user is already in context');
     } finally { await c.end(); }
   });
-  it('a second enter through the real definers in one transaction: asserted then asserted  [red if: the marker-exists check or the primary key is missing]', async () => {
-    const x = await inTx('poly_app', async (c) => { await q(c, 'SELECT app.enter_asserted_user($1, $2)', [U, S]); return fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [V, S])); });
+  it('a second enter through the real definers in one transaction: session then session  [red if: the marker-exists check or the primary key is missing]', async () => {
+    const x = await inTx('poly_app', async (c) => { await enterAsUser(c, U); return fails(enterAsUser(c, V)); });
     expect(codeOf(x), msgOf(x)).toBe('42501');
     expect(msgOf(x)).toContain(HAS_ID);
   });
   it('INSERT, UPDATE and DELETE on the marker table are refused 42501 for poly_app and poly_worker  [red if: any runtime role holds a write grant]', async () => {
     for (const role of ['poly_app', 'poly_worker']) {
       for (const text of [
-        `INSERT INTO app.tx_identity (xid, user_id, kind) VALUES (pg_current_xact_id(), '${V}', 'web')`,
+        `INSERT INTO app.tx_identity (xid, user_id, kind) VALUES (pg_current_xact_id(), '${V}', 'session')`,
         `UPDATE app.tx_identity SET user_id = '${V}'`,
         'DELETE FROM app.tx_identity',
       ]) {
@@ -229,11 +202,10 @@ describe('(iii) every enter_* refuses when a marker already exists; the interim 
       }
     }
   });
-  it('the interim definer refuses after a write: an INSERT first, then enter_asserted_user, is 42501 first-write  [red if: the xid-assigned check is missing]', async () => {
-    const id = uid();
-    const ctl = await inTx('poly_app', async (c) => { await q(c, 'SELECT app.enter_asserted_user($1, $2)', [V, S]); return 'ok'; });
+  it('the tenant entry refuses after a write: an assigned transaction id first, then enter_session, is 42501 first-write  [red if: the xid-assigned check is missing]', async () => {
+    const ctl = await inTx('poly_app', async (c) => { await enterAsUser(c, V); return 'ok'; });
     expect(ctl).toBe('ok');
-    const x = await inTx('poly_app', async (c) => { await c.query(ins(id)); return fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [V, S])); });
+    const x = await inTx('poly_app', async (c) => { await q(c, 'SELECT pg_current_xact_id()'); return fails(enterAsUser(c, V)); });
     expect(codeOf(x), msgOf(x)).toBe('42501');
     expect(msgOf(x)).toContain(FIRST_WRITE);
   });
@@ -271,9 +243,9 @@ describe('(ii) the marker survives any later savepoint rollback', () => {
     });
     expect(got).toEqual({ user: U, kept: 1 });
   });
-  it('the marker row is the transaction\'s first write: its xid is the one withTenant\'s first statement assigned  [red if: another statement runs between BEGIN and the marker]', async () => {
+  it('the marker row is the transaction\'s first write: its xid is the one the wrapper\'s first statement assigned  [red if: another statement runs between BEGIN and the marker]', async () => {
     const r = await tenant(U, async (tx) => (await rows(tx, `SELECT (xid = pg_current_xact_id()) AS same, kind FROM app.tx_identity WHERE xid = pg_current_xact_id_if_assigned()`))[0]);
-    expect(r).toEqual({ same: true, kind: 'web' });
+    expect(r).toEqual({ same: true, kind: 'session' });
   });
 });
 
@@ -283,7 +255,7 @@ describe('(ii, sign-up) rolling back to BetterAuth\'s savepoint takes the marker
     await as(c, 'poly_auth'); await c.query(ins(id)); await q(c, 'SELECT app.enter_new_user($1)', [id]); await c.query('RESET ROLE');
     await c.query('ROLLBACK TO SAVEPOINT ba_1');
   };
-  it('enter_new_user for that id, and for an existing id, then enter_asserted_user, each 42501 with the ruled message; current_user_id() is null  [red if: the marker or the user row survives the rollback]', async () => {
+  it('enter_new_user for that id, and for an existing id, then enter_session, each 42501 with the ruled message; current_user_id() is null  [red if: the marker or the user row survives the rollback]', async () => {
     const existing = uid();
     must(ins(existing), db);
     const id = uid();
@@ -293,14 +265,15 @@ describe('(ii, sign-up) rolling back to BetterAuth\'s savepoint takes the marker
     const b = await inTx('poly_auth', async (c) => { await setup(c, uid()); return fails(q(c, 'SELECT app.enter_new_user($1)', [existing])); });
     expect(codeOf(b), msgOf(b)).toBe('42501');
     expect(msgOf(b)).toContain('not a user created by this transaction');
-    const d = await inTx(null, async (c) => { await setup(c, uid()); await as(c, 'poly_app'); return fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [existing, S])); });
+    const d = await inTx(null, async (c) => { await setup(c, uid()); await as(c, 'poly_app'); return fails(enterAsUser(c, existing)); });
     expect(codeOf(d), msgOf(d)).toBe('42501');
     expect(msgOf(d)).toContain(FIRST_WRITE);
     const n = await inTx('poly_auth', async (c) => { await setup(c, uid()); return (await q(c, 'SELECT app.current_user_id()::text AS u')).rows[0].u; });
     expect(n).toBeNull();
   });
-  it('with RELEASE instead, the marker stays: a second enter_new_user and enter_asserted_user are refused  [red if: RELEASE drops the marker]', async () => {
+  it('with RELEASE instead, the marker stays: a second enter_new_user and enter_session are refused  [red if: RELEASE drops the marker]', async () => {
     const id = uid();
+    const HB = handleFor(db, U); // a live handle of another user: the call must be refused as a second identity
     const run = async (role: string, again: (c: any) => Promise<unknown>) => inTx(null, async (c) => {
       await c.query('SAVEPOINT ba_1'); await as(c, 'poly_auth'); await c.query(ins(id)); await q(c, 'SELECT app.enter_new_user($1)', [id]); await c.query('RESET ROLE'); await c.query('RELEASE SAVEPOINT ba_1');
       await as(c, role);
@@ -309,7 +282,7 @@ describe('(ii, sign-up) rolling back to BetterAuth\'s savepoint takes the marker
     const a = await run('poly_auth', (c) => q(c, 'SELECT app.enter_new_user($1)', [id]));
     expect(codeOf(a), msgOf(a)).toBe('42501');
     expect(msgOf(a)).toContain('a user is already in context');
-    const b = await run('poly_app', (c) => q(c, 'SELECT app.enter_asserted_user($1, $2)', [id, S]));
+    const b = await run('poly_app', (c) => q(c, ENTER_SESSION, [HB]));
     expect(codeOf(b), msgOf(b)).toBe('42501');
     expect(msgOf(b)).toContain(HAS_ID);
   });
@@ -340,8 +313,8 @@ describe('K1 readers see only their own transaction\'s row; the read side never 
 
 // ---------------------------------------------------------------- the wrappers, and each definer's kind
 describe('J1/J3 the wrappers write the marker, each definer its own kind', () => {
-  it('withTenant kind is web; withSystem kind is system:qa_job with the principal from job_targets  [red if: a wrapper or definer takes the kind from the caller, or withSystem names a user]', async () => {
-    expect(await tenant(U, async (tx) => (await rows(tx, `SELECT user_id::text u, session_id::text s, kind FROM app.tx_identity WHERE xid = pg_current_xact_id_if_assigned()`))[0])).toEqual({ u: U, s: S, kind: 'web' });
+  it('withSession kind is session; withSystem kind is system:qa_job with the principal from job_targets  [red if: a wrapper or definer takes the kind from the caller, or withSystem names a user]', async () => {
+    expect(await tenant(U, async (tx) => (await rows(tx, `SELECT user_id::text u, session_id::text s, kind FROM app.tx_identity WHERE xid = pg_current_xact_id_if_assigned()`))[0])).toEqual({ u: U, s: S, kind: 'session' });
     expect(await system('qa_job', async (tx) => (await rows(tx, `SELECT user_id::text u, session_id::text s, kind FROM app.tx_identity WHERE xid = pg_current_xact_id_if_assigned()`))[0])).toEqual({ u: U, s: null, kind: 'system:qa_job' });
   });
   it('zero rows, two rows, or a null principal from job_targets is NoPrincipalError and the callback never runs  [red if: enter_job takes the first row, or the P0002 is not rethrown]', async () => {
@@ -353,7 +326,7 @@ describe('J1/J3 the wrappers write the marker, each definer its own kind', () =>
     }
   });
   it('the worker can no longer name a user: its only identity entry is enter_job  [red if: poly_worker still holds an enter_* other than enter_job]', async () => {
-    const x = await inTx('poly_worker', (c) => fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [U, S])));
+    const x = await inTx('poly_worker', (c) => fails(q(c, ENTER_SESSION, ['A'.repeat(43)])));
     expect(codeOf(x), msgOf(x)).toBe('42501');
     expect(msgOf(x)).toMatch(/permission denied/);
   });
@@ -370,7 +343,7 @@ describe('J1/J3 the wrappers write the marker, each definer its own kind', () =>
     const job = seat('system:qa_job');
     expect(job.ok, job.err).toBe(true);
     expect(job.rows.flat()).toContain('system:qa_job');
-    const web = seat('web');
+    const web = seat('session');
     expect(web.ok, web.err).toBe(true);
     expect(web.rows.flat()).toContain('user');
   });
@@ -378,7 +351,7 @@ describe('J1/J3 the wrappers write the marker, each definer its own kind', () =>
 
 // ---------------------------------------------------------------- S6 and S1: one statement cannot leave the transaction
 describe('S6 the commit check, and S1 a statement cannot leave the transaction', () => {
-  it('a COMMIT sent through tx.execute makes withTenant reject with IdentityMarkerLost; the next INSERT was refused and current_user_id() read null  [red if: the wrapper does not check the marker before COMMIT]', async () => {
+  it('a COMMIT sent through tx.execute makes withSession reject with IdentityMarkerLost; the next INSERT was refused and current_user_id() read null  [red if: the wrapper does not check the marker before COMMIT]', async () => {
     let afterCommit: unknown = 'not run';
     let insertCode: string | undefined;
     const x = await fails(tenant(U, async (tx) => {
@@ -392,7 +365,7 @@ describe('S6 the commit check, and S1 a statement cannot leave the transaction',
     expect(insertCode).toBe('42501');
     expect(Number(must(`SELECT count(*) FROM public.entity WHERE name = 'qa-147-s6'`, db).rows[0]![0])).toBe(0);
   });
-  it('the same for withSystem  [red if: the check is only in withTenant]', async () => {
+  it('the same for withSystem  [red if: the check is only in withSession]', async () => {
     const x = await fails(system('qa_job', async (tx) => { await tx.execute(raw('COMMIT')); }));
     expect(x?.name, msgOf(x)).toBe('IdentityMarkerLost');
   });
@@ -414,7 +387,7 @@ describe('S6 the commit check, and S1 a statement cannot leave the transaction',
       code = codeOf(await fails(tx.execute(raw("PREPARE TRANSACTION 'qa_147_x'"))));
       after = (await rows(tx, 'SELECT app.current_user_id()::text AS u'))[0].u;
     }));
-    expect(x, 'withTenant must reject').not.toBeNull();
+    expect(x, 'withSession must reject').not.toBeNull();
     expect(code, 'observed SQLSTATE of the refused PREPARE (ruling: 55000, unmeasured)').toBe('55000');
     expect(after).toBeNull();
     expect(must('SELECT count(*) FROM pg_prepared_xacts', db).rows[0]![0]).toBe('0');
@@ -423,14 +396,14 @@ describe('S6 the commit check, and S1 a statement cannot leave the transaction',
 
 // ---------------------------------------------------------------- K4: the purge
 describe('K4 the purge removes old markers of finished transactions and never an in-progress one', () => {
-  const old = (user: string) => must(`INSERT INTO app.tx_identity (xid, user_id, kind, created_at) VALUES (pg_current_xact_id(), '${user}', 'web', now() - interval '2 hours')`, db);
+  const old = (user: string) => must(`INSERT INTO app.tx_identity (xid, user_id, kind, created_at) VALUES (pg_current_xact_id(), '${user}', 'session', now() - interval '2 hours')`, db);
   it('a committed marker older than the cut-off is purged, a recent one is kept  [red if: the purge ignores age, or deletes everything]', async () => {
     const X = uid();
     must(`INSERT INTO public."user" (id, name, email) VALUES ('${X}', 'X', '${X}@qa.test')`, db);
     old(X);
     const recent = uid();
     must(`INSERT INTO public."user" (id, name, email) VALUES ('${recent}', 'R', '${recent}@qa.test')`, db);
-    must(`INSERT INTO app.tx_identity (xid, user_id, kind) VALUES (pg_current_xact_id(), '${recent}', 'web')`, db);
+    must(`INSERT INTO app.tx_identity (xid, user_id, kind) VALUES (pg_current_xact_id(), '${recent}', 'session')`, db);
     expect(markers(X)).toBe(1);
     const c = await open('poly_worker');
     let purged: number;
@@ -443,13 +416,13 @@ describe('K4 the purge removes old markers of finished transactions and never an
     const c = await open();
     try {
       await c.query('BEGIN');
-      await c.query(`INSERT INTO app.tx_identity (xid, user_id, kind, created_at) VALUES (pg_current_xact_id(), '${U}', 'web', now() - interval '2 hours')`);
+      await c.query(`INSERT INTO app.tx_identity (xid, user_id, kind, created_at) VALUES (pg_current_xact_id(), '${U}', 'session', now() - interval '2 hours')`);
       await c.query('SET LOCAL ROLE poly_worker');
       await q(c, 'SELECT app.purge_tx_identity() AS n');
       await c.query('RESET ROLE');
       expect(Number((await c.query('SELECT count(*) AS n FROM app.tx_identity WHERE xid = pg_current_xact_id()')).rows[0].n)).toBe(1);
       await c.query('SET LOCAL ROLE poly_app');
-      const a = await fails(q(c, 'SELECT app.enter_asserted_user($1, $2)', [V, S]));
+      const a = await fails(enterAsUser(c, V));
       expect(codeOf(a), msgOf(a)).toBe('42501');
     } finally { await c.query('ROLLBACK').catch(() => {}); await c.end(); }
   });
@@ -463,7 +436,7 @@ describe('K4 the purge removes old markers of finished transactions and never an
 describe('(i) every poly_app and poly_worker query is extended: a two-statement string is refused 42601 on all three paths', () => {
   const two = ['SELECT 1; SELECT 2', 'SELECT 1; COMMIT; BEGIN; SELECT 1'];
   for (const s of two) {
-    it(`(a) the wrappers: ${JSON.stringify(s)} through withTenant, withSystem and withOperatorTx  [red if: a pool still sends simple-protocol queries]`, async () => {
+    it(`(a) the wrappers: ${JSON.stringify(s)} through withSession, withSystem and withOperatorTx  [red if: a pool still sends simple-protocol queries]`, async () => {
       const t = await fails(tenant(U, (tx) => tx.execute(raw(s))));
       expect(codeOf(t), msgOf(t)).toBe('42601');
       const w = await fails(system('qa_job', (tx) => tx.execute(raw(s))));
@@ -471,7 +444,7 @@ describe('(i) every poly_app and poly_worker query is extended: a two-statement 
       const o = await fails(dbo.withOperatorTx((tx: any) => tx.execute(raw(s))));
       expect(codeOf(o), msgOf(o)).toBe('42601');
     });
-    it(`(b) the routing-pool handle inside withTenant: ${JSON.stringify(s)} is refused, and after a savepoint rollback the marker is still in place  [red if: the handle sends simple queries]`, async () => {
+    it(`(b) the routing-pool handle inside withSession: ${JSON.stringify(s)} is refused, and after a savepoint rollback the marker is still in place  [red if: the handle sends simple queries]`, async () => {
       const got = await tenant(U, async () => {
         const l = await pool.connect();
         try {

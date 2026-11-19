@@ -545,7 +545,7 @@
     },
     {
       "table": "app.email_challenge",
-      "reason": "user-scoped, not role-scoped: RLS user_id = app.current_user_id(), six columns readable, written only by the second-step definers; covered by tests/db/second-step-challenge.test.ts (POLY-89 ruling R2)"
+      "reason": "not role-scoped: no login role holds any privilege on it (POLY-149 revoked the last read); read and written only by the second-step definers; covered by tests/db/second-step-challenge.test.ts (POLY-89 ruling R2)"
     },
     {
       "table": "app.enrolment_grant",
@@ -558,6 +558,14 @@
     {
       "table": "app.session_handle",
       "reason": "not role-scoped: no login role holds any privilege on it; read and written only by the session-handle definers (attach_session_handle, enter_session) of poly_authz, and deleted only by the cascade from public.session; covered by tests/db/session-handle-attach.test.ts (POLY-153 ruling R1)"
+    },
+    {
+      "table": "app.sign_in_record",
+      "reason": "not role-scoped: no login role holds any privilege on it; written by the session trigger and the lock guard (poly_govern), read and deleted only by the purge (poly_purge); covered by tests/db/sign-in-record.test.ts (POLY-149 ruling R3)"
+    },
+    {
+      "table": "app.second_step_streak",
+      "reason": "not role-scoped: no login role holds any privilege on it; read and written only by the lock guard and reset_second_step (poly_govern); covered by tests/db/second-step-lock.test.ts (POLY-149 ruling R2)"
     }
   ]
 }

@@ -94,15 +94,6 @@ describe('T3 / H7: the three definers refuse a kind web and a kind auth marker (
     ['revoke_my_session', REVOKE, (sid) => [sid]],
   ];
   for (const [name, sql, args] of calls) {
-    it(`${name} under a kind web marker (enter_asserted_user as poly_app naming a victim's session) is refused 42501 and nothing changes [red if: the definer does not check kind = 'session']`, async () => {
-      const u = await f.user(); const victim = sessionWithHandle(db, u.id, { fresh: true }); const other = sessionWithHandle(db, u.id);
-      const before = snap(u.id);
-      const x = await tx(db, 'poly_app', async (q) => { await q('SELECT app.enter_asserted_user($1, $2)', [u.id, victim.id]); return fails(q(sql, args(other.id))); });
-      expect(x, 'must be refused').not.toBeNull();
-      expect(codeOf(x)).toBe('42501');
-      expect(msgOf(x)).not.toMatch(/permission denied for function/);
-      expect(snap(u.id)).toBe(before);
-    });
     it(`${name} under a kind auth marker (planted by a superuser as poly_app) is refused 42501 and nothing changes [red if: only kind web is refused]`, async () => {
       const u = await f.user(); const s = sessionWithHandle(db, u.id, { fresh: true }); const other = sessionWithHandle(db, u.id);
       const before = snap(u.id);

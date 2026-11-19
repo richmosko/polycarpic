@@ -12,7 +12,6 @@ import poly from './plugin.mjs';
 
 const RESOLVER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'resolver.cjs');
 const SRC = '**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,svelte}';
-const TESTS = ['**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}', '**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}'];
 // Repo-root test code a colocated test or a package's tests/ dir may import by path (POLY-140 condition 5).
 const OUTSIDE_ROOTS = ['tests'];
 
@@ -53,7 +52,6 @@ export function generateConfig(layers, opts = {}) {
       rules: {
         'boundaries/dependencies': [2, { default: 'disallow', policies }],
         'poly/no-computed-import': 2,
-        'poly/no-session-user-id-cast': 2,
         ...(layers.confined ? { 'poly/confined-module': [2, { root, confined: layers.confined, packages: Object.fromEntries(names.map((x) => [x, pk[x].dir])) }] } : {}),
         ...(layers.reservedLiterals ? { 'poly/reserved-literal': [2, { root, reserved: layers.reservedLiterals }] } : {}),
         ...(layers.confinedMembers ? { 'poly/confined-member': [2, { root, members: layers.confinedMembers }] } : {}),
@@ -107,10 +105,8 @@ export function generateConfig(layers, opts = {}) {
     for (const m of ['module', 'node:module']) paths.push({ name: m, message: 'node:module builds require functions that hide imports from the layer lint (POLY-140).' });
     banned.push('module', 'node:module');
     // POLY-153 R7.3 (and POLY-152's N3): web enters by withSession alone and holds no BetterAuth. The same refusals cover the web-side
-    // files of packages/auth, which layers.json lets import db/session for other files.
+    // files of packages/auth.
     const webSide = [
-      { name: '@poly/db/session', message: 'Web has no SessionUserId brand: it enters by withSession (POLY-153 R7.3).' },
-      { name: '@poly/db', importNames: ['withTenant', 'sessionUserId'], message: 'Web enters by withSession alone; withTenant and sessionUserId are not for web (POLY-153 R7.3).' },
       { name: 'better-auth', message: 'Web holds no BetterAuth: the sign-in service is a separate process (POLY-152 N3, POLY-153 R7.3).' },
     ];
     const webSidePatterns = [{ group: ['better-auth/*', '@better-auth/*'], message: 'Web holds no BetterAuth: the sign-in service is a separate process (POLY-152 N3, POLY-153 R7.3).' }];
@@ -171,7 +167,6 @@ export function generateConfig(layers, opts = {}) {
   });
 
   // Exceptions, each one named in layers.json or fixed by the rule itself.
-  cfg.push({ name: 'poly/cast-exempt', files: [`${layers.packages.db.dir}/src/session.ts`, ...TESTS], plugins: { poly }, rules: { 'poly/no-session-user-id-cast': 0 } });
   if (layers.sessionSetExempt) {
     cfg.push({ name: 'poly/session-set-exempt', files: [layers.sessionSetExempt], plugins: { poly }, rules: { 'poly/no-session-set': 0 } });
   }

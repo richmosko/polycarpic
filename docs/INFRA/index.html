@@ -25,8 +25,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>devops-engineer</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 1.3.15</span>
-    <span><strong>Last updated:</strong> 2026-11-18</span>
+    <span><strong>Version:</strong> 1.3.16</span>
+    <span><strong>Last updated:</strong> 2026-11-19</span>
   </div>
 </header>
 
@@ -189,6 +189,7 @@ flowchart TB
       <tr><td><code>uploader</code></td><td>prod</td><td>A small tools image (<code>rclone</code> and a shell), by digest</td><td><code>uploader</code>, run by a systemd timer every minute and after each backup run</td><td>128 MB</td><td><code>backup_store_credential</code> (the put-only pair) and <code>heartbeat_url</code>. <strong>No database credential</strong>, no route to Postgres. Network: <code>upload-net</code> only (internet allowed; on the home box the host allowlist still limits it to 443).</td></tr>
     </tbody>
   </table>
+    <p><strong>The database controls the deploy gate checks.</strong> <code>auth</code> connects as <code>poly_auth</code> and is the only service that writes sign-in state. <code>web</code> connects as <code>poly_app</code>, which holds no privilege on BetterAuth's six tables, the session-handle table, the sign-in record or the lock streak table, and enters through <code>app.enter_session</code> alone. The sign-in record (<code>app.sign_in_record</code>) is written by database triggers, is append-only, and is read by no login role but <code>poly_backup</code>; <code>poly_worker</code> alone can purge it. <code>infra/postgres/gate-check.sh</code> checks all of this on the migrated instance before the first real account (§7.1 step 16).</p>
     <p><strong>Networks (prod project).</strong> Subnets are fixed in the compose file because <code>pg_hba.conf</code> matches a subnet, and a container address is not stable. The Docker daemon is told (<code>default-address-pools</code> in <code>daemon.json</code>, base <code>10.200.0.0/16</code>) to allocate everything else elsewhere, so the fixed ranges never collide with an auto-assigned one (unmeasured; checked by <code>provision-check</code>).</p>
   <table>
     <thead><tr><th>Network</th><th>Subnet (start)</th><th>Members</th><th>Properties</th></tr></thead>
@@ -634,23 +635,9 @@ laptop$ curl -sI https://app.example.com | head -5
 laptop$ ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no polyops@app.example.com</code></pre>
       <p class="expect">Expect: exactly three open ports, 22, 80 and 443, in both scans (a full scan can take 10 to 20 minutes). The <code>curl</code> shows <code>HTTP/2 200</code> (staging) or the maintenance response (prod) over a valid certificate. The last command ends <code>Permission denied (publickey)</code>. Any other open port, especially 5432, 2375 or 3000, means a containment failure: close it (<code>polycarpic-ops lockdown</code> stops all containers except Caddy), and tell the team-lead before doing anything else.</p></li>
     <li><strong>Make the bootstrap user</strong> (SECURITY C-01, §4.1: an invitation on an empty instance, so the first sign-up cannot be won by a stranger).
-      <p><strong>Gate: the first real account and its data start here, so do not run this step on prod until stage 2's revocation (POLY-149) is in place.</strong> Until then a bug in web can let an attacker sign in as any user who has no passkey (SECURITY R-2). A closed, empty prod holds nothing, so steps 5 to 15 may run first. The check is on the instance, after it has migrated.</p>
-      <pre class="cmd"><code>box$ docker compose exec -T postgres psql -U postgres -d polycarpic -tA -v ON_ERROR_STOP=1 &lt;&lt;'SQL'
-SELECT count(*) FROM (
-SELECT t, p
-FROM unnest(ARRAY['public."user"', 'public.session', 'public.account', 'public.verification', 'public.two_factor', 'public.passkey']) t,
-     unnest(ARRAY['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) p
-WHERE CASE WHEN p IN ('SELECT', 'INSERT', 'UPDATE', 'REFERENCES')
-           THEN has_any_column_privilege('poly_app', t::regclass, p)
-           ELSE has_table_privilege('poly_app', t::regclass, p) END
-UNION ALL
-SELECT p.oid::regprocedure::text, 'EXECUTE'
-FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-WHERE n.nspname = 'app' AND p.proname LIKE 'enter\_%' AND p.proname &lt;&gt; 'enter_session'
-  AND has_function_privilege('poly_app', p.oid, 'EXECUTE')
-) g;
-SQL</code></pre>
-      <p class="expect">The gate passes only when the command exits 0 and prints exactly one line, <code>0</code>. Any other output (a number above 0, nothing at all, or an error) is a fail: stop and do not make the user. A number above 0 counts the privileges <code>poly_app</code> still holds on BetterAuth's six tables (at table or column level) and the <code>enter_*</code> definers other than <code>enter_session</code>. The command and the service name are unmeasured; the first prod run confirms them. <code>polycarpic-ops gate-check</code> replaces the raw command once it exists. The same check, and the same rule, apply to the home box and the Vercel path. Staging is not gated.</p>
+      <p><strong>Gate: the first real account and its data start here, so this step does not run on prod until the deploy-gate check passes.</strong> The check is on the instance, after it has migrated. It reads the catalog and changes nothing. A closed, empty prod holds nothing, so steps 5 to 15 run first.</p>
+      <pre class="cmd"><code>box$ sudo polycarpic-ops gate-check</code></pre>
+      <p class="expect">The same check without the helper, from the release's ops bundle: <code>infra/postgres/gate-check.sh docker compose exec -T postgres psql -U postgres -d polycarpic</code>. The gate passes only when the command exits 0 and prints exactly one line, <code>gate: pass</code>. Any other output, a non-zero exit, or an error is a fail: stop and do not make the user. Every failing control prints its own <code>FAIL</code> line naming the object. The check requires, on the migrated schema: <code>app.second_step_streak</code> and <code>app.sign_in_record</code> exist with row-level security enabled and forced; the six triggers (<code>two_factor_15_lock</code>, <code>two_factor_16_lock_delete</code>, <code>session_80_sign_in_record</code>, <code>sign_in_record_05_refuse</code>, <code>sign_in_record_10_immutable</code>, <code>sign_in_record_no_truncate</code>) exist and are enabled; <code>app.guard_second_step_lock()</code> and <code>app.record_session_sign_in()</code> are owned by <code>poly_govern</code>, are <code>SECURITY DEFINER</code> and are executable by no login role; <code>app.purge_sign_in_record()</code> is owned by <code>poly_purge</code>, is <code>SECURITY DEFINER</code> and is executable by <code>poly_worker</code> only; no login role holds a write privilege on either table; no login role other than <code>poly_backup</code> can read the sign-in record (the backup role reads every table); <code>app.enter_asserted_user</code> does not exist; <code>poly_app</code> holds no privilege on BetterAuth's six tables, <code>app.session_handle</code>, the sign-in record or the streak table, and executes exactly the ten <code>app</code> functions web needs; no login role can delete from <code>public."user"</code>; and role membership is exactly this set: <code>poly_migrator</code> holds <code>poly_owner</code> and the seven definer-owner roles (no inherit, set, no admin) and <code>poly_backup</code> holds <code>pg_read_all_data</code>, so no login role can <code>SET ROLE</code> to a role that owns the record or its triggers. Each line is refused by a planted fault in <code>tests/db/gate-check.test.ts</code>. The command and the service name are unmeasured; the first prod run confirms them. The same check and the same rule apply to the home box and the Vercel path. Staging is not gated.</p>
       <pre class="cmd"><code>box$ sudo polycarpic-ops cli user invite you@example.com --bootstrap</code></pre>
       <p class="expect">Expect: it prints "invitation recorded" and emails you a sign-up link; the link works only for that address. If no email arrives within 5 minutes, check the Resend dashboard and the spam folder; <code>polycarpic-ops logs web | tail -50</code> shows the send result without any secret.</p></li>
     <li><strong>Open the door, sign up, and set the second step.</strong>
@@ -719,7 +706,7 @@ box$ sudo reboot</code></pre>
 box$ sudo polycarpic-ops provision-check --console</code></pre>
       <p class="expect">Expect: <code>ALL CHECKS PASSED</code>. As a hands-on test, power-cycle the box and at the boot menu press <code>e</code>: it must ask for the bootloader password.</p></li>
     <li><strong>DNS and TLS: choose one mode and set it before first deploy.</strong> The mode is set by <code>TLS_MODE</code> in <code>/etc/polycarpic/host.env</code> and the app refuses to start on a mismatch. See 7.3 for each mode, then return here.</li>
-    <li><strong>Secrets, first deploy, keyring, outside-in check.</strong> Do §7.1 steps 12 and 14 (secrets; first deploy and keyring for prod) with <code>--target home</code>; the bootstrap, open, backup and drill steps (16 to 19) follow once the checks in steps 11 and 12 below pass. There is no staging on this box: run the process in staging on the Hetzner server first. The gate in §7.1 step 16 applies here: do not run the bootstrap or open the box until the gate passes: the command exits 0 and prints exactly one line, <code>0</code>. Any other output (a number above 0, nothing at all, or an error) is a fail: stop.
+    <li><strong>Secrets, first deploy, keyring, outside-in check.</strong> Do §7.1 steps 12 and 14 (secrets; first deploy and keyring for prod) with <code>--target home</code>; the bootstrap, open, backup and drill steps (16 to 19) follow once the checks in steps 11 and 12 below pass. There is no staging on this box: run the process in staging on the Hetzner server first. The gate in §7.1 step 16 applies here: do not run the bootstrap or open the box until the gate passes: the command exits 0 and prints exactly one line, <code>gate: pass</code>. Any other output, a non-zero exit or an error is a fail: stop.
       <p class="expect">Expect the same results, except the first-deploy check also prints <code>served certificate issuer matches TLS_MODE</code>.</p></li>
     <li><strong>Outside-in scan of your home from outside.</strong> Use your phone on mobile data as a hotspot for the laptop (or a cloud shell). Find your home's public IPv4 address (visit any "what is my IP" page from home) and the box's IPv6 global address if it has one (<code>ip -6 addr</code> on the box; disabled means none).
       <pre class="cmd"><code>laptop-off-LAN$ nmap -Pn -p- &lt;home-public-ipv4&gt;
@@ -782,7 +769,7 @@ laptop$ infra/ca/ca.sh intermediate --out ./box-intermediate</code></pre>
       <p class="expect">Expect: <code>select version();</code> shows the pinned major. Record Neon's restore window for your plan from the plan page (§6.6).</p></li>
     <li><strong>Vercel.</strong> Create the team with MFA on, then two projects from the repository: <code>polycarpic-web</code> and <code>polycarpic-jobs</code>, build command and output per <code>infra/vercel/README</code>. Set environment variables <strong>per project</strong> from the table in that file: <code>web</code> gets the public keys and <code>poly_app</code> pooled URL; <code>jobs</code> gets the keyring, <code>poly_worker</code> pooled URL and <code>CRON_SECRET</code>; the migrate step gets the <code>poly_migrator</code> <em>direct</em> URL as a build-only variable on <code>web</code> only. Set Production Branch to a branch nobody pushes to, so Vercel never deploys on its own.</li>
     <li><strong>Deploy a verified release, by hand.</strong>
-      <p><strong>Gate:</strong> the gate in §7.1 step 16 applies to the first real account on this path. Run its query against Neon through the SQL editor. There is no exit code there, so the result must be the single value <code>0</code>; any other result (a number above 0, no result, or an error) is a fail: stop, and do not create the first account. The deploy itself is not gated.</p>
+      <p><strong>Gate:</strong> the gate in §7.1 step 16 applies to the first real account on this path. Paste <code>infra/postgres/gate-check.sql</code> into Neon's SQL editor and run it. There is no exit code there, so the result must be the single row <code>gate: pass</code>; any other result (a <code>FAIL</code> row, no result, or an error) is a fail: stop, and do not create the first account. The deploy itself is not gated.</p>
       <pre class="cmd"><code>laptop$ git fetch --tags &amp;&amp; git tag -v v1.0.0
 laptop$ git checkout v1.0.0
 laptop$ infra/vercel/deploy.sh --tag v1.0.0</code></pre>
@@ -800,6 +787,7 @@ laptop$ infra/vercel/deploy.sh --tag v1.0.0</code></pre>
       <tr><td><code>polycarpic-ops cli user reset-mfa &lt;email&gt;</code></td><td>Removes that person's second-step methods and ends their sessions; they re-enrol on next sign-in. Use after verifying who is asking, in person or by a call you place yourself.</td><td>"sessions revoked: N", an <code>audit_event</code>, and an email to the user</td></tr>
       <tr><td><code>polycarpic-ops cli membership remove-owner &lt;entity&gt; &lt;email&gt;</code></td><td>The audited backstop for removing a co-owner who cannot or will not act (R-19). Notifies every owner, the target included.</td><td>"change.forced recorded", emails sent</td></tr>
       <tr><td><code>polycarpic-ops cli entity set-founder &lt;entity&gt; &lt;email&gt;</code></td><td>Sets a new founding owner when the founder has vanished without transferring</td><td>As above</td></tr>
+      <tr><td><code>polycarpic-ops gate-check</code></td><td>The deploy gate of §7.1 step 16: reads the migrated schema and checks the revocation, the second-step lock, the sign-in record and poly_app's reach. Changes nothing.</td><td>One line, <code>gate: pass</code>, exit 0; otherwise one <code>FAIL</code> line per broken control and exit 1</td></tr>
       <tr><td><code>polycarpic-ops cli secrets rotate</code></td><td>Keyring rotation (§8.12)</td><td>"rows remaining under old key: 0"</td></tr>
     </tbody>
   </table>

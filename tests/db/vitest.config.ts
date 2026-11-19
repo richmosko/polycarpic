@@ -11,7 +11,8 @@ import { defineConfig } from 'vitest/config';
 //   template-clone asserts the login roles' stored password hashes
 //   ops-hardening  a 4.8 s production timeout, not measured under contention
 //   pgtap-membership role-membership GRANTs planted in pgTAP 08's rolled-back transaction (POLY-152 N2)
-export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts'];
+//   gate-check-membership role-membership GRANTs planted with the deploy-gate check, each rolled back (POLY-149e)
+export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts', 'tests/db/gate-check-membership.test.ts'];
 
 export default defineConfig({
   test: {

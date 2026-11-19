@@ -139,7 +139,7 @@ export const superCount = (db: string, sql: string, fx: Fixture, actor: string):
 export type Outcome = { error: string | null; rows: number };
 const ROLLBACK = Symbol('rollback');
 
-/** Run one statement as `actor` through withTenant in a transaction that is always rolled back. */
+/** Run one statement as `actor` through withSession in a transaction that is always rolled back. */
 export async function runAs(
   tenant: (uid: string, fn: (tx: any) => Promise<any>) => Promise<any>,
   rawQuery: (tx: any, text: string, p: unknown[]) => Promise<{ rowCount: number | null; rows: unknown[] }>,

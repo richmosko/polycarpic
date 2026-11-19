@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { cloneMigrated } from './helpers/api';
 import { codeOf, fixture, fails, msgOf } from './helpers/second-step';
 import { must } from './helpers/sql';
-import { attach } from './helpers/handle';
+import { ENTER_SESSION, attach, sessionWithHandle } from './helpers/handle';
 
 let db: string;
 let f: ReturnType<typeof fixture>;
@@ -208,7 +208,7 @@ describe('C-b the race on the exemption (two connections)', () => {
       await c.connect();
       const q = (t: string, v?: unknown[]) => c.query({ text: t, values: v, queryMode: 'extended' });
       await q('BEGIN');
-      await q('SELECT app.enter_asserted_user($1, $2)', [u.id, s]);
+      await q(ENTER_SESSION, [sessionWithHandle(db, u.id, { fresh: true }).handle]); // one session each: a shared one serialises both entries on the slide's row lock
       return { c, q };
     };
     const a = await open();

@@ -147,11 +147,11 @@ describe('the exact-call set (seceng #18 as stage 1)', () => {
   it('an entry after a write in the transaction is refused and the write is not kept [red if: the first-write check is absent]', async () => {
     const { u, handle } = await live();
     const x = await asApp(async (q) => {
-      await q(`UPDATE public."user" SET name = 'W' WHERE id = $1`, [u.id]);
+      await q('SELECT pg_current_xact_id()'); // any assigned transaction id counts as a write (poly_app holds no UPDATE on user since POLY-149)
       return fails(q(ENTER_SESSION, [handle]));
     });
     expect(codeOf(x)).toBe('42501');
-    expect(must(`SELECT name FROM public."user" WHERE id = '${u.id}'`, db).rows[0]![0]).toBe('C');
+    expect(msgOf(x)).toMatch(/first write/);
   });
   for (const role of ['poly_worker', 'poly_operator', 'poly_auth']) {
     it(`${role} has no EXECUTE and writes no marker [red if: EXECUTE is granted to ${role}]`, async () => {

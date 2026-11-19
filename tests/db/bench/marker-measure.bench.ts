@@ -1,7 +1,8 @@
-// POLY-147 R7: the cost of the identity marker. The same read-only withTenant transaction 1,000 times, on this tree and on a
+// POLY-147 R7: the cost of the identity marker. The same read-only withSession transaction 1,000 times, on this tree and on a
 // same-day control of `main` against the SAME server. Case S: 1 user, 20 entities, 20 owner memberships. Case L: 2,000 of each
 // (ledger-sized, so a per-row evaluation of the policies' current_user_id() shows). Uses only surfaces present on main.
 // One JSON line per case: { tree, sha, case, p50_ms, p95_ms, wal_bytes_per_tx }, to stdout and appended to $BENCH_OUT.
+import { handleFor } from '../helpers/handle';
 import { spawnSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { afterAll, describe, expect, it, vi } from 'vitest';
@@ -31,10 +32,9 @@ async function measure(label: 'S' | 'L', entities: number) {
     ANALYZE;`, db);
   vi.resetModules();
   dbm = await import('../../../packages/db/src/index.ts');
-  const dbs = await import('../../../packages/db/src/session.ts');
   await dbm.close();
   dbm.configure({ app: dbEnv('poly_app', db), worker: dbEnv('poly_worker', db), max: 1 });
-  const once = () => dbm.withTenant(dbs.sessionUserId(UID), SID, (tx: any) => tx.execute(dbm.sql`SELECT count(*) FROM public.entity`));
+  const once = () => dbm.withSession(handleFor(db, UID, SID), (tx: any) => tx.execute(dbm.sql`SELECT count(*) FROM public.entity`));
   const first = await once();
   expect(Number((first.rows ?? first)[0].count), 'the owner sees every seeded entity').toBe(entities);
   for (let i = 1; i < WARM; i++) await once();

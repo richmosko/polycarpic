@@ -9,10 +9,10 @@ import { cloneMigrated } from './helpers/api';
 import { DB_PKG, server, url } from './helpers/pg';
 import { enterAs } from './helpers/second-step';
 import { must } from './helpers/sql';
-import { withHandle } from './helpers/handle';
+import { ENTER_SESSION, handleFor, sessionWithHandle, withHandle } from './helpers/handle';
 
 const pgmod = createRequire(join(DB_PKG, 'package.json'))('pg');
-const ROLES = ['poly_app', 'poly_auth'] as const;
+const ROLES = ['poly_auth'] as const; // POLY-149: poly_app holds nothing on the factor tables (pgTAP 11, revocation.test.ts)
 // POLY-152 R8: positive paths through the nine POLY-89 helpers run as poly_auth alone; poly_app lost EXECUTE (its refusals: second-step-challenge.test.ts).
 const AUTH_ONLY = ['poly_auth'] as const;
 type Role = (typeof ROLES)[number];
@@ -49,7 +49,7 @@ async function committed(user: string, fn: (q: (t: string, v?: unknown[]) => Pro
   const c = new pgmod.Client({ connectionString: url('poly_app', db) });
   await c.connect();
   const q = (text: string, values?: unknown[]) => c.query({ text, values, queryMode: 'extended' });
-  try { await q('BEGIN'); await q('SELECT app.enter_asserted_user($1, $2)', [user, SID]); await fn(q); await q('COMMIT'); }
+  try { await q('BEGIN'); await q(ENTER_SESSION, [handleFor(db, user, SID)]); await fn(q); await q('COMMIT'); }
   catch (x) { await c.query('ROLLBACK').catch(() => {}); throw x; }
   finally { await c.end(); }
 }
@@ -59,7 +59,7 @@ async function shared(owner: string, name: string): Promise<string> {
   return must(`SELECT id FROM public.entity WHERE name = '${name}'`, db).rows[0]![0]!;
 }
 
-/** One marked transaction as `role`: BEGIN; enter_asserted_user; fn; ROLLBACK. Every query is extended-mode. */
+/** One marked transaction as `role`: BEGIN; enter_session (or enter_auth_session); fn; ROLLBACK. Every query is extended-mode. */
 async function marked<T>(role: Role, user: string | null, session: string | null, fn: (q: (t: string, v?: unknown[]) => Promise<any>) => Promise<T>): Promise<T> {
   const c = new pgmod.Client({ connectionString: url(role, db) });
   await c.connect();
@@ -195,7 +195,7 @@ describe('C14 user.two_factor_enabled is guarded (R3 #2, #9)', () => {
     await c.connect();
     try {
       await c.query({ text: 'BEGIN', queryMode: 'extended' });
-      await c.query({ text: 'SELECT app.enter_asserted_user($1, $2)', values: [u.id, SID], queryMode: 'extended' });
+      await c.query({ text: ENTER_SESSION, values: [handleFor(db, u.id, SID)], queryMode: 'extended' });
       const ins = await fails(c.query({ text: `INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', $1, true)`, values: [u.id], queryMode: 'extended' }));
       const commit = ins ?? (await fails(c.query({ text: 'COMMIT', queryMode: 'extended' })));
       expect(commit).not.toBeNull();
@@ -304,11 +304,11 @@ describe('R1.1/R1.5 identity from the marker, exact call, no marker refused (C12
 });
 
 describe('C8 email_challenge and enrolment_grant (R2)', () => {
-  it('app.email_challenge has the ruled columns, session_id ON DELETE CASCADE NOT NULL, and poly_app can SELECT only the six listed columns [red if: the table is absent or poly_app can read code_hash]', () => {
+  it('app.email_challenge has the ruled columns, session_id ON DELETE CASCADE NOT NULL, and poly_app holds no column privilege on it since POLY-149 (pgTAP 11) [red if: the table is absent or poly_app can read code_hash]', () => {
     const cols = must(`SELECT column_name FROM information_schema.columns WHERE table_schema = 'app' AND table_name = 'email_challenge' ORDER BY 1`, db).rows.map((r) => r[0]);
     expect(cols).toEqual(['attempts', 'code_hash', 'created_at', 'expires_at', 'id', 'purpose', 'session_id', 'used_at', 'user_id'].sort());
     expect(must(`SELECT has_column_privilege('poly_app', 'app.email_challenge', 'code_hash', 'SELECT')`, db).rows[0]![0]).toBe('f');
-    expect(must(`SELECT has_column_privilege('poly_app', 'app.email_challenge', 'attempts', 'SELECT')`, db).rows[0]![0]).toBe('t');
+    expect(must(`SELECT has_column_privilege('poly_app', 'app.email_challenge', 'attempts', 'SELECT')`, db).rows[0]![0]).toBe('f');
     expect(must(`SELECT confdeltype FROM pg_constraint WHERE conrelid = 'app.email_challenge'::regclass AND contype = 'f' AND confrelid = 'public.session'::regclass`, db).rows[0]![0]).toBe('c');
   });
   it('app.enrolment_grant: session_id ON DELETE SET NULL, consumed_xid recorded, poly_app holds no privilege, one open grant per user [red if: the table is absent or the index is not partial-unique]', () => {
@@ -468,7 +468,7 @@ describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
   it('race 1 (C-b): a last-factor delete racing a first invitation on the own Person: exactly one commits [red if: refuse_last_method does not lock the user row or reads before its lock]', async () => {
     const u = await seed({ enrolled: true });
     const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${u.id}', 'tkx${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`), db).rows[0]![0]!;
-    const open = async () => { const c = new pgmod.Client({ connectionString: url('poly_app', db) }); await c.connect(); const q = (t: string, v?: unknown[]) => c.query({ text: t, values: v, queryMode: 'extended' }); await q('BEGIN'); await q('SELECT app.enter_asserted_user($1, $2)', [u.id, s]); return { c, q }; };
+    const open = async () => { const c = new pgmod.Client({ connectionString: url('poly_app', db) }); await c.connect(); const q = (t: string, v?: unknown[]) => c.query({ text: t, values: v, queryMode: 'extended' }); await q('BEGIN'); await q(ENTER_SESSION, [sessionWithHandle(db, u.id, { fresh: true }).handle]); return { c, q }; }; // one session each: a shared one would serialise the two entries on the slide's row lock
     const a = await open();
     const b = await open();
     const outcomes: string[] = [];
@@ -520,7 +520,7 @@ describe('R1.3 amended (35e375b5): a superuser passes every guard; a superuser a
     try {
       await q('BEGIN');
       if (setRole) await q('SET LOCAL ROLE poly_app');
-      if (user) await q('SELECT app.enter_asserted_user($1, $2)', [user, SID]);
+      if (user) await q(ENTER_SESSION, [handleFor(db, user, SID)]);
       const r = await fn(q);
       if (commit) await q('COMMIT');
       return r;
@@ -596,7 +596,7 @@ describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect:
   });
   it('N1 (green today BY DESIGN, a pin): the exact set of app functions poly_app may EXECUTE, so a new one fails until someone reviews it [red if: a function is granted to poly_app, or one of these loses its grant]', () => {
     const got = must(`SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace s ON s.oid = p.pronamespace WHERE s.nspname = 'app' AND p.prokind = 'f' AND has_function_privilege('poly_app', p.oid, 'EXECUTE') ORDER BY 1`, db).rows.map((r) => r[0]);
-    const before89 = ['app.accept_invitations(bytea)', 'app.claim_invitations(bytea,text)', 'app.current_session_id()', 'app.current_user_id()', 'app.enter_asserted_user(uuid,uuid)', 'app.enter_new_user(uuid)', 'app.has_role(uuid,text)', 'app.owner_count(uuid)', 'app.visible_entities()'];
+    const before89 = ['app.accept_invitations(bytea)', 'app.claim_invitations(bytea,text)', 'app.current_session_id()', 'app.current_user_id()', 'app.enter_new_user(uuid)', 'app.has_role(uuid,text)', 'app.owner_count(uuid)', 'app.visible_entities()'];
     const readOnly = ['app.second_step_required()', 'app.enrolment_grant_live()']; // R1.5 exempt: no exact-call check
     const forTriggers = ['app.step_up_fresh()', 'app.enrol_proof(text)', 'app.check_factor_removal(uuid,text,uuid)', 'app.consume_passkey_grant()', 'app.take_recent_auth_stamp(uuid)']; // invoker triggers call them (seceng N1)
     const exactCall = ['app.set_two_factor_enabled(boolean)', 'app.issue_email_challenge(text)', 'app.confirm_email_challenge(text)']; // app.reset_second_step is poly_operator's, not poly_app's

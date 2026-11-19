@@ -55,22 +55,20 @@ describe('A1/§5.2 poly_app after 0014 differs from 0013 by exactly the twelve E
     expect(b.filter((l) => !a.includes(l))).toEqual([]);
     expect(must(`SELECT count(*) FROM pg_proc p WHERE p.proname IN ('enter_auth_session','provision_person') AND has_function_privilege('poly_app', p.oid, 'EXECUTE')`, db).rows[0]![0]).toBe('0');
   });
-  it('poly_app still executes second_step_required, has_role, visible_entities, owner_count, enter_asserted_user, enter_job-free [red if: a removal went too far]', () => {
-    for (const f of ['app.second_step_required()', 'app.has_role(uuid, text)', 'app.visible_entities()', 'app.owner_count(uuid)', 'app.enter_asserted_user(uuid, uuid)'])
+  it('poly_app still executes second_step_required, has_role, visible_entities, owner_count, enter_session, enter_job-free [red if: a removal went too far]', () => {
+    for (const f of ['app.second_step_required()', 'app.has_role(uuid, text)', 'app.visible_entities()', 'app.owner_count(uuid)', 'app.enter_session(text)'])
       expect(must(`SELECT has_function_privilege('poly_app', to_regprocedure('${f}'), 'EXECUTE')`, db).rows[0]![0], f).toBe('t');
   });
 });
 
 describe('A2 the sign-up stamp names poly_auth only', () => {
-  it('a user INSERT as poly_app gets a NULL stamp and enter_new_user refuses it (poly_app also lost EXECUTE) [red if: the stamp still names poly_app]', async () => {
+  it('a user INSERT as poly_app is refused 42501 (it holds nothing on the user table since POLY-149) and enter_new_user is refused too [red if: poly_app can write user rows]', async () => {
     const id = uid();
-    const r = await tx(db, 'poly_app', async (q) => {
-      await q(`INSERT INTO public."user" (id, name, email) VALUES ($1, 'S', $2)`, [id, `${id}@qa.test`]);
-      const stamp = (await q(`SELECT signup_txid FROM public."user" WHERE id = $1`, [id])).rows[0].signup_txid;
-      return { stamp, x: await fails(q('SELECT app.enter_new_user($1)', [id])) };
-    });
-    expect(r.stamp).toBeNull();
-    expect(codeOf(r.x)).toBe('42501');
+    const x = await tx(db, 'poly_app', (q) => fails(q(`INSERT INTO public."user" (id, name, email) VALUES ($1, 'S', $2)`, [id, `${id}@qa.test`])));
+    expect(codeOf(x)).toBe('42501');
+    expect(must(`SELECT count(*) FROM public."user" WHERE id = '${id}'`, db).rows[0]![0]).toBe('0');
+    const y = await tx(db, 'poly_app', (q) => fails(q('SELECT app.enter_new_user($1)', [id])));
+    expect(codeOf(y)).toBe('42501');
   });
   it('as poly_auth the stamp is set and the step succeeds [red if: the stamp names neither]', async () => {
     const id = uid();

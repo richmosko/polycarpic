@@ -1,7 +1,7 @@
 // POLY-153 R8 (C4), R10: after a REAL sign-in in Chromium, web receives the handle cookie and none of BetterAuth's. The cookie names and paths
 // are read from the browser's own jar and from the headers it sent, never guessed. Titles end [red if: <mutation>].
-// The seeded user is serve.ts's (Ada Lovelace). serve.ts also revokes poly_app's grants on BetterAuth's tables and on
-// enter_asserted_user (R7.4), so every page here also proves web enters by handle alone.
+// The seeded user is serve.ts's (Ada Lovelace). the migrated chain revokes poly_app's grants on BetterAuth's tables (0017),
+// so every page here also proves web enters by handle alone.
 import { expect, test } from '@playwright/test';
 
 const base = `http://localhost:${process.env.E2E_PORT ?? 4173}`;

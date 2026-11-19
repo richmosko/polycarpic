@@ -1,6 +1,6 @@
 // POLY-62 ruling R6: the tenancy fixture. Users O, M, V, X are inserted as superuser. M (manager) and V (viewer) are seated
 // as superuser too, because poly_app holds no membership INSERT; their audit rows carry actor 'none' and the seed asserts it.
-// Every other write goes through the real withTenant as poly_app, so the seed is itself a test of the policies. poly_app
+// Every other write goes through the real withSession as poly_app, so the seed is itself a test of the policies. poly_app
 // may not supply an entity id, so ids are read back by a unique name. A seed step that fails is a failing test.
 import { must } from './pg';
 

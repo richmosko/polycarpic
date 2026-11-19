@@ -68,13 +68,13 @@ describe('criterion 9: timestamptz and the three core calls as poly_app', () => 
 describe('S16a: the app role cannot write second_step_at or recent_auth_at', () => {
   const wrote = async (run: () => Promise<unknown>) => run().then(() => 'ok', (x: any) => (x?.code === '42501' || /permission denied/i.test(String(x?.message)) ? 'denied' : `error:${x?.message}`));
 
-  it('UPDATE of either column is denied to poly_app  [red if: the table-level UPDATE grant covers the column]', async () => {
+  it('UPDATE of either column is denied to poly_auth (poly_app holds nothing on these tables since POLY-149)  [red if: the table-level UPDATE grant covers the column]', async () => {
     const u = e.seedUser();
     const { cookie } = await e.signIn(u.email, await e.mk());
     void cookie;
     const sid = must(`SELECT id FROM public.session WHERE user_id = '${u.id}'`, e.db).rows[0][0];
-    const r1 = await wrote(() => e.dbm.withTenant(e.dbs.sessionUserId(u.id), sid, (tx: any) => e.dba.clientOf(tx).query(`UPDATE public."user" SET second_step_at = now() WHERE id = '${u.id}'`)));
-    const r2 = await wrote(() => e.dbm.withTenant(e.dbs.sessionUserId(u.id), sid, (tx: any) => e.dba.clientOf(tx).query(`UPDATE public.session SET recent_auth_at = now() WHERE id = '${sid}'`)));
+    const r1 = await wrote(() => e.dba.withContextFreeTx((tx: any) => e.dba.clientOf(tx).query(`UPDATE public."user" SET second_step_at = now() WHERE id = '${u.id}'`)));
+    const r2 = await wrote(() => e.dba.withContextFreeTx((tx: any) => e.dba.clientOf(tx).query(`UPDATE public.session SET recent_auth_at = now() WHERE id = '${sid}'`)));
     expect([r1, r2]).toEqual(['denied', 'denied']);
     expect(must(`SELECT second_step_at IS NULL FROM public."user" WHERE id = '${u.id}'`, e.db).rows[0][0]).toBe('t');
   });
@@ -85,7 +85,7 @@ describe('S16a: the app role cannot write second_step_at or recent_auth_at', () 
     expect(must(`SELECT coalesce(bool_and(second_step_at IS NULL), true) FROM public."user" WHERE email = '${email}'`, e.db).rows[0][0]).toBe('t');
     const u = e.seedUser();
     const probe = `probe-${Date.now()}`;
-    await wrote(() => e.dbm.withTenant(e.dbs.sessionUserId(u.id), '33333333-3333-4333-8333-333333333333', (tx: any) =>
+    await wrote(() => e.dba.withContextFreeTx((tx: any) =>
       e.dba.clientOf(tx).query(`INSERT INTO public.session (user_id, token, expires_at, created_at, updated_at, recent_auth_at) VALUES ('${u.id}', '${probe}', now() + interval '1 day', now(), now(), now())`)));
     expect(must(`SELECT coalesce(bool_and(recent_auth_at IS NULL), true) FROM public.session WHERE token = '${probe}'`, e.db).rows[0][0]).toBe('t');
   });

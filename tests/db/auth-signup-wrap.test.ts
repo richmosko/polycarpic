@@ -63,7 +63,7 @@ describe('criterion 11: every user-inserting route runs inside withContextFreeTx
   });
 
   for (const path of Object.keys(drivers))
-    it(`${path}: creates the user inside the wrapper, in the transaction the wrapper opened  [red if: the handler runs this route on the plain pool or under withTenant]`, async () => {
+    it(`${path}: creates the user inside the wrapper, in the transaction the wrapper opened  [red if: the handler runs this route on the plain pool or under a signed-in request]`, async () => {
       accepting();
       const email = `wrap-${stamp()}@qa.test`;
       const token = invite(email);
@@ -102,7 +102,7 @@ describe('criterion 12: the sign-up hook never opens a transaction of its own', 
     expect(users(email)).toBe(0);
   });
 
-  it('under withTenant (a signed-in request) a user-creating route fails closed: hook throws, no user row  [red if: the check accepts any client rather than kind === withContextFreeTx]', async () => {
+  it('under a signed-in request a user-creating route fails closed: hook throws, no user row  [red if: the check accepts any client rather than kind === withContextFreeTx]', async () => {
     accepting();
     const existing = e.seedUser();
     const { cookie } = await e.signIn(existing.email, auth);
@@ -114,7 +114,7 @@ describe('criterion 12: the sign-up hook never opens a transaction of its own', 
 });
 
 describe('POLY-87 build check: a commit-time 42501 is labelled invitation_required on the sign-up path only', () => {
-  it('a signed-in request whose COMMIT fails with 42501 is not answered 403 invitation_required  [red if: handler.ts maps every 42501, withTenant included]', async () => {
+  it('a signed-in request whose COMMIT fails with 42501 is not answered 403 invitation_required  [red if: handler.ts maps every 42501, signed-in requests included]', async () => {
     must(`CREATE FUNCTION public.qa_late_42501() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'qa: refused at commit' USING ERRCODE = '42501'; END $$;
       CREATE CONSTRAINT TRIGGER qa_late_42501 AFTER UPDATE ON public."user" DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.name = 'Late') EXECUTE FUNCTION public.qa_late_42501();`, e.db);
     const u = e.seedUser();

@@ -1,5 +1,5 @@
 // POLY-153 R0, R6 (service side), R7.4, R11: the pins that are not behaviour of one definer. (1) what this loop must NOT change
-// (poly_app keeps enter_asserted_user and its BetterAuth grants on the migrated chain; the revoke of R7.4 is the e2e harness's alone);
+// (the revocation moved to POLY-149: pgTAP 11 and revocation.test.ts);
 // (2) definers.json lists the six new functions; (3) the service-side step-up check is `app.step_up_fresh()` and fails closed outside a
 // session transaction (the third unmeasured claim). Titles end [red if: <mutation>].
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -14,14 +14,6 @@ vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./hel
 let e: Env;
 beforeAll(async () => { e = await boot(); });
 afterAll(() => teardown(e));
-
-describe('R0 this loop revokes nothing from poly_app (that is POLY-149)', () => {
-  it('poly_app still executes enter_asserted_user and still holds its BetterAuth table grants on the migrated chain [red if: this loop moved the revocation in]', () => {
-    expect(must(`SELECT has_function_privilege('poly_app', 'app.enter_asserted_user(uuid, uuid)', 'EXECUTE')`, e.db).rows[0]![0]).toBe('t');
-    for (const t of ['public."user"', 'public.session', 'public.account', 'public.verification', 'public.two_factor', 'public.passkey'])
-      expect(must(`SELECT has_table_privilege('poly_app', '${t}', 'SELECT')`, e.db).rows[0]![0], t).toBe('t');
-  });
-});
 
 describe('R11 definers.json lists the six new functions with owner and EXECUTE', () => {
   const want: [string, string[]][] = [
@@ -77,7 +69,6 @@ describe('R7.1 withSession(handle, fn) in packages/db (real, on the poly_app poo
     const r = await root();
     expect(typeof r.withSession).toBe('function');
     expect(typeof r.NoLiveSession).toBe('function');
-    expect(typeof ((await import('../../packages/db/src/session.ts')) as any).withSession).toBe('undefined');
   });
   it('enters by ONE statement `SELECT * FROM app.enter_session($1)`, hands fn (tx, shell) for the live session, and the marker is kind session [red if: setup sends two statements, a hash, or another kind]', async () => {
     const r = await root();
@@ -91,7 +82,7 @@ describe('R7.1 withSession(handle, fn) in packages/db (real, on the poly_app poo
     const entries = sql.filter((q) => /enter_session/.test(q));
     expect(entries).toHaveLength(1);
     expect(entries[0]!.replace(/\s+/g, ' ').trim()).toMatch(/^SELECT \* FROM app\.enter_session\(\$1\);?$/);
-    expect(sql.some((q) => /enter_asserted_user/.test(q))).toBe(false);
+    expect(sql.some((q) => /enter_asserted/.test(q))).toBe(false);
   });
   it('a handle that is not live throws NoLiveSession and never runs fn [red if: the 42501 escapes as a raw database error or fn runs unmarked]', async () => {
     const r = await root();

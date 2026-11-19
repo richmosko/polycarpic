@@ -4,4 +4,4 @@ import type * as db from '@poly/db';
 
 type Expect<T extends true> = T;
 type Keys = keyof typeof db;
-export type NoSessionConstructor = Expect<Extract<Keys, 'sessionUserId' | 'SessionUserId'> extends never ? true : false>;
+export type NoSessionConstructor = Expect<Extract<Keys, `${'session' | 'Session'}UserId`> extends never ? true : false>;
