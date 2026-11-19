@@ -58,8 +58,7 @@ describe('criterion 9: timestamptz and the three core calls as poly_app', () => 
     const invitationToken = seedInvitation({ db: e.db, email, role: 'viewer' }); // a real no-entity invitation (POLY-87)
     const su = await e.dba.withContextFreeTx(() => auth.api.signUpEmail({ body: { email, password: PW, name: 'Core', invitationToken } }));
     expect(su.user.email).toBe(email);
-    const si = await auth.api.signInEmail({ body: { email, password: PW }, returnHeaders: true });
-    const cookie = si.headers.getSetCookie().map((c: string) => c.split(';')[0]).join('; ');
+    const { cookie } = await e.signIn(email, auth); // through handleAuthRequest: the handle is issued in the sign-in transaction (POLY-153 R10)
     const s = await auth.api.getSession({ headers: new Headers({ cookie }) });
     expect(s?.user.email).toBe(email);
     expect(Object.values(s.session).some((v) => v instanceof Date)).toBe(true);

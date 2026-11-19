@@ -1,4 +1,4 @@
-// POLY-152 R1.1, R1.2, seceng D2 / E2 / E3: the service's two listeners and its startup checks, in process through
+// POLY-152 R1.1, R1.2, seceng D2 and POLY-153 R9: the service's one listener (the internal /session listener is removed) and its startup checks, in process through
 // `startAuthService(env)` (backend-lead-152's contract names, point 3). Red today: apps/auth does not exist. Titles end [red if: ...].
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -11,18 +11,18 @@ const dir = mkdtempSync(join(tmpdir(), 'poly152-main-'));
 const file = (n: string, c: string) => { const p = join(dir, n); writeFileSync(p, c); return p; };
 let db: string;
 let port = 41000 + (process.pid % 500) * 4;
-type Svc = { publicOrigin: string; internalOrigin: string; close(): Promise<void> };
+type Svc = { publicOrigin: string; internalOrigin?: string; close(): Promise<void> };
 const start = async (env: Record<string, string>): Promise<Svc> => ((await import('../../apps/auth/src/main.ts')) as any).startAuthService(env);
 const envFor = (database: string, over: Record<string, string> = {}): Record<string, string> => ({
   ...(process.env as Record<string, string>),
   APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'https://app.qa.test',
   ...dbEnv('poly_auth', database), AUTH_SECRET_FILE: file('secret', `${SECRET}\n`),
-  AUTH_INTERNAL_HOST: '127.0.0.1', AUTH_INTERNAL_PORT: String(++port), AUTH_PUBLIC_PORT: String(++port),
+  AUTH_PUBLIC_PORT: String(++port), // R9: no AUTH_INTERNAL_HOST / AUTH_INTERNAL_PORT
   ...over,
 });
 beforeAll(() => { db = cloneMigrated(); });
 
-describe('R1.1 the two listeners', () => {
+describe('R1.1 / R9 the one listener', () => {
   let svc: Svc;
   let startErr: unknown = null;
   const ready = (): Svc => { if (startErr) throw startErr; return svc; };
@@ -39,14 +39,15 @@ describe('R1.1 the two listeners', () => {
     for (const p of ['/', '/session', '/api/session', '/api/authx', '/sign-in', '/api/auth/../session'])
       expect((await fetch(`${ready().publicOrigin}${p}`, { redirect: 'manual' })).status, p).toBe(404);
   });
-  it('the internal listener: GET /session with no cookie is 204; any other path, method or query is 404; /api/auth/ok is not served there [red if: the internal listener is wider]', async () => {
-    expect((await fetch(`${ready().internalOrigin}/session`)).status).toBe(204);
-    for (const [m, p] of [['POST', '/session'], ['GET', '/'], ['GET', '/session?x=1'], ['GET', '/api/auth/ok']] as const)
-      expect((await fetch(`${ready().internalOrigin}${p}`, { method: m })).status, `${m} ${p}`).toBe(404);
+  it('R9: GET /session on the public listener is 404 for every spelling, with and without a cookie [red if: handleSessionRequest is still served]', async () => {
+    for (const p of ['/session', '/api/session', '/api/auth/session-internal', '/session?x=1', '//session'])
+      for (const cookie of [undefined, '__Secure-better-auth.session_token=abc.def'])
+        expect((await fetch(`${ready().publicOrigin}${p}`, { redirect: 'manual', headers: cookie ? { cookie } : {} })).status, `${p} ${cookie ?? ''}`).toBe(404);
   });
-  it('the internal origin is not the public one and binds the configured host, never a wildcard [red if: one port or 0.0.0.0]', () => {
-    expect(new URL(ready().internalOrigin).port).not.toBe(new URL(ready().publicOrigin).port);
-    expect(new URL(ready().internalOrigin).hostname).toBe('127.0.0.1');
+  it('R9: the service exposes one origin; startAuthService returns no internalOrigin and the env cannot ask for one [red if: a second listener exists]', async () => {
+    expect(ready().internalOrigin).toBeUndefined();
+    const x = await (async () => { try { const s = await start(envFor(db, { AUTH_INTERNAL_HOST: '127.0.0.1', AUTH_INTERNAL_PORT: String(++port) })); await s.close(); return null; } catch (e) { return e as Error; } })();
+    expect(x, 'AUTH_INTERNAL_* is forbidden config for auth (R9)').not.toBeNull();
   });
   it('D2: the auth secret appears in no log line from startup or from a request [red if: the service logs its secret]', async () => {
     await fetch(`${ready().publicOrigin}/api/auth/ok`);

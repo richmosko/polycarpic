@@ -6,6 +6,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { cloneMigrated } from './helpers/api';
 import { codeOf, fixture, fails, msgOf } from './helpers/second-step';
 import { must } from './helpers/sql';
+import { attach } from './helpers/handle';
 
 let db: string;
 let f: ReturnType<typeof fixture>;
@@ -114,6 +115,7 @@ describe('C3/C15 first enrolment in SQL, in BetterAuth\'s measured order (R3 #1 
       await q(`INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('sec', 'bk', $1, false)`, [u.id]);
       await q('SELECT app.set_two_factor_enabled($1)', [true]);
       const copy = await q(`INSERT INTO public.session (user_id, token, expires_at) VALUES ($1, $2, now() + interval '1 day') RETURNING id, recent_auth_at`, [u.id, `rot${Math.random()}`]);
+      await attach(q, copy.rows[0].id);
       await q('DELETE FROM public.session WHERE id = $1', [s]);
       await q(`UPDATE public.two_factor SET verified = true WHERE user_id = $1`, [u.id]);
       return copy.rows[0];
@@ -145,8 +147,10 @@ describe('C3/C15 first enrolment in SQL, in BetterAuth\'s measured order (R3 #1 
         expect(await confirm(q, (await issue(q))!)).toBe(true);
         await q(`INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('sec', 'bk', $1, false)`, [u.id]);
         await q('SELECT app.set_two_factor_enabled($1)', [true]);
-        await q(`INSERT INTO public.session (user_id, token, expires_at) VALUES ($1, $2, now() + interval '1 day')`, [u.id, `one${Math.random()}`]);
-        const r = await q(`INSERT INTO public.session (user_id, token, expires_at) VALUES ($1, $2, now() + interval '1 day') RETURNING recent_auth_at`, [u.id, `two${Math.random()}`]);
+        const one = await q(`INSERT INTO public.session (user_id, token, expires_at) VALUES ($1, $2, now() + interval '1 day') RETURNING id`, [u.id, `one${Math.random()}`]);
+        await attach(q, one.rows[0].id);
+        const r = await q(`INSERT INTO public.session (user_id, token, expires_at) VALUES ($1, $2, now() + interval '1 day') RETURNING id, recent_auth_at`, [u.id, `two${Math.random()}`]);
+        await attach(q, r.rows[0].id);
         await q(`UPDATE public.two_factor SET verified = true WHERE user_id = $1`, [u.id]);
         return r.rows[0];
       });
@@ -156,7 +160,7 @@ describe('C3/C15 first enrolment in SQL, in BetterAuth\'s measured order (R3 #1 
       const u = await f.user();
       const s = f.session(u.id);
       await enrolTotp(role, u, s);
-      const later = await f.committed(role, u.id, null, (q) => q(`INSERT INTO public.session (user_id, token, expires_at) VALUES ($1, $2, now() + interval '1 day') RETURNING recent_auth_at`, [u.id, `late${Math.random()}`]).then((r) => r.rows[0]));
+      const later = await f.committed(role, u.id, null, async (q) => { const r = await q(`INSERT INTO public.session (user_id, token, expires_at) VALUES ($1, $2, now() + interval '1 day') RETURNING id, recent_auth_at`, [u.id, `late${Math.random()}`]); await attach(q, r.rows[0].id); return r.rows[0]; });
       expect(later.recent_auth_at).toBeNull();
     });
     it(`${role}: the flag may turn off only in the transaction that deletes the last factor, after a fresh step-up; the grant row is not reusable for a second user [red if: set_two_factor_enabled(false) works alone or the grant crosses users]`, async () => {

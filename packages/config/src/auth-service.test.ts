@@ -47,6 +47,22 @@ describe('forbidden for every service but auth (loadConfig refuses)', () => {
   });
 });
 
+describe('POLY-153 R9: the interim session listener\'s variables are forbidden for web and for auth', () => {
+  for (const svc of ['web', 'auth'] as const) {
+    for (const v of ['AUTH_INTERNAL_URL', 'AUTH_INTERNAL_HOST', 'AUTH_INTERNAL_PORT']) {
+      it(`${svc} given ${v}: a forbidden fault and loadConfig throws [red if: ${v} is still accepted or required]`, () => {
+        const over = { ...(svc === 'auth' ? { AUTH_SECRET_FILE: file('s\n') } : {}), [v]: v === 'AUTH_INTERNAL_URL' ? 'http://127.0.0.1:3001' : v === 'AUTH_INTERNAL_PORT' ? '3001' : '127.0.0.1' };
+        const problems = check(svc, over);
+        expect(problems.some((p) => p.var === v && /forbid/i.test(p.fault)), JSON.stringify(problems)).toBe(true);
+        expect(() => (loadConfig as any)(svc, env(svc, over))).toThrow();
+      });
+    }
+  }
+  it('auth loads with no AUTH_INTERNAL_* at all [red if: the internal host is still required]', () => {
+    expect(check('auth', { AUTH_SECRET_FILE: file('s\n') })).toEqual([]);
+  });
+});
+
 describe('auth itself', () => {
   it('auth with AUTH_SECRET_FILE and poly_auth\'s password loads; without AUTH_SECRET_FILE it is refused as missing [red if: required is false]', () => {
     expect(check('auth', { AUTH_SECRET_FILE: file('s\n') })).toEqual([]);

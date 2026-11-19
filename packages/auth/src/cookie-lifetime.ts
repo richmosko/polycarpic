@@ -4,6 +4,8 @@
 // headers reaches the client. The matcher accepts every path: widenTwoFactorMatcher counts after-hooks that accept /sign-in/email
 // and reject its sentinel path, so a path-specific matcher would make startup throw. The path test is not needed: newSession is set
 // only where a session was issued.
+import { handleAfter } from './session-handle.ts';
+
 const CAP_MS = 30 * 86_400_000;
 
 interface HookCtx {
@@ -35,6 +37,11 @@ export async function lifetimeAfter(ctx: HookCtx): Promise<Record<string, never>
 export function cookieLifetime() {
   return {
     id: 'cookie-lifetime',
-    hooks: { after: [{ matcher: () => true, handler: lifetimeAfter }] },
+    hooks: {
+      after: [
+        { matcher: () => true, handler: lifetimeAfter },
+        { matcher: () => true, handler: handleAfter }, // POLY-153 R5.1: after the lifetime hook, so it copies the capped Max-Age
+      ],
+    },
   } as const;
 }

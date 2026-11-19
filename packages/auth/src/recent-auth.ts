@@ -1,20 +1,17 @@
-// Step-up (ARCH §3.1c, §3.3): a session passes only within 5 minutes of its recent_auth_at, by the database's clock.
+// Step-up (ARCH §3.1c, §3.3): a session passes only within 5 minutes of its recent_auth_at, by the database's clock. The check is the
+// database's own (app.step_up_fresh(), POLY-153 R6): it reads the marker's session, so it runs on the request's transaction or not at all.
 import { APIError } from 'better-auth/api';
-import { createRoutingPool } from './routing-pool.ts';
+import { currentClient } from '@poly/db/auth';
 
-const WINDOW_SECONDS = 300;
-const pool = createRoutingPool();
-
-/** Reads recent_auth_at from the row on every call (no cookie cache). A stamp in the future, or none, is refused. */
-export async function requireRecentAuth(sessionId: string): Promise<void> {
-  const res = (await pool.query(
-    'SELECT extract(epoch FROM (now() - recent_auth_at))::float8 AS age FROM public.session WHERE id = $1',
-    [sessionId],
-  )) as { rows: { age: number | null }[] };
-  const age = res.rows[0]?.age;
-  if (age == null || age < 0 || age > WINDOW_SECONDS) {
-    throw new APIError('FORBIDDEN', { code: 'step_up_required', message: 'step_up_required' });
+/** A stamp in the future, none, or no session transaction of ours (it fails closed) is refused. */
+export async function requireRecentAuth(_sessionId: string): Promise<void> {
+  const cur = currentClient();
+  let fresh = false;
+  if (cur) {
+    const res = await cur.client.query('SELECT app.step_up_fresh()');
+    fresh = Object.values((res.rows[0] ?? {}) as Record<string, unknown>)[0] === true;
   }
+  if (!fresh) throw new APIError('FORBIDDEN', { code: 'step_up_required', message: 'step_up_required' });
 }
 
 const ABSOLUTE_CAP_MS = 30 * 86_400_000;

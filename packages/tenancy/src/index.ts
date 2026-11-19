@@ -24,10 +24,12 @@ export const TAX_BY_KIND: Record<EntityKind, readonly TaxClassification[]> = {
 
 /**
  * Gives the transaction's user their own Person (owner membership seated by the entity trigger). Idempotent. Acts for
- * app.current_user_id(); with no user set the insert is refused (42501). No RETURNING: the new row's SELECT policy
+ * app.current_user_id(); the Person takes `name` (a NULL or empty one gives 'Person'); with no user set the insert is refused (42501). No RETURNING: the new row's SELECT policy
  * cannot see the AFTER trigger's membership, so the id is read back in a second statement.
  */
-export async function provisionPerson(tx: Tx): Promise<{ personId: string; created: boolean }> {
+export async function provisionPerson(tx: Tx, name?: string | null): Promise<{ personId: string; created: boolean }> {
+  // The name is the marker user's own, from app.enter_session's row (POLY-153 R7.2): this function reads no BetterAuth table.
+  const personName = typeof name === 'string' && name.trim() !== '' ? name : 'Person';
   const find = () =>
     tx.execute<{ id: string }>(sql`SELECT id FROM public.entity WHERE self_user_id = app.current_user_id()`);
   const existing = await find();
@@ -37,7 +39,7 @@ export async function provisionPerson(tx: Tx): Promise<{ personId: string; creat
   await tx.execute(sql`
     INSERT INTO public.entity (type_id, name, self_user_id)
     SELECT t.id,
-           coalesce((SELECT u.name FROM public."user" u WHERE u.id = app.current_user_id()), 'Person'),
+           ${personName}::text,
            app.current_user_id()
     FROM public.entity_type t WHERE t.system_key = 'person'`);
   const row = (await find()).rows[0];

@@ -7,6 +7,7 @@ import { loadAllow } from './helpers/definers';
 import { seedInvitation, tokenHash } from './helpers/invitation';
 import { asUserSql, newUserSql } from './helpers/marker';
 import { must, psql, psqlSession } from './helpers/pg';
+import { withHandle } from './helpers/handle';
 
 let e: Env;
 beforeAll(async () => { e = await boot(); });
@@ -83,7 +84,7 @@ describe('condition 13: enter_new_user refuses (each on its own transaction), wi
     const fresh = uid();
     must(ins(old), e.db);
     const tok = `tok-${old}`;
-    must(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${old}', '${tok}', now() + interval '1 day')`, e.db);
+    must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${old}', '${tok}', now() + interval '1 day')`), e.db);
     // POLY-152: poly_auth enters by its own definer, from a live session row (it has no enter_asserted_user)
     const r = app(`BEGIN; \nSELECT app.enter_auth_session($1) \\bind '${tok}' \\g /dev/null\n ${ins(fresh)} ${step(fresh)} ROLLBACK;`);
     expect(r.sqlstate).toBe('42501');

@@ -14,7 +14,7 @@ test('TAX_CLASSIFICATIONS lists the seven classifications of ARCH 3.1', () => {
 });
 
 // Mutation: delete the export, or make it take a user id (ruling: it acts for the transaction's current user).
-test('provisionPerson is exported and takes only the transaction', () => {
+test('provisionPerson is exported and takes the transaction, then the name (R7.2: web passes the name enter_session returned)', () => {
   expect(typeof tenancy.provisionPerson).toBe('function');
-  expect(tenancy.provisionPerson.length).toBe(1);
+  expect(tenancy.provisionPerson.length).toBe(2); // (tx, name?): a plain signature, not a rest tuple
 });

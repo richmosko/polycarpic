@@ -41,13 +41,11 @@ services:
     user: "10101:10101"
     environment:
       DB_PASSWORD_FILE: /run/secrets/db_password_app
-      AUTH_INTERNAL_URL: http://10.202.40.3:3001
     secrets:
       - {source: db_password_app__web, target: db_password_app}
       - {source: plaid_secret__web, target: plaid_secret}
     networks:
       default: {}
-      web-auth: {}
       edge-staging:
         aliases: [staging-web]
     mem_limit: 384m
@@ -67,16 +65,12 @@ services:
       AUTH_SECRET_FILE: /run/secrets/auth_secret
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
       AUTH_PUBLIC_PORT: "3000"
-      AUTH_INTERNAL_HOST: 10.202.40.3
-      AUTH_INTERNAL_PORT: "3001"
     secrets:
       - {source: db_password_auth__auth, target: db_password_auth}
       - {source: auth_secret__auth, target: auth_secret}
       - {source: resend_api_key__auth, target: resend_api_key}
     networks:
       default: {}
-      web-auth:
-        ipv4_address: 10.202.40.3
       edge-staging:
         aliases: [staging-auth]
     mem_limit: 192m
@@ -147,10 +141,6 @@ networks:
     name: polycarpic-staging_default
     ipam:
       config: [{subnet: 10.202.1.0/24}]
-  web-auth:
-    internal: true
-    ipam:
-      config: [{subnet: 10.202.40.0/29}]
   edge-staging:
     name: polycarpic-edge-staging
     external: true

@@ -46,13 +46,11 @@ services:
     user: "10001:10001"
     environment:
       DB_PASSWORD_FILE: /run/secrets/db_password_app
-      AUTH_INTERNAL_URL: http://10.201.40.3:3001
     secrets:
       - {source: db_password_app__web, target: db_password_app}
       - {source: plaid_secret__web, target: plaid_secret}
     networks:
       default: {}
-      web-auth: {}
       edge-prod:
         aliases: [prod-web]
     mem_limit: 768m
@@ -72,16 +70,12 @@ services:
       AUTH_SECRET_FILE: /run/secrets/auth_secret
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
       AUTH_PUBLIC_PORT: "3000"
-      AUTH_INTERNAL_HOST: 10.201.40.3
-      AUTH_INTERNAL_PORT: "3001"
     secrets:
       - {source: db_password_auth__auth, target: db_password_auth}
       - {source: auth_secret__auth, target: auth_secret}
       - {source: resend_api_key__auth, target: resend_api_key}
     networks:
       default: {}
-      web-auth:
-        ipv4_address: 10.201.40.3
       edge-prod:
         aliases: [prod-auth]
     mem_limit: 256m
@@ -201,10 +195,6 @@ networks:
   upload-net:
     ipam:
       config: [{subnet: 10.201.20.0/29}]
-  web-auth:
-    internal: true
-    ipam:
-      config: [{subnet: 10.201.40.0/29}]
   edge-prod:
     name: polycarpic-edge-prod
     external: true

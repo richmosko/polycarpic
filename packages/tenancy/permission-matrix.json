@@ -554,6 +554,10 @@
     {
       "table": "public.entity_type",
       "reason": "type metadata, label-only read; covered by its per-table cross-tenant test in tests/db/tenancy.test.ts (ARCH 3.1, POLY-62 ruling R7)"
+    },
+    {
+      "table": "app.session_handle",
+      "reason": "not role-scoped: no login role holds any privilege on it; read and written only by the session-handle definers (attach_session_handle, enter_session) of poly_authz, and deleted only by the cascade from public.session; covered by tests/db/session-handle-attach.test.ts (POLY-153 ruling R1)"
     }
   ]
 }

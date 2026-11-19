@@ -20,7 +20,7 @@ export const DB_SHARED = [
 const T = (names) => names.map((n) => `tests/db/${n}.test.ts`);
 export const DB_AREAS = {
   auth: {
-    tests: T(['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-internal-session', 'auth-signin-tx', 'auth-refresh', 'auth-service-main']),
+    tests: T(['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins']),
     paths: [/^apps\/auth\//, /^packages\/auth\//, /^packages\/tenancy\//, /^apps\/worker\/src\/cli\//, /^apps\/worker\/src\/startup\.ts$/, /^apps\/worker\/package\.json$/, /^bin\/polycarpic$/],
   },
   tenancy: {
@@ -28,7 +28,7 @@ export const DB_AREAS = {
     paths: [/^packages\/tenancy\//, /^tests\/db\/pgtap\//],
   },
   migrate: {
-    tests: T(['checks', 'connection', 'migrate-run-helper', 'runner', 'template-clone']),
+    tests: T(['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'runner', 'template-clone']),
     paths: [],
   },
   ops: {

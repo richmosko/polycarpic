@@ -53,3 +53,9 @@ Follow-ups from POLY-152:
 - **N4:** the provisioning check that production `pg_extension` holds only plpgsql is what keeps pgTAP 08's extension skip safe; it is not built yet.
 - **Live probe:** from the Caddy container, show that it cannot reach the auth service's internal listener (ruling R6.2; unmeasured until the first compose up).
 - **Memory caps:** the auth container's caps (256 MB prod, 192 MB staging) are estimates; measure at the first staging deploy.
+
+### @team-lead — 2026-11-18
+
+From the POLY-153 loop (`process/DECISIONS.md`, 2026-11-19; SECURITY Open Risks). **Gates the first deploy with real household data.** Two additions to this issue:
+- The operator guide states the domain rule: under the app's domain there are only `app` and `staging`, no wildcard record and no alias (CNAME) to an outside service.
+- A check lists the domain's DNS records through Cloudflare's API and fails, naming each record, if it finds a wildcard, an outside alias, or any name other than `app` and `staging`. It runs in the deploy gate (INFRA §7.1, with step 16) and in the monthly window. The check must be shown to fail on a planted extra record before it is trusted. The Cloudflare token it uses is read-only for DNS.

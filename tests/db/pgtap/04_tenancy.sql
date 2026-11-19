@@ -65,7 +65,7 @@ SELECT is((SELECT array_agg(c.relname::text || '.' || p.proname::text ORDER BY c
   ARRAY['audit_event.refuse_change', 'entity.check_entity', 'entity.seat_creator', 'invitation.gate_owner_changes', 'membership.audit_membership', 'membership.gate_owner_changes', 'membership.keep_an_owner'],
   'check_entity, seat_creator, gate_owner_changes (membership and invitation), audit_membership, keep_an_owner and refuse_change are attached');
 SELECT is((SELECT count(*)::int FROM pg_trigger t JOIN pg_proc p ON p.oid = t.tgfoid
-    WHERE NOT t.tgisinternal AND p.proname = 'refuse_truncate' AND (t.tgtype & 32) = 32 AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2), 9, 'BEFORE TRUNCATE statement trigger on the six tenancy tables, the identity marker and the two second-step tables (POLY-147, POLY-89)');
+    WHERE NOT t.tgisinternal AND p.proname = 'refuse_truncate' AND (t.tgtype & 32) = 32 AND (t.tgtype & 1) = 0 AND (t.tgtype & 2) = 2), 10, 'BEFORE TRUNCATE statement trigger on the six tenancy tables, the identity marker, the two second-step tables and the session handle (POLY-147, POLY-89, POLY-153 R1)');
 
 -- trigger order is set by trigger names (addendum 1): the gate fires before the last-owner guard, the audit row comes after
 SELECT is((SELECT array_agg(c.relname::text || '.' || t.tgname || ':' || CASE WHEN (t.tgtype & 2) = 2 THEN 'before' ELSE 'after' END ORDER BY t.tgname COLLATE "C")

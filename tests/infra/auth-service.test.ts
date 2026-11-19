@@ -49,19 +49,30 @@ for (const f of ['prod.yml', 'staging.yml']) {
     });
   });
 
-  describe(`E2/R6.2 ${f}: the internal listener is reachable on the web–auth network alone`, () => {
+  describe(`R9 ${f}: no internal listener, no web–auth network, one port`, () => {
     const d = doc(f);
     const names = Object.keys(d.services);
     const authN = () => need(d);
     const nets = (n: string): string[] => { const x = d.services[n].networks; return Array.isArray(x) ? x : Object.keys(x ?? {}); };
-    it('a network marked internal: true holds auth and web and no caddy, worker, operator, migrate or other service [red if: no such network]', () => {
-      const internal = Object.entries<any>(d.networks ?? {}).filter(([k, v]) => v?.internal === true && nets(authN()).includes(k)).map(([k]) => k);
-      const link = internal.filter((k) => names.some((n) => /(^|-)web$/.test(n) && nets(n).includes(k)));
-      expect(link.length, `networks of auth: ${nets(authN())}`).toBeGreaterThan(0);
-      for (const k of link) {
-        const on = names.filter((n) => nets(n).includes(k));
-        expect(on.sort()).toEqual(names.filter((n) => /(^|-)(web|auth)$/.test(n)).sort());
+    it('there is no web-auth network, and no network holds auth and web alone [red if: the interim network survives]', () => {
+      expect(Object.keys(d.networks ?? {}).filter((k) => /web-auth/.test(k))).toEqual([]);
+      for (const [k, v] of Object.entries<any>(d.networks ?? {})) {
+        if (v?.internal !== true) continue;
+        const on = names.filter((n) => nets(n).includes(k)).sort();
+        expect(on, `internal network ${k}`).not.toEqual(names.filter((n) => /(^|-)(web|auth)$/.test(n)).sort());
       }
+    });
+    it('auth has no fixed ipv4_address, and neither it nor web sets AUTH_INTERNAL_URL, AUTH_INTERNAL_HOST or AUTH_INTERNAL_PORT [red if: the listener address is still configured]', () => {
+      const a = d.services[authN()];
+      const nn = a.networks;
+      if (nn && !Array.isArray(nn)) for (const v of Object.values<any>(nn)) expect(v?.ipv4_address, 'auth ipv4_address').toBeUndefined();
+      for (const n of names) for (const k of Object.keys(d.services[n].environment ?? {})) expect(`${n}:${k}`).not.toMatch(/AUTH_INTERNAL/);
+    });
+    it('auth exposes exactly one port: the public listener, published nowhere [red if: a second port is exposed]', () => {
+      const a = d.services[authN()];
+      expect(a.ports ?? []).toEqual([]);
+      expect([...(a.expose ?? [])].length).toBeLessThanOrEqual(1);
+      expect(Object.keys(a.environment ?? {}).filter((k) => /_PORT$/.test(k) && !/^DATABASE_/.test(k))).toEqual(['AUTH_PUBLIC_PORT']);
     });
     it('auth is on the edge network so Caddy reaches its public port, and publishes no ports: [red if: auth is not on edge]', () => {
       expect(nets(authN()).join(',')).toMatch(/edge-(prod|staging)/);

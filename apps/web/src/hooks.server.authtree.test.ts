@@ -23,7 +23,7 @@ describe('E4 web refuses the /api/auth tree (Caddy bypassed)', () => {
   }
   it('a path that only looks like the tree (/api/authx, /api/author) is not swallowed as the tree [red if: the prefix test is a bare startsWith]', async () => {
     const { res } = await run('/api/authx');
-    expect([404, 200, 302, 303, 503]).toContain(res.status); // 503: no service origin is set in this test (E5); whatever the app does; the point is /api/auth/ok above is 404 for the right reason
+    expect([404, 200, 302, 303]).toContain(res.status); // whatever the app does with a path that is not the tree; the point is /api/auth/ok above is 404 for the right reason
   });
 });
 

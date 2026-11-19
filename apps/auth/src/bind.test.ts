@@ -1,29 +1,21 @@
-// POLY-152 R6.2 (seceng §5.1, E2): the internal listener binds only to the service's address on the web–auth network, or to a Unix
-// socket on a volume that only web and auth mount; never 0.0.0.0 or ::. internalBind(env) returns { host } or { path }.
+// POLY-153 R9: the internal listener is removed, so its bind is too. bind.ts keeps only the public port; internalBind and the
+// AUTH_INTERNAL_* variables are gone (POLY-152 R6.2's wildcard and socket tests go with them).
 import { describe, expect, it } from 'vitest';
 
-// The module is loaded OUTSIDE the refusal catch, so a missing file is a red test, never a vacuous "refused".
-const load = async (): Promise<(env: Record<string, string>) => { host?: string; path?: string; port?: number }> => ((await import('./bind.ts')) as any).internalBind;
-const bind = async (env: Record<string, string>) => (await load())(env);
-const refuses = async (env: Record<string, string>) => { const f = await load(); try { f(env); return null; } catch (e) { return e as Error; } };
+const load = async (): Promise<Record<string, unknown>> => (await import('./bind.ts')) as Record<string, unknown>;
 
-describe('the internal bind', () => {
-  it('a concrete network address is accepted and returned as given [red if: bind.ts is absent]', async () => {
-    const b = await bind({ AUTH_INTERNAL_HOST: '10.201.2.5', AUTH_INTERNAL_PORT: '3001' });
-    expect(b.host).toBe('10.201.2.5');
+describe('the bind after R9', () => {
+  it('internalBind is no longer exported [red if: the internal listener\'s bind survives]', async () => {
+    expect((await load()).internalBind).toBeUndefined();
   });
-  it('a Unix socket path is accepted, returned as { path } [red if: sockets are not supported]', async () => {
-    expect((await bind({ AUTH_INTERNAL_SOCKET: '/run/auth/internal.sock' })).path).toBe('/run/auth/internal.sock');
+  it('publicPort still reads AUTH_PUBLIC_PORT, defaults to 3000 and refuses a bad value [red if: the public bind regressed in the removal]', async () => {
+    const m = (await load()) as { publicPort: (e: Record<string, string | undefined>) => number };
+    expect(m.publicPort({})).toBe(3000);
+    expect(m.publicPort({ AUTH_PUBLIC_PORT: '3100' })).toBe(3100);
+    expect(() => m.publicPort({ AUTH_PUBLIC_PORT: '70000' })).toThrow();
   });
-  for (const h of ['0.0.0.0', '::', '::0', '', '[::]', '0000:0000:0000:0000:0000:0000:0000:0000']) {
-    it(`host ${JSON.stringify(h)} is refused at startup [red if: a wildcard or unresolved name can be bound]`, async () => {
-      expect(await refuses({ AUTH_INTERNAL_HOST: h, AUTH_INTERNAL_PORT: '3001' })).not.toBeNull();
-    });
-  }
-  it('no host and no socket is refused: there is no default bind [red if: it defaults to all interfaces]', async () => {
-    expect(await refuses({ AUTH_INTERNAL_PORT: '3001' })).not.toBeNull();
-  });
-  it('the internal port may not equal the public port [red if: the two listeners can collide]', async () => {
-    expect(await refuses({ AUTH_INTERNAL_HOST: '10.201.2.5', AUTH_INTERNAL_PORT: '3000', AUTH_PUBLIC_PORT: '3000' })).not.toBeNull();
+  it('bind.ts mentions no AUTH_INTERNAL variable [red if: any internal bind variable is still read]', async () => {
+    const { readFileSync } = await import('node:fs');
+    expect(readFileSync(new URL('./bind.ts', import.meta.url), 'utf8')).not.toMatch(/AUTH_INTERNAL/);
   });
 });

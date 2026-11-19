@@ -40,8 +40,6 @@ export interface Config {
   readonly plaidEnv: 'sandbox' | 'production' | undefined;
   /** web only; 8081 by default. The bind host is not configurable (R4). */
   readonly statusPort: number;
-  /** web only: the sign-in service's internal listener (POLY-152 R6.2), an http origin with no path; undefined when not set. */
-  readonly authInternalOrigin: string | undefined;
   /** The source commit baked into the image (POLY_IMAGE_REVISION); undefined outside an image. */
   readonly imageRevision: string | undefined;
   /** One Secret per registered *_FILE variable that is set, keyed by the variable name. */
@@ -160,15 +158,8 @@ function evaluate(service: Service, env: Env): { problems: Problem[]; secrets: R
     else add('STATUS_PORT', 'invalid', 'STATUS_PORT must be an integer from 1024 to 65535');
   }
 
-  // AUTH_INTERNAL_URL (web only): where web asks the sign-in service who the session is (POLY-152 R6.2). An origin, nothing else.
-  let authInternalOrigin: string | undefined;
-  if (service === 'web' && set('AUTH_INTERNAL_URL') !== undefined) {
-    const raw = env.AUTH_INTERNAL_URL!;
-    let u: URL | undefined;
-    try { u = new URL(raw); } catch { /* refused below */ }
-    if (!u || u.origin !== raw || (u.protocol !== 'http:' && u.protocol !== 'https:')) add('AUTH_INTERNAL_URL', 'invalid', 'AUTH_INTERNAL_URL must be an http(s) origin with no path, query, fragment or credentials');
-    else authInternalOrigin = raw;
-  }
+  // POLY-153 R9: the interim session listener is gone; its variables are refused for every service.
+  for (const k of ['AUTH_INTERNAL_URL', 'AUTH_INTERNAL_HOST', 'AUTH_INTERNAL_PORT']) if (set(k) !== undefined) add(k, 'forbidden', `${k} must not be set`);
 
   // DATABASE_* (POLY-83 addendum 1; the texts are pinned by tests/db/checks.test.ts)
   for (const k of ['DATABASE_URL', 'DATABASE_PASSWORD']) if (set(k) !== undefined) add(k, 'forbidden', `${k} must not be set`);
@@ -218,7 +209,7 @@ function evaluate(service: Service, env: Env): { problems: Problem[]; secrets: R
   }
 
   const config = problems.length === 0 && appEnv && tlsMode && originRaw !== undefined
-    ? { service, appEnv, tlsMode, publicOrigin: originRaw, plaidEnv, statusPort, authInternalOrigin, imageRevision: set('POLY_IMAGE_REVISION') }
+    ? { service, appEnv, tlsMode, publicOrigin: originRaw, plaidEnv, statusPort, imageRevision: set('POLY_IMAGE_REVISION') }
     : undefined;
   return { problems, secrets, config };
 }

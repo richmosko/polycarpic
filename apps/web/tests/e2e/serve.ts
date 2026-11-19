@@ -12,6 +12,7 @@ import { cloneMigrated, dbEnv, setRolePasswords } from '../../../../tests/db/hel
 import { ensureBootstrapLockDir, releaseBootstrapLockDir } from '../../../../tests/db/helpers/bootstrap-lock.ts';
 import { asUserSql } from '../../../../tests/db/helpers/marker.ts';
 import { must, startServer } from '../../../../tests/db/helpers/pg.ts';
+import { revokeTarget } from './revoke-target.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.E2E_PORT ?? 4173);
@@ -30,27 +31,24 @@ const db = cloneMigrated();
 
 const secretFile = join(mkdtempSync(join(tmpdir(), 'poly86-e2e-')), 'auth_secret');
 writeFileSync(secretFile, 'e2e-auth-secret-0123456789abcdef0123456789abcdef\n');
-const authPort = port + 1000; // the sign-in service's public listener; the internal one is the next port (POLY-152 R1.7)
-const authInternalPort = port + 1001;
+const authPort = port + 1000; // the sign-in service's one listener (POLY-153 R9: the internal /session listener is gone)
 const common = { APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: origin };
-// Web holds no auth secret (R1.3): it learns where the service's internal listener is, nothing else.
-const appEnv = { ...dbEnv('poly_app', db), ...common, AUTH_INTERNAL_URL: `http://127.0.0.1:${authInternalPort}`, AUTH_PUBLIC_PORT: String(authPort) };
-const authEnv = { ...dbEnv('poly_auth', db), ...common, AUTH_SECRET_FILE: secretFile, AUTH_PUBLIC_PORT: String(authPort), AUTH_INTERNAL_HOST: '127.0.0.1', AUTH_INTERNAL_PORT: String(authInternalPort) };
+// Web holds no auth secret (R1.3) and no address of the service's internal listener (POLY-153 R9).
+const appEnv = { ...dbEnv('poly_app', db), ...common, AUTH_PUBLIC_PORT: String(authPort) };
+const authEnv = { ...dbEnv('poly_auth', db), ...common, AUTH_SECRET_FILE: secretFile, AUTH_PUBLIC_PORT: String(authPort) };
 Object.assign(process.env, appEnv);
 
 // In-process sign-in through the same exported configuration the app uses.
-const { e2eAuth } = await import('../../../../tests/db/helpers/e2e-auth.ts');
+const { e2eAuth, storageCookies } = await import('../../../../tests/db/helpers/e2e-auth.ts');
 const auth = await e2eAuth(db, origin, 'e2e-auth-secret-0123456789abcdef0123456789abcdef');
 const { close } = auth;
 const hash = await auth.hash(PASSWORD);
 const id = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('${NAME}', '${EMAIL}', true) RETURNING id`, db).rows[0]![0];
 must(`INSERT INTO public.account (account_id, provider_id, user_id, password) VALUES ('${id}', 'credential', '${id}', '${hash}')`, db);
 const signed = await auth.signIn(EMAIL, PASSWORD);
-const cookies = signed.headers.getSetCookie().map((c: string) => {
-  const [pair = ''] = c.split(';');
-  const eq = pair.indexOf('=');
-  return { name: pair.slice(0, eq), value: pair.slice(eq + 1), domain: 'localhost', path: '/', expires: -1, httpOnly: true, secure: true, sameSite: 'Lax' as const };
-});
+// Each cookie keeps its own Path: __Secure-better-auth.session_token at /api/auth, __Host-poly_handle at / (POLY-153 R10).
+const cookies = storageCookies(signed);
+if (!cookies.some((c) => c.name === '__Host-poly_handle') || !cookies.some((c) => c.name.startsWith('__Secure-better-auth.') && c.path === '/api/auth')) { stop(); throw new Error('the seeded sign-in did not set both cookies'); }
 // A second session and a step-up stamp (what POLY-89's definers will write), so the Sessions spec can revoke another session.
 await auth.signIn(EMAIL, PASSWORD);
 must(`UPDATE public.session SET recent_auth_at = now() WHERE user_id = '${id}'`, db);
@@ -68,6 +66,14 @@ must(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ('${SHARED
 mkdirSync(join(here, '.auth'), { recursive: true });
 writeFileSync(join(here, '.auth', 'user.json'), JSON.stringify({ cookies, origins: [] }));
 await close();
+// POLY-153 R7.4: a MEASUREMENT, not POLY-149's revocation. Web must enter by handle and touch no BetterAuth table, so poly_app loses
+// both here, after seeding and before web starts. This lives only in this file (never in a migration, roles.sql or a shared fixture),
+// and no catalog test reads this database.
+// The definer's name is reserved to packages/db/src/context.ts (poly/reserved-literal), so it is found in the catalog, not spelled here.
+const fn = revokeTarget(must(`SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname LIKE 'enter_asserted%'`, db).rows); // exactly one function, or this throws
+must(`REVOKE EXECUTE ON FUNCTION ${fn} FROM poly_app`, db);
+if (must(`SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname LIKE 'enter_asserted%' AND has_function_privilege('poly_app', p.oid, 'EXECUTE')`, db).rows[0]![0] !== '0') throw new Error('R7.4: poly_app still executes the asserted-user entry');
+must(`REVOKE ALL ON public."user", public.session, public.account, public.verification, public.two_factor, public.passkey FROM poly_app`, db);
 
 const web = join(here, '..', '..');
 const run = (args: string[]) => spawn('pnpm', ['exec', ...args], { cwd: web, stdio: 'inherit', env: { ...process.env, ...appEnv } });

@@ -92,7 +92,7 @@ describe('S-7(b) web crash handler (dynamic)', () => {
     writeFileSync(pre, `setTimeout(() => { const e = new Error(${JSON.stringify(CANARIES.memo)}); e.detail = ${JSON.stringify(CANARIES.token)}; e.code = '23505'; throw e; }, 500);\n`);
     const db = dbEnv('poly_app', migrated());
     const port = await freePort();
-    const env = { PATH: process.env.PATH!, ...db, APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173', AUTH_INTERNAL_URL: 'http://127.0.0.1:3001', STATUS_PORT: String(port) }; // POLY-152: web holds no auth secret; it names the service's internal origin
+    const env = { PATH: process.env.PATH!, ...db, APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173', STATUS_PORT: String(port) }; // POLY-152: web holds no auth secret; POLY-153 R9: and names no internal origin
     const p = spawn('node', ['--experimental-strip-types', '--import', pre, join(ROOT, 'apps/web/src/main.ts')], { env, cwd: ROOT });
     let out = '';
     p.stdout.on('data', (c) => (out += c)); p.stderr.on('data', (c) => (out += c));

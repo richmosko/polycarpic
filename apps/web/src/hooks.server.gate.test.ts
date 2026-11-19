@@ -1,20 +1,23 @@
-// POLY-89 build review N5 (seceng), retargeted by POLY-152 R7: the sign-in gate's 303 to /settings/second-step. Web relays no cookie any
+// POLY-89 build review N5 (seceng), retargeted by POLY-152 R7 and POLY-153 R7.2 (the gate runs in the handle's session transaction): the sign-in gate's 303 to /settings/second-step. Web relays no cookie any
 // more (the service re-sets nothing on a page load; the row is the idle bound), so neither the redirect nor the page carries a Set-Cookie.
 // Titles end with [red if: <mutation>].
 import { describe, expect, it, vi } from 'vitest';
 
 let required = true;
-vi.mock('@poly/auth/web', () => ({
-  HttpError: class extends Error {},
-  setAuthInternalOrigin: () => {},
-  loadSession: async () => ({ userId: 'u', sessionId: 's', shell: { user: { id: 'u', name: 'Gated', image: null }, expiresAt: '2030-01-01T00:00:00Z' }, secondStepRequired: required }),
+const HANDLE = 'g'.repeat(43);
+vi.mock('@poly/db', async (orig) => ({
+  ...((await orig()) as object),
+  withSession: async (_h: string, fn: (tx: unknown, shell: unknown) => unknown) =>
+    fn({ execute: async () => ({ rows: [{ r: required }] }) }, { userId: 'u', sessionId: 's', name: 'Gated', image: null, expiresAt: '2030-01-01T00:00:00Z' }),
+  NoLiveSession: class extends Error {},
 }));
+vi.mock('@poly/tenancy', async (orig) => ({ ...((await orig()) as object), provisionPerson: async () => undefined }));
 
 const { handle } = await import('./hooks.server.ts');
 
 async function request(path: string): Promise<Response> {
   const url = new URL(`https://app.qa.test${path}`);
-  const event = { url, request: new Request(url), locals: {}, cookies: { get: () => undefined } };
+  const event = { url, request: new Request(url), locals: {}, cookies: { get: (n: string) => (n === '__Host-poly_handle' ? HANDLE : undefined), set: () => {}, delete: () => {} } };
   const resolve = async () => new Response('page');
   return (handle as (a: unknown) => Promise<Response>)({ event, resolve });
 }

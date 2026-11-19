@@ -1,24 +1,9 @@
-// POLY-152: the assumed surface of the sign-in service, in ONE place so the builder reconciles names here and not in four files.
-// ASSUMED names (the ruling fixes the behaviour, not the exports):
-//   apps/auth/src/internal.ts : handleInternal(request: Request, auth): Promise<Response>   the internal listener's GET /session (R6.2)
-//   apps/auth/src/public.ts   : handlePublic(request: Request, auth): Promise<Response>     the public listener (/api/auth/* only, else 404)
-//   @poly/db/auth             : withAuthSession(token, fn), withSignInTx(fn)               (R5, R9)
-//   packages/auth/src/cookie-lifetime.ts : cookieLifetime() -> BetterAuth plugin, last in plugins[]
-//   db configure({ auth }) is the pool key for poly_auth.
+// POLY-152/153: helpers for the in-process sign-in service suites (the internal /session listener helpers went with R9).
 import { createHmac } from 'node:crypto';
 import { expect } from 'vitest';
 import { PW, SECRET, get, jar, post, type Env } from './auth';
 import { pgmod, totp } from './second-step';
 import { must } from './sql';
-
-export const INTERNAL = 'http://auth.internal:3001';
-export const internalReq = (cookie: string, path = '/session', init: RequestInit & { headers?: Record<string, string> } = {}) =>
-  new Request(`${INTERNAL}${path}`, { method: 'GET', ...init, headers: { ...(cookie ? { cookie } : {}), ...(init.headers ?? {}) } });
-
-export async function internal(): Promise<{ handleInternal: (r: Request, a: any) => Promise<Response>; handlePublic: (r: Request, a: any) => Promise<Response> }> {
-  const A: any = await import('../../../packages/auth/src/index.ts'); // handleSessionRequest: the internal listener's handler (contract names, point 4)
-  return { handleInternal: A.handleSessionRequest, handlePublic: A.handleAuthRequest };
-}
 
 /** The signed-cookie value better-call builds for a token. */
 export const signed = (token: string, secret = SECRET) => `${token}.${createHmac('sha256', secret).update(token).digest('base64')}`;

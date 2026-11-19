@@ -1,11 +1,47 @@
-import { HttpError, loadSession, setAuthInternalOrigin } from '@poly/auth/web';
-import { loadConfig } from '@poly/config';
-import type { Handle, ServerInit } from '@sveltejs/kit/hooks';
+import { createLogger } from '@poly/config/log';
+import { NoLiveSession, sql, withSession } from '@poly/db';
+import { provisionPerson } from '@poly/tenancy';
+import type { Handle } from '@sveltejs/kit/hooks';
 
-export const init: ServerInit = () => {
-  // The sign-in service's internal listener (POLY-152 R6.2). Web holds no BetterAuth instance and no secret.
-  setAuthInternalOrigin(loadConfig('web').authInternalOrigin);
+// POLY-153 R7.2: web enters a transaction only by the handle cookie. BetterAuth's cookies are scoped to /api/auth and never reach it.
+const HANDLE_COOKIE = '__Host-poly_handle';
+const log = createLogger({ service: 'web' });
+
+const isSelfUniqueRace = (e: unknown): boolean => {
+  for (let cur: unknown = e, n = 0; cur && typeof cur === 'object' && n < 5; cur = (cur as { cause?: unknown }).cause, n++) {
+    const p = cur as { code?: unknown; constraint?: unknown };
+    if (typeof p.code === 'string') return p.code === '23505' && p.constraint === 'entity_self_user_id_unique';
+  }
+  return false;
 };
+
+/**
+ * One transaction under a `session` marker: the user's own Person on first load (named from the row enter_session returned, so web's
+ * SQL names no BetterAuth table), then the sign-in gate. A NoLiveSession (a dead handle) is thrown as is.
+ */
+async function enter(handle: string) {
+  const once = () =>
+    withSession(handle, async (tx, row) => {
+      const name = typeof row.name === 'string' && row.name.trim() !== '' ? row.name : 'Person';
+      await provisionPerson(tx, name);
+      const gate = await tx.execute<{ r: boolean }>(sql`SELECT app.second_step_required() AS r`);
+      return {
+        shell: { user: { id: row.userId, name, image: row.image ?? null }, expiresAt: new Date(row.expiresAt).toISOString() },
+        secondStepRequired: gate.rows[0]?.r === true,
+      };
+    });
+  try {
+    return await once();
+  } catch (e) {
+    if (!isSelfUniqueRace(e)) throw e;
+    try {
+      return await once(); // the whole transaction again, fresh; it finds the winner's Person
+    } catch (again) {
+      log.error('session.provision_failed', { outcome: 'error', err: again });
+      throw again;
+    }
+  }
+}
 
 const notFound = () => new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
 const isAuthTree = (p: string) => p === '/api/auth' || p.startsWith('/api/auth/');
@@ -31,23 +67,25 @@ export const handle: Handle = async ({ event, resolve }) => {
   if (isAuthTree(pathname)) return notFound();
   if (isPublic(pathname)) return page();
 
-  let loaded;
+  const signIn = () => new Response(null, { status: 303, headers: { location: `/sign-in?${new URLSearchParams({ next: safeNext(pathname + search) })}` } });
+  const handleValue = event.cookies.get(HANDLE_COOKIE);
+  if (!handleValue) return signIn();
+  let entered;
   try {
-    loaded = await loadSession(event.request);
+    entered = await enter(handleValue);
   } catch (e) {
-    // The service is unreachable or answered oddly: never a redirect to /sign-in, which would read as signed out (R6.2).
-    if (e instanceof HttpError && e.status === 503) return new Response('Sign-in service unavailable', { status: 503, headers: { 'retry-after': '5' } });
+    if (e instanceof NoLiveSession) {
+      // A dead handle: clear the cookie so the browser does not look signed in, and go to sign-in.
+      event.cookies.delete(HANDLE_COOKIE, { path: '/', secure: true, httpOnly: true, sameSite: 'lax' });
+      return signIn();
+    }
     throw e;
   }
-  if (!loaded) {
-    const to = new URLSearchParams({ next: safeNext(pathname + search) });
-    return new Response(null, { status: 303, headers: { location: `/sign-in?${to}` } });
-  }
   // The sign-in gate (POLY-89 R5): while the database says a second step is required, every page but the placeholder redirects to it.
-  if (loaded.secondStepRequired && pathname !== '/settings/second-step') {
+  if (entered.secondStepRequired && pathname !== '/settings/second-step') {
     return new Response(null, { status: 303, headers: { location: '/settings/second-step' } });
   }
-  event.locals.session = loaded.shell;
-  event.locals.identity = { userId: loaded.userId, sessionId: loaded.sessionId };
+  event.locals.session = entered.shell;
+  event.locals.handle = handleValue;
   return page();
 };

@@ -6,6 +6,7 @@ import type { createAuth } from './index.ts';
 import { matchAuthPath, USER_INSERTING } from './route-policy.ts';
 import { cappedOut } from './recent-auth.ts';
 import { COMMIT_HEADER } from './anchor.ts';
+import { HANDLE_COOKIE } from './session-handle.ts';
 
 export type AnyAuth = Awaited<ReturnType<typeof createAuth>>;
 
@@ -75,6 +76,11 @@ async function inTransaction(request: Request, auth: AnyAuth, run: <T>(fn: () =>
     return withoutCommitHeader(res);
   } catch (e) {
     if (e instanceof RollbackWith) return withoutCommitHeader(withoutCookies(e.response));
+    // R5.2: a session that would commit without its handle is refused by the database at COMMIT. Nothing of the answer survives: a 5xx, no cookie.
+    if ((e as { code?: string }).code === '23514') {
+      console.error(JSON.stringify({ event: 'session_handle_missing', path: template }));
+      return new Response(JSON.stringify({ message: 'Internal server error' }), { status: 500, headers: { 'content-type': 'application/json' } });
+    }
     // A refusal the database raises at COMMIT (the stamp check, C32) surfaces after BetterAuth answered 200: the same 403.
     if (contextFree && (e as { code?: string }).code === '42501') {
       return new Response(JSON.stringify({ code: 'invitation_required', message: 'invitation_required' }), { status: 403, headers: { 'content-type': 'application/json' } });
@@ -114,9 +120,13 @@ export async function handleAuthRequest(request: Request, given: Promise<AnyAuth
   if (session && cappedOut(session.session.createdAt)) {
     await ctx.internalAdapter.deleteSession(session.session.token);
     session = null;
+    // The session cookie and the handle cookie are cleared together; the session row's delete took the handle row by cascade.
+    const headers = new Headers({ 'content-type': 'application/json' });
+    headers.append('set-cookie', clearingCookie(ctx.authCookies.sessionToken));
+    headers.append('set-cookie', `${HANDLE_COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`);
     return new Response(JSON.stringify({ message: 'Unauthorized' }), {
       status: 401,
-      headers: { 'content-type': 'application/json', 'set-cookie': clearingCookie(ctx.authCookies.sessionToken) },
+      headers,
     });
   }
   if (session) {

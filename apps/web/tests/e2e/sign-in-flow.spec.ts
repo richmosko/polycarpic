@@ -20,7 +20,24 @@ test.describe('sign-in form', () => {
     await page.getByLabel(/password/i).fill(PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
     await sent;
-    await page.waitForURL('**/dashboard');
+    await page.waitForURL((u) => u.pathname === '/dashboard');
+    // POLY-153 R8 (C4): after a REAL sign-in, the handle is __Host- at Path=/ and BetterAuth's cookies are __Secure- at Path=/api/auth.
+    const jar = [...(await page.context().cookies(base)), ...(await page.context().cookies(`${base}/api/auth/`))];
+    const handle = jar.find((c) => c.name === '__Host-poly_handle');
+    expect(handle, 'the handle cookie [red if: no handle is set]').toBeDefined();
+    expect(handle!.path).toBe('/');
+    expect(handle!.httpOnly && handle!.secure).toBe(true);
+    expect(handle!.value).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    const ba = jar.filter((c) => /better-auth/.test(c.name));
+    expect(ba.length).toBeGreaterThan(0);
+    for (const c of ba) { expect(c.name).toMatch(/^__Secure-better-auth\./); expect(c.path).toBe('/api/auth'); }
+    // and a page request carries the handle and no better-auth cookie [red if: web still receives BetterAuth's cookie]
+    const docCookies: string[] = [];
+    page.on('request', async (r) => { if (r.resourceType() === 'document') docCookies.push((await r.allHeaders()).cookie ?? ''); });
+    await page.goto(`${base}/settings/sessions`);
+    await page.waitForLoadState('networkidle');
+    expect(docCookies.length).toBeGreaterThan(0);
+    for (const cookie of docCookies) { expect(cookie).toMatch(/__Host-poly_handle=[A-Za-z0-9_-]{43}/); expect(cookie).not.toMatch(/better-auth/); }
   });
 });
 
@@ -66,7 +83,7 @@ test.describe('signed in', () => {
     await page.getByLabel(/email/i).fill(EMAIL);
     await page.getByLabel(/password/i).fill(PASSWORD);
     await page.getByRole('button', { name: 'Sign in' }).click();
-    await page.waitForURL('**/dashboard');
+    await page.waitForURL((u) => u.pathname === '/dashboard');
     await page.waitForLoadState('networkidle');
     await page.getByTestId('sidebar').getByRole('button', { name: 'Ada Lovelace' }).click();
     const item = page.getByRole('menuitem', { name: /log out/i });
