@@ -658,3 +658,17 @@ If the Principal picks (b), tell them plainly: a found backup code plus the pass
 - **The other codes** each tell the caller only facts about their own account, which `mySecondStep` already returns: `method_unavailable`, `no_second_step`, the 429 with no `pausedFor`, and the limiter's 429 with no code.
   - The strict `invalid_request` (extra fields refused) is good.
 - **The lock-band amendment** (locked plus an expired hold gives 429 with no band) is accepted. The holder of an expired hold learns only that the account is locked.
+
+**Addendum 5 at `1ff6c9ed`: ACCEPT** (code-read; I ran nothing).
+- **Written by the database, on add and remove, on every path.** The event lives in `app.sync_second_step()`, which runs for `two_factor` (INSERT, UPDATE OF `verified`, DELETE) and `passkey` (INSERT, DELETE). No new trigger can be skipped, and the paths are:
+  - BetterAuth's routes;
+  - direct SQL as poly_auth, which is H.1's planted factor and is tested;
+  - `reset-mfa`;
+  - a cascade from a deleted user (row triggers fire on cascades).
+- **Nothing can change a method silently.** Replacing a passkey's key, or flipping a verified TOTP back, would be a method change without an INSERT or DELETE, and both are already refused (guards #5 and #6). No role holds TRUNCATE on either table: poly_auth has S/I/U/D (0014:17), poly_govern has SELECT and DELETE.
+- **Append-only:** written by poly_govern only, with `audit_event_append_only` and `audit_event_no_truncate`.
+- **The pending point:**
+  - `audit_event` has no CHECK on `actor` or `kind`, and no FK on `subject_user_id` (0002:1-10, 79), so nothing needs widening;
+  - a user's delete cascading through their methods can write its rows.
+- **Recommended, not blocking:** a `no_truncate` trigger on `two_factor` and `passkey`, so even the table owner cannot clear methods without rows. A superuser can always bypass triggers.
+- **The four deploy-gate rows:** agreed.
