@@ -1,7 +1,7 @@
 ---
 id: POLY-149
 title: Stage 2 revocation and docs
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-148, POLY-89, POLY-152, POLY-153]
@@ -87,3 +87,7 @@ Feature started. Branch: `feature/poly-149-stage-2-revocation-and-docs`. Stages:
 ### @team-lead — 2026-11-19
 
 PR opened: https://github.com/richmosko/polycarpic/pull/138. Gate code sha 1e832bbc; docs and tracker only since.
+
+### @team-lead — 2026-11-19
+
+Validate passed; merging via PR #138. Closing.
