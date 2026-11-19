@@ -564,3 +564,77 @@ Everything here is code-read against the tree at `3427c586` and better-auth 1.7.
 - **R-25:** codes captured from altered pages work once at a re-check, and Open 5 covers sign-in.
 - **A new T-entry:** a planted factor by poly_auth SQL.
 - **§9:** method changes are audited.
+
+---
+
+## 13. Confirm it's you: review of Addendum 3 re-issued at `671d219e` (replaces §12's verdict)
+
+**Verdict: ACCEPT `671d219e` once RC6 is fixed.** RC6 is one word in A3.2, and nothing else blocks.
+
+The re-issue answers my checklist item by item. It also states H.1's added reach plainly, which is what RC5(a) asked for. I read the whole addendum against the tree. Everything is code-read; nothing was run.
+
+### 13.1 What is left from §12
+| Item | At `671d219e` | Result |
+|---|---|---|
+| **RC5(a)**: say what poly_auth's SQL gains | H.1 says it plainly: stamp any session it holds **or creates**, add its own factor, takeover that outlasts the compromise | **Met.** |
+| **RC5(b)**: R-2's wording | H.1's sentence covers the stamp and the factor. §13.2 below is the fuller text to write at the build review | **Met at build review.** |
+| **RC5(c)**: a planted factor is visible | Settings lists every method with its added date (R2: `totp_added_at`, the passkeys' `created_at`). That is the one place a user sees it live. No audit event is written | **Accepted as is.** No runtime role reads `audit_event` for a user, so that event would add forensics, not detection. Required instead: **POLY-137's criteria gain "email the user when a second-step method is added or removed"**. The lead files that. |
+| **RC6**: the stamp later than `now()` | **Still `clock_timestamp()`** (A3.2, the `UPDATE public.session` line). `step_up_fresh()` needs `recent_auth_at <= now()` (0013:118), so guard #5 refuses the backup-code list write in the same transaction, and A3.3 then rolls back every backup-code re-check | **Required.** Stamp with `now()`. Do not loosen `step_up_fresh`. If D7 (a) is chosen, A3.3 goes, and with it the only in-transaction reader. Still use `now()`, so that no future same-transaction step-up check meets this. |
+| **RC7**: the list of what the stamp unlocks | H.3, including the enrolment class, the database guards and web's `revoke_my_session`; purge and account deletion named as consuming | **Met.** |
+| **RC8**: S1 written down | H.2. Also: S1 would not close the gap anyway, because the passkey path stays the service's word | **Met. I agree with declining it.** |
+| **RC9**: the passkey sentence | H no longer says every path takes the password | **Met.** |
+| **RC10**: two tests | T7 refuses another user's credential. T4 pins the single writer | **Met.** Add to T4: only poly_govern holds `UPDATE (recent_auth_at)`. That is minor and does not block. |
+| **M2** challenge | Now a database challenge for every method (`begin` → `complete`), single-use | **Met, fully.** |
+| **M3** reuse at sign-in | A3.4 feeds sign-in's step into the guard, so a code used at sign-in cannot pass a re-check. Sign-in itself still accepts a reused code (Open 5) | **Met for the re-check.** Open 5 stays open, filed. |
+| **M15** change-email | Not enabled; Open 6 keeps it off until it sends a notice and writes a record row | **Met.** |
+| Also checked | A3.5 (a marked passkey counter never goes down), `note_totp_step` (SQL can only push `last_step` forward one step, a 30-second denial of one re-check) | **Fine.** |
+
+### 13.2 H.1 for the Principal: what this route adds over today's R-2
+**How it works** (code-read).
+- The database cannot check a code or a passkey signature, so the sign-in service's word that a check passed is the stamp.
+- SQL as poly_auth can:
+  1. create a session for any user, with a handle it knows;
+  2. stamp that session through `begin_step_up` and `complete_step_up`;
+  3. then pass every check that needs Confirm it's you (H.3).
+
+**Who can use it:** anyone who gets SQL as poly_auth, through an injection bug in the sign-in service or its stolen database password. Code execution in the service could already do all of this, so for that attacker nothing is new.
+
+**Today versus with this route**, for a user with a second step:
+
+| | Today (R-2) | With this route |
+|---|---|---|
+| **Act as the user at web while the breach lasts** | Yes: it reads and writes their books through a session it creates | Unchanged |
+| **Step-up actions** (export, purge, bank link and account deletion, once built; changing methods) | No | **Yes,** for 300 s per stamp, as often as it likes |
+| **Survive being evicted** | No. Its sessions die when they are revoked or capped. To sign in afterwards it needs the password and the second step. It can set a password hash, but it cannot pass the second step. | **Yes.** It plants its own authenticator or passkey, and sets a password it knows. Afterwards it signs in normally over HTTP. |
+| **Lock the user out** | No | **Yes.** It adds its own method first, then removes the user's. `refuse_last_method` is satisfied, because one method still remains: the attacker's. |
+| **Survive the user changing their password** | No | **Only if it also changed the email.** It can do that by SQL today, which redirects the password reset. Otherwise the user's new password ends its sign-in, and the planted method alone is useless. |
+
+**For a user with no second step, nothing is new.** Today's R-2 already lets it set their email and password and take the account.
+
+**How it is detected:**
+- **Live:** the user sees an unfamiliar method, with its added date, in Settings, or finds they cannot sign in.
+- **Forensic:** every stamp leaves a `step_up` row, and every session it created leaves a `session` row. No login role can delete either. But nothing reads them at runtime: only `poly_backup` does.
+- **No email** until POLY-137, which is why RC5(c) adds the method-change notice to POLY-137.
+
+**The stronger options:**
+
+| Option | What it closes | Cost | Verdict |
+|---|---|---|---|
+| **The database checks the TOTP code** (S1) | Nothing on its own: the passkey path stays the service's word | About $15 and 50 min (guess). The TOTP seeds become readable to the database server and every backup | **Declined,** agreed |
+| **Bind the stamp to the web handle** | Nothing: poly_auth creates the session and its handle itself | About $4 | **Declined,** agreed |
+| **A method added through a re-check, as opposed to first enrolment, waits 24 h before it works; the user is emailed at once and can cancel** | It turns a silent takeover into one the user is warned of and can stop. A user who adds a method for real waits a day | About $12 and 40 min (guess), plus the mailer | **Recommended with POLY-137.** It is meaningless without the email |
+| **A worker job that reports `step_up` followed by a method change to the operator** | Detection by the operator | About $10 (guess), plus the mailer or an operator report | With POLY-137 or POLY-64 |
+| **Building no re-check (D3 (b), the interim dialog)** | All of it | Nil. Users cannot change methods after 5 minutes without `reset-mfa` | The Principal chose against it, at `d5ec9130` |
+
+**The residual for the Principal, in one sentence:** a breach of the sign-in service's database password can, beyond what it reaches today, plant a second step of its own on any enrolled account and lock the owner out. It leaves a record the user cannot see until the mailer exists, and Settings shows the planted method's date.
+
+**R-2's text at build review:** "SQL as poly_auth can create a session for any user, mark it freshly confirmed, and so pass every step-up check as that user. That includes adding its own authenticator or passkey and removing theirs, which lets it sign in again after it is evicted and lock the user out, until `reset-mfa`. Each stamp leaves a `step_up` line and each session a `session` line in the sign-in record, which it cannot remove. The user sees each method's added date in Settings."
+
+### 13.3 D7: the backup code as a re-check. I still recommend (a), S2
+§12.3 stands. On the architect's reason for (b), "the operator's identity check is the weaker control":
+- On this instance the operator knows each member in person, while a backup code is a stored secret: printed, or a `.txt` in Downloads.
+- Under (b), a found code plus the password is **the same takeover as H.1** (add a method, remove the user's), without needing any breach of the service.
+- Under (a), it is up to ten sign-ins that cannot change methods.
+- (a) also removes A3.3, the part most likely to fail at red, and with it RC6's only current reader.
+
+If the Principal picks (b), tell them plainly: a found backup code plus the password lets someone take the account and lock the owner out.
