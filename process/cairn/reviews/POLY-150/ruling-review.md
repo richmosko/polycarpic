@@ -638,3 +638,9 @@ The re-issue answers my checklist item by item. It also states H.1's added reach
 - (a) also removes A3.3, the part most likely to fail at red, and with it RC6's only current reader.
 
 If the Principal picks (b), tell them plainly: a found backup code plus the password lets someone take the account and lock the owner out.
+
+**Accepted tip for Addendum 3: `fa3bac5c`.** I read `git diff 671d219e fa3bac5c -- …/ruling.md`.
+- **RC6 is fixed.** A3.2 stamps with `now()`, and `step_up_fresh` is unchanged.
+- **T4** now pins that only poly_govern holds `UPDATE (recent_auth_at)`.
+- **Also in that diff:** the decisions status and R7's lock wording under D6 (b). These match my §7.4 conditions: a band only on the lock refusal, and the fallback wording when no band comes back.
+- **ACCEPT.** H.1's residual and D7 are with the Principal (§13.2, §13.3).
