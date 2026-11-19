@@ -33,7 +33,7 @@ WITH logins AS (
   -- 2. the triggers exist and are enabled
   UNION ALL
   SELECT 'FAIL trigger ' || name || ' on ' || tbl || ': ' ||
-         CASE WHEN g.oid IS NULL THEN 'missing' ELSE 'tgenabled = ' || g.tgenabled || ', not O' END
+         CASE WHEN g.oid IS NULL THEN 'missing' ELSE 'tgenabled = ' || g.tgenabled::text || ', not O' END
   FROM trig LEFT JOIN pg_trigger g ON g.tgrelid = to_regclass(tbl) AND g.tgname = name AND NOT g.tgisinternal
   WHERE g.oid IS NULL OR g.tgenabled <> 'O'
   -- 3. the two trigger definers: owner, SECURITY DEFINER, executable by no login role

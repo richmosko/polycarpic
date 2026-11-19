@@ -21,7 +21,7 @@ function gate(db: string) {
 describe('the gate passes on the migrated, revoked schema', () => {
   it('exit 0 and exactly one line, `gate: pass`', () => {
     const g = gate(cloneMigrated());
-    expect(g.out).toBe('gate: pass');
+    expect(g.out, g.err).toBe('gate: pass');
     expect(g.code).toBe(0);
   });
   it('poly_backup reads the record through pg_read_all_data and the gate still passes (the one allowed reader)', () => {
