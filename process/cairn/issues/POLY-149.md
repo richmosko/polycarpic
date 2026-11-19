@@ -20,7 +20,7 @@ Split on 2026-11-17 (the Principal confirmed): the service is POLY-152, web ente
 
 ## Acceptance criteria
 
-Ticks by qa at the gate sha ff6e2a94 (`process/cairn/reviews/POLY-149/gate.md`); each criterion's proving test is named in `process/cairn/reviews/POLY-149/test-plan.md`. Unticked: INFRA §7.1 step 16 (devops), the docs and the RSS measurement.
+Ticks by qa at the gate sha ff6e2a94 (`process/cairn/reviews/POLY-149/gate.md`); each criterion's proving test is named in `process/cairn/reviews/POLY-149/test-plan.md`.
 
 **Revocation (one migration)**
 - [x] poly_app holds no grant on any BetterAuth table and no EXECUTE on any `enter_*` except `enter_session`. A catalog test pins poly_app's complete EXECUTE set on `app` functions after the revocation, not only the `enter_*` ones (seceng F2, `process/cairn/reviews/POLY-152/ruling-review.md` §5).
@@ -45,12 +45,12 @@ Ticks by qa at the gate sha ff6e2a94 (`process/cairn/reviews/POLY-149/gate.md`);
 - [x] No column of the record holds the code that was typed (a test types a known code and searches every column for it).
 - [x] As poly_auth, no record row of any kind can be changed or deleted (the same effective-privilege and trigger checks as above).
 - [x] No login role reads the record in this issue. A later Settings screen gets its own grant review.
-- [ ] INFRA §7.1 step 16's check also refuses when the growing lock or the record is missing (devops; see seceng's note).
+- [x] INFRA §7.1 step 16's check also refuses when the growing lock or the record is missing (devops; see seceng's note). Proof: `tests/db/gate-check.test.ts` and `gate-check-membership.test.ts`, 94 tests with every plant refused (87 + 7 at the gate sha); INFRA 1.3.16.
 
 **D: docs**
-- [ ] ARCH §2.2, §3.1, §3.1c, §3.3 and §7; SECURITY R-2 re-worded to its residual, never retired (seceng #15). The residual stays: the sign-in service can create any session, code execution in web reaches the users active while it runs, and the worker's reach lasts until POLY-64's scoping lands. Also T-18, A-31, A-39, C-84 and the secrets table; INFRA §2.2 and §7.5. All of them state the current state only.
-- [ ] SECURITY R-2's backup-code item (POLY-89 D1: copied backup codes plus a planted magic link sign in as any authenticator-app user) is removed when the revocation lands; the residual names the sign-in service's write access to factor rows.
-- [ ] Running cost measured: the RSS of the auth container at idle and under the e2e suite, recorded against ARCH §7.3.
+- [x] ARCH §2.2, §3.1, §3.1c, §3.3 and §7; SECURITY R-2 re-worded to its residual, never retired (seceng #15). The residual stays: the sign-in service can create any session, code execution in web reaches the users active while it runs, and the worker's reach lasts until POLY-64's scoping lands. Also T-18, A-31, A-39, C-84 and the secrets table; INFRA §2.2 and §7.5. All of them state the current state only. Proof: ARCH 1.21.0, SECURITY 1.13.0, INFRA 1.3.16; `process/cairn/reviews/POLY-149/verdict.md` and `build-review.md`.
+- [x] SECURITY R-2's backup-code item (POLY-89 D1: copied backup codes plus a planted magic link sign in as any authenticator-app user) is removed when the revocation lands; the residual names the sign-in service's write access to factor rows. Proof: SECURITY 1.13.0; `build-review.md` §5.
+- [x] Running cost measured: the RSS of the auth container at idle and under the e2e suite, recorded against ARCH §7.3. Proof: `process/cairn/reviews/POLY-149/r7-auth-memory.md` (idle 128 MiB, e2e peak 130 MiB); ARCH §7.3.
 
 ## Estimate
 
