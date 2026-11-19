@@ -1,5 +1,7 @@
 # POLY-149c — gate run (qa-engineer-149)
 
+**SUPERSEDED: the run at `8d77a350` predates Addenda 3 and 4 (address tests, pgTAP 12 pins, eslint pin removal, pushed at c3129d71); the final gate is re-measured on the final sha and replaces it. Kept for its counts and the main control.**
+
 **One run, one sha: `8d77a350`** (`feature/poly-149-stage-2-revocation-and-docs`: the build at 002cda1f, devops's gate check, and qa's last test commit 65876882 plus devops's 8d77a350; `git status` empty before and after). This file and the criteria ticks land after it, docs only.
 
 ## Results (passed + failed + skipped = total)
