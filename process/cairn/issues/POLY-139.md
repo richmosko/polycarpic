@@ -10,7 +10,7 @@ labels: [design]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-12
+updated: 2026-11-19
 ---
 
 POLY-86 shipped placeholder pages for `/sign-in` and Settings → Sessions because DESIGN has no screen for either (ruling follow-up 1; verdict follow-up 14).
@@ -26,3 +26,7 @@ POLY-86 shipped placeholder pages for `/sign-in` and Settings → Sessions becau
 ### @team-lead — 2026-11-12
 
 From the POLY-87 loop: `/sign-up` exists as a minimal page (reads `?invitation=`, strips it from the address bar, offers Google and GitHub) and `/` redirects to `/dashboard?entity=<id>`. When one sign-up seats several viewer invitations (the token-less paths match every live invitation for the address), the landing entity is the newest membership with an arbitrary but stable tie-break on `entity_id`; the entity selector is where the user gets the choice.
+
+### @team-lead — 2026-11-19
+
+From the POLY-153 loop (seceng build-review §3 and §6, `process/cairn/reviews/POLY-153/build-review.md`). **F1:** a sign-in from a browser that already carries a live session ends that earlier session in the same transaction. POLY-153 clears the handle cookie when a sign-in is held at the second step; this is the stronger option seceng filed for later (about a quarter-day, a guess).
