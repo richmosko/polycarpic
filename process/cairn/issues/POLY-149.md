@@ -20,7 +20,7 @@ Split on 2026-11-17 (the Principal confirmed): the service is POLY-152, web ente
 
 ## Acceptance criteria
 
-Ticks by qa at the gate sha 8d77a350 (`process/cairn/reviews/POLY-149/gate.md`); each criterion's proving test is named in `process/cairn/reviews/POLY-149/test-plan.md`. Unticked: INFRA §7.1 step 16 (devops), the docs and the RSS measurement.
+Ticks by qa at the gate sha 9fc167f4 (`process/cairn/reviews/POLY-149/gate.md`); each criterion's proving test is named in `process/cairn/reviews/POLY-149/test-plan.md`. Unticked: INFRA §7.1 step 16 (devops), the docs and the RSS measurement.
 
 **Revocation (one migration)**
 - [x] poly_app holds no grant on any BetterAuth table and no EXECUTE on any `enter_*` except `enter_session`. A catalog test pins poly_app's complete EXECUTE set on `app` functions after the revocation, not only the `enter_*` ones (seceng F2, `process/cairn/reviews/POLY-152/ruling-review.md` §5).

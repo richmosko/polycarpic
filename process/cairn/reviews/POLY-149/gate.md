@@ -1,8 +1,33 @@
 # POLY-149c — gate run (qa-engineer-149)
 
-**SUPERSEDED: the run at `8d77a350` predates Addenda 3 and 4 (address tests, pgTAP 12 pins, eslint pin removal, pushed at c3129d71); the final gate is re-measured on the final sha and replaces it. Kept for its counts and the main control.**
+**FINAL: one run, one sha `9fc167f4`** (`feature/poly-149-stage-2-revocation-and-docs`, after Addenda 1 to 6; `git status` empty before and after; nobody else ran tests, load 3.8 to 5.9 throughout). The earlier run below is superseded and kept for its main control and history.
 
-**One run, one sha: `8d77a350`** (`feature/poly-149-stage-2-revocation-and-docs`: the build at 002cda1f, devops's gate check, and qa's last test commit 65876882 plus devops's 8d77a350; `git status` empty before and after). This file and the criteria ticks land after it, docs only.
+| Step | Files | Passed | Failed | Skipped | Total |
+|---|---|---|---|---|---|
+| `pnpm lint` | — | exit 0 | | | |
+| `pnpm typecheck` (19 tasks) | — | exit 0 | | | |
+| tests/db (parallel + serial) | 47 | 1057 | 0 | 0 | 1057 |
+| e2e (Chromium, no harness revoke) | 8 | 57 | 0 | 0 | 57 |
+| tests/ci | 20 | 542 | 0 | 0 | 542 |
+| tests/layers (root run) | 8 | 545 | 0 | 0 | 545 |
+| tests/infra | 4 | 184 | 0 | 0 | 184 |
+| tests/config | 5 | 97 | 0 | 15 | 112 |
+| packages/auth | 8 | 58 | 0 | 0 | 58 |
+| packages/config | 6 | 334 | 0 | 0 | 334 |
+| packages/tenancy | 2 | 6 | 0 | 0 | 6 |
+| packages/db | 6 | 43 | 0 | 0 | 43 |
+| apps/auth | 1 | 3 | 0 | 0 | 3 |
+| apps/web unit | 9 | 97 | 0 | 0 | 97 |
+
+Not run: `tests/infra/image` (Docker image build, POLY-143) and `tests/log`. tests/config's 15 skipped are POLY-152's.
+
+**db time against the same-day main control (be41b202, 902 tests, 40 files, 76 s, load under 6): 1057 tests, 47 files, 96 s at load about 5 (+20 s, +26 %) for +155 tests and +7 files.** The earlier runs on this branch took 93 s and 96 s at the same load; two runs at load 13 to 26 took 1048 s with 60 s timeouts, so a reading needs the load beside it.
+
+---
+
+## Superseded run at `8d77a350`
+
+One run, sha `8d77a350` (`feature/poly-149-stage-2-revocation-and-docs`: the build at 002cda1f, devops's gate check, and qa's last test commit 65876882 plus devops's 8d77a350; `git status` empty before and after). This file and the criteria ticks land after it, docs only.
 
 ## Results (passed + failed + skipped = total)
 
