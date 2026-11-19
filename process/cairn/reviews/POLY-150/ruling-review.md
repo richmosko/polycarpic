@@ -244,3 +244,11 @@
 - (1) `resend_available_at` is a future time only under the published 3-in-15-minutes cap. It is NULL otherwise, so it never tells the 24-hour suppression apart from "would send now". The resend answer stays the same 200 either way.
 - (2) Setting `no-store` on every `/api/auth` response removes the unmeasured dependency on BetterAuth's headers.
 - (3) I accept a browser test for Make new codes only, with RC3's steps and an old code refused. Remove on the last method and Remove while paused need no browser test: the controls are the database refusals (POLY-89 R3 #7, POLY-149's delete guard), already tested in `tests/db`, and the button state is cosmetic and covered by the unit test of the pure function. Accepted tip: `7d87cbfa`.
+
+**pgTAP 07 pin at `09a55671`: ACCEPT** (code-read of `app.my_second_step()` in 0018 at `fad5c4a2`). The pin lists exactly one new reader of the marker table, and the function meets R2:
+- **It trusts the marker only under kind `session`.** It runs the exact-call check first, then the same `tx_identity … kind = 'session'` test as `recent_auth_ok`, then refuses a NULL user or session.
+- **Every row it reads is keyed to the marker's own user.** The challenge and the grant are also keyed to the marker's session.
+- **It returns no secret**, only the eight R2 columns: no secret, `backup_codes`, public key, credential id, hash, attempt count, lock time or email. `codes_paused` is a boolean, and `resend_available_at` follows Addendum 2 (`v_wrong < 10`).
+- **It writes nothing:** only SELECTs, and the call to the read-only `second_step_needed`. Its owner is poly_govern, with `search_path` set to empty and EXECUTE granted to poly_app only.
+
+The formal build review waits for the gate.
