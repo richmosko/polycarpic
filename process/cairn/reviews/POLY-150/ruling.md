@@ -775,7 +775,7 @@ In this order:
 
 With R6's interim state removed (−$3), the loop total on the recommended options is about **$146 and 7 h 55 min**.
 
-### D7 (Principal, recommend b). The backup code as a re-check [M10, S2]
+### D7. The backup code as a re-check [M10, S2]. Decided: (b) (Addendum 5)
 
 - **(a) [S2, the stronger option] No backup codes for a re-check; they stay for sign-in recovery only.**
   - A stolen code plus the password then signs someone in, but cannot change the user's methods.
@@ -808,7 +808,6 @@ The Principal accepted Addendum 3 with H.1's limit (`process/DECISIONS.md` @ cb2
 | Status | `code` | When | The dialog |
 |---|---|---|---|
 | 400 | `invalid_request` | The body is missing a field, has an extra field, or fails its type: `challengeId` not a uuid, `code` not 6 digits, both `code` and `backupCode` present, or `method` unknown. | A generic failure. This is a client bug, never a user error. |
-| 400 | `method_refused` | `method: 'backup_code'` or a `backupCode` body while D7 is undecided or decided (a). | It never sends these. |
 | 401 | BetterAuth's own | No session. | Back to `/sign-in`. |
 | 403 | `no_second_step` | `second_step_at` is NULL. | It is never opened for such a user. |
 | 403 | `method_unavailable` | `begin` for a method the user has not set up (`begin_step_up`'s refusal). | It offers only `mySecondStep`'s methods. |
@@ -834,3 +833,54 @@ A raise rolls back the transaction, so a TOTP step it refused is not recorded ei
 - the lock refusal on `/reauth` carries no `pausedFor`;
 - a wrong code followed by the right code on the same `challengeId` passes;
 - a used `challengeId` answers `challenge_expired`.
+
+## Addendum 5: D7 decided (b); method changes audited by the database (RC5(c), now required)
+
+**D7 is decided: (b)** (`process/DECISIONS.md` @ c49f5d33). A backup code is accepted for Confirm it's you, with the password.
+- **A3.3 is a rule:** the stamp comes first, then the list is written, under the deferred evidence check.
+- **`begin` and `/second-step/reauth` take `method: 'backup_code'` and `{challengeId, password, backupCode}`**, as Addendum 4's table shows for "once D7 is decided (b)".
+- **`method_refused` is dropped** from Addendum 4: nothing refuses a method on these routes now. An unknown `method` stays 400 `invalid_request`.
+- **The Principal accepted the residual** with H.1's limit: a found backup code plus the password is a full takeover. A method added through a re-check waiting 24 hours, with an email to the user, is POLY-137's deploy condition (DECISIONS @ cb2ae18f).
+
+**The audit event (seceng RC5(c), required under D7 (b)).** Every second-step method added or removed is written to `public.audit_event` **by the database**, whichever role or path made the change.
+
+- **Where:** `app.sync_second_step()`, the poly_govern function already run by the AFTER triggers `two_factor_80_sync` (INSERT, UPDATE OF `verified`, DELETE) and `passkey_80_sync` (INSERT, DELETE). It is replaced in 0019 (CREATE OR REPLACE, `SET ROLE poly_govern`). No new trigger is needed, and no path that changes a method can skip it.
+- **What counts as a change:**
+  - **TOTP is added** when `verified` goes false → true (an unverified row is not a method).
+  - **TOTP is removed** when a verified row is DELETEd.
+  - **A passkey is added** on INSERT and **removed** on DELETE.
+  - An unverified `two_factor` row inserted or deleted writes nothing.
+- **What it writes,** one row per change:
+  - `kind`: `second_step.method_added` | `second_step.method_removed`;
+  - `subject_user_id`: the row's `user_id` (NEW, or OLD on a delete);
+  - `actor` and `actor_user_id`: `user` and `app.current_user_id()` when a user marker is present; `operator` and NULL when `session_user = 'poly_operator'` (`reset-mfa`); `system` and NULL otherwise;
+  - `entity_id`: NULL;
+  - `payload`: `{method: 'totp' | 'passkey', passkey_id (or null), session_id: app.current_session_id() (or null), marker_kind (or null)}`;
+  - `created_at`: the database clock.
+  - Whether `audit_event` CHECKs `actor` or `kind` is (code-read pending). If it does, 0019 widens the CHECK to the values above; a build that finds a CHECK it cannot widen reports to me.
+- **Who can write it:** only poly_govern, as now (0003's grant and the `audit_event_insert` policy).
+  - It is append-only (`audit_event_append_only`, `audit_event_no_truncate`).
+  - No login role can UPDATE or DELETE it, poly_auth included. A planted factor therefore leaves a row its planter cannot remove.
+- **Who can read it, under 0003's `audit_event_select`, unchanged:**
+  - **poly_app,** for the user themself, on rows where `actor_user_id` is them, so the events of changes they made;
+  - **poly_worker;**
+  - **poly_backup** (all data).
+  
+  Rows written under `reset-mfa` or with no marker have `actor_user_id` NULL and `entity_id` NULL, so poly_app cannot read them. **This loop shows no audit list in web.** Settings' added dates (R2) are where a user sees a planted method, and POLY-137's email will be the alert.
+- **Tests (`tests/db`, through the real handler on poly_auth unless noted):**
+  - each of these writes exactly one row with the fields above: first TOTP verify, TOTP disable, passkey registration, passkey delete, a later factor added after a re-check;
+  - an unverified `two_factor` row inserted then deleted writes none;
+  - **a factor planted directly by SQL as poly_auth** (H.1's path: a created session, a stamp, then an INSERT into `passkey`) writes `method_added`, with `actor_user_id` the victim and `marker_kind = 'auth'`;
+  - `reset-mfa` writes one `method_removed` per method with `actor = 'operator'`, plus the existing `second_step.reset`;
+  - as each login role, UPDATE and DELETE of such a row are refused and the row reads back unchanged;
+  - as poly_app with the user's marker, the user reads the rows they acted on and not another user's.
+- **The deploy gate (INFRA §7.1 step 16, POLY-149 R5's table).** H.1's residual was accepted on the condition that a planted factor is recorded, so these join the gate. The lead edits INFRA at the build review, with devops-engineer when spawned.
+
+| Object | Check |
+|---|---|
+| triggers `two_factor_80_sync`, `passkey_80_sync` | exist, `tgenabled = 'O'`, and run `app.sync_second_step()` |
+| `app.sync_second_step()` | owner poly_govern, SECURITY DEFINER, no login role can execute; its body inserts both `second_step.method_*` kinds (a pgTAP body pin, as for `record_session_sign_in`) |
+| `app.complete_step_up(text, uuid, bigint)` | owner poly_govern; EXECUTE poly_auth only; the only new writer of `recent_auth_at` |
+| triggers `step_up_totp_10_forward`, `two_factor_85_step_up_spent`, `step_up_pending_resolved` | exist, `tgenabled = 'O'`; the last is DEFERRABLE INITIALLY DEFERRED |
+
+**Cost (guess):** about $5 and 15 minutes, inside A7's build and tests.
