@@ -717,3 +717,15 @@ Add new decisions ABOVE this comment, newest first.
 - Audit production dependencies only — hides every future advisory in the tools that build the images.
 - Wait for a fix — every pull request stays blocked with no date known.
 **Approved by:** the Principal (2026-11-17), on seceng's brief.
+
+### 2026-11-19 — Only `app` and `staging` live under the app's domain; a DNS check enforces it before real data
+**Decision:** the risk that a sibling address under the app's domain plants a sign-in cookie is accepted, with a rule and a check. The rule: under the domain there are only `app` and `staging`, no wildcard record and no alias to an outside service. The check: before the first deploy that holds real household data, a step lists the domain's DNS records through Cloudflare's API and stops if it finds anything else. The rule and the check are built in POLY-97 and the check joins the deploy gate. SECURITY carries the remaining risk as an Open Risks row.
+**Why:** POLY-153 keeps the sign-in service's cookies on `/api/auth` only, so web never receives them. That forces their type from one only the app's own address can set (`__Host-`) to one any address under the same domain can set (`__Secure-`). A page on a sibling address could then plant a sign-in cookie, and a user's sign-in actions (adding a passkey, linking Google) could land in another account on the same instance. The attacker needs control of a sibling address and, for anything beyond a nuisance, an account of their own on the instance (sign-up is by invitation only). They never sign in as the user and reach none of the user's existing data; the handle cookie keeps the strict type. Which cookie the service reads when two arrive, and the reach beyond the cookie rules themselves, are seceng's reading and are not measured.
+**Remaining risk:** `staging` is the one sibling left. Using it takes a break-in to the allow-listed staging site and an account on the real instance.
+**Alternatives considered:**
+- Accept and record only — free; leaves a forgotten DNS alias or a later second service as open routes.
+- Also move staging to its own domain — removes the last sibling; about a quarter-day more and a second domain at roughly $10–15 a year (guesses). Offered as the stronger option and not taken.
+- The sign-in service refuses a request carrying two sign-in cookies — does not cover the Google or GitHub sign-in case; reconsider if more than one family shares an install.
+- Go back to the strict type for the sign-in cookies — web would receive the sign-in cookie on every page again, which is the more likely attack and the reason for POLY-153.
+**Cost:** about a quarter-day of work in POLY-97 (seceng's guess); no running cost.
+**Approved by:** the Principal (2026-11-19), on seceng's brief and the lead's recommendation.
