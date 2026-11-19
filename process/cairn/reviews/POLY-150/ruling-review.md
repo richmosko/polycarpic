@@ -203,3 +203,37 @@
 - Code-read: the C-88 retry behaviour, R8's network reach, and the absence of any `recent_auth_at` writer.
 - Spec: serving a prerendered page as a static file with only a `<meta>` CSP, and the back-forward cache's handling of `no-store`.
 - Guessed: the costs in §7.3 and §7.4, which are the architect's.
+
+---
+
+## 8. Final verdict at `91c8aea6`, with DESIGN at `afc74388` (0.18.3). This replaces §7's verdict.
+
+**Verdict: ACCEPT `91c8aea6`. Nothing blocks.** From `ee09c8d9` to `91c8aea6` only Addendum 1's RC2 block changed (`git diff ee09c8d9 91c8aea6 -- …/ruling.md`). Everything else in §7 stands, except its Caddy line.
+
+- **RC2: met, as I withdrew it.**
+  - No Caddy header is added.
+  - R10's header test reads `frame-ancestors 'none'` from the HTTP response on three pages.
+  - The R1 boundary test refuses `prerender` anywhere under `routes/{settings,sign-in}/**`, layouts included, and it is shown to fail on a planted copy. This is a direct test, stronger than the indirect one I accepted in §7.1, and it also covers future pages under those paths.
+  - §7.1's "keep the Caddy header" is withdrawn. It is not needed: every browser that is still supported honours `frame-ancestors`.
+- **RC1, RC3 and RC4:** ruled as in §7.1. Met.
+- **D1 and D5:** my assessment for the Principal is unchanged. §7.3 recommends (b), the interim no-input dialog, with its two conditions. §7.4 recommends (b), three bands, with four conditions on the hold-cookie read. (a) is the stronger option and costs nothing.
+
+### DESIGN 0.18.3: the wording against the ruling
+| Item | Result |
+|---|---|
+| W1: one locked state | **Met.** `#locked` says "Use a passkey" for everyone, and `#locked-long` is gone. The step-up variant reads "Use a passkey if you have one". |
+| W2: no claimed email | **Met.** `#done` says only that every new sign-in asks. |
+| W3: no-mailer state | **Met.** `#no-mail` has one neutral line and no password field. It is shown before anything is checked, and Sign out stays. The send step reads "We've asked for a code to be sent", the same whether the code was sent, was capped or failed. |
+| W4: no "this device is new" | **Met.** |
+| The lock wording | It matches option (a) today, with no time. If the Principal picks D5 (b), DESIGN gains the three bands, and those are the only change. |
+| Wrong-code text | The TOTP and backup-code paths read the same, with no count. |
+| Confirm it's you | The not-available state has Close only, and no inputs (R6). |
+| Resend and enable | Both ask for the password again, and the page says it keeps none. |
+| Viewer `#offered` | Skip for now. It names the entity and the role to the user who just joined, which is the user's own fact. Fine. |
+
+**One wording note, not about security.** `#backup` says "make new codes in Settings if you are running low". Under D1 (b), that is possible only in the first 5 minutes until POLY-151 lands. The designer may add "or ask the person who runs Polycarpic".
+
+**Still to come at the build review:**
+- the QR encoder's exact pin (N3);
+- SECURITY brought to the current state (§6), with D1 and D5 as the Principal decides;
+- R8's forged-address reach added to R-2.
