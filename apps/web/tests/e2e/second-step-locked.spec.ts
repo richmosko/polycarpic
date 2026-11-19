@@ -20,7 +20,7 @@ async function lockedPage(page: import('@playwright/test').Page, u: U) {
   await page.getByRole('button', { name: 'Continue' }).click();
 }
 
-for (const [key, phrase] of [['lock30', /try again in under an hour/i], ['lock120', /try again in a few hours/i], ['lock600', /try again within a day/i]] as const) {
+for (const [key, phrase] of [['lock30', /work again in under an hour/i], ['lock120', /work again in a few hours/i], ['lock600', /work again within a day/i]] as const) {
   test(`${key}: the #locked state says "${phrase.source}", names a passkey, and shows no time, no minutes and no count  [red if: the band is not shown or a time is]`, async ({ page }) => {
     const u = users()[key]!;
     await lockedPage(page, u);
