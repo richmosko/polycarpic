@@ -1,7 +1,7 @@
 ---
 id: POLY-149b
 title: Revocation security review
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-149
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-149.md, process/cairn/reviews/POLY-149/**, pro
 stage: plan
 estimate.cost_usd: "7.00"
 estimate.gate_cycles: 2
-labels: [security, auth]
+actual.cost_usd: "8.6833"
+actual.tokens: 24219164
+actual.gate_cycles: 11
+actual.wall_clock: 136
+ratio: "1.24"
+labels: [security, auth, bloat]
 priority: null
 pr: null
 created: 2026-11-19
@@ -21,6 +26,6 @@ seceng reviews the ruling before tests and the build at the gate sha, and owns S
 
 ## Acceptance criteria
 
-- [ ] `ruling-review.md` accepts the ruling at an exact sha, or lists required changes.
-- [ ] `build-review.md` accepts the build at the gate sha.
-- [ ] SECURITY R-2 is re-worded to its residual and never retired; the backup-code item is removed; T-18, A-31, A-39, C-84 and the secrets table state the current state only.
+- [x] `ruling-review.md` accepts the ruling at an exact sha, or lists required changes.
+- [x] `build-review.md` accepts the build at the gate sha.
+- [x] SECURITY R-2 is re-worded to its residual and never retired; the backup-code item is removed; T-18, A-31, A-39, C-84 and the secrets table state the current state only.
