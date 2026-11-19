@@ -1,7 +1,7 @@
 // handleAuthRequest (POLY-86 ruling R4; seceng S1, S14): runs BetterAuth for one /api/auth/* request inside the right
 // transaction of ours, and commits only when BetterAuth's answer is a success.
 import { isIP } from 'node:net';
-import { withAuthSession, withContextFreeTx, withSignInTx } from '@poly/db/auth';
+import { withAuthSession, withContextFreeTx, withSignInTx, type ClientMeta } from '@poly/db/auth';
 import type { createAuth } from './index.ts';
 import { matchAuthPath, USER_INSERTING } from './route-policy.ts';
 import { cappedOut } from './recent-auth.ts';
@@ -96,6 +96,12 @@ const clientIpResolved = (request: Request): boolean => {
   return v !== null && /^[0-9a-fA-F:.]+$/.test(v.trim()) && isIP(v.trim()) !== 0;
 };
 
+/** The address (the single forwarded entry, when it is an address) and browser the sign-in service passes to the database (POLY-149 R3). */
+const clientMeta = (request: Request): ClientMeta => ({
+  ip: clientIpResolved(request) ? request.headers.get('x-forwarded-for')!.trim() : null,
+  userAgent: request.headers.get('user-agent'),
+});
+
 const notFound = () => new Response(JSON.stringify({ message: 'Not found' }), { status: 404, headers: { 'content-type': 'application/json' } });
 
 /** The cap's clearing cookie carries the path, Secure, SameSite and HttpOnly BetterAuth set the cookie with, never a literal Path=/ (C7). */
@@ -131,9 +137,9 @@ export async function handleAuthRequest(request: Request, given: Promise<AnyAuth
   }
   if (session) {
     const token = session.session.token;
-    return inTransaction(request, auth, (fn) => withAuthSession(token, fn));
+    return inTransaction(request, auth, (fn) => withAuthSession(token, fn, clientMeta(request)));
   }
-  if (USER_INSERTING.has(route.template)) return inTransaction(request, auth, (fn) => withContextFreeTx(fn), true);
-  if (SIGN_IN_TX.has(route.template)) return inTransaction(request, auth, (fn) => withSignInTx(fn));
+  if (USER_INSERTING.has(route.template)) return inTransaction(request, auth, (fn) => withContextFreeTx(fn, clientMeta(request)), true);
+  if (SIGN_IN_TX.has(route.template)) return inTransaction(request, auth, (fn) => withSignInTx(fn, clientMeta(request)));
   return auth.handler(request);
 }

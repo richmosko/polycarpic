@@ -1,9 +1,9 @@
-// db/auth: importable by packages/auth alone (layers.json). BetterAuth's connection path is neither withTenant nor
+// db/auth: importable by packages/auth alone (layers.json). BetterAuth's connection path is neither withSession nor
 // withSystem, so it lives here: the plain poly_app pool, the context-free transaction, and the fields map.
 import { getTableColumns, type Table } from 'drizzle-orm';
 import * as schema from './schema/auth.ts';
 
-export { withContextFreeTx, withAuthSession, withSignInTx, clientOf, currentClient, currentTx, NestedContextError, ContextNotEmptyError, TransactionAborted, TransactionEnded, TransactionClosed, type AuthClient, type Tx, type ContextFreeTx } from './context.ts';
+export { withContextFreeTx, withAuthSession, withSignInTx, type ClientMeta, clientOf, currentClient, currentTx, NestedContextError, ContextNotEmptyError, TransactionAborted, TransactionEnded, TransactionClosed, type AuthClient, type Tx, type ContextFreeTx } from './context.ts';
 export { authPool, close } from './pool.ts';
 
 type Fields<T extends Table> = { [K in keyof T['_']['columns']]: string };

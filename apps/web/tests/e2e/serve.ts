@@ -12,7 +12,6 @@ import { cloneMigrated, dbEnv, setRolePasswords } from '../../../../tests/db/hel
 import { ensureBootstrapLockDir, releaseBootstrapLockDir } from '../../../../tests/db/helpers/bootstrap-lock.ts';
 import { asUserSql } from '../../../../tests/db/helpers/marker.ts';
 import { must, startServer } from '../../../../tests/db/helpers/pg.ts';
-import { revokeTarget } from './revoke-target.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const port = Number(process.env.E2E_PORT ?? 4173);
@@ -49,14 +48,14 @@ const signed = await auth.signIn(EMAIL, PASSWORD);
 // Each cookie keeps its own Path: __Secure-better-auth.session_token at /api/auth, __Host-poly_handle at / (POLY-153 R10).
 const cookies = storageCookies(signed);
 if (!cookies.some((c) => c.name === '__Host-poly_handle') || !cookies.some((c) => c.name.startsWith('__Secure-better-auth.') && c.path === '/api/auth')) { stop(); throw new Error('the seeded sign-in did not set both cookies'); }
-// A second session and a step-up stamp (what POLY-89's definers will write), so the Sessions spec can revoke another session.
+// A second session and a step-up stamp (what POLY-89's definers will write), so the Sessions spec can end another session.
 await auth.signIn(EMAIL, PASSWORD);
 must(`UPDATE public.session SET recent_auth_at = now() WHERE user_id = '${id}'`, db);
 // POLY-89 (R7): a manager with no second step, which is the state `polycarpic cli user reset-mfa` leaves behind. The entity belongs to an
 // enrolled owner (a verified factor and the flag as superuser, then the Business as poly_app under the marker, as the db fixtures do).
 const OWNER_ID = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('Grace Owner', 'owner@e2e.test', true) RETURNING id`, db).rows[0]![0]!;
 must(`BEGIN; INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '${OWNER_ID}', true); UPDATE public."user" SET two_factor_enabled = true WHERE id = '${OWNER_ID}'; COMMIT;`, db);
-const SHARED = must(`BEGIN; ${asUserSql(OWNER_ID)}
+const SHARED = must(`BEGIN; ${asUserSql(OWNER_ID, db)}
   INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), 'E2E Shared', 'business_pass_through');
   SELECT id FROM public.entity WHERE name = 'E2E Shared'; COMMIT;`, db, { role: 'poly_app' }).rows.at(-1)![0]!;
 const MGR_ID = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('Manny Manager', 'manager@e2e.test', true) RETURNING id`, db).rows[0]![0]!;
@@ -66,15 +65,6 @@ must(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ('${SHARED
 mkdirSync(join(here, '.auth'), { recursive: true });
 writeFileSync(join(here, '.auth', 'user.json'), JSON.stringify({ cookies, origins: [] }));
 await close();
-// POLY-153 R7.4: a MEASUREMENT, not POLY-149's revocation. Web must enter by handle and touch no BetterAuth table, so poly_app loses
-// both here, after seeding and before web starts. This lives only in this file (never in a migration, roles.sql or a shared fixture),
-// and no catalog test reads this database.
-// The definer's name is reserved to packages/db/src/context.ts (poly/reserved-literal), so it is found in the catalog, not spelled here.
-const fn = revokeTarget(must(`SELECT p.oid::regprocedure::text FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname LIKE 'enter_asserted%'`, db).rows); // exactly one function, or this throws
-must(`REVOKE EXECUTE ON FUNCTION ${fn} FROM poly_app`, db);
-if (must(`SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname LIKE 'enter_asserted%' AND has_function_privilege('poly_app', p.oid, 'EXECUTE')`, db).rows[0]![0] !== '0') throw new Error('R7.4: poly_app still executes the asserted-user entry');
-must(`REVOKE ALL ON public."user", public.session, public.account, public.verification, public.two_factor, public.passkey FROM poly_app`, db);
-
 const web = join(here, '..', '..');
 const run = (args: string[]) => spawn('pnpm', ['exec', ...args], { cwd: web, stdio: 'inherit', env: { ...process.env, ...appEnv } });
 // The sign-in service starts before `vite preview` and is waited for on /api/auth/ok (R1.7).

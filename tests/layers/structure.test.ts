@@ -1,5 +1,5 @@
 // POLY-82 acceptance harness, structure half: workspace shape, layers.json vs ARCH, exports maps, strict linking, and
-// the tsc-resolved criteria (deep import, SessionUserId constructor absent from the @poly/db index).
+// the tsc-resolved criteria (deep import, no session-brand constructor on the @poly/db index).
 // layers.json shape: { packages: { <key>: { dir, name, layer, subpaths: ['./x'], allow } }, sessionSetExempt: '<one literal path>' }.
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -45,8 +45,9 @@ describe('layers.json (criteria 2, 21, 22, 23)', () => {
     }
   });
 
-  it('declares db/auth as a restricted subpath of db, and db/session', () => {
-    expect(layers.packages.db.subpaths).toEqual(expect.arrayContaining(['./auth', './session']));
+  it('declares db/auth as a restricted subpath of db, and no db/session', () => {
+    expect(layers.packages.db.subpaths).toEqual(expect.arrayContaining(['./auth']));
+    expect(layers.packages.db.subpaths).not.toContain('./session');
     expect(layers.packages.secrets.subpaths).toContain('./open');
   });
 
@@ -102,12 +103,8 @@ describe('tsc-resolved criteria (13, 15)', () => {
     const r = tsc('tsconfig.declared-subpath.json');
     expect(r.status, r.stdout).toBe(0);
   });
-  it('the @poly/db index does not export the SessionUserId constructor (type test compiles)', () => {
+  it('the @poly/db index exports no session-brand constructor (type test compiles)', () => {
     const r = tsc('tsconfig.db-index.json');
-    expect(r.status, r.stdout).toBe(0);
-  });
-  it('the type test is not vacuous: the same probe against db/session DOES find the constructor', () => {
-    const r = tsc('tsconfig.db-session-control.json');
     expect(r.status, r.stdout).toBe(0);
   });
 });

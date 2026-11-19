@@ -1,6 +1,6 @@
 // POLY-87 C6: "/" sends a signed-in user to /dashboard?entity=<landing entity> (ruling R3 step 6). Titles end with [red if: ...].
 // POLY-153 R7.2: load({ locals: { handle } }) runs landingEntity(tx) from @poly/tenancy inside withSession(handle) from @poly/db and
-// throws SvelteKit's redirect; both packages are replaced here, the redirect is the real one. locals.identity and withTenant are gone.
+// throws SvelteKit's redirect; both packages are replaced here, the redirect is the real one. locals.identity and the old tenant wrapper are gone.
 import { describe, expect, it, vi } from 'vitest';
 
 const ENTITY = '00000000-0000-4000-8000-0000000000e1';
