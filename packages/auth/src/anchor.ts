@@ -6,6 +6,7 @@
 // Postgres cannot check a password. The answer to send-code is the same whether a code was sent or suppressed (R2, S8).
 import type { BetterAuthPlugin } from 'better-auth';
 import { APIError, createAuthEndpoint, sessionMiddleware } from 'better-auth/api';
+import { lockBandHook } from './lock-band.ts';
 import { createRoutingPool } from './routing-pool.ts';
 
 export interface SecondStepCode {
@@ -46,6 +47,7 @@ const refusal = (status: number, code: string): Response =>
 export function secondStepAnchor(opts: { sendSecondStepCode?: SendSecondStepCode }): BetterAuthPlugin {
   return {
     id: 'second-step-anchor',
+    hooks: { after: [lockBandHook] }, // POLY-150 D6 (b)
     endpoints: {
       sendSecondStepCode: createAuthEndpoint('/second-step/send-code', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
         // POLY-150 R3: no mailer, no answer to anything else: the same 503 for every caller, before the body, the password or the cap.
