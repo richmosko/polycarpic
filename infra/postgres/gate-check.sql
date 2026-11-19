@@ -140,6 +140,12 @@ WITH logins AS (
   FROM unnest(ARRAY['second_step.method_added', 'second_step.method_removed']) k
   WHERE to_regprocedure('app.sync_second_step()') IS NOT NULL
     AND position(k IN (SELECT prosrc FROM pg_proc WHERE oid = to_regprocedure('app.sync_second_step()'))) = 0
+  -- 12b. the no-truncate triggers are BEFORE TRUNCATE, statement-level (tgtype 34 = BEFORE 2 + TRUNCATE 32, no row bit) and run app.refuse_truncate()
+  UNION ALL
+  SELECT 'FAIL trigger ' || name || ' on ' || tbl || ': not BEFORE TRUNCATE FOR EACH STATEMENT running app.refuse_truncate()'
+  FROM (VALUES ('public.two_factor', 'two_factor_no_truncate'), ('public.passkey', 'passkey_no_truncate')) t(tbl, name)
+  JOIN pg_trigger g ON g.tgrelid = to_regclass(tbl) AND g.tgname = name AND NOT g.tgisinternal
+  WHERE g.tgtype <> 34 OR g.tgfoid IS DISTINCT FROM to_regprocedure('app.refuse_truncate()')
   -- 13. complete_step_up: owner poly_govern, SECURITY DEFINER, EXECUTE poly_auth only; no login role writes recent_auth_at itself
   UNION ALL
   SELECT 'FAIL function app.complete_step_up(text,uuid,bigint): missing' WHERE to_regprocedure('app.complete_step_up(text,uuid,bigint)') IS NULL

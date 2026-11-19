@@ -104,6 +104,10 @@ const plants: Plant[] = [
   ...['method_added', 'method_removed'].map((k): Plant => [`sync_second_step body no longer writes ${k}`,
     `UPDATE pg_proc SET prosrc = replace(prosrc, 'second_step.${k}', 'second_step.x') WHERE oid = 'app.sync_second_step()'::regprocedure`,
     `function app.sync_second_step(): its body does not write second_step.${k}`]),
+  ...[['public.two_factor', 'two_factor_no_truncate'], ['public.passkey', 'passkey_no_truncate']].flatMap(([t, n]): Plant[] => [
+    [`${n} re-pointed at another function`, `DROP TRIGGER ${n} ON ${t}; CREATE TRIGGER ${n} BEFORE TRUNCATE ON ${t} FOR EACH STATEMENT EXECUTE FUNCTION app.guard_second_step_lock()`, `trigger ${n} on ${t}: not BEFORE TRUNCATE FOR EACH STATEMENT running app.refuse_truncate()`],
+    [`${n} fired AFTER, not BEFORE`, `DROP TRIGGER ${n} ON ${t}; CREATE TRIGGER ${n} AFTER TRUNCATE ON ${t} FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate()`, `trigger ${n} on ${t}: not BEFORE TRUNCATE FOR EACH STATEMENT running app.refuse_truncate()`],
+  ]),
   // 13. complete_step_up
   [`${STEP_UP} owned by poly_owner`, `ALTER FUNCTION ${STEP_UP} OWNER TO poly_owner`, `function ${STEP_UP}: owner is poly_owner`],
   [`${STEP_UP} made an invoker`, `ALTER FUNCTION ${STEP_UP} SECURITY INVOKER`, `function ${STEP_UP}: not SECURITY DEFINER`],
