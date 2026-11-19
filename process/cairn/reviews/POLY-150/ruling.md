@@ -445,6 +445,13 @@ The rise over the earlier $72 is the extra design and review cycles, plus the di
 
 ## Addendum 2 (proposed, not in force): "Trust this device" (D2 (b), the Principal's choice)
 
+**Deferred to POLY-154; not built in this loop.** R7's `trustDevice` refusal stands here. The Principal confirmed the box is unticked by default. This addendum is input to POLY-154's ruling.
+
+**seceng's finding, for POLY-154: trust must never be honoured on a magic-link or OAuth sign-in.**
+- twoFactor's widened hold covers `/magic-link/verify` and `/callback/:id` (`SIGN_IN_PATHS`), and the trust check runs on any held path (`index.mjs:28`).
+- On those paths, a trusted device would skip the second step after a sign-in that proved only the mailbox or the provider account, with no password.
+- POLY-154 limits the skip to `/sign-in/email`, and tests that the other two still hold a trusted device.
+
 R7's `trustDevice` refusal stands until the lead relays approval of a shape below. Line references are to better-auth 1.7.18 `plugins/two-factor/{index,verify-two-factor}.mjs` (code-read).
 
 **What BetterAuth already does.**
