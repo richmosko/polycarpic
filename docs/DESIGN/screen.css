@@ -2112,3 +2112,5 @@ ol.backup-codes { margin-top: 0; }
 .dark .modal-layer .je-modal { border: 1px solid var(--border); }
 .second-step-banner > span:not(.icon) { flex: 1; }
 .second-step-banner .btn { flex: none; }
+.entity-menu .popover-item { display: flex; align-items: center; gap: 8px; width: 100%; }
+.entity-menu .entity-menu-check { margin-left: auto; }
