@@ -140,10 +140,23 @@ test.describe('R1.3 the gate while held (Lou)', () => {
       expect(u.searchParams.get('next'), `${label}: next`).toBe(next);
     };
     for (const p of ['/settings/second-step', '/settings/second-step/__data.json']) expect((await request.get(`${base}${p}`, { maxRedirects: 0 })).status(), p).toBe(200);
-    for (const p of ['/settings', '/settings/sessions', '/settings/sessions/__data.json', '/settings/second-step/x', '/entities', '/entities/__data.json', '/dashboard']) {
+    for (const p of ['/settings', '/settings/sessions', '/settings/second-step/x', '/entities', '/dashboard']) {
       const r = await request.get(`${base}${p}`, { maxRedirects: 0 });
       expect(r.status(), p).toBe(303);
       held(r.headers()['location'], p, p);
+    }
+    // A data request (`__data.json`): SvelteKit answers a handle redirect there as 200 JSON {type: "redirect", location}, not a 303. What matters: the body is
+    // a redirect to the set-up route with setup=1, and it carries no page data (no `nodes`) for the held user.
+    for (const p of ['/settings/sessions/__data.json', '/entities/__data.json', '/dashboard/__data.json']) {
+      const r = await request.get(`${base}${p}`, { maxRedirects: 0 });
+      expect([200, 303], `${p} answered ${r.status()}`).toContain(r.status());
+      if (r.status() === 303) { held(r.headers()['location'], p.replace('/__data.json', ''), p); continue; }
+      const body = (await r.json()) as { type?: string; location?: string; nodes?: unknown };
+      expect(body.type, `${p}: the body is a redirect`).toBe('redirect');
+      const to = new URL(body.location ?? '', base);
+      expect(to.pathname, `${p}: to the set-up route`).toBe('/settings/second-step');
+      expect(to.searchParams.get('setup'), `${p}: setup=1`).toBe('1');
+      expect(body.nodes, `${p}: no page data for a held user`).toBeUndefined();
     }
     const slash = await request.get(`${base}/settings/second-step/`, { maxRedirects: 0 });
     expect([200, 303, 308], 'trailing slash: normalised to the exempt path, or held').toContain(slash.status());
