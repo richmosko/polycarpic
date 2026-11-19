@@ -10,7 +10,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-17
+updated: 2026-11-19
 ---
 
 Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict and seceng reviews under `process/cairn/reviews/POLY-86/`). One loop for the batch; add later auth nits here.
@@ -62,3 +62,7 @@ From the POLY-89 loop (merged 2026-11-17, PR #131). `sendSecondStepCode` throws 
 ### @team-lead — 2026-11-17
 
 From POLY-152's ruling review (seceng F3, 2026-11-17): SECURITY R-24 now covers every OAuth callback, not only a first sign-in, because the sign-in service holds one transaction across the provider exchange on every callback (ruling R9). The rate limit and the idle-in-transaction timeout here must cover every callback; say so in the criterion when this issue is started.
+
+### @team-lead — 2026-11-19
+
+From the POLY-149 loop (ruling R3 and its "Decisions for the lead" 4). **Schedule the two purge functions in the worker:** `app.purge_sign_in_record()` (400-day retention and deleted accounts) and `app.purge_tx_identity()`. Neither has a caller today. Until a job calls the first, the 400-day retention is not enforced.

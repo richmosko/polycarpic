@@ -729,3 +729,16 @@ Add new decisions ABOVE this comment, newest first.
 - Go back to the strict type for the sign-in cookies — web would receive the sign-in cookie on every page again, which is the more likely attack and the reason for POLY-153.
 **Cost:** about a quarter-day of work in POLY-97 (seceng's guess); no running cost.
 **Approved by:** the Principal (2026-11-19), on seceng's brief and the lead's recommendation.
+
+### 2026-11-19 — Three limits of the sign-in record and the growing lock are accepted
+**Decision:** three limits found in POLY-149's ruling (`process/cairn/reviews/POLY-149/ruling.md`, seceng's `ruling-review.md` §2.2 and §4) are accepted and stated in SECURITY.
+1. **The backup role reads the sign-in record.** It reads every table, so the record is in every backup and comes back after a restore. The rule becomes: no login role reads the record, except the backup role.
+2. **The sign-in service's own SQL can reset the lock's doubling while no lock is running.** The database cannot check a code, so it recognises a correct-code reset by the shape of the write. It still refuses, for every role, to shorten, clear or replace a lock that is running.
+3. **The migration credential can erase the sign-in record,** as well as someone with full control of the database server (the limit accepted on 2026-11-17). The migration role can act as the table's owner and drop the triggers that make it append-only.
+**Why:** (1) the same credential already reads every session, every second-factor row and all household data; leaving the record out of the backup would let a forced restore erase it. (2) Using it takes a break-in to the sign-in service, which can already create a session for any user; every wrong code, lock and new session still lands in the record. qa measured that only a correct code sends the reset write in normal use (`red-run.md`). (3) That password already reaches every table and every access rule in the app's database.
+**Alternatives considered:**
+- (1) Per-table backup grants that skip the record — weaker: a restore loses the record. About $5 (a guess).
+- (2) A reset counts only if the same transaction creates a session — adds a visible line per reset and no protection; rests on an unmeasured claim that every correct-code path creates a session. About $3 (a guess).
+- (3) An owner the migration role cannot act as — every later change to the table is then made by hand as superuser, and the superuser is still not stopped. About half a day (a guess).
+- (3) Copy the record off the server — the cure for (3) and for the database-server case. Needs log shipping that does not exist. Filed as a follow-up on POLY-103.
+**Approved by:** the Principal (2026-11-19), each on seceng's assessment and the lead's recommendation.

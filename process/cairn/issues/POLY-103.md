@@ -11,7 +11,7 @@ labels: [ops, observability]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-11
+updated: 2026-11-19
 ---
 
 INFRA §6.5: the 5-minute self-check against the public name (issuer matches TLS_MODE), backup and deploy pings, the Resend path for host alerts, the alert list (spool, backup age from last-upload, certificate, disk, slots and WAL, unaccounted poly_backup connections, B2 cap, GitHub token, pending reboot), and the Healthchecks setup checklist. The ledger-chain SEV1 email is POLY-109's.
@@ -27,3 +27,7 @@ INFRA §6.5: the 5-minute self-check against the public name (issuer matches TLS
 ### @team-lead — 2026-11-11
 
 From the POLY-95 loop (ruling F7): alert on `pg_stat_archiver.failed_count` rising, beside the 2-hour spool alert.
+
+### @team-lead — 2026-11-19
+
+From the POLY-149 loop (`process/DECISIONS.md`, 2026-11-19; Principal). **Copy the sign-in record off the server.** `app.sign_in_record` can be erased by the migration credential or by anyone with full control of the database server. When log shipping exists, ship each new record line to a store that no database credential can write or delete, and say in SECURITY what the copy covers. Until then the risk stands as accepted.
