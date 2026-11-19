@@ -222,6 +222,7 @@ const ROWS: Row[] = [
   ['Caddy site block without the headers snippet', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\timport security_headers\n\tbasic_auth', '\tbasic_auth'); }, 'caddy-headers', 'per-site snippet import not checked'],
   ['Caddy snippet lacks nosniff', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\t\tX-Content-Type-Options "nosniff"\n', ''); }, 'caddy-headers', 'snippet contents not checked'],
   ['Caddy snippet adds includeSubDomains', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('max-age=31536000"', 'max-age=31536000; includeSubDomains"'); }, 'caddy-headers', 'HSTS value not exact (ruling: no includeSubDomains/preload)'],
+  ['Caddy snippet lacks X-Frame-Options DENY (POLY-150 RC2)', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace(/\t\tX-Frame-Options "DENY"\n/, ''); }, 'caddy-headers', 'snippet lacks: X-Frame-Options "DENY"'],
   ['Caddy snippet without defer', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\t\tdefer\n', ''); }, 'caddy-headers', 'upstream could override the headers'],
   ['Caddy sets a CSP', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\t\tdefer\n', '\t\tdefer\n\t\tContent-Security-Policy "default-src *"\n'); }, 'caddy-csp', 'Caddy allowed to set or strip the CSP (it is Kit\'s)'],
 ];

@@ -15,6 +15,15 @@ Run on the tree at the test commit, before any build. Every file is shown red fo
 | `tests/db/gate-check.test.ts` | 1 / (all plants) | the new plant `poly_app loses my_second_step` errors on the missing function. `infra/postgres/gate-check.sql`'s own list of ten is the builder's to move to eleven; the plant names the object the gate must print |
 | `tests/db/second-step-flow.test.ts`, `tests/ci/*` | 0 | green: the `totp` helper moved to `helpers/totp.ts` and is re-exported, and `infra/ci/changes.mjs` gained `second-step-screens` (DB_AREAS and the `db-areas.test.ts` row) and `apps/auth/src/` in `TABLE.e2e` (the e2e entry now imports it; 542 / 542) |
 
+## Addendum 1 additions (ruling e3e2b003)
+
+| File | Red | Reason |
+|---|---|---|
+| `apps/web/src/routes/second-step-rc.test.ts` | 4 / 5 | RC2 prerender ban (red: the trees have no held page yet; its plant test passes: the rule sees `export const prerender = true`, a string value and a re-export, and not `ssr`), RC3 (`pagehide` and destroy clearing, `no-store` in the load), RC4 widened (`{@html` across settings, sign-in and `ConfirmItsYou.svelte`) |
+| `tests/infra/lint.test.ts` | 1 / 144 | new case `Caddy snippet lacks X-Frame-Options DENY`: the Caddyfile has none and the lint's `need` list does not require it, so removing it fires no rule. RC2's Caddy half; the e2e header test stays for the CSP |
+
+D5 (lock wording): no test written; the boundary test still bans `locked_until` in sources.
+
 ## Playwright
 
 `playwright test`: **57 passed, 10 red, 4 did not run**. The 4 are specs 4 and 5 (skipped after spec 3 failed in a serial describe) and the two `rate-limit` tests (a failed dependency), so that project was run on its own with `--no-deps` (below). Before my changes the same suite was 57 / 57 in 24 s, so nothing existing went red.
