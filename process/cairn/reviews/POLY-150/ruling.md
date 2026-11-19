@@ -357,3 +357,55 @@ seceng reviewed 56eec7fa. Its D1 and D2 are this file's D2 and D3. It has not ye
    - **Make new codes needs a browser test.** It is the second place backup codes reach the screen, so RC3's controls apply to it. Spec 1 extends: within Enid's 5-minute window, Make new codes asks her password and shows ten codes that differ from the first set. Then RC3's leave, back and forward steps find no code in the DOM, and one of the old codes is refused at a later held sign-in.
    - **Remove on the last method, and Remove while codes are paused, need no browser test.** The database refuses both whatever the screen shows: POLY-89 R3 #7, and POLY-149's delete guard, both already tested. The screen's part is cosmetic.
    - What decides each action's state is one pure function in `@poly/auth/web` (or the panel's module): it takes `my_second_step`'s row and `recentAuthOk`, and returns `shown`, `disabled` or `hidden` per action. It gets a unit test covering `needs_a_method` with one method and with two, `codes_paused`, and `recentAuthOk` false. That and `my_second_step`'s `tests/db` coverage are enough.
+
+## Addendum 3 (the Principal's review, 2026-11-19): proposed, not in force
+
+Nothing in R1–R10 changes until the lead relays the Principal's go-ahead. Then this addendum is folded into R1–R10, and the ruling is re-issued whole.
+
+### Part 1 (decided by the Principal): one set-up dialog
+
+**Routes.**
+- `/settings/second-step` stays as the route, but becomes an ordinary app-shell page holding the Settings → Sign-in and second step panel (R5). It is no longer a bare page.
+- The set-up becomes `SecondStepSetup.svelte`, a dialog. It runs R3's steps and calls unchanged, and it is opened:
+  - by the panel's **Set up second step** button;
+  - by a message with a button on `/entities`, shown while `second_step_at` is NULL;
+  - by `?setup=1` on `/settings/second-step`. The gate (R1, option (a) below) and the end of sign-up navigate there. The parameter is a display hint only.
+- Opened from an action, the dialog calls back into that action when it finishes. It needs no `next`.
+- `/sign-in/second-step` is unchanged and stays a bare page.
+
+**Where the QR code, key and backup codes render.** Only inside the dialog's component state. No host page's `load` returns them; R2's columns are the only data. Closing the dialog, finishing it, destroying it on navigation, or `pagehide` all clear the URI, the key and the codes (RC3, now for the dialog). After a successful `verify-totp`, the host calls `invalidateAll()` so its data loads under the rotated handle.
+
+**How RC3 and R10 hold on an app page.**
+- **Every signed-in HTML response carries `Cache-Control: no-store`,** set once in `hooks.server.ts`. The rule then holds on any page that mounts the dialog, now or later, and it suits pages that show private books anyway. The cost is that no signed-in page enters the back-forward cache.
+- RC3's leave, back and forward test runs with the dialog opened on `/settings/second-step` and again on `/entities`.
+- **Boundary tests widen from two routes to all of web:**
+  - no server file anywhere under `apps/web/src` names `/api/auth` or calls the service, apart from `hooks.server.ts`'s 404 for the tree;
+  - `{@html` is banned in every `.svelte` file under `apps/web/src`. `Icon.svelte` already renders without it, per SECURITY C-41;
+  - the prerender ban covers `routes/**`.
+  
+  qa's existing `second-step-boundary.test.ts` and `second-step-rc.test.ts` change scope accordingly.
+- R10's page-data test adds `/entities`. The frame header test (R10, RC2) adds it too.
+
+**Cost of Part 1 against R11 (guess).** About +$7 and +25 minutes: the dialog instead of a page, the Entities message, the wider boundary tests, and the qa rework of two test files and spec 1.
+
+### Part 2 (to assess): a per-entity gate
+
+Who is gated today: a user with no second step who holds manager or owner outside the own-Person exemption. After POLY-89 that is in practice only a manager after `reset-mfa`: a seat as manager or owner already needs a second step (POLY-89 R3 #10), and inviting needs an enrolled inviter (#11). The threat is someone holding only that user's password.
+
+**How strong today's redirect is.** It is web-only, but it is **one default-deny choke point**. `hooks.server.ts` runs before every route and redirects everything except `/settings/second-step`, `/sign-in/*`, `/sign-up` and `/healthz`, so a new page is covered without anyone remembering. A gap needs a hooks bug or a new public path. Behind it, the database would show such a user every entity they belong to.
+
+| Option | What it protects, and what a gap exposes | Cost (guess) | Fits this loop? |
+|---|---|---|---|
+| **(a)** Keep the redirect; its target becomes `/settings/second-step?setup=1` | As today: one choke point, and a gap means a hooks bug. The sidebar bounces back to Settings, which is not what the Principal asked for. | +$1, 5 min | Yes |
+| **(b)** A per-entity gate in web's loaders | Every loader, action and cross-entity query (Entities list, selector, later rollups and reports) has to check each entity itself. **One missed check shows a shared entity's books to someone holding only the password.** It is default-allow, and every future page pays for it. | about $20, 1 h now, plus a review on every later page | Could, but not recommended |
+| **(c)** A per-entity gate in the database | Every tenant policy already routes through `app.has_role()` and `app.visible_entities()` (0003). For a held user, both answer only for entities where `app.own_person_exempt()` is true. A web bug or a missed page then shows nothing: the rows are invisible to the session. | about $45 and 2 h 30 min, plus a seceng review cycle | **Its own issue** |
+
+**What (c) needs, for that issue's ruling.**
+- `app.enter_session` computes `held = app.second_step_required()` once and writes it on the marker row (`app.tx_identity`), so the policies do not re-run it per row.
+- `has_role` and `visible_entities` read the flag for user markers only, leaving worker and system markers unchanged.
+- The greyed-out list in the selector and on Entities comes from one definer that returns, for the held entities, `id`, `name` and `type`, and nothing below them. seceng should judge whether names are too much. A count is the narrower answer.
+- Tests: the permission matrix (`tests/db/helpers/matrix.ts`) gains a held actor across every tenant table; a held user's writes to the own Person pass.
+- Web then drops the redirect: hooks passes a `held` flag to the shell, which greys the rest out.
+- **One case to state:** if the user's own Person is itself shared, nothing is usable, and the result equals today's redirect.
+
+**Recommendation.** Ship (a) in this loop, with the dialog. File (c) as its own issue, with a ruling and seceng's review, before POLY-110 and POLY-144 make shared entities common. Do not build (b): it trades a single default-deny check for one in every loader.
