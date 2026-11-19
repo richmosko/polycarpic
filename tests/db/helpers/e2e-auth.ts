@@ -11,7 +11,8 @@ export async function e2eAuth(db: string, origin: string, secret: string, sendSe
   configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db) });
   // The seed's instance has its own memory limiter, separate from the running service's (the one the specs share a bucket on, R8); it is off here
   // because the seed signs in a dozen users from one address in a few seconds, as the db suites' own instances do (S6: in the test's options, not the defaults).
-  const auth = await createAuth({ ...authOptions({ secret, baseURL: origin, tlsMode: 'private-ca', requireClientIp: false, sendMagicLink: async () => {}, ...(sendSecondStepCode ? { sendSecondStepCode } : {}) }), rateLimit: { enabled: false } });
+  const opts = authOptions({ secret, baseURL: origin, tlsMode: 'private-ca', requireClientIp: false, sendMagicLink: async () => {}, ...(sendSecondStepCode ? { sendSecondStepCode } : {}) });
+  const auth = await createAuth({ ...opts, rateLimit: { ...opts.rateLimit!, enabled: false } });
   return {
     hash: async (password: string): Promise<string> => (await auth.$context).password.hash(password),
     /** POST /api/auth/sign-in/email through handleAuthRequest; the Response carries both Set-Cookie lines. */

@@ -84,11 +84,11 @@ describe('R2 app.my_second_step()', () => {
   const fresh = async (o: { enrolled?: boolean } = {}) => { const u = await fx.user(o); return { ...u, sid: fx.session(u.id, true) }; };
 
   it('catalog: owner poly_govern, SECURITY DEFINER, search_path empty, EXECUTE poly_app only [red if: the function is missing, owned wrongly or granted to PUBLIC or another role]', () => {
-    const r = must(`SELECT pg_get_userbyid(proowner), prosecdef, proconfig::text, (SELECT string_agg(grantee::regrole::text, ',' ORDER BY grantee::regrole::text) FROM aclexplode(coalesce(proacl, acldefault('f', proowner))) WHERE privilege_type = 'EXECUTE' AND grantee <> proowner) FROM pg_proc WHERE oid = to_regprocedure('app.my_second_step()')`, e.db).rows[0];
+    const r = must(`SELECT pg_get_userbyid(proowner), prosecdef, array_to_string(proconfig, ','), (SELECT string_agg(grantee::regrole::text, ',' ORDER BY grantee::regrole::text) FROM aclexplode(coalesce(proacl, acldefault('f', proowner))) WHERE privilege_type = 'EXECUTE' AND grantee <> proowner) FROM pg_proc WHERE oid = to_regprocedure('app.my_second_step()')`, e.db).rows[0];
     expect(r, 'app.my_second_step() exists').toBeTruthy();
     expect(r![0]).toBe('poly_govern');
     expect(r![1]).toBe('t');
-    expect(r![2]).toMatch(/search_path=""|search_path=''/);
+    expect(r![2]).toMatch(/search_path=""/);
     expect(r![3]).toBe('poly_app');
   });
   it('returns exactly eight columns: no secret, backup codes, public key, credential id, code hash, attempt count or email (S16) [red if: a column is added or renamed]', () => {
@@ -222,6 +222,7 @@ describe('R7 trustDevice is refused on both verify paths', () => {
   it.each(PATHS)('%s with trustDevice: true answers 400 trust_device_refused: no session, no handle, no trust_device cookie; the same body without it signs in [red if: a 30-day trusted-device skip is possible]', async (path) => {
     const u = e.seedUser();
     const { secret, backupCodes } = await enrolTotp(e, withMail, u, mails);
+    const enrolSessions = e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`); // the enrolment's own session stays
     const held = await heldSignIn(e, withMail, u.email);
     const code = path === PATHS[0] ? totp(secret) : backupCodes[0]!;
     const r = await e.handle(post(path, { code, trustDevice: true }, held.cookie), withMail);
@@ -229,7 +230,7 @@ describe('R7 trustDevice is refused on both verify paths', () => {
     expect((await json(r)).code).toBe('trust_device_refused');
     expect(hasSessionCookie(r)).toBe(false);
     expect(r.headers.getSetCookie().join('\n')).not.toMatch(/trust_device|poly_handle=[^;]/);
-    expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`)).toBe(0);
+    expect(e.count(`SELECT 1 FROM public.session WHERE user_id = '${u.id}'`), "no new session from the refused code").toBe(enrolSessions);
     for (const v of ['true', 1, 'yes']) {
       const again = await e.handle(post(path, { code, trustDevice: v }, held.cookie), withMail);
       expect(again.status, String(v)).toBe(400);
