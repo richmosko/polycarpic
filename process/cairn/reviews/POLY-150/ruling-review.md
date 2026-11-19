@@ -292,3 +292,9 @@ The formal build review waits for the gate.
 - P1: the selector's label comes from the session row, no entity query runs on that route, and the label carries no id.
 - P2: `next` passes through `safe-next.ts` at both the gate and the dialog, with `//evil` giving `/`.
 - D1 (a) is recorded. ACCEPT.
+
+**Gate assertion for data requests at `cfc65712`: ACCEPT** (spec and code-read; I ran nothing).
+- **Why it is the right test.** The gate returns in `handle` before `resolve`, so no `load` runs for a held user. A 200 `{type: "redirect"}` is how SvelteKit carries a redirect on a data request. Allowing 200 or 303, both checked to reach `/settings/second-step?setup=1` and anything else failing, matches R1.3.
+- **Recommended, not blocking.** Two cheap additions would make it check "no page data" directly rather than only the absence of the `nodes` key a SvelteKit version happens to use:
+  - assert the body's keys are a subset of `{type, location, status}`;
+  - assert the raw body text contains no "Shared Co".
