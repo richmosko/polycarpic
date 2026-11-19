@@ -28,8 +28,8 @@ export const DB_AREAS = {
     paths: [/^packages\/tenancy\//, /^tests\/db\/pgtap\//],
   },
   migrate: {
-    tests: T(['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'runner', 'template-clone']),
-    paths: [],
+    tests: T(['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'runner', 'template-clone']),
+    paths: [/^infra\/postgres\/gate-check\.(sh|sql)$/],
   },
   ops: {
     tests: T(['ops-status', 'ops-hardening']),
