@@ -2,7 +2,7 @@
   // POLY-150 Addendum 3 A2: Confirm it's you before a step-up action. Password and an authenticator code, or a passkey with user verification. Opening it
   // sends `begin` for the method shown first; switching method begins again. After a pass the host's data reloads (invalidateAll) and the action that
   // opened the dialog runs as a new request, never a replay. Same mounting (portal on document.body, no page form, fetch only to /api/auth) and clearing
-  // as the set-up dialog: the password and code live only here and go on every way out. The backup-code option waits on D7.
+  // as the set-up dialog: the password and code live only here and go on every way out. A backup code is the lost-phone path (D7 b).
   import { Dialog } from 'bits-ui';
   import { invalidateAll } from '$app/navigation';
   import { onDestroy, onMount } from 'svelte';
@@ -27,13 +27,14 @@
     onclose: () => void;
   } = $props();
 
-  type Method = 'totp' | 'passkey';
+  type Method = 'totp' | 'backup_code' | 'passkey';
   // svelte-ignore state_referenced_locally
   let method = $state<Method>(hasApp ? 'totp' : 'passkey');
   let challengeId = $state('');
   let options = $state<RequestOptionsJSON | null>(null);
   let password = $state('');
   let code = $state('');
+  let backupCode = $state('');
   let error = $state('');
   let paused = $state(false);
   let signInAgain = $state(false);
@@ -42,6 +43,7 @@
   const clear = () => {
     password = '';
     code = '';
+    backupCode = '';
     challengeId = '';
     options = null;
   };
@@ -95,9 +97,10 @@
     busy = true;
     error = '';
     try {
-      const r = await api('POST', '/second-step/reauth', { challengeId, password, code });
+      const r = await api('POST', '/second-step/reauth', method === 'backup_code' ? { challengeId, password, backupCode } : { challengeId, password, code });
       password = '';
       code = '';
+      backupCode = '';
       if (r.ok) return await passed();
       refused(r); // a wrong password or code does not consume the challenge: the same one is retried
     } finally {
@@ -156,6 +159,23 @@
               <button type="button" class={primary} disabled={busy} onclick={usePasskey}>{hasApp ? 'Use a passkey' : 'Use your passkey'}</button>
             </div>
           </div>
+        {:else if method === 'backup_code'}
+          <form onsubmit={submit} class="flex flex-col gap-3">
+            <div class="flex flex-col gap-1">
+              <label for="ciy-pw-b">Password</label>
+              <input id="ciy-pw-b" class={field} type="password" autocomplete="current-password" bind:value={password} required />
+            </div>
+            <div class="flex flex-col gap-1">
+              <label for="ciy-backup">Backup code</label>
+              <input id="ciy-backup" class="{field} font-mono" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="xxxxx-xxxxx" bind:value={backupCode} aria-invalid={error ? 'true' : undefined} required />
+              {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
+            </div>
+            <p class="text-muted-foreground text-xs">Each backup code works once. <button type="button" class={link} onclick={() => begin('totp')}>Use your authenticator app</button></p>
+            <div class="flex justify-end gap-2">
+              <button type="button" class={ghost} onclick={close}>Cancel</button>
+              <button type="submit" class={primary} disabled={busy || !challengeId}>Confirm</button>
+            </div>
+          </form>
         {:else}
           <form onsubmit={submit} class="flex flex-col gap-3">
             <div class="flex flex-col gap-1">
@@ -168,7 +188,8 @@
               {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
             </div>
             <p class="text-muted-foreground text-xs">
-              <button type="button" class={link} onclick={() => begin('passkey')}>Use a passkey instead</button>
+              <button type="button" class={link} onclick={() => begin('passkey')}>Use a passkey instead</button> ·
+              <button type="button" class={link} onclick={() => begin('backup_code')}>Use a backup code</button>
             </p>
             <div class="flex justify-end gap-2">
               <button type="button" class={ghost} onclick={close}>Cancel</button>
