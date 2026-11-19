@@ -159,6 +159,7 @@ test.describe('C5 spec 2: enrol by passkey from the Entities message (Pia)', () 
     await dlg.getByLabel('Code from the email').fill(await codeFor('pia@e2e.test', mark));
     await slot('/second-step/confirm-code');
     await dlg.getByRole('button', { name: 'Continue' }).click();
+    await dlg.getByRole('radio', { name: /passkey/i }).click(); // DESIGN defaults to the authenticator app
     await dlg.getByLabel('Name this passkey').fill('Pia laptop');
     await dlg.getByRole('button', { name: 'Create passkey' }).click();
     await expect.poll(() => registrations.length, { timeout: 15_000 }).toBeGreaterThan(0);

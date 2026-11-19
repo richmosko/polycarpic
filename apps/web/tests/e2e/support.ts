@@ -140,8 +140,9 @@ export async function enrolByAppToCodes(page: Page, email: string): Promise<{ ke
   await dlg.getByLabel('Code from the email').fill(code);
   await slot('/second-step/confirm-code');
   await dlg.getByRole('button', { name: 'Continue' }).click();
-  await dlg.getByRole('button', { name: /show the qr code|authenticator app/i }).first().click();
-  await dlg.getByLabel('Your password, again').fill(PASSWORD); // step 3 asks it again for /two-factor/enable (R3.3)
+  await dlg.getByRole('radio', { name: /authenticator app/i }).click(); // the default, chosen explicitly
+  await dlg.getByLabel('Your password, again').fill(PASSWORD); // step 3 asks it again for /two-factor/enable (R3.3), then shows the QR code
+  await dlg.getByRole('button', { name: 'Show the QR code' }).click();
   const key = ((await dlg.getByTestId('totp-key').textContent()) ?? '').replace(/\s/g, '');
   expect(key, 'the typed-out key').toMatch(/^[A-Z2-7]{16,}$/);
   await dlg.getByLabel('Enter the 6-digit code it shows').fill(totp(key));
