@@ -319,3 +319,14 @@ seceng reviews this addendum; the pin guards the lock.
 Both go in one code commit and one re-gate. Editing 0017 is safe because it has not merged. A dev database that already applied it from this branch is rebuilt (`check-migrations` flags the changed hash).
 
 **Addendum 7, item 1, amended (seceng ruling-review §15):** the `LOCK TABLE app.tx_identity IN SHARE ROW EXCLUSIVE MODE` is 0017's first statement, before the REVOKEs, rather than just before the delete. 0017 then takes its strongest lock on `tx_identity` first and never upgrades a weaker lock it already holds, so a concurrent transaction cannot deadlock against it. The rest of item 1 is unchanged.
+
+**Addendum 7, item 1, corrected (backend-lead's measurement at 2d66bbb6):** a DELETE whose WHERE reads a column also needs a SELECT policy that shows the row. With FORCE RLS and only the DELETE policy, the owner saw no rows, deleted nothing, and the CHECK refused with 23514 (reproduced). So 0017 runs, as poly_owner and in this order:
+1. `LOCK TABLE app.tx_identity IN SHARE ROW EXCLUSIVE MODE`, the file's first statement;
+2. the REVOKEs, the policy drop on `email_challenge` and the function drop, as before;
+3. `CREATE POLICY tx_identity_drop_web_read ON app.tx_identity FOR SELECT TO poly_owner USING (kind = 'web')`;
+4. `CREATE POLICY tx_identity_drop_web ON app.tx_identity FOR DELETE TO poly_owner USING (kind = 'web')`;
+5. `DELETE FROM app.tx_identity WHERE kind = 'web'`;
+6. `DROP POLICY tx_identity_drop_web` and `DROP POLICY tx_identity_drop_web_read`;
+7. the kind CHECK, then `audit_membership`.
+
+Both temporary policies show only `web` rows and exist only inside the migration's transaction. Both are dropped before the CHECK. pgTAP 07's line (no policy on `app.tx_identity` names poly_owner) covers both. The test is unchanged: a fresh committed `web` marker migrates through 0017.
