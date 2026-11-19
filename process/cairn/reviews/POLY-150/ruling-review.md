@@ -132,3 +132,74 @@
 - **R-26:** no lock time is shown, and `trustDevice` is refused.
 - **§4.1:** sign-up asks for the code (D1), passkey-only users get no codes (D2), and suppression is visible to its own user.
 - **C-07:** the second-step pages are covered, and no page there may be prerendered.
+
+---
+
+## 7. Final verdict at `ee09c8d9` (the re-issue at `48acb75c` plus Addendum 1)
+
+**Verdict: ACCEPT `ee09c8d9`. Nothing blocks.** The ruling file is unchanged after it. This section replaces §1's list of open changes. §2–§4 still give my reasons; their numbering follows the ruling at `56eec7fa`, so my D1 and D2 there are the ruling's D2 and D3 now.
+
+### 7.1 RC1–RC4
+| Item | Ruled | Result |
+|---|---|---|
+| RC1 | pgTAP 11 goes to eleven functions, and `sign-in-controls-pins` moves with it. The safety property is stated: it reads only its own user and session, writes nothing, carries the exact-call check and returns no secret | **Met.** |
+| RC2 | The CSP header is tested on three pages from the HTTP response; `X-Frame-Options: DENY` in Caddy with a lint entry; no new page prerenders | **Met. Keep the Caddy header.** It costs one line, covers old browsers behind Caddy, and does not clash with the `caddy-csp` lint, because it is not a CSP. **The prerender ban is tested as I asked, indirectly:** e2e runs the built server, a prerendered page is served as a static file with only a `<meta>` CSP (spec), and the header test on those three pages then fails. A future page outside the three has no such test. Acceptable. |
+| RC3 | `load` sets `no-store`; the codes are cleared on `pagehide`, on destroy and on Finish; a test follows a link away, then goes back and forward | **Met.** Clearing on `pagehide` is the control that counts, and the ruling says so. |
+| RC4 | `{@html` is banned under `settings` and `sign-in`, and in `ConfirmItsYou.svelte`; a passkey name with a script-like payload is seeded | **Met.** |
+
+### 7.2 What the re-issue changed
+- **Resend goes back to the password step; `enable` asks for the password again (R3).** Accept. These are the stronger choices. The page keeps no password beyond its own request, so no password sits in component state, and none is left in memory after the request. The cost is that the user types the password up to three times. Each password check needs a session; `send-code` is in `LIMITED`, and `enable` also needs a live grant, so neither gives a password-guessing route to anyone without a session and the emailed code.
+- **One lock state; every state offers code, backup code and passkey; the page is the same for every caller (R7).** Accept. This closes W1 and checklist item 10.
+- **`resend_available_at` is NULL for both "the 24-hour rule suppresses" and "nothing suppresses" (R2).** Accept. It shows only the published 15-minute cap, and only to the session holder. This replaces my note N1.
+- **`codes_paused`, a boolean, on Settings (R2).** Accept. Its reader holds a session, so has already passed the second step. It shows no time.
+- **A compromised web can forge `x-forwarded-for` to auth, which is on the same compose network (R8).** Accept, as stated. It reaches the rate-limit bucket and the address in the sign-in record, nothing that grants access. It goes into R-2 at the build review.
+- **`Cache-Control: no-store` on every `/api/auth` response (R10, D4).** Accept.
+
+### 7.3 D1: Confirm it's you. Recommend (b), the dialog in its interim, no-input state
+- **Mechanism (code-read).**
+  - Nothing writes `recent_auth_at` for an enrolled user after the first 5 minutes, and BetterAuth 1.7.18 has no way to re-check an existing session.
+  - Under both options, everything in the step-up class is refused after that window: remove a method, make new backup codes, add a passkey, and the other step-up routes.
+  - The database refuses these anyway (C-03). The dialog changes only what the user is told.
+- **Who it affects.**
+  - **The real user, after a loss.** A user whose phone is stolen cannot remove that authenticator. A user whose backup codes leak cannot replace them.
+    - Their remedy is the operator's `reset-mfa`, plus ending their own sessions.
+    - The stolen phone keeps producing valid codes until the reset. A thief who also has the password can sign in in that time.
+  - **An attacker holding a stolen session** also cannot change or remove methods. That is a gain.
+- **What anyone reaches:** nothing new. The failure is closed.
+- **The stronger option (a), POLY-151 now.** The service would stamp `recent_auth_at` on its own word, because the database cannot check a TOTP code. That proof needs its own design and review.
+  - Cost: about +$35 and 1 h 45 min (the architect's guess), and a second ruling on the critical path of a loop that is already the longest so far.
+  - A rushed proof design is the larger risk to the Principal.
+- **Recommend (b),** on two conditions the lead should carry:
+  - POLY-151 lands before POLY-110 and POLY-144, as already filed;
+  - INFRA's `reset-mfa` runbook says how the operator checks who is asking, since that runbook is the only recovery path until then.
+
+### 7.4 D5: what a locked person is told. Recommend (b), coarse bands, with conditions
+- **Mechanism.**
+  - The lock caps guesses whatever the screen says (C-88).
+  - A refusal during a lock is not counted, so someone holding the password can already find the end of a lock by retrying. Each try costs a password sign-in, at 5 per minute per address under `LIMITED`, and someone using many addresses goes faster.
+  - Since they caused the lock, polling also tells them its length, and so whether the real user reset the doubling. That holds even under (a). It is effort, not something they could not otherwise learn.
+- **Who learns what.**
+
+  | Option | What a password holder learns | What the real user learns |
+  |---|---|---|
+  | (a) | Nothing from the screen | Nothing, for up to a day |
+  | (b) | One of three bands, saving some polling | Whether to wait minutes, hours or until tomorrow |
+  | (c) | The exact second, and the reset signal directly | The exact time |
+
+- **What none of them reach:** none adds a guess or shortens a lock.
+- **The security cost of (b) or (c) is mostly the new code path, not the wording.**
+  - The after-hook reads the hold cookie and looks up a user's `locked_until`.
+  - If it trusted an unsigned or expired hold, anyone could ask about any user. Only one fact would leak: whether that user is locked, and roughly how long.
+- **Conditions for (b):**
+  1. Read the hold with BetterAuth's own signed-cookie check, never by parsing the value. Then match the live `verification` row by its exact identifier, unexpired.
+  2. Add the field only to BetterAuth's lock refusal, never to any other answer.
+  3. Run the tests the ruling lists: no field with no hold cookie, a forged one, an expired one or a session.
+  4. If the after-hook does not see the thrown refusal, put the code in `handleAuthRequest` under the same conditions. Do not loosen them.
+- **The stronger option (a):** costs nothing and adds no code path. The usability cost is a locked user retrying for up to a day, or asking the operator for a `reset-mfa` they don't need. That reset path is the one an attacker can try to talk the operator into, so it widens what the operator has to defend.
+- **(c)** gives the attacker convenience over (b) and the real user little more. I would not take it.
+- **The recommendation is (b).** (a) is the right choice if the Principal prefers no new code reading lock state in this loop.
+
+### 7.5 Tags
+- Code-read: the C-88 retry behaviour, R8's network reach, and the absence of any `recent_auth_at` writer.
+- Spec: serving a prerendered page as a static file with only a `<meta>` CSP, and the back-forward cache's handling of `no-store`.
+- Guessed: the costs in §7.3 and §7.4, which are the architect's.
