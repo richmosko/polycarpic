@@ -790,3 +790,47 @@ With R6's interim state removed (−$3), the loop total on the recommended optio
 
 5. **BetterAuth's sign-in verify still accepts a reused code within its window** (`totp/index.mjs:157-160`). A3.4 only records the step. Making sign-in refuse a reused step means a before-hook on `/two-factor/verify-totp` that reads `step_up_totp`. That is a change to BetterAuth's sign-in path, for its own issue.
 6. **`/change-email`** must not be enabled until it sends a security notice to the old address and writes a record row (H.4).
+
+## Addendum 4: the re-check routes' request and response shapes (Addendum 3 A1)
+
+The Principal accepted Addendum 3 with H.1's limit (`process/DECISIONS.md` @ cb2ae18f). This addendum fixes the wire shapes, so the dialog (26895352) and the routes meet. It keeps the dialog's assumptions where they are sound: `begin` answers `{challengeId, options?}`, and failures read `step_up_failed`, plus the lock as 429 `ACCOUNT_TEMPORARILY_LOCKED`.
+
+**Every refusal body is `{code, message}`, with `message` equal to `code`,** as the anchor's refusals are today (`anchor.ts`'s `refusal`). The dialog branches on `status` and `code` only, and never shows `message`. A success sets no cookie and does not rotate the session.
+
+| Route | Request body | 200 |
+|---|---|---|
+| `POST /api/auth/second-step/reauth/begin` | `{method: 'totp' \| 'passkey'}` (`'backup_code'` once D7 is decided (b)) | `{challengeId: string (uuid), options?: PublicKeyCredentialRequestOptionsJSON}`. `options` is present for `passkey` only: user verification `required`, `allowCredentials` the user's passkeys, the 32-byte challenge base64url-encoded. |
+| `POST /api/auth/second-step/reauth` | `{challengeId, password, code}`, with `code` six digits as a string. `{challengeId, password, backupCode}` once D7 is decided (b). | `{status: true}` |
+| `POST /api/auth/second-step/reauth/passkey` | `{challengeId, response: AuthenticationResponseJSON}` (`@simplewebauthn/browser`'s `startAuthentication` output, unmodified) | `{status: true}` |
+
+**Errors** (the same on all three routes unless the row says otherwise):
+
+| Status | `code` | When | The dialog |
+|---|---|---|---|
+| 400 | `invalid_request` | The body is missing a field, has an extra field, or fails its type: `challengeId` not a uuid, `code` not 6 digits, both `code` and `backupCode` present, or `method` unknown. | A generic failure. This is a client bug, never a user error. |
+| 400 | `method_refused` | `method: 'backup_code'` or a `backupCode` body while D7 is undecided or decided (a). | It never sends these. |
+| 401 | BetterAuth's own | No session. | Back to `/sign-in`. |
+| 403 | `no_second_step` | `second_step_at` is NULL. | It is never opened for such a user. |
+| 403 | `method_unavailable` | `begin` for a method the user has not set up (`begin_step_up`'s refusal). | It offers only `mySecondStep`'s methods. |
+| 403 | `password_required` | The user has no password. Not reachable in this loop (A1). | "Sign in again". |
+| 403 | `step_up_failed` | A wrong password, a wrong code, a TOTP step that is not later than the last one accepted, a failed or foreign passkey assertion. **One code for all of them** [M6]. | DESIGN's single message, with no count. |
+| 403 | `challenge_expired` | The challenge is missing, used, expired, another session's, or for another method. | It calls `begin` again and says "Try again". The code tells nothing about the password or the factor. |
+| 429 | `ACCOUNT_TEMPORARILY_LOCKED` | The code paths during a lock, on `begin` (method `totp`) and on `/reauth`. The body is `{code, message}` with **no `pausedFor`**: D6's band is only for a held sign-in with no session, and this caller has one. | The locked message, with the passkey offered if the user has one. |
+| 429 | none (BetterAuth's limiter: `{message}` only, code-read `rate-limiter/index.mjs:65`) | `LIMITED`'s 5 per 60 s. | "Too many attempts. Wait a minute and try again." It tells this from the lock by the absence of `code`. |
+| 5xx | — | Anything else, which rolls the transaction back. | A generic failure. |
+
+**How the service tells the two refusals apart.** `complete_step_up` raises 42501 with one of two fixed messages, which never reach the client:
+- `step_up_challenge` for the challenge conditions → `challenge_expired`;
+- `step_up_refused` for everything else (no marker, no second step, an earlier stamp, the lock, the step guard) → `step_up_failed`, or the lock refusal when the lock holds.
+
+A raise rolls back the transaction, so a TOTP step it refused is not recorded either.
+
+**When a challenge is consumed:**
+- **Consumed:** on success, by `complete_step_up`; and by a failed passkey assertion, committed through `COMMIT_HEADER` (A1).
+- **Not consumed:** by a wrong password or a wrong TOTP code. The dialog can retry on the same `challengeId` within its 5 minutes, and the shared counter and lock bound the guesses (A4).
+
+**Tests** (added to A6):
+- one per row of the errors table, asserting status and `code`;
+- the lock refusal on `/reauth` carries no `pausedFor`;
+- a wrong code followed by the right code on the same `challengeId` passes;
+- a used `challengeId` answers `challenge_expired`.
