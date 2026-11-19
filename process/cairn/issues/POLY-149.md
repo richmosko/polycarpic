@@ -1,7 +1,7 @@
 ---
 id: POLY-149
 title: Stage 2 revocation and docs
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-148, POLY-89, POLY-152, POLY-153]
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [process/cairn/issues/POLY-149.md, process/cairn/reviews/POLY-149/**, apps/auth/**, apps/web/**, apps/worker/**, packages/**, infra/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, bin/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**]
 labels: [security, auth]
 priority: P1
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/138
 created: 2026-11-13
 updated: 2026-11-19
 ---
@@ -83,3 +83,7 @@ From the POLY-153 loop (`process/cairn/reviews/POLY-153/`). Two additions to thi
 ### @team-lead — 2026-11-19
 
 Feature started. Branch: `feature/poly-149-stage-2-revocation-and-docs`. Stages: POLY-149a (ruling), b (security review), c (tests), d (build), e (deploy gate and cost), f (verdict).
+
+### @team-lead — 2026-11-19
+
+PR opened: https://github.com/richmosko/polycarpic/pull/138. Gate code sha 1e832bbc; docs and tracker only since.

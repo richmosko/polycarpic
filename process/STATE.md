@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-149-stage-2-revocation-and-docs`
 - **Started:** 2026-11-19
 - **Goal:** `poly_app` loses every grant on BetterAuth's tables and every `enter_*` but `enter_session`; the second-step lock grows and an uneditable sign-in record is kept. Loop 3 of 3 of stage 2; its merge lifts the deploy gate.
-- **Status:** In Progress
+- **Status:** In Review — PR [#138](https://github.com/richmosko/polycarpic/pull/138)
 
 _Standing context. POLY-153 (Web enters by handle) merged 2026-11-19 via PR [#136](https://github.com/richmosko/polycarpic/pull/136) — ARCH 1.20.0, SECURITY 1.12.0, INFRA 1.3.15._
 
