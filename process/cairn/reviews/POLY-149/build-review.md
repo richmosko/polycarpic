@@ -123,3 +123,5 @@ Read: `git diff 9fc167f4 1e832bbc -- packages`, 12 lines in 0016 and 0017, and p
 - **Nothing else in `packages` changed** since my ACCEPT at `9fc167f4`.
 
 **ACCEPT `1e832bbc`**, once qa's re-gate reports green on that sha with the counts in `gate.md`. If a count drops or a plant stops failing, this acceptance does not hold until I have read why.
+
+**Final: ACCEPT `1e832bbc`.** qa's re-gate (`gate.md` at `34d31965`) is green with no count dropped (db 1057 → 1059, e2e 57/0/0), and Addendum 7's tests pass.
