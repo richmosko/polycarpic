@@ -19,6 +19,8 @@ const mails: { email: string; code: string }[] = [];
 beforeAll(async () => { e = await boot(); db = cloneMigrated(); fx = fixture(db, 1494); });
 afterAll(() => teardown(e));
 
+/** A user with no session ever (the fixture's user() enters by handle and so leaves a record row of its own). */
+const plainUser = async () => { const id = crypto.randomUUID(); must(`INSERT INTO public."user" (id, name, email, email_verified) VALUES ('${id}', 'P', 'p${id}@qa.test', true)`, db); return { id }; };
 const asAuth = <T>(fn: (q: Q) => Promise<T>, commit = false) => tx(db, 'poly_auth', fn, commit);
 const newSession = (q: Q, userId: string, ip: string | null = '203.0.113.9', ua: string | null = 'QA Browser/1.0') =>
   q(`INSERT INTO public.session (user_id, token, expires_at, ip_address, user_agent) VALUES ($1, $2, now() + interval '1 day', $3, $4) RETURNING id`, [userId, `t${Math.random()}`, ip, ua]).then((r) => r.rows[0].id as string);
@@ -28,7 +30,7 @@ const RUNTIME = LOGINS.filter((r) => r !== 'poly_backup');
 
 describe('every committed session INSERT leaves exactly one record row, written by the database', () => {
   it('as poly_auth: insert, attach, delete, commit: one row remains with the session id, the copied address and browser, and created_at from the database clock [red if: no trigger, or it copies NEW.created_at]', async () => {
-    const u = await fx.user(); let sid = '';
+    const u = await plainUser(); let sid = '';
     await asAuth(async (q) => { sid = await newSession(q, u.id); await attach(q, sid, newHandle()); await q('DELETE FROM public.session WHERE id = $1', [sid]); }, true);
     const r = recs(u.id);
     expect(r.length).toBe(1);
@@ -39,12 +41,12 @@ describe('every committed session INSERT leaves exactly one record row, written 
     expect(Number(must(`SELECT extract(epoch FROM (clock_timestamp() - created_at)) FROM app.sign_in_record WHERE user_id = '${u.id}'`, db).rows[0]![0])).toBeLessThan(5);
   });
   it('a rolled-back insert leaves none [red if: the record is written outside the transaction]', async () => {
-    const u = await fx.user();
+    const u = await plainUser();
     await asAuth(async (q) => { const s = await newSession(q, u.id); await attach(q, s, newHandle()); }, false);
     expect(recs(u.id).length).toBe(0);
   });
   it('T-S2: a session with a 10 KB address and a 10 KB browser still writes its row, the browser cut to 512 characters [red if: the trigger fails the sign-in or stores it whole]', async () => {
-    const u = await fx.user(); const big = 'x'.repeat(10_240);
+    const u = await plainUser(); const big = 'x'.repeat(10_240);
     await asAuth(async (q) => { const s = await newSession(q, u.id, '203.0.113.7', big); await attach(q, s, newHandle()); }, true);
     const r = recs(u.id);
     expect(r.length).toBe(1);
@@ -75,7 +77,7 @@ describe('no login role can write the record; the owner and superuser cannot cha
     for (const r of RUNTIME) expect(must(`SELECT has_table_privilege('${r}', 'app.sign_in_record', 'SELECT')`, db).rows[0]![0], `${r} SELECT`).toBe('f');
   });
   it('UPDATE, DELETE of a fresh row and TRUNCATE are refused for the owner and for the superuser, and the row stays [red if: the immutable trigger is absent]', async () => {
-    const u = await fx.user();
+    const u = await plainUser();
     await asAuth(async (q) => { const s = await newSession(q, u.id); await attach(q, s, newHandle()); }, true);
     for (const asRole of ['', 'SET LOCAL ROLE poly_owner;']) for (const sql of [`UPDATE app.sign_in_record SET ip_address = 'x' WHERE user_id = '${u.id}'`, `DELETE FROM app.sign_in_record WHERE user_id = '${u.id}'`, 'TRUNCATE app.sign_in_record']) {
       const r = psql(`BEGIN; ${asRole} ${sql}; COMMIT;`, db);
@@ -85,7 +87,7 @@ describe('no login role can write the record; the owner and superuser cannot cha
     expect(recs(u.id).length).toBe(1);
   });
   it('SET ROLE poly_purge, then DELETE of a fresh row: 42501 [red if: poly_purge may delete what is not purgeable]', async () => {
-    const u = await fx.user();
+    const u = await plainUser();
     await asAuth(async (q) => { const s = await newSession(q, u.id); await attach(q, s, newHandle()); }, true);
     const r = psql(`BEGIN; SET LOCAL ROLE poly_purge; DELETE FROM app.sign_in_record WHERE user_id = '${u.id}'; COMMIT;`, db);
     expect(r.ok, r.err).toBe(false);
@@ -96,7 +98,7 @@ describe('no login role can write the record; the owner and superuser cannot cha
 
 describe('retention: only app.purge_sign_in_record deletes (T-S4)', () => {
   it('as poly_worker: a 401-day row and a deleted user\'s row go; a 399-day row and a live user\'s fresh row stay; a second call deletes nothing [red if: the purge is absent, wrongly bounded, or not idempotent]', async () => {
-    const live = await fx.user(); const gone = '00000000-0000-4000-8000-000000149999';
+    const live = await plainUser(); const gone = '00000000-0000-4000-8000-000000149999';
     must(`INSERT INTO app.sign_in_record (kind, user_id, session_id, created_at) VALUES
       ('session', '${live.id}', gen_random_uuid(), now() - interval '401 days'), ('session', '${live.id}', gen_random_uuid(), now() - interval '399 days'),
       ('session', '${live.id}', gen_random_uuid(), now()), ('session', '${gone}', gen_random_uuid(), now())`, db);

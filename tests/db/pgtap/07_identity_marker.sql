@@ -65,17 +65,16 @@ SELECT is((SELECT count(*)::int FROM unnest(ARRAY['poly_app', 'poly_worker', 'po
 SELECT is(current_setting('max_prepared_transactions'), '0', 'S1: max_prepared_transactions = 0, so a marked transaction cannot be parked (mutation: the setting is raised)');
 
 -- ---------------------------------------------------------------- R2: the definers (seceng S2)
-SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('enter_asserted_user'))), 'p_user uuid, p_session uuid', 'R2: enter_asserted_user(p_user uuid, p_session uuid)');
+SELECT is(to_regprocedure('app.enter_asserted_user(uuid, uuid)')::text, NULL, 'POLY-149: enter_asserted_user does not exist');
 SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('enter_job'))), 'p_job text, p_entity uuid, p_connection uuid', 'R2: enter_job(p_job text, p_entity uuid, p_connection uuid)');
 SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('enter_new_user'))), 'uuid', 'R2: enter_new_user(uuid), the unnamed argument kept');
 SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('purge_tx_identity'))), '', 'R2: purge_tx_identity() takes no argument, so the caller cannot choose the age');
 SELECT is((SELECT pg_get_function_result(pg_temp.fn('purge_tx_identity'))), 'integer', 'R2: purge_tx_identity returns the row count');
 SELECT is((SELECT string_agg(p.proname || ':' || pg_get_userbyid(p.proowner) || ':' || p.prosecdef::text || ':' || coalesce(array_to_string(p.proconfig, ','), 'none') || ':' || pg_get_function_result(p.oid), ',' ORDER BY p.proname COLLATE "C")
-    FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname IN ('enter_asserted_user', 'enter_job', 'enter_new_user', 'purge_tx_identity')),
-  'enter_asserted_user:poly_authz:true:search_path="":text,enter_job:poly_authz:true:search_path="":text,enter_new_user:poly_authz:true:search_path="":void,purge_tx_identity:poly_purge:true:search_path="":integer',
-  'R2: owners poly_authz / poly_purge, SECURITY DEFINER, search_path pinned empty, results text, text, void, integer');
-SELECT is((SELECT string_agg(p.proname, ',' ORDER BY p.proname COLLATE "C") FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname IN ('enter_asserted_user', 'enter_job', 'enter_new_user') AND p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')), 'enter_asserted_user,enter_job,enter_new_user', 'R2: the three identity definers are plpgsql');
-SELECT is(pg_temp.grantees(pg_temp.fn('enter_asserted_user')::text), 'poly_app', 'I1: EXECUTE on enter_asserted_user: poly_app alone (mutation: PUBLIC, or poly_worker)');
+    FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname IN ('enter_job', 'enter_new_user', 'purge_tx_identity')),
+  'enter_job:poly_authz:true:search_path="":text,enter_new_user:poly_authz:true:search_path="":void,purge_tx_identity:poly_purge:true:search_path="":integer',
+  'R2: owners poly_authz / poly_purge, SECURITY DEFINER, search_path pinned empty, results text, void, integer');
+SELECT is((SELECT string_agg(p.proname, ',' ORDER BY p.proname COLLATE "C") FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname IN ('enter_job', 'enter_new_user') AND p.prolang = (SELECT oid FROM pg_language WHERE lanname = 'plpgsql')), 'enter_job,enter_new_user', 'R2: the identity definers enter_job and enter_new_user are plpgsql');
 SELECT is(pg_temp.grantees(pg_temp.fn('enter_job')::text), 'poly_worker', 'J1: EXECUTE on enter_job: poly_worker alone');
 SELECT is(pg_temp.grantees('app.enter_new_user(uuid)'), 'poly_auth', 'K3: EXECUTE on enter_new_user: poly_auth alone (POLY-152 R8)');
 SELECT is(pg_temp.grantees(pg_temp.fn('purge_tx_identity')::text), 'poly_worker', 'K4: EXECUTE on purge_tx_identity: poly_worker alone');
@@ -83,7 +82,7 @@ SELECT is(pg_temp.grantees(pg_temp.fn('current_session_id')::text), 'poly_app,po
 SELECT is(pg_temp.grantees('app.job_targets(text)'), '', 'J1: job_targets has no EXECUTE grantee but its owner');
 SELECT ok(has_function_privilege('poly_app', 'app.current_user_id()', 'EXECUTE') AND has_function_privilege('poly_worker', 'app.current_user_id()', 'EXECUTE') AND NOT has_function_privilege('public', 'app.current_user_id()', 'EXECUTE'), 'R1: current_user_id grants unchanged: poly_app and poly_worker, not PUBLIC');
 SELECT is((SELECT string_agg(p.proname || '=>' || pg_temp.grantees(p.oid::regprocedure::text), ';' ORDER BY p.proname COLLATE "C") FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname LIKE 'enter\_%'),
-  'enter_asserted_user=>poly_app;enter_auth_session=>poly_auth;enter_job=>poly_worker;enter_new_user=>poly_auth;enter_session=>poly_app', 'I1: every app.enter_* function, with its exact EXECUTE set; an unlisted enter_* fails here');
+  'enter_auth_session=>poly_auth;enter_job=>poly_worker;enter_new_user=>poly_auth;enter_session=>poly_app', 'I1: every app.enter_* function, with its exact EXECUTE set; an unlisted enter_* fails here');
 SELECT is((SELECT count(*)::int FROM pg_proc p WHERE p.pronamespace = 'app'::regnamespace AND p.proname ~ '^(enter_|purge_tx)' AND pg_get_function_arguments(p.oid) ~* 'kind'), 0, 'J3: no definer takes a kind argument; the kind comes from the body');
 
 -- ---------------------------------------------------------------- R11: no "run a SQL string" built-in for PUBLIC
@@ -136,7 +135,7 @@ SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.
 SELECT is((SELECT count(*)::int FROM pg_policy WHERE pg_get_expr(polqual, polrelid) ILIKE '%app.session_id%' OR pg_get_expr(polwithcheck, polrelid) ILIKE '%app.session_id%'), 0, 'S9: no policy mentions app.session_id');
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname IN ('app', 'public') AND p.prosrc ILIKE '%app.user_id%'), 0, 'K2: no function body mentions app.user_id any more');
 SELECT is((SELECT string_agg(p.proname, ',' ORDER BY p.proname COLLATE "C") FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname IN ('app', 'public') AND p.prosrc ILIKE '%tx\_identity%'),
-  'audit_membership,current_session_id,current_user_id,enter_asserted_user,enter_auth_session,enter_job,enter_new_user,enter_session,my_sessions,provision_person,purge_tx_identity,recent_auth_ok,revoke_my_session', 'R8: only these thirteen functions (POLY-153: enter_session, my_sessions, recent_auth_ok, revoke_my_session read the marker for kind session; POLY-152: enter_auth_session, provision_person per R3) read or write the marker table (mutation: a new reader)');
+  'audit_membership,current_session_id,current_user_id,enter_auth_session,enter_job,enter_new_user,enter_session,my_sessions,provision_person,purge_tx_identity,recent_auth_ok,revoke_my_session', 'R8: only these twelve functions (POLY-153: enter_session, my_sessions, recent_auth_ok, revoke_my_session read the marker for kind session; POLY-152: enter_auth_session, provision_person per R3) read or write the marker table (mutation: a new reader)');
 SELECT is((SELECT count(*)::int FROM pg_policy WHERE pg_get_expr(polqual, polrelid) ILIKE '%tx\_identity%' AND polrelid <> 'app.tx_identity'::regclass), 0, 'R8: no policy outside the marker table reads it directly');
 SELECT matches((SELECT prosrc FROM pg_proc WHERE oid = 'app.audit_membership()'::regprocedure), 'tx_identity', 'R1: audit_membership reads the actor label from the marker');
 

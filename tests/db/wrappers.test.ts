@@ -1,10 +1,11 @@
 // POLY-83 wrapper fixtures (ARCH §3.3, SECURITY C-84, A-3). Assumed surface, reconcile in helpers/api.ts `loadDb`:
-//   @poly/db            : withTenant(userId, sessionId, fn), withSystem(job, target, fn), close()
+//   @poly/db            : withSession(handle, fn), withSystem(job, target, fn), close()
 //   @poly/db/auth       : withContextFreeTx(fn)
 //   fn receives a tx exposing `query(text, params?) => Promise<{ rows }>`; connection from DATABASE_HOST/PORT/NAME/USER/SSLMODE/PASSWORD_FILE (poly_app).
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { REAL_MIGRATIONS, dbEnv, freshDb, migrateCli } from './helpers/api';
 import { must, psql } from './helpers/pg';
+import { handleFor } from './helpers/handle';
 
 const UID = '11111111-1111-4111-8111-111111111111';
 const SID = '22222222-2222-4222-8222-222222222222';
@@ -13,7 +14,6 @@ const SEEDED_TARGET = { entityId: '33333333-3333-4333-8333-333333333333', connec
 let db: string;
 let m: any;
 let auth: any;
-let session: any;
 let m0: any;
 let operator: any;
 
@@ -27,7 +27,6 @@ beforeAll(async () => {
   m0.configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
-  session = await import('../../packages/db/src/session.ts');
   operator = await import('../../packages/db/src/operator.ts'); // POLY-142 R3: the fourth wrapper, subpath @poly/db/operator
 });
 afterAll(async () => { await m?.close?.(); await auth?.close?.(); });
@@ -35,15 +34,15 @@ afterAll(async () => { await m?.close?.(); await auth?.close?.(); });
 // tx is a drizzle db; clientOf (db/auth) exposes its pg client
 const q = (tx: any, text: string, p?: unknown[]) => auth.clientOf(tx).query(text, p).then((r: any) => r.rows);
 
-describe('withTenant', () => {
-  it('writes the identity marker for this transaction only: current_user_id() and current_session_id() read it, kind web  [red if: withTenant still sets app.user_id, or the marker outlives the transaction]', async () => {
-    const got = await m.withTenant(session.sessionUserId(UID), SID, async (tx: any) => ({
+describe('withSession (the tenant entry)', () => {
+  it('writes the identity marker for this transaction only: current_user_id() and current_session_id() read it, kind session  [red if: the entry still sets app.user_id, or the marker outlives the transaction]', async () => {
+    const got = await m.withSession(handleFor(db, UID, SID), async (tx: any) => ({
       u: (await q(tx, `select app.current_user_id()::text u`))[0].u,
       s: (await q(tx, `select app.current_session_id()::text s`))[0].s,
       k: (await q(tx, `select kind as k from app.tx_identity where xid = pg_current_xact_id_if_assigned()`))[0].k,
       raw: (await q(tx, `select coalesce(current_setting('app.user_id', true), '') raw`))[0].raw,
     }));
-    expect(got).toEqual({ u: UID, s: SID, k: 'web', raw: '' });
+    expect(got).toEqual({ u: UID, s: SID, k: 'session', raw: '' });
     // a following transaction on the pool carries nothing
     const after = await auth.withContextFreeTx(async (tx: any) => (await q(tx, `select app.current_user_id() is null as denied`))[0]);
     expect(after.denied).toBe(true);
@@ -57,9 +56,9 @@ describe('withTenant', () => {
     expect(r).toBe(true);
   });
 
-  it('does not run the callback when the userId is not a SessionUserId-shaped uuid', async () => {
+  it('does not run the callback when the handle is not live', async () => {
     let ran = false;
-    await expect(m.withTenant('not-a-uuid', SID, async () => { ran = true; })).rejects.toThrow();
+    await expect(m.withSession('not-a-handle', async () => { ran = true; })).rejects.toThrow();
     expect(ran).toBe(false);
   });
 });
@@ -111,7 +110,7 @@ describe('no nesting: all sixteen ordered pairs (self-nesting included), each re
           LANGUAGE sql STABLE SECURITY DEFINER SET search_path = '' AS $$ select '${SEEDED_TARGET.entityId}'::uuid, '${UID}'::uuid, null::uuid $$`, db);
   });
   const w: Record<string, (fn: () => Promise<unknown>) => Promise<unknown>> = {
-    tenant: (fn) => m.withTenant(session.sessionUserId(UID), SID, fn),
+    tenant: (fn) => m.withSession(handleFor(db, UID, SID), fn),
     system: (fn) => m.withSystem(SEEDED_JOB, SEEDED_TARGET, fn),
     ctxfree: (fn) => auth.withContextFreeTx(fn),
     operator: (fn) => operator.withOperatorTx(fn),

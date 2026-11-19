@@ -1,6 +1,6 @@
 // POLY-86 criteria 4, 13 (ruling R5; seceng S13, S14, S15). Real Postgres, as poly_app. Step-up stamps are written as superuser,
 // exactly as POLY-89's definers will write them in production (no route in this issue sets recent_auth_at).
-// POLY-153 R6, R7: Settings → Sessions and the shell run on withSession(handle); the old loadSession and withTenant paths are gone.
+// POLY-153 R6, R7: Settings → Sessions and the shell run on withSession(handle); the old in-process session paths are gone.
 // Titles end with [red if: <mutation>].
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PW, boot, get, post, teardown, type Env } from './helpers/auth';
@@ -119,7 +119,7 @@ describe('Settings → Sessions (by handle: withSession, then the three definers
   });
 });
 
-describe('withSession: the shell, the caps and the idle bound (S14, S15; was loadSession)', () => {
+describe('withSession: the shell, the caps and the idle bound (S14, S15)', () => {
   it('hands fn the token-free flat row and relays no cookie; a revoked session stops at once  [red if: the row carries the token, the handle or a cookie, or a deleted session still enters]', async () => {
     const u = e.seedUser({ name: 'Shell Person' });
     const { cookie, res } = await e.signIn(u.email, auth);

@@ -1,6 +1,6 @@
 // Reusable by every feature that adds a tenant table (ruling R4): how many of `other`'s rows can `as` read from `table`
-// through the real withTenant wrapper (poly_app, RLS in force)? A table is isolated when this is 0 and its positive
-// control (`ownRows`) is above 0. `tenant` is the harness's binding of withTenant; `q` runs SQL in the open tx.
+// through the real withSession wrapper (poly_app, RLS in force)? A table is isolated when this is 0 and its positive
+// control (`ownRows`) is above 0. `tenant` is the harness's binding of withSession; `q` runs SQL in the open tx.
 // `keys` (POLY-62 ruling R8) names the column values to compare when they are not the user ids themselves, e.g. the
 // entity ids on an entity-keyed table: { own: F, other: E } with ownerColumn 'entity_id'. Default: `as` / `other`.
 export type Tx = unknown;

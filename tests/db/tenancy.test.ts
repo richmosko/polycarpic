@@ -9,18 +9,18 @@ import { activeRows, checkProbe, loadMatrix, runAs, runnableEntries, type Actor,
 import { must, psql, url } from './helpers/pg';
 import { pgmod } from './helpers/second-step';
 import { ID, seedTenancy, type Seed } from './helpers/tenancy';
+import { tenantBy } from './helpers/handle';
 
 const SID = '22222222-2222-4222-8222-222222222222';
 let db: string;
 let m: any;
 let auth: any;
-let session: any;
 let provisionPerson: (tx: any) => Promise<{ personId: string; created: boolean }>;
 let S: Seed;
 
 const q = (tx: any, text: string, p?: unknown[]) => auth.clientOf(tx).query(text, p).then((r: any) => r.rows);
 const raw = (tx: any, text: string, p?: unknown[]) => auth.clientOf(tx).query(text, p);
-const tenant = (uid: string, fn: (tx: any) => Promise<any>) => m.withTenant(session.sessionUserId(uid), SID, fn);
+const tenant = (uid: string, fn: (tx: any) => Promise<any>) => tenantBy(m, db, SID)(uid, fn);
 const free = (fn: (tx: any) => Promise<any>) => auth.withContextFreeTx(fn);
 // POLY-152: the context-free kind runs as poly_auth, which holds no has_role / visible_entities / owner_count (R2). The no-identity read of those
 // definers is asked of poly_app itself: a plain connection, in a transaction, with no marker.
@@ -64,7 +64,6 @@ beforeAll(async () => {
   m0.configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), max: 4 });
   m = await import('../../packages/db/src/index.ts');
   auth = await import('../../packages/db/src/auth.ts');
-  session = await import('../../packages/db/src/session.ts');
   ({ provisionPerson } = await import('../../packages/tenancy/src/index.ts'));
   S = await seedTenancy({ db, tenant, q, provisionPerson });
   E = S.entity;

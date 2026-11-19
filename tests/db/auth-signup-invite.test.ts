@@ -5,7 +5,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { dbEnv } from './helpers/api';
 import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
 import { claimedBy, inviteRow, newToken, seedInvitation, seedOwnerEntity, tokenHash } from './helpers/invitation';
-import { asUserSql } from './helpers/marker';
+import { asAuthSql } from './helpers/marker';
+import { tenantBy } from './helpers/handle';
 import { psql, psqlSession } from './helpers/pg';
 import { must } from './helpers/sql';
 
@@ -153,10 +154,10 @@ describe('condition 4: two concurrent sign-ups on one token', () => {
 const SID = '00000000-0000-4000-8000-0000000000e1';
 const landing = async (userId: string): Promise<string> => {
   const T: any = await import('../../packages/tenancy/src/index.ts');
-  return e.dbm.withTenant(e.dbs.sessionUserId(userId), SID, (tx: any) => T.landingEntity(tx));
+  return tenantBy(e.dbm, e.db, SID)(userId, (tx: any) => T.landingEntity(tx));
 };
 const visibleCount = (userId: string): Promise<number> =>
-  e.dbm.withTenant(e.dbs.sessionUserId(userId), SID, async (tx: any) =>
+  tenantBy(e.dbm, e.db, SID)(userId, async (tx: any) =>
     Number((await tx.execute(e.dbm.sql`SELECT cardinality(app.visible_entities()) AS n`)).rows[0].n));
 const uidOf = (email: string) => must(`SELECT id FROM public."user" WHERE email = '${email}'`, e.db).rows[0]![0]!;
 const personOf = (uid: string) => must(`SELECT id FROM public.entity WHERE self_user_id = '${uid}'`, e.db).rows[0]![0]!;
@@ -609,7 +610,7 @@ describe('condition 33 (S14): after the sign-up commits, an email change passes'
     expect(r.status, await r.clone().text()).toBe(200);
     const uid = uidOf(email);
     const moved = `s14-moved-${stamp()}@qa.test`;
-    const u = psql(`BEGIN; ${asUserSql(uid)} UPDATE public."user" SET email = '${moved}', email_verified = true WHERE id = '${uid}'; COMMIT;`, e.db, { role: 'poly_app' });
+    const u = psql(`BEGIN; ${asAuthSql(uid, e.db)} UPDATE public."user" SET email = '${moved}', email_verified = true WHERE id = '${uid}'; COMMIT;`, e.db, { role: 'poly_auth', password: 'qa-poly_auth' });
     expect(u.ok, u.err).toBe(true);
     expect(users(moved)).toBe(1);
   });

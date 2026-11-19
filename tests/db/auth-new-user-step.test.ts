@@ -7,7 +7,7 @@ import { loadAllow } from './helpers/definers';
 import { seedInvitation, tokenHash } from './helpers/invitation';
 import { asUserSql, newUserSql } from './helpers/marker';
 import { must, psql, psqlSession } from './helpers/pg';
-import { withHandle } from './helpers/handle';
+import { handleFor, withHandle } from './helpers/handle';
 
 let e: Env;
 beforeAll(async () => { e = await boot(); });
@@ -85,7 +85,7 @@ describe('condition 13: enter_new_user refuses (each on its own transaction), wi
     must(ins(old), e.db);
     const tok = `tok-${old}`;
     must(withHandle(`INSERT INTO public.session (user_id, token, expires_at) VALUES ('${old}', '${tok}', now() + interval '1 day')`), e.db);
-    // POLY-152: poly_auth enters by its own definer, from a live session row (it has no enter_asserted_user)
+    // POLY-152: poly_auth enters by its own definer, from a live session row (it has no tenant entry)
     const r = app(`BEGIN; \nSELECT app.enter_auth_session($1) \\bind '${tok}' \\g /dev/null\n ${ins(fresh)} ${step(fresh)} ROLLBACK;`);
     expect(r.sqlstate).toBe('42501');
     expect(r.err).toMatch(/a user is already in context/);
@@ -178,11 +178,10 @@ describe('condition 13 (handle): the step is reachable from withContextFreeTx\'s
   });
 });
 
-describe('condition 14: the step is not on the db index, db/auth or db/session, nor on withTenant\'s Tx', () => {
+describe('condition 14: the step is not on the db index or db/auth, nor on the tenant entry\'s Tx', () => {
   const surfaces: Record<string, string> = {
     '@poly/db': '../../packages/db/src/index.ts',
     '@poly/db/auth': '../../packages/db/src/auth.ts',
-    '@poly/db/session': '../../packages/db/src/session.ts',
   };
   for (const [name, path] of Object.entries(surfaces))
     it(`${name}: no export is named like the step and no exported function's source calls enter_new_user  [red if: the step is exported from the index]`, async () => {
@@ -191,9 +190,9 @@ describe('condition 14: the step is not on the db index, db/auth or db/session, 
       for (const [k, v] of Object.entries(m))
         if (typeof v === 'function') expect(String(v), `${name}.${k}`).not.toMatch(/enter_new_user|enterNewUser/);
     });
-  it('a withTenant and a withSystem Tx have no enterNewUser  [red if: the step is attached to every Tx, not to the context-free kind]', async () => {
+  it('a withSession and a withSystem Tx have no enterNewUser  [red if: the step is attached to every Tx, not to the context-free kind]', async () => {
     const u = must(`INSERT INTO public."user" (name, email) VALUES ('T', 't-${uid()}@qa.test') RETURNING id`, e.db).rows[0]![0]!;
-    const has = await e.dbm.withTenant(e.dbs.sessionUserId(u), '00000000-0000-4000-8000-0000000000e2', async (tx: any) => 'enterNewUser' in tx || typeof tx.enterNewUser !== 'undefined');
+    const has = await e.dbm.withSession(handleFor(e.db, u, '00000000-0000-4000-8000-0000000000e2'), async (tx: any) => 'enterNewUser' in tx || typeof tx.enterNewUser !== 'undefined');
     expect(has).toBe(false);
     // withSystem: M1's job_targets returns no rows, so (as wrappers.test.ts does) the superuser replaces its body in THIS database only
     const target = { entityId: '33333333-3333-4333-8333-333333333333', connectionId: null };
@@ -250,7 +249,7 @@ describe('condition 30 (S4): claim_invitations from a signed-in transaction take
         await new Promise((r) => setTimeout(r, 100));
       }
       const t0 = Date.now();
-      const r = app(`BEGIN; ${asUserSql(user)} SELECT app.claim_invitations(decode('${hex}', 'hex'), 'lock@qa.test'); ROLLBACK;`);
+      const r = app(`BEGIN; ${asUserSql(user, e.db)} SELECT app.claim_invitations(decode('${hex}', 'hex'), 'lock@qa.test'); ROLLBACK;`);
       expect(r.sqlstate).toBe('42501');
       expect(Date.now() - t0).toBeLessThan(3500);
     } finally { holder.kill(); }

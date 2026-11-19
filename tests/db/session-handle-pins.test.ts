@@ -1,5 +1,5 @@
 // POLY-153 R0, R6 (service side), R7.4, R11: the pins that are not behaviour of one definer. (1) what this loop must NOT change
-// (poly_app keeps enter_asserted_user and its BetterAuth grants on the migrated chain; the revoke of R7.4 is the e2e harness's alone);
+// (the revocation moved to POLY-149: pgTAP 11 and revocation.test.ts);
 // (2) definers.json lists the six new functions; (3) the service-side step-up check is `app.step_up_fresh()` and fails closed outside a
 // session transaction (the third unmeasured claim). Titles end [red if: <mutation>].
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -82,7 +82,7 @@ describe('R7.1 withSession(handle, fn) in packages/db (real, on the poly_app poo
     const entries = sql.filter((q) => /enter_session/.test(q));
     expect(entries).toHaveLength(1);
     expect(entries[0]!.replace(/\s+/g, ' ').trim()).toMatch(/^SELECT \* FROM app\.enter_session\(\$1\);?$/);
-    expect(sql.some((q) => /enter_asserted_user/.test(q))).toBe(false);
+    expect(sql.some((q) => /enter_asserted/.test(q))).toBe(false);
   });
   it('a handle that is not live throws NoLiveSession and never runs fn [red if: the 42501 escapes as a raw database error or fn runs unmarked]', async () => {
     const r = await root();

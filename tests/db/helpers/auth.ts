@@ -3,7 +3,6 @@
 // marked ASSUMED):
 //   @poly/auth     : authOptions(input) -> BetterAuthOptions; createAuth(options) -> BetterAuth instance (awaited, so sync or async);
 //                    handleAuthRequest(request, auth?) -> Response   (ASSUMED 2nd arg: the instance; default = the app's own);
-//                    loadSession(request, auth?) -> null | { userId, sessionId, shell, setCookie };
 //                    listSessions(tx), revokeSession(tx, id); AUTH_ROUTES. input = { secret, baseURL, tlsMode, google?, github?, sendMagicLink }
 //                    with tlsMode 'real-domain' | 'private-ca' (ASSUMED value for the first).
 //   @poly/db/auth  : currentClient() -> { kind, client } | null (R2), withContextFreeTx, authPool
@@ -58,7 +57,6 @@ export async function boot() {
   await dbm.close();
   dbm.configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db), worker: dbEnv('poly_worker', db), operator: dbEnv('poly_operator', db) });
   const dba: any = await import('../../../packages/db/src/auth.ts');
-  const dbs: any = await import('../../../packages/db/src/session.ts');
   const A: any = await import('../../../packages/auth/src/index.ts');
   const mails: { email: string; token: string; url: string }[] = [];
   const input = (tlsMode: Mode = 'real-domain', extra: Record<string, unknown> = {}) => ({
@@ -119,7 +117,7 @@ export async function boot() {
   const sessionRow = (cookieEmail: string) =>
     must(`SELECT s.id, s.token FROM public.session s JOIN public."user" u ON u.id = s.user_id WHERE u.email = '${cookieEmail}' ORDER BY s.created_at DESC LIMIT 1`, db).rows[0];
   const count = (sql: string) => Number(must(`SELECT count(*) FROM (${sql}) q`, db).rows[0][0]);
-  return { db, dbm, dba, dbs, A, auth, mk, input, optionsOf, mails, handle, seedUser, signIn, cookieForToken, oauth, sessionRow, count, hash };
+  return { db, dbm, dba, A, auth, mk, input, optionsOf, mails, handle, seedUser, signIn, cookieForToken, oauth, sessionRow, count, hash };
 }
 
 export async function teardown(e?: Env) {

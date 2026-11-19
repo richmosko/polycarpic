@@ -5,13 +5,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { boot, teardown, type Env } from './helpers/auth';
 import { must } from './helpers/sql';
+import { tenantBy } from './helpers/handle';
 
 const U1 = '11111111-1111-4111-8111-111111111111';
 const U2 = '22222222-2222-4222-8222-222222222222';
 const S1 = '33333333-3333-4333-8333-333333333333';
 let e: Env;
 let pool: any;
-const tenant = (u: string, fn: (tx: any) => Promise<any>) => e.dbm.withTenant(e.dbs.sessionUserId(u), S1, fn);
+const tenant = (u: string, fn: (tx: any) => Promise<any>) => tenantBy(e.dbm, e.db, S1)(u, fn);
 const scratch = () => Number(must('SELECT count(*) FROM public.qa_scratch', e.db).rows[0][0]);
 const lease = async () => pool.connect();
 
@@ -23,7 +24,7 @@ beforeAll(async () => {
 });
 afterAll(() => teardown(e));
 
-describe('inside withTenant', () => {
+describe('inside withSession', () => {
   it('BetterAuth statements run on the request client: same backend, the marker identity visible  [red if: the pool opens its own connection]', async () => {
     await tenant(U1, async (tx) => {
       const outer = (await e.dba.clientOf(tx).query('select pg_backend_pid() p')).rows[0].p;
@@ -147,7 +148,7 @@ describe('outside a transaction', () => {
     expect(r.rows[0]).toEqual({ u: '', s: '', cu: 'poly_auth' });
   });
 
-  it('P7: a backend that served a withTenant, checked out next on the plain path, reads no identity  [red if: an identity leaks onto the backend]', async () => {
+  it('P7: a backend that served a withSession, checked out next on the plain path, reads no identity  [red if: an identity leaks onto the backend]', async () => {
     await tenant(U2, async () => {});
     for (let i = 0; i < 5; i++) {
       const c = await pool.connect();
@@ -160,7 +161,7 @@ describe('outside a transaction', () => {
 });
 
 describe('a lease dies with its transaction (S3, P3)', () => {
-  it('a timer scheduled inside withTenant that calls connect() after commit rejects and the next tenant sees nothing  [red if: the store is not revoked, so the late write runs on a reused backend]', async () => {
+  it('a timer scheduled inside withSession that calls connect() after commit rejects and the next tenant sees nothing  [red if: the store is not revoked, so the late write runs on a reused backend]', async () => {
     const before = scratch();
     let late: Promise<unknown> | undefined;
     await tenant(U1, async () => {
@@ -191,7 +192,7 @@ describe('a lease dies with its transaction (S3, P3)', () => {
     expect(e.dba.currentClient()).toBeNull();
     await tenant(U1, async () => {
       const c = e.dba.currentClient();
-      expect(c.kind).toBe('withTenant');
+      expect(c.kind).toBe('withSession');
       expect('release' in c.client).toBe(false);
       expect(typeof c.client.query).toBe('function');
     });
@@ -244,7 +245,7 @@ describe('closed statement grammar (S4)', () => {
 });
 
 describe('a silent rollback is an error (S2, P2)', () => {
-  it('a statement fails inside withTenant, the error is caught, fn returns normally: withTenant still rejects  [red if: inTransaction does not check the COMMIT result]', async () => {
+  it('a statement fails inside withSession, the error is caught, fn returns normally: withSession still rejects  [red if: inTransaction does not check the COMMIT result]', async () => {
     const before = scratch();
     await expect(tenant(U1, async (tx) => {
       const c = e.dba.clientOf(tx);

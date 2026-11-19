@@ -247,9 +247,9 @@ describe('unmeasured (R2): no other BetterAuth write sends the reset shape (coun
     const f = await factor(e, mails);
     const lines: string[] = [];
     const run = async (label: string, fn: () => Promise<unknown>, wantResets: number) => {
-      const { stmts } = await captureStatements(fn);
+      const { result, stmts } = await captureStatements(fn);
       const hits = stmts.filter(touches);
-      lines.push(`${label}: ${hits.map((h) => `${h.text.replace(/\s+/g, ' ').slice(0, 120)} <- ${JSON.stringify(h.values)}`).join(' | ') || 'none'}`);
+      lines.push(`${label} [status ${(result as any)?.status ?? "-"}]: ${hits.map((h) => `${h.text.replace(/\s+/g, ' ').slice(0, 120)} <- ${JSON.stringify(h.values)}`).join(' | ') || 'none'}`);
       if (wantResets >= 0) expect(hits.length, `${label}: ${lines.at(-1)}`).toBe(wantResets);
     };
     await run('held sign-in', () => heldSignIn(e, f.auth, f.u.email), 0);
@@ -259,6 +259,7 @@ describe('unmeasured (R2): no other BetterAuth write sends the reset shape (coun
     await run('enrolment of a second user', async () => { const u2 = e.seedUser(); await enrolTotp(e, g.auth, u2, mails); }, -1); // enrolment's first verify is MEASURED and printed (red-run.md), not asserted
     const ok = await rightCode(e, f, TOTP);
     const cookie = jar('', ok);
+    must(`UPDATE public.session SET recent_auth_at = now() WHERE user_id = '${f.u.id}'`, e.db); // a fresh step-up, so the routes run (measured: 403 without it)
     await run('regenerate backup codes', () => e.handle(post('/two-factor/generate-backup-codes', { password: PW }, cookie), f.auth), -1);
     await run('disable', () => e.handle(post('/two-factor/disable', { password: PW }, cookie), f.auth), -1);
     console.log(`[reset-shape] ${lines.join('\n')}`);

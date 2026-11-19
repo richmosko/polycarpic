@@ -8,7 +8,7 @@
 // test pins hashInvitationToken to this same function.
 import { createHash, randomBytes } from 'node:crypto';
 import { must, psql } from './pg.ts';
-import { asUserSql, SID } from './marker.ts';
+import { asUserSql } from './marker.ts';
 
 export const tokenHash = (token: string): Buffer => createHash('sha256').update(Buffer.from(token, 'base64url')).digest();
 export const newToken = (): string => randomBytes(32).toString('base64url');
@@ -33,7 +33,7 @@ export function seedOwnerEntity(db: string, tag = Math.random().toString(36).sli
   // transaction; the sync trigger sets second_step_at), which the ruling allows for fixtures. No guard is weakened.
   must(`BEGIN; INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s', 'b', '${ownerId}', true); UPDATE public."user" SET two_factor_enabled = true WHERE id = '${ownerId}'; COMMIT;`, db);
   const r = must(
-    `BEGIN; ${asUserSql(ownerId, SID)}
+    `BEGIN; ${asUserSql(ownerId, db)}
      INSERT INTO public.entity (type_id, name, tax_classification) VALUES ((SELECT id FROM public.entity_type WHERE system_key = 'business'), '${name}', 'business_pass_through');
      SELECT id FROM public.entity WHERE name = '${name}'; COMMIT;`,
     db,
@@ -51,7 +51,7 @@ export function seedInvitation(a: SeedArgs): string {
   if (a.entityId) {
     if (!a.as) throw new Error('seedInvitation: an entity invitation needs `as` (the owner)');
     must(
-      `BEGIN; ${asUserSql(a.as, SID)}
+      `BEGIN; ${asUserSql(a.as, a.db)}
        INSERT INTO public.invitation (entity_id, email, role, inviter_user_id, token_hash, expires_at)
        VALUES ('${a.entityId}', '${a.email}', '${role}', '${a.as}', decode('${hex}', 'hex'), ${exp}); COMMIT;`,
       a.db,

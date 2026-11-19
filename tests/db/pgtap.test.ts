@@ -78,7 +78,7 @@ describe('POLY-152 08_poly_auth_grants.sql fails on a planted grant', () => {
     ['a SELECT through PUBLIC', 'GRANT SELECT ON public.entity TO PUBLIC'],
     ['an extra privilege on an allowed table', 'GRANT TRUNCATE ON public.account TO poly_auth'],
     ['UPDATE on session.recent_auth_at', 'GRANT UPDATE (recent_auth_at) ON public.session TO poly_auth'],
-    ['EXECUTE on enter_asserted_user', 'GRANT EXECUTE ON FUNCTION app.enter_asserted_user(uuid, uuid) TO poly_auth'],
+    ['EXECUTE on enter_session', 'GRANT EXECUTE ON FUNCTION app.enter_session(text) TO poly_auth'],
     ['a function with EXECUTE granted through PUBLIC', 'CREATE FUNCTION public.qa_plant152() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$; GRANT EXECUTE ON FUNCTION public.qa_plant152() TO PUBLIC'],
     ['a sequence privilege', 'CREATE SEQUENCE public.qa_seq152; GRANT USAGE ON SEQUENCE public.qa_seq152 TO poly_auth'],
     // POLY-152 N2 (role membership in poly_app, plain and WITH INHERIT FALSE, SET TRUE): tests/db/pgtap-membership.test.ts, a SERIAL file

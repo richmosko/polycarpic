@@ -49,3 +49,22 @@ export function handleOf(res: Response): string | null {
 export const handleSetCookie = (res: Response): string | undefined => res.headers.getSetCookie().find((c) => c.startsWith(`${HANDLE_COOKIE}=`));
 /** The extended-mode canonical entry call. */
 export const ENTER_SESSION = 'SELECT * FROM app.enter_session($1)';
+
+/**
+ * POLY-149: a live handle for `userId`, optionally for the named session `sid` (the id a test asserts through current_session_id()).
+ * A known session keeps its id and gets a fresh handle (superuser fixture); an unknown one is created. The user row is made if absent.
+ */
+export function handleFor(db: string, userId: string, sid?: string | null): string {
+  must(`INSERT INTO public."user" (id, name, email, email_verified) VALUES ('${userId}', 'T', 'tenant-${userId}@qa.test', true) ON CONFLICT DO NOTHING`, db);
+  const owner = sid ? must(`SELECT user_id FROM public.session WHERE id = '${sid}'`, db).rows[0]?.[0] : undefined;
+  if (sid && owner === userId) {
+    const handle = newHandle();
+    must(`UPDATE app.session_handle SET handle_hash = decode('${hashHex(handle)}', 'hex') WHERE session_id = '${sid}'`, db);
+    return handle;
+  }
+  // the named id is free: make it. It names another user's session (suites reuse one SID across users): a fresh id, so the entry is still this user's
+  return sessionWithHandle(db, userId, sid && owner === undefined ? { id: sid } : {}).handle;
+}
+/** The stand-in for the removed asserted-user tenant wrapper: enter by handle (`withSession`); fn gets the transaction. */
+export const tenantBy = (m: { withSession: (h: string, fn: (tx: any) => Promise<any>) => Promise<any> }, db: string, sid?: string) =>
+  <T>(uid: string, fn: (tx: any) => Promise<T>): Promise<T> => m.withSession(handleFor(db, uid, sid), (tx: any) => fn(tx));
