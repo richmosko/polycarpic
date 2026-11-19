@@ -644,3 +644,17 @@ If the Principal picks (b), tell them plainly: a found backup code plus the pass
 - **T4** now pins that only poly_govern holds `UPDATE (recent_auth_at)`.
 - **Also in that diff:** the decisions status and R7's lock wording under D6 (b). These match my §7.4 conditions: a band only on the lock refusal, and the fallback wording when no band comes back.
 - **ACCEPT.** H.1's residual and D7 are with the Principal (§13.2, §13.3).
+
+**Addendum 4 at `35fd42bd`: ACCEPT** (code-read; I ran nothing). Every caller of these routes already holds the user's session, so each answer below is judged against what that caller can already learn.
+- **`step_up_failed` is one code, 403,** for a wrong password, a wrong code, a reused or earlier TOTP step, and a failed or foreign passkey assertion.
+  - So a right code refused as reused is not told apart from a wrong one, and a foreign credential is not told apart from a bad one.
+  - **One indirect signal remains:** a wrong code moves the shared counter and a wrong password does not. So a caller guessing passwords sees the lock arrive within 10 tries of the right one.
+  - That tells them nothing new. The open `/change-password` route already says directly whether a session holder's password is right. Accepted.
+- **A wrong password or code does not use up the challenge. That is right.**
+  - The challenge exists to make a *successful* stamp single-use, and `begin` is free. Using it up on each failure would add a round trip and no limit.
+  - Guesses are bounded by `LIMITED` and by the shared counter and lock (10, then the doubling), exactly as at sign-in.
+  - A refused reused step rolls back, so it neither counts as a wrong code nor resets the counter.
+- **`challenge_expired`** covers missing, used, expired, another session's and another method's challenge with one code. It reveals nothing about other sessions.
+- **The other codes** each tell the caller only facts about their own account, which `mySecondStep` already returns: `method_unavailable`, `no_second_step`, the 429 with no `pausedFor`, and the limiter's 429 with no code.
+  - The strict `invalid_request` (extra fields refused) is good.
+- **The lock-band amendment** (locked plus an expired hold gives 429 with no band) is accepted. The holder of an expired hold learns only that the account is locked.
