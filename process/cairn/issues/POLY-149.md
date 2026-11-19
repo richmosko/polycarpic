@@ -1,12 +1,12 @@
 ---
 id: POLY-149
 title: Stage 2 revocation and docs
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-148, POLY-89, POLY-152, POLY-153]
 assignee: backend-lead
-paths: [process/cairn/issues/POLY-149.md, apps/auth/**, apps/web/**, packages/auth/**, packages/db/**, packages/config/**, packages/tenancy/**, infra/compose/**, infra/caddy/**, infra/lint/**, infra/postgres/pg_hba.*.conf, tests/db/**, tests/layers/**, apps/web/tests/e2e/**, layers.json, eslint.config.js, package.json, pnpm-lock.yaml, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**]
+paths: [process/cairn/issues/POLY-149.md, process/cairn/reviews/POLY-149/**, apps/auth/**, apps/web/**, apps/worker/**, packages/**, infra/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, bin/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, docs/DESIGN/**]
 labels: [security, auth]
 priority: P1
 pr: null
@@ -77,3 +77,7 @@ From POLY-152's close: INFRA §7.1 step 16 (the deploy-gate check) must also ref
 From the POLY-153 loop (`process/cairn/reviews/POLY-153/`). Two additions to this issue:
 - **F1 (seceng, ruling-review §5):** the sign-in record is written inside `app.attach_session_handle` or by a trigger on it, not by service code, so the sign-in service cannot skip a line.
 - **N1 (seceng build-review §4; architect's verdict §4):** `app.enter_session`'s slide rewrites the session row on every page load in the last 6 days before the 30-day cap. Require the new `expires_at` to be greater than the old before writing, with a qa test that a slide at the cap writes nothing.
+
+### @team-lead — 2026-11-19
+
+Feature started. Branch: `feature/poly-149-stage-2-revocation-and-docs`. Stages: POLY-149a (ruling), b (security review), c (tests), d (build), e (deploy gate and cost), f (verdict).
