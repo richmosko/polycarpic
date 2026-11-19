@@ -24,6 +24,8 @@ Set-up is one dialog (`SecondStepSetup.svelte`, a portal on `document.body`) ope
 | R10 every signed-in HTML and `__data.json` is `no-store`; `/entities` joins the page-data and header scans | misc spec | `second-step-misc.spec.ts` |
 | R9 seeds | Enid and Lou are managers of "Shared Co"; **Pia and Vic hold no manager seat** (see note); Rae is gone (spec 6b and spec 1 cover what her test did) | `serve.ts` |
 
+Addendum 1 on the re-issue (be15ecae): **P1** spec 1 shows Enid's name "Enid Enrol (Person)" as the held page's selector label and no "Shared Co" anywhere (the `__data.json` check stands); **P2** the gate redirect is `?setup=1&next=<safeNext(path)>` (unit table and e2e parse it; `//evil.example` gives `next=/`), the dialog imports `safe-next` and calls `safeNext(` (source check), and spec 1 ends with Finish landing on `/dashboard` (the sidebar-leave, back and forward checks moved to the Make-new-codes screen).
+
 Note for the lead: R9 spec 2 has Pia open `/entities` and see the message, but R9's seeds make her a manager, whom the gate redirects away from `/entities`. I seeded Pia as a non-held user.
 
 ## Criteria

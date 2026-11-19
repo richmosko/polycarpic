@@ -133,19 +133,24 @@ test.describe('R1.3 the gate while held (Lou)', () => {
   test.use({ storageState: 'tests/e2e/.auth/lou.json' });
 
   test('the two exempt paths answer 200; every other path, a trailing slash, a longer path and a POST to a form action elsewhere answer 303 to /settings/second-step?setup=1  [red if: the exemption is a prefix of /settings, or the redirect lacks setup=1]', async ({ request }) => {
-    const SETUP = '/settings/second-step?setup=1';
+    const held = (loc: string | undefined, next: string, label: string) => {
+      const u = new URL(loc ?? '', base);
+      expect(u.pathname, label).toBe('/settings/second-step');
+      expect(u.searchParams.get('setup'), label).toBe('1');
+      expect(u.searchParams.get('next'), `${label}: next`).toBe(next);
+    };
     for (const p of ['/settings/second-step', '/settings/second-step/__data.json']) expect((await request.get(`${base}${p}`, { maxRedirects: 0 })).status(), p).toBe(200);
     for (const p of ['/settings', '/settings/sessions', '/settings/sessions/__data.json', '/settings/second-step/x', '/entities', '/entities/__data.json', '/dashboard']) {
       const r = await request.get(`${base}${p}`, { maxRedirects: 0 });
       expect(r.status(), p).toBe(303);
-      expect(r.headers()['location'], p).toBe(SETUP);
+      held(r.headers()['location'], p, p);
     }
     const slash = await request.get(`${base}/settings/second-step/`, { maxRedirects: 0 });
     expect([200, 303, 308], 'trailing slash: normalised to the exempt path, or held').toContain(slash.status());
-    if (slash.status() === 303) expect(slash.headers()['location']).toBe(SETUP);
+    if (slash.status() === 303) expect(new URL(slash.headers()['location'] ?? '', base).searchParams.get('setup')).toBe('1');
     const post = await request.post(`${base}/settings/sessions?/revoke`, { maxRedirects: 0, form: { id: 'x' }, headers: { origin: base } });
     expect(post.status(), 'a POST to a form action elsewhere').toBe(303);
-    expect(post.headers()['location']).toBe(SETUP);
+    expect(new URL(post.headers()['location'] ?? '', base).searchParams.get('setup')).toBe('1');
   });
 });
 

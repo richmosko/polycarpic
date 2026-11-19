@@ -27,8 +27,21 @@ describe('the sign-in gate (R5)', () => {
     required = true;
     const res = await request('/dashboard');
     expect(res.status).toBe(303);
-    expect(res.headers.get('location')).toBe('/settings/second-step?setup=1');
+    const u = new URL(res.headers.get('location') ?? '', 'http://x');
+    expect(u.pathname).toBe('/settings/second-step');
+    expect(u.searchParams.get('setup')).toBe('1');
+    expect(u.searchParams.get('next'), 'the gate carries where the user was going (P2)').toBe('/dashboard');
     expect(res.headers.getSetCookie()).toEqual([]);
+  });
+  it('P2: a gate redirect for an off-origin path carries next=/ (through safe-next) [red if: next is passed through unchecked]', async () => {
+    required = true;
+    for (const p of ['//evil.example/x', '/\\evil.example']) {
+      const res = await request(p);
+      if (res.status !== 303) continue; // a path the server normalises away is not a gate case
+      expect(new URL(res.headers.get('location') ?? '', 'http://x').searchParams.get('next'), p).toBe('/');
+    }
+    const ok = await request('/dashboard');
+    expect(ok.status).toBe(303);
   });
   it('R1.3: while held, exactly two paths are exempt; the rest of /settings, /entities and a POST elsewhere answer 303 to /settings/second-step?setup=1 [red if: the exemption is a prefix, or the redirect lacks setup=1]', async () => {
     required = true;
@@ -36,7 +49,8 @@ describe('the sign-in gate (R5)', () => {
     for (const p of ['/settings', '/settings/sessions', '/settings/sessions/__data.json', '/settings/second-step/x', '/settings/second-step/y/z', '/settings/second-stepper', '/entities', '/entities/__data.json', '/settings/second-step/__data.jsonx']) {
       const res = await request(p);
       expect(res.status, p).toBe(303);
-      expect(res.headers.get('location'), p).toBe('/settings/second-step?setup=1');
+      const u = new URL(res.headers.get('location') ?? '', 'http://x');
+      expect([u.pathname, u.searchParams.get('setup'), u.searchParams.get('next')], p).toEqual(['/settings/second-step', '1', p]);
     }
   });
   it('the placeholder itself is not redirected while gated, an ungated user reaches any page, and neither answer sets a cookie [red if: the gate loops or relays a cookie]', async () => {

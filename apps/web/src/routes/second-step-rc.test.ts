@@ -35,6 +35,11 @@ describe('RC3 / R3.5: the dialog clears on every way out; web\'s signed-in respo
     expect(s).toMatch(/beforeNavigate/);
     expect(s).toMatch(/onDestroy|return\s*\(\)\s*=>/);
   });
+  it('the dialog goes to safeNext(next) after set-up, through the one safe-next module (P2) [red if: the dialog keeps its own copy of the rule or follows next unchecked]', () => {
+    expect(existsSync(DIALOG)).toBe(true);
+    expect(src(DIALOG)).toMatch(/safe-next/);
+    expect(src(DIALOG)).toMatch(/safeNext\(/);
+  });
   it('hooks.server.ts sets Cache-Control: no-store once on signed-in pages and __data.json (R10) [red if: a page that mounts the dialog is storable]', () => {
     expect(src(join(webSrc, 'hooks.server.ts'))).toMatch(/no-store/);
   });

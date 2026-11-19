@@ -6,7 +6,13 @@
 import { expect, test } from '@playwright/test';
 import { appendFlow, base, cookieNames, enrolByAppToCodes, expectNoSecretsKept, openSetup, outboxMark, codeFor, PASSWORD, seed, signInUi, slot, watchUrls, watchWebWrites } from './support.ts';
 
-const SETUP = '/settings/second-step?setup=1';
+/** The gate's redirect (R1.3, P2): the one Settings page, `setup=1`, and `next` = the path asked for, through safe-next. */
+const expectGate = (location: string | null | undefined, nextPath: string, label: string) => {
+  const u = new URL(location ?? '', base);
+  expect(u.pathname, `${label}: path`).toBe('/settings/second-step');
+  expect(u.searchParams.get('setup'), `${label}: setup`).toBe('1');
+  expect(u.searchParams.get('next'), `${label}: next`).toBe(nextPath);
+};
 
 test.describe('C1: a new user with only the own Person', () => {
   test('signs in and reaches /dashboard with no redirect and no enrolment prompt  [red if: the gate fires for the own-Person exemption]', async ({ page }) => {
@@ -25,7 +31,7 @@ test.describe('C6: a manager with no second step (after reset-mfa)', () => {
     await page.waitForURL('**/settings/second-step**');
     for (const path of ['/dashboard', '/settings/sessions', '/entities', '/']) {
       await page.goto(`${base}${path}`);
-      expect(new URL(page.url()).pathname + new URL(page.url()).search, path).toBe(SETUP);
+      expectGate(page.url(), path, path);
     }
   });
 });
@@ -43,26 +49,31 @@ test.describe('C5 spec 1: enrol by authenticator app from the gate (Enid)', () =
     for (const path of ['/dashboard', '/entities', '/settings/sessions']) {
       const r = await page.request.get(`${base}${path}`, { maxRedirects: 0 });
       expect(r.status(), path).toBe(303);
-      expect(r.headers()['location'], path).toBe(SETUP);
+      expectGate(r.headers()['location'], path, path);
     }
+    // P2: an off-origin `next` is carried as `/`: a request for //evil.example is held and its redirect names no such host.
+    const evil = await page.request.get(`${base}//evil.example/x`, { maxRedirects: 0 });
+    if (evil.status() === 303) expectGate(evil.headers()['location'], '/', 'a //evil next');
     const data = await (await page.request.get(`${base}/settings/second-step/__data.json`)).text();
     expect(data, 'the held page loads no entity data, the shell included').not.toContain(shared.sharedEntityName);
     expect(data).not.toContain(shared.sharedEntityId);
     await page.goto(`${base}/dashboard`);
-    await page.waitForURL('**/settings/second-step?setup=1');
+    await page.waitForURL('**/settings/second-step?setup=1&next=**');
     await expect(page.getByRole('dialog')).toBeVisible(); // ?setup=1 opens it
+    // P1: the held page's selector shows the user's own name as its only label, and no entity's (no entity query runs on that route).
+    await expect(page.getByText('Enid Enrol (Person)').first()).toBeVisible();
+    await expect(page.locator('body')).not.toContainText(shared.sharedEntityName);
     const { key, codes } = await enrolByAppToCodes(page, 'enid@e2e.test');
     appendFlow('flows.jsonl', { user: 'enid', key, codes });
     const dlg = page.getByRole('dialog');
     await expect(dlg.getByRole('button', { name: 'Finish' })).toBeDisabled();
-    // A sidebar link with the codes on screen: the dialog asks first (G2); on confirming, the link is followed (client-side: no pagehide fires).
-    await page.getByRole('link', { name: 'Dashboard' }).first().dispatchEvent('click');
-    await expect(page.getByText(/leave|discard|before you go|not saved/i).first()).toBeVisible();
-    expect(new URL(page.url()).pathname, 'not followed yet').toBe('/settings/second-step');
-    await page.getByRole('button', { name: /leave|discard|yes/i }).first().click();
-    await page.waitForURL('**/dashboard');
     const noCodes = async (where: string, list: string[]) => { for (const c of list) await expect(page.locator('body'), where).not.toContainText(c); };
-    await noCodes('after the link', codes);
+    // Finish needs the check; then the dialog goes to safeNext(next): she asked for /dashboard and lands on it (P2, R3.6).
+    await dlg.getByLabel(/I have saved these codes/i).check();
+    await dlg.getByRole('button', { name: 'Finish' }).click();
+    await dlg.getByRole('button', { name: 'Done' }).click().catch(() => {});
+    await page.waitForURL('**/dashboard');
+    await noCodes('after Finish', codes);
     await page.goBack();
     await noCodes('after back', codes);
     await page.goForward();
@@ -83,9 +94,13 @@ test.describe('C5 spec 1: enrol by authenticator app from the gate (Enid)', () =
     const fresh10 = (await page.getByTestId('backup-code').allTextContents()).map((c) => c.trim());
     expect(fresh10.filter((c) => codes.includes(c)), 'the new codes differ from the first set').toEqual([]);
     appendFlow('flows.jsonl', { user: 'enid-new-codes', codes: fresh10 });
+    // A sidebar link with the NEW codes on screen: the dialog asks first (G2); on confirming, the link is followed (client-side: no pagehide fires).
     await page.getByRole('link', { name: 'Dashboard' }).first().dispatchEvent('click');
-    await page.getByRole('button', { name: /leave|discard|yes/i }).first().click().catch(() => {}); // asks again if the codes are still on screen
+    await expect(page.getByText(/leave|discard|before you go|not saved/i).first()).toBeVisible();
+    expect(new URL(page.url()).pathname, 'not followed yet').toBe('/settings/second-step');
+    await page.getByRole('button', { name: /leave|discard|yes/i }).first().click();
     await page.waitForURL('**/dashboard');
+    await noCodes('new codes after the link', fresh10);
     await page.goBack();
     await noCodes('new codes after back', fresh10);
     await page.goForward();
