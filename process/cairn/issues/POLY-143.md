@@ -48,3 +48,21 @@ From POLY-152 and PR #134:
 - **N5 (second sighting):** `svelte-kit sync` has to run before `tests/db` in a fresh worktree.
 - **Re-check by 2026-12-17:** the dependency audit ignores GHSA-fc5q-39xc-vjpf (`picomatch`, no patched release; `process/DECISIONS.md` 2026-11-17). `tests/ci/audit-exemption.test.ts` fails after that date. On or before it: check for a fixed release, then remove the `auditConfig.ignoreGhsas` entry in `pnpm-workspace.yaml` or move the date with a note here.
 - seceng's note on PR #134: the pin checks that the audit step and the guard step carry the same condition; narrowing both together would pass it.
+
+### @team-lead — 2026-11-18
+
+**Test Postgres containers leak (Principal asked for a long-term fix, 2026-11-18).** On 2026-11-18 the dev machine had 24 `poly83-qa-*` containers running, 13 of them between 30 hours and 5 days old (removed by hand, with `poly147-bench`); 11 more were left by one loop's runs within 25 minutes.
+
+Diagnosis, from reading the code (not yet reproduced):
+- `tests/db/helpers/pg.ts:42-53` starts `docker run -d --rm --name poly83-qa-<random>` and returns a `stop()`. The container is removed only if that `stop()` runs.
+- Callers: `tests/db/global-setup.ts:15`, `tests/db/bench/global-setup.ts:8`, `apps/web/tests/e2e/serve.ts:24`. Nothing stops the container when the process is killed (a tool timeout, a cancelled run, a teammate shutdown, Playwright killing `serve.ts`), and `serve.ts` can throw between `startServer()` and its first `stop()` (it did this loop: the seed check at line 51 throws with the container already up).
+- The name is random and the container carries no label, so nothing can tell a live run's container from an orphan, and nothing reaps.
+
+Criteria for the fix (one change in `tests/db/helpers/pg.ts` plus its callers; qa-engineer owns the harness):
+- [ ] Every harness container carries labels: a fixed marker, the owner's pid and start time, and the checkout path.
+- [ ] `startServer()` first removes labelled containers whose owner pid is no longer alive on this host; a test starts an orphan (owner pid dead) and shows the next start removes it, and shows a container with a live owner is left alone.
+- [ ] The container ends on its own when its owner dies, even on SIGKILL: either a hard lifetime (for example 2 hours) or a lifeline the container watches. A test kills the owner with SIGKILL and shows the container gone within the stated time.
+- [ ] `stop()` is registered for exit, SIGINT and SIGTERM as soon as the container starts, and `serve.ts` cannot throw past it; a test makes the seed check throw and shows no container left.
+- [ ] `poly147-bench` and any other fixed-name container get the same treatment.
+- [ ] A one-line `pnpm` script removes every labelled orphan; the team-lead runs it at loop close.
+- [ ] CI is unaffected (`POLY_TEST_PG_URL` path starts no container).
