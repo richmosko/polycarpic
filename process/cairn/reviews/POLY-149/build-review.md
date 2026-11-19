@@ -108,3 +108,18 @@ Edited to the current state, with no history:
 - **The worst a wrong label could do** is make the record store, or drop, an address that a strictly computed check would have treated differently. The address is the service's word in any case (C-89). It never affects whether a row is written, its kind, user, time or lock length, or anything the lock guard decides.
 
 **Agreed:** relabel it STABLE when it is next touched, and move pgTAP 12's pin with it. This is not a change for this PR.
+
+## 7. The Addendum 7 build at `1e832bbc`: ACCEPT, pending qa's counts
+
+Read: `git diff 9fc167f4 1e832bbc -- packages`, 12 lines in 0016 and 0017, and pgTAP 07:69 at `1e832bbc`.
+- **`app.sign_in_address` is now `STABLE`.** It matches §6, and its behaviour is unchanged.
+- **0017's lock is its first statement**, before the REVOKEs and the `DROP FUNCTION`. That closes the deadlock risk I raised in ruling-review §15.1.
+- **The second temporary policy, `tx_identity_drop_web_read`**, is `FOR SELECT TO poly_owner USING (kind = 'web')`. It is needed because a DELETE's WHERE reads rows under the SELECT policies too (spec; backend-lead measured that without it the delete matched nothing).
+  - My §15.1 reading holds for it as it does for the DELETE policy.
+  - It is created and dropped inside 0017's one transaction, so no other session ever sees it.
+  - It names only poly_owner, whose session can already switch off RLS on the table, and only `web` rows.
+  - Both policies are dropped before the CHECK.
+  - pgTAP 07:69 counts every `tx_identity` policy that names poly_owner and requires 0. So it pins both names, and any later policy of the same kind.
+- **Nothing else in `packages` changed** since my ACCEPT at `9fc167f4`.
+
+**ACCEPT `1e832bbc`**, once qa's re-gate reports green on that sha with the counts in `gate.md`. If a count drops or a plant stops failing, this acceptance does not hold until I have read why.
