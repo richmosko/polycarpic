@@ -10,7 +10,7 @@ labels: [ci, tooling]
 priority: null
 pr: null
 created: 2026-11-12
-updated: 2026-11-18
+updated: 2026-11-19
 ---
 
 An umbrella for small CI and test-time items found in the POLY-141 and POLY-87 loops. None blocks a feature; each is taken when the `db` job's same-day median on `main` nears its 100 s warning budget, or when a loop is already in the files concerned. The timing rule these serve: a loop's cost is the branch's battery-step median minus `main`'s at the merge base, same session, at least three runs each (POLY-87 ruling, "Timing guard").
@@ -66,3 +66,11 @@ Criteria for the fix (one change in `tests/db/helpers/pg.ts` plus its callers; q
 - [ ] `poly147-bench` and any other fixed-name container get the same treatment.
 - [ ] A one-line `pnpm` script removes every labelled orphan; the team-lead runs it at loop close.
 - [ ] CI is unaffected (`POLY_TEST_PG_URL` path starts no container).
+
+### @team-lead — 2026-11-19
+
+From the POLY-149 loop (`process/cairn/reviews/POLY-149/gate.md`, verdict N3). Four additions:
+- **The db suite is 28% slower.** 76 s on `main` (902 tests) to 97 s (1,059 tests) locally, one control and one branch run at low load; CI's `db` job went from 2 min 22 s to 3 min 12 s. `tests/db/second-step-lock.test.ts` is the largest addition (eight nine-lock sequences of real sign-ins on two paths). Look for a cheaper way to reach a lock in a test.
+- **Parallel suites overload the machine.** With three teammates running db suites at once the load average reached 32 to 63; runs took 1,048 s and hit 60 s timeouts, test Postgres failed to become ready, and containers vanished mid-run. All passed on a quiet machine. A gate must be measured alone; consider a lock or queue so only one db suite runs at a time.
+- **The e2e server leaks its container every run.** `apps/web/tests/e2e/serve.ts` left one `poly83-qa-*` container after each of three gate runs (the leak already described above).
+- **Typecheck in a local gate is mostly cache.** 18 of 19 packages came from the turbo cache; say so in gate.md or force a clean run.
