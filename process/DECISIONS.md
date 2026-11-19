@@ -795,3 +795,11 @@ Add new decisions ABOVE this comment, newest first.
 - Tie the confirmation to the web handle — declined by both: the attacker creates the session and its handle.
 **Cost:** about $60 and 3 hours for the route (the architect's guess); about $12 for the delay and email on POLY-137 (seceng's guess). Someone adding a method through Confirm it's you will wait a day once the delay ships.
 **Approved by:** the Principal (2026-11-19), on seceng's assessment (`ruling-review.md` §13.2).
+
+### 2026-11-19 — A backup code is accepted for Confirm it's you
+**Decision:** Confirm it's you accepts the password with a backup code, as well as the password with an authenticator code, or a passkey. The database writes an audit event for every second-step method added or removed.
+**Why:** the route was built so that someone who loses their phone can replace the authenticator without the operator's reset; refusing backup codes here would leave that case unsolved.
+**The risk accepted:** recovering an account and taking it over are the same act here. Anyone who finds a backup code (a printout, a downloaded file) and knows the password can confirm, remove the owner's authenticator and add their own: a permanent takeover with no break-in needed. Once the mailer exists, the 24-hour delay and the email with cancel on a method added through Confirm it's you (the entry above; POLY-137; a condition of the first deploy with real household data) turn that into a takeover the owner is warned of and can stop.
+**Alternatives considered:**
+- Do not accept a backup code here — recommended by seceng: a found code plus the password could then sign in up to ten times but could not change the methods, and a password change would end it. About $6 cheaper (a guess). The cost falls on someone who loses a phone, who needs `reset-mfa`.
+**Approved by:** the Principal (2026-11-19), on the architect's and the lead's recommendation and against seceng's.
