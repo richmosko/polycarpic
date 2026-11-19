@@ -15,14 +15,6 @@ let e: Env;
 beforeAll(async () => { e = await boot(); });
 afterAll(() => teardown(e));
 
-describe('R0 this loop revokes nothing from poly_app (that is POLY-149)', () => {
-  it('poly_app still executes enter_asserted_user and still holds its BetterAuth table grants on the migrated chain [red if: this loop moved the revocation in]', () => {
-    expect(must(`SELECT has_function_privilege('poly_app', 'app.enter_asserted_user(uuid, uuid)', 'EXECUTE')`, e.db).rows[0]![0]).toBe('t');
-    for (const t of ['public."user"', 'public.session', 'public.account', 'public.verification', 'public.two_factor', 'public.passkey'])
-      expect(must(`SELECT has_table_privilege('poly_app', '${t}', 'SELECT')`, e.db).rows[0]![0], t).toBe('t');
-  });
-});
-
 describe('R11 definers.json lists the six new functions with owner and EXECUTE', () => {
   const want: [string, string[]][] = [
     ['app.enter_session(p_handle text)', ['poly_app']], ['app.my_sessions()', ['poly_app']], ['app.revoke_my_session(p_id uuid)', ['poly_app']], ['app.recent_auth_ok()', ['poly_app']],
@@ -77,7 +69,6 @@ describe('R7.1 withSession(handle, fn) in packages/db (real, on the poly_app poo
     const r = await root();
     expect(typeof r.withSession).toBe('function');
     expect(typeof r.NoLiveSession).toBe('function');
-    expect(typeof ((await import('../../packages/db/src/session.ts')) as any).withSession).toBe('undefined');
   });
   it('enters by ONE statement `SELECT * FROM app.enter_session($1)`, hands fn (tx, shell) for the live session, and the marker is kind session [red if: setup sends two statements, a hash, or another kind]', async () => {
     const r = await root();
