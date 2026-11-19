@@ -130,3 +130,11 @@ Read: `git diff b31be909 3725d22e -- process/cairn/reviews/POLY-149/ruling.md`. 
 | §2.4 the `web` marker delete under FORCE RLS | Unchanged | Still a build note, not security. |
 
 §3's other conditions and §4's two recommendations stand unchanged at this sha.
+
+## 8. The R5 addendum at `4b421984`: §2.1 closed
+
+Read: `git diff 3725d22e 4b421984 -- process/cairn/reviews/POLY-149/ruling.md`.
+- R5 gains a row: poly_app, poly_auth, poly_worker, poly_operator and poly_migrator hold no SELECT on `app.sign_in_record`, checked by effective privilege. poly_backup is the one exception, pending decision 1.
+- R3's test line now has a plant for it, `GRANT SELECT … TO poly_worker`, which must be shown to fail the test. R5's opening sentence already requires the same of the gate.
+
+That is §2.1(3), and with it §2.1 is closed. **The ruling is accepted at `4b421984`, with no required change outstanding.** If the Principal chooses (b) on decision 1, poly_backup joins the row and §4.1 applies.
