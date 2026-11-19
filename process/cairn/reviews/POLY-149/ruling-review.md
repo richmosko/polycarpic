@@ -178,3 +178,14 @@ Read: `git diff 30552d2a 8de05776 -- process/cairn/reviews/POLY-149/ruling.md`.
   - Its tests (10 000 characters, `'not-an-ip'`, `'::1'`, `'203.0.113.7'`, on both kinds of row) are the T-S1 and T-S2 I asked for.
 
 **The ruling is accepted at `8de05776`.** Nothing is outstanding. The build review is at qa's gate sha.
+
+## 12. ARCH §3.1c at `38305740`: accepted
+
+Read: `git diff abf5298a 38305740 -- docs/ARCH/index.html`, against the decisions dated 2026-11-19 (1–3) and the ruling at `8de05776`.
+- **Decision 3 is right.** The erase limit names both the database server and the migration credential, which can `SET ROLE poly_owner` and drop the triggers.
+- **The streak** says that no runtime login role holds it and that poly_backup reads it. This matches decision 1 as it applies to the streak, and my early-read item 2.
+- **Current state:** the purge has no job yet, so the 400 days is not enforced (POLY-137).
+- **The guard's five steps** match R2 and the code at `002cda1f`, in this order: refuse during a lock, the lazy clear, the new lock with its record row, the failure row, the reset.
+- **The address** is kept only if it is a valid inet (Addendum 4.3).
+
+No conflict with the Principal's decisions. **ARCH §3.1c is accepted at `38305740`**, together with the ruling at `8de05776`.
