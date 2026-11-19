@@ -36,10 +36,15 @@ const TRIGGERS: [string, string][] = [
   ['public.two_factor', 'two_factor_15_lock'], ['public.two_factor', 'two_factor_16_lock_delete'],
   ['public.session', 'session_80_sign_in_record'],
   ['app.sign_in_record', 'sign_in_record_05_refuse'], ['app.sign_in_record', 'sign_in_record_10_immutable'], ['app.sign_in_record', 'sign_in_record_no_truncate'],
+  // POLY-150j (ruling Addendum 5): the method-change audit triggers and the step-up triggers
+  ['public.two_factor', 'two_factor_80_sync'], ['public.passkey', 'passkey_80_sync'],
+  ['public.two_factor', 'two_factor_85_step_up_spent'], ['app.step_up_totp', 'step_up_totp_10_forward'],
+  ['app.step_up_pending', 'step_up_pending_resolved'],
 ];
 const LOGINS = ['poly_app', 'poly_auth', 'poly_worker', 'poly_operator', 'poly_migrator'];
 const TABLES = ['app.sign_in_record', 'app.second_step_streak'];
-const DEFINERS = ['app.guard_second_step_lock()', 'app.record_session_sign_in()'];
+const DEFINERS = ['app.guard_second_step_lock()', 'app.record_session_sign_in()', 'app.sync_second_step()'];
+const STEP_UP = 'app.complete_step_up(text,uuid,bigint)';
 const plants: Plant[] = [
   // 1. the objects, RLS enabled and forced
   ['app.second_step_streak dropped', 'DROP TABLE app.second_step_streak CASCADE', 'table app.second_step_streak: missing'],
@@ -87,11 +92,28 @@ const plants: Plant[] = [
   ['poly_app DELETE on passkey', 'GRANT DELETE ON public.passkey TO poly_app', 'public.passkey: poly_app holds DELETE'],
   ['poly_app SELECT on session_handle', 'GRANT SELECT ON app.session_handle TO poly_app', 'app.session_handle: poly_app holds SELECT'],
   ['poly_app SELECT on the streak', 'GRANT SELECT ON app.second_step_streak TO poly_app', 'app.second_step_streak: poly_app holds SELECT'],
-  // 9. poly_app's EXECUTE set on app is exactly the ten
+  // 9. poly_app's EXECUTE set on app is exactly the eleven
   ['poly_app EXECUTE on enter_new_user', 'GRANT EXECUTE ON FUNCTION app.enter_new_user(uuid) TO poly_app', 'function app.enter_new_user(uuid): poly_app can execute it'],
   ['a new app function granted to PUBLIC', 'CREATE FUNCTION app.qa_new() RETURNS int LANGUAGE sql AS $$ SELECT 1 $$; GRANT EXECUTE ON FUNCTION app.qa_new() TO PUBLIC', 'function app.qa_new(): poly_app can execute it'],
   ['poly_app loses enter_session', 'REVOKE EXECUTE ON FUNCTION app.enter_session(text) FROM poly_app', 'function app.enter_session(text): poly_app cannot execute it'],
   ['poly_app loses my_second_step (RC1)', 'REVOKE EXECUTE ON FUNCTION app.my_second_step() FROM poly_app', 'function app.my_second_step(): poly_app cannot execute it'],
+  // 12. method changes are audited by the database (Addendum 5)
+  ['passkey_80_sync re-pointed at another function', 'DROP TRIGGER passkey_80_sync ON public.passkey; CREATE TRIGGER passkey_80_sync AFTER INSERT OR DELETE ON public.passkey FOR EACH ROW EXECUTE FUNCTION app.guard_second_step_lock()', 'trigger passkey_80_sync on public.passkey: does not run app.sync_second_step()'],
+  ['two_factor_80_sync re-pointed at another function', 'DROP TRIGGER two_factor_80_sync ON public.two_factor; CREATE TRIGGER two_factor_80_sync AFTER INSERT OR DELETE ON public.two_factor FOR EACH ROW EXECUTE FUNCTION app.guard_second_step_lock()', 'trigger two_factor_80_sync on public.two_factor: does not run app.sync_second_step()'],
+  ...['method_added', 'method_removed'].map((k): Plant => [`sync_second_step body no longer writes ${k}`,
+    `UPDATE pg_proc SET prosrc = replace(prosrc, 'second_step.${k}', 'second_step.x') WHERE oid = 'app.sync_second_step()'::regprocedure`,
+    `function app.sync_second_step(): its body does not write second_step.${k}`]),
+  // 13. complete_step_up
+  [`${STEP_UP} owned by poly_owner`, `ALTER FUNCTION ${STEP_UP} OWNER TO poly_owner`, `function ${STEP_UP}: owner is poly_owner`],
+  [`${STEP_UP} made an invoker`, `ALTER FUNCTION ${STEP_UP} SECURITY INVOKER`, `function ${STEP_UP}: not SECURITY DEFINER`],
+  [`${STEP_UP} EXECUTE to poly_worker`, `GRANT EXECUTE ON FUNCTION ${STEP_UP} TO poly_worker`, `function ${STEP_UP}: poly_worker can execute it`],
+  [`${STEP_UP} EXECUTE to PUBLIC`, `GRANT EXECUTE ON FUNCTION ${STEP_UP} TO PUBLIC`, `function ${STEP_UP}: poly_app can execute it`],
+  [`${STEP_UP} EXECUTE revoked from poly_auth`, `REVOKE EXECUTE ON FUNCTION ${STEP_UP} FROM poly_auth`, `function ${STEP_UP}: poly_auth cannot execute it`],
+  [`${STEP_UP} dropped`, `DROP FUNCTION ${STEP_UP}`, `function ${STEP_UP}: missing`],
+  ['poly_auth granted UPDATE (recent_auth_at) on session', 'GRANT UPDATE (recent_auth_at) ON public.session TO poly_auth', 'public.session.recent_auth_at: poly_auth holds UPDATE'],
+  ['poly_worker granted UPDATE on session (whole table)', 'GRANT UPDATE ON public.session TO poly_worker', 'public.session.recent_auth_at: poly_worker holds UPDATE'],
+  // 14. the deferred constraint trigger
+  ['step_up_pending_resolved made immediate', `DO $$ DECLARE f regproc; BEGIN SELECT tgfoid::regproc INTO f FROM pg_trigger WHERE tgname = 'step_up_pending_resolved'; DROP TRIGGER step_up_pending_resolved ON app.step_up_pending; EXECUTE format('CREATE CONSTRAINT TRIGGER step_up_pending_resolved AFTER INSERT ON app.step_up_pending FOR EACH ROW EXECUTE FUNCTION %s()', f); END $$`, 'trigger step_up_pending_resolved on app.step_up_pending: not DEFERRABLE INITIALLY DEFERRED'],
   // 10. no login role deletes a user
   ...LOGINS.map((r): Plant => [`${r} DELETE on user`, `GRANT DELETE ON public."user" TO ${r}`, `public."user": ${r} holds DELETE`]),
 ];
