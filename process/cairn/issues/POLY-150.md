@@ -1,16 +1,17 @@
 ---
 id: POLY-150
 title: Second-step screens
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: ux-designer
+paths: [process/cairn/issues/POLY-150.md, process/cairn/reviews/POLY-150/**, docs/DESIGN/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, apps/web/**, apps/auth/**, packages/**, tests/**, infra/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore]
 labels: [design, security]
 priority: null
 pr: null
 created: 2026-11-16
-updated: 2026-11-16
+updated: 2026-11-19
 ---
 
 POLY-89 shipped the second sign-in step as database guards and auth routes, with a placeholder at `/settings/second-step`. No screen reaches enrolment, so nobody can enrol in a browser, and no one can create a non-Person entity or send an invitation until these exist (ruling R7 in `process/cairn/reviews/POLY-89/ruling.md`; it fails closed). POLY-139 covers only Sign-in and Sessions. ux-designer designs, frontend-lead builds. Lands before POLY-110 and POLY-144.
@@ -28,3 +29,7 @@ POLY-89 shipped the second sign-in step as database guards and auth routes, with
 ### @team-lead — 2026-11-16
 
 Filed from the POLY-89 loop (merged 2026-11-17, PR #131). The lead's check of the sign-in gate was over HTTP only, because the app needs `x-forwarded-for` to resolve a client address and a plain browser has none; the browser tests here should run behind a proxy that sets it.
+
+### @team-lead — 2026-11-19
+
+Feature started. Branch: `feature/poly-150-second-step-screens`. Stages: POLY-150a (design), b (ruling), c (security review), d (tests), e (build), f (verdict). The Principal reviews the screens before the build starts.
