@@ -62,3 +62,12 @@ ARCH 1.21.0 states the current state:
 - §7.3: the auth container's measured memory.
 
 `ARCH.pdf` is not regenerated.
+
+## 7. Re-gate at `1e832bbc` (Addendum 7)
+
+**APPROVE at `1e832bbc`.** I read `git diff 9fc167f4 1e832bbc -- packages`: 13 changed lines, all in 0016 and 0017, against Addendum 7 as corrected (`ff6e2a94`).
+- 0016: `app.sign_in_address` is `STABLE` (verdict N1 closed). Nothing else in the file changed.
+- 0017: the `LOCK TABLE app.tx_identity IN SHARE ROW EXCLUSIVE MODE` is the first statement. As poly_owner, the read and delete policies (`USING (kind = 'web')`) come in that order, then the DELETE, then both are dropped before the kind CHECK. Nothing else changed.
+- Evidence from qa (`gate.md` at `34d31965`): db 1059/0/0, e2e 57/0/0, every other suite and lint green; Addendum 7's two tests pass (a fresh `web` marker migrates through 0017 with the CHECK validated; no `tx_identity` policy names poly_owner). From seceng: `build-review.md` §7 at `464249ef`.
+- **ARCH needs no change.** It never stated the helper's volatility, and the temporary policies do not outlive the migration, so the current state is the same.
+- **One cosmetic line, not blocking:** 0017's header comment still lists the order as "the REVOKEs, the policy, …" and omits the lock that now comes first. The in-file Addendum 7 comment states the real order. Fix it only if 0017 is edited again before merge; a migration's comment cannot change after.
