@@ -320,7 +320,7 @@ else {
     }
   }
   const snippet = blocks.find((b) => b.head === '(security_headers)');
-  const need = ['defer', 'Strict-Transport-Security "max-age=31536000"', 'X-Content-Type-Options "nosniff"', 'Referrer-Policy "strict-origin-when-cross-origin"'];
+  const need = ['defer', 'Strict-Transport-Security "max-age=31536000"', 'X-Content-Type-Options "nosniff"', 'X-Frame-Options "DENY"', 'Referrer-Policy "strict-origin-when-cross-origin"'];
   if (!snippet) v('caddy-headers', 'infra/caddy/Caddyfile', 'snippet (security_headers) missing');
   else for (const n of need) if (!snippet.body.includes(n)) v('caddy-headers', 'infra/caddy/Caddyfile', `snippet lacks: ${n}`);
   for (const b of blocks) {

@@ -20,11 +20,11 @@ WITH logins AS (
          ('app.sign_in_record', 'sign_in_record_no_truncate')
 ), definers(sig, owner) AS (
   VALUES ('app.guard_second_step_lock()', 'poly_govern'), ('app.record_session_sign_in()', 'poly_govern')
-), app_ten(sig) AS (
+), app_eleven(sig) AS (
   VALUES ('app.current_user_id()'), ('app.current_session_id()'), ('app.has_role(uuid,text)'),
          ('app.visible_entities()'), ('app.owner_count(uuid)'), ('app.second_step_required()'),
          ('app.enter_session(text)'), ('app.my_sessions()'), ('app.recent_auth_ok()'),
-         ('app.revoke_my_session(uuid)')
+         ('app.revoke_my_session(uuid)'), ('app.my_second_step()')
 ), member_want(m, r, inh, st, adm) AS (
   -- pg_auth_members, both ways (roles.sql is the source): poly_migrator holds the owner and the seven definer-owner roles
   -- (inherit false, set true, admin false); poly_backup holds pg_read_all_data (its inherit and set are not compared).
@@ -105,15 +105,15 @@ WITH logins AS (
              ELSE has_table_privilege('poly_app', to_regclass(t), p) END
   UNION ALL
   SELECT 'FAIL ' || t || ': missing' FROM (SELECT t FROM betterauth UNION ALL SELECT 'app.session_handle') x(t) WHERE to_regclass(t) IS NULL
-  -- 9. poly_app's EXECUTE set on app is exactly the ten
+  -- 9. poly_app's EXECUTE set on app is exactly the eleven
   UNION ALL
   SELECT 'FAIL function ' || p.oid::regprocedure::text || ': poly_app can execute it'
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname = 'app' AND has_function_privilege('poly_app', p.oid, 'EXECUTE')
-    AND p.oid::regprocedure::text NOT IN (SELECT sig FROM app_ten)
+    AND p.oid::regprocedure::text NOT IN (SELECT sig FROM app_eleven)
   UNION ALL
   SELECT 'FAIL function ' || sig || ': poly_app cannot execute it (or it is missing)'
-  FROM app_ten WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_app', to_regprocedure(sig), 'EXECUTE')
+  FROM app_eleven WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_app', to_regprocedure(sig), 'EXECUTE')
   -- 11. role membership is the exact set: a login role that can SET ROLE to a definer owner passes every line above
   UNION ALL
   SELECT 'FAIL membership: ' || m || ' holds ' || r || ' (inherit ' || coalesce(inh::text, '-') || ', set ' || coalesce(st::text, '-')

@@ -82,6 +82,8 @@ export const twoFactor = pgTable(
     verified: boolean('verified').default(false).notNull(),
     failedVerificationCount: integer('failed_verification_count').default(0),
     lockedUntil: tstz('locked_until'),
+    // POLY-150 (0018): when the factor was added; BetterAuth's INSERT names no such column, so the default fills it.
+    createdAt: tstz('created_at').defaultNow().notNull(),
   },
   (t) => [index('two_factor_secret_idx').on(t.secret), index('two_factor_user_id_idx').on(t.userId)],
 );

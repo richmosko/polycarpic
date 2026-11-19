@@ -38,6 +38,7 @@
   { "function": "app.session_needs_handle()", "owner": "poly_authz", "execute": [] },
   { "function": "app.recent_auth_ok()", "owner": "poly_authz", "execute": ["poly_app"] },
   { "function": "app.my_sessions()", "owner": "poly_authz", "execute": ["poly_app"] },
+  { "function": "app.my_second_step()", "owner": "poly_govern", "execute": ["poly_app"] },
   { "function": "app.revoke_my_session(p_id uuid)", "owner": "poly_authz", "execute": ["poly_app"] },
   { "function": "app.record_session_sign_in()", "owner": "poly_govern", "execute": [] },
   { "function": "app.guard_second_step_lock()", "owner": "poly_govern", "execute": [] },

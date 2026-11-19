@@ -8,6 +8,7 @@ import { widenTwoFactorMatcher } from './second-step.ts';
 export const name = '@poly/auth';
 
 export { authOptions, type AuthInput } from './options.ts';
+export type { SendSecondStepCode } from './anchor.ts';
 export { AUTH_ROUTES, USER_INSERTING, SIGN_IN_PATHS, matchAuthPath, refusedByHandle, type RouteClass, type TlsMode } from './route-policy.ts';
 export { createRoutingPool } from './routing-pool.ts';
 export { requireRecentAuth } from './recent-auth.ts';

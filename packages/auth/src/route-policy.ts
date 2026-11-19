@@ -175,6 +175,8 @@ export function routePolicyHook(tlsMode: TlsMode) {
       if (extra.length > 0 || (body.image !== undefined && body.image !== null)) throw new APIError('BAD_REQUEST', { message: 'update-user accepts a name and a null image only' });
     }
 
+    // POLY-150 R7: trustDevice would skip the second step in this browser for 30 days; the held sign-in asks every time.
+    if ((ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code') && body.trustDevice) throw new APIError('BAD_REQUEST', { code: 'trust_device_refused', message: 'trust_device_refused' });
     // S16, S17: a registration never mints a session, and the only second factor BetterAuth may enable is totp.
     if (ctx.path === '/passkey/verify-registration' && body.createSession) throw new APIError('BAD_REQUEST', { code: 'create_session_refused', message: 'create_session_refused' });
     if (ctx.path === '/two-factor/enable' && body.method !== undefined && body.method !== 'totp') throw new APIError('BAD_REQUEST', { code: 'method_refused', message: 'method_refused' });

@@ -2,7 +2,7 @@
 // Order: configuration (refuse before any pool exists), the role and schema checks, then BetterAuth, then the one listener.
 // startAuthService(env) is the testable core; the process wrapper at the bottom runs only when this file is the entry point.
 import { pathToFileURL } from 'node:url';
-import { authOptions, createAuth } from '@poly/auth';
+import { authOptions, createAuth, type SendSecondStepCode } from '@poly/auth';
 import { ConfigError, loadConfig, runCheckConfig } from '@poly/config';
 import { createLogger } from '@poly/config/log';
 import { assertRole, assertSchemaNotBehind, closePools, configureAuthPool } from '@poly/db/startup';
@@ -16,9 +16,16 @@ export interface AuthService {
 }
 
 /** Starts the service from `env`. Throws (and starts nothing) on a config fault, the wrong database role, a schema behind the image, or an unreadable secret. */
-export async function startAuthService(env: Record<string, string | undefined> = process.env): Promise<AuthService> {
+export async function startAuthService(
+  env: Record<string, string | undefined>,
+  deps: { sendSecondStepCode?: SendSecondStepCode } = {},
+): Promise<AuthService> {
   const log = createLogger({ service: 'auth' });
   const config = loadConfig('auth', env);
+  // POLY-150 R4: a delivery stand-in is a development-only argument; the process wrapper passes none, and a release image refuses one.
+  if (deps.sendSecondStepCode && config.appEnv !== 'development') {
+    throw new ConfigError([{ var: 'deps', fault: 'forbidden', message: 'deps.sendSecondStepCode is accepted only when APP_ENV is development' }]);
+  }
   const port = publicPort(env);
   const secret = config.secrets.AUTH_SECRET_FILE;
   if (!secret) throw new ConfigError([{ var: 'AUTH_SECRET_FILE', fault: 'not_set', message: 'AUTH_SECRET_FILE is not set' }]);
@@ -35,14 +42,13 @@ export async function startAuthService(env: Record<string, string | undefined> =
       secret: secret.reveal(),
       baseURL: config.publicOrigin,
       tlsMode: config.tlsMode,
-      requireClientIp: config.appEnv !== 'development',
+      requireClientIp: true,
       // Providers arrive with POLY-88; the mailer with POLY-137. Until then a magic link answers 503.
       sendMagicLink: async () => {
-        throw new Error('mailer not configured');
+        throw new Error('magic link delivery is unavailable');
       },
-      sendSecondStepCode: async () => {
-        throw new Error('mailer not configured');
-      },
+      // No mailer until POLY-137: with none passed, send-code answers 503 mailer_unavailable.
+      sendSecondStepCode: deps.sendSecondStepCode,
     }),
   );
   const onError = (e: unknown) => log.error('auth.request_failed', { outcome: 'error', err: e });

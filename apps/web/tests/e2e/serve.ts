@@ -129,7 +129,7 @@ const tee = (child: ReturnType<typeof spawn>, file: string) => {
 const run = (args: string[]) => tee(spawn('pnpm', ['exec', ...args], { cwd: web, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...appEnv } }), 'web.log');
 // The sign-in service starts before `vite preview` and is waited for on /api/auth/ok (R1.7).
 // POLY-150 R4: through auth-entry.ts, the real service with the delivery stand-in as its one injected dependency.
-const service = tee(spawn('node', [join(here, 'auth-entry.ts')], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...authEnv } }), 'auth.log');
+const service = tee(spawn('node', [join(here, '..', '..', '..', '..', 'tests', 'db', 'helpers', 'auth-entry.ts')], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...authEnv } }), 'auth.log');
 for (let i = 0; ; i++) {
   if (i > 100) { service.kill(); stop(); throw new Error('the sign-in service did not start'); }
   if (await fetch(`http://127.0.0.1:${authPort}/api/auth/ok`, { headers: { 'x-forwarded-for': '127.0.0.1' } }).then((r) => r.ok, () => false)) break;

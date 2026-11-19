@@ -33,6 +33,13 @@ export async function enrolmentGrantLive(): Promise<boolean> {
   return rows[0]?.enrolment_grant_live === true;
 }
 
+/** `r•••@e•••.com`: enough to recognise the address, never the local part (POLY-150 R3). */
+const maskEmail = (email: string): string => {
+  const [local = '', domain = ''] = email.split('@');
+  const dot = domain.lastIndexOf('.');
+  return `${local.slice(0, 1)}***@${domain.slice(0, 1)}***${dot > 0 ? domain.slice(dot) : ''}`;
+};
+
 const refusal = (status: number, code: string): Response =>
   new Response(JSON.stringify({ code, message: code }), { status, headers: { 'content-type': 'application/json', [COMMIT_HEADER]: '1' } });
 
@@ -41,6 +48,10 @@ export function secondStepAnchor(opts: { sendSecondStepCode?: SendSecondStepCode
     id: 'second-step-anchor',
     endpoints: {
       sendSecondStepCode: createAuthEndpoint('/second-step/send-code', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
+        // POLY-150 R3: no mailer, no answer to anything else: the same 503 for every caller, before the body, the password or the cap.
+        if (!opts.sendSecondStepCode) {
+          return new Response(JSON.stringify({ code: 'mailer_unavailable' }), { status: 503, headers: { 'content-type': 'application/json', [COMMIT_HEADER]: '1' } });
+        }
         const { user, session } = ctx.context.session;
         // ARCH §3.1c: the code goes to the current verified address only.
         if (!user.emailVerified) throw new APIError('FORBIDDEN', { code: 'email_not_verified', message: 'email_not_verified' });
@@ -59,11 +70,10 @@ export function secondStepAnchor(opts: { sendSecondStepCode?: SendSecondStepCode
         const rows = asRows<{ issue_email_challenge: string | null }>(await pool.query('SELECT app.issue_email_challenge($1)', ['first_enrolment']));
         const code = rows[0]?.issue_email_challenge ?? null;
         if (code !== null) {
-          if (!opts.sendSecondStepCode) throw new Error('second step: sendSecondStepCode is not configured');
           // Before commit: a failed send rolls the challenge back.
-          await opts.sendSecondStepCode({ email: user.email, code });
+          await opts.sendSecondStepCode!({ email: user.email, code });
         }
-        return ctx.json({ status: true });
+        return ctx.json({ status: true, sentTo: maskEmail(user.email) });
       }),
       confirmSecondStepCode: createAuthEndpoint('/second-step/confirm-code', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
         const code = (ctx.body as { code?: unknown } | undefined)?.code;

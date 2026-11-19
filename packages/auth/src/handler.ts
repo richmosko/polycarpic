@@ -112,7 +112,16 @@ function clearingCookie(c: { name: string; attributes: { path?: string; domain?:
   return parts.join('; ');
 }
 
+/** Every /api/auth answer is `no-store` whatever BetterAuth sent: enable returns the key and the codes, and a refusal is not for a cache either (POLY-150 R10). */
 export async function handleAuthRequest(request: Request, given: Promise<AnyAuth> | AnyAuth = defaultAuth()): Promise<Response> {
+  const res = await handleAuthRequestInner(request, given);
+  if (res.headers.get('cache-control')?.toLowerCase() === 'no-store') return res;
+  const headers = new Headers(res.headers);
+  headers.set('cache-control', 'no-store');
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+}
+
+async function handleAuthRequestInner(request: Request, given: Promise<AnyAuth> | AnyAuth): Promise<Response> {
   const route = matchAuthPath(new URL(request.url).pathname);
   if (!route || route.rule.class === 'blocked') return notFound(); // the same answer for an unlisted and a blocked path
   const auth = await given;

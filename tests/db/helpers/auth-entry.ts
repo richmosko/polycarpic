@@ -5,10 +5,10 @@
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { startAuthService } from '../../../auth/src/main.ts';
+import { startAuthService } from '../../../apps/auth/src/main.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const outbox = join(here, '.auth', 'outbox.jsonl');
+const outbox = join(here, '..', '..', '..', 'apps', 'web', 'tests', 'e2e', '.auth', 'outbox.jsonl');
 mkdirSync(dirname(outbox), { recursive: true });
 
 const sendSecondStepCode = async (m: { email: string; code: string }): Promise<void> => {
