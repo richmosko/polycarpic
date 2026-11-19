@@ -211,3 +211,28 @@ The list is still safe:
 - The size pin at `:76` makes any further addition a reviewed diff.
 
 **Accepted at `cd6ab898`.**
+
+## 14. Addendum 5 at `d170edfd`, the no-adjustable-clock pin: accepted, with one tightening
+
+Read: `git diff 8de05776 d170edfd -- process/cairn/reviews/POLY-149/ruling.md`; 0013:360, :391, :420; 0016 (the four functions); and a grep of 0000–0017 for `EXECUTE` inside function bodies.
+
+**1. `role` as a fourth allowed setting: accepted.**
+- The three 0013 guards compare `current_setting('role') = 'none'` to tell a superuser login with no `SET ROLE` from one that switched to a runtime role (code-read).
+- The value is a role name, not a time, so it cannot move a clock.
+- It cannot widen what the guards allow either. It is read only after `rolsuper` is true for `session_user`, and a non-superuser cannot make that true.
+
+**2. Only the two address settings in the four lock and record functions, pinned per function with a plant: accepted.** This is the pin my T-L5 asked for, made exact.
+
+**3. Scanning all of `pg_proc` outside `pg_catalog` and `information_schema`, excluding extension members: accepted.** Excluding extension members is safe: only a superuser can install an extension, and that is already the accepted limit.
+
+**4. No read of `pg_settings` or `pg_show_all_settings`, and no dynamic `EXECUTE` in the four functions: accepted, with one tightening.**
+- **The tightening:** apply the `EXECUTE` ban over the same schema-wide scope as item 3, not only to the four functions.
+- **Why:** a dynamic `EXECUTE` in a helper that the guard comes to call later would escape every text scan, including the schema-wide setting scan. Item 3's own reasoning, that the guard's safety must not depend on where a helper lives, applies to this ban too.
+- **Cost:** nothing today. No function body in 0000–0017 contains `EXECUTE`; every match is a GRANT, REVOKE, `EXECUTE FUNCTION` in a CREATE TRIGGER, or a comment (code-read).
+- **Side effect:** any future definer that needs dynamic SQL comes for review. That is also a guard against SQL injection inside definers.
+- **How:** this only tightens the pin, so qa can write it in the re-write without a new addendum, unless the architect prefers to rule it.
+- **Pin and plant:** `prosrc !~* '\mexecute\M'` over item 3's scope, plus a plant: a function in `public` whose body runs `EXECUTE 'SELECT 1'`.
+
+The guards call `pg_catalog.clock_timestamp()` by its qualified name, with `search_path = ''`, so no object can shadow the clock (code-read, 0016).
+
+**Accepted at `d170edfd`**, with item 4's tightening carried by qa's re-write of pgTAP 12.
