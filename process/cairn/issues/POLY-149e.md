@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-149
 blocked_by: []
 assignee: devops-engineer
-paths: [process/cairn/issues/POLY-149.md, process/cairn/reviews/POLY-149/**, process/cairn/issues/POLY-149e.md, infra/**, docs/INFRA/**, tests/infra/**]
+paths: [process/cairn/issues/POLY-149.md, process/cairn/reviews/POLY-149/**, process/cairn/issues/POLY-149e.md, infra/**, docs/INFRA/**, tests/infra/**, tests/db/gate-check.test.ts, tests/ci/db-areas.test.ts]
 stage: execute
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 3
