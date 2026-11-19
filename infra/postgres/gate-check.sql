@@ -16,7 +16,8 @@ WITH logins AS (
 ), trig(tbl, name) AS (
   VALUES ('public.two_factor', 'two_factor_15_lock'), ('public.two_factor', 'two_factor_16_lock_delete'),
          ('public.session', 'session_80_sign_in_record'),
-         ('app.sign_in_record', 'sign_in_record_10_immutable'), ('app.sign_in_record', 'sign_in_record_no_truncate')
+         ('app.sign_in_record', 'sign_in_record_05_refuse'), ('app.sign_in_record', 'sign_in_record_10_immutable'),
+         ('app.sign_in_record', 'sign_in_record_no_truncate')
 ), definers(sig, owner) AS (
   VALUES ('app.guard_second_step_lock()', 'poly_govern'), ('app.record_session_sign_in()', 'poly_govern')
 ), app_ten(sig) AS (
@@ -24,6 +25,18 @@ WITH logins AS (
          ('app.visible_entities()'), ('app.owner_count(uuid)'), ('app.second_step_required()'),
          ('app.enter_session(text)'), ('app.my_sessions()'), ('app.recent_auth_ok()'),
          ('app.revoke_my_session(uuid)')
+), member_want(m, r, inh, st, adm) AS (
+  -- pg_auth_members, both ways (roles.sql is the source): poly_migrator holds the owner and the seven definer-owner roles
+  -- (inherit false, set true, admin false); poly_backup holds pg_read_all_data (its inherit and set are not compared).
+  SELECT 'poly_migrator', r, false, true, false
+  FROM unnest(ARRAY['poly_owner', 'poly_authz', 'poly_purge', 'poly_rollup', 'poly_graph', 'poly_stake', 'poly_govern', 'poly_journal']) r
+  UNION ALL SELECT 'poly_backup', 'pg_read_all_data', NULL, NULL, false
+), member_have AS (
+  SELECT um.rolname::text AS m, ro.rolname::text AS r,
+         CASE WHEN um.rolname = 'poly_backup' THEN NULL ELSE a.inherit_option END AS inh,
+         CASE WHEN um.rolname = 'poly_backup' THEN NULL ELSE a.set_option END AS st, a.admin_option AS adm
+  FROM pg_auth_members a JOIN pg_roles um ON um.oid = a.member JOIN pg_roles ro ON ro.oid = a.roleid
+  WHERE um.rolname LIKE 'poly\_%' OR ro.rolname LIKE 'poly\_%' OR um.rolcanlogin
 ), f(line) AS (
   -- 1. the two tables exist, RLS enabled and forced
   SELECT 'FAIL table ' || t || ': missing' FROM tbls WHERE to_regclass(t) IS NULL
@@ -101,6 +114,14 @@ WITH logins AS (
   UNION ALL
   SELECT 'FAIL function ' || sig || ': poly_app cannot execute it (or it is missing)'
   FROM app_ten WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_app', to_regprocedure(sig), 'EXECUTE')
+  -- 11. role membership is the exact set: a login role that can SET ROLE to a definer owner passes every line above
+  UNION ALL
+  SELECT 'FAIL membership: ' || m || ' holds ' || r || ' (inherit ' || coalesce(inh::text, '-') || ', set ' || coalesce(st::text, '-')
+         || ', admin ' || adm || ') and should not, or not so'
+  FROM (SELECT * FROM member_have EXCEPT SELECT * FROM member_want) x
+  UNION ALL
+  SELECT 'FAIL membership: ' || m || ' does not hold ' || r || ' as it should'
+  FROM (SELECT * FROM member_want EXCEPT SELECT * FROM member_have) x
   -- 10. no login role can delete a user
   UNION ALL
   SELECT 'FAIL public."user": ' || r || ' holds DELETE' FROM logins WHERE has_table_privilege(r, 'public."user"', 'DELETE')
