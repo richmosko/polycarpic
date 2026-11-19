@@ -252,3 +252,38 @@
 - **It writes nothing:** only SELECTs, and the call to the read-only `second_step_needed`. Its owner is poly_govern, with `search_path` set to empty and EXECUTE granted to poly_app only.
 
 The formal build review waits for the gate.
+
+---
+
+## 9. Verdict on the ruling re-issued at `fbf9a527`, with DESIGN at `00412384` (0.19.1). This replaces every earlier verdict.
+
+**Verdict: ACCEPT `fbf9a527`.** The conditions from my gate and dialog assessment landed as I wrote them. Two points need a line from the architect, or the build must follow them as written here (§9.2). Neither blocks the tests.
+
+### 9.1 My conditions
+| Condition | Ruling | Result |
+|---|---|---|
+| [GA] Gate (a): exempt exactly one route, and while held the page loads no shared-entity data | R1.3. The exemption is exactly `/settings/second-step` and its `__data.json`, never the `/settings` tree. Tests cover the trailing slash, `/x`, Sessions and a form POST elsewhere. The page's `__data.json` must not name the seeded "Shared Co" | **Met.** It is still one check before `resolve`, closed by default, as strong as today (assessment §0). |
+| [G1] No page form; posts by `fetch` only | R3.0. A portal to `body`, forms with no `action` or `method`, `preventDefault` first, and no JavaScript means no dialog. The test logs requests while the dialog is opened on Settings and on Entities | **Met.** |
+| [G2] Codes cleared on every way out | R3.5. Cleared on Finish, close, Escape, a backdrop click, `beforeNavigate`, `onDestroy` and `pagehide`. Spec 1 clicks a sidebar link and goes back and forward. Spec 6 closes the dialog four ways | **Met.** |
+| [G3] `no-store` | R10. Set once in `hooks.server.ts` on every signed-in HTML and `__data.json` response, so it covers every page that can host the dialog. `/api/auth` keeps it too | **Met, and stronger than I asked.** |
+| [G4] Secrets stay in the dialog's own state; `handleError` serialises none; the object URL is revoked | R3.0 | **Met.** |
+| [G5] The `{@html` ban | R1.4. The ban covers every `.svelte` file in web, each test fails on a plant | **Met, and stronger than I asked.** |
+| [G6] Boundary and page-data tests on every page that hosts the dialog | R1.4 (all of web), R10 (Settings, Entities, the hold page) | **Met.** |
+| [G7] Carrying on as a new request on the rotated session | R3.6. `invalidateAll()`, then the action as a new request, never a replay; the first-enrolment stamp makes the new session fresh | **Met.** |
+| RC1–RC4, Addendum 2, the D6 (b) conditions | Folded in unchanged | **Met.** |
+| D1: no count of tries left | The Principal chose (a). R2 returns no attempt count and the screens show none | **Met.** |
+
+### 9.2 Two points for the build (the ruling and DESIGN 0.19.1 differ)
+- **P1. The entity selector while held.**
+  - **The mismatch.** DESIGN's `second-step-required.html` shows the selector listing the own Person, but R1.3 says no entity id or name at all.
+  - **The rule I accept.** The own Person may show. Its name comes from the session row (`enter_session` already returns it, `hooks.server.ts`), **not** from an entity-list query filtered in web, because a bug in that filter would put the shared names on screen.
+  - **The test.** R1.3's "Shared Co" test is unchanged.
+  - If the architect prefers no selector while held, that is also fine.
+- **P2. "Goes on to the page they asked for".**
+  - **The mismatch.** DESIGN says the held user goes on to the page they asked for, but R1.2 says the dialog needs no `next`, and the gate sends `?setup=1` with no target.
+  - **The rule I accept.** If the build carries the target, the gate adds `next` from `safe-next.ts`, and the dialog goes there with the same module in the browser, under R1.2's unit test. Otherwise the user lands on the dashboard.
+  - Either is acceptable. An unchecked `next` is not.
+
+### 9.3 DESIGN 0.19.1 wording
+- **Dialog states.** They match R3: `#no-mail` has one line and Close, the backup-code step has no Cancel and the Finish check, and `#done` claims no email.
+- **The held page.** It names no entity in its message, keeps Log out, and shows nothing else of Settings. That matches R1.3, with P1.
