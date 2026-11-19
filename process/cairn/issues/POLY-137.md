@@ -66,3 +66,11 @@ From POLY-152's ruling review (seceng F3, 2026-11-17): SECURITY R-24 now covers 
 ### @team-lead — 2026-11-19
 
 From the POLY-149 loop (ruling R3 and its "Decisions for the lead" 4). **Schedule the two purge functions in the worker:** `app.purge_sign_in_record()` (400-day retention and deleted accounts) and `app.purge_tx_identity()`. Neither has a caller today. Until a job calls the first, the 400-day retention is not enforced.
+
+### @team-lead — 2026-11-19
+
+From the POLY-150 loop (Principal, 2026-11-19; `process/DECISIONS.md`; seceng `process/cairn/reviews/POLY-150/ruling-review.md` §13.2). **Gates the first deploy with real household data.** Three additions once the mailer exists:
+- Email the account's owner at once whenever a second-step method is added or removed.
+- A method added through Confirm it's you (as opposed to first set-up) works only after 24 hours; the email says so and lets the owner cancel it. Shown red first: the method is refused for 24 hours and accepted after; a cancelled method never works.
+- seceng's ruling review of both before any test is written. The deploy-gate check (INFRA §7.1 step 16) refuses when either is missing.
+Also from that loop: a held sign-in through a magic link answers JSON to a browser navigation and must become a 302 to `/sign-in/second-step?with=code` (ruling "Open 1"); `/change-email` stays disabled until it notifies the old address and writes a record row (Addendum 3, Open 6).
