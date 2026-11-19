@@ -113,6 +113,20 @@
       "when": 1795029333449,
       "tag": "0015_session_handle",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795115733449,
+      "tag": "0016_sign_in_controls",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1795202133449,
+      "tag": "0017_revocation",
+      "breakpoints": true
     }
   ]
 }
