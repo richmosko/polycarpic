@@ -123,6 +123,7 @@ export const CADDYFILE = `{\n\tadmin off\n}\n\n(security_headers) {
 \t\tdefer
 \t\tStrict-Transport-Security "max-age=31536000"
 \t\tX-Content-Type-Options "nosniff"
+\t\tX-Frame-Options "DENY"
 \t\tReferrer-Policy "strict-origin-when-cross-origin"
 \t}
 }
