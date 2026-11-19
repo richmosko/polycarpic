@@ -317,3 +317,5 @@ seceng reviews this addendum; the pin guards the lock.
 2. **`app.sign_in_address` is declared `STABLE`.** It calls `pg_input_is_valid`, so it may claim no more than that function does. No index or generated column uses it, so nothing depends on `IMMUTABLE`. pgTAP 12's pin changes to `provolatile = 's'`.
 
 Both go in one code commit and one re-gate. Editing 0017 is safe because it has not merged. A dev database that already applied it from this branch is rebuilt (`check-migrations` flags the changed hash).
+
+**Addendum 7, item 1, amended (seceng ruling-review §15):** the `LOCK TABLE app.tx_identity IN SHARE ROW EXCLUSIVE MODE` is 0017's first statement, before the REVOKEs, rather than just before the delete. 0017 then takes its strongest lock on `tx_identity` first and never upgrades a weaker lock it already holds, so a concurrent transaction cannot deadlock against it. The rest of item 1 is unchanged.
