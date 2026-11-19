@@ -664,7 +664,7 @@ R7's `trustDevice` refusal stands until the lead relays approval of a shape belo
   - **for `totp`:** `p_step` is within `floor(extract(epoch FROM clock_timestamp()) / 30) ± 1`, and **greater than** `step_up_totp.last_step`. That row is then set to `p_step` [M3];
   - **for `backup_code`:** it inserts `step_up_pending (pg_current_xact_id(), user)` (A3.3).
 - **Then:**
-  - `UPDATE public.session SET recent_auth_at = clock_timestamp() WHERE id = app.current_session_id() AND user_id = app.current_user_id()`. It must hit **exactly one row**, or it raises. That is the session row's own `user_id` [M4].
+  - `UPDATE public.session SET recent_auth_at = now() WHERE id = app.current_session_id() AND user_id = app.current_user_id()`. It must hit **exactly one row**, or it raises. That is the session row's own `user_id` [M4]. It uses `now()`, the transaction's start time, because `step_up_fresh()` requires `recent_auth_at <= now()` (0013:118); a `clock_timestamp()` stamp would fail that test inside the same transaction and refuse A3.3's list write. `step_up_fresh()` is not loosened (RC6).
   - It inserts the `step_up` record row (A4) in the same statement sequence, so no stamp exists without its row [M11].
   - It returns true.
 - **Its grants.** poly_govern holds `UPDATE (recent_auth_at)` (POLY-89 R1.4). `guard_recent_auth` lets it through under R1.3 and refuses every other writer (unmeasured: qa stamps through it, and is refused writing the column directly as poly_auth).
@@ -732,7 +732,7 @@ In this order:
 | **T1 Replay** | The same `/second-step/reauth` request twice: the second answers 403, and the challenge row is gone after the first. |
 | **T2 Code reuse** | A code accepted at a held sign-in, then the same code at a re-check within 30 s → refused. The same between two sessions of one user, and an earlier step. |
 | **T3 Forgery and confusion** | `begin_step_up` and `complete_step_up` as poly_app → permission denied. As poly_auth under kinds `session` and `signup`, with no marker, and outside the exact call → 42501. Another session's challenge → refused. POLY-89 R1.2's cases: another user's session, and a session id with no row. A direct `UPDATE session SET recent_auth_at` as poly_auth → refused. |
-| **T4 Catalog** | The four definers' EXECUTE grants (poly_auth only), the exact-call check, and the single-writer pin (A3.2). |
+| **T4 Catalog** | The four definers' EXECUTE grants (poly_auth only), the exact-call check, the single-writer pin (A3.2), and that only poly_govern holds `UPDATE (recent_auth_at)` on `public.session`, granted and effective. |
 | **T5 Lock** | 10 wrong re-check codes lock the factor, the 2nd lock is 30 minutes, and `second_step_failure` rows are written. During the lock, a code re-check is refused and a passkey re-check passes. |
 | **T6 Backup code** | It is consumed once, and its record row says `backup_code`. Used twice → refused. A stamp with the list unwritten → the commit fails. The list written first → refused by #5. |
 | **T7 Passkey** | Through `helpers/webauthn.ts`: no new `session` row, no rotation, and the stamp lands on the existing session. An assertion for another user's credential → refused. A counter lower than stored → refused. |
