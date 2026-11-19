@@ -239,3 +239,8 @@
 - R8's forged-address reach added to R-2.
 
 **Accepted tip: `e3e2b003`.** I read `git diff ee09c8d9 e3e2b003`. It keeps the Caddy `X-Frame-Options: DENY` line, which I accept: it is harmless and reverses §8's withdrawal of it. It adds the direct prerender ban with its plant. D5 (b) now carries my §7.4 conditions in full. ACCEPT.
+
+**Addendum 2 at `7d87cbfa`: ACCEPT.** I read `git diff e3e2b003 7d87cbfa`.
+- (1) `resend_available_at` is a future time only under the published 3-in-15-minutes cap. It is NULL otherwise, so it never tells the 24-hour suppression apart from "would send now". The resend answer stays the same 200 either way.
+- (2) Setting `no-store` on every `/api/auth` response removes the unmeasured dependency on BetterAuth's headers.
+- (3) I accept a browser test for Make new codes only, with RC3's steps and an old code refused. Remove on the last method and Remove while paused need no browser test: the controls are the database refusals (POLY-89 R3 #7, POLY-149's delete guard), already tested in `tests/db`, and the button state is cosmetic and covered by the unit test of the pure function. Accepted tip: `7d87cbfa`.
