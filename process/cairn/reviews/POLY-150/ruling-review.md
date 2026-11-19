@@ -298,3 +298,159 @@ The formal build review waits for the gate.
 - **Recommended, not blocking.** Two cheap additions would make it check "no page data" directly rather than only the absence of the `nodes` key a SvelteKit version happens to use:
   - assert the body's keys are a subset of `{type, location, status}`;
   - assert the raw body text contains no "Shared Co".
+
+---
+
+## 10. The per-entity gate and the set-up dialog: seceng-150's assessment (2026-11-19)
+
+*Recorded from my hand-off. POLY-91 cites it for option (c). The Principal chose (a) for this loop, with (c) filed on POLY-91 (`process/DECISIONS.md` @ 60f45d2f).*
+
+Read at `82608edf`: `apps/web/src/hooks.server.ts`, migrations 0003, 0013 and 0018, and POLY-91. Tags: **measured**, **code-read**, **spec**, **guessed**. I ran nothing.
+
+### 0. Who is held today, and how strong the redirect is
+
+**Who is held.** The gate holds a user while `app.second_step_required()` is true: they have no second step, and they are manager or owner of an entity other than their own unshared Person. Three things make that state hard to reach (code-read, 0013):
+- A manager or owner seat for an unenrolled user is refused (`membership_05`).
+- An invited manager is seated only when they enrol (`seat_claimed_invitations`). Until then they are not held: they see only their own Person.
+- Removing the last method is refused while the user needs one (`refuse_last_method`).
+
+So **in practice the only held user is a manager after the operator's `reset-mfa`**. Reset leaves memberships unchanged. The forced case is rare, and it is exactly the case an attacker aims for: persuade the operator to reset, then sign in with the password alone. The new-invitee case the Principal may be picturing already works his way: the user sees their own Person, and the shared entity appears once they enrol.
+
+**What the redirect is** (code-read, `hooks.server.ts:84`):
+- **One check point, closed by default.** It runs in `handle` before `resolve`, for every path that is not public. That covers every page, every `__data.json`, every form action and every `+server.ts`, including routes not written yet. One path is exempt.
+- **The database decides.** The answer is `app.second_step_required()`, read in the same transaction as the session marker.
+- **It fails closed.** If the call raises, `enter` throws and nothing is served.
+- **Its weakness is that only web enforces it.** No RLS policy and no guard reads `second_step_at` for ordinary reads and writes. `app.has_role()` checks the membership role alone, and POLY-91's held role is not built (backlog). So the database would let a held manager do every manager write. Only web's choke point stops it.
+- **How strong it is: strong against a page someone forgot**, because there are no per-page checks to forget. **Weak against a bug in those five lines** or a future widening of the exemption. **No protection against code execution in web**, which R-2 already gives the run of every active user. SQL injection by a held user has almost nothing to aim at, since only the exempt page is served to them.
+
+### 1. The options
+
+#### (a) Keep the redirect; its target becomes the Settings panel
+- **Mechanism.** As today, but the exempt path becomes the Settings route that hosts the set-up.
+- **Who can use a gap:** a password holder for a reset manager.
+- **What a gap reaches.** Whatever the exempt page loads and does. This needs two rules, or (a) gets weaker than today:
+  1. **Exempt exactly one route** (and its `__data.json`), never the `/settings` tree. Settings also holds Sessions, export, and later account deletion.
+  2. **The exempt page loads no entity data.** That includes the app shell's entity selector, if the panel is rendered in the shell. Either render it without shell data, or have the shell show only the own Person.
+- **Strength:** the same as today.
+- **Cost:** small, inside Addendum 3 (guessed: under $5).
+
+#### (b) A per-entity gate in web's loaders
+- **Mechanism.** The global redirect goes. Each loader, action and endpoint that touches an entity checks "shared, and the user has no second step" and refuses or greys it out.
+- **Who can use a gap:** the same password holder.
+- **What a gap reaches.** Any loader, action or `+server.ts` that forgets the check, now or later, gives **full manager or owner rights on that shared entity**. Entity ids come from URL parameters and the selector, so a hand-typed URL is all it takes.
+  - A shared helper (`withEntity(id)`) with a lint rule narrows the risk but does not remove it. It is still only web, and still something each page opts into.
+  - **This is weaker than today.** It replaces one check that is closed by default with many checks that are open by default, while the attacker in question is the one this population invites.
+- **Stronger option:** (a) or (c).
+- **Cost:** guessed $25–35 now, and a check in every future entity page for good. I advise against (b) alone.
+
+#### (c) A per-entity gate in the database
+- **Mechanism.** `app.has_role(entity, role)`, which every RLS policy and guard uses, returns false for manager or owner rights on an entity where `own_person_exempt` is false while the user has no second step. That is the same rule as `second_step_needed`, applied per entity.
+  - Greying out needs the names of the locked entities: one narrow definer that returns id and name only.
+  - This is the machinery POLY-91 already plans: a held role keeps viewer access until enrolment. The two should be one design. The choice is whether a held entity is invisible, viewer-only, or name-only.
+  - The own Person keeps working through the exemption.
+- **Who can use a gap:** a gap would be a bug in `has_role` itself, pinned by pgTAP like every policy.
+- **What it holds against:** a forgotten page, a web bug, and SQL injection as poly_app. It does **not** hold against code execution in web, which is R-2's reach whatever is chosen.
+- **What a gap reaches.** If web shows something it shouldn't, the database still refuses, so the greying is cosmetic and safe. Once (c) lands, the global redirect can go.
+- **Costs and risks:**
+  - `has_role` is on the hot path of every policy, so one extra lookup per check (guessed small; qa should measure it).
+  - Its effect on `owner_count` and approvals: a reset sole owner leaves the entity with no effective owner until they enrol. That is safe and closed, but it needs stating.
+- **Cost:** guessed one loop, $60–80 and 3–4 h. **It is its own issue, merged with or right after POLY-91, not this loop.**
+
+### 2. Recommendation for the Principal
+- **Now (this loop): (a).** It is the only shape as strong as today, and the case it bites is rare (after a reset). Settings is the redirect target, and the set-up dialog opens there.
+- **Next: (c) with POLY-91**, so that the database enforces "own Person usable, shared entities greyed". The redirect is then replaced by web greying entities in a way the database backs.
+- **Never (b) on its own.**
+- **Until (c):** the reset-mfa runbook's identity check (INFRA, devops) carries even more weight, because a reset is the one way into the held state.
+
+### 3. Part 1: what I need for the QR key and backup codes in a dialog on an app page
+1. **No page form around it.** The dialog's inputs must not sit inside any page `<form>`, and it posts only by `fetch` to `/api/auth`, never to a web `action`.
+   - Entities will soon have form actions (Create entity). A dialog inside that form, or a submit that falls back to the page's action, would hand the password and codes to web's server.
+   - Render it outside the page tree (portal). Its submit handler always prevents the default.
+   - Test: submitting each step sends no request to web's origin other than `/api/auth/*`.
+2. **Codes cleared on every way out.**
+   - Clear the URI, key, QR and backup codes on close, Escape, a backdrop click, `onDestroy`, `beforeNavigate` (a client-side sidebar link fires no `pagehide`) and `pagehide`.
+   - Closing at the codes step without "I have saved these" asks first, because the codes are already valid.
+   - Test: from the codes step, click a sidebar link, then back, then forward; then a full reload, then back. Each time, no code is in the DOM.
+3. **no-store.** Codes are never in page data, so a host page's HTML holds none. `no-store` on the host pages is then defence in depth, and clearing on `pagehide` is the control that counts.
+   - Set `no-store` on every page that can mount the dialog (Settings, Entities), or say the clearing replaces it. Either is acceptable if the test in item 2 passes.
+   - `/api/auth`'s `no-store` (Addendum 2) stays.
+4. **State stays inside the dialog.** No Svelte store, context or layout data carries any secret. They live only in the dialog's own component state.
+   - No `console` call, and no client-side `handleError` that serialises component state.
+   - The download blob's URL is revoked after use.
+5. **The `{@html` ban** extends to the dialog component and its folder (`lib/…`), and to every route that mounts it. RC4's literal-text passkey test stays in Settings.
+6. **R10's boundary test** covers every route that mounts the dialog: no server file there receives a dialog field, and the R10 page-data and log canaries run with the dialog flow on an app page.
+7. **Carrying on with the action** (for example Create entity) happens after `verify-totp` rotates the session. The pending action is sent again on the new handle and never replays a request from before the rotation. The fresh step-up stamp covers it.
+8. **Unchanged:** QR as inline SVG with no image URL, the CSP (`connect-src 'self'`, `frame-ancestors 'none'`), the rule that nothing returns the URI after verify, and `/sign-in/second-step` staying a bare page with no server file.
+
+---
+
+## 11. "Trust this device": seceng-150's assessment (2026-11-19)
+
+*Recorded from my hand-off. POLY-154 cites it. The Principal chose to offer it, unticked by default, as POLY-154. R7's refusal stands until that issue ships.*
+
+Read: better-auth 1.7.18 `plugins/two-factor/{index,verify-two-factor,constant}.mjs`, our `packages/auth/src/{second-step,options}.ts`, and migration 0013's `reset_second_step`. Tags: **code-read** (read, not run), **spec**, **guessed**. Nothing here is measured.
+
+### 1. How it works in 1.7.18 (code-read)
+- **Issued by** `verify-totp` or `verify-backup-code` with `trustDevice: true` (`verify-two-factor.mjs:43`). Passkey sign-ins never issue it. A passkey-only user is held by our own `passkeyOnlyHold`, which ignores the cookie, so they never benefit.
+- **The cookie** is `__Secure-better-auth.trust_device`, with our defaults: `Path=/api/auth`, `HttpOnly`, `Secure`, `SameSite=Lax`. Web never sees it.
+  - Its value is `HMAC-SHA256(auth secret, userId!trustId)!trustId`, signed again as a signed cookie.
+  - A `verification` row holds `identifier = trust-device-<32 random chars>`, `value = userId` and `expiresAt`.
+- **What it is bound to:** the user and that server row, nothing else. It is a bearer token: no device, IP, browser, password version or factor set enters it. Copied to another machine, it works there.
+- **What it skips:** on a sign-in path, if the cookie checks out and the row is live, the second step is skipped entirely (`index.mjs:28-53, 310-324`). The password is still asked on `/sign-in/email`.
+  - **But our `widenTwoFactorMatcher` adds `/magic-link/verify` and `/callback/:id`** (`second-step.ts:27`, `SIGN_IN_PATHS`). So a trusted browser plus a magic link would sign in with **neither the password nor the second step**: only the inbox. The same goes for a Google or GitHub sign-in. Neither path is reachable today (no mailer, and OAuth answers 404 in private-CA mode), but both will be.
+- **Lifetime:** `trustDeviceMaxAge`, 30 days by default.
+- **It slides, and it rotates.** Each trusted sign-in deletes the row and issues a new cookie and row with a fresh 30 days (`index.mjs:312-323`).
+  - So trust never ends for a browser that signs in at least once every 30 days.
+  - Rotation means that if a copied cookie is used, the first user invalidates the other copy. If an attacker uses it first, the real user's next sign-in silently asks for the code again. That is the only signal.
+- **What ends it today:**
+  - `/two-factor/disable` deletes only the row of the browser that calls it, not other browsers (`index.mjs:292-297`).
+  - `reset-mfa` deletes every `verification` row of the user (0013:562).
+  - Rotating the auth secret voids every cookie.
+  - **Nothing else does:** not a password change, a password reset, "sign out everywhere", adding or removing a method, making new codes, or a lock.
+
+### 2. Who can use it, and what they reach
+| Who | With the password | Without the password |
+|---|---|---|
+| **A copied browser profile**: an infostealer log, a synced or backed-up profile, a sold or lost computer not wiped | **The whole account**, with no second step, for up to 30 days after the browser's last trusted sign-in. Infostealers take saved passwords together with cookies, and the second step is exactly what defeats that today. | Nothing on `/sign-in/email`. **But with the profile's signed-in webmail, a magic link (once POLY-137 lands) gets in with neither** (the §1 bug). |
+| **Malware running on the machine** | It already rides the live sessions (R-2's class). Trust adds **persistence**: new sessions without the factor after those end, for as long as it keeps signing in. | It can usually read the saved password from the same profile. |
+| **Someone at an unlocked or shared computer** | Signs in with no second step if the browser fills the password. | Only the sessions already open (unchanged). |
+| **A network attacker, another site, another user of this instance** | Nothing: the cookie is Secure and HttpOnly, sent only to `/api/auth`, and bound to the user id by the HMAC. | Nothing. |
+
+**What that reaches:**
+- For an owner or manager, the books of every shared entity: R-25's "the second factor makes a captured password alone insufficient" no longer holds for a trusted browser.
+- For a viewer, or a user with only their own Person, their own books.
+
+### 3. What SECURITY would have to say
+- **C-03:** the second step is asked "on every new sign-in, except in a browser the user chose to trust", with the lifetime, what ends trust, and who may not trust.
+- **R-26 and C-88:** a trusted browser never meets the code step, so the lock does not apply to it. That helps the real user, but a stolen trusted profile is not slowed by the lock.
+- **R-25:** the protection against a captured password holds only where the user has not trusted the browser.
+- **A new open risk** (beside T-101): a copied profile with a trust cookie and a saved password is a full sign-in until trust ends. Who, reach, the stronger option, and the Principal as approver.
+- **C-89:** the record marks a sign-in that skipped the second step (condition C3 below).
+- **§6.1:** rotating the auth secret ends every trust.
+
+### 4. Conditions
+Costs are guessed. "Must" means the option is not acceptable without it.
+
+| # | Condition | Why | Cost (guess) | Verdict |
+|---|---|---|---|---|
+| C1 | **Unticked by default**, with a plain line saying what it skips | Opt-in, as the Principal said | nil | **Must** |
+| C2 | **Trust never applies to magic-link or OAuth sign-ins.** A before-hook drops the trust cookie from the request on `/magic-link/verify` and `/callback/:id`, so the password is always the other half | Closes "inbox alone" (§1) | $4, 15 min | **Must** |
+| C3 | **The sign-in record marks it.** The service sets a transaction setting (like `poly.client_ip`) when it skips the second step, and the record row stores `second_step = 'trusted'` (others: `code`, `backup_code`, `passkey`, `none`) | Lets the user and the operator tell a trusted sign-in from a checked one. It is the service's word, as the address is | $6, 20 min | **Must** |
+| C4 | **Ended by:** password change, password reset, `reset-mfa` (already), adding or removing a method or making new codes, "sign out everywhere", and an email change. One poly_govern definer deletes the user's `trust-device-%` rows, called from those writes (triggers on `account.password`, `two_factor`, `passkey` and `user.email`, and the revoke route) | Without it, a user who changes the password after a theft still leaves the thief trusted | $8, 25 min | **Must** |
+| C5 | **Not offered to owners and managers of shared entities** (`second_step_needed()` true): `verify-*` refuses `trustDevice` for them. A raise to manager or owner (seat, or POLY-91's promotion) deletes their trust rows, so trust taken as a viewer does not carry over | The Principal requires the second step precisely for those who can reach others' books. Trust for them undoes that mandate for every stolen profile | $8, 25 min | **Must, strongly recommended.** If the Principal still wants it for managers, the minimum is C6 at 7 days |
+| C6 | **A shorter, absolute lifetime:** 14 days from the code entry, not extended by use. Rotation keeps the original expiry, through a hook that copies `expiresAt` | Sliding makes "30 days" mean "forever while used" | $8, 25 min (nil for 14 days that still slides) | Recommended. The minimum is 14 days sliding at nil cost |
+| C7 | **A list with Revoke in Settings:** each trusted browser with the date it was trusted and its browser name, stored at issuance (`verification` holds no label, so a column or a side table). A definer lists and deletes only the caller's own rows | Lets a user end one lost device's trust without changing the password | $18, 50 min | Recommended, with POLY-139 (Sessions). C4's password change is the fallback until then |
+| C8 | **A lock ends trust** | Not needed. A lock means someone without trust is guessing, and trust lets the real user in during it. C4 covers the follow-up password change | $3 | Not recommended |
+
+**Cost of the "must" set:** C1 + C2 + C3 + C4 + C5, about $26 and 1 h 25 min (guessed), on top of removing R7's refusal.
+
+### 5. Recommendation
+- **The stronger option is still D2 (a), no trust,** at nil cost.
+- **If the Principal keeps (b),** it is acceptable with C1–C5. Then:
+  - **viewers and own-Person users get the convenience;**
+  - owners and managers still meet the second step on every new sign-in;
+  - the password is always required;
+  - every trusted sign-in leaves a marked line;
+  - changing the password or a method ends every trust.
+- **C6 and C7 can follow,** C7 with POLY-139.
+- **The residual to state to the Principal in one line:** a stolen browser profile with a saved password gets into a trusting viewer's account without the second step, until that viewer changes their password.
