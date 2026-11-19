@@ -2,7 +2,7 @@
 
 **Reviewed:** `process/cairn/reviews/POLY-150/ruling.md` at `56eec7fa`, against my checklist (31 items), DESIGN at `c93449ad`, POLY-89's ruling and reviews, POLY-149's build review, and SECURITY C-03, C-88, C-89, R-2, R-25 and R-26. I read the code it cites (`anchor.ts`, `handler.ts`, `route-policy.ts`, `apps/auth/src/main.ts`, `packages/config/src/check.ts`, `Dockerfile`, `infra/caddy/Caddyfile`, `serve.ts`, `playwright.config.ts`). I ran nothing.
 
-**Verdict: ACCEPT `56eec7fa` with four required changes (RC1–RC4).** Each is small, and none changes the ruling's design. They can come in one addendum. qa may write the tests for R1–R10 now, adding RC1–RC4's tests.
+**Verdict: ACCEPT `56eec7fa` with three required changes (RC1, RC3, RC4) and one condition (RC2).** Each is small, and none changes the ruling's design. They can come in one addendum. qa may write the tests for R1–R10 now, adding these tests.
 
 ## 1. Required changes
 
@@ -11,12 +11,13 @@
 - The ruling should name that pin test and its new count, and list the new function's safety property as POLY-89 R1.5 does for the others. Its property: it reads only the marker's own user and session, writes nothing, and carries the exact-call check.
 - Otherwise the build either fails the pin with no ruling to update it from, or someone loosens the pin.
 
-**RC2. The new pages can be framed. Add `frame-ancestors 'none'`.**
-- *How it works (code-read):* neither Caddy's `security_headers` nor web sets `Content-Security-Policy` or `X-Frame-Options`. Any site can load `/settings/second-step`, `/sign-in/second-step` or Settings in an invisible frame.
-- *Who can use it:* any site the user visits while signed in.
-- *What they reach:* little today. The same-origin rule stops the framing site reading the QR code, the key or the backup codes, and every write needs typed input or a step-up. It is the standard precondition for click-tricks on one-click actions such as Finish, Skip for now, and the R5 actions once POLY-151 enables them.
-- *Fix:* one header in Caddy's `security_headers`, `Content-Security-Policy: frame-ancestors 'none'`, plus `X-Frame-Options: DENY` for old browsers, with a test in the existing Caddy header lint (`infra/lint/compose-policy.mjs`). About 10 minutes. `infra/**` is in POLY-150's paths.
-- *Not asked here:* a full CSP (`script-src`, `connect-src`). It would also limit what a compromised dependency could send out (see N3), but it needs its own design.
+**RC2. Framing: withdrawn. C-07 already covers it, with one condition.**
+- I was wrong that no page sets `frame-ancestors`; my search missed `apps/web/vite.config.ts`. Kit's `csp` option (SECURITY C-07) sets `frame-ancestors 'none'`, `connect-src 'self'` and `script-src 'self'`.
+- **It applies in production** (code-read, spec):
+  - web is built with `adapter-node`, and no route sets `prerender`;
+  - Kit sends the policy as a response header on every page it renders on the server, and as a `<meta>` tag only on prerendered pages;
+  - browsers ignore `frame-ancestors` in a `<meta>` tag.
+- **Condition:** the R10 test that reads the header from the built server's HTTP response stands. The boundary test adds that no file under the second-step routes or Settings exports `prerender`, since a prerendered page would silently lose `frame-ancestors`. No Caddy header is needed.
 
 **RC3. The backup codes can come back with the back button.**
 - *How it works (spec):* R10 drops the codes from component state on Continue. Two cases escape that:
@@ -99,7 +100,7 @@
 - **N2. Reloading between `verify-totp` and the codes screen loses the codes.** The user regenerates them within the 5-minute window, or later through POLY-151. That is a usability point.
 - **N3. The QR encoder runs in the browser with the TOTP secret.**
   - Pin it exactly, with no dependencies and no network calls. frontend-lead names the package and version in the build commit, and I read it at build review.
-  - With no `connect-src` CSP, a compromised encoder could send the secret anywhere. That is R-25's class: same-origin code is trusted.
+  - C-07's `connect-src 'self'` stops a compromised encoder sending the secret to another site by `fetch`, but not by a navigation or a form post to the same origin. That is R-25's class: same-origin code is trusted.
 - **N4. Open 1 (OAuth and magic-link holds answering JSON) stays unreachable while private-CA returns 404 for OAuth and magic link needs the mailer.** POLY-88 and POLY-137 own it, as the ruling says.
 
 ## 5. Checklist items closed by the ruling
@@ -120,7 +121,7 @@
 | 23–24 | R4 |
 | 25–26 | R8 |
 | 27–29 | R4, DESIGN W3 |
-| 30 | RC2 |
+| 30 | C-07 (RC2's condition) |
 | 31 | the service's origin check; web has no form actions (R1) |
 
 ## 6. SECURITY at build review (not before)
@@ -130,4 +131,4 @@
 - **R-25:** the screens exist, production enrolment waits on POLY-137, and the page set that takes a secret grows.
 - **R-26:** no lock time is shown, and `trustDevice` is refused.
 - **§4.1:** sign-up asks for the code (D1), passkey-only users get no codes (D2), and suppression is visible to its own user.
-- **The framing control (RC2).**
+- **C-07:** the second-step pages are covered, and no page there may be prerendered.
