@@ -772,3 +772,14 @@ Add new decisions ABOVE this comment, newest first.
 - Ship the interim dialog and build POLY-151 next — recommended by the architect, seceng and the lead; about $3 (already built). seceng's concern with the choice taken is rushing the proof design: the database cannot check a code itself, so a passed re-check is the sign-in service's word.
 **Cost:** about +$35 and 1 hour 45 minutes (the architect's guess), a second ruling cycle, and a re-gate of POLY-150.
 **Approved by:** the Principal (2026-11-19).
+
+### 2026-11-19 — Four choices on the second-step screens
+**Decision:** the Principal's answers on the POLY-150 screens, each on the designer's, architect's and seceng's recommendation (`process/cairn/reviews/POLY-150/ruling.md` and `ruling-review.md`).
+1. **No count of wrong tries left.** A wrong code says only that it did not work.
+2. **Sign-up asks for the emailed code,** like every other first set-up.
+3. **Someone who sets up only a passkey gets no backup codes.** The screen says to add an authenticator app to get them; a lost passkey is recovered by the operator's `reset-mfa`.
+4. **A locked-out person is told a rough time band:** "in under an hour", "in a few hours" or "within a day". The band is returned only on the lock refusal, to a held sign-in whose cookie signature checks.
+**Why:** (1) a count helps someone guessing more than the owner. (2) The invitation link is printed to the operator's terminal and passed on by any channel, so it proves who received it, not who controls the mailbox; the emailed code stays the one anchor for every first factor. (3) The sign-in library's backup codes belong to the authenticator app; codes for passkey users would put ten guessable codes, outside the growing lock, on accounts that have nothing to guess today. (4) A person locked for up to a day needs some idea how long; someone holding the password can already find a lock's end by retrying, so a band changes the effort and not the exposure.
+**Alternatives considered:** (2) trusting the invitation, about $12 (a guess), a second path that grants a first set-up; (3) our own backup codes, about one loop; (4) saying nothing, which is stronger and free, and the exact time, which shows the minute to resume and whether the real person signed in correctly in between.
+**Cost:** about $6 and 20 minutes for (4) (a guess); none for the others. Until the mailer exists (POLY-137), (2) means an invitee cannot finish set-up in production, as for everyone else.
+**Approved by:** the Principal (2026-11-19).
