@@ -35,7 +35,7 @@ Written against `ruling.md` @ 48acb75c (R0–R11, D1–D4) and `ruling-review.md
 | **R3** with a mailer: 200 `{status, sentTo}` masked, equal for sent and suppressed | `DB` › "sentTo"; suppressed after 3 sends answers the same shape | no `sentTo` |
 | **R3** nothing falls back: code in no log/response | `DB` › canary over a captured console and response bodies; E2E R10 log capture | — |
 | **R4** seam | `SEAM`: `cli()` passes no deps; `startAuthService` with `deps.sendSecondStepCode` throws `ConfigError` unless `APP_ENV=development`; `apps/auth/src/**` names no outbox/file sink/test entry. E2E harness: `auth-entry.ts` + `outbox.jsonl` (0600) are the stand-in | no `deps` parameter |
-| **R5** Settings panel: methods, add passkey, remove, new codes, last-method Remove absent, paused Remove disabled | E2E spec 8 (Tess: panel shows app + date, Remove app is absent while `needs_a_method`; Make new codes inside the 5-minute freshness runs directly) | no panel |
+| **R5** Settings panel: methods listed, Remove and Make new codes | E2E spec 8 (Una, an app and a passkey: both listed, no backup-code count). The service side of add, remove and make-new-codes is POLY-89's. **Not browser-tested here**: the last-method Remove being absent, a paused Remove being disabled, and Make new codes running inside the 5-minute freshness: each needs a user in a state the seed cannot hold for the length of the suite (the 5 minutes) or a second user per state; `my_second_step`'s `needs_a_method` and `codes_paused` are covered in `DB`, so the build has the data | no panel |
 | **R6** interim Confirm it's you: names the action, one Close button, no inputs | E2E spec 8 (Kay's session older than 5 minutes: serve.ts back-dates `recent_auth_at`) | no dialog |
 | **R7** hold lifetime 600 s | `DB` › "unmeasured (R7): hold cookie Max-Age 600 and verification expiresAt 600 ± 5"; "a hold past expiresAt answers 401" | measured in `red-run.md` |
 | **R7** `trustDevice` refused 400 on both paths, no session, no `trust_device` cookie | `DB` › "trustDevice on verify-totp / verify-backup-code" | passes through today |
@@ -51,6 +51,10 @@ Written against `ruling.md` @ 48acb75c (R0–R11, D1–D4) and `ruling-review.md
 | **RC2** `frame-ancestors 'none'` | `E2E` › "headers" (web's CSP; the Caddy half is devops's lint and not mine) | page absent |
 | **RC3** backup codes not recoverable by back/forward or the page cache | `E2E` spec 1: after the codes screen, navigate away and `goBack`, and reload: no code in the DOM, and `/settings/second-step`'s response is `Cache-Control: no-store` | page absent |
 | **RC4** passkey name shown as text | `BND`: no `{@html` under the second-step routes or the Settings panel; `E2E` spec 9: a seeded passkey named `<img src=x onerror=…>` renders as literal text and runs nothing | no panel |
+
+## E2E users and the shared sign-in limit
+
+Seeded by `serve.ts` through the service's code path: Enid (spec 1, app), Pia (spec 2, passkey), Rae (RC3), Lou (spec 6), Tess (specs 3, 4; TOTP), Kay (spec 5; passkey only, key exported for Chromium's virtual authenticator), Una (specs 7–9, R10; TOTP + a passkey named `<img src=x onerror=window.__xss=1>`, step-up stamp an hour old). Enid, Pia, Rae, Lou and Una start from a signed-in state file, so a spec that is not about signing in spends no limiter budget. `support.ts` `slot()` paces the real 5-a-minute limit (see `red-run.md`); the limit is never raised, forged or reset. Logs of web and the service are teed to `.auth/` for the R10 scan, which runs last in the `rate-limit` project.
 
 ## Not covered, on purpose
 

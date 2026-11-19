@@ -1,7 +1,7 @@
 -- POLY-149 (ruling R1; seceng F2): what poly_app holds after the revocation (0017), pinned exactly in both directions and read twice: what is
 -- granted to the role, and what it EFFECTIVELY holds (has_*_privilege, PUBLIC included). A missing or an extra privilege fails. poly_app holds
 -- nothing on BetterAuth's six tables, app.session_handle, app.sign_in_record, app.second_step_streak or app.email_challenge, and its EXECUTE set
--- on `app` is the ten functions the web tier needs. The planted-grant tests (tests/db/sign-in-controls-pins.test.ts) show each check bites.
+-- on `app` is the eleven functions the web tier needs. The planted-grant tests (tests/db/sign-in-controls-pins.test.ts) show each check bites.
 -- One transaction, rolled back.
 BEGIN;
 SELECT no_plan();
@@ -64,18 +64,18 @@ SELECT is((SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.r
   AND (has_sequence_privilege('poly_app', c.oid, 'USAGE') OR has_sequence_privilege('poly_app', c.oid, 'SELECT') OR has_sequence_privilege('poly_app', c.oid, 'UPDATE'))), 0,
   'effective: poly_app holds no sequence privilege in public, app, drizzle');
 
--- EFFECTIVE EXECUTE over every function in public, app, drizzle (PUBLIC included): exactly the ten (seceng F2).
+-- EFFECTIVE EXECUTE over every function in public, app, drizzle (PUBLIC included): exactly the eleven (seceng F2; RC1 adds app.my_second_step).
 CREATE TEMP TABLE want_fn (sig text);
 INSERT INTO want_fn VALUES ('app.current_user_id()'), ('app.current_session_id()'), ('app.has_role(uuid,text)'), ('app.visible_entities()'), ('app.owner_count(uuid)'),
-  ('app.second_step_required()'), ('app.enter_session(text)'), ('app.my_sessions()'), ('app.recent_auth_ok()'), ('app.revoke_my_session(uuid)');
+  ('app.second_step_required()'), ('app.enter_session(text)'), ('app.my_sessions()'), ('app.recent_auth_ok()'), ('app.revoke_my_session(uuid)'), ('app.my_second_step()');
 CREATE FUNCTION pg_temp.fn_extra() RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(x ORDER BY x), '{}') FROM (
     SELECT p.oid::regprocedure::text AS x FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname IN ('public','app','drizzle') AND has_function_privilege('poly_app', p.oid, 'EXECUTE') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
     EXCEPT SELECT to_regprocedure(sig)::text FROM want_fn WHERE to_regprocedure(sig) IS NOT NULL) q $f$;
-SELECT is(pg_temp.fn_extra(), '{}'::text[], 'effective: poly_app executes no function outside the ten (PUBLIC included; enter_asserted_user and every enter_* but enter_session are out)');
+SELECT is(pg_temp.fn_extra(), '{}'::text[], 'effective: poly_app executes no function outside the eleven (PUBLIC included; enter_asserted_user and every enter_* but enter_session are out)');
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_app', to_regprocedure(sig), 'EXECUTE')), NULL::text[],
-  'effective: poly_app executes every one of the ten (a missing or ungranted function is listed)');
+  'effective: poly_app executes every one of the eleven (a missing or ungranted function is listed)');
 SELECT is(to_regprocedure('app.enter_asserted_user(uuid, uuid)')::text, NULL, 'app.enter_asserted_user does not exist (dropped, so a grant can never bring it back)');
 
 -- Granted to the role itself (the second reading).
@@ -85,8 +85,8 @@ SELECT is((SELECT array_agg(DISTINCT table_schema||'.'||table_name ORDER BY tabl
 SELECT is((SELECT array_agg(DISTINCT table_schema||'.'||table_name ORDER BY table_schema||'.'||table_name) FROM information_schema.role_column_grants WHERE grantee='poly_app' AND table_schema||'.'||table_name NOT IN ('public.audit_event','public.entity','public.membership','public.notification','app.tx_identity','drizzle.__drizzle_migrations')),
   ARRAY['public.entity_type','public.invitation'], 'granted: column grants beyond the table-level ones are on entity_type and invitation only (no BetterAuth table, no email_challenge)');
 SELECT is((SELECT array_agg(DISTINCT routine_schema||'.'||routine_name ORDER BY routine_schema||'.'||routine_name) FROM information_schema.routine_privileges WHERE grantee='poly_app'),
-  ARRAY['app.current_session_id','app.current_user_id','app.enter_session','app.has_role','app.my_sessions','app.owner_count','app.recent_auth_ok','app.revoke_my_session','app.second_step_required','app.visible_entities'],
-  'granted: routine_privileges lists exactly the ten functions');
+  ARRAY['app.current_session_id','app.current_user_id','app.enter_session','app.has_role','app.my_second_step','app.my_sessions','app.owner_count','app.recent_auth_ok','app.revoke_my_session','app.second_step_required','app.visible_entities'],
+  'granted: routine_privileges lists exactly the eleven functions');
 SELECT is((SELECT array_agg(schemaname||'.'||tablename||' '||policyname ORDER BY 1) FROM pg_policies WHERE 'poly_app' = ANY (roles) AND tablename IN ('email_challenge','session','user','account','verification','two_factor','passkey','session_handle','sign_in_record','second_step_streak')), NULL::text[],
   'no policy naming poly_app on email_challenge or any BetterAuth table (email_challenge_own is dropped)');
 SELECT is((SELECT count(*)::int FROM pg_default_acl d WHERE d.defaclacl::text LIKE '%poly_app=%'), 0, 'no default privilege grants anything to poly_app');

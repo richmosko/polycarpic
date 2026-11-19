@@ -1,7 +1,6 @@
 // POLY-89c fixtures shared by the second-step suites (ruling 6eed53f8). Marked transactions are the POLY-147 shape: BEGIN, then
 // app.enter_session($1) (or enter_auth_session for poly_auth) as its own extended-mode statement, then the test's statements. `poly_auth` is the stage-2
 // fixture role created once per run in helpers/api.ts setRolePasswords (R1.3).
-import { createHmac } from 'node:crypto';
 import { expect } from 'vitest';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
@@ -77,16 +76,4 @@ export function fixture(db: string, tag: number) {
   return { user, session, marked, committed, one };
 }
 
-/** RFC 6238 SHA-1, 30 s, 6 digits, from a base32 secret (the otpauth URI's `secret`). */
-export function totp(base32: string, at = Date.now()): string {
-  const A = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-  let bits = '';
-  for (const ch of base32.replace(/=+$/, '').toUpperCase()) bits += A.indexOf(ch).toString(2).padStart(5, '0');
-  const key = Buffer.from(bits.match(/.{8}/g)!.map((b) => parseInt(b, 2)));
-  const ctr = Buffer.alloc(8);
-  ctr.writeBigUInt64BE(BigInt(Math.floor(at / 1000 / 30)));
-  const h = createHmac('sha1', key).update(ctr).digest();
-  const o = h[h.length - 1]! & 0xf;
-  const n = ((h[o]! & 0x7f) << 24) | (h[o + 1]! << 16) | (h[o + 2]! << 8) | h[o + 3]!;
-  return String(n % 1_000_000).padStart(6, '0');
-}
+export { totp } from './totp.ts';

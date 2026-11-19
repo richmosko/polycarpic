@@ -1,6 +1,7 @@
 // POLY-86 visual-leg defects 1-3 (lead @ f99b888): the real app, signed in and out. Titles end with [red if: <mutation>].
 // The seeded user is serve.ts's: Ada Lovelace, password below.
 import { expect, test } from '@playwright/test';
+import { slot } from './support.ts';
 
 const base = `http://localhost:${process.env.E2E_PORT ?? 4173}`;
 const EMAIL = 'ada@e2e.test';
@@ -14,10 +15,12 @@ test.describe('sign-in form', () => {
     await page.waitForLoadState('networkidle');
     await page.getByLabel(/email/i).fill(EMAIL);
     await page.getByLabel(/password/i).fill('not the password at all');
+    await slot('/sign-in/email');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page.getByRole('alert')).toBeVisible();
     const sent = page.waitForRequest((r) => r.url().endsWith('/api/auth/sign-in/email') && r.method() === 'POST');
     await page.getByLabel(/password/i).fill(PASSWORD);
+    await slot('/sign-in/email');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await sent;
     await page.waitForURL((u) => u.pathname === '/dashboard');
@@ -82,6 +85,7 @@ test.describe('signed in', () => {
     await page.waitForLoadState('networkidle');
     await page.getByLabel(/email/i).fill(EMAIL);
     await page.getByLabel(/password/i).fill(PASSWORD);
+    await slot('/sign-in/email');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await page.waitForURL((u) => u.pathname === '/dashboard');
     await page.waitForLoadState('networkidle');

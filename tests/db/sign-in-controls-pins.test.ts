@@ -23,6 +23,7 @@ describe('11_poly_app_grants.sql bites (ruling R1: ten functions, no BetterAuth 
     ['GRANT SELECT (id) ON app.email_challenge TO poly_app', 'the email_challenge column read that R1 revokes'],
     [`SET LOCAL ROLE poly_owner; CREATE FUNCTION app.qa_plant_pub() RETURNS int LANGUAGE sql AS 'SELECT 1'; GRANT EXECUTE ON FUNCTION app.qa_plant_pub() TO PUBLIC; RESET ROLE`, 'a new app function granted to PUBLIC (effective only)'],
     ['REVOKE EXECUTE ON FUNCTION app.enter_session(text) FROM poly_app', 'a listed EXECUTE missing'],
+    ['REVOKE EXECUTE ON FUNCTION app.my_second_step() FROM poly_app', 'my_second_step (RC1) missing from the eleven'],
   ];
   for (const [plant, label] of plants) it(`${label} turns 11 red [red if: 11 does not read that surface]`, () => { expect(run(body, plant).length, plant).toBeGreaterThanOrEqual(1); });
 });
