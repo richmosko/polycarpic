@@ -1,7 +1,7 @@
 ---
 id: POLY-153
 title: Web enters by handle
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-152]
@@ -11,7 +11,7 @@ labels: [security, auth]
 priority: P1
 pr: https://github.com/richmosko/polycarpic/pull/136
 created: 2026-11-17
-updated: 2026-11-18
+updated: 2026-11-19
 ---
 
 Loop 2 of stage 2 (split from POLY-149 on 2026-11-17). Web enters a transaction only by handing the database a session handle. The database holds just a hash of that handle and checks it in `app.enter_session`. The handle is a second cookie, `__Host-poly_handle`, set by one plugin that must be last in `plugins[]`, on all 13 session paths (`process/cairn/reviews/POLY-148/spike.md` §1 H, §7). Design source: `process/cairn/reviews/POLY-145/pricing.md` §1 blocks E and H. The dev and e2e harness's seeded `storageState` must carry the handle cookie and its `app.session_handle` row (spike §4).
@@ -64,3 +64,7 @@ Architect on backend-lead-153's five build judgment calls @ 943a8fd0. Four are w
 ### @team-lead — 2026-11-18
 
 PR opened: https://github.com/richmosko/polycarpic/pull/136. Gate sha 13af0fad; docs and tracker only since.
+
+### @team-lead — 2026-11-19
+
+Validate passed; merging via PR #136. Closing.
