@@ -236,3 +236,28 @@ Read: `git diff 8de05776 d170edfd -- process/cairn/reviews/POLY-149/ruling.md`; 
 The guards call `pg_catalog.clock_timestamp()` by its qualified name, with `search_path = ''`, so no object can shadow the clock (code-read, 0016).
 
 **Accepted at `d170edfd`**, with item 4's tightening carried by qa's re-write of pgTAP 12.
+
+## 15. Addendum 7 at `373d089c`: the temporary policy and the STABLE label. Accepted.
+
+Read: `git diff 373d089c~1 373d089c -- process/cairn/reviews/POLY-149/ruling.md`.
+
+### 15.1 The temporary DELETE policy on `app.tx_identity`
+**It is never visible outside the migration** (spec). CREATE POLICY and DROP POLICY are transactional catalog changes. Both run inside 0017's one migration transaction, so no other session ever sees `tx_identity_drop_web`.
+- **Who could use it while it exists:** only the migration's own session, as poly_owner. That session can already drop RLS on the table, so the policy grants nothing new.
+- **What it allows:** deleting `web` rows only (`USING (kind = 'web')`), and only by poly_owner. No login role is named.
+
+**The lock.**
+- `SHARE ROW EXCLUSIVE` conflicts with the `ROW EXCLUSIVE` lock that every INSERT and DELETE takes. So the delete sees every committed `web` marker, and no new marker can arrive before the CHECK.
+- Markers are rows of the migration's own transaction or of transactions that have ended. A marker of a transaction still open blocks the lock until that transaction ends. That is correct: it fails by waiting, never by missing a row.
+
+**The pin afterwards.** pgTAP 07 asserts that no `tx_identity` policy names poly_owner. That is the check that matters: a policy left behind by mistake would let the migration credential, already the accepted limit, delete markers without switching off RLS. With the pin it cannot stay.
+
+**Not blocking: take the lock first.** Move `LOCK TABLE app.tx_identity …` to the top of 0017, before the REVOKEs and the `DROP FUNCTION`.
+- If the lock waits on an open web transaction while the migration already holds locks from its earlier statements, a deadlock is possible, though unlikely (guessed; nothing is deployed, and migrate runs before the app starts).
+- Postgres detects deadlocks and aborts one side, so the worst case is a failed migration that is re-run, never a partial one.
+- It is the architect's call.
+
+### 15.2 `app.sign_in_address` STABLE, pinned `provolatile = 's'`
+**Accepted.** This is §6's recommendation. It does not change behaviour, and its security reading is unchanged.
+
+**Accepted at `373d089c`.** I confirm the build at the new gate sha once you send the code diff.
