@@ -10,7 +10,15 @@ SET ROLE poly_authz;--> statement-breakpoint
 DROP FUNCTION app.enter_asserted_user(uuid, uuid);--> statement-breakpoint
 
 SET ROLE poly_owner;--> statement-breakpoint
+-- Addendum 7: FORCE RLS hides every row from the owner, so the delete runs under a policy that lives only for this statement. The lock
+-- waits for any open marker and keeps new ones out until the CHECK below is in place.
+LOCK TABLE app.tx_identity IN SHARE ROW EXCLUSIVE MODE;--> statement-breakpoint
+-- The DELETE's WHERE reads kind, so the owner needs a SELECT policy for the same rows as well.
+CREATE POLICY tx_identity_drop_web_read ON app.tx_identity FOR SELECT TO poly_owner USING (kind = 'web');--> statement-breakpoint
+CREATE POLICY tx_identity_drop_web ON app.tx_identity FOR DELETE TO poly_owner USING (kind = 'web');--> statement-breakpoint
 DELETE FROM app.tx_identity WHERE kind = 'web';--> statement-breakpoint
+DROP POLICY tx_identity_drop_web ON app.tx_identity;--> statement-breakpoint
+DROP POLICY tx_identity_drop_web_read ON app.tx_identity;--> statement-breakpoint
 ALTER TABLE app.tx_identity DROP CONSTRAINT tx_identity_kind_check;--> statement-breakpoint
 ALTER TABLE app.tx_identity ADD CONSTRAINT tx_identity_kind_check
   CHECK (kind IN ('signup', 'auth', 'session') OR kind ~ '^system:[a-z][a-z0-9_]{0,62}$');--> statement-breakpoint

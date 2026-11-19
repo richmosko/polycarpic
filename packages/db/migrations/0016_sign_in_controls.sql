@@ -76,9 +76,9 @@ GRANT CREATE ON SCHEMA app TO poly_govern, poly_purge, poly_authz;--> statement-
 SET ROLE poly_govern;--> statement-breakpoint
 
 -- Addendum 4: one rule for the address on every record row: kept as given when it is an inet (so at most 45 characters), else NULL.
--- An invoker and immutable; only the two poly_govern definers below call it.
+-- An invoker and stable (pg_input_is_valid is); only the two poly_govern definers below call it.
 CREATE FUNCTION app.sign_in_address(p_value text) RETURNS text
-  LANGUAGE sql IMMUTABLE
+  LANGUAGE sql STABLE
   SET search_path = ''
   AS $fn$ SELECT CASE WHEN p_value IS NOT NULL AND pg_catalog.pg_input_is_valid(p_value, 'inet') THEN p_value END $fn$;--> statement-breakpoint
 
