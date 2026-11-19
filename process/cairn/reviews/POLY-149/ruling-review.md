@@ -138,3 +138,14 @@ Read: `git diff 3725d22e 4b421984 -- process/cairn/reviews/POLY-149/ruling.md`.
 - R3's test line now has a plant for it, `GRANT SELECT … TO poly_worker`, which must be shown to fail the test. R5's opening sentence already requires the same of the gate.
 
 That is §2.1(3), and with it §2.1 is closed. **The ruling is accepted at `4b421984`, with no required change outstanding.** If the Principal chooses (b) on decision 1, poly_backup joins the row and §4.1 applies.
+
+## 9. Addendum 1 at `44ef4ed4`: the acceptance stands
+
+- **T-L3.** The architect's reading is right. My §3 T-L3 was written against `b31be909`, where step 1 checked only `locked_until`. Since `3725d22e`, step 1 also refuses a lower count, as I recorded in §7. During a lock, `SET failed_verification_count = 0` as poly_auth must give 42501, and the count, `locked_until` and the streak must all read back unchanged. That outcome replaces T-L3 as I worded it in §3. `second-step-lock.test.ts:176-179` tests it.
+- **The two invokers leave `definers.json`: accepted.** Each has to see the role that is deleting in `current_user`, so neither can be a definer.
+  - pgTAP 12 pins both: their owner, `prosecdef = false`, `search_path = ''`, and no login role can execute them, granted or effective.
+  - Neither one widens what any role can do. The delete guard reads only `OLD` and the clock.
+  - `sign_in_record_immutable` reads `public."user"` only on the purge branch, as poly_purge, which holds `SELECT (id)` on it (R3). For any other role it refuses before reading anything.
+  - Postgres checks EXECUTE on a trigger function when the trigger is created, not when it fires (spec). "No login role can execute it" therefore guards direct calls, and the trigger still fires for every role.
+
+**The ruling is accepted at `44ef4ed4`.** Nothing is outstanding.
