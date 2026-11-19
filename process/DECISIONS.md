@@ -752,3 +752,15 @@ Add new decisions ABOVE this comment, newest first.
 - The per-entity lock in the database, in this loop — about $45 to $80 and 2.5 to 4 hours (guesses), with its own ruling and seceng review; deferred to its own loop.
 **Open for that loop:** whether a locked entity shows its name or only a count to a password-only session; a sole owner who is reset leaves the entity with no effective owner until they set up again.
 **Approved by:** the Principal (2026-11-19), on the architect's and seceng's assessments (`process/cairn/reviews/POLY-150/ruling.md`, Addendum 3).
+
+### 2026-11-19 — "Trust this device" is offered at the second sign-in step, unticked by default, as its own issue
+**Decision:** the second step offers a "trust this device" tick-box, unticked by default, so a person opts in per device. It is built as its own issue (POLY-154), with its own ruling and seceng review. Until it ships, the sign-in service keeps refusing the option (POLY-150 ruling R7). The sign-in library's own version is not used as it stands.
+**Why:** the Principal: it "is user useful. And the user can opt out for added security." The architect and seceng had recommended not offering it. Read in the library's code (better-auth 1.7.18, not run): its trust cookie is tied to the user and not the machine, renews for 30 days on every use, survives a password change, a method change and sign-out, and has no list or revoke. Our code also applies the second-step check to magic-link and Google/GitHub sign-ins, so trust plus a magic link would sign in with the inbox alone.
+**Accepted in principle, to be stated in SECURITY when it ships:** a copied browser profile with a saved password signs in without the second step until the password changes.
+**Not yet decided (the issue's ruling brings them back with costs):** who may use it (every role, or not owners and managers of shared entities); the lifetime (30 or 14 days); whether "sign out everywhere" ends trust.
+**Alternatives considered:**
+- Do not offer it — the stronger option; recommended by the architect and seceng; not taken.
+- The library's version as it is — about $5 (a guess); permanent and unrevocable.
+- Build it inside POLY-150 — about +$40 and 2 hours (guesses) and a re-review of a loop that is built and green.
+**Cost:** about $45 and 2 hours 15 minutes as its own issue (the architect's guess).
+**Approved by:** the Principal (2026-11-19), against the architect's and seceng's recommendation, on their assessments.
