@@ -1,7 +1,7 @@
 ---
 id: POLY-153f
 title: Handle entry verdict
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-153
 blocked_by: [POLY-153d]
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-153.md, process/cairn/reviews/POLY-153/**, pro
 stage: review
 estimate.cost_usd: "5.00"
 estimate.gate_cycles: 3
-labels: [security, auth]
+actual.cost_usd: "3.3294"
+actual.tokens: 10878013
+actual.gate_cycles: 4
+actual.wall_clock: 57
+ratio: "0.67"
+labels: [security, auth, bloat]
 priority: null
 pr: null
 created: 2026-11-18
