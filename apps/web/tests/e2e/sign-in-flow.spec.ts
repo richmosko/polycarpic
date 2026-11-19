@@ -18,9 +18,9 @@ test.describe('sign-in form', () => {
     await slot('/sign-in/email');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await expect(page.getByRole('alert')).toBeVisible();
-    const sent = page.waitForRequest((r) => r.url().endsWith('/api/auth/sign-in/email') && r.method() === 'POST');
     await page.getByLabel(/password/i).fill(PASSWORD);
-    await slot('/sign-in/email');
+    await slot('/sign-in/email'); // the wait for a limiter slot comes before the request is watched for: waitForRequest has its own 15 s clock
+    const sent = page.waitForRequest((r) => r.url().endsWith('/api/auth/sign-in/email') && r.method() === 'POST');
     await page.getByRole('button', { name: 'Sign in' }).click();
     await sent;
     await page.waitForURL((u) => u.pathname === '/dashboard');
