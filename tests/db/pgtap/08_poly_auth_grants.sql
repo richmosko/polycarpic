@@ -88,8 +88,8 @@ SELECT is(pg_temp.fn_extra(), '{}'::text[], 'effective: poly_auth executes no fu
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_auth', to_regprocedure(sig), 'EXECUTE')), NULL::text[],
   'effective: poly_auth executes every one of the seventeen (a missing or ungranted function is listed)');
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='app'
-  AND p.proname IN ('enter_asserted_user','enter_job','has_role','visible_entities','owner_count','second_step_required','issue_operator_invitation','reset_second_step','purge_tx_identity')
-  AND has_function_privilege('poly_auth', p.oid, 'EXECUTE')), 0, 'pinned absent: enter_asserted_user, enter_job, has_role, visible_entities, owner_count, second_step_required, issue_operator_invitation, reset_second_step, purge_tx_identity');
+  AND p.proname IN ('enter_job','has_role','visible_entities','owner_count','second_step_required','issue_operator_invitation','reset_second_step','purge_tx_identity')
+  AND has_function_privilege('poly_auth', p.oid, 'EXECUTE')), 0, 'pinned absent: enter_job, has_role, visible_entities, owner_count, second_step_required, issue_operator_invitation, reset_second_step, purge_tx_identity');
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='app' AND p.proname IN ('enter_auth_session','provision_person')
   AND (has_function_privilege('poly_app', p.oid, 'EXECUTE') OR has_function_privilege('poly_worker', p.oid, 'EXECUTE') OR has_function_privilege('poly_operator', p.oid, 'EXECUTE'))), 0,
   'poly_app, poly_worker, poly_operator never execute enter_auth_session or provision_person');

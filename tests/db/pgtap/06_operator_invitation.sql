@@ -12,7 +12,7 @@ BEGIN
     RETURN;
   END IF;
   DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id();
-  IF uid <> '' THEN INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), uid::uuid, NULL, 'web'); END IF;
+  IF uid <> '' THEN INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), uid::uuid, NULL, 'session'); END IF;
 END $$;
 CREATE FUNCTION pg_temp.sx(q text) RETURNS text LANGUAGE plpgsql AS $$ BEGIN EXECUTE q; RETURN 'ok'; EXCEPTION WHEN OTHERS THEN RETURN 'ERR:' || SQLSTATE; END $$;
 CREATE FUNCTION pg_temp.run_as(role text, uid text, pre text, q text) RETURNS text LANGUAGE plpgsql AS $$

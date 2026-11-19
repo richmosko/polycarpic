@@ -171,8 +171,8 @@ describe('withOperatorTx (@poly/db/operator)', () => {
       must(`ALTER ROLE poly_operator IN DATABASE ${db} RESET app.user_id`);
     }
   });
-  it('no other entry point exports it: @poly/db, /auth, /session, /migrate and /startup have no withOperatorTx  [red if: a re-export is added to any of them]', async () => {
-    for (const f of ['index', 'auth', 'session', 'migrate', 'startup']) {
+  it('no other entry point exports it: @poly/db, /auth, /migrate and /startup have no withOperatorTx  [red if: a re-export is added to any of them]', async () => {
+    for (const f of ['index', 'auth', 'migrate', 'startup']) {
       const x: any = await import(`../../packages/db/src/${f}.ts`);
       expect(Object.keys(x), f).not.toContain('withOperatorTx');
     }

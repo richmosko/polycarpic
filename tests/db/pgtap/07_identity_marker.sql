@@ -8,7 +8,7 @@ SELECT no_plan();
 CREATE FUNCTION pg_temp.set_id(uid text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
   DELETE FROM app.tx_identity WHERE xid = pg_current_xact_id();
-  IF uid <> '' THEN INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), uid::uuid, NULL, 'web'); END IF;
+  IF uid <> '' THEN INSERT INTO app.tx_identity (xid, user_id, session_id, kind) VALUES (pg_current_xact_id(), uid::uuid, NULL, 'session'); END IF;
 END $$;
 -- runs q as role (after the marker for uid, '' = none); returns the single text value, or 'ERR:<sqlstate>'
 CREATE FUNCTION pg_temp.run_as(role text, uid text, q text) RETURNS text LANGUAGE plpgsql AS $$
@@ -38,7 +38,7 @@ SELECT is((SELECT string_agg(column_name || ':' || data_type || ':' || is_nullab
   'xid:xid8:NO,user_id:uuid:NO,session_id:uuid:YES,kind:text:NO,created_at:timestamp with time zone:NO', 'K1: columns xid8, user_id, session_id (null), kind, created_at, in this order');
 SELECT is((SELECT array_agg(a.attname::text) FROM pg_index i JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY (i.indkey) WHERE i.indrelid = 'app.tx_identity'::regclass AND i.indisprimary), ARRAY['xid'], 'K1: xid is the primary key (a second marker per transaction stays impossible)');
 SELECT is((SELECT count(*)::int FROM pg_constraint WHERE conrelid = 'app.tx_identity'::regclass AND contype = 'f'), 0, 'R1: no foreign key (it would lock the user row on every request)');
-SELECT is((SELECT count(*)::int FROM pg_constraint WHERE conrelid = 'app.tx_identity'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) ~ 'web' AND pg_get_constraintdef(oid) ~ 'signup' AND pg_get_constraintdef(oid) ~ 'system:'), 1, 'R1: a CHECK limits kind to web, signup and system:<job>');
+SELECT is((SELECT count(*)::int FROM pg_constraint WHERE conrelid = 'app.tx_identity'::regclass AND contype = 'c' AND pg_get_constraintdef(oid) ~ 'session' AND NOT pg_get_constraintdef(oid) ~ 'web' AND pg_get_constraintdef(oid) ~ 'signup' AND pg_get_constraintdef(oid) ~ 'system:'), 1, 'R1: a CHECK limits kind to signup, auth, session and system:<job> (no web since POLY-149)');
 SELECT is((SELECT pg_get_userbyid(relowner)::text FROM pg_class WHERE oid = 'app.tx_identity'::regclass), 'poly_owner', 'R1: owned by poly_owner');
 SELECT ok((SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid = 'app.tx_identity'::regclass), 'R1: RLS enabled and FORCEd (mutation: not forced)');
 SELECT is((SELECT string_agg(CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END || ':' || a.privilege_type, ',' ORDER BY CASE WHEN a.grantee = 0 THEN 'PUBLIC' ELSE pg_get_userbyid(a.grantee)::text END COLLATE "C", a.privilege_type COLLATE "C")

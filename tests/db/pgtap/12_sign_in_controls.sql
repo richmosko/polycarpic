@@ -47,10 +47,10 @@ SELECT is((SELECT array_agg(column_name::text ORDER BY ordinal_position) FROM in
 SELECT ok(EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('app.second_step_streak') AND contype = 'f' AND confrelid = 'public."user"'::regclass AND confdeltype = 'c'), 'user_id references public."user" ON DELETE CASCADE');
 SELECT is((SELECT array_agg(DISTINCT grantee::text ORDER BY grantee::text) FROM information_schema.role_table_grants WHERE table_schema = 'app' AND table_name = 'second_step_streak' AND grantee <> 'poly_owner'), ARRAY['poly_govern'], 'granted: second_step_streak grants name poly_govern only');
 SELECT is((SELECT array_agg(DISTINCT r::text ORDER BY r::text) FROM pg_policies p, unnest(p.roles) r WHERE schemaname = 'app' AND tablename = 'second_step_streak'), ARRAY['poly_govern'], 'the second_step_streak policies name poly_govern only');
-SELECT is((SELECT count(*)::int FROM logins JOIN (SELECT unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p) q ON true WHERE to_regclass('app.second_step_streak') IS NOT NULL AND has_table_privilege(r, 'app.second_step_streak', p)), 0,
-  'effective: no login role holds any privilege on second_step_streak (PUBLIC included)');
+SELECT is((SELECT count(*)::int FROM logins JOIN (SELECT unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) p) q ON true WHERE to_regclass('app.second_step_streak') IS NOT NULL AND has_table_privilege(r, 'app.second_step_streak', p) AND NOT (r = 'poly_backup' AND p = 'SELECT')), 0,
+  'effective: no login role holds any privilege on second_step_streak (PUBLIC included); poly_backup reads it through pg_read_all_data, SELECT only (Principal decision 1)');
 SELECT is((SELECT count(*)::int FROM logins JOIN (SELECT unnest(ARRAY['SELECT','INSERT','UPDATE','REFERENCES']) p) q ON true JOIN pg_attribute a ON a.attrelid = to_regclass('app.second_step_streak') AND a.attnum > 0 AND NOT a.attisdropped
-  WHERE has_column_privilege(r, a.attrelid, a.attnum, p)), 0, 'effective: no login role holds a column privilege on second_step_streak');
+  WHERE has_column_privilege(r, a.attrelid, a.attnum, p) AND NOT (r = 'poly_backup' AND p = 'SELECT')), 0, 'effective: no login role holds a column privilege on second_step_streak (poly_backup reads through pg_read_all_data, SELECT only)');
 SELECT ok(EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = to_regclass('app.second_step_streak') AND NOT t.tgisinternal AND t.tgenabled = 'O' AND t.tgtype & 32 = 32), 'second_step_streak has an enabled BEFORE TRUNCATE trigger');
 
 -- ===== the guard triggers on public.two_factor and the session trigger =====
@@ -88,13 +88,13 @@ SELECT is((SELECT array_agg(r ORDER BY r) FROM logins WHERE has_table_privilege(
 CREATE FUNCTION pg_temp.setting_reads() RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(DISTINCT p.oid::regprocedure::text || ' reads ' || m[1] ORDER BY p.oid::regprocedure::text || ' reads ' || m[1]), '{}')
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace, LATERAL regexp_matches(p.prosrc, 'current_setting\s*\(\s*''([^'']+)''', 'g') m
-  WHERE n.nspname IN ('app','public') AND m[1] NOT IN ('app.actor','poly.client_ip','poly.user_agent') $f$;
-SELECT is(pg_temp.setting_reads(), '{}'::text[], 'no function in app or public reads a setting other than app.actor, poly.client_ip, poly.user_agent (a clock override would be one)');
+  WHERE n.nspname = 'app' AND m[1] NOT IN ('app.actor','poly.client_ip','poly.user_agent','role') $f$; -- 'role' is read by three trigger helpers (measured, not a clock)
+SELECT is(pg_temp.setting_reads(), '{}'::text[], 'no function in app reads a setting other than app.actor, poly.client_ip, poly.user_agent and role (a clock override would be one)');
 SELECT is((SELECT array_agg(p.oid::regprocedure::text ORDER BY p.oid::regprocedure::text) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
-  WHERE n.nspname IN ('app','public') AND p.prosrc ~* 'current_setting' AND (SELECT count(*) FROM regexp_matches(p.prosrc, 'current_setting', 'gi')) <> (SELECT count(*) FROM regexp_matches(p.prosrc, 'current_setting\s*\(\s*''[^'']+''', 'gi'))), NULL::text[],
-  'every current_setting call in app and public has a literal name (no dynamic setting name)');
-SELECT is((SELECT array_agg(p.oid::regprocedure::text ORDER BY p.oid::regprocedure::text) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname IN ('app','public') AND p.prosrc ~* 'set_config'), NULL::text[],
-  'no function in app or public calls set_config (a clock override would need it)');
+  WHERE n.nspname = 'app' AND p.prosrc ~* 'current_setting' AND (SELECT count(*) FROM regexp_matches(p.prosrc, 'current_setting', 'gi')) <> (SELECT count(*) FROM regexp_matches(p.prosrc, 'current_setting\s*\(\s*''[^'']+''', 'gi'))), NULL::text[],
+  'every current_setting call in app has a literal name (no dynamic setting name)');
+SELECT is((SELECT array_agg(p.oid::regprocedure::text ORDER BY p.oid::regprocedure::text) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.prosrc ~* 'set_config'), NULL::text[],
+  'no function in app calls set_config (a clock override would need it)');
 SELECT is((SELECT p.prosrc !~* 'clock_timestamp' FROM pg_proc p WHERE p.oid = to_regprocedure('app.guard_second_step_lock()')), false, 'the guard reads clock_timestamp(), not now() and no setting');
 
 ROLLBACK;

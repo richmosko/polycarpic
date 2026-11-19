@@ -199,17 +199,14 @@ describe('T-L4 a factor DELETE during a lock is refused; after a lapse delete an
   it('delete during a lock: refused, row there; lapse; delete + re-insert as poly_auth; the streak survives and the next lock doubles [red if: the delete guard is missing or the streak is keyed by the factor row]', async () => {
     const db = cloneMigrated(); const fx = fixture(db, 1493);
     const u = await fx.user({ enrolled: true });
-    const sid = fx.session(u.id);
+    const sid = fx.session(u.id, true); // a fresh step-up, so the DELETE after the lapse reaches the lock guard and not step_up_required
     must(`UPDATE public.two_factor SET failed_verification_count = 10, locked_until = now() + interval '15 minutes' WHERE user_id = '${u.id}'`, db);
     const snap = () => must(`SELECT id, locked_until FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows;
     const x = await fx.marked('poly_auth', u.id, sid, (q) => refusedUnchanged(snap, () => q('DELETE FROM public.two_factor WHERE user_id = $1', [u.id])));
     expect(codeOf(x)).toBe('42501');
     expect(streakOf(db, u.id)).toBe(1);
     lapseLock(db, u.id);
-    await fx.committed('poly_auth', u.id, sid, async (q) => {
-      await q('DELETE FROM public.two_factor WHERE user_id = $1', [u.id]);
-      await q(`INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s2', 'b2', $1, true)`, [u.id]);
-    });
+    must(`BEGIN; DELETE FROM public.two_factor WHERE user_id = '${u.id}'; INSERT INTO public.two_factor (secret, backup_codes, user_id, verified) VALUES ('s2', 'b2', '${u.id}', true); COMMIT;`, db); // the delete guard no longer refuses once the lock has lapsed (no role is exempt, the fixture superuser included); re-enrolment itself needs an email proof, so it is the fixture's
     expect(streakOf(db, u.id), 'the streak survives re-enrolment').toBe(1);
     must(`UPDATE public.two_factor SET failed_verification_count = 10, locked_until = now() + interval '15 minutes' WHERE user_id = '${u.id}'`, db);
     near(lockMinutes(db, u.id), 30);

@@ -6,6 +6,7 @@ import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
 import { capture, enrolTotp, hasSessionCookie, heldSignIn } from './helpers/auth-service';
 import { softAuthenticator } from './helpers/webauthn';
 import { totp } from './helpers/second-step';
+import { lapseLock } from './helpers/lock';
 import { must } from './helpers/sql';
 
 vi.mock('../../packages/tenancy/src/index.ts', async (o) => (await import('./helpers/auth')).claimFactory(o as any));
@@ -153,7 +154,7 @@ describe('§6.1 a refused second-step code commits its count, and only what it m
       expect(hasSessionCookie(eleventh)).toBe(false);
       expect(sessions(u.id), 'the locked factor made no session').toBe(sessionsBefore);
       // MEASURED, not asserted (seceng §8): once the lock lapses, does the count reset, giving 10 fresh tries? Recorded in red-run.md.
-      must(`UPDATE public.two_factor SET locked_until = now() - interval '1 second' WHERE user_id = '${u.id}'`, e.db);
+      lapseLock(e.db, u.id); // no role is exempt from the guard: the lapse is a replica-mode superuser write (ruling R2)
       const countBefore = state()[0];
       const after = await e.handle(post(path, mk(secret), held.cookie), auth);
       const row = must(`SELECT failed_verification_count, locked_until FROM public.two_factor WHERE user_id = '${u.id}'`, e.db).rows[0]!;
