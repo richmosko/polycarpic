@@ -883,4 +883,8 @@ A raise rolls back the transaction, so a TOTP step it refused is not recorded ei
 | `app.complete_step_up(text, uuid, bigint)` | owner poly_govern; EXECUTE poly_auth only; the only new writer of `recent_auth_at` |
 | triggers `step_up_totp_10_forward`, `two_factor_85_step_up_spent`, `step_up_pending_resolved` | exist, `tgenabled = 'O'`; the last is DEFERRABLE INITIALLY DEFERRED |
 
+- **No TRUNCATE on the method tables.** A TRUNCATE fires no row trigger, so it could remove every method with no audit row. 0019 therefore adds `two_factor_no_truncate` and `passkey_no_truncate`: `BEFORE TRUNCATE … FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate()`, the function `audit_event` and `tx_identity` already use.
+  - **pgTAP 12** pins both triggers: they exist, `tgenabled = 'O'`, and they are statement-level BEFORE TRUNCATE. It also pins that no login role holds TRUNCATE on either table. Plant: one trigger dropped.
+  - Both triggers join the deploy-gate table, with the same check: exist and `tgenabled = 'O'`.
+
 **Cost (guess):** about $5 and 15 minutes, inside A7's build and tests.
