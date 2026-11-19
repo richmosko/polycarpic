@@ -10,7 +10,8 @@
   import SecondStepSetup from '../../../lib/second-step/SecondStepSetup.svelte';
 
   let { data } = $props();
-  type Open = null | 'setup' | 'newcodes' | { confirm: string } | 'removeApp' | 'addPasskey';
+  type Open = null | 'setup' | 'newcodes' | 'confirm' | 'removeApp' | 'addPasskey';
+  let confirming = $state<{ action: string; run: () => void } | null>(null);
   let open = $state<Open>(null);
   let error = $state('');
 
@@ -24,7 +25,11 @@
   const states = $derived(actionStates({ passkeys: s.passkeys, totp_added_at: s.totpAddedAt, needs_a_method: s.needsAMethod, codes_paused: s.codesPaused }, data.recentAuthOk));
   const day = (iso: string) => iso.slice(0, 10);
   // A step-up action runs directly while the last confirmation is fresh; otherwise it opens Confirm it's you (interim, R6).
-  const stepUp = (confirm: string, run: () => void) => (data.recentAuthOk ? run() : (open = { confirm }));
+  const stepUp = (action: string, run: () => void) => {
+    if (data.recentAuthOk) return run();
+    confirming = { action, run };
+    open = 'confirm';
+  };
 
   async function removePasskey(id: string) {
     error = '';
@@ -74,7 +79,7 @@
           <div class="text-muted-foreground text-xs">Added {day(s.totpAddedAt)}</div>
         </div>
         {#if states.removeApp !== 'hidden'}
-          <button type="button" class={btn} disabled={states.removeApp === 'disabled'} onclick={() => stepUp('remove your authenticator app', () => (open = 'removeApp'))}>Remove</button>
+          <button type="button" class={btn} disabled={states.removeApp === 'disabled'} onclick={() => stepUp('Removing your authenticator app', () => (open = 'removeApp'))}>Remove</button>
         {/if}
       </div>
     {/if}
@@ -85,7 +90,7 @@
           <div class="text-muted-foreground text-xs">Added {day(k.createdAt)}</div>
         </div>
         {#if states.removePasskey !== 'hidden'}
-          <button type="button" class={btn} disabled={states.removePasskey === 'disabled'} onclick={() => stepUp('remove a passkey', () => removePasskey(k.id))}>Remove</button>
+          <button type="button" class={btn} disabled={states.removePasskey === 'disabled'} onclick={() => stepUp('Removing a passkey', () => removePasskey(k.id))}>Remove</button>
         {/if}
       </div>
     {/each}
@@ -98,7 +103,7 @@
     <div class={row}>
       <div class="text-sm font-medium">Add a method</div>
       {#if states.addPasskey !== 'hidden'}
-        <button type="button" class={btn} onclick={() => stepUp('add a passkey', () => (open = 'addPasskey'))}>Add passkey</button>
+        <button type="button" class={btn} onclick={() => stepUp('Adding a passkey', () => (open = 'addPasskey'))}>Add passkey</button>
       {/if}
     </div>
     {#if states.makeNewCodes !== 'hidden'}
@@ -107,7 +112,7 @@
           <div class="text-sm font-medium">Backup codes</div>
           <div class="text-muted-foreground text-xs">Each works once; new codes replace them all.</div>
         </div>
-        <button type="button" class={btn} onclick={() => stepUp('make new backup codes', () => (open = 'newcodes'))}>Make new codes</button>
+        <button type="button" class={btn} onclick={() => stepUp('Making new backup codes', () => (open = 'newcodes'))}>Make new codes</button>
       </div>
     {/if}
   {/if}
@@ -119,6 +124,19 @@
   <SecondStepSetup mode="newcodes" onclose={() => (open = null)} />
 {:else if open === 'removeApp' || open === 'addPasskey'}
   <PanelAction kind={open} onclose={() => (open = null)} />
-{:else if open && typeof open === 'object'}
-  <ConfirmItsYou action={open.confirm} onclose={() => (open = null)} />
+{:else if open === 'confirm' && confirming}
+  <ConfirmItsYou
+    action={confirming.action}
+    hasApp={s.totpAddedAt !== null}
+    onconfirmed={() => {
+      const run = confirming?.run;
+      open = null;
+      confirming = null;
+      run?.(); // a new request on the refreshed data, never a replay
+    }}
+    onclose={() => {
+      open = null;
+      confirming = null;
+    }}
+  />
 {/if}

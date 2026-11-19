@@ -1,65 +1,162 @@
 <script lang="ts">
-  // POLY-150 R6 (D3 b, interim): Confirm it's you before a step-up action. Confirming isn't built yet (POLY-151), so the dialog names the action, says so
-  // plainly and has one button and no input. It takes a `confirm` function so POLY-151 can fill the real form; the interim passes none. It follows
-  // R3.0's mounting (portal on document.body) and R3.5's clearing: nothing is kept here.
+  // POLY-150 Addendum 3 A2: Confirm it's you before a step-up action. Password and an authenticator code, or a passkey with user verification. Opening it
+  // sends `begin` for the method shown first; switching method begins again. After a pass the host's data reloads (invalidateAll) and the action that
+  // opened the dialog runs as a new request, never a replay. Same mounting (portal on document.body, no page form, fetch only to /api/auth) and clearing
+  // as the set-up dialog: the password and code live only here and go on every way out. The backup-code option waits on D7.
   import { Dialog } from 'bits-ui';
+  import { invalidateAll } from '$app/navigation';
+  import { onDestroy, onMount } from 'svelte';
+  import { api } from './auth-api';
+  import { getCredential, type RequestOptionsJSON } from './webauthn';
 
   let {
     action,
-    confirm,
+    hasApp,
+    onconfirmed,
     onclose,
-  }: { action: string; confirm?: (secret: { password: string; code: string }) => Promise<boolean>; onclose: () => void } = $props();
+  }: {
+    /** The action's name as a phrase that starts a sentence: "Making new backup codes". */
+    action: string;
+    /** The user has an authenticator app (my_second_step's totp_added_at); without one the dialog is the passkey-only variant. */
+    hasApp: boolean;
+    /** Runs after a pass, once the data has reloaded. */
+    onconfirmed: () => void;
+    onclose: () => void;
+  } = $props();
 
+  type Method = 'totp' | 'passkey';
+  // svelte-ignore state_referenced_locally
+  let method = $state<Method>(hasApp ? 'totp' : 'passkey');
+  let challengeId = $state('');
+  let options = $state<RequestOptionsJSON | null>(null);
   let password = $state('');
   let code = $state('');
   let error = $state('');
+  let paused = $state(false);
+  let busy = $state(false);
 
-  const close = () => {
+  const clear = () => {
     password = '';
     code = '';
+    challengeId = '';
+    options = null;
+  };
+  const close = () => {
+    clear();
     onclose();
   };
+  onDestroy(clear);
+
+  async function begin(m: Method) {
+    method = m;
+    error = '';
+    options = null;
+    const r = await api<{ challengeId?: string; options?: RequestOptionsJSON }>('POST', '/second-step/reauth/begin', { method: m });
+    if (r.ok && typeof r.body.challengeId === 'string') {
+      challengeId = r.body.challengeId;
+      options = r.body.options ?? null;
+    } else error = 'That did not work. Close this and try again.';
+  }
+  onMount(() => void begin(method));
+
+  async function passed() {
+    clear();
+    await invalidateAll();
+    onconfirmed();
+  }
+  /** A refusal: the lock is its own state; everything else is the one message, with no count. */
+  function refused(r: { status: number; body: { code?: string } }) {
+    if (r.status === 429 && r.body.code === 'ACCOUNT_TEMPORARILY_LOCKED') paused = true;
+    else if (r.status === 429) error = 'Too many attempts. Wait a minute and try again.';
+    else error = method === 'passkey' ? "That passkey didn't work. Try again." : "That password or code didn't work. Check both and try again.";
+  }
+
   async function submit(e: SubmitEvent) {
     e.preventDefault();
-    if (!confirm) return;
-    const ok = await confirm({ password, code });
-    password = '';
-    code = '';
-    if (ok) onclose();
-    else error = "That didn't confirm. Check your password and code and try again.";
+    if (busy || !challengeId) return;
+    busy = true;
+    error = '';
+    try {
+      const r = await api('POST', '/second-step/reauth', { challengeId, password, code });
+      password = '';
+      code = '';
+      if (r.ok) return await passed();
+      refused(r);
+      if (!paused) await begin('totp');
+    } finally {
+      busy = false;
+    }
   }
+
+  async function usePasskey() {
+    if (busy) return;
+    busy = true;
+    error = '';
+    try {
+      if (method !== 'passkey' || !options) await begin('passkey');
+      const o = options;
+      const response = o ? await getCredential(o) : null;
+      const r = response ? await api('POST', '/second-step/reauth/passkey', { challengeId, response }) : null;
+      if (r?.ok) return await passed();
+      if (r) refused(r);
+      else error = "That passkey didn't work. Try again.";
+      await begin('passkey');
+    } finally {
+      busy = false;
+    }
+  }
+
+  const field = 'border-input bg-card text-foreground focus-visible:ring-ring w-full rounded-md border px-3 py-2 text-sm focus-visible:ring-2 focus-visible:outline-none';
+  const primary = 'bg-primary text-primary-foreground focus-visible:ring-ring rounded-md px-3 py-1.5 text-sm font-medium focus-visible:ring-2 focus-visible:outline-none disabled:opacity-50';
+  const ghost = 'text-foreground hover:bg-accent focus-visible:ring-ring rounded-md px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none';
+  const link = 'text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded text-sm underline focus-visible:ring-2 focus-visible:outline-none';
 </script>
 
-<svelte:window onpagehide={() => { password = ''; code = ''; }} />
+<svelte:window onpagehide={clear} />
 
 <Dialog.Root open={true} onOpenChange={(o) => !o && close()}>
   <Dialog.Portal to={document.body}>
     <Dialog.Overlay class="fixed inset-0 z-40 bg-black/50" />
     <Dialog.Content class="bg-card text-card-foreground border-border fixed top-1/2 left-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-xl border p-6 shadow-lg">
       <Dialog.Title class="font-heading text-lg font-semibold">Confirm it's you</Dialog.Title>
-      <Dialog.Description class="text-muted-foreground mt-1 text-sm">To {action}, confirm it's you first.</Dialog.Description>
+      <Dialog.Description class="text-muted-foreground mt-1 text-sm">{action} needs a fresh check. You won't be asked again for 5 minutes.</Dialog.Description>
       <div class="mt-4 flex flex-col gap-3 text-sm">
-        {#if confirm}
+        {#if paused}
+          <div role="status" class="border-border bg-background rounded-md border p-3"><strong>Codes are paused</strong> after too many wrong codes. Try again later.</div>
+          <p class="text-muted-foreground text-xs">Use a passkey if you have one; it still works.</p>
+          <div class="flex justify-end gap-2">
+            <button type="button" class={ghost} onclick={close}>Cancel</button>
+            <button type="button" class={primary} disabled={busy} onclick={() => { paused = false; void usePasskey(); }}>Use a passkey</button>
+          </div>
+        {:else if method === 'passkey'}
+          <p>Your browser asks for Touch ID, Face ID or your security key.</p>
+          {#if error}<p role="alert" class="text-destructive text-sm">{error}</p>{/if}
+          <div class="flex items-center justify-between gap-2">
+            {#if hasApp}<button type="button" class={link} onclick={() => begin('totp')}>Use your authenticator app</button>{:else}<span></span>{/if}
+            <div class="flex gap-2">
+              <button type="button" class={ghost} onclick={close}>Cancel</button>
+              <button type="button" class={primary} disabled={busy} onclick={usePasskey}>{hasApp ? 'Use a passkey' : 'Use your passkey'}</button>
+            </div>
+          </div>
+        {:else}
           <form onsubmit={submit} class="flex flex-col gap-3">
             <div class="flex flex-col gap-1">
               <label for="ciy-pw">Password</label>
-              <input id="ciy-pw" class="border-input bg-card w-full rounded-md border px-3 py-2" type="password" autocomplete="current-password" bind:value={password} required />
+              <input id="ciy-pw" class={field} type="password" autocomplete="current-password" bind:value={password} required />
             </div>
             <div class="flex flex-col gap-1">
               <label for="ciy-code">Code from your authenticator app</label>
-              <input id="ciy-code" class="border-input bg-card w-full rounded-md border px-3 py-2 font-mono" inputmode="numeric" autocomplete="one-time-code" maxlength="6" bind:value={code} required />
+              <input id="ciy-code" class="{field} font-mono tracking-widest" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" bind:value={code} aria-invalid={error ? 'true' : undefined} required />
+              {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
             </div>
-            {#if error}<p role="alert" class="text-destructive text-sm">{error}</p>{/if}
+            <p class="text-muted-foreground text-xs">
+              <button type="button" class={link} onclick={() => begin('passkey')}>Use a passkey instead</button>
+            </p>
             <div class="flex justify-end gap-2">
-              <button type="button" class="hover:bg-accent rounded-md px-3 py-1.5" onclick={close}>Close</button>
-              <button type="submit" class="bg-primary text-primary-foreground rounded-md px-3 py-1.5 font-medium">Confirm</button>
+              <button type="button" class={ghost} onclick={close}>Cancel</button>
+              <button type="submit" class={primary} disabled={busy || !challengeId}>Confirm</button>
             </div>
           </form>
-        {:else}
-          <p>Confirming it's you isn't available yet. You can make changes in the first 5 minutes after you set up your second step, or the person who runs Polycarpic can reset it.</p>
-          <div class="flex justify-end">
-            <button type="button" class="bg-primary text-primary-foreground focus-visible:ring-ring rounded-md px-3 py-1.5 font-medium focus-visible:ring-2 focus-visible:outline-none" onclick={close}>Close</button>
-          </div>
         {/if}
       </div>
     </Dialog.Content>
