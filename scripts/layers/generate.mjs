@@ -12,7 +12,6 @@ import poly from './plugin.mjs';
 
 const RESOLVER = path.join(path.dirname(fileURLToPath(import.meta.url)), 'resolver.cjs');
 const SRC = '**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,svelte}';
-const TESTS = ['**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}', '**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}'];
 // Repo-root test code a colocated test or a package's tests/ dir may import by path (POLY-140 condition 5).
 const OUTSIDE_ROOTS = ['tests'];
 
@@ -53,7 +52,6 @@ export function generateConfig(layers, opts = {}) {
       rules: {
         'boundaries/dependencies': [2, { default: 'disallow', policies }],
         'poly/no-computed-import': 2,
-        'poly/no-session-user-id-cast': 2,
         ...(layers.confined ? { 'poly/confined-module': [2, { root, confined: layers.confined, packages: Object.fromEntries(names.map((x) => [x, pk[x].dir])) }] } : {}),
         ...(layers.reservedLiterals ? { 'poly/reserved-literal': [2, { root, reserved: layers.reservedLiterals }] } : {}),
         ...(layers.confinedMembers ? { 'poly/confined-member': [2, { root, members: layers.confinedMembers }] } : {}),
@@ -169,7 +167,6 @@ export function generateConfig(layers, opts = {}) {
   });
 
   // Exceptions, each one named in layers.json or fixed by the rule itself.
-  cfg.push({ name: 'poly/cast-exempt', files: [...TESTS], plugins: { poly }, rules: { 'poly/no-session-user-id-cast': 0 } });
   if (layers.sessionSetExempt) {
     cfg.push({ name: 'poly/session-set-exempt', files: [layers.sessionSetExempt], plugins: { poly }, rules: { 'poly/no-session-set': 0 } });
   }

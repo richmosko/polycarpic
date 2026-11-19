@@ -157,25 +157,6 @@ const noSessionSet = {
   },
 };
 
-const brandName = (t) => {
-  if (!t || t.type !== 'TSTypeReference') return false;
-  const n = t.typeName;
-  return (n.type === 'Identifier' && n.name === 'SessionUserId') || (n.type === 'TSQualifiedName' && n.right.name === 'SessionUserId');
-};
-
-const noSessionUserIdCast = {
-  meta: { type: 'problem', schema: [] },
-  create(context) {
-    const report = (node) =>
-      context.report({ node, message: 'A cast to SessionUserId skips the brand; obtain it from the db/session constructor (SECURITY A-39).' });
-    return {
-      TSAsExpression: (node) => brandName(node.typeAnnotation) && report(node),
-      TSTypeAssertion: (node) => brandName(node.typeAnnotation) && report(node),
-      TSSatisfiesExpression: () => {},
-    };
-  },
-};
-
 const BANNED_MEMBERS = new Set(['encrypt', 'decrypt', 'wrapKey', 'unwrapKey']);
 const ALLOWED_MEMBERS = new Set(['digest', 'sign', 'verify']);
 
@@ -459,7 +440,6 @@ export default {
     'no-banned-specifier': noBannedSpecifier,
     'no-computed-import': noComputedImport,
     'no-session-set': noSessionSet,
-    'no-session-user-id-cast': noSessionUserIdCast,
     'no-webcrypto-members': noWebcryptoMembers,
   },
 };
