@@ -114,3 +114,19 @@ The criterion's exception list names `reset-mfa`. A user removing their own fact
   - C-89, the sign-in record: R3, the purge and the backup's read (§4.1).
 
   The ids are provisional; I take the next free ones at the edit.
+
+## 7. The re-issued ruling at `3725d22e`
+
+Read: `git diff b31be909 3725d22e -- process/cairn/reviews/POLY-149/ruling.md`. It replaces `b31be909` whole and takes in my preparation checklist. **Verdict: ACCEPT `3725d22e`, on one line still missing from §2.1.**
+
+| Item | At `3725d22e` | Result |
+|---|---|---|
+| §2.1(1)–(2) the gate exits non-zero, each line shown to fail by a plant | R5's opening sentence | **Met.** devops' plant list follows §2.1(2). |
+| §2.1(3) the five runtime roles have no SELECT on the record | R5 adds poly_app only, plus poly_app's exact EXECUTE set and no DELETE on `user` | **Still required:** one more R5 row, "poly_auth, poly_worker, poly_operator and poly_migrator hold no SELECT on `app.sign_in_record` (effective)". It can come as an addendum line, or the qa and devops tests can carry it if the lead prefers. It does not reopen anything else. |
+| §2.3 a factor DELETE during a lock | A new invoker trigger, `two_factor_16_lock_delete`, refuses unless `current_user = 'poly_govern'`, so only `reset-mfa` passes | **Accepted. It is stronger than I asked**, and T-L4 changes: the delete is refused, and the row is read back unchanged. Its cost: during a lock, a user cannot turn off their own authenticator from a signed-in session. Only `reset-mfa`, or waiting out the lock, clears it. That is acceptable, and SECURITY says so. |
+| T-L3 lowering the count during a lock | Step 1 now refuses it | Met, more strictly than the test condition. |
+| The reset is the service's word; no clock a role can change | Stated in R2, and pinned by pgTAP 12 with a plant | **Met.** It is the residual R-2 states. |
+| The `user` cascade on the streak | Safe, because no login role deletes `user`. The gate and pgTAP 12 pin it | Met (T-S3). |
+| §2.4 the `web` marker delete under FORCE RLS | Unchanged | Still a build note, not security. |
+
+§3's other conditions and §4's two recommendations stand unchanged at this sha.
