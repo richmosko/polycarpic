@@ -189,3 +189,25 @@ Read: `git diff abf5298a 38305740 -- docs/ARCH/index.html`, against the decision
 - **The address** is kept only if it is a valid inet (Addendum 4.3).
 
 No conflict with the Principal's decisions. **ARCH §3.1c is accepted at `38305740`**, together with the ruling at `8de05776`.
+
+## 13. The pgTAP 02 exemption diff at `cd6ab898`: accepted
+
+This is the C-13 review that the file's header requires. The diff touches only `tests/db/pgtap/02_rls_catalog.sql`: two pairs added, and the list size goes from 1 to 3.
+
+`app.sign_in_record:pk_not_uuid`. **Accepted.**
+- R3 rules a `bigint GENERATED ALWAYS AS IDENTITY` key.
+- C-18 asks for UUID keys so that ids cannot be guessed or counted. Here no login role reads the record (the backup aside), and no definer takes a record id from a caller. A guessable id is therefore worth nothing to anyone.
+
+`app.second_step_streak:for_all_policy`. **Accepted.**
+- The single policy is `FOR ALL TO poly_govern USING (true) WITH CHECK (true)`.
+- poly_govern is NOLOGIN and is reached only through fixed definer bodies. The guard and `reset_second_step` touch the streak, and no other function does (0016, code-read).
+- No login role holds any privilege on the table. pgTAP 12 and R5's gate pin that, with poly_backup's `pg_read_all_data` read as the one exception.
+- A FOR ALL policy is a risk on a table that a login role can reach. This table is not one.
+
+The list is still safe:
+- Each pair hides only its own reason (the `qa_canary_reasonex` canaries, :190-192).
+- `:77` asserts that each listed pair still hides a gap that fires, so an entry that is no longer needed fails CI.
+- `:75` asserts that each entry names a real relation.
+- The size pin at `:76` makes any further addition a reviewed diff.
+
+**Accepted at `cd6ab898`.**
