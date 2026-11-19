@@ -20,7 +20,8 @@ WITH logins AS (
          ('app.sign_in_record', 'sign_in_record_no_truncate'),
          ('public.two_factor', 'two_factor_80_sync'), ('public.passkey', 'passkey_80_sync'),
          ('public.two_factor', 'two_factor_85_step_up_spent'), ('app.step_up_totp', 'step_up_totp_10_forward'),
-         ('app.step_up_pending', 'step_up_pending_resolved')
+         ('app.step_up_pending', 'step_up_pending_resolved'),
+         ('public.two_factor', 'two_factor_no_truncate'), ('public.passkey', 'passkey_no_truncate')
 ), sync_trig(tbl, name) AS (
   -- the two method-change triggers must run app.sync_second_step(), the function that writes the audit event
   VALUES ('public.two_factor', 'two_factor_80_sync'), ('public.passkey', 'passkey_80_sync')
