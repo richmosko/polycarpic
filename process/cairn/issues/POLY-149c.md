@@ -21,7 +21,7 @@ qa writes the failing tests from the ruling, shows each red against the current 
 
 ## Acceptance criteria
 
-- [ ] `test-plan.md` maps every POLY-149 criterion to a test; `red-run.md` shows each red before the build.
-- [ ] `gate.md` records green counts for every suite at one sha, with a same-day db control on main.
-- [ ] The poly_auth test fixture is the real role, not one created IN ROLE poly_app.
-- [ ] POLY-149's criteria are ticked, each with its proving test.
+- [x] `test-plan.md` maps every POLY-149 criterion to a test; `red-run.md` shows each red before the build.
+- [x] `gate.md` records green counts for every suite at one sha, with a same-day db control on main.
+- [x] The poly_auth test fixture is the real role, not one created IN ROLE poly_app.
+- [x] POLY-149's criteria are ticked, each with its proving test.
