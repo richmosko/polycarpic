@@ -258,3 +258,23 @@ UPDATE public.session s SET expires_at = v_new, updated_at = pg_catalog.now()
    R5's deploy-gate table now lists it (enabled `'O'`). pgTAP 12 pins it, with a plant that drops it. The test: as poly_owner (`SET ROLE`), `UPDATE app.sign_in_record SET kind = kind` and `DELETE FROM app.sign_in_record` each give 42501.
 2. **Drop `poly/no-session-user-id-cast`, together with its pin in `relative-structure.test.ts`.** The brand type no longer exists, so the rule guards nothing, and R1 already rules that the rules existing only for those names go. A dead rule invites a later reader to think the brand still exists. Whoever edits the test (qa or backend-lead) removes both in one commit; the layers suite is the check.
 3. **The fixture move to `36-reserved-literal` is accepted.** Dir 31 covered the other reserved literals too. Deleting only the three `enter_asserted` fixtures keeps that coverage. The ruling's "fixture dir 31 goes" meant its `enter_asserted_user` cases.
+
+## Addendum 4 (seceng: role membership in the deploy gate; the address cap)
+
+1. **R5 gains a role-membership row.** `has_*_privilege` sees only what a role can use without switching. A role granted `poly_govern` or `poly_owner` with `INHERIT FALSE, SET TRUE` passes every privilege line, yet it can `SET ROLE` to that role and drop the record's triggers or delete its rows. The deploy-gate check therefore compares `pg_auth_members` with this set, both ways. That covers every row whose member or granted role is a `poly_*` role, and every row whose member is a login role:
+
+   | Member | Granted role | inherit / set / admin |
+   |---|---|---|
+   | poly_migrator | poly_owner, poly_authz, poly_purge, poly_rollup, poly_graph, poly_stake, poly_govern, poly_journal (8 rows) | false / true / false |
+   | poly_backup | pg_read_all_data | as `roles.sql` grants it; admin false |
+
+   Nothing else. No grant to poly_app, poly_auth, poly_worker or poly_operator of any role, `pg_*` predefined roles included, and no member of any `poly_*` role but poly_migrator. This is pgTAP 01's predicates (lines 43–56) plus the login-role half, so the check and pgTAP read one list. This section is that list; `roles.sql` is its source.
+   - **Plants, each shown to fail it:** `GRANT poly_govern TO poly_auth WITH INHERIT FALSE, SET TRUE`; `GRANT pg_write_all_data TO poly_worker`; poly_migrator's grant of `poly_purge` re-made `WITH ADMIN TRUE`.
+   - **Accepted, as R3 states:** poly_migrator itself can `SET ROLE poly_owner` and drop the triggers. Changing the schema is the migration's authority. It runs only in the migrate step, with a password the runtime services never mount.
+2. **`sign_in_record_05_refuse` (seceng's acceptance).** The owner test asserts the error, not the row count. As poly_owner, `UPDATE app.sign_in_record SET kind = kind` and `DELETE FROM app.sign_in_record` each raise 42501. A result of `UPDATE 0` or `DELETE 0` fails the test. Addendum 3 already names this test; this makes the assertion exact.
+3. **The address: one rule for every kind, the inet check.** `record_session_sign_in` treats `NEW.ip_address` as the guard treats `poly.client_ip`. It stores the value when `pg_catalog.pg_input_is_valid(v, 'inet')` (Postgres 16+; the chain runs 17), and otherwise stores NULL. The value is stored as given, which an inet is at most 45 characters for IPv6 without a zone. Both writers share one helper, `app.sign_in_address(text) RETURNS text` (owner poly_govern, invoker, IMMUTABLE, `SET search_path = ''`, no login-role EXECUTE; pinned like the other invokers in pgTAP 12). Why not a length cap:
+   - A cap keeps garbage that is not an address.
+   - The inet check bounds the length and the content together.
+   - A value that is not an address loses nothing a cap would have kept. The session row still holds it while it lives, and the record's job is the existence of the row.
+
+   **Tests:** a session inserted with `ip_address` of 10 000 characters, and one with `'not-an-ip'`, each leave a record row with a NULL address; `'::1'` and `'203.0.113.7'` are stored as given. The same four values as `poly.client_ip` behave the same on a second-step failure row.
