@@ -17,7 +17,7 @@ export interface AuthService {
 
 /** Starts the service from `env`. Throws (and starts nothing) on a config fault, the wrong database role, a schema behind the image, or an unreadable secret. */
 export async function startAuthService(
-  env: Record<string, string | undefined>,
+  env: Record<string, string | undefined> = process.env,
   deps: { sendSecondStepCode?: SendSecondStepCode } = {},
 ): Promise<AuthService> {
   const log = createLogger({ service: 'auth' });
@@ -45,7 +45,7 @@ export async function startAuthService(
       requireClientIp: true,
       // Providers arrive with POLY-88; the mailer with POLY-137. Until then a magic link answers 503.
       sendMagicLink: async () => {
-        throw new Error('magic link delivery is unavailable');
+        throw new Error('mailer not configured');
       },
       // No mailer until POLY-137: with none passed, send-code answers 503 mailer_unavailable.
       sendSecondStepCode: deps.sendSecondStepCode,
