@@ -1,7 +1,7 @@
 ---
 id: POLY-153f
 title: Handle entry verdict
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-153
 blocked_by: [POLY-153d]
