@@ -392,7 +392,7 @@ Decided: D1 (a), D3 (a, Addendum 3), D4 (a), D5 (a), D6 (b). D2 goes to POLY-154
   - **(b, recommended)** A coarse band. On the lock refusal only, the service adds `pausedFor: 'under_an_hour' | 'a_few_hours' | 'up_to_a_day'` (under 60 minutes, under 6 hours, or longer). It reveals three bands, and so a rough doubling level for long locks. DESIGN's "later today" and "tomorrow" would need the user's time zone, which the service does not have, so the wording uses the bands. About +$6 and 20 minutes (guess).
   - **(c)** The exact end time, `pausedUntil`. It reveals the minute to resume, and from successive lengths whether the real user signed in correctly in between. About +$5 and 20 minutes (guess).
   - **How (b) and (c) return it, to a held sign-in only:**
-    - An after-hook in the existing last plugin, on `/two-factor/verify-totp` and `/two-factor/verify-backup-code`, runs only when the response is BetterAuth's lock refusal and the request carries no session.
+    - An after-hook in the second-step anchor plugin (`packages/auth/src/lock-band.ts`), on `/two-factor/verify-totp` and `/two-factor/verify-backup-code`, runs only when the response is BetterAuth's lock refusal and the request carries no session. The ruling's earlier "last plugin" is corrected to match the build: the band needs nothing from `cookieLifetime()`, which stays last with its two pinned after-hooks.
     - It reads the hold cookie **only through BetterAuth's signed-cookie check** (`ctx.getSignedCookie` with the auth secret). An unsigned or wrongly signed value counts as no hold, and so does a `verification` row past `expiresAt`.
     - It then takes the row's user and reads `two_factor.locked_until` as poly_auth.
     - That after-hooks see a thrown lock refusal is (unmeasured); if they do not, the code goes in `handleAuthRequest`.
@@ -400,7 +400,10 @@ Decided: D1 (a), D3 (a, Addendum 3), D4 (a), D5 (a), D6 (b). D2 goes to POLY-154
     - one field value per band, or the exact time, with `locked_until` set by a superuser helper;
     - no field with no hold cookie;
     - no field with a forged one (unsigned, wrong secret, or a valid signature over another identifier);
-    - no field with an expired hold;
+    - no field with an expired hold. **Measured by backend-lead-150:** BetterAuth checks the lock before the hold's expiry, and an after-hook cannot change the status, so a locked account with an expired hold answers 429 with no `pausedFor`, not 401.
+      - **This is accepted.** The caller learns only that the account is locked, which the same expired cookie learnt when it was live, and gets no band.
+      - The page shows `#locked`'s no-band fallback, not `#expired`. That is the right advice, because starting again meets the same lock.
+      - A test pins it: locked plus expired hold gives 429, no `pausedFor`, and the fallback wording;
     - no field with a session.
 
 ## Where the build differs from DESIGN 0.19.0 (for ux-designer-150)
