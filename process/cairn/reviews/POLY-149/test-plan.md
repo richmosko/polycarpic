@@ -52,8 +52,6 @@ Written against `ruling.md` @ 4b421984 (R0–R9, R5 addendum) and `ruling-review
 
 `tests/db/helpers/second-step.ts` `enterAs` for poly_app and `tests/db/helpers/{marker,tenancy,matrix,cross-tenant,invitation}.ts`, plus the `withTenant` callers listed by `revoked-names.test.ts`, move to `app.enter_session` with a handle from `sessionWithHandle`. The scratch measurement in `red-run.md` lists which tests break under the real revocation, as a check on the ruling's list of ten.
 
-## Open points raised to the lead
+## Open points
 
-1. **T-L3 vs R2 step 1.** Seceng's T-L3 says `SET failed_verification_count = 0` during a lock "passes step 1"; the ruling's step 1 refuses `NEW.count < OLD.count` outright. The test accepts either outcome for the statement and pins what both agree on: streak and lock unchanged, no reset counted.
-2. **definers.json (R6.3)** lists `guard_second_step_lock_delete`, which R2 makes an **invoker**; `definerGaps` checks `prosecdef` functions only. `revoked-names.test.ts` asserts the three real definers only. The architect should say which.
-3. **The two open Principal decisions** have no tests (backup role's read; whether a streak reset needs a same-transaction session).
+Both answered in ruling Addendum 1 (44ef4ed4): T-L3 is one outcome, refused 42501 with count, `locked_until` and streak unchanged (test tightened); the delete guard is an invoker outside `definers.json`, pinned with `sign_in_record_immutable` in pgTAP 12 (owner, `prosecdef` false, search_path, no login-role EXECUTE). The two Principal decisions (backup role's read; same-transaction session for a reset) have no tests.

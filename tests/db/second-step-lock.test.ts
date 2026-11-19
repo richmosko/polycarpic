@@ -173,11 +173,10 @@ describe('L5 poly_auth cannot shorten, clear, lower or delete a lock (own databa
       expect(streakOf(db, u.id)).toBe(streak0);
     });
   }
-  it('T-L3: setting failed_verification_count = 0 and leaving locked_until alone is no reset: streak and lock unchanged (the ruling refuses it outright, step 1) [red if: the count can be lowered during a lock, or it counts as a reset]', async () => {
+  it('T-L3: failed_verification_count = 0 during a lock (locked_until left alone) is refused 42501 and count, locked_until and streak read back unchanged (R2 step 1, Addendum 1) [red if: the count can be lowered during a lock]', async () => {
     const streak0 = streakOf(db, u.id);
-    const before = snap();
-    await fx.marked('poly_auth', u.id, sid, async (q) => { await fails(q(`UPDATE public.two_factor SET failed_verification_count = 0 WHERE user_id = $1`, [u.id])); });
-    expect(snap()).toEqual(before);
+    const x = await fx.marked('poly_auth', u.id, sid, (q) => refusedUnchanged(snap, () => q(`UPDATE public.two_factor SET failed_verification_count = 0 WHERE user_id = $1`, [u.id])));
+    expect(codeOf(x), msgOf(x)).toBe('42501');
     expect(streakOf(db, u.id)).toBe(streak0);
     expect(streak0, 'the setup lock is the first lock').toBe(1);
   });

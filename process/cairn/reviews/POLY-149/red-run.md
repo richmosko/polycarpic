@@ -59,7 +59,7 @@ Not run: e2e (Chromium; the harness revoke still lives in `serve.ts` until the b
 
 ## Findings for the lead and the architect
 
-1. **T-L3 vs R2 step 1.** Step 1 refuses `NEW.failed_verification_count < OLD.failed_verification_count` during a lock; seceng's T-L3 says that write "passes step 1". The test accepts either outcome and pins what both agree on (streak and lock unchanged, no reset counted).
-2. **`definers.json` and the delete guard.** R6.3 lists `guard_second_step_lock_delete` as a definer; R2 makes it an invoker. The allowlist and `definerGaps` cover `SECURITY DEFINER` functions only. `revoked-names.test.ts` asserts three definers; `pgtap/12` pins the delete guard as an invoker.
+1. **Answered in ruling Addendum 1 (44ef4ed4)**: T-L3 is one outcome (42501, row and streak unchanged; the test is tightened), and `guard_second_step_lock_delete` is an invoker outside `definers.json` (pgTAP 12 pins both invokers).
+2. (merged into 1)
 3. **Shared-session fixtures serialise.** `enter_session` slides the session row, so two concurrent transactions entering on one session id block each other until the first commits (the two C-b races hung on it). Those two races use one session each. A later race test that shares a session will hang the same way.
 4. **The fixture `user()` and the record.** Any fixture that enters as poly_app inserts a session, which writes a record row that nothing can delete (append-only). The record tests use `plainUser()` and count by kind and session id for that reason.

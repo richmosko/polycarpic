@@ -36,6 +36,8 @@ SELECT ok(EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = to_regclass('app.
 SELECT ok(EXISTS (SELECT 1 FROM pg_trigger t WHERE t.tgrelid = to_regclass('app.sign_in_record') AND t.tgname = 'sign_in_record_no_truncate' AND NOT t.tgisinternal AND t.tgenabled = 'O' AND t.tgtype & 32 = 32), 'sign_in_record_no_truncate is enabled, BEFORE TRUNCATE');
 SELECT is((SELECT p.prosecdef FROM pg_proc p WHERE p.oid = to_regprocedure('app.sign_in_record_immutable()')), false, 'sign_in_record_immutable is an invoker (so current_user is the deleting role)');
 SELECT is((SELECT pg_get_userbyid(p.proowner) FROM pg_proc p WHERE p.oid = to_regprocedure('app.sign_in_record_immutable()')), 'poly_owner', 'sign_in_record_immutable is owned by poly_owner');
+SELECT ok(to_regprocedure('app.sign_in_record_immutable()') IS NOT NULL AND 'search_path=""' = ANY (coalesce((SELECT proconfig FROM pg_proc WHERE oid = to_regprocedure('app.sign_in_record_immutable()')), '{}')), 'sign_in_record_immutable pins search_path');
+SELECT is((SELECT array_agg(r ORDER BY r) FROM logins WHERE to_regprocedure('app.sign_in_record_immutable()') IS NOT NULL AND has_function_privilege(r, to_regprocedure('app.sign_in_record_immutable()'), 'EXECUTE')), NULL::text[], 'effective: no login role executes sign_in_record_immutable (PUBLIC included)');
 
 -- ===== app.second_step_streak =====
 SELECT has_table('app', 'second_step_streak', 'app.second_step_streak exists');
@@ -71,7 +73,7 @@ INSERT INTO want_fn VALUES
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn WHERE to_regprocedure(sig) IS NULL), NULL::text[], 'the four new functions exist');
 SELECT is((SELECT array_agg(sig || ' ' || pg_get_userbyid(p.proowner) ORDER BY sig) FROM want_fn w JOIN pg_proc p ON p.oid = to_regprocedure(w.sig) WHERE pg_get_userbyid(p.proowner) <> w.owner OR p.prosecdef <> w.secdef), NULL::text[],
   'each new function has the ruled owner and kind (definer, except the delete guard, an invoker)');
-SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn w JOIN pg_proc p ON p.oid = to_regprocedure(w.sig) WHERE w.secdef AND NOT ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))), NULL::text[], 'each new definer pins search_path = ''''');
+SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn w JOIN pg_proc p ON p.oid = to_regprocedure(w.sig) WHERE NOT ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))), NULL::text[], 'each new function (the two invokers included) pins search_path = ''''');
 SELECT is((SELECT array_agg(sig || ' ' || l.r ORDER BY sig, l.r) FROM want_fn w CROSS JOIN logins l WHERE to_regprocedure(w.sig) IS NOT NULL AND has_function_privilege(l.r, to_regprocedure(w.sig), 'EXECUTE') AND NOT (l.r = ANY (w.exec))), NULL::text[],
   'effective: no login role executes a new function it is not listed for (PUBLIC included)');
 SELECT is((SELECT array_agg(sig || ' ' || r ORDER BY sig, r) FROM want_fn w CROSS JOIN unnest(w.exec) r WHERE to_regprocedure(w.sig) IS NULL OR NOT has_function_privilege(r, to_regprocedure(w.sig), 'EXECUTE')), NULL::text[], 'effective: every listed EXECUTE is held (poly_worker runs the purge)');
