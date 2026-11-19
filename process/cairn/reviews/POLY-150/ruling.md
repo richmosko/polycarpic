@@ -341,3 +341,19 @@ seceng reviewed 56eec7fa. Its D1 and D2 are this file's D2 and D3. It has not ye
     - an expired hold: the row moved past `expiresAt`;
     - a request with a session.
 - **Why (b):** it answers the real user's question ("today or tomorrow?") without handing a password holder minutes or the reset signal. (a) is the stronger option but leaves a locked user with no guidance for up to a day. seceng names coarse as stronger than exact.
+
+## Addendum 2 (qa's red run at 35395695)
+
+1. **`resend_available_at`: one rule.**
+   - It is a **future time only while the 3-in-15-minutes rule holds**: the third-newest challenge's `created_at` plus 15 minutes.
+   - It is **NULL in every other case**: when a send would issue now, and while the 10-wrong-in-24-hours rule suppresses.
+   - R2's "`now()` when it would issue now" is struck.
+   - Tests: NULL with no sends; a future time after three sends in 15 minutes; NULL after 10 wrong entries in 24 hours with fewer than three sends.
+   - The page shows "resend" whenever the value is NULL or in the past.
+2. **`no-store` does not rest on BetterAuth's headers.**
+   - `handleAuthRequest` sets `Cache-Control: no-store` on **every** `/api/auth` response, overwriting whatever BetterAuth sent (R10). What BetterAuth sends on `enable` therefore does not matter, and the (unmeasured) tag on it is dropped.
+   - The header test reads it on the responses of `/two-factor/enable`, `/two-factor/generate-backup-codes` and `/two-factor/verify-totp`, and on `/settings/second-step` (RC3).
+3. **The three Settings actions.**
+   - **Make new codes needs a browser test.** It is the second place backup codes reach the screen, so RC3's controls apply to it. Spec 1 extends: within Enid's 5-minute window, Make new codes asks her password and shows ten codes that differ from the first set. Then RC3's leave, back and forward steps find no code in the DOM, and one of the old codes is refused at a later held sign-in.
+   - **Remove on the last method, and Remove while codes are paused, need no browser test.** The database refuses both whatever the screen shows: POLY-89 R3 #7, and POLY-149's delete guard, both already tested. The screen's part is cosmetic.
+   - What decides each action's state is one pure function in `@poly/auth/web` (or the panel's module): it takes `my_second_step`'s row and `recentAuthOk`, and returns `shown`, `disabled` or `hidden` per action. It gets a unit test covering `needs_a_method` with one method and with two, `codes_paused`, and `recentAuthOk` false. That and `my_second_step`'s `tests/db` coverage are enough.
