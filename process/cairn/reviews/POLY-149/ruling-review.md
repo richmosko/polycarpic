@@ -1,8 +1,8 @@
-# POLY-149 — Stage 2 revocation and docs: security review of the ruling at `b31be909` (seceng-149)
+# POLY-149 — Stage 2 revocation and docs: security review of the ruling at `3725d22e` (seceng-149)
 
 **Reviewed:** `process/cairn/reviews/POLY-149/ruling.md` at `b31be909` (R0–R9, decisions 1–5). I read it against POLY-149's criteria (V, L, S, D) and its 2026-11-19 comments (F1, N1). I also read migrations 0000–0015 (grep), `packages/db/sql/roles.sql`, `infra/postgres/pg_hba.prod.conf` and the callers of `email_challenge`. I have not read better-auth's source myself; for it I rely on the ruling's code-read of `verify-two-factor.mjs`. Nothing was run: this is a design, and each item below is a test that qa writes red before the build.
 
-**Verdict: ACCEPT, on one required change (§2.1).** The change adds a few lines to R5 and does not reopen the rest. I will check it at the addendum's sha. §3 lists the test conditions. §4 answers the two Principal decisions, and §5 the lead's two questions. One residual has to be stated in SECURITY (§2.2). It needs no new decision from the Principal.
+**Verdict: ACCEPT `3725d22e` (the tip; it replaces `b31be909` whole), with one line still owed in R5 (§7: the four other runtime roles hold no SELECT on the record).** §1–§6 were written against `b31be909`; §7 states what changed and what each item now reads at `3725d22e`. §3 lists the test conditions, §4 answers the two Principal decisions and §5 the lead's two questions. One residual has to be stated in SECURITY (§2.2). It needs no new decision from the Principal.
 
 ## 1. Criteria against the ruling
 
