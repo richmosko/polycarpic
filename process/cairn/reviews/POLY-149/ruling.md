@@ -296,3 +296,24 @@ seceng reviews this addendum; the pin guards the lock.
 ## Addendum 6 (seceng, ruling-review §14 at 1e7c220d)
 
 **The rule: no function in Addendum 5 item 3's scope contains dynamic `EXECUTE`.** That scope is every function outside `pg_catalog` and `information_schema`, extension members excluded. A plant, a `public` function that runs `EXECUTE 'SELECT 1'`, must fail the pin. No function body in 0000–0017 uses it (code-read by seceng and by me). No planned definer needs dynamic SQL either. One that ever does is a ruling change, not a pin exemption.
+
+## Addendum 7 (seceng's build review §4 and ruling-review §2.4; verdict N1)
+
+1. **0017's delete of `web` markers runs under a policy that exists only for that statement.** As built, it runs as poly_owner under FORCE RLS, and no policy names poly_owner, so it deletes nothing. Running it as poly_purge is not enough either: `tx_identity_purge` deletes only markers older than an hour, so a fresh one would still fail the new CHECK. In 0017, as poly_owner, replacing the single DELETE:
+   ```
+   LOCK TABLE app.tx_identity IN SHARE ROW EXCLUSIVE MODE;
+   CREATE POLICY tx_identity_drop_web ON app.tx_identity FOR DELETE TO poly_owner USING (kind = 'web');
+   DELETE FROM app.tx_identity WHERE kind = 'web';
+   DROP POLICY tx_identity_drop_web ON app.tx_identity;
+   ```
+   then the CHECK, as now.
+   - **Why the lock comes first:** it waits for any transaction that holds an uncommitted marker, and it blocks new markers until the migration commits. So the DELETE sees every `web` marker, and none arrives before the CHECK.
+   - **The policy never outlives the file:** it is created and dropped in the same migration transaction.
+   - **Why not `NOT VALID`:** it would leave a CHECK that the catalog marks unvalidated, and rows it does not hold, indefinitely.
+   - **Tests (qa):**
+     - Migrate a fresh database to 0016, then as superuser commit a `web` marker created now (under an hour old). Run 0017: it succeeds, no `web` row remains, and `tx_identity_kind_check` is validated (`convalidated`).
+     - A pgTAP line in 07: no policy on `app.tx_identity` names poly_owner.
+     - Red at `9fc167f4`: the CHECK refuses the migration (23514).
+2. **`app.sign_in_address` is declared `STABLE`.** It calls `pg_input_is_valid`, so it may claim no more than that function does. No index or generated column uses it, so nothing depends on `IMMUTABLE`. pgTAP 12's pin changes to `provolatile = 's'`.
+
+Both go in one code commit and one re-gate. Editing 0017 is safe because it has not merged. A dev database that already applied it from this branch is rebuilt (`check-migrations` flags the changed hash).
