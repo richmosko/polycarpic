@@ -3,9 +3,10 @@
 // __Host-poly_handle cookie (withSession); the database hashes and checks it in app.enter_session.
 import { withSession } from '@poly/db';
 import { landingEntity } from '@poly/tenancy';
+import { readSecondStep, type SecondStep } from './web/second-step.ts';
 import { HttpError, listSessions, revokeSession, type SessionRow } from './web/sessions.ts';
 
-export { HttpError, listSessions, revokeSession, type SessionRow };
+export { HttpError, listSessions, revokeSession, type SessionRow, type SecondStep };
 
 export type ShellSession = {
   user: { id: string; name: string; image: string | null };
@@ -22,3 +23,6 @@ export const revokeMySession = (handle: string, id: string): Promise<{ current: 
 
 /** The entity the signed-in user lands on at "/": the newest one an invitation seated, else their own Person (POLY-87 R3). */
 export const myLandingEntity = (handle: string): Promise<string | null> => withSession(handle, (tx) => landingEntity(tx));
+
+/** Settings → Sign-in and second step for the request's handle (POLY-150 R2): the state read, never a secret. */
+export const mySecondStep = (handle: string): Promise<{ secondStep: SecondStep; recentAuthOk: boolean }> => withSession(handle, (tx) => readSecondStep(tx));
