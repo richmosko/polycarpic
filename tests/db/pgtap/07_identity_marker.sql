@@ -66,6 +66,7 @@ SELECT is(current_setting('max_prepared_transactions'), '0', 'S1: max_prepared_t
 
 -- ---------------------------------------------------------------- R2: the definers (seceng S2)
 SELECT is(to_regprocedure('app.enter_asserted_user(uuid, uuid)')::text, NULL, 'POLY-149: enter_asserted_user does not exist');
+SELECT is((SELECT count(*)::int FROM pg_policies WHERE schemaname = 'app' AND tablename = 'tx_identity' AND 'poly_owner' = ANY (roles)), 0, 'POLY-149 Addendum 7: no tx_identity policy names poly_owner (the delete in 0017 creates its policy and drops it in the same file)');
 SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('enter_job'))), 'p_job text, p_entity uuid, p_connection uuid', 'R2: enter_job(p_job text, p_entity uuid, p_connection uuid)');
 SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('enter_new_user'))), 'uuid', 'R2: enter_new_user(uuid), the unnamed argument kept');
 SELECT is((SELECT pg_get_function_identity_arguments(pg_temp.fn('purge_tx_identity'))), '', 'R2: purge_tx_identity() takes no argument, so the caller cannot choose the age');

@@ -31,7 +31,7 @@ const FILES = readdirSync(join(ROOT, 'tests/db')).filter((f) => f.endsWith('.tes
 const TABLE: Record<(typeof AREAS)[number], string[]> = {
   auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins', 'second-step-lock', 'sign-in-record', 'revocation', 'enter-session-slide', 'sign-in-controls-pins', 'gate-check'],
   tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap'],
-  migrate: ['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'runner', 'template-clone'],
+  migrate: ['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'migration-0017', 'runner', 'template-clone'],
   ops: ['ops-status', 'ops-hardening'],
 };
 const tf = (names: string[]) => names.map((n) => `tests/db/${n}.test.ts`).sort();

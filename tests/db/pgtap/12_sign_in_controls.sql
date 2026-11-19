@@ -76,7 +76,7 @@ INSERT INTO want_fn VALUES
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn WHERE to_regprocedure(sig) IS NULL), NULL::text[], 'the five new functions exist');
 SELECT is((SELECT array_agg(sig || ' ' || pg_get_userbyid(p.proowner) ORDER BY sig) FROM want_fn w JOIN pg_proc p ON p.oid = to_regprocedure(w.sig) WHERE pg_get_userbyid(p.proowner) <> w.owner OR p.prosecdef <> w.secdef), NULL::text[],
   'each new function has the ruled owner and kind (definer, except the delete guard, an invoker)');
-SELECT is((SELECT p.provolatile FROM pg_proc p WHERE p.oid = to_regprocedure('app.sign_in_address(text)')), 'i', 'sign_in_address is IMMUTABLE');
+SELECT is((SELECT p.provolatile FROM pg_proc p WHERE p.oid = to_regprocedure('app.sign_in_address(text)')), 's', 'sign_in_address is STABLE (it calls pg_input_is_valid; Addendum 7)');
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn w JOIN pg_proc p ON p.oid = to_regprocedure(w.sig) WHERE NOT ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))), NULL::text[], 'each new function (the two invokers included) pins search_path = ''''');
 SELECT is((SELECT array_agg(sig || ' ' || l.r ORDER BY sig, l.r) FROM want_fn w CROSS JOIN logins l WHERE to_regprocedure(w.sig) IS NOT NULL AND has_function_privilege(l.r, to_regprocedure(w.sig), 'EXECUTE') AND NOT (l.r = ANY (w.exec))), NULL::text[],
   'effective: no login role executes a new function it is not listed for (PUBLIC included)');
