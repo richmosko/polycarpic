@@ -53,7 +53,13 @@ test.describe('C5 spec 1: enrol by authenticator app from the gate (Enid)', () =
     }
     // P2: an off-origin `next` is carried as `/`: a request for //evil.example is held and its redirect names no such host.
     const evil = await page.request.get(`${base}//evil.example/x`, { maxRedirects: 0 });
-    if (evil.status() === 303) expectGate(evil.headers()['location'], '/', 'a //evil next');
+    // Every outcome is explicit: a refusal (400 or 404), or a 303 to this origin's Settings page with next=/; anything else, a redirect to another host included, fails.
+    expect([303, 400, 404], `//evil.example/x answered ${evil.status()}`).toContain(evil.status());
+    if (evil.status() === 303) {
+      const to = new URL(evil.headers()['location'] ?? '', base);
+      expect(to.origin, 'never a redirect to another host').toBe(new URL(base).origin);
+      expectGate(evil.headers()['location'], '/', 'a //evil next');
+    }
     const data = await (await page.request.get(`${base}/settings/second-step/__data.json`)).text();
     expect(data, 'the held page loads no entity data, the shell included').not.toContain(shared.sharedEntityName);
     expect(data).not.toContain(shared.sharedEntityId);

@@ -37,7 +37,9 @@ describe('the sign-in gate (R5)', () => {
     required = true;
     for (const p of ['//evil.example/x', '/\\evil.example']) {
       const res = await request(p);
-      if (res.status !== 303) continue; // a path the server normalises away is not a gate case
+      expect([303, 400, 404], `${p} answered ${res.status}`).toContain(res.status);
+      if (res.status !== 303) continue;
+      expect(new URL(res.headers.get('location') ?? '', 'http://x').origin, 'never a redirect to another host').toBe('http://x');
       expect(new URL(res.headers.get('location') ?? '', 'http://x').searchParams.get('next'), p).toBe('/');
     }
     const ok = await request('/dashboard');
