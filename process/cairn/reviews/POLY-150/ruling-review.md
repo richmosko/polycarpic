@@ -454,3 +454,113 @@ Costs are guessed. "Must" means the option is not acceptable without it.
   - changing the password or a method ends every trust.
 - **C6 and C7 can follow,** C7 with POLY-139.
 - **The residual to state to the Principal in one line:** a stolen browser profile with a saved password gets into a trusting viewer's account without the second step, until that viewer changes their password.
+
+---
+
+## 12. Confirm it's you: review of Addendum 3 at `3427c586`
+
+**Verdict: REQUIRED CHANGES (RC5–RC10).** The design is sound and I accept its shape: one writer, the step guard, the single-use passkey challenge, the backup-code evidence, the shared lock and the record row written in the database.
+- **RC5:** the ruling's central claim about SQL as poly_auth is wrong in one case that matters.
+- **RC6:** the backup-code path as written cannot commit.
+- **RC7–RC10:** wording and tests.
+
+None of these changes A1–A5's design except the stamp's time. qa may write the A6 tests now, with RC6 and RC10 folded in.
+
+Everything here is code-read against the tree at `3427c586` and better-auth 1.7.18. Nothing was run.
+
+### 12.1 Against my checklist
+| # | Ruling | Result |
+|---|---|---|
+| M1 one writer | `complete_step_up`: poly_auth only, exact call, kind `auth`, stamps only the marker's session of the marker's user, and must hit exactly one row. pgTAP 08 moves | **Met,** with RC10's catalog pin. The R-2 statement is **not** met (RC5). |
+| M2 single-use challenge | The passkey challenge is stored as a hash, one per session, deleted on use. TOTP: the monotone `last_step`. Backup: the code leaves the list | **Met in substance.** The step guard is a fair stand-in for a TOTP challenge. |
+| M3 no code twice | `step > last_step`, within ±1, at the re-check. A code first used at sign-in is not covered (Open 5) | **Partly met, accepted as open.** The exposure is narrow: it needs the user's session and password, plus a code seen at sign-in and used within about 90 s. File Open 5 as an issue. |
+| M4 the session's own user | `withAuthSession` (proven by the token), and `allowCredentials` limited to the user's passkeys | **Met.** Add a test (RC10). |
+| M5 passkey makes no session | A dedicated options and verify pair, `requireUserVerification: true`, no session, the counter written back | **Met.** |
+| M6 password plus a factor | Code and backup paths: the password first, the same `step_up_failed` for both, no provider path | **Met.** The passkey path takes no password, and H4 says every path does (RC9). |
+| M7 route class | `reauth`: needs a session and `second_step_at`, in `LIMITED`, commits refusals | **Met.** |
+| S1 database-checked TOTP | H1 says the database checks no factor. The stronger option is not priced or declined in words | **RC8.** |
+| M8 one counter and lock | BetterAuth's counter shape, so `two_factor_15_lock` applies; refused during a lock by the service and the database; passkey stays open | **Met.** |
+| M9 rate limit | `LIMITED`, with M8 as the per-user cap | **Met.** |
+| M10 backup-code order | Stamp, then the list, with a deferred evidence check | **The design is met, but it cannot commit as written (RC6).** |
+| M11 record | `step_up` with its method, written by `complete_step_up` in the same transaction; `step_up_failure` for a passkey | **Met.** |
+| M12 window | 300 s, one session, not copied by a rotation | **Met.** |
+| M13 the list | "Every step-up action" | **RC7.** |
+| M14 last method | `refuse_last_method` unchanged | **Met.** |
+| M15 change-email | Not addressed | **Open,** for POLY-137: a security notice. |
+
+### 12.2 Required changes
+
+**RC5. SQL as poly_auth can stamp a session it can use, and with it plant its own second step on any enrolled user.**
+- **The claim** (H1, A3.4): poly_auth's SQL stamps only "a session it still cannot use", because it lacks the auth secret and the handle.
+- **That holds for sessions other people created.** It does not hold for sessions poly_auth creates itself.
+- **How it works** (code-read):
+  1. SQL as poly_auth inserts a session for the victim and attaches a handle it chose. Today's R-2 already says so, and `attach_session_handle` allows it in the creating transaction.
+  2. In a later transaction it enters that session with `enter_auth_session` (kind `auth`), using the token it wrote.
+  3. It calls `complete_step_up('totp', <current step + 1>)`. Nothing checks a code, and the step guard only needs a later step.
+  4. The session is now fresh, and poly_auth holds its handle.
+- **What it reaches:**
+  - **At web, for 300 s,** every step-up action as the victim. Today none exists in web, but export, purge, bank link and account deletion will, once they land.
+  - **In the database, directly,** what guard #5 and the passkey guard now allow: a **later factor needs only a fresh step-up** (POLY-89 R3 #5, #6).
+    - It inserts a TOTP row with a secret it knows and verifies it, or inserts a passkey of its own.
+    - It can then remove the victim's methods (`refuse_last_method` is satisfied by the fresh stamp).
+    - **This persists after the breach is fixed:** a password change, a session revocation and rotating the auth secret all leave a planted factor in place. Only `reset-mfa`, or the user noticing it in Settings, ends it.
+- **Today's baseline** (code-read, §0 of my checklist): none of this is possible for an enrolled user. `recent_auth_at` comes only from a first enrolment's grant, so a compromised service can act as anyone, but cannot change an enrolled user's second step.
+- **Who can use it:** anyone with SQL as poly_auth, through injection in the sign-in service or its stolen database password. Code execution in auth could already do it, since it holds the auth secret (R-2).
+- **Required:**
+  - (a) **Correct H1 and A3.4** to say this.
+  - (b) **Write R-2's new bullet at build review, in these words:** "SQL as poly_auth can create a session for any user, mark it freshly confirmed, and use it. It can then perform every step-up action as that user, including adding its own authenticator or passkey and removing theirs, which outlasts a password change, session revocation and rotating the auth secret. Every such session leaves a `session` and a `step_up` line in the sign-in record, which it cannot remove."
+  - (c) **Make a planted factor visible:**
+    - every method added or removed writes an `audit_event` (`second_step.method_added` or `method_removed`, with `subject_user_id` and the method kind) **from the database**, through the AFTER triggers on `two_factor` and `passkey` that `sync_second_step` already runs;
+    - the Settings panel shows each method's added date, as R2 returns.
+
+    The cost is small (guessed: $4, 15 min). Today only `reset-mfa` writes a second-step audit event (0013:563).
+- **The stronger option and its cost:**
+  - **The database checks the code (S1).** It closes this for SQL-only attackers. It costs about one loop, and the TOTP seeds become readable to the database server and every backup, where today they are encrypted under the auth secret. It does not help against code execution in auth. **I would decline it,** for the backup exposure.
+  - **A planted-factor delay:** a factor added on a re-check works only after 24 hours, and the user is notified. That needs POLY-137's mailer to be meaningful; name it for POLY-137.
+  - **The residual for the Principal in one line:** a breach of the sign-in service's database password lets the attacker quietly add their own second step to any account. The database records it, but nothing tells the user until the mailer exists.
+
+**RC6. The backup-code path cannot commit, because the stamp is later than `now()`.**
+- `complete_step_up` writes `recent_auth_at = clock_timestamp()`.
+- Guard #5 then checks the list write with `step_up_fresh()`, which requires `recent_auth_at <= now()` (0013:118). In the same transaction `now()` is the transaction's start, earlier than `clock_timestamp()`. So the fresh check fails, the list write is refused, and every backup-code re-check is refused.
+- `recent_auth_ok` has the same bound (0015:145), which is harmless for later requests.
+- **Fix:** stamp with `now()`, the transaction time. The window then starts at the transaction's start, a few milliseconds early, which is harmless. Do not loosen `step_up_fresh`.
+- qa's "both orders" test would find this. Rule it now so the build does not discover it at red.
+
+**RC7. List what the fresh stamp unlocks.**
+- **Today, at `/api/auth`:**
+  - `/passkey/delete-passkey`, `/two-factor/disable`, `/two-factor/generate-backup-codes`;
+  - `/unlink-account`, `/link-social`, `/change-email`, `/revoke-other-sessions`;
+  - the enrolment class with `second_step_at` set (add a passkey);
+  - and, in the database, guard #5's and #6's later-factor writes, plus `refuse_last_method`.
+- **Later:** C-03's tenant actions. Name purge and account deletion as **consuming** the stamp (single-use) when they land, so one re-check cannot serve two irreversible actions.
+
+**RC8. Write S1 down.** The database checking the TOTP code: what it closes, what it costs, the backup exposure, and that it is declined.
+
+**RC9. H4's sentence.** The passkey path takes no password, because a passkey with user verification counts as two factors itself. Say so, instead of "every path takes the password and a factor".
+
+**RC10. Two tests.**
+- A passkey assertion naming another user's credential is refused, and `recent_auth_at` is unchanged.
+- A catalog test fails if any function other than `stamp_recent_auth`'s trigger path and `complete_step_up` writes `recent_auth_at`, or if any role other than poly_govern holds UPDATE on it.
+
+### 12.3 D7: the backup code as a re-check. I recommend (a), not accepting it. The architect recommends (b).
+- **How it works.** With (b), the password and one backup code give a fresh stamp. That unlocks RC7's list: removing the user's authenticator, adding the holder's own, new codes, and changing the email.
+- **Who can use it:** anyone holding the password and one unused backup code.
+  - The codes are designed to be written down or downloaded. DESIGN's Download makes a `.txt`, which usually lands in Downloads.
+  - Malware that steals files, or saved passwords and files together, a shared computer, or someone at home who finds the printout.
+- **What they reach:**
+  - **With (a):** up to ten sign-ins, one per code, each acting as the user at web. Serious, but they cannot change the user's methods, so the user keeps their authenticator, and a password change ends it.
+  - **With (b):** the account taken for good. They replace the user's methods with their own, the user is locked out, and only `reset-mfa` recovers it.
+- **What (a) costs.** A user who lost their phone signs in with a backup code but cannot remove the lost authenticator or add a new one. They ask the operator for `reset-mfa`, whose runbook carries the identity check.
+  - Meanwhile the lost phone still produces valid codes, so a thief who has it and the password can sign in.
+  - On a household instance where the operator knows everyone, that is a short wait, not a dead end.
+- **Why (a).** Self-service recovery and takeover are the same act here: remove the old factor, add a new one. (b) lets the weaker credential, a code meant to be stored, perform it. (a) puts it behind the operator's check. It saves about $6 and 20 minutes (guessed), and removes A3.3's evidence check, which is the part of this addendum most likely to fail at red.
+- **If the Principal chooses (b):** RC5(c)'s audit event becomes required, not just recommended, so a takeover by backup code is at least on the record. Say plainly to the Principal that a found code plus the password is a full takeover.
+
+### 12.4 SECURITY at the build review
+- **R-2:** RC5(b)'s bullet.
+- **C-03:** the re-check routes, the 300 s window, RC7's list, and D7's choice.
+- **C-88:** one counter, and the re-check locks.
+- **C-89:** the `step_up` and `step_up_failure` kinds, and the `method` column.
+- **R-25:** codes captured from altered pages work once at a re-check, and Open 5 covers sign-in.
+- **A new T-entry:** a planted factor by poly_auth SQL.
+- **§9:** method changes are audited.
