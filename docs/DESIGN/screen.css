@@ -2099,3 +2099,16 @@ ol.backup-codes { margin-top: 0; }
 .backup-actions { display: flex; gap: 8px; margin-bottom: 16px; }
 .check-row { display: flex; gap: 10px; align-items: flex-start; text-align: left; font-size: 14px; margin-bottom: 16px; }
 .check-row input { margin-top: 3px; accent-color: var(--primary); width: 16px; height: 16px; flex: none; }
+
+/* A dialog shown open over a live page (the second-step set-up): the page
+   stays rendered behind a scrim; the dialog is centred and scrolls inside
+   itself when taller than the viewport. */
+.modal-layer { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; background: oklch(0 0 0 / 40%); }
+.modal-layer .je-modal { width: 100%; max-width: 520px; max-height: calc(100vh - 48px); overflow-y: auto; margin: 0; }
+.je-modal .auth-step { margin: 0 0 12px; }
+.je-modal .auth-wait { margin: 16px 0 8px; text-align: center; }
+.je-modal .auth-note { margin-bottom: 0; }
+.dark .modal-layer { background: oklch(0 0 0 / 60%); }
+.dark .modal-layer .je-modal { border: 1px solid var(--border); }
+.second-step-banner > span:not(.icon) { flex: 1; }
+.second-step-banner .btn { flex: none; }
