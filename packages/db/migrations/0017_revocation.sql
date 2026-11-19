@@ -2,6 +2,10 @@
 -- POLY-149 (ruling R1, R6.2): poly_app loses its reach into BetterAuth's tables and the asserted-user entry is deleted.
 -- Order: the REVOKEs, the policy, the function drop (poly_authz), the marker CHECK (poly_owner), audit_membership (poly_govern).
 
+-- Addendum 7: the lock comes first, before the REVOKEs (no deadlock with them). It waits for any open marker and keeps new ones out until
+-- the CHECK below is in place.
+LOCK TABLE app.tx_identity IN SHARE ROW EXCLUSIVE MODE;--> statement-breakpoint
+
 REVOKE ALL ON public."user", public.session, public.account, public.verification, public.two_factor, public.passkey FROM poly_app;--> statement-breakpoint
 REVOKE SELECT (id, purpose, created_at, expires_at, attempts, used_at) ON app.email_challenge FROM poly_app;--> statement-breakpoint
 DROP POLICY email_challenge_own ON app.email_challenge;--> statement-breakpoint
@@ -10,9 +14,7 @@ SET ROLE poly_authz;--> statement-breakpoint
 DROP FUNCTION app.enter_asserted_user(uuid, uuid);--> statement-breakpoint
 
 SET ROLE poly_owner;--> statement-breakpoint
--- Addendum 7: FORCE RLS hides every row from the owner, so the delete runs under a policy that lives only for this statement. The lock
--- waits for any open marker and keeps new ones out until the CHECK below is in place.
-LOCK TABLE app.tx_identity IN SHARE ROW EXCLUSIVE MODE;--> statement-breakpoint
+-- Addendum 7: FORCE RLS hides every row from the owner, so the delete runs under a policy that lives only for this statement.
 -- The DELETE's WHERE reads kind, so the owner needs a SELECT policy for the same rows as well.
 CREATE POLICY tx_identity_drop_web_read ON app.tx_identity FOR SELECT TO poly_owner USING (kind = 'web');--> statement-breakpoint
 CREATE POLICY tx_identity_drop_web ON app.tx_identity FOR DELETE TO poly_owner USING (kind = 'web');--> statement-breakpoint
