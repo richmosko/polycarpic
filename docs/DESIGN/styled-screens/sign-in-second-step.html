@@ -9,7 +9,7 @@
 <script>(function(){var h=document.documentElement,set=function(){var s=location.hash.slice(1),all=document.querySelectorAll(".auth-state"),hit=null;all.forEach(function(e){if(e.dataset.state===s)hit=e;});hit=hit||all[0];all.forEach(function(e){e.classList.toggle("is-shown",e===hit);});};addEventListener("DOMContentLoaded",set);addEventListener("hashchange",set);})();</script>
 </head>
 <body>
-<!-- Sign in, second step: /sign-in/second-step, for a user with a second step on a device new to the account, after the password or Google / GitHub. A bare split page like Sign in, no app shell. Reached only past the first step, so nothing here says more about the account than the password already did. States by URL hash: #code (default), #wrong, #backup, #backup-wrong, #passkey (the browser's prompt is open), #locked (10 wrong codes across sign-ins pause codes and backup codes; the pause grows 15, 30, 60 ... minutes up to 24 hours, said in plain words with the clock time; a passkey still works), #locked-long (a day-long pause, no passkey set up), #expired (the held sign-in ended after 10 minutes or 5 wrong codes; back to Sign in). A known device skips this page. -->
+<!-- Sign in, second step: /sign-in/second-step, for a user with a second step on a device new to the account, after the password or Google / GitHub. A bare split page like Sign in, no app shell. Reached only past the first step, so nothing here says more about the account than the password already did. States by URL hash: #code (default), #wrong, #backup, #backup-wrong, #passkey (the browser's prompt is open), #locked (10 wrong codes across sign-ins pause codes and backup codes; the pause grows 15, 30, 60 ... minutes up to 24 hours, said only coarsely, later today or tomorrow, never the exact time, length or tries left; a passkey still works), #locked-long (a pause into tomorrow, no passkey set up), #expired (the held sign-in ended after 10 minutes or 5 wrong codes; back to Sign in; every caller without a held sign-in gets this same state). Wrong codes, wrong backup codes and used backup codes all read the same. A known device skips this page. -->
 <div class="auth-shell">
   <div class="auth-form-pane">
     <div class="auth-logo"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></div>
@@ -31,7 +31,7 @@
         <p class="auth-subtitle">This device is new to your account. Enter the code from your authenticator app.</p>
         <div class="auth-field">
           <label for="si-wrong">6-digit code</label>
-          <input id="si-wrong" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="771204" aria-invalid="true" aria-describedby="si-wrong-msg"><div class="cap-error" id="si-wrong-msg" role="alert">That code didn't work. Enter the newest code your app shows; each lasts 30 seconds.</div>
+          <input id="si-wrong" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="771204" aria-invalid="true" aria-describedby="si-wrong-msg"><div class="cap-error" id="si-wrong-msg" role="alert">That code didn't work. Check it and try again.</div>
         </div>
         <button class="btn btn-default auth-submit" type="button">Continue</button>
         <p class="auth-signup-line"><button class="btn btn-ghost btn-sm" type="button" style="padding-left:0;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use a passkey instead</button></p>
@@ -54,7 +54,7 @@
         <p class="auth-subtitle">Enter one of the ten codes you saved when you set up your second step. Each works once.</p>
         <div class="auth-field">
           <label for="si-backup-err">Backup code</label>
-          <input id="si-backup-err" class="input mono" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" value="k7m2p-9qx4t" aria-invalid="true" aria-describedby="si-backup-err-msg"><div class="cap-error" id="si-backup-err-msg" role="alert">That backup code didn't work. It may already have been used. Try another.</div>
+          <input id="si-backup-err" class="input mono" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" value="k7m2p-9qx4t" aria-invalid="true" aria-describedby="si-backup-err-msg"><div class="cap-error" id="si-backup-err-msg" role="alert">That code didn't work. Check it and try again.</div>
         </div>
         <button class="btn btn-default auth-submit" type="button">Continue</button>
         <p class="auth-signup-line"><a href="#code">Use your authenticator app</a></p>
@@ -68,7 +68,7 @@
       <div class="auth-state" data-state="locked">
         <div class="auth-title">Codes are paused</div>
         <p class="auth-subtitle">Too many wrong codes were entered for this account.</p>
-        <div class="auth-note auth-note--caution" role="status"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span><strong>Codes and backup codes work again in 30 minutes, at 3:42 PM.</strong> Each further pause lasts longer, up to a day.</span></div>
+        <div class="auth-note auth-note--caution" role="status"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span><strong>Codes and backup codes are paused for now.</strong> Try again later today.</span></div>
         <button class="btn btn-default auth-submit" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use a passkey</button>
         <p class="auth-signup-line">If this wasn't you, someone may know your password. Once you're in, change it in Settings.</p>
         <p class="auth-signup-line">Lost every method? The person who runs this instance can reset your second step.</p>
@@ -77,7 +77,7 @@
       <div class="auth-state" data-state="locked-long">
         <div class="auth-title">Codes are paused</div>
         <p class="auth-subtitle">Too many wrong codes were entered for this account.</p>
-        <div class="auth-note auth-note--caution" role="status"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span><strong>Codes and backup codes work again in about a day, tomorrow at 3:42 PM.</strong></span></div>
+        <div class="auth-note auth-note--caution" role="status"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span><strong>Codes and backup codes are paused for now.</strong> Try again tomorrow.</span></div>
         <p class="auth-body">No passkey is set up, so there is no other way in until then.</p>
         <p class="auth-signup-line">If this wasn't you, someone may know your password. Once you're in, change it in Settings.</p>
         <p class="auth-signup-line">Lost every method? The person who runs this instance can reset your second step.</p>
