@@ -2032,9 +2032,7 @@ table.data-table.cap-table tr.cap-add td { border-bottom: 1px solid var(--border
    alone. */
 .auth-state { display: none; }
 html[data-state="default"] .auth-state[data-state="default"],
-html[data-state="local"] .auth-state[data-state="local"],
-html[data-state="second-step"] .auth-state[data-state="second-step"],
-html[data-state="backup-codes"] .auth-state[data-state="backup-codes"] { display: block; }
+html[data-state="local"] .auth-state[data-state="local"] { display: block; }
 .auth-note { text-align: left; display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); font-size: 13px; color: var(--muted-foreground); }
 .auth-note .icon { flex: none; margin-top: 1px; }
 .code-input { font-family: var(--font-mono); font-size: 20px; letter-spacing: 0.4em; text-align: center; }

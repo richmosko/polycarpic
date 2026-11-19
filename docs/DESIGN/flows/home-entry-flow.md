@@ -9,13 +9,13 @@ flowchart TD
   invite([Invite link from\nan entity owner]) --> signup
   login -- "Have an invite?\nCreate your account" --> signup[Sign up:\ninvite code, then account\nGoogle, GitHub\nor email + password]
   login -- "No invite?\nSet up your own instance" --> gs
-  login -- enter login credentials --> known{Known device?}
-  known -- yes --> landed([Dashboard])
-  known -- "no: code\nor passkey" --> landed
+  login -- enter login credentials --> known{Has a\nsecond step?}
+  known -- no --> landed([Dashboard])
+  known -- "yes: code\nor passkey" --> landed
   gs -- "yes: I have an invite" --> signup
   gs -- "no: my own instance" --> walk[Walkthrough, same page:\nrequirements, deploy,\noperator sign-in, invite]
   signup -- valid invite --> role{Joining as owner\nor manager?}
-  role -- yes --> enrol[Set up a second step:\nauthenticator app or passkey,\nthen backup codes]
+  role -- yes --> enrol[Set up a second step:\npassword, emailed code,\nthen app or passkey]
   role -- "viewer: offered,\nSkip for now" --> invited
   enrol --> invited([Dashboard of the\ninvited entity])
 ```
