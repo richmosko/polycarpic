@@ -5,9 +5,9 @@ import { createHmac } from 'node:crypto';
 import { expect } from 'vitest';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
-import { DB_PKG, url } from './pg';
-import { must } from './sql';
-import { ENTER_SESSION, handleFor, withHandle } from './handle';
+import { DB_PKG, url } from './pg.ts';
+import { must } from './sql.ts';
+import { ENTER_SESSION, handleFor, withHandle } from './handle.ts';
 
 export const pgmod = createRequire(join(DB_PKG, 'package.json'))('pg');
 export const ROLES = ['poly_auth'] as const; // POLY-149: poly_app holds nothing on the factor tables (pinned by pgTAP 11 and revocation.test.ts)

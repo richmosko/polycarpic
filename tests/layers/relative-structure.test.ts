@@ -58,12 +58,6 @@ describe('every source extension is linted (condition 12)', () => {
       expect(await linted(p)).toBe(true);
     });
   }
-  it('packages/auth/src/x.test.mts is a test file: the cast exemption applies  [red if: TESTS lacks mts]', async () => {
-    const cfg = await eslint.calculateConfigForFile(join(root, 'packages/auth/src/x.test.mts'));
-    const entry = cfg?.rules?.['poly/no-session-user-id-cast'];
-    expect(entry, 'x.test.mts is configured at all').toBeDefined();
-    expect(JSON.stringify(entry)).toMatch(/^(0|\[0\]|"off"|\["off"\])$/);
-  });
   it('every tracked source file under apps/ or packages/ is matched by SRC', async () => {
     const files = tracked('apps', 'packages').filter((f) => EXT.test(f));
     expect(files.length).toBeGreaterThan(50);

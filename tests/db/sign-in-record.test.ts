@@ -45,13 +45,35 @@ describe('every committed session INSERT leaves exactly one record row, written 
     await asAuth(async (q) => { const s = await newSession(q, u.id); await attach(q, s, newHandle()); }, false);
     expect(recs(u.id).length).toBe(0);
   });
-  it('T-S2: a session with a 10 KB address and a 10 KB browser still writes its row, the browser cut to 512 characters [red if: the trigger fails the sign-in or stores it whole]', async () => {
+  it('T-S2: a session with a 10 KB browser still writes its row, the browser cut to 512 characters [red if: the trigger fails the sign-in or stores it whole]', async () => {
     const u = await plainUser(); const big = 'x'.repeat(10_240);
     await asAuth(async (q) => { const s = await newSession(q, u.id, '203.0.113.7', big); await attach(q, s, newHandle()); }, true);
     const r = recs(u.id);
     expect(r.length).toBe(1);
     expect(String(r[0]![4]).length).toBe(512);
   });
+  // Addendum 4 item 3: one rule for every kind, app.sign_in_address (inet check; invalid is NULL, valid is stored as given)
+  const ADDR: [string, string, string][] = [['10 000 characters', '1'.repeat(10_000), ''], ['not-an-ip', 'not-an-ip', ''], ['::1', '::1', '::1'], ['an IPv4', '203.0.113.7', '203.0.113.7']];
+  for (const [label, input, want] of ADDR) {
+    it(`address ${label}: a session row stores ${want || 'NULL'} [red if: the address is stored unchecked, or an invalid one fails the sign-in]`, async () => {
+      const u = await plainUser();
+      await asAuth(async (q) => { const s = await newSession(q, u.id, input, 'QA'); await attach(q, s, newHandle()); }, true);
+      const r = recs(u.id);
+      expect(r.length).toBe(1);
+      expect(r[0]![3]).toBe(want);
+    });
+    it(`address ${label}: as poly.client_ip a second-step failure row stores ${want || 'NULL'} [red if: the guard and the session trigger apply different rules]`, async () => {
+      const u = await fx.user({ enrolled: true }); const sid = fx.session(u.id);
+      const n0 = recordCount(db, u.id, 'second_step_failure');
+      await fx.committed('poly_auth', u.id, sid, async (q) => {
+        await q(`SELECT pg_catalog.set_config('poly.client_ip', $1, true), pg_catalog.set_config('poly.user_agent', 'QA', true)`, [input]);
+        await q(`UPDATE public.two_factor SET failed_verification_count = failed_verification_count + 1 WHERE user_id = $1`, [u.id]);
+      });
+      const r = recordRows(db, u.id, 'second_step_failure');
+      expect(r.length - n0).toBe(1);
+      expect(r.at(-1)![3]).toBe(want);
+    });
+  }
   it('real sign-ins: email, Google and a held sign-in each add exactly one row naming the new session [red if: a path skips the trigger]', async () => {
     const u = e.seedUser();
     const n = () => recordCount(e.db, u.id, 'session');
@@ -79,7 +101,8 @@ describe('no login role can write the record; the owner and superuser cannot cha
   it('UPDATE, DELETE of a fresh row and TRUNCATE are refused for the owner and for the superuser, and the row stays [red if: the immutable trigger is absent]', async () => {
     const u = await plainUser();
     await asAuth(async (q) => { const s = await newSession(q, u.id); await attach(q, s, newHandle()); }, true);
-    for (const asRole of ['', 'SET LOCAL ROLE poly_owner;']) for (const sql of [`UPDATE app.sign_in_record SET ip_address = 'x' WHERE user_id = '${u.id}'`, `DELETE FROM app.sign_in_record WHERE user_id = '${u.id}'`, 'TRUNCATE app.sign_in_record']) {
+    // Addendum 4 item 2: the error, not a row count. The two WHERE false statements match nothing, and must still raise 42501 (UPDATE 0 / DELETE 0 fails).
+    for (const asRole of ['', 'SET LOCAL ROLE poly_owner;']) for (const sql of [`UPDATE app.sign_in_record SET ip_address = 'x' WHERE user_id = '${u.id}'`, `DELETE FROM app.sign_in_record WHERE user_id = '${u.id}'`, 'UPDATE app.sign_in_record SET kind = kind', 'DELETE FROM app.sign_in_record', 'UPDATE app.sign_in_record SET kind = kind WHERE false', 'DELETE FROM app.sign_in_record WHERE false', 'TRUNCATE app.sign_in_record']) {
       const r = psql(`BEGIN; ${asRole} ${sql}; COMMIT;`, db);
       expect(r.ok, `${asRole || 'superuser'}: ${sql}: ${r.err}`).toBe(false);
       if (!sql.startsWith('TRUNCATE')) expect(r.sqlstate, `${asRole || 'superuser'}: ${sql}`).toBe('42501');
