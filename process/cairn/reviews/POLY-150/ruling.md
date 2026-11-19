@@ -442,3 +442,71 @@ The rise over the earlier $72 is the extra design and review cycles, plus the di
 - **The seed.** Pia is not a manager. She is a non-held user whose only entity is her own Person, with no second step. R9's seed line becomes: "Enid: a manager with no second step who also manages 'Shared Co'. Pia: a user who owns only her own Person, with no second step and never held."
 - **Why spec 2 needs that.** A manager would be sent to Settings by the gate and would never see Entities' message. Spec 2 runs unchanged for Pia: `/entities` shows the message, and the dialog enrols her by passkey.
 - **The held case** stays Enid's, in spec 1.
+
+## Addendum 2 (proposed, not in force): "Trust this device" (D2 (b), the Principal's choice)
+
+R7's `trustDevice` refusal stands until the lead relays approval of a shape below. Line references are to better-auth 1.7.18 `plugins/two-factor/{index,verify-two-factor}.mjs` (code-read).
+
+**What BetterAuth already does.**
+- A verify with `trustDevice: true` stores a `verification` row, `trust-device-<random>`, with the user id and an expiry 30 days out (`trustDeviceMaxAge`, set in `options.ts`).
+- It also sets a signed cookie: `HMAC(secret, user!id)!id` (`verify-two-factor.mjs:43`).
+- On the next sign-in, a valid cookie plus a live row skips the hold (`index.mjs:28-53`). The skip then **rotates the trust**: it deletes the row and writes a new one with a fresh 30 days, so **the trust slides**, and a device used once a month is never asked again (`index.mjs:312-323`).
+- Disabling TOTP deletes the trust of the requesting device only (`index.mjs:292`). Nothing else ends it: not a password change or reset, sign-out, removing a passkey, or a lock.
+- `reset-mfa` already deletes every `verification` row whose value is the user's id (POLY-89 R6), and that covers these rows.
+- Trust applies only to the TOTP hold. A passkey-only user is held by our `passkeyOnlyHold`, which ignores trust, and needs nothing more than the passkey.
+
+**The shape I recommend** (each point an option for the Principal; the recommended choice first):
+1. **The tick-box:** "Trust this device for 30 days", **unticked**, on `/sign-in/second-step`'s code state only. A device is trusted only when the user asks, each time.
+   - Not on the backup-code state. A backup code is the recovery path, and trusting a device from it would stretch a possibly stolen code into 30 days.
+   - Ticked by default would make the weaker setting the one most users get without choosing it.
+2. **Lifetime: 30 days from the tick, not sliding.** The second step is then asked at least monthly on each device. BetterAuth's slide would make trust permanent on any device used within each 30 days.
+   - Keeping the expiry needs our own table (point 4): the rotation re-keys the device's row and keeps its first expiry.
+   - The alternative is to accept the slide, about $4 less (guess).
+3. **The cookie:** `__Secure-better-auth.trust_device`, `Path=/api/auth`, `HttpOnly`, `Secure`, `SameSite=Lax`, `Max-Age` = the time left (POLY-153 R8's prefix and defaults; unmeasured for this cookie, so qa reads it).
+   - Web never receives it.
+   - It proves nothing without its live row, so deleting the row ends the trust even while the cookie is still in the browser. BetterAuth then expires the cookie (`index.mjs:325`).
+4. **`app.device_trust`** (owner poly_govern; no login role holds any privilege on it): `id`, `user_id`, `identifier_hash` (sha256 of the `trust-device-…` identifier), `trusted_at`, `expires_at`, `last_used_at`, `user_agent` (the first 512 characters), `ip_address`.
+   - It is kept in step by triggers on `verification` rows whose identifier starts `trust-device-`:
+     - **INSERT with no rotation** creates the row;
+     - **DELETE then INSERT for the same user in one transaction** (the rotation) re-keys the row, sets `last_used_at`, and sets `NEW."expiresAt" := least(NEW."expiresAt", trusted_at + 30 days)`. This is what makes point 2's limit hold;
+     - **DELETE with no INSERT** deletes the row at commit, by a deferred check.
+   - That the rotation's delete and insert share one transaction holds on the `withSignInTx` paths (POLY-152 R9) (unmeasured).
+5. **What ends trust.** All of these are database triggers, so they hold on every path, including BetterAuth's. Each deletes all of the user's trust rows: `verification` and `app.device_trust`.
+   - **Ends it:**
+     - **a password change or reset:** AFTER UPDATE OF `password` ON `account`. This is the step a user takes when they think the password leaked;
+     - **removing a method:** extending `app.sync_second_step()` on DELETE. This is the lost-phone case;
+     - **disabling TOTP:** the same trigger, for every device and not BetterAuth's one;
+     - **`reset-mfa`:** as today, plus the new table;
+     - **Forget, or Forget all, in Settings** (point 6).
+   - **Does not end it:**
+     - **Adding a method.** It is not a sign of compromise, and forgetting every device on add would teach users not to add methods.
+     - **Sign-out.** Trust exists to outlive the session; "Sign out and forget this device" can be a later addition.
+     - **Revoking a session in Settings.** That ends a session, not a device.
+     - **A lock.** A lock means someone without a trusted device is guessing codes. Ending the real user's trust then would push them into the locked code step.
+6. **Seeing and revoking.** Settings → Sign-in and second step gains "Trusted devices": the browser (from `user_agent`), the address, when it was trusted, when it was last used, and when it expires. Each has **Forget**, and the list has **Forget all**.
+   - Two definers, owner poly_govern, EXECUTE poly_app, refusing unless the marker has kind `session`, under the exact-call check:
+     - `app.my_trusted_devices()` returns no identifier and no hash;
+     - `app.forget_trusted_device(p_id uuid)` (or NULL for all) deletes the user's own rows only.
+   - Forgetting needs no step-up: it only removes trust.
+7. **The sign-in record (C-89):**
+   - a skipped hold appends one `app.sign_in_record` row, **kind `trusted_device`**, with the user, the time, and the request's address and browser from POLY-149 R3's settings. It is written by point 4's rotation trigger, next to the `session` row;
+   - a `trusted_device_added` row is written when trust is first granted, and `trusted_device_forgotten` when it ends, with the cause: `password`, `method_removed`, `forgotten` or `reset`;
+   - the kind CHECK gains the three values.
+8. **Who may use it: every role, owners and managers included,** recommended.
+   - Trust needs this device's cookie **and** the password. A remote attacker with only the password is still held.
+   - The residual is a stolen or shared device plus the password, for up to 30 days. Points 2, 5 and 6 bound it.
+   - (b) Viewers only: managers and owners, who reach shared books, are always asked. It is stronger, costs nothing more, and is less useful to exactly the users with the most to protect.
+   - seceng's assessment should decide between the two.
+
+**Fit and cost (guesses).**
+
+| Option | What it holds | Cost | Time |
+|---|---|---|---|
+| (i) BetterAuth as is: lift the refusal, add the tick-box | Sliding and permanent; ends only on `reset-mfa` and this device's TOTP disable; no list, no revoke, no record line | $5 | 20 min |
+| (ii) Points 1–8 in this loop | Everything above | +$40, plus a seceng review cycle | +2 h |
+| **(iii) Points 1–8 as their own issue,** with R7's refusal staying until it lands | The same, without reopening POLY-150's tests, which are already red and in flight | about $45 | about 2 h 15 min |
+
+**Recommend (iii).**
+- The refusal is the safe interim: the cost is only that every new sign-in asks.
+- Points 4–7 are database work with their own guards and tests, the shape of a POLY-149 loop. Folding them in would re-gate POLY-150's tests and build.
+- (i) is not recommended. It ships trust that slides forever and survives a password change, and the user cannot see or revoke it. That defeats the opt-out the Principal wants.
