@@ -2,7 +2,7 @@
 // refused by the exact-call check). psql >= 16 is required; global-setup.ts checks it. Output goes to /dev/null so the
 // returned xid never lands in a test's rows. Each call sits on its own lines because \g takes the rest of its line.
 // psql has no NULL parameter, so a null argument is tested through node-pg, not here.
-import { sessionWithHandle } from './handle';
+import { sessionWithHandle } from './handle.ts';
 export const SID = '00000000-0000-4000-8000-0000000005e1';
 /** POLY-149: the canonical entry by handle. The session and its handle are made here (superuser), so `db` is needed. */
 export const asUserSql = (uid: string, db: string): string =>

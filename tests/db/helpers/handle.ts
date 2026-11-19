@@ -2,7 +2,7 @@
 // public.session commits with its handle (R5.2 refuses a handle-less session at commit, superuser included).
 //   app.session_handle (session_id, handle_hash bytea = sha256(utf8(handle))); the plain handle is 43 base64url characters.
 import { createHash, randomBytes } from 'node:crypto';
-import { must } from './sql';
+import { must } from './sql.ts';
 import type { Q } from './second-step';
 
 export const HANDLE_COOKIE = '__Host-poly_handle';
