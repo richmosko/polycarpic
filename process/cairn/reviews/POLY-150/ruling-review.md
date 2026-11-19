@@ -287,3 +287,8 @@ The formal build review waits for the gate.
 ### 9.3 DESIGN 0.19.1 wording
 - **Dialog states.** They match R3: `#no-mail` has one line and Close, the backup-code step has no Cancel and the Finish check, and `#done` claims no email.
 - **The held page.** It names no entity in its message, keeps Log out, and shows nothing else of Settings. That matches R1.3, with P1.
+
+**Accepted tip: `be15ecae`.** I read `git diff fbf9a527 be15ecae`.
+- P1: the selector's label comes from the session row, no entity query runs on that route, and the label carries no id.
+- P2: `next` passes through `safe-next.ts` at both the gate and the dialog, with `//evil` giving `/`.
+- D1 (a) is recorded. ACCEPT.
