@@ -289,3 +289,49 @@ Compared with POLY-149's $58 in 2 h 40 min, this loop has less SQL and more brow
 1. **OAuth and magic-link holds answer JSON to a browser navigation.** twoFactor's widened hold on the GET paths `/callback/:id` and `/magic-link/verify` returns `{twoFactorRedirect}` as a JSON page (code-read; only `passkeyOnlyHold` redirects GETs). Neither path is reachable today: private-CA mode answers 404 to OAuth, and magic link needs the mailer. POLY-88 and POLY-137 must turn it into a 302 to `/sign-in/second-step`.
 2. **The first-method email** (DESIGN: "A first-method email follows the set-up") needs POLY-137's mailer, and is a security notice the user must see (SECURITY §9). POLY-137's criteria should carry it.
 3. **"Backup codes left"** needs the service to decrypt and count. A later issue adds a count-only route to the anchor plugin.
+
+## Addendum 1 (seceng's review at 88780475, RC1–RC4; the lock wording)
+
+seceng reviewed 56eec7fa. Its D1 and D2 are this file's D2 and D3. It has not yet reviewed what the re-issue changed: D1 and R6's interim dialog, R3's resend and enable steps, and R7's single lock state.
+
+**RC1. The poly_app pin.** `tests/db/pgtap/11_poly_app_grants.sql` goes from ten functions to **eleven**, with `app.my_second_step()` added to its list, and its planted-grant twin `tests/db/sign-in-controls-pins.test.ts` moves with it. SECURITY R-2's count follows at build review. The function is safe for the reason POLY-89 R1.5 gives the read-only exemptions:
+- it reads only the marker's own user and session (kind `session`), and writes nothing;
+- it carries the exact-call check;
+- it returns no secret (R2).
+
+**RC2. Framing: the premise is half right.**
+- Web already sends `frame-ancestors 'none'`. SvelteKit's `kit.csp` (`vite.config.ts:30`) puts it in the response header on every page web renders, in dev, `vite preview` and e2e as well as in production. `shell.spec.ts:92` pins it on one page.
+- Caddy must not set a CSP: `infra/lint/compose-policy.mjs:308` (`caddy-csp`) refuses one, so web owns a single policy.
+- **Ruled:**
+  1. Caddy's `(security_headers)` gains `X-Frame-Options "DENY"`, for old browsers, and the lint's `need` list gains it. This applies behind Caddy only (staging, production); in dev and e2e the CSP header covers it.
+  2. Neither new page prerenders. A prerendered page gets a `<meta>` CSP, and a meta CSP cannot carry `frame-ancestors`.
+  3. An e2e test reads `frame-ancestors 'none'` from the HTTP header of `/settings/second-step`, `/sign-in/second-step` and the Settings panel.
+- **Who builds it:** the build lead, in this loop (`infra/**` is in the paths). seceng reads it at the build review; devops is not needed.
+
+**RC3. The codes must not come back.**
+- `/settings/second-step`'s `load` sets `Cache-Control: no-store`.
+- The component clears the codes on `pagehide` and on destroy, as well as on Finish. Clearing on `pagehide` is the control that counts: newer Chromium may keep a `no-store` page in the back-forward cache.
+- R9 spec 1 adds: from the codes screen, follow a link away, then `page.goBack()`, then forward. No code may be in the DOM at any of those points.
+
+**RC4. Passkey names are text.**
+- A lint rule bans `{@html` under `apps/web/src/routes/{settings,sign-in}/**` and in `ConfirmItsYou.svelte`. The one existing use, `lib/shell/icons.ts`, holds static SVG strings and is outside those paths.
+- R9 seeds Pia's second passkey with the name `<img src=x onerror="window.__xss=1">`. The test finds it rendered as literal text and `window.__xss` undefined.
+
+**reset-mfa identity check.** This belongs in INFRA's runbook (devops-engineer). It is not a ruling item here; the lead files it.
+
+**D5 (Principal, recommend b). What a locked person is told.** Locks run 15 minutes, doubling up to 24 hours (POLY-149 R2).
+- **What anyone learns now, under any option.** A refusal during a lock does not count against the user. So someone holding the password can already find when a lock ends by trying again, with one sign-in per try under the rate limit of 5 per minute. Whatever the screen says changes how much effort that takes, not whether it can be found. The number of guesses is capped by the lock either way.
+- **(a) Nothing:** "Codes are paused. Use a passkey, or try again later." It costs nothing and reveals nothing. The usability cost is real: a person locked for up to a day gets no idea how long to wait, keeps retrying, or asks the operator for a reset-mfa they don't need.
+- **(b) A coarse bucket.** On the lock refusal only, the service adds `pausedFor: 'under_an_hour' | 'a_few_hours' | 'up_to_a_day'` (remaining time under 60 minutes, under 6 hours, or longer). The screen says "in under an hour", "in a few hours" or "within a day".
+  - It reveals three bands, and from them a rough doubling level for long locks.
+  - DESIGN's "later today" and "tomorrow" need the user's time zone, which the service does not have, so its wording changes to the bands.
+  - Cost: about $6 and 20 minutes (guess).
+- **(c) The exact end time:** the field `pausedUntil` (ISO). The screen shows the time left and the clock time.
+  - It reveals when to resume to the second. Successive lock lengths also show whether the real user has signed in correctly in between: a 15-minute lock after a long one means the doubling was reset.
+  - Cost: about $5 and 20 minutes (guess).
+- **How (b) and (c) return it, to a held sign-in only.**
+  - An after-hook in the existing last plugin, on `/two-factor/verify-totp` and `/two-factor/verify-backup-code`, runs only when the response is BetterAuth's lock refusal and the request carries no session.
+  - It reads the signed hold cookie, finds its live `verification` row, takes that row's user, and reads `two_factor.locked_until` as poly_auth, which already holds SELECT on both tables.
+  - A caller reaches this only after passing the password. With no hold, a dead hold or a session, nothing is added. That BetterAuth's after-hooks see a thrown lock refusal is (unmeasured); if they do not, the code goes in `handleAuthRequest`.
+  - Tests: one field value per band (or the exact time) with `locked_until` set by a superuser helper; and no field with no hold cookie, with a forged one, or with a session.
+- **Why (b):** it answers the real user's question ("today or tomorrow?") without handing a password holder minutes or the reset signal. (a) is the stronger option but leaves a locked user with no guidance for up to a day. seceng names coarse as stronger than exact.
