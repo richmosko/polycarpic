@@ -1,7 +1,7 @@
 ---
 id: POLY-149c
 title: Revocation tests
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-149
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-149.md, process/cairn/reviews/POLY-149/**, pro
 stage: execute
 estimate.cost_usd: "16.00"
 estimate.gate_cycles: 9
+actual.cost_usd: "10.9890"
+actual.tokens: 74215352
+actual.gate_cycles: 9
+actual.wall_clock: 123
+ratio: "0.69"
 labels: [security, auth]
 priority: null
 pr: null
