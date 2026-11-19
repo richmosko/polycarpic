@@ -292,3 +292,7 @@ UPDATE public.session s SET expires_at = v_new, updated_at = pg_catalog.now()
 4. **Two more ways to read a setting, pinned over the same scope:** no function reads `pg_settings` or `pg_show_all_settings`. And the four lock and record functions contain no dynamic `EXECUTE` (`prosrc !~* '\mexecute\M'`), because a string run that way escapes every text scan.
 
 seceng reviews this addendum; the pin guards the lock.
+
+## Addendum 6 (seceng, ruling-review §14 at 1e7c220d)
+
+**The rule: no function in Addendum 5 item 3's scope contains dynamic `EXECUTE`.** That scope is every function outside `pg_catalog` and `information_schema`, extension members excluded. A plant, a `public` function that runs `EXECUTE 'SELECT 1'`, must fail the pin. No function body in 0000–0017 uses it (code-read by seceng and by me). No planned definer needs dynamic SQL either. One that ever does is a ruling change, not a pin exemption.
