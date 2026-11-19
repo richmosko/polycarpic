@@ -6,10 +6,10 @@
 <title>Styled screen — Sign up</title>
 <link rel="stylesheet" href="../tokens.css">
 <link rel="stylesheet" href="../screen.css">
-<script>(function(){var h=document.documentElement,set=function(){var s=location.hash.slice(1);h.dataset.state=(s==="local"||s==="second-step")?s:"default";};set();addEventListener("hashchange",set);})();</script>
+<script>(function(){var h=document.documentElement,set=function(){var s=location.hash.slice(1);h.dataset.state=(s==="local"||s==="second-step"||s==="backup-codes")?s:"default";};set();addEventListener("hashchange",set);})();</script>
 </head>
 <body>
-<!-- Sign up: invite-gated account creation, in Login's split layout. A visitor arrives from an invite link (shown: the code pre-filled and validated, naming the inviter and the entity) or types a code. The invite is common to both account paths, so a rule and a caption separate it from the OAuth buttons: Google or GitHub, or email + password. Create account lands on the dashboard of the invited entity; the new user's own Person entity is created at the same time. Visitors without an invite are pointed to Get started. State #second-step: after Create account, an invitee joining as owner or manager sets up an authenticator app or a passkey before landing; a viewer sees the same step with Skip for now. State #local: a home box on a .local name; the OAuth buttons and divider give way to a one-line note. -->
+<!-- Sign up: invite-gated account creation, in Login's split layout. A visitor arrives from an invite link (shown: the code pre-filled and validated, naming the inviter and the entity) or types a code. The invite is common to both account paths, so a rule and a caption separate it from the OAuth buttons: Google or GitHub, or email + password. Create account lands on the dashboard of the invited entity; the new user's own Person entity is created at the same time. Visitors without an invite are pointed to Get started. State #second-step: after Create account, an invitee joining as owner or manager sets up an authenticator app or a passkey before landing; a viewer sees the same step with Skip for now. State #backup-codes: the ten backup codes that follow, shown once, then the invited entity. State #local: a home box on a .local name; the OAuth buttons and divider give way to a one-line note. -->
 <div class="auth-shell">
   <div class="auth-form-pane">
     <div class="auth-logo"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></div>
@@ -97,7 +97,17 @@
           <input id="en-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
         </div>
         <button class="btn btn-default auth-submit">Turn on second step</button>
-        <p class="auth-signup-line">Next you get ten backup codes to keep somewhere safe. Joining as a viewer? This step is offered with Skip for now.</p>
+        <p class="auth-signup-line">Next you get <a href="#backup-codes">ten backup codes</a> to keep somewhere safe. Joining as a viewer? This step is offered with Skip for now.</p>
+      </div>
+      <div class="auth-state" data-state="backup-codes">
+        <div class="auth-step">Last step · Save your backup codes</div>
+        <div class="auth-title">Save your backup codes</div>
+        <p class="auth-subtitle">Each code signs you in once when your phone or passkey isn't at hand. This is the only time they are shown.</p>
+        <ol class="backup-codes" aria-label="Ten backup codes"><li>k7m2p-9qx4t</li><li>w3rf8-hb6nd</li><li>c9tz2-m4kqe</li><li>p5xv7-r2jyw</li><li>h8nd3-q6fta</li><li>e2wk9-t7mzc</li><li>y4qb6-n3xrp</li><li>f6jt2-w9kdm</li><li>r3mc8-p5vqh</li><li>a9xe4-k2tnw</li></ol>
+        <div class="backup-actions"><button class="btn btn-outline btn-sm" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg></span>Copy all</button><button class="btn btn-outline btn-sm" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg></span>Download (.txt)</button></div>
+        <label class="check-row" for="su-saved"><input id="su-saved" type="checkbox"><span>I have saved these codes somewhere safe, away from this device.</span></label>
+        <button class="btn btn-default auth-submit" type="button" disabled aria-disabled="true">Go to The Moskos</button>
+        <p class="auth-signup-line">Lost these and your phone? Make new codes in Settings while you still have a way in.</p>
       </div>
     </div>
   </div>
