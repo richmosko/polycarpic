@@ -123,7 +123,7 @@ writeSecret('una-secrets.json', { email: 'una@e2e.test', secret: una.secret, bac
 // Locked users for the lock-band checks (R7, D6 b): a TOTP factor whose lock has the given minutes left, set by a superuser statement in replica mode (the
 // guard does not fire), one user per band plus one for the fallback (the spec removes the band from the response).
 const lockUsers: Record<string, { email: string; secret: string }> = {};
-for (const [key, minutes] of [['lock30', 30], ['lock120', 120], ['lock600', 600], ['lockfb', 30]] as const) {
+for (const [key, minutes] of [['lock30', 30], ['lock120', 120], ['lock600', 600], ['lockfb', 30], ['lockexp', 30]] as const) {
   const email = `${key}@e2e.test`;
   const id = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('${key}', '${email}', true) RETURNING id`, db).rows[0]![0]!;
   must(`INSERT INTO public.account (account_id, provider_id, user_id, password) VALUES ('${id}', 'credential', '${id}', '${hash}')`, db);

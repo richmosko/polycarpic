@@ -3,6 +3,7 @@
 // returned with no hold, a forged hold (unsigned, wrong secret, a valid signature over another identifier), an expired hold, or a session.
 // Each negative starts with a CONTROL: a genuine hold gets its band in the same test, so "no field" cannot pass because the feature is absent.
 // Red today: the service returns no `pausedFor` at all. Titles end [red if: ...].
+import { createHash } from 'node:crypto';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { SECRET, boot, post, teardown, type Env } from './helpers/auth';
 import { heldSignIn, signed } from './helpers/auth-service';
@@ -108,12 +109,14 @@ describe('seceng\'s four conditions: nothing is returned without a valid hold (e
     const f = await locked(30);
     await control(f);
     const held = await heldSignIn(e, f.auth, f.u.email);
-    // The hold's verification row is stored under a hash of the cookie's identifier, so it is found by the user it names (its value), not by identifier.
-    const hit = must(`UPDATE public.verification SET expires_at = now() - interval '1 second' WHERE value LIKE '%${f.u.id}%' RETURNING 1`, e.db).rows.length;
-    expect(hit, 'this user\'s hold row was expired (and no other user\'s)').toBeGreaterThanOrEqual(1);
+    // The hold's verification row is stored under the sha-256 (base64url) of the cookie's identifier: expire exactly that row, by identifier.
+    const id = holdValue(held.res).split('.')[0]!;
+    const hashed = createHash('sha256').update(id).digest('base64url');
+    const hit = must(`UPDATE public.verification SET expires_at = now() - interval '1 second' WHERE identifier = '${hashed}' RETURNING 1`, e.db).rows.length;
+    expect(hit, 'the hold\'s own row, by identifier, was expired').toBe(1);
     const r = await refusal(f, held.cookie);
-    // BetterAuth checks the lock before the hold's expiry and an after-hook cannot change the status, so the refusal may stay 429: what the condition requires is no band.
-    expect(r.status).toBeGreaterThanOrEqual(400);
+    // Ruled (3dac70df): BetterAuth checks the lock before the hold's expiry, so a locked account with an expired hold answers 429 with no band.
+    expect(r.status).toBe(429);
     expect((await json(r)).pausedFor).toBeUndefined();
   });
   it('a request that carries a SESSION: no field, even with a genuine hold beside it [red if: the band is answered to a signed-in caller]', async () => {

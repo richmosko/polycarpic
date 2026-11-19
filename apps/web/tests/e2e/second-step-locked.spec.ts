@@ -48,3 +48,28 @@ test('with no pausedFor in the response the #locked state says "try again later"
   await expect(page.locator('body')).toContainText(/try again later/i);
   await expect(page.locator('body')).not.toContainText(BANDS);
 });
+
+test('a locked account with an EXPIRED hold answers 429 with no band, and the page shows the no-band fallback (ruling 3dac70df)  [red if: an expired hold is told a band, or the page invents one]', async ({ page }) => {
+  const u = users()['lockexp']!;
+  const s = seed<{ testServer: unknown; db: string; password: string }>('seeds.json');
+  process.env.POLY_TEST_SERVER = JSON.stringify(s.testServer);
+  const { must } = await import('../../../../tests/db/helpers/sql.ts');
+  const { createHash } = await import('node:crypto');
+  const answers: { status: number; body: string }[] = [];
+  page.on('response', async (r) => { if (r.url().endsWith('/api/auth/two-factor/verify-totp')) answers.push({ status: r.status(), body: await r.text().catch(() => '') }); });
+  await signInUi(page, u.email, s.password);
+  await page.waitForURL('**/sign-in/second-step**');
+  // Expire the hold's own verification row, found by the sha-256 (base64url) of the cookie's identifier.
+  const hold = (await page.context().cookies()).find((c) => /two_factor/.test(c.name))!;
+  const id = decodeURIComponent(hold.value).split('.')[0]!;
+  const hit = must(`UPDATE public.verification SET expires_at = now() - interval '1 second' WHERE identifier = '${createHash('sha256').update(id).digest('base64url')}' RETURNING 1`, s.db).rows.length;
+  expect(hit, 'the hold row was expired').toBe(1);
+  await page.getByLabel('6-digit code').fill(totp(u.secret));
+  await slot('/two-factor/verify-totp');
+  await page.getByRole('button', { name: 'Continue' }).click();
+  await expect(page.getByText(/codes are paused for this account/i)).toBeVisible();
+  await expect(page.locator('body')).toContainText(/try again later/i);
+  await expect(page.locator('body')).not.toContainText(BANDS);
+  expect(answers.at(-1)?.status, 'the refusal').toBe(429);
+  expect(answers.at(-1)?.body).not.toContain('pausedFor');
+});
