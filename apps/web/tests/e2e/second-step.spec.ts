@@ -64,11 +64,35 @@ test.describe('C5 spec 1: enrol by authenticator app (Enid)', () => {
     expect(enable?.cache ?? '', 'enable: Cache-Control').toContain('no-store');
     const settings = await page.request.get(`${base}/settings/second-step`);
     expect(settings.headers()['cache-control'] ?? '', '/settings/second-step: Cache-Control').toContain('no-store');
-    // A re-sign-in as Enid is held: the second step is on now.
+    // Make new codes (Addendum 2.3), inside her 5-minute window: it asks her password, shows ten codes that differ from the first set,
+    // RC3's leave, back and forward steps find none of them in the DOM, and an old code is refused at a held sign-in.
+    await page.goto(`${base}/settings/second-step`);
+    await page.getByRole('button', { name: /make new codes/i }).click();
+    await page.getByLabel('Password').fill(PASSWORD);
+    await page.getByRole('button', { name: /^(continue|make new codes)$/i }).last().click();
+    await expect(page.getByTestId('backup-code')).toHaveCount(10);
+    const fresh10 = (await page.getByTestId('backup-code').allTextContents()).map((c) => c.trim());
+    expect(fresh10.filter((c) => codes.includes(c)), 'the new codes differ from the first set').toEqual([]);
+    appendFlow('flows.jsonl', { user: 'enid-new-codes', codes: fresh10 });
+    await page.goto(`${base}/dashboard`);
+    await page.goBack();
+    for (const c of fresh10) await expect(page.locator('body')).not.toContainText(c);
+    await page.goForward();
+    await page.goBack();
+    await page.reload();
+    for (const c of fresh10) await expect(page.locator('body')).not.toContainText(c);
+    await expectNoSecretsKept(page, urls, fresh10, 'after Make new codes');
+    // A re-sign-in as Enid is held: the second step is on now. One of the OLD codes no longer works.
     const fresh = await browser.newContext({ storageState: { cookies: [], origins: [] } });
     const p2 = await fresh.newPage();
     await signInUi(p2, 'enid@e2e.test', PASSWORD);
     await p2.waitForURL('**/sign-in/second-step**');
+    expect(await cookieNames(p2)).not.toContain('__Host-poly_handle');
+    await p2.getByRole('button', { name: /use a backup code/i }).or(p2.getByRole('link', { name: /use a backup code/i })).first().click();
+    await p2.getByLabel('Backup code').fill(codes[0]!);
+    await slot('/two-factor/verify-backup-code');
+    await p2.getByRole('button', { name: 'Continue' }).click();
+    await expect(p2.getByRole('alert')).toBeVisible();
     expect(await cookieNames(p2)).not.toContain('__Host-poly_handle');
     await fresh.close();
   });

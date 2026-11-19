@@ -22,6 +22,8 @@ Run on the tree at the test commit, before any build. Every file is shown red fo
 | `apps/web/src/routes/second-step-rc.test.ts` | 4 / 5 | RC2 prerender ban (red: the trees have no held page yet; its plant test passes: the rule sees `export const prerender = true`, a string value and a re-export, and not `ssr`), RC3 (`pagehide` and destroy clearing, `no-store` in the load), RC4 widened (`{@html` across settings, sign-in and `ConfirmItsYou.svelte`) |
 | `tests/infra/lint.test.ts` | 1 / 144 | new case `Caddy snippet lacks X-Frame-Options DENY`: the Caddyfile has none and the lint's `need` list does not require it, so removing it fires no rule. RC2's Caddy half; the e2e header test stays for the CSP |
 
+**Addendum 2 (7d87cbfa).** `second-step-screens.test.ts` is now 22 red of 25 (new: the three `resend_available_at` cases; the header test also reads `generate-backup-codes`). `apps/web/src/lib/second-step-actions.test.ts`: 6 / 6 red (module missing); its contract is in the file's header: `actionStates(row, recentAuthOk)` returning `shown|disabled|hidden` for `removeApp`, `removePasskey`, `makeNewCodes`, `addPasskey`; rename in one place if the builder prefers. Spec 1 gained Make new codes (new ten codes differ; leave/back/forward show none; an old code is refused at a held sign-in); it fails earlier today at the same place as before, so the new steps are not yet shown running. "10 wrong in 24 hours" is seeded as one challenge with `attempts = 10`: the builder reports if the rule counts another way.
+
 D5 (lock wording): no test written; the boundary test still bans `locked_until` in sources.
 
 ## Playwright

@@ -164,6 +164,20 @@ describe('R2 app.my_second_step()', () => {
     expect(new Date(r.resend_available_at).getTime()).toBeGreaterThan(Date.now());
     expect(new Date(r.resend_available_at).getTime()).toBeLessThanOrEqual(Date.now() + 15 * 60_000 + 5000);
   });
+  it('resend_available_at (Addendum 2): NULL with no sends; NULL with two sends; NULL after 10 wrong entries in 24 hours with fewer than three sends; only the 3-in-15 rule gives a future time, the third-newest created_at + 15 minutes [red if: now() is returned when a send would issue, or the 24-hour rule shows a time]', async () => {
+    const none = await fresh();
+    expect((await read(none.id, none.sid))[0].resend_available_at, 'no sends').toBeNull();
+    const two = await fresh();
+    for (const ago of [1, 2]) must(`INSERT INTO app.email_challenge (user_id, session_id, purpose, code_hash, created_at, expires_at, used_at) VALUES ('${two.id}', '${two.sid}', 'first_enrolment', '\\x00', now() - interval '${ago} minutes', now() + interval '5 minutes', now())`, e.db);
+    expect((await read(two.id, two.sid))[0].resend_available_at, 'two sends would issue now').toBeNull();
+    const wrong = await fresh();
+    must(`INSERT INTO app.email_challenge (user_id, session_id, purpose, code_hash, created_at, expires_at, attempts) VALUES ('${wrong.id}', '${wrong.sid}', 'first_enrolment', '\\x00', now() - interval '2 hours', now() - interval '110 minutes', 10)`, e.db);
+    expect((await read(wrong.id, wrong.sid))[0].resend_available_at, '10 wrong in 24 hours suppresses, and says nothing about when').toBeNull();
+    const three = await fresh();
+    for (const ago of [1, 2, 3]) must(`INSERT INTO app.email_challenge (user_id, session_id, purpose, code_hash, created_at, expires_at, used_at) VALUES ('${three.id}', '${three.sid}', 'first_enrolment', '\\x00', now() - interval '${ago} minutes', now() + interval '5 minutes', now())`, e.db);
+    const at = new Date((await read(three.id, three.sid))[0].resend_available_at).getTime();
+    expect(Math.abs(at - (Date.now() - 3 * 60_000 + 15 * 60_000)), 'third-newest created_at + 15 minutes').toBeLessThan(10_000);
+  });
   it('a live grant for this user and session gives grant_expires_at; a grant for another session does not [red if: the grant is read across sessions]', async () => {
     const u = await fresh();
     const other = fx.session(u.id, true);
@@ -262,7 +276,10 @@ describe('R10 Cache-Control: no-store on every /api/auth response', () => {
     await go('confirm-code', post('/second-step/confirm-code', { code }, cookie));
     const en = await go('enable', post('/two-factor/enable', { password: PW }, cookie));
     const secret = new URL((await json(en)).totpURI).searchParams.get('secret')!;
-    await go('verify-totp', post('/two-factor/verify-totp', { code: totp(secret) }, cookie));
+    const ver = await go('verify-totp', post('/two-factor/verify-totp', { code: totp(secret) }, cookie));
+    cookie = jar(cookie, ver);
+    const regen = await go('generate-backup-codes', post('/two-factor/generate-backup-codes', { password: PW }, cookie));
+    expect(regen.status, 'the step-up is fresh after a first enrolment').toBe(200);
     await go('refusal', post('/sign-in/email', { email: u.email, password: 'wrong wrong wrong' }));
     cookie = '';
     for (const [name, r] of seen) expect((r.headers.get('cache-control') ?? '').toLowerCase(), name).toContain('no-store');
