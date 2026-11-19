@@ -120,6 +120,20 @@ must(`INSERT INTO public.passkey (name, public_key, user_id, credential_id, coun
 must(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE public.session SET recent_auth_at = now() - interval '1 hour' WHERE user_id = '${unaId}'; COMMIT;`, db);
 writeFileSync(join(here, '.auth', 'una.json'), JSON.stringify(state(una.verified)));
 writeSecret('una-secrets.json', { email: 'una@e2e.test', secret: una.secret, backupCodes: una.backupCodes, credentialId: unaKey.credentialId, publicKey: unaKey.publicKey, passkeyName: XSS });
+// Confirm it's you (Addendum 3 T10): managers with an authenticator app AND a passkey, signed in, with a step-up stamp older than 5 minutes.
+// Rex re-checks by code (a wrong code first); Kit re-checks by passkey through Chromium's virtual authenticator (his credential is exported to .auth/).
+const reauthUsers: Record<string, unknown> = {};
+for (const key of ['rex', 'kit'] as const) {
+  const email = `${key}@e2e.test`;
+  const id = addManager(`${key[0]!.toUpperCase()}${key.slice(1)} Recheck`, email);
+  const f = await enrolTotp(email);
+  const pk = softAuthenticator(origin);
+  must(`INSERT INTO public.passkey (name, public_key, user_id, credential_id, counter, device_type, backed_up, transports) VALUES ('${key} key', '${pk.publicKey}', '${id}', '${pk.credentialId}', 0, 'singleDevice', false, 'internal')`, db);
+  must(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE public.session SET recent_auth_at = now() - interval '1 hour' WHERE user_id = '${id}'; COMMIT;`, db);
+  writeFileSync(join(here, '.auth', `${key}.json`), JSON.stringify(state(f.verified)));
+  reauthUsers[key] = { email, secret: f.secret, passkeyName: `${key} key`, credentialId: pk.credentialId, privateKey: pk.privateKeyPkcs8, userHandle: Buffer.from(id).toString('base64'), rpId: new URL(origin).hostname };
+}
+writeSecret('reauth-users.json', reauthUsers);
 // Locked users for the lock-band checks (R7, D6 b): a TOTP factor whose lock has the given minutes left, set by a superuser statement in replica mode (the
 // guard does not fire), one user per band plus one for the fallback (the spec removes the band from the response).
 const lockUsers: Record<string, { email: string; secret: string }> = {};

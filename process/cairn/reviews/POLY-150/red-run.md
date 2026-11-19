@@ -15,6 +15,24 @@ Run on the tree at the test commit, before any build. Every file is shown red fo
 | `tests/db/gate-check.test.ts` | 1 / (all plants) | the new plant `poly_app loses my_second_step` errors on the missing function. `infra/postgres/gate-check.sql`'s own list of ten is the builder's to move to eleven; the plant names the object the gate must print |
 | `tests/db/second-step-flow.test.ts`, `tests/ci/*` | 0 | green: the `totp` helper moved to `helpers/totp.ts` and is re-exported, and `infra/ci/changes.mjs` gained `second-step-screens` (DB_AREAS and the `db-areas.test.ts` row) and `apps/auth/src/` in `TABLE.e2e` (the e2e entry now imports it; 542 / 542) |
 
+## Confirm it's you (Addendums 3 and 4), red run before any build
+
+`tests/db/step-up-reauth.test.ts`: **20 red of 24** (in `DB_AREAS`; tests/ci 542/542). Red reasons: the three routes answer 404 (not in `AUTH_ROUTES`), `app.begin_step_up`, `complete_step_up`, `note_totp_step` and `record_step_up_failure` do not exist (42883, not the 42501 the tests require, so a missing function cannot pass as a refusal). Covered: the success shape (200 `{status: true}`, no cookie, no rotation, the stamp lands, a step-up action runs after and was refused before: C3); T1 replay; every row of Addendum 4's error table (401, 400 `invalid_request`, 400 `method_refused` [D7], 403 `no_second_step`, `method_unavailable`, `step_up_failed` as one answer, `challenge_expired` for no/other-session/other-method/expired, 429 `ACCOUNT_TEMPORARILY_LOCKED` with no `pausedFor`; `password_required` is unreachable in this loop and the limiter's 429 is the e2e rate-limit spec's); a wrong password or code does not consume the challenge; T2 code reuse (held sign-in, a later step, an earlier step, a second session); T3 forgery and confusion; T4 catalog (four definers, single writer, `UPDATE (recent_auth_at)` for poly_govern only); T5 lock (10 wrong codes, 10 `second_step_failure` rows, 2nd lock 30 min, passkey open during a lock); T7 passkey (no new session, counter written, foreign credential and lower counter refused, failed assertion consumes the challenge and writes `step_up_failure`); T8 window (299 s / 301 s); T9 record (also by a direct SQL call).
+
+The 4 that pass today are on purpose: T8's window (today's 300 s guard), the direct `UPDATE session SET recent_auth_at` refusal (today's `guard_recent_auth`), and two measurements below.
+
+**Not written, on purpose:** the backup-code path (T6, A3.3: D7 is with the Principal; one `[D7]` test asserts the `method_refused` Addendum 4 gives meanwhile); `password_required`; T8's "a rotation leaves the new session with no stamp" (the first-verify and disable rotations are POLY-89's, already pinned).
+
+**Unmeasured items, as measured here:**
+
+| Item | Result |
+|---|---|
+| `/change-email` answers a refusal today, never a success | **Measured, passes today**: BetterAuth's `changeEmail` is not enabled; the email is unchanged |
+| backup-code storage format | **Measured**: one encrypted string, none of the ten codes readable in the row, longer than 40 characters |
+| step matching against `createOTP`; A3.3 in both orders; `guard_recent_auth` letting the definer through; marked counter writes reaching the lock guard; refusals committing; the virtual authenticator passing `requireUserVerification` | **Measured by the tests above once built** (T2, T6 held, T5, T5 (`second_step_failure` rows after refusals), T7 and the Kit spec); not measurable before 0019 exists |
+
+`apps/web/tests/e2e/second-step-reauth.spec.ts` (3 red, all at the dialog's missing code field): Rex re-checks by code (wrong code shows "That password or code didn't work", no count, the passkey stays; the right code removes it), the dialog clears on Close, Escape and a backdrop click, and Kit re-checks by passkey in a user-verified virtual authenticator. `serve.ts` seeds Rex and Kit (app and passkey, stamp an hour old). Selector contract in the spec header.
+
 ## Re-issue fbf9a527 (set-up is a dialog), run on the tree at fad5c4a2 + the tests
 
 - **Unit:** `hooks.server.gate.test.ts` 2 red (the redirect lacks `?setup=1`; `/settings/second-step/__data.json` is not exempt). `web-boundary.test.ts` 2 red of 5 (dialog missing; the held page has no server file yet), its plant test passes. `second-step-rc.test.ts` 7 red of 9 (dialog, `pagehide`/`beforeNavigate`, form attributes, no `no-store` in hooks, `{@html` scan not vacuous); the two plant tests (prerender, `{@html`) pass, showing the rules bite.
