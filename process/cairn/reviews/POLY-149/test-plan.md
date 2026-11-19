@@ -46,6 +46,7 @@ Written against `ruling.md` @ 4b421984 (R0–R9, R5 addendum) and `ruling-review
 | F1 record written by the database, not service code | the S1 tests send no record statement (service code has none); `pgtap/12` pins the session trigger (+ dropped/disabled plants) | no trigger |
 | **S10** INFRA §7.1 step 16 check | **not mine**: `tests/infra`, devops (ruling R5 table). The R5 line "no runtime role reads the record" is the same predicate as S9 | — |
 | **N1** slide writes only when the expiry moves forward | `enter-session-slide.test.ts` › "a session at its 30-day cap … two entries leave xmin, updated_at and expires_at unchanged"; controls: a slide below the cap still writes; settles at the cap | the UPDATE runs unconditionally |
+| Addendum 2 non-blocking slide | `enter-session-slide.test.ts` › "Addendum 2: a second entry on a slide-due session, while the first transaction is still open, returns within 2 s; after both commit expires_at moved once" (red: it waits the full 2 s statement_timeout on the row lock) | the slide takes the row lock and waits |
 | **D1–D3** docs, backup-code item removed, RSS | no executable test (docs and devops measurement). `revoked-names.test.ts` pins only the code-side removals | — |
 
 ## Fixtures that ran as poly_app (ruling R1, "Test fixtures")
@@ -54,4 +55,4 @@ Written against `ruling.md` @ 4b421984 (R0–R9, R5 addendum) and `ruling-review
 
 ## Open points
 
-Both answered in ruling Addendum 1 (44ef4ed4): T-L3 is one outcome, refused 42501 with count, `locked_until` and streak unchanged (test tightened); the delete guard is an invoker outside `definers.json`, pinned with `sign_in_record_immutable` in pgTAP 12 (owner, `prosecdef` false, search_path, no login-role EXECUTE). The two Principal decisions (backup role's read; same-transaction session for a reset) have no tests.
+Both answered in ruling Addendum 1 (44ef4ed4): T-L3 is one outcome, refused 42501 with count, `locked_until` and streak unchanged (test tightened); the delete guard is an invoker outside `definers.json`, pinned with `sign_in_record_immutable` in pgTAP 12 (owner, `prosecdef` false, search_path, no login-role EXECUTE). The Principal chose (a) on both decisions: no tests for either.
