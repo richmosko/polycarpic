@@ -685,3 +685,12 @@ If the Principal picks (b), tell them plainly: a found backup code plus the pass
 - **Declining the comparison in the database:** agreed, for the reason given. The only forger wrote the hash itself.
 - **Build note:** the service should compare the hashes in constant time (`timingSafeEqual`). That is minor, because the challenge is single-use and expires.
 - **The no-truncate triggers on `two_factor` and `passkey`,** added in the same addendum and pinned in pgTAP 12, meet my recommendation.
+
+**Three pins for 0019 (code-read against 0019 at `360246a4` and HEAD; I ran nothing):**
+- **pgTAP 02 at `9845cb0c`: ACCEPT.** `app.step_up_pending` is keyed by `xid8`, as A3 rules, like `tx_identity`. Only `pk_not_uuid` is exempted, so every other RLS and grant check still runs on it. The list's count and its "the exemption is needed" self-check move with it.
+- **pgTAP 07 at `c82fac24`: ACCEPT.** The five new readers of the marker table are each ruled:
+  - `begin_step_up`, `complete_step_up`, `record_step_up_failure` and `step_up_challenge_hash` each require a kind `auth` marker for the transaction after the exact-call check (0019:110, 159, 247, 272), per A3, A4 and Addendum 6;
+  - `sync_second_step` reads it only for the audit row's actor and `marker_kind` (Addendum 5).
+  - `note_totp_step` is rightly **not** a reader. It takes `p_user` under the exact-call check and the ±1 window, as A3.4 rules, so SQL as poly_auth can push any user's `last_step` forward by at most one step. That denies one honest re-check for about 30 s, and A3.4 accepts it.
+- **pgTAP 08 at `88140fdf`: ACCEPT.** poly_auth's five new EXECUTEs are exactly `begin_step_up`, `complete_step_up`, `note_totp_step`, `record_step_up_failure` and `step_up_challenge_hash`, which is A5's four plus Addendum 6's one, as granted at 0019:355. The pin is still both effective and granted, so any further grant fails.
+  - The trigger functions `step_up_spent` and `step_up_pending_resolved` get a temporary EXECUTE for poly_owner, revoked after the triggers are made (HEAD 0019:373). No login role holds either.
