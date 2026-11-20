@@ -21,6 +21,6 @@ ux-designer completes DESIGN for the second step from what is already there (flo
 
 ## Acceptance criteria
 
-- [ ] DESIGN carries the set-up flow (`#flow-second-step`): password, emailed code, then the factor (authenticator app or passkey), with the backup codes shown once, as styled screens.
-- [ ] DESIGN carries `/sign-in/second-step` for an enrolled user on a new device, with its wrong-code, locked and backup-code states, and the Confirm it's you prompt.
-- [ ] The Principal has reviewed the screens before the build starts.
+- [x] DESIGN carries the set-up flow (`#flow-second-step`): password, emailed code, then the factor (authenticator app or passkey), with the backup codes shown once, as styled screens. (DESIGN 0.20.5: `second-step-dialog.html`, all states; `second-step-required.html`; `entities.html#second-step-first`. As one dialog, not a bare page, per the Principal; `process/DECISIONS.md` 2026-11-19.)
+- [x] DESIGN carries `/sign-in/second-step` for an enrolled user on a new device, with its wrong-code, locked and backup-code states, and the Confirm it's you prompt. (DESIGN 0.20.5: `sign-in-second-step.html` `#code`, `#wrong`, `#backup`, `#backup-wrong`, `#passkey`, `#locked`, `#expired`; `settings.html#step-up-states`.)
+- [x] The Principal has reviewed the screens before the build starts. (Review of DESIGN 0.18.3 and the answers that followed: one set-up dialog, the forced case held on Settings, sign-up asks the emailed code, no backup codes for a passkey, three lock bands, Confirm it's you built here, a backup code accepted there; `process/DECISIONS.md` 2026-11-19.)
