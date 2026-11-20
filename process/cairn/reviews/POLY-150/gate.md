@@ -42,6 +42,12 @@ The browser suite (80 tests, Chromium, Playwright default workers) takes **161 s
 
 Kit's passkey re-check spec (`second-step-reauth.spec.ts`) failed once in a full run on frontend-lead's machine at `4de71e05` and passed alone. **The cause is unproven**: I could not reproduce it. At the tip, four full runs in a row were 80/80 (the margin at 61 s once, then at 68 s three times), and an 8-worker stress run at the old margin was 80/80. Kit's data is single-use (the spec removes his app), so the spec cannot be repeated alone. The likeliest cause is the limiter margin (a real 429, "Too many attempts", which I saw once on Kit before the margin was raised), so the margin went from 61 s to 68 s in `de01a9a4`. If it fails again, read its `error-context.md`: a 429 alert confirms this cause, anything else is another.
 
+## The healthcheck delta, `dc48d669` → `3607aa34`
+
+Messages crossed: the lead asked for a partial re-run at the tip while the full final gate above was already running at `3607aa34`, so the table at the top is a **full gate at the tip** and no partial argument is needed. For the record, `git diff --stat dc48d669 3607aa34` is `infra/compose/prod.yml` and `infra/compose/staging.yml` (one line each: the auth container's healthcheck sends `x-forwarded-for: 127.0.0.1`), `tests/infra/auth-service.test.ts` (the new pin) and a docs file under `process/cairn/`; only `tests/infra` and `tests/ci` read the compose files. Re-run at the tip with the rest: tests/infra 187/187 (was 185 at `dc48d669`), tests/ci 542/542, lint exit 0, and everything else. `tests/infra/image` is not run locally.
+
+**The new pin fails with the header removed** (a plant, restored after): with `,{headers:{'x-forwarded-for':'127.0.0.1'}}` deleted from `infra/compose/prod.yml`'s healthcheck, `tests/infra/auth-service.test.ts` › "fetches /api/auth/ok with a valid x-forwarded-for entry and treats a 5xx as unhealthy" fails with `the healthcheck sends no x-forwarded-for: expected null not to be null` (1 failed, 22 passed); the file was restored from a copy and `git status` is clean.
+
 ## The run at `dc48d669` (superseded)
 
 All green and identical to the final run except tests/infra at 185 (devops added two pins in `3607aa34`); db 1192/1192 in 115.6 s against a 97.0 s control; e2e 80/80 in 161 s. The saved logs are in `temp/gate-2/`.
