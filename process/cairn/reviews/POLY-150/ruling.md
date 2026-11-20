@@ -888,3 +888,34 @@ A raise rolls back the transaction, so a TOTP step it refused is not recorded ei
   - Both triggers join the deploy-gate table, with the same check: exist and `tgenabled = 'O'`.
 
 **Cost (guess):** about $5 and 15 minutes, inside A7's build and tests.
+
+## Addendum 6: `app.step_up_challenge_hash(uuid)` (backend-lead-150's build at 360246a4, 0019:262-279)
+
+**Accepted as built.** The service keeps no state between `begin` and the passkey verify, and `@simplewebauthn/server` needs `expectedChallenge` at verify time, so the service must look up the hash it handed to `begin_step_up`.
+
+- **Owner and access:** poly_govern; SECURITY DEFINER; `SET search_path = ''`; EXECUTE **poly_auth only** (REVOKE FROM PUBLIC). It is listed in `definers.json`. It is STABLE and writes nothing.
+- **Refuses (42501):**
+  - outside the exact call `SELECT app.step_up_challenge_hash($1)`;
+  - when this transaction has no marker of kind `auth`.
+- **Returns** the stored `webauthn_hash` only for a challenge that matches `p_challenge` and is all of these:
+  - the marker user's and the marker session's;
+  - `method = 'passkey'`;
+  - unexpired.
+  
+  Otherwise it returns NULL, and the service answers `challenge_expired` (Addendum 4).
+- **Why it gives poly_auth nothing new:**
+  - It returns a SHA-256 of 32 random bytes, never the challenge itself, and only for the caller's own session.
+  - That is a hash poly_auth itself sent to `begin_step_up` in an earlier request.
+  - A forger with SQL as poly_auth already chooses the hash it begins with (H.1), so reading it back adds no reach.
+  - It does not consume the challenge. `complete_step_up` still checks and deletes it, so being single-use is still enforced by the database.
+- **Declined: moving the comparison into the database.** That would mean passing the presented challenge to `complete_step_up` and checking `sha256` there. It would make the challenge's content checked by the database rather than the service, but against the only forger, poly_auth's SQL, it adds nothing, since that forger wrote the hash. It would cost reworking `complete_step_up`'s signature and its pins (about $4 and 15 minutes, guess).
+- **Pins:**
+  - pgTAP 08: poly_auth holds EXECUTE, granted and effective, so poly_auth's new EXECUTEs are five, not A5's four;
+  - pgTAP 11: poly_app holds none;
+  - the definer catalog test: owner, `prosecdef` and the exact-call check.
+- **Tests (`tests/db`):**
+  - as poly_app → permission denied;
+  - as poly_auth under kind `session`, with no marker, and outside the exact call → 42501;
+  - NULL for another session's challenge, another user's, a `totp` challenge, an expired one, and one already consumed by `complete_step_up`;
+  - the right hash for the caller's own open passkey challenge.
+- **Deploy gate: no.** It enforces nothing the gate relies on. If it is missing, the passkey re-check fails closed (`challenge_expired`), and no protection is lost.
