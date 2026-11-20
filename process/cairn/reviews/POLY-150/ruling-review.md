@@ -694,3 +694,8 @@ If the Principal picks (b), tell them plainly: a found backup code plus the pass
   - `note_totp_step` is rightly **not** a reader. It takes `p_user` under the exact-call check and the ±1 window, as A3.4 rules, so SQL as poly_auth can push any user's `last_step` forward by at most one step. That denies one honest re-check for about 30 s, and A3.4 accepts it.
 - **pgTAP 08 at `88140fdf`: ACCEPT.** poly_auth's five new EXECUTEs are exactly `begin_step_up`, `complete_step_up`, `note_totp_step`, `record_step_up_failure` and `step_up_challenge_hash`, which is A5's four plus Addendum 6's one, as granted at 0019:355. The pin is still both effective and granted, so any further grant fails.
   - The trigger functions `step_up_spent` and `step_up_pending_resolved` get a temporary EXECUTE for poly_owner, revoked after the triggers are made (HEAD 0019:373). No login role holds either.
+
+**Confirm it's you after a refusal: clear both fields.**
+- The password should not outlive its own request, as in the set-up dialog (R3.2, R3.3).
+- A refused code is of no further use.
+- `step_up_failed` does not say which of the two was wrong, so asking for both again is also the honest prompt.
