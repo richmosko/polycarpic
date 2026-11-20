@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-150-second-step-screens`
 - **Started:** 2026-11-19
 - **Goal:** the second-step set-up screens, `/sign-in/second-step` and the Confirm it's you prompt are designed and built in web, so a user can enrol a second step in a browser; two browser tests prove it against the real handler.
-- **Status:** In Progress
+- **Status:** In Review — PR [#141](https://github.com/richmosko/polycarpic/pull/141)
 
 _Standing context. POLY-149 (Stage 2 revocation and docs) merged 2026-11-19 via PR [#138](https://github.com/richmosko/polycarpic/pull/138) — ARCH 1.21.0, SECURITY 1.13.0, INFRA 1.3.16; PRD 1.5.0 and ARCH 1.21.1 followed in PR [#140](https://github.com/richmosko/polycarpic/pull/140)._
 

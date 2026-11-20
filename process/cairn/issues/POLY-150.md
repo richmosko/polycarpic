@@ -1,7 +1,7 @@
 ---
 id: POLY-150
 title: Second-step screens
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: ux-designer
 paths: [process/cairn/issues/POLY-150.md, process/cairn/reviews/POLY-150/**, docs/DESIGN/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, apps/web/**, apps/auth/**, packages/**, tests/**, infra/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore]
 labels: [design, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/141
 created: 2026-11-16
 updated: 2026-11-19
 ---
@@ -33,3 +33,7 @@ Filed from the POLY-89 loop (merged 2026-11-17, PR #131). The lead's check of th
 ### @team-lead — 2026-11-19
 
 Feature started. Branch: `feature/poly-150-second-step-screens`. Stages: POLY-150a (design), b (ruling), c (security review), d (tests), e (build), f (verdict). The Principal reviews the screens before the build starts.
+
+### @team-lead — 2026-11-19
+
+PR opened: https://github.com/richmosko/polycarpic/pull/141. Gate code sha 3607aa34; docs and tracker only since. Carries POLY-151.

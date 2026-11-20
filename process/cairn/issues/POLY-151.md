@@ -1,14 +1,14 @@
 ---
 id: POLY-151
 title: Confirm it's you route
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
 labels: [security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/141
 created: 2026-11-16
 updated: 2026-11-19
 ---
