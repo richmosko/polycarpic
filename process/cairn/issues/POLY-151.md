@@ -17,7 +17,7 @@ Nothing writes `recent_auth_at` after first enrolment, so an enrolled user canno
 
 ## Acceptance criteria
 
-- [ ] A ruling names the route, what it accepts (authenticator code or passkey), its rate limit and its route class, reviewed by seceng.
+- [x] A ruling names the route, what it accepts (authenticator code or passkey), its rate limit and its route class, reviewed by seceng. (`process/cairn/reviews/POLY-150/ruling.md` Addenda 3–7: A1 the routes, class `reauth`, `LIMITED`; Addendum 4 the shapes; seceng's `ruling-review.md` §13, ACCEPT 671d219e once RC6 is fixed, fixed at fa3bac5c.)
 - [x] A passed re-check writes `recent_auth_at` through a definer; `poly_app` gets no new grant on BetterAuth's tables. (`step-up-reauth.test.ts` T3, T4; pgTAP 08 and 11.)
 - [x] An enrolled user can add and remove a method after the 5-minute window, proved in `tests/db` through the real handler. (`step-up-reauth.test.ts` C3, `method-audit.test.ts`, `last-method-guard.test.ts`; browser: `second-step-reauth.spec.ts`.)
 - [x] A failed or replayed re-check leaves `recent_auth_at` unchanged. (`step-up-reauth.test.ts` T1, T2, the error table, the lock and reuse-rollback cases.)
