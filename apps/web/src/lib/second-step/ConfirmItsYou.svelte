@@ -98,11 +98,8 @@
     error = '';
     try {
       const r = await api('POST', '/second-step/reauth', method === 'backup_code' ? { challengeId, password, backupCode } : { challengeId, password, code });
-      password = '';
-      code = '';
-      backupCode = '';
       if (r.ok) return await passed();
-      refused(r); // a wrong password or code does not consume the challenge: the same one is retried
+      refused(r); // DESIGN keeps what was typed after a refusal; a wrong password or code does not consume the challenge, so the same one is retried
     } finally {
       busy = false;
     }
@@ -188,7 +185,7 @@
               {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
             </div>
             <p class="text-muted-foreground text-xs">
-              <button type="button" class={link} onclick={() => begin('passkey')}>Use a passkey instead</button> ·
+              <button type="button" class={link} onclick={usePasskey}>Use a passkey instead</button> ·
               <button type="button" class={link} onclick={() => begin('backup_code')}>Use a backup code</button>
             </p>
             <div class="flex justify-end gap-2">
