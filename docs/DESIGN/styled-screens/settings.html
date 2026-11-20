@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Settings. Entry point is PROPOSED under the avatar popover, shown open here with Settings marked current; the Principal has not ruled on the placement. No sidebar nav item is active. Schedule, import options and the tax close cadence (monthly by default, or quarterly; shown only on a taxpayer entity) are per entity; app preferences are per user. Viewers can see this page but cannot change schedule/import options (Manager/Owner only, ARCH 2.4). Export this entity (owners) ends in a receipt carrying the ledger fingerprint: the last Journal ID and its chain hash, short form shown, full form in the title and Copy. Sign-in and second step is per user: the second step is required while the user is an owner or manager anywhere, so the last method cannot be removed then. References below the cards: the step-up prompt (Confirm it's you) with its wrong-code, paused, backup-code and passkey-only states, the account-deletion choices with the successor-founder step first, Sign-in and second step with none set up (Set up second step opens the set-up dialog, second-step-dialog.html), and a method row while codes are paused (Remove disabled). Outside the 5 minutes after a fresh check, Remove, Add passkey and Make new codes open Confirm it's you first, then run. -->
+<!-- Settings. Entry point is PROPOSED under the avatar popover, shown open here with Settings marked current; the Principal has not ruled on the placement. No sidebar nav item is active. Schedule, import options and the tax close cadence (monthly by default, or quarterly; shown only on a taxpayer entity) are per entity; app preferences are per user. Viewers can see this page but cannot change schedule/import options (Manager/Owner only, ARCH 2.4). Export this entity (owners) ends in a receipt carrying the ledger fingerprint: the last Journal ID and its chain hash, short form shown, full form in the title and Copy. Sign-in and second step is per user: the second step is required while the user is an owner or manager anywhere, so the last method cannot be removed then. References below the cards: the step-up prompt (Confirm it's you) with its wrong-code, paused, backup-code, passkey-only and passkey-not-accepted states, the account-deletion choices with the successor-founder step first, Sign-in and second step with none set up (Set up second step opens the set-up dialog, second-step-dialog.html), and a method row while codes are paused (Remove disabled). Outside the 5 minutes after a fresh check, Remove, Add passkey and Make new codes open Confirm it's you first, then run. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -123,7 +123,7 @@
       </div></div>
     </div>
     <div class="card" id="step-up-states">
-      <span class="eyebrow">Confirm it's you — wrong code, codes paused, backup code, passkey only (references)</span>
+      <span class="eyebrow">Confirm it's you — wrong code, codes paused, backup code, passkey only, passkey not accepted (references)</span>
       <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Confirm it's you, code not accepted" style="max-width:440px;">
         <div class="je-modal-title">Confirm it's you</div>
         <div class="je-modal-subtitle">Exporting Mosko (Person) needs a fresh check. You won't be asked again for 5 minutes.</div>
@@ -153,6 +153,14 @@
         <div class="je-modal-subtitle">Adding a passkey needs a fresh check. You won't be asked again for 5 minutes.</div>
         <p>Your browser asks for Touch ID, Face ID or your security key.</p>
         <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use your passkey</button></div>
+      </div></div>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Confirm it's you, passkey not accepted" style="max-width:440px;">
+        <div class="je-modal-title">Confirm it's you</div>
+        <div class="je-modal-subtitle">Removing your authenticator app needs a fresh check. You won't be asked again for 5 minutes.</div>
+        <p>Your browser asks for Touch ID, Face ID or your security key.</p>
+        <div class="cap-error" role="alert" style="margin:0 0 4px;">That passkey didn't work. Try again.</div>
+        <p class="card-sub"><a class="je-link" href="#">Use your authenticator app</a></p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use a passkey</button></div>
       </div></div>
     </div>
     <div class="card" id="second-step-paused">
