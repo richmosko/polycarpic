@@ -36,7 +36,7 @@ export const allEmailedCodes = (): string[] => lines().map((l) => l.code);
 // ---- the shared limiter ledger ------------------------------------------------------------------------------------------------------
 const LEDGER = join(AUTH_DIR, 'limiter.json');
 const LOCK = join(AUTH_DIR, 'limiter.lock');
-const REOPEN_MS = 61_000; // BetterAuth's window is 60 s since the last counted call; one second of margin
+const REOPEN_MS = 68_000; // BetterAuth's window is 60 s since the last counted call. The slot is taken before the click and the request leaves a little later (a passkey prompt, a page load), so the margin is 8 s, not 1
 async function withLock<T>(fn: () => T): Promise<T> {
   for (let i = 0; ; i++) {
     try { mkdirSync(LOCK); break; } catch { if (i > 3000) { rmSync(LOCK, { recursive: true, force: true }); } await sleep(10); }
