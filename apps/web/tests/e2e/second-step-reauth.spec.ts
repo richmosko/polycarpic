@@ -33,8 +33,8 @@ test.describe('T10 by code (Rex)', () => {
     await expect(dlg).toContainText("That password or code didn't work");
     await expect(dlg).not.toContainText(/\b\d+\s*(tries|attempts|left|remaining)\b/i);
     await expect(row(page, r.passkeyName)).toBeVisible();
-    // The dialog keeps no password past its own request (R3), so a retry asks for it again.
-    await dlg.getByLabel('Password', { exact: true }).fill('e2e correct horse battery staple');
+    // Typed values stay after a refusal, as DESIGN draws it: the retry needs only the new code.
+    await expect(dlg.getByLabel('Password', { exact: true })).toHaveValue('e2e correct horse battery staple');
     // The right code: the dialog closes, the action runs as a new request, the passkey is gone.
     await dlg.getByLabel(/code from your authenticator app/i).fill(totp(r.secret, Date.now() + 30_000)); // the seed's enrolment spent the current step (A3.4), so a re-check uses the next one
     await slot('/second-step/reauth');
@@ -89,9 +89,15 @@ test.describe('T10 by passkey (Kit)', () => {
     await expect(dlg).toBeVisible();
     await slot('/second-step/reauth/passkey');
     await slot('/second-step/reauth/begin'); // switching method sends `begin` again, which is another limited call
-    await dlg.getByRole('button', { name: /use a passkey instead/i }).click(); // his default method is the app
-    await dlg.getByRole('button', { name: /^use (a|your) passkey$/i }).click();
+    await dlg.getByRole('button', { name: /use a passkey instead/i }).click(); // his default method is the app; choosing the passkey runs the check
+    // The re-check passed (user-verified assertion), so the action that opened the dialog runs as a new request: Remove the authenticator app asks its own password.
     await expect(dlg).toBeHidden({ timeout: 15_000 });
+    const remove = page.getByRole('dialog', { name: /remove the authenticator app/i });
+    await expect(remove).toBeVisible();
+    await remove.getByLabel('Password', { exact: true }).fill('e2e correct horse battery staple');
+    await remove.getByRole('button', { name: 'Remove' }).click();
+    await expect(remove).toBeHidden();
+    await expect(page.getByText(/authenticator app/i).first()).toBeHidden();
     expect(writes).toEqual([]);
   });
 });
