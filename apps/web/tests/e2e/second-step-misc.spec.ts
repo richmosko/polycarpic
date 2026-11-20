@@ -68,25 +68,25 @@ test.describe('spec 7b / R8: the address the service records is the proxy\'s', (
 test.describe('Settings → Sign-in and second step (Una: an app, and a passkey named like a script)', () => {
   test.use({ storageState: 'tests/e2e/.auth/una.json' });
 
-  test('spec 8: lists the app with its date and the passkey with its name; Remove and Make new codes open Confirm it\'s you in its interim form: the action named, a plain sentence, only Close, no input  [red if: the panel is missing, or the dialog has inputs that cannot succeed (R6)]', async ({ page }) => {
+  test('spec 8: lists the app with its date and the passkey with its name; Remove and Make new codes open Confirm it\'s you with the password and the authenticator code  [red if: the panel is missing, or the dialog is not a working re-check (Addendum 3)]', async ({ page }) => {
     await page.goto(`${base}/settings/second-step`);
     await expect(page.getByText(/authenticator app/i).first()).toBeVisible();
     await expect(page.getByText(una().passkeyName, { exact: true })).toBeVisible();
     await expect(page.locator('body')).not.toContainText(una().secret);
     await expect(page.locator('body')).not.toContainText(/backup codes left|[0-9]+ (backup )?codes? (left|remaining)/i); // the count is not shown (R2)
+    await slot('/second-step/reauth/begin'); // opening the dialog sends `begin`
     await page.getByRole('button', { name: /make new codes/i }).click();
-    const dialog = page.getByRole('dialog');
+    const dialog = page.getByRole('dialog', { name: /confirm it's you/i });
     await expect(dialog).toBeVisible();
-    await expect(dialog).toContainText(/new codes|backup codes/i); // the action's name
-    await expect(dialog).toContainText(/confirming it's you isn't available yet/i);
-    await expect(dialog.getByRole('button')).toHaveCount(1);
-    await expect(dialog.getByRole('button', { name: 'Close' })).toBeVisible();
-    await expect(dialog.locator('input, textarea, select')).toHaveCount(0);
-    await dialog.getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).toContainText(/new backup codes|new codes|backup codes/i); // the action's name
+    await expect(dialog.getByLabel('Password', { exact: true })).toBeVisible(); // a working re-check (Addendum 3), not the interim state
+    await expect(dialog.getByLabel(/code from your authenticator app/i)).toBeVisible();
+    await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
+    await slot('/second-step/reauth/begin');
     await page.getByRole('button', { name: /^remove/i }).first().click();
-    await expect(page.getByRole('dialog').locator('input')).toHaveCount(0);
-    await expect(page.getByRole('dialog')).toContainText(/isn't available yet/i);
+    await expect(page.getByRole('dialog', { name: /confirm it's you/i }).getByLabel('Password', { exact: true })).toBeVisible();
+    await expect(page.getByRole('dialog')).not.toContainText(/isn't available yet/i);
   });
 
   test('spec 9 / RC4: the passkey name `<img src=x onerror=…>` renders as literal text and runs nothing  [red if: the name is injected as HTML]', async ({ page }) => {
