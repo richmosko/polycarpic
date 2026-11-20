@@ -1,8 +1,9 @@
 -- Custom migration (generate --custom). Runs as session_user poly_migrator with SET ROLE poly_owner active (src/migrate.ts).
 -- POLY-150i (ruling Addendum 3, A3 to A5): Confirm it's you. One writer of session.recent_auth_at for an enrolled user (complete_step_up),
--- a challenge row per begin, a forward-only TOTP step per user, and the step_up record rows. The backup-code path (A3.3) is not built:
--- D7 is the Principal's, so there is no step_up_pending table and no evidence trigger; 'backup_code' stays in the CHECKs and the
--- definers refuse it. Order as A5: (1) tables, (2) the record's kind and method, (3) poly_govern definers, (4) triggers. Ends on poly_owner.
+-- a challenge row per begin, a forward-only TOTP step per user, and the step_up record rows. D7 (b) is decided: a backup code is accepted,
+-- so A3.3's write order and its evidence (step_up_pending, two triggers) are here. The database also writes an audit event for every
+-- second-step method added or removed (DECISIONS 2026-11-19). Order as A5: (1) tables, (2) the record's kind and method,
+-- (3) poly_govern definers, (4) triggers. Ends on poly_owner.
 
 -- (1) The challenge: one open row per session, hashed WebAuthn challenge for the passkey method only. No login role holds a privilege.
 CREATE TABLE app.step_up_challenge (
@@ -54,6 +55,20 @@ REVOKE EXECUTE ON FUNCTION app.step_up_totp_forward() FROM PUBLIC;--> statement-
 CREATE TRIGGER step_up_totp_10_forward BEFORE UPDATE ON app.step_up_totp
   FOR EACH ROW EXECUTE FUNCTION app.step_up_totp_forward();--> statement-breakpoint
 
+-- A3.3: the evidence that a backup-code stamp was followed by the list write, in the same transaction.
+CREATE TABLE app.step_up_pending (
+  xid     xid8 PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES public."user"(id) ON DELETE CASCADE
+);--> statement-breakpoint
+ALTER TABLE app.step_up_pending ENABLE ROW LEVEL SECURITY;--> statement-breakpoint
+ALTER TABLE app.step_up_pending FORCE ROW LEVEL SECURITY;--> statement-breakpoint
+REVOKE ALL ON app.step_up_pending FROM PUBLIC;--> statement-breakpoint
+GRANT SELECT, INSERT, DELETE ON app.step_up_pending TO poly_govern;--> statement-breakpoint
+CREATE POLICY step_up_pending_read ON app.step_up_pending FOR SELECT TO poly_govern USING (true);--> statement-breakpoint
+CREATE POLICY step_up_pending_insert ON app.step_up_pending FOR INSERT TO poly_govern WITH CHECK (true);--> statement-breakpoint
+CREATE POLICY step_up_pending_delete ON app.step_up_pending FOR DELETE TO poly_govern USING (true);--> statement-breakpoint
+CREATE TRIGGER step_up_pending_no_truncate BEFORE TRUNCATE ON app.step_up_pending FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate();--> statement-breakpoint
+
 -- (2) The record gains the re-check's two kinds and the method. A step_up row carries its session; a step_up_failure does not need one.
 DO $do$
 DECLARE
@@ -100,7 +115,7 @@ CREATE FUNCTION app.begin_step_up(p_method text, p_webauthn_hash bytea) RETURNS 
     IF v_uid IS NULL OR v_sid IS NULL THEN
       RAISE EXCEPTION 'no user in context' USING ERRCODE = '42501';
     END IF;
-    IF p_method IS NULL OR p_method NOT IN ('totp', 'passkey') THEN
+    IF p_method IS NULL OR p_method NOT IN ('totp', 'backup_code', 'passkey') THEN
       RAISE EXCEPTION 'unknown method' USING ERRCODE = '22023';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM public."user" u WHERE u.id = v_uid AND u.second_step_at IS NOT NULL) THEN
@@ -109,7 +124,7 @@ CREATE FUNCTION app.begin_step_up(p_method text, p_webauthn_hash bytea) RETURNS 
     IF NOT EXISTS (SELECT 1 FROM public.session s WHERE s.id = v_sid AND s.user_id = v_uid) THEN
       RAISE EXCEPTION 'no such session' USING ERRCODE = '42501';
     END IF;
-    IF p_method = 'totp' AND (p_webauthn_hash IS NOT NULL OR NOT EXISTS (SELECT 1 FROM public.two_factor t WHERE t.user_id = v_uid AND t.verified)) THEN
+    IF p_method IN ('totp', 'backup_code') AND (p_webauthn_hash IS NOT NULL OR NOT EXISTS (SELECT 1 FROM public.two_factor t WHERE t.user_id = v_uid AND t.verified)) THEN
       RAISE EXCEPTION 'no authenticator app' USING ERRCODE = '42501';
     END IF;
     IF p_method = 'passkey' AND (p_webauthn_hash IS NULL OR pg_catalog.octet_length(p_webauthn_hash) <> 32
@@ -149,34 +164,38 @@ CREATE FUNCTION app.complete_step_up(p_method text, p_challenge uuid, p_step big
     IF v_uid IS NULL OR v_sid IS NULL THEN
       RAISE EXCEPTION 'no user in context' USING ERRCODE = '42501';
     END IF;
-    IF p_method IS NULL OR p_method NOT IN ('totp', 'passkey') THEN
+    IF p_method IS NULL OR p_method NOT IN ('totp', 'backup_code', 'passkey') THEN
       RAISE EXCEPTION 'unknown method' USING ERRCODE = '22023';
     END IF;
     IF NOT EXISTS (SELECT 1 FROM public."user" u WHERE u.id = v_uid AND u.second_step_at IS NOT NULL) THEN
-      RAISE EXCEPTION 'no second step' USING ERRCODE = '42501';
+      RAISE EXCEPTION 'step_up_refused' USING ERRCODE = '42501';
     END IF;
     -- No earlier stamp in this transaction: now() is the transaction's start, so a stamp made here reads as equal to it.
     IF EXISTS (SELECT 1 FROM public.session s WHERE s.id = v_sid AND s.recent_auth_at = pg_catalog.now()) THEN
-      RAISE EXCEPTION 'already stamped in this transaction' USING ERRCODE = '42501';
+      RAISE EXCEPTION 'step_up_refused' USING ERRCODE = '42501';
     END IF;
     -- The challenge: this user's, this session's, this method's, unexpired. It is spent by being read.
     DELETE FROM app.step_up_challenge c
       WHERE c.id = p_challenge AND c.user_id = v_uid AND c.session_id = v_sid AND c.method = p_method AND c.expires_at > pg_catalog.now();
     GET DIAGNOSTICS v_n = ROW_COUNT;
     IF v_n <> 1 THEN
-      RAISE EXCEPTION 'no such challenge' USING ERRCODE = '42501';
+      RAISE EXCEPTION 'step_up_challenge' USING ERRCODE = '42501';
     END IF;
-    IF p_method = 'totp' THEN
-      IF EXISTS (SELECT 1 FROM public.two_factor t WHERE t.user_id = v_uid AND t.verified AND t.locked_until > pg_catalog.clock_timestamp()) THEN
-        RAISE EXCEPTION 'second_step_locked' USING ERRCODE = '42501';
-      END IF;
+    IF p_method IN ('totp', 'backup_code') AND EXISTS (SELECT 1 FROM public.two_factor t WHERE t.user_id = v_uid AND t.verified AND t.locked_until > pg_catalog.clock_timestamp()) THEN
+      RAISE EXCEPTION 'step_up_refused' USING ERRCODE = '42501';
+    END IF;
+    IF p_method = 'backup_code' THEN
+      -- A3.3: the stamp comes first, then the list is written (guard #5 wants the fresh stamp). If the list is never written,
+      -- step_up_pending_resolved raises at commit and the stamp rolls back with it.
+      INSERT INTO app.step_up_pending (xid, user_id) VALUES (pg_catalog.pg_current_xact_id(), v_uid);
+    ELSIF p_method = 'totp' THEN
       IF p_step IS NULL OR p_step < v_now_step - 1 OR p_step > v_now_step + 1 THEN
-        RAISE EXCEPTION 'a TOTP step outside the window' USING ERRCODE = '42501';
+        RAISE EXCEPTION 'step_up_refused' USING ERRCODE = '42501';
       END IF;
       SELECT s.last_step INTO v_last FROM app.step_up_totp s WHERE s.user_id = v_uid FOR UPDATE;
       IF FOUND THEN
         IF p_step <= v_last THEN
-          RAISE EXCEPTION 'that code was already used' USING ERRCODE = '42501';
+          RAISE EXCEPTION 'step_up_refused' USING ERRCODE = '42501';
         END IF;
         UPDATE app.step_up_totp s SET last_step = p_step WHERE s.user_id = v_uid;
       ELSE
@@ -186,7 +205,7 @@ CREATE FUNCTION app.complete_step_up(p_method text, p_challenge uuid, p_step big
     UPDATE public.session s SET recent_auth_at = pg_catalog.now() WHERE s.id = v_sid AND s.user_id = v_uid;
     GET DIAGNOSTICS v_n = ROW_COUNT;
     IF v_n <> 1 THEN
-      RAISE EXCEPTION 'no such session' USING ERRCODE = '42501';
+      RAISE EXCEPTION 'step_up_refused' USING ERRCODE = '42501';
     END IF;
     INSERT INTO app.sign_in_record (kind, user_id, session_id, method, ip_address, user_agent)
     VALUES ('step_up', v_uid, v_sid, p_method,
@@ -259,10 +278,90 @@ CREATE FUNCTION app.step_up_challenge_hash(p_challenge uuid) RETURNS bytea
   END
   $fn$;--> statement-breakpoint
 
-REVOKE EXECUTE ON FUNCTION app.begin_step_up(text, bytea), app.complete_step_up(text, uuid, bigint), app.note_totp_step(uuid, bigint), app.record_step_up_failure(), app.step_up_challenge_hash(uuid) FROM PUBLIC;--> statement-breakpoint
+-- A3.3: the list write resolves the evidence; a stamp with no list write fails at commit.
+CREATE FUNCTION app.step_up_spent() RETURNS trigger
+  LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path = ''
+  AS $fn$
+  BEGIN
+    IF OLD.backup_codes IS DISTINCT FROM NEW.backup_codes THEN
+      DELETE FROM app.step_up_pending p WHERE p.xid = pg_catalog.pg_current_xact_id();
+    END IF;
+    RETURN NULL;
+  END
+  $fn$;--> statement-breakpoint
+CREATE FUNCTION app.step_up_pending_resolved() RETURNS trigger
+  LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path = ''
+  AS $fn$
+  BEGIN
+    IF EXISTS (SELECT 1 FROM app.step_up_pending p WHERE p.xid = NEW.xid) THEN
+      RAISE EXCEPTION 'step_up_unresolved: a backup-code re-check must spend the code' USING ERRCODE = '42501';
+    END IF;
+    RETURN NULL;
+  END
+  $fn$;--> statement-breakpoint
+
+-- DECISIONS 2026-11-19: every second-step method added or removed by a user is an audit event, written by the database (RC5 c), so a
+-- planted factor is on the record. The reset is the operator's and writes its own event; it has no user marker, so it adds none here.
+CREATE OR REPLACE FUNCTION app.sync_second_step() RETURNS trigger
+  LANGUAGE plpgsql SECURITY DEFINER
+  SET search_path = ''
+  AS $fn$
+  DECLARE
+    v_user uuid := CASE TG_OP WHEN 'DELETE' THEN OLD.user_id ELSE NEW.user_id END;
+    v_has boolean;
+    v_set boolean;
+    v_event text;
+    v_kind text := CASE TG_TABLE_NAME WHEN 'passkey' THEN 'passkey' ELSE 'totp' END;
+  BEGIN
+    IF app.current_user_id() IS NOT NULL AND v_user IS DISTINCT FROM app.current_user_id() THEN
+      RAISE EXCEPTION 'a second step belongs to its own user' USING ERRCODE = '42501';
+    END IF;
+    IF app.current_user_id() IS NOT NULL THEN
+      -- A passkey row has no `verified`; the two tables are told apart before either record is read.
+      IF TG_TABLE_NAME = 'passkey' THEN
+        v_event := CASE TG_OP WHEN 'INSERT' THEN 'second_step.method_added' WHEN 'DELETE' THEN 'second_step.method_removed' END;
+      ELSIF TG_OP = 'INSERT' THEN
+        IF NEW.verified THEN v_event := 'second_step.method_added'; END IF;
+      ELSIF TG_OP = 'UPDATE' THEN
+        IF NEW.verified AND NOT OLD.verified THEN v_event := 'second_step.method_added'; END IF;
+      ELSIF OLD.verified THEN
+        v_event := 'second_step.method_removed';
+      END IF;
+      IF v_event IS NOT NULL THEN
+        INSERT INTO public.audit_event (entity_id, actor_user_id, actor, kind, subject_user_id, payload)
+        VALUES (NULL, app.current_user_id(), 'user', v_event, v_user, pg_catalog.jsonb_build_object('method', v_kind));
+      END IF;
+    END IF;
+    v_has := EXISTS (SELECT 1 FROM public.two_factor t WHERE t.user_id = v_user AND t.verified)
+          OR EXISTS (SELECT 1 FROM public.passkey k WHERE k.user_id = v_user);
+    SELECT u.second_step_at IS NOT NULL INTO v_set FROM public."user" u WHERE u.id = v_user;
+    IF NOT FOUND THEN
+      RETURN NULL;
+    END IF;
+    IF v_has AND NOT v_set THEN
+      UPDATE public."user" SET second_step_at = pg_catalog.now() WHERE id = v_user;
+      PERFORM app.seat_claimed_invitations();
+    ELSIF NOT v_has AND v_set THEN
+      UPDATE public."user" SET second_step_at = NULL WHERE id = v_user;
+    END IF;
+    RETURN NULL;
+  END
+  $fn$;--> statement-breakpoint
+
+REVOKE EXECUTE ON FUNCTION app.begin_step_up(text, bytea), app.complete_step_up(text, uuid, bigint), app.note_totp_step(uuid, bigint), app.record_step_up_failure(), app.step_up_challenge_hash(uuid), app.step_up_spent(), app.step_up_pending_resolved() FROM PUBLIC;--> statement-breakpoint
+GRANT EXECUTE ON FUNCTION app.step_up_spent(), app.step_up_pending_resolved() TO poly_owner;--> statement-breakpoint
 GRANT EXECUTE ON FUNCTION app.begin_step_up(text, bytea), app.complete_step_up(text, uuid, bigint), app.note_totp_step(uuid, bigint), app.record_step_up_failure(), app.step_up_challenge_hash(uuid) TO poly_auth;--> statement-breakpoint
 
 -- (4) Back to poly_owner: guard_passkey is replaced, and no trigger is added to a BetterAuth table.
+SET ROLE poly_owner;--> statement-breakpoint
+CREATE TRIGGER two_factor_85_step_up_spent AFTER UPDATE OF backup_codes ON public.two_factor
+  FOR EACH ROW EXECUTE FUNCTION app.step_up_spent();--> statement-breakpoint
+CREATE CONSTRAINT TRIGGER step_up_pending_resolved AFTER INSERT ON app.step_up_pending
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION app.step_up_pending_resolved();--> statement-breakpoint
+SET ROLE poly_govern;--> statement-breakpoint
+REVOKE EXECUTE ON FUNCTION app.step_up_spent(), app.step_up_pending_resolved() FROM poly_owner;--> statement-breakpoint
 SET ROLE poly_owner;--> statement-breakpoint
 -- A3.5 (guard_passkey is poly_owner's, 0013): a marked counter change, like an unmarked one, never goes down. A constant 0 still passes. Otherwise 0013's body.
 CREATE OR REPLACE FUNCTION app.guard_passkey() RETURNS trigger
