@@ -73,20 +73,21 @@ SELECT is((SELECT count(*)::int FROM pg_class c JOIN pg_namespace n ON n.oid=c.r
   AND (has_sequence_privilege('poly_auth', c.oid, 'USAGE') OR has_sequence_privilege('poly_auth', c.oid, 'SELECT') OR has_sequence_privilege('poly_auth', c.oid, 'UPDATE'))), 0,
   'effective: poly_auth holds no sequence privilege in public, app, drizzle');
 
--- EFFECTIVE EXECUTE over every function in public, app, drizzle (PUBLIC included): exactly the seventeen.
+-- EFFECTIVE EXECUTE over every function in public, app, drizzle (PUBLIC included): exactly the twenty-two.
 CREATE TEMP TABLE want_fn (sig text);
 INSERT INTO want_fn VALUES ('app.current_user_id()'), ('app.current_session_id()'),
   ('app.enter_new_user(uuid)'), ('app.claim_invitations(bytea,text)'), ('app.accept_invitations(bytea)'), ('app.provision_person()'), ('app.enter_auth_session(text)'),
   ('app.step_up_fresh()'), ('app.enrol_proof(text)'), ('app.enrolment_grant_live()'), ('app.check_factor_removal(uuid,text,uuid)'), ('app.set_two_factor_enabled(boolean)'),
-  ('app.consume_passkey_grant()'), ('app.take_recent_auth_stamp(uuid)'), ('app.issue_email_challenge(text)'), ('app.confirm_email_challenge(text)'), ('app.attach_session_handle(uuid,text)');
+  ('app.consume_passkey_grant()'), ('app.take_recent_auth_stamp(uuid)'), ('app.issue_email_challenge(text)'), ('app.confirm_email_challenge(text)'), ('app.attach_session_handle(uuid,text)'),
+  ('app.begin_step_up(text,bytea)'), ('app.complete_step_up(text,uuid,bigint)'), ('app.note_totp_step(uuid,bigint)'), ('app.record_step_up_failure()'), ('app.step_up_challenge_hash(uuid)'); -- POLY-150 Addendum 3 A3/A3.4/A4 and Addendum 6
 CREATE FUNCTION pg_temp.fn_extra() RETURNS text[] LANGUAGE sql AS $f$
   SELECT coalesce(array_agg(x ORDER BY x), '{}') FROM (
     SELECT p.oid::regprocedure::text AS x FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
     WHERE n.nspname IN ('public','app','drizzle') AND has_function_privilege('poly_auth', p.oid, 'EXECUTE') AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e')
     EXCEPT SELECT sig FROM want_fn) q $f$;
-SELECT is(pg_temp.fn_extra(), '{}'::text[], 'effective: poly_auth executes no function outside the seventeen (PUBLIC included)');
+SELECT is(pg_temp.fn_extra(), '{}'::text[], 'effective: poly_auth executes no function outside the twenty-two (PUBLIC included)');
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM want_fn WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_auth', to_regprocedure(sig), 'EXECUTE')), NULL::text[],
-  'effective: poly_auth executes every one of the seventeen (a missing or ungranted function is listed)');
+  'effective: poly_auth executes every one of the twenty-two (a missing or ungranted function is listed)');
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='app'
   AND p.proname IN ('enter_job','has_role','visible_entities','owner_count','second_step_required','issue_operator_invitation','reset_second_step','purge_tx_identity')
   AND has_function_privilege('poly_auth', p.oid, 'EXECUTE')), 0, 'pinned absent: enter_job, has_role, visible_entities, owner_count, second_step_required, issue_operator_invitation, reset_second_step, purge_tx_identity');
@@ -105,9 +106,9 @@ SELECT is((SELECT array_agg(DISTINCT table_schema||'.'||table_name ORDER BY tabl
   'granted: table grants on exactly the BetterAuth six, tx_identity and __drizzle_migrations');
 SELECT is((SELECT count(*)::int FROM information_schema.role_column_grants WHERE grantee='poly_auth' AND table_name NOT IN ('user','session','account','verification','two_factor','passkey','tx_identity','__drizzle_migrations')), 0, 'granted: column grants only on the BetterAuth six, tx_identity and __drizzle_migrations (table-level grants list per column)');
 SELECT is((SELECT array_agg(DISTINCT routine_schema||'.'||routine_name ORDER BY routine_schema||'.'||routine_name) FROM information_schema.routine_privileges WHERE grantee='poly_auth'),
-  ARRAY['app.accept_invitations','app.attach_session_handle','app.check_factor_removal','app.claim_invitations','app.confirm_email_challenge','app.consume_passkey_grant','app.current_session_id','app.current_user_id','app.enrol_proof',
-        'app.enrolment_grant_live','app.enter_auth_session','app.enter_new_user','app.issue_email_challenge','app.provision_person','app.set_two_factor_enabled','app.step_up_fresh','app.take_recent_auth_stamp'],
-  'granted: routine_privileges lists exactly the seventeen functions');
+  ARRAY['app.accept_invitations','app.attach_session_handle','app.begin_step_up','app.check_factor_removal','app.claim_invitations','app.complete_step_up','app.confirm_email_challenge','app.consume_passkey_grant','app.current_session_id','app.current_user_id','app.enrol_proof',
+        'app.enrolment_grant_live','app.enter_auth_session','app.enter_new_user','app.issue_email_challenge','app.note_totp_step','app.provision_person','app.record_step_up_failure','app.set_two_factor_enabled','app.step_up_challenge_hash','app.step_up_fresh','app.take_recent_auth_stamp'],
+  'granted: routine_privileges lists exactly the twenty-two functions');
 SELECT is((SELECT array_agg(tablename::text ORDER BY tablename) FROM pg_policies WHERE 'poly_auth' = ANY (roles)), ARRAY['tx_identity'],
   'no policy names poly_auth except tx_identity_own');
 SELECT is((SELECT count(*)::int FROM pg_default_acl d WHERE d.defaclacl::text LIKE '%poly_auth=%'), 0, 'no default privilege grants anything to poly_auth');
