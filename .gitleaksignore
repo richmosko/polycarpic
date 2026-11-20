@@ -1,0 +1,6 @@
+# gitleaks ignore list (SECURITY C-82). One exact fingerprint per entry (commit:file:rule:line), never a path or a rule.
+# Each entry names why it is not a secret and the issue that reviewed it; seceng reviews every entry.
+
+# POLY-150 (seceng-150, build-review.md §7): a dummy auth secret that the R8 test writes to a temporary AUTH_SECRET_FILE for a
+# development-mode sign-in service on a throwaway test database. It is used nowhere else and protects nothing.
+353956958f0749b78b50a52c13851e06c0a5913a:tests/db/second-step-screens.test.ts:generic-api-key:288

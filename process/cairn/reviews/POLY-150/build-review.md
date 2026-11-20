@@ -149,3 +149,25 @@ Read from `git diff origin/main...HEAD` of `packages/auth/package.json`, `apps/w
 - **One thing for POLY-137's S9 test and any later better-auth bump.** `packages/auth` now pins `@simplewebauthn/server` and `@better-auth/utils` directly.
   - A better-auth or passkey bump that moves either of them would install a second copy beside ours instead of moving ours.
   - The bump must move all four pins together, and S9 should fail if the lockfile holds two versions of either package.
+
+## 7. The gitleaks finding on PR #141 (`generic-api-key`, `tests/db/second-step-screens.test.ts:288` at `35395695`)
+
+**Ruled: ignore that one fingerprint. That is acceptable under C-82.**
+
+**The value is a dummy.** `qa-ip-secret-0123456789abcdef0123456789abcdef` appears only at that line (now line 306), and nowhere else in the tree (`git grep`). The R8 test writes it to a temporary `AUTH_SECRET_FILE` for a development-mode sign-in service on a throwaway test database. It protects nothing, and the same pattern of dummy test secret is used in five other test files.
+
+**Why an ignore, not an edit.**
+- The commit stays in the PR range, so changing the line cannot clear the finding.
+- A gitleaks fingerprint is the commit, the file, the rule and the line together. The entry can therefore hide nothing else: a secret in any other commit, file or line gets a different fingerprint and is still reported.
+- The entry goes in a root `.gitleaksignore`, with a comment saying why.
+
+**The rule for any later entry** (added to C-82 in SECURITY):
+- one exact fingerprint, never a path, rule or wildcard;
+- a comment naming the reason and the reviewing issue;
+- seceng reviews each entry, as for `.trivyignore`.
+
+**Recommended, not required:** qa replaces the literal with a generated value (`randomBytes(32).toString('hex')`). It does not clear the old commit, but it stops later edits from re-triggering the rule.
+
+**The lead should check two things before releasing the push:**
+- re-run gitleaks 8.30.1 over the range with this exact file, comments included;
+- add `.gitleaksignore` to POLY-150's `paths`, because the guard will refuse it otherwise.
