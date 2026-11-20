@@ -5,8 +5,9 @@ import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { cloneMigrated } from './helpers/api';
-import { psql, ROOT, server } from './helpers/pg';
-import { must } from './helpers/sql';
+// `must` is the psql one (a connection per call, closed): helpers/sql keeps one pg.Client open per database, and one clone per plant
+// (over a hundred) exhausted the server's max_connections.
+import { must, psql, ROOT, server } from './helpers/pg';
 
 const SCRIPT = join(ROOT, 'infra', 'postgres', 'gate-check.sh');
 function gate(db: string) {
