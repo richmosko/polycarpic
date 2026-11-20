@@ -583,7 +583,7 @@ R7's `trustDevice` refusal stands until the lead relays approval of a shape belo
 - They join the second-step commit rule (POLY-152 R9): a refusal below 500 commits, through `COMMIT_HEADER`, so wrong-code counts and consumed challenges survive.
 
 **`POST /second-step/reauth`, in order:**
-1. **Not during a lock** [M8]. If the verified `two_factor` row's `locked_until > now()`, answer the lock refusal before any check. Under D6 (b) it carries `pausedFor`; the passkey path stays open.
+1. **Not during a lock** [M8]. If the verified `two_factor` row's `locked_until > now()`, answer the lock refusal before any check, **with no `pausedFor`**. Addendum 4's table rules; it is settled for the build review. The passkey path stays open.
 2. **The password** (`ctx.context.password.verify`, against `session.user` from the cookie [M4]). Wrong → 403 `step_up_failed`, the same answer as a wrong code [M6], and no factor counter is touched.
    - A user with no password → 403 `password_required`. There is no provider path until POLY-88 [M6].
    - A password alone never passes: the code step is always required (C-03).
@@ -919,3 +919,14 @@ A raise rolls back the transaction, so a TOTP step it refused is not recorded ei
   - NULL for another session's challenge, another user's, a `totp` challenge, an expired one, and one already consumed by `complete_step_up`;
   - the right hash for the caller's own open passkey challenge.
 - **Deploy gate: no.** It enforces nothing the gate relies on. If it is missing, the passkey re-check fails closed (`challenge_expired`), and no protection is lost.
+
+## Addendum 7: no band on the re-check's lock
+
+**The re-check's lock refusal carries no `pausedFor`.** It is 429 `ACCOUNT_TEMPORARILY_LOCKED`, and the dialog says "try again later", as Addendum 4, the build and qa's tests have it. Addendum 3 A1 step 1 is corrected to match.
+
+**Why:**
+- D6's band, and seceng's conditions on it, were ruled for one read path only: a held sign-in with no session, read through the signed hold cookie.
+- On `/second-step/reauth` the caller holds a session of that account. A band there would be a second disclosure path that the review did not cover.
+- It would also bring no recovery the dialog lacks: the passkey stays offered, and a user with no passkey waits either way.
+- If DESIGN wants the band here later, it is a small change with its own seceng read.
+- **DESIGN follows the ruling:** the paused Confirm it's you state says "try again later", with no band.
