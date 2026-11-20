@@ -120,7 +120,7 @@
     <div role="status" class="flex items-start gap-2 rounded-md bg-[color-mix(in_srgb,var(--warning)_14%,var(--card))] p-3 text-sm text-warning-foreground dark:text-warning"><Icon name="clock" class="mt-0.5 size-4 shrink-0" /><span><strong>Codes are paused for this account.</strong> {#if when}They work again {when}. Use a passkey, or try again then.{:else}Use a passkey, or try again later.{/if}</span></div>
     {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
     <button type="button" class={primary} onclick={usePasskey}>Use a passkey</button>
-    <p class={reset}>If this wasn't you, someone may know your password. Once you're in, change it in Settings.</p>
+    <p class={reset}>If this wasn't you, someone may know your password. Tell the person who runs this instance.</p>
     <p class={reset}>Lost every method? The person who runs this instance can reset your second step.</p>
     <a class={link} href="/sign-in">Back to sign in</a>
   {:else}
