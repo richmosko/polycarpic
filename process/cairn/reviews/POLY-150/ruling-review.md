@@ -720,5 +720,21 @@ If the Principal picks (b), tell them plainly: a found backup code plus the pass
 **The auth healthcheck sends `x-forwarded-for: 127.0.0.1` (option a): ACCEPT, preferred over (b)** (code-read; I ran nothing).
 - **It lets no caller do anything new.** The header is set by the probe itself, inside the auth container, on loopback. Anyone who can run that probe can already run anything in the container.
 - **The rate limit does not apply.** `/ok` is not in `LIMITED` (options.ts:16), so no rate-limit bucket is touched.
-- **No outside request can reach the 127.0.0.1 address.** Caddy replaces every incoming `x-forwarded-for` with the real connecting address (R8). Only a compromised web on the compose network could send one, and it can already forge any address (R8).
+- **What Caddy does with the client's address (corrected; this replaced a line that said Caddy overwrites `x-forwarded-for`).**
+  - The Caddyfile has plain `reverse_proxy` lines, with no `header_up` and no `trusted_proxies`, and the lint refuses `trusted_proxies`.
+  - Caddy's documented default is to ignore a client's `X-Forwarded-*` values from a peer it does not trust, and to set the field from the connecting address (spec: caddyserver.com, `reverse_proxy`).
+  - **That is not set explicitly or tested in this repo (unmeasured).** POLY-138 makes it explicit and tested before the first deploy.
+- **(a) holds whatever Caddy turns out to do:**
+  - **If Caddy replaces the field,** no outside request can carry 127.0.0.1.
+  - **If it appends,** a forged entry gives two entries. `clientIpResolved` accepts exactly one, so the request is refused with a 503 and fails closed.
+  - **If it passed the client's value through,** any client could claim any address. That is the general POLY-138 exposure, not one (a) creates: `/ok` has no rate-limit bucket.
+  - A compromised web on the compose network can already forge any address (R8).
+- **At `3607aa34`:** both compose files send the header, and `tests/infra/auth-service.test.ts` fails without it.
 - **(b) is worse.** An exemption in the handler would weaken the service's one address rule for a health probe, and it would be one more path to keep exempt correctly.
+
+**SECURITY at the build review, on the client address until POLY-138 lands:**
+- **The address the sign-in service rate-limits on and records** (C-04 and C-89) is the single `X-Forwarded-For` entry.
+- **In production that entry comes from Caddy.** Its documented default ignores a client's header and sets the connecting address. That is unmeasured here, and POLY-138 makes it explicit and tested before the first deploy.
+- **If the default does not hold, a client chooses its own address.** That defeats the per-address limit (`LIMITED`) and puts false addresses in the sign-in record.
+- **What it does not touch:** the per-user counter and the growing lock (C-88), the challenges, and every database guard. None of them uses the address.
+- **A request with several entries, or none, is refused (503).**
