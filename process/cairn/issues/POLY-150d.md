@@ -1,7 +1,7 @@
 ---
 id: POLY-150d
 title: Second-step screens tests
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-150
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-150.md, process/cairn/reviews/POLY-150/**, pro
 stage: execute
 estimate.cost_usd: "9.00"
 estimate.gate_cycles: 5
+actual.cost_usd: "26.5382"
+actual.tokens: 190058404
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: "2.95"
 labels: [design, security]
 priority: null
 pr: null

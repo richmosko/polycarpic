@@ -6,7 +6,7 @@
 
 ## Current Phase
 
-**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 were approved at the gate; ARCH is now v1.21.1 (layer map and its enforcement; Drizzle Kit confirmed by the POLY-76 spike, §6.2; sign-up inside our own transaction, §3.1), SECURITY v1.13.0 and INFRA v1.3.16. `POLY-C` closed and archived. The first session's issues (POLY-76, 82, 83, 84, 85) are done; the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
+**Phase:** Implement — milestone `POLY-M1` Foundations (L0 platform, L1 identity & tenancy, L6 app shell; `process/cairn/milestones/POLY-M1.md`). Plan gate approved 2026-11-09 (POLY-127): ARCH v1.11, SECURITY v1.4, INFRA v1.2 and DESIGN v0.17 were approved at the gate; ARCH is now v1.22.0 (layer map and its enforcement; Drizzle Kit confirmed by the POLY-76 spike, §6.2; sign-up inside our own transaction, §3.1), SECURITY v1.14.0, INFRA v1.3.18, DESIGN v0.20.5 and PRD v1.5.0. `POLY-C` closed and archived. The first session's issues (POLY-76, 82, 83, 84, 85) are done; the throwaway prototype at `prototype/` is the look-and-feel reference until the first real screens ship.  
 **Started:** 2026-11-09  
 **Driver agent:** backend-lead (qa-engineer drives Validate)  
 **Gate criteria:** _see [`WORKFLOW.md`](WORKFLOW.md)_
@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-150-second-step-screens`
 - **Started:** 2026-11-19
 - **Goal:** the second-step set-up screens, `/sign-in/second-step` and the Confirm it's you prompt are designed and built in web, so a user can enrol a second step in a browser; two browser tests prove it against the real handler.
-- **Status:** In Progress
+- **Status:** In Review — PR [#141](https://github.com/richmosko/polycarpic/pull/141)
 
 _Standing context. POLY-149 (Stage 2 revocation and docs) merged 2026-11-19 via PR [#138](https://github.com/richmosko/polycarpic/pull/138) — ARCH 1.21.0, SECURITY 1.13.0, INFRA 1.3.16; PRD 1.5.0 and ARCH 1.21.1 followed in PR [#140](https://github.com/richmosko/polycarpic/pull/140)._
 
