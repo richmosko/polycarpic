@@ -33,8 +33,11 @@ test.describe('T10 by code (Rex)', () => {
     await expect(dlg).toContainText("That password or code didn't work");
     await expect(dlg).not.toContainText(/\b\d+\s*(tries|attempts|left|remaining)\b/i);
     await expect(row(page, r.passkeyName)).toBeVisible();
-    // Typed values stay after a refusal, as DESIGN draws it: the retry needs only the new code.
-    await expect(dlg.getByLabel('Password', { exact: true })).toHaveValue('e2e correct horse battery staple');
+    // seceng (02142143): after a refusal the dialog clears BOTH the password and the code and shows the one error message.
+    await expect(dlg.getByLabel('Password', { exact: true })).toHaveValue('');
+    await expect(dlg.getByLabel(/code from your authenticator app/i)).toHaveValue('');
+    await expect(dlg.getByRole('alert')).toHaveCount(1);
+    await dlg.getByLabel('Password', { exact: true }).fill('e2e correct horse battery staple');
     // The right code: the dialog closes, the action runs as a new request, the passkey is gone.
     await dlg.getByLabel(/code from your authenticator app/i).fill(totp(r.secret, Date.now() + 30_000)); // the seed's enrolment spent the current step (A3.4), so a re-check uses the next one
     await slot('/second-step/reauth');

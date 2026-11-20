@@ -375,9 +375,10 @@ describe('R3 #3/#6/#5 guards on session, passkey, two_factor (C9, C15)', () => {
       const attacker = await seed({ enrolled: true });
       const p = must(`INSERT INTO public.passkey (public_key, user_id, credential_id, counter, device_type, backed_up) VALUES ('k','${victim.id}','cv${n}',0,'singleDevice',false) RETURNING id`, db).rows[0]![0]!;
       const del = await marked(role, attacker.id, null, (q) => fails(q('DELETE FROM public.passkey WHERE id = $1', [p])));
-      expect(del).not.toBeNull();
+      // The guard's own refusal, not any failure (POLY-150: since POLY-89 every passkey delete failed with 42703 and "it fails" passed as the right failure).
+      expect([codeOf(del), msgOf(del)], 'delete').toEqual(['42501', expect.stringMatching(/removed by its own user/)]);
       const ren = await marked(role, attacker.id, null, (q) => fails(q(`UPDATE public.passkey SET name = 'z' WHERE id = $1`, [p])));
-      expect(ren).not.toBeNull();
+      expect([codeOf(ren), msgOf(ren)], 'rename').toEqual(['42501', expect.stringMatching(/belongs to its own user/)]);
     });
     it(`${role}: an unmarked passkey.counter may rise or stay but never go down, and no other passkey column changes (passkey sign-in carve-out, C-a) [red if: guard_passkey lets the counter fall]`, async () => {
       const u = await seed({ enrolled: true });
@@ -450,10 +451,10 @@ describe('C10 last method and the races (R3 #7, R1.6, C-b)', () => {
       must(`INSERT INTO public.membership (entity_id, user_id, role) VALUES ('${ent}', '${owner.id}', 'owner') ON CONFLICT DO NOTHING`, db);
       const s = must(withHandle(`INSERT INTO public.session (user_id, token, expires_at, recent_auth_at) VALUES ('${owner.id}', 'tkl${n}${Math.random()}', now() + interval '1 day', now()) RETURNING id`), db).rows[0]![0]!;
       const x = await marked(role, owner.id, s, (q) => fails(q(`DELETE FROM public.two_factor WHERE user_id = $1`, [owner.id])));
-      expect(x).not.toBeNull();
+      expect([codeOf(x), msgOf(x)], 'the last method of a manager').toEqual(['42501', expect.stringMatching(/second_step_required/)]);
       const viewer = await seed({ enrolled: true });
       const y = await marked(role, viewer.id, null, (q) => fails(q(`DELETE FROM public.two_factor WHERE user_id = $1`, [viewer.id])));
-      expect(y).not.toBeNull();
+      expect([codeOf(y), msgOf(y)], 'a viewer without a fresh step-up').toEqual(['42501', expect.stringMatching(/step_up_required/)]);
     });
   }
   it('the own-Person user with only an exempt Person may remove the last factor after a fresh step-up, and second_step_at clears [red if: refuse_last_method does not call own_person_exempt]', async () => {
@@ -605,7 +606,7 @@ describe('R1.5 the exact call (seceng early ruling: strict, no alias; architect:
     expect(twelve).toHaveLength(12);
     expect(got.filter((g) => twelve.includes(g))).toEqual([]);
     // POLY-153 R2: poly_app gains exactly four, the web-entry and Settings -> Sessions definers (each refuses unless the marker is kind session).
-    const handleFour = ['app.enter_session(text)', 'app.my_sessions()', 'app.recent_auth_ok()', 'app.revoke_my_session(uuid)'];
+    const handleFour = ['app.enter_session(text)', 'app.my_sessions()', 'app.recent_auth_ok()', 'app.revoke_my_session(uuid)', 'app.my_second_step()']; // POLY-150 RC1 adds my_second_step to the four
     expect([...got].sort()).toEqual([...before89, ...readOnly, ...handleFour].filter((f) => !twelve.includes(f)).sort());
     expect(must(`SELECT has_function_privilege('poly_auth', 'app.reset_second_step(text)', 'EXECUTE')`, db).rows[0]![0]).toBe('f');
     // R1.5 (d88aa7ae): the group a function is in is part of the pin. The three (and reset_second_step) carry the exact-call check, which

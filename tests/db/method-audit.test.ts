@@ -25,7 +25,7 @@ afterAll(() => teardown(e));
 
 type Row = { kind: string; actor: string; actor_user_id: string | null; entity_id: string | null; subject: string | null; payload: any };
 const rows = (uid: string, kindLike = 'second_step.method_%'): Row[] =>
-  must(`SELECT kind, actor, coalesce(actor_user_id::text, ''), coalesce(entity_id::text, ''), coalesce(subject_user_id::text, ''), payload::text FROM public.audit_event WHERE subject_user_id = '${uid}' AND kind LIKE '${kindLike}' ORDER BY id`, e.db).rows
+  must(`SELECT kind, actor, coalesce(actor_user_id::text, ''), coalesce(entity_id::text, ''), coalesce(subject_user_id::text, ''), payload::text FROM public.audit_event WHERE subject_user_id = '${uid}' AND kind LIKE '${kindLike}' ORDER BY created_at, id`, e.db).rows
     .map((r) => ({ kind: r[0]!, actor: r[1]!, actor_user_id: r[2] || null, entity_id: r[3] || null, subject: r[4] || null, payload: JSON.parse(r[5]!) }));
 const json = async (r: Response) => (await r.clone().json().catch(() => ({}))) as any;
 const enrol = async () => { const u = e.seedUser(); const r = await enrolTotp(e, auth, u, mails); return { u, ...r }; };
