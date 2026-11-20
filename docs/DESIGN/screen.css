@@ -2032,8 +2032,7 @@ table.data-table.cap-table tr.cap-add td { border-bottom: 1px solid var(--border
    alone. */
 .auth-state { display: none; }
 html[data-state="default"] .auth-state[data-state="default"],
-html[data-state="local"] .auth-state[data-state="local"],
-html[data-state="second-step"] .auth-state[data-state="second-step"] { display: block; }
+html[data-state="local"] .auth-state[data-state="local"] { display: block; }
 .auth-note { text-align: left; display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; margin-bottom: 20px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--muted); font-size: 13px; color: var(--muted-foreground); }
 .auth-note .icon { flex: none; margin-top: 1px; }
 .code-input { font-family: var(--font-mono); font-size: 20px; letter-spacing: 0.4em; text-align: center; }
@@ -2066,3 +2065,50 @@ table.data-table.cap-table tr.cap-former td:first-child { font-style: italic; }
 .plan-step { padding: 14px 0; border-top: 1px solid var(--border); }
 .plan-step:first-of-type { border-top: none; }
 .plan-step .kv-row { padding: 8px 0; }
+
+/* Second-step pages (/settings/second-step and /sign-in/second-step):
+   bare split pages like Sign in, one state shown at a time. In the mock a
+   state is picked by URL hash and marked .is-shown; in the build each is a
+   server- or client-rendered state of one route. */
+.auth-state.is-shown { display: block; }
+.auth-step { font-size: 12px; font-weight: 500; color: var(--muted-foreground); margin-bottom: 8px; }
+.auth-form-inner .auth-body { text-align: left; font-size: 14px; margin: 0 0 16px; }
+.auth-form-inner .auth-help { text-align: left; font-size: 12px; color: var(--muted-foreground); margin: -8px 0 16px; }
+.auth-form-inner .cap-error { text-align: left; }
+.auth-form-inner .input[aria-invalid="true"] { border-color: var(--destructive); }
+.auth-actions { display: flex; gap: 8px; margin-top: 4px; }
+.auth-actions .btn { flex: 1; justify-content: center; }
+.auth-form-inner .auth-note { margin-bottom: 16px; }
+.auth-form-inner .auth-note strong { color: var(--foreground); font-weight: 600; }
+/* A paused code step: the caution tier, with its icon and words, never
+   colour alone. Same fill as the duplicate warning. */
+.auth-note--caution { border-color: transparent; background: color-mix(in srgb, var(--warning) 14%, var(--card)); color: var(--warning-foreground); }
+.dark .auth-note--caution { color: var(--warning); }
+.auth-form-inner .auth-note--caution strong { color: inherit; }
+/* Waiting on the browser's passkey prompt: a static icon in a soft disc,
+   no spinner (the browser owns the progress UI). */
+.auth-wait { display: flex; flex-direction: column; align-items: center; gap: 12px; margin: 8px 0 20px; font-size: 13px; color: var(--muted-foreground); }
+.auth-wait .auth-wait-icon { width: 56px; height: 56px; border-radius: 50%; background: var(--secondary); color: var(--secondary-foreground); display: inline-flex; align-items: center; justify-content: center; }
+.auth-wait .auth-wait-icon .icon { width: 26px; height: 26px; }
+.backup-codes { margin-bottom: 12px; }
+.auth-form-inner .backup-codes { text-align: left; }
+.backup-codes li { list-style: none; color: var(--foreground); }
+ol.backup-codes { margin-top: 0; }
+.backup-actions { display: flex; gap: 8px; margin-bottom: 16px; }
+.check-row { display: flex; gap: 10px; align-items: flex-start; text-align: left; font-size: 14px; margin-bottom: 16px; }
+.check-row input { margin-top: 3px; accent-color: var(--primary); width: 16px; height: 16px; flex: none; }
+
+/* A dialog shown open over a live page (the second-step set-up): the page
+   stays rendered behind a scrim; the dialog is centred and scrolls inside
+   itself when taller than the viewport. */
+.modal-layer { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px; background: oklch(0 0 0 / 40%); }
+.modal-layer .je-modal { width: 100%; max-width: 520px; max-height: calc(100vh - 48px); overflow-y: auto; margin: 0; }
+.je-modal .auth-step { margin: 0 0 12px; }
+.je-modal .auth-wait { margin: 16px 0 8px; text-align: center; }
+.je-modal .auth-note { margin-bottom: 0; }
+.dark .modal-layer { background: oklch(0 0 0 / 60%); }
+.dark .modal-layer .je-modal { border: 1px solid var(--border); }
+.second-step-banner > span:not(.icon) { flex: 1; }
+.second-step-banner .btn { flex: none; }
+.entity-menu .popover-item { display: flex; align-items: center; gap: 8px; width: 100%; }
+.entity-menu .entity-menu-check { margin-left: auto; }

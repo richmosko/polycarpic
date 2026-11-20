@@ -4,12 +4,22 @@
   let {
     entities,
     current,
-  }: { entities: readonly { id: string; name: string }[]; current: string | null } = $props();
+    heldLabel,
+  }: { entities: readonly { id: string; name: string }[]; current: string | null; heldLabel?: string } = $props();
 
   const label = $derived(entities.find((e) => e.id === current)?.name ?? 'Entity');
 </script>
 
-{#if entities.length === 0}
+{#if heldLabel}
+  <!-- A held user (POLY-150 R1.3): the one label, from the session row. Shared entities are POLY-91's. -->
+  <button
+    type="button"
+    disabled
+    class="border-border bg-card text-card-foreground rounded-md border px-3 py-1.5 text-sm"
+  >
+    {heldLabel}
+  </button>
+{:else if entities.length === 0}
   <button
     type="button"
     disabled

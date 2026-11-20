@@ -17,7 +17,7 @@ $f$;
 -- THE PER-REASON EXEMPTIONS (POLY-147, seceng review 4). 'rel:reason' pairs; a listed pair hides that one check on that one
 -- relation and nothing else. Adding an entry needs SecEng review of the diff, as for the table list above.
 CREATE FUNCTION pg_temp.reason_exemptions() RETURNS text[] LANGUAGE sql AS $f$
-  SELECT ARRAY['app.tx_identity:pk_not_uuid', 'app.sign_in_record:pk_not_uuid', 'app.second_step_streak:for_all_policy'] -- POLY-149: R3 rules a bigint identity key for the record; R2 rules one FOR ALL policy for poly_govern on the streak
+  SELECT ARRAY['app.tx_identity:pk_not_uuid', 'app.sign_in_record:pk_not_uuid', 'app.second_step_streak:for_all_policy', 'app.step_up_pending:pk_not_uuid'] -- POLY-149: R3 rules a bigint identity key for the record; R2 rules one FOR ALL policy for poly_govern on the streak; POLY-150 Addendum 3 A3 rules step_up_pending keyed by the transaction id (xid8), like tx_identity
 $f$;
 
 CREATE FUNCTION pg_temp.col_allow() RETURNS text[] LANGUAGE sql AS $f$
@@ -73,7 +73,7 @@ $f$;
 -- per-reason list: each entry names a real relation, the list is the one entry, and each entry hides a gap that really fires
 -- (a listed-but-unneeded entry fails). The xid8 key of the identity marker is the one gap, by design.
 SELECT ok(to_regclass(split_part(e, ':', 1)) IS NOT NULL, 'reason exemption names a real relation: ' || e) FROM unnest(pg_temp.reason_exemptions()) e;
-SELECT is(cardinality(pg_temp.reason_exemptions()), 3, 'the per-reason list is exactly three entries (POLY-149: the record''s bigint key and the streak''s FOR ALL policy, each ruled)');
+SELECT is(cardinality(pg_temp.reason_exemptions()), 4, 'the per-reason list is exactly four entries (POLY-149: the record''s bigint key and the streak''s FOR ALL policy; POLY-150: the step-up pending table''s xid8 key, each ruled)');
 SELECT ok(EXISTS (SELECT 1 FROM pg_temp.battery_gaps(pg_temp.exemptions(), pg_temp.col_allow(), '{}') g WHERE g.rel::text || ':' || g.reason = e), 'reason exemption is needed, it hides a gap that fires: ' || e) FROM unnest(pg_temp.reason_exemptions()) e;
 SELECT is((SELECT coalesce(array_agg(rel::text || ':' || reason), '{}') FROM pg_temp.battery_gaps(pg_temp.exemptions(), pg_temp.col_allow(), '{}') WHERE rel::text = 'app.tx_identity'), ARRAY['app.tx_identity:pk_not_uuid'], 'the marker table fires exactly pk_not_uuid without the reason list (the TRUNCATE trigger exists, every other check passes)');
 

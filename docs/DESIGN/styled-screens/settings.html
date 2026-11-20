@@ -8,7 +8,7 @@
 <link rel="stylesheet" href="../screen.css">
 </head>
 <body>
-<!-- Settings (pass 7; styled pass 13). Entry point is PROPOSED under the avatar popover, shown open here with Settings marked current; the Principal has not ruled on the placement. No sidebar nav item is active. Schedule, import options and the tax close cadence (monthly by default, or quarterly; shown only on a taxpayer entity) are per entity; app preferences are per user. Viewers can see this page but cannot change schedule/import options (Manager/Owner only, ARCH 2.4). Export this entity (owners) ends in a receipt carrying the ledger fingerprint: the last Journal ID and its chain hash, short form shown, full form in the title and Copy. Sign-in and second step is per user: the second step is required while the user is an owner or manager anywhere, so the last method cannot be removed then. References below the cards: the step-up prompt, and the account-deletion choices with the successor-founder step first. -->
+<!-- Settings. Entry point is PROPOSED under the avatar popover, shown open here with Settings marked current; the Principal has not ruled on the placement. No sidebar nav item is active. Schedule, import options and the tax close cadence (monthly by default, or quarterly; shown only on a taxpayer entity) are per entity; app preferences are per user. Viewers can see this page but cannot change schedule/import options (Manager/Owner only, ARCH 2.4). Export this entity (owners) ends in a receipt carrying the ledger fingerprint: the last Journal ID and its chain hash, short form shown, full form in the title and Copy. Sign-in and second step is per user: the second step is required while the user is an owner or manager anywhere, so the last method cannot be removed then. References below the cards: the step-up prompt (Confirm it's you) with its wrong-code, paused, backup-code, passkey-only and passkey-not-accepted states, the account-deletion choices with the successor-founder step first, Sign-in and second step with none set up (Set up second step opens the set-up dialog, second-step-dialog.html), and a method row while codes are paused (Remove disabled). Outside the 5 minutes after a fresh check, Remove, Add passkey and Make new codes open Confirm it's you first, then run. -->
 <div class="shell">
   <aside class="sidebar" id="app-sidebar">
     <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
@@ -100,10 +100,10 @@
     </div>
     <div class="card" id="second-step">
       <div class="card-head"><span class="card-title">Sign-in and second step</span><span class="card-sub">Just you, every entity</span></div>
-      <div class="kv-row"><span class="kv-label">Second step<span class="kv-help">Required while you own or manage any entity besides your own unshared Person, so at least one method stays set up. Asked on a new device and before export, purge, granting access and linking a bank.</span></span><span class="badge badge-positive-soft"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>On</span></div>
+      <div class="kv-row"><span class="kv-label">Second step<span class="kv-help">Required while you own or manage any entity besides your own unshared Person, so at least one method stays set up. Asked at every new sign-in and before export, purge, granting access and linking a bank.</span></span><span class="badge badge-positive-soft"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span>On</span></div>
       <div class="kv-row"><span class="kv-label"><span><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span> Authenticator app</span><span class="kv-help">Added Oct 3, 2026</span></span><span class="kv-value"><button class="btn btn-ghost btn-sm" type="button">Remove</button></span></div>
       <div class="kv-row"><span class="kv-label"><span><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span> Passkey: MacBook Touch ID</span><span class="kv-help">Added Oct 3, 2026 · last used today</span></span><span class="kv-value"><button class="btn btn-ghost btn-sm" type="button">Remove</button><button class="btn btn-outline btn-sm" type="button">Add passkey</button></span></div>
-      <div class="kv-row"><span class="kv-label">Backup codes<span class="kv-help">8 of 10 left. Each works once, for when your phone or passkey is not at hand.</span></span><button class="btn btn-outline btn-sm" type="button">Make new codes</button></div>
+      <div class="kv-row"><span class="kv-label">Backup codes<span class="kv-help">Ten were shown once when you set up. Each works once; new codes replace them all.</span></span><button class="btn btn-outline btn-sm" type="button">Make new codes</button></div>
       <div class="kv-row"><span class="kv-label">Password<span class="kv-help">Changing it signs you out everywhere else.</span></span><button class="btn btn-outline btn-sm" type="button">Change password</button></div>
     </div>
     <div class="card" id="delete-account">
@@ -121,6 +121,51 @@
         <p class="card-sub">Signed in with Google or GitHub? You are sent to that provider to sign in again, then asked for the code.</p>
         <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Confirm</button></div>
       </div></div>
+    </div>
+    <div class="card" id="step-up-states">
+      <span class="eyebrow">Confirm it's you — wrong code, codes paused, backup code, passkey only, passkey not accepted (references)</span>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Confirm it's you, code not accepted" style="max-width:440px;">
+        <div class="je-modal-title">Confirm it's you</div>
+        <div class="je-modal-subtitle">Exporting Mosko (Person) needs a fresh check. You won't be asked again for 5 minutes.</div>
+        <div class="cap-error" id="su-w-msg" role="alert" style="margin:0 0 12px;">That password or code didn't work. Check both and try again.</div>
+        <div class="auth-field"><label for="su-pw-w">Password</label><input id="su-pw-w" class="input" type="password" autocomplete="current-password" placeholder="Password" aria-describedby="su-w-msg" style="outline:2px solid var(--ring);outline-offset:1px;"></div>
+        <div class="auth-field"><label for="su-code-w">Code from your authenticator app</label><input id="su-code-w" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-describedby="su-w-msg"></div>
+        <p class="card-sub"><button class="btn btn-ghost btn-sm" type="button" style="padding-left:0;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use a passkey instead</button> · <a class="je-link" href="#">Use a backup code</a></p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Confirm</button></div>
+      </div></div>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Confirm it's you, codes paused" style="max-width:440px;">
+        <div class="je-modal-title">Confirm it's you</div>
+        <div class="je-modal-subtitle">Exporting Mosko (Person) needs a fresh check. You won't be asked again for 5 minutes.</div>
+        <div class="auth-note auth-note--caution" role="status"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span><strong>Codes are paused</strong> after too many wrong codes. Try again later.</span></div>
+        <p class="card-sub">Use a passkey if you have one; it still works.</p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use a passkey</button></div>
+      </div></div>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Confirm it's you, backup code" style="max-width:440px;">
+        <div class="je-modal-title">Confirm it's you</div>
+        <div class="je-modal-subtitle">Exporting Mosko (Person) needs a fresh check. You won't be asked again for 5 minutes.</div>
+        <div class="auth-field"><label for="su-pw-b">Password</label><input id="su-pw-b" class="input" type="password" value="••••••••••••"></div>
+        <div class="auth-field"><label for="su-backup">Backup code</label><input id="su-backup" class="input mono" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="xxxxx-xxxxx"></div>
+        <p class="card-sub">Each backup code works once. <a class="je-link" href="#">Use your authenticator app</a></p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Confirm</button></div>
+      </div></div>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Confirm it's you, passkey only" style="max-width:440px;">
+        <div class="je-modal-title">Confirm it's you</div>
+        <div class="je-modal-subtitle">Adding a passkey needs a fresh check. You won't be asked again for 5 minutes.</div>
+        <p>Your browser asks for Touch ID, Face ID or your security key.</p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use your passkey</button></div>
+      </div></div>
+      <div class="je-modal-scrim" style="margin-top:12px;"><div class="je-modal" role="dialog" aria-modal="true" aria-label="Confirm it's you, passkey not accepted" style="max-width:440px;">
+        <div class="je-modal-title">Confirm it's you</div>
+        <div class="je-modal-subtitle">Removing your authenticator app needs a fresh check. You won't be asked again for 5 minutes.</div>
+        <p>Your browser asks for Touch ID, Face ID or your security key.</p>
+        <div class="cap-error" role="alert" style="margin:0 0 4px;">That passkey didn't work. Try again.</div>
+        <p class="card-sub"><a class="je-link" href="#">Use your authenticator app</a></p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use a passkey</button></div>
+      </div></div>
+    </div>
+    <div class="card" id="second-step-paused">
+      <span class="eyebrow">Sign-in and second step, while codes are paused (reference)</span>
+      <div class="kv-row" style="margin-top:12px;"><span class="kv-label"><span><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span> Authenticator app</span><span class="kv-help">Added Oct 3, 2026 · codes are paused after too many wrong codes. It can be removed once the pause ends.</span></span><span class="kv-value"><span class="badge badge-outline badge-sm"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>Paused</span><button class="btn btn-ghost btn-sm" type="button" disabled aria-disabled="true">Remove</button></span></div>
     </div>
     <div class="card">
       <span class="eyebrow">Export receipt — an entity with no posted entries (reference)</span>
@@ -157,8 +202,8 @@
     </div>
     <div class="card" id="second-step-off">
       <span class="eyebrow">Sign-in and second step, none set up yet (reference)</span>
-      <div class="kv-row" style="margin-top:12px;"><span class="kv-label">Second step<span class="kv-help">Off. Set one up to own or manage a shared entity. Setting up your first asks for your password and a code sent to your email, then the method.</span></span><span class="kv-value"><span class="badge badge-outline">Off</span><button class="btn btn-outline btn-sm" type="button">Set up second step</button></span></div>
-      <p class="card-sub">Opens "Set up a second step": the same three steps as Set up a second step first on Entities, with nothing to continue afterwards.</p>
+      <div class="kv-row" style="margin-top:12px;"><span class="kv-label">Second step<span class="kv-help">Off. Set one up to own or manage a shared entity. Setting up your first asks for your password and a code sent to your email, then the method.</span></span><span class="kv-value"><span class="badge badge-outline">Off</span><a class="btn btn-outline btn-sm" href="second-step-dialog.html">Set up second step</a></span></div>
+      <p class="card-sub">Opens the <a class="je-link" href="second-step-dialog.html">Set up a second step dialog</a> over this page: password, emailed code, method, then the backup codes.</p>
     </div>
     <div class="card" id="delete-no-second-step">
       <span class="eyebrow">Delete account, no second step yet (reference): your password, then the emailed code, then the choices above. No second step is set up.</span>
@@ -166,9 +211,9 @@
         <div class="je-modal-title">Confirm it's you</div>
         <div class="je-modal-subtitle">Deleting your account needs a fresh check. You have no second step, so we use your password and your email.</div>
         <p class="card-sub">Step 2 of 2 · Check your email</p>
-        <p>We sent a code to <span class="mono">m•••@example.com</span>.</p>
+        <p>We've asked for a code to be sent to <span class="mono">m•••@example.com</span>. It can take a few minutes.</p>
         <div class="auth-field"><label for="del-email-code">Code from the email</label><input id="del-email-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" value="" placeholder="000000"></div>
-        <p class="card-sub">This code works for 10 minutes, once, in this window. Didn't get it? Check spam, or <a class="je-link" href="#">resend the code</a>.</p>
+        <p class="card-sub">This code works for 10 minutes, once, in this window. Didn't get it? Check spam, or <a class="je-link" href="#">send a new code</a>, which asks for your password again.</p>
         <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Continue</button></div>
       </div></div>
     </div>

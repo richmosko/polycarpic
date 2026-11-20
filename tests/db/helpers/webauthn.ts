@@ -2,7 +2,8 @@
 // BetterAuth's /passkey/verify-registration takes) and signs assertions (/passkey/verify-authentication). Origin and rp id come
 // from helpers/auth's BASE. No browser, no network.
 import { createHash, generateKeyPairSync, randomBytes, sign, type KeyObject } from 'node:crypto';
-import { BASE } from './auth';
+// Plain node (no vitest import) so the Playwright seed can use it: the default origin is helpers/auth's BASE, spelled out here.
+const BASE = 'https://app.qa.test';
 
 const sha256 = (b: Buffer) => createHash('sha256').update(b).digest();
 const b64u = (b: Buffer) => b.toString('base64url');
@@ -15,15 +16,17 @@ function cbor(v: any): Buffer {
   throw new Error('cbor: unsupported value');
 }
 
-export function softAuthenticator() {
+export function softAuthenticator(base: string = BASE) {
   const { publicKey, privateKey } = generateKeyPairSync('ec', { namedCurve: 'P-256' }) as { publicKey: KeyObject; privateKey: KeyObject };
   const jwk: any = publicKey.export({ format: 'jwk' });
   const cose = cbor(new Map<any, any>([[1, 2], [3, -7], [-1, 1], [-2, Buffer.from(jwk.x, 'base64url')], [-3, Buffer.from(jwk.y, 'base64url')]]));
   const idBytes = randomBytes(16);
-  const rpIdHash = sha256(Buffer.from(new URL(BASE).hostname));
-  const clientData = (type: string, challenge: string) => Buffer.from(JSON.stringify({ type, challenge, origin: BASE, crossOrigin: false }));
+  const rpIdHash = sha256(Buffer.from(new URL(base).hostname));
+  const clientData = (type: string, challenge: string) => Buffer.from(JSON.stringify({ type, challenge, origin: base, crossOrigin: false }));
   return {
     credentialId: b64u(idBytes),
+    /** PKCS#8, base64: what Chromium's WebAuthn.addCredential takes as `privateKey` (POLY-150 e2e: the same key signs in the browser). */
+    privateKeyPkcs8: (privateKey.export({ type: 'pkcs8', format: 'der' }) as Buffer).toString('base64'),
     /** What the passkey table stores in public_key (SimpleWebAuthn: the COSE key, base64url). */
     publicKey: b64u(cose),
     /** The body of /passkey/verify-registration's `response` for the options BetterAuth issued. */

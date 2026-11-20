@@ -17,14 +17,22 @@ WITH logins AS (
   VALUES ('public.two_factor', 'two_factor_15_lock'), ('public.two_factor', 'two_factor_16_lock_delete'),
          ('public.session', 'session_80_sign_in_record'),
          ('app.sign_in_record', 'sign_in_record_05_refuse'), ('app.sign_in_record', 'sign_in_record_10_immutable'),
-         ('app.sign_in_record', 'sign_in_record_no_truncate')
+         ('app.sign_in_record', 'sign_in_record_no_truncate'),
+         ('public.two_factor', 'two_factor_80_sync'), ('public.passkey', 'passkey_80_sync'),
+         ('public.two_factor', 'two_factor_85_step_up_spent'), ('app.step_up_totp', 'step_up_totp_10_forward'),
+         ('app.step_up_pending', 'step_up_pending_resolved'),
+         ('public.two_factor', 'two_factor_no_truncate'), ('public.passkey', 'passkey_no_truncate')
+), sync_trig(tbl, name) AS (
+  -- the two method-change triggers must run app.sync_second_step(), the function that writes the audit event
+  VALUES ('public.two_factor', 'two_factor_80_sync'), ('public.passkey', 'passkey_80_sync')
 ), definers(sig, owner) AS (
-  VALUES ('app.guard_second_step_lock()', 'poly_govern'), ('app.record_session_sign_in()', 'poly_govern')
-), app_ten(sig) AS (
+  VALUES ('app.guard_second_step_lock()', 'poly_govern'), ('app.record_session_sign_in()', 'poly_govern'),
+         ('app.sync_second_step()', 'poly_govern')
+), app_eleven(sig) AS (
   VALUES ('app.current_user_id()'), ('app.current_session_id()'), ('app.has_role(uuid,text)'),
          ('app.visible_entities()'), ('app.owner_count(uuid)'), ('app.second_step_required()'),
          ('app.enter_session(text)'), ('app.my_sessions()'), ('app.recent_auth_ok()'),
-         ('app.revoke_my_session(uuid)')
+         ('app.revoke_my_session(uuid)'), ('app.my_second_step()')
 ), member_want(m, r, inh, st, adm) AS (
   -- pg_auth_members, both ways (roles.sql is the source): poly_migrator holds the owner and the seven definer-owner roles
   -- (inherit false, set true, admin false); poly_backup holds pg_read_all_data (its inherit and set are not compared).
@@ -105,15 +113,15 @@ WITH logins AS (
              ELSE has_table_privilege('poly_app', to_regclass(t), p) END
   UNION ALL
   SELECT 'FAIL ' || t || ': missing' FROM (SELECT t FROM betterauth UNION ALL SELECT 'app.session_handle') x(t) WHERE to_regclass(t) IS NULL
-  -- 9. poly_app's EXECUTE set on app is exactly the ten
+  -- 9. poly_app's EXECUTE set on app is exactly the eleven
   UNION ALL
   SELECT 'FAIL function ' || p.oid::regprocedure::text || ': poly_app can execute it'
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
   WHERE n.nspname = 'app' AND has_function_privilege('poly_app', p.oid, 'EXECUTE')
-    AND p.oid::regprocedure::text NOT IN (SELECT sig FROM app_ten)
+    AND p.oid::regprocedure::text NOT IN (SELECT sig FROM app_eleven)
   UNION ALL
   SELECT 'FAIL function ' || sig || ': poly_app cannot execute it (or it is missing)'
-  FROM app_ten WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_app', to_regprocedure(sig), 'EXECUTE')
+  FROM app_eleven WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege('poly_app', to_regprocedure(sig), 'EXECUTE')
   -- 11. role membership is the exact set: a login role that can SET ROLE to a definer owner passes every line above
   UNION ALL
   SELECT 'FAIL membership: ' || m || ' holds ' || r || ' (inherit ' || coalesce(inh::text, '-') || ', set ' || coalesce(st::text, '-')
@@ -122,6 +130,47 @@ WITH logins AS (
   UNION ALL
   SELECT 'FAIL membership: ' || m || ' does not hold ' || r || ' as it should'
   FROM (SELECT * FROM member_want EXCEPT SELECT * FROM member_have) x
+  -- 12. method changes are audited by the database: the sync triggers run app.sync_second_step(), whose body writes both kinds
+  UNION ALL
+  SELECT 'FAIL trigger ' || name || ' on ' || tbl || ': does not run app.sync_second_step()'
+  FROM sync_trig JOIN pg_trigger g ON g.tgrelid = to_regclass(tbl) AND g.tgname = name AND NOT g.tgisinternal
+  WHERE g.tgfoid IS DISTINCT FROM to_regprocedure('app.sync_second_step()')
+  UNION ALL
+  SELECT 'FAIL function app.sync_second_step(): its body does not write ' || k
+  FROM unnest(ARRAY['second_step.method_added', 'second_step.method_removed']) k
+  WHERE to_regprocedure('app.sync_second_step()') IS NOT NULL
+    AND position(k IN (SELECT prosrc FROM pg_proc WHERE oid = to_regprocedure('app.sync_second_step()'))) = 0
+  -- 12b. the no-truncate triggers are BEFORE TRUNCATE, statement-level (tgtype 34 = BEFORE 2 + TRUNCATE 32, no row bit) and run app.refuse_truncate()
+  UNION ALL
+  SELECT 'FAIL trigger ' || name || ' on ' || tbl || ': not BEFORE TRUNCATE FOR EACH STATEMENT running app.refuse_truncate()'
+  FROM (VALUES ('public.two_factor', 'two_factor_no_truncate'), ('public.passkey', 'passkey_no_truncate')) t(tbl, name)
+  JOIN pg_trigger g ON g.tgrelid = to_regclass(tbl) AND g.tgname = name AND NOT g.tgisinternal
+  WHERE g.tgtype <> 34 OR g.tgfoid IS DISTINCT FROM to_regprocedure('app.refuse_truncate()')
+  -- 13. complete_step_up: owner poly_govern, SECURITY DEFINER, EXECUTE poly_auth only; no login role writes recent_auth_at itself
+  UNION ALL
+  SELECT 'FAIL function app.complete_step_up(text,uuid,bigint): missing' WHERE to_regprocedure('app.complete_step_up(text,uuid,bigint)') IS NULL
+  UNION ALL
+  SELECT 'FAIL function app.complete_step_up(text,uuid,bigint): owner is ' || pg_get_userbyid(p.proowner) || ', not poly_govern'
+  FROM pg_proc p WHERE p.oid = to_regprocedure('app.complete_step_up(text,uuid,bigint)') AND pg_get_userbyid(p.proowner) <> 'poly_govern'
+  UNION ALL
+  SELECT 'FAIL function app.complete_step_up(text,uuid,bigint): not SECURITY DEFINER'
+  FROM pg_proc p WHERE p.oid = to_regprocedure('app.complete_step_up(text,uuid,bigint)') AND NOT p.prosecdef
+  UNION ALL
+  SELECT 'FAIL function app.complete_step_up(text,uuid,bigint): ' || r || ' can execute it'
+  FROM logins WHERE to_regprocedure('app.complete_step_up(text,uuid,bigint)') IS NOT NULL AND r <> 'poly_auth'
+    AND has_function_privilege(r, to_regprocedure('app.complete_step_up(text,uuid,bigint)'), 'EXECUTE')
+  UNION ALL
+  SELECT 'FAIL function app.complete_step_up(text,uuid,bigint): poly_auth cannot execute it'
+  WHERE to_regprocedure('app.complete_step_up(text,uuid,bigint)') IS NOT NULL
+    AND NOT has_function_privilege('poly_auth', to_regprocedure('app.complete_step_up(text,uuid,bigint)'), 'EXECUTE')
+  UNION ALL
+  SELECT 'FAIL public.session.recent_auth_at: ' || r || ' holds UPDATE' FROM logins
+  WHERE has_column_privilege(r, 'public.session', 'recent_auth_at', 'UPDATE')
+  -- 14. the step-up trigger on the pending row is a deferred constraint trigger (raises at commit, not at the statement)
+  UNION ALL
+  SELECT 'FAIL trigger step_up_pending_resolved on app.step_up_pending: not DEFERRABLE INITIALLY DEFERRED'
+  FROM pg_trigger g WHERE g.tgrelid = to_regclass('app.step_up_pending') AND g.tgname = 'step_up_pending_resolved'
+    AND NOT g.tgisinternal AND NOT (g.tgdeferrable AND g.tginitdeferred)
   -- 10. no login role can delete a user
   UNION ALL
   SELECT 'FAIL public."user": ' || r || ' holds DELETE' FROM logins WHERE has_table_privilege(r, 'public."user"', 'DELETE')

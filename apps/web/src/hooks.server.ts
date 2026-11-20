@@ -2,6 +2,7 @@ import { createLogger } from '@poly/config/log';
 import { NoLiveSession, sql, withSession } from '@poly/db';
 import { provisionPerson } from '@poly/tenancy';
 import type { Handle } from '@sveltejs/kit/hooks';
+import { safeNext } from './lib/safe-next';
 
 // POLY-153 R7.2: web enters a transaction only by the handle cookie. BetterAuth's cookies are scoped to /api/auth and never reach it.
 const HANDLE_COOKIE = '__Host-poly_handle';
@@ -47,8 +48,8 @@ const notFound = () => new Response(JSON.stringify({ message: 'Not found' }), { 
 const isAuthTree = (p: string) => p === '/api/auth' || p.startsWith('/api/auth/');
 const isPublic = (p: string) => p === '/sign-in' || p.startsWith('/sign-in/') || p === '/sign-up' || p === '/healthz';
 
-/** next is honoured only as a path on this origin: '/x', never '//x' or '/\x' (S12). */
-const safeNext = (path: string) => (path.startsWith('/') && path[1] !== '/' && path[1] !== '\\' ? path : '/');
+const SETUP_PATH = '/settings/second-step';
+const SETUP_PATHS = new Set([SETUP_PATH, `${SETUP_PATH}/__data.json`]);
 
 export const handle: Handle = async ({ event, resolve }) => {
   const { pathname, search } = event.url;
@@ -58,10 +59,17 @@ export const handle: Handle = async ({ event, resolve }) => {
   const look = stored === 'dark' ? 'dark' : stored === 'auto' ? 'auto' : '';
   // shadcn's `sidebar:state` cookie holds the open state: exactly "false" means collapsed.
   const sidebar = event.cookies.get('sidebar:state') === 'false' ? 'collapsed' : 'expanded';
-  const page = () =>
+  const render = () =>
     resolve(event, {
       transformPageChunk: ({ html }) => html.replace('%poly.theme%', look).replace('%poly.sidebar%', sidebar),
     });
+  const page = () => render();
+  // R10: a signed-in page or its __data.json is never storable, so a page that mounts the set-up dialog cannot come back from a cache.
+  const signedInPage = async () => {
+    const res = await render();
+    res.headers.set('cache-control', 'no-store');
+    return res;
+  };
 
   // The /api/auth tree belongs to the sign-in service; Caddy routes it there and web refuses it, listed or not (POLY-152 R1.6).
   if (isAuthTree(pathname)) return notFound();
@@ -81,11 +89,13 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
     throw e;
   }
-  // The sign-in gate (POLY-89 R5): while the database says a second step is required, every page but the placeholder redirects to it.
-  if (entered.secondStepRequired && pathname !== '/settings/second-step') {
-    return new Response(null, { status: 303, headers: { location: '/settings/second-step' } });
+  // The sign-in gate (POLY-89 R5, POLY-150 R1.3): while the database says a second step is required, every page redirects to the Settings panel
+  // (where the set-up dialog opens, and returns to `next` after Finish, P2) except exactly two paths: that page and its __data.json. Never a prefix: the rest of /settings stays gated.
+  if (entered.secondStepRequired && !SETUP_PATHS.has(pathname)) {
+    return new Response(null, { status: 303, headers: { location: `${SETUP_PATH}?${new URLSearchParams({ setup: '1', next: safeNext(pathname + search) })}` } });
   }
   event.locals.session = entered.shell;
   event.locals.handle = handleValue;
-  return page();
+  event.locals.secondStepRequired = entered.secondStepRequired;
+  return signedInPage();
 };

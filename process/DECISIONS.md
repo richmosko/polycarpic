@@ -742,3 +742,64 @@ Add new decisions ABOVE this comment, newest first.
 - (3) An owner the migration role cannot act as — every later change to the table is then made by hand as superuser, and the superuser is still not stopped. About half a day (a guess).
 - (3) Copy the record off the server — the cure for (3) and for the database-server case. Needs log shipping that does not exist. Filed as a follow-up on POLY-103.
 **Approved by:** the Principal (2026-11-19), each on seceng's assessment and the lead's recommendation.
+
+### 2026-11-19 — Second-step set-up is one dialog inside the app; the per-entity lock is built later, in the database
+**Decision:** two changes to the POLY-150 screens, from the Principal's review. (1) Set-up is one dialog used everywhere, not a standalone page. It opens from Settings → Sign-in and second step and from a message on Entities (and later from any action that needs a second step), and the sidebar behaves normally. `/sign-in/second-step` stays a bare page, because it is part of signing in. (2) For a user who must have a second step and has none, POLY-150 keeps the single block (POLY-89 R5) and aims it at that one Settings page, which loads no shared-entity data. The Principal's preferred behaviour, the user's own Person usable and shared entities greyed out until set-up, is built as its own loop and enforced in the database (filed on POLY-91).
+**Why:** (1) the Principal: a bare page "seems like a UX departure"; someone should be able to set up a second step from Settings independently of adding an entity, and the Entities page should say a second factor is required and offer a button that opens the same pop-up. (2) Today's block is one check that runs before every page and denies by default, so a new page cannot forget it. In practice it holds only a manager or owner whose second step the operator has reset, which is the case a password-only attacker aims for. A per-entity check in web's page code would swap that for a check every page must remember: one missed page shows a shared entity's books to someone holding only a password. Enforced in the database, a locked entity's rows are invisible to the session whatever web does, which is also stronger than today.
+**Alternatives considered:**
+- A bare set-up page with no app shell — designed first; rejected by the Principal.
+- The per-entity lock in web's loaders, in this loop — about $20 (a guess); rejected by the architect and seceng as open by default.
+- The per-entity lock in the database, in this loop — about $45 to $80 and 2.5 to 4 hours (guesses), with its own ruling and seceng review; deferred to its own loop.
+**Open for that loop:** whether a locked entity shows its name or only a count to a password-only session; a sole owner who is reset leaves the entity with no effective owner until they set up again.
+**Approved by:** the Principal (2026-11-19), on the architect's and seceng's assessments (`process/cairn/reviews/POLY-150/ruling.md`, Addendum 3).
+
+### 2026-11-19 — "Trust this device" is offered at the second sign-in step, unticked by default, as its own issue
+**Decision:** the second step offers a "trust this device" tick-box, unticked by default, so a person opts in per device. It is built as its own issue (POLY-154), with its own ruling and seceng review. Until it ships, the sign-in service keeps refusing the option (POLY-150 ruling R7). The sign-in library's own version is not used as it stands.
+**Why:** the Principal: it "is user useful. And the user can opt out for added security." The architect and seceng had recommended not offering it. Read in the library's code (better-auth 1.7.18, not run): its trust cookie is tied to the user and not the machine, renews for 30 days on every use, survives a password change, a method change and sign-out, and has no list or revoke. Our code also applies the second-step check to magic-link and Google/GitHub sign-ins, so trust plus a magic link would sign in with the inbox alone.
+**Accepted in principle, to be stated in SECURITY when it ships:** a copied browser profile with a saved password signs in without the second step until the password changes.
+**Not yet decided (the issue's ruling brings them back with costs):** who may use it (every role, or not owners and managers of shared entities); the lifetime (30 or 14 days); whether "sign out everywhere" ends trust.
+**Alternatives considered:**
+- Do not offer it — the stronger option; recommended by the architect and seceng; not taken.
+- The library's version as it is — about $5 (a guess); permanent and unrevocable.
+- Build it inside POLY-150 — about +$40 and 2 hours (guesses) and a re-review of a loop that is built and green.
+**Cost:** about $45 and 2 hours 15 minutes as its own issue (the architect's guess).
+**Approved by:** the Principal (2026-11-19), against the architect's and seceng's recommendation, on their assessments.
+
+### 2026-11-19 — The Confirm it's you route is built in the second-step screens loop
+**Decision:** POLY-151 (the Confirm it's you route) is brought into the POLY-150 loop and ships in the same PR, so the prompt works when the screens ship. It still gets its own ruling and seceng review before any test is written.
+**Why:** without it, an enrolled user can add or remove a second-step method, or make new backup codes, only in the first 5 minutes after set-up. Someone who loses a phone cannot remove it, and the operator's `reset-mfa` is the only way out. The Principal chose a working prompt over an interim dialog that says it cannot confirm yet.
+**Alternatives considered:**
+- Ship the interim dialog and build POLY-151 next — recommended by the architect, seceng and the lead; about $3 (already built). seceng's concern with the choice taken is rushing the proof design: the database cannot check a code itself, so a passed re-check is the sign-in service's word.
+**Cost:** about +$35 and 1 hour 45 minutes (the architect's guess), a second ruling cycle, and a re-gate of POLY-150.
+**Approved by:** the Principal (2026-11-19).
+
+### 2026-11-19 — Four choices on the second-step screens
+**Decision:** the Principal's answers on the POLY-150 screens, each on the designer's, architect's and seceng's recommendation (`process/cairn/reviews/POLY-150/ruling.md` and `ruling-review.md`).
+1. **No count of wrong tries left.** A wrong code says only that it did not work.
+2. **Sign-up asks for the emailed code,** like every other first set-up.
+3. **Someone who sets up only a passkey gets no backup codes.** The screen says to add an authenticator app to get them; a lost passkey is recovered by the operator's `reset-mfa`.
+4. **A locked-out person is told a rough time band:** "in under an hour", "in a few hours" or "within a day". The band is returned only on the lock refusal, to a held sign-in whose cookie signature checks.
+**Why:** (1) a count helps someone guessing more than the owner. (2) The invitation link is printed to the operator's terminal and passed on by any channel, so it proves who received it, not who controls the mailbox; the emailed code stays the one anchor for every first factor. (3) The sign-in library's backup codes belong to the authenticator app; codes for passkey users would put ten guessable codes, outside the growing lock, on accounts that have nothing to guess today. (4) A person locked for up to a day needs some idea how long; someone holding the password can already find a lock's end by retrying, so a band changes the effort and not the exposure.
+**Alternatives considered:** (2) trusting the invitation, about $12 (a guess), a second path that grants a first set-up; (3) our own backup codes, about one loop; (4) saying nothing, which is stronger and free, and the exact time, which shows the minute to resume and whether the real person signed in correctly in between.
+**Cost:** about $6 and 20 minutes for (4) (a guess); none for the others. Until the mailer exists (POLY-137), (2) means an invitee cannot finish set-up in production, as for everyone else.
+**Approved by:** the Principal (2026-11-19).
+
+### 2026-11-19 — The Confirm it's you route ships with a known limit; a 24-hour delay and an email warning follow with the mailer
+**Decision:** the Confirm it's you route is built in POLY-150 as ruled (`process/cairn/reviews/POLY-150/ruling.md`, Addendum 3, accepted by seceng at `fa3bac5c`), and the limit it adds is accepted. When the mailer exists (POLY-137), a second-step method added through Confirm it's you works only after 24 hours, and the account's owner is emailed at once and can cancel it; the owner is also emailed whenever a method is added or removed. That delay and those emails are a condition of the first deploy with real household data.
+**The limit accepted:** the database cannot check an authenticator code or a passkey, so a passed check is the sign-in service's word. Someone who gets SQL as the sign-in service (a bug in it, or its stolen database password) can create a session for any user, mark it confirmed, and so pass every check that needs Confirm it's you. For an account with a second step that is new: they can add their own authenticator or passkey and remove the owner's, sign in again after being shut out, and lock the owner out until `reset-mfa`. Each confirmation and each session leaves a line in the sign-in record that they cannot remove, and Settings shows each method's added date; nothing reads the record at runtime and no email warns the owner until the mailer exists. For an account with no second step nothing is new.
+**Why:** the Principal: "No one is going to use this service before the email capabilities are present." Without the route, nobody can change their methods after the first 5 minutes, and a lost phone needs the operator's reset.
+**Alternatives considered:**
+- Ship the interim dialog and build the route in its own loop — recommended by the lead; removes the new reach from this loop.
+- Accept the limit with no delay or email — detection would be Settings and the record only.
+- The database checks the authenticator code — declined by the architect and seceng: passkeys would still rest on the service's word, and the authenticator seeds would be readable in every backup.
+- Tie the confirmation to the web handle — declined by both: the attacker creates the session and its handle.
+**Cost:** about $60 and 3 hours for the route (the architect's guess); about $12 for the delay and email on POLY-137 (seceng's guess). Someone adding a method through Confirm it's you will wait a day once the delay ships.
+**Approved by:** the Principal (2026-11-19), on seceng's assessment (`ruling-review.md` §13.2).
+
+### 2026-11-19 — A backup code is accepted for Confirm it's you
+**Decision:** Confirm it's you accepts the password with a backup code, as well as the password with an authenticator code, or a passkey. The database writes an audit event for every second-step method added or removed.
+**Why:** the route was built so that someone who loses their phone can replace the authenticator without the operator's reset; refusing backup codes here would leave that case unsolved.
+**The risk accepted:** recovering an account and taking it over are the same act here. Anyone who finds a backup code (a printout, a downloaded file) and knows the password can confirm, remove the owner's authenticator and add their own: a permanent takeover with no break-in needed. Once the mailer exists, the 24-hour delay and the email with cancel on a method added through Confirm it's you (the entry above; POLY-137; a condition of the first deploy with real household data) turn that into a takeover the owner is warned of and can stop.
+**Alternatives considered:**
+- Do not accept a backup code here — recommended by seceng: a found code plus the password could then sign in up to ten times but could not change the methods, and a password change would end it. About $6 cheaper (a guess). The cost falls on someone who loses a phone, who needs `reset-mfa`.
+**Approved by:** the Principal (2026-11-19), on the architect's and the lead's recommendation and against seceng's.

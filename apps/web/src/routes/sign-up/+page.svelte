@@ -32,7 +32,7 @@
       });
       if (res.status === 429) error = 'Too many attempts. Wait a minute and try again.';
       else if (!res.ok) error = 'Could not sign up. Check that the invitation link is current.';
-      else location.assign('/');
+      else location.assign('/settings/second-step?setup=1'); // R1.1: the set-up dialog opens on Settings (a held manager is sent there anyway)
     } catch {
       error = 'Could not sign up.';
     } finally {

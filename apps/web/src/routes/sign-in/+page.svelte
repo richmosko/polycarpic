@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { safeNext } from '../../lib/safe-next';
   // Placeholder (POLY-86): an email + password form. The design is POLY-88's.
   let email = $state('');
   let password = $state('');
@@ -20,10 +21,12 @@
       const body = await res.json().catch(() => ({}));
       if (res.status === 429) error = 'Too many attempts. Wait a minute and try again.';
       else if (!res.ok) error = 'Could not sign in.';
-      else if (body.twoFactorRedirect || body.secondStepRequired) location.assign('/sign-in/second-step');
       else {
-        const next = new URLSearchParams(location.search).get('next') ?? '/';
-        location.assign(next.startsWith('/') && next[1] !== '/' && next[1] !== '\\' ? next : '/');
+        const next = safeNext(new URLSearchParams(location.search).get('next'));
+        // The held page is shown only from this response (R7): a code hold, or a passkey-only user (a display hint, never a fact the page trusts).
+        if (body.twoFactorRedirect) location.assign(`/sign-in/second-step?${new URLSearchParams({ next })}`);
+        else if (body.secondStepRequired === 'passkey') location.assign(`/sign-in/second-step?${new URLSearchParams({ with: 'passkey', next })}`);
+        else location.assign(next);
       }
     } catch {
       error = 'Could not sign in.';

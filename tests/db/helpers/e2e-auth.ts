@@ -7,9 +7,12 @@ import { authOptions, createAuth, handleAuthRequest } from '../../../packages/au
 import { close, configure } from '../../../packages/db/src/index.ts';
 import { dbEnv } from './api.ts';
 
-export async function e2eAuth(db: string, origin: string, secret: string) {
+export async function e2eAuth(db: string, origin: string, secret: string, sendSecondStepCode?: (m: { email: string; code: string }) => Promise<void>) {
   configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db) });
-  const auth = await createAuth(authOptions({ secret, baseURL: origin, tlsMode: 'private-ca', requireClientIp: false, sendMagicLink: async () => {} }));
+  // The seed's instance has its own memory limiter, separate from the running service's (the one the specs share a bucket on, R8); it is off here
+  // because the seed signs in a dozen users from one address in a few seconds, as the db suites' own instances do (S6: in the test's options, not the defaults).
+  const opts = authOptions({ secret, baseURL: origin, tlsMode: 'private-ca', requireClientIp: false, sendMagicLink: async () => {}, ...(sendSecondStepCode ? { sendSecondStepCode } : {}) });
+  const auth = await createAuth({ ...opts, rateLimit: { ...opts.rateLimit!, enabled: false } });
   return {
     hash: async (password: string): Promise<string> => (await auth.$context).password.hash(password),
     /** POST /api/auth/sign-in/email through handleAuthRequest; the Response carries both Set-Cookie lines. */
@@ -18,6 +21,13 @@ export async function e2eAuth(db: string, origin: string, secret: string) {
         method: 'POST',
         headers: { 'content-type': 'application/json', origin, 'x-forwarded-for': '203.0.113.7' },
         body: JSON.stringify({ email, password }),
+      }), auth),
+    /** Any /api/auth POST through handleAuthRequest (POLY-150 seeds: enrolment, second-step holds). */
+    call: (path: string, body: unknown, cookie = ''): Promise<Response> =>
+      handleAuthRequest(new Request(`${origin}/api/auth${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', origin, 'x-forwarded-for': '203.0.113.7', ...(cookie ? { cookie } : {}) },
+        body: JSON.stringify(body),
       }), auth),
     close,
   };
@@ -36,4 +46,16 @@ export function storageCookies(res: Response, domain = 'localhost'): StorageCook
       httpOnly: has('HttpOnly'), secure: has('Secure'), sameSite: 'Lax' as const,
     };
   });
+}
+
+/** Merge Set-Cookie lines into a Cookie header (a cleared cookie is dropped). */
+export function cookieHeader(prev: string, res: Response): string {
+  const m = new Map(prev.split('; ').filter(Boolean).map((c) => [c.split('=')[0]!, c] as const));
+  for (const sc of res.headers.getSetCookie()) {
+    const kv = sc.split(';')[0]!;
+    const k = kv.split('=')[0]!;
+    if (kv.slice(k.length + 1) === '' || /max-age=0/i.test(sc)) m.delete(k);
+    else m.set(k, kv);
+  }
+  return [...m.values()].join('; ');
 }

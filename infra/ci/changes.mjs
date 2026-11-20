@@ -20,7 +20,7 @@ export const DB_SHARED = [
 const T = (names) => names.map((n) => `tests/db/${n}.test.ts`);
 export const DB_AREAS = {
   auth: {
-    tests: T(['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins', 'second-step-lock', 'sign-in-record', 'revocation', 'enter-session-slide', 'sign-in-controls-pins', 'gate-check']),
+    tests: T(['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins', 'second-step-lock', 'sign-in-record', 'revocation', 'enter-session-slide', 'sign-in-controls-pins', 'gate-check', 'second-step-screens', 'second-step-lock-band', 'step-up-reauth', 'method-audit', 'last-method-guard']),
     paths: [/^apps\/auth\//, /^packages\/auth\//, /^packages\/tenancy\//, /^apps\/worker\/src\/cli\//, /^apps\/worker\/src\/startup\.ts$/, /^apps\/worker\/package\.json$/, /^bin\/polycarpic$/, /^infra\/postgres\/gate-check\.(sh|sql)$/],
   },
   tenancy: {
@@ -62,7 +62,7 @@ export const TABLE = {
   ci: [/^\.github\/workflows\//, /^infra\/ci\//, /^tests\/ci\//],
   // POLY-141 E1: what the web e2e server imports or reads that turbo cannot see (it follows workspace packages only):
   // the db harness helpers and image build, apps/migrate, and the Postgres pin. Runs only the `unit` job's e2e step.
-  e2e: [/^tests\/db\/helpers\//, /^tests\/db\/docker\//, /^apps\/migrate\//, /^infra\/postgres\/Dockerfile$/, /^infra\/postgres-major$/],
+  e2e: [/^apps\/auth\/src\//, /^tests\/db\/helpers\//, /^tests\/db\/docker\//, /^apps\/migrate\//, /^infra\/postgres\/Dockerfile$/, /^infra\/postgres-major$/],
 };
 
 // One key per db sub-battery. `db` is always the OR of these.

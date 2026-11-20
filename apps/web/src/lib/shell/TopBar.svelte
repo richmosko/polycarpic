@@ -9,6 +9,7 @@
     more,
   }: { ontoggle: () => void; more?: Snippet } = $props();
 
+  const heldLabel = $derived(page.data.held && page.data.session ? `${page.data.session.user.name} (Person)` : undefined);
   const title = $derived(NAV.find((n) => n.href === page.url.pathname)?.label ?? 'polycarpic');
 </script>
 
@@ -33,6 +34,6 @@
       <li><h1 aria-current="page" class="font-heading truncate text-base font-semibold">{title}</h1></li>
     </ol>
   </nav>
-  <EntitySelector entities={[]} current={null} />
+  <EntitySelector entities={[]} current={null} {heldLabel} />
   {#if more}{@render more()}{/if}
 </header>

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Sign in, second step</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+<script>(function(){var h=document.documentElement,set=function(){var s=location.hash.slice(1),all=document.querySelectorAll(".auth-state"),hit=null;all.forEach(function(e){if(e.dataset.state===s)hit=e;});hit=hit||all[0];all.forEach(function(e){e.classList.toggle("is-shown",e===hit);});};addEventListener("DOMContentLoaded",set);addEventListener("hashchange",set);})();</script>
+</head>
+<body>
+<!-- Sign in, second step: /sign-in/second-step, after the password or Google / GitHub, for a user with a second step. Every new sign-in asks; a signed-in browser asks nothing more until its session ends. There is no remember-this-device control. A bare split page like Sign in, no app shell, with no server code: web learns to show it only from the sign-in response. States by URL hash: #code (default; Use a passkey instead is always shown, whatever the user has), #wrong, #backup, #backup-wrong, #passkey (the browser prompt is open), #locked (10 wrong codes across sign-ins pause codes and backup codes; the note is "Codes are paused for this account." then "They work again in under an hour." / "in a few hours." / "within a day." and "Use a passkey, or try again then.", or with no band just "Use a passkey, or try again later."; no sentence about pauses growing; one state for every user: one rough band only (in under an hour, in a few hours, within a day), no clock time, no tries left, and Use a passkey always offered, "if you have one"), #expired (no held sign-in: timed out after 10 minutes, 5 wrong codes, or opened directly; Start again goes to Sign in; every caller without a held sign-in gets this same state). Wrong codes, wrong backup codes and used backup codes all read the same. -->
+<div class="auth-shell">
+  <div class="auth-form-pane">
+    <div class="auth-logo"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></div>
+    <div class="auth-form-inner">
+      <div class="auth-state" data-state="code">
+        <div class="auth-title">Second step</div>
+        <p class="auth-subtitle">Enter the code from your authenticator app.</p>
+        <div class="auth-field">
+          <label for="si-code">6-digit code</label>
+          <input id="si-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
+        </div>
+        <button class="btn btn-default auth-submit" type="button">Continue</button>
+        <p class="auth-signup-line"><button class="btn btn-ghost btn-sm" type="button" style="padding-left:0;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use a passkey instead</button></p>
+        <p class="auth-signup-line"><a href="#backup">Use a backup code</a></p>
+        <p class="auth-signup-line">Lost every method? The person who runs this instance can reset your second step.</p>
+      </div>
+      <div class="auth-state" data-state="wrong">
+        <div class="auth-title">Second step</div>
+        <p class="auth-subtitle">Enter the code from your authenticator app.</p>
+        <div class="auth-field">
+          <label for="si-wrong">6-digit code</label>
+          <input id="si-wrong" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" value="771204" aria-invalid="true" aria-describedby="si-wrong-msg"><div class="cap-error" id="si-wrong-msg" role="alert">That code didn't work. Check it and try again.</div>
+        </div>
+        <button class="btn btn-default auth-submit" type="button">Continue</button>
+        <p class="auth-signup-line"><button class="btn btn-ghost btn-sm" type="button" style="padding-left:0;"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use a passkey instead</button></p>
+        <p class="auth-signup-line"><a href="#backup">Use a backup code</a></p>
+        <p class="auth-signup-line">Lost every method? The person who runs this instance can reset your second step.</p>
+      </div>
+      <div class="auth-state" data-state="backup">
+        <div class="auth-title">Use a backup code</div>
+        <p class="auth-subtitle">Enter one of the ten codes you saved when you set up your second step. Each works once.</p>
+        <div class="auth-field">
+          <label for="si-backup">Backup code</label>
+          <input id="si-backup" class="input mono" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="xxxxx-xxxxx">
+        </div>
+        <button class="btn btn-default auth-submit" type="button">Continue</button>
+        <p class="auth-signup-line"><a href="#code">Use your authenticator app</a></p>
+        <p class="auth-signup-line">Once you're in, make new codes in Settings if you are running low.</p>
+      </div>
+      <div class="auth-state" data-state="backup-wrong">
+        <div class="auth-title">Use a backup code</div>
+        <p class="auth-subtitle">Enter one of the ten codes you saved when you set up your second step. Each works once.</p>
+        <div class="auth-field">
+          <label for="si-backup-err">Backup code</label>
+          <input id="si-backup-err" class="input mono" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" value="k7m2p-9qx4t" aria-invalid="true" aria-describedby="si-backup-err-msg"><div class="cap-error" id="si-backup-err-msg" role="alert">That code didn't work. Check it and try again.</div>
+        </div>
+        <button class="btn btn-default auth-submit" type="button">Continue</button>
+        <p class="auth-signup-line"><a href="#code">Use your authenticator app</a></p>
+      </div>
+      <div class="auth-state" data-state="passkey">
+        <div class="auth-title">Second step</div>
+        <div class="auth-wait" role="status"><span class="auth-wait-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span><span>Follow your browser's prompt to use your passkey.</span></div>
+        <div class="auth-actions"><a class="btn btn-outline" href="#code">Use a code instead</a></div>
+        <p class="auth-signup-line">Nothing happened? This device may not hold your passkey. Use your phone's code, or a security key.</p>
+      </div>
+      <div class="auth-state" data-state="locked">
+        <div class="auth-title">Codes are paused</div>
+        <p class="auth-subtitle">Too many wrong codes were entered.</p>
+        <div class="auth-note auth-note--caution" role="status"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span><span><strong>Codes are paused for this account.</strong> They work again in under an hour. Use a passkey, or try again then.</span></div>
+        <button class="btn btn-default auth-submit" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span>Use a passkey</button>
+        <p class="auth-signup-line">If this wasn't you, someone may know your password. Tell the person who runs this instance.</p>
+        <p class="auth-signup-line">Lost every method? The person who runs this instance can reset your second step.</p>
+        <p class="auth-signup-line"><a href="login.html">Back to sign in</a></p>
+      </div>
+      <div class="auth-state" data-state="expired">
+        <div class="auth-title">Sign in again</div>
+        <p class="auth-subtitle">For your safety, this sign-in stopped after 10 minutes or 5 wrong codes. Nothing was changed.</p>
+        <a class="btn btn-default auth-submit" href="login.html">Start again</a>
+        <p class="auth-signup-line">Lost every method? The person who runs this instance can reset your second step.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="auth-visual-pane">
+    <!-- The art covers a tall pane, so the image's rendered side is the
+         larger of the pane's height (100vh - 48px) and width (50vw - 24px);
+         width wins only on viewports wider than ~2:1. `sizes` states that
+         side and the browser picks from srcset by it times the device pixel
+         ratio: a 1x desktop fetches the 1024px file, 2x the 2048, large
+         retina the 3072. -->
+    <img class="visual-art"
+         src="../brand/polycarpic-bg-forest.jpeg"
+         srcset="../brand/polycarpic-bg-forest.jpeg 1024w,
+                 ../brand/polycarpic-bg-forest-2048.jpeg 2048w,
+                 ../brand/polycarpic-bg-forest-3072.jpeg 3072w"
+         sizes="(min-aspect-ratio: 2/1) calc(50vw - 24px), calc(100vh - 48px)"
+         alt="" aria-hidden="true">
+  </div>
+</div>
+</body>
+</html>

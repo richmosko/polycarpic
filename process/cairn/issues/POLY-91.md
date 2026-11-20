@@ -11,7 +11,7 @@ labels: [db, tenancy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-16
+updated: 2026-11-19
 ---
 
 A raise to manager or owner for an unenrolled member is parked on membership.pending_role while they keep viewer access, and promoted only by app.promote_held_roles() at enrolment (ARCH §3.1c; SECURITY A-25; DESIGN Waiting for second step).
@@ -30,3 +30,11 @@ A raise to manager or owner for an unenrolled member is parked on membership.pen
 ### @team-lead — 2026-11-16
 
 From the POLY-89 loop (merged 2026-11-17, PR #131), both in migration `0013_second_step_guards`. (1) `seat_claimed_invitations` inserts `ON CONFLICT DO NOTHING` and then sets `accepted_at` either way (lines 314-315), so an invitee who already holds a viewer seat is marked accepted without the raise. Refuse the claim or apply it as a raise (seceng build review N4). (2) The `membership_seat_claimed` policy (line 20) lets any poly_govern definer insert a manager or owner row for the marker's user on any entity; only `seat_claimed_invitations` uses it. Narrow it to a claimed, unaccepted invitation for that entity, user and role (architect verdict, finding 3).
+
+### @team-lead — 2026-11-19
+
+From the POLY-150 loop (Principal, 2026-11-19; `process/DECISIONS.md`; ruling Addendum 3, Part 2 option (c)). **A per-entity second-step lock, enforced in the database.** A user who must have a second step and has none can view and manage their own Person; shared entities where they are owner or manager are greyed out until they set one up. Design it together with this issue's held role, as one mechanism.
+- `app.has_role()` and `app.visible_entities()` answer only for the own-Person exemption while the user is held; `app.enter_session` computes the held flag once and writes it on the marker. Web then drops the all-pages redirect (POLY-89 R5) and greys the rest.
+- The permission matrix gains a held actor across every tenant table; a held user's writes to their own Person pass.
+- Decide with seceng: a locked entity shows its name or only a count; a reset sole owner leaves the entity with no effective owner until they enrol; a shared own Person leaves nothing usable.
+- Needs its own ruling and seceng review; land before POLY-110 and POLY-144 make shared entities common. Guessed at $45 to $80 and 2.5 to 4 hours. DESIGN's sketch of the greyed state is in the POLY-150 record.

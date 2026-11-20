@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Styled screen — Second step required (Settings)</title>
+<link rel="stylesheet" href="../tokens.css">
+<link rel="stylesheet" href="../screen.css">
+<script>(function(){var set=function(){var s=location.hash.slice(1),all=document.querySelectorAll(".auth-state"),hit=null;all.forEach(function(e){if(e.dataset.state===s)hit=e;});hit=hit||all[0];all.forEach(function(e){e.classList.toggle("is-shown",e===hit);});};addEventListener("DOMContentLoaded",set);addEventListener("hashchange",set);})();</script>
+</head>
+<body>
+<!-- Second step required: a user who owns or manages a shared entity and has no second step (for example after the operator reset it). Signing in lands here, on Settings -> Sign-in and second step inside the app shell; every other page sends them back here. The sidebar is the usual one. The entity selector lists only their own Person, because this page loads no shared-entity data. One message says why without naming any entity. Set up second step opens the set-up dialog (second-step-dialog.html); when it is done the user goes on to the page they asked for. Log out stays on the panel and in the avatar menu. Nothing else of Settings shows here. States by URL hash: #page (default), #selector (the entity selector open: the Person only), #dialog (the set-up dialog open at step 1; the other states are second-step-dialog.html's). -->
+<div class="auth-state" data-state="page"></div>
+<div class="shell">
+  <aside class="sidebar" id="app-sidebar">
+    <!-- Brand row (pass 12, Gemini pattern): expanded = logo + wordmark,
+         panel-left-close right-aligned; collapsed = logo mark only, which
+         is itself the expand button — swaps to panel-left-open with an
+         "Expand sidebar" tooltip on hover / keyboard focus. -->
+    <div class="sidebar-top">
+      <div class="brand-lockup"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span class="sidebar-brand-label">Polycarpic</span></div>
+      <button class="sidebar-collapse" type="button" aria-label="Collapse sidebar" title="Collapse sidebar" aria-expanded="true" aria-controls="app-sidebar" onclick="document.getElementById('app-sidebar').classList.add('collapsed')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m16 15-3-3 3-3"/></svg></button>
+      <button class="sidebar-expand" type="button" aria-label="Expand sidebar" aria-expanded="false" aria-controls="app-sidebar" onclick="document.getElementById('app-sidebar').classList.remove('collapsed')"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span class="sidebar-expand-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/><path d="m14 9 3 3-3 3"/></svg></span><span class="sidebar-tooltip" role="tooltip">Expand sidebar</span></button>
+    </div>
+    <nav class="sidebar-nav">
+      <a class="nav-item" href="dashboard.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg></span><span class="nav-label">Dashboard</span></a>
+      <a class="nav-item" href="transactions.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></svg></span><span class="nav-label">Transactions</span></a>
+      <a class="nav-item" href="general-ledger.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M8 7h6"/><path d="M8 11h8"/></svg></span><span class="nav-label">General Ledger</span></a>
+      <a class="nav-item" href="custodial-accounts.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></svg></span><span class="nav-label">Custodial Accounts</span></a>
+      <a class="nav-item" href="allocation.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg></span><span class="nav-label">Allocation</span></a>
+      <a class="nav-item" href="tax.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 17.5v-11"/></svg></span><span class="nav-label">Tax</span></a>
+      <a class="nav-item" href="reports.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg></span><span class="nav-label">Reports</span></a>
+      <a class="nav-item" href="entities.html"><span class="nav-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span><span class="nav-label">Entities</span></a>
+    </nav>
+    <div class="sidebar-bottom">
+      <button class="sidebar-avatar-trigger">
+        <span class="avatar">M</span>
+        <span class="sidebar-user-name">Mosko</span>
+        <span class="sidebar-user-chevron"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+      </button>
+    </div>
+  </aside>
+
+  <div class="shell-main">
+    <div class="topbar">
+      <div class="topbar-left">
+        <nav class="breadcrumbs" aria-label="Breadcrumb"><span class="crumb">Settings</span></nav>
+      </div>
+      <div class="topbar-right">
+        <div class="more-menu-wrap">
+          <button class="entity-selector" aria-haspopup="menu">
+            <span class="entity-selector-name">Mosko (Person)</span>
+            <span class="avatar-cluster"><span class="avatar">M</span></span>
+          </button>
+          <div class="auth-state" data-state="selector">
+            <div class="more-menu entity-menu" role="menu" aria-label="Entities" style="width:240px;">
+              <button class="popover-item" role="menuitemradio" aria-checked="true"><span class="avatar-cluster"><span class="avatar">M</span></span>Mosko (Person)<span class="icon entity-menu-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span></button>
+            </div>
+          </div>
+        </div>
+        <span class="topbar-separator"></span>
+        <div class="more-menu-wrap">
+          <button class="icon-btn" title="More" aria-label="More actions" aria-haspopup="menu"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg></span></button>
+        </div>
+      </div>
+    </div>
+
+  <main class="content" style="padding-top:8px;">
+    <div class="link-health-banner second-step-banner" role="status"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg></span><span>You own or manage an entity shared with others, so your account needs a second step before you can go on. Until then, only this page opens. Your entities and their books are unchanged.</span></div>
+    <div class="card" id="second-step">
+      <div class="card-head"><span class="card-title">Sign-in and second step</span><span class="card-sub">Just you, every entity</span></div>
+      <div class="kv-row"><span class="kv-label">Second step<span class="kv-help">Off. Required for your account.</span></span><span class="kv-value"><span class="badge badge-outline">Off</span><button class="btn btn-default btn-sm" type="button" aria-haspopup="dialog">Set up second step</button></span></div>
+      <div class="kv-row"><span class="kv-label">Log out<span class="kv-help">Set it up later. Signing in again brings you back here.</span></span><button class="btn btn-outline btn-sm" type="button"><span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg></span>Log out</button></div>
+    </div>
+  </main>
+  </div>
+</div>
+<div class="auth-state" data-state="dialog">
+<div class="modal-layer">
+  <div class="je-modal" role="dialog" aria-modal="true" aria-labelledby="ssd-title">
+    <div class="je-modal-title" id="ssd-title">Set up a second step</div>
+    <div class="je-modal-subtitle">Your account needs a second step before you can go on.</div>
+        <p class="auth-step">Step 1 of 3 · Your password</p>
+        <div class="auth-field"><label for="d-pw">Password</label><input id="d-pw" class="input" type="password" autocomplete="current-password" placeholder="Password"></div>
+        <p class="card-sub">Next we email you a code, then you choose an authenticator app or a passkey.</p>
+        <div class="je-modal-footer"><button class="btn btn-ghost btn-sm" type="button">Cancel</button><button class="btn btn-default btn-sm" type="button">Continue</button></div>
+  </div>
+</div>
+</div>
+</body>
+</html>

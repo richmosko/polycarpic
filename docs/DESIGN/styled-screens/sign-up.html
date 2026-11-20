@@ -6,10 +6,10 @@
 <title>Styled screen — Sign up</title>
 <link rel="stylesheet" href="../tokens.css">
 <link rel="stylesheet" href="../screen.css">
-<script>(function(){var h=document.documentElement,set=function(){var s=location.hash.slice(1);h.dataset.state=(s==="local"||s==="second-step")?s:"default";};set();addEventListener("hashchange",set);})();</script>
+<script>(function(){var h=document.documentElement,set=function(){var s=location.hash.slice(1);h.dataset.state=s==="local"?s:"default";};set();addEventListener("hashchange",set);})();</script>
 </head>
 <body>
-<!-- Sign up: invite-gated account creation, in Login's split layout. A visitor arrives from an invite link (shown: the code pre-filled and validated, naming the inviter and the entity) or types a code. The invite is common to both account paths, so a rule and a caption separate it from the OAuth buttons: Google or GitHub, or email + password. Create account lands on the dashboard of the invited entity; the new user's own Person entity is created at the same time. Visitors without an invite are pointed to Get started. State #second-step: after Create account, an invitee joining as owner or manager sets up an authenticator app or a passkey before landing; a viewer sees the same step with Skip for now. State #local: a home box on a .local name; the OAuth buttons and divider give way to a one-line note. -->
+<!-- Sign up: invite-gated account creation, in Login's split layout. A visitor arrives from an invite link (shown: the code pre-filled and validated, naming the inviter and the entity) or types a code. The invite is common to both account paths, so a rule and a caption separate it from the OAuth buttons: Google or GitHub, or email + password. Create account lands on the dashboard of the invited entity; the new user's own Person entity is created at the same time. Visitors without an invite are pointed to Get started. After Create account, the invitee lands on Settings with the set-up dialog open (second-step-dialog.html): password, the emailed code, then the method; a viewer sees Skip for now there.local name; the OAuth buttons and divider give way to a one-line note. -->
 <div class="auth-shell">
   <div class="auth-form-pane">
     <div class="auth-logo"><span class="brand-icon"><svg class="brand-mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.61 12.23 C11.88 9.39 12.74 6.15 15.45 4.12 C17.07 2.91 18.69 2.23 20.04 1.55 C19.55 5.12 18.20 9.53 13.42 12.23"/><path d="M10.50 13.66 C10.74 11.07 8.47 8.36 3.88 6.96 C5.12 10.26 7.07 13.18 10.50 13.66 Z"/><path d="M10.50 13.66 C11.39 14.74 11.66 15.88 11.58 17.09 L11.61 21.23"/><path d="M12.61 12.23 C12.07 13.99 11.61 15.61 11.58 17.09"/><path d="M8.74 22.36 C10.04 21.28 13.28 21.01 14.77 22.42"/></svg></span><span>Polycarpic</span></div>
@@ -83,21 +83,6 @@
         <p class="auth-signup-line">No invite? <a href="get-started.html">Set up your own instance</a></p>
   
         <p class="auth-legal-footer">By creating an account you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.</p>
-      </div>
-      <div class="auth-state" data-state="second-step">
-        <div class="auth-title">Set up a second step</div>
-        <p class="auth-subtitle">You are joining The Moskos as a manager. Owners and managers confirm sign-ins with a second step, so a stolen password alone can't reach the books.</p>
-        <div class="factor-choice" role="radiogroup" aria-label="Second step method">
-          <div class="fork-card" role="radio" aria-checked="true" tabindex="0"><div class="card-title"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg></span> Authenticator app</div><p>A 6-digit code from an app on your phone. Works on every device.</p></div>
-          <div class="fork-card" role="radio" aria-checked="false" tabindex="-1"><div class="card-title"><span class="icon icon-sm"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg></span> Passkey</div><p>Touch ID, Face ID or a security key on this device.</p></div>
-        </div>
-        <div class="enrol-row"><div class="qr-box" role="img" aria-label="QR code for your authenticator app"></div><div>Scan this with your authenticator app, or enter the key by hand:<div class="mono" style="margin-top:6px;color:var(--foreground);">JBSW Y3DP EHPK 3PXP</div></div></div>
-        <div class="auth-field">
-          <label for="en-code">Enter the 6-digit code it shows</label>
-          <input id="en-code" class="input code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000">
-        </div>
-        <button class="btn btn-default auth-submit">Turn on second step</button>
-        <p class="auth-signup-line">Next you get ten backup codes to keep somewhere safe. Joining as a viewer? This step is offered with Skip for now.</p>
       </div>
     </div>
   </div>

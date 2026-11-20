@@ -23,6 +23,7 @@ describe('11_poly_app_grants.sql bites (ruling R1: ten functions, no BetterAuth 
     ['GRANT SELECT (id) ON app.email_challenge TO poly_app', 'the email_challenge column read that R1 revokes'],
     [`SET LOCAL ROLE poly_owner; CREATE FUNCTION app.qa_plant_pub() RETURNS int LANGUAGE sql AS 'SELECT 1'; GRANT EXECUTE ON FUNCTION app.qa_plant_pub() TO PUBLIC; RESET ROLE`, 'a new app function granted to PUBLIC (effective only)'],
     ['REVOKE EXECUTE ON FUNCTION app.enter_session(text) FROM poly_app', 'a listed EXECUTE missing'],
+    ['REVOKE EXECUTE ON FUNCTION app.my_second_step() FROM poly_app', 'my_second_step (RC1) missing from the eleven'],
   ];
   for (const [plant, label] of plants) it(`${label} turns 11 red [red if: 11 does not read that surface]`, () => { expect(run(body, plant).length, plant).toBeGreaterThanOrEqual(1); });
 });
@@ -35,6 +36,9 @@ describe('12_sign_in_controls.sql bites (ruling R2, R3, R5; seceng T-L5, T-S3)',
     ['ALTER TABLE public.two_factor DISABLE TRIGGER two_factor_15_lock', 'the lock guard disabled'],
     ['DROP TRIGGER two_factor_16_lock_delete ON public.two_factor', 'the delete guard dropped'],
     ['ALTER TABLE public.two_factor DISABLE TRIGGER two_factor_16_lock_delete', 'the delete guard disabled'],
+    ['DROP TRIGGER two_factor_no_truncate ON public.two_factor', 'the two_factor no-truncate trigger dropped (POLY-150 Addendum 5)'],
+    ['DROP TRIGGER passkey_no_truncate ON public.passkey', 'the passkey no-truncate trigger dropped (POLY-150 Addendum 5)'],
+    ['GRANT TRUNCATE ON public.passkey TO poly_auth', 'TRUNCATE on passkey for a login role'],
     ['GRANT UPDATE ON app.second_step_streak TO poly_auth', 'a direct UPDATE of the streak for poly_auth'],
     ['GRANT SELECT ON app.second_step_streak TO PUBLIC', 'the streak readable through PUBLIC'],
     ['GRANT DELETE ON public."user" TO poly_auth', 'DELETE on user for a login role (the cascade could reset the streak)'],

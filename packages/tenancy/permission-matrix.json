@@ -566,6 +566,18 @@
     {
       "table": "app.second_step_streak",
       "reason": "not role-scoped: no login role holds any privilege on it; read and written only by the lock guard and reset_second_step (poly_govern); covered by tests/db/second-step-lock.test.ts (POLY-149 ruling R2)"
+    },
+    {
+      "table": "app.step_up_challenge",
+      "reason": "not role-scoped: no login role holds any privilege on it; read and written only by begin_step_up, complete_step_up and step_up_challenge_hash (poly_govern); covered by tests/db/step-up-reauth.test.ts (POLY-150 Addendum 3 A3)"
+    },
+    {
+      "table": "app.step_up_pending",
+      "reason": "not role-scoped: no login role holds any privilege on it; written only by complete_step_up and the backup-code triggers (poly_govern); covered by tests/db/step-up-reauth.test.ts (POLY-150 Addendum 3 A3.3)"
+    },
+    {
+      "table": "app.step_up_totp",
+      "reason": "not role-scoped: no login role holds any privilege on it; forward-only, written only by complete_step_up and note_totp_step (poly_govern); covered by tests/db/step-up-reauth.test.ts (POLY-150 Addendum 3 A3.4)"
     }
   ]
 }

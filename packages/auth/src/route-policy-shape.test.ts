@@ -7,11 +7,12 @@ const R = AUTH_ROUTES as Record<string, { class: string; insertsUser?: true; rea
 const of = (c: string) => Object.entries(R).filter(([, r]) => r.class === c).map(([p]) => p).sort();
 
 describe('AUTH_ROUTES', () => {
-  it('holds the 49 paths of ARCH §3.1c (47 and the two anchor routes), each with one of the five classes  [red if: a path is dropped or given a sixth class]', () => {
-    expect(Object.keys(R)).toHaveLength(49);
+  it('holds the 52 paths of ARCH §3.1c (47, the two anchor routes and the three reauth routes of POLY-150), each with one of the six classes  [red if: a path is dropped or given a seventh class]', () => {
+    expect(Object.keys(R)).toHaveLength(52);
+    expect(of('reauth')).toEqual(['/second-step/reauth', '/second-step/reauth/begin', '/second-step/reauth/passkey']);
     expect(of('anchor')).toEqual(['/second-step/confirm-code', '/second-step/send-code']);
     for (const [p, r] of Object.entries(R)) {
-      expect(['open', 'enrolment', 'step-up', 'anchor', 'blocked'], p).toContain(r.class);
+      expect(['open', 'enrolment', 'step-up', 'anchor', 'reauth', 'blocked'], p).toContain(r.class);
       expect(p.startsWith('/'), p).toBe(true);
     }
   });

@@ -15,7 +15,9 @@ describe('0017 on a database that holds a fresh web marker', () => {
     const full = journalOf(dir);
     const to16 = { ...full, entries: full.entries.filter((e: { tag: string }) => e.tag < '0017') };
     expect(to16.entries.at(-1).tag, 'the chain has a 0016 and a 0017').toMatch(/^0016_/);
-    expect(full.entries.length).toBe(to16.entries.length + 1);
+    // POLY-150: the chain continues past 0017 (0018, 0019); the migration under test is the one entry between the two journals.
+    const to17 = { ...full, entries: full.entries.filter((e: { tag: string }) => e.tag < '0018') };
+    expect(to17.entries.length).toBe(to16.entries.length + 1);
     const db = freshDb();
     setJournal(dir, to16);
     const r1 = migrateCli(db, dir);

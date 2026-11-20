@@ -8,7 +8,7 @@ import { enrolmentGrantLive } from './anchor.ts';
 import { requireRecentAuth } from './recent-auth.ts';
 import { invitationRequired } from './user-hooks.ts';
 
-export type RouteClass = 'open' | 'enrolment' | 'step-up' | 'anchor' | 'blocked';
+export type RouteClass = 'open' | 'enrolment' | 'step-up' | 'anchor' | 'reauth' | 'blocked';
 export type Rule = { class: RouteClass; insertsUser?: true; realDomainOnly?: true; whenSession?: RouteClass | 'refused' };
 export type TlsMode = 'real-domain' | 'private-ca';
 
@@ -16,6 +16,7 @@ const open = (extra: Omit<Rule, 'class'> = {}): Rule => ({ class: 'open', ...ext
 const enrolment: Rule = { class: 'enrolment' };
 const stepUp = (extra: Omit<Rule, 'class'> = {}): Rule => ({ class: 'step-up', ...extra });
 const anchor: Rule = { class: 'anchor' };
+const reauth: Rule = { class: 'reauth' };
 const blocked: Rule = { class: 'blocked' };
 
 export const AUTH_ROUTES: Readonly<Record<string, Rule>> = {
@@ -45,6 +46,9 @@ export const AUTH_ROUTES: Readonly<Record<string, Rule>> = {
   '/passkey/update-passkey': open(),
   '/second-step/send-code': anchor,
   '/second-step/confirm-code': anchor,
+  '/second-step/reauth/begin': reauth,
+  '/second-step/reauth': reauth,
+  '/second-step/reauth/passkey': reauth,
   '/two-factor/enable': enrolment,
   '/passkey/generate-register-options': enrolment,
   '/passkey/verify-registration': enrolment,
@@ -175,6 +179,8 @@ export function routePolicyHook(tlsMode: TlsMode) {
       if (extra.length > 0 || (body.image !== undefined && body.image !== null)) throw new APIError('BAD_REQUEST', { message: 'update-user accepts a name and a null image only' });
     }
 
+    // POLY-150 R7: trustDevice would skip the second step in this browser for 30 days; the held sign-in asks every time.
+    if ((ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code') && body.trustDevice) throw new APIError('BAD_REQUEST', { code: 'trust_device_refused', message: 'trust_device_refused' });
     // S16, S17: a registration never mints a session, and the only second factor BetterAuth may enable is totp.
     if (ctx.path === '/passkey/verify-registration' && body.createSession) throw new APIError('BAD_REQUEST', { code: 'create_session_refused', message: 'create_session_refused' });
     if (ctx.path === '/two-factor/enable' && body.method !== undefined && body.method !== 'totp') throw new APIError('BAD_REQUEST', { code: 'method_refused', message: 'method_refused' });
@@ -185,11 +191,16 @@ export function routePolicyHook(tlsMode: TlsMode) {
       if (s) cls = rule.whenSession;
     }
     if (cls === 'refused') throw forbidden('session_present');
-    if (cls !== 'enrolment' && cls !== 'step-up' && cls !== 'anchor') return;
+    if (cls !== 'enrolment' && cls !== 'step-up' && cls !== 'anchor' && cls !== 'reauth') return;
 
     const session = await getSessionFromCtx(raw as never, { disableRefresh: true });
     if (!session) return; // BetterAuth's own session middleware answers 401
     const secondStepAt = (session.user as { secondStepAt?: Date | null }).secondStepAt;
+    if (cls === 'reauth') {
+      // POLY-150 A1: a re-check is for a user who has a second step to re-check.
+      if (!secondStepAt) throw forbidden('no_second_step');
+      return;
+    }
     if (cls === 'anchor') {
       // The anchor is for a first enrolment only (R2).
       if (secondStepAt) throw forbidden('second_step_already_set');
