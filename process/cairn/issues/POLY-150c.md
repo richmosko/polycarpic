@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-150
 blocked_by: []
 assignee: seceng
-paths: [process/cairn/issues/POLY-150.md, process/cairn/reviews/POLY-150/**, process/cairn/issues/POLY-150c.md, docs/SECURITY/**, process/cairn/issues/POLY-137.md, process/cairn/issues/POLY-151.md]
+paths: [process/cairn/issues/POLY-150.md, process/cairn/reviews/POLY-150/**, process/cairn/issues/POLY-150c.md, docs/SECURITY/**, process/cairn/issues/POLY-137.md, process/cairn/issues/POLY-151.md, .gitleaksignore]
 stage: plan
 estimate.cost_usd: "5.00"
 estimate.gate_cycles: 2
@@ -19,7 +19,7 @@ labels: [design, security, bloat]
 priority: null
 pr: null
 created: 2026-11-19
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 seceng reviews the ruling before tests and the build at the gate sha.
