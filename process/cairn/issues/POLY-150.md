@@ -6,12 +6,12 @@ milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: ux-designer
-paths: [process/cairn/issues/POLY-150.md, process/cairn/reviews/POLY-150/**, docs/DESIGN/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, apps/web/**, apps/auth/**, packages/**, tests/**, infra/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore]
+paths: [process/cairn/issues/POLY-150.md, process/cairn/reviews/POLY-150/**, docs/DESIGN/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, apps/web/**, apps/auth/**, packages/**, tests/**, infra/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, .gitleaksignore]
 labels: [design, security]
 priority: null
 pr: https://github.com/richmosko/polycarpic/pull/141
 created: 2026-11-16
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 POLY-89 shipped the second sign-in step as database guards and auth routes, with a placeholder at `/settings/second-step`. No screen reaches enrolment, so nobody can enrol in a browser, and no one can create a non-Person entity or send an invitation until these exist (ruling R7 in `process/cairn/reviews/POLY-89/ruling.md`; it fails closed). POLY-139 covers only Sign-in and Sessions. ux-designer designs, frontend-lead builds. Lands before POLY-110 and POLY-144.
