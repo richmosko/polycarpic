@@ -21,6 +21,6 @@ qa writes the failing tests from the ruling and measures the gate.
 
 ## Acceptance criteria
 
-- [ ] A browser test shows an enrolled user held at `/sign-in` until the second step passes.
-- [ ] A browser test enrols a user end to end against the real handler.
-- [ ] `test-plan.md`, `red-run.md` and `gate.md` are written; POLY-150's criteria are ticked with their proving tests.
+- [x] A browser test shows an enrolled user held at `/sign-in` until the second step passes.
+- [x] A browser test enrols a user end to end against the real handler.
+- [x] `test-plan.md`, `red-run.md` and `gate.md` are written; POLY-150's criteria are ticked with their proving tests.

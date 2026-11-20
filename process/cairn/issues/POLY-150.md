@@ -20,9 +20,9 @@ POLY-89 shipped the second sign-in step as database guards and auth routes, with
 
 - [ ] DESIGN carries the set-up flow (`#flow-second-step`): password, emailed code, then the factor (authenticator app or passkey), with the backup codes shown once.
 - [ ] DESIGN carries `/sign-in/second-step` for an enrolled user on a new device, and the Confirm it's you prompt.
-- [ ] The screens are built in web and replace the `/settings/second-step` placeholder.
-- [ ] A browser test shows an enrolled user held at `/sign-in` until the second step passes (ruling R7, criteria C4/C5 of POLY-89; proved only in `tests/db` today).
-- [ ] A browser test enrols a user end to end against the real handler.
+- [x] The screens are built in web and replace the `/settings/second-step` placeholder. (Proved by `second-step.spec.ts` specs 1 and 2, `second-step-misc.spec.ts`, `web-boundary.test.ts`; `process/cairn/reviews/POLY-150/gate.md`.)
+- [x] A browser test shows an enrolled user held at `/sign-in` until the second step passes (ruling R7, criteria C4/C5 of POLY-89; proved only in `tests/db` today). (`second-step-held.spec.ts` specs 3, 4, 5; `second-step-locked.spec.ts`.)
+- [x] A browser test enrols a user end to end against the real handler. (`second-step.spec.ts` spec 1 by app and spec 2 by passkey.)
 
 ## Comments
 
