@@ -10,7 +10,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict and seceng reviews under `process/cairn/reviews/POLY-86/`). One loop for the batch; add later auth nits here.
@@ -74,3 +74,13 @@ From the POLY-150 loop (Principal, 2026-11-19; `process/DECISIONS.md`; seceng `p
 - A method added through Confirm it's you (as opposed to first set-up) works only after 24 hours; the email says so and lets the owner cancel it. Shown red first: the method is refused for 24 hours and accepted after; a cancelled method never works.
 - seceng's ruling review of both before any test is written. The deploy-gate check (INFRA §7.1 step 16) refuses when either is missing.
 Also from that loop: a held sign-in through a magic link answers JSON to a browser navigation and must become a 302 to `/sign-in/second-step?with=code` (ruling "Open 1"); `/change-email` stays disabled until it notifies the old address and writes a record row (Addendum 3, Open 6).
+
+### @team-lead — 2026-11-20
+
+From POLY-150 (merged 2026-11-20, PR #141). These join the 24-hour delay and method-change emails already recorded here as a condition of the first real deploy.
+
+1. **Held sign-in by magic link (ruling "Open 1").** It answers JSON to a browser navigation; turn it into a 302 to `/sign-in/second-step?with=code`. The Google and GitHub half is on POLY-88.
+2. **Backup codes left (ruling "Open 3").** Settings shows no count. It needs a count-only route in the anchor plugin.
+3. **Recent changes to your sign-in methods.** An owner-readable view built from the `second_step.method_added` and `second_step.method_removed` audit rows. A planted method is recorded with the victim as actor and `marker_kind = 'auth'`.
+4. **Reused sign-in code (Addendum 3, Open 5).** BetterAuth's sign-in verify still accepts a reused code within its window. Refusing it needs a before-hook on `/two-factor/verify-totp`. Confirm it's you already refuses a reused code.
+5. **S9 pin test (seceng build-review §6).** `packages/auth` now pins `@simplewebauthn/server` 13.3.3 and `@better-auth/utils` 0.5.1 directly, beside better-auth and `@better-auth/passkey` at 1.7.18. A bump must move all four together, or a second copy installs. S9 fails if the lockfile holds two versions of either.

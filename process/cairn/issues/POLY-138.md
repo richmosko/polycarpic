@@ -11,7 +11,7 @@ labels: [ops, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-15
+updated: 2026-11-20
 ---
 
 Umbrella for the Caddy and edge-network findings from the POLY-95 and POLY-86 loops (`process/cairn/reviews/POLY-95/`, `process/cairn/reviews/POLY-86/seceng-client-ip.md`). The first item gates the first deploy.
@@ -42,3 +42,7 @@ Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `p
 ### @team-lead — 2026-11-15
 
 Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cairn/reviews/POLY-148/spike.md` (§1, §2, §6 and seceng's reading in §7).
+
+### @team-lead — 2026-11-20
+
+From POLY-150 (devops and seceng, 2026-11-20). This issue is a prerequisite for even a staging deploy. Until Caddy sets `X-Forwarded-For` explicitly, and that is tested, the client address the sign-in service limits on and records rests on Caddy's untested default. SECURITY C-04 says so.

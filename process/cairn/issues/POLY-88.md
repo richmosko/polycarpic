@@ -11,7 +11,7 @@ labels: [auth]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-11
+updated: 2026-11-20
 ---
 
 Login and Sign up offer Continue with Google and Continue with GitHub beside email and password. Sign in with Apple is deferred to the native iOS milestone (Principal, 2026-11-08) and has its own issue (POLY-122). Providers only authenticate an invited user; they never create an account without an invitation and never skip the second step. Each provider asserts a verified email as SECURITY C-05 pins it.
@@ -36,3 +36,7 @@ Placed here from the POLY-85 architect ruling (Open 2): the C-76 zone (SOA) test
 ### @team-lead — 2026-11-11
 
 From the POLY-86 loop: (1) POLY-85's Open 1 moves here (ruling R11, follow-up 4). (2) Google and GitHub are not wired in apps/web: config has the secret files and no client-id variable (verdict follow-up 10). (3) Once the image serves the app, add a served `/healthz` and a sign-in smoke against the built image; they replace the `createAuth`-only smoke in `image.sh check` (seceng @ db1a712).
+
+### @team-lead — 2026-11-20
+
+From POLY-150 (ruling "Open 1"). A held sign-in that arrives through Google or GitHub answers JSON to a browser navigation. Turn it into a 302 to `/sign-in/second-step?with=code`. The magic-link half of the same gap is on POLY-137.

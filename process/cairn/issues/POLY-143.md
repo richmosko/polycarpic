@@ -10,7 +10,7 @@ labels: [ci, tooling]
 priority: null
 pr: null
 created: 2026-11-12
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 An umbrella for small CI and test-time items found in the POLY-141 and POLY-87 loops. None blocks a feature; each is taken when the `db` job's same-day median on `main` nears its 100 s warning budget, or when a loop is already in the files concerned. The timing rule these serve: a loop's cost is the branch's battery-step median minus `main`'s at the merge base, same session, at least three runs each (POLY-87 ruling, "Timing guard").
@@ -74,3 +74,17 @@ From the POLY-149 loop (`process/cairn/reviews/POLY-149/gate.md`, verdict N3). F
 - **Parallel suites overload the machine.** With three teammates running db suites at once the load average reached 32 to 63; runs took 1,048 s and hit 60 s timeouts, test Postgres failed to become ready, and containers vanished mid-run. All passed on a quiet machine. A gate must be measured alone; consider a lock or queue so only one db suite runs at a time.
 - **The e2e server leaks its container every run.** `apps/web/tests/e2e/serve.ts` left one `poly83-qa-*` container after each of three gate runs (the leak already described above).
 - **Typecheck in a local gate is mostly cache.** 18 of 19 packages came from the turbo cache; say so in gate.md or force a clean run.
+
+### @team-lead — 2026-11-20
+
+From POLY-150 (merged 2026-11-20, PR #141). First to fix: CI's `unit` job went from 1 min 46 s to about 5 min 24 s.
+
+1. **Sign-in limiter waits.** The e2e suite waits about nine times for the 5-per-minute sign-in limit: 2.3 to 2.7 min locally, 4.3 min on the runner (80 tests). It grows with every sign-in test.
+2. **Leaked containers.** The e2e server leaves one `poly83-qa-*` container per run; six were left by one teammate in one sitting.
+3. **"Too many clients".** `tests/db/helpers/sql`'s `must` keeps one open client per database, so a file that clones per plant hits the limit. `gate-check.test.ts` moved to the psql helper; others may hit it.
+4. **Failure output is wiped.** A failed e2e run's output in Playwright's `test-results/` is overwritten by the next run. Keep failures somewhere that is not overwritten. Kit's passkey re-check test failed once on 2026-11-20 and its cause is unproven for this reason.
+5. **Dev tools on `latest`.** The root `package.json` asks for `latest`, so an install in a feature branch moves them unasked (this loop: eslint 10.15.0, turbo 2.11.13, vitest 5.1.1, minimatch 11.0.9; CI ran vitest 5.1.1 while the local gate ran 5.1.0). Pin them exactly.
+6. **Hand-pinned route count.** `infra/ci/image.sh` pins the auth route count (49 to 52 this loop) and only CI runs it. Derive it, or pin it in `tests/ci` beside route-policy-shape so the local gate catches it.
+7. **Seam test cold import.** `apps/auth/src/seam.test.ts` timed out at 5 s on the runner; it now imports once in `beforeAll`. Watch it.
+8. **gitleaks.** `tests/db/second-step-screens.test.ts:306` writes a literal dummy auth secret that the `generic-api-key` rule flags; one fingerprint is in `.gitleaksignore` (seceng build-review §7, SECURITY C-82). Replace the literal with a generated value. Run gitleaks in the local gate or pre-push so a finding shows before the PR opens, and have the CI step print the rule, file and line with the value redacted.
+9. **Push guard.** `cairn guard-push` checks the sub-issue's paths, not the parent's, so a file added to the parent alone is refused. A teammate ran the guard and the push in one step and the push went out past the refusal. Make the push depend on the guard's exit code.

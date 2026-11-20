@@ -10,7 +10,7 @@ labels: [design]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 POLY-86 shipped placeholder pages for `/sign-in` and Settings → Sessions because DESIGN has no screen for either (ruling follow-up 1; verdict follow-up 14).
@@ -30,3 +30,11 @@ From the POLY-87 loop: `/sign-up` exists as a minimal page (reads `?invitation=`
 ### @team-lead — 2026-11-19
 
 From the POLY-153 loop (seceng build-review §3 and §6, `process/cairn/reviews/POLY-153/build-review.md`). **F1:** a sign-in from a browser that already carries a live session ends that earlier session in the same transaction. POLY-153 clears the handle cookie when a sign-in is held at the second step; this is the stronger option seceng filed for later (about a quarter-day, a guess).
+
+### @team-lead — 2026-11-20
+
+From POLY-150 (designer's build review).
+
+1. **Shell on Settings (items 7 and 9).** The breadcrumb reads "Home / polycarpic" and the entity selector reads "No entity" for a signed-in user, who always has a Person.
+2. **Split layout.** `/sign-in` and `/sign-in/second-step` are plain columns; DESIGN draws the split layout with the forest art. Build both with Sign-in's look.
+3. **Accepted look gaps in the second-step screens (items 11 to 17).** Method cards without icons or ring, the On pill, icons on Copy all, Download and the Entities message, and the viewer's entity name.
