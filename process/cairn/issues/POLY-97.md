@@ -11,7 +11,7 @@ labels: [ops, infra]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 The committed, idempotent scripts INFRA §7.1 steps 7–11 call (D-7): create.sh, cloud-init, provision.sh and provision-check.sh. provision-check is the evidence for C-70, C-71, C-72, C-76, C-77 and C-79 (sshd from sshd -T, the C-79 set, spool holds only .age, Docker pools vs fixed subnets).
@@ -63,3 +63,7 @@ From the POLY-153 loop (`process/DECISIONS.md`, 2026-11-19; SECURITY Open Risks)
 ### @team-lead — 2026-11-19
 
 From the POLY-153 loop (architect's verdict §4, `process/cairn/reviews/POLY-153/verdict.md`). **F4:** a data-only `pg_restore --disable-triggers` skips the deferred check that every session has a handle. The restore runbook (INFRA §8.10) must restore `app.session_handle` together with `session`, or delete all sessions after the restore so everyone signs in again.
+
+### @team-lead — 2026-11-20
+
+From POLY-150 (seceng build-review, deviation 6). If the database ever runs on another host than the sign-in service (the Neon path), the deploy gate must check clock sync, or `noteTotpStepHook` must refuse instead of logging: a service clock 30 s ahead lets one sign-in code through a re-check.
