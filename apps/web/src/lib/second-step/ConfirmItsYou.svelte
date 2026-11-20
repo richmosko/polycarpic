@@ -157,12 +157,10 @@
         {:else if method === 'passkey'}
           <p>Your browser asks for Touch ID, Face ID or your security key.</p>
           {#if error}<p role="alert" class="text-destructive text-sm">{error}{#if signInAgain} <a class="underline" href="/sign-in">Sign in again</a>{/if}</p>{/if}
-          <div class="flex items-center justify-between gap-2">
-            {#if hasApp}<button type="button" class={link} onclick={() => begin('totp')}>Use your authenticator app</button>{:else}<span></span>{/if}
-            <div class="flex gap-2">
-              <button type="button" class={ghost} onclick={close}>Cancel</button>
-              <button type="button" class={primary} disabled={busy} onclick={usePasskey}>{hasApp ? 'Use a passkey' : 'Use your passkey'}</button>
-            </div>
+          {#if hasApp}<p class="text-xs"><button type="button" class={link} onclick={() => begin('totp')}>Use your authenticator app</button></p>{/if}
+          <div class="flex justify-end gap-2">
+            <button type="button" class={ghost} onclick={close}>Cancel</button>
+            <button type="button" class={primary} disabled={busy} onclick={usePasskey}>{hasApp ? 'Use a passkey' : 'Use your passkey'}</button>
           </div>
         {:else if method === 'backup_code'}
           <form onsubmit={submit} class="flex flex-col gap-3">
