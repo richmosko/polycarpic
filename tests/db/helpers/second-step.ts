@@ -33,10 +33,12 @@ export async function enterAs(q: Q, db: string, role: Role, userId: string, sess
   await q('SELECT app.enter_auth_session($1)', [token]);
 }
 /** A refusal that changed nothing: `snap` is read before and after, and the two must be equal (seceng §5.2: 42501 alone proves nothing). */
-export async function refusedUnchanged(snap: () => unknown, attempt: () => Promise<unknown>): Promise<any> {
+export async function refusedUnchanged(snap: () => unknown, attempt: () => Promise<unknown>, expected?: { code: string; message: RegExp }): Promise<any> {
   const before = JSON.stringify(await snap());
   const x = await fails(attempt());
   expect(x, 'the statement must be refused').not.toBeNull();
+  // POLY-150 (seceng 93c67eaa): a refusal is the guard's OWN refusal, so a test that expects one passes the SQLSTATE and message it expects, and any other error fails.
+  if (expected) { expect(codeOf(x), `SQLSTATE (${msgOf(x)})`).toBe(expected.code); expect(msgOf(x), 'message').toMatch(expected.message); }
   expect(JSON.stringify(await snap()), 'the refusal must leave the row(s) unchanged').toBe(before);
   return x;
 }

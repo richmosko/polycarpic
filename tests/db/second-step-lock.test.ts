@@ -168,14 +168,14 @@ describe('L5 poly_auth cannot shorten, clear, lower or delete a lock (own databa
   for (const [label, sql] of attempts.map((a) => [a[0], a[1]] as const)) {
     it(`${label}: refused 42501 and the row (and the streak) is read back unchanged [red if: the guard or the delete guard is missing]`, async () => {
       const streak0 = streakOf(db, u.id);
-      const x = await fx.marked('poly_auth', u.id, sid, (q) => refusedUnchanged(snap, () => q(sql, [u.id])));
+      const x = await fx.marked('poly_auth', u.id, sid, (q) => refusedUnchanged(snap, () => q(sql, [u.id]), { code: '42501', message: /second_step_locked/ }));
       expect(codeOf(x), msgOf(x)).toBe('42501');
       expect(streakOf(db, u.id)).toBe(streak0);
     });
   }
   it('T-L3: failed_verification_count = 0 during a lock (locked_until left alone) is refused 42501 and count, locked_until and streak read back unchanged (R2 step 1, Addendum 1) [red if: the count can be lowered during a lock]', async () => {
     const streak0 = streakOf(db, u.id);
-    const x = await fx.marked('poly_auth', u.id, sid, (q) => refusedUnchanged(snap, () => q(`UPDATE public.two_factor SET failed_verification_count = 0 WHERE user_id = $1`, [u.id])));
+    const x = await fx.marked('poly_auth', u.id, sid, (q) => refusedUnchanged(snap, () => q(`UPDATE public.two_factor SET failed_verification_count = 0 WHERE user_id = $1`, [u.id]), { code: '42501', message: /second_step_locked/ }));
     expect(codeOf(x), msgOf(x)).toBe('42501');
     expect(streakOf(db, u.id)).toBe(streak0);
     expect(streak0, 'the setup lock is the first lock').toBe(1);
@@ -187,8 +187,8 @@ describe('L5 poly_auth cannot shorten, clear, lower or delete a lock (own databa
         try {
           const x = await fails(c.query({ text: sql, queryMode: 'extended' }));
           expect(x, `${role}: ${sql}`).not.toBeNull();
-          expect(codeOf(x), `${role}: ${sql}: ${msgOf(x)}`).toMatch(/42501|42P01/); // 42P01 only on the red tree (no table); 42501 is the pin
-          expect(msgOf(x)).not.toMatch(/does not exist/); // the red run reports the missing table here
+          expect(codeOf(x), `${role}: ${sql}: ${msgOf(x)}`).toBe('42501');
+          expect(msgOf(x), 'permission denied, not a missing table').toMatch(/permission denied/);
         } finally { await c.end(); }
       }
     }
@@ -202,7 +202,7 @@ describe('T-L4 a factor DELETE during a lock is refused; after a lapse delete an
     const sid = fx.session(u.id, true); // a fresh step-up, so the DELETE after the lapse reaches the lock guard and not step_up_required
     must(`UPDATE public.two_factor SET failed_verification_count = 10, locked_until = now() + interval '15 minutes' WHERE user_id = '${u.id}'`, db);
     const snap = () => must(`SELECT id, locked_until FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows;
-    const x = await fx.marked('poly_auth', u.id, sid, (q) => refusedUnchanged(snap, () => q('DELETE FROM public.two_factor WHERE user_id = $1', [u.id])));
+    const x = await fx.marked('poly_auth', u.id, sid, (q) => refusedUnchanged(snap, () => q('DELETE FROM public.two_factor WHERE user_id = $1', [u.id]), { code: '42501', message: /second_step_locked/ }));
     expect(codeOf(x)).toBe('42501');
     expect(streakOf(db, u.id)).toBe(1);
     lapseLock(db, u.id);

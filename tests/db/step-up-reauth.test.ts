@@ -302,8 +302,8 @@ describe('T3 forgery and confusion; T4 catalog', () => {
   });
   it('a direct UPDATE of session.recent_auth_at as poly_auth is refused, and the value is unchanged [red if: any writer but complete_step_up can stamp]', async () => {
     const { f, s } = await setup();
-    const x = await refusedUnchanged(() => stamp(s.id), () => fx.marked('poly_auth', f.u.id, s.id, (q) => q('UPDATE public.session SET recent_auth_at = now() WHERE id = $1', [s.id])));
-    expect(codeOf(x), 'the guard\'s own SQLSTATE, not any failure').toBe('42501');
+    const x = await refusedUnchanged(() => stamp(s.id), () => fx.marked('poly_auth', f.u.id, s.id, (q) => q('UPDATE public.session SET recent_auth_at = now() WHERE id = $1', [s.id]), { code: '42501', message: /recent_auth_at is written only by/ }));
+    expect(codeOf(x)).toBe('42501');
   });
   it('begin_step_up for a user with no second step, and under a session id with no row, is refused [red if: a challenge can be opened for a user who cannot finish it, or for no session]', async () => {
     const plain = e.seedUser();
