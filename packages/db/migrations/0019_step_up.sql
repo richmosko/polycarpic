@@ -302,8 +302,8 @@ CREATE FUNCTION app.step_up_pending_resolved() RETURNS trigger
   END
   $fn$;--> statement-breakpoint
 
--- DECISIONS 2026-11-19: every second-step method added or removed by a user is an audit event, written by the database (RC5 c), so a
--- planted factor is on the record. The reset is the operator's and writes its own event; it has no user marker, so it adds none here.
+-- Addendum 5 (RC5 c): every second-step method added or removed is an audit event, written by the database whichever role or path made
+-- the change, so a planted factor is on the record. Actor: the marker's user; the operator (reset-mfa); else the system.
 CREATE OR REPLACE FUNCTION app.sync_second_step() RETURNS trigger
   LANGUAGE plpgsql SECURITY DEFINER
   SET search_path = ''
@@ -313,26 +313,33 @@ CREATE OR REPLACE FUNCTION app.sync_second_step() RETURNS trigger
     v_has boolean;
     v_set boolean;
     v_event text;
-    v_kind text := CASE TG_TABLE_NAME WHEN 'passkey' THEN 'passkey' ELSE 'totp' END;
+    v_marker uuid := app.current_user_id();
+    v_kind text;
   BEGIN
-    IF app.current_user_id() IS NOT NULL AND v_user IS DISTINCT FROM app.current_user_id() THEN
+    IF v_marker IS NOT NULL AND v_user IS DISTINCT FROM v_marker THEN
       RAISE EXCEPTION 'a second step belongs to its own user' USING ERRCODE = '42501';
     END IF;
-    IF app.current_user_id() IS NOT NULL THEN
-      -- A passkey row has no `verified`; the two tables are told apart before either record is read.
-      IF TG_TABLE_NAME = 'passkey' THEN
-        v_event := CASE TG_OP WHEN 'INSERT' THEN 'second_step.method_added' WHEN 'DELETE' THEN 'second_step.method_removed' END;
-      ELSIF TG_OP = 'INSERT' THEN
-        IF NEW.verified THEN v_event := 'second_step.method_added'; END IF;
-      ELSIF TG_OP = 'UPDATE' THEN
-        IF NEW.verified AND NOT OLD.verified THEN v_event := 'second_step.method_added'; END IF;
-      ELSIF OLD.verified THEN
-        v_event := 'second_step.method_removed';
-      END IF;
-      IF v_event IS NOT NULL THEN
-        INSERT INTO public.audit_event (entity_id, actor_user_id, actor, kind, subject_user_id, payload)
-        VALUES (NULL, app.current_user_id(), 'user', v_event, v_user, pg_catalog.jsonb_build_object('method', v_kind));
-      END IF;
+    -- A passkey row has no `verified`; the two tables are told apart before either record is read.
+    IF TG_TABLE_NAME = 'passkey' THEN
+      v_event := CASE TG_OP WHEN 'INSERT' THEN 'second_step.method_added' WHEN 'DELETE' THEN 'second_step.method_removed' END;
+    ELSIF TG_OP = 'INSERT' THEN
+      IF NEW.verified THEN v_event := 'second_step.method_added'; END IF;
+    ELSIF TG_OP = 'UPDATE' THEN
+      IF NEW.verified AND NOT OLD.verified THEN v_event := 'second_step.method_added'; END IF;
+    ELSIF OLD.verified THEN
+      v_event := 'second_step.method_removed';
+    END IF;
+    IF v_event IS NOT NULL THEN
+      SELECT t.kind INTO v_kind FROM app.tx_identity t WHERE t.xid = pg_catalog.pg_current_xact_id_if_assigned();
+      INSERT INTO public.audit_event (entity_id, actor_user_id, actor, kind, subject_user_id, payload)
+      VALUES (NULL, v_marker,
+              CASE WHEN v_marker IS NOT NULL THEN 'user' WHEN session_user = 'poly_operator' THEN 'operator' ELSE 'system' END,
+              v_event, v_user,
+              pg_catalog.jsonb_build_object(
+                'method', CASE TG_TABLE_NAME WHEN 'passkey' THEN 'passkey' ELSE 'totp' END,
+                'passkey_id', CASE WHEN TG_TABLE_NAME = 'passkey' THEN CASE TG_OP WHEN 'DELETE' THEN OLD.id ELSE NEW.id END END,
+                'session_id', app.current_session_id(),
+                'marker_kind', v_kind));
     END IF;
     v_has := EXISTS (SELECT 1 FROM public.two_factor t WHERE t.user_id = v_user AND t.verified)
           OR EXISTS (SELECT 1 FROM public.passkey k WHERE k.user_id = v_user);
@@ -356,6 +363,8 @@ GRANT EXECUTE ON FUNCTION app.begin_step_up(text, bytea), app.complete_step_up(t
 
 -- (4) Back to poly_owner: guard_passkey is replaced, and no trigger is added to a BetterAuth table.
 SET ROLE poly_owner;--> statement-breakpoint
+CREATE TRIGGER two_factor_no_truncate BEFORE TRUNCATE ON public.two_factor FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate();--> statement-breakpoint
+CREATE TRIGGER passkey_no_truncate BEFORE TRUNCATE ON public.passkey FOR EACH STATEMENT EXECUTE FUNCTION app.refuse_truncate();--> statement-breakpoint
 CREATE TRIGGER two_factor_85_step_up_spent AFTER UPDATE OF backup_codes ON public.two_factor
   FOR EACH ROW EXECUTE FUNCTION app.step_up_spent();--> statement-breakpoint
 CREATE CONSTRAINT TRIGGER step_up_pending_resolved AFTER INSERT ON app.step_up_pending
