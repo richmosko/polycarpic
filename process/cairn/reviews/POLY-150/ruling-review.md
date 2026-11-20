@@ -672,3 +672,16 @@ If the Principal picks (b), tell them plainly: a found backup code plus the pass
   - a user's delete cascading through their methods can write its rows.
 - **Recommended, not blocking:** a `no_truncate` trigger on `two_factor` and `passkey`, so even the table owner cannot clear methods without rows. A superuser can always bypass triggers.
 - **The four deploy-gate rows:** agreed.
+
+**Addendum 6 at `df8a4c6f`, and `app.step_up_challenge_hash` at `360246a4` (0019:264-279): ACCEPT** (code-read; I ran nothing).
+- **The function matches the addendum:**
+  - the exact-call check comes first, then a kind `auth` marker for this transaction;
+  - it returns `webauthn_hash` only for the marker user's and the marker session's unexpired passkey challenge, and NULL otherwise;
+  - it is STABLE and writes nothing.
+- **It gives poly_auth nothing new:**
+  - the value is a SHA-256 of a 32-byte challenge that poly_auth itself passed to `begin_step_up`, for its own session only;
+  - a hash cannot produce a WebAuthn assertion, because that still needs the authenticator's signature over the challenge;
+  - `complete_step_up` still checks the challenge and deletes it, so it stays single-use in the database.
+- **Declining the comparison in the database:** agreed, for the reason given. The only forger wrote the hash itself.
+- **Build note:** the service should compare the hashes in constant time (`timingSafeEqual`). That is minor, because the challenge is single-use and expires.
+- **The no-truncate triggers on `two_factor` and `passkey`,** added in the same addendum and pinned in pgTAP 12, meet my recommendation.
