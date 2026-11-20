@@ -35,7 +35,7 @@ describe('R1.1 / R9 the one listener', () => {
   afterAll(async () => { await svc?.close(); });
 
   it('the public listener answers /api/auth/ok 200 and nothing else: /, /session, /api/session, /api/authx, /healthz-less paths are 404 [red if: the public listener serves more than handleAuthRequest]', async () => {
-    expect((await fetch(`${ready().publicOrigin}/api/auth/ok`)).status).toBe(200);
+    expect((await fetch(`${ready().publicOrigin}/api/auth/ok`, { headers: { 'x-forwarded-for': '127.0.0.1' } })).status).toBe(200); // R8: the client address is required in every APP_ENV, the proxy sets it
     for (const p of ['/', '/session', '/api/session', '/api/authx', '/sign-in', '/api/auth/../session'])
       expect((await fetch(`${ready().publicOrigin}${p}`, { redirect: 'manual' })).status, p).toBe(404);
   });
@@ -50,7 +50,7 @@ describe('R1.1 / R9 the one listener', () => {
     expect(x, 'AUTH_INTERNAL_* is forbidden config for auth (R9)').not.toBeNull();
   });
   it('D2: the auth secret appears in no log line from startup or from a request [red if: the service logs its secret]', async () => {
-    await fetch(`${ready().publicOrigin}/api/auth/ok`);
+    await fetch(`${ready().publicOrigin}/api/auth/ok`, { headers: { 'x-forwarded-for': '127.0.0.1' } });
     expect(logs.join('\n')).not.toContain(SECRET);
   });
 });

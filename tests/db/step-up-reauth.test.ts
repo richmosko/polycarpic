@@ -356,6 +356,19 @@ describe('Addendum 6: app.step_up_challenge_hash(uuid) returns the stored hash o
   });
 });
 
+describe('the step-up tables are no role\'s: no privilege for any login role', () => {
+  it('the step-up tables: no privilege for any login role (SELECT, INSERT, UPDATE, DELETE, TRUNCATE; table and columns, effective) [red if: a login role can read or write a challenge, the TOTP step or the pending row]', () => {
+    for (const t of ['app.step_up_challenge', 'app.step_up_totp', 'app.step_up_pending']) {
+      for (const r of ['poly_app', 'poly_auth', 'poly_worker', 'poly_operator', 'poly_migrator']) {
+        for (const priv of ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) {
+          expect(must(`SELECT has_table_privilege('${r}', '${t}', '${priv}')`, e.db).rows[0]![0], `${r} ${priv} on ${t}`).toBe('f');
+        }
+        expect(must(`SELECT count(*) FROM pg_attribute a WHERE a.attrelid = '${t}'::regclass AND a.attnum > 0 AND NOT a.attisdropped AND (has_column_privilege('${r}', '${t}', a.attname, 'SELECT') OR has_column_privilege('${r}', '${t}', a.attname, 'UPDATE') OR has_column_privilege('${r}', '${t}', a.attname, 'INSERT'))`, e.db).rows[0]![0], `${r} column privileges on ${t}`).toBe('0');
+      }
+    }
+  });
+});
+
 describe('T5 the shared counter and the lock; a passkey re-check passes during a lock', () => {
   it('10 wrong re-check codes lock the factor with 10 second_step_failure rows; the 2nd lock is 30 minutes; during a lock the code paths answer 429 ACCOUNT_TEMPORARILY_LOCKED with no pausedFor and a passkey re-check still passes [red if: the re-check has its own counter, no lock, or a band]', async () => {
     const { f, s } = await setup();
