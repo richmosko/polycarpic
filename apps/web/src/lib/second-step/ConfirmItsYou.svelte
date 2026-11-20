@@ -99,7 +99,10 @@
     try {
       const r = await api('POST', '/second-step/reauth', method === 'backup_code' ? { challengeId, password, backupCode } : { challengeId, password, code });
       if (r.ok) return await passed();
-      refused(r); // DESIGN keeps what was typed after a refusal; a wrong password or code does not consume the challenge, so the same one is retried
+      password = ''; // a refusal clears both: the password does not outlive its request, and step_up_failed does not say which was wrong
+      code = '';
+      backupCode = '';
+      refused(r); // a wrong password or code does not consume the challenge, so the same one is retried
     } finally {
       busy = false;
     }
