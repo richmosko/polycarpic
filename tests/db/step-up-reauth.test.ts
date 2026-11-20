@@ -29,7 +29,8 @@ async function stale(f: Factor): Promise<S> {
 async function setup() { const f = await factor(e, mails); return { f, s: await stale(f) }; }
 const call = (f: Factor, s: S, path: string, body: unknown) => e.handle(post(path, body, s.cookie), f.auth);
 const begin = async (f: Factor, s: S, method: 'totp' | 'passkey' = 'totp') => { const r = await call(f, s, '/second-step/reauth/begin', { method }); return { r, j: await json(r) }; };
-const reauth = (f: Factor, s: S, challengeId: string, o: Record<string, unknown> = {}) => call(f, s, '/second-step/reauth', { challengeId, password: PW, code: totp(f.secret), ...o });
+// The enrolment's verify spent the CURRENT step (A3.4: a code accepted at sign-in or first enrolment cannot then pass a re-check), so a re-check uses the NEXT step (30 s on, inside the +-1 window).
+const reauth = (f: Factor, s: S, challengeId: string, o: Record<string, unknown> = {}) => call(f, s, '/second-step/reauth', { challengeId, password: PW, code: totp(f.secret, Date.now() + 30_000), ...o });
 /** A step-up probe: BetterAuth's /two-factor/generate-backup-codes is the step-up class, so 200 means fresh and 403 means stale. */
 const probe = async (f: Factor, s: S) => (await call(f, s, '/two-factor/generate-backup-codes', { password: PW })).status;
 const setLock = (uid: string, minutes: number) => must(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE public.two_factor SET locked_until = clock_timestamp() + interval '${minutes} minutes' WHERE user_id = '${uid}'; COMMIT;`, e.db);
@@ -90,7 +91,7 @@ describe('T1 replay, and the errors table (status and code, one per row)', () =>
   it('T1: the same /second-step/reauth request twice: the second answers 403 challenge_expired and the challenge row is gone after the first [red if: a challenge can be spent twice]', async () => {
     const { f, s } = await setup();
     const b = await begin(f, s);
-    const body = { challengeId: b.j.challengeId, password: PW, code: totp(f.secret) };
+    const body = { challengeId: b.j.challengeId, password: PW, code: totp(f.secret, Date.now() + 30_000) };
     expect((await call(f, s, '/second-step/reauth', body)).status).toBe(200);
     expect(e.count(`SELECT 1 FROM app.step_up_challenge WHERE id = '${b.j.challengeId}'`), 'the challenge is deleted by the success').toBe(0);
     const again = await call(f, s, '/second-step/reauth', body);
@@ -303,17 +304,18 @@ describe('T3 forgery and confusion; T4 catalog', () => {
     const { f, s } = await setup();
     await refusedUnchanged(() => stamp(s.id), () => fx.marked('poly_auth', f.u.id, s.id, (q) => q('UPDATE public.session SET recent_auth_at = now() WHERE id = $1', [s.id])));
   });
-  it('another user\'s session, and a session id with no row: begin is refused [red if: a marker for the wrong session can open a challenge]', async () => {
-    const { f, s } = await setup();
-    const other = await factor(e, mails);
-    const x = await fails(fx.marked('poly_auth', other.u.id, s.id, (q) => q('SELECT app.begin_step_up($1, $2)', ['totp', null])));
-    expect(codeOf(x), 'another user\'s session').toBe('42501');
-    const y = await fails(fx.marked('poly_auth', f.u.id, '00000000-0000-4000-8000-0000000000aa', (q) => q('SELECT app.begin_step_up($1, $2)', ['totp', null])));
-    expect(codeOf(y), 'a session id with no row').toBe('42501');
-    void other;
+  it('begin_step_up for a user with no second step, and under a session id with no row, is refused [red if: a challenge can be opened for a user who cannot finish it, or for no session]', async () => {
+    const plain = e.seedUser();
+    const ps = sessionWithHandle(e.db, plain.id);
+    const x = await fails(fx.marked('poly_auth', plain.id, ps.id, (q) => q('SELECT app.begin_step_up($1, $2)', ['totp', null])));
+    expect(codeOf(x), 'a user with no second step').toBe('42501');
+    const y = await fails(fx.marked('poly_auth', plain.id, '00000000-0000-4000-8000-0000000000aa', (q) => q('SELECT app.begin_step_up($1, $2)', ['totp', null])));
+    expect(y, 'a session id with no row cannot even enter').not.toBeNull();
+    // (another user's session cannot be built as a marker: enter_auth_session takes the user from the session row, so the wrong-session case is the
+    // other-session challenge, covered by "403 challenge_expired" above)
   });
   it('T4: the four definers are owned by poly_govern, SECURITY DEFINER, search_path empty, EXECUTE poly_auth only; only complete_step_up (and 0013\'s two) assign recent_auth_at; only poly_govern holds UPDATE (recent_auth_at) on session [red if: a grant or a second writer exists]', () => {
-    for (const fn of ['begin_step_up(text,bytea)', 'complete_step_up(text,uuid,bigint)', 'note_totp_step(uuid,bigint)', 'record_step_up_failure()']) {
+    for (const fn of ['begin_step_up(text,bytea)', 'complete_step_up(text,uuid,bigint)', 'note_totp_step(uuid,bigint)', 'record_step_up_failure()', 'step_up_challenge_hash(uuid)']) {
       const r = must(`SELECT pg_get_userbyid(proowner), prosecdef, array_to_string(proconfig, ','), (SELECT string_agg(grantee::regrole::text, ',' ORDER BY grantee::regrole::text) FROM aclexplode(coalesce(proacl, acldefault('f', proowner))) WHERE privilege_type = 'EXECUTE' AND grantee <> proowner) FROM pg_proc WHERE oid = to_regprocedure('app.${fn}')`, e.db).rows[0];
       expect(r, `app.${fn} exists`).toBeTruthy();
       expect(r!.slice(0, 2), fn).toEqual(['poly_govern', 't']);
@@ -325,6 +327,31 @@ describe('T3 forgery and confusion; T4 catalog', () => {
     expect(writers.length, 'complete_step_up plus 0013\'s two and no other').toBeLessThanOrEqual(3);
     const holders = must(`SELECT r.rolname FROM pg_roles r WHERE r.rolcanlogin = false OR r.rolcanlogin = true`, e.db).rows.map((x: any) => x[0]).filter((r: string) => must(`SELECT has_column_privilege('${r}', 'public.session', 'recent_auth_at', 'UPDATE')`, e.db).rows[0]![0] === 't' && !/^(postgres|poly_owner|poly_migrator|pg_)/.test(r));
     expect(holders.sort(), 'effective UPDATE (recent_auth_at)').toEqual(['poly_govern']);
+  });
+});
+
+describe('Addendum 6: app.step_up_challenge_hash(uuid) returns the stored hash only for the caller\'s own user and session, passkey only, unexpired; it does not consume', () => {
+  const HASH = 'ab'.repeat(32);
+  it('the own session reads the hash; another session of the same user, another user, a totp challenge and an expired challenge all read NULL, and the challenge is not consumed [red if: the hash can be read across sessions or users, or reading spends the challenge]', async () => {
+    const { f, s } = await setup();
+    addPasskey(f.u.id);
+    const s2 = await stale(f);
+    const other = await factor(e, mails);
+    addPasskey(other.u.id);
+    const so = await stale(other);
+    const open = (sid: string, uid: string, method: string, hash: string | null) => fx.committed('poly_auth', uid, sid, async (q) => (await q('SELECT app.begin_step_up($1, $2)', [method, hash ? Buffer.from(hash, 'hex') : null])).rows[0].begin_step_up as string);
+    const read = (sid: string, uid: string, id: string) => fx.marked('poly_auth', uid, sid, async (q) => (await q('SELECT app.step_up_challenge_hash($1)', [id])).rows[0].step_up_challenge_hash as Buffer | null);
+    const id = await open(s.id, f.u.id, 'passkey', HASH);
+    expect((await read(s.id, f.u.id, id))?.toString('hex'), 'own user and session').toBe(HASH);
+    expect(await read(s2.id, f.u.id, id), 'another session of the same user').toBeNull();
+    expect(await read(so.id, other.u.id, id), 'another user').toBeNull();
+    expect(e.count(`SELECT 1 FROM app.step_up_challenge WHERE id = '${id}'`), 'reading does not consume the challenge').toBe(1);
+    const totpId = await open(s2.id, f.u.id, 'totp', null);
+    expect(await read(s2.id, f.u.id, totpId), 'a totp challenge has no hash').toBeNull();
+    must(`UPDATE app.step_up_challenge SET expires_at = now() - interval '1 second' WHERE id = '${id}'`, e.db);
+    expect(await read(s.id, f.u.id, id), 'an expired challenge').toBeNull();
+    const x = await fails(fx.marked('poly_app', f.u.id, s.id, (q) => q('SELECT app.step_up_challenge_hash($1)', [id])));
+    expect(codeOf(x), 'poly_app cannot execute it').toBe('42501');
   });
 });
 

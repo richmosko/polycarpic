@@ -2,6 +2,7 @@
 // One user per band, seeded locked by serve.ts (30, 120 and 600 minutes left). The fallback removes the band from the response in the browser, which is
 // what the page sees for a forged, expired or missing hold (the service's side of those is tests/db/second-step-lock-band.test.ts). Each spec spends one sign-in
 // and one verify-totp slot. Titles end [red if: <mutation>].
+import { createHash } from 'node:crypto';
 import { expect, test } from '@playwright/test';
 import { totp } from '../../../../tests/db/helpers/totp.ts';
 import { cookieNames, seed, signInUi, slot } from './support.ts';
@@ -54,7 +55,6 @@ test('a locked account with an EXPIRED hold answers 429 with no band, and the pa
   const s = seed<{ testServer: unknown; db: string; password: string }>('seeds.json');
   process.env.POLY_TEST_SERVER = JSON.stringify(s.testServer);
   const { must } = await import('../../../../tests/db/helpers/sql.ts');
-  const { createHash } = await import('node:crypto');
   const answers: { status: number; body: string }[] = [];
   page.on('response', async (r) => { if (r.url().endsWith('/api/auth/two-factor/verify-totp')) answers.push({ status: r.status(), body: await r.text().catch(() => '') }); });
   await signInUi(page, u.email, s.password);

@@ -53,8 +53,8 @@ SELECT is((SELECT array_agg(sig || ' ' || r ORDER BY sig, r) FROM new_fn n CROSS
   WHERE to_regprocedure(sig) IS NULL OR NOT has_function_privilege(r, to_regprocedure(sig), 'EXECUTE')), NULL::text[], 'effective: every listed EXECUTE is held');
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname = 'enter_session'), 1, 'enter_session has one overload only (no function takes a hash)');
 SELECT is((SELECT count(*)::int FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND pg_get_function_identity_arguments(p.oid) ~ 'bytea'
-  AND (has_function_privilege('poly_app', p.oid, 'EXECUTE') OR has_function_privilege('poly_auth', p.oid, 'EXECUTE')) AND p.proname NOT IN ('claim_invitations','accept_invitations')), 0,
-  'no function a login role can execute takes a bytea other than the two invitation definers (no entry by hash)');
+  AND (has_function_privilege('poly_app', p.oid, 'EXECUTE') OR has_function_privilege('poly_auth', p.oid, 'EXECUTE')) AND p.proname NOT IN ('claim_invitations','accept_invitations','begin_step_up')), 0,
+  'no function a login role can execute takes a bytea other than the two invitation definers and begin_step_up (a WebAuthn challenge hash, POLY-150 Addendum 3 A3.1); no entry by hash');
 SELECT is((SELECT array_agg(p.proname || ':' || pg_get_userbyid(p.proowner) || ':' || p.prosecdef::text || ':' || ('search_path=""' = ANY (coalesce(p.proconfig, '{}')))::text || ':' || coalesce(array_length(p.proconfig, 1), 0)::text ORDER BY p.proname)
   FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname = 'app' AND p.proname IN ('enter_session','my_sessions','revoke_my_session','recent_auth_ok','attach_session_handle','session_needs_handle')),
   ARRAY['attach_session_handle:poly_authz:true:true:1','enter_session:poly_authz:true:true:1','my_sessions:poly_authz:true:true:1',

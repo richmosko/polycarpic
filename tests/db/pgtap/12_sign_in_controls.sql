@@ -15,7 +15,7 @@ SELECT has_table('app', 'sign_in_record', 'app.sign_in_record exists');
 SELECT is((SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid = to_regclass('app.sign_in_record')), 'poly_owner', 'sign_in_record is owned by poly_owner');
 SELECT ok((SELECT relrowsecurity AND relforcerowsecurity FROM pg_class WHERE oid = to_regclass('app.sign_in_record')), 'sign_in_record has RLS enabled and forced');
 SELECT is((SELECT array_agg(column_name::text ORDER BY ordinal_position) FROM information_schema.columns WHERE table_schema = 'app' AND table_name = 'sign_in_record'),
-  ARRAY['id','kind','user_id','session_id','created_at','ip_address','user_agent','lock_minutes'], 'sign_in_record has exactly the eight columns of R3 (no column for a typed code)');
+  ARRAY['id','kind','user_id','session_id','created_at','ip_address','user_agent','lock_minutes','method'], 'sign_in_record has exactly the nine columns of R3 and Addendum 3 A4 (method, set only on step_up kinds; no column for a typed code)');
 SELECT is((SELECT count(*)::int FROM pg_constraint WHERE conrelid = to_regclass('app.sign_in_record') AND contype = 'f'), 0, 'sign_in_record has no foreign key (a row outlives its account; deleting a user cannot erase it)');
 SELECT ok(EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid = to_regclass('app.sign_in_record') AND contype = 'c' AND pg_get_constraintdef(oid) ~ 'second_step_lock'), 'kind and lock_minutes are CHECKed together');
 SELECT is((SELECT count(*)::int FROM pg_index WHERE indrelid = to_regclass('app.sign_in_record') AND NOT indisprimary), 2, 'two indexes besides the primary key: (user_id, created_at) and (created_at)');
