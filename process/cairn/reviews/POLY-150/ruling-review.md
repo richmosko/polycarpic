@@ -716,3 +716,9 @@ If the Principal picks (b), tell them plainly: a found backup code plus the pass
   - a viewer deletes their own passkey;
   - a manager with TOTP and a passkey deletes the passkey after a re-check.
 - **No pgTAP test pins the body.** Only `second-step-gates.test.ts:296`'s catalog list names it, and pgTAP 12 and the gate check its triggers. The behaviour tests above are the pin.
+
+**The auth healthcheck sends `x-forwarded-for: 127.0.0.1` (option a): ACCEPT, preferred over (b)** (code-read; I ran nothing).
+- **It lets no caller do anything new.** The header is set by the probe itself, inside the auth container, on loopback. Anyone who can run that probe can already run anything in the container.
+- **The rate limit does not apply.** `/ok` is not in `LIMITED` (options.ts:16), so no rate-limit bucket is touched.
+- **No outside request can reach the 127.0.0.1 address.** Caddy replaces every incoming `x-forwarded-for` with the real connecting address (R8). Only a compromised web on the compose network could send one, and it can already forge any address (R8).
+- **(b) is worse.** An exemption in the handler would weaken the service's one address rule for a health probe, and it would be one more path to keep exempt correctly.
