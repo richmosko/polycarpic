@@ -113,3 +113,20 @@ describe('B7 pg_hba', () => {
     });
   }
 });
+
+// The sign-in service refuses a request with no client address (503, handler.ts requireClientIp), so a healthcheck that fetches
+// /api/auth/ok without a valid x-forwarded-for could never report healthy.
+for (const f of ['prod.yml', 'staging.yml']) {
+  describe(`${f}: the auth healthcheck can pass`, () => {
+    it('fetches /api/auth/ok with a valid x-forwarded-for entry and treats a 5xx as unhealthy [red if: the header is missing]', () => {
+      const d = doc(f);
+      const name = Object.keys(d.services).find((n) => /(^|-)auth$/.test(n))!;
+      const script: string = (d.services[name].healthcheck.test as string[]).join(' ');
+      expect(script).toContain('/api/auth/ok');
+      const ip = /['"]x-forwarded-for['"]\s*:\s*['"]([0-9a-fA-F:.]+)['"]/.exec(script);
+      expect(ip, 'the healthcheck sends no x-forwarded-for').not.toBeNull();
+      expect(ip![1]).toMatch(/^127\.0\.0\.1$|^::1$/);
+      expect(script).toMatch(/status<500\?0:1/);
+    });
+  });
+}
