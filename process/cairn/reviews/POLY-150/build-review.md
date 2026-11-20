@@ -125,3 +125,27 @@ Everything below is code-read against `3607aa34`.
 - **On this deployment the skew is nil.** `auth` and Postgres are containers on one host, sharing the kernel clock.
 - **The refusal is logged** (`totp_step_not_noted`), so a skewed host would show up.
 - **The rule would change if the database ever moved to another host.** Then the deploy gate should check clock sync, or the hook should refuse the sign-in instead. Nothing needs saying in SECURITY now.
+
+## 6. The new production dependencies in `packages/auth`, and the pin constraint
+
+Read from `git diff origin/main...HEAD` of `packages/auth/package.json`, `apps/web/package.json` and `pnpm-lock.yaml`, with the lockfile compared entry by entry. I ran no install and no `pnpm audit`.
+
+**Verdict: no breach of the constraint.** No better-auth, passkey or simplewebauthn version moves.
+
+- **`@better-auth/utils` 0.5.1 and `@simplewebauthn/server` 13.3.3 only become direct dependencies.**
+  - Both were already locked on `main` at exactly these versions, as dependencies of `better-auth` 1.7.18 and `@better-auth/passkey` 1.7.18.
+  - Their package and snapshot entries are identical in both lockfiles. The only new lines are the two importer entries under `packages/auth`.
+  - `better-auth`, `@better-auth/core` and `@better-auth/passkey` stay at 1.7.18, with unchanged entries.
+- **One new package enters the production install: `qrcode-generator` 2.0.4** (web), with no dependencies (§3). Nothing new enters the sign-in service's production install.
+- **The rest of the lockfile diff is development tooling, re-resolved because the root `package.json` pins them as `latest`:**
+  - eslint 10.14.0 → 10.15.0, with `@eslint/config-array` 0.23.6, `minimatch` 11.0.9 and its new `@isaacs/nonrecursive-glob-match` 1.1.0;
+  - turbo 2.11.11 → 2.11.13;
+  - vitest 5.1.0 → 5.1.1.
+
+  All of these sit under the root importer's `devDependencies`. The image installs with `pnpm install --frozen-lockfile --prod` (`Dockerfile:15`), so none ships. They are outside the constraint. The PR description should name them, so a reviewer does not take the lockfile churn for an auth change.
+- **Advisories, by reading** (spec):
+  - The one advisory for `@simplewebauthn/server` is GHSA-6hxq-p678-4hr2: low severity, attestation certificate-chain validation at *registration*, fixed in 13.3.2. 13.3.3 includes the fix, and the re-check uses only `generateAuthenticationOptions` and `verifyAuthenticationResponse`, which do no attestation.
+  - I did not check `@better-auth/utils` 0.5.1, `qrcode-generator` 2.0.4 or the dev bumps against an advisory database (unmeasured). The CI audit job covers that.
+- **One thing for POLY-137's S9 test and any later better-auth bump.** `packages/auth` now pins `@simplewebauthn/server` and `@better-auth/utils` directly.
+  - A better-auth or passkey bump that moves either of them would install a second copy beside ours instead of moving ours.
+  - The bump must move all four pins together, and S9 should fail if the lockfile holds two versions of either package.
