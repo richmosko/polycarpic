@@ -414,4 +414,27 @@ CREATE OR REPLACE FUNCTION app.guard_passkey() RETURNS trigger
   END
   $$;--> statement-breakpoint
 
+-- A factor's deletion (0013's body): the kind is chosen by table before any row field is read, because a passkey row has no `verified`.
+CREATE OR REPLACE FUNCTION app.refuse_last_method() RETURNS trigger
+  LANGUAGE plpgsql
+  SET search_path = ''
+  AS $$
+  DECLARE
+    v_kind text;
+  BEGIN
+    IF current_user = 'poly_govern' OR (SELECT r.rolsuper FROM pg_catalog.pg_roles r WHERE r.rolname = current_user) THEN
+      RETURN OLD;
+    END IF;
+    IF TG_TABLE_NAME = 'passkey' THEN
+      v_kind := 'passkey';
+    ELSIF OLD.verified THEN
+      v_kind := 'two_factor';
+    ELSE
+      v_kind := 'two_factor_unverified';
+    END IF;
+    PERFORM app.check_factor_removal(OLD.user_id, v_kind, OLD.id);
+    RETURN OLD;
+  END
+  $$;--> statement-breakpoint
+
 REVOKE CREATE ON SCHEMA app FROM poly_govern;
