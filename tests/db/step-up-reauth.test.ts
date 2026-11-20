@@ -1,6 +1,5 @@
 // POLY-150h (ruling Addendum 3 A6 T1-T9 and C3, and Addendum 4's error table): Confirm it's you, through the real handler on poly_auth. Real Postgres.
-// The backup-code path (A3.3, T6) is NOT written: D7 is with the Principal. The one backup-code test here asserts the refusal Addendum 4 gives until D7 is
-// decided: `method_refused`; it is marked [D7] and goes when D7 is decided (b).
+// D7 is decided (b) (Addendum 5): a backup code is a re-check, so the backup-code path (A3.3, T6) is tested here, and `method_refused` is gone.
 // Every refusal reads `recent_auth_at` back unchanged. Titles end [red if: ...]. Red today: the three routes are not in AUTH_ROUTES (404) and 0019 does not exist.
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PW, boot, post, teardown, type Env } from './helpers/auth';
@@ -126,15 +125,6 @@ describe('T1 replay, and the errors table (status and code, one per row)', () =>
     }
     expect(stamp(s.id)).toBe('NULL');
   });
-  it('[D7] 400 method_refused for a backup code, on begin and on reauth, until D7 is decided (b): nothing is stamped and no code is consumed [red if: a backup code is accepted before D7 is decided]', async () => {
-    const { f, s } = await setup();
-    const b1 = await call(f, s, '/second-step/reauth/begin', { method: 'backup_code' });
-    expect([b1.status, (await json(b1)).code]).toEqual([400, 'method_refused']);
-    const b = await begin(f, s);
-    const r = await call(f, s, '/second-step/reauth', { challengeId: b.j.challengeId, password: PW, backupCode: f.backupCodes[0] });
-    expect([r.status, (await json(r)).code]).toEqual([400, 'method_refused']);
-    expect(stamp(s.id)).toBe('NULL');
-  });
   it('403 no_second_step for a user with no second step; 403 method_unavailable for a method the user has not set up [red if: begin opens a challenge it cannot finish]', async () => {
     const u = e.seedUser();
     const sess = sessionWithHandle(e.db, u.id);
@@ -172,6 +162,93 @@ describe('T1 replay, and the errors table (status and code, one per row)', () =>
     const old = await reauth(f, s, b.j.challengeId);
     expect([old.status, (await json(old)).code], 'an expired challenge').toEqual([403, 'challenge_expired']);
     expect(stamp(s.id)).toBe('NULL');
+  });
+});
+
+describe('D7 (b): a backup code is a re-check, with the password (A3.3: the stamp first, then the list, under the deferred evidence check)', () => {
+  const listOf = (uid: string) => must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${uid}'`, e.db).rows[0]![0]!;
+  const bc = (f: Factor, s: S, challengeId: string, backupCode: string, password = PW) => call(f, s, '/second-step/reauth', { challengeId, password, backupCode });
+  it('begin accepts backup_code; a right code with the password stamps the session, shortens the stored list, and writes a step_up row saying backup_code; the same code a second time is refused [red if: a backup code cannot re-check, is reusable, or the list is not written (T6)]', async () => {
+    const { f, s } = await setup();
+    const before = listOf(f.u.id);
+    const b = await call(f, s, '/second-step/reauth/begin', { method: 'backup_code' });
+    expect(b.status, JSON.stringify(await json(b))).toBe(200);
+    const id = (await json(b)).challengeId;
+    const r = await bc(f, s, id, f.backupCodes[0]!);
+    expect(r.status, JSON.stringify(await json(r))).toBe(200);
+    expect(stamp(s.id)).not.toBe('NULL');
+    expect(listOf(f.u.id), 'the stored list changed in the same transaction').not.toBe(before);
+    expect(must(`SELECT method FROM app.sign_in_record WHERE user_id = '${f.u.id}' AND kind = 'step_up'`, e.db).rows[0]![0]).toBe('backup_code');
+    // used twice: refused, in a fresh session
+    const s2 = await stale(f);
+    const b2 = await call(f, s2, '/second-step/reauth/begin', { method: 'backup_code' });
+    const again = await bc(f, s2, (await json(b2)).challengeId, f.backupCodes[0]!);
+    expect([again.status, (await json(again)).code], 'a used code never works twice').toEqual([403, 'step_up_failed']);
+    expect(stamp(s2.id)).toBe('NULL');
+    // a different code still works
+    const b3 = await call(f, s2, '/second-step/reauth/begin', { method: 'backup_code' });
+    expect((await bc(f, s2, (await json(b3)).challengeId, f.backupCodes[1]!)).status).toBe(200);
+  });
+  it('a wrong password with a right code, and a wrong code with the right password, are the one step_up_failed answer and consume no code [red if: a refusal spends a backup code]', async () => {
+    const { f, s } = await setup();
+    const before = listOf(f.u.id);
+    const id = (await json(await call(f, s, '/second-step/reauth/begin', { method: 'backup_code' }))).challengeId;
+    const a = await bc(f, s, id, f.backupCodes[0]!, 'wrong wrong wrong');
+    const b = await bc(f, s, id, 'not-a-backup-code');
+    expect([a.status, (await json(a)).code, b.status, (await json(b)).code]).toEqual([403, 'step_up_failed', 403, 'step_up_failed']);
+    expect(listOf(f.u.id)).toBe(before);
+    expect(stamp(s.id)).toBe('NULL');
+  });
+  it('A3.3 in both orders, as poly_auth SQL: a stamp with the list unwritten fails at COMMIT and rolls everything back; the list written before the stamp is refused by guard #5 [red if: a stamp can stand without the list write, or the list can be written without the stamp]', async () => {
+    const { f, s } = await setup();
+    const before = listOf(f.u.id);
+    const step = 0;
+    const noList = await fails(fx.committed('poly_auth', f.u.id, s.id, async (q) => {
+      const id = (await q('SELECT app.begin_step_up($1, $2)', ['backup_code', null])).rows[0].begin_step_up;
+      await q('SELECT app.complete_step_up($1, $2, $3)', ['backup_code', id, step]); // the stamp, and the list is never written
+    }));
+    expect(noList, 'the deferred evidence check raises at commit').not.toBeNull();
+    expect(stamp(s.id), 'the whole transaction rolled back, the stamp included').toBe('NULL');
+    expect(e.count(`SELECT 1 FROM app.step_up_challenge WHERE session_id = '${s.id}'`), 'and the challenge is as it was (none: begin rolled back too)').toBe(0);
+    const first = await fails(fx.marked('poly_auth', f.u.id, s.id, (q) => q(`UPDATE public.two_factor SET backup_codes = 'replaced' WHERE user_id = $1`, [f.u.id])));
+    expect(codeOf(first), 'the list written before any stamp is refused by guard #5').toBe('42501');
+    expect(listOf(f.u.id)).toBe(before);
+  });
+  it('the shared counter and lock: 10 wrong backup codes lock the factor; during the lock a backup-code re-check answers 429 ACCOUNT_TEMPORARILY_LOCKED with no pausedFor and the code is not spent [red if: backup codes have their own counter or bypass the lock]', async () => {
+    const { f, s } = await setup();
+    const id = (await json(await call(f, s, '/second-step/reauth/begin', { method: 'backup_code' }))).challengeId;
+    for (let i = 0; i < 10; i++) expect((await json(await bc(f, s, id, `wrong-${i}`))).code, `wrong backup code ${i + 1}`).toBe('step_up_failed');
+    expect(recordCount(e.db, f.u.id, 'second_step_failure')).toBe(10);
+    const before = listOf(f.u.id);
+    const locked = await bc(f, s, id, f.backupCodes[0]!);
+    expect(locked.status).toBe(429);
+    const j = await json(locked);
+    expect([j.code, j.pausedFor]).toEqual(['ACCOUNT_TEMPORARILY_LOCKED', undefined]);
+    expect(listOf(f.u.id), 'the right code during a lock is not consumed').toBe(before);
+    expect(stamp(s.id)).toBe('NULL');
+  });
+  it('an unknown method is still 400 invalid_request (nothing refuses a method by name now) [red if: the route is missing]', async () => {
+    const { f, s } = await setup();
+    const r = await call(f, s, '/second-step/reauth/begin', { method: 'sms' });
+    expect([r.status, (await json(r)).code]).toEqual([400, 'invalid_request']);
+  });
+});
+
+describe('a refused reused TOTP step rolls back: it neither counts as a wrong code nor resets the counter (seceng, Addendum 4)', () => {
+  it('with failed_verification_count at 3, a reused step is refused 403 step_up_failed and the count is still 3, no second_step_failure row is added [red if: a reuse counts as a wrong code, or resets the counter]', async () => {
+    const f = await factor(e, mails);
+    const { heldSignIn } = await import('./helpers/auth-service');
+    const held = await heldSignIn(e, f.auth, f.u.email);
+    const code = totp(f.secret);
+    expect((await e.handle(post('/two-factor/verify-totp', { code }, held.cookie), f.auth)).status).toBe(200); // spends the step
+    const s = await stale(f);
+    must(`BEGIN; SET LOCAL session_replication_role = replica; UPDATE public.two_factor SET failed_verification_count = 3 WHERE user_id = '${f.u.id}'; COMMIT;`, e.db);
+    const failures = recordCount(e.db, f.u.id, 'second_step_failure');
+    const b = await begin(f, s);
+    const r = await reauth(f, s, b.j.challengeId, { code });
+    expect([r.status, (await json(r)).code]).toEqual([403, 'step_up_failed']);
+    expect(must(`SELECT failed_verification_count FROM public.two_factor WHERE user_id = '${f.u.id}'`, e.db).rows[0]![0], 'not +1 and not reset').toBe('3');
+    expect(recordCount(e.db, f.u.id, 'second_step_failure')).toBe(failures);
   });
 });
 

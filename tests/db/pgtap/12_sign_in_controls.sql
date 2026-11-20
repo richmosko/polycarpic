@@ -112,4 +112,13 @@ SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn WHERE prosrc
   'no function in scope contains a dynamic EXECUTE (a string run that way escapes every text scan; seceng review section 14)');
 SELECT is((SELECT p.prosrc !~* 'clock_timestamp' FROM pg_proc p WHERE p.oid = to_regprocedure('app.guard_second_step_lock()')), false, 'the guard reads clock_timestamp(), not now() and no setting');
 
+-- 5. POLY-150 Addendum 5: a TRUNCATE fires no row trigger, so it could remove every method with no audit row. Both method tables refuse it.
+SELECT is((SELECT array_agg(c.relname || ':' || t.tgname || ':' || t.tgenabled::text || ':' || ((t.tgtype & 1) = 0)::text || ':' || ((t.tgtype & 2) = 2)::text || ':' || ((t.tgtype & 32) = 32)::text || ':' || p.proname ORDER BY c.relname)
+  FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid JOIN pg_proc p ON p.oid = t.tgfoid
+  WHERE NOT t.tgisinternal AND t.tgname IN ('two_factor_no_truncate', 'passkey_no_truncate')),
+  ARRAY['passkey:passkey_no_truncate:O:true:true:true:refuse_truncate', 'two_factor:two_factor_no_truncate:O:true:true:true:refuse_truncate'],
+  'two_factor_no_truncate and passkey_no_truncate exist, are enabled, and are statement-level BEFORE TRUNCATE running app.refuse_truncate()');
+SELECT is((SELECT array_agg(r || ' ' || t ORDER BY r, t) FROM unnest(ARRAY['poly_app','poly_auth','poly_worker','poly_operator','poly_migrator']) r, unnest(ARRAY['public.two_factor','public.passkey']) t
+  WHERE has_table_privilege(r, t, 'TRUNCATE')), NULL::text[], 'no login role holds TRUNCATE on two_factor or passkey');
+
 ROLLBACK;
