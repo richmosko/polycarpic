@@ -1,7 +1,7 @@
 ---
 id: POLY-150a
 title: Second-step screens design
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-150
 blocked_by: []
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-150.md, process/cairn/reviews/POLY-150/**, pro
 stage: plan
 estimate.cost_usd: "8.00"
 estimate.gate_cycles: 3
-labels: [design, security]
+actual.cost_usd: "21.0479"
+actual.tokens: 51071751
+actual.gate_cycles: 10
+actual.wall_clock: 279
+ratio: "2.63"
+labels: [design, security, bloat]
 priority: null
 pr: null
 created: 2026-11-19
