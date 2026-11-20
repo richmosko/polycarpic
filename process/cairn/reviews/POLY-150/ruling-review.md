@@ -699,3 +699,20 @@ If the Principal picks (b), tell them plainly: a found backup code plus the pass
 - The password should not outlive its own request, as in the set-up dialog (R3.2, R3.3).
 - A refused code is of no further use.
 - `step_up_failed` does not say which of the two was wrong, so asking for both again is also the honest prompt.
+
+**`refuse_last_method` replaced at `ddd4e614`: ACCEPT** (code-read and spec; I ran nothing).
+- **Nothing is loosened.** The new body matches 0013's (0013:727-740) line for line, with one change: the CASE becomes IF/ELSIF on `TG_TABLE_NAME`.
+  - It is still an invoker with `search_path = ''`.
+  - It makes the same early return for poly_govern and superusers, which is `reset-mfa`'s path, and only that.
+  - It gives the same three kinds to the same `check_factor_removal`, unchanged: own user, row lock, fresh step-up, then the count of methods left against `second_step_needed`.
+  - So a verified TOTP as the last method and the last passkey with no TOTP are each refused `second_step_required` exactly as ruled, and an unverified TOTP row is still let through.
+- **What 0013 did before this loop** (spec: PL/pgSQL resolves every record field an expression names when it runs the expression, so a CASE does not short-circuit a missing field):
+  - **every passkey DELETE by a non-exempt role raised 42703**, refusing the owner's own deletion of any passkey, last or not, viewers included;
+  - TOTP deletes were unaffected;
+  - so it **never removed anything wrongly; it refused too much**, failing closed;
+  - `reset-mfa`'s deletes were unaffected, because the exemption returns before the expression.
+- **The masking.** POLY-89's passkey-delete test (`second-step-gates.test.ts:373-377`) asserts only that the delete fails, so it passed on the 42703.
+- **Required in the tests, not the ruling:** every refusal test on the method tables asserts the SQLSTATE and message (`42501` with `second_step_required` or `step_up_required`), not just a failure. Add positive cases:
+  - a viewer deletes their own passkey;
+  - a manager with TOTP and a passkey deletes the passkey after a re-check.
+- **No pgTAP test pins the body.** Only `second-step-gates.test.ts:296`'s catalog list names it, and pgTAP 12 and the gate check its triggers. The behaviour tests above are the pin.
