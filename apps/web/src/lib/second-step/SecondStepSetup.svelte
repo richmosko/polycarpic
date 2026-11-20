@@ -98,6 +98,17 @@
     if (to) void goto(to);
   }
 
+  /** Arrow keys move the choice, as a radio group does: only the checked card is in the tab order. */
+  function chooseByKey(e: KeyboardEvent) {
+    const step = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    method = method === 'app' ? 'passkey' : 'app';
+    error = '';
+    const cards = (e.currentTarget as HTMLElement).querySelectorAll<HTMLElement>('[role="radio"]');
+    cards[method === 'app' ? 0 : 1]?.focus();
+  }
+
   const cleanly = (e: SubmitEvent, run: () => Promise<void>) => {
     e.preventDefault();
     if (busy) return;
@@ -301,7 +312,7 @@
               </div>
             </form>
           {:else if step === 'method'}
-            <div role="radiogroup" aria-label="Second step method" class="grid gap-2 sm:grid-cols-2">
+            <div role="radiogroup" aria-label="Second step method" class="grid gap-2 sm:grid-cols-2" tabindex="-1" onkeydown={chooseByKey}>
               {#each [{ id: 'app', name: 'Authenticator app', text: 'A 6-digit code from an app on your phone. Works on every device.' }, { id: 'passkey', name: 'Passkey', text: 'Touch ID, Face ID or a security key on this device.' }] as m (m.id)}
                 <button
                   type="button"
