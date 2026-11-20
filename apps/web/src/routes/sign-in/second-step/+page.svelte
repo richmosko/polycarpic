@@ -3,6 +3,7 @@
   // the sign-in service keeps at /api/auth. The page is the same for every caller: no email, no list of factors, no "passkey available". Every
   // write is a browser fetch to /api/auth/*. Wrong codes read one way and show no count of tries; a lock shows no time (D1, D6 a).
   import { safeNext } from '../../../lib/safe-next';
+  import Icon from '../../../lib/shell/Icon.svelte';
   import { api } from '../../../lib/second-step/auth-api';
   import { getCredential, type RequestOptionsJSON } from '../../../lib/second-step/webauthn';
 
@@ -81,7 +82,7 @@
       <p class="text-muted-foreground text-sm">Enter the code from your authenticator app.</p>
       <div class="flex flex-col gap-1">
         <label for="si-code" class="text-sm">6-digit code</label>
-        <input id="si-code" class="{field} font-mono tracking-widest" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" bind:value={code} aria-invalid={error ? 'true' : undefined} required />
+        <input id="si-code" class="{field} font-mono text-xl tracking-[0.4em] text-center" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" bind:value={code} aria-invalid={error ? 'true' : undefined} required />
         {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
       </div>
       <button type="submit" class={primary} disabled={busy}>Continue</button>
@@ -116,7 +117,7 @@
   {:else if view === 'locked'}
     <h1 class="font-heading text-xl font-semibold">Codes are paused</h1>
     <p class="text-muted-foreground text-sm">Too many wrong codes were entered.</p>
-    <div role="status" class="border-border bg-card rounded-md border p-3 text-sm"><strong>Codes are paused for this account.</strong> {#if when}They work again {when}. Use a passkey, or try again then.{:else}Use a passkey, or try again later.{/if}</div>
+    <div role="status" class="flex items-start gap-2 rounded-md bg-[color-mix(in_srgb,var(--warning)_14%,var(--card))] p-3 text-sm text-warning-foreground dark:text-warning"><Icon name="clock" class="mt-0.5 size-4 shrink-0" /><span><strong>Codes are paused for this account.</strong> {#if when}They work again {when}. Use a passkey, or try again then.{:else}Use a passkey, or try again later.{/if}</span></div>
     {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
     <button type="button" class={primary} onclick={usePasskey}>Use a passkey</button>
     <p class={reset}>If this wasn't you, someone may know your password. Once you're in, change it in Settings.</p>

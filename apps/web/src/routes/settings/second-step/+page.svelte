@@ -45,7 +45,7 @@
 <h1 class="font-heading mb-4 text-xl font-semibold">Settings</h1>
 
 {#if data.held}
-  <p role="status" class="border-border bg-card mb-4 max-w-2xl rounded-md border p-3 text-sm">Your role needs a second step before you can use shared entities. Set one up to carry on.</p>
+  <p role="status" class="border-border bg-card mb-4 max-w-2xl rounded-md border p-3 text-sm">You own or manage an entity shared with others, so your account needs a second step before you can go on. Until then, only this page opens. Your entities and their books are unchanged.</p>
 {/if}
 
 <section id="second-step" class="bg-card border-border max-w-2xl rounded-xl border p-5">

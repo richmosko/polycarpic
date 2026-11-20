@@ -6,6 +6,7 @@
   import { beforeNavigate, goto, invalidateAll } from '$app/navigation';
   import { onDestroy } from 'svelte';
   import { safeNext } from '../safe-next';
+  import Icon from '../shell/Icon.svelte';
   import { api } from './auth-api';
   import { createCredential, type CreationOptionsJSON } from './webauthn';
   import { keyFromUri, qrPath } from './qr';
@@ -217,6 +218,9 @@
       await sendNow(); // a refusal is shown on this step
     });
 
+  async function copyKey() {
+    await navigator.clipboard?.writeText(key.replace(/\s/g, '')).catch(() => {});
+  }
   async function copyAll() {
     await navigator.clipboard?.writeText(codes.join('\n')).catch(() => {});
   }
@@ -286,7 +290,7 @@
               <p>We've asked for a code to be sent to <span class="font-mono">{sentTo || 'your account email'}</span>. It can take a few minutes. This confirms it's really you before your first second step is set up.</p>
               <div class="flex flex-col gap-1">
                 <label for="ssd-code">Code from the email</label>
-                <input id="ssd-code" class="{field} font-mono tracking-widest" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" bind:value={code} aria-invalid={error ? 'true' : undefined} required />
+                <input id="ssd-code" class="{field} font-mono text-xl tracking-[0.4em] text-center" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" bind:value={code} aria-invalid={error ? 'true' : undefined} required />
                 {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
               </div>
               <p class="text-muted-foreground text-xs">
@@ -369,11 +373,12 @@
                 <div>
                   Scan this with your authenticator app, or enter the key by hand:
                   <div class="text-foreground mt-1.5 font-mono" data-testid="totp-key">{key}</div>
+                  <button type="button" class="{ghost} mt-1 -ml-3 inline-flex items-center gap-1.5" onclick={copyKey}><Icon name="copy" class="size-4" />Copy key</button>
                 </div>
               </div>
               <div class="flex flex-col gap-1">
                 <label for="ssd-totp">Enter the 6-digit code it shows</label>
-                <input id="ssd-totp" class="{field} font-mono tracking-widest" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" bind:value={code} aria-invalid={error ? 'true' : undefined} required />
+                <input id="ssd-totp" class="{field} font-mono text-xl tracking-[0.4em] text-center" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" bind:value={code} aria-invalid={error ? 'true' : undefined} required />
                 {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
               </div>
               <p class="text-muted-foreground text-xs">Next you get ten backup codes to keep somewhere safe.</p>

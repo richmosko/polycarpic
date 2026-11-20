@@ -5,7 +5,8 @@
   // as the set-up dialog: the password and code live only here and go on every way out. A backup code is the lost-phone path (D7 b).
   import { Dialog } from 'bits-ui';
   import { invalidateAll } from '$app/navigation';
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
+  import Icon from '../shell/Icon.svelte';
   import { api } from './auth-api';
   import { getCredential, type RequestOptionsJSON } from './webauthn';
 
@@ -39,6 +40,7 @@
   let paused = $state(false);
   let signInAgain = $state(false);
   let busy = $state(false);
+  let pwEl = $state<HTMLInputElement | null>(null);
 
   const clear = () => {
     password = '';
@@ -102,7 +104,10 @@
       password = ''; // a refusal clears both: the password does not outlive its request, and step_up_failed does not say which was wrong
       code = '';
       backupCode = '';
-      refused(r); // a wrong password or code does not consume the challenge, so the same one is retried
+      refused(r);
+      await tick();
+      pwEl?.focus(); // back to the password: both fields are empty and the one message above them names neither
+      // a wrong password or code does not consume the challenge, so the same one is retried
     } finally {
       busy = false;
     }
@@ -143,7 +148,7 @@
       <Dialog.Description class="text-muted-foreground mt-1 text-sm">{action} needs a fresh check. You won't be asked again for 5 minutes.</Dialog.Description>
       <div class="mt-4 flex flex-col gap-3 text-sm">
         {#if paused}
-          <div role="status" class="border-border bg-background rounded-md border p-3"><strong>Codes are paused</strong> after too many wrong codes. Try again later.</div>
+          <div role="status" class="flex items-start gap-2 rounded-md bg-[color-mix(in_srgb,var(--warning)_14%,var(--card))] p-3 text-sm text-warning-foreground dark:text-warning"><Icon name="clock" class="mt-0.5 size-4 shrink-0" /><span><strong>Codes are paused</strong> after too many wrong codes. Try again later.</span></div>
           {#if hasPasskey}<p class="text-muted-foreground text-xs">Use a passkey if you have one; it still works.</p>{/if}
           <div class="flex justify-end gap-2">
             <button type="button" class={ghost} onclick={close}>Cancel</button>
@@ -161,14 +166,14 @@
           </div>
         {:else if method === 'backup_code'}
           <form onsubmit={submit} class="flex flex-col gap-3">
+            {#if error}<p id="ciy-msg" role="alert" class="text-destructive text-sm">{error}</p>{/if}
             <div class="flex flex-col gap-1">
               <label for="ciy-pw-b">Password</label>
-              <input id="ciy-pw-b" class={field} type="password" autocomplete="current-password" bind:value={password} required />
+              <input id="ciy-pw-b" bind:this={pwEl} class={field} type="password" autocomplete="current-password" aria-describedby={error ? 'ciy-msg' : undefined} bind:value={password} required />
             </div>
             <div class="flex flex-col gap-1">
               <label for="ciy-backup">Backup code</label>
-              <input id="ciy-backup" class="{field} font-mono" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="xxxxx-xxxxx" bind:value={backupCode} aria-invalid={error ? 'true' : undefined} required />
-              {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
+              <input id="ciy-backup" class="{field} font-mono" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="xxxxx-xxxxx" aria-describedby={error ? 'ciy-msg' : undefined} bind:value={backupCode} required />
             </div>
             <p class="text-muted-foreground text-xs">Each backup code works once. <button type="button" class={link} onclick={() => begin('totp')}>Use your authenticator app</button></p>
             <div class="flex justify-end gap-2">
@@ -178,14 +183,14 @@
           </form>
         {:else}
           <form onsubmit={submit} class="flex flex-col gap-3">
+            {#if error}<p id="ciy-msg" role="alert" class="text-destructive text-sm">{error}</p>{/if}
             <div class="flex flex-col gap-1">
               <label for="ciy-pw">Password</label>
-              <input id="ciy-pw" class={field} type="password" autocomplete="current-password" bind:value={password} required />
+              <input id="ciy-pw" bind:this={pwEl} class={field} type="password" autocomplete="current-password" aria-describedby={error ? 'ciy-msg' : undefined} bind:value={password} required />
             </div>
             <div class="flex flex-col gap-1">
               <label for="ciy-code">Code from your authenticator app</label>
-              <input id="ciy-code" class="{field} font-mono tracking-widest" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" bind:value={code} aria-invalid={error ? 'true' : undefined} required />
-              {#if error}<p role="alert" class="text-destructive text-xs">{error}</p>{/if}
+              <input id="ciy-code" class="{field} font-mono text-xl tracking-[0.4em] text-center" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" aria-describedby={error ? 'ciy-msg' : undefined} bind:value={code} required />
             </div>
             <p class="text-muted-foreground text-xs">
               <button type="button" class={link} onclick={usePasskey}>Use a passkey instead</button> ·
