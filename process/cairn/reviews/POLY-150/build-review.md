@@ -116,3 +116,12 @@ Everything below is code-read against `3607aa34`.
 - **§9:** method changes are audited by the database.
 - **New T-105:** a forged or replayed re-check, or a planted method.
 - **C-04:** the address the limit keys on, and its dependence on Caddy until POLY-138.
+
+**Verdict deviation 6 (`noteTotpStepHook` lets a sign-in stand when `note_totp_step` refuses the step): acceptable as is. No SECURITY change** (code-read).
+- **Only one direction of clock skew opens a gap.** Both definers test the step against the same database clock, ±1 step.
+  - If the service's clock is **behind** the database's, a step refused at sign-in is further out of the window by the time of any re-check, so `complete_step_up` refuses it too.
+  - Only a service clock **ahead** by at least a full step (30 s or more) lets that one code pass a re-check later, while the database clock catches up: at most about a minute.
+- **Using that gap still takes the user's session, their password and the code seen at sign-in.**
+- **On this deployment the skew is nil.** `auth` and Postgres are containers on one host, sharing the kernel clock.
+- **The refusal is logged** (`totp_step_not_noted`), so a skewed host would show up.
+- **The rule would change if the database ever moved to another host.** Then the deploy gate should check clock sync, or the hook should refuse the sign-in instead. Nothing needs saying in SECURITY now.
