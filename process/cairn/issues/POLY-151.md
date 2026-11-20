@@ -1,7 +1,7 @@
 ---
 id: POLY-151
 title: Confirm it's you route
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -10,7 +10,7 @@ labels: [security]
 priority: null
 pr: https://github.com/richmosko/polycarpic/pull/141
 created: 2026-11-16
-updated: 2026-11-19
+updated: 2026-11-20
 ---
 
 Nothing writes `recent_auth_at` after first enrolment, so an enrolled user cannot add or remove a second-step method once the first 5 minutes pass. BetterAuth 1.7.18 has no TOTP re-check against an existing session, so the re-authentication route is ours to design and needs its own ruling with seceng's review before any test is written. Lands before POLY-110 and POLY-144. The screen is in the Second-step screens issue.
@@ -27,3 +27,7 @@ Nothing writes `recent_auth_at` after first enrolment, so an enrolled user canno
 ### @team-lead — 2026-11-19
 
 The Principal brought this issue into the POLY-150 loop (2026-11-19; `process/DECISIONS.md`). Its ruling is an addendum to `process/cairn/reviews/POLY-150/ruling.md`, its stages are POLY-150h (ruling) and POLY-150i (route build), and it ships in POLY-150's PR. This issue closes with that PR.
+
+### @team-lead — 2026-11-20
+
+Validate passed; merging via PR #141. Closing.

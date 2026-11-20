@@ -1,7 +1,7 @@
 ---
 id: POLY-150
 title: Second-step screens
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -37,3 +37,7 @@ Feature started. Branch: `feature/poly-150-second-step-screens`. Stages: POLY-15
 ### @team-lead — 2026-11-19
 
 PR opened: https://github.com/richmosko/polycarpic/pull/141. Gate code sha 3607aa34; docs and tracker only since. Carries POLY-151.
+
+### @team-lead — 2026-11-20
+
+Validate passed; merging via PR #141. Closing.
