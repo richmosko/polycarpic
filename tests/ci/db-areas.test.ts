@@ -29,7 +29,7 @@ const FILES = readdirSync(join(ROOT, 'tests/db')).filter((f) => f.endsWith('.tes
 
 // The ruling's table, pinned: which file belongs to which area.
 const TABLE: Record<(typeof AREAS)[number], string[]> = {
-  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins', 'second-step-lock', 'sign-in-record', 'revocation', 'enter-session-slide', 'sign-in-controls-pins', 'gate-check', 'second-step-screens', 'second-step-lock-band', 'step-up-reauth', 'method-audit', 'last-method-guard'],
+  auth: ['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins', 'second-step-lock', 'sign-in-record', 'revocation', 'enter-session-slide', 'sign-in-controls-pins', 'gate-check', 'second-step-screens', 'second-step-lock-band', 'step-up-reauth', 'method-audit', 'last-method-guard', 'auth-method-hold', 'auth-mail-flows', 'auth-notice-triggers', 'worker-mail-jobs'],
   tenancy: ['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap'],
   migrate: ['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'migration-0017', 'runner', 'template-clone'],
   ops: ['ops-status', 'ops-hardening'],
@@ -86,6 +86,15 @@ describe('C8 classify', () => {
     [['apps/worker/src/startup.ts'], ['auth'], 'the worker startup guard (imported by the CLI) dropped from auth / TABLE.db'],
     [['apps/worker/package.json'], ['auth'], 'the worker manifest dropped from auth / TABLE.db'],
     [['bin/polycarpic'], ['auth'], 'the image dispatcher (run as a child by the CLI test) dropped from auth / TABLE.db'],
+    // POLY-137: the four mail/hold files join auth only; the worker's job modules and @poly/mail run the auth area
+    [['tests/db/auth-method-hold.test.ts'], ['auth'], 'the new file is in no area, or in two'],
+    [['tests/db/auth-mail-flows.test.ts'], ['auth'], 'the new file is in no area, or in two'],
+    [['tests/db/auth-notice-triggers.test.ts'], ['auth'], 'the new file is in no area, or in two'],
+    [['tests/db/worker-mail-jobs.test.ts'], ['auth'], 'the new file is in no area, or in two'],
+    [['apps/worker/src/jobs/mail.ts'], ['auth'], 'apps/worker/src/jobs dropped from auth / TABLE.db'],
+    [['apps/worker/src/jobs/purge.ts'], ['auth'], 'apps/worker/src/jobs dropped from auth / TABLE.db'],
+    [['packages/mail/src/index.ts'], ['auth'], 'packages/mail dropped from auth / TABLE.db'],
+    [['packages/mail/src/fake.ts'], ['auth'], 'packages/mail dropped from auth / TABLE.db'],
     [['tests/db/ops-hardening.test.ts', 'tests/db/auth-session.test.ts'], ['auth', 'ops'], 'a union of two areas is lost'],
   ];
   for (const [paths, want, mut] of ONLY) {

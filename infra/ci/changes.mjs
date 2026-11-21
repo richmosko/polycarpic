@@ -20,8 +20,10 @@ export const DB_SHARED = [
 const T = (names) => names.map((n) => `tests/db/${n}.test.ts`);
 export const DB_AREAS = {
   auth: {
-    tests: T(['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins', 'second-step-lock', 'sign-in-record', 'revocation', 'enter-session-slide', 'sign-in-controls-pins', 'gate-check', 'second-step-screens', 'second-step-lock-band', 'step-up-reauth', 'method-audit', 'last-method-guard']),
-    paths: [/^apps\/auth\//, /^packages\/auth\//, /^packages\/tenancy\//, /^apps\/worker\/src\/cli\//, /^apps\/worker\/src\/startup\.ts$/, /^apps\/worker\/package\.json$/, /^bin\/polycarpic$/, /^infra\/postgres\/gate-check\.(sh|sql)$/],
+    tests: T(['auth-client-ip', 'auth-fields', 'auth-route-policy', 'auth-routing-pool', 'auth-second-step', 'auth-session', 'second-step-flow', 'second-step-gates', 'second-step-challenge', 'second-step-reset', 'auth-signup-wrap', 'auth-signup-invite', 'auth-new-user-step', 'operator-invite', 'identity-marker', 'auth-enter-session', 'auth-provision-person', 'auth-service-grants', 'auth-signin-tx', 'auth-refresh', 'auth-service-main', 'session-handle-enter', 'session-handle-attach', 'session-handle-definers', 'session-handle-signin', 'session-handle-paths', 'session-handle-pins', 'second-step-lock', 'sign-in-record', 'revocation', 'enter-session-slide', 'sign-in-controls-pins', 'gate-check', 'second-step-screens', 'second-step-lock-band', 'step-up-reauth', 'method-audit', 'last-method-guard', 'auth-method-hold', 'auth-mail-flows', 'auth-notice-triggers', 'worker-mail-jobs']),
+    paths: [/^apps\/auth\//, /^packages\/auth\//, /^packages\/tenancy\//, /^apps\/worker\/src\/cli\//, /^apps\/worker\/src\/startup\.ts$/, /^apps\/worker\/package\.json$/, /^bin\/polycarpic$/, /^infra\/postgres\/gate-check\.(sh|sql)$/,
+      // POLY-137: the worker's job modules and the mailer package are imported by the auth area's mail tests
+      /^apps\/worker\/src\/jobs\//, /^packages\/mail\//],
   },
   tenancy: {
     tests: T(['tenancy', 'matrix', 'wrappers', 'battery', 'pgtap']),
@@ -52,6 +54,7 @@ export const TABLE = {
   db: [
     /^tests\/db\//, /^packages\/tenancy\//, /^packages\/auth\//, /^apps\/auth\//,
     /^apps\/worker\/src\/cli\//, /^apps\/worker\/src\/startup\.ts$/, /^apps\/worker\/package\.json$/, /^bin\/polycarpic$/,
+    /^apps\/worker\/src\/jobs\//, /^packages\/mail\//,
     /^infra\/postgres\/gate-check\.(sh|sql)$/,
     /^apps\/web\/src\/ops\//, /^apps\/web\/src\/main\.ts$/, /^apps\/web\/src\/startup\.ts$/, /^tests\/log\//,
     ...DB_SHARED,
