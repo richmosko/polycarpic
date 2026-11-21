@@ -1,0 +1,46 @@
+name: renovate-check
+
+# POLY-138 ruling D1 (b): a read-only weekly look-up for the pins Renovate watches (renovate.json: the two derivative
+# Dockerfiles). It opens nothing: no token, no secret, no write permission, and Renovate runs with --platform=local and
+# --dry-run=lookup. The run fails when a dependency has an update, and the red scheduled run is the notification; a
+# human makes the one-to-three line bump. Triggers are schedule and workflow_dispatch only.
+
+on:
+  schedule:
+    - cron: "47 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lookup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Renovate look-up (read-only)
+        run: |
+          set -euo pipefail
+          out="$(mktemp -d)"
+          chmod 777 "$out"
+          docker run --rm \
+            -v "$PWD:/repo:ro" -w /repo \
+            -v "$out:/out" \
+            -e LOG_LEVEL=info \
+            -e RENOVATE_REPORT_TYPE=file \
+            -e RENOVATE_REPORT_PATH=/out/report.json \
+            renovate/renovate@sha256:d6b65ff3562dd499240b23d34ef806ec7e5fd2675e4236a027dfb36774f2aa75 \
+            renovate --platform=local --dry-run=lookup
+          test -s "$out/report.json"
+          due="$(jq -r '.repositories[].packageFiles[][] | .packageFile as $f | .deps[] | select((.updates // []) | length > 0) | "\($f): \(.depName) \(.currentValue // "") -> \([.updates[] | (.newValue // "") + (if .newDigest then "@" + .newDigest else "" end)] | join(", "))"' "$out/report.json")"
+          if [ -n "$due" ]; then
+            echo "Updates are due; bump the line named below, run the DB battery, and merge:"
+            echo "$due"
+            exit 1
+          fi
+          echo "No update is due."
