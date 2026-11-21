@@ -40,3 +40,22 @@ The branch runs 2 and 3 were at `2f65e869` plus the test-id fix (before the comp
 - Single-file db runs of every `tests/db` file in the auth area, `pgtap` and `gate-check-membership` were run while migrating (see the commit history); the full run above supersedes them.
 - Rows: POLY-137's 15 rows are ticked with their proving tests (each line carries its `**Proof:**`).
 - Mutations: every test that was green on arrival has its mutation recorded in `red-run.md` (raw-path pair, signed-in `/API/AUTH` pair, `accountLockout`, lockfile, refused-by-hook).
+
+## Delta gate at cb27be1e11991fbc762904e59ea0fd4c07c9dd79: PASS
+
+Head: frontend `b82feb5f` (wording rows 17, 18, 29 and the three page titles: `cancel-method`, `forgot` and `reset` pages) and backend `cb27be1e` (the "not armed" mail phrase in `packages/mail/src/templates.ts`). Paths changed since `13c1e405` outside process files: the three `sign-in/*/+page.svelte` pages, `packages/mail/src/templates.ts`, `docs/ARCH`, `docs/DESIGN` (index and `styled-screens/login.html`), and my tests and `infra/ci/image.sh`. A clean tree again (generated folders and caches deleted, offline frozen install, `svelte-kit sync`), machine quiet.
+
+| Step | Result |
+|---|---|
+| `scripts/layers/check.mjs`, `eslint packages apps scripts/layers`, `check-migrations` | exit 0 each |
+| `turbo run typecheck --force` | 20 of 20, exit 0 |
+| `turbo run test --force` (web unit, `@poly/mail`, worker, auth, config, db packages, each from its own directory) | 19 of 19, exit 0; includes the wording pins (rows 17, 18, 29, titles) now green |
+| `tests/layers` | 556 passed |
+| `tests/ci` | 553 passed |
+| `tests/infra`, `tests/config` | 187 and 97 passed |
+| db files that read the mail text or the hold: `auth-mail-flows`, `worker-mail-jobs`, `auth-method-hold` | 62 passed |
+| e2e specs that touch `/sign-in` (`sign-in-flow`, `handle-cookie`, `shell-signed-in`, `second-step`, `second-step-held`, `second-step-locked`, `second-step-misc`) | 34 passed |
+
+**Carried from 13c1e405, and why:** the full `tests/db` run (58 files, 1400 passed; no `packages/db`, migration, gate-check or auth-service source changed since; the three files that read the changed mail text were re-run above), the full e2e run (80 passed; only the three pages' markup changed and every spec that touches `/sign-in` was re-run), and `tests/infra/image` (no Docker, compose or image path changed except `image.sh`, whose smoke CI ran green on `66096adc`).
+
+**The 15 ticks hold:** every proving test named on the ticked rows passed in this delta or in the carried full run; the wording changes touch rows 37 and 38's pages and mail text, whose tests are the ones re-run above.
