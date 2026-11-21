@@ -76,7 +76,26 @@ Reviewed: `process/cairn/reviews/POLY-138/ruling.md` @ `d3957dc2423ff7a146e46a03
 - *Cost:* a small change in the sign-in code plus a fixed address for Caddy, as a follow-up loop. It does not block the first deploy.
 - *Recommendation:* accept until that follow-up lands, as an Open Risk.
 
-## Follow-ups (the lead files after merge)
+## Delta review: replacement ruling @ `d5ead294a69f1da09ca1d25830e1f48904736182`
+
+**ACCEPT.** I reviewed the diff against `538c4bf1`. Each of the seven findings is answered:
+
+| Finding | Where the ruling answers it | Checked |
+|---|---|---|
+| 1 | R1 names the deploy condition; F5 | — |
+| 2 | R1 records the bypass and the ARCH correction; F6; my Open Risk | — |
+| 3 | R5: the existing `edge-network` rule plus two new fail fixtures | `infra/lint/compose-policy.mjs` lines 218, 221 and 248 already allow only `web` and `auth` on the edge networks, and only `caddy` in `edge.yml` |
+| 4 | The R2 test row | — |
+| 5 | R10 and D3 | Measured (M14) |
+| 6 | R3 and `caddy-log` refuse `debug`; the R3 row adds the accept-then-close case | Measured (M15) |
+| 7 | D1 | — |
+
+Two notes; neither changes the ruling:
+
+- **R10's own reach.** R10 stops a hijacked `web` from making a *page* stick in the cache. It does not reach altered bodies already cached under real `/_app/immutable/*` names. Only the `Clear-Site-Data` incident step clears those. My Incident Response and R-25 text will say so.
+- **R10 is not in the target Caddyfile block.** If D3 is taken, the build adds the snippet and its two imports (`caddy-cache` pins them). The lint must be checked against that text, not the R-text block.
+
+
 
 - F5. The post-deploy probe or `provision-check` asserts that Caddy sees the real client address: an IPv4 bind, `userland-proxy` off, and the probe's own address echoed back (finding 1).
 - F6. `auth` trusts `X-Forwarded-For` only from Caddy's fixed edge address; optionally `auth` gets its own database network (finding 2).
