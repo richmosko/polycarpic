@@ -165,7 +165,10 @@ describe('R3: no token reaches the Caddy logs', () => {
   const m = () => randomBytes(8).toString('hex');
   const uris = (t: string) => [`/sign-up?invitation=${t}`, `/api/auth/reset-password/${t}?callbackURL=${t}`, `/api/auth/magic-link/verify?token=${t}`, `/api/auth/callback/google?code=${t}&state=${t}`];
   const logs = () => { const r = sh('docker', ['logs', CADDY]); return r.out + '\n' + r.err; };
-  const hit = (t: string, extra: string[] = []) => uris(t).map((u) => get(`app.${DOMAIN}`, u, [...extra, '-H', `Referer: https://app.${DOMAIN}/x?r=${t}`, '-H', `Authorization: Bearer ${t}`, '-H', `Cookie: s=${t}`]).status);
+  // all four requests at once (curl --parallel): each 502 waits out lb_try_duration 10s, so serial requests cost 40 s per case
+  const statuses = (urls: string[], extra: string[]) => sh('curl', ['-ksS', '--parallel', '--parallel-max', '8', '-w', '%{http_code}\\n', '--max-time', '40', '--resolve', `app.${DOMAIN}:${PORT}:127.0.0.1`, ...extra,
+    ...urls.flatMap((u) => ['-o', '/dev/null', `https://app.${DOMAIN}:${PORT}${u}`])]).out.split('\n').map(Number);
+  const hit = (t: string, extra: string[] = []) => statuses(uris(t), [...extra, '-H', `Referer: https://app.${DOMAIN}/x?r=${t}`, '-H', `Authorization: Bearer ${t}`, '-H', `Cookie: s=${t}`]);
 
   // MEASURED 2026-11-21 (qa): with `handle_errors` in a site block (the ruled Caddyfile has it on both), Caddy writes NO
   // log line for the dial-failure 502 at all; ruling M9 was measured without handle_errors. So on the real stack no marker
@@ -205,7 +208,7 @@ describe('R3: no token reaches the Caddy logs', () => {
   it('an upstream that accepts and closes: no marker (Caddy may log nothing at the default level, which also passes)', { timeout: 240_000 }, () => {
     const t = m();
     const closing = (u: string) => u.replace(/^(\/[^?]*?)(\?|$)/, `$1/closeme$2`);
-    for (const u of uris(t)) get(`app.${DOMAIN}`, closing(u), ['-H', `Referer: https://app.${DOMAIN}/x?r=${t}`, '-H', `Cookie: s=${t}`]);
+    statuses(uris(t).map(closing), ['-H', `Referer: https://app.${DOMAIN}/x?r=${t}`, '-H', `Cookie: s=${t}`]);
     expect(logs().includes(t)).toBe(false); // red: a Caddy that starts logging this 502 unfiltered
   });
   it('a request that succeeds leaves no marker either', () => {
