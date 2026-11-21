@@ -6,6 +6,18 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { handle } from './hooks.server.ts';
 
+// A signed-in caller (seceng ruling-review §6): web's session gate is stubbed to a live session, so the request passes the gate and the path
+// itself is what is tested. @poly/db and @poly/tenancy are mocked; @poly/auth is spied to show web never reaches the auth service.
+const dbm = vi.hoisted(() => ({ executed: [] as string[], authCalls: 0 }));
+vi.mock('@poly/db', () => ({
+  NoLiveSession: class extends Error {},
+  sql: (s: TemplateStringsArray) => s.join(''),
+  withSession: async (_h: string, fn: (tx: unknown, row: unknown) => unknown) =>
+    fn({ execute: async (q: string) => { dbm.executed.push(String(q)); return { rows: [{ r: false }] }; } }, { userId: 'u1', name: 'Ada', image: null, expiresAt: new Date(Date.now() + 1e6) }),
+}));
+vi.mock('@poly/tenancy', () => ({ provisionPerson: async () => {} }));
+vi.mock('@poly/auth', () => ({ handleAuthRequest: () => { dbm.authCalls++; return new Response('auth'); } }));
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const route = (p: string) => join(HERE, 'routes', ...p.split('/'));
 const read = (p: string) => (existsSync(route(p)) ? readFileSync(route(p), 'utf8') : null);
@@ -78,6 +90,21 @@ describe('R8 /API/AUTH/...: the raw pathname is never taken for the tree, and we
       expect(resolve).not.toHaveBeenCalled();
       expect([404, 303]).toContain(res.status);
       if (res.status === 303) expect(res.headers.get('location')).toMatch(/^\/sign-in\?/);
+    });
+  }
+  for (const p of ['/API/AUTH/get-session', '/Api/Auth/list-sessions']) {
+    it(`${p} signed in: passes the gate, the router answers 404, and no auth service or BetterAuth table is touched [red if: the case variant is served, proxied or treated as the auth tree]`, async () => {
+      const url = new URL(`https://app.qa.test${p}`);
+      const resolve = vi.fn(async () => new Response('not found', { status: 404 })); // SvelteKit has no such route
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      dbm.executed.length = 0;
+      const event = { url, request: new Request(url), locals: {}, cookies: { get: (n: string) => (n === '__Host-poly_handle' ? 'live-handle' : undefined), set: vi.fn(), delete: vi.fn() }, setHeaders: vi.fn(), getClientAddress: () => '127.0.0.1' };
+      const res = await (handle as (a: unknown) => Promise<Response>)({ event, resolve });
+      expect(res.status).toBe(404);
+      expect(dbm.authCalls, 'the auth service is never called').toBe(0);
+      expect(fetchSpy, 'nothing is proxied').not.toHaveBeenCalled();
+      expect(dbm.executed.join('\n'), 'no BetterAuth table is named').not.toMatch(/"user"|public\.session|two_factor|passkey/);
+      fetchSpy.mockRestore();
     });
   }
   it('the exact tree stays 404, so the raw-pathname test above is not passing for the wrong reason  [red if: the tree check is lost]', async () => {

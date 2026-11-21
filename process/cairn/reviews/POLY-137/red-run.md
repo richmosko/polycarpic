@@ -55,6 +55,7 @@ tests/db (one file each) vitest run --config tests/db/vitest.config.ts tests/db/
 |---|---|---|
 | `raw-path-137` (apps/auth), 4 cases | the ruling says no code change: `handlePublic` already tests the raw pathname | `public.ts`: `new URL(request.url).pathname.toLowerCase()` → **4 failed**, 1 passed |
 | `auth-pages-137` R8 (web), 4 cases | same | `hooks.server.ts`: `isPublic` also accepts `p.toLowerCase().startsWith('/api/auth')` → **4 failed**, 1 passed |
+| `auth-pages-137` R8 signed in (seceng §6), 2 cases | green on arrival: web passes a live session through its gate and the router answers 404; the auth service, fetch and BetterAuth tables are never touched | `hooks.server.ts`: `if (pathname.toLowerCase().startsWith('/api/auth')) return new Response('served', {status: 200})` after the tree check → **2 failed**; reverted, 2 passed |
 | `options-137` accountLockout | `options.ts` leaves it at the library default | `options.ts`: `accountLockout: { enabled: false }` in `twoFactor({…})` → **1 failed**: "the method hold (POLY-137 R3.4) needs accountLockout: expected false to be true"; reverted, 1 passed |
 | `dist-enumeration` B: lockfile and pins | one version of each today | a second `@simplewebauthn/server@13.4.0` key under `packages:` → **1 failed**; section A runs the same condition on synthetic input |
 | `dist-enumeration` A (8 cases) | pure functions in the test file; each is a construction that must fail (R6.5) | by construction: each case asserts the fault string for its mutated input |
