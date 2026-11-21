@@ -102,7 +102,7 @@ export function fakeMailer(o?: { fail?: boolean }): Mailer & { sent: Mail[] }
 | `mail.drain` | worker | notice | never | the outbox row is claimed (R5.2) | not applicable |
 | operator invitation | none | none | not applicable | no mail is sent: `user-invite` prints the link to stdout (`apps/worker/src/cli/user-invite.ts:29`) | not applicable |
 
-A magic link is no longer sent to an address that has no account. **The cost:** an invitee can no longer make their account through a magic link. They sign up through the invitation's own `/sign-up` link, which is how they do it today, since no page offers a magic link yet (code-read: `apps/web/src/routes/sign-in/+page.svelte` has none).
+A magic link is no longer sent to an address that has no account, and `magicLink({..., disableSignUp: true})` turns off its sign-up as defence in depth (seceng §5.2). `/magic-link/verify` stays in `USER_INSERTING`, because that is harmless and changes nothing else. **The cost:** an invitee can no longer make their account through a magic link. They sign up through the invitation's own `/sign-up` link, which is how they do it today, since no page offers a magic link yet (code-read: `apps/web/src/routes/sign-in/+page.svelte` has none).
 
 ## R2. Password reset
 
@@ -236,14 +236,14 @@ Mails that carry a secret (the magic link, the code, the reset link) are sent sy
 | Definer | Exact call | Does |
 |---|---|---|
 | `app.claim_mail()` | `SELECT * FROM app.claim_mail()` | Picks the oldest unsent row with `attempts < 10` that is unclaimed or was claimed more than 5 minutes ago (`FOR UPDATE SKIP LOCKED`). Sets `claimed_at = clock_timestamp()`, `attempts += 1`. Returns `(id, kind, to_address, payload, attempts)` or no row |
-| `app.arm_hold_cancel(p_mail uuid, p_hash bytea)` | `SELECT app.arm_hold_cancel($1, $2)` | For the holds whose `mail_id = p_mail`, while they are held and the mail is unsent: sets `cancel_hash = p_hash` (32 bytes) and `usable_at = greatest(usable_at, clock_timestamp() + interval '24 hours')` on **every** such hold (RC4: one transaction's adds share one mail), then returns the latest `usable_at`, which the mail shows as `{until}`. With no held hold it returns NULL, which now happens only after a cancel. Each re-arm replaces the hash. A stolen `poly_worker` can only delay a method or re-arm a link; it cannot make one live sooner |
+| `app.arm_hold_cancel(p_mail uuid, p_hash bytea)` | `SELECT app.arm_hold_cancel($1, $2)` | For the holds whose `mail_id = p_mail`, while they are held and the mail is unsent: sets `cancel_hash = p_hash` (32 bytes) and `usable_at = greatest(usable_at, clock_timestamp() + interval '24 hours')` on **every** such hold (RC4: one transaction's adds share one mail), then returns the latest `usable_at`, which the mail shows as `{until}`. With no held hold it returns NULL, which now happens only after a cancel. Each re-arm replaces the hash. A stolen `poly_worker` can delay a method or re-arm a link, and it cannot make one live sooner. **But it can make one live unannounced:** it can arm the hold and call `mail_sent` without ever sending. That needs two credentials, `poly_auth` to plant the method and `poly_worker` to mark its mail sent, and an injection in `auth` yields only the first |
 | `app.mail_sent(p_mail uuid)` | `SELECT app.mail_sent($1)` | Sets `sent_at`, and `notice_sent_at` on every hold whose `mail_id = p_mail` |
 | `app.mail_failed(p_mail uuid, p_status int)` | `SELECT app.mail_failed($1, $2)` | Sets `last_status`. Stores no message text |
 
 **R3.7 The cancel link** (M11–M13).
 - **The token:** the worker draws 32 bytes from the CSPRNG for each send attempt and arms the hash with `sha256(token bytes)`. The mail carries 43 characters of canonical base64url in the **fragment**, `#{token}`, so it never reaches Caddy's log or a Referer.
 - **Only the last mail's link works:** `Idempotency-Key` is `mail-{id}-{attempts}`. A retry after an unknown result may send a second mail, and that mail's link is then the only one that works.
-- **If arming returns false** (the hold was cancelled, has lapsed, or the method is gone), the mail is sent in its "not armed" form (R1.7).
+- **If arming returns NULL** (only after a cancel, R3.6), the mail is sent in its "not armed" form (R1.7).
 - **The route:** `POST /api/auth/second-step/cancel-hold {token}` is a new endpoint in the anchor plugin, class `open`, with no session middleware, on C-04's list.
 - **Its transaction:** the handler runs it **without a marker, even when the request carries a session**. A new set, `NO_MARKER = {'/second-step/cancel-hold'}`, is checked before the session branch (`handler.ts:146`). A signed-in other user in the same browser must not turn the cancel into `sync_second_step`'s "belongs to its own user" refusal.
 - **The definer it calls:** `app.cancel_method_hold(p_token text) RETURNS boolean`, owned by `poly_govern`, executable by `poly_auth` only. Exact call: `SELECT app.cancel_method_hold($1)`. It decodes the token canonically (anything not exactly 32 bytes answers false), then looks for a hold `WHERE cancel_hash = sha256(bytes)`, locked `FOR UPDATE`, that is held in R3.1's sense. A link stops working once the method is live, so a mailbox thief cannot remove a working method without Confirm it's you. With none it returns false. Otherwise, for that hold's user, it:
@@ -255,7 +255,7 @@ Mails that carry a secret (the magic link, the code, the reset link) are sent sy
   Step 1's delete fires `sync_second_step`, so a `method_removed` audit row and mail follow.
 - **The route answers** 200 `{status: true}`, or 400 `cancel_link_invalid` for every refusal: unknown, malformed, already used, lapsed.
 
-**What a stolen cancel link can do:** within the 24 hours, once, remove one method that does not work yet, and sign the user out everywhere. It cannot add a method, remove a working one, sign anyone in, or read anything. The token is 256 bits behind a 5-a-minute limit.
+**What a stolen cancel link can do:** while the hold lasts, once, remove every method of that user that does not work yet, and sign the user out everywhere. It cannot add a method, remove a working one, sign anyone in, or read anything. The token is 256 bits behind a 5-a-minute limit.
 
 **The page** `/sign-in/cancel-method` (D3) is a bare public page with no `load`. Its script reads `location.hash`, then removes it with `history.replaceState`.
 - It shows the heading `Cancel the new sign-in method`, the text `Someone added a sign-in method to your account. If it wasn't you, cancel it. This removes the new method and signs your account out on every device.`, and a button, `Cancel the new method`.
@@ -400,7 +400,7 @@ done
   - `user-inserting`: every route is in `USER_INSERTING`. This is the only class besides `unloaded`, `definition`, `blocked` and `option-off` that a `createUser` or `createOAuthUser` site may take;
   - `sign-in-tx`: every route is in `SIGN_IN_TX` (newly exported from `handler.ts`) or in `USER_INSERTING`;
   - `with-session`: every route is in `AUTH_ROUTES`, is not `blocked`, and its endpoint answers 401 without a session (the row's `why` names the middleware; a reviewed claim);
-  - `option-off`: the site sits behind the BetterAuth option at path `option`, which resolves to a falsy value in `authOptions(sample)`. The test asserts that.
+  - `option-off`: the site sits behind the BetterAuth option at path `option`, which `authOptions(sample)` sets to the value that disables the site (the row carries `disabledBy`: `falsy` or `true`). The test asserts that. The magic-link `createUser` site (`plugins/magic-link/index.mjs:179`) is `option-off` by `disableSignUp`, which must be `true` (R1.9).
 
 **R6.4 The test fails when any of these holds:**
 - the set of scanned sites outside `unloaded` differs from the fixture's rows in any `(pkg, file, line, writer)`;
