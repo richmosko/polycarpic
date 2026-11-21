@@ -847,3 +847,12 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - An access log per site with the token filter — a per-request record at the edge, at the price of a standing target and retention rules; to be looked at again with monitoring (POLY-103).
 **Approved by:** the Principal (2026-11-21), on the architect's and the lead's recommendation.
+
+### 2026-11-21 — Four additions to POLY-137 are kept
+**Decision:** The four protections the POLY-137 ruling added beyond the scoped rows stay in the loop (ruling D1 to D4): no login role can change a user's email; the owner is emailed when backup codes are replaced or one is used, and a direct change that lengthens the list is refused; the three pages `/sign-in/forgot`, `/sign-in/reset` and `/sign-in/cancel-method`; the owner is emailed when the password changes.
+**Why:** each closes a way around the 24-hour hold or announces a takeover step. An attacker with SQL as the sign-in service could otherwise redirect the hold's warning by rewriting the email, swap in backup codes, or set a password, all silently; and without the pages, reset and the cancel link are unreachable.
+**The risk accepted:** the backup-code and password notices warn but do not delay, and someone who also holds the mailbox can delete them (SECURITY R-28). An operator who must correct a user's address does it as a database superuser. A reset that creates a first password sends no notice. The three pages ship as bare pages that were not designed first; the Principal finds them generic and wants them redesigned with the ux-designer to fit the rest of the product, as a follow-up.
+**Alternatives considered:**
+- Strike any of the four — the route it closes reopens and is recorded as accepted.
+- Hold newly generated backup codes for 24 hours while the old ones keep working — about $10 more (the architect's guess) and a change to the library's verify path; put to the Principal in the second auth loop.
+**Approved by:** the Principal (2026-11-21), each of the four in turn, on the architect's, seceng's and the lead's recommendation.

@@ -115,3 +115,7 @@ Feature started. Branch: `feature/poly-137-auth-follow-ups`. Runs in parallel wi
 ### @team-lead — 2026-11-21
 
 PR opened: https://github.com/richmosko/polycarpic/pull/144. Awaiting Validate. Verdict APPROVE at `cb27be1e`; post-merge gate PASS at `52edd768` after POLY-138 landed (`process/cairn/reviews/POLY-137/gate.md`). The Principal is confirming the four ruled-in additions (ruling D1 to D4) one at a time: D1 and D2 kept so far.
+
+### @team-lead — 2026-11-21
+
+Confirmed by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D1 to D4 are all kept. On D3 the Principal finds the three pages generic and wants a redesign with the ux-designer so they fit the rest of the design; that is a follow-up, filed after this merges (candidate home POLY-139), and the pages ship as built here.
