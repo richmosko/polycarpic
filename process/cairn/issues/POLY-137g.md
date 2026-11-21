@@ -21,5 +21,5 @@ ux-designer reviews the wording and look of the three bare pages (ruling D3) and
 
 ## Acceptance criteria
 
-- [ ] `process/cairn/reviews/POLY-137/wording-review.md`: each string on `/sign-in/forgot`, `/sign-in/reset` and `/sign-in/cancel-method` is accepted or given its replacement text, including the four the builder added beyond the ruling.
-- [ ] A short DESIGN entry records the three pages as built, with no history text.
+- [x] `process/cairn/reviews/POLY-137/wording-review.md`: each string on `/sign-in/forgot`, `/sign-in/reset` and `/sign-in/cancel-method` is accepted or given its replacement text, including the four the builder added beyond the ruling.
+- [x] A short DESIGN entry records the three pages as built, with no history text.
