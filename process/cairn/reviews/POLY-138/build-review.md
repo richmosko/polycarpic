@@ -86,3 +86,9 @@ Unchanged from the ruling review: F5 (deploy shows the real client address), F6 
    - *Test:* the real report with `skipReason: "contains-variable"` set on the postgres FROM dependency exits 2 and names it. The same case set on the regex `age` pin exits 2 too.
 
 Note (no action needed): the `--replace golang.org/x/net@v0.62.0` version in `infra/caddy/Dockerfile` is not watched. A later x/net security release would not turn the run red. Follow-up F1, which drops the replace, removes this. Until then, R7's test pins only the floor, ≥ 0.62.0.
+
+## Delta review: `check-report.sh` @ `e98cc512c0e1ab76e4d104f424031b7a1bfaa0a6`, tests @ `6f69ff98`
+
+**ACCEPT.** Finding 3 is met. The PINS match now drops any dependency whose `skipReason` is set before it counts the pin as present, so a pin that is extracted but skipped exits 2 and is named. The dockerfile manager's own `age` entry, with `unknown-registry`, is outside PINS and stays clean. All five pins have a skipped-pin fixture.
+
+**Partial lookups:** no path I know of still lets a partial lookup exit 0. One residual sits outside the report: a registry that returns a stale or truncated tag list *without* a warning looks the same as "nothing due", and no report field can show it. A Renovate run that fails also fails the step before the script runs, and the report directory is new on every run, so a stale report cannot be read.
