@@ -23,3 +23,11 @@ The ruling's nine follow-ups stand. Add:
 - **N1 (seceng):** a failed background `findUserByEmail` in the magic-link sender should log `mail.failed {kind: 'magic_link'}`.
 - **N2 (seceng):** INFRA's account-administration runbook should say that an operator corrects an address as a superuser at the box (D1).
 - **The gate's item 3:** no file in this repository delivers `MAIL_FROM`, like every other host setting. That is the ops bundle's job (INFRA D-1), and the fail-closed config check covers a gap at the first deploy.
+
+## Wording #29 (ruled; `wording-review.md` @ `fdfc39af`)
+
+The Settings panel is titled "Sign-in and second step" (DESIGN 5.11), so both strings name it that way. Each must match exactly:
+- **The cancel page, on 400** (R3.7): `This link no longer works. It may have been used already, or the 24 hours are over. Sign in, check Settings, Sign-in and second step, and change your password if anything there is not yours.`
+- **The `method_added` mail, held, link not armed** (R1.7), third paragraph: `If you did not add it, someone else may be signed in as you. Sign in, remove it under Settings, Sign-in and second step, change your password, and tell your operator.`
+
+This changes where the text points the user, and nothing else: it has no security effect. The ruling's two strings are amended in place (`ruling.md` lines 63 and 263). qa pins both strings red first in `auth-pages-137.test.ts` and `jobs.test.ts`. Frontend changes `cancel-method/+page.svelte`, and backend changes `packages/mail/src/templates.ts`.
