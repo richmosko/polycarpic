@@ -13,6 +13,7 @@
   "dependencies": {
     "@poly/auth": "workspace:*",
     "@poly/config": "workspace:*",
-    "@poly/db": "workspace:*"
+    "@poly/db": "workspace:*",
+    "@poly/mail": "workspace:*"
   }
 }

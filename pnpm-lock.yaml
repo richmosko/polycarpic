@@ -232,6 +232,9 @@ importers:
       '@poly/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@poly/mail':
+        specifier: workspace:*
+        version: link:../../packages/mail
 
   apps/migrate:
     dependencies:
@@ -338,6 +341,9 @@ importers:
       '@poly/import':
         specifier: workspace:*
         version: link:../../packages/import
+      '@poly/mail':
+        specifier: workspace:*
+        version: link:../../packages/mail
       '@poly/posting':
         specifier: workspace:*
         version: link:../../packages/posting
@@ -368,6 +374,9 @@ importers:
       '@poly/db':
         specifier: workspace:*
         version: link:../db
+      '@poly/mail':
+        specifier: workspace:*
+        version: link:../mail
       '@poly/tenancy':
         specifier: workspace:*
         version: link:../tenancy
@@ -439,6 +448,12 @@ importers:
       '@poly/tenancy':
         specifier: workspace:*
         version: link:../tenancy
+
+  packages/mail:
+    devDependencies:
+      '@types/node':
+        specifier: 26.6.6
+        version: 26.6.6
 
   packages/portfolio:
     dependencies:
