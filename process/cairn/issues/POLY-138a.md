@@ -1,7 +1,7 @@
 ---
 id: POLY-138a
 title: Caddy and edge ruling
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-138
 blocked_by: []
@@ -10,6 +10,10 @@ paths: [process/cairn/issues/POLY-138.md, process/cairn/reviews/POLY-138/**, pro
 stage: plan
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2
+actual.cost_usd: null
+actual.tokens: null
+actual.gate_cycles: 1
+actual.wall_clock: 25
 labels: [ops, security]
 priority: null
 pr: null
