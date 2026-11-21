@@ -71,7 +71,7 @@ describe('S-5 a declared key is kept only if its value passes that field\'s sche
     const s = schema();
     const sample: Record<string, unknown> = {
       commit: 'a'.repeat(40), req_id: UUID, user_id: UUID, entity_id: UUID, run_id: UUID, route: '/api/v1/accounts/[id]', method: 'GET', status: 200,
-      outcome: 'ok', latency_ms: 1.5, job: 'prices', migration: '0000_init', var: 'AUTH_SECRET_FILE', fault: s.properties.fault?.enum?.[0] ?? 'empty', count: 3,
+      outcome: 'ok', latency_ms: 1.5, job: 'prices', migration: '0000_init', kind: 'magic_link', ms: 12, deleted: 4, sent: 2, failed: 1, var: 'AUTH_SECRET_FILE', fault: s.properties.fault?.enum?.[0] ?? 'empty', count: 3,
     };
     const v = validator();
     const keys = Object.keys(s.properties).filter((k) => !['ts', 'level', 'service', 'event', 'dropped', 'err'].includes(k));

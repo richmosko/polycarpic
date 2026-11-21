@@ -19,7 +19,7 @@ describe('R4 the seam', () => {
   it('startAuthService takes a second parameter, `deps` [red if: the seam is absent]', async () => {
     expect(typeof main.startAuthService).toBe('function'); // the signature is the builder's; the behavioural cases below pin the seam
     expect(read('main.ts')).toMatch(/deps\s*(:|=|\.)/);
-    expect(read('main.ts')).toMatch(/sendSecondStepCode:\s*deps\.sendSecondStepCode|deps\??\.sendSecondStepCode/);
+    expect(read('main.ts')).toMatch(/deps\??\.mailer/); // POLY-137 R1.5: the seam is `deps.mailer`
   });
   it('cli() passes no deps [red if: the process wrapper can inject a sender]', () => {
     const cli = read('main.ts').split('async function cli()')[1] ?? '';
@@ -30,13 +30,14 @@ describe('R4 the seam', () => {
     const { ConfigError } = await import('@poly/config');
     const d = mkdtempSync(join(tmpdir(), 'poly150-seam-'));
     writeFileSync(join(d, 'pw'), 'p\n');
+    writeFileSync(join(d, 'rk'), 're_key\n');
     writeFileSync(join(d, 'sec'), 'seam-auth-secret-0123456789abcdef0123456789abcdef\n');
     // A complete, valid env for the environment, so the ONLY fault is the stand-in (an env with other faults would refuse for them).
     const env = { APP_ENV: appEnv, TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'https://app.qa.test', AUTH_PUBLIC_PORT: '41999', PLAID_ENV: appEnv === 'production' ? 'production' : 'sandbox',
-      DATABASE_HOST: 'localhost', DATABASE_NAME: 'x', DATABASE_USER: 'poly_auth', DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: join(d, 'pw'), AUTH_SECRET_FILE: join(d, 'sec') };
-    const x: any = await main.startAuthService(env, { sendSecondStepCode: async () => {} }).then(() => null, (e: unknown) => e);
+      DATABASE_HOST: 'localhost', DATABASE_NAME: 'x', DATABASE_USER: 'poly_auth', DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: join(d, 'pw'), AUTH_SECRET_FILE: join(d, 'sec'), RESEND_API_KEY_FILE: join(d, 'rk'), MAIL_FROM: 'no-reply@app.qa.test' }; // R1.3: a release env carries the mailer pair
+    const x: any = await main.startAuthService(env, { mailer: { send: async () => {} } }).then(() => null, (e: unknown) => e);
     expect(x, 'the stand-in must be refused').toBeInstanceOf(ConfigError);
-    expect(JSON.stringify(x.problems)).toMatch(/deps|sendSecondStepCode/);
+    expect(JSON.stringify(x.problems)).toMatch(/deps|mailer/);
   });
   it('apps/auth/src names no outbox, no file sink and no test entry; no env var carries a path for one [red if: the shipped service can write a code to disk]', () => {
     for (const f of walk(here).filter((p) => /\.ts$/.test(p) && !/\.test\.ts$/.test(p))) {

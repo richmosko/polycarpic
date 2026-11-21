@@ -141,6 +141,20 @@
       "when": 1795202300000,
       "tag": "0019_step_up",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1795279925196,
+      "tag": "0020_method_hold_outbox",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1795280081234,
+      "tag": "0021_method_hold_rules",
+      "breakpoints": true
     }
   ]
 }

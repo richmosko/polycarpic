@@ -32,7 +32,7 @@ describe('the gate passes on the migrated, revoked schema', () => {
   });
 });
 
-type Plant = [name: string, sql: string, expected: string];
+type Plant = [name: string, sql: string, expected: string | RegExp];
 const TRIGGERS: [string, string][] = [
   ['public.two_factor', 'two_factor_15_lock'], ['public.two_factor', 'two_factor_16_lock_delete'],
   ['public.session', 'session_80_sign_in_record'],
@@ -124,6 +124,69 @@ const plants: Plant[] = [
   ...LOGINS.map((r): Plant => [`${r} DELETE on user`, `GRANT DELETE ON public."user" TO ${r}`, `public."user": ${r} holds DELETE`]),
 ];
 
+
+// POLY-137 R3.8, R4.2, R5.3 (ruling @ a5e9ce4f): gate lines 15-24. Each plant breaks exactly one thing on a migrated clone; the gate must exit 1
+// and print the broken object. The FAIL wording follows the existing lines' phrasing; the ruling words only line 19 exactly
+// (`FAIL mail: <n> notices unsent for over an hour`), so every other expected string is ASSUMED and reconciled here, in one place.
+const NEWTBL = ['app.method_hold', 'app.mail_outbox'];
+const NEWLOGINS = ['poly_app', 'poly_auth', 'poly_worker', 'poly_operator', 'poly_migrator'];
+const DEF137: [sig: string, owner: string, exec: string | null][] = [
+  ['app.method_held(text,uuid)', 'poly_govern', 'poly_auth'], ['app.cancel_method_hold(text)', 'poly_govern', 'poly_auth'],
+  ['app.claim_mail()', 'poly_govern', 'poly_worker'], ['app.arm_hold_cancel(uuid,bytea)', 'poly_govern', 'poly_worker'],
+  ['app.mail_sent(uuid)', 'poly_govern', 'poly_worker'], ['app.mail_failed(uuid,integer)', 'poly_govern', 'poly_worker'],
+  ['app.purge_mail_outbox()', 'poly_purge', 'poly_worker'],
+  ['app.note_codes_replaced()', 'poly_govern', null], ['app.note_password_changed()', 'poly_govern', null],
+];
+const TRIG137: [tbl: string, name: string, runs: string][] = [
+  ['public.two_factor', 'two_factor_12_method_hold', 'app.guard_method_hold()'], ['public.passkey', 'passkey_12_method_hold', 'app.guard_method_hold()'],
+  ['public."user"', 'user_21_email_fixed', 'app.refuse_email_change()'], ['public.two_factor', 'two_factor_84_codes_replaced', 'app.note_codes_replaced()'],
+  ['public.account', 'account_80_password_changed', 'app.note_password_changed()'],
+];
+const plants137: Plant[] = [
+  // 15. the two tables
+  ...NEWTBL.map((t): Plant => [`${t} dropped`, `DROP TABLE ${t} CASCADE`, `table ${t}: missing`]),
+  ...NEWTBL.flatMap((t): Plant[] => [
+    [`${t}: FORCE ROW LEVEL SECURITY off`, `ALTER TABLE ${t} NO FORCE ROW LEVEL SECURITY`, `table ${t}: row-level security`],
+    [`${t}: ROW LEVEL SECURITY off`, `ALTER TABLE ${t} DISABLE ROW LEVEL SECURITY`, `table ${t}: row-level security`],
+    ...NEWLOGINS.map((r): Plant => [`${r} SELECT on ${t}`, `GRANT SELECT ON ${t} TO ${r}`, `${t}: ${r} holds SELECT`]),
+    ...['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'].map((p): Plant => [`poly_auth ${p} on ${t}`, `GRANT ${p} ON ${t} TO poly_auth`, `${t}: poly_auth holds ${p}`]),
+    [`poly_worker column UPDATE on ${t}`, `GRANT UPDATE (${t === 'app.method_hold' ? 'usable_at' : 'sent_at'}) ON ${t} TO poly_worker`, `${t}: poly_worker holds UPDATE`],
+    [`poly_auth column SELECT on ${t}`, `GRANT SELECT (${t === 'app.method_hold' ? 'cancel_hash' : 'to_address'}) ON ${t} TO poly_auth`, `${t}: poly_auth holds SELECT`],
+    [`poly_backup INSERT on ${t}`, `GRANT INSERT ON ${t} TO poly_backup`, `${t}: poly_backup holds INSERT`],
+  ]),
+  // 16 and 20. the triggers: dropped, disabled, re-pointed
+  ...TRIG137.flatMap(([t, n, f]): Plant[] => [
+    [`trigger ${n} dropped`, `DROP TRIGGER ${n} ON ${t}`, `trigger ${n} on ${t}: missing`],
+    [`trigger ${n} disabled`, `ALTER TABLE ${t} DISABLE TRIGGER ${n}`, `trigger ${n} on ${t}: tgenabled = D`],
+    [`trigger ${n} re-pointed at another function`, `DROP TRIGGER ${n} ON ${t}; CREATE TRIGGER ${n} AFTER INSERT ON ${t} FOR EACH ROW EXECUTE FUNCTION app.refuse_truncate()`, `trigger ${n} on ${t}: does not run ${f}`],
+  ]),
+  ['two_factor_12_method_hold fired AFTER, not BEFORE UPDATE OF the two columns', 'DROP TRIGGER two_factor_12_method_hold ON public.two_factor; CREATE TRIGGER two_factor_12_method_hold AFTER UPDATE OF failed_verification_count, backup_codes ON public.two_factor FOR EACH ROW EXECUTE FUNCTION app.guard_method_hold()', 'trigger two_factor_12_method_hold on public.two_factor: not BEFORE UPDATE OF failed_verification_count, backup_codes'],
+  ['two_factor_12_method_hold on every UPDATE (no column list)', 'DROP TRIGGER two_factor_12_method_hold ON public.two_factor; CREATE TRIGGER two_factor_12_method_hold BEFORE UPDATE ON public.two_factor FOR EACH ROW EXECUTE FUNCTION app.guard_method_hold()', 'trigger two_factor_12_method_hold on public.two_factor: not BEFORE UPDATE OF failed_verification_count, backup_codes'],
+  ['passkey_12_method_hold fired AFTER, not BEFORE UPDATE OF counter', 'DROP TRIGGER passkey_12_method_hold ON public.passkey; CREATE TRIGGER passkey_12_method_hold AFTER UPDATE OF counter ON public.passkey FOR EACH ROW EXECUTE FUNCTION app.guard_method_hold()', 'trigger passkey_12_method_hold on public.passkey: not BEFORE UPDATE OF counter'],
+  // 17. the tripwire: bodies that name the hold and the outbox (the proof is behavioural, R3.10 tests 3, 7, 8)
+  ['sync_second_step body no longer names app.method_hold', `UPDATE pg_proc SET prosrc = replace(prosrc, 'app.method_hold', 'app.x') WHERE oid = 'app.sync_second_step()'::regprocedure`, 'function app.sync_second_step(): its body does not mention app.method_hold'],
+  ['sync_second_step body no longer names app.mail_outbox', `UPDATE pg_proc SET prosrc = replace(prosrc, 'app.mail_outbox', 'app.x') WHERE oid = 'app.sync_second_step()'::regprocedure`, 'function app.sync_second_step(): its body does not mention app.mail_outbox'],
+  ['complete_step_up body no longer names method_hold', `UPDATE pg_proc SET prosrc = replace(prosrc, 'method_hold', 'x') WHERE oid = 'app.complete_step_up(text,uuid,bigint)'::regprocedure`, 'function app.complete_step_up(text,uuid,bigint): its body does not mention method_hold'],
+  ['check_factor_removal body no longer names method_hold', `UPDATE pg_proc SET prosrc = replace(prosrc, 'method_hold', 'x') WHERE oid = 'app.check_factor_removal(uuid,text,uuid)'::regprocedure`, 'function app.check_factor_removal(uuid,text,uuid): its body does not mention method_hold'],
+  // 18. the nine new definers
+  ...DEF137.flatMap(([f, owner, exec]): Plant[] => [
+    [`${f} dropped`, `DROP FUNCTION ${f} CASCADE`, `function ${f}: missing`],
+    [`${f} owned by poly_owner (not ${owner})`, `ALTER FUNCTION ${f} OWNER TO poly_owner`, `function ${f}: owner is poly_owner`],
+    [`${f} made an invoker`, `ALTER FUNCTION ${f} SECURITY INVOKER`, `function ${f}: not SECURITY DEFINER`],
+    [`${f} EXECUTE to PUBLIC`, `GRANT EXECUTE ON FUNCTION ${f} TO PUBLIC`, `function ${f}: poly_app can execute it`],
+    ...NEWLOGINS.filter((r) => r !== exec && r !== 'poly_app').map((r): Plant => [`${f} EXECUTE to ${r}`, `GRANT EXECUTE ON FUNCTION ${f} TO ${r}`, `function ${f}: ${r} can execute it`]),
+    ...(exec ? [[`${f} EXECUTE revoked from ${exec}`, `REVOKE EXECUTE ON FUNCTION ${f} FROM ${exec}`, `function ${f}: ${exec} cannot execute it`] as Plant] : []),
+  ]),
+  // 19. a notice unsent for over an hour (exact line, ruling R3.8)
+  ['an unsent outbox row 2 hours old', `INSERT INTO public."user" (name, email, email_verified) VALUES ('G', 'g@qa.test', true); INSERT INTO app.mail_outbox (user_id, kind, to_address, payload, created_at) SELECT id, 'password_changed', email, '{}'::jsonb, now() - interval '2 hours' FROM public."user" LIMIT 1`, 'FAIL mail: 1 notices unsent for over an hour'],
+  // 21. poly_auth's idle timeout: its two plants alter a CLUSTER-wide role setting, so they run serially in gate-check-role-setting.test.ts
+  // 22-24. the purges' footprint: a row the purge would have deleted
+  ['a tx_identity row 7 hours old, its transaction over', `INSERT INTO app.tx_identity (xid, user_id, kind, created_at) VALUES ('1'::xid8, gen_random_uuid(), 'session', now() - interval '7 hours')`, /tx_identity.*6 hours/],
+  ['a sign_in_record row 402 days old', `BEGIN; SET LOCAL session_replication_role = replica; INSERT INTO app.sign_in_record (kind, user_id, session_id, created_at) VALUES ('session', gen_random_uuid(), gen_random_uuid(), now() - interval '402 days'); COMMIT`, /sign_in_record.*401 days/],
+  ['a SENT outbox row 32 days old', `INSERT INTO public."user" (name, email, email_verified) VALUES ('G', 'g@qa.test', true); INSERT INTO app.mail_outbox (user_id, kind, to_address, payload, created_at, sent_at) SELECT id, 'password_changed', email, '{}'::jsonb, now() - interval '32 days', now() - interval '32 days' FROM public."user" LIMIT 1`, /mail_outbox.*31 days/],
+];
+plants.push(...plants137);
+
 describe('the gate refuses each planted fault: exit 1, the broken object named', () => {
   it.each(plants)('%s', (_name, sql, expected) => {
     const db = cloneMigrated();
@@ -131,8 +194,31 @@ describe('the gate refuses each planted fault: exit 1, the broken object named',
     const g = gate(db);
     expect(g.code, g.out).toBe(1);
     expect(g.out).toContain('FAIL');
-    expect(g.out).toContain(expected);
+    if (typeof expected === 'string') expect(g.out).toContain(expected); else expect(g.out).toMatch(expected);
     expect(g.out).not.toContain('gate: pass');
+  });
+});
+
+
+describe('POLY-137 gate lines 15-24: the positive cases (each fault above is the only thing that differs from a pass)', () => {
+  const user = `INSERT INTO public."user" (name, email, email_verified) VALUES ('G', 'g@qa.test', true)`;
+  const row = (age: string, sent: boolean) => `INSERT INTO app.mail_outbox (user_id, kind, to_address, payload, created_at${sent ? ', sent_at' : ''}) SELECT id, 'password_changed', email, '{}'::jsonb, now() - interval '${age}'${sent ? `, now() - interval '${age}'` : ''} FROM public."user" LIMIT 1`;
+  it('an unsent row 59 minutes old does not fail line 19 [red if: the threshold is not an hour, or any unsent row fails]', () => {
+    const db = cloneMigrated();
+    must(`${user}; ${row('59 minutes', false)}`, db);
+    const g = gate(db);
+    expect(g.out, g.err).toBe('gate: pass');
+  });
+  it('a SENT row 2 hours old does not fail line 19, and a sent row 30 days old does not fail line 24 [red if: a sent notice counts as unsent, or the 31-day line fires early]', () => {
+    const db = cloneMigrated();
+    must(`${user}; ${row('2 hours', true)}; ${row('30 days', true)}`, db);
+    const g = gate(db);
+    expect(g.out, g.err).toBe('gate: pass');
+  });
+  it('poly_backup reads both new tables through pg_read_all_data and the gate still passes (the one allowed reader) [red if: the new tables are not covered by the allowed-reader rule]', () => {
+    const db = cloneMigrated();
+    for (const t of ['app.method_hold', 'app.mail_outbox']) expect(must(`SELECT has_table_privilege('poly_backup', '${t}', 'SELECT')`, db).rows[0]![0]).toBe('t');
+    expect(gate(db).out).toBe('gate: pass');
   });
 });
 

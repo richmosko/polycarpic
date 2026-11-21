@@ -85,7 +85,13 @@ const stateOf = (c: AuthClient): RequestState => {
   return s;
 };
 
-const textOf = (q: unknown): string => (typeof q === 'string' ? q : String((q as { text?: string })?.text ?? ''));
+/** R8: a query-config object is held to the same grammar as a string. Any control or savepoint text, or a text that is not a string, is refused. */
+function refuseObjectControl(q: unknown): void {
+  const text = (q as { text?: unknown } | null)?.text;
+  if (typeof text !== 'string') throw new UnsupportedTransactionControl('query config without a text');
+  const bare = text.trim();
+  if (PASS.test(bare) || CONTROL.test(bare)) throw new UnsupportedTransactionControl(text);
+}
 
 class Lease {
   #open = true;
@@ -99,8 +105,12 @@ class Lease {
   async query(q: unknown, values?: unknown): Promise<unknown> {
     if (!this.#open) throw new Error('TransactionClosed: the lease was released');
     const run = this.client.query as (...a: unknown[]) => Promise<unknown>;
-    const out = this.state.rewrite(textOf(q));
-    if (typeof q !== 'string' || out[0] === q) return run(q, values);
+    if (typeof q !== 'string') {
+      refuseObjectControl(q);
+      return run(q, values);
+    }
+    const out = this.state.rewrite(q);
+    if (out[0] === q) return run(q, values);
     let last: unknown;
     for (const stmt of out) last = await run(stmt);
     return last;

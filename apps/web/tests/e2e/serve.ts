@@ -52,9 +52,9 @@ const signed = await auth.signIn(EMAIL, PASSWORD);
 // Each cookie keeps its own Path: __Secure-better-auth.session_token at /api/auth, __Host-poly_handle at / (POLY-153 R10).
 const cookies = storageCookies(signed);
 if (!cookies.some((c) => c.name === '__Host-poly_handle') || !cookies.some((c) => c.name.startsWith('__Secure-better-auth.') && c.path === '/api/auth')) { stop(); throw new Error('the seeded sign-in did not set both cookies'); }
-// A second session and a step-up stamp (what POLY-89's definers will write), so the Sessions spec can end another session.
+// A second session, so the Sessions spec can end another session. The step-up stamp it needs is NOT written here: this seed runs before `vite build`,
+// and a slow build outlived the 5-minute window. The spec writes it (support.ts stampStepUp) right before its action (POLY-137 R8).
 await auth.signIn(EMAIL, PASSWORD);
-must(`UPDATE public.session SET recent_auth_at = now() WHERE user_id = '${id}'`, db);
 // POLY-89 (R7): a manager with no second step, which is the state `polycarpic cli user reset-mfa` leaves behind. The entity belongs to an
 // enrolled owner (a verified factor and the flag as superuser, then the Business as poly_app under the marker, as the db fixtures do).
 const OWNER_ID = must(`INSERT INTO public."user" (name, email, email_verified) VALUES ('Grace Owner', 'owner@e2e.test', true) RETURNING id`, db).rows[0]![0]!;
@@ -74,6 +74,7 @@ mkdirSync(join(here, '.auth'), { recursive: true });
 // A fresh run: no ledger, no outbox, no flow records from the last one.
 for (const f of ['limiter.json', 'outbox.jsonl', 'flows.jsonl', 'slot-waits.jsonl', 'slot-calls.jsonl']) writeFileSync(join(here, '.auth', f), f === 'limiter.json' ? '{}' : '', { mode: 0o600 });
 const writeSecret = (name: string, v: unknown) => writeFileSync(join(here, '.auth', name), JSON.stringify(v), { mode: 0o600 });
+writeSecret('db.json', { db, server }); // the database and server the specs' own helpers reach (support.ts stampStepUp)
 const state = (res: Response) => ({ cookies: storageCookies(res), origins: [] });
 const need = (r: Response, what: string): Response => { if (!r.ok) { stop(); throw new Error(`seed: ${what} answered ${r.status}`); } return r; };
 

@@ -804,6 +804,25 @@ Add new decisions ABOVE this comment, newest first.
 - Do not accept a backup code here — recommended by seceng: a found code plus the password could then sign in up to ten times but could not change the methods, and a password change would end it. About $6 cheaper (a guess). The cost falls on someone who loses a phone, who needs `reset-mfa`.
 **Approved by:** the Principal (2026-11-19), on the architect's and the lead's recommendation and against seceng's.
 
+### 2026-11-21 — POLY-137 takes the deploy gates only; the second-step cap waits for a second auth loop
+**Decision:** The POLY-137 loop builds the mailer, password reset, the method-change emails, the 24-hour delay, the callback and magic-link rate limits, the S9 pin test, the magic-link 302, the purge jobs and the small fixes. The cap after 3 locks, the lock notice and the remaining auth items move to a second loop, which is not a condition of the first deploy.
+**Why:** the issue had grown past 20 items across five loops, too many for one reviewable PR; the chosen set is what the first deploy with real household data waits on.
+**The risk accepted:** a first real deploy can go out with the growing second-step lock (15 minutes doubling to 24 hours) but without the cap after 3 locks and the first-lock notice decided on 2026-11-17. Someone holding a user's first step can keep trying codes at the lock's pace, and the user is not told.
+**Alternatives considered:**
+- Add the cap to this loop — about a day more (a guess) and a larger security review.
+- Split, with the second loop recorded as a condition of the first real-data deploy.
+- Everything in one loop — advised against by the lead.
+**Approved by:** the Principal (2026-11-21), on the lead's recommendation.
+
+### 2026-11-21 — The mailer caps token emails per recipient
+**Decision:** The POLY-137 mailer refuses more than about 10 token emails (magic link, password reset, second-step code) to one address in an hour; the ruling sets the number. Security notices are exempt.
+**Why:** the per-email sign-in limit is deferred, and the per-IP limit alone lets anyone with many addresses make us mail a member without bound. That spends the Resend quota and puts the sending domain's reputation at risk, which decides whether the security notices reach the inbox.
+**The risk accepted:** someone can use up a member's allowance and block that member's own sign-in or reset email for up to an hour.
+**Alternatives considered:**
+- Defer it with the per-email limit and accept flooding until the second auth loop.
+- Defer it and make the second loop a condition of the first deploy that sends real mail.
+**Approved by:** the Principal (2026-11-21), on seceng's and the lead's recommendation.
+
 ### 2026-11-21 — A read-only weekly workflow runs Renovate
 **Decision:** A scheduled GitHub workflow with `contents: read`, no secrets, and the Renovate image pinned by digest looks up updates for the pinned Postgres, Caddy and `age` versions once a week and fails when one is due. A person makes the bump. Built in POLY-138 (ruling D1, option b).
 **Why:** nothing ran Renovate although SECURITY and INFRA said it did, and POLY-138 holds the Postgres server packages at the pinned minor, so this signal is the only way a Postgres security fix reaches the image. The workflow gives the signal without giving any party write access.
@@ -828,3 +847,12 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - An access log per site with the token filter — a per-request record at the edge, at the price of a standing target and retention rules; to be looked at again with monitoring (POLY-103).
 **Approved by:** the Principal (2026-11-21), on the architect's and the lead's recommendation.
+
+### 2026-11-21 — Four additions to POLY-137 are kept
+**Decision:** The four protections the POLY-137 ruling added beyond the scoped rows stay in the loop (ruling D1 to D4): no login role can change a user's email; the owner is emailed when backup codes are replaced or one is used, and a direct change that lengthens the list is refused; the three pages `/sign-in/forgot`, `/sign-in/reset` and `/sign-in/cancel-method`; the owner is emailed when the password changes.
+**Why:** each closes a way around the 24-hour hold or announces a takeover step. An attacker with SQL as the sign-in service could otherwise redirect the hold's warning by rewriting the email, swap in backup codes, or set a password, all silently; and without the pages, reset and the cancel link are unreachable.
+**The risk accepted:** the backup-code and password notices warn but do not delay, and someone who also holds the mailbox can delete them (SECURITY R-28). An operator who must correct a user's address does it as a database superuser. A reset that creates a first password sends no notice. The three pages ship as bare pages that were not designed first; the Principal finds them generic and wants them redesigned with the ux-designer to fit the rest of the product, as a follow-up.
+**Alternatives considered:**
+- Strike any of the four — the route it closes reopens and is recorded as accepted.
+- Hold newly generated backup codes for 24 hours while the old ones keep working — about $10 more (the architect's guess) and a change to the library's verify path; put to the Principal in the second auth loop.
+**Approved by:** the Principal (2026-11-21), each of the four in turn, on the architect's, seceng's and the lead's recommendation.

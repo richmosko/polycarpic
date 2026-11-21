@@ -578,6 +578,14 @@
     {
       "table": "app.step_up_totp",
       "reason": "not role-scoped: no login role holds any privilege on it; forward-only, written only by complete_step_up and note_totp_step (poly_govern); covered by tests/db/step-up-reauth.test.ts (POLY-150 Addendum 3 A3.4)"
+    },
+    {
+      "table": "app.method_hold",
+      "reason": "not role-scoped: no login role holds any privilege on it; written by sync_second_step and the worker's mail definers, read by method_held and cancel_method_hold (poly_govern); covered by tests/db/auth-method-hold.test.ts (POLY-137 ruling R3.1)"
+    },
+    {
+      "table": "app.mail_outbox",
+      "reason": "not role-scoped: no login role holds any privilege on it; written by the notice triggers and the worker's mail definers (poly_govern), purged by purge_mail_outbox (poly_purge); covered by tests/db/worker-mail-jobs.test.ts (POLY-137 ruling R3.1)"
     }
   ]
 }

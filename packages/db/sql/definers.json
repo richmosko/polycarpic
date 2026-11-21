@@ -49,5 +49,14 @@
   { "function": "app.revoke_my_session(p_id uuid)", "owner": "poly_authz", "execute": ["poly_app"] },
   { "function": "app.record_session_sign_in()", "owner": "poly_govern", "execute": [] },
   { "function": "app.guard_second_step_lock()", "owner": "poly_govern", "execute": [] },
-  { "function": "app.purge_sign_in_record()", "owner": "poly_purge", "execute": ["poly_worker"] }
+  { "function": "app.purge_sign_in_record()", "owner": "poly_purge", "execute": ["poly_worker"] },
+  { "function": "app.method_held(p_table text, p_id uuid)", "owner": "poly_govern", "execute": ["poly_auth"] },
+  { "function": "app.cancel_method_hold(p_token text)", "owner": "poly_govern", "execute": ["poly_auth"] },
+  { "function": "app.claim_mail()", "owner": "poly_govern", "execute": ["poly_worker"] },
+  { "function": "app.arm_hold_cancel(p_mail uuid, p_hash bytea)", "owner": "poly_govern", "execute": ["poly_worker"] },
+  { "function": "app.mail_sent(p_mail uuid)", "owner": "poly_govern", "execute": ["poly_worker"] },
+  { "function": "app.mail_failed(p_mail uuid, p_status integer)", "owner": "poly_govern", "execute": ["poly_worker"] },
+  { "function": "app.purge_mail_outbox()", "owner": "poly_purge", "execute": ["poly_worker"] },
+  { "function": "app.note_codes_replaced()", "owner": "poly_govern", "execute": [] },
+  { "function": "app.note_password_changed()", "owner": "poly_govern", "execute": [] }
 ]

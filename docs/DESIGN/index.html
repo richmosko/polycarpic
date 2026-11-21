@@ -28,8 +28,8 @@
   <div class="doc-meta">
     <span><strong>Owner:</strong> <code>ux-designer</code> agent</span>
     <span><strong>Status:</strong> Approved</span>
-    <span><strong>Version:</strong> 0.20.5</span>
-    <span><strong>Last updated:</strong> 2026-11-19</span>
+    <span><strong>Version:</strong> 0.20.6</span>
+    <span><strong>Last updated:</strong> 2026-11-21</span>
   </div>
 </header>
 
@@ -189,6 +189,7 @@
       <tr><td>Date range control</td><td>Popover + Range Calendar</td><td>General Ledger's Journal entries card: presets plus one month grid</td></tr>
       <tr><td>Journal entry popover</td><td>Popover</td><td>Transactions' Posted tab: a Journal ID opens the entry in place, with its legs, correction trail and a link to the General Ledger</td></tr>
       <tr><td>Brand app bar</td><td>—, custom</td><td>Every page without the app shell (Home, Get started, Admin): fixed near-black bar, neon lockup left, the page's trailing items right, a fade below (deep over Home's image, a short shadow over plain pages)</td></tr>
+      <tr><td>Bare auth page</td><td>—, custom</td><td>Password reset (<code>/sign-in/forgot</code>, <code>/sign-in/reset</code>) and cancelling a new sign-in method (<code>/sign-in/cancel-method</code>): one narrow centered column, no app shell, no visual pane — see 5.14</td></tr>
       <tr><td>Split screen login</td><td>—, custom</td><td>Login — full field list, centered form column, always-branded visual pane</td></tr>
     </tbody>
   </table>
@@ -688,6 +689,16 @@ flowchart TD
     <li><strong>3. Entities you leave.</strong> Listed by name, with the note that their other owners are notified.</li>
     <li><strong>A failed bank revoke stops the run</strong> at that entity: entities already purged stay purged, the rest are untouched, the account is kept, and the user sees which entity stopped it.</li>
     <li><strong>The plan belongs to this sign-in.</strong> Another session, or signing in again, starts from the list; if the 5-minute check lapses mid-run, Confirm it's you appears again (without a second step: the password and a new emailed code).</li>
+  </ul>
+
+  <h3 id="flow-password-reset">5.14 Password reset &amp; cancelling a new sign-in method</h3>
+  <p class="section-hint"><strong>Story (PRD §5, access):</strong> a user who forgot the password resets it from Sign in; a user mailed about a sign-in method they did not add cancels it from the mail. Both links come by email; neither page needs a session.</p>
+  <ul>
+    <li><strong>Bare pages.</strong> Three public pages under <code>/sign-in/</code> share one layout: a single column at most 384px wide (<code>max-w-sm</code>), the <code>polycarpic</code> wordmark in <code>--font-heading</code>, an <code>--font-heading</code> heading, then the form. They use the tokens directly: fields on <code>--card</code> with <code>--input</code> borders, the full-width primary button on <code>--primary</code> / <code>--primary-foreground</code>, secondary links in <code>--muted-foreground</code> turning <code>--foreground</code> on hover, and a <code>--ring</code> focus ring on every control. There is no app shell and no visual pane; Login's split layout is not used, because these pages are reached from a mail on any device and carry one task each.</li>
+    <li><strong>Forgot your password?</strong> sits under Sign in's button and opens <code>/sign-in/forgot</code>. States: <em>form</em> (Email, <strong>Send the link</strong>, Back to sign in); <em>sent</em>: "If that address has an account, we have sent it a link. The link works for 15 minutes." with Back to sign in; <em>too many tries</em>; <em>could not send</em>. The sent text is the same for every address, and so is every error, so the page never says whether an account exists.</li>
+    <li><strong>Choose a new password</strong> (<code>/sign-in/reset</code>, from the mail). The link's token is read and removed from the address bar on load. States: <em>form</em> (New password, New password again, <strong>Change password</strong>); <em>passwords differ</em>, checked before sending; <em>too many tries</em>; <em>could not change</em>; <em>done</em>: "Your password is changed and every device is signed out." with Sign in; <em>link no longer works</em>, one text for a used, expired, bad or missing link, with Ask for a new link.</li>
+    <li><strong>Cancel the new sign-in method</strong> (<code>/sign-in/cancel-method</code>, from the method-added mail). Opening the page changes nothing; only the button does, because mail scanners open links. The text names no method. States: <em>ask</em> (the explanation and <strong>Cancel the new method</strong>); <em>done</em>: the method is removed, every device is signed out, sign in and change the password; <em>link no longer works</em>: used or past 24 hours, check Settings → Sign-in and second step; <em>too many tries</em>; <em>could not cancel</em>.</li>
+    <li><strong>Messages.</strong> Errors and outcomes are one plain line under the form, <code>role="alert"</code> for an error and <code>role="status"</code> for an outcome. No message repeats what the server said; each is our own text. The exact strings are pinned by tests (<code>process/cairn/reviews/POLY-137/wording-review.md</code>).</li>
   </ul>
 </section>
 

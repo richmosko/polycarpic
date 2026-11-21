@@ -63,10 +63,10 @@ case "$cmd" in
       [ "$(id -un)" = node ] || { echo "image check: process user is $(id -un)" >&2; bad=1; }
       exit $bad'
     # POLY-86 S20: the sign-in service's auth still starts with the build tooling gone (a removed package that better-auth imports at load
-    # fails here, not in production). No database: the schema probe logs an error and createAuth still resolves.
+    # fails here, not in production). The mailer seam (POLY-137 R1.5) takes `mailer`; the route count is AUTH_ROUTES' (53 with /second-step/cancel-hold). No database: the schema probe logs an error and createAuth still resolves.
     smoke="const m = await import('/app/apps/auth/node_modules/@poly/auth/src/index.ts');
-      const a = await m.createAuth(m.authOptions({ secret: 'smoke-'.repeat(8), baseURL: 'https://smoke.invalid', tlsMode: 'real-domain', requireClientIp: true, sendMagicLink: async () => {} }));
-      if (typeof a.handler !== 'function' || Object.keys(m.AUTH_ROUTES).length !== 52) process.exit(1);"
+      const a = await m.createAuth(m.authOptions({ secret: 'smoke-'.repeat(8), baseURL: 'https://smoke.invalid', tlsMode: 'real-domain', requireClientIp: true, mailer: { send: async () => {} } }));
+      if (typeof a.handler !== 'function' || Object.keys(m.AUTH_ROUTES).length !== 53) process.exit(1);"
     docker run --rm --network none --cap-drop ALL --security-opt no-new-privileges --entrypoint node "$ref" --input-type=module --eval "$smoke" >/dev/null 2>&1 \
       || { echo "image check: @poly/auth does not start in the built image" >&2; exit 1; }
     ;;

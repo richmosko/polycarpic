@@ -73,6 +73,8 @@ const same = (a: string, b: string): boolean => a.length === b.length && timingS
 function fromComplete(e: unknown): never {
   const err = e as { code?: string; message?: string };
   if (err.code === '42501' && err.message === 'step_up_challenge') throw refuse('FORBIDDEN', 'challenge_expired');
+  // POLY-137 R3.4: a method still on hold cannot confirm (the database refuses; nothing is stamped).
+  if (err.code === '42501' && err.message === 'method_on_hold') throw refuse('FORBIDDEN', 'method_on_hold');
   if (err.code === '42501') throw failed();
   throw e;
 }
@@ -225,7 +227,12 @@ export function reauthEndpoints() {
       if (e instanceof APIError) throw e;
       return fail();
     }
-    await ctx.context.adapter.update({ model: 'passkey', where: [{ field: 'id', value: key.id }], update: { counter: newCounter } });
+    try {
+      // Under a savepoint: the hold's refusal aborts the statement, and the 403 must still commit what came before it (R3.4).
+      await guarded(() => ctx.context.adapter.update({ model: 'passkey', where: [{ field: 'id', value: key.id }], update: { counter: newCounter } }));
+    } catch (e) {
+      fromComplete(e);
+    }
     try {
       await guarded(() => pool.query('SELECT app.complete_step_up($1, $2, $3)', ['passkey', challengeId, null]));
     } catch (e) {

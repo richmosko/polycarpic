@@ -14,6 +14,8 @@ import { createHmac } from 'node:crypto';
 import { vi } from 'vitest';
 import { cloneMigrated, dbEnv } from './api';
 import { closeSql, must } from './sql.ts';
+import { legacyMailer } from './legacy-mailer.ts';
+import { magicLink } from 'better-auth/plugins';
 
 export const BASE = 'https://app.qa.test';
 export const SECRET = 'qa-auth-secret-0123456789abcdef0123456789abcdef';
@@ -59,19 +61,38 @@ export async function boot() {
   const dba: any = await import('../../../packages/db/src/auth.ts');
   const A: any = await import('../../../packages/auth/src/index.ts');
   const mails: { email: string; token: string; url: string }[] = [];
-  const input = (tlsMode: Mode = 'real-domain', extra: Record<string, unknown> = {}) => ({
-    secret: SECRET, baseURL: BASE, tlsMode, requireClientIp: false,
-    google: { clientId: 'qa-google', clientSecret: 'qa-google-secret' },
-    sendMagicLink: async (m: { email: string; token: string; url: string }) => { mails.push(m); },
-    ...extra,
-  });
-  const optionsOf = (tlsMode: Mode = 'real-domain', extra: Record<string, unknown> = {}) => A.authOptions(input(tlsMode, extra));
+  // POLY-137 R1.5: the service takes one `mailer`. A suite that still names the old callbacks (`sendMagicLink`, `sendSecondStepCode`) gets them adapted
+  // (helpers/legacy-mailer.ts); `noMailer: true` builds the service with none (development's R1.4 answers); `mailer` is passed through.
+  const input = (tlsMode: Mode = 'real-domain', extra: Record<string, unknown> = {}) => {
+    const { sendMagicLink, sendSecondStepCode, noMailer, ...rest } = extra as any;
+    const mailer = rest.mailer ?? (noMailer ? undefined : legacyMailer({ magic: sendMagicLink ?? ((m) => { mails.push(m); }), code: sendSecondStepCode }));
+    return { secret: SECRET, baseURL: BASE, tlsMode, requireClientIp: false, google: { clientId: 'qa-google', clientSecret: 'qa-google-secret' }, ...(mailer ? { mailer } : {}), ...rest };
+  };
+  // The legacy suites drive /magic-link/verify for addresses with no account (the wrapper, the invitation claim). Production now mails a link only to a
+  // member and turns magic-link sign-up off (R1.9); those two rules are pinned by options-137 and auth-mail-flows. Here the default instance stands in
+  // for delivery at the plugin (the callback gets every request) and leaves sign-up on, so these suites still reach the code they were written for.
+  const optionsOf = (tlsMode: Mode = 'real-domain', extra: Record<string, unknown> = {}) => {
+    const o: any = A.authOptions(input(tlsMode, extra));
+    if ((extra as any).mailer || (extra as any).noMailer) return o;
+    const at = (o.plugins ?? []).findIndex((p: any) => p.id === 'magic-link');
+    if (at >= 0) {
+      // rebuilt, not patched: the plugin reads disableSignUp when it is created
+      o.plugins[at] = magicLink({ ...o.plugins[at].options, disableSignUp: false, sendMagicLink: (extra as any).sendMagicLink ?? (async (x: any) => { mails.push(x); }) });
+    }
+    return o;
+  };
   // S6: tests that need the limiter off do it here, in their own options, never in authOptions' defaults.
   const mk = async (tlsMode: Mode = 'real-domain', patch: (o: any) => any = (o) => o) =>
     A.createAuth(patch({ ...optionsOf(tlsMode), rateLimit: { enabled: false } }));
   const auth = await mk();
   const hash: string = await (await auth.$context).password.hash(PW);
-  const handle = (req: Request, a: any = auth) => A.handleAuthRequest(req, a);
+  // POLY-137 R1.9, R2.2: the magic-link and reset senders are started, not awaited, so a request answers before its mail is sent. A suite that reads
+  // the mail right after the request gets a short settle here (a stranger's address sends nothing, so the wait is bounded, not polled to a count).
+  const handle = async (req: Request, a: any = auth) => {
+    const res = await A.handleAuthRequest(req, a);
+    if (req.method === 'POST' && /\/api\/auth\/(sign-in\/magic-link|request-password-reset)$/.test(new URL(req.url).pathname)) await new Promise((r) => setTimeout(r, 150));
+    return res;
+  };
 
   let n = 0;
   function seedUser(o: { email?: string; name?: string; secondStepAt?: boolean; twoFactor?: boolean; password?: boolean } = {}) {

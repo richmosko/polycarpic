@@ -601,8 +601,8 @@ describe('condition 29 (S9): token handling', () => {
   });
 });
 
-describe('condition 33 (S14): after the sign-up commits, an email change passes', () => {
-  it('the stamp is cleared, so the email can change (as poly_app, the way /change-email would)  [red if: signup_email_fixed refuses with a null stamp]', async () => {
+describe('condition 33 (S14): after the sign-up commits, no login role changes the email (POLY-137 D1 supersedes the stamp rule)', () => {
+  it('poly_auth is refused 42501 with D1\'s message, the address is unchanged, and a superuser (the operator at the box) can move it  [red if: a login role can change user.email]', async () => {
     const o = seedOwnerEntity(e.db);
     const email = `s14-${stamp()}@qa.test`;
     const t = seedInvitation({ db: e.db, email, role: 'viewer', entityId: o.entityId, as: o.ownerId });
@@ -611,7 +611,9 @@ describe('condition 33 (S14): after the sign-up commits, an email change passes'
     const uid = uidOf(email);
     const moved = `s14-moved-${stamp()}@qa.test`;
     const u = psql(`BEGIN; ${asAuthSql(uid, e.db)} UPDATE public."user" SET email = '${moved}', email_verified = true WHERE id = '${uid}'; COMMIT;`, e.db, { role: 'poly_auth', password: 'qa-poly_auth' });
-    expect(u.ok, u.err).toBe(true);
+    expect([u.ok, u.sqlstate, /a user's email is changed by no login role/.test(u.err)]).toEqual([false, '42501', true]);
+    expect(users(moved)).toBe(0);
+    must(`UPDATE public."user" SET email = '${moved}' WHERE id = '${uid}'`, e.db);
     expect(users(moved)).toBe(1);
   });
 });

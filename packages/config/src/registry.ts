@@ -10,6 +10,8 @@ export interface SecretRow {
   readonly required: boolean;
   /** line: exactly one line, no surrounding whitespace. text: any content (a keyring). */
   readonly shape: 'line' | 'text';
+  /** false: a plain (non-secret) variable, read from the environment and not from a file (POLY-137 R1.3 MAIL_FROM). Default true. */
+  readonly secret?: boolean;
 }
 
 export const REGISTRY: readonly SecretRow[] = [
@@ -19,6 +21,7 @@ export const REGISTRY: readonly SecretRow[] = [
   { var: 'OAUTH_GOOGLE_SECRET_FILE', services: ['auth'], required: false, shape: 'line' },
   { var: 'OAUTH_GITHUB_SECRET_FILE', services: ['auth'], required: false, shape: 'line' },
   { var: 'RESEND_API_KEY_FILE', services: ['auth', 'worker'], required: false, shape: 'line' },
+  { var: 'MAIL_FROM', services: ['auth', 'worker'], required: false, shape: 'line', secret: false },
   { var: 'PLAID_SECRET_FILE', services: ['web', 'worker'], required: false, shape: 'line' },
   { var: 'PRICE_API_KEY_FILE', services: ['worker'], required: false, shape: 'line' },
   { var: 'BLS_API_KEY_FILE', services: ['worker'], required: false, shape: 'line' },

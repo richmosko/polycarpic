@@ -38,6 +38,8 @@ BEGIN
   END IF;
   ALTER ROLE poly_backup LOGIN REPLICATION BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE CONNECTION LIMIT 3;
   ALTER ROLE poly_backup SET default_transaction_read_only = on;
+  -- POLY-137 R4.2: a callback holds a pool connection while it waits on an IdP; a floor against floods, not against a compromised service.
+  ALTER ROLE poly_auth SET idle_in_transaction_session_timeout = '15s';
 END
 $roles$;
 

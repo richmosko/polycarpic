@@ -42,6 +42,8 @@ export interface Config {
   readonly statusPort: number;
   /** The source commit baked into the image (POLY_IMAGE_REVISION); undefined outside an image. */
   readonly imageRevision: string | undefined;
+  /** auth and worker: the From of every mail; undefined where no mailer is configured (development only). */
+  readonly mailFrom: string | undefined;
   /** One Secret per registered *_FILE variable that is set, keyed by the variable name. */
   readonly secrets: Readonly<Record<string, Secret>>;
 }
@@ -52,6 +54,10 @@ const SSLMODES = ['disable', 'require', 'verify-full'];
 const MAX_SECRET_BYTES = 64 * 1024;
 /** Hosts that are never on the public DNS even where the public suffix list knows the final label. */
 const PRIVATE_SUFFIX = /\.(local|localhost|internal|lan|home\.arpa|test|invalid)$/;
+
+/** `addr` or `name <addr>`: one address, no list, no control characters (a header-injection guard). */
+const MAIL_ADDR = '[^\\s<>@,"]+@[^\\s<>@,"]+';
+const MAIL_FROM_RE = new RegExp(`^(?:${MAIL_ADDR}|[^<>\\r\\n,"]*[^<>\\r\\n,"\\s] <${MAIL_ADDR}>)$`);
 
 type Read = { ok: true; value: string } | { ok: false; fault: Fault };
 
@@ -170,7 +176,7 @@ function evaluate(service: Service, env: Env): { problems: Problem[]; secrets: R
   if (!env.DATABASE_SSLMODE || !SSLMODES.includes(env.DATABASE_SSLMODE)) add('DATABASE_SSLMODE', 'invalid', `DATABASE_SSLMODE must be one of ${SSLMODES.join(' | ')}`);
 
   // plain-variable fallbacks, refused in every APP_ENV (S-2)
-  for (const k of [...FORBIDDEN_PLAIN, ...REGISTRY.map((r) => stemOf(r.var))]) {
+  for (const k of [...FORBIDDEN_PLAIN, ...REGISTRY.filter((r) => r.secret !== false).map((r) => stemOf(r.var))]) {
     if (set(k) !== undefined) add(k, 'forbidden', `${k} must not be set; the secret comes from ${k === 'BETTER_AUTH_SECRET' ? 'AUTH_SECRET_FILE' : `${k}_FILE`}`);
   }
 
@@ -182,7 +188,7 @@ function evaluate(service: Service, env: Env): { problems: Problem[]; secrets: R
     if (!row) add(k, 'unregistered', `${k} is not a known secret file variable`);
     else if (!row.services.includes(service)) add(k, 'forbidden', `${k} must not be set for ${service}`);
   }
-  for (const row of REGISTRY.filter((r) => r.services.includes(service))) {
+  for (const row of REGISTRY.filter((r) => r.secret !== false && r.services.includes(service))) {
     const path = set(row.var);
     if (path === undefined) {
       if (row.required) add(row.var, 'not_set', fileMessage(row.var, 'not_set', undefined));
@@ -199,6 +205,19 @@ function evaluate(service: Service, env: Env): { problems: Problem[]; secrets: R
     else secrets[row.var] = new Secret(value);
   }
 
+  // POLY-137 R1.3: no mail, no start. The key is required for auth and worker in staging and production; MAIL_FROM whenever the key is set.
+  let mailFrom: string | undefined;
+  if (REGISTRY.some((r) => r.var === 'MAIL_FROM' && r.services.includes(service))) {
+    const release = appEnv === 'staging' || appEnv === 'production';
+    const keySet = env.RESEND_API_KEY_FILE !== undefined && env.RESEND_API_KEY_FILE !== '';
+    if (release && !keySet) add('RESEND_API_KEY_FILE', 'not_set', 'RESEND_API_KEY_FILE is not set');
+    const from = set('MAIL_FROM');
+    if (from === undefined) {
+      if (release || keySet) add('MAIL_FROM', 'not_set', 'MAIL_FROM is not set');
+    } else if (!MAIL_FROM_RE.test(from)) add('MAIL_FROM', 'invalid', 'MAIL_FROM must be "name <address>" or "address"');
+    else mailFrom = from;
+  } else if (set('MAIL_FROM') !== undefined) add('MAIL_FROM', 'forbidden', `MAIL_FROM must not be set for ${service}`);
+
   // secret-looking variables in staging and production (SECURITY 6.2; staging is held to the same standard)
   if (appEnv === 'staging' || appEnv === 'production') {
     for (const k of Object.keys(env)) {
@@ -209,7 +228,7 @@ function evaluate(service: Service, env: Env): { problems: Problem[]; secrets: R
   }
 
   const config = problems.length === 0 && appEnv && tlsMode && originRaw !== undefined
-    ? { service, appEnv, tlsMode, publicOrigin: originRaw, plaidEnv, statusPort, imageRevision: set('POLY_IMAGE_REVISION') }
+    ? { service, appEnv, tlsMode, publicOrigin: originRaw, plaidEnv, statusPort, imageRevision: set('POLY_IMAGE_REVISION'), mailFrom }
     : undefined;
   return { problems, secrets, config };
 }

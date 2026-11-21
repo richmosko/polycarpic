@@ -6,15 +6,10 @@
 // Postgres cannot check a password. The answer to send-code is the same whether a code was sent or suppressed (R2, S8).
 import type { BetterAuthPlugin } from 'better-auth';
 import { APIError, createAuthEndpoint, sessionMiddleware } from 'better-auth/api';
+import type { Senders } from './mail.ts';
 import { lockBandHook } from './lock-band.ts';
 import { noteTotpStepHook, reauthEndpoints } from './reauth.ts';
 import { createRoutingPool } from './routing-pool.ts';
-
-export interface SecondStepCode {
-  email: string;
-  code: string;
-}
-export type SendSecondStepCode = (m: SecondStepCode) => Promise<void>;
 
 /** The answer a refused-but-counted confirm gives: the request transaction commits (the attempt is recorded), the status is 403. */
 export const COMMIT_HEADER = 'x-poly-commit';
@@ -45,7 +40,8 @@ const maskEmail = (email: string): string => {
 const refusal = (status: number, code: string): Response =>
   new Response(JSON.stringify({ code, message: code }), { status, headers: { 'content-type': 'application/json', [COMMIT_HEADER]: '1' } });
 
-export function secondStepAnchor(opts: { sendSecondStepCode?: SendSecondStepCode }): BetterAuthPlugin {
+export function secondStepAnchor(opts: { senders: Senders }): BetterAuthPlugin {
+  const { senders } = opts;
   return {
     id: 'second-step-anchor',
     hooks: { after: [lockBandHook, noteTotpStepHook] }, // POLY-150 D6 (b)
@@ -53,7 +49,7 @@ export function secondStepAnchor(opts: { sendSecondStepCode?: SendSecondStepCode
       ...reauthEndpoints(),
       sendSecondStepCode: createAuthEndpoint('/second-step/send-code', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
         // POLY-150 R3: no mailer, no answer to anything else: the same 503 for every caller, before the body, the password or the cap.
-        if (!opts.sendSecondStepCode) {
+        if (!senders.mailer) {
           return new Response(JSON.stringify({ code: 'mailer_unavailable' }), { status: 503, headers: { 'content-type': 'application/json', [COMMIT_HEADER]: '1' } });
         }
         const { user, session } = ctx.context.session;
@@ -71,13 +67,26 @@ export function secondStepAnchor(opts: { sendSecondStepCode?: SendSecondStepCode
           // No password: the session must be a fresh sign-in (a magic link makes one). The mailbox alone, as email is the recovery root (C-e).
           throw new APIError('FORBIDDEN', { code: 'recent_sign_in_required', message: 'recent_sign_in_required' });
         }
+        // R1.8: the cap is decided before the challenge is issued, so a capped request writes no challenge row. The count is kept if the send fails.
+        if (!senders.allow(user.email, user.id)) {
+          return new Response(JSON.stringify({ code: 'mail_capped', message: 'mail_capped' }), { status: 429, headers: { 'content-type': 'application/json' } });
+        }
         const rows = asRows<{ issue_email_challenge: string | null }>(await pool.query('SELECT app.issue_email_challenge($1)', ['first_enrolment']));
         const code = rows[0]?.issue_email_challenge ?? null;
         if (code !== null) {
           // Before commit: a failed send rolls the challenge back.
-          await opts.sendSecondStepCode!({ email: user.email, code });
+          await senders.sendCode({ email: user.email, code });
         }
         return ctx.json({ status: true, sentTo: maskEmail(user.email) });
+      }),
+      // R3.7: the mailed cancel link's POST. No session middleware; the handler runs it with no marker (NO_MARKER). One answer for every refusal.
+      cancelMethodHold: createAuthEndpoint('/second-step/cancel-hold', { method: 'POST' }, async (ctx) => {
+        const invalid = () => new APIError('BAD_REQUEST', { code: 'cancel_link_invalid', message: 'cancel_link_invalid' });
+        const token = (ctx.body as { token?: unknown } | undefined)?.token;
+        if (typeof token !== 'string') throw invalid();
+        const rows = asRows<{ cancel_method_hold: boolean }>(await pool.query('SELECT app.cancel_method_hold($1)', [token]));
+        if (rows[0]?.cancel_method_hold !== true) throw invalid();
+        return ctx.json({ status: true });
       }),
       confirmSecondStepCode: createAuthEndpoint('/second-step/confirm-code', { method: 'POST', use: [sessionMiddleware] }, async (ctx) => {
         const code = (ctx.body as { code?: unknown } | undefined)?.code;

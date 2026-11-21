@@ -37,8 +37,9 @@ const good = (svc: Svc, over: Env = {}): Env => {
   if (svc === 'auth') e.AUTH_SECRET_FILE = file('auth-secret\n');
   return { ...e, ...over };
 };
+// POLY-137 R1.3: a release auth or worker must carry the Resend key and MAIL_FROM (the negative cases are in mail-137.test.ts).
 const prod = (svc: Svc, over: Env = {}): Env =>
-  good(svc, { APP_ENV: 'production', TLS_MODE: 'real-domain', PUBLIC_ORIGIN: 'https://app.example.com', PLAID_ENV: 'production', DATABASE_SSLMODE: 'verify-full', ...over });
+  good(svc, { APP_ENV: 'production', TLS_MODE: 'real-domain', PUBLIC_ORIGIN: 'https://app.example.com', PLAID_ENV: 'production', DATABASE_SSLMODE: 'verify-full', ...(svc === 'auth' || svc === 'worker' ? { RESEND_API_KEY_FILE: file('re_key\n'), MAIL_FROM: 'polycarpic <no-reply@mail.example.com>' } : {}), ...over });
 const stage = (svc: Svc, over: Env = {}): Env => prod(svc, { APP_ENV: 'staging', PLAID_ENV: 'sandbox', ...over });
 
 const vars = (svc: Svc, env: Env) => checkConfig(svc, env).map((p) => p.var);
@@ -120,7 +121,7 @@ describe('R3 *_FILE semantics (criterion 1: a missing or empty file refuses star
     const optional: [Svc, string][] = [['auth', 'OAUTH_GOOGLE_SECRET_FILE'], ['auth', 'OAUTH_GITHUB_SECRET_FILE'], ['auth', 'RESEND_API_KEY_FILE'], ['worker', 'RESEND_API_KEY_FILE'], ['web', 'PLAID_SECRET_FILE'], ['worker', 'PLAID_SECRET_FILE'], ['worker', 'PRICE_API_KEY_FILE'], ['worker', 'BLS_API_KEY_FILE'], ['worker', 'CREDENTIAL_KEYRING_FILE']];
     for (const [svc, v] of optional) {
       it(`${svc}: ${v} absent is fine`, () => expect(vars(svc, good(svc))).not.toContain(v));
-      it(`${svc}: ${v} set to a good file is fine`, () => expect(checkConfig(svc, good(svc, { [v]: file('x\n') }))).toEqual([]));
+      it(`${svc}: ${v} set to a good file is fine`, () => expect(checkConfig(svc, good(svc, { [v]: file('x\n'), ...(v === 'RESEND_API_KEY_FILE' ? { MAIL_FROM: 'no-reply@mail.example.com' } : {}) }))).toEqual([])); // R1.3: a key needs its sender address
       it(`${svc}: ${v} set but missing refuses`, () => expect(vars(svc, good(svc, { [v]: join(dir, 'nope') }))).toContain(v));
       it(`${svc}: ${v} set but empty refuses`, () => expect(vars(svc, good(svc, { [v]: file('') }))).toContain(v));
     }

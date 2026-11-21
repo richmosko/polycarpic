@@ -152,3 +152,15 @@ export async function enrolByAppToCodes(page: Page, email: string): Promise<{ ke
   const codes = (await dlg.getByTestId('backup-code').allTextContents()).map((c) => c.trim());
   return { key, codes };
 }
+
+/**
+ * The step-up stamp (what Confirm it's you leaves), written to the user's sessions at the moment a spec needs it, never in the seed: the seed runs
+ * before `vite build`, and the stamp lasts 5 minutes (POLY-137 R8; seceng verdict follow-up 12). A spec that takes over 5 minutes to reach its
+ * action fails, as it should.
+ */
+export async function stampStepUp(email: string): Promise<void> {
+  const { db, server } = seed<{ db: string; server: unknown }>('db.json');
+  process.env.POLY_TEST_SERVER = JSON.stringify(server);
+  const { must } = await import('../../../../tests/db/helpers/pg.ts');
+  must(`UPDATE public.session SET recent_auth_at = now() WHERE user_id = (SELECT id FROM public."user" WHERE email = '${email.replace(/'/g, "''")}')`, db);
+}

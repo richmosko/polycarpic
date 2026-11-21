@@ -1,0 +1,31 @@
+---
+id: POLY-137a
+title: Auth follow-ups ruling
+status: done
+milestone: POLY-M1
+parent: POLY-137
+blocked_by: []
+assignee: architect
+paths: [process/cairn/issues/POLY-137.md, process/cairn/reviews/POLY-137/**, process/cairn/issues/POLY-137a.md, docs/ARCH/**]
+stage: plan
+estimate.cost_usd: "8.00"
+estimate.gate_cycles: 2
+actual.cost_usd: "14.4818"
+actual.tokens: 32262255
+actual.gate_cycles: 3
+actual.wall_clock: 88
+ratio: "1.81"
+labels: [auth, security, bloat]
+priority: null
+pr: null
+created: 2026-11-21
+updated: 2026-11-21
+---
+
+The architect rules the design for this loop's criteria on POLY-137 before any test is written.
+
+## Acceptance criteria
+
+- [x] A ruling at `process/cairn/reviews/POLY-137/ruling.md` covers every row of POLY-137's "Acceptance criteria (this loop)": the mailer seam and its fake, the reset wiring, where the 24-hour hold and its cancel live (the database decides), the limiter, the purge schedule, and the migration order.
+- [x] Each measured claim cites its command; the rest is tagged (unmeasured).
+- [x] seceng's review of the ruling is answered; any re-issue is a single replacement ruling.

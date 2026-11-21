@@ -48,7 +48,7 @@ describe.each(modes)('route policy, %s mode', (mode) => {
     const u = e.seedUser();
     const { cookie } = await e.signIn(u.email, auth);
     const blocked = Object.entries(e.A.AUTH_ROUTES as Record<string, any>).filter(([, r]) => r.class === 'blocked').map(([p]) => p.replace(':id', 'google'));
-    expect(blocked.length).toBe(13);
+    expect(blocked.length).toBe(14); // POLY-137 R2.1: GET /reset-password/:token is blocked (the reset token travels in a fragment)
     for (const p of blocked) for (const method of ['GET', 'POST']) {
       const r = await e.handle(method === 'GET' ? get(p, cookie) : post(p, {}, cookie), auth);
       expect(r.status, `${method} ${p}`).toBe(404);
@@ -262,9 +262,9 @@ describe('POLY-146: reset and magic-link tokens are stored hashed', () => {
       const p = await e.handle(post('/reset-password', { newPassword: 'attacker chosen passphrase 77', token: v }), auth);
       expect(p.status, `POST ${v}`).toBeGreaterThanOrEqual(400);
       const g = await e.handle(get(`/reset-password/${encodeURIComponent(v)}?callbackURL=/reset`), auth);
-      const loc = g.headers.get('location') ?? '';
-      expect(loc, `GET ${v}`).toMatch(/error=/);
-      expect(loc, `GET ${v}`).not.toMatch(/[?&]token=/);
+      // POLY-137 R2.1: the GET route is blocked, so it answers 404 for every value and never redirects with a token
+      expect(g.status, `GET ${v}`).toBe(404);
+      expect(g.headers.get('location') ?? '', `GET ${v}`).not.toMatch(/[?&]token=/);
     }
     expect(verRows(), 'a refused value consumed nothing').toBe(before);
     expect((await e.signIn(u.email, auth)).res.status, 'the password is unchanged').toBe(200);
