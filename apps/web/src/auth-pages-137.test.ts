@@ -67,6 +67,37 @@ describe('the pages exist, say what the ruling says, and read their token from t
   });
 });
 
+// Wording review (ux-designer, wording-review.md @ fdfc39af): rows 17, 18 and the page titles.
+describe('wording review: the reset page shows our text by code, never the library message', () => {
+  it('row 17: PASSWORD_TOO_SHORT -> "Use at least 8 characters.", PASSWORD_TOO_LONG -> "Use at most 128 characters." (our voice, by body.code)  [red if: the reset page renders what the server said]', () => {
+    const src = read('sign-in/reset/+page.svelte');
+    expect(src).not.toBeNull();
+    for (const t of ['PASSWORD_TOO_SHORT', 'Use at least 8 characters.', 'PASSWORD_TOO_LONG', 'Use at most 128 characters.']) expect(src!, t).toContain(t);
+  });
+  it('row 17: body.message is never rendered (a library upgrade could change its English without a test noticing)  [red if: the server message reaches the page]', () => {
+    const src = read('sign-in/reset/+page.svelte');
+    expect(src).not.toBeNull();
+    expect(src!).not.toMatch(/\bmessage\b/);
+  });
+  it('row 18: the fallback says what failed, then what to do: "Could not change the password. Try again."  [red if: the old text without "Try again."]', () => {
+    const src = read('sign-in/reset/+page.svelte');
+    expect(src).not.toBeNull();
+    expect(src!).toContain('Could not change the password. Try again.');
+    expect(src!).not.toMatch(/Could not change the password\.(?! Try again)/);
+  });
+});
+
+describe('wording review: a <title> on each of the three pages (WCAG 2.4.2), static text', () => {
+  for (const [dir, title] of [['sign-in/forgot', 'Reset your password · polycarpic'], ['sign-in/reset', 'Choose a new password · polycarpic'], ['sign-in/cancel-method', 'Cancel the new sign-in method · polycarpic']] as const) {
+    it(`${dir}: <svelte:head><title>${title}</title>  [red if: the tab shows the URL]`, () => {
+      const src = read(`${dir}/+page.svelte`);
+      expect(src).not.toBeNull();
+      expect(src!).toMatch(/<svelte:head>[\s\S]*<title>/);
+      expect(src!).toContain(`<title>${title}</title>`);
+    });
+  }
+});
+
 describe('both token pages and the forgot page send Referrer-Policy: no-referrer and Cache-Control: no-store', () => {
   for (const p of ['/sign-in/forgot', '/sign-in/reset', '/sign-in/cancel-method']) {
     it(`${p}: public (no sign-in redirect), no-referrer, no-store  [red if: the page is gated, cached, or leaks the fragment-bearing URL in a Referer]`, async () => {
