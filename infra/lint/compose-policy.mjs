@@ -336,7 +336,7 @@ else {
   if (!snippet) v('caddy-headers', 'infra/caddy/Caddyfile', 'snippet (security_headers) missing');
   else for (const n of need) if (!snippet.body.includes(n)) v('caddy-headers', 'infra/caddy/Caddyfile', `snippet lacks: ${n}`);
   for (const b of blocks) {
-    if (b.head === '' || b.head === '(security_headers)' || b.head === '(upstream)') continue; // (upstream) imports no headers, by design
+    if (b.head === '' || b.head === '(security_headers)' || b.head === '(upstream)' || b.head === '(no_store)') continue; // these snippets import no headers, by design
     // a direct child: the import inside handle_errors covers only the error responses
     if (!b.body.some((t, i) => t === 'import security_headers' && b.depths[i] === 1)) v('caddy-headers', 'infra/caddy/Caddyfile', `site block "${b.head}" does not import security_headers`);
   }
@@ -380,6 +380,17 @@ else {
     if (m < 0 || route[m + 1] !== 'respond @sw 403') { v('caddy-sw', CF, `site block "${b.head}": route must hold "@sw header Service-Worker *" followed by "respond @sw 403"`); continue; }
     const first = route.findIndex((t) => /^(basic_auth|reverse_proxy)(\s|$)/.test(t));
     if (first >= 0 && first < m) v('caddy-sw', CF, `site block "${b.head}": the Service-Worker refusal must come before basic_auth and every reverse_proxy`);
+  }
+
+  // caddy-cache (R10): a browser keeps nothing from a page the upstream controls, except the content-hashed files
+  const ns = blocks.find((b) => b.head === '(no_store)');
+  const NS_LINES = ['@mutable not path /_app/immutable/*', 'header @mutable {', 'defer', 'Cache-Control "no-store"', '}'];
+  if (!ns) v('caddy-cache', CF, 'snippet (no_store) missing');
+  else if (ns.body.join('\n') !== NS_LINES.join('\n')) v('caddy-cache', CF, `snippet (no_store) must hold exactly: ${NS_LINES.join('; ')}`);
+  for (const b of sites) {
+    const at = b.body.map((t, i) => [t, b.depths[i]]).filter(([t]) => t === 'import no_store').map(([, d]) => d);
+    if (kindOf(b) === 'http') { if (at.length) v('caddy-cache', CF, `site block "${b.head}" imports no_store; the redirect block serves no page`); continue; }
+    if (at.length !== 1 || at[0] !== 1) v('caddy-cache', CF, `site block "${b.head}" must import no_store exactly once, directly in the site block (not in handle_errors)`);
   }
 
   // caddy-log: the filtered default logger in the global block; no site logger, no debug, no log_credentials

@@ -24,6 +24,17 @@
 	}
 }
 
+# A compromised web must not make a browser keep a page or script: everything except the content-hashed /_app/immutable/*
+# files is no-store, whatever the upstream sent. Its own snippet, because security_headers is also imported by
+# handle_errors and a matcher cannot be defined twice in one site.
+(no_store) {
+	@mutable not path /_app/immutable/*
+	header @mutable {
+		defer
+		Cache-Control "no-store"
+	}
+}
+
 # Imported inside every reverse_proxy block. Nothing sits in front of Caddy, so the TCP peer is the client: the header is
 # set, never appended to, and the two other client-address headers are dropped.
 (upstream) {
@@ -41,6 +52,7 @@ http://app.{$POLY_DOMAIN}, http://staging.{$POLY_DOMAIN} {
 app.{$POLY_DOMAIN} {
 	tls {$POLY_TLS}
 	import security_headers
+	import no_store
 	handle_errors {
 		import security_headers
 	}
@@ -60,6 +72,7 @@ app.{$POLY_DOMAIN} {
 staging.{$POLY_DOMAIN} {
 	tls {$POLY_TLS}
 	import security_headers
+	import no_store
 	handle_errors {
 		import security_headers
 	}
