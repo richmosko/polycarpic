@@ -93,6 +93,18 @@ const ROWS: Row[] = [
   ['caddy-log: log_credentials in the global block', rep('\t\toutput stderr\n', '\t\toutput stderr\n\t\tlog_credentials\n'), 'caddy-log', 'log_credentials accepted'],
   ['caddy-log: a site-level log directive', rep('app.{$POLY_DOMAIN} {\n\ttls {$POLY_TLS}\n', 'app.{$POLY_DOMAIN} {\n\ttls {$POLY_TLS}\n\tlog\n'), 'caddy-log', 'site log (which bypasses the filter) accepted'],
   ['caddy-log: a site-level log block with its own output', rep('staging.{$POLY_DOMAIN} {\n\ttls {$POLY_TLS}\n', 'staging.{$POLY_DOMAIN} {\n\ttls {$POLY_TLS}\n\tlog {\n\t\toutput stdout\n\t}\n'), 'caddy-log', 'site log accepted'],
+
+  // caddy-cache (R10, decision D3 taken)
+  ['caddy-cache: the (no_store) snippet is missing', (s) => cf(s, (t) => t.replace(/\(no_store\) \{[\s\S]*?\n\}\n\n/, '').replaceAll('\timport no_store\n', '')), 'caddy-cache', 'snippet absence not reported'],
+  ['caddy-cache: app. does not import no_store', rep('\ttls {$POLY_TLS}\n\timport security_headers\n\timport no_store\n', '\ttls {$POLY_TLS}\n\timport security_headers\n'), 'caddy-cache', 'app. import not checked'],
+  ['caddy-cache: staging. does not import no_store', rep(/(staging\.\{\$POLY_DOMAIN\} \{\n\ttls \{\$POLY_TLS\}\n\timport security_headers\n)\timport no_store\n/, '$1'), 'caddy-cache', 'staging. import not checked'],
+  ['caddy-cache: no_store imported inside handle_errors', rep('\thandle_errors {\n\t\timport security_headers\n\t}\n\troute {\n\t\t@sw header Service-Worker *\n\t\trespond @sw 403\n\t\t@auth', '\thandle_errors {\n\t\timport security_headers\n\t\timport no_store\n\t}\n\troute {\n\t\t@sw header Service-Worker *\n\t\trespond @sw 403\n\t\t@auth'), 'caddy-cache', 'the matcher would be defined twice (M14)'],
+  ['caddy-cache: no_store imported in the http:// redirect block', rep('\timport security_headers\n\tredir', '\timport security_headers\n\timport no_store\n\tredir'), 'caddy-cache', 'http block not scanned'],
+  ['caddy-cache: the override value is max-age, not no-store', rep('Cache-Control "no-store"', 'Cache-Control "max-age=60"'), 'caddy-cache', 'value not compared'],
+  ['caddy-cache: the override is not deferred (the upstream header would win)', rep('\t\tdefer\n\t\tCache-Control', '\t\tCache-Control'), 'caddy-cache', 'defer not required'],
+  ['caddy-cache: the matcher spares nothing (every path no-store)', rep('@mutable not path /_app/immutable/*', '@mutable path *'), 'caddy-cache', 'immutable exemption not compared'],
+  ['caddy-cache: the matcher spares more than /_app/immutable/*', rep('@mutable not path /_app/immutable/*', '@mutable not path /_app/*'), 'caddy-cache', 'exemption width not compared'],
+  ['caddy-cache: the header is not bound to the matcher', rep('header @mutable {', 'header {'), 'caddy-cache', 'matcher binding not checked'],
 ];
 
 describe.concurrent('compose-policy lint: POLY-138 edge fail fixtures (pass baseline + one mutation each)', () => {

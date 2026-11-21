@@ -69,3 +69,12 @@ Follow-up: the last row is structural only. If devops puts the check in a script
 file or manager, naming only the due dependency); 0 on empty or absent `updates`; 2 and stderr for a missing, empty, non-JSON,
 `{}`, empty or list `repositories`; 2 for a repository with no `packageFiles` and for package files with no dependencies (a lookup
 that looked at nothing must not read as clean); the workflow runs the script.
+
+## R10 (decision D3 taken, added 2026-11-21)
+
+| Criterion | Test | Red when |
+|---|---|---|
+| R10 | `caddy-edge.test.ts` > R10: both sites, `/`, `/sign-in`, `/api/auth/session` arrive as exactly `["no-store"]` though the echo upstream sends `max-age=31536000, immutable`; `/_app/immutable/x.js` keeps the upstream value; `/_app/version.json`, `/x/_app/immutable/y.js`, `/_app/immutable` are no-store; the Service-Worker 403 keeps the security headers | the upstream value survives (no `import no_store`, no `defer`), the exemption is missing or wider |
+| R10 `caddy-cache` lint | `lint-edge.test.ts`, 10 rows: snippet missing, no import in `app.`, none in `staging.`, import inside `handle_errors` (matcher defined twice, M14), import in the `http://` block, value `max-age=60`, no `defer`, matcher `path *`, matcher `not path /_app/*`, header not bound to `@mutable` | rule absent |
+
+The baseline Caddyfile (`baseline.ts`) now carries the `(no_store)` snippet and both imports.

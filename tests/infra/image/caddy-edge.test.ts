@@ -7,7 +7,8 @@
 //   R3  no query string, path token, Referer or credential value reaches `docker logs`, for a stopped upstream (dial
 //       failure) and for one that accepts and closes; the stopped case shows the filtered paths (so a silent log passes nothing).
 // The echo upstream is the repo's pinned node image (the app Dockerfile's FROM), already pulled for the app build.
-// R10 (Cache-Control override) is not here: it waits for decision D3.
+//   R10 (decision D3 taken) the upstream's Cache-Control max-age=31536000, immutable arrives as no-store on pages and
+//       /api/auth paths, and is kept on /_app/immutable/*, on both sites.
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -29,7 +30,7 @@ let dir = '';
 
 // Echoes the raw request header lines and the peer. A URL containing "closeme" gets its socket destroyed (accept-then-close).
 const ECHO = `require('http').createServer((q,r)=>{if(q.url.includes('closeme')){q.socket.destroy();return}
-r.setHeader('content-type','application/json');r.end(JSON.stringify({who:process.env.WHO,url:q.url,raw:q.rawHeaders,peer:q.socket.remoteAddress}))}).listen(3000)`;
+r.setHeader('content-type','application/json');r.setHeader('cache-control','max-age=31536000, immutable');r.end(JSON.stringify({who:process.env.WHO,url:q.url,raw:q.rawHeaders,peer:q.socket.remoteAddress}))}).listen(3000)`;
 
 type Res = { status: number; h: Record<string, string[]>; body: string };
 const get = (host: string, path: string, extra: string[] = []): Res => {
@@ -130,6 +131,33 @@ describe('R2: a request carrying Service-Worker is refused before basic_auth and
       expect(echo(r.body).who).toBe(who);
     }
     expect(get(`staging.${DOMAIN}`, '/sign-in').status, 'staging without credentials still asks for them').toBe(401);
+  });
+});
+
+describe('R10: Caddy overrides Cache-Control to no-store outside /_app/immutable/* (decision D3)', () => {
+  const OWN = 'max-age=31536000, immutable'; // what the echo upstream sends on every response
+  const cases = SITES.flatMap(([host, auth]) => ['/', '/sign-in', '/api/auth/session'].map((p) => [host, auth, p] as const));
+  it.each(cases)('%s %s %s: the upstream\'s max-age=31536000, immutable arrives as exactly one no-store', (host, auth, path) => {
+    const r = get(host, path, auth);
+    expect(r.status).toBe(200);
+    expect(echo(r.body).url).toBe(path); // the request really reached the upstream that sent the long max-age
+    expect(r.h['cache-control']).toEqual(['no-store']); // red: the upstream value survives (no `import no_store`), or both values are sent (no `defer`/replace)
+  });
+  it.each(SITES)('%s /_app/immutable/x.js keeps the upstream value (content-named files stay cacheable)', (host, auth) => {
+    const r = get(host, '/_app/immutable/x.js', auth);
+    expect(r.status).toBe(200);
+    expect(r.h['cache-control']).toEqual([OWN]); // red: an override with no exemption (`@mutable path *`), or an exemption that does not match
+  });
+  it('the exemption is only /_app/immutable/: /_app/version.json and a lookalike path are no-store', () => {
+    for (const p of ['/_app/version.json', '/x/_app/immutable/y.js', '/_app/immutable']) {
+      expect(get(`app.${DOMAIN}`, p).h['cache-control'], p).toEqual(['no-store']); // red: the exemption is wider (/_app/*, or a substring match)
+    }
+  });
+  it('the override is not added to Caddy\'s own 403 for Service-Worker (it carries no upstream value) and the security headers stay', () => {
+    const r = get(`app.${DOMAIN}`, '/sign-in', ['-H', 'Service-Worker: script']);
+    expect(r.status).toBe(403);
+    expect(r.h['strict-transport-security']).toEqual(['max-age=31536000']);
+    expect(r.h['cache-control'] ?? ['no-store']).toEqual(['no-store']); // never an upstream max-age on a refusal
   });
 });
 

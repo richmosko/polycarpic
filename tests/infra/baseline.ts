@@ -141,6 +141,14 @@ export const CADDYFILE = `{
 \t}
 }
 
+(no_store) {
+\t@mutable not path /_app/immutable/*
+\theader @mutable {
+\t\tdefer
+\t\tCache-Control "no-store"
+\t}
+}
+
 (upstream) {
 \theader_up X-Forwarded-For {remote_host}
 \theader_up -X-Real-IP
@@ -156,6 +164,7 @@ http://app.{$POLY_DOMAIN}, http://staging.{$POLY_DOMAIN} {
 app.{$POLY_DOMAIN} {
 \ttls {$POLY_TLS}
 \timport security_headers
+\timport no_store
 \thandle_errors {
 \t\timport security_headers
 \t}
@@ -175,6 +184,7 @@ app.{$POLY_DOMAIN} {
 staging.{$POLY_DOMAIN} {
 \ttls {$POLY_TLS}
 \timport security_headers
+\timport no_store
 \thandle_errors {
 \t\timport security_headers
 \t}
