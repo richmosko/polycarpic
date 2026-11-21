@@ -42,4 +42,5 @@
   <label class="flex flex-col gap-1 text-sm">Password <input name="password" type="password" bind:value={password} required autocomplete="current-password" class="rounded border px-2 py-1" /></label>
   {#if error}<p role="alert" class="text-sm">{error}</p>{/if}
   <button type="submit" class="rounded border px-3 py-1">Sign in</button>
+  <a href="/sign-in/forgot" class="text-muted-foreground text-sm underline">Forgot your password?</a>
 </form>
