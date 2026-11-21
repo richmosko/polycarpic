@@ -31,6 +31,8 @@
   }
 </script>
 
+<svelte:head><title>Reset your password · polycarpic</title></svelte:head>
+
 <div class="mx-auto flex max-w-sm flex-col gap-3 py-12">
   <div class="font-heading mb-2 text-lg font-semibold">polycarpic</div>
   {#if sent}

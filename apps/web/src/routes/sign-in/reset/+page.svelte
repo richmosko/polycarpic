@@ -37,18 +37,22 @@
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ token, newPassword: pw }),
       });
-      const body = (await res.json().catch(() => ({}))) as { code?: string; message?: string };
+      const body = (await res.json().catch(() => ({}))) as { code?: string };
       if (res.ok) view = 'done';
       else if (body.code === 'INVALID_TOKEN') view = 'invalid';
       else if (res.status === 429) error = 'Too many tries. Wait a minute and try again.';
-      else error = body.message ?? 'Could not change the password.';
+      else if (body.code === 'PASSWORD_TOO_SHORT') error = 'Use at least 8 characters.';
+      else if (body.code === 'PASSWORD_TOO_LONG') error = 'Use at most 128 characters.';
+      else error = 'Could not change the password. Try again.';
     } catch {
-      error = 'Could not change the password.';
+      error = 'Could not change the password. Try again.';
     } finally {
       busy = false;
     }
   }
 </script>
+
+<svelte:head><title>Choose a new password · polycarpic</title></svelte:head>
 
 <div class="mx-auto flex max-w-sm flex-col gap-3 py-12">
   <div class="font-heading mb-2 text-lg font-semibold">polycarpic</div>

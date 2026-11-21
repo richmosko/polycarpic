@@ -39,13 +39,15 @@
   }
 </script>
 
+<svelte:head><title>Cancel the new sign-in method · polycarpic</title></svelte:head>
+
 <div class="mx-auto flex max-w-sm flex-col gap-3 py-12">
   <div class="font-heading mb-2 text-lg font-semibold">polycarpic</div>
   {#if view === 'done'}
     <p role="status" class="text-sm">Cancelled. The new method is removed and every device is signed out. Sign in and change your password now.</p>
     <a href="/sign-in" class={link}>Sign in</a>
   {:else if view === 'invalid'}
-    <p role="alert" class="text-sm">This link no longer works. It may have been used already, or the 24 hours are over. Sign in, check Settings, Second step, and change your password if anything there is not yours.</p>
+    <p role="alert" class="text-sm">This link no longer works. It may have been used already, or the 24 hours are over. Sign in, check Settings, Sign-in and second step, and change your password if anything there is not yours.</p>
     <a href="/sign-in" class={link}>Sign in</a>
   {:else}
     <h1 class="font-heading text-lg font-semibold">Cancel the new sign-in method</h1>
