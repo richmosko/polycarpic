@@ -1,7 +1,7 @@
 ---
 id: POLY-137
 title: Auth follow-ups
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -119,3 +119,7 @@ PR opened: https://github.com/richmosko/polycarpic/pull/144. Awaiting Validate. 
 ### @team-lead — 2026-11-21
 
 Confirmed by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D1 to D4 are all kept. On D3 the Principal finds the three pages generic and wants a redesign with the ux-designer so they fit the rest of the design; that is a follow-up, filed after this merges (candidate home POLY-139), and the pages ship as built here.
+
+### @team-lead — 2026-11-21
+
+Validate passed; merging via PR #144 on the Principal's standing instruction (merge on green, 2026-11-21). CI on the merged tree: run 44937674187, all eight jobs. Closing. The deferred rows move to a second auth loop, filed with the other follow-ups in one PR after this merges.
