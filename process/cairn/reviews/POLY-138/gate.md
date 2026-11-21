@@ -66,3 +66,25 @@ Renovate: the 13 findings tests were red at `ec786dc8`/`e535ed33` and are green 
 Carried, not re-run: the Caddy and Postgres container tests, the `tests/db/connection.test.ts` check, the image-job timing (88 s against 44 s) and the Renovate validator run. They were measured at `eb3e43fd` (the validator at `4b98851c`). `git diff eb3e43fd bb728fa6` changes `infra/renovate/check-report.sh`, `tests/infra/renovate-report.test.ts`, SECURITY, and review/issue records, and nothing under `infra/caddy`, `infra/postgres`, `infra/compose`, `renovate.json`, `Dockerfile`, `.dockerignore`, `tests/infra/image` or `tests/db`, which are everything those results read.
 
 Verdict: PASS. The +44 s image-job guard exceedance stands, for the architect's verdict.
+
+## Delta gate 2 at `e98cc512c0e1ab76e4d104f424031b7a1bfaa0a6` (finding 3 fixed)
+
+Clean tree, caches deleted, turbo forced. `git diff bb728fa6 e98cc512` changes `infra/renovate/check-report.sh` (4 lines), `tests/infra/renovate-report.test.ts` and records only, so the container results and the validator run stay carried for the reason given above.
+
+| Suite | Result |
+|---|---|
+| `tests/infra` | 320 pass (the 10 finding-3 cases green) |
+| `tests/ci` | 542 pass |
+| `tests/layers` | 545 pass |
+| `tests/image` (static) | 40 pass, 15 skipped |
+| `pnpm run lint`, exit code | 0 |
+| `turbo run typecheck --force` | 0 |
+| `tests/workflow` (`run_tests.py --gate green`) | **2 failures of 2017**, see below |
+
+The two failures: `test_otel_receiver_watchdog_attribution.ForeignSessionFilterTests.test_own_session_with_a_direct_transcript_is_kept` and
+`..._with_only_a_worktree_sibling_transcript_is_kept` (`0 != 1 ... got []`). The same suite passed at `bb728fa6` 40 minutes earlier, and this loop touches nothing under
+`scripts/cairn/`. Run alone, `python3 -m unittest test_otel_receiver_watchdog_attribution.ForeignSessionFilterTests` passes (5 tests, 33 s), so
+the failures depend on the load of the gate run (8 workers, other teams' suites on the machine), not on this tree. I did not re-run the whole suite to get green;
+the cause belongs to whoever owns the watchdog test (a 33 s test with a timing window is a flake risk).
+
+Verdict: PASS on everything this loop touches; the workflow suite is red by two load-dependent tests in untouched code. The lead decides whether that blocks.
