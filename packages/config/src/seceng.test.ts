@@ -19,7 +19,7 @@ const good = (over: Env = {}): Env => ({
   APP_ENV: 'development', TLS_MODE: 'private-ca', PUBLIC_ORIGIN: 'http://localhost:5173', DATABASE_HOST: '127.0.0.1', DATABASE_PORT: '5432', DATABASE_NAME: 'polycarpic',
   DATABASE_USER: 'poly_auth', DATABASE_SSLMODE: 'disable', DATABASE_PASSWORD_FILE: file('pw\n'), AUTH_SECRET_FILE: file('auth\n'), ...over,
 });
-const prod = (over: Env = {}): Env => good({ APP_ENV: 'production', TLS_MODE: 'real-domain', PUBLIC_ORIGIN: 'https://app.example.com', PLAID_ENV: 'production', DATABASE_SSLMODE: 'verify-full', ...over });
+const prod = (over: Env = {}): Env => good({ APP_ENV: 'production', TLS_MODE: 'real-domain', PUBLIC_ORIGIN: 'https://app.example.com', PLAID_ENV: 'production', DATABASE_SSLMODE: 'verify-full', RESEND_API_KEY_FILE: file('re_key\n'), MAIL_FROM: 'no-reply@mail.example.com', ...over }); // R1.3: release auth carries the mailer pair
 const stage = (over: Env = {}): Env => prod({ APP_ENV: 'staging', PLAID_ENV: 'sandbox', ...over });
 const vars = (env: Env, svc: 'auth' | 'worker' | 'migrate' = 'auth') => checkConfig(svc, env).map((p) => p.var);
 const authSecret = (c: string): any => (loadConfig('auth', good({ AUTH_SECRET_FILE: file(c) })) as any).secrets.AUTH_SECRET_FILE;
