@@ -812,3 +812,11 @@ Add new decisions ABOVE this comment, newest first.
 - The Mend Renovate GitHub App — update PRs appear by themselves, but a third party gets write access to contents, PRs and workflows.
 - A manual monthly lookup from a runbook line — nothing automated, and easy to forget.
 **Approved by:** the Principal (2026-11-21), on the architect's, seceng's and the lead's recommendation.
+
+### 2026-11-21 — Caddy forbids browsers from caching pages
+**Decision:** Caddy overrides `Cache-Control` to `no-store` on every response except the content-named files under `/_app/immutable/`. Built in POLY-138 (ruling R10, D3; seceng brief A).
+**Why:** someone in control of `web` could tell browsers to keep an altered sign-in page for a year, and the copy would outlive the clean-up and keep collecting typed passwords. Caddy is outside `web`'s control, so its override holds.
+**The risk accepted:** the rule does not reach altered script files a browser already holds under their real `/_app/immutable/` names; only the incident step (`Clear-Site-Data` for 30 days) clears those. Every page is fetched from the server each time; the cost to page speed is not measured.
+**Alternatives considered:**
+- Decline in this loop — the route stays open under SECURITY R-25 and the rule becomes a follow-up.
+**Approved by:** the Principal (2026-11-21), on seceng's, the architect's and the lead's recommendation.

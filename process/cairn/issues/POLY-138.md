@@ -60,3 +60,7 @@ Feature started. Branch: `feature/poly-138-caddy-edge-follow-ups`. Runs in paral
 ### @team-lead — 2026-11-21
 
 Decided by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D1 is option (b), the read-only weekly Renovate workflow. qa writes its structure test as the ruling's D1 lists (`permissions: contents: read`, no `secrets.*`, `schedule` and `workflow_dispatch` only, the Renovate image by digest); devops builds it and words INFRA to match. D2 and D3 are still open.
+
+### @team-lead — 2026-11-21
+
+Decided by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D3 is taken. R10 (Caddy overrides `Cache-Control` to `no-store` except `/_app/immutable/*`) is built in this loop: qa writes its test row and lint fixture red from the ruling's R10 section, devops builds the snippet and its two imports, seceng's SECURITY text covers the `Clear-Site-Data` incident step. D2 is still open.
