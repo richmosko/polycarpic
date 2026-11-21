@@ -44,14 +44,14 @@ if ! jq -e '[.repositories[].packageFiles | .[][] | .deps[]?] | length > 0' "$re
   fail "$report lists no dependency"
 fi
 missing="$(jq -r --argjson pins "$PINS" '
-  [.repositories[].packageFiles | to_entries[] | .key as $m | .value[] | .packageFile as $f | .deps[]? | {m: $m, f: $f, n: .depName, v: (.currentValue // "")}] as $deps
+  [.repositories[].packageFiles | to_entries[] | .key as $m | .value[] | .packageFile as $f | .deps[]? | select((.skipReason // "") == "") | {m: $m, f: $f, n: .depName, v: (.currentValue // "")}] as $deps
   | [$pins[] | . as [$m, $f, $n, $k]
      | select([$deps[] | select(.m == $m and .f == $f and .n == $n
          and ($k == "any" or ($k == "builder" and (.v | endswith("-builder"))) or ($k == "runtime" and (.v | endswith("-builder") | not))))] | length == 0)
      | "\($n) (\($m), \($f)\(if $k == "any" then "" else ", " + $k end))"]
   | join("; ")' "$report")"
 if [ -n "$missing" ]; then
-  fail "expected pins missing from the report (no longer extracted, so no longer watched): $missing"
+  fail "expected pins missing from the report, or extracted but skipped (so not watched): $missing"
 fi
 
 due="$(jq -r '.repositories[].packageFiles | .[][] | .packageFile as $f | .deps[]? | select((.updates // []) | length > 0) | "\($f): \(.depName) \(.currentValue // "") -> \([.updates[] | (.newValue // "") + (if .newDigest then "@" + .newDigest else "" end)] | join(", "))"' "$report")"
