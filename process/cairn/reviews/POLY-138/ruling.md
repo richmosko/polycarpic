@@ -1,6 +1,7 @@
 # POLY-138 ruling: Caddy and edge follow-ups
 
-Architect, 2026-11-21. Tree read at `a82fad62d98e16f85e39217e7ea79073b8e7c764`. Scope: the six items and five comments on
+Architect, 2026-11-21. This replaces the ruling at `d3957dc2` whole and answers seceng's seven findings
+(`ruling-review.md` @ `538c4bf1`). Tree read at `a82fad62d98e16f85e39217e7ea79073b8e7c764`. Scope: the six items and five comments on
 `POLY-138.md`, plus one drift found while measuring (R4). A claim is measured unless tagged `(unmeasured)`; the
 measurements are in §M and were taken on this Mac (Docker 29.9.3, arm64) on the date above. Where the lead's or the
 Principal's call is needed it is in §D, and the ruling proceeds on the recommendation unless the issue file says otherwise.
@@ -22,6 +23,8 @@ Principal's call is needed it is in §D, and the ruling proceeds on the recommen
 | M11 | The whole target Caddyfile (§R-text) | `caddy adapt` in the `infra/caddy` derivative, env as `edge.yml` renders | Exit 0, no `"level":"error"`. Four `warn` lines "Unnecessary header_up X-Forwarded-For" (expected; see R1). Every `reverse_proxy` handler has `headers.request.set["X-Forwarded-For"] = ["{http.request.remote.host}"]`, `delete = ["X-Real-IP","Forwarded"]`, `load_balancing.try_duration = 10000000000`; no `trusted_proxies` in the JSON. |
 | M12 | Does any Renovate config exist, or any issue own one? | `ls renovate.json .github/renovate.json .renovaterc*`; `grep -il renovate process/cairn/issues/*`; `gh pr list --search author:app/renovate` | No config file, no issue other than POLY-138's own, and no Renovate or Dependabot PR ever. SECURITY C-80 and INFRA §5/§6.1a describe Renovate as if it runs. |
 | M13 | The R8 config | `renovate/renovate@sha256:d6b65ff3…` (44.257.9): `renovate-config-validator --strict`; `--platform=local --dry-run=lookup` on a copy of the two Dockerfiles | Valid. Proposes `postgres` 17.10 → 17.12 (branch `renovate/postgres-17.x`, digest `b60e9004…`) and groups the two Caddy digest bumps on `renovate/caddy`; offers no 18.x/19.x; finds `age` (current, no update) and the `xcaddy build v2.11.9` literal. Without `timestamp-optional` the Postgres minors sit **pending forever**: Docker Hub gives them no release timestamp. |
+| M14 | R10's cache override | R10's `(no_store)` snippet in the target Caddyfile; upstream answers `Cache-Control: max-age=31536000, immutable` | `/sign-in` and `/` reach the client as `Cache-Control: no-store`; `/_app/immutable/x.js` keeps the upstream's value. Defining the matcher inside `(security_headers)` fails adapt ("matcher is defined more than once", because `handle_errors` imports it too), so it is its own snippet imported at site level. |
+| M15 | Accept-then-close upstream | upstream that destroys the socket on request; `GET /api/auth/reset-password/<tok>?x=<tok>` | 502; Caddy writes **no** log line at the default level for it (the dial-failure 502 of M9 does). The R3 test still covers it, so a Caddy that starts logging it is caught. `Service-Worker` sent lowercase to an `/api/auth/` path: 403. |
 
 ## R1 — Client address (item 1; gates POLY-104)
 
@@ -31,6 +34,15 @@ Principal's call is needed it is in §D, and the ruling proceeds on the recommen
   nothing sits in front of Caddy (POLY-86 S19 point 2). A CDN or tunnel in front needs a new seceng ruling.
 - Deleting `X-Real-IP` and `Forwarded` is new: the app reads neither today (S19 point 1), and removing them stops a
   later change from trusting a client-sent value. Cost: two lines in one snippet.
+- **Deploy condition, not a container property (seceng finding 1).** The container test's peer is the Docker bridge
+  gateway, and in production the same happens to every client whenever Docker's userland proxy terminates the
+  connection (an IPv6 bind with an IPv4-only network, hairpin traffic). Every client then shares one rate-limit
+  bucket and staging's allowlist sees the gateway. R1's test cannot show this; the deploy must. Follow-up F5.
+- **`web` can reach `auth` without Caddy (seceng finding 2).** They share `default` and `edge-<p>`, so a compromised
+  web can post to `auth:3000` with any `X-Forwarded-For` and spray one password across users at no per-address cost.
+  The per-user counter and lock (C-88) still bind. Not fixed in this loop: the fix is in `packages/auth`, outside this
+  issue's paths (F6). Recorded as an Open Risk by seceng (brief B); ARCH's sentence that web "shares no network with
+  the service beyond the edge" is false for `default` and is corrected at the verdict.
 - `caddy adapt` warns "Unnecessary header_up X-Forwarded-For" (M11): Caddy's default does the same thing. The line
   stays, so the result does not rest on that default (S19). The adapt test keeps failing on `error` only, never `warn`.
 
@@ -52,7 +64,9 @@ Principal's call is needed it is in §D, and the ruling proceeds on the recommen
   does): `request>uri regexp "^(/api/auth/[^/?#]*)[^?#]*|[?#].*" "${1}"` and `request>headers>Referer delete`.
   The regex drops the query and fragment everywhere, and under `/api/auth/` everything after the first segment,
   because `/reset-password/:token` carries its token in the path (`packages/auth/src/route-policy.ts`). M10.
-- `log_credentials` appears nowhere (it would print `Cookie` and `Authorization`, which Caddy redacts by default).
+- `log_credentials` appears nowhere (it would print `Cookie` and `Authorization`, which Caddy redacts by default), and
+  neither does the global `debug` option: at debug level `reverse_proxy` logs each upstream round trip, which no test
+  covers (seceng finding 6a).
 - Rule that follows: outside `/api/auth/`, no route carries a secret in a path segment. Recorded for ARCH at the
   verdict; nothing violates it today (the invitation token is in the `/sign-up` query).
 
@@ -150,6 +164,10 @@ staging.{$POLY_DOMAIN} {
 
 New rule ids, each with a fail fixture in `tests/infra/lint.test.ts` or `lint-sc.test.ts`:
 
+- `edge-network` (existing) already allows only `web` and `auth` on `polycarpic-edge-<p>` and only `caddy` in
+  `edge.yml`, which also stops a staging service *named* `prod-web` (compose registers the service name on every
+  network). Two fail fixtures are added for it: a staging service named `prod-web` on `edge-staging`, and a second
+  service in `edge.yml` (seceng finding 3).
 - `edge-alias` (F11). In `prod.yml` and `staging.yml`, a service on `polycarpic-edge-<p>` has `aliases` on that network
   equal to exactly `["<kind>-<service>"]` (`prod-web`, `prod-auth`, `staging-web`, `staging-auth`), and sets no
   `container_name` and no `links`/`external_links` (each also registers a name on the network). Read from the
@@ -161,9 +179,30 @@ New rule ids, each with a fail fixture in `tests/infra/lint.test.ts` or `lint-sc
   in `{` and the next line is `import upstream`. `trusted_proxies` stays refused (existing check).
 - `caddy-sw`. Each HTTPS site's `route` holds `@sw header Service-Worker *` then `respond @sw 403`, before its first
   `basic_auth` and first `reverse_proxy`.
-- `caddy-log`. The global block holds the R3 `log` block with its two filter lines; no site block holds a `log`
-  directive; `log_credentials` appears nowhere.
+- `caddy-log`. The global block holds the R3 `log` block with its two filter lines and no `debug`; no site block holds a
+  `log` directive; `log_credentials` appears nowhere.
+- `caddy-cache` (only if §D3 takes R10). The `(no_store)` snippet holds R10's lines and both HTTPS sites import it.
 - The existing `caddy-headers` loop exempts the `(upstream)` snippet (it imports no headers, by design).
+
+## R10 — Browser-cache persistence (seceng finding 5; built only if §D3 is taken)
+
+A compromised web can also persist through the HTTP cache: `Cache-Control: max-age=31536000, immutable` on the sign-in
+page, or altered bodies under the real content-hashed `/_app/immutable/*` names, which a clean redeploy of the same
+build reuses. If taken, the Caddyfile gains one snippet, imported in both HTTPS sites right after `import
+security_headers` (not in `handle_errors` and not in the `http://` block), measured as M14:
+
+```caddyfile
+(no_store) {
+	@mutable not path /_app/immutable/*
+	header @mutable {
+		defer
+		Cache-Control "no-store"
+	}
+}
+```
+
+The incident step (`Clear-Site-Data: "cache", "storage"` for 30 days after a web compromise) is seceng's runbook
+text in SECURITY, not a Caddyfile line now. Without D3 the risk is accepted under R-25 and the override is F7.
 
 ## R6 — The Postgres image runs the minor its tag names (item 5)
 
@@ -259,8 +298,9 @@ The lint counts as a test any file matching `\.(test|spec)\.[cm]?[jt]sx?$` (`scr
 |---|---|---|
 | R1 forged header | container (`tests/infra/image/caddy.test.ts`): upstream echoes raw headers; send `X-Forwarded-For: 198.51.100.1, 203.0.113.5` plus a second `X-Forwarded-For` line, `X-Real-IP`, `Forwarded` to both sites (staging with credentials, allowlisted), to the web and the `/api/auth` upstream | upstream sees ≠ one line, one entry, equal to the peer; or sees `X-Real-IP`/`Forwarded` |
 | R1, R4 adapted | `caddy-adapt.test.ts`: every `reverse_proxy` handler's `headers.request` and `load_balancing.try_duration` as in M11; no `trusted_proxies` | any handler differs |
-| R2 | container: `Service-Worker: script` → 403 with the three security headers, on `app.` and on allowlisted `staging.` with and without credentials; without the header the same path proxies | any 200/401, or a missing header |
-| R3 | container: upstream stopped, GET each M10 URI with a unique marker; `docker logs` holds zero markers and the M10 paths; adapt JSON has the filter and no site `log` | a marker appears |
+| R2 | container: `Service-Worker: script` → 403 with the three security headers, to a web path **and** an `/api/auth/*` path on `app.` and on allowlisted `staging.` (with and without credentials); one case repeats with the lowercase name `service-worker`; without the header the same paths proxy | any 200/401, or a missing header |
+| R3 | container: GET each M10 URI with a unique marker against two failing upstreams, one stopped (dial failure, M9) and one that accepts and closes (M15); `docker logs` holds zero markers, and the stopped case shows the M10 paths; adapt JSON has the filter, no site `log`, no `debug` | a marker appears |
+| R10 (if D3) | container: upstream sends `max-age=31536000, immutable`; `/sign-in` arrives `no-store`, `/_app/immutable/x.js` unchanged, on both sites | an upstream `max-age` survives outside `/_app/immutable/` |
 | R5 | lint fixtures, one per rule id | the fixture passes the lint |
 | R6 | `SHOW server_version` (prod container and DB harness); static hold-before-upgrade in both Dockerfiles; FROM line is 17.12 at the ruled digest | version ≠ tag, hold missing or after the upgrade |
 | R7 | effective x/net ≥ 0.62.0; checksum-env checks | below 0.62.0, or a forbidden token/setting |
@@ -279,7 +319,10 @@ The lint counts as a test any file matching `\.(test|spec)\.[cm]?[jt]sx?$` (`scr
 - seceng (138b): C-04's client-address sentence and §1560's "rests on Caddy's default until POLY-138"; R-25's Caddy
   mitigation ("not built yet" goes); C-80's Renovate sentences match §D1's outcome.
 - devops (138d): INFRA §5 and §6.1a on the hold, the 17.12 pin and who runs Renovate; the log filter and "no access log".
-- architect (138e): ARCH's client-address paragraph and R3's path-segment rule.
+- architect (138e): ARCH's client-address paragraph, R3's path-segment rule, and the sign-in service sentence that web
+  shares no network with it beyond the edge (false for `default`; finding 2).
+- seceng (138b) also: R-25 does not claim the service-worker refusal stops all persistence (worded to §D3's outcome);
+  brief B's Open Risk.
 
 ## D — Decisions for the lead
 
@@ -289,11 +332,22 @@ The lint counts as a test any file matching `\.(test|spec)\.[cm]?[jt]sx?$` (`scr
   - (b) **Recommended:** a weekly scheduled workflow with `permissions: contents: read`, no secrets, running the
     digest-pinned Renovate image in `--platform=local --dry-run=lookup`. It fails when an update is due, and the red
     scheduled run is the email. A human makes the 1–3 line bump. No new write access, no third party; cost one small
-    workflow plus a structure test, built in this loop if chosen before tests-red.
+    workflow plus a structure test, built in this loop if chosen before tests-red. The structure test pins
+    `permissions: contents: read`, no `secrets.*` reference, triggers `schedule` and `workflow_dispatch` only (never
+    `pull_request_target`), and the Renovate image by digest.
+  - **Security coupling (seceng finding 7):** with the server packages held (R6), a Postgres security minor reaches the
+    image only when this signal fires. Under (c) a fixed server CVE waits on a remembered monthly check; that is a
+    second reason for (b).
   - (c) Nothing runs it; devops runs the same lookup by hand monthly (runbook line). Cheapest, easiest to forget.
 - **D2. No Caddy access log.** Recommended, for now: the edge keeps no per-request record. The app's own logs and the
   filtered error log remain. If an access log is wanted, it is one site `log` per site with R3's filter, plus a lint
   change; the cost is one more place a token could leak if the filter drifts.
+
+- **D3. Browser-cache persistence (seceng brief A, finding 5).** Recommended: take R10 in this loop. Mechanism: a
+  hijacked web tells browsers to keep an altered sign-in page or script for a year, and the copy outlives the clean-up;
+  Caddy, which the attacker does not control, overrides `Cache-Control` to `no-store` on everything except the
+  content-named `/_app/immutable/*` files. Cost: one snippet, two import lines, one test row and one lint rule; pages
+  are fetched from the server every time. Declined: accepted under R-25, override filed as F7.
 
 ## Follow-ups (the lead files after merge)
 
@@ -304,3 +358,8 @@ The lint counts as a test any file matching `\.(test|spec)\.[cm]?[jt]sx?$` (`scr
 - F3. Renovate (or §D1's runner) for the app's Node base image, pnpm and GitHub Actions: SECURITY C-80 assumes it.
 - F4. The prod maintenance page INFRA §7.1 steps 14–17 and lockdown describe is not in the Caddyfile (POLY-100 or the
   deploy issue that owns first-deploy).
+- F5. The post-deploy probe or `provision-check` asserts Caddy sees the real client address: an IPv4 `POLY_BIND_ADDR`,
+  Docker `userland-proxy` off, and an off-box probe sees its own public address echoed back (seceng finding 1).
+- F6. `auth` trusts `X-Forwarded-For` only from Caddy's fixed edge address (`ipv4_address` in `edge.yml`) and answers
+  503 otherwise; optionally `auth` leaves `default` for its own network with `postgres` (seceng finding 2).
+- F7. If §D3 is declined: R10's `Cache-Control` override and the `Clear-Site-Data` incident step.
