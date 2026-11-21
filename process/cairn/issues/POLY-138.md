@@ -1,7 +1,7 @@
 ---
 id: POLY-138
 title: Caddy and edge follow-ups
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-138.md, process/cairn/reviews/POLY-138/**, infra/caddy/**, infra/compose/**, infra/lint/**, infra/postgres/**, tests/infra/**, .dockerignore, Dockerfile, renovate.json, .github/renovate.json, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, .github/workflows/**, infra/ci/**]
 labels: [ops, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/143
 created: 2026-11-11
 updated: 2026-11-21
 ---
@@ -64,3 +64,7 @@ Decided by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D1 is opti
 ### @team-lead — 2026-11-21
 
 Decided by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D3 is taken. R10 (Caddy overrides `Cache-Control` to `no-store` except `/_app/immutable/*`) is built in this loop: qa writes its test row and lint fixture red from the ruling's R10 section, devops builds the snippet and its two imports, seceng's SECURITY text covers the `Clear-Site-Data` incident step. D2 is still open.
+
+### @team-lead — 2026-11-21
+
+PR opened: https://github.com/richmosko/polycarpic/pull/143. Awaiting Validate. The architect's verdict is APPROVE at `e98cc512` (`process/cairn/reviews/POLY-138/verdict.md`); ruling D2 (no Caddy access log) is built as ruled and awaits the Principal's confirmation.
