@@ -219,6 +219,16 @@ for (const [kind, cfg] of Object.entries(rendered)) {
     } else {
       if (projects.size > 1 || [...projects].some((p) => p !== kind)) v('cross-project', rel, `${at}: on networks of another project (${names.join(', ')})`);
       for (const n of names) if (EDGE_NET.test(n) && sn !== 'web' && sn !== 'auth') v('edge-network', rel, `${at}: only web and auth join ${n}`);
+      // edge-alias (POLY-138 F11): Caddy sits on both edge networks, so what answers to <kind>-web there is a name this file
+      // controls. Exactly one alias, the ruled one; container_name and the link keys each register another name.
+      for (const key of sNets) {
+        if (!EDGE_NET.test(netName(key)) || (sn !== 'web' && sn !== 'auth')) continue;
+        const aliases = list(s.networks[key]?.aliases);
+        if (aliases.length !== 1 || aliases[0] !== `${kind}-${sn}`) v('edge-alias', rel, `${at}: aliases on ${netName(key)} must be exactly [${kind}-${sn}] (got [${aliases.join(', ')}])`);
+        for (const k of ['container_name', 'links', 'external_links']) {
+          if (Array.isArray(s[k]) ? s[k].length : s[k]) v('edge-alias', rel, `${at}: ${k} registers a name on the edge network and is not allowed`);
+        }
+      }
     }
   }
   {
@@ -312,11 +322,13 @@ else {
   for (const line of caddy.split('\n')) {
     const t = line.trim();
     if (!t || t.startsWith('#')) continue;
-    if (depth === 0 && t.endsWith('{')) { cur = { head: t.slice(0, -1).trim(), body: [] }; blocks.push(cur); depth = 1; continue; }
+    if (depth === 0 && t.endsWith('{')) { cur = { head: t.slice(0, -1).trim(), body: [], depths: [] }; blocks.push(cur); depth = 1; continue; }
     if (depth > 0) {
+      let d = depth;
       if (t.endsWith('{')) depth++;
-      else if (t === '}') { depth--; if (depth === 0) { cur = null; continue; } }
+      else if (t === '}') { depth--; d = depth; if (depth === 0) { cur = null; continue; } }
       cur.body.push(t);
+      cur.depths.push(d); // 1 = a direct child of the block; an opener and its closer share a depth
     }
   }
   const snippet = blocks.find((b) => b.head === '(security_headers)');
@@ -324,9 +336,63 @@ else {
   if (!snippet) v('caddy-headers', 'infra/caddy/Caddyfile', 'snippet (security_headers) missing');
   else for (const n of need) if (!snippet.body.includes(n)) v('caddy-headers', 'infra/caddy/Caddyfile', `snippet lacks: ${n}`);
   for (const b of blocks) {
-    if (b.head === '' || b.head === '(security_headers)') continue;
-    if (!b.body.includes('import security_headers')) v('caddy-headers', 'infra/caddy/Caddyfile', `site block "${b.head}" does not import security_headers`);
+    if (b.head === '' || b.head === '(security_headers)' || b.head === '(upstream)') continue; // (upstream) imports no headers, by design
+    // a direct child: the import inside handle_errors covers only the error responses
+    if (!b.body.some((t, i) => t === 'import security_headers' && b.depths[i] === 1)) v('caddy-headers', 'infra/caddy/Caddyfile', `site block "${b.head}" does not import security_headers`);
   }
+
+  // ---- POLY-138 R5: upstream names, the client-address snippet, the Service-Worker refusal, the log filter
+  const CF = 'infra/caddy/Caddyfile';
+  const sites = blocks.filter((b) => b.head !== '' && !b.head.startsWith('('));
+  const kindOf = (b) => (b.head.startsWith('http://') ? 'http' : b.head.startsWith('app.') ? 'prod' : b.head.startsWith('staging.') ? 'staging' : null);
+
+  // caddy-upstream: each site proxies only its own kind's web and auth
+  for (const b of sites) {
+    const kind = kindOf(b);
+    const ok = kind === 'prod' || kind === 'staging' ? [`${kind}-web:3000`, `${kind}-auth:3000`] : [];
+    for (const t of b.body) {
+      if (!/^reverse_proxy(\s|$)/.test(t)) continue;
+      const target = t.replace(/\{$/, '').trim().split(/\s+/).filter((w) => !w.startsWith('@')).pop();
+      if (!ok.includes(target)) v('caddy-upstream', CF, `site block "${b.head}" proxies ${target === 'reverse_proxy' ? 'nothing named' : target}; allowed: ${ok.join(', ') || 'none'}`);
+    }
+  }
+
+  // caddy-xff: one snippet, exactly four lines, imported as the first line inside every reverse_proxy block
+  const up = blocks.find((b) => b.head === '(upstream)');
+  const UP_LINES = ['header_up X-Forwarded-For {remote_host}', 'header_up -X-Real-IP', 'header_up -Forwarded', 'lb_try_duration 10s'];
+  if (!up) v('caddy-xff', CF, 'snippet (upstream) missing');
+  else if (up.body.join('\n') !== UP_LINES.join('\n')) v('caddy-xff', CF, `snippet (upstream) must hold exactly: ${UP_LINES.join('; ')}`);
+  for (const b of sites) {
+    b.body.forEach((t, i) => {
+      if (!/^reverse_proxy(\s|$)/.test(t)) return;
+      if (!t.endsWith('{') || b.body[i + 1] !== 'import upstream') v('caddy-xff', CF, `site block "${b.head}": "${t}" must open a block whose first line is "import upstream"`);
+    });
+  }
+
+  // caddy-sw: the refusal sits in each HTTPS site's route, first among the matchers' consumers
+  for (const b of sites) {
+    if (kindOf(b) === 'http') continue;
+    const at = b.body.findIndex((t, i) => t === 'route {' && b.depths[i] === 1);
+    if (at < 0) { v('caddy-sw', CF, `site block "${b.head}" has no route block`); continue; }
+    const route = [];
+    for (let i = at + 1; i < b.body.length && b.depths[i] > 1; i++) if (b.depths[i] === 2) route.push(b.body[i]);
+    const m = route.indexOf('@sw header Service-Worker *');
+    if (m < 0 || route[m + 1] !== 'respond @sw 403') { v('caddy-sw', CF, `site block "${b.head}": route must hold "@sw header Service-Worker *" followed by "respond @sw 403"`); continue; }
+    const first = route.findIndex((t) => /^(basic_auth|reverse_proxy)(\s|$)/.test(t));
+    if (first >= 0 && first < m) v('caddy-sw', CF, `site block "${b.head}": the Service-Worker refusal must come before basic_auth and every reverse_proxy`);
+  }
+
+  // caddy-log: the filtered default logger in the global block; no site logger, no debug, no log_credentials
+  const global = blocks.find((b) => b.head === '');
+  const LOG_LINES = ['log {', 'output stderr', 'format filter {', 'request>uri regexp "^(/api/auth/[^/?#]*)[^?#]*|[?#].*" "${1}"', 'request>headers>Referer delete'];
+  if (!global) v('caddy-log', CF, 'global options block missing');
+  else {
+    const g = global.body.join('\n');
+    if (!g.includes(LOG_LINES.join('\n'))) v('caddy-log', CF, `global block must hold the filtered log block: ${LOG_LINES.join('; ')}`);
+    if (global.body.some((t) => /^debug(\s|$)/.test(t))) v('caddy-log', CF, 'no global debug option (it logs every upstream round trip)');
+  }
+  for (const b of sites) if (b.body.some((t) => /^log(\s|$)/.test(t))) v('caddy-log', CF, `site block "${b.head}" has a log directive; a site logger bypasses the filter`);
+  if (blocks.some((b) => b.body.some((t) => /^log_credentials(\s|$)/.test(t)))) v('caddy-log', CF, 'log_credentials appears nowhere');
 }
 
 if (violations.length) {
