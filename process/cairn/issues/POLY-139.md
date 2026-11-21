@@ -10,7 +10,7 @@ labels: [design]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 POLY-86 shipped placeholder pages for `/sign-in` and Settings → Sessions because DESIGN has no screen for either (ruling follow-up 1; verdict follow-up 14).
@@ -38,3 +38,7 @@ From POLY-150 (designer's build review).
 1. **Shell on Settings (items 7 and 9).** The breadcrumb reads "Home / polycarpic" and the entity selector reads "No entity" for a signed-in user, who always has a Person.
 2. **Split layout.** `/sign-in` and `/sign-in/second-step` are plain columns; DESIGN draws the split layout with the forest art. Build both with Sign-in's look.
 3. **Accepted look gaps in the second-step screens (items 11 to 17).** Method cards without icons or ring, the On pill, icons on Copy all, Download and the Entities message, and the viewer's entity name.
+
+### @team-lead — 2026-11-21
+
+From POLY-137 (merged 2026-11-21, PR #144; Principal, `process/DECISIONS.md` 2026-11-21). The three bare pages `/sign-in/forgot`, `/sign-in/reset` and `/sign-in/cancel-method` shipped undesigned; the Principal finds them generic and amateur and wants them redesigned to fit the rest of the design. Design first: ux-designer produces styled screens, the Principal sees them, then the build. Security wording and behaviour that must survive the redesign are in `process/cairn/reviews/POLY-137/wording-review.md` and DESIGN 5.14 (same answer for a known and an unknown address; tokens only in the URL fragment; a plain visit to the cancel page changes nothing). Not a condition of the first deploy.
