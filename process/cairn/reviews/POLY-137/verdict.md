@@ -2,7 +2,7 @@
 
 **Build** `c74a89209f639211702cea5f68df7a0abf3f4750`; **qa's gate** at `13c1e405576b17cd7c3cca617af293e92bc26cdb`; **head** `66096adc3f4f7ce18bf62c16f72133213f0896e2`. `git diff --stat 66096adc HEAD -- packages apps infra/postgres layers.json` is empty: after the gate only tests and `infra/ci/image.sh` changed.
 
-**Verdict: APPROVE is held** for two axes: CI (run 44934342417) and the ux wording review of the three pages. Every other axis passes, as shown below.
+**Verdict: APPROVE** at `cb27be1e11991fbc762904e59ea0fd4c07c9dd79` (backend `cb27be1e` on frontend `b82feb5f`): every axis below passes.
 
 | Axis | Result | Evidence |
 |---|---|---|
@@ -14,8 +14,8 @@
 | Security (taken from seceng) | Pass | `build-review.md`: ACCEPT @ `91fe1b35`, and the delta at `c74a8920` ACCEPT @ `d7e6376a`. SECURITY's edits are in that commit. N1 and N2 are non-blocking and listed as follow-ups below. |
 | Browser leg (taken from the lead) | Pass | `temp/poly-137-lead-browser/README.md` @ `66096adc`, all checks pass:<br>• the Forgot link;<br>• the three pages: 200, `no-store`, `no-referrer`;<br>• the same text for a known and an unknown address;<br>• the fragment stripped from the URL;<br>• the cancel page sends no non-GET request on a plain visit, and a bad token gets one POST, a 400 and the ruled text.<br>A real reset or cancel with a mailed token is not covered there; the db suites cover both. |
 | Architecture drift | Pass, with ARCH updated | `layers.json` matches ARCH §2.2 (`check.mjs` exit 0 at the gate). ARCH §3.1c and §3.3 are brought to the built state in the commit after this file. |
-| CI | **Held** | Run 44934342417 on `66096adc` was in progress when this file was written. The result is to follow. |
-| ux wording of the three pages | **Held** until the three changes land | `wording-review.md` @ `fdfc39af` (ux-designer): 28 strings accepted and 3 changed.<br>• **#29, ruled here:** the cancel page's 400 text and the R1.7 "not armed" mail both say "Settings, **Sign-in and second step**", the panel's real title. The ruling's strings are amended in place. This is a navigation fix with no security effect.<br>• **#17 and #18** are builder strings and need no ruling.<br>• The builder updates `cancel-method/+page.svelte`, `packages/mail/src/templates.ts` and the reset page. qa updates `auth-pages-137.test.ts` and `jobs.test.ts`. |
+| CI | Pass | Run 44934342417 on `66096adc`: all eight jobs green. Run 44934982685 on `cb27be1e`: success on all eight jobs (image, lint, unit, db, app, cairn, guard, changes). |
+| ux wording of the three pages | Pass | `wording-review.md` @ `fdfc39af`: 28 strings accepted, 3 changed (#17, #18, #29; #29 is ruled below). Built at frontend `b82feb5f` and backend `cb27be1e`. Both #29 strings are present verbatim, checked directly: `grep -c` gives 1 in `cancel-method/+page.svelte` and 1 in `templates.ts`, and no "Settings, Second step" remains under `apps/web/src` or `packages/mail/src`. qa's delta gate passes: `gate.md` "Delta gate" @ `cf899f92`. |
 
 ## Follow-ups (the lead files them after merge)
 
