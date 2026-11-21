@@ -26,6 +26,6 @@ The architect rules the design for this loop's criteria on POLY-137 before any t
 
 ## Acceptance criteria
 
-- [ ] A ruling at `process/cairn/reviews/POLY-137/ruling.md` covers every row of POLY-137's "Acceptance criteria (this loop)": the mailer seam and its fake, the reset wiring, where the 24-hour hold and its cancel live (the database decides), the limiter, the purge schedule, and the migration order.
-- [ ] Each measured claim cites its command; the rest is tagged (unmeasured).
-- [ ] seceng's review of the ruling is answered; any re-issue is a single replacement ruling.
+- [x] A ruling at `process/cairn/reviews/POLY-137/ruling.md` covers every row of POLY-137's "Acceptance criteria (this loop)": the mailer seam and its fake, the reset wiring, where the 24-hour hold and its cancel live (the database decides), the limiter, the purge schedule, and the migration order.
+- [x] Each measured claim cites its command; the rest is tagged (unmeasured).
+- [x] seceng's review of the ruling is answered; any re-issue is a single replacement ruling.

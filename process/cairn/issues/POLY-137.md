@@ -20,19 +20,6 @@ Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict an
 
 Scope decided by the Principal on 2026-11-21 (`process/DECISIONS.md`): this loop takes what gates the first deploy, plus the small fixes. Each row's source is the item or comment below that it names; the architect's ruling amends these rows in place.
 
-- [ ] The Resend mailer exists and is used by `sendMagicLink`, `sendSecondStepCode` and password reset; with no mailer configured each answers as today. Password reset is wired with a 900-second token lifetime and a test for the expiry (comment 2026-11-13).
-- [ ] The account's owner is emailed at once whenever a second-step method is added or removed (comment 2026-11-19).
-- [ ] A method added through Confirm it's you works only after 24 hours; the email says so and lets the owner cancel it. Shown red first: refused for 24 hours and accepted after; a cancelled method never works. The deploy-gate check (INFRA §7.1 step 16) refuses when either this or the email is missing (comment 2026-11-19).
-- [ ] Every OAuth callback and `/magic-link/verify` are on C-04's limited list, and the sign-in service's role has an idle-in-transaction timeout (SECURITY R-24; comments 2026-11-12 and 2026-11-17).
-- [ ] The S9 dist-enumeration test exists and fails if the lockfile holds two versions of `@simplewebauthn/server` or `@better-auth/utils` (item 1; comment 2026-11-20 no. 5).
-- [ ] A held sign-in by magic link answers a browser navigation with a 302 to `/sign-in/second-step?with=code` (comment 2026-11-20 no. 1).
-- [ ] The worker schedules `app.purge_sign_in_record()` and `app.purge_tx_identity()` (comment 2026-11-19).
-- [ ] The routing pool refuses a transaction-control statement passed as a query-config object (item 2).
-- [ ] `/change-password` forces `revokeOtherSessions` (item 3).
-- [ ] Settings → Sessions: revoking with an id that is not a uuid answers 404 (item 4).
-- [ ] One test for `/API/AUTH/...` on the raw pathname (item 6).
-- [ ] The e2e step-up stamp is written inside the revoke spec (item 7).
-- [ ] SECURITY R-12 carries no plain-token sentence (comment 2026-11-13).
 - [x] The mailer caps token emails (magic link, password reset, second-step code) at 10 per address per rolling 60 minutes, one shared in-memory counter keyed on the stored address, counted before the send; notices are never counted or refused. A capped magic link or reset answers exactly as an unknown address does; a capped second-step code answers 429 `mail_capped`. A magic link goes only to an address with an account; the reset token travels only in a URL fragment and GET `/reset-password/:token` is blocked (ruling R1.8, R1.9, R2.1; Principal, 2026-11-21; seceng brief B1). **Proof:** tests/db/auth-mail-flows.test.ts (R1.8 cap, R1.9 members only), packages/mail/src/mail.test.ts (RecipientCap).
 - [x] The Resend mailer (`@poly/mail`, ruling R1) is used by `sendMagicLink`, `sendSecondStepCode` and password reset; with no mailer configured (development only) each answers as today, and staging or production refuse to start without `RESEND_API_KEY_FILE` and `MAIL_FROM`. Password reset is wired with a 900-second token lifetime and a test for the expiry, revokes every session, never changes its answer with the mailer, and has its two pages (R2; comment 2026-11-13). **Proof:** tests/db/auth-mail-flows.test.ts (R2.6 a-g, 900 s, sessions), packages/auth/src/options-137.test.ts, packages/config/src/mail-137.test.ts (R1.3), apps/web/src/auth-pages-137.test.ts.
 - [x] The account's owner is emailed whenever a second-step method is added or removed: the database writes the notice in the same transaction (`app.mail_outbox`) and the worker sends it (R3.2, R3.6, R5.2). The email address cannot be changed by any login role (D1); replaced backup codes and a changed password are notified too (D2, D4) (comment 2026-11-19). **Proof:** tests/db/auth-method-hold.test.ts (R3.2, R3.10.7), auth-notice-triggers.test.ts (D1, D2, D4), worker-mail-jobs.test.ts, apps/worker/src/jobs/jobs.test.ts.
@@ -53,17 +40,17 @@ Scope decided by the Principal on 2026-11-21 (`process/DECISIONS.md`): this loop
 
 ## Items
 
-- [ ] **S9 dist-enumeration test (gates any upgrade).** Grep the pinned better-auth dist for `createUser`, `createOAuthUser`, `createSession` and `setSessionCookie` and classify each path against `route-policy.ts`. No `better-auth` or `@better-auth/passkey` pin change merges before this test exists (seceng build review @ 04bd75b; verdict follow-up 13).
-- [ ] The routing pool refuses a transaction-control statement passed as a query-config object, as it already does for a string (seceng build review, follow-up 1).
-- [ ] `/change-password` forces `revokeOtherSessions` (SECURITY C-02); today the caller decides.
-- [ ] Settings → Sessions: revoking with an id that is not a uuid answers 404, not 500.
-- [ ] A per-email sign-in limit, which C-04 calls for and BetterAuth lacks (seceng S19).
-- [ ] One test for `/API/AUTH/...` once routes exist under `/api`: the handle's tree test runs on the raw pathname (verdict follow-up 9).
-- [ ] qa: write the e2e step-up stamp inside the revoke spec, not in `serve.ts` before `vite build`; the spec fails if a run takes over 5 minutes to reach it (verdict follow-up 12).
-- [ ] The Resend mailer for `sendMagicLink`; apps/web passes one that answers 503 until it exists (ruling follow-up 3).
-- [ ] Avatar upload to our own origin, with the same-origin rule on `/update-user` image (ruling follow-up 2; seceng).
+- [x] **S9 dist-enumeration test (gates any upgrade).** Grep the pinned better-auth dist for `createUser`, `createOAuthUser`, `createSession` and `setSessionCookie` and classify each path against `route-policy.ts`. No `better-auth` or `@better-auth/passkey` pin change merges before this test exists (seceng build review @ 04bd75b; verdict follow-up 13). — done in this loop; see the matching row above.
+- [x] The routing pool refuses a transaction-control statement passed as a query-config object, as it already does for a string (seceng build review, follow-up 1). — done in this loop; see the matching row above.
+- [x] `/change-password` forces `revokeOtherSessions` (SECURITY C-02); today the caller decides. — done in this loop; see the matching row above.
+- [x] Settings → Sessions: revoking with an id that is not a uuid answers 404, not 500. — done in this loop; see the matching row above.
+- [ ] A per-email sign-in limit, which C-04 calls for and BetterAuth lacks (seceng S19). — deferred to the second auth loop (Principal, 2026-11-21; filed after this merges).
+- [x] One test for `/API/AUTH/...` once routes exist under `/api`: the handle's tree test runs on the raw pathname (verdict follow-up 9). — done in this loop; see the matching row above.
+- [x] qa: write the e2e step-up stamp inside the revoke spec, not in `serve.ts` before `vite build`; the spec fails if a run takes over 5 minutes to reach it (verdict follow-up 12). — done in this loop; see the matching row above.
+- [x] The Resend mailer for `sendMagicLink`; apps/web passes one that answers 503 until it exists (ruling follow-up 3). — done in this loop; see the matching row above.
+- [ ] Avatar upload to our own origin, with the same-origin rule on `/update-user` image (ruling follow-up 2; seceng). — deferred to the second auth loop (Principal, 2026-11-21; filed after this merges).
 
-- [ ] **Second-step cap and lock notice (`process/DECISIONS.md` 2026-11-17).** Needs the mailer above. Each sub-item is shown red first:
+- [ ] **Second-step cap and lock notice (`process/DECISIONS.md` 2026-11-17).** Needs the mailer above. Each sub-item is shown red first: — deferred to the second auth loop (Principal, 2026-11-21; filed after this merges).
   - On a fake clock, the 3rd lock of one factor within a rolling 24 hours shuts the code step. While it is shut, a correct TOTP or backup code is refused, creates no session, and counts toward nothing.
   - It opens only when the user confirms a code emailed to their account's address (the `app.email_challenge` machinery, its own purpose, single use, 15-minute expiry, 5 wrong entries end it).
   - The emailed code never shortens or clears the growing lock: confirming it during a lock leaves `locked_until` and the doubling unchanged, and the right TOTP is refused until the lock lapses.

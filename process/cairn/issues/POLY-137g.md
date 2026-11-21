@@ -1,7 +1,7 @@
 ---
 id: POLY-137g
 title: Auth follow-ups page wording
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-137
 blocked_by: [POLY-137f]
@@ -10,6 +10,10 @@ paths: [process/cairn/issues/POLY-137.md, process/cairn/reviews/POLY-137/**, pro
 stage: review
 estimate.cost_usd: "3.00"
 estimate.gate_cycles: 1
+actual.cost_usd: null
+actual.tokens: null
+actual.gate_cycles: 1
+actual.wall_clock: 164
 labels: [auth, design]
 priority: null
 pr: null

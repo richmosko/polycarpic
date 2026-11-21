@@ -1,7 +1,7 @@
 ---
 id: POLY-137e
 title: Auth follow-ups verdict
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-137
 blocked_by: [POLY-137d]
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-137.md, process/cairn/reviews/POLY-137/**, pro
 stage: review
 estimate.cost_usd: "5.00"
 estimate.gate_cycles: 3
-labels: [auth, security]
+actual.cost_usd: "0.3669"
+actual.tokens: 1621315
+actual.gate_cycles: 4
+actual.wall_clock: 86
+ratio: "0.07"
+labels: [auth, security, bloat]
 priority: null
 pr: null
 created: 2026-11-21
