@@ -46,3 +46,23 @@ The remaining cost is the R3 stopped/closed cases (10 s retries by design) and f
 dropping the two stack-level R3 regression cases (addendum 1 says they gate nothing) or sharing one echo stack across more files.
 
 Not run: the cold `--no-cache` Caddy build; `image.sh scan` (Trivy).
+
+## Delta gate at `bb728fa6365b9ab58875bf30b5d3ff6250fbd205` (after seceng's two build-review findings, fix `36fe64dc`)
+
+Clean tree, `.vite`, `.vitest-cache`, `.vite-temp`, `__pycache__` deleted first, turbo forced. Re-run at this sha:
+
+| Suite | Result |
+|---|---|
+| `tests/infra` | 8 files, 308 pass (was 290; `renovate-report.test.ts` grew to 36 tests) |
+| `tests/ci` | 542 pass |
+| `tests/layers` | 545 pass |
+| `tests/image` (static) | 40 pass, 15 skipped |
+| `tests/workflow` (`run_tests.py --gate green`) | 2017 tests, OK (4 skipped) |
+| `pnpm run lint`, exit code read | 0 |
+| `turbo run typecheck --force` | 0 (19 of 19) |
+
+Renovate: the 13 findings tests were red at `ec786dc8`/`e535ed33` and are green at `36fe64dc` (34 of 34 at the fix, 36 of 36 with the PINS-against-Dockerfiles check, which pins `PINS` in `check-report.sh` to the pins the two Dockerfiles hold; a pure case shows it can fail). Row 4 stays ticked.
+
+Carried, not re-run: the Caddy and Postgres container tests, the `tests/db/connection.test.ts` check, the image-job timing (88 s against 44 s) and the Renovate validator run. They were measured at `eb3e43fd` (the validator at `4b98851c`). `git diff eb3e43fd bb728fa6` changes `infra/renovate/check-report.sh`, `tests/infra/renovate-report.test.ts`, SECURITY, and review/issue records, and nothing under `infra/caddy`, `infra/postgres`, `infra/compose`, `renovate.json`, `Dockerfile`, `.dockerignore`, `tests/infra/image` or `tests/db`, which are everything those results read.
+
+Verdict: PASS. The +44 s image-job guard exceedance stands, for the architect's verdict.
