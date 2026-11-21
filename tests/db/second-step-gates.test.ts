@@ -546,8 +546,8 @@ describe('R1.3 amended (35e375b5): a superuser passes every guard; a superuser a
   });
   it('an inconsistent two_factor_enabled: a user INSERT with the flag on is refused under SET LOCAL ROLE poly_app, and passes with no SET ROLE [red if: guard_two_factor_flag or the commit-time check has no superuser pass]', async () => {
     const ins = (q: any, id: string) => q(`INSERT INTO public."user" (id, name, email, two_factor_enabled) VALUES ($1, 'x', $2, true)`, [id, `r13c${id.slice(-6)}@qa.test`]);
-    const a = uid(960 + ++n);
-    const b = uid(960 + ++n);
+    const a = uid(7000 + ++n); // a range no fixed uid in this file uses (960 + n reached uid(990) at line 359 once n grew)
+    const b = uid(7000 + ++n);
     expect(await asSuper(true, null, (q) => fails(ins(q, a)))).not.toBeNull();
     expect(await asSuper(false, null, (q) => fails(ins(q, b).then(() => q('SET CONSTRAINTS ALL IMMEDIATE'))))).toBeNull();
   });
