@@ -221,6 +221,32 @@ describe('infra/renovate/check-report.sh', () => {
     });
   });
 
+  describe('finding 2, PINS inside the script against the two Dockerfiles', () => {
+    const PGF = 'infra/postgres/Dockerfile', CDF = 'infra/caddy/Dockerfile';
+    /** the pins Renovate extracts from the two Dockerfiles, as [manager, file, depName, role] */
+    const derive = (pg: string, cd: string): string[][] => {
+      const froms = (t: string) => t.split('\n').filter((l) => /^FROM /.test(l));
+      const role = (l: string, any: boolean) => (any ? 'any' : /^FROM caddy:\S*-builder@/.test(l) ? 'builder' : 'runtime');
+      return [
+        ...froms(pg).map((l) => ['dockerfile', PGF, /^FROM (\w+):/.exec(l)![1]!, 'any']),
+        ...(pg.match(/\bage=\S+/g) ?? []).map(() => ['regex', PGF, 'age', 'any']),
+        ...froms(cd).map((l) => ['dockerfile', CDF, /^FROM (\w+):/.exec(l)![1]!, role(l, false)]),
+        ...(cd.match(/xcaddy build v\d+\.\d+\.\d+/g) ?? []).map(() => ['regex', CDF, 'caddy', 'any']),
+      ];
+    };
+    const listed = (): string[][] => JSON.parse(/^PINS='(\[[\s\S]*?\n\])'/m.exec(readFileSync(SCRIPT, 'utf8'))![1]!);
+    const key = (rows: string[][]) => rows.map((r) => r.join('|')).sort();
+    it('PINS equals the pins the two Dockerfiles hold now (no pin unlisted, none listed that is gone)', () => {
+      const live = derive(readFileSync(join(ROOT, PGF), 'utf8'), readFileSync(join(ROOT, CDF), 'utf8'));
+      expect(key(listed())).toEqual(key(live)); // red: a FROM, age= or xcaddy literal added or removed without editing PINS
+    });
+    it('the comparison can fail: one more FROM in a Dockerfile makes the derived list differ from PINS', () => {
+      const pg = readFileSync(join(ROOT, PGF), 'utf8'), cd = readFileSync(join(ROOT, CDF), 'utf8');
+      expect(key(derive(pg + '\nFROM debian:13@sha256:' + '0'.repeat(64) + '\n', cd))).not.toEqual(key(listed()));
+      expect(key(derive(pg, cd.replace(/xcaddy build v\S+/, 'xcaddy build'))).length).toBe(key(listed()).length - 1);
+    });
+  });
+
   it('the weekly workflow runs this script, not an inline check', () => {
     const f = join(ROOT, '.github', 'workflows', 'renovate-check.yml');
     expect(existsSync(f)).toBe(true);
