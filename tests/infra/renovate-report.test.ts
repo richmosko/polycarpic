@@ -186,6 +186,41 @@ describe('infra/renovate/check-report.sh', () => {
     });
   });
 
+  describe('finding 2, the expected list against the two Dockerfiles (a pin added without listing it fails here)', () => {
+    const src = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
+    const FROMS = (rel: string) => src(rel).split('\n').filter((l) => /^FROM /.test(l));
+    it('the Dockerfiles hold exactly the five pins the check expects: 1 postgres FROM, 2 caddy FROMs, one `age=`, one xcaddy literal', () => {
+      expect(FROMS(PG)).toHaveLength(1); // red: a new stage or base image is a pin nobody lists
+      expect(FROMS(CD)).toHaveLength(2);
+      expect(src(PG).match(/\bage=\S+/g)).toHaveLength(1);
+      expect(src(CD).match(/xcaddy build v\d+\.\d+\.\d+/g)).toHaveLength(1);
+      expect(FROMS(PG)[0]).toMatch(/^FROM postgres:\d+\.\d+@sha256:/);
+      expect(FROMS(CD)[0]).toMatch(/^FROM caddy:\S+-builder@sha256:/);
+      expect(FROMS(CD)[1]).toMatch(/^FROM caddy:\d\S*@sha256:/);
+    });
+    it('a report built from the live Dockerfiles\' pins (their current values, no updates) is clean; without any one of them it exits 2', () => {
+      const pg = /^FROM postgres:(\S+?)@/.exec(FROMS(PG)[0]!)![1]!;
+      const age = /\bage=(\S+)/.exec(src(PG))![1]!;
+      const [bld, rtm] = FROMS(CD).map((l) => /^FROM caddy:(\S+?)@/.exec(l)![1]!);
+      const lit = /xcaddy build v(\d+\.\d+\.\d+)/.exec(src(CD))![1]!;
+      const build = (skip: number): Report => ({
+        problems: [],
+        repositories: { local: { problems: [], packageFiles: {
+          dockerfile: [
+            { packageFile: CD, deps: ([{ depName: 'caddy', currentValue: bld, depType: 'stage', updates: [], warnings: [] }, { depName: 'caddy', currentValue: rtm, depType: 'final', updates: [], warnings: [] }] as Dep[]).filter((_d, i) => skip !== 2 + i) },
+            { packageFile: PG, deps: skip === 0 ? [] : [{ depName: 'postgres', currentValue: pg, depType: 'final', updates: [], warnings: [] }] },
+          ],
+          regex: [
+            { packageFile: PG, deps: skip === 1 ? [] : [{ depName: 'age', currentValue: age, updates: [], warnings: [] }] },
+            { packageFile: CD, deps: skip === 4 ? [] : [{ depName: 'caddy', currentValue: lit, updates: [], warnings: [] }] },
+          ],
+        } } },
+      });
+      expect(run(J(build(-1))).code, 'every live pin present').toBe(0); // red: the expected list asks for a pin the Dockerfiles no longer hold, or reads the live values wrong
+      for (const skip of [0, 1, 2, 3, 4]) expect(run(J(build(skip))).code, `pin ${skip} missing`).toBe(2);
+    });
+  });
+
   it('the weekly workflow runs this script, not an inline check', () => {
     const f = join(ROOT, '.github', 'workflows', 'renovate-check.yml');
     expect(existsSync(f)).toBe(true);
