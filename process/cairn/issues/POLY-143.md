@@ -10,7 +10,7 @@ labels: [ci, tooling]
 priority: null
 pr: null
 created: 2026-11-12
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 An umbrella for small CI and test-time items found in the POLY-141 and POLY-87 loops. None blocks a feature; each is taken when the `db` job's same-day median on `main` nears its 100 s warning budget, or when a loop is already in the files concerned. The timing rule these serve: a loop's cost is the branch's battery-step median minus `main`'s at the merge base, same session, at least three runs each (POLY-87 ruling, "Timing guard").
@@ -88,3 +88,8 @@ From POLY-150 (merged 2026-11-20, PR #141). First to fix: CI's `unit` job went f
 7. **Seam test cold import.** `apps/auth/src/seam.test.ts` timed out at 5 s on the runner; it now imports once in `beforeAll`. Watch it.
 8. **gitleaks.** `tests/db/second-step-screens.test.ts:306` writes a literal dummy auth secret that the `generic-api-key` rule flags; one fingerprint is in `.gitleaksignore` (seceng build-review §7, SECURITY C-82). Replace the literal with a generated value. Run gitleaks in the local gate or pre-push so a finding shows before the PR opens, and have the CI step print the rule, file and line with the value redacted.
 9. **Push guard.** `cairn guard-push` checks the sub-issue's paths, not the parent's, so a file added to the parent alone is refused. A teammate ran the guard and the push in one step and the push went out past the refusal. Make the push depend on the guard's exit code.
+
+### @team-lead — 2026-11-21
+
+From the POLY-138 loop (2026-11-21): `tests/db/auth-routing-pool.test.ts` "a timer scheduled inside withSession that calls connect() after commit rejects" failed once on CI (run 44925366365, promise resolved where a rejection was expected) and passed on the re-run of the same commit and on every run since. Timing-dependent; find the race or widen the test's wait.
+From POLY-137: the db suite is about 30 s slower (148 s against 138, 116 and 114 s on a same-day control, which carried 33 fast environmental failures); accepted by the architect at 0.14 s per added test. The 33 `ops-status` and `ops-hardening` failures on a tree without `svelte-kit sync` are worth a clearer error.
