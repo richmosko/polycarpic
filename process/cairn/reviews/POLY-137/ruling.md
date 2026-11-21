@@ -541,3 +541,25 @@ The amendments are made in place in POLY-137.md, in the same commit as this file
 7. INFRA (devops-engineer): the Resend domain with open and click tracking off; two sending-only keys for that one domain, one per service, and the 401/403 check of RC7; key rotation; SPF, DKIM and DMARC `p=reject` on the sending domain (seceng M24, S2).
 8. POLY-138: the edge access log records no query string for `/api/auth/magic-link/verify` (seceng RC5 and M19; follow-up 1 of `ruling-review.md`).
 9. POLY-88: an explicit fetch timeout, under 15 s, on the IdP token exchange (seceng M21).
+
+## Addendum 1: qa's assumed seams (test-plan.md @ 78cbbc94) and R8
+
+1. **Worker and `@poly/db/jobs`: confirmed as qa wrote them.** `startSchedule(jobs, log)`, `buildJobs({mailer, origin, log})`, `drainMail({mailer, origin})`. `claimMail()` returns `null` or `{id, kind, toAddress, payload, attempts}`, with snake_case mapped to camelCase in `jobs.ts`. `armHoldCancel(id, hash)` returns a `Date` or `null`.
+2. **`dist-sites.json`: confirmed.** The row shape is `{pkg, file, line, writer, class, routes?, option?, disabledBy?: 'falsy'|'true', why?}`, and `option` is a dotted path where `plugins[<id>]` selects a plugin by id.
+3. **Gate FAIL wording: confirmed.** qa's strings for lines 15–18, 20 and 21 are the canonical wording. For lines 22–24 the canonical lines are:
+   - `FAIL purge: app.tx_identity holds rows older than 6 hours`;
+   - `FAIL purge: app.sign_in_record holds rows older than 401 days`;
+   - `FAIL purge: app.mail_outbox holds sent rows older than 31 days`.
+
+   Each of these matches qa's patterns.
+4. **D1's refusal: fixed.** It raises `42501`, message `a user's email is changed by no login role`. The exact-call refusals keep their existing message, `a second-step definer must be called on its own`.
+5. **Logs: one seam added.** `packages/auth` may not import `@poly/config/log` (`layers.json`). So `AuthInput` gains `log?: (event: string, fields: Record<string, unknown>) => void`.
+   - `apps/auth` passes its pino logger.
+   - The default is `console.error(JSON.stringify({event, ...fields}))`, as in `handler.ts:130`. qa's `captureLogs` on `console` holds with the default.
+6. **Outbox payload: corrected.** After RC4, holds point to their mail through `method_hold.mail_id`, so the payload carries **no `hold_id`**. Its keys are:
+   - `methods` and `at`;
+   - `usable_at`, present on a held `method_added` only.
+
+   qa's assertion (each key one of the four, and `methods`, `at` and `usable_at` present on a held add) already passes. Nothing changes in the tests.
+7. **The old helpers:** `sendMagicLink` and `sendSecondStepCode` are removed from `AuthInput` (R1.5), as qa's plan says. Moving the four helpers to `mailer` is part of the green gate.
+8. **R8 `/API/AUTH/...` on web: the 303 is accepted.** A signed-out caller meets the sign-in gate before any route. A 303 to `/sign-in?next=…` or a 404 both meet the rule, which is that the path is never treated as the auth tree, never proxied, and makes no auth or database call. qa's test, which accepts either, stands. The auth service's own answer stays 404.
