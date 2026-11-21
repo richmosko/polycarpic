@@ -9,7 +9,10 @@ WITH logins AS (
 ), runtime AS (
   SELECT r FROM logins WHERE r <> 'poly_backup'
 ), tbls(t) AS (
-  VALUES ('app.second_step_streak'), ('app.sign_in_record')
+  VALUES ('app.second_step_streak'), ('app.sign_in_record'), ('app.method_hold'), ('app.mail_outbox')
+), tbls_read(t) AS (
+  -- POLY-137: the two new tables are read by no runtime login role (poly_backup reads them through pg_read_all_data)
+  VALUES ('app.method_hold'), ('app.mail_outbox')
 ), betterauth(t) AS (
   VALUES ('public."user"'), ('public.session'), ('public.account'), ('public.verification'),
          ('public.two_factor'), ('public.passkey')
@@ -21,7 +24,45 @@ WITH logins AS (
          ('public.two_factor', 'two_factor_80_sync'), ('public.passkey', 'passkey_80_sync'),
          ('public.two_factor', 'two_factor_85_step_up_spent'), ('app.step_up_totp', 'step_up_totp_10_forward'),
          ('app.step_up_pending', 'step_up_pending_resolved'),
-         ('public.two_factor', 'two_factor_no_truncate'), ('public.passkey', 'passkey_no_truncate')
+         ('public.two_factor', 'two_factor_no_truncate'), ('public.passkey', 'passkey_no_truncate'),
+         -- POLY-137 R3.8 lines 16 and 20: the hold's guards and the three notice triggers
+         ('public.two_factor', 'two_factor_12_method_hold'), ('public.passkey', 'passkey_12_method_hold'),
+         ('public."user"', 'user_21_email_fixed'), ('public.two_factor', 'two_factor_84_codes_replaced'),
+         ('public.account', 'account_80_password_changed')
+), trig_fn(tbl, name, fn) AS (
+  VALUES ('public.two_factor', 'two_factor_12_method_hold', 'app.guard_method_hold()'),
+         ('public.passkey', 'passkey_12_method_hold', 'app.guard_method_hold()'),
+         ('public."user"', 'user_21_email_fixed', 'app.refuse_email_change()'),
+         ('public.two_factor', 'two_factor_84_codes_replaced', 'app.note_codes_replaced()'),
+         ('public.account', 'account_80_password_changed', 'app.note_password_changed()')
+), trig_def(tbl, name, frag) AS (
+  VALUES ('public.two_factor', 'two_factor_12_method_hold', 'BEFORE UPDATE OF failed_verification_count, backup_codes'),
+         ('public.passkey', 'passkey_12_method_hold', 'BEFORE UPDATE OF counter')
+), body_chk(sig, needle) AS (
+  -- Line 17 is a TRIPWIRE, not a proof: a comment in the body would satisfy it. The proof is behavioural (tests/db/auth-method-hold.test.ts,
+  -- R3.10 tests 3, 7 and 8); this gate is read-only and cannot run them.
+  VALUES ('app.sync_second_step()', 'app.method_hold'), ('app.sync_second_step()', 'app.mail_outbox'),
+         ('app.complete_step_up(text,uuid,bigint)', 'method_hold'), ('app.check_factor_removal(uuid,text,uuid)', 'method_hold')
+), def137(sig, owner, exec) AS (
+  VALUES ('app.method_held(text,uuid)', 'poly_govern', 'poly_auth'), ('app.cancel_method_hold(text)', 'poly_govern', 'poly_auth'),
+         ('app.claim_mail()', 'poly_govern', 'poly_worker'), ('app.arm_hold_cancel(uuid,bytea)', 'poly_govern', 'poly_worker'),
+         ('app.mail_sent(uuid)', 'poly_govern', 'poly_worker'), ('app.mail_failed(uuid,integer)', 'poly_govern', 'poly_worker'),
+         ('app.purge_mail_outbox()', 'poly_purge', 'poly_worker'),
+         ('app.note_codes_replaced()', 'poly_govern', NULL), ('app.note_password_changed()', 'poly_govern', NULL)
+), cnt(k, n) AS (
+  -- Lines 19, 22, 23, 24: what a missed run leaves behind. A count over a table that is missing is 0 here; line 1 names the missing table.
+  -- The text of each count is run through query_to_xml (the gate runs as a superuser) so a missing table is a FAIL line, not a failed script.
+  SELECT 'mail_unsent', CASE WHEN to_regclass('app.mail_outbox') IS NULL THEN 0 ELSE
+    (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM app.mail_outbox WHERE sent_at IS NULL AND created_at < now() - interval ''1 hour''', false, true, '')))[1]::text::bigint END
+  UNION ALL
+  SELECT 'tx_identity', CASE WHEN to_regclass('app.tx_identity') IS NULL THEN 0 ELSE
+    (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM app.tx_identity WHERE created_at < now() - interval ''6 hours'' AND pg_xact_status(xid) IS DISTINCT FROM ''in progress''', false, true, '')))[1]::text::bigint END
+  UNION ALL
+  SELECT 'sign_in_record', CASE WHEN to_regclass('app.sign_in_record') IS NULL THEN 0 ELSE
+    (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM app.sign_in_record WHERE created_at < now() - interval ''401 days''', false, true, '')))[1]::text::bigint END
+  UNION ALL
+  SELECT 'mail_sent_old', CASE WHEN to_regclass('app.mail_outbox') IS NULL THEN 0 ELSE
+    (xpath('/row/c/text()', query_to_xml('SELECT count(*) AS c FROM app.mail_outbox WHERE sent_at IS NOT NULL AND created_at < now() - interval ''31 days''', false, true, '')))[1]::text::bigint END
 ), sync_trig(tbl, name) AS (
   -- the two method-change triggers must run app.sync_second_step(), the function that writes the audit event
   VALUES ('public.two_factor', 'two_factor_80_sync'), ('public.passkey', 'passkey_80_sync')
@@ -86,7 +127,7 @@ WITH logins AS (
   SELECT 'FAIL function app.purge_sign_in_record(): poly_worker cannot execute it'
   WHERE to_regprocedure('app.purge_sign_in_record()') IS NOT NULL
     AND NOT has_function_privilege('poly_worker', to_regprocedure('app.purge_sign_in_record()'), 'EXECUTE')
-  -- 5. no login role writes either table (INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER; table or column level)
+  -- 5. no login role writes any of the tables (INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER; table or column level)
   UNION ALL
   SELECT 'FAIL ' || t || ': ' || r || ' holds ' || p
   FROM tbls CROSS JOIN logins CROSS JOIN unnest(ARRAY['INSERT', 'UPDATE', 'REFERENCES', 'DELETE', 'TRUNCATE', 'TRIGGER']) p
@@ -174,6 +215,56 @@ WITH logins AS (
   -- 10. no login role can delete a user
   UNION ALL
   SELECT 'FAIL public."user": ' || r || ' holds DELETE' FROM logins WHERE has_table_privilege(r, 'public."user"', 'DELETE')
+  -- 15. (POLY-137) the hold and the outbox: lines 1 and 5 cover their existence, row-level security and every write privilege; no runtime role reads either
+  UNION ALL
+  SELECT 'FAIL ' || t || ': ' || r || ' holds SELECT'
+  FROM tbls_read CROSS JOIN runtime WHERE to_regclass(t) IS NOT NULL AND has_any_column_privilege(r, to_regclass(t), 'SELECT')
+  -- 16. and 20. the guards run the right function, and the two method-hold triggers are BEFORE UPDATE OF the named columns
+  UNION ALL
+  SELECT 'FAIL trigger ' || name || ' on ' || tbl || ': does not run ' || fn
+  FROM trig_fn JOIN pg_trigger g ON g.tgrelid = to_regclass(tbl) AND g.tgname = name AND NOT g.tgisinternal
+  WHERE g.tgfoid IS DISTINCT FROM to_regprocedure(fn)
+  UNION ALL
+  SELECT 'FAIL trigger ' || name || ' on ' || tbl || ': not ' || frag
+  FROM trig_def JOIN pg_trigger g ON g.tgrelid = to_regclass(tbl) AND g.tgname = name AND NOT g.tgisinternal
+  WHERE position(frag IN pg_get_triggerdef(g.oid)) = 0
+  -- 17. the bodies name the hold and the outbox (a tripwire, see body_chk)
+  UNION ALL
+  SELECT 'FAIL function ' || sig || ': its body does not mention ' || needle
+  FROM body_chk WHERE to_regprocedure(sig) IS NOT NULL
+    AND position(needle IN (SELECT prosrc FROM pg_proc WHERE oid = to_regprocedure(sig))) = 0
+  -- 18. the nine definers: owner, SECURITY DEFINER, executable by exactly the listed login role
+  UNION ALL
+  SELECT 'FAIL function ' || sig || ': missing' FROM def137 WHERE to_regprocedure(sig) IS NULL
+  UNION ALL
+  SELECT 'FAIL function ' || sig || ': owner is ' || pg_get_userbyid(p.proowner) || ', not ' || owner
+  FROM def137 JOIN pg_proc p ON p.oid = to_regprocedure(sig) WHERE pg_get_userbyid(p.proowner) <> owner
+  UNION ALL
+  SELECT 'FAIL function ' || sig || ': not SECURITY DEFINER'
+  FROM def137 JOIN pg_proc p ON p.oid = to_regprocedure(sig) WHERE NOT p.prosecdef
+  UNION ALL
+  SELECT 'FAIL function ' || sig || ': ' || r || ' can execute it'
+  FROM def137 CROSS JOIN logins WHERE to_regprocedure(sig) IS NOT NULL AND r IS DISTINCT FROM exec
+    AND has_function_privilege(r, to_regprocedure(sig), 'EXECUTE')
+  UNION ALL
+  SELECT 'FAIL function ' || sig || ': ' || exec || ' cannot execute it'
+  FROM def137 WHERE exec IS NOT NULL AND to_regprocedure(sig) IS NOT NULL AND NOT has_function_privilege(exec, to_regprocedure(sig), 'EXECUTE')
+  -- 19. no notice has waited over an hour. The gate runs at INFRA 7.1 step 16 and when the operator reruns it: this is not a standing monitor.
+  -- The standing control is the hold itself: an unsent notice keeps its method off (an undeliverable notice is a runbook case).
+  UNION ALL
+  SELECT 'FAIL mail: ' || n || ' notices unsent for over an hour' FROM cnt WHERE k = 'mail_unsent' AND n > 0
+  -- 21. poly_auth's idle-in-transaction timeout (roles.sql)
+  UNION ALL
+  SELECT 'FAIL role poly_auth: idle_in_transaction_session_timeout is not 15s'
+  WHERE NOT EXISTS (SELECT 1 FROM pg_db_role_setting s JOIN pg_roles r ON r.oid = s.setrole
+                    WHERE r.rolname = 'poly_auth' AND s.setdatabase = 0 AND 'idle_in_transaction_session_timeout=15s' = ANY (s.setconfig))
+  -- 22-24. a missed purge shows as rows past their purge age
+  UNION ALL
+  SELECT 'FAIL tx_identity: ' || n || ' markers older than 6 hours' FROM cnt WHERE k = 'tx_identity' AND n > 0
+  UNION ALL
+  SELECT 'FAIL sign_in_record: ' || n || ' rows older than 401 days' FROM cnt WHERE k = 'sign_in_record' AND n > 0
+  UNION ALL
+  SELECT 'FAIL mail_outbox: ' || n || ' sent rows older than 31 days' FROM cnt WHERE k = 'mail_sent_old' AND n > 0
 )
 SELECT line FROM f
 UNION ALL SELECT 'gate: pass' WHERE NOT EXISTS (SELECT 1 FROM f);

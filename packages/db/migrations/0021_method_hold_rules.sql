@@ -276,7 +276,7 @@ CREATE OR REPLACE FUNCTION app.check_factor_removal(p_user uuid, p_kind text, p_
     IF NOT app.step_up_fresh() THEN
       RAISE EXCEPTION 'step_up_required' USING ERRCODE = '42501';
     END IF;
-    -- A held method is not a working one: it does not stand in for the method being removed.
+    -- A held method (a live app.method_hold row) is not a working one: it does not stand in for the method being removed.
     SELECT (SELECT pg_catalog.count(*) FROM public.two_factor t
              WHERE t.user_id = p_user AND t.verified AND p_kind <> 'two_factor_all' AND (p_kind <> 'two_factor' OR t.id <> p_id)
                AND NOT app.method_held('two_factor', t.id))
@@ -318,6 +318,7 @@ CREATE OR REPLACE FUNCTION app.complete_step_up(p_method text, p_challenge uuid,
     IF NOT EXISTS (SELECT 1 FROM public."user" u WHERE u.id = v_uid AND u.second_step_at IS NOT NULL) THEN
       RAISE EXCEPTION 'step_up_refused' USING ERRCODE = '42501';
     END IF;
+    -- A method on hold (app.method_hold) cannot confirm.
     IF p_method IN ('totp', 'backup_code')
        AND EXISTS (SELECT 1 FROM public.two_factor t WHERE t.user_id = v_uid AND t.verified AND app.method_held('two_factor', t.id)) THEN
       RAISE EXCEPTION 'method_on_hold' USING ERRCODE = '42501';
