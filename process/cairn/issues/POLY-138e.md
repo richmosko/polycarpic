@@ -1,7 +1,7 @@
 ---
 id: POLY-138e
 title: Caddy and edge verdict
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-138
 blocked_by: [POLY-138d]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-138.md, process/cairn/reviews/POLY-138/**, pro
 stage: review
 estimate.cost_usd: "3.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "4.4679"
+actual.tokens: 17605485
+actual.gate_cycles: 2
+actual.wall_clock: 47
+ratio: "1.49"
 labels: [ops, security]
 priority: null
 pr: null
