@@ -449,7 +449,7 @@ describe('R3.10.6 the R0 attacker: SQL as poly_auth with a forged marker and sta
       expect([codeOf(r), msgOf(r)], f).toEqual(['42501', expect.stringMatching(/permission denied for function/)]);
     }
     const em = await attempt(`UPDATE public."user" SET email = 'attacker@evil.test' WHERE id = $1`, [x.u.id]);
-    expect([codeOf(em), msgOf(em)], 'D1: no login role changes the address').toEqual(['42501', expect.stringMatching(/email/i)]);
+    expect([codeOf(em), msgOf(em)], 'D1: no login role changes the address').toEqual(['42501', expect.stringMatching(/a user's email is changed by no login role/)]);
     expect(must(`SELECT email FROM public."user" WHERE id = '${x.u.id}'`, e.db).rows[0]![0]).toBe(x.u.email);
     // positive cases: the legitimate calls on the same connection pass
     expect(await attempt('SELECT app.method_held($1, $2)', ['passkey', crypto.randomUUID()]), 'method_held is poly_auth\'s').toBeNull();

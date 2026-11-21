@@ -39,7 +39,7 @@ describe('D1 user.email cannot be changed by any login role', () => {
     const sid = (await freshCookie(e, auth, u.id)).id;
     const x = await marked(u.id, sid, `UPDATE public."user" SET email = $2 WHERE id = $1`, [u.id, evil()]);
     expect(x).not.toBeNull();
-    expect([codeOf(x), msgOf(x)]).toEqual(['42501', expect.stringMatching(/email/i)]);
+    expect([codeOf(x), msgOf(x)]).toEqual(['42501', expect.stringMatching(/a user's email is changed by no login role/)]);
     expect(must(`SELECT email FROM public."user" WHERE id = '${u.id}'`, e.db).rows[0]![0]).toBe(u.email);
     expect(await marked(u.id, sid, `UPDATE public."user" SET email = email WHERE id = $1`, [u.id]), 'a no-op write is not a change').toBeNull();
     expect(await marked(u.id, sid, `UPDATE public."user" SET name = 'N' WHERE id = $1`, [u.id])).toBeNull();
@@ -49,7 +49,7 @@ describe('D1 user.email cannot be changed by any login role', () => {
   it('the unmarked (sign-in transaction) path is refused the same way, and by poly_app too [red if: the trigger checks the marker instead of the role]', async () => {
     const u = await fx.user();
     const x = await unmarked(`UPDATE public."user" SET email = $2 WHERE id = $1`, [u.id, evil()]);
-    expect([codeOf(x), msgOf(x)]).toEqual(['42501', expect.stringMatching(/email/i)]);
+    expect([codeOf(x), msgOf(x)]).toEqual(['42501', expect.stringMatching(/a user's email is changed by no login role/)]);
   });
 });
 
