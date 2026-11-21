@@ -21,5 +21,5 @@ The architect checks the build against the ruling at the gate sha.
 
 ## Acceptance criteria
 
-- [ ] `process/cairn/reviews/POLY-138/verdict.md`: APPROVE or findings at the gate sha, with what was checked directly and what was taken from others, CI included as an axis.
-- [ ] ARCH is updated if this loop changes it.
+- [x] `process/cairn/reviews/POLY-138/verdict.md`: APPROVE or findings at the gate sha, with what was checked directly and what was taken from others, CI included as an axis.
+- [x] ARCH is updated if this loop changes it.

@@ -2,8 +2,7 @@
 
 Build read at `e98cc512c0e1ab76e4d104f424031b7a1bfaa0a6`, against `ruling.md` (R1–R10, addenda 1–2).
 
-**Verdict: held.** The APPROVE line is written once qa's final delta at `e98cc512` and CI on `e98cc512` (run 44929409165) are in.
-Every axis below is a pass except those two, which are pending.
+**Verdict: APPROVE at `e98cc512`.** Every axis below passes; POLY-138 may merge.
 
 | Axis | Result | Evidence (sha) |
 |---|---|---|
@@ -13,9 +12,9 @@ Every axis below is a pass except those two, which are pending.
 | Postgres 17.12 @ `b60e9004…`, hold before upgrade in both Dockerfiles (R6) | pass, direct | `e98cc512` |
 | `.dockerignore` names and order (R9) | pass, direct | `e98cc512` |
 | Compose-policy lint, CI's env | pass, direct: `compose-policy: clean`, exit 0; `lint-edge.test.ts` 51/51 | `e98cc512` |
-| Suites, lint, typecheck; container tests (R1, R2, R3, R10, R6 `server_version`, R7 x/net and checksum env) | pass, from qa: all green; the three `postgres.test.ts` failures are POLY-143's, matched on a `main` control | `gate.md` @ `4b98851c` / `eb3e43fd` / `bb728fa6`; final delta @ `e98cc512` **pending** |
+| Suites, lint, typecheck; container tests (R1, R2, R3, R10, R6 `server_version`, R7 x/net and checksum env) | pass, from qa: all green; the three `postgres.test.ts` failures are POLY-143's, matched on a `main` control | `gate.md` @ `85c38319` (PASS at `e98cc512`: infra 320, ci 542, layers 545, image static 40, lint 0, typecheck 0; containers carried from `eb3e43fd`) |
 | Security review | pass, from seceng: no open findings on the build; findings 1–3 on `check-report.sh` met | `build-review.md` @ `44a0a2dc` (ACCEPT of `check-report.sh` @ `e98cc512`) |
-| CI | green at `4b98851c` (run 44926953668), from the lead | run on `e98cc512` **pending** |
+| CI | pass, from the lead: run 44929409165, all eight jobs success | `e98cc512` |
 | Image-job guard | **re-ruled: +44 s accepted** (see below) | `gate.md` @ `eb3e43fd` |
 | Arch drift | pass: no new top-level job beyond D1(b)'s `renovate-check.yml`; the Caddy and lint changes stay in their files | `e98cc512` |
 | ARCH current | updated: the client address, "Secrets in URLs" (R3's path-segment rule) and the web↔auth network sentence | this commit |
@@ -30,6 +29,11 @@ stack-level R3 cases, each waiting out `lb_try_duration 10s` on a failing upstre
 because it runs without `handle_errors`. The image job runs only on infra and image changes. A cut would save about 10 s and lose that check.
 
 ## Taken from others, not re-run
+
+One red outside this loop: 2 of 2017 in `tests/workflow` (`test_otel_receiver_watchdog_attribution`). The lead's ruling:
+load-sensitive, not blocking (18/18 alone three times; CI's cairn job green on `e98cc512`; this branch does not touch `scripts/cairn`).
+It goes to the tooling umbrella.
+
 
 Container tests, suite runs and timings (qa). The reading of the security controls (seceng). CI (the lead). D2 is built as ruled and still awaits the Principal.
 
