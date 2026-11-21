@@ -16,6 +16,27 @@ updated: 2026-11-21
 
 Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict and seceng reviews under `process/cairn/reviews/POLY-86/`). One loop for the batch; add later auth nits here.
 
+## Acceptance criteria (this loop)
+
+Scope decided by the Principal on 2026-11-21 (`process/DECISIONS.md`): this loop takes what gates the first deploy, plus the small fixes. Each row's source is the item or comment below that it names; the architect's ruling amends these rows in place.
+
+- [ ] The Resend mailer exists and is used by `sendMagicLink`, `sendSecondStepCode` and password reset; with no mailer configured each answers as today. Password reset is wired with a 900-second token lifetime and a test for the expiry (comment 2026-11-13).
+- [ ] The account's owner is emailed at once whenever a second-step method is added or removed (comment 2026-11-19).
+- [ ] A method added through Confirm it's you works only after 24 hours; the email says so and lets the owner cancel it. Shown red first: refused for 24 hours and accepted after; a cancelled method never works. The deploy-gate check (INFRA §7.1 step 16) refuses when either this or the email is missing (comment 2026-11-19).
+- [ ] Every OAuth callback and `/magic-link/verify` are on C-04's limited list, and the sign-in service's role has an idle-in-transaction timeout (SECURITY R-24; comments 2026-11-12 and 2026-11-17).
+- [ ] The S9 dist-enumeration test exists and fails if the lockfile holds two versions of `@simplewebauthn/server` or `@better-auth/utils` (item 1; comment 2026-11-20 no. 5).
+- [ ] A held sign-in by magic link answers a browser navigation with a 302 to `/sign-in/second-step?with=code` (comment 2026-11-20 no. 1).
+- [ ] The worker schedules `app.purge_sign_in_record()` and `app.purge_tx_identity()` (comment 2026-11-19).
+- [ ] The routing pool refuses a transaction-control statement passed as a query-config object (item 2).
+- [ ] `/change-password` forces `revokeOtherSessions` (item 3).
+- [ ] Settings → Sessions: revoking with an id that is not a uuid answers 404 (item 4).
+- [ ] One test for `/API/AUTH/...` on the raw pathname (item 6).
+- [ ] The e2e step-up stamp is written inside the revoke spec (item 7).
+- [ ] SECURITY R-12 carries no plain-token sentence (comment 2026-11-13).
+- [ ] seceng reviews the ruling for the 24-hour delay and the method-change emails before any test is written.
+
+**Deferred to a second auth loop, filed after this one merges:** the second-step cap after 3 locks and the lock notice; the per-email sign-in limit; refusing a reused sign-in code; the backup-codes-left count; the recent-changes view; emails on a voided code and on an operator reset; `/change-email`; avatar upload. Their rows stay below, unticked.
+
 ## Items
 
 - [ ] **S9 dist-enumeration test (gates any upgrade).** Grep the pinned better-auth dist for `createUser`, `createOAuthUser`, `createSession` and `setSessionCookie` and classify each path against `route-policy.ts`. No `better-auth` or `@better-auth/passkey` pin change merges before this test exists (seceng build review @ 04bd75b; verdict follow-up 13).

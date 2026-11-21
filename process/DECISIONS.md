@@ -803,3 +803,13 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Do not accept a backup code here — recommended by seceng: a found code plus the password could then sign in up to ten times but could not change the methods, and a password change would end it. About $6 cheaper (a guess). The cost falls on someone who loses a phone, who needs `reset-mfa`.
 **Approved by:** the Principal (2026-11-19), on the architect's and the lead's recommendation and against seceng's.
+
+### 2026-11-21 — POLY-137 takes the deploy gates only; the second-step cap waits for a second auth loop
+**Decision:** The POLY-137 loop builds the mailer, password reset, the method-change emails, the 24-hour delay, the callback and magic-link rate limits, the S9 pin test, the magic-link 302, the purge jobs and the small fixes. The cap after 3 locks, the lock notice and the remaining auth items move to a second loop, which is not a condition of the first deploy.
+**Why:** the issue had grown past 20 items across five loops, too many for one reviewable PR; the chosen set is what the first deploy with real household data waits on.
+**The risk accepted:** a first real deploy can go out with the growing second-step lock (15 minutes doubling to 24 hours) but without the cap after 3 locks and the first-lock notice decided on 2026-11-17. Someone holding a user's first step can keep trying codes at the lock's pace, and the user is not told.
+**Alternatives considered:**
+- Add the cap to this loop — about a day more (a guess) and a larger security review.
+- Split, with the second loop recorded as a condition of the first real-data deploy.
+- Everything in one loop — advised against by the lead.
+**Approved by:** the Principal (2026-11-21), on the lead's recommendation.
