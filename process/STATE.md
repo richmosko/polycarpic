@@ -17,7 +17,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 
 One loop is in flight (started 2026-11-21):
 
-- **POLY-137 — Auth follow-ups** · milestone `POLY-M1` · branch `feature/poly-137-auth-follow-ups` · status: In Progress. Goal: the mailer, the 24-hour delay and method-change emails, the rate limits and the S9 pin test that gate the first real deploy.
+- **POLY-137 — Auth follow-ups** · milestone `POLY-M1` · branch `feature/poly-137-auth-follow-ups` · status: In Review, PR [#144](https://github.com/richmosko/polycarpic/pull/144). Goal: the mailer, the 24-hour delay and method-change emails, the rate limits and the S9 pin test that gate the first real deploy.
 
 _Standing context. POLY-138 (Caddy and edge follow-ups) merged 2026-11-21 via PR [#143](https://github.com/richmosko/polycarpic/pull/143) — ARCH 1.22.1, SECURITY 1.15.0, INFRA 1.3.19. Caddy sets the client address on every upstream, refuses `Service-Worker` requests, overrides `Cache-Control` to `no-store` outside `/_app/immutable/*`, filters its log and keeps no access log; Postgres is pinned at 17.12 with the server packages held; a read-only weekly workflow runs Renovate. Decided by the Principal on 2026-11-21 (`process/DECISIONS.md`): the Renovate workflow, the `no-store` override, no access log. Not yet done: a deployed box showing that Caddy sees each visitor's real address (first staging deploy); the follow-ups in `process/cairn/reviews/POLY-138/verdict.md` are not filed yet._
 

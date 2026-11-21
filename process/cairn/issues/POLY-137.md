@@ -1,7 +1,7 @@
 ---
 id: POLY-137
 title: Auth follow-ups
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: backend-lead
 paths: [process/cairn/issues/POLY-137.md, process/cairn/reviews/POLY-137/**, apps/auth/**, apps/web/**, apps/worker/**, apps/migrate/**, packages/**, docs/DESIGN/**, infra/postgres/**, infra/compose/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, .github/workflows/**, infra/ci/**]
 labels: [auth, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/144
 created: 2026-11-11
 updated: 2026-11-21
 ---
@@ -111,3 +111,7 @@ From POLY-150 (merged 2026-11-20, PR #141). These join the 24-hour delay and met
 ### @team-lead — 2026-11-21
 
 Feature started. Branch: `feature/poly-137-auth-follow-ups`. Runs in parallel with POLY-138.
+
+### @team-lead — 2026-11-21
+
+PR opened: https://github.com/richmosko/polycarpic/pull/144. Awaiting Validate. Verdict APPROVE at `cb27be1e`; post-merge gate PASS at `52edd768` after POLY-138 landed (`process/cairn/reviews/POLY-137/gate.md`). The Principal is confirming the four ruled-in additions (ruling D1 to D4) one at a time: D1 and D2 kept so far.
