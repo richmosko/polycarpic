@@ -167,3 +167,19 @@ I read the whole replacement against the tree, by reading the code; I ran nothin
 - **R-2:** the `poly_worker` note above.
 - **C-03:** D2's size check on an unmarked change, and D4.
 - **T1:** the reset token is only ever in the fragment; `/reset-password/:token` is blocked.
+
+## 6. Addendum 1 at `bb2dd89f` (after qa's red at `78cbbc94`)
+
+**Verdict: ACCEPT.** I read `git diff fab91743 bb2dd89f -- …/ruling.md`, code-read only.
+
+- **§5.2 is taken in full:**
+  - the stolen-`poly_worker` sentence now says "live unannounced";
+  - `disableSignUp: true`, with S9's `option-off` row for the magic-link `createUser` site;
+  - the two leftover phrases are fixed.
+- The test plan's row 7 has `purge_mail_outbox` delete only sent rows, and gate line 24's wording ("sent rows older than 31 days") matches.
+- **Items 1–3, 6 and 7** change names and shapes, not reach. Dropping `hold_id` removes a field, and no payload key carries a token or a user string.
+- **Item 4:** `42501` with a fixed message, and no value echoed back. Fine.
+- **Item 5, the `log` seam:** fine. Every call site passes the fixed field sets of R1.2, R1.8 and R2.2 (`kind`, `status`, `user_id`), never an address, a subject, a body or a `MailError` body. The default writes to `console.error` as `handler.ts:130` does.
+  - At the build review I check each `log(` call's fields against that list.
+- **Item 8, the 303:** accepted. A signed-out `/API/AUTH/...` meets the sign-in gate, which redirects to our own `/sign-in?next=…` and makes no auth call.
+  - **Note (not blocking):** add the same request **with a session** to `auth-pages-137.test.ts`. A signed-in caller passes the gate, so that case is the one that proves web never treats the path as the auth tree. Expect 404 and no call to the auth service.
