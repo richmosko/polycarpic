@@ -64,6 +64,7 @@ services:
       DB_PASSWORD_FILE: /run/secrets/db_password_auth
       AUTH_SECRET_FILE: /run/secrets/auth_secret
       RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM}
       AUTH_PUBLIC_PORT: "3000"
     secrets:
       - {source: db_password_auth__auth, target: db_password_auth}
@@ -86,6 +87,8 @@ services:
     user: "10102:10102"
     environment:
       DB_PASSWORD_FILE: /run/secrets/db_password_worker
+      RESEND_API_KEY_FILE: /run/secrets/resend_api_key
+      MAIL_FROM: ${MAIL_FROM:?set MAIL_FROM}
     secrets:
       - {source: db_password_worker__worker, target: db_password_worker}
       - {source: credential_keyring__worker, target: credential_keyring}
