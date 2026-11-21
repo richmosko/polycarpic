@@ -59,3 +59,22 @@ Head: frontend `b82feb5f` (wording rows 17, 18, 29 and the three page titles: `c
 **Carried from 13c1e405, and why:** the full `tests/db` run (58 files, 1400 passed; no `packages/db`, migration, gate-check or auth-service source changed since; the three files that read the changed mail text were re-run above), the full e2e run (80 passed; only the three pages' markup changed and every spec that touches `/sign-in` was re-run), and `tests/infra/image` (no Docker, compose or image path changed except `image.sh`, whose smoke CI ran green on `66096adc`).
 
 **The 15 ticks hold:** every proving test named on the ticked rows passed in this delta or in the carried full run; the wording changes touch rows 37 and 38's pages and mail text, whose tests are the ones re-run above.
+
+## Post-merge at 52edd768435576110735e07ec07b8b3f746c1405: PASS
+
+POLY-138 (PR #143) merged to main and main merged into this branch: the tree now holds both loops (Caddyfile, the new compose-policy rules, Postgres 17.12 with the package hold, Renovate files, `.dockerignore`; the harness image builds from 17.12). A clean tree (generated folders and caches deleted, offline frozen install, `svelte-kit sync`), machine quiet, everything run once.
+
+| Step | Result |
+|---|---|
+| `scripts/layers/check.mjs`, `eslint packages apps scripts/layers`, `check-migrations` | exit 0 each |
+| `turbo run typecheck --force` | exit 0 |
+| `turbo run test --force` (every package, from its own directory) | exit 0 |
+| `tests/layers` | 556 passed |
+| `tests/ci` (DB_AREAS and `changes.mjs` from both loops) | 553 passed |
+| `tests/infra` in full (the new lint rules against this loop's compose files; adds the Renovate workflow test) | 320 passed in 8 files |
+| `tests/image` (static) | 40 passed, 15 skipped |
+| `tests/config` | 100 passed, 15 skipped |
+| `tests/db` full, both projects | 58 files, 1401 passed, 2 expected fail, 148 s (the gate at `13c1e405` was 148 s on 1400) |
+| e2e full (`turbo run e2e --force`) | 80 passed, 2 m 42 s |
+
+No step failed and no test needed a change. The db time is unchanged by the 17.12 base image.
