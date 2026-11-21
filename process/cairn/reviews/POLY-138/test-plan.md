@@ -62,3 +62,10 @@ Static and lint tests run in the `lint` job (`tests/infra/vitest.config.ts`); co
 | a run step fails when an update is due (a failing shell condition; no `|| true`, no `continue-on-error`) | the exit code swallowed |
 
 Follow-up: the last row is structural only. If devops puts the check in a script, tell qa its path and a behavioural test (a fixture log with and without a proposed branch) replaces it.
+
+### D1(b) behavioural test (added after devops's `check-report.sh` @ 96dbb7d9)
+
+`tests/infra/renovate-report.test.ts`: the real script on fixture reports. Exit 1 on an update (also digest-only, also in a second
+file or manager, naming only the due dependency); 0 on empty or absent `updates`; 2 and stderr for a missing, empty, non-JSON,
+`{}`, empty or list `repositories`; 2 for a repository with no `packageFiles` and for package files with no dependencies (a lookup
+that looked at nothing must not read as clean); the workflow runs the script.

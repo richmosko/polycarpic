@@ -75,3 +75,9 @@ R10 test row and `caddy-cache` fixture (D3); the D1(b) workflow structure test. 
 Run against a compliant sample workflow (not committed) all 8 pass, and each of eight mutations turns exactly one test red:
 `pull_request_target` trigger, `contents: write`, `secrets.X` in checkout, image by tag, exit code swallowed, daily cron,
 `--dry-run=full`, no permissions block. Total red is now 84.
+
+## D1(b) behavioural test (`renovate-report.test.ts`, against `check-report.sh` @ 96dbb7d9)
+
+16 tests, 14 pass, **2 red, both fail-open**: a report whose repository has no `packageFiles` (`{"repositories":{"r":{}}}`), and
+one whose package files hold no dependencies, both exit 0 "No update is due." A lookup that extracted nothing (a broken
+`includePaths` or config) reads as clean, so the weekly run would stay green while checking nothing. Wanted: exit 2. Total red: 86.
