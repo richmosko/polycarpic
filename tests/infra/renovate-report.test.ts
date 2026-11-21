@@ -74,6 +74,21 @@ describe('infra/renovate/check-report.sh', () => {
   it('a repository whose package files hold no dependencies at all: exit 2 as well', () => {
     expect(run(report([])).code).toBe(2); // red: an empty extraction reads as clean
   });
+  describe('a real Renovate file report (fixtures/renovate-report-due.json: two Caddy digest updates, none for postgres or age)', () => {
+    const REAL = join(ROOT, 'tests', 'infra', 'fixtures', 'renovate-report-due.json');
+    it('exit 1, naming the two Caddy dependencies and neither postgres nor age', () => {
+      const r = spawnSync('bash', [SCRIPT, REAL], { encoding: 'utf8' });
+      expect(r.status).toBe(1); // red: a real report with updates reads as clean
+      expect(r.stdout.match(/infra\/caddy\/Dockerfile: caddy /g)).toHaveLength(2);
+      expect(r.stdout).not.toMatch(/: (postgres|age) /);
+    });
+    it('the same report with every updates list emptied: exit 0', () => {
+      const j = JSON.parse(readFileSync(REAL, 'utf8'));
+      const strip = (o: any): void => { if (Array.isArray(o)) o.forEach(strip); else if (o && typeof o === 'object') { if ('updates' in o) o.updates = []; Object.values(o).forEach(strip); } };
+      strip(j);
+      expect(run(JSON.stringify(j)).code).toBe(0); // red: an empty updates list is read as due
+    });
+  });
   it('the weekly workflow runs this script, not an inline check', () => {
     const f = join(ROOT, '.github', 'workflows', 'renovate-check.yml');
     expect(existsSync(f)).toBe(true);
