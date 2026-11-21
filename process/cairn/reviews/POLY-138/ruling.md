@@ -363,3 +363,16 @@ The lint counts as a test any file matching `\.(test|spec)\.[cm]?[jt]sx?$` (`scr
 - F6. `auth` trusts `X-Forwarded-For` only from Caddy's fixed edge address (`ipv4_address` in `edge.yml`) and answers
   503 otherwise; optionally `auth` leaves `default` for its own network with `postgres` (seceng finding 2).
 - F7. If §D3 is declined: R10's `Cache-Control` override and the `Clear-Site-Data` incident step.
+
+## Addendum 1 — M9 and R3 corrected (qa's red run, `red-run.md` @ `a64292ab`)
+
+- **Reproduced:** ruled sites, filter removed, upstream stopped, `GET /api/auth/reset-password/<tok>?x=<tok>`: with
+  `handle_errors` 502, zero `http.log.error` lines, zero markers; the same sites without `handle_errors` 502, one line
+  holding the token. M9 holds only for a site **without** `handle_errors`; both ruled sites have one, so today no
+  request-bearing line is written on a 502. M15's "no log line" has the same cause, not the accept-and-close.
+- **R3 reads:** Caddy writes no request URI on the ruled stack today; the default-logger filter is kept as the control
+  for any line that does carry one: a site without `handle_errors`, an access log (D2), `debug`, or a Caddy release
+  that changes this. Cost: four lines and a lint rule, nothing at runtime.
+- **The gating R3 test** is qa's isolated one: the real Caddyfile's global block on a site with no `handle_errors`,
+  upstream stopped; red when a marker appears, and it shows the M10 paths. The stack-level R3 tests (stopped,
+  closed) stay as regression checks for zero markers; they pass with or without the filter and gate nothing.
