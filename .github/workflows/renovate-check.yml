@@ -37,10 +37,5 @@ jobs:
             renovate/renovate@sha256:d6b65ff3562dd499240b23d34ef806ec7e5fd2675e4236a027dfb36774f2aa75 \
             renovate --platform=local --dry-run=lookup
           test -s "$out/report.json"
-          due="$(jq -r '.repositories[].packageFiles[][] | .packageFile as $f | .deps[] | select((.updates // []) | length > 0) | "\($f): \(.depName) \(.currentValue // "") -> \([.updates[] | (.newValue // "") + (if .newDigest then "@" + .newDigest else "" end)] | join(", "))"' "$out/report.json")"
-          if [ -n "$due" ]; then
-            echo "Updates are due; bump the line named below, run the DB battery, and merge:"
-            echo "$due"
-            exit 1
-          fi
-          echo "No update is due."
+          # the decision lives in a script so a test can show it fails: exit 1 when any update is due, 2 on a bad report
+          bash infra/renovate/check-report.sh "$out/report.json" || exit 1
