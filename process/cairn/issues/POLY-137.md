@@ -33,6 +33,7 @@ Scope decided by the Principal on 2026-11-21 (`process/DECISIONS.md`): this loop
 - [ ] One test for `/API/AUTH/...` on the raw pathname (item 6).
 - [ ] The e2e step-up stamp is written inside the revoke spec (item 7).
 - [ ] SECURITY R-12 carries no plain-token sentence (comment 2026-11-13).
+- [ ] The mailer caps token emails (magic link, password reset, second-step code) per recipient address per hour; security notices are exempt and never counted. The ruling sets the number (about 10) and says what a capped request answers, without revealing whether the address has an account (Principal, 2026-11-21; seceng brief B1).
 - [ ] seceng reviews the ruling for the 24-hour delay and the method-change emails before any test is written.
 
 **Deferred to a second auth loop, filed after this one merges:** the second-step cap after 3 locks and the lock notice; the per-email sign-in limit; refusing a reused sign-in code; the backup-codes-left count; the recent-changes view; emails on a voided code and on an operator reset; `/change-email`; avatar upload. Their rows stay below, unticked.

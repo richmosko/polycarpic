@@ -813,3 +813,12 @@ Add new decisions ABOVE this comment, newest first.
 - Split, with the second loop recorded as a condition of the first real-data deploy.
 - Everything in one loop — advised against by the lead.
 **Approved by:** the Principal (2026-11-21), on the lead's recommendation.
+
+### 2026-11-21 — The mailer caps token emails per recipient
+**Decision:** The POLY-137 mailer refuses more than about 10 token emails (magic link, password reset, second-step code) to one address in an hour; the ruling sets the number. Security notices are exempt.
+**Why:** the per-email sign-in limit is deferred, and the per-IP limit alone lets anyone with many addresses make us mail a member without bound. That spends the Resend quota and puts the sending domain's reputation at risk, which decides whether the security notices reach the inbox.
+**The risk accepted:** someone can use up a member's allowance and block that member's own sign-in or reset email for up to an hour.
+**Alternatives considered:**
+- Defer it with the per-email limit and accept flooding until the second auth loop.
+- Defer it and make the second loop a condition of the first deploy that sends real mail.
+**Approved by:** the Principal (2026-11-21), on seceng's and the lead's recommendation.
