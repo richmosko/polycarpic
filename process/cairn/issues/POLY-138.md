@@ -1,17 +1,17 @@
 ---
 id: POLY-138
 title: Caddy and edge follow-ups
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [infra/caddy/**, infra/compose/**, infra/lint/**, tests/infra/**]
+paths: [process/cairn/issues/POLY-138.md, process/cairn/reviews/POLY-138/**, infra/caddy/**, infra/compose/**, infra/lint/**, infra/postgres/**, tests/infra/**, .dockerignore, Dockerfile, renovate.json, .github/renovate.json, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, .github/workflows/**, infra/ci/**]
 labels: [ops, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 Umbrella for the Caddy and edge-network findings from the POLY-95 and POLY-86 loops (`process/cairn/reviews/POLY-95/`, `process/cairn/reviews/POLY-86/seceng-client-ip.md`). The first item gates the first deploy.
@@ -46,3 +46,7 @@ Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cair
 ### @team-lead — 2026-11-20
 
 From POLY-150 (devops and seceng, 2026-11-20). This issue is a prerequisite for even a staging deploy. Until Caddy sets `X-Forwarded-For` explicitly, and that is tested, the client address the sign-in service limits on and records rests on Caddy's untested default. SECURITY C-04 says so.
+
+### @team-lead — 2026-11-21
+
+Feature started. Branch: `feature/poly-138-caddy-edge-follow-ups`. Runs in parallel with POLY-137.

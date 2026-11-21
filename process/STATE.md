@@ -15,7 +15,12 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-_None. POLY-150 (Second-step screens) and POLY-151 (Confirm it's you) merged 2026-11-20 via PR [#141](https://github.com/richmosko/polycarpic/pull/141) — DESIGN 0.20.5, ARCH 1.22.0, SECURITY 1.14.1, INFRA 1.3.18; follow-ups on POLY-137, POLY-138, POLY-143, POLY-91, POLY-154. A user can enrol a second step in a browser from Settings → Sign-in and second step; no real household data is deployed before POLY-137, POLY-138 and POLY-97's domain rule are in (`process/DECISIONS.md` 2026-11-19)._
+Two loops run in parallel, each on its own branch with its own team (started 2026-11-21):
+
+- **POLY-137 — Auth follow-ups** · milestone `POLY-M1` · branch `feature/poly-137-auth-follow-ups` · status: In Progress. Goal: the mailer, the 24-hour delay and method-change emails, the rate limits and the S9 pin test that gate the first real deploy.
+- **POLY-138 — Caddy and edge follow-ups** · milestone `POLY-M1` · branch `feature/poly-138-caddy-edge-follow-ups` · status: In Progress. Goal: Caddy sets the client address, drops the query string from its log and refuses service-worker scripts, tested, before any deploy.
+
+_Standing context. POLY-150 (Second-step screens) and POLY-151 (Confirm it's you) merged 2026-11-20 via PR [#141](https://github.com/richmosko/polycarpic/pull/141) — DESIGN 0.20.5, ARCH 1.22.0, SECURITY 1.14.1, INFRA 1.3.18; follow-ups on POLY-137, POLY-138, POLY-143, POLY-91, POLY-154. A user can enrol a second step in a browser from Settings → Sign-in and second step; no real household data is deployed before POLY-137, POLY-138 and POLY-97's domain rule are in (`process/DECISIONS.md` 2026-11-19)._
 
 _Standing context. POLY-149 (Stage 2 revocation and docs) merged 2026-11-19 via PR [#138](https://github.com/richmosko/polycarpic/pull/138) — ARCH 1.21.0, SECURITY 1.13.0, INFRA 1.3.16; PRD 1.5.0 and ARCH 1.21.1 followed in PR [#140](https://github.com/richmosko/polycarpic/pull/140)._
 
