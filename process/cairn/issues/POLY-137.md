@@ -1,16 +1,17 @@
 ---
 id: POLY-137
 title: Auth follow-ups
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: backend-lead
+paths: [process/cairn/issues/POLY-137.md, process/cairn/reviews/POLY-137/**, apps/auth/**, apps/web/**, apps/worker/**, apps/migrate/**, packages/**, docs/DESIGN/**, infra/postgres/**, infra/compose/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, .github/workflows/**, infra/ci/**]
 labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-11
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 Umbrella for the non-blocking findings from the POLY-86 loop (ruling, verdict and seceng reviews under `process/cairn/reviews/POLY-86/`). One loop for the batch; add later auth nits here.
@@ -84,3 +85,7 @@ From POLY-150 (merged 2026-11-20, PR #141). These join the 24-hour delay and met
 3. **Recent changes to your sign-in methods.** An owner-readable view built from the `second_step.method_added` and `second_step.method_removed` audit rows. A planted method is recorded with the victim as actor and `marker_kind = 'auth'`.
 4. **Reused sign-in code (Addendum 3, Open 5).** BetterAuth's sign-in verify still accepts a reused code within its window. Refusing it needs a before-hook on `/two-factor/verify-totp`. Confirm it's you already refuses a reused code.
 5. **S9 pin test (seceng build-review §6).** `packages/auth` now pins `@simplewebauthn/server` 13.3.3 and `@better-auth/utils` 0.5.1 directly, beside better-auth and `@better-auth/passkey` at 1.7.18. A bump must move all four together, or a second copy installs. S9 fails if the lockfile holds two versions of either.
+
+### @team-lead — 2026-11-21
+
+Feature started. Branch: `feature/poly-137-auth-follow-ups`. Runs in parallel with POLY-138.
