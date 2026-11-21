@@ -37,7 +37,7 @@ describe('the committed schema', () => {
   it('requires exactly ts, level, service, event', () => expect([...schema().required].sort()).toEqual(['event', 'level', 'service', 'ts']));
   it('declares exactly the allowed fields (SECURITY 9 "Logged" list + R3/R4 needs), and no free-text msg', () => {
     const keys = Object.keys(schema().properties).sort();
-    expect(keys).toEqual(['commit', 'count', 'deleted', 'dropped', 'entity_id', 'err', 'event', 'failed', 'fault', 'job', 'latency_ms', 'level', 'method', 'migration', 'ms', 'outcome', 'req_id', 'route', 'run_id', 'sent', 'service', 'status', 'ts', 'user_id', 'var'].sort());
+    expect(keys).toEqual(['commit', 'count', 'deleted', 'dropped', 'entity_id', 'err', 'event', 'failed', 'fault', 'job', 'kind', 'latency_ms', 'level', 'method', 'migration', 'ms', 'outcome', 'req_id', 'route', 'run_id', 'sent', 'service', 'status', 'ts', 'user_id', 'var'].sort());
     expect(keys).not.toContain('msg');
     expect(keys).not.toContain('message');
   });

@@ -53,7 +53,7 @@ const signed = await auth.signIn(EMAIL, PASSWORD);
 const cookies = storageCookies(signed);
 if (!cookies.some((c) => c.name === '__Host-poly_handle') || !cookies.some((c) => c.name.startsWith('__Secure-better-auth.') && c.path === '/api/auth')) { stop(); throw new Error('the seeded sign-in did not set both cookies'); }
 // A second session, so the Sessions spec can end another session. The step-up stamp it needs is NOT written here: this seed runs before `vite build`,
-// and a slow build outlived the 5-minute window. The spec writes it (support.ts stampStepUp) right before the revoke (POLY-137 R8).
+// and a slow build outlived the 5-minute window. The spec writes it (support.ts stampStepUp) right before its action (POLY-137 R8).
 await auth.signIn(EMAIL, PASSWORD);
 // POLY-89 (R7): a manager with no second step, which is the state `polycarpic cli user reset-mfa` leaves behind. The entity belongs to an
 // enrolled owner (a verified factor and the flag as superuser, then the Business as poly_app under the marker, as the db fixtures do).

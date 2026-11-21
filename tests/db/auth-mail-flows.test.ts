@@ -289,6 +289,20 @@ describe('R7 a held magic-link sign-in answers 302 to the second-step page, with
     expect(v.status, JSON.stringify(await json(v))).toBe(200);
     expect(hasSessionCookie(v)).toBe(true);
   });
+  it('Addendum 2 shape (b): the same link with no callbackURL (a 200 JSON twoFactorRedirect from the plugin) is rewritten to the same 302, cookie kept, body dropped [red if: only the redirect shape is rewritten, so this link answers JSON to a browser]', async () => {
+    const x = await enrol(e, auth, mm);
+    const n = mm.sent.length;
+    await magic(x.u.email);
+    expect(await sentCount(mm, n + 1)).toBe(true);
+    const link = new URL(magicUrlIn(lastTo(mm, x.u.email)!));
+    link.searchParams.delete('callbackURL');
+    const r = await e.handle(new Request(link, { redirect: 'manual', headers: { origin: BASE, accept: 'text/html' } }), auth);
+    expect(r.status, await r.clone().text()).toBe(302);
+    expect(r.headers.get('location')).toBe('/sign-in/second-step?with=code');
+    expect(r.headers.getSetCookie().some((c) => /two_factor/.test(c.split(';')[0]!))).toBe(true);
+    expect(hasSessionCookie(r)).toBe(false);
+    expect(await r.clone().text(), 'the JSON body is dropped').toBe('');
+  });
   it('a user with no second step is not redirected: the link signs in and sets the session cookie, no 302 to the second-step page [red if: the rewrite catches every verify]', async () => {
     const u = e.seedUser();
     const n = mm.sent.length;
@@ -296,6 +310,8 @@ describe('R7 a held magic-link sign-in answers 302 to the second-step page, with
     expect(await sentCount(mm, n + 1)).toBe(true);
     const r = await e.handle(new Request(magicUrlIn(lastTo(mm, u.email)!), { redirect: 'manual', headers: { origin: BASE } }), auth);
     expect(r.headers.get('location') ?? '').not.toContain('/sign-in/second-step');
+    expect(r.status, 'the ordinary sign-in is BetterAuth\'s own redirect to the callback, left alone').toBe(302);
+    expect(new URL(r.headers.get('location')!, BASE).pathname).toBe('/');
     expect(hasSessionCookie(r)).toBe(true);
   });
 });

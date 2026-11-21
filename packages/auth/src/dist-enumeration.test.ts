@@ -16,7 +16,7 @@ const ROOT = join(HERE, '..', '..', '..');
 const WRITERS = ['createUser', 'createOAuthUser', 'createSession', 'setSessionCookie'] as const;
 type Writer = (typeof WRITERS)[number];
 type Site = { pkg: string; file: string; line: number; writer: string };
-type Row = Site & { class: string; routes?: string[]; option?: string; disabledBy?: 'falsy' | 'true'; why?: string };
+type Row = Site & { class: string; routes?: string[]; option?: string; disabledBy?: 'falsy' | 'true'; why?: string; refusal?: { path: string; body: Record<string, unknown> } };
 const SITE_RE = new RegExp(`\\b(${WRITERS.join('|')})\\(`, 'g');
 const key = (s: Site) => `${s.pkg}|${s.file}|${s.line}|${s.writer}`;
 
@@ -47,6 +47,10 @@ function checkRow(r: Row, c: Ctx): string | null {
     case 'sign-in-tx':
       if (userWriter) return `class sign-in-tx is not allowed for ${r.writer}`;
       return names.length && names.every((n) => c.signInTx.has(n) || c.userInserting.has(n)) ? null : 'a route is in neither SIGN_IN_TX nor USER_INSERTING';
+    case 'refused-by-hook': // Addendum 2 item 4: the hook refuses the body that reaches the site (proved by the async test in section B); only a session writer may take it
+      if (r.writer !== 'createSession' && r.writer !== 'setSessionCookie') return `class refused-by-hook is not allowed for ${r.writer}`;
+      if (!r.refusal || typeof r.refusal.path !== 'string' || typeof r.refusal.body !== 'object' || !names.includes(r.refusal.path)) return 'a refused-by-hook row needs refusal {path, body} on one of its routes';
+      return null;
     case 'with-session':
       if (userWriter) return `class with-session is not allowed for ${r.writer}`;
       if (!names.length || names.some((n) => c.routes[n]!.class === 'blocked')) return 'a route is blocked or none is named';
@@ -129,6 +133,14 @@ describe('A. S9 on synthetic input (R6.5): each failing condition fails, and the
     expect(bad(1, { routes: ['/not-a-route'] })).toMatch(/not in AUTH_ROUTES/);
     expect(bad(3, { routes: ['/sign-in/email'] })).toMatch(/not in USER_INSERTING/);
   });
+  it('a refused-by-hook row fails for a createUser site and when it carries no refusal on one of its routes  [red if: the class is a free pass]', () => {
+    const base: Row = { pkg: 'better-auth', file: 'api/routes/sign-in.mjs', line: 3, writer: 'createSession', class: 'refused-by-hook', routes: ['/sign-in/email'], refusal: { path: '/sign-in/email', body: { x: 1 } } };
+    const ctx = { ...ctx0, lineText: () => '' };
+    expect(checkRow(base, ctx)).toBeNull();
+    expect(checkRow({ ...base, writer: 'createUser' }, ctx)).toMatch(/not allowed for createUser/);
+    expect(checkRow({ ...base, refusal: undefined }, ctx)).toMatch(/needs refusal/);
+    expect(checkRow({ ...base, refusal: { path: '/sign-up/email', body: {} } }, ctx)).toMatch(/needs refusal/);
+  });
   it('an option-off row fails when the option does not disable the site  [red if: disableSignUp can be false and the row still passes]', () => {
     const flipped: Ctx = { ...ctx0, option: () => false };
     expect(run(goodRows, flipped).join('\n')).toMatch(/does not disable the site/);
@@ -178,6 +190,17 @@ describe('B. S9 on the real tree', () => {
     const o: any = authOptions(sample as any);
     const c: Ctx = { routes: P.AUTH_ROUTES, userInserting: P.USER_INSERTING, signInTx: H.SIGN_IN_TX, option: (p) => optionAt(o, p), lineText: () => '' };
     expect(faults(realSites(), loadFixture(), c)).toEqual([]);
+  });
+  it('each refused-by-hook row: its refusal {path, body} sent through routePolicyHook is answered with a 4xx, before any session is made  [red if: the hook lets the body through, so the site is reachable]', async () => {
+    const { routePolicyHook } = await import('./route-policy.ts');
+    const hook: any = routePolicyHook('real-domain');
+    const rows = loadFixture().filter((r) => r.class === 'refused-by-hook');
+    expect(rows.length, 'the fixture has refused-by-hook rows').toBeGreaterThan(0);
+    for (const r of rows) {
+      const x: any = await hook({ path: r.refusal!.path, body: r.refusal!.body, headers: new Headers(), context: { options: { baseURL: 'https://app.qa.test' } } }).catch((e: unknown) => e);
+      expect(Number(x?.statusCode ?? x?.status), `${key(r)}: ${r.refusal!.path} ${JSON.stringify(r.refusal!.body)} -> ${String(x?.message ?? x)}`).toBeGreaterThanOrEqual(400);
+      expect(Number(x?.statusCode ?? x?.status)).toBeLessThan(500);
+    }
   });
   it('the magic-link createUser site (plugins/magic-link/index.mjs) is option-off by disableSignUp: true  [red if: that site has any other class]', () => {
     const r = loadFixture().filter((x) => x.pkg === 'better-auth' && x.file === 'plugins/magic-link/index.mjs' && x.writer === 'createUser');
