@@ -65,7 +65,7 @@ function project(kind: 'prod' | 'staging'): Y {
         ...(prod ? ['/etc/polycarpic/age-recipients.txt:/etc/postgresql/age-recipients.txt:ro', '/srv/polycarpic/spool/wal:/spool/wal'] : []),
       ],
     }),
-    web: hard(10001, { image: APP, networks: ['default', E] }),
+    web: hard(10001, { image: APP, networks: { default: {}, [E]: { aliases: [`${kind}-web`] } } }),
     auth: hard(prod ? 10007 : 10107, { image: APP, command: ['auth'], networks: { default: {}, [E]: { aliases: [`${kind}-auth`] } } }),
     worker: hard(10002, { image: APP, networks: ['default'] }),
     migrate: hard(10003, { image: APP, networks: ['default'] }),
@@ -118,7 +118,20 @@ host  polycarpic   poly_operator  10.202.1.0/24   scram-sha-256
 host  all          all            all             reject
 local all          postgres                       peer
 `;
-export const CADDYFILE = `{\n\tadmin off\n}\n\n(security_headers) {
+export const CADDYFILE = `{
+\tadmin off
+\thttp_port 8080
+\thttps_port 8443
+\tlog {
+\t\toutput stderr
+\t\tformat filter {
+\t\t\trequest>uri regexp "^(/api/auth/[^/?#]*)[^?#]*|[?#].*" "\${1}"
+\t\t\trequest>headers>Referer delete
+\t\t}
+\t}
+}
+
+(security_headers) {
 \theader {
 \t\tdefer
 \t\tStrict-Transport-Security "max-age=31536000"
@@ -128,19 +141,59 @@ export const CADDYFILE = `{\n\tadmin off\n}\n\n(security_headers) {
 \t}
 }
 
-app.{$POLY_DOMAIN} {
+(upstream) {
+\theader_up X-Forwarded-For {remote_host}
+\theader_up -X-Real-IP
+\theader_up -Forwarded
+\tlb_try_duration 10s
+}
+
+http://app.{$POLY_DOMAIN}, http://staging.{$POLY_DOMAIN} {
 \timport security_headers
-\treverse_proxy prod-web:3000
+\tredir https://{host}{uri} permanent
+}
+
+app.{$POLY_DOMAIN} {
+\ttls {$POLY_TLS}
+\timport security_headers
+\thandle_errors {
+\t\timport security_headers
+\t}
+\troute {
+\t\t@sw header Service-Worker *
+\t\trespond @sw 403
+\t\t@auth path /api/auth /api/auth/*
+\t\treverse_proxy @auth prod-auth:3000 {
+\t\t\timport upstream
+\t\t}
+\t\treverse_proxy prod-web:3000 {
+\t\t\timport upstream
+\t\t}
+\t}
 }
 
 staging.{$POLY_DOMAIN} {
+\ttls {$POLY_TLS}
 \timport security_headers
-\tbasic_auth {
-\t\t{file./run/secrets/staging_basic_auth}
+\thandle_errors {
+\t\timport security_headers
 \t}
-\t@denied not remote_ip {$POLY_STAGING_ALLOW}
-\trespond @denied 403
-\treverse_proxy staging-web:3000
+\troute {
+\t\t@denied not remote_ip {$POLY_STAGING_ALLOW}
+\t\trespond @denied 403
+\t\t@sw header Service-Worker *
+\t\trespond @sw 403
+\t\tbasic_auth {
+\t\t\timport /run/secrets/staging_basic_auth
+\t\t}
+\t\t@auth path /api/auth /api/auth/*
+\t\treverse_proxy @auth staging-auth:3000 {
+\t\t\timport upstream
+\t\t}
+\t\treverse_proxy staging-web:3000 {
+\t\t\timport upstream
+\t\t}
+\t}
 }
 `;
 

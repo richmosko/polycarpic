@@ -7,7 +7,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { connectionFrom } from '../../packages/db/src/connection.ts';
-import { DB_PKG } from './helpers/pg';
+import { DB_PKG, PG_BASE, must } from './helpers/pg';
+
+// POLY-138 R6: the DB battery runs the Postgres minor the FROM line names (the pgtap image holds the server packages before
+// installing pgTAP). Red when pgtap's install, or an upgrade, moves the server to a newer minor than the tag.
+describe('the harness server runs the minor infra/postgres/Dockerfile names (POLY-138 R6)', () => {
+  it('SHOW server_version starts with <major>.<minor> of the FROM line', () => {
+    const want = /^postgres:(\d+\.\d+)@/.exec(PG_BASE)?.[1];
+    expect(want, `a pinned FROM line (${PG_BASE})`).toBeDefined();
+    const got = must('SHOW server_version').rows[0]?.[0] ?? '';
+    expect(got).toMatch(new RegExp(`^${want!.replace('.', '\\.')}( |$)`)); // red: 17.10 named, 17.12 running
+  });
+});
 
 const env = (mode: string) => {
   const f = join(mkdtempSync(join(tmpdir(), 'poly83-conn-')), 'pw');
