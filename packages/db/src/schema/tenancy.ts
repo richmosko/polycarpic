@@ -125,5 +125,5 @@ export const auditEvent = pgTable(
     subjectUserId: uuid('subject_user_id'),
     payload: jsonb('payload').notNull().default(sql`'{}'::jsonb`),
   },
-  (t) => [index('audit_event_entity_idx').on(t.entityId)],
+  (t) => [index('audit_event_entity_idx').on(t.entityId), index('audit_event_subject_kind_idx').on(t.subjectUserId, t.kind, t.createdAt)],
 ).enableRLS();

@@ -1,8 +1,10 @@
 // The worker entrypoint (POLY-85): `polycarpic worker` runs this; `polycarpic worker check-config` validates and exits.
 // Same order as web: crash handlers, configuration (refuse before any pool exists), schema guard. The job loop arrives
-// with the first job feature; until then the process idles so the container stays up.
+// The schedule (POLY-137 R5): three purges and the mail drain.
 import { ConfigError, loadConfig, runCheckConfig } from '@poly/config';
 import { createLogger } from '@poly/config/log';
+import { resendMailer } from '@poly/mail';
+import { buildJobs, startSchedule } from './jobs/index.ts';
 import { startupGuard } from './startup.ts';
 
 const log = createLogger({ service: 'worker' });
@@ -28,8 +30,14 @@ async function main(): Promise<void> {
   }
   await startupGuard();
   log.info('worker.started', { outcome: 'ok', ...(config.imageRevision ? { commit: config.imageRevision } : {}) });
-  process.on('SIGTERM', () => process.exit(0));
-  setInterval(() => undefined, 1 << 30); // idle until the first job feature adds the loop
+  // POLY-137 R1.3: a staging or production worker has the key and the sender (check-config refused otherwise); development may have neither.
+  const key = config.secrets.RESEND_API_KEY_FILE;
+  const mailer = key && config.mailFrom ? resendMailer({ apiKey: key.reveal(), from: config.mailFrom }) : undefined;
+  const schedule = startSchedule(buildJobs({ mailer, origin: config.publicOrigin, log }), log);
+  process.on('SIGTERM', () => {
+    schedule.stop();
+    process.exit(0);
+  });
 }
 
 await main();

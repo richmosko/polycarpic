@@ -124,11 +124,18 @@ function clearingCookie(c: { name: string; attributes: { path?: string; domain?:
  * 302 /sign-in/second-step?with=code. Every Set-Cookie is kept (the signed two-factor hold cookie must reach the browser); the body is dropped.
  */
 async function heldRedirect(request: Request, res: Response): Promise<Response> {
-  if (request.method !== 'GET' || res.status !== 200) return res;
+  if (request.method !== 'GET') return res;
   const template = matchAuthPath(new URL(request.url).pathname)?.template;
   if (!template || !HELD_REDIRECT_GET.has(template)) return res;
-  const body = (await res.clone().json().catch(() => null)) as { twoFactorRedirect?: unknown } | null;
-  if (body?.twoFactorRedirect !== true) return res;
+  // Measured on 1.7.18: the plugin answers a held sign-in with a redirect to the callback URL that carries the two-factor cookie and no session
+  // cookie (a JSON `twoFactorRedirect: true` body is the other shape the library can give). Both are rewritten.
+  const holdCookie = res.headers.getSetCookie().some((c) => /\.two_factor=[^;]+/.test(c));
+  let held = res.status >= 300 && res.status < 400 && holdCookie;
+  if (!held && res.status === 200) {
+    const body = (await res.clone().json().catch(() => null)) as { twoFactorRedirect?: unknown } | null;
+    held = body?.twoFactorRedirect === true;
+  }
+  if (!held) return res;
   const headers = new Headers(res.headers);
   headers.delete('content-type');
   headers.delete('content-length');

@@ -26,6 +26,10 @@
     "var": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$", "maxLength": 64 },
     "fault": { "type": "string", "enum": ["not_set", "missing", "unreadable", "empty", "multiline", "whitespace", "forbidden", "unregistered", "secret_in_env", "invalid", "mismatch"] },
     "count": { "type": "integer", "minimum": 0 },
+    "ms": { "type": "number", "minimum": 0 },
+    "deleted": { "type": "integer", "minimum": 0 },
+    "sent": { "type": "integer", "minimum": 0 },
+    "failed": { "type": "integer", "minimum": 0 },
     "dropped": { "type": "integer", "minimum": 1 },
     "err": {
       "type": "object",
