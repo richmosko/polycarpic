@@ -68,3 +68,7 @@ Decided by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D3 is take
 ### @team-lead — 2026-11-21
 
 PR opened: https://github.com/richmosko/polycarpic/pull/143. Awaiting Validate. The architect's verdict is APPROVE at `e98cc512` (`process/cairn/reviews/POLY-138/verdict.md`); ruling D2 (no Caddy access log) is built as ruled and awaits the Principal's confirmation.
+
+### @team-lead — 2026-11-21
+
+Confirmed by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D2 stands, Caddy keeps no access log. Nothing in the build changes. Edge logging is looked at again with POLY-103.

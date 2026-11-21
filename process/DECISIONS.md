@@ -820,3 +820,11 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Decline in this loop — the route stays open under SECURITY R-25 and the rule becomes a follow-up.
 **Approved by:** the Principal (2026-11-21), on seceng's, the architect's and the lead's recommendation.
+
+### 2026-11-21 — Caddy keeps no access log
+**Decision:** Caddy writes no per-request access log on either site (POLY-138 ruling D2). Its error log stays, filtered of query strings and token-bearing paths, and the lint refuses a site-level `log` without a new ruling.
+**Why:** invitation, magic-link and OAuth callback URLs carry secrets, and an access log is one more place they can land if the filter drifts; it would also hold visitor addresses that need retention and access rules.
+**The risk accepted:** after an incident there is no edge record of who requested what, from where and when; requests that never reach the app leave little trace. The app's logs, the filtered error log and the database's sign-in record remain.
+**Alternatives considered:**
+- An access log per site with the token filter — a per-request record at the edge, at the price of a standing target and retention rules; to be looked at again with monitoring (POLY-103).
+**Approved by:** the Principal (2026-11-21), on the architect's and the lead's recommendation.
