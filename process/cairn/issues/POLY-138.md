@@ -1,29 +1,35 @@
 ---
 id: POLY-138
 title: Caddy and edge follow-ups
-status: backlog
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [infra/caddy/**, infra/compose/**, infra/lint/**, tests/infra/**]
+paths: [process/cairn/issues/POLY-138.md, process/cairn/reviews/POLY-138/**, infra/caddy/**, infra/compose/**, infra/lint/**, infra/postgres/**, tests/infra/**, .dockerignore, Dockerfile, renovate.json, .github/renovate.json, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, tests/**, layers.json, eslint.config.js, scripts/layers/**, package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .gitignore, .github/workflows/**, infra/ci/**]
 labels: [ops, security]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/143
 created: 2026-11-11
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 Umbrella for the Caddy and edge-network findings from the POLY-95 and POLY-86 loops (`process/cairn/reviews/POLY-95/`, `process/cairn/reviews/POLY-86/seceng-client-ip.md`). The first item gates the first deploy.
 
 ## Items
 
-- [ ] **Caddy overwrites the client IP (gates POLY-104).** `header_up X-Forwarded-For {remote_host}` on both sites, no `trusted_proxies`, and a container test that a forged header arrives as one entry. Until it lands every `/api/auth/*` request answers 503 outside development, because the app trusts only a single-entry header (seceng S19 @ a7a22c3; POLY-86 verdict follow-up 11).
-- [ ] Drop the xcaddy rebuild and its `--replace golang.org/x/net` when a Caddy release carries x/net ≥ 0.62.0; the image guard then returns to +150 s (POLY-95 verdict F9; seceng @ 0e54cb0: nothing in the build may disable Go checksum verification meanwhile).
-- [ ] A lint rule so a staging container cannot take prod's alias on the edge networks (POLY-95 seceng build review F11).
-- [ ] A Renovate rule for the single Postgres `FROM` line and the pinned `age` version (INFRA §6.1a, §5), if no issue owns Renovate config (POLY-95 ruling F4).
-- [ ] **The Postgres image runs the minor its tag names.** `infra/postgres/Dockerfile` pins `postgres:17.10@sha256:…`, but line 2's `apt-get upgrade -y` moves the server to 17.12; the digest pins only the base layer (POLY-147 ruling R11; devops finding, not verified against a live apt run). Drop the upgrade and bump the digest when a new minor is wanted, or hold the postgres packages; a test asserts `SHOW server_version` matches the tag.
-- [ ] **Caddy refuses any request carrying `Service-Worker: script`.** The app registers no service worker. One planted by a compromised web would keep serving altered pages, the sign-in page included, after the server is cleaned up. Measured in Chromium to stop registration (POLY-148 spike §2c, `spikes/POLY-148/caddy/Caddyfile.sw`). Part of the Principal's decision that the sign-in pages stay in web (`process/DECISIONS.md`, 2026-11-15). A config test pins the rule on both sites.
+Acceptance criteria as ruled in `process/cairn/reviews/POLY-138/ruling.md` (R-numbers below); the ruling holds the exact text.
+
+- [x] **Caddy overwrites the client address (gates POLY-104; R1).** Every `reverse_proxy` on both sites imports one `(upstream)` snippet: `header_up X-Forwarded-For {remote_host}`, `header_up -X-Real-IP`, `header_up -Forwarded`; no `trusted_proxies` anywhere. A container test sends a forged two-entry header plus a second header line to web and auth on both sites, and the upstream sees one entry equal to the peer, and no `X-Real-IP` or `Forwarded`. Until it lands every `/api/auth/*` request answers 503 outside development (seceng S19 @ a7a22c3). Proven by: caddy-edge.test.ts R1 (4 cases), caddy-adapt-edge.test.ts, lint-edge.test.ts caddy-xff (gate.md).
+- [x] **The xcaddy rebuild stays (R7).** Measured 2026-11-21: no Caddy release carries x/net ≥ 0.62.0 (v2.11.9 bundles 0.60.0). Tests: the built binary's effective x/net is ≥ 0.62.0, and nothing in the Caddy build disables Go checksum verification. Dropping the rebuild is a follow-up. Proven by: caddy-build.test.ts (x/net, go env), edge-static.test.ts R7 tokens (gate.md).
+- [x] **Edge alias lint (R5).** `edge-alias`: on `polycarpic-edge-<p>` a service's aliases are exactly `<p>-<service>`, with no `container_name` or links; `caddy-upstream`: the `app.` site proxies only to `prod-*`, `staging.` only to `staging-*`. Plus `caddy-xff`, `caddy-sw` and `caddy-log`, each with a fail fixture, and two new fixtures for the existing `edge-network` rule (a staging service named `prod-web`; a second service in `edge.yml`). Proven by: lint-edge.test.ts edge-network (2), edge-alias (8), caddy-upstream (6), caddy-xff, caddy-sw, caddy-log (gate.md).
+- [x] **Renovate config for the Postgres, age and Caddy pins (R8).** `renovate.json` as ruled: only those two Dockerfiles, 3-day minimum age, no automerge, no Postgres major. What runs it is the lead's decision D1. Proven by: edge-static.test.ts R8, renovate-workflow.test.ts, renovate-report.test.ts; validator run in gate.md (gate.md).
+- [x] **The Postgres image runs the minor its tag names (R6).** `FROM postgres:17.12@sha256:b60e9004…`; the server packages are held (`apt-mark hold`) before `apt-get upgrade`, in the image and in the pgtap test image. `SHOW server_version` matches the tag's minor on the compose-run container and in the DB harness (measured: today the upgrade moves 17.10 to 17.12). Proven by: postgres.test.ts and tests/db/connection.test.ts (SHOW server_version), edge-static.test.ts R6 (gate.md).
+- [x] **Caddy refuses any request carrying a `Service-Worker` header (R2).** `@sw header Service-Worker *` → 403 in both HTTPS sites' `route`, before `basic_auth` and any proxy. The app registers no service worker, so this stops one planted by a compromised web from outliving the clean-up (POLY-148 spike §2c). A container test pins the 403 and its security headers on both sites, on a web path and an `/api/auth/*` path, and once with the lowercase header name. Proven by: caddy-edge.test.ts R2, lint-edge.test.ts caddy-sw (gate.md).
+- [x] **No query string or path token in any Caddy log (R3; comment of 2026-11-12).** The default logger's filter strips the query and fragment, and everything after the first segment under `/api/auth/`, and deletes `Referer`; no site writes an access log; no `debug` and no `log_credentials`. Measured: without the filter, Caddy's error log writes the full URI on a 502. A container test finds no token in the logs, for a stopped upstream and for one that accepts and closes. Proven by: caddy-edge.test.ts R3 (isolated filter test gates), caddy-adapt-edge.test.ts, lint-edge.test.ts caddy-log (gate.md).
+- [x] **Only if the Principal takes D3 (R10): Caddy sends `Cache-Control: no-store` on everything outside `/_app/immutable/*`,** so a compromised web cannot pin an altered page in browser caches. A container test shows an upstream `max-age` replaced on `/sign-in` and kept on `/_app/immutable/x.js`. Proven by: caddy-edge.test.ts R10, lint-edge.test.ts caddy-cache (gate.md).
+- [x] **`lb_try_duration 10s` in `(upstream)` (R4)**, so ARCH §8.1 and INFRA §4.6 are true. Proven by: caddy-adapt-edge.test.ts (try_duration), lint-edge.test.ts caddy-xff (gate.md).
+- [x] **`.dockerignore` excludes every test name the lint counts (R9; comment of 2026-11-12):** `**/*.test.*`, `**/*.spec.*`, and the same two under `packages/secrets/**` after its negation. Proven by: edge-static.test.ts R9, tests/image/dockerfile.test.ts (gate.md).
 
 ## Comments
 
@@ -46,3 +52,27 @@ Follow-ups from POLY-148 (merged via PR #129) added above; source: `process/cair
 ### @team-lead — 2026-11-20
 
 From POLY-150 (devops and seceng, 2026-11-20). This issue is a prerequisite for even a staging deploy. Until Caddy sets `X-Forwarded-For` explicitly, and that is tested, the client address the sign-in service limits on and records rests on Caddy's untested default. SECURITY C-04 says so.
+
+### @team-lead — 2026-11-21
+
+Feature started. Branch: `feature/poly-138-caddy-edge-follow-ups`. Runs in parallel with POLY-137.
+
+### @team-lead — 2026-11-21
+
+Decided by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D1 is option (b), the read-only weekly Renovate workflow. qa writes its structure test as the ruling's D1 lists (`permissions: contents: read`, no `secrets.*`, `schedule` and `workflow_dispatch` only, the Renovate image by digest); devops builds it and words INFRA to match. D2 and D3 are still open.
+
+### @team-lead — 2026-11-21
+
+Decided by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D3 is taken. R10 (Caddy overrides `Cache-Control` to `no-store` except `/_app/immutable/*`) is built in this loop: qa writes its test row and lint fixture red from the ruling's R10 section, devops builds the snippet and its two imports, seceng's SECURITY text covers the `Clear-Site-Data` incident step. D2 is still open.
+
+### @team-lead — 2026-11-21
+
+PR opened: https://github.com/richmosko/polycarpic/pull/143. Awaiting Validate. The architect's verdict is APPROVE at `e98cc512` (`process/cairn/reviews/POLY-138/verdict.md`); ruling D2 (no Caddy access log) is built as ruled and awaits the Principal's confirmation.
+
+### @team-lead — 2026-11-21
+
+Confirmed by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D2 stands, Caddy keeps no access log. Nothing in the build changes. Edge logging is looked at again with POLY-103.
+
+### @team-lead — 2026-11-21
+
+Validate passed; merging via PR #143. Closing. Follow-ups (ruling F1, F3 to F6, seceng's and qa's notes) are held for one filing PR after POLY-137 merges.

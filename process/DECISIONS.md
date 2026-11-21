@@ -803,3 +803,28 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Do not accept a backup code here — recommended by seceng: a found code plus the password could then sign in up to ten times but could not change the methods, and a password change would end it. About $6 cheaper (a guess). The cost falls on someone who loses a phone, who needs `reset-mfa`.
 **Approved by:** the Principal (2026-11-19), on the architect's and the lead's recommendation and against seceng's.
+
+### 2026-11-21 — A read-only weekly workflow runs Renovate
+**Decision:** A scheduled GitHub workflow with `contents: read`, no secrets, and the Renovate image pinned by digest looks up updates for the pinned Postgres, Caddy and `age` versions once a week and fails when one is due. A person makes the bump. Built in POLY-138 (ruling D1, option b).
+**Why:** nothing ran Renovate although SECURITY and INFRA said it did, and POLY-138 holds the Postgres server packages at the pinned minor, so this signal is the only way a Postgres security fix reaches the image. The workflow gives the signal without giving any party write access.
+**The risk accepted:** the signal is a failed scheduled run and its email, checked weekly; a fix can wait up to seven days before it is seen, and longer if the red run is ignored.
+**Alternatives considered:**
+- The Mend Renovate GitHub App — update PRs appear by themselves, but a third party gets write access to contents, PRs and workflows.
+- A manual monthly lookup from a runbook line — nothing automated, and easy to forget.
+**Approved by:** the Principal (2026-11-21), on the architect's, seceng's and the lead's recommendation.
+
+### 2026-11-21 — Caddy forbids browsers from caching pages
+**Decision:** Caddy overrides `Cache-Control` to `no-store` on every response except the content-named files under `/_app/immutable/`. Built in POLY-138 (ruling R10, D3; seceng brief A).
+**Why:** someone in control of `web` could tell browsers to keep an altered sign-in page for a year, and the copy would outlive the clean-up and keep collecting typed passwords. Caddy is outside `web`'s control, so its override holds.
+**The risk accepted:** the rule does not reach altered script files a browser already holds under their real `/_app/immutable/` names; only the incident step (`Clear-Site-Data` for 30 days) clears those. Every page is fetched from the server each time; the cost to page speed is not measured.
+**Alternatives considered:**
+- Decline in this loop — the route stays open under SECURITY R-25 and the rule becomes a follow-up.
+**Approved by:** the Principal (2026-11-21), on seceng's, the architect's and the lead's recommendation.
+
+### 2026-11-21 — Caddy keeps no access log
+**Decision:** Caddy writes no per-request access log on either site (POLY-138 ruling D2). Its error log stays, filtered of query strings and token-bearing paths, and the lint refuses a site-level `log` without a new ruling.
+**Why:** invitation, magic-link and OAuth callback URLs carry secrets, and an access log is one more place they can land if the filter drifts; it would also hold visitor addresses that need retention and access rules.
+**The risk accepted:** after an incident there is no edge record of who requested what, from where and when; requests that never reach the app leave little trace. The app's logs, the filtered error log and the database's sign-in record remain.
+**Alternatives considered:**
+- An access log per site with the token filter — a per-request record at the edge, at the price of a standing target and retention rules; to be looked at again with monitoring (POLY-103).
+**Approved by:** the Principal (2026-11-21), on the architect's and the lead's recommendation.
