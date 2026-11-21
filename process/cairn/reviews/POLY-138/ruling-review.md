@@ -95,7 +95,13 @@ Two notes; neither changes the ruling:
 - **R10's own reach.** R10 stops a hijacked `web` from making a *page* stick in the cache. It does not reach altered bodies already cached under real `/_app/immutable/*` names. Only the `Clear-Site-Data` incident step clears those. My Incident Response and R-25 text will say so.
 - **R10 is not in the target Caddyfile block.** If D3 is taken, the build adds the snippet and its two imports (`caddy-cache` pins them). The lint must be checked against that text, not the R-text block.
 
+## Delta review: Addendum 1 @ `03ac06f8b1c300f565c4d6542a0005b914ec2362`
 
+**ACCEPT.** Keeping the filter as the control for any line that carries a request is right. The gate rests on the isolated test, which goes red when the filter is removed, and the stack-level tests stay as regression checks.
+
+One condition on the build: the isolated test must read its global block from `infra/caddy/Caddyfile` at test time, not from a copy. A pasted copy would let the shipped filter drift while the gate stays green. I check this at the build review.
+
+## Follow-ups (the lead files after merge)
 
 - F5. The post-deploy probe or `provision-check` asserts that Caddy sees the real client address: an IPv4 bind, `userland-proxy` off, and the probe's own address echoed back (finding 1).
 - F6. `auth` trusts `X-Forwarded-For` only from Caddy's fixed edge address; optionally `auth` gets its own database network (finding 2).
