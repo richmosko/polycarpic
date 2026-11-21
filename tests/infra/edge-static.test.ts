@@ -47,6 +47,16 @@ describe('R7: nothing in the Caddy build disables Go checksum verification', () 
   });
 });
 
+describe('Addendum 2: the Caddy FROM lines take the re-pushed 2.11.9 digests', () => {
+  const froms = () => lines('infra/caddy/Dockerfile').filter((l) => l.startsWith('FROM '));
+  it('builder FROM is caddy:2.11.9-builder@sha256:f9beaa5d…', () => {
+    expect(froms()[0]).toBe('FROM caddy:2.11.9-builder@sha256:f9beaa5ddbe7df6f26ebbcf9cbf44e05a1917b9bba464f0c3229038d7e2e6e13 AS build'); // red: still 1b828679…
+  });
+  it('runtime FROM is caddy:2.11.9@sha256:4851e54a…', () => {
+    expect(froms()[1]).toBe('FROM caddy:2.11.9@sha256:4851e54a46b206517c574821bb5cc67f170d2156041e9fbc4c9193b45e84a75b'); // red: still 0c2243ef…
+  });
+});
+
 describe('R8: renovate.json', () => {
   const WANT = {
     $schema: 'https://docs.renovatebot.com/renovate-schema.json',

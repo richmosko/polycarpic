@@ -81,3 +81,7 @@ Run against a compliant sample workflow (not committed) all 8 pass, and each of 
 16 tests, 14 pass, **2 red, both fail-open**: a report whose repository has no `packageFiles` (`{"repositories":{"r":{}}}`), and
 one whose package files hold no dependencies, both exit 0 "No update is due." A lookup that extracted nothing (a broken
 `includePaths` or config) reads as clean, so the weekly run would stay green while checking nothing. Wanted: exit 2. Total red: 86.
+
+## Addendum 2 (ruling @ 04edd0f3)
+
+No test pinned the Caddy FROM lines. Added two to `edge-static.test.ts`: builder `f9beaa5d…`, runtime `4851e54a…`. Both red (still `1b828679…` and `0c2243ef…`). Total red: 88. The R7 tests re-measure x/net and the checksum env at build-green, as the addendum says.
