@@ -66,3 +66,23 @@ Edited in this loop: C-04, R-2's client-address line, R-25, C-80 and RB-2. Brief
 ## Follow-ups (the lead files after merge)
 
 Unchanged from the ruling review: F5 (deploy shows the real client address), F6 (`auth` trusts the header only from Caddy's fixed address), and F3 (Renovate coverage for the Node image, pnpm and Actions).
+
+## Delta review: `check-report.sh` @ `36fe64dc867b85c9f6ab8208a923613eecc95430`, tests @ `e535ed3336d77718c8f3148c5c92991c0134d796`
+
+**One finding remains; findings 1 and 2 are otherwise met.** It is a small change, and the verdict can follow once it lands.
+
+- **Met:** a non-empty `problems`, top-level or per repository, exits 2. So does any `deps[].warnings`, in object or string form, with or without an update elsewhere in the report. A missing or null `warnings` stays clean, as it should. A pin absent from the report exits 2, whether it is one pin, a whole manager or a whole Dockerfile, and a missing pin does not hide an update on another pin.
+- **PINS covers every pin in both Dockerfiles** the ruling watches: the postgres FROM, `age=` (regex), and the Caddy builder FROM, runtime FROM and `xcaddy build` literal (regex). The static test holds the Dockerfiles to exactly those five, so adding a pin fails until it is listed.
+- **C-80 matches the code.** Its sentence says the check "fails the run when the lookup is broken: Renovate reports a problem or a lookup warning, or an expected pin is missing from the report". Once finding 3 lands, that is still true, because a skipped pin counts as a broken lookup.
+
+3. **A pin that is present but skipped still exits 0.**
+   - *Mechanism:* a dependency Renovate extracts but does not look up carries `skipReason` and no `updates`. The missing-pin check counts it as present, and the update check sees nothing due. The likely causes:
+     - a FROM line rewritten through a build `ARG` (`contains-variable`);
+     - a `packageRules` entry with `enabled: false` (`disabled`);
+     - a value Renovate cannot parse (`invalid-value`).
+
+     In each case the pin is no longer watched and the run stays green. That is the same silent loss as finding 2.
+   - *Fix:* in the PINS match, count a dependency only when `skipReason` is absent or null. The dockerfile manager's own `age` entry, with `unknown-registry`, is not in PINS, so it stays benign.
+   - *Test:* the real report with `skipReason: "contains-variable"` set on the postgres FROM dependency exits 2 and names it. The same case set on the regex `age` pin exits 2 too.
+
+Note (no action needed): the `--replace golang.org/x/net@v0.62.0` version in `infra/caddy/Dockerfile` is not watched. A later x/net security release would not turn the run red. Follow-up F1, which drops the replace, removes this. Until then, R7's test pins only the floor, ≥ 0.62.0.
