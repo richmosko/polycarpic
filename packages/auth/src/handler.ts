@@ -123,14 +123,18 @@ function clearingCookie(c: { name: string; attributes: { path?: string; domain?:
  * R7.1: on the final Response, after commit. A GET to /magic-link/verify that answers 200 with twoFactorRedirect === true becomes
  * 302 /sign-in/second-step?with=code. Every Set-Cookie is kept (the signed two-factor hold cookie must reach the browser); the body is dropped.
  */
-async function heldRedirect(request: Request, res: Response): Promise<Response> {
+async function heldRedirect(request: Request, res: Response, given: Promise<AnyAuth> | AnyAuth): Promise<Response> {
   if (request.method !== 'GET') return res;
   const template = matchAuthPath(new URL(request.url).pathname)?.template;
   if (!template || !HELD_REDIRECT_GET.has(template)) return res;
   // Measured on 1.7.18: the plugin answers a held sign-in with a redirect to the callback URL that carries the two-factor cookie and no session
   // cookie (a JSON `twoFactorRedirect: true` body is the other shape the library can give). Both are rewritten.
-  const holdCookie = res.headers.getSetCookie().some((c) => /\.two_factor=[^;]+/.test(c));
-  let held = res.status >= 300 && res.status < 400 && holdCookie;
+  const ctx = await (await given).$context;
+  const cookies = res.headers.getSetCookie();
+  const setWithValue = (name: string): boolean => cookies.some((c) => c.startsWith(`${name}=`) && c.slice(name.length + 1).split(';')[0] !== '');
+  const holdCookie = setWithValue(ctx.createAuthCookie('two_factor').name);
+  const sessionCookie = setWithValue(ctx.authCookies.sessionToken.name);
+  let held = res.status >= 300 && res.status < 400 && holdCookie && !sessionCookie;
   if (!held && res.status === 200) {
     const body = (await res.clone().json().catch(() => null)) as { twoFactorRedirect?: unknown } | null;
     held = body?.twoFactorRedirect === true;
@@ -145,7 +149,7 @@ async function heldRedirect(request: Request, res: Response): Promise<Response> 
 
 /** Every /api/auth answer is `no-store` whatever BetterAuth sent: enable returns the key and the codes, and a refusal is not for a cache either (POLY-150 R10). */
 export async function handleAuthRequest(request: Request, given: Promise<AnyAuth> | AnyAuth = defaultAuth()): Promise<Response> {
-  const res = await heldRedirect(request, await handleAuthRequestInner(request, given));
+  const res = await heldRedirect(request, await handleAuthRequestInner(request, given), given);
   if (res.headers.get('cache-control')?.toLowerCase() === 'no-store') return res;
   const headers = new Headers(res.headers);
   headers.set('cache-control', 'no-store');

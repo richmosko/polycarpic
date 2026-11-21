@@ -32,13 +32,15 @@ export interface AuthInput {
   requireClientIp: boolean;
   /** The one seam for mail (POLY-137 R1.5). None in development: the magic link throws, send-code answers 503, reset is disabled. */
   mailer?: Mailer;
+  /** Where mail.failed and mail.capped go (packages/auth cannot import config/log). Default: a JSON line on stderr. */
+  log?: (event: string, fields: Record<string, unknown>) => void;
 }
 
 /** Fields are read from db/auth at call time, so the startup check sees exactly the map in force. */
 export function authOptions(input: AuthInput) {
   const f = authFields;
   const origin = new URL(input.baseURL).origin;
-  const senders = buildSenders(input.mailer, origin);
+  const senders = buildSenders(input.mailer, origin, input.log);
   return {
     appName: 'polycarpic',
     secret: input.secret,

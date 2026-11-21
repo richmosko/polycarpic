@@ -260,11 +260,11 @@ WITH logins AS (
                     WHERE r.rolname = 'poly_auth' AND s.setdatabase = 0 AND 'idle_in_transaction_session_timeout=15s' = ANY (s.setconfig))
   -- 22-24. a missed purge shows as rows past their purge age
   UNION ALL
-  SELECT 'FAIL tx_identity: ' || n || ' markers older than 6 hours' FROM cnt WHERE k = 'tx_identity' AND n > 0
+  SELECT 'FAIL purge: app.tx_identity holds ' || 'rows older than 6 hours' FROM cnt WHERE k = 'tx_identity' AND n > 0
   UNION ALL
-  SELECT 'FAIL sign_in_record: ' || n || ' rows older than 401 days' FROM cnt WHERE k = 'sign_in_record' AND n > 0
+  SELECT 'FAIL purge: app.sign_in_record holds ' || 'rows older than 401 days' FROM cnt WHERE k = 'sign_in_record' AND n > 0
   UNION ALL
-  SELECT 'FAIL mail_outbox: ' || n || ' sent rows older than 31 days' FROM cnt WHERE k = 'mail_sent_old' AND n > 0
+  SELECT 'FAIL purge: app.mail_outbox holds ' || 'sent rows older than 31 days' FROM cnt WHERE k = 'mail_sent_old' AND n > 0
 )
 SELECT line FROM f
 UNION ALL SELECT 'gate: pass' WHERE NOT EXISTS (SELECT 1 FROM f);

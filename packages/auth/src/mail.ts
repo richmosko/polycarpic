@@ -15,18 +15,20 @@ export interface Senders {
   sendCode(m: { email: string; code: string }): Promise<void>;
 }
 
-const logFailed = (kind: Kind, e: unknown): void => {
-  const status = (e as { status?: unknown } | null)?.status;
-  console.error(JSON.stringify({ event: 'mail.failed', kind, status: typeof status === 'number' ? status : null }));
-};
-const logCapped = (kind: Kind, userId: string): void => {
-  console.warn(JSON.stringify({ event: 'mail.capped', kind, user_id: userId }));
-};
+export type LogFn = (event: string, fields: Record<string, unknown>) => void;
+/** The default sink: one JSON line on stderr (as handler.ts does). apps/auth passes its pino logger instead. */
+const consoleLog: LogFn = (event, fields) => console.error(JSON.stringify({ event, ...fields }));
 
 type Finder = { context: { internalAdapter: { findUserByEmail(email: string): Promise<{ user: { id: string; email: string } } | null> } } };
 
-export function buildSenders(mailer: Mailer | undefined, origin: string): Senders {
+export function buildSenders(mailer: Mailer | undefined, origin: string, log: LogFn = consoleLog): Senders {
   const cap = new RecipientCap();
+  // A timeout has no status: the field is omitted, never a string.
+  const logFailed = (kind: Kind, e: unknown): void => {
+    const status = (e as { status?: unknown } | null)?.status;
+    log('mail.failed', { kind, ...(typeof status === 'number' ? { status } : {}) });
+  };
+  const logCapped = (kind: Kind, userId: string): void => log('mail.capped', { kind, user_id: userId });
   /** Started, not awaited: the answer never depends on the lookup, the cap or the provider. */
   const background = (fn: () => Promise<void>): void => {
     void fn().catch(() => {});

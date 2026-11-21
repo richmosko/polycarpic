@@ -73,11 +73,16 @@
   "file": "api/routes/sign-in.mjs",
   "line": 212,
   "writer": "setSessionCookie",
-  "class": "with-session",
+  "class": "refused-by-hook",
   "routes": [
    "/sign-in/social"
   ],
-  "why": "the idToken branch: routePolicyHook refuses a /sign-in/social body that carries idToken (400), so this line is not reached"
+  "refusal": {
+   "path": "/sign-in/social",
+   "body": {
+    "idToken": "x"
+   }
+  }
  },
  {
   "pkg": "better-auth",
@@ -372,22 +377,32 @@
   "file": "index.mjs",
   "line": 485,
   "writer": "createSession",
-  "class": "with-session",
+  "class": "refused-by-hook",
   "routes": [
    "/passkey/verify-registration"
   ],
-  "why": "the createSession flag of the body: routePolicyHook refuses a /passkey/verify-registration body that sets it (S16), and the route needs a session"
+  "refusal": {
+   "path": "/passkey/verify-registration",
+   "body": {
+    "createSession": true
+   }
+  }
  },
  {
   "pkg": "@better-auth/passkey",
   "file": "index.mjs",
   "line": 495,
   "writer": "setSessionCookie",
-  "class": "with-session",
+  "class": "refused-by-hook",
   "routes": [
    "/passkey/verify-registration"
   ],
-  "why": "the createSession flag of the body: routePolicyHook refuses a /passkey/verify-registration body that sets it (S16), and the route needs a session"
+  "refusal": {
+   "path": "/passkey/verify-registration",
+   "body": {
+    "createSession": true
+   }
+  }
  },
  {
   "pkg": "@better-auth/passkey",

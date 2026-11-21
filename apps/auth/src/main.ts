@@ -48,6 +48,7 @@ export async function startAuthService(
       tlsMode: config.tlsMode,
       requireClientIp: true,
       mailer,
+      log: (event, fields) => (event === 'mail.failed' ? log.error : log.warn)(event, fields),
     }),
   );
   const onError = (e: unknown) => log.error('auth.request_failed', { outcome: 'error', err: e });
