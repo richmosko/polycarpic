@@ -146,11 +146,11 @@ const ROWS: Row[] = [
   ['worker on the edge network', (s) => { svc(s, 'prod', 'worker').networks.push('edge-prod'); }, 'edge-network', 'edge membership not limited to caddy+web'],
   ['web (not caddy) on both projects\' edge networks', (s) => {
     s.prod.networks['edge-staging'] = { name: 'polycarpic-edge-staging', external: true };
-    svc(s, 'prod', 'web').networks.push('edge-staging');
+    svc(s, 'prod', 'web').networks['edge-staging'] = {};
   }, 'cross-project', 'cross-project membership allowed for services other than caddy'],
   ['staging service on the prod default network', (s) => {
     s.staging.networks.prodnet = { name: 'polycarpic-prod_default', external: true };
-    svc(s, 'staging', 'web').networks.push('prodnet');
+    svc(s, 'staging', 'web').networks.prodnet = {};
   }, 'cross-project', 'only the edge network compared'],
   ['edge subnet overlaps a pg_hba allow CIDR', (s) => { s.edge.networks['edge-prod'].ipam.config[0].subnet = '10.201.1.0/28'; }, 'edge-overlap', 'edge subnets not compared with pg_hba allow lines'],
   ['edge network without a fixed subnet', (s) => { delete s.edge.networks['edge-staging'].ipam; }, 'edge-overlap', 'unfixed edge subnet accepted'],
@@ -161,7 +161,7 @@ const ROWS: Row[] = [
   ['pg_hba poly_backup subnet differs from backup-net', (s) => {
     s.text['infra/postgres/pg_hba.prod.conf'] = s.text['infra/postgres/pg_hba.prod.conf']!.replaceAll('10.201.10.0/29', '10.201.10.0/28');
   }, 'backup-net-subnet', 'comparison reads the compose side twice'],
-  ['web on backup-net', (s) => { svc(s, 'prod', 'web').networks.push('backup-net'); }, 'backup-net-members', 'membership not limited to postgres+backup'],
+  ['web on backup-net', (s) => { svc(s, 'prod', 'web').networks['backup-net'] = {}; }, 'backup-net-members', 'membership not limited to postgres+backup'],
   ['backup missing from backup-net', (s) => { svc(s, 'prod', 'backup').networks = ['upload-net']; }, 'backup-net-members', 'only extra members checked'],
   ['backup on the default network', (s) => { svc(s, 'prod', 'backup').networks.push('default'); }, 'backup-net-members', 'backup allowed on the app network'],
   ['uploader on the default network', (s) => { svc(s, 'prod', 'uploader').networks.push('default'); }, 'uploader-isolation', 'uploader sharing a network with postgres allowed'],
@@ -219,7 +219,7 @@ const ROWS: Row[] = [
   ['prod operator without logging driver none', (s) => { delete svc(s, 'prod', 'operator').logging; }, 'operator-one-shot', 'the invitation link on stdout reaches the log driver (A1.1)'],
   ['staging operator with the json-file log driver', (s) => { svc(s, 'staging', 'operator').logging = { driver: 'json-file' }; }, 'operator-one-shot', 'only the absence of logging is checked, not the driver'],
   // R1
-  ['Caddy site block without the headers snippet', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\timport security_headers\n\tbasic_auth', '\tbasic_auth'); }, 'caddy-headers', 'per-site snippet import not checked'],
+  ['Caddy site block without the headers snippet', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\ttls {$POLY_TLS}\n\timport security_headers\n', '\ttls {$POLY_TLS}\n'); }, 'caddy-headers', 'per-site snippet import not checked'],
   ['Caddy snippet lacks nosniff', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('\t\tX-Content-Type-Options "nosniff"\n', ''); }, 'caddy-headers', 'snippet contents not checked'],
   ['Caddy snippet adds includeSubDomains', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace('max-age=31536000"', 'max-age=31536000; includeSubDomains"'); }, 'caddy-headers', 'HSTS value not exact (ruling: no includeSubDomains/preload)'],
   ['Caddy snippet lacks X-Frame-Options DENY (POLY-150 RC2)', (s) => { s.text['infra/caddy/Caddyfile'] = s.text['infra/caddy/Caddyfile']!.replace(/\t\tX-Frame-Options "DENY"\n/, ''); }, 'caddy-headers', 'snippet lacks: X-Frame-Options "DENY"'],

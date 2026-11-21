@@ -1,0 +1,34 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "enabledManagers": ["dockerfile", "custom.regex"],
+  "includePaths": ["infra/postgres/Dockerfile", "infra/caddy/Dockerfile"],
+  "minimumReleaseAge": "3 days",
+  "automerge": false,
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^infra/postgres/Dockerfile$/"],
+      "matchStrings": ["\\bage=(?<currentValue>\\S+)"],
+      "depNameTemplate": "age",
+      "datasourceTemplate": "deb",
+      "versioningTemplate": "deb",
+      "registryUrlTemplate": "https://deb.debian.org/debian?suite=trixie&components=main&binaryArch=amd64"
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^infra/caddy/Dockerfile$/"],
+      "matchStrings": ["xcaddy build v(?<currentValue>\\d+\\.\\d+\\.\\d+)"],
+      "depNameTemplate": "caddy",
+      "datasourceTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchDatasources": ["docker"],
+      "matchDepNames": ["postgres"],
+      "allowedVersions": "<18",
+      "minimumReleaseAgeBehaviour": "timestamp-optional"
+    },
+    { "matchDepNames": ["caddy"], "groupName": "caddy" }
+  ]
+}

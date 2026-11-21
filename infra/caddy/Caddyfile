@@ -2,6 +2,16 @@
 	admin off
 	http_port 8080
 	https_port 8443
+	# The default logger carries every entry that has a request, including the 502 `http.log.error` (it prints the full URI).
+	# The filter drops the query and fragment everywhere and, under /api/auth/, everything after the first path segment
+	# (a reset-password token travels in the path). No site has a `log` directive: a site logger would bypass this filter.
+	log {
+		output stderr
+		format filter {
+			request>uri regexp "^(/api/auth/[^/?#]*)[^?#]*|[?#].*" "${1}"
+			request>headers>Referer delete
+		}
+	}
 }
 
 (security_headers) {
@@ -14,6 +24,26 @@
 	}
 }
 
+# A compromised web must not make a browser keep a page or script: everything except the content-hashed /_app/immutable/*
+# files is no-store, whatever the upstream sent. Its own snippet, because security_headers is also imported by
+# handle_errors and a matcher cannot be defined twice in one site.
+(no_store) {
+	@mutable not path /_app/immutable/*
+	header @mutable {
+		defer
+		Cache-Control "no-store"
+	}
+}
+
+# Imported inside every reverse_proxy block. Nothing sits in front of Caddy, so the TCP peer is the client: the header is
+# set, never appended to, and the two other client-address headers are dropped.
+(upstream) {
+	header_up X-Forwarded-For {remote_host}
+	header_up -X-Real-IP
+	header_up -Forwarded
+	lb_try_duration 10s
+}
+
 http://app.{$POLY_DOMAIN}, http://staging.{$POLY_DOMAIN} {
 	import security_headers
 	redir https://{host}{uri} permanent
@@ -22,17 +52,27 @@ http://app.{$POLY_DOMAIN}, http://staging.{$POLY_DOMAIN} {
 app.{$POLY_DOMAIN} {
 	tls {$POLY_TLS}
 	import security_headers
+	import no_store
 	handle_errors {
 		import security_headers
 	}
-	@auth path /api/auth /api/auth/*
-	reverse_proxy @auth prod-auth:3000
-	reverse_proxy prod-web:3000
+	route {
+		@sw header Service-Worker *
+		respond @sw 403
+		@auth path /api/auth /api/auth/*
+		reverse_proxy @auth prod-auth:3000 {
+			import upstream
+		}
+		reverse_proxy prod-web:3000 {
+			import upstream
+		}
+	}
 }
 
 staging.{$POLY_DOMAIN} {
 	tls {$POLY_TLS}
 	import security_headers
+	import no_store
 	handle_errors {
 		import security_headers
 	}
@@ -41,11 +81,17 @@ staging.{$POLY_DOMAIN} {
 	route {
 		@denied not remote_ip {$POLY_STAGING_ALLOW}
 		respond @denied 403
+		@sw header Service-Worker *
+		respond @sw 403
 		basic_auth {
 			import /run/secrets/staging_basic_auth
 		}
 		@auth path /api/auth /api/auth/*
-		reverse_proxy @auth staging-auth:3000
-		reverse_proxy staging-web:3000
+		reverse_proxy @auth staging-auth:3000 {
+			import upstream
+		}
+		reverse_proxy staging-web:3000 {
+			import upstream
+		}
 	}
 }

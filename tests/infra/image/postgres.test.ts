@@ -1,12 +1,24 @@
 // POLY-95 R5, R6, R8, criteria 2 and 3: the compose-run prod `postgres` (stack.ts) -- SHOW, sourcefile, role settings,
 // ALTER SYSTEM, runtime uid, the archive_command fail-closed behaviour, and secret-file modes under a non-root uid.
 // Runs in the existing `image` job. Each test names the mutation that turns it red.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { IMG, sh, up, type Stack } from './stack.ts';
+import { IMG, ROOT, sh, up, type Stack } from './stack.ts';
 
 let s: Stack;
 beforeAll(() => { s = up(); });
 afterAll(() => { s?.down(); });
+
+// POLY-138 R6: the image runs the minor its FROM tag names (the server packages are held before apt-get upgrade).
+describe('the compose-run server is the minor the Dockerfile tag names (POLY-138 R6)', () => {
+  it('SHOW server_version starts with <major>.<minor> read from infra/postgres/Dockerfile', () => {
+    const from = readFileSync(join(ROOT, 'infra', 'postgres', 'Dockerfile'), 'utf8').split('\n').find((l) => l.startsWith('FROM ')) ?? '';
+    const want = /^FROM postgres:(\d+\.\d+)@/.exec(from)?.[1];
+    expect(want, `a pinned FROM line (${from})`).toBeDefined();
+    expect(s.psql('SHOW server_version')).toMatch(new RegExp(`^${want!.replace('.', '\\.')}( |$)`)); // red: apt-get upgrade moved 17.10 to 17.12
+  });
+});
 
 const SETTINGS: [string, string, string][] = [
   // [name, SHOW value, mutation that turns it red]
