@@ -85,3 +85,10 @@ one whose package files hold no dependencies, both exit 0 "No update is due." A 
 ## Addendum 2 (ruling @ 04edd0f3)
 
 No test pinned the Caddy FROM lines. Added two to `edge-static.test.ts`: builder `f9beaa5d…`, runtime `4851e54a…`. Both red (still `1b828679…` and `0c2243ef…`). Total red: 88. The R7 tests re-measure x/net and the checksum env at build-green, as the addendum says.
+
+## R10 (decision D3 taken)
+
+Lint: 10 `caddy-cache` rows red (rule absent; the snippet-missing row exits 0). The baseline now carries `(no_store)` and both imports, so the 3 baseline-based positive cases stay red for the `(upstream)`/`(no_store)` `caddy-headers` exemption until the lint is built.
+Container (`caddy-edge.test.ts` -t R10, today's Caddyfile): 7 red, 3 green. Red: the six page/auth cases (`expected ['max-age=31536000, immutable'] to deeply equal ['no-store']`) and the lookalike-path case (`/_app/version.json` keeps the upstream value). Green today: `/_app/immutable/x.js` keeps the upstream value (both sites) and the Service-Worker 403 case.
+Controls: today's Caddyfile plus the ruling's snippet and two imports (temporary, reverted) makes all 32 tests in `caddy-edge` and `caddy-adapt-edge` pass.
+Net new red: 17 (10 lint + 7 container), so 105 at the red gate.
