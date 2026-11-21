@@ -56,7 +56,14 @@ function withoutCommitHeader(res: Response): Response {
 }
 
 /** The paths that create a session on a single factor and have no handle yet: one transaction for every row (R9). */
-const SIGN_IN_TX = new Set(['/sign-in/email', '/passkey/verify-authentication', '/two-factor/verify-totp', '/two-factor/verify-backup-code']);
+export const SIGN_IN_TX: ReadonlySet<string> = new Set(['/sign-in/email', '/passkey/verify-authentication', '/two-factor/verify-totp', '/two-factor/verify-backup-code']);
+/**
+ * R3.7: the cancel link's POST runs with no identity marker, even when the request carries a session. A signed-in other user in the same
+ * browser must not turn the cancel into sync_second_step's "belongs to its own user" refusal. Checked before the session branch.
+ */
+const NO_MARKER: ReadonlySet<string> = new Set(['/second-step/cancel-hold']);
+/** R7: a GET here that answers a held sign-in (twoFactorRedirect) is rewritten to a 302 to the second-step page. */
+const HELD_REDIRECT_GET: ReadonlySet<string> = new Set(['/magic-link/verify']);
 /** The second-step paths also commit a refusal below 500: the wrong-code count and the lockout survive a refused code (R9). */
 const COMMITS_REFUSAL = new Set(['/two-factor/verify-totp', '/two-factor/verify-backup-code', '/second-step/reauth', '/second-step/reauth/passkey']);
 
@@ -112,9 +119,26 @@ function clearingCookie(c: { name: string; attributes: { path?: string; domain?:
   return parts.join('; ');
 }
 
+/**
+ * R7.1: on the final Response, after commit. A GET to /magic-link/verify that answers 200 with twoFactorRedirect === true becomes
+ * 302 /sign-in/second-step?with=code. Every Set-Cookie is kept (the signed two-factor hold cookie must reach the browser); the body is dropped.
+ */
+async function heldRedirect(request: Request, res: Response): Promise<Response> {
+  if (request.method !== 'GET' || res.status !== 200) return res;
+  const template = matchAuthPath(new URL(request.url).pathname)?.template;
+  if (!template || !HELD_REDIRECT_GET.has(template)) return res;
+  const body = (await res.clone().json().catch(() => null)) as { twoFactorRedirect?: unknown } | null;
+  if (body?.twoFactorRedirect !== true) return res;
+  const headers = new Headers(res.headers);
+  headers.delete('content-type');
+  headers.delete('content-length');
+  headers.set('location', '/sign-in/second-step?with=code');
+  return new Response(null, { status: 302, headers });
+}
+
 /** Every /api/auth answer is `no-store` whatever BetterAuth sent: enable returns the key and the codes, and a refusal is not for a cache either (POLY-150 R10). */
 export async function handleAuthRequest(request: Request, given: Promise<AnyAuth> | AnyAuth = defaultAuth()): Promise<Response> {
-  const res = await handleAuthRequestInner(request, given);
+  const res = await heldRedirect(request, await handleAuthRequestInner(request, given));
   if (res.headers.get('cache-control')?.toLowerCase() === 'no-store') return res;
   const headers = new Headers(res.headers);
   headers.set('cache-control', 'no-store');
@@ -144,6 +168,7 @@ async function handleAuthRequestInner(request: Request, given: Promise<AnyAuth> 
       headers,
     });
   }
+  if (NO_MARKER.has(route.template)) return inTransaction(request, auth, (fn) => withSignInTx(fn, clientMeta(request)));
   if (session) {
     const token = session.session.token;
     return inTransaction(request, auth, (fn) => withAuthSession(token, fn, clientMeta(request)));

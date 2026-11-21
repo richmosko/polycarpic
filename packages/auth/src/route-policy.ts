@@ -36,7 +36,7 @@ export const AUTH_ROUTES: Readonly<Record<string, Rule>> = {
   '/verify-email': open(),
   '/send-verification-email': open(),
   '/request-password-reset': open(),
-  '/reset-password/:token': open(),
+  '/reset-password/:token': blocked, // R2.1: the token travels in a fragment, never in a path; the GET redirect is never reached
   '/reset-password': open(),
   '/change-password': open(),
   '/update-user': open(),
@@ -46,6 +46,7 @@ export const AUTH_ROUTES: Readonly<Record<string, Rule>> = {
   '/passkey/update-passkey': open(),
   '/second-step/send-code': anchor,
   '/second-step/confirm-code': anchor,
+  '/second-step/cancel-hold': open(), // R3.7: the mailed cancel link's POST; no session, no marker (handler NO_MARKER)
   '/second-step/reauth/begin': reauth,
   '/second-step/reauth': reauth,
   '/second-step/reauth/passkey': reauth,
@@ -179,6 +180,8 @@ export function routePolicyHook(tlsMode: TlsMode) {
       if (extra.length > 0 || (body.image !== undefined && body.image !== null)) throw new APIError('BAD_REQUEST', { message: 'update-user accepts a name and a null image only' });
     }
 
+    // POLY-137 R8: another session of the user never survives a password change; the caller does not get to decide.
+    if (ctx.path === '/change-password' && body.revokeOtherSessions !== true) throw new APIError('BAD_REQUEST', { code: 'revoke_other_sessions_required', message: 'revoke_other_sessions_required' });
     // POLY-150 R7: trustDevice would skip the second step in this browser for 30 days; the held sign-in asks every time.
     if ((ctx.path === '/two-factor/verify-totp' || ctx.path === '/two-factor/verify-backup-code') && body.trustDevice) throw new APIError('BAD_REQUEST', { code: 'trust_device_refused', message: 'trust_device_refused' });
     // S16, S17: a registration never mints a session, and the only second factor BetterAuth may enable is totp.

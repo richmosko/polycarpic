@@ -4,7 +4,9 @@ import { passkey } from '@better-auth/passkey';
 import { authFields } from '@poly/db/auth';
 import { magicLink, twoFactor } from 'better-auth/plugins';
 import { githubUserInfo } from './github.ts';
-import { secondStepAnchor, type SendSecondStepCode } from './anchor.ts';
+import type { Mailer } from '@poly/mail';
+import { secondStepAnchor } from './anchor.ts';
+import { buildSenders } from './mail.ts';
 import { passkeyOnlyHold } from './second-step.ts';
 import { cookieLifetime } from './cookie-lifetime.ts';
 import { routePolicyHook, type TlsMode } from './route-policy.ts';
@@ -13,7 +15,7 @@ import { accountDropIdToken, sessionCreateBefore, userCreateAfter, userCreateBef
 
 const DAY = 86400;
 /** C-04: five a minute per IP on the credential and verification paths (S19). */
-const LIMITED = ['/sign-in/email', '/sign-in/magic-link', '/sign-up/email', '/request-password-reset', '/two-factor/verify-totp', '/two-factor/verify-backup-code', '/passkey/verify-authentication', '/second-step/send-code', '/second-step/confirm-code', '/second-step/reauth/begin', '/second-step/reauth', '/second-step/reauth/passkey'];
+const LIMITED = ['/sign-in/email', '/sign-in/magic-link', '/sign-up/email', '/request-password-reset', '/two-factor/verify-totp', '/two-factor/verify-backup-code', '/passkey/verify-authentication', '/second-step/send-code', '/second-step/confirm-code', '/second-step/reauth/begin', '/second-step/reauth', '/second-step/reauth/passkey', '/callback/*', '/magic-link/verify', '/reset-password', '/second-step/cancel-hold'];
 const customRules = Object.fromEntries(LIMITED.map((p) => [p, { window: 60, max: 5 }]));
 
 export interface Provider {
@@ -28,22 +30,28 @@ export interface AuthInput {
   github?: Provider;
   /** S19: refuse an /api/auth/* request whose client IP does not resolve (true outside development). */
   requireClientIp: boolean;
-  sendMagicLink: (m: { email: string; token: string; url: string }) => Promise<void>;
-  /** The emailed code that first enrolment rests on (R2). Web's version throws until the mailer exists (POLY-137). */
-  sendSecondStepCode?: SendSecondStepCode;
+  /** The one seam for mail (POLY-137 R1.5). None in development: the magic link throws, send-code answers 503, reset is disabled. */
+  mailer?: Mailer;
 }
 
 /** Fields are read from db/auth at call time, so the startup check sees exactly the map in force. */
 export function authOptions(input: AuthInput) {
   const f = authFields;
   const origin = new URL(input.baseURL).origin;
+  const senders = buildSenders(input.mailer, origin);
   return {
     appName: 'polycarpic',
     secret: input.secret,
     baseURL: input.baseURL,
     trustedOrigins: [origin],
     database: createRoutingPool(),
-    emailAndPassword: { enabled: true, revokeSessionsOnPasswordReset: true },
+    emailAndPassword: {
+      enabled: true,
+      revokeSessionsOnPasswordReset: true,
+      // R2.1: 900 s (the library default is 3600). With no mailer the option stays unset, so the route answers RESET_PASSWORD_DISABLED (R1.4).
+      resetPasswordTokenExpiresIn: 900,
+      ...(input.mailer ? { sendResetPassword: senders.sendResetPassword } : {}),
+    },
     socialProviders: {
       ...(input.google ? { google: input.google } : {}),
       ...(input.github ? { github: { ...input.github, getUserInfo: githubUserInfo } } : {}),
@@ -149,8 +157,8 @@ export function authOptions(input: AuthInput) {
           },
         },
       }),
-      magicLink({ sendMagicLink: input.sendMagicLink, storeToken: 'hashed' }),
-      secondStepAnchor({ sendSecondStepCode: input.sendSecondStepCode }),
+      magicLink({ sendMagicLink: senders.sendMagicLink, storeToken: 'hashed', disableSignUp: true }),
+      secondStepAnchor({ senders }),
       passkey({
         rpName: 'polycarpic',
         schema: {

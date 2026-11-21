@@ -3,6 +3,8 @@
 // app.recent_auth_ok through revoke_my_session, app.revoke_my_session), each of which requires a marker of kind `session`.
 import { sql, type Tx } from '@poly/db';
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export class HttpError extends Error {
   readonly status: number;
   readonly code: string;
@@ -49,6 +51,8 @@ export async function listSessions(tx: Tx): Promise<SessionRow[]> {
  * caller's, or unknown) is 404; 42501 step_up_required is 403. Anything else is thrown as it came.
  */
 export async function revokeSession(tx: Tx, id: string): Promise<void> {
+  // R8: an id that is not a uuid is a 404, not a 500 from the ::uuid cast. The same pattern as reauth.ts.
+  if (typeof id !== 'string' || !UUID.test(id)) throw new HttpError(404, 'not_found');
   try {
     await tx.execute(sql`SELECT app.revoke_my_session(${id}::uuid)`);
   } catch (e) {

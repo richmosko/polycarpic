@@ -1,0 +1,412 @@
+[
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/callback.mjs",
+  "line": 161,
+  "writer": "setSessionCookie",
+  "class": "user-inserting",
+  "routes": [
+   "/callback/:id"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/email-verification.mjs",
+  "line": 228,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/verify-email"
+  ],
+  "why": "setSessionCookie re-signs the caller's existing session inside `if (session)`; it creates no session"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/email-verification.mjs",
+  "line": 260,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/verify-email"
+  ],
+  "why": "setSessionCookie re-signs the caller's existing session inside `if (session)`; it creates no session"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/email-verification.mjs",
+  "line": 292,
+  "writer": "createSession",
+  "class": "option-off",
+  "option": "emailVerification.autoSignInAfterVerification",
+  "disabledBy": "falsy"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/email-verification.mjs",
+  "line": 294,
+  "writer": "setSessionCookie",
+  "class": "option-off",
+  "option": "emailVerification.autoSignInAfterVerification",
+  "disabledBy": "falsy"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/email-verification.mjs",
+  "line": 301,
+  "writer": "setSessionCookie",
+  "class": "option-off",
+  "option": "emailVerification.autoSignInAfterVerification",
+  "disabledBy": "falsy"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/session.mjs",
+  "line": 211,
+  "writer": "setSessionCookie",
+  "class": "blocked",
+  "routes": [
+   "/get-session"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/sign-in.mjs",
+  "line": 212,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/sign-in/social"
+  ],
+  "why": "the idToken branch: routePolicyHook refuses a /sign-in/social body that carries idToken (400), so this line is not reached"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/sign-in.mjs",
+  "line": 352,
+  "writer": "createSession",
+  "class": "sign-in-tx",
+  "routes": [
+   "/sign-in/email"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/sign-in.mjs",
+  "line": 357,
+  "writer": "setSessionCookie",
+  "class": "sign-in-tx",
+  "routes": [
+   "/sign-in/email"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/sign-up.mjs",
+  "line": 217,
+  "writer": "createUser",
+  "class": "user-inserting",
+  "routes": [
+   "/sign-up/email"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/sign-up.mjs",
+  "line": 255,
+  "writer": "createSession",
+  "class": "sign-in-tx",
+  "routes": [
+   "/sign-up/email"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/sign-up.mjs",
+  "line": 257,
+  "writer": "setSessionCookie",
+  "class": "sign-in-tx",
+  "routes": [
+   "/sign-up/email"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/update-session.mjs",
+  "line": 50,
+  "writer": "setSessionCookie",
+  "class": "blocked",
+  "routes": [
+   "/update-session"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/update-user.mjs",
+  "line": 71,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/update-user"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; the route re-signs that session"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/update-user.mjs",
+  "line": 177,
+  "writer": "createSession",
+  "class": "with-session",
+  "routes": [
+   "/change-password"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; revokeOtherSessions is forced true (R8) and the caller gets a replacement session"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/update-user.mjs",
+  "line": 183,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/change-password"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; sets the cookie of the caller's replacement session"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "api/routes/update-user.mjs",
+  "line": 462,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/change-email"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; /change-email is a step-up route"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "cookies/index.mjs",
+  "line": 169,
+  "writer": "setSessionCookie",
+  "class": "definition"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "oauth2/link-account.mjs",
+  "line": 309,
+  "writer": "createUser",
+  "class": "user-inserting",
+  "routes": [
+   "/callback/:id"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "oauth2/link-account.mjs",
+  "line": 358,
+  "writer": "createSession",
+  "class": "sign-in-tx",
+  "routes": [
+   "/callback/:id"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/magic-link/index.mjs",
+  "line": 179,
+  "writer": "createUser",
+  "class": "option-off",
+  "option": "plugins[magic-link].options.disableSignUp",
+  "disabledBy": "true"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/magic-link/index.mjs",
+  "line": 198,
+  "writer": "createSession",
+  "class": "sign-in-tx",
+  "routes": [
+   "/magic-link/verify"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/magic-link/index.mjs",
+  "line": 200,
+  "writer": "setSessionCookie",
+  "class": "sign-in-tx",
+  "routes": [
+   "/magic-link/verify"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/index.mjs",
+  "line": 174,
+  "writer": "createSession",
+  "class": "with-session",
+  "routes": [
+   "/two-factor/enable"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; this is the signed-in route's own session replacement"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/index.mjs",
+  "line": 175,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/two-factor/enable"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; this is the signed-in route's own session replacement"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/index.mjs",
+  "line": 198,
+  "writer": "createSession",
+  "class": "with-session",
+  "routes": [
+   "/two-factor/enable"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; this is the signed-in route's own session replacement"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/index.mjs",
+  "line": 199,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/two-factor/enable"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; this is the signed-in route's own session replacement"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/index.mjs",
+  "line": 283,
+  "writer": "createSession",
+  "class": "with-session",
+  "routes": [
+   "/two-factor/disable"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; this is the signed-in route's own session replacement"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/index.mjs",
+  "line": 287,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/two-factor/disable"
+  ],
+  "why": "sessionMiddleware answers 401 without a session; this is the signed-in route's own session replacement"
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/otp/index.mjs",
+  "line": 196,
+  "writer": "createSession",
+  "class": "blocked",
+  "routes": [
+   "/two-factor/verify-otp"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/otp/index.mjs",
+  "line": 197,
+  "writer": "setSessionCookie",
+  "class": "blocked",
+  "routes": [
+   "/two-factor/verify-otp"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/totp/index.mjs",
+  "line": 175,
+  "writer": "createSession",
+  "class": "sign-in-tx",
+  "routes": [
+   "/two-factor/verify-totp"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/totp/index.mjs",
+  "line": 176,
+  "writer": "setSessionCookie",
+  "class": "sign-in-tx",
+  "routes": [
+   "/two-factor/verify-totp"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/verify-two-factor.mjs",
+  "line": 33,
+  "writer": "createSession",
+  "class": "sign-in-tx",
+  "routes": [
+   "/two-factor/verify-totp",
+   "/two-factor/verify-backup-code"
+  ]
+ },
+ {
+  "pkg": "better-auth",
+  "file": "plugins/two-factor/verify-two-factor.mjs",
+  "line": 38,
+  "writer": "setSessionCookie",
+  "class": "sign-in-tx",
+  "routes": [
+   "/two-factor/verify-totp",
+   "/two-factor/verify-backup-code"
+  ]
+ },
+ {
+  "pkg": "@better-auth/passkey",
+  "file": "index.mjs",
+  "line": 485,
+  "writer": "createSession",
+  "class": "with-session",
+  "routes": [
+   "/passkey/verify-registration"
+  ],
+  "why": "the createSession flag of the body: routePolicyHook refuses a /passkey/verify-registration body that sets it (S16), and the route needs a session"
+ },
+ {
+  "pkg": "@better-auth/passkey",
+  "file": "index.mjs",
+  "line": 495,
+  "writer": "setSessionCookie",
+  "class": "with-session",
+  "routes": [
+   "/passkey/verify-registration"
+  ],
+  "why": "the createSession flag of the body: routePolicyHook refuses a /passkey/verify-registration body that sets it (S16), and the route needs a session"
+ },
+ {
+  "pkg": "@better-auth/passkey",
+  "file": "index.mjs",
+  "line": 583,
+  "writer": "createSession",
+  "class": "sign-in-tx",
+  "routes": [
+   "/passkey/verify-authentication"
+  ]
+ },
+ {
+  "pkg": "@better-auth/passkey",
+  "file": "index.mjs",
+  "line": 587,
+  "writer": "setSessionCookie",
+  "class": "sign-in-tx",
+  "routes": [
+   "/passkey/verify-authentication"
+  ]
+ }
+]
