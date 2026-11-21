@@ -201,9 +201,9 @@ describe('C5 no test outside the serial project writes cluster-wide state', () =
 
 describe('C6 the vitest config shape', () => {
   const projectOf = (cfg: Cfg, name: string) => (cfg.test?.projects ?? []).find((p: any) => p?.test?.name === name);
-  it('SERIAL is exactly runner, template-clone, ops-hardening, pgtap-membership and gate-check-membership (the role-membership plants), as repo-relative paths that exist', async () => {
+  it('SERIAL is exactly runner, template-clone, ops-hardening, pgtap-membership, gate-check-membership (the role-membership plants) and gate-check-role-setting (poly_auth cluster-wide setting, restored), as repo-relative paths that exist', async () => {
     const { SERIAL } = await config();
-    expect([...SERIAL].sort()).toEqual(['tests/db/gate-check-membership.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts', 'tests/db/runner.test.ts', 'tests/db/template-clone.test.ts']);
+    expect([...SERIAL].sort()).toEqual(['tests/db/gate-check-membership.test.ts', 'tests/db/gate-check-role-setting.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts', 'tests/db/runner.test.ts', 'tests/db/template-clone.test.ts']);
     for (const f of SERIAL) expect(existsSync(join(ROOT, f)), f).toBe(true);
   });
   it('projects db-parallel (groupOrder 0, fileParallelism true) and db-serial (groupOrder 1, fileParallelism false)', async () => {

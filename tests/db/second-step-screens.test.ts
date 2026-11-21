@@ -21,7 +21,7 @@ let noMail: any;
 beforeAll(async () => {
   e = await boot();
   withMail = await e.A.createAuth({ ...e.optionsOf('real-domain', { sendSecondStepCode: mailer }), rateLimit: { enabled: false } });
-  noMail = await e.mk();
+  noMail = await e.A.createAuth({ ...e.optionsOf('real-domain', { noMailer: true }), rateLimit: { enabled: false } }); // R1.4: no mailer, so send-code answers 503
 });
 afterAll(() => teardown(e));
 const json = async (r: Response) => (await r.clone().json().catch(() => ({}))) as any;

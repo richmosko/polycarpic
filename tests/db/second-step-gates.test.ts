@@ -412,8 +412,9 @@ describe('C-a sign-in under the carve-out (poly_app, 0013 applied)', () => {
   for (const role of ROLES) {
     it(`D1(b) ${role}: an unmarked backup_codes change on a VERIFIED two_factor row commits (a backup-code sign-in consumes one code) [red if: guard_two_factor refuses unmarked backup_codes or two_factor_91_consistent uses the marker]`, async () => {
       const u = await seed({ enrolled: true });
-      await unmarked(role, `UPDATE public.two_factor SET backup_codes = 'consumed-one' WHERE user_id = $1`, [u.id]);
-      expect(must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows[0]![0]).toBe('consumed-one');
+      // POLY-137 D2: an unmarked change is a spend only if the list shrinks (the seeded list is one character), so the spend leaves it empty
+      await unmarked(role, `UPDATE public.two_factor SET backup_codes = '' WHERE user_id = $1`, [u.id]);
+      expect(must(`SELECT backup_codes FROM public.two_factor WHERE user_id = '${u.id}'`, db).rows[0]![0]).toBe('');
     });
     it(`D1(b) ${role}: an unmarked backup_codes change on an UNVERIFIED row is refused (the carve-out is verified rows only) [red if: the carve-out ignores verified for backup_codes]`, async () => {
       const u = await seed();

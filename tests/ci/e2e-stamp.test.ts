@@ -10,8 +10,8 @@ const E2E = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'apps', 'w
 const src = (f: string) => readFileSync(join(E2E, f), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
 
 describe('the step-up stamp moves from serve.ts into the revoke spec', () => {
-  it('serve.ts writes no recent_auth_at (it ran before `vite build`, so a slow build outlived the 5-minute window)  [red if: the seed still stamps]', () => {
-    expect(src('serve.ts')).not.toMatch(/recent_auth_at/);
+  it('serve.ts stamps no session as fresh (`recent_auth_at = now()`); its stale backdated stamps for other users stay (it ran before `vite build`, so a slow build outlived the 5-minute window)  [red if: the seed still stamps]', () => {
+    expect(src('serve.ts')).not.toMatch(/recent_auth_at\s*=\s*now\(\)(?!\s*-)/);
   });
   it('support.ts exports stampStepUp(email), which writes recent_auth_at for the user\'s sessions  [red if: no helper]', () => {
     const s = src('support.ts');

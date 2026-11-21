@@ -1,7 +1,7 @@
 // POLY-86 visual-leg defects 1-3 (lead @ f99b888): the real app, signed in and out. Titles end with [red if: <mutation>].
 // The seeded user is serve.ts's: Ada Lovelace, password below.
 import { expect, test } from '@playwright/test';
-import { slot } from './support.ts';
+import { slot, stampStepUp } from './support.ts';
 
 const base = `http://localhost:${process.env.E2E_PORT ?? 4173}`;
 const EMAIL = 'ada@e2e.test';
@@ -72,6 +72,7 @@ test.describe('signed in', () => {
     const rows = page.locator('tbody tr');
     const before = await rows.count(); // other specs may have left a session of their own
     expect(before).toBeGreaterThanOrEqual(2);
+    await stampStepUp(EMAIL); // right before the revoke: the stamp lasts 5 minutes (POLY-137 R8)
     await rows.filter({ hasNotText: '(this device)' }).first().getByRole('button', { name: 'Revoke' }).click();
     await expect(rows).toHaveCount(before - 1);
     await expect(rows.filter({ hasText: '(this device)' })).toHaveCount(1);

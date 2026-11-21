@@ -30,7 +30,7 @@ export const DB_AREAS = {
     paths: [/^packages\/tenancy\//, /^tests\/db\/pgtap\//],
   },
   migrate: {
-    tests: T(['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'migration-0017', 'runner', 'template-clone']),
+    tests: T(['checks', 'connection', 'migrate-run-helper', 'pgtap-membership', 'gate-check-membership', 'gate-check-role-setting', 'migration-0017', 'runner', 'template-clone']),
     paths: [/^infra\/postgres\/gate-check\.(sh|sql)$/],
   },
   ops: {
@@ -65,7 +65,7 @@ export const TABLE = {
   ci: [/^\.github\/workflows\//, /^infra\/ci\//, /^tests\/ci\//],
   // POLY-141 E1: what the web e2e server imports or reads that turbo cannot see (it follows workspace packages only):
   // the db harness helpers and image build, apps/migrate, and the Postgres pin. Runs only the `unit` job's e2e step.
-  e2e: [/^apps\/auth\/src\//, /^tests\/db\/helpers\//, /^tests\/db\/docker\//, /^apps\/migrate\//, /^infra\/postgres\/Dockerfile$/, /^infra\/postgres-major$/],
+  e2e: [/^apps\/auth\/src\//, /^packages\/mail\//, /^tests\/db\/helpers\//, /^tests\/db\/docker\//, /^apps\/migrate\//, /^infra\/postgres\/Dockerfile$/, /^infra\/postgres-major$/],
 };
 
 // One key per db sub-battery. `db` is always the OR of these.

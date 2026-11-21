@@ -98,9 +98,9 @@ SELECT is((SELECT coalesce(array_agg(DISTINCT sig || ' reads ' || m[1] ORDER BY 
   WHERE m[1] NOT IN ('app.actor','poly.client_ip','poly.user_agent','role')), '{}'::text[], 'no function reads a setting other than app.actor, poly.client_ip, poly.user_agent and role (a clock override would be one)');
 SELECT is((SELECT array_agg(sig ORDER BY sig) FROM pg_temp.scope_fn f WHERE prosrc ~* 'current_setting' AND (SELECT count(*) FROM regexp_matches(prosrc, 'current_setting', 'gi')) <> (SELECT count(*) FROM regexp_matches(prosrc, 'current_setting\s*\(\s*''[^'']+''', 'gi'))), NULL::text[],
   'every current_setting call has a literal name (no dynamic setting name)');
--- 2. `role` is read by exactly the three POLY-89 commit-time trigger functions
+-- 2. `role` is read by exactly the three POLY-89 commit-time trigger functions and the three POLY-137 trigger definers (each passes a superuser session that has not SET ROLE: fixtures, restores)
 SELECT is((SELECT coalesce(array_agg(sig ORDER BY sig), '{}') FROM pg_temp.scope_fn WHERE prosrc ~* 'current_setting\s*\(\s*''role''' ),
-  ARRAY['app.require_enrolled_inviter()','app.require_second_step_for_role()','app.two_factor_consistent()'], 'current_setting(''role'') is read only by two_factor_consistent, require_second_step_for_role and require_enrolled_inviter');
+  ARRAY['app.note_codes_replaced()','app.note_password_changed()','app.require_enrolled_inviter()','app.require_second_step_for_role()','app.sync_second_step()','app.two_factor_consistent()'], 'current_setting(''role'') is read only by two_factor_consistent, require_second_step_for_role, require_enrolled_inviter, and POLY-137''s sync_second_step, note_codes_replaced and note_password_changed');
 -- 3. the lock's own path reads only poly.client_ip and poly.user_agent
 SELECT is((SELECT coalesce(array_agg(sig || ' reads ' || m[1] ORDER BY sig || ' reads ' || m[1]), '{}') FROM pg_temp.scope_fn f, LATERAL regexp_matches(f.prosrc, 'current_setting\s*\(\s*''([^'']+)''', 'g') m
   WHERE sig IN ('app.guard_second_step_lock()','app.guard_second_step_lock_delete()','app.record_session_sign_in()','app.sign_in_address(text)') AND m[1] NOT IN ('poly.client_ip','poly.user_agent')), '{}'::text[],

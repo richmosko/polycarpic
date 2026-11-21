@@ -7,8 +7,8 @@ const R = AUTH_ROUTES as Record<string, { class: string; insertsUser?: true; rea
 const of = (c: string) => Object.entries(R).filter(([, r]) => r.class === c).map(([p]) => p).sort();
 
 describe('AUTH_ROUTES', () => {
-  it('holds the 52 paths of ARCH §3.1c (47, the two anchor routes and the three reauth routes of POLY-150), each with one of the six classes  [red if: a path is dropped or given a seventh class]', () => {
-    expect(Object.keys(R)).toHaveLength(52);
+  it('holds the 53 paths of ARCH §3.1c (47, the two anchor routes and the three reauth routes of POLY-150, and the POLY-137 cancel-hold), each with one of the six classes  [red if: a path is dropped or given a seventh class]', () => {
+    expect(Object.keys(R)).toHaveLength(53);
     expect(of('reauth')).toEqual(['/second-step/reauth', '/second-step/reauth/begin', '/second-step/reauth/passkey']);
     expect(of('anchor')).toEqual(['/second-step/confirm-code', '/second-step/send-code']);
     for (const [p, r] of Object.entries(R)) {
@@ -17,10 +17,10 @@ describe('AUTH_ROUTES', () => {
     }
   });
 
-  it('blocked is exactly the 13 token- and secret-bearing routes  [red if: /get-session, /list-sessions, an IdP-token route or deleteUser is not blocked]', () => {
+  it('blocked is exactly the 14 token- and secret-bearing routes (POLY-137 R2.1 blocks GET /reset-password/:token)  [red if: /get-session, /list-sessions, an IdP-token route or deleteUser is not blocked]', () => {
     expect(of('blocked')).toEqual([
       '/account-info', '/delete-user', '/delete-user/callback', '/get-access-token', '/get-session', '/list-sessions', '/refresh-token',
-      '/revoke-session', '/two-factor/get-totp-uri', '/two-factor/send-otp', '/two-factor/verify-otp', '/update-session', '/verify-password',
+      '/reset-password/:token', '/revoke-session', '/two-factor/get-totp-uri', '/two-factor/send-otp', '/two-factor/verify-otp', '/update-session', '/verify-password',
     ].sort());
   });
 

@@ -6,6 +6,7 @@ import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startAuthService } from '../../../apps/auth/src/main.ts';
+import { legacyMailer } from './legacy-mailer.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outbox = join(here, '..', '..', '..', 'apps', 'web', 'tests', 'e2e', '.auth', 'outbox.jsonl');
@@ -15,7 +16,7 @@ const sendSecondStepCode = async (m: { email: string; code: string }): Promise<v
   appendFileSync(outbox, `${JSON.stringify({ email: m.email, code: m.code })}\n`, { mode: 0o600 });
 };
 
-const svc = await startAuthService(process.env, { sendSecondStepCode });
+const svc = await startAuthService(process.env, { mailer: legacyMailer({ code: sendSecondStepCode }) });
 const stop = () => void svc.close().then(() => process.exit(0));
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);

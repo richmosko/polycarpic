@@ -170,7 +170,7 @@ const plants137: Plant[] = [
   ['check_factor_removal body no longer names method_hold', `UPDATE pg_proc SET prosrc = replace(prosrc, 'method_hold', 'x') WHERE oid = 'app.check_factor_removal(uuid,text,uuid)'::regprocedure`, 'function app.check_factor_removal(uuid,text,uuid): its body does not mention method_hold'],
   // 18. the nine new definers
   ...DEF137.flatMap(([f, owner, exec]): Plant[] => [
-    [`${f} dropped`, `DROP FUNCTION ${f}`, `function ${f}: missing`],
+    [`${f} dropped`, `DROP FUNCTION ${f} CASCADE`, `function ${f}: missing`],
     [`${f} owned by poly_owner (not ${owner})`, `ALTER FUNCTION ${f} OWNER TO poly_owner`, `function ${f}: owner is poly_owner`],
     [`${f} made an invoker`, `ALTER FUNCTION ${f} SECURITY INVOKER`, `function ${f}: not SECURITY DEFINER`],
     [`${f} EXECUTE to PUBLIC`, `GRANT EXECUTE ON FUNCTION ${f} TO PUBLIC`, `function ${f}: poly_app can execute it`],
@@ -179,11 +179,9 @@ const plants137: Plant[] = [
   ]),
   // 19. a notice unsent for over an hour (exact line, ruling R3.8)
   ['an unsent outbox row 2 hours old', `INSERT INTO public."user" (name, email, email_verified) VALUES ('G', 'g@qa.test', true); INSERT INTO app.mail_outbox (user_id, kind, to_address, payload, created_at) SELECT id, 'password_changed', email, '{}'::jsonb, now() - interval '2 hours' FROM public."user" LIMIT 1`, 'FAIL mail: 1 notices unsent for over an hour'],
-  // 21. poly_auth's idle timeout
-  ['poly_auth idle_in_transaction_session_timeout reset', 'ALTER ROLE poly_auth RESET idle_in_transaction_session_timeout', /poly_auth.*idle_in_transaction_session_timeout/],
-  ['poly_auth idle_in_transaction_session_timeout set to 30s', `ALTER ROLE poly_auth SET idle_in_transaction_session_timeout = '30s'`, /poly_auth.*idle_in_transaction_session_timeout/],
+  // 21. poly_auth's idle timeout: its two plants alter a CLUSTER-wide role setting, so they run serially in gate-check-role-setting.test.ts
   // 22-24. the purges' footprint: a row the purge would have deleted
-  ['a tx_identity row 7 hours old, its transaction over', `INSERT INTO app.tx_identity (xid, user_id, kind, created_at) VALUES ('1'::xid8, gen_random_uuid(), 'web', now() - interval '7 hours')`, /tx_identity.*6 hours/],
+  ['a tx_identity row 7 hours old, its transaction over', `INSERT INTO app.tx_identity (xid, user_id, kind, created_at) VALUES ('1'::xid8, gen_random_uuid(), 'session', now() - interval '7 hours')`, /tx_identity.*6 hours/],
   ['a sign_in_record row 402 days old', `BEGIN; SET LOCAL session_replication_role = replica; INSERT INTO app.sign_in_record (kind, user_id, session_id, created_at) VALUES ('session', gen_random_uuid(), gen_random_uuid(), now() - interval '402 days'); COMMIT`, /sign_in_record.*401 days/],
   ['a SENT outbox row 32 days old', `INSERT INTO public."user" (name, email, email_verified) VALUES ('G', 'g@qa.test', true); INSERT INTO app.mail_outbox (user_id, kind, to_address, payload, created_at, sent_at) SELECT id, 'password_changed', email, '{}'::jsonb, now() - interval '32 days', now() - interval '32 days' FROM public."user" LIMIT 1`, /mail_outbox.*31 days/],
 ];

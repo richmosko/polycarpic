@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { PW, boot, get, jar, post, teardown, type Env } from './helpers/auth';
 import { tx } from './helpers/auth-tx';
 import { sessionWithHandle } from './helpers/handle';
-import { enrol, freshCookie, mailAuth, holds, markSent, memMailer, outbox, type Mem } from './helpers/mail';
+import { enrol, operatorReset, freshCookie, mailAuth, holds, markSent, memMailer, outbox, type Mem } from './helpers/mail';
 import { codeOf, fails, fixture, msgOf, totp } from './helpers/second-step';
 import { must } from './helpers/sql';
 import { softAuthenticator } from './helpers/webauthn';
@@ -153,13 +153,15 @@ describe('R3.2, R3.3 a method added after the first is held, and its notice is w
     const again = await enrol(e, auth, mm, x.u);
     expect(holds(e, x.u.id), 'rule 2: re-enrolling after removing your own methods is held').toHaveLength(1);
     expect(again.u.id).toBe(x.u.id);
-    // the operator's reset is the exemption
+    // the operator's reset is the exemption: it removes a method (an `operator` audit row), so the next add is a first set-up again
     const y = await enrol(e, auth, mm);
     const { cookie: c2 } = await freshCookie(e, auth, y.u.id);
     expect((await e.handle(post('/two-factor/disable', { password: PW }, c2), auth)).status).toBe(200);
-    must(`SELECT app.reset_second_step('${y.u.email}')`, e.db, { role: 'poly_operator' });
     await enrol(e, auth, mm, y.u);
-    expect(holds(e, y.u.id), 'after reset-mfa the add is a first set-up').toEqual([]);
+    expect(holds(e, y.u.id), 'rule 2: held after the user removed their own').toHaveLength(1);
+    await operatorReset(e, y.u.email);
+    await enrol(e, auth, mm, y.u);
+    expect(holds(e, y.u.id), 'after reset-mfa the add is a first set-up: no new hold').toHaveLength(1);
   });
   it('R3.10.7 two passkeys added in one transaction write ONE method_added row naming both methods, and two holds sharing its id [red if: a merged add writes two mails, or one hold]', async () => {
     const x = await enrol(e, auth, mm);
@@ -188,7 +190,7 @@ describe('R3.2, R3.3 a method added after the first is held, and its notice is w
     await addPasskey(x.u.id);
     await addPasskey(x.u.id);
     expect(outbox(e, x.u.id, 'method_removed')).toEqual([]);
-    must(`SELECT app.reset_second_step('${x.u.email}')`, e.db, { role: 'poly_operator' });
+    await operatorReset(e, x.u.email);
     const rm = outbox(e, x.u.id, 'method_removed');
     expect(rm).toHaveLength(1);
     expect(JSON.parse(rm[0]![3]!).methods.sort()).toEqual(['passkey', 'passkey', 'totp']);
@@ -237,7 +239,7 @@ describe('R3.4 a held method cannot sign in, and nothing it touched survives', (
     expect(wrong.status).toBe(401);
     expect(Number(codes()[1]), 'a wrong code during the hold still counts').toBeGreaterThan(Number(before[1]));
     markSent(e, u.id);
-    const ok = await e.handle(post('/two-factor/verify-totp', { code: totp(t.secret, Date.now() + 60_000) }, await held()), auth);
+    const ok = await e.handle(post('/two-factor/verify-totp', { code: totp(t.secret, Date.now() + 30_000) }, await held()), auth);
     expect(ok.status, JSON.stringify(await json(ok))).toBe(200);
     expect(hasSessionCookie(ok)).toBe(true);
   });
@@ -302,7 +304,8 @@ describe('R3.5 a held method does not count as a remaining method', () => {
       await q(`INSERT INTO public.passkey (public_key, user_id, credential_id, counter, device_type, backed_up, transports) VALUES ($1, $2, $3, 0, 'singleDevice', false, 'internal')`, [k.publicKey, u.id, k.credentialId]);
     });
     expect(holds(e, u.id)).toHaveLength(1);
-    const del = () => fails(fx.committed('poly_auth', u.id, sid, (q) => q('DELETE FROM public.two_factor WHERE user_id = $1', [u.id])));
+    // the flag goes first (two_factor_consistent, 0013), in the same transaction as the delete
+    const del = () => fails(fx.committed('poly_auth', u.id, sid, async (q) => { await q('SELECT app.set_two_factor_enabled($1)', [false]); await q('DELETE FROM public.two_factor WHERE user_id = $1', [u.id]); }));
     const x = await del();
     expect(x).not.toBeNull();
     expect([codeOf(x), msgOf(x)]).toEqual(['42501', expect.stringMatching(/second_step_required/)]);

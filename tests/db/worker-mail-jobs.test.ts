@@ -3,7 +3,7 @@
 // mail_sent / mail_failed record the result; purge_mail_outbox deletes only SENT rows over 30 days old; the other two purges are callable by
 // poly_worker alone. Titles end [red if: ...]. Red today: the definers and tables do not exist.
 // The drain tests import apps/worker/src/jobs/mail.ts (ASSUMED export drainMail({mailer, origin}), see jobs.test.ts) inside each test.
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { boot, teardown, type Env } from './helpers/auth';
 import { tx } from './helpers/auth-tx';
 import { holds, memMailer, outbox } from './helpers/mail';
@@ -17,6 +17,8 @@ let e: Env;
 let fx: ReturnType<typeof fixture>;
 beforeAll(async () => { e = await boot(); fx = fixture(e.db, 139); });
 afterAll(() => teardown(e));
+// each case starts with an empty queue: the drain claims the oldest row first, so a row another case left would be sent too
+beforeEach(() => { must('DELETE FROM app.mail_outbox', e.db); });
 
 const asWorker = <T>(fn: (q: (t: string, v?: unknown[]) => Promise<any>) => Promise<T>) => tx(e.db, 'poly_worker', (q) => fn((t, v = []) => q(t, v)), true);
 const claim = () => asWorker(async (q) => (await q('SELECT * FROM app.claim_mail()')).rows);

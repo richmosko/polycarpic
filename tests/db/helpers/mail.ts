@@ -6,6 +6,7 @@ import { PW, post, type Env } from './auth';
 import { sessionWithHandle } from './handle';
 import { totp } from './second-step';
 import { must } from './sql';
+import { tx } from './auth-tx';
 
 export type Sent = { to: string; subject: string; text: string; idempotencyKey?: string };
 export type Mem = { sent: Sent[]; fail: boolean; send(m: Sent): Promise<void> };
@@ -31,10 +32,7 @@ export const settle = (ms = 250) => new Promise((r) => setTimeout(r, ms));
 
 /** A service instance built with `mailer`; the limiter is off unless `limiter` is set (S6). */
 export async function mailAuth(e: Env, mailer: Mem | undefined, o: { limiter?: boolean; tls?: 'real-domain' | 'private-ca' } = {}) {
-  // `sendSecondStepCode` is the pre-POLY-137 injection point (R1.5 removes it from AuthInput, so after the build it is ignored and the code
-  // arrives through `mailer`). While it still exists, it lets first set-up work, so the hold's own tests reach the hold and fail there.
-  const legacy = mailer ? { sendSecondStepCode: async (m: any) => { const code = Object.values(m).find((v) => typeof v === 'string' && /^\d{6}$/.test(v as string)) as string; mailer.sent.push({ to: String(m.email), subject: 'legacy stand-in', text: `Your code is ${code}.` }); } } : {};
-  const extra = mailer ? { mailer, ...legacy } : {};
+  const extra = mailer ? { mailer } : { noMailer: true };
   return e.A.createAuth({ ...e.optionsOf(o.tls ?? 'real-domain', extra), ...(o.limiter ? {} : { rateLimit: { enabled: false } }) });
 }
 
@@ -73,3 +71,5 @@ export function markSent(e: Env, uid: string, o: { usableInHours?: number } = {}
   const at = o.usableInHours === undefined ? `now() - interval '1 second'` : `now() + interval '${o.usableInHours} hours'`;
   must(`UPDATE app.mail_outbox SET sent_at = now(), attempts = greatest(attempts, 1) WHERE user_id = '${uid}' AND kind = 'method_added'; UPDATE app.method_hold SET notice_sent_at = now() - interval '1 hour', usable_at = ${at} WHERE user_id = '${uid}' AND cancelled_at IS NULL`, e.db);
 }
+/** The operator's reset as the CLI makes it: the definer's exact call, over the extended protocol (a literal over psql is refused by its exact-call check). */
+export const operatorReset = (e: Env, email: string) => tx(e.db, 'poly_operator', async (q) => (await q('SELECT app.reset_second_step($1)', [email])).rows[0].reset_second_step, true);

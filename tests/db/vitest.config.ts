@@ -12,7 +12,8 @@ import { defineConfig } from 'vitest/config';
 //   ops-hardening  a 4.8 s production timeout, not measured under contention
 //   pgtap-membership role-membership GRANTs planted in pgTAP 08's rolled-back transaction (POLY-152 N2)
 //   gate-check-membership role-membership GRANTs planted with the deploy-gate check, each rolled back (POLY-149e)
-export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts', 'tests/db/gate-check-membership.test.ts'];
+//   gate-check-role-setting poly_auth's cluster-wide role setting, planted and restored (POLY-137)
+export const SERIAL = ['tests/db/runner.test.ts', 'tests/db/template-clone.test.ts', 'tests/db/ops-hardening.test.ts', 'tests/db/pgtap-membership.test.ts', 'tests/db/gate-check-membership.test.ts', 'tests/db/gate-check-role-setting.test.ts'];
 
 export default defineConfig({
   test: {

@@ -6,12 +6,13 @@
 import { authOptions, createAuth, handleAuthRequest } from '../../../packages/auth/src/index.ts';
 import { close, configure } from '../../../packages/db/src/index.ts';
 import { dbEnv } from './api.ts';
+import { legacyMailer } from './legacy-mailer.ts';
 
 export async function e2eAuth(db: string, origin: string, secret: string, sendSecondStepCode?: (m: { email: string; code: string }) => Promise<void>) {
   configure({ app: dbEnv('poly_app', db), auth: dbEnv('poly_auth', db) });
   // The seed's instance has its own memory limiter, separate from the running service's (the one the specs share a bucket on, R8); it is off here
   // because the seed signs in a dozen users from one address in a few seconds, as the db suites' own instances do (S6: in the test's options, not the defaults).
-  const opts = authOptions({ secret, baseURL: origin, tlsMode: 'private-ca', requireClientIp: false, sendMagicLink: async () => {}, ...(sendSecondStepCode ? { sendSecondStepCode } : {}) });
+  const opts = authOptions({ secret, baseURL: origin, tlsMode: 'private-ca', requireClientIp: false, ...(sendSecondStepCode ? { mailer: legacyMailer({ code: sendSecondStepCode }) } : {}) });
   const auth = await createAuth({ ...opts, rateLimit: { ...opts.rateLimit!, enabled: false } });
   return {
     hash: async (password: string): Promise<string> => (await auth.$context).password.hash(password),

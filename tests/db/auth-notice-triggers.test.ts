@@ -86,7 +86,7 @@ describe('D2 backup codes: every change outside a spend we can see is noticed, a
     // Confirm it's you with a backup code: a re-check, no notice
     const s = sessionWithHandle(e.db, x.u.id);
     const cookie = await e.cookieForToken(s.token, auth);
-    const b = await e.handle(post('/second-step/reauth/begin', { method: 'totp' }, cookie), auth);
+    const b = await e.handle(post('/second-step/reauth/begin', { method: 'backup_code' }, cookie), auth);
     const re = await e.handle(post('/second-step/reauth', { challengeId: (await json(b)).challengeId, password: PW, backupCode: x.backupCodes[1] }, cookie), auth);
     expect(re.status, JSON.stringify(await json(re))).toBe(200);
     expect(kinds(x.u.id, 'backup_code_used'), 'the re-check spend is not a sign-in').toBe(1);
@@ -141,7 +141,7 @@ describe('D4 a changed password is noticed', () => {
 });
 
 describe('R4.2 poly_auth\'s idle-in-transaction timeout is 15 s, set on the role', () => {
-  it('SHOW as poly_auth answers 15s; poly_worker and poly_app keep the server default; pg_db_role_setting holds the entry [red if: the ALTER ROLE is missing from roles.sql]', async () => {
+  it('SHOW as poly_auth answers 15s; poly_worker and poly_app keep the server default; pg_db_role_setting holds the entry [red if: the role setting is missing from roles.sql]', async () => {
     const show = (role: string) => tx(e.db, role, async (q) => (await q('SHOW idle_in_transaction_session_timeout', [])).rows[0].idle_in_transaction_session_timeout);
     expect(await show('poly_auth')).toBe('15s');
     expect(await show('poly_worker')).not.toBe('15s');

@@ -17,7 +17,7 @@ describe('layers.json', () => {
     const a = layers.packages['auth-app'];
     expect(a.dir).toBe('apps/auth');
     expect(a.layer).toBe(6);
-    expect([...a.allow].sort()).toEqual(['auth', 'config', 'config/log', 'db/startup']);
+    expect([...a.allow].sort()).toEqual(['auth', 'config', 'config/log', 'db/startup', 'mail']); // POLY-137 R1.1
   });
   it('packages/auth gains the subpath ./web; web allows auth/web and no longer auth [red if: web may still import the root]', () => {
     expect(layers.packages.auth.subpaths).toContain('./web');
