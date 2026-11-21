@@ -130,3 +130,40 @@ Everything here is code-read against better-auth 1.7.18 (the main checkout's `no
 1. POLY-138: the edge access log records no query string for `/api/auth/magic-link/verify` (RC5).
 2. A warning in the app that does not depend on the mailbox: Settings shows a held method with "works from {until}", and the signed-in shell shows a banner while a method is held. Today a stolen mailbox loses the only warning. This extends the ruling's own follow-up 2.
 3. A notice on a password change or reset. This is the ruling's follow-up 5, and I endorse it. It is the strongest signal of R0.
+
+---
+
+## 5. Review of the replacement ruling at `fab91743` (replaces §1's verdict)
+
+**Verdict: ACCEPT `fab91743`.** Each of RC1–RC9 is met. The new material (R1.8, R1.9, RC3's refusal of a change that does not shrink, D4) adds no reach for an attacker. qa may write the tests now.
+
+I read the whole replacement against the tree, by reading the code; I ran nothing.
+
+### 5.1 RC1–RC9
+| Item | At `fab91743` | Result |
+|---|---|---|
+| **RC1** the cap | R1.8, R1.9. Counter keyed on the stored address. The magic-link sender looks the address up first and mails no address without an account | **Met.** RC1 keyed on the requested address to close the open relay. R1.9 closes the relay outright, so the stored-address key is sound: only members are mailed, and for them the requested and stored addresses are the same. The answers, the counting, where the count lives, the notice exemption and the tests are all as asked |
+| **RC2** fail closed | A method is held while `notice_sent_at IS NULL OR usable_at > now()`. `arm_hold_cancel` sets `usable_at` to at least 24 h after the arming. Line 19 is no longer claimed as a monitor | **Met** |
+| **RC3** the unmarked copy | D2 writes a notice on every change of `backup_codes`, with a marker or without one (`backup_code_used` when unmarked). An unmarked change that does not shrink is refused | **Met.** The optional size check is taken |
+| **RC4** merged adds | One mail id across the transaction's holds. Arming and cancelling act on every held method of the user | **Met** |
+| **RC5** the reset token | Travels only in the fragment. `/reset-password/:token` is blocked. No `redirectTo`. Test (f) | **Met.** The magic link's query string is follow-up 8 (POLY-138) |
+| **RC6** `accountLockout` | The dependency is stated, and `options.test.ts` asserts it | **Met** |
+| **RC7** sending-only keys | R1.3, one per service; the INFRA check is follow-up 7 | **Met.** The runbook check is devops's, before the first deploy |
+| **RC8** the magic-link send | (a): not awaited, outside any transaction, and the answer never changes. Tests (d) and (g) | **Met** |
+| **RC9** tests | #6 (`audit_event` INSERT) and #5 (B's cookie) | **Met** |
+
+### 5.2 Notes (not blocking; fix at the build if convenient)
+- **A stolen `poly_worker` can make a held method live without its mail.**
+  - **How:** it calls `arm_hold_cancel`, then `mail_sent`, and never sends. The method then goes live 24 h after the arming, silently.
+  - **Why it does not block:** it needs **two** credentials, `poly_auth` to plant and `poly_worker` to mark the mail sent. An injection in `auth` yields only the first.
+  - **For the Principal's record:** the ruling's sentence "a stolen `poly_worker` … cannot make one live sooner" is true. It should also say "but it can make one live unannounced". I write that into R-2 at the build review.
+- **`purge_mail_outbox`** should delete only sent rows. An unsent row older than 30 days still keeps its method held, because `notice_sent_at` stays NULL, so it fails closed either way. But deleting the row hides it from gate line 19 and from the operator.
+- **`magicLink({disableSignUp: true})`.** Since R1.9 mails no address without an account, `/magic-link/verify` can no longer reach a sign-up legitimately. Turning sign-up off there removes `insertsUser` from a route that no longer needs it, which is defence in depth. It is a one-line change, so do it if it fits.
+- **Two leftover phrases from before RC4:**
+  - R3.7's "What a stolen cancel link can do" still says "remove one method". It now removes every held method.
+  - "If arming returns false" should read "returns NULL" (R3.6).
+
+### 5.3 SECURITY at the build review (adds to §3)
+- **R-2:** the `poly_worker` note above.
+- **C-03:** D2's size check on an unmarked change, and D4.
+- **T1:** the reset token is only ever in the fragment; `/reset-password/:token` is blocked.
