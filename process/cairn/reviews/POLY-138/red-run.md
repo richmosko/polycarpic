@@ -92,3 +92,14 @@ Lint: 10 `caddy-cache` rows red (rule absent; the snippet-missing row exits 0). 
 Container (`caddy-edge.test.ts` -t R10, today's Caddyfile): 7 red, 3 green. Red: the six page/auth cases (`expected ['max-age=31536000, immutable'] to deeply equal ['no-store']`) and the lookalike-path case (`/_app/version.json` keeps the upstream value). Green today: `/_app/immutable/x.js` keeps the upstream value (both sites) and the Service-Worker 403 case.
 Controls: today's Caddyfile plus the ruling's snippet and two imports (temporary, reverted) makes all 32 tests in `caddy-edge` and `caddy-adapt-edge` pass.
 Net new red: 17 (10 lint + 7 container), so 105 at the red gate.
+
+## Seceng build review, two findings on `check-report.sh` (`build-review.md` @ 0c687af7)
+
+`renovate-report.test.ts` rewritten: every fixture is the real report plus one change (32 tests; 12 red, 20 green).
+Finding 1, 5 red: top-level `problems`, repository `problems`, a dependency `warnings` object, a string, and one on the last dependency, each with
+every `updates` list empty, exit 0 "No update is due." today; wanted exit 2 with `problem|warning` on stderr.
+Finding 2, 7 red: the report without each of the five pins (postgres FROM, age regex, caddy builder, caddy runtime, xcaddy literal), without the
+whole regex manager, and without a whole Dockerfile exits 0; wanted exit 2 naming the pin.
+Green guards that keep the fix honest: the real due report (exit 1) and the real report emptied (exit 0); `skipReason: unknown-registry` on the dockerfile
+`age` entry stays clean; removing the dockerfile manager's own `age` entry stays clean (it is not a pin); a missing pin or a warning never hides an update (not 0).
+Not written: a static check of the expected-pin list against the two Dockerfiles ("adding a pin without listing it also fails"), because the list's home is devops's call; send the path and I add it.
