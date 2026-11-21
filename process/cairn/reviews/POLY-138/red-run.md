@@ -68,3 +68,10 @@ Re-run it against the built file at the green gate.
 ## Held for the Principal
 
 R10 test row and `caddy-cache` fixture (D3); the D1(b) workflow structure test. D2 proceeded as ruled (`caddy-log` refuses a site `log`).
+
+## D1(b) workflow test (added 2026-11-21)
+
+`tests/infra/renovate-workflow.test.ts`: 8 tests, all red on today's tree (`.github/workflows/renovate-check.yml` does not exist).
+Run against a compliant sample workflow (not committed) all 8 pass, and each of eight mutations turns exactly one test red:
+`pull_request_target` trigger, `contents: write`, `secrets.X` in checkout, image by tag, exit code swallowed, daily cron,
+`--dry-run=full`, no permissions block. Total red is now 84.

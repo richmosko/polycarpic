@@ -45,3 +45,20 @@ Static and lint tests run in the `lint` job (`tests/infra/vitest.config.ts`); co
 
 - F-QA1: R1's container test cannot tell a trusted forged header from the peer by value alone, because Caddy's default already overwrites `X-Forwarded-For` (M8). It passes on today's tree; the `X-Real-IP` and `Forwarded` assertions are what turn it red. Pinned by the adapt test and `caddy-xff`, not by the container.
 - F-QA2: a lint row for `edge-alias` on `links` also trips the existing `[links]` rule; both fire once built.
+
+## D1 option (b): the Renovate workflow (added 2026-11-21)
+
+`tests/infra/renovate-workflow.test.ts` pins `.github/workflows/renovate-check.yml` (the file name is pinned here; devops builds it).
+
+| Property | Red when (mutation run on a compliant sample) |
+|---|---|
+| file exists | no workflow |
+| `permissions` exactly `contents: read`, workflow level and any job | `contents: write`, or no permissions block |
+| no `secrets.*`, `secrets:` key, `RENOVATE_TOKEN`/`GH_TOKEN`/`GITHUB_TOKEN` | `${{ secrets.X }}` on the checkout |
+| triggers exactly `schedule` and `workflow_dispatch` | `pull_request_target` added |
+| one weekly cron (day-of-week set, day and month wild) | `* * *` daily |
+| Renovate image `renovate/renovate@sha256:<64 hex>` only | a tag |
+| `--platform=local` and `--dry-run=lookup` | `--dry-run=full` |
+| a run step fails when an update is due (a failing shell condition; no `|| true`, no `continue-on-error`) | the exit code swallowed |
+
+Follow-up: the last row is structural only. If devops puts the check in a script, tell qa its path and a behavioural test (a fixture log with and without a proposed branch) replaces it.
