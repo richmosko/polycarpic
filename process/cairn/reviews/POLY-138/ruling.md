@@ -376,3 +376,17 @@ The lint counts as a test any file matching `\.(test|spec)\.[cm]?[jt]sx?$` (`scr
 - **The gating R3 test** is qa's isolated one: the real Caddyfile's global block on a site with no `handle_errors`,
   upstream stopped; red when a marker appears, and it shows the M10 paths. The stack-level R3 tests (stopped,
   closed) stay as regression checks for zero markers; they pass with or without the filter and gate nothing.
+
+## Addendum 2 — Caddy digest bump now (F2 taken into this loop)
+
+- **Measured** (`docker buildx imagetools inspect --raw` on each index): builder `1b828679…` → `f9beaa5d…` and runtime
+  `0c2243ef…` → `4851e54a…` keep **every Linux platform manifest and attestation at the same digest** (amd64
+  `29f98311…`/`fc9cbc10…`, arm64 `f68d5c35…`/`9ee99810…`, and arm v6/v7, ppc64le, s390x). Only the two Windows
+  entries changed, and the runtime index gained `linux/riscv64`. On arm64: same `Created`, layer count (9 / 5) and env
+  (`GOLANG_VERSION=1.27.4`, `XCADDY_VERSION=v0.4.7`, `CADDY_VERSION=v2.11.9`).
+- So the Linux images we build from and ship are byte-identical. M3 (x/net replaced to 0.62.0) and M4 (checksum env)
+  hold by digest identity, with no rebuild needed to show it; R7's tests re-measure them at build-green.
+- **Ruling: bump now.** `infra/caddy/Dockerfile` takes `caddy:2.11.9-builder@sha256:f9beaa5ddbe7df6f26ebbcf9cbf44e05a1917b9bba464f0c3229038d7e2e6e13`
+  and `caddy:2.11.9@sha256:4851e54a46b206517c574821bb5cc67f170d2156041e9fbc4c9193b45e84a75b`. It changes nothing
+  we run, and the D1(b) check starts green, so its first red means a real update. Leaving it red would teach that a
+  red run can be ignored. F2 is closed by this.
