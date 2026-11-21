@@ -1,7 +1,7 @@
 ---
 id: POLY-138
 title: Caddy and edge follow-ups
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -72,3 +72,7 @@ PR opened: https://github.com/richmosko/polycarpic/pull/143. Awaiting Validate. 
 ### @team-lead — 2026-11-21
 
 Confirmed by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D2 stands, Caddy keeps no access log. Nothing in the build changes. Edge logging is looked at again with POLY-103.
+
+### @team-lead — 2026-11-21
+
+Validate passed; merging via PR #143. Closing. Follow-ups (ruling F1, F3 to F6, seceng's and qa's notes) are held for one filing PR after POLY-137 merges.
