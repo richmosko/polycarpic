@@ -122,3 +122,5 @@ I read `git diff main...2f65e869`. Everything here is code-read; I ran nothing, 
 - **R-12:** the cancel-link token is not redeemable from a database read.
 - **R-24:** the limits and the 15 s timeout, and their limit: a compromised service can `SET` its own timeout.
 - **R-25, R-26, R-28:** stale "until the mailer exists" text replaced. R-26 says the cap after 3 locks is deferred. R-28 states the mailbox residual.
+
+**Delta `c74a8920` (MAIL_FROM moved from compose to `host.env`): ACCEPT.** No code changed (`packages/config` is untouched), so `check.ts` still refuses a staging or production `auth` or `worker` without `MAIL_FROM`. `APP_ENV` is required and never defaulted, so the check cannot be skipped. `MAIL_FROM` is a non-secret sender address, now listed with `PUBLIC_ORIGIN` among D-1's non-secret host settings. `RESEND_API_KEY_FILE` and every other secret stay as files mounted per container in compose, and no secret moved.
