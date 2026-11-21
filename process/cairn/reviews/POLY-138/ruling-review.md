@@ -101,6 +101,15 @@ Two notes; neither changes the ruling:
 
 One condition on the build: the isolated test must read its global block from `infra/caddy/Caddyfile` at test time, not from a copy. A pasted copy would let the shipped filter drift while the gate stays green. I check this at the build review.
 
+## Delta review: Addendum 2 @ `04edd0f3e81140d794e175f2d13184098528db92`
+
+**ACCEPT.** I checked the claim myself. I ran `docker buildx imagetools inspect --raw` on all four index digests and compared each Linux platform manifest and attestation entry by digest:
+
+- **Builder** `1b828679…` against `f9beaa5d…`: identical.
+- **Runtime** `0c2243ef…` against `4851e54a…`: identical, except that the new index adds `linux/riscv64` and its attestation. Nothing was removed or changed.
+
+The amd64 and arm64 images we build from and ship are therefore byte-identical, and taking the new index digest adds no new code to our supply chain. R7's tests re-measure x/net and the checksum env at build-green.
+
 ## Follow-ups (the lead files after merge)
 
 - F5. The post-deploy probe or `provision-check` asserts that Caddy sees the real client address: an IPv4 bind, `userland-proxy` off, and the probe's own address echoed back (finding 1).
