@@ -803,3 +803,12 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Do not accept a backup code here — recommended by seceng: a found code plus the password could then sign in up to ten times but could not change the methods, and a password change would end it. About $6 cheaper (a guess). The cost falls on someone who loses a phone, who needs `reset-mfa`.
 **Approved by:** the Principal (2026-11-19), on the architect's and the lead's recommendation and against seceng's.
+
+### 2026-11-21 — A read-only weekly workflow runs Renovate
+**Decision:** A scheduled GitHub workflow with `contents: read`, no secrets, and the Renovate image pinned by digest looks up updates for the pinned Postgres, Caddy and `age` versions once a week and fails when one is due. A person makes the bump. Built in POLY-138 (ruling D1, option b).
+**Why:** nothing ran Renovate although SECURITY and INFRA said it did, and POLY-138 holds the Postgres server packages at the pinned minor, so this signal is the only way a Postgres security fix reaches the image. The workflow gives the signal without giving any party write access.
+**The risk accepted:** the signal is a failed scheduled run and its email, checked weekly; a fix can wait up to seven days before it is seen, and longer if the red run is ignored.
+**Alternatives considered:**
+- The Mend Renovate GitHub App — update PRs appear by themselves, but a third party gets write access to contents, PRs and workflows.
+- A manual monthly lookup from a runbook line — nothing automated, and easy to forget.
+**Approved by:** the Principal (2026-11-21), on the architect's, seceng's and the lead's recommendation.

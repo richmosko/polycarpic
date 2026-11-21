@@ -56,3 +56,7 @@ From POLY-150 (devops and seceng, 2026-11-20). This issue is a prerequisite for 
 ### @team-lead — 2026-11-21
 
 Feature started. Branch: `feature/poly-138-caddy-edge-follow-ups`. Runs in parallel with POLY-137.
+
+### @team-lead — 2026-11-21
+
+Decided by the Principal, 2026-11-21 (`process/DECISIONS.md`): ruling D1 is option (b), the read-only weekly Renovate workflow. qa writes its structure test as the ruling's D1 lists (`permissions: contents: read`, no `secrets.*`, `schedule` and `workflow_dispatch` only, the Renovate image by digest); devops builds it and words INFRA to match. D2 and D3 are still open.
