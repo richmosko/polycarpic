@@ -563,3 +563,20 @@ The amendments are made in place in POLY-137.md, in the same commit as this file
    qa's assertion (each key one of the four, and `methods`, `at` and `usable_at` present on a held add) already passes. Nothing changes in the tests.
 7. **The old helpers:** `sendMagicLink` and `sendSecondStepCode` are removed from `AuthInput` (R1.5), as qa's plan says. Moving the four helpers to `mailer` is part of the green gate.
 8. **R8 `/API/AUTH/...` on web: the 303 is accepted.** A signed-out caller meets the sign-in gate before any route. A 303 to `/sign-in?next=…` or a 404 both meet the rule, which is that the path is never treated as the auth tree, never proxied, and makes no auth or database call. qa's test, which accepts either, stands. The auth service's own answer stays 404.
+
+## Addendum 2: R7.1 corrected; S9 judgment rows; log fields
+
+1. **R7.1's premise was wrong.** The builder measured it, and the code-read reproduces it. `/sign-in/magic-link` always puts a `callbackURL` in the mailed link (`magic-link/index.mjs:105`, default `/`). So verify *throws* a redirect to it (`:209`), and the twoFactor after-hook's JSON (`two-factor/index.mjs:376-378`) never becomes the answer. The hook's `.two_factor` cookie is still set, and `setNewSession(null)` (`:340`) leaves no session cookie. A 200 with `twoFactorRedirect` happens only with no `callbackURL` (`:204`).
+2. **R7.1 is replaced.** On a `GET` to `/magic-link/verify`, the seam rewrites either shape to `302 Location: /sign-in/second-step?with=code`:
+   - (a) a 3xx whose `Set-Cookie` sets the two-factor cookie (`ctx.authCookies`' `two_factor` name, not a hard-coded literal) and sets no session-token cookie with a value;
+   - (b) a 200 JSON with `twoFactorRedirect === true`.
+
+   Every `Set-Cookie` is kept, the body is dropped, and `no-store` stays. A 3xx without that cookie (an ordinary signed-in redirect, or `passkeyOnlyHold`'s) is left alone. R7.2 adds two tests: the 302-shape case, and an ordinary magic-link sign-in with no second step, whose redirect is not rewritten.
+3. **S9, `email-verification.mjs:228, 260`:** class `with-session` is accepted. The sites sit behind `if (session)`, and with a session the handler runs `withAuthSession`.
+4. **S9, `sign-in.mjs:212` and `passkey/dist/index.mjs:485, 495`:** class `with-session` is **refused**. Its rule (the endpoint answers 401 without a session) is false for `/sign-in/social` and `/passkey/verify-registration`. A new class replaces it:
+   - **`refused-by-hook`,** with `refusal: {path, body}`.
+   - The test sends that body through `routePolicyHook` with a fake context and expects a 4xx: `{idToken: 'x'}` gives 400, and `{createSession: true}` gives 400 `create_session_refused` (`route-policy.ts:179-187`).
+   - The class is allowed for `createSession` and `setSessionCookie` only.
+
+   **This changes qa's test:** `dist-enumeration.test.ts` gains the class and its check.
+5. **Log fields:** `log.schema.json` gains `ms`, `deleted`, `sent` and `failed`. Each is an `integer` with `minimum: 0`; `ms` has `maximum: 86400000` and the counts have `maximum: 1000000`. They carry no string and no address. If `job` or `kind` is added too, each is an `enum` of exactly the values ruled in R5.2 and R1.7.
