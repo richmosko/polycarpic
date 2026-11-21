@@ -35,7 +35,7 @@ const ADDED_SUBJECT = 'A sign-in method was added to your polycarpic account';
 export const methodAddedHeldMail = (o: { methods: readonly Method[]; at: Date | string; until: Date | string; origin: string; cancelToken: string | null }): Body => {
   const head = `${was(o.methods, 'added')} as a second step for signing in to your polycarpic account on ${utc(o.at)}.\n\nIt will not work until ${utc(o.until)}, at least 24 hours from this email.\n\nIf you added it, you need do nothing.\n\n`;
   const tail = o.cancelToken === null
-    ? 'If you did not add it, someone else may be signed in as you. Sign in, remove it under Settings, Second step, change your password, and tell your operator.'
+    ? 'If you did not add it, someone else may be signed in as you. Sign in, remove it under Settings, Sign-in and second step, change your password, and tell your operator.'
     : `If you did not add it, someone else may be signed in as you. Cancel it before ${utc(o.until)}:\n\n${o.origin}/sign-in/cancel-method#${o.cancelToken}\n\nCancelling removes the new method and signs your account out on every device. Then change your password.`;
   return { subject: ADDED_SUBJECT, text: head + tail };
 };
