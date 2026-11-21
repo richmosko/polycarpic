@@ -153,7 +153,7 @@ describe('R5.2 mail.drain: one row, one mail', () => {
     const { mailer } = await drain([row('method_added', { methods: ['totp'], usable_at: '2026-11-22T18:04:30Z' })]);
     const t = mailer.sent[0].text;
     expect(t).not.toContain('cancel-method');
-    expect(t).toContain('If you did not add it, someone else may be signed in as you. Sign in, remove it under Settings, Second step, change your password, and tell your operator.');
+    expect(t).toContain('If you did not add it, someone else may be signed in as you. Sign in, remove it under Settings, Sign-in and second step, change your password, and tell your operator.');
   });
   it('a first set-up (no usable_at): never armed, and the mail says it works now  [red if: a first set-up is armed or told to wait]', async () => {
     const { mailer } = await drain([row('method_added', { methods: ['totp'] })]);
