@@ -183,3 +183,18 @@ I read the whole replacement against the tree, by reading the code; I ran nothin
   - At the build review I check each `log(` call's fields against that list.
 - **Item 8, the 303:** accepted. A signed-out `/API/AUTH/...` meets the sign-in gate, which redirects to our own `/sign-in?next=…` and makes no auth call.
   - **Note (not blocking):** add the same request **with a session** to `auth-pages-137.test.ts`. A signed-in caller passes the gate, so that case is the one that proves web never treats the path as the auth tree. Expect 404 and no call to the auth service.
+
+## 7. Addendum 2 at `71016dc1`
+
+**Verdict: ACCEPT.** I read `git diff bb2dd89f 71016dc1 -- …/ruling.md` and the hook at `71016dc1`, code-read only.
+
+- **R7.1, the held magic link.**
+  - The rewrite keys on the two-factor cookie, takes the name from `ctx.authCookies` rather than a hard-coded string, and requires that no session cookie with a value is set. That separates the held sign-in from an ordinary signed-in redirect.
+  - It also replaces a `Location` that came from the caller's `callbackURL` with our fixed path. That is a gain: the held browser never follows a URL the requester chose.
+  - The negative test (a sign-in with no second step is not rewritten) is the one that matters. Good.
+- **S9, `refused-by-hook`: right call.** A 401 without a session was not true for these two routes, so that class's claim was wrong for them. The hook does refuse both:
+  - `/sign-in/social` refuses any `idToken !== undefined` (`route-policy.ts:152`), so every shape is refused, including `null` and an object;
+  - `/passkey/verify-registration` refuses any truthy `createSession` (`:187`).
+  - Restricting the class to `createSession` and `setSessionCookie` is correct: a `createUser` site must still be `user-inserting` or `option-off`.
+- **Log fields:** bounded integers in a schema that rejects any undeclared field (`additionalProperties: false`, `packages/config/log.schema.json:7`), so no address can reach the log through them.
+  - **Note (not blocking):** `mail.failed`'s `status` and `kind`, and `mail.capped`'s `kind`, must also be declared. Undeclared fields are dropped, so the line would arrive without them. Declare `status` as an integer between 100 and 599, or null, and `kind` as an enum.
