@@ -103,3 +103,8 @@ whole regex manager, and without a whole Dockerfile exits 0; wanted exit 2 namin
 Green guards that keep the fix honest: the real due report (exit 1) and the real report emptied (exit 0); `skipReason: unknown-registry` on the dockerfile
 `age` entry stays clean; removing the dockerfile manager's own `age` entry stays clean (it is not a pin); a missing pin or a warning never hides an update (not 0).
 Added after the lead's note: a report built from the live Dockerfiles' pins (parsed at test time) must be clean and exit 2 without any one pin (red, 13 red in all), and a test that the Dockerfiles hold exactly five pins (green; goes red when a pin is added). Still open: a check of the list inside the script, if devops puts it in a file beside it.
+
+## Seceng delta review finding 3 (`build-review.md` @ 801822f7): a skipped pin
+
+`renovate-report.test.ts`: 10 red (each of the five pins with a `skipReason`, once with `contains-variable`/`disabled`/`invalid-value` and once with `unknown-registry`), all exit 0 today, wanted exit 2 naming the pin.
+Green guards: a null `skipReason` is clean; a skipped pin never hides an update on another pin; the dockerfile manager's own `age` entry with `unknown-registry` (not a pin) stays clean.

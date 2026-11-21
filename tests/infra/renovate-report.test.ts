@@ -186,6 +186,30 @@ describe('infra/renovate/check-report.sh', () => {
     });
   });
 
+  describe('finding 3: a pin that is present but skipped is not watched (seceng delta review @ 801822f7)', () => {
+    const REASONS = ['contains-variable', 'disabled', 'invalid-value', 'unknown-registry'];
+    it.each(PINS.flatMap((p, i) => [[...p, REASONS[i % 3]!], [...p, 'unknown-registry']] as const))('%s with skipReason %#', (_n, manager, file, pred, name, ...rest) => {
+      const reason = rest[0] as string;
+      const r = clean();
+      find(r, manager, file, pred).skipReason = reason;
+      const o = run(J(r));
+      expect(o.code).toBe(2); // red: the pin counts as present and nothing is due, so the run is green while that pin is unwatched
+      expect(o.err).toMatch(name);
+      expect(o.out).not.toMatch(/No update is due/);
+    });
+    it('a null skipReason on a pin is the same as none (clean)', () => {
+      const r = clean();
+      find(r, 'dockerfile', PG, (d) => d.depName === 'postgres').skipReason = null as unknown as string;
+      expect(run(J(r)).code).toBe(0); // red: a check that treats the key's presence as a skip
+    });
+    it('a skipped pin does not hide an update on another pin: not exit 0', () => {
+      const r = clean();
+      find(r, 'dockerfile', PG, (d) => d.depName === 'postgres').skipReason = 'contains-variable';
+      find(r, 'regex', CD, (d) => d.depName === 'caddy').updates = [{ newValue: '2.11.10' }];
+      expect(run(J(r)).code).not.toBe(0);
+    });
+  });
+
   describe('finding 2, the expected list against the two Dockerfiles (a pin added without listing it fails here)', () => {
     const src = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
     const FROMS = (rel: string) => src(rel).split('\n').filter((l) => /^FROM /.test(l));
