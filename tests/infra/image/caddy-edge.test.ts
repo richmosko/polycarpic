@@ -137,17 +137,42 @@ describe('R3: no token reaches the Caddy logs', () => {
   const m = () => randomBytes(8).toString('hex');
   const uris = (t: string) => [`/sign-up?invitation=${t}`, `/api/auth/reset-password/${t}?callbackURL=${t}`, `/api/auth/magic-link/verify?token=${t}`, `/api/auth/callback/google?code=${t}&state=${t}`];
   const logs = () => { const r = sh('docker', ['logs', CADDY]); return r.out + '\n' + r.err; };
-  const hit = (t: string, extra: string[] = []) => uris(t).forEach((u) => get(`app.${DOMAIN}`, u, [...extra, '-H', `Referer: https://app.${DOMAIN}/x?r=${t}`, '-H', `Authorization: Bearer ${t}`, '-H', `Cookie: s=${t}`]));
+  const hit = (t: string, extra: string[] = []) => uris(t).map((u) => get(`app.${DOMAIN}`, u, [...extra, '-H', `Referer: https://app.${DOMAIN}/x?r=${t}`, '-H', `Authorization: Bearer ${t}`, '-H', `Cookie: s=${t}`]).status);
 
-  it('a stopped upstream (dial failure, the 502 Caddy logs by default): no marker; the filtered paths are logged', { timeout: 240_000 }, () => {
+  // MEASURED 2026-11-21 (qa): with `handle_errors` in a site block (the ruled Caddyfile has it on both), Caddy writes NO
+  // log line for the dial-failure 502 at all; ruling M9 was measured without handle_errors. So on the real stack no marker
+  // can reach the log today, and the test below cannot be red on today's tree. The filter itself is exercised in the next
+  // test, on a site without handle_errors, with the real Caddyfile's global block.
+  it('a stopped upstream: every request is a 502 and no marker reaches docker logs', { timeout: 240_000 }, () => {
     const t = m();
     sh('docker', ['stop', WEB, AUTH]);
-    try { hit(t); } finally { sh('docker', ['start', WEB, AUTH]); sh('sleep', ['2']); }
-    const l = logs();
-    expect(l.includes(t), 'the marker appears in docker logs').toBe(false); // red: the full URI, Referer or a credential is logged
-    for (const p of ['/sign-up', '/api/auth/reset-password', '/api/auth/magic-link', '/api/auth/callback']) {
-      expect(l, `the filtered path ${p} is logged, so a silent log cannot pass`).toMatch(new RegExp(`"uri":"${p.replace(/\//g, '\\/')}"`)); // red: no log line, or the path is cut short or kept whole
-    }
+    let st: number[] = [];
+    try { st = hit(t); } finally { sh('docker', ['start', WEB, AUTH]); sh('sleep', ['2']); }
+    expect(st, 'every request got Caddy\'s 502').toEqual([502, 502, 502, 502]);
+    expect(logs().includes(t), 'the marker appears in docker logs').toBe(false); // red: the full URI, Referer or a credential is logged
+  });
+  it('the real global log block filters a dial-failure 502 that IS logged (a site without handle_errors): paths kept, tokens gone', { timeout: 240_000 }, () => {
+    const real = readFileSync(join(ROOT, 'infra', 'caddy', 'Caddyfile'), 'utf8');
+    const global = /^\{\n[\s\S]*?\n\}\n/.exec(real)?.[0] ?? '';
+    expect(global, 'a global options block').toMatch(/admin off/);
+    writeFileSync(join(dir, 'Filter'), `${global}\nhttp://:8080 {\n\treverse_proxy nowhere-${tag}:3000\n}\n`);
+    const name = `poly138filter${tag}`, port = PORT + 2000;
+    const run = sh('docker', ['run', '-d', '--name', name, '--network', NET, '-p', `127.0.0.1:${port}:8080`, '-v', `${dir}/Filter:/etc/caddy/Caddyfile:ro`, IMG]);
+    expect(run.code, run.err).toBe(0);
+    try {
+      const t = m();
+      sh('sleep', ['3']);
+      const st = uris(t).map((u) => Number(/^HTTP\/\S+ (\d+)/.exec(sh('curl', ['-sS', '-i', '--max-time', '40', '-H', `Referer: http://x/?r=${t}`, '-H', `Cookie: s=${t}`, '-H', `Authorization: Bearer ${t}`, `http://127.0.0.1:${port}${u}`]).out)?.[1] ?? 0));
+      expect(st).toEqual([502, 502, 502, 502]);
+      const r = sh('docker', ['logs', name]);
+      const l = r.out + '\n' + r.err;
+      expect(l.includes(t), 'the marker appears in docker logs').toBe(false); // red: no filter, or a regexp that keeps the query or a path token
+      for (const p of ['/sign-up', '/api/auth/reset-password', '/api/auth/magic-link', '/api/auth/callback']) {
+        expect(l, `the filtered path ${p} is logged, so a silent log cannot pass`).toMatch(new RegExp(`"uri":"${p}"`)); // red: path cut short, kept whole, or not logged
+      }
+      expect(l, 'Referer removed').not.toMatch(/"Referer"/);
+      expect(l, 'Cookie and Authorization redacted by default').not.toMatch(/Bearer/);
+    } finally { sh('docker', ['rm', '-f', name]); }
   });
   it('an upstream that accepts and closes: no marker (Caddy may log nothing at the default level, which also passes)', { timeout: 240_000 }, () => {
     const t = m();
