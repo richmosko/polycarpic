@@ -11,7 +11,7 @@ labels: [ops, infra]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-20
+updated: 2026-11-21
 ---
 
 The committed, idempotent scripts INFRA §7.1 steps 7–11 call (D-7): create.sh, cloud-init, provision.sh and provision-check.sh. provision-check is the evidence for C-70, C-71, C-72, C-76, C-77 and C-79 (sshd from sshd -T, the C-79 set, spool holds only .age, Docker pools vs fixed subnets).
@@ -67,3 +67,12 @@ From the POLY-153 loop (architect's verdict §4, `process/cairn/reviews/POLY-153
 ### @team-lead — 2026-11-20
 
 From POLY-150 (seceng build-review, deviation 6). If the database ever runs on another host than the sign-in service (the Neon path), the deploy gate must check clock sync, or `noteTotpStepHook` must refuse instead of logging: a service clock 30 s ahead lets one sign-in code through a re-check.
+
+### @team-lead — 2026-11-21
+
+From POLY-137 and POLY-138 (both merged 2026-11-21). Deploy items for this issue or the first staging deploy:
+- Show on the deployed box that Caddy sees each visitor's real address: an IPv4 bind, `userland-proxy` off, and the probe's own address echoed back (POLY-138 F5; SECURITY C-04 says the address is trusted only once this is shown).
+- `MAIL_FROM` reaches `auth` and `worker` from `/etc/polycarpic/host.env` (INFRA D-1); nothing in the repo delivers it, and both services refuse to start without it.
+- Resend: the sending domain with open and click tracking off; two sending-only keys, one per service; key rotation; SPF, DKIM and DMARC `p=reject` (INFRA §6.1).
+- Runbook: only a database superuser can correct a user's email (seceng N2); a notice that cannot be delivered keeps its method held; an alert when the worker's `job.run` lines stop.
+- INFRA §7.1 describes a prod maintenance page that the Caddyfile does not have (POLY-138 F4).
