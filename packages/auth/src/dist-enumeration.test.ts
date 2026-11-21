@@ -9,7 +9,7 @@
 import { existsSync, readdirSync, readFileSync, realpathSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..', '..', '..');
@@ -172,6 +172,9 @@ const optionAt = (o: any, path: string) => path.split('.').reduce((v: any, seg) 
 }, o);
 
 describe('B. S9 on the real tree', () => {
+  // handler.ts and options.ts pull in better-auth, the db pools and the config loader: the first import is cold on a CI runner and exceeded a test's 5 s
+  // (the unit job at 2f65e869). Warm them once, with room, as apps/auth's seam.test does; the tests below then run on warm modules.
+  beforeAll(async () => { await import('./route-policy.ts'); await import('./options.ts'); await import('./handler.ts'); }, 120_000);
   it('the fixture packages/auth/src/dist-sites.json exists  [red if: the fixture is missing, so any upgrade merges unreviewed]', () => {
     expect(existsSync(join(HERE, 'dist-sites.json'))).toBe(true);
   });
