@@ -10,10 +10,11 @@ paths: [process/cairn/issues/POLY-138.md, process/cairn/reviews/POLY-138/**, pro
 stage: plan
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2
-actual.cost_usd: null
-actual.tokens: null
-actual.gate_cycles: 1
-actual.wall_clock: 25
+actual.cost_usd: "0.1556"
+actual.tokens: 536101
+actual.gate_cycles: 2
+actual.wall_clock: 54
+ratio: "0.04"
 labels: [ops, security]
 priority: null
 pr: null
