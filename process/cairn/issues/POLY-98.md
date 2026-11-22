@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-98.md, process/cairn/reviews/POLY-98/**, infra/ops/**, infra/operator/**, infra/provision.sh, infra/provision-check.sh, infra/postgres/**, infra/compose/**, infra/README.md, infra/lint/**, infra/ci/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, pnpm-lock.yaml, .gitignore]
 labels: [ops, cli]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/149
 created: 2026-11-08
 updated: 2026-11-22
 ---
@@ -89,3 +89,7 @@ Gate 4 (verdict): process/cairn/reviews/POLY-98/verdict.md on a3e97748. PASS on 
 ### @team-lead — 2026-11-22
 
 Verdict condition C1 met at `61d303c6` (devops-engineer, `docs/INFRA/index.html` only); architect-98 confirmed by message on 2026-11-22 that both phrasings carry no development status, so the verdict stands as an unconditional PASS on `a3e97748` plus that docs commit. Stage sub-issues 98a-98e closed.
+
+### @team-lead — 2026-11-22
+
+PR opened: https://github.com/richmosko/polycarpic/pull/149. Full CI run 45074055392 green at `13619aa9` (provision 112 s, db 256 s, image 306 s); merge state CLEAN. Awaiting the Principal's merge decision.
