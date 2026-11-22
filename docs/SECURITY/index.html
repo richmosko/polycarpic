@@ -1429,7 +1429,7 @@ host  replication  all          all                reject</code></pre></li>
       </ul></li>
     <li><strong>C-82 Scanning.</strong>
       <ul>
-        <li>gitleaks runs in CI and as a pre-commit hook. In CI it runs on every PR, outside the change filter, so a docs-only PR is scanned too. A <code>.gitleaksignore</code> entry is one exact fingerprint (commit, file, rule and line), never a path, a rule or a wildcard. It carries a comment naming why the value is not a secret and the issue that reviewed it, and seceng reviews each entry. Two entries exist: a dummy test secret in <code>tests/db/second-step-screens.test.ts</code>, and a fixture <code>HCLOUD_TOKEN</code> value in <code>tests/infra/image/provision-create.test.ts</code>.</li>
+        <li>gitleaks runs in CI and as a pre-commit hook. In CI it runs on every PR, outside the change filter, so a docs-only PR is scanned too. A <code>.gitleaksignore</code> entry is one exact fingerprint (commit, file, rule and line), never a path, a rule or a wildcard. It carries a comment naming why the value is not a secret and the issue that reviewed it, and seceng reviews each entry. Three entries exist: a dummy test secret in <code>tests/db/second-step-screens.test.ts</code>, a fixture Hetzner token value in <code>tests/infra/image/provision-create.test.ts</code>, and a quotation of that fixture in a review note.</li>
         <li>CodeQL (JS/TS) runs on PRs. Not yet built: POLY-102 builds it, and until then this line is a target, not a control in force.</li>
         <li>Trivy scans images and fails the build on fixable critical or high findings and on embedded secrets.</li>
         <li>Each release carries a CycloneDX SBOM.</li>

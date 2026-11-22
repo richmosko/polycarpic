@@ -72,8 +72,9 @@ It also says that any other WAIT, or a WAIT naming `staging`, is a finding. Othe
 
 ## gitleaks entry
 
-`df6ed743…:tests/infra/image/provision-create.test.ts:generic-api-key:31` was read at that commit. The line is
-`HCLOUD_TOKEN=tok-FIXTURE-1234`, in the test that `create.sh` refuses a token in the environment. That is a 16-character
-fixture with the word FIXTURE in it, passed only to the fake `hcloud`. A Hetzner API token is 64 random characters, so
-this is not one. The line was replaced later (`c61d6b68`), and history is not rewritten. Added to `.gitleaksignore` as
-one exact fingerprint, with its reason. SECURITY's gitleaks paragraph now names both entries.
+`df6ed743…:tests/infra/image/provision-create.test.ts:generic-api-key:31` was read at that commit. The line sets the
+Hetzner token variable to a 16-character fixture string with the word FIXTURE in it, in the test that `create.sh`
+refuses a token in the environment. Only the fake `hcloud` receives it. A Hetzner API token is 64 random characters,
+so this is not one. The line was replaced later (`c61d6b68`), and history is not rewritten. Added to
+`.gitleaksignore` as one exact fingerprint, with its reason. A second entry covers this note's earlier wording at
+`59662a5f`, which quoted the same fixture. SECURITY's gitleaks paragraph names all three entries.

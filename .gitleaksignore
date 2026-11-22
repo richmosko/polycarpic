@@ -9,3 +9,7 @@
 # refuses HCLOUD_TOKEN in the environment. Not a Hetzner token (those are 64 random characters); it reaches only the
 # test's fake hcloud and protects nothing. The line was replaced later; the commit stays in history.
 df6ed74352bcff1f0486994fdbc37d694ff5f860:tests/infra/image/provision-create.test.ts:generic-api-key:31
+
+# POLY-97 (seceng-97): build-review.md at 59662a5f quoted the same fixture as the entry above while recording that review.
+# It is a quotation of a fixture, not a secret; the next commit rewords the line.
+59662a5f983706a05187b3fa01ed1e6b915738fa:process/cairn/reviews/POLY-97/build-review.md:generic-api-key:76
