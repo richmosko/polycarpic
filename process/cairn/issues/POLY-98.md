@@ -77,3 +77,7 @@ Gate: build green (98c). Sha 5a6ed6ca: ops unit 152, operator 93, provision cont
 ### @qa-engineer — 2026-11-22
 
 Gate: build green (98c), re-run on 2255a499 (devops build d332d571 with B1-B4, plus my tests). ops unit 162, operator 93, provision container config 153 (ops.test.ts 23: incl. B1 early-value pty, B4 pasted-secret pty, G2 four real-Postgres cases), tests/ci 579, tests/infra 332, tests/layers 556: all green. 14 test commits since the red run, all mine, none loosened; the builder changed no test. Delta vs same-day main control: provision +1.7 s, ci/infra flat, ops unit 5.5 s. Detail: process/cairn/reviews/POLY-98/gate.md.
+
+### @qa-engineer — 2026-11-22
+
+Gate: build green (98c), final, on a3e97748 (devops build with B1-B5 and B2', plus my tests). ops unit 166, operator 93, provision container config 153, tests/ci 579, tests/infra 332, tests/layers 556: all green. Test changes since the red run: 15 commits, all mine, none loosened; the builder changed no test. G2 outputs and the main control carried over from the 2255a499 run (slots/revokes SQL unchanged); provision +3.4 s vs control. Detail in process/cairn/reviews/POLY-98/gate.md.
