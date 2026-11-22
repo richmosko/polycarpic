@@ -19,6 +19,7 @@ import base64
 import datetime
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -48,10 +49,9 @@ def real_transport(method, url, headers, body):
 
 
 def real_runner(argv, env=None, stdin=None):
-    try:
-        return subprocess.run(argv, env=env, input=stdin).returncode
-    except FileNotFoundError:
-        return 127
+    """Runs a command and returns (returncode, its output text). Raises FileNotFoundError when the program is missing."""
+    done = subprocess.run(argv, env=env, input=stdin, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    return done.returncode, done.stdout.decode("utf8", "replace")
 
 
 class ApiError(Exception):
@@ -264,21 +264,29 @@ def run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, e
     child["RCLONE_CONFIG_PROBE_ACCESS_KEY_ID"] = new["applicationKeyId"]
     child["RCLONE_CONFIG_PROBE_SECRET_ACCESS_KEY"] = new["applicationKey"]
     child["RCLONE_CONFIG_PROBE_NO_CHECK_BUCKET"] = "true"
+    code, text, error = None, "", None
     try:
-        code = runner(["rclone", "rcat", "--s3-no-head", target], env=child, stdin=b"x")
+        code, text = runner(["rclone", "rcat", "--s3-no-head", target], env=child, stdin=b"x")
+    except OSError as err:  # rclone missing or not runnable
+        error = err.__class__.__name__
     finally:
         call("POST", api + "b2_delete_key", hdr, {"applicationKeyId": new["applicationKeyId"]})
         del child, new
     out()
-    if code == 0:
-        out("PROBE: the writeFiles-only upload was accepted (%s). The box-key constant can be {writeFiles}: set b2-capabilities.json and recreate the put-only key." % target)
+    denied = bool(re.search(r"access ?denied|\b40[13]\b|not authori[sz]ed|forbidden|unauthori[sz]ed", text or "", re.I))
+    if error is None and code == 0:
+        out("PROBE: the writeFiles-only upload was accepted (%s): writeFiles alone is enough. The box-key constant can be {writeFiles}: set b2-capabilities.json and recreate the put-only key." % target)
         out("The probe object stays locked for 35 days; that costs next to nothing.")
-    elif code == 127:
-        out("PROBE: rclone is not installed here (exit 127); install it and run --probe again.")
+        result = 0
+    elif error is None and code != 0 and denied:
+        out("PROBE: the writeFiles-only upload was refused (access denied): listBuckets is needed. Keep listBuckets in b2-capabilities.json.")
+        result = 0
     else:
-        out("PROBE: the writeFiles-only upload was refused or failed (exit %s). Keep listBuckets in b2-capabilities.json." % code)
+        why = "rclone could not be run (%s)" % error if error else "rclone exited %s without a permission error" % code
+        out("PROBE: INCONCLUSIVE: %s. This says nothing about the capability set; fix the cause and run --probe again." % why)
+        result = 1
     out("The temporary key was deleted.")
-    return 0
+    return result
 
 
 if __name__ == "__main__":
