@@ -39,3 +39,7 @@ From the POLY-97 loop (ruling Scope, Addendum 1 S6; seceng positions 1a/1b; buil
 - Restore runbook F4 (`app.session_handle` restored with `session`) stays here.
 - Once the uploader's rclone flags are fixed here, `infra/operator/b2-setup.py --probe` reuses them.
 - No spool writer may `chmod` a spool file: a `chmod 0600` cancels the uploader's ACL (ruling M1).
+
+### @team-lead — 2026-11-22
+
+From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.md` R-a; ruling R7): `polycarpic-ops status` accounts for poly_backup connections by the windows in `jobs.log`, which the backup uid itself writes, so a compromised backup container could write a window covering its own connections (capped at 6 h by K9). Take the windows from a source root writes: the systemd unit start and stop times in the journal. The ruling's R7 also fixes the line formats the backup and uploader write to `jobs.log` and `last-upload`.

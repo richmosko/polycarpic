@@ -74,3 +74,7 @@ From the POLY-97 loop (ruling Scope): `env_file:` wiring of `/etc/polycarpic/hos
 ### @team-lead — 2026-11-22
 
 From the POLY-98 ruling (`process/cairn/reviews/POLY-98/ruling.md` M4, Scope): the `operator` compose service sets only `DB_PASSWORD_FILE`, while the config registry reads `DATABASE_PASSWORD_FILE` and the operator also needs `PUBLIC_ORIGIN` and `APP_ENV`. Add `operator` to the env wiring this issue owns. Until then `polycarpic-ops cli user invite` is proven against fakes only; the first live invite is POLY-104's. The GitHub-token-days `status` item is also this issue's.
+
+### @team-lead — 2026-11-22
+
+From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.md` R-b): the ops bundle is installed from the laptop's checkout, so the compose files `set-secret` and `cli` read can drift from the deployed release's. A drift misses a mount or runs a stale `operator` definition; it grants nothing. `self-update` installing from the attested release bundle is where they converge (ruling R1 leaves the `sha256-<12 hex>` id for it).
