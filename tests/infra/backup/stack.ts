@@ -34,7 +34,7 @@ export const R2_DUMP = /^(base|dump|globals)-([0-9]{2})-([0-9]{1,20})-([0-9]{8}T
 export const AGE_HEADER = 'age-encryption.org/v1';
 
 export type Stack = {
-  dir: string; cfg: any; canary: string; sys: string; major: string; identity: string; recipient: string;
+  dir: string; env: Record<string, string>; cfg: any; canary: string; sys: string; major: string; identity: string; recipient: string;
   vol: (d: Dir) => string;
   compose: (...a: string[]) => Res;
   superSql: (sql: string, db?: string) => string;
@@ -51,18 +51,39 @@ export type Stack = {
 /** Best-effort removal of everything this process's stack made; safe to call when setup failed half-way. */
 export function teardown() {
   sh('docker', ['rm', '-f', `${PROJECT}-bk`, `${PROJECT}-watch`]);
-  sh('docker', ['compose', '-p', PROJECT, 'down', '-v', '--remove-orphans'], { env: { POLY_POSTGRES_IMAGE: IMG } });
+  const label = `label=com.docker.compose.project=${PROJECT}`;
+  const ids = sh('docker', ['ps', '-aq', '--filter', label]).out.split('\n').filter(Boolean);
+  if (ids.length) sh('docker', ['rm', '-f', '-v', ...ids]);
+  const nets = sh('docker', ['network', 'ls', '-q', '--filter', label]).out.split('\n').filter(Boolean);
+  if (nets.length) sh('docker', ['network', 'rm', ...nets]);
+  sh('docker', ['rm', '-f', `${PROJECT}-b2`, `${PROJECT}-up`]);
   for (const d of DIRS) sh('docker', ['volume', 'rm', '-f', `${PROJECT}-${d}`]);
 }
 
-export function up(): Stack {
+/** uploader: true builds infra/backup/tools.Dockerfile; 'stub' uses qa's own tools image (harness self-tests of fake-b2 that need no uploader). */
+export type UpOpts = { uploader?: boolean | 'stub' };
+export const TOOLS_UP = 'poly99-tools-up:test';
+export const INSTANCE = 'poly-test';
+export const BUCKET = 'poly-test-bucket';
+export const S3_HOST = 's3.eu-fake-001.backblazeb2.com';
+export const KEY_ID = '0049fixturekeyid0000000001';
+export const APP_KEY = 'K004FIXTUREAPPLICATIONKEY00000000000';
+
+export function up(opts: UpOpts = {}): Stack {
   for (const [tag, ctx] of [[IMG, join(ROOT, 'infra', 'postgres')], [TOOLS, join(ROOT, 'tests', 'infra', 'backup', 'tools')]] as const) {
     const b = sh('docker', ['build', '-q', '-t', tag, ctx]);
     if (b.code !== 0) throw new Error(`docker build ${ctx} failed: ${b.err.slice(-500)}`);
   }
   const dir = mkdtempSync(join(tmpdir(), 'poly99-stack-'));
   chmodSync(dir, 0o755);
-  const env = { POLY_POSTGRES_IMAGE: IMG, POLY_BIND_ADDR: '127.0.0.1' };
+  const env: Record<string, string> = { POLY_POSTGRES_IMAGE: IMG, POLY_BIND_ADDR: '127.0.0.1' };
+  if (opts.uploader === 'stub') env.POLY_TOOLS_IMAGE = TOOLS;
+  else if (opts.uploader) {
+    // R4: the tools image is built here from infra/backup/tools.Dockerfile (context infra/backup); build.yml publishes it in POLY-100.
+    const b = sh('docker', ['build', '-q', '-t', TOOLS_UP, '-f', join(ROOT, 'infra', 'backup', 'tools.Dockerfile'), join(ROOT, 'infra', 'backup')]);
+    if (b.code !== 0) throw new Error(`docker build infra/backup/tools.Dockerfile failed: ${b.err.slice(-600)}`);
+    env.POLY_TOOLS_IMAGE = TOOLS_UP;
+  }
   const base = join(ROOT, 'infra', 'compose', 'prod.yml');
   const rendered = sh('docker', ['compose', '-f', base, '--profile', 'backup', '--profile', 'uploader', 'config', '--format', 'json'], { env });
   if (rendered.code !== 0) throw new Error(`compose config failed: ${rendered.err.slice(-500)}`);
@@ -76,6 +97,17 @@ export function up(): Stack {
   const identity = keygen.out + '\n';
   const recipient = sh('docker', ['run', '--rm', '-i', '--entrypoint', 'age-keygen', IMG, '-y'], { input: identity }).out.trim() + '\n';
 
+  // the fake's CA and server certificate, made at run time (R11); the uploader's CA bundle is replaced by this CA alone
+  mkdirSync(join(dir, 'pki'), { recursive: true });
+  const pki = sh('docker', ['run', '--rm', '-v', `${join(dir, 'pki')}:/pki`, '-w', '/pki', '--entrypoint', 'bash', TOOLS, '-c', [
+    'set -e',
+    'openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.crt -days 2 -subj /CN=poly99-test-ca 2>/dev/null',
+    `openssl req -newkey rsa:2048 -nodes -keyout srv.key -out srv.csr -subj /CN=${S3_HOST} 2>/dev/null`,
+    `printf 'subjectAltName=DNS:${S3_HOST}' > ext`,
+    'openssl x509 -req -in srv.csr -CA ca.crt -CAkey ca.key -CAcreateserial -out srv.crt -days 2 -extfile ext 2>/dev/null',
+    'chmod 0644 *.crt *.key',
+  ].join('\n')]);
+  if (pki.code !== 0) throw new Error(`pki failed: ${pki.err}`);
   const redirect = (p: string) => join(dir, p.replace(/^\//, ''));
   const SERVICES = ['postgres', 'backup', 'uploader'].filter((s) => cfg.services[s]);
   const ov: any = { services: {}, secrets: {}, volumes: {} };
@@ -93,9 +125,12 @@ export function up(): Stack {
       }
       const src = redirect(v.source);
       if (/age/.test(v.source)) { mkdirSync(dirname(src), { recursive: true }); writeFileSync(src, recipient); chmodSync(src, 0o644); }
+      else if (/ops\.conf$/.test(v.source)) { mkdirSync(dirname(src), { recursive: true }); writeFileSync(src, `B2_BUCKET=${BUCKET}\nB2_S3_ENDPOINT=https://${S3_HOST}\n`); chmodSync(src, 0o644); }
+      else if (/host\.env$/.test(v.source)) { mkdirSync(dirname(src), { recursive: true }); writeFileSync(src, `POLY_INSTANCE=${INSTANCE}\n`); chmodSync(src, 0o644); }
       else mkdirSync(src, { recursive: true });
       vols.push({ type: 'bind', source: src, target: v.target, read_only: ro });
     }
+    if (s === 'uploader') vols.push({ type: 'bind', source: join(dir, 'pki', 'ca.crt'), target: '/etc/ssl/certs/ca-certificates.crt', read_only: true });
     ov.services[s] = { volumes: vols };
   }
   const secretsDir = join(dir, 'etc', 'polycarpic', 'secrets');
@@ -105,7 +140,7 @@ export function up(): Stack {
     if (!def.file) continue;
     const f = redirect(def.file);
     mkdirSync(dirname(f), { recursive: true });
-    writeFileSync(f, `qa-${key}-fixture\n`);
+    writeFileSync(f, key.startsWith('backup_store_credential') ? `${KEY_ID}\n${APP_KEY}\n` : `qa-${key}-fixture\n`);
     ov.secrets[key] = { file: f };
     const svc = def.file.split('/').slice(-2)[0] as string;
     const gid = String(cfg.services[svc]?.user ?? '').split(':')[1];
@@ -124,7 +159,7 @@ export function up(): Stack {
   // The spool as POLY-99 provisions it (R10, C3). 10004 owns dump/ and premigration/; 10005 has r-x, never write.
   const spoolSetup = [
     'set -e',
-    'chown 999:999 /s/wal && chmod 0700 /s/wal',
+    'chown 999:999 /s/wal && chmod 0700 /s/wal && setfacl -m u:10005:r-x /s/wal && setfacl -d -m u::rwx,g::---,o::---,u:10005:r-x /s/wal',
     'for d in dump premigration; do',
     '  chown 10004:10004 /s/$d && chmod 0700 /s/$d',
     '  setfacl -m u:10005:r-x /s/$d && setfacl -d -m u::rwx,g::---,o::---,u:10005:r-x /s/$d',
@@ -198,10 +233,10 @@ export function up(): Stack {
   };
 
   return {
-    dir, cfg, canary, sys, major, identity, recipient, vol, compose, superSql, tools, ls, clearSpool, runBackup, startBackupContainer, watch,
+    dir, env, cfg, canary, sys, major, identity, recipient, vol, compose, superSql, tools, ls, clearSpool, runBackup, startBackupContainer, watch,
     down: () => {
       sh('docker', ['rm', '-f', BK, `${PROJECT}-watch`]);
-      compose('down', '-v', '--remove-orphans');
+      compose('--profile', '*', 'down', '-v', '--remove-orphans');
       rootRun('rm -rf /w/* 2>/dev/null; true');
       for (const d of DIRS) sh('docker', ['volume', 'rm', '-f', vol(d)]);
     },
