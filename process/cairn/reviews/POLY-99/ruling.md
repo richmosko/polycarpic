@@ -1,6 +1,8 @@
 # POLY-99 ruling: backup, uploader, restore, drill
 
-Architect, 2026-11-22. Tree read at `d1dae3438f982f3b01cd8393cc84f0c10c05de2b`. Scope: the description, five
+Architect, 2026-11-22. This replaces the ruling at `9f87a180` whole. It folds in seceng-99's prep positions
+(mapped in §S). Neither a review nor a test had used the earlier text. Tree read at
+`d1dae3438f982f3b01cd8393cc84f0c10c05de2b`. Scope: the description, five
 acceptance criteria and four comments on `POLY-99.md`; INFRA §2.2, §2.3, §6.1–§6.7, §8.10, D-13–D-15; SECURITY C-73,
 C-79; POLY-97 ruling, seceng positions 1a/1b, build review F-probe2; POLY-98 ruling R7 and review R-a; POLY-100's
 description. A claim is measured unless tagged `(unmeasured)`; §M lists the measurements (this Mac, Docker 29.9.3,
@@ -43,7 +45,8 @@ IN: R1–R13. OUT, with where each item goes:
 
 ## R1 — The backup container: `infra/backup/backup.sh`
 
-- Bash, `set -euo pipefail`, shellcheck clean. It runs in the Postgres derivative image (`POLY_POSTGRES_IMAGE`, the
+- Bash, `set -euo pipefail`, `ulimit -c 0`, shellcheck clean. There is no `tee` or process substitution in any
+  pipe, so `pipefail` sees every stage. It runs in the Postgres derivative image (`POLY_POSTGRES_IMAGE`, the
   same image as the server, INFRA §6.1a) as `10004:10004` on `backup-net`. Compose mounts it
   `../backup/backup.sh:/usr/local/bin/backup.sh:ro`. It holds `db_password_backup` and the age recipient only.
 - Connection: `PGHOST=postgres PGUSER=poly_backup PGDATABASE=polycarpic`; a `PGPASSFILE` in `/tmp` (tmpfs) carrying
@@ -64,7 +67,8 @@ IN: R1–R13. OUT, with where each item goes:
 - At start, each mode removes leftovers in its own `.inflight/` (the runner's lock, R5, makes it the only writer).
 - Never `chmod`, never `umask` other than for the passfile, never `chown` (POLY-97 M1).
 - Stdout: the last line on exit 0 is `published <dir> <TS> <sys> <name>…`. Nothing else goes to stdout. Exit codes:
-  0 published; 1 a step failed; 2 usage; 3 precondition.
+  0 published; 1 a step failed; 2 usage; 3 precondition. It writes nothing outside its two spool directories and
+  `/tmp`; every record is root's (R5).
 
 ## R2 — Spool name grammar (shared by backup, archive, uploader, restore)
 
@@ -87,51 +91,51 @@ wrong cluster's segment. The `.backup`, `.history` and `.partial` forms are what
 - **Who moves a segment out of `.inflight/`: archive-wal.sh itself**, by `ln` and then `rm`. No one else reads or moves
   `.inflight/`. A crash between `ln` and `rm` leaves a temporary that the next call for the same `%f` removes.
 - A crash after `ln` but before Postgres records the segment as archived makes the retry fail on the existing target
-  until the uploader has shipped and removed it (one minute at most). The retry then uploads a second version of that
+  until the segment has been shipped and root has removed it (about one minute). The retry then uploads a second version of that
   name. That is the one benign source of a two-version name, and restore treats it as an alert (R8), not as silence.
 
 ## R4 — The uploader: `infra/backup/upload.sh` and the tools image
 
+The uploader is the container that faces the internet, so it can **read** the spool and nothing more. It deletes
+nothing, writes no spool or state file and sends no ping. It reports what it verified, and root acts on the report
+(R5).
+
 - **Image:** `infra/backup/tools.Dockerfile`: `debian:bookworm-slim@sha256:…`, `ca-certificates`, `curl`, and rclone
   **v1.76.0** (the measured version) from the official release zip, checked against a SHA-256 pinned in the file. It is
   built in the tests here; `build.yml` publishes and attests it in POLY-100 (POLY-95 F3).
-- Bash, `set -euo pipefail`, shellcheck clean, as `10005:10005` on `upload-net`. It holds `backup_store_credential` (two
-  lines, POLY-97 R6) and `heartbeat_url` only, plus read-only mounts of `ops.conf` and `host.env` (both world-readable
-  already). It parses `B2_BUCKET`, `B2_S3_ENDPOINT` (R10's pattern) and `POLY_INSTANCE` by exact pattern, never by
-  `source`. rclone is configured from the environment (`RCLONE_CONFIG_B2_TYPE=s3`, `PROVIDER=Other`, `ENDPOINT`,
-  `NO_CHECK_BUCKET=true`, the two keys read from the file). No script carries an endpoint override.
+- Bash, `set -euo pipefail`, `ulimit -c 0`, shellcheck clean, as `10005:10005` on `upload-net`. It holds
+  `backup_store_credential` (two lines, POLY-97 R6) and nothing else secret, plus read-only mounts of the spool,
+  `ops.conf` and `host.env` (the last two are world-readable already). It parses `B2_BUCKET`, `B2_S3_ENDPOINT` (R10's
+  pattern) and `POLY_INSTANCE` by exact pattern, never by `source`. The rclone config (`type = s3`,
+  `provider = Other`, `endpoint`, `no_check_bucket = true`, the two keys) is written to `/tmp/rclone.conf` under
+  `umask 077` and passed with `--config`. No key goes into argv or the environment, and no script carries an endpoint
+  override.
 - **The exact upload argv**, one object per call, and the same for the `.sha256` sibling:
-  `rclone copyto <file> b2:<bucket>/<object> --no-check-dest --s3-no-head --s3-upload-cutoff 5G --retries 1
-  --low-level-retries 1`. Never `--ignore-checksum`, never `--s3-disable-checksum`. `b2-setup.py --probe` adopts this
-  argv (F-probe2): its `rcat` becomes `copyto` of a 1-byte file with these flags.
+  `rclone --config /tmp/rclone.conf copyto <file> b2:<bucket>/<object> --no-check-dest --s3-no-head
+  --s3-upload-cutoff 5G --retries 1 --low-level-retries 1`. Never `--ignore-checksum`, never `--s3-disable-checksum`.
+  `b2-setup.py --probe` adopts this argv (F-probe2): its `rcat` becomes `copyto` of a 1-byte file with these flags.
+  Single-part only, so `Content-MD5` covers the whole object and the response `ETag` is compared with it (M-U1, M-U4).
 - **Object name:** `<POLY_INSTANCE>/<M>/<dir>/<spool name>`, where `<dir>` is the spool subdirectory, and the major
-  in the path is the one in the name. The sibling `<object>.sha256` holds `<sha256 hex>  <spool name>\n`.
-- **Per run**, under the runner's lock (R5): for `wal/`, then `dump/`, then `premigration/`, every regular file
-  (never `.inflight/`, never a symlink, sorted by name):
-  1. Not matching R2 for its directory: **stray**. Exit 2 after the loop, file kept, nothing uploaded for it.
-  2. Its first 22 bytes are not `age-encryption.org/v1\n`: **refused** as stray. Over 5 GiB: refused (exit 1).
-  3. In `premigration/` with a `.sha256` sibling present: already uploaded; deleted with its sibling when its `<TS>`
-     is more than 7 days old, else skipped.
-  4. Upload the file; on success upload the sibling (from `/tmp`).
-  5. `wal/`, `dump/`: delete the spool file. `premigration/`: write the sibling into the spool beside it (its
-     uploaded marker; never chmod).
-  The first failed upload stops the run: the file stays, exit 1.
-- **Nightly set complete** = in this run a `globals-<M>-<sys>-<TS>` object was verified and no `base` or `dump` file of
-  the same `<sys>-<TS>` is left in `dump/`. Only then does it rewrite `last-upload` and ping success. WAL uploads do
-  neither: otherwise WAL alone would keep the 26-hour alert and the heartbeat green while the nightly set failed.
-- **`last-upload`** (format unchanged from POLY-98 R7): line 1 the completion time `YYYY-MM-DDTHH:MM:SSZ`, then the
-  three object names. It is a single-file bind mount, so it is written in place, without truncating first:
-  `printf … 1<> /state/last-upload`, then `truncate -s <len>`. A reader sees the old or the new line 1.
-- **Pings:** success → `<heartbeat_url>`; any exit 1 or 2 → `<heartbeat_url>/fail`. `curl -fsS -m 10 --retry 2
-  --config -`, URL on stdin, never in argv. `heartbeat_url` is the backup check's full ping URL. No file → no ping
-  (H13 already warns). A failed ping does not change the exit code.
-- **Exit:** 0 done (including nothing to do); 1 an upload refused or mismatched (S6(d)); 2 stray file; 3 config
-  missing (credential, endpoint, bucket, instance). It writes nothing to `jobs.log`.
+  in the path is the one in the name. The sibling `<object>.sha256` holds `<sha256 hex>  <spool name>\n`, built in
+  `/tmp`.
+- **Per run:** for `wal/`, then `dump/`, then `premigration/`, every regular file (never `.inflight/`, never a symlink,
+  sorted by name):
+  1. Not matching R2 for its directory: **stray**. Nothing is uploaded for it; exit 2 after the loop.
+  2. Its first 22 bytes are not `age-encryption.org/v1\n`: refused as stray. This guards against a bug, not an
+     attacker (S7). Over 5 GiB: refused (exit 1).
+  3. In `premigration/` with a `.sha256` sibling present: already uploaded, so skipped.
+  4. Compute the sha256 and upload the file, then the sibling.
+  5. Print `verified <dir> <name> <sha256 hex>` to stdout.
+  The first failed upload stops the run (exit 1).
+- **Stdout** carries only `verified` lines. **Exit:** 0 done (nothing to do included); 1 an upload was refused or
+  mismatched (S6(d)); 2 a stray file; 3 config missing (credential, endpoint, bucket, instance).
 
-## R5 — The host job runner: `polycarpic-ops backup …` and `polycarpic-ops upload`
+## R5 — The host job runner (root): `polycarpic-ops backup …` and `polycarpic-ops upload`
 
-New module `infra/ops/commands/backup.py` (with `upload` as its own `commands/upload.py`), in the POLY-98 house style:
-root, injected `ctx`, argv lists, fixed env, every K-condition.
+New modules `infra/ops/commands/backup.py` and `commands/upload.py`, in the POLY-98 house style (root, an injected
+`ctx`, argv lists, a fixed env, every K-condition). **Root writes every record the status, the alerts and the restore
+read:** `jobs.log`, `last-upload`, the premigration record and the spool siblings. The backup and uploader uids write
+none of them (closes R-a and S8(a) of the POLY-98 review).
 
 - `backup nightly|premigration`: `flock /run/polycarpic/backup.lock`, waiting at most 30 min (exit 4 if not got).
   Image = the running prod postgres container's `Config.Image` (as D3 takes it); none running → exit 3.
@@ -139,35 +143,61 @@ root, injected `ctx`, argv lists, fixed env, every K-condition.
   `docker compose -p polycarpic-prod -f /opt/polycarpic/ops/current/compose/prod.yml --profile backup run --rm
   --no-deps -T --name polycarpic-prod-backup backup /usr/local/bin/backup.sh <mode>` with `POLY_POSTGRES_IMAGE` set.
   Timeout 3 h (nightly) or 30 min (premigration); on timeout `docker rm -f` the named container. **After** the
-  container is gone (always, failures included), `t1`, and root appends `<t0> <t1> backup-<mode> ok|failed` to
-  `/var/lib/polycarpic/state/jobs.log`. On failure it pings `/fail` itself (root reads the uploader's `heartbeat_url`
-  file, curl `--config -`). On success it runs `systemctl start --no-block polycarpic-uploader.service`.
-- `upload`: non-blocking `flock /run/polycarpic/upload.lock` (busy → exit 0, the minute timer overlaps). Reads
-  `POLY_TOOLS_IMAGE` and `POLY_POSTGRES_IMAGE` (needed to render) from `/opt/polycarpic/images.env`, root 0644, lines
-  `NAME=<ref>@sha256:<64 hex>`; missing → exit 3. Runs the `uploader` service the same way and returns its exit code.
+  container is gone, failures included, root records `t1` and appends `<t0> <t1> backup-<mode> ok|failed` to
+  `/var/lib/polycarpic/state/jobs.log`.
+- On exit 0, root parses R1's `published` line, checks each named file is a regular file in the stated directory, and
+  computes **its own** sha256 of each. It appends `<sha256> <dir>/<name>` lines to
+  `/var/lib/polycarpic/state/spool.sha256` (root 0644; the **spool record**). A named file that is missing turns the
+  run into `failed`.
+- On failure it pings `<heartbeat_url>/fail`. Root reads `secrets/uploader/heartbeat_url` (the backup check's full
+  ping URL) and passes the URL to curl on stdin (`--config -`). On success it runs
+  `systemctl start --no-block polycarpic-uploader.service`.
+- `upload`: a non-blocking `flock /run/polycarpic/upload.lock` (busy → exit 0, since the minute timer overlaps).
+  It reads `POLY_TOOLS_IMAGE` and `POLY_POSTGRES_IMAGE` (the second only to render) from `/opt/polycarpic/images.env`,
+  root 0644, lines `NAME=<ref>@sha256:<64 hex>`; missing → exit 3. It runs the `uploader` service the same way and
+  reads its stdout. For each `verified <dir> <name> <sha>` line (any other line: ignored and counted as a fault):
+  - root recomputes the spool file's sha256. It must equal `<sha>`, and for `dump/` and `premigration/` it must also
+    equal the spool record. On a mismatch the file is kept, the run counts as failed, and the reason is printed.
+  - On a match: `wal/` and `dump/`, root deletes the file. `premigration/`, root writes the `.sha256` sibling beside
+    it (the uploaded marker).
+  - **Premigration prune:** a file with a sibling whose `<TS>` is more than 7 days old is deleted with its sibling by
+    root. Spool-record lines for files that are gone are dropped when the record is rewritten (tmp + rename).
+- **Nightly set complete** = in this run root confirmed a `globals-<M>-<sys>-<TS>`, and no `base` or `dump` of the
+  same `<sys>-<TS>` is left in `dump/`. Only then does root rewrite `last-upload` (POLY-98 R7 format: line 1
+  `YYYY-MM-DDTHH:MM:SSZ`, then the three object names; tmp + rename, root 0644) and ping `<heartbeat_url>`. WAL
+  uploads do neither, because WAL alone would otherwise keep the 26-hour alert and the heartbeat green while the
+  nightly set failed.
+- Uploader exit 1 or 2, or any root-side mismatch: ping `/fail`, exit 1. A failed ping does not change the exit code.
 - `backup list-premigration` and `backup fetch-premigration <name>`: R6.
-- **Units** in `infra/backup/systemd/`: `polycarpic-backup.service` (oneshot, `ExecStart=/usr/local/sbin/polycarpic-ops
-  backup nightly`, `TimeoutStartSec=4h`) with `.timer` (`OnCalendar=*-*-* 02:15:00 UTC`, `Persistent=true`), and
-  `polycarpic-uploader.service` (oneshot, `ExecStart=… upload`) with `.timer` (`OnCalendar=minutely`).
-  `provision.sh --stage host` installs the four files into `/etc/systemd/system/` and runs `daemon-reload`, **not
-  enabled**. POLY-100's first-deploy enables both timers once `images.env` exists. POLY-103 adds none of these.
+- **Units** in `infra/backup/systemd/`:
+  - `polycarpic-backup.service`: oneshot, `ExecStart=/usr/local/sbin/polycarpic-ops backup nightly`,
+    `TimeoutStartSec=4h`, with a `.timer` set to `OnCalendar=*-*-* 02:15:00 UTC` and `Persistent=true`.
+  - `polycarpic-uploader.service`: oneshot, `ExecStart=… upload`, with a `.timer` set to `OnCalendar=minutely`.
+  - `provision.sh --stage host` installs the four files into `/etc/systemd/system/` and runs `daemon-reload`, **not
+    enabled**. POLY-100's first-deploy enables both timers once `images.env` exists. POLY-103 adds none of these.
 - `install.sh`'s bundle `PATHS` gains `infra/backup` and `infra/postgres/archive-wal.sh`.
 
 ## R6 — The premigration contract (POLY-100 builds against this)
 
 - **Call:** as root on the box, `polycarpic-ops backup premigration`. Precondition: prod postgres running.
 - **Success:** exit 0, and the last stdout line is exactly
-  `premigration-set <TS> dump-<M>-<sys>-<TS>.age globals-<M>-<sys>-<TS>.age`. Both files are in
-  `/srv/polycarpic/spool/premigration/`; `jobs.log` has `<t0> <t1> backup-premigration ok`; the uploader has been
-  started. The deploy writes that line to `deploy.log` and migrates **only** on exit 0.
+  `premigration-set <TS> dump-<M>-<sys>-<TS>.age globals-<M>-<sys>-<TS>.age`. At that point:
+  - both files are in `/srv/polycarpic/spool/premigration/`;
+  - root has recorded their sha256 in the spool record;
+  - `jobs.log` has `<t0> <t1> backup-premigration ok`;
+  - the uploader has been started.
+  The deploy writes that line to `deploy.log` and migrates **only** on exit 0.
 - **Failure:** 1 the backup failed (nothing published); 3 not ready; 4 the lock was not got in 30 min (a nightly run
   holds it). The deploy does not migrate on any of them and alerts.
-- **Kept:** on the spool until 7 days after its `<TS>`, and never before its upload (R4 step 3); in the bucket for 35 days at
+- **Kept:** on the spool until 7 days after its `<TS>`, and never before its upload (R5); in the bucket for 35 days at
   `<instance>/<M>/premigration/<name>`.
-- **Found by restore:** `ssh <user@host> sudo polycarpic-ops backup list-premigration` prints one line per complete
-  set, oldest first: `<TS> <dump name> <globals name> uploaded|pending`. `… fetch-premigration <name>` checks the name
-  against R2, opens `spool/premigration/<name>` with `O_NOFOLLOW`, requires a regular file, and writes its bytes to
-  stdout. Nothing else on the box takes part, and neither command reads a secret.
+- **Found by restore:**
+  - `ssh <user@host> sudo polycarpic-ops backup list-premigration` prints one line per complete set, oldest first:
+    `<TS> <dump name> <dump sha256> <globals name> <globals sha256> uploaded|pending`. The sha256 values come from
+    root's spool record.
+  - `… fetch-premigration <name>` checks the name against R2, opens `spool/premigration/<name>` with `O_NOFOLLOW`,
+    requires a regular file, and writes its bytes to stdout.
+  - Nothing else on the box takes part, and neither command reads a secret.
 
 ## R7 — `infra/restore.sh` (runs on the laptop, decrypts there only)
 
@@ -176,26 +206,45 @@ restore.sh --identity <age key file> --premigration --from-box <user@host> [--se
 restore.sh --identity <age key file> --read-credential <file> --bucket <name> (--base | --dump) [--instance <i>] [--before <UTC>]
 ```
 
-- Decryption is `age -d -i <identity>` in a local process. The identity file is read only by that process, is never
-  given to `ssh`, `scp` or `docker`, and must be mode 0600 or tighter, or the script exits 2. Only `list-premigration`
-  and `fetch-premigration` are ever sent over ssh.
-- **From the box:** the newest set, or `--set`. With `--read-credential`, each fetched file's sha256 must equal the
-  bucket sibling of the **first** version of its object, and that object must have exactly one version; otherwise
-  exit 4. Without it, or while the set is `pending`, it prints `WARN not cross-checked against the bucket` (§D1).
+- **Process hygiene:** `ulimit -c 0`, `umask 077`, `set -euo pipefail`. The identity file is passed by path only,
+  never by argv to a child other than `age -d -i <path>`, never in the environment. It must be mode 0600 or tighter,
+  or the script exits 2. Decryption is a local `age -d` process.
+- **ssh:** `ssh -a -x -o ForwardAgent=no -o ClearAllForwardings=yes -o BatchMode=yes`. Only `list-premigration` and
+  `fetch-premigration <name>` are ever sent.
+  - Every name and TS that comes back from the box is checked against R2 and `^[0-9]{8}T[0-9]{6}Z$` **before** any
+    command uses it. A line that fails is refused (exit 5): through `sudo`, a box-supplied name is input to root.
+  - Bytes outside 0x20–0x7E are replaced with `?` before any box output is printed.
+- **From the box:** the newest set, or `--set`. The sha256 of each fetched file must equal the root spool record that
+  `list-premigration` printed, or exit 4. With `--read-credential`, the file must also equal the bucket sibling of the
+  **first** version of its object, and that object must have exactly one version, or exit 4. Without that check, or
+  while the set is `pending`, it prints `WARN not cross-checked against the bucket` (§D1).
 - **From the bucket:** B2's native API with the read key (`b2_list_file_versions`, `b2_download_file_by_id`), Python
-  stdlib in `infra/backup/b2read.py`, no rclone. It picks a **version** (`fileId`), never a name. A name with more than
-  one upload version, or any `hide` action, refuses the selection (exit 3) and prints each one with its upload time,
-  unless `--before <UTC>` is given. Then it takes the newest version uploaded before that time and prints `WARN`. The
-  sha256 sibling (same rule) must match the download, or exit 4.
+  stdlib in `infra/backup/b2read.py`, no rclone. It picks a **version** (`fileId`), never a name.
+  - A name with more than one upload version, or any `hide` action, refuses the selection (exit 3). Each version is
+    printed with its upload time.
+  - With `--before <UTC>`, it takes the newest version uploaded before that time instead, and prints `WARN`.
+  - The sha256 sibling, chosen by the same rule, must match the download, or exit 4.
+- **Replay check** (seceng R3), on every chosen artifact:
+  - The time inside the archive must lie within 15 min of the name's `<TS>`, or exit 4. That time is
+    `pg_restore -l`'s "Archive created at" for a dump, and `backup_label`'s `START TIME` for a base.
+  - An upload time earlier than `<TS>` is also exit 4.
+  - An upload more than 48 h after `<TS>` prints `WARN late upload`.
 - `--base`: the newest complete nightly set, then every `wal-<M>-<sys>-…` version from the base's start to the
   newest, chosen by the same rule. `--dump`: the dump and globals of the newest set.
-- **Only into a throwaway Postgres:** it always starts its own container from the image in
-  `infra/postgres/Dockerfile`'s `FROM` line, `--network none`, no bind mount, input by `docker cp` and
-  `docker exec -i`. It reads no `PG*` variable and takes no host or port flag. Globals first, then `pg_restore` of the
-  whole dump (never `--data-only`, so INFRA's F4 holds: `app.session_handle` comes with `session`), or the base with a
-  `restore_command` reading the decrypted WAL inside the container. It prints the container name and the `docker exec`
-  line to reach it. The decrypted files sit in a `mktemp -d` directory removed on exit, unless `--keep`.
-- **Exit:** 0 restored; 1 restore failed; 2 usage; 3 selection refused; 4 integrity; 5 the box or bucket refused.
+- **Only into a throwaway Postgres:** it always starts its own **separate cluster** in a container, never a database
+  inside a running cluster:
+  - The image comes from `infra/postgres/Dockerfile`'s `FROM` line.
+  - The container runs with `--network none --cap-drop ALL --security-opt no-new-privileges --user 999:999`, with no
+    bind mount and no secret. Input goes in by `docker cp` and `docker exec -i`. That this set starts Postgres is
+    `(unmeasured)`, and qa pins it.
+  - It reads no `PG*` variable and takes no host or port flag.
+  - Globals go in first, then `pg_restore` of the whole dump. It is never `--data-only`, so INFRA's F4 holds:
+    `app.session_handle` comes with `session`. A base is restored with a `restore_command` reading the decrypted WAL
+    inside the container.
+  - It prints the container name and the `docker exec` line to reach it.
+  - The decrypted files sit in a `mktemp -d` directory, removed on exit unless `--keep`.
+- **Exit:** 0 restored; 1 restore failed; 2 usage; 3 selection refused; 4 integrity or replay; 5 the box or bucket
+  refused, or a box line failed validation.
 
 ## R8 — `infra/drill.sh` (the §6.7 assertions)
 
@@ -214,41 +263,62 @@ restore.sh --identity <age key file> --read-credential <file> --bucket <name> (-
 | DR7 | The row count of every FORCE-RLS table equals between the dump and the base restores |
 | DR8 | No `public.session` row lacks an `app.session_handle` row (F4) |
 | DR9 | Trial balance sums to zero per entity; the hash-chain verifier passes; the newest journal entry is within 20 min of the drill's start. SKIP while the schema has no ledger (today) |
+| DR11 | R7's replay check on every chosen artifact (archive time vs name vs upload time) |
 | DR10 | With the box credential: deleting an object, uploading over an existing version, shortening a retention, changing the bucket default retention are each refused |
 
 Last line `DRILL PASSED` (exit 0), `DRILL PASSED WITH SKIPS: <ids>` (exit 3) or `DRILL FAILED: <ids>` (exit 1); usage
 2. `--report` writes the date, object names and fileIds, timings and results as markdown for the lead to file. The
 GA gate (POLY-116) accepts exit 0 only. Scratch containers are removed on exit.
 
-## R9 — `jobs.log` windows: root-written, and the status reader
+## R9 — Records root writes, and the status readers
 
-- seceng's R-a is closed in this loop, not by the journal but by the same trust: **the windows are written by root.**
-  The runner (R5) writes `backup-nightly` and `backup-premigration` lines; provision-check writes `provision-check-d3`
-  as built. No container mounts `jobs.log` (it is not mounted today). Why not journal parsing: the runner's window
-  covers the whole container lifetime by construction (written after `docker rm -f`), keeps the R7 line format and
-  reader, and is testable without systemd as PID 1. The journal gives the same root trust and adds parsing of
-  systemd message ids.
-- `provision.sh`: `jobs.log` becomes `0:0` 0644 (an existing 10004-owned file is chowned). `last-dump` has no reader
-  and is no longer created; an empty one is removed (`change:` line).
-- **`infra/ops/status/05_backupdb.py`** changes: RED `jobs.log is not root-written` when the file's uid is not 0 or
-  its mode has group or other write. `CAPS` gains `backup-premigration: 3600`; `backup-nightly` keeps the 6 h default.
-  **`04_backup.py` does not change**: same path, same line 1; it now means "last complete nightly set" (R4).
+- seceng's R-a is closed in this loop by root writing the windows. The journal is not parsed for them:
+  - The runner (R5) writes the `backup-nightly` and `backup-premigration` lines; provision-check writes
+    `provision-check-d3`, as built.
+  - No container mounts anything under `/var/lib/polycarpic/state` (R10).
+  - Why not the journal: it carries the same root trust. The runner's window covers the whole life of the container by
+    construction, because it is written after `docker rm -f`. It keeps POLY-98 R7's line format and reader, and it is
+    testable without systemd as PID 1.
+- `provision.sh`: `jobs.log` and `last-upload` become `0:0` 0644 (an existing file is chowned); it also creates an
+  empty `spool.sha256`, `0:0` 0644. `last-dump` has no reader and is no longer created; an empty one is removed (with a
+  `change:` line).
+- **`infra/ops/status/05_backupdb.py`:** RED `jobs.log is not root-written` when the file's uid is not 0 or its mode
+  has group or other write. `CAPS` gains `backup-premigration: 3600`; `backup-nightly` keeps the 6 h default.
+- **`infra/ops/status/04_backup.py`:** the same check on `last-upload`, which is RED `last-upload is not root-written`.
+  Its path and its line 1 do not change, but line 1 now means "the last complete nightly set" (R5).
 
 ## R10 — Compose, lint, provisioning
 
-- `prod.yml` `backup`: add the `backup.sh` mount. `uploader`: replace `/srv/polycarpic/uploader-state:/state` with
-  `/var/lib/polycarpic/state/last-upload:/state/last-upload`; add `../backup/upload.sh:/usr/local/bin/upload.sh:ro`,
-  `/etc/polycarpic/ops.conf:/etc/uploader/ops.conf:ro` and `/etc/polycarpic/host.env:/etc/uploader/host.env:ro`. No
-  new interpolated variable: compose interpolates every service whatever its profile, so a `${…:?}` here would fail
-  every prod render and every deploy `up`. `postgres`: no change (archive-wal.sh is mounted already).
-- `infra/lint/policy.json` mount allowlists follow; new lint rule: no service but `uploader` mounts anything under
-  `/var/lib/polycarpic/state`, and that only as the one file.
-- `provision.sh --stage host`: creates `.inflight/` in `wal/`, `dump/` and `premigration/` with the parent's owner and
-  the same access and default ACLs; installs the units (R5); `--b2-endpoint <url>` writes `B2_S3_ENDPOINT=<url>`
-  (pattern `^https://s3\.[a-z0-9-]+\.backblazeb2\.com$`) into `ops.conf`; `polycarpic-ops provision` forwards it (K2).
-- `provision-check.sh`: H6 admits exactly `B2_BUCKET=` and `B2_S3_ENDPOINT=` lines; H7 covers the `.inflight/` dirs;
-  H8's 10-minute rule covers all three `.inflight/` dirs and admits `.sha256` in `premigration/` only; new **H16**: the
-  four unit files equal the bundle's copies (enabled-ness is POLY-100's line).
+- **`prod.yml`, `backup`:** add the `backup.sh` mount, and `tmpfs` `/tmp:size=1m` (enough for the passfile, too small to
+  stage a dump: seceng B1).
+- **`prod.yml`, `uploader`:**
+  - Mount `/srv/polycarpic/spool:/spool:ro`.
+  - Drop the `/srv/polycarpic/uploader-state` mount and the `heartbeat_url` secret: root pings (R5).
+  - Add `../backup/upload.sh:/usr/local/bin/upload.sh:ro`, `/etc/polycarpic/ops.conf:/etc/uploader/ops.conf:ro` and
+    `/etc/polycarpic/host.env:/etc/uploader/host.env:ro`.
+  - `tmpfs` `/tmp:size=1m`, which holds the rclone config and the sibling.
+  - No new interpolated variable. Compose interpolates every service whatever its profile, so a `${…:?}` here would
+    fail every prod render and every deploy `up`.
+- **`backup`, `uploader` and `postgres`:** `ulimits: {core: 0}`. The root disk is not on LUKS, and a core file holds
+  plaintext (seceng B3).
+- **`infra/lint/policy.json`:** the mount allowlists follow. New rules:
+  - no service mounts anything under `/var/lib/polycarpic/state`;
+  - `uploader`'s spool mount is read-only;
+  - those three services set `core: 0`;
+  - `backup`'s and `uploader`'s `/tmp` carry a size of at most 1m.
+- **`provision.sh --stage host`:**
+  - The spool ACL for 10005 becomes **`r-x`**, both access and default, on `wal/`, `dump/` and `premigration/` and
+    their `.inflight/`. It is no longer `rwx`: only root deletes. 10005's effective rights on a created file are
+    then `r--` (unmeasured for `r-x`; POLY-97 M1 measured `rwx`; qa pins it).
+  - It creates `.inflight/` in each of the three, with the parent's owner and ACLs.
+  - It installs the units (R5).
+  - `--b2-endpoint <url>` writes `B2_S3_ENDPOINT=<url>` into `ops.conf`, matching
+    `^https://s3\.[a-z0-9-]+\.backblazeb2\.com$`. `polycarpic-ops provision` forwards the flag (K2).
+- **`provision-check.sh`:**
+  - H6 admits exactly the `B2_BUCKET=` and `B2_S3_ENDPOINT=` lines.
+  - H7 asserts the new ACLs and covers the `.inflight/` dirs.
+  - H8's 10-minute rule covers all three `.inflight/` dirs, and admits `.sha256` in `premigration/` only.
+  - New **H16**: the four unit files equal the bundle's copies. Whether they are enabled is POLY-100's line.
 
 ## R11 — Test seams (qa builds these; the builder builds to them)
 
@@ -267,15 +337,16 @@ GA gate (POLY-116) accepts exit 0 only. Scratch containers are removed on exit.
 - **Scratch stack:** the derivative image built from `infra/postgres/Dockerfile`, the prod `postgresql.prod.conf` and
   `pg_hba.prod.conf`, `roles.sql` applied, poly_backup's password set; `backup` and `uploader` started from the
   **rendered `prod.yml` service definitions**, with only image refs and host paths overridden.
-- **Spool watcher:** `inotifywait -m -r` on the spool (`CREATE`, `CLOSE_WRITE`, `MOVED_TO`) in a side container. Each
+- **Spool watcher:** `inotifywait -m -r` on the spool and on the backup container's `/tmp` (`CREATE`, `CLOSE_WRITE`,
+  `MOVED_TO`) in a side container. In `/tmp`, nothing but the passfile may appear. In the spool, each
   created name must match R2 or the `.inflight` temporary form. Each closed file must start with the age header and
   must not contain the canary (a unique string the stack inserts into a FORCE-RLS table).
 
 ## R12 — The thin slice, then the rest
 
 **Slice 0 (green before qa writes the rest):** `backup.sh nightly` against the scratch stack. It must publish exactly
-three R2 names in `spool/dump/`, each giving 10005 an effective `r` (`getfacl`). The watcher must see no plaintext,
-and the R1 stdout line must be printed. qa commits the stack, the watcher and this one test first; the builder makes
+three R2 names in `spool/dump/`, each giving 10005 an effective `r--` (`getfacl`). The watcher must see no
+plaintext, and the R1 stdout line must be printed. qa commits the stack, the watcher and this one test first; the builder makes
 it green; qa's contract pins (anything here the builder needs pinned further) go in that same first commit.
 
 **Security-bearing behaviours, each red on the fault, green on the fix. The fault is a mutant copy of the script
@@ -287,7 +358,7 @@ under test or a planted file; never a fake of the script under test:**
 | T2 | All or nothing | `postgres` stopped during `pg_dump`: nothing published, `.inflight/` empty; a mutant without `pipefail` publishes a truncated file |
 | T3 | Backup has no route out, no bucket key | from the rendered backup service: TCP to fake-b2 fails; the lint SC cases already cover the mounts. Red: the same network with `internal: false` connects |
 | T4 | Uploader has no DB credential or route | TCP to `postgres:5432` from the rendered uploader fails; no `db_password_*` in its mounts |
-| T5 | Mismatched checksum keeps the file and pings `/fail` | fake-b2 `etag`: exit 1, file still in the spool, `/fail` in fake-hc, no success ping, `last-upload` unchanged. Red: a mutant with `--ignore-checksum` |
+| T5 | Mismatched checksum keeps the file and pings `/fail` | fake-b2 `etag`: uploader exit 1, runner exit 1, file still in the spool, `/fail` in fake-hc, no success ping, `last-upload` unchanged. Red: a mutant uploader with `--ignore-checksum` |
 | T6 | No HEAD, no list | fake-b2's log over a full run holds PUTs only, plus at most one refused DELETE after a T5 mismatch (M-U4). Red: a mutant without `--no-check-dest`, and one without `--s3-no-head` (M-U2, M-U3) |
 | T7 | Refused upload fails loudly | fake-b2 `refuse`: exit 1, `/fail`, file kept |
 | T8 | Uploader never ships a non-age or stray file | a planted plaintext file with a valid name, and a `wal-…` name in `dump/`: exit 2, no PUT for it, `/fail` |
@@ -295,19 +366,25 @@ under test or a planted file; never a fake of the script under test:**
 | T10 | Restore picks a version | fake-b2 holds two versions of the dump (the newer one poisoned: a different canary) and a hide marker: exit 3 listing them; with `--before` the older fileId is downloaded and the restored canary is the original. Red: a mutant that takes the newest |
 | T11 | Restore only into a throwaway Postgres | with `PGHOST` pointing at a decoy Postgres: the decoy receives no connection. Red: a mutant honouring `PGHOST` |
 | T12 | Windows are root-written | status RED when `jobs.log` is owned by 10004 or group-writable (fixture), OK when root 0644 |
-| T13 | No chmod on spool files | after T1's run every published file gives 10005 `r`. Red: a mutant adding `chmod 0600` (H7 flags it too) |
+| T13 | No chmod on spool files | after T1's run every published file gives 10005 `r--`. Red: a mutant adding `chmod 0600` (H7 flags it too) |
+| T14 | The uploader cannot change the spool | from the rendered uploader service: creating, replacing or deleting a spool file fails (read-only mount, `r-x` ACL). Red: the same run with the mount `rw` |
+| T15 | Root deletes only what it verified | a fake uploader prints `verified` with a wrong sha, or for a file whose bytes differ from the spool record: root keeps the file, runner exit 1, `/fail`. (This fakes the uploader, which is not the unit under test here; the runner is.) Red: a mutant runner that deletes without the comparison |
+| T16 | Box-supplied names are validated | the box fixture's `list-premigration` returns a name carrying `;`, a newline or `$(…)`: restore exits 5 and sends no further ssh command. Red: a mutant without the check runs the name |
+| T17 | Replay is detected | a dump whose "Archive created at" is 2 h before its name's `<TS>`: restore exits 4. Red: a mutant without the check restores it |
 
 ## R13 — Acceptance text per stage
 
 **99c (tests red).** Slice 0 first, as R12. Then each case red for its own missing behaviour, asserting the message and
 exit code: R1's exit 3 per precondition, and the stdout line; R2's grammar over a table of good and bad names (each
 `.backup`, `.history`, `.partial` form; a name with `/`; an 8-digit major); R3's target name and the `exists` failure;
-R4's run order, sibling content, premigration skip and 7-day prune, the set-complete rule (WAL-only run: no
-`last-upload` write, no ping), the in-place `last-upload` write, exit 3 per missing config; R5's argv to docker
-(fake docker) per mode, the `jobs.log` line on ok, failed and timeout, lock busy → 4, no postgres → 3, the R6 line;
+R4's run order, the `verified` lines, sibling content, the premigration skip, exit 3 per missing config, the rclone
+config file at 0600 with no key in argv or env; R5's argv to docker (fake docker) per mode, the `jobs.log` line on ok,
+failed and timeout, lock busy → 4, no postgres → 3, the spool record, the R6 line, deletion only after the sha
+comparison, the 7-day prune, the set-complete rule (WAL-only run: no `last-upload` write, no ping), the pings;
 R6's list format and `fetch` refusing a symlink, a bad name and a non-regular file; R7's exit 2 on a 0644 identity,
-the from-box cross-check (match, mismatch → 4, absent → WARN); R8's final line and exit for each outcome, DR3 failing
-on a planted hash, DR10 failing under fake-b2 `permissive`; R9's status cases; R10's lint and provision cases; T1–T13.
+the ssh options, control characters replaced, the root-record check, the bucket cross-check (match, mismatch → 4,
+absent → WARN), the scratch container's flags; R8's final line and exit for each outcome, DR3 failing
+on a planted hash, DR10 failing under fake-b2 `permissive`; R9's status cases; R10's lint and provision cases; T1–T17.
 **Criterion 3:** one round trip (backup → spool → uploader → fake-b2 → `restore.sh --base` and `--dump` → scratch)
 with the canary row inserted **after** the base present after recovery.
 
@@ -324,54 +401,102 @@ build green.
 
 **INFRA (devops-engineer), each to say what R1–R10 say:** §2.2 the backup row (image: the Postgres derivative, not
 "the app image or a tools image") and the uploader row (the tools image file, its mounts and environment); "How the
-two halves hand over" (`.inflight/` publish, all or nothing, siblings in `premigration/` only); §2.3 the spool row,
-the state row (`jobs.log` root-written by the runner and provision-check; `last-dump` gone; `last-upload` a single-file
-mount meaning the last complete nightly set), `ops.conf` (two lines) and `/opt/polycarpic/` (`images.env`); §6.1
+two halves hand over" (`.inflight/` publish, all or nothing; the uploader reads only and root deletes after its
+comparison; siblings in `premigration/` only); §2.3 the spool row (10005 `r-x`), the state row (`jobs.log`,
+`last-upload` and `spool.sha256` written by root only, mounted nowhere; `last-dump` gone; `last-upload` meaning the last
+complete nightly set), `ops.conf` (two lines) and `/opt/polycarpic/` (`images.env`); §6.1
 Nightly (names, gzip, the runner, the uploader start), Continuous (gzip, the system id, the history forms), the upload
 step (R4's argv and what it checks, the refused DELETE, the 5 GiB limit); §6.2 rewritten to R2 and R4's object name;
-§6.4 the bad-migration path to R6 and R7, with the box-side step as §L1 places it; §6.5 heartbeat sent only after a
-complete nightly set, `heartbeat_url` is the full check URL, `backupdb` windows root-written; §6.7 to R8 (ids, SKIP,
+§6.4 the bad-migration path to R6 and R7, with the box-side step as §L1 and §D2 place it; §6.5 root sends the
+backup heartbeat, only after a complete nightly set, `heartbeat_url` is the full check URL and no container holds it,
+`backupdb` windows root-written; §6.7 to R8 (ids, SKIP,
 exit codes); §8.10 step 2 to R7's CLI plus the F4 sentence; D-15's meaning of `last-upload`; OQ-INFRA-11 answered by
 M-P1 and criterion 3.
 
-**SECURITY (seceng):** C-79's detection text (root-written windows); C-73's restore text (the from-box cross-check,
-`--network none` scratch, the DELETE rclone sends after a mismatch).
+**SECURITY (seceng):** C-79's detection text (root-written windows); C-73's restore text (the root-record and bucket
+cross-checks, the scratch cluster's isolation, the replay check, the DELETE rclone sends after a mismatch, the
+read-only uploader).
 
 **ARCH (architect):** §7.2 edited in this commit: the uploader is the container, WAL is compressed then encrypted, the
 windows are root-written.
 
 ## S — Positions for seceng (POLY-99b)
 
-- **S1. Root-written windows instead of the journal (R9).** Same trust as the journal. The window spans the container's
-  life because it is written after `docker rm -f`. Accept, or require journal timestamps.
-- **S2. Compress before encrypt (R3, M-W).** Object sizes leak how compressible the data is, to read-key holders and
-  B2 only. The alternative is a full bucket in about two days. Accept.
+Seceng's prep positions, and how this ruling carries each:
+
+| Prep | Carried | Where |
+|---|---|---|
+| B1 no staging room in backup; the watcher also covers `/tmp` | yes: `/tmp:size=1m`, read-only rootfs, watcher on `/tmp` | R10, R11 |
+| B2 exit status of every stage; `.partial` then rename | yes: there is no `tee` in any pipe; `pipefail`; `.inflight/` then `ln`, all or nothing | R1, T2 |
+| B3 no core dumps | yes: `core: 0` on three services, `ulimit -c 0` in the scripts | R4, R7, R10 |
+| B4 completeness check in the pipe (`tee` into `pg_restore`) | **not adopted.** A `tee` process substitution is exactly the stage `pipefail` misses (B2). `pg_dump`'s exit status already covers a truncated stream (T2). Parsing a non-seekable custom archive is unmeasured. Root computes the ciphertext sha256 itself after the container exits | R5 |
+| B5 root writes `jobs.log`, `last-upload` and the premigration record | yes | R5, R9 |
+| U1 uploader read-only; root prunes after comparing with the record | yes | R4, R5, R10 |
+| U2 names by grammar; the age header check is a bug guard | yes | R4 |
+| U3 verify with no HEAD and no list; single-part; the fake enforces it | yes, measured (M-U1–M-U6) | R4, R11 |
+| U4 no secret in argv or env; rclone config in tmpfs 0600 | yes | R4 |
+| R1 no forwarding; validate box names; strip control characters; hygiene | yes. Streaming into `restore-apply` belongs to §L1 / §D2 | R7 |
+| R2 a separate throwaway cluster, never a database inside prod | yes, for the laptop. Binding on whoever builds the box side (§L1) | R7 |
+| R3 internal time vs name vs upload time | yes | R7, DR11 |
+| R4 check the from-box sha256 against root's record | yes | R6, R7 |
+| Off-box daily list check | the Principal's call | §D3 |
+
+Positions left for the review:
+
+- **S1. Root-written windows instead of the journal (R9).** They carry the same trust as the journal, and the window
+  spans the container's life. Accept, or require journal timestamps.
+- **S2. Compress before encrypting (R3, M-W).** Object sizes reveal how compressible the data is, but only to read-key
+  holders and to B2. The alternative is a full bucket in about two days. Accept.
 - **S3. rclone's DELETE after a mismatch (M-U4).** It cannot be turned off without `--ignore-checksum`. The key lacks
   `deleteFiles`, and Object Lock holds the version (POLY-105 measures the refusal). Accept.
-- **S4. The from-box premigration path (R7, §D1)** trusts the spool unless the bucket cross-check runs.
-- **S5. The scratch container is `--network none`, with no bind mount (R7).** A poisoned dump runs SQL as superuser
-  inside the scratch. `COPY … TO PROGRAM` then gets a shell in that container and nothing beyond. Confirm that
-  bound is enough.
-- **S6. The runner reads `heartbeat_url` as root to ping `/fail` (R5)**, since backup has no route out.
-- **S7. The uploader refuses any file without the age header (R4 step 2)**: a second line behind "plaintext never
-  reaches the spool".
-- **S8. `POLY_B2_AUTH_URL` (R11)** is honoured by `b2read.py` on the laptop, https or loopback only. Whoever sets the
-  laptop's environment already holds the read key.
+- **S4. The from-box path (R7, §D1)** is checked against root's record always, and against the bucket when the read
+  key is given.
+- **S5. The scratch cluster (R7)** runs with no network, no capabilities, no bind mount and no secret. A poisoned
+  dump runs SQL as superuser there; `COPY … TO PROGRAM` reaches a shell in that container and nothing beyond.
+  Confirm that bound is enough.
+- **S6. Root reads `heartbeat_url` to ping (R5).** No container holds it any more.
+- **S7. The age header check (R4 step 2)** is a guard against a bug, not against an attacker. An attacker on the box
+  can encrypt to the public key.
+- **S8. `POLY_B2_AUTH_URL` (R11)** is honoured by `b2read.py` on the laptop only, over https or loopback. Whoever sets
+  the laptop's environment already holds the read key.
 
-## D — Decision for the Principal
+## D — Decisions for the Principal
 
-- **D1. The bad-migration restore from the box spool.** The mechanism: the encrypted file is copied from the box's
-  spool to the laptop and decrypted there. The attacker's reach: someone already in control of the box could swap in
-  a validly encrypted fake dump, since the box holds the public key. The restore then loads the fake into a throwaway
-  container on the laptop, and that container has no network (S5). **Recommended, and ruled:** when the read key is
-  given, the file must equal the bucket's first-uploaded version, or the restore stops. Without it, a WARN line. Cost:
-  you need the read key at hand, and in the first minute after the deploy (before the upload) the check cannot run.
-  The stronger option is to require the cross-check always: the restore then waits about a minute for the upload and
-  never runs without the read key. Choose: (a) as ruled, (b) always required.
+- **D1. The bad-migration restore from the box spool.**
+  - **The mechanism:** the encrypted file is copied from the box's spool to the laptop and decrypted there. Its
+    sha256 must equal the record root wrote when the backup finished.
+  - **The attacker's reach:** someone already in control of root on the box could swap both the file and the record
+    for a validly encrypted fake dump. The fake then loads into a throwaway container with no network on the laptop
+    (S5).
+  - **Ruled:** when the read key is given, the file must also equal the bucket's first-uploaded version, or the
+    restore stops. Without it, a WARN.
+  - **The stronger option:** require the bucket check always. The cost is about a minute's wait for the upload after
+    the deploy, and no restore without the read key.
+  - **Choose:** (a) as ruled; (b) always required.
+- **D2. Where the decrypted premigration data may exist on the box (with §L1).** Q8 (2026-11-08) says no plaintext
+  dump is written on the box. INFRA §6.4 sends one there as a file. Two ways through:
+  - **(a) Stream, seceng's proposal:** the laptop decrypts and streams the restore over ssh stdin into a throwaway
+    cluster on the box. There is no plaintext file, but the scratch cluster's data files are plaintext on the LUKS
+    volume until it is destroyed.
+  - **(b) Laptop only:** no plaintext reaches the box in any form, and the comparison is done on the laptop's scratch
+    (this ruling). Copying corrected rows back into prod then needs its own audited path.
+  - **Recommended: (a)**, provided the scratch cluster is destroyed in the same session. Its exposure is the same as
+    prod's own data files on the same volume.
+- **D3. A daily off-box check of the bucket listing** (seceng). A scheduled job outside the box, holding a key with
+  `listFiles` only, would see hide markers and a silent uploader daily rather than at the monthly drill.
+  - The cost: GitHub would hold a bucket credential (TB-12). It reveals object names, not contents.
+  - **What it would catch that nothing else does:** an uploader that prints `verified` without uploading. Root
+    then deletes the spool copy, and the gap shows only at the next listing. Today that listing is the monthly drill.
+  - **Recommended:** not before POLY-103 decides alerting, and only with seceng's ruling on TB-12. Until then, the
+    26-hour heartbeat (R5) catches an uploader that stops reporting, but not one that lies.
+  - **Choose:** (a) defer to POLY-103; (b) add it now as a new issue.
 
 ## L — Questions for the lead
 
-- **L1.** INFRA §6.4 and §8.10 send the decrypted dump back to the box (`/srv/polycarpic/restore/`) and run
-  `polycarpic-ops restore-apply` there. That step is not in the confirmed scope. This ruling stops at a throwaway
-  Postgres on the laptop. Without it, the 60-minute bad-migration RTO has no built way back into prod. It needs a
-  home: POLY-116, or a new issue before POLY-104.
+- **L1.** INFRA §6.4 and §8.10 put decrypted data on the box and run `polycarpic-ops restore-apply` there. That step
+  is not in the confirmed scope, and this ruling stops at a throwaway cluster on the laptop. Without it, the
+  60-minute bad-migration recovery has no built route back into prod.
+  - Its design follows §D2.
+  - Whoever builds it is bound by R7's scratch rules: a separate cluster, no network, never a database inside prod,
+    and names validated before use.
+  - It needs a home: POLY-116, or a new issue before POLY-104.
