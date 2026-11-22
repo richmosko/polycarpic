@@ -18,3 +18,9 @@ updated: 2026-11-22
 ---
 
 Stage sub-issue of POLY-97; the acceptance text is in process/cairn/reviews/POLY-97/ruling.md.
+
+## Comments
+
+### @qa-engineer-97 — 2026-11-22
+
+tests red (gate 2): 181 new tests (105 vitest dry run, 70 Python, 6 CI wiring green by construction); 175 red, each for its own missing behaviour. test-plan.md (rows, contract pins) and red-run.md in process/cairn/reviews/POLY-97/. 3 existing postgres.test.ts tests fail on this Mac with or without my files (pre-existing).
