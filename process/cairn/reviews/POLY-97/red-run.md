@@ -27,3 +27,19 @@ Throwaway reference scripts (a ~50-line `create.sh`, a ~70-line host stage, a cl
   3. `postgres.test.ts:184` "archive_command: age, fail closed … an age failure (unreadable recipients file) -> non-zero, no .age, .inflight empty"
   Any other red in that suite at build-green is a regression.
 - `docker ps` after the runs: no test container left.
+
+## Harness fixes during the build
+
+All in `tests/**`; no assertion was weakened. Each row: what the test asserted before, and after. At the sha of this section all three dry-run files run clean against devops's build: `provision-create` + `provision` 100/100, `provision-db` 25/25.
+
+| # | Gap | Fixed at | Before → after |
+|--|--|--|--|
+| 1 | `CHECK` not imported in `provision.test.ts` (ReferenceError in 5 tests) | ec0c768c | import added; assertions unchanged |
+| 2 | `waitPg` compared untrimmed psql output | c808535a | `out === '1'` → `out.trim() === '1'`; same readiness test |
+| 3 | `STAGE()` built `…password\n; bash …` (syntax error) | b3dae06c | `.trim()` on the point lines; same commands |
+| 4 | M2 forced failing ALTER: `CREATE EVENT TRIGGER … ON ALTER ROLE` is refused by Postgres 17 | b3dae06c | trigger plant replaced by the fake psql (`psql-break-alter`) rewriting each verifier line to `ALTER ROLE <r> BREAKME …`. **The rewritten statement still carries the real verifier** (sed inserts one word, touches nothing else), and Postgres rejects it ("unrecognized role option"), so the error-statement path runs; the log sweep (no `SCRAM-SHA-256$`, no plaintext, nothing of any generated secret) is the same assertion as before and proves M2's case D (`log_min_error_statement = panic` keeps the failing statement out of the log). Without the script's SET, Postgres would log that statement, so the test is not vacuous. Control assertion changed from `/planted failure/` to `/unrecognized role option\|syntax error/` (same intent: the ALTER failed inside Postgres) |
+| 5 | `point()` ended in a newline (`…\n; touch …`) in the failing-ALTER and `--project` runs | fe92c630 | `.filter(Boolean)`; same commands |
+| 6 | idempotency `rc=0\n1$` vs untrimmed output | fe92c630 | `/rc=0\n1\n?$/` (formatting only; same two facts) |
+| 7 | the sweep's secret list: `cat secrets/*/*` concatenated files that carry no trailing newline into one value, so `not.toContain` checked one giant string and `vals.length > 5` failed | this commit | one value per file (`for f; do cat; echo; done`): **stricter**, three uses |
+
+Gap 8, none: no other harness error appeared in the 125 dry-run tests against the build. Containers: `docker ps` shows only `boring_goldstine`, not mine (names `poly97-pg*`); my networks and Postgres containers are removed by `afterAll`.

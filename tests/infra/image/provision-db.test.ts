@@ -115,7 +115,7 @@ ${Object.entries(LOGIN).map(([role, f]) => `PGPASSWORD=$(cat /etc/polycarpic/sec
     const log = sh('docker', ['logs', names.good]).all;
     expect(log).toMatch(/statement: .*(CREATE|ALTER) ROLE|statement: CREATE|statement: ALTER/i); // control: ddl logging is live, so roles.sql lines are in the log
     expect(log).not.toMatch(/SCRAM-SHA-256\$/);
-    const vals = run('cat /etc/polycarpic/secrets/*/*', { image: HOST }).out.split('\n').filter(Boolean);
+    const vals = run('for f in /etc/polycarpic/secrets/*/*; do cat $f; echo; done', { image: HOST }).out.split('\n').filter(Boolean);
     expect(vals.length).toBeGreaterThan(5);
     for (const v of vals) expect(log).not.toContain(v);
   });
@@ -124,15 +124,15 @@ ${Object.entries(LOGIN).map(([role, f]) => `PGPASSWORD=$(cat /etc/polycarpic/sec
     const r = run(`${OPS} ${point(names.fail, null)}; touch /var/fake-state/psql-break-alter; bash /tmp/ops/provision.sh --stage database --project prod > /tmp/o 2>&1; echo "rc=$?"; cat /tmp/o`, { image: HOST, network: NET });
     expect(r.out).not.toMatch(/rc=0\n/);
     const log = sh('docker', ['logs', names.fail]).all;
-    expect(log, 'control: the broken ALTER really failed inside Postgres').toMatch(/syntax error/);
+    expect(log, 'control: the broken ALTER really failed inside Postgres').toMatch(/unrecognized role option|syntax error/);
     expect(log).not.toMatch(/SCRAM-SHA-256\$/);
-    const vals = run('cat /etc/polycarpic/secrets/*/*', { image: HOST }).out.split('\n').filter(Boolean);
+    const vals = run('for f in /etc/polycarpic/secrets/*/*; do cat $f; echo; done', { image: HOST }).out.split('\n').filter(Boolean);
     for (const v of vals) expect(log).not.toContain(v);
     expect(r.all).not.toMatch(/SCRAM-SHA-256\$/); // not on the operator's screen either
   });
 
   it('no password or verifier in argv (the fakes\' call log) or in the script\'s output', () => {
-    const r = run(`${STAGE()} > /tmp/o 2>&1; cat /tmp/o; echo ==; grep -E '^docker' /var/fake-state/calls.log; echo ==; cat /etc/polycarpic/secrets/*/*`, { image: HOST, network: NET });
+    const r = run(`${STAGE()} > /tmp/o 2>&1; cat /tmp/o; echo ==; grep -E '^docker' /var/fake-state/calls.log; echo ==; for f in /etc/polycarpic/secrets/*/*; do cat $f; echo; done`, { image: HOST, network: NET });
     const [o, calls, vals] = r.out.split('==\n');
     expect(calls).not.toMatch(/SCRAM-SHA-256|PASSWORD/i);
     for (const v of vals!.split('\n').filter(Boolean)) {
