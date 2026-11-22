@@ -89,7 +89,7 @@ case "$name" in
         exit 0 ;;
       run)
         # D3 probe (ruling Addendum 2/3): tools image run inside <svc>'s network namespace, passfile read-only, pgpass on a tmpfs.
-        shift; ns=""; tmpfs=0; ro=0; conn=""; mode=select; envpw=0
+        shift; all="$*"; ns=""; tmpfs=0; ro=0; conn=""; mode=select; envpw=0
         while [ $# -gt 0 ]; do
           case "$1" in
             --network) ns=$2; shift ;;
@@ -114,8 +114,8 @@ case "$name" in
           container:*) [ -e "$S/no-web" ] && { echo "Error response from daemon: No such container: ${ns#container:}" >&2; exit 125; } ;;
           *) grep -q "\"$ns\"" "$S/networks.json" 2>/dev/null || { echo "Error response from daemon: network $ns not found" >&2; exit 125; } ;;
         esac
-        case " $* " in *" $img "*) ;; *) echo "FAKE: probe image is not the running postgres container's image ($img)" >&2; exit 97 ;; esac
-        case " $* " in *" postgres:17 "*|*" postgres:17."*) echo "FAKE: probe used a default postgres tag" >&2; exit 97 ;; esac
+        case " $all " in *" $img "*) ;; *) echo "FAKE: probe image is not the running postgres container's image ($img)" >&2; exit 97 ;; esac
+        case " $all " in *" postgres:17 "*|*" postgres:17."*) echo "FAKE: probe used a default postgres tag" >&2; exit 97 ;; esac
         [ $tmpfs = 1 ] || { echo "FAKE: probe without --tmpfs for the pgpass" >&2; exit 97; }
         [ $ro = 1 ] || { echo "FAKE: probe without a read-only db_password_backup mount" >&2; exit 97; }
         [ $envpw = 0 ] || { echo "FAKE: probe passes the password through -e" >&2; exit 97; }
