@@ -1,7 +1,7 @@
 ---
 id: POLY-97d
 title: Provisioning build
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-97
 blocked_by: [POLY-97c]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-97.md, process/cairn/reviews/POLY-97/**, proce
 stage: execute
 estimate.cost_usd: "15.00"
 estimate.gate_cycles: 3
+actual.cost_usd: "6.6473"
+actual.tokens: 32422593
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: "0.44"
 labels: [ops, infra]
 priority: null
 pr: null
