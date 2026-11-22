@@ -26,7 +26,7 @@ function startPg(name: string, extra: string[] = []) {
 function waitPg(name: string) {
   for (let i = 0; i < 90; i++) {
     const r = sh('docker', ['exec', name, 'psql', '-U', 'postgres', '-d', 'polycarpic', '-tAc', 'select 1']);
-    if (r.out === '1') return;
+    if (r.out.trim() === '1') return;
     sh('sleep', ['1']);
   }
   throw new Error(`pg ${name} did not come up: ${sh('docker', ['logs', name]).all.slice(-500)}`);
