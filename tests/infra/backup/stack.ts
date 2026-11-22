@@ -207,3 +207,20 @@ export function up(): Stack {
     },
   };
 }
+
+/** argv that runs script `text` inside container `name` as the exec user: `bash -c <text> backup.sh <args>`. No stdin is used (a
+ * synchronous helper elsewhere in a test would starve an async stdin write), and `input` stays '' for callers that pass it on. */
+export function execText(name: string, text: string, args: string[], env: Record<string, string> = {}) {
+  const e = Object.entries(env).flatMap(([k, v]) => ['-e', `${k}=${v}`]);
+  return { argv: ['exec', ...e, name, 'bash', '-c', text, 'backup.sh', ...args], input: '' };
+}
+/** the host path of the recipients file the backup service mounts (tests rewrite it between runs) */
+export const recipientsPath = (dir: string) => join(dir, 'etc', 'polycarpic', 'age-recipients.txt');
+export const pgContainer = () => `${PROJECT}-postgres-1`;
+export const BACKUP_SH = join(ROOT, 'infra', 'backup', 'backup.sh');
+/** a mutant copy of a script under test: `from` must occur, or the mutant would silently equal the original */
+export function mutate(text: string, from: string | RegExp, to: string): string {
+  const out = text.replace(from, to);
+  if (out === text) throw new Error(`mutant did not change the script: ${String(from)}`);
+  return out;
+}
