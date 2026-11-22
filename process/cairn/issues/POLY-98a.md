@@ -1,7 +1,7 @@
 ---
 id: POLY-98a
 title: Ops CLI ruling
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-98
 blocked_by: []
