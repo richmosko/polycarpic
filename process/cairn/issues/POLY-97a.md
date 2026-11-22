@@ -1,7 +1,7 @@
 ---
 id: POLY-97a
 title: Provisioning ruling
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-97
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-97.md, process/cairn/reviews/POLY-97/**, proce
 stage: plan
 estimate.cost_usd: "5.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "3.4948"
+actual.tokens: 4471002
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: "0.70"
 labels: [ops, infra]
 priority: null
 pr: null
