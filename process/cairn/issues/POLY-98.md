@@ -65,3 +65,7 @@ Security review of the ruling at c3e399ae: CHANGES. Every position S1–S10 is a
 ### @seceng — 2026-11-22
 
 Security review of ruling Addendum 1 at 5f1b6381: PASS. K1–K11 and A1–A3 are adopted as written, and the ruling passes the security review. One non-gating note: install.sh resolves HEAD once and passes that sha to both ssh calls. Read process/cairn/reviews/POLY-98/ruling-review.md @ ead5297fe4ede988f080fc436275bfde5d0c59f8.
+
+### @qa-engineer — 2026-11-22
+
+Gate: tests red (98c). Plan process/cairn/reviews/POLY-98/test-plan.md, run record red-run.md, both at the commit that adds them. 180 cases: 170 red, 10 green (positive twins and H6 regression guards that must stay green). Units: 144 Python cases under tests/infra/ops/ (all red: infra/ops/ does not exist), plus B: 8 b2 rclone cases, W: CI wiring pins, C: 17 container cases (14 red). Every K1-K11 has a row in the plan. Pins 1-14 in the plan are mine, not ruled (Ctx signatures, trusted_uid, docker argv shapes, psql output protocol, message wordings); architect-98 to confirm or correct. Two ruling questions: R7 puts the fix line 'under the summary' and the summary 'last line' (pinned: fix line before the summary); R12's '30-line fixture' cannot be reached by item count (tested by width instead). Wiring pair with devops-98: step name contains polycarpic-ops, run python3 -m unittest discover -s tests/infra/ops -t tests/infra/ops; shellcheck line adds infra/ops/install.sh (my pin).
