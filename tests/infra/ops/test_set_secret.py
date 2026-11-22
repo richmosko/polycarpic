@@ -160,6 +160,7 @@ class SetSecret(OpsTest):
             r = self.put("resend_api_key", "fxnewvalue", confirm=answer)
             self.assertEqual((r.rc, r.err), (1, "not replaced\n"), answer)
             self.assertEqual(r.confirms, ["resend_api_key exists for: auth; type yes to replace:"])
+            self.assertEqual(r.prompts, [], "a refused replace shows no value prompt at all")
             self.assertEqual(self.on_disk("auth", "resend_api_key").read_text(), "old\n")
             self.assertFalse(self.on_disk("worker", "resend_api_key").exists(), "nothing written for the other service either")
 
@@ -169,10 +170,17 @@ class SetSecret(OpsTest):
         r = self.put("resend_api_key", "fxnewvalue", confirm="yes")
         self.assertEqual(r.rc, 0, r.err)
         self.assertEqual(r.confirms, ["resend_api_key exists for: auth, worker; type yes to replace:"])
+        self.assertEqual(r.events, ["confirm", "getpass"], "R4 order: the yes question first, then the hidden value prompt")
         for svc in ("auth", "worker"):
             self.assertEqual(self.on_disk(svc, "resend_api_key").read_text(), "fxnewvalue\n")
 
     # ---- directory and symlink safety
+    def test_a_bad_directory_is_refused_before_any_question_or_prompt(self):
+        os.chmod(str(self.host.p("/etc/polycarpic/secrets/auth")), 0o755)
+        self.host.secret("worker", "resend_api_key", "old\n")
+        r = self.put("resend_api_key", "fxvalue", confirm="yes")
+        self.assertEqual((r.rc, r.events), (4, []))
+
     def test_a_symlinked_service_directory_exits_4_with_nothing_written_anywhere(self):
         d = self.host.p("/etc/polycarpic/secrets/worker")
         other = self.tmp / "elsewhere"

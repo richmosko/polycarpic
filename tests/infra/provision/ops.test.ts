@@ -212,7 +212,7 @@ def answer_all(answers):
     return given
 for s in steps:
     if "answers" in s:
-        answer_all(s["answers"])
+        print("DRIVER-GIVEN", json.dumps(sorted(answer_all(s["answers"]))))
         continue
     if "early" in s:
         os.write(fd, s["early"].encode())
@@ -246,6 +246,8 @@ echo "SYMLINK-AUTH=$(ls /etc/polycarpic/secrets/auth | grep -c resend) WORKER=$(
 grep -rl 'fxSecretValue123\\|fxOtherValue456\\|fxThirdValue789' /tmp /var /root /home /opt /etc 2>/dev/null | grep -v '/etc/polycarpic/secrets/' | grep -v '^/tmp/ptydrv.py$' || true`);
     const rcs = [...r.out.matchAll(/DRIVER-RC (\d+)/g)].map((m) => m[1]);
     expect(rcs, r.out.slice(-800)).toEqual(['0', '1', '4']);
+    // R4 order (architect): checks, then the yes question, then the hidden value prompt. A refused replace shows no value prompt; a bad directory shows nothing.
+    expect([...r.out.matchAll(/DRIVER-GIVEN (.*)/g)].map((m) => JSON.parse(m[1]!))).toEqual([['type yes to replace:'], []]);
     expect(r.out).toContain('440 0:10007 17');
     expect(r.out).toContain('440 0:10002 17');
     expect(r.out).toContain('AFTERNO=fxSecretValue123');

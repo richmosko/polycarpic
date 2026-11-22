@@ -233,7 +233,10 @@ class Host(object):
         vals = list(secrets)
         clock = [now]
 
+        r.events = []
+
         def fake_getpass(prompt=""):
+            r.events.append("getpass")
             r.prompts.append(prompt)
             if not vals:
                 raise AssertionError("getpass asked more than the test supplied: %r" % prompt)
@@ -245,6 +248,7 @@ class Host(object):
             return v
 
         def fake_confirm(prompt=""):
+            r.events.append("confirm")
             r.confirms.append(prompt)
             if confirm is None:
                 raise AssertionError("confirm asked but the test supplied no answer: %r" % prompt)
