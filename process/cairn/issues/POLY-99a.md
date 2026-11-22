@@ -1,7 +1,7 @@
 ---
 id: POLY-99a
 title: Backup ruling
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-99
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-99.md, process/cairn/reviews/POLY-99/**, proce
 stage: plan
 estimate.cost_usd: "5.00"
 estimate.gate_cycles: 3
+actual.cost_usd: "6.9540"
+actual.tokens: 14132642
+actual.gate_cycles: 1
+actual.wall_clock: 27
+ratio: "1.39"
 labels: [ops, backup]
 priority: null
 pr: null
