@@ -126,3 +126,4 @@ The ruling fixes the Ctx field list but not signatures. Everything below is what
 | 76 | B3 `--mail-from -x@example.com` → 2, `provision: bad --mail-from`, nothing run | U:provision :: test_mail_from_starting_with_a_dash… |
 | 77 | R4 order (architect @ 0c279807): checks, yes question, then hidden value prompt; refused replace shows no value prompt; bad directory shows neither | U:set_secret :: test_replacing_asks…, test_yes_replaces…, test_a_bad_directory_is_refused_before…; C: set-secret on a real root (DRIVER-GIVEN) |
 | 78 | B4 (seceng): production confirm reads with echo off (TCSAFLUSH), restores, never echoes the answer | U:test_ctx_getpass :: test_b4_* |
+| 79 | B4 second test: a secret pasted at the replace question → exit 1 `not replaced`, nowhere in output/argv/env/files, not echoed on a real pty | U:set_secret :: test_b4_a_secret_pasted…; C: "B4: a secret pasted at the replace question…" (driver reports `DRIVER-ECHOED []`) |

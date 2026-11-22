@@ -184,7 +184,7 @@ cmd, steps = sys.argv[1], json.loads(sys.argv[2])
 pid, fd = pty.fork()
 if pid == 0:
     os.execvp("bash", ["bash", "-c", cmd])
-buf, eof = b"", False
+buf, eof, alltext, sent = b"", False, b"", []
 def pump(until=None, limit=20):
     global buf, eof
     end = time.time() + limit
@@ -198,6 +198,7 @@ def pump(until=None, limit=20):
             if not d:
                 eof = True
             buf += d
+            alltext += d
 def answer_all(answers):
     global buf
     given = set()
@@ -207,6 +208,7 @@ def answer_all(answers):
             if k.encode() in buf and k not in given:
                 buf = buf.split(k.encode(), 1)[1]
                 os.write(fd, v.encode())
+                sent.append(v.strip())
                 given.add(k)
         pump(None, 0.6)
     return given
@@ -225,6 +227,7 @@ for s in steps:
     elif not s.get("optional"):
         print("DRIVER-MISSING", s["expect"])
 pump(None, 20)
+print("DRIVER-ECHOED", json.dumps([v for v in sent if v and v.encode() in alltext]))
 _, status = os.waitpid(pid, 0)
 print("DRIVER-RC", os.waitstatus_to_exitcode(status))
 PY`;
@@ -253,6 +256,18 @@ grep -rl 'fxSecretValue123\\|fxOtherValue456\\|fxThirdValue789' /tmp /var /root 
     expect(r.out).toContain('AFTERNO=fxSecretValue123');
     expect(r.out).toContain('SYMLINK-AUTH=0 WORKER=fxSecretValue123'); // nothing written for either service: auth stays empty, the worker file keeps the first value
     expect(r.out).not.toMatch(/fx(Secret|Other|Third)Value\d+\n\/(tmp|var|root|home|opt|etc)\//); // no copy of a value outside the secret trees
+  });
+
+  it('B4: a secret pasted at the replace question is not echoed, exits 1 `not replaced`, and lands in no file', () => {
+    const r = INSTALLED(`${DRIVER}
+mkdir -p /etc/polycarpic/secrets/auth; echo old > /etc/polycarpic/secrets/auth/resend_api_key; chown root:10007 /etc/polycarpic/secrets/auth/resend_api_key; chmod 0440 /etc/polycarpic/secrets/auth/resend_api_key
+${PTY('polycarpic-ops set-secret resend_api_key', [{ answers: { 'type yes to replace:': 'fxPasted999secret\n' } }])}
+echo "AUTH=$(cat /etc/polycarpic/secrets/auth/resend_api_key)"
+grep -rl 'fxPasted999secret' /tmp /var /root /home /opt /etc 2>/dev/null | grep -v '^/tmp/ptydrv.py$' || true`);
+    expect(r.out, r.all.slice(-800)).toContain('DRIVER-RC 1');
+    expect(r.out).toContain('DRIVER-ECHOED []');
+    expect(r.out).toContain('AUTH=old');
+    expect(r.out).not.toMatch(/fxPasted999secret\n\//);
   });
 
   it('B1: input sent before the prompt is dropped, not taken as the secret; only what is typed after the prompt is written', () => {
