@@ -104,3 +104,20 @@ attackers that matter here are the two below.
 
 The C-87 and C-79 detection text (R13) lands at the build review, quoting the built `status` lines. The doc states only
 what is true, and `status` does not exist yet.
+
+## Addendum 1 at 5f1b6381: PASS
+
+The ruling's diff `c3e399ae..5f1b6381` adds only §Addendum 1, which adopts K1–K11 as written, each with its tests, and
+A1–A3.
+- **K7 is measured.** `--pull never` and `--no-deps` are both present in compose 5.7.0's `run --help`.
+- **A1's new install path adds no reach.**
+  - `/opt/polycarpic` is root 0755, so only root can create or replace `.incoming`.
+  - `install -d -m 0700` resets its mode on every run.
+  - `install_box.py` and the archive come from the same verified checkout over the operator's own SSH, the trust
+    level S7 accepted.
+  - `tarfile` with `filter='data'` now refuses absolute members, `..` members and links before anything is written.
+- **One note, not gating.** `install.sh` resolves `HEAD` once and passes the same 40-hex sha to both `git show` and
+  `git archive`. Then the installer and the bundle cannot come from different commits if `HEAD` moves between the two
+  ssh calls. qa can test it: the fake ssh log shows one sha in both commands.
+
+The ruling at `5f1b6381`, Addendum 1 included, passes the security review.
