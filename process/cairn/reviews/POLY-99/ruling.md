@@ -500,3 +500,15 @@ Positions left for the review:
   - Whoever builds it is bound by R7's scratch rules: a separate cluster, no network, never a database inside prod,
     and names validated before use.
   - It needs a home: POLY-116, or a new issue before POLY-104.
+
+## Addendum 1 — seceng's ruling review (`ruling-review.md` @ `465a7753`, read against `9f87a180`)
+
+seceng C1–C12 are carried by reference and are 99c tests as written there. The deltas against the re-issued text:
+- **C3** wins over R10 on `.inflight/`: it gets the default ACL `u:10005:r--` and **no** 10005 access entry. On the other spool dirs 10005 keeps R10's `r-x` and the read-only mount, which is stricter than C3's `rwx`, so the uploader prunes nothing and root does (R5).
+- **C4**: R5's root hash, taken after the container is gone, stands for the in-pipe `tee`. No uid can write `dump/` or `premigration/` between publish and that hash, because 10004 has exited and 10005 is read-only. `spool.sha256` is C4's index. `fetch-premigration` hashes the file and refuses (exit 1, nothing written) on a mismatch or a missing record. The R6 line gains `<name>=<sha256>` per file.
+- **C2**: `ulimits: {core: 0}` moves into `x-hardened`, so it covers every service in prod and staging. **C6**: the scratch also gets `--pids-limit 512 --memory 2g` and the `FROM` digest. **C8** replaces R11's auth-URL rule. **C12** adds the `fdesetup` guard.
+- **C7** replaces R7's replay bullets: choose the set by upload time, use C7's refusals (an upload more than 4 h after `<TS>` is refused, not merely warned), and allow 10 min, not 15, for content time.
+- **C9**: DR1's text and the refusal listing. **C5**: `b2read.py` names local files by `fileId`, refuses a key other than `<instance>/<M>/<dir>/<R2 name>`, and `list-premigration` prints `stray <n>` lines.
+- **C11**: R4's rclone config in a 0600 tmpfs file stands; `--config` takes a path, never a key. The sweep covers that file's contents too.
+- **T18 (criterion 5):** `backup premigration` → `restore.sh --premigration --from-box` (fake ssh into the box fixture) → scratch, with the canary present and the C4 check passing.
+- **§D:** D1 is seceng's P1, and both recommend (a). D3 is P2. Seceng recommends a daily list-only job, and I now agree. It catches an uploader that lies, which nothing on the box can. It is not built in this loop; it goes to POLY-105. §L1 carries seceng's (i)–(iii).
