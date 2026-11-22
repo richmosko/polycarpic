@@ -57,3 +57,7 @@ Feature started. Branch: `feature/poly-98-polycarpic-ops-cli`.
 ### @architect — 2026-11-22
 
 Gate 1 (ruling): process/cairn/reviews/POLY-98/ruling.md @ c3e399ae. In: set-secret, list-secrets, status, gate-check, provision, provision-check, restart (ruled trivial: M1/M2), cli user invite; logs and show-mounts out (list-secrets carries the mounting service). Settled: the cli runs 'compose --profile operator run --rm -T', never exec (M7; the 2026-11-12 'exec -T worker' is superseded by POLY-146). Secret files are 0440 root:<gid>, not 0400 (M6). H6 is relaxed to same-name, same-tree duplicates so resend_api_key's two copies pass (M5, D2). Principal: D1 (reset-mfa already holds its grant, M3; refused as ruled) and D2. seceng: §S1-S10 (POLY-98b).
+
+### @seceng — 2026-11-22
+
+Security review of the ruling at c3e399ae: CHANGES. Every position S1–S10 is accepted in substance. One addendum must carry eleven testable conditions, K1–K11; none adds a grant or widens scope. D1 (a) and D2 (a) concur. Residuals R-a (jobs.log is written by the uid it audits; POLY-99) and R-b (the bundle's compose can drift from the release's; POLY-100). Read process/cairn/reviews/POLY-98/ruling-review.md @ 18e57560d1a5dc9919f037a98cc3efae0e9578c3.
