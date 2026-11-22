@@ -109,3 +109,56 @@ Asking about the replace before the value prompt is right, and the build already
     restores the terminal afterwards.
   - **Test (set-secret).** An answer equal to a fixture secret exits 1, `not replaced`. The fixture appears nowhere in
     stdout, stderr or any file (the K-sweep).
+
+## Re-review of the fix at 939a9fb9: CHANGES (B2 is bypassable; B4 and B5 open)
+
+Read: `git diff 5a6ed6ca..939a9fb9 -- infra/ops/` (commits 33c3497b, 1619c591 and 939a9fb9). The only thing run was
+`covered()` from `status/05_backupdb.py`, called in-process on fixture windows. It is a pure function.
+
+| Item | Result |
+|---|---|
+| B1 | **Met.** The echo-off call now uses `TCSAFLUSH`, and the restore uses `TCSADRAIN`. |
+| B2 | **Not met: the union is miscounted.** See B2′. |
+| B3 | **Met.** `--mail-from -…` exits 2 with `provision: bad --mail-from` before argparse runs. `--mail-from=-…` is refused by the dispatcher's `=` rule. |
+| B4 | **Open.** Production `confirm` is still `input()`, which echoes. Not in this fix. |
+
+**The hand-rolled prompt read (939a9fb9).**
+- **What it reads from.** It reads `sys.stdin`, not `/dev/tty`. `set-secret` refuses a non-terminal stdin first (the
+  `isatty` check), so this is the operator's terminal. It is the only caller.
+- **Echo is restored on every path except an uncatchable kill.**
+  - The `finally` restores on success, on EOF (an empty value, refused) and on `KeyboardInterrupt`.
+  - If the echo-off `tcsetattr` raises, the `finally` restores before anything is read, and the termios error ends the
+    run with a traceback that holds no value.
+  - SIGTERM, SIGHUP or SIGKILL leaves the terminal with echo *off*. That fails safe: nothing leaks, and `reset` fixes
+    it. Ctrl-Z stops the process with echo off, which is the same.
+- **No echo or log of the value.** It goes only into the return value. A traceback after `readline` shows no locals.
+  Undecodable input raises `UnicodeDecodeError` *inside* `readline`, and its message names one byte offset and value,
+  not the input.
+- **K5 holds.** If `tcgetattr` fails, it warns `GetPassWarning` and returns before reading anything, and `set-secret`
+  exits 2. **B5 (new):** `tcsetattr` reports success if *any* requested change took effect (POSIX). The read must
+  re-read the attributes after the echo-off call and refuse, in the same way as a failed `tcgetattr`, if `ECHO` is
+  still set.
+- **Would `getpass` alone have met B1? Yes for the flush, no for K5.** Stdlib `getpass` turns echo off with
+  `TCSAFLUSH`. But when it cannot control echo, `fallback_getpass` emits `GetPassWarning` and then **reads with echo
+  on** in the same call. So `set-secret`'s catch-the-warning refuses only after the operator has typed the value in
+  clear. 33c3497b's revert to `getpass` had that flaw. The tool's own read refuses *before* reading, so it is
+  acceptable, and it is better than `getpass`, provided B5 is added.
+
+- **B2′. `covered()` undercounts when one window lies inside another, so the cap can be bypassed.**
+  - **Mechanism.** For a window that ends before the running end, `total += b - max(a, end)` adds a *negative* number.
+    A short line placed inside a long one subtracts most of the long one.
+  - **Measured.** Three lines give a true union of 9 h 4 min: 00:00–05:59, 00:10–00:15 and 07:00–09:59, each widened
+    by 60 s. `covered()` returns 3.3 h, so the item reads OK.
+  - **Who can exploit it.** The backup uid, which writes `jobs.log`, can repeat the pattern and cover the whole day.
+  - **Fix.** Count a window only when `b > end`: `total += b - max(a, end); end = b`.
+  - **Test.** The three lines above → `RED  backupdb  prod     jobs.log windows cover 9 h of 24`. qa's identical-window
+    case passed only because the subtraction there is 0.
+- **B5. Verify echo is off.**
+  - **Test (fake `termios`).** `tcgetattr` after the echo-off call still shows `ECHO` → `GetPassWarning`, nothing
+    read, and `set-secret` exits 2 with `the terminal cannot hide input; nothing written`.
+
+**The ruling correction at 0c279807 (confirm before value).** No objection to the reason. Asking first means a refused
+replace never reads the secret, and the build already works in this order. The one consequence is B4, already raised.
+
+**SECURITY C-79** now carries the total cap: the windows together may cover at most 8 h of the last 24, and the
+`backupdb` item is red beyond that. That text is true once B2′ lands.
