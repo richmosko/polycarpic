@@ -98,3 +98,24 @@ I read the changes in `infra/operator/b2-setup.py` and `infra/hetzner/create.sh`
 **Advisory.** When `s3ApiUrl` is missing, or rclone fails for any reason other than an access refusal, the probe should report the result as inconclusive rather than "keep `listBuckets`". Keeping `listBuckets` is the safe default, so this does not gate.
 
 PASS once C1 is in.
+
+## C1 at 4da2d8c1: CHANGES (the refusal classifier)
+
+**C1 is met.**
+- The probe runs `rclone rcat --s3-no-head`, and the test makes the HEAD path fail so that only a run with the flag passes.
+- The temporary key is deleted in `finally` on every outcome, including when rclone cannot be started.
+- rclone's output is captured and never printed.
+- Success needs exit 0, so a refused or failed upload can never be read as "`writeFiles` alone is enough". That is the only outcome that would weaken the key.
+
+**The classifier.** It is `access ?denied|\b40[13]\b|not authori[sz]ed|forbidden|unauthori[sz]ed`, run over all of rclone's output.
+- **Network errors cannot match it.** A failed name lookup, a timeout or a refused connection carries none of those words. Port numbers and IP octets cannot form `401` or `403`, and the region suffix (`-003`) is not a whole-word `403`. The test's `no such host` case is INCONCLUSIVE, as it should be.
+- **Credential errors can match it.** S3 returns HTTP 403 for `SignatureDoesNotMatch` (a wrong secret, or an endpoint in the wrong region), `RequestTimeTooSkewed` (the laptop clock is off) and `InvalidAccessKeyId` (a key B2 has not propagated yet: unmeasured). Each of those matches `\b403\b`, and the test asserts that `SignatureDoesNotMatch 403` counts as denied. None of them says anything about `listBuckets`.
+- **The harm is limited.** A wrong answer can only point toward keeping `listBuckets`, which is the key as built, so security is not weakened. But the probe would give a wrong answer rather than INCONCLUSIVE, which is what this round set out to stop.
+
+**Required (C2).**
+- Count the result as denied only when the output carries the S3 code `AccessDenied`. A B2 wording such as "not entitled" or "not authorized to perform" may stand in for it (unmeasured which one B2 sends).
+- When the output also carries `SignatureDoesNotMatch`, `RequestTimeTooSkewed`, `InvalidAccessKeyId`, `InvalidToken` or `ExpiredToken`, the result is INCONCLUSIVE.
+- A bare `401`, `403`, `Forbidden` or `Unauthorized` is INCONCLUSIVE.
+- Test: move `SignatureDoesNotMatch 403`, `403 Forbidden` and `HTTP 401 Unauthorized` into the inconclusive cases, and add a `RequestTimeTooSkewed` case.
+
+PASS once C2 is in.
