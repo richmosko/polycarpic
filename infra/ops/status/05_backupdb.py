@@ -21,9 +21,9 @@ def covered(windows, now):
     """Seconds of the last 24 h inside the union of the windows."""
     total, end = 0, now - 24 * 3600
     for a, b in sorted((max(a, now - 24 * 3600), min(b, now)) for a, b in windows):
-        if b > a:
+        if b > end:  # a window inside an earlier one adds nothing
             total += b - max(a, end)
-            end = max(end, b)
+            end = b
     return total
 
 

@@ -62,6 +62,9 @@ def _real_getpass(prompt=""):
     new[3] &= ~termios.ECHO
     try:
         termios.tcsetattr(fd, termios.TCSAFLUSH, new)
+        if termios.tcgetattr(fd)[3] & termios.ECHO:  # B5: the terminal did not take it: never read a secret that would show
+            warnings.warn("echo is still on", _getpass.GetPassWarning)
+            return ""
         sys.stderr.write(prompt)
         sys.stderr.flush()
         line = sys.stdin.readline()
