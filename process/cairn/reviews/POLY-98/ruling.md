@@ -149,7 +149,9 @@ bundle, installed once, root-owned, and survive reboots.
   written as `<value>\n` (provision.sh's form). Refused (exit 2, nothing written): empty, any whitespace or control
   character inside the value; for `heartbeat_url`, anything not starting `https://`.
 - **Replacing:** if any target exists, it prints `<name> exists for: <services>; type yes to replace:` and reads the
-  answer from the terminal. Anything but `yes` exits 1, `not replaced`.
+  answer from the terminal. Anything but `yes` exits 1, `not replaced`. **Order:** name, targets and directories are
+  checked first, then this question, then the hidden value prompt. A refused replace therefore never takes the secret
+  through the terminal or into memory.
 - **Writing, per target:** open the service directory with `O_DIRECTORY|O_NOFOLLOW` and require `root:<g>` 0750, else exit
   4 `<dir> is not root:<gid> 0750: run provision`. Then, relative to that directory fd: create `.<name>.tmp-<random>` with
   `O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW` and mode 0440, `fchown` it `0:<g>`, write, `fsync`, and `rename` it over `<name>`.
