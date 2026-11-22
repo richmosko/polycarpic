@@ -56,3 +56,7 @@ Gate 1, ruling: `process/cairn/reviews/POLY-99/ruling.md` @ 9f87a180a2403b83023a
 - Premigration contract for POLY-100: R6.
 - `jobs.log` windows are written by root (the job runner); this closes POLY-98 R-a (R9). `05_backupdb.py` gains a root-owner check; `04_backup.py` is unchanged.
 - Principal: D1 (whether the from-box premigration restore always requires the bucket cross-check). Lead: L1 (where the box-side `restore-apply` goes; not in the confirmed scope).
+
+### @architect — 2026-11-22
+
+Gate 1, ruling re-issued whole: `process/cairn/reviews/POLY-99/ruling.md` @ 852474706b9c6a90ed21c73e6f278685042ded37. It replaces 9f87a180, which no review or test had used. It folds in seceng-99 prep positions (mapped in §S): the uploader is read-only; root writes every record and does every deletion and ping; from-box names are validated and the file checked against root record; the scratch cluster is separate and isolated; replay is checked; no core dumps. B4 is not adopted (§S). Principal: D1-D3. Lead: L1.
