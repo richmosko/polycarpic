@@ -662,7 +662,19 @@ jobs:
           bash infra/ci/image.sh scan polycarpic-postgres:ci
           bash infra/ci/image.sh scan polycarpic-caddy:ci
 
-      - name: Container tests (SHOW, archive_command, secret modes, Caddy headers)
+      - name: Build the provisioning test container (POLY-97)
+        if: needs.changes.outputs.image == 'true'
+        run: docker build -t poly97-box:test tests/infra/provision
+
+      - name: Shellcheck the provisioning scripts (inside the test container, so the version is pinned with it)
+        if: needs.changes.outputs.image == 'true'
+        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh
+
+      - name: Operator tool tests (Python stdlib, injected transports, no network)
+        if: needs.changes.outputs.image == 'true'
+        run: python3 -m unittest discover -s tests/infra/operator -t tests/infra/operator
+
+      - name: Container tests (SHOW, archive_command, secret modes, Caddy headers, provisioning dry run)
         if: needs.changes.outputs.image == 'true'
         run: pnpm exec vitest run -c tests/infra/vitest.image.config.ts
 
