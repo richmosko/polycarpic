@@ -1,7 +1,7 @@
 ---
 id: POLY-98
 title: polycarpic-ops operator CLI
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97]

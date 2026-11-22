@@ -21,7 +21,7 @@ A feature = one cairn issue = one PR = one Implement→Validate loop. Exists onl
 - **Branch:** `feature/poly-98-polycarpic-ops-cli`
 - **Started:** 2026-11-22
 - **Goal:** One `polycarpic-ops` command on the box for the operator jobs INFRA §7 and §8 name — secrets, status, gate-check, provision and the `cli` pass-through — each tested against a fake host root.
-- **Status:** In Progress
+- **Status:** In Review — verdict PASS on `a3e97748` (`process/cairn/reviews/POLY-98/verdict.md`); the PR is on the board and the issue's `pr:` field
 
 _Standing context. POLY-97 (Infra scaffolding + provisioning) merged 2026-11-22 via PR [#147](https://github.com/richmosko/polycarpic/pull/147) — ARCH 1.26.0, SECURITY 1.17.0, INFRA 1.3.21. `infra/hetzner/create.sh`, `infra/provision.sh` and `infra/provision-check.sh` exist and passed a real run on Hetzner (`process/cairn/reviews/POLY-97/real-run.md`): a `cx33` in `nbg1` created, hardened, checked, rebooted and deleted; the project is empty and no token is stored on the laptop. Operator tools for the Backblaze keys and DNS are under `infra/operator/`, proven against fakes only. Decided by the Principal on 2026-11-22 (`process/DECISIONS.md`): mail from `mail.polycarpic.com`; no password manager, password-free sudo for `polyops` and no DMARC reports, each an accepted risk in SECURITY; before real data, a Backblaze card with caps and the Healthchecks.io alarm._
 
