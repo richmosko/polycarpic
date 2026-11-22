@@ -49,13 +49,26 @@ def _real_run_inherit(argv, env=None, timeout=None):
 
 def _real_getpass(prompt=""):
     # getpass falls back to an echoed read when it cannot switch echo off; refuse that outright (K5).
+    # Our own read (getpass.getpass restores with the same flag): echo off with TCSAFLUSH, so anything typed before the prompt, already
+    # echoed by the tty, is dropped and never becomes the secret (B1); the restore drains.
     try:
         import termios
-        termios.tcgetattr(sys.stdin.fileno())
+        fd = sys.stdin.fileno()
+        old = termios.tcgetattr(fd)
     except Exception:
         warnings.warn("cannot control echo", _getpass.GetPassWarning)
         return ""
-    return _getpass.getpass(prompt)  # flushes type-ahead (TCSAFLUSH): anything typed before the prompt was already echoed, so it is not kept
+    new = list(old)
+    new[3] &= ~termios.ECHO
+    try:
+        termios.tcsetattr(fd, termios.TCSAFLUSH, new)
+        sys.stderr.write(prompt)
+        sys.stderr.flush()
+        line = sys.stdin.readline()
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+        sys.stderr.write("\n")
+    return line.rstrip("\n")
 
 
 def _real_chown(target, uid, gid):
