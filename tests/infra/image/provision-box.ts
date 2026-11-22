@@ -19,7 +19,7 @@ export const CAPS = '/repo/tests/infra/provision/fixtures/b2-capabilities.json';
 export const FX = {
   b2KeyId: '0049fixturekeyid0000000001',
   b2AppKey: 'K004FIXTUREAPPLICATIONKEY00000000000',
-  b2Token: '4_0049fixtureAUTHTOKEN_0000_0000000000_acct',
+  b2Token: 'authtoken-b2-aaaaaaaaaaaaaaaaaaaaaaaaaaaa',
 };
 
 export type R = { code: number; out: string; err: string; all: string };

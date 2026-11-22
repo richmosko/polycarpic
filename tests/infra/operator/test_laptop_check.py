@@ -6,7 +6,7 @@ from pathlib import Path
 from base import ToolTest
 
 HEADER = "ACTIVE   NAME\n"
-TOKEN = "hcloudFIXTURETOKEN0123456789abcdefghijklmnopqrstuvwxyz012345"
+TOKEN = "hcloudtoken-cccccccccccccccccccccccccccccccccccc"
 
 
 class LaptopCheck(ToolTest):

@@ -28,10 +28,10 @@ describe('create.sh (R1)', () => {
   });
 
   it('refuses HCLOUD_TOKEN in the environment (exit 2, names the variable, never echoes the value)', () => {
-    const r = run(`${KEY} HCLOUD_TOKEN=tok-FIXTURE-1234 ${CREATE} 2>&1; echo "rc=$?"; ${calls}`);
+    const r = run(`${KEY} HCLOUD_TOKEN=tok-dddddddddddddddd ${CREATE} 2>&1; echo "rc=$?"; ${calls}`);
     expect(r.out).toMatch(/rc=2/);
     expect(r.all).toMatch(/HCLOUD_TOKEN/);
-    expect(r.all).not.toMatch(/tok-FIXTURE-1234/);
+    expect(r.all).not.toMatch(/tok-dddddddddddddddd/);
     expect(r.out).not.toMatch(MUTATING);
   });
 

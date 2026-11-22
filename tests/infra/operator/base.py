@@ -31,8 +31,8 @@ BUCKET_ID = "4a48fe8875c6214145260818"
 SECRETS = {
     "b2_master_id": "0049fixturemasterid000000001",
     "b2_master_key": "K004FIXTUREMASTERKEYxxxxxxxxxxxxxx",
-    "b2_token": "4_0049fixtureAUTHTOKEN_0000_0000000000_acct",
-    "cf_token": "cfFIXTURETOKENabcdefghijklmnopqrstuvwx",
+    "b2_token": "authtoken-b2-aaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "cf_token": "cftoken-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     "pb_key": "pk1_fixtureporkbunkey0000000000000000",
     "pb_secret": "sk1_fixtureporkbunsecret00000000000000",
 }
