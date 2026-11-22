@@ -1,7 +1,7 @@
 ---
 id: POLY-97
 title: Infra scaffolding + provisioning
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -120,3 +120,7 @@ Feature started. Branch: `feature/poly-97-infra-provisioning`.
 ### @team-lead — 2026-11-22
 
 PR opened: https://github.com/richmosko/polycarpic/pull/147. Awaiting the PR's CI run (third timing sample) and the Principal's merge decision.
+
+### @team-lead — 2026-11-22
+
+Validate passed; merging via PR #147. Closing. Criterion 6 and the live runs of the Backblaze and DNS tools move to POLY-104 (verdict, real-run.md).
