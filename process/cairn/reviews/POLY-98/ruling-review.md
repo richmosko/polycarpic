@@ -121,3 +121,41 @@ A1–A3.
   ssh calls. qa can test it: the fake ssh log shows one sha in both commands.
 
 The ruling at `5f1b6381`, Addendum 1 included, passes the security review.
+
+## Addendum 2 and the R1 correction at 1af8ebd4: PASS with one condition (K12)
+
+Read the ruling diff `5f1b6381..1af8ebd4`, `tests/infra/ops/base.py`, `test_lint.py` and `test-plan.md` pin 3, all
+@ `1c9b09ec`.
+
+**`trusted_uid` (pin 3).** The test-only reading is sound: unit tests cannot chown to root, so they pass their own uid.
+- **Today no production path can set it.** The ruling makes it a constructor field like `root`, and production
+  constructs `Ctx` with `0`.
+- **The risk is a builder getting it wrong.** For example, `trusted_uid` taken from `SUDO_UID`, from the environment or
+  from a flag. The integrity check would then accept files owned by `polyops`, uid 1000.
+  - `polyops` is root through sudo already, so the direct gain is nil.
+  - The cost is that a laptop-side `scp` or `rsync` into the install, owned by `polyops`, would pass silently. Owned by
+    root is the one invariant the K1 walk exists to hold.
+- **The lint does not catch this.** `test_no_test_hook_…` looks only for the strings `POLYCARPIC_ROOT`, `OPS_ROOT` and
+  `--root`.
+
+**R1 correction (`status/` pattern).** Ignoring every other file is right. One gap: Python's `$` also matches before a
+trailing newline, so a file named `01_x.py` followed by a newline would pass `re.match(…$)`. The directory is
+root-owned, so this is a correctness point, not a reach.
+
+**The rest of Addendum 2** (df's used formula, fix-line order, the all-RED width case, pin 9's reading of K6) carries
+nothing security-bearing.
+
+- **K12. `trusted_uid` is 0 in production, and patterns match whole strings.**
+  - (a) **Lint (AST, not substring).** Under `infra/ops/`, every `Ctx(...)` call either omits `trusted_uid` or passes
+    the literal `0`. No code outside `Ctx.__init__` assigns `trusted_uid`. No module reads `SUDO_UID` or `SUDO_USER`.
+  - (b) **Behaviour.** The dispatcher's production builder runs with `SUDO_UID=1000` and `--trusted-uid 1000` in the
+    environment and argv. It yields `trusted_uid == 0`, or exits 2 on the unknown flag.
+  - (c) **Behaviour.** `set-secret`'s recorded `chown` uid is the literal 0 even when the test's `trusted_uid` is not.
+    Production code must never pass `trusted_uid` as the owner.
+  - (d) **Container (real root).** A file in the install chowned to the sudo user exits 4 under real `sudo`, naming it.
+  - (e) **Patterns.** Every pattern match under `infra/ops/` uses `re.fullmatch`, never `re.match(…$)`.
+    - Test: files named `evil.py`, and `01_evil.py`, each with a trailing newline in the name and planted in
+      `commands/` and `status/`, are ignored.
+    - Lint: no `re.match` or `re.search` with a pattern ending in `$` under `infra/ops/`.
+
+PASS once K12 is in the 98c list. It needs no ruling change: it pins what Addendum 2 and R1 already say.
