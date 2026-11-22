@@ -1,40 +1,34 @@
-# POLY-97 gate 3: qa sign-off run
+# POLY-97 gate 3: qa sign-off run (final, at the build tip)
 
-Tip tested: 38cd64bd (branch `feature/poly-97-infra-provisioning`, tree clean, build ea78daae plus my fixture change). Mac, Docker 29.9.3, machine quiet (no other containers of mine; devops and seceng reading). `docker ps` after: clean.
+Tip tested: 5ef6a2d0 (branch `feature/poly-97-infra-provisioning`, tree clean; devops's fix-round build 9e92e880 plus my test fixes). Mac, Docker 29.9.3, machine quiet. `docker ps` after: clean.
 
 ## 1. The run
 
 | Suite | Result | Time |
 |--|--|--|
-| Dry run, 3 vitest files (create 36, host stage + H 64, database stage + D 25) | **125/125** | 83.4 s |
-| Python operator tools, 5 files | **70/70** | 0.06 s |
-| CI wiring (6, inside the fixture suite below) | 6/6 | — |
-| `tests/infra` fixture suite (9 files, includes wiring) | **326/326** | 12.5 s |
-| `tests/ci` (21 files) | **553/553** | 9.0 s |
-| Existing image suite (6 files) | 78/81; the 3 red are the known pre-existing `postgres.test.ts:113,:121,:184` (`expected +0 not to be +0`, macOS bind mounts; same on the lead's checkout before any of this work) | 83.5 s |
+| `provision` job locally: `vitest.provision.config.ts`, 3 files in parallel (create 38, host stage + H 64, D checks + summaries 18) | **120/120** | 48.7 s |
+| Python operator tools, 5 files | **78/78** | 0.06 s |
 | shellcheck of the 3 scripts, in the test container | exit **0** | — |
+| `tests/infra` fixture suite (9 files, includes the 6 CI-wiring tests) | **327/327** | 12.4 s |
+| `tests/ci` (21 files) | **573/573** | 9.8 s |
+| `image` job locally: existing image suite (81) + `provision-db.test.ts` (9, the database stage and M2 sweep) | 87/90; the 3 red are the known pre-existing `postgres.test.ts:113,:121,:184` (`expected +0 not to be +0`, macOS bind mounts; also red on the lead's checkout before this work) | 91.0 s (database-stage file 8.6 s of it) |
 
-**Suite-time delta against `main` today** (main = `git archive origin/main` extracted to a scratch dir, same machine, same minute; main has no `.git`, so 8 `tests/ci` cases that need one fail there and are ignored for time): `tests/ci` 553 tests 8.9 s on main vs 553 tests 9.0 s here (+0.1 s); `tests/infra` fixture 320 tests 12.7 s vs 326 tests 12.5 s (+6 tests, no measurable time); existing image suite unchanged (no file in it was touched; 83.5 s); **new**: dry run +83.4 s, Python +0.06 s.
-
-**Dry run vs the ruling's 60 s local guard: 83.4 s (86.0 s on the previous run).** Over the guard by about 23 s. The cost is container start (about 0.25 s × 125 tests plus three host-stage snapshots and four Postgres starts); the db file alone is 31 s. Not reduced by anything cheap I can do without sharing state across tests. The ruling's CI guard (added `image` steps ≤ 120 s) is measured on the first green CI run, not here.
+**Suite-time delta against `main`** (measured at the previous gate run on `git archive origin/main`, same machine): `tests/ci` 8.9 s → 9.8 s (553 → 573 tests, +20 for the provision area rows); `tests/infra` fixture 12.7 s → 12.4 s (320 → 327 tests); the `image` job's local time grows by 8.6 s (the database-stage test only); the new `provision` job is 48.7 s locally. The ruling's local guard was 60 s for the dry run: **met after the architect's split (48.7 s vs 83 s serial)**. CI limits (architect, pins-review @ 5b2a5e90: `provision` ≤ 200 s, `image` ≤ 290 s) are judged on the next two CI runs, not locally.
 
 ## 2. Audit: every ruled item against the tree
 
-Grepped the three vitest files, the five Python files and the wiring test for each id and fault; every item below has at least one passing test (all 125 + 70 + 6 pass).
+Grepped the three provision files, `provision-db.test.ts`, the five Python files and the wiring test for each id and fault: none without a test, all pass.
 
-- H1–H15 (+ INFO H12b), D1–D6: one or more planted-fault tests each with id, found value and `— fix:` asserted, plus a positive case (H8, H12, H13, H15, D3, D5, D6 have their own positive).
-- R9: wildcard, CNAME other / pointing elsewhere, pinned value (DMARC, DKIM + re-pin fix text, MX), two records, proxied, NS below apex, app/staging address, absent allowed, A/AAAA/CAA at each CNAME target (6 plants), fail-closed on `result_info` and `success:false`, pagination.
-- Addendum 1: DMARC without `rua`, `ruf` fails, three CAA rows, exact TXT comparison and 255-byte join, case-insensitive names/CNAME, `authorizationToken` never printed (H12 success and failure, b2-setup, DNS tools), S7/H15 (AllowUsers, sudoers exact/0440, other sudoers file, second login account), S8 D1 extras.
-- Addendum 2/3: D3 probe by reason with hygiene (tmpfs, `require_auth`, `:ro`, no `-e`, no password in output or call log), D5 staging (no verifier; a planted one fails), ssh key file (5 refusals; `"` `'` `:` `#{}` comments dropped; plain key accepted).
-- pins-review 3a–c (flag wins, missing flag / unreadable file is FAIL H12 never WAIT) and 5a–b (one-device glob both ways, wipefs `--no-act` only, luksFormat on LUKS refused).
-- M1 (spool as 999/10004/10005, chmod 0600 trips H7), M2 (success and forced failing ALTER, log sweep), R10 sweeps.
+- H1–H15 (+ INFO H12b), D1–D6 with id, found value and `— fix:`, plus positives.
+- R9 faults, target health, fail-closed, pagination; Addendum 1 (DMARC pin, `ruf`, three CAA rows, exact TXT, `authorizationToken` never printed, S7/H15, S8 D1 extras); Addenda 2/3 (D3 probe by reason with hygiene, D5 staging, ssh key file); pins-review 3a–c and 5a–b; M1, M2 and R10 sweeps.
+- Added since the last gate, all green on the build: build-review B1 (probe via rclone's S3 backend), B2 (unrestricted key that can write = FAIL, read-only = WARN, another bucket = silent), probe master-key regeneration and 401, CAA as `data` with content-only / data-only / both list replies, second-firewall drift (detach, never delete), the A-M2 mutation case (the verifier does reach the log without the two SETs), staging stage (five roles authenticate, `poly_backup` has no verifier), and the CI wiring of the new `provision` job (changes key and paths, aggregate REQUIRED, budget).
 
-**No ruled item lacks a passing test.** Not testable here, and so not in the suite: R12 E1–E9 (the Principal's real run); the Docker apt key against Docker's real key (only the pinned-fingerprint branch and its refusal); `userland-proxy: false` and the address-pool check against a live daemon (fake `docker info`); B2/Cloudflare/Hetzner live shapes; R7's four-file copy (a runbook step); R11 docs. Pin 1 (Python `main()` signature) was never ruled; the architect's pins-review accepted it.
+**No ruled item lacks a passing test.** Not testable here and so not in the suite: R12 E1–E9 (the Principal's real run); the Docker apt key against Docker's real key (only the pinned-fingerprint branch and refusal); `userland-proxy: false` and the address-pool check against a live daemon (fake `docker info`); B2/Cloudflare/Hetzner live shapes (including the unmeasured `s3ApiUrl` and CAA `data` shapes); R7's four-file copy (a runbook step); R11 docs.
 
-## 3. CI run 45046572609: red `guard` job
+## 3. gitleaks
 
-The step is `gitleaks … --redact --log-opts "origin/main..HEAD"`; its log prints only `32 commits scanned … leaks found: 1`, with no rule or file. I could not run gitleaks here (the auto-mode classifier refused to execute the downloaded binary), so I reproduced the rule's regex and 3.5-bit entropy threshold in Python over the branch diff. Two of my fixtures scored far over it: `cfFIXTURETOKENabcdefghijklmnopqrstuvwx` (5.0 bits, `tests/infra/operator/base.py`, key name contains `token`) and `hcloudFIXTURETOKEN0123456789abcdefghijklmnopqrstuvwxyz012345` (5.4 bits, `tests/infra/operator/test_laptop_check.py`, `token = "…"`): almost certainly the generic-api-key finding. Three lower ones (3.6–3.9 bits) were changed too. **Fix at the source, no allowlist: every fixture secret is now a repeated-character placeholder (`cftoken-bbbb…`), under 3 bits, same distinctness; the scan finds nothing at or above 3.5 in the branch diff.** Caveat: gitleaks scans every commit in the range, and the old values are still in earlier commits of this branch. HEAD no longer has them; a green guard needs those commits rewritten (squash before the PR) or a fresh range. That is the lead's call; I did not rewrite history.
+Settled by the lead and seceng: two reviewed fingerprints in `.gitleaksignore`, gitleaks 8.30.1 clean on `origin/main..df34376b`. My part: the two high-entropy fixture tokens in the tests were replaced by low-entropy placeholders (c61d6b68); new fixtures stay under 3 bits.
 
 ## Verdict
 
-PASS for tests: 125 + 70 + 6 new green, existing suites unchanged (3 known pre-existing reds), shellcheck 0, no untested ruled item. Open for the lead: the dry run is 83 s against a 60 s guard; the guard job needs the history point above.
+**PASS** for tests at 5ef6a2d0: 120 + 78 + 6 wiring green, shellcheck 0, `tests/ci` and `tests/infra` green, existing image suite unchanged (3 known pre-existing reds), no untested ruled item, dry run within the local guard after the split. Open, not mine: CI limits for `provision` and `image` on the next two runs.

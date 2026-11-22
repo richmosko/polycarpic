@@ -45,3 +45,7 @@ All in `tests/**`; no assertion was weakened. Each row: what the test asserted b
 Gap 8, none: no other harness error appeared in the 125 dry-run tests against the build. Containers: `docker ps` shows only `boring_goldstine`, not mine (names `poly97-pg*`); my networks and Postgres containers are removed by `afterAll`.
 
 | 8 | `test_dns_records` expected-set key stripped every trailing quote, so CAA `0 issue "letsencrypt.org"` could never match | next commit | strip on all content, now only on TXT (CAA compared exactly as sent); not weakened |
+
+| 9 | `test_b2_setup` probe: `line(out+err, "master")` returns the first line containing "master" (the opening instruction), so the still-live regex could never match | 5ef6a2d0 | `line(out+err, "master", "still")`; same regex `still (live|valid|authori)`; not loosened |
+| 10 | second-firewall test: jq `[a \| length, (b), (c)]` pipes everything after the bar into the array ("Cannot index array") | 5ef6a2d0 | each element parenthesised; same three expected counts `[1,0,1]` |
+| 11 | dry-run files moved by the CI remedy (provision-create/provision/provision-box to tests/infra/provision/, box.ts, pg.ts); D checks run on the pinned base image, not the derivative | 0393d972 | imports only; the D1-D6 and summary assertions are unchanged; the database-stage tests keep the derivative |
