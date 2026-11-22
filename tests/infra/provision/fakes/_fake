@@ -135,8 +135,14 @@ case "$name" in
                 host=$(cat "$S/pg-$proj-host"); [ "${cmd[0]}" = psql ] || unsupported "$@"
                 if [ -s "$S/pg-$proj-password" ]; then PGPASSWORD=$(cat "$S/pg-$proj-password"); export PGPASSWORD; fi
                 if [ -t 0 ]; then exec psql -h "$host" -U postgres "${cmd[@]:1}"; fi
-                tee -a /dev/shm/psql-stdin.log | psql -h "$host" -U postgres "${cmd[@]:1}"
-                exit "${PIPESTATUS[1]}" ;;
+                # psql-break-alter: break the syntax of every verifier ALTER so Postgres fails it and logs the error statement (M2 case C)
+                set -o pipefail
+                if [ -e "$S/psql-break-alter" ]; then
+                  tee -a /dev/shm/psql-stdin.log | sed -E '/SCRAM-SHA-256\$/ s/ALTER ROLE +([A-Za-z_"]+)/ALTER ROLE \1 BREAKME/I' | psql -h "$host" -U postgres "${cmd[@]:1}"
+                else
+                  tee -a /dev/shm/psql-stdin.log | psql -h "$host" -U postgres "${cmd[@]:1}"
+                fi
+                exit $? ;;
               *) unsupported "$@" ;;
             esac ;;
           *) unsupported "$@" ;;

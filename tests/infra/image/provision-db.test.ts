@@ -47,7 +47,7 @@ const ALL = (plant = '', o: { prod?: string | null; staging?: string | null; arg
   run(`${OPS}\n${b2Fixture({})}\n${nets(NETS_GOOD)}\n${point(o.prod === undefined ? names.good : o.prod, o.staging === undefined ? names.stg : o.staging)}\n${plant}\n${CHECK} ${o.args ?? ''}; echo "rc=$?"`, { image: COMPLETE, network: NET });
 const sql = (host: string, q: string) => `psql -h ${host} -U postgres -d polycarpic -tAc "${q}"`;
 const asSuper = (cmd: string) => `export PGPASSWORD=$(cat /etc/polycarpic/secrets/postgres/db_superuser_password); ${cmd}`;
-const STAGE = (project = 'prod', host = names.good) => `${OPS} ${point(host, null).replace(/pg-prod/g, `pg-${project}`)}; bash /tmp/ops/provision.sh --stage database --project ${project}`;
+const STAGE = (project = 'prod', host = names.good) => `${OPS} ${point(host, null).replace(/pg-prod/g, `pg-${project}`).trim()}; bash /tmp/ops/provision.sh --stage database --project ${project}`;
 
 const LOGIN: Record<string, string> = { poly_app: 'web/db_password_app', poly_auth: 'auth/db_password_auth', poly_worker: 'worker/db_password_worker', poly_migrator: 'migrate/db_password_migrator', poly_operator: 'operator/db_password_operator', poly_backup: 'backup/db_password_backup' };
 
@@ -75,12 +75,7 @@ beforeAll(() => {
   // the faulty instance: roles without passwords, an extra extension, a leftover replication slot
   const seed = run(`${asSuper('')} for q in "CREATE EXTENSION pgcrypto" "SELECT pg_create_physical_replication_slot('leftover')"; do psql -h ${names.bad} -U postgres -d polycarpic -c "$q"; done; psql -h ${names.bad} -U postgres -d polycarpic -f /repo/packages/db/sql/roles.sql`, { image: HOST, network: NET });
   if (seed.code !== 0) throw new Error(`seeding the faulty instance: ${seed.all.slice(-600)}`);
-  // the failing instance: an event trigger that refuses any ALTER ROLE carrying a SCRAM verifier
-  const trig = run(`${asSuper('')} psql -h ${names.fail} -U postgres -d polycarpic -v ON_ERROR_STOP=1 <<'SQL'
-CREATE FUNCTION public.deny_verifier() RETURNS event_trigger LANGUAGE plpgsql AS $$ BEGIN IF current_query() LIKE '%SCRAM-SHA-256$%' THEN RAISE EXCEPTION 'planted failure'; END IF; END $$;
-CREATE EVENT TRIGGER deny_verifier ON ddl_command_start WHEN TAG IN ('ALTER ROLE') EXECUTE FUNCTION public.deny_verifier();
-SQL`, { image: HOST, network: NET });
-  if (trig.code !== 0) throw new Error(`planting the event trigger: ${trig.all.slice(-500)}`);
+  // the failing instance needs no setup: the fake psql breaks every verifier ALTER (Postgres 17 has no event triggers for ALTER ROLE)
   } catch (e) { setupError = String((e as Error).message); }
 }, 900_000);
 beforeEach(() => { if (setupError) throw new Error(setupError); });
@@ -125,11 +120,11 @@ ${Object.entries(LOGIN).map(([role, f]) => `PGPASSWORD=$(cat /etc/polycarpic/sec
     for (const v of vals) expect(log).not.toContain(v);
   });
 
-  it('M2: a forced failing ALTER (event trigger raises) exits non-zero and still leaves no plaintext and no verifier in the Postgres log', () => {
-    const r = run(`${OPS} ${point(names.fail, null)}; bash /tmp/ops/provision.sh --stage database --project prod > /tmp/o 2>&1; echo "rc=$?"; cat /tmp/o`, { image: HOST, network: NET });
+  it('M2: a forced failing ALTER (the fake psql breaks its syntax) exits non-zero and still leaves no plaintext and no verifier in the Postgres log', () => {
+    const r = run(`${OPS} ${point(names.fail, null)}; touch /var/fake-state/psql-break-alter; bash /tmp/ops/provision.sh --stage database --project prod > /tmp/o 2>&1; echo "rc=$?"; cat /tmp/o`, { image: HOST, network: NET });
     expect(r.out).not.toMatch(/rc=0\n/);
     const log = sh('docker', ['logs', names.fail]).all;
-    expect(log, 'control: the planted ALTER really failed inside Postgres').toMatch(/planted failure/);
+    expect(log, 'control: the broken ALTER really failed inside Postgres').toMatch(/syntax error/);
     expect(log).not.toMatch(/SCRAM-SHA-256\$/);
     const vals = run('cat /etc/polycarpic/secrets/*/*', { image: HOST }).out.split('\n').filter(Boolean);
     for (const v of vals) expect(log).not.toContain(v);
