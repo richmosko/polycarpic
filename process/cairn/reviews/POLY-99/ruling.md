@@ -92,7 +92,8 @@ wrong cluster's segment. The `.backup`, `.history` and `.partial` forms are what
   `.inflight/`. A crash between `ln` and `rm` leaves a temporary that the next call for the same `%f` removes.
 - A crash after `ln` but before Postgres records the segment as archived makes the retry fail on the existing target
   until the segment has been shipped and root has removed it (about one minute). The retry then uploads a second version of that
-  name. That is the one benign source of a two-version name, and restore treats it as an alert (R8), not as silence.
+  name. That is one benign source of a two-version name; the checksum-mismatch retry (S3) is the second. Restore treats
+  both as an alert (R8), not as silence. *(Correction, Addendum 2: this said "the one benign source".)*
 
 ## R4 — The uploader: `infra/backup/upload.sh` and the tools image
 
@@ -512,3 +513,22 @@ seceng C1–C12 are carried by reference and are 99c tests as written there. The
 - **C11**: R4's rclone config in a 0600 tmpfs file stands; `--config` takes a path, never a key. The sweep covers that file's contents too.
 - **T18 (criterion 5):** `backup premigration` → `restore.sh --premigration --from-box` (fake ssh into the box fixture) → scratch, with the canary present and the C4 check passing.
 - **§D:** D1 is seceng's P1, and both recommend (a). D3 is P2. Seceng recommends a daily list-only job, and I now agree. It catches an uploader that lies, which nothing on the box can. It is not built in this loop; it goes to POLY-105. §L1 carries seceng's (i)–(iii).
+
+## Addendum 2 — seceng's re-review (`ruling-review.md` § Re-review @ `2eea8816`); the addendum budget is now closed
+
+- **N1 (gates)** is carried as written there, with its tests. Root accepts a `verified` or `published` line only when
+  `<dir>` ∈ {`wal`, `dump`, `premigration`} and `<name>` matches R2 for that dir. It then opens the file relative to
+  that spool dir with `O_NOFOLLOW` and requires a regular file, and only after that hashes, deletes or writes a
+  sibling. Any failing line touches nothing: exit 1 and `/fail`. **A5** is adopted: at most 1 MiB of uploader stdout,
+  and a line over 4 KiB is a fault.
+- **C7′** replaces Addendum 1's C7 bullet. The base `START TIME` must fall in `[TS−1 min, TS+10 min]`. The dump's time
+  must fall in `[TS−1 min, TS+3 h]` for nightly or `[TS−1 min, TS+30 min]` for premigration. WAL is chosen by the
+  version rule and `<sys>` only. An upload more than 4 h after `<TS>` is refused (exit 3) unless `--set <TS>` names
+  the set, which passes it with `WARN late upload`.
+- `drill.sh` runs `ulimit -c 0` itself. `list-premigration` refuses a `spool.sha256` that is not root-owned 0644
+  (C10). R3 is corrected in place.
+- **§D supersedes:** seceng's D1–D3 in the re-review are the text the lead carries to the Principal.
+  - D1: I concur with (b), with a loud override switch.
+  - D2: I concur with (a), destroyed as seceng defines it, in tmpfs while it fits.
+  - D3: I concur with filing it now as its own issue that gates the first real household data; this replaces my
+    POLY-105 placement.
