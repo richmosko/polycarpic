@@ -27,3 +27,32 @@ Three pins need one stated precision, which the build follows.
 - **5b.** `wipefs` is called only with `--no-act` (`-n`). The fake exits non-zero on any `wipefs` without it, so a
   destructive call fails the dry run. The same applies to `luksFormat` on a device that `isLuks` reports as LUKS: the
   fake refuses it, so R5's "never reformatted" is tested.
+
+## 2026-11-22 — CI guard tripped: the remedy (applies the ruling's Guards rule)
+
+Measured by devops on one Linux run (45046572609): `image` took 407 s, against 242–260 s on the POLY-137 branch. The breakdown is about 165 s added: the test container build 47 s, shellcheck 2 s, the dry run about 115 s. The limit is 120 s. One run is enough for this decision, because the overshoot is larger than any run-to-run spread seen on `image`.
+
+**Ruling: a new job, `provision`.** Everything this loop added to the `image` job moves there, except the database-stage test.
+- **What moves:**
+  - the test container build;
+  - shellcheck;
+  - `python3 -m unittest discover -s tests/infra/operator`;
+  - every dry-run vitest case: create.sh, the host stage, the H checks, the D checks and the summaries against the fake `docker`.
+
+  These need no built image. The dry-run tests move to `tests/infra/provision/` with their own `vitest.provision.config.ts`, and the image config no longer picks them up.
+- **What stays in `image`:** the database-stage test (R5: the SCRAM verifier and the log sweep), because it needs the Postgres derivative that `image` builds. Split it out of `provision-db.test.ts`.
+- **Change filter.** `infra/ci/changes.mjs` gains an area `provision`:
+  - its paths are `^infra/hetzner/`, `^infra/provision(-check)?\.sh$`, `^infra/operator/` and `^tests/infra/(provision|operator)/`;
+  - the `image` area gains a lookahead excluding `infra/(hetzner|operator)/` and `tests/infra/(provision|operator)/`;
+  - `infra/provision.sh` stays in `image` too, because the database-stage test runs it.
+- **Aggregate.** `ci.yml`'s `app` needs `provision`. In `infra/ci/aggregate.mjs`:
+  - `REQUIRED` gains `provision: ['provision']`;
+  - `provision` is added to the list of job results that must be present;
+  - the `tests/ci` structure tests that tie `aggregate.mjs` to `ci.yml` cover the new job.
+
+  A provisioning failure must block a merge.
+- **Limits.**
+  - `provision` ≤ 200 s wall, recorded in `infra/ci/budgets.json`.
+  - `image` returns to within 30 s of its POLY-137 range (≤ 290 s); the database-stage test is the only addition left there.
+  - Both are judged on the next two runs, not one.
+- **Allowed time cut, not required.** Read-only positive cases may share one container snapshot taken after the host stage (`docker commit`, or one long-lived container per file). Each planted-fault case still starts from the clean snapshot, never from another fault's leftovers.
