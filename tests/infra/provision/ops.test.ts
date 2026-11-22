@@ -264,3 +264,68 @@ describe('provision-check D3 records its probe window in jobs.log (R7: without i
     expect(LINE.exec(l!)![3]).toBe('failed');
   });
 });
+
+describe('status revokes and slots SQL against a real Postgres (architect G2; pin 16)', () => {
+  // Pin 16: infra/ops/status/<nn>_slots.py has `SQL` (str); infra/ops/status/<nn>_revokes.py has `sql(signatures) -> str`. The test loads both from the tree and runs them as built.
+  const NET = `poly98gnet${process.pid}`;
+  const names = namesFor('g');
+  let dbError: string | null = null;
+  beforeAll(() => {
+    try {
+      const superPw = superPassword();
+      sh('docker', ['network', 'create', NET]);
+      startPg(names.good, NET, BASE_IMAGE, superPw); // after roles.sql
+      startPg(names.bad, NET, BASE_IMAGE, superPw); // fresh: roles.sql never ran
+      for (const n of [names.good, names.bad]) waitPg(n);
+      const prod = run(`${STAGE(names.good)} 2>&1`, { image: HOST, network: NET });
+      if (prod.code !== 0) throw new Error(`the database stage failed: ${prod.all.slice(-600)}`);
+    } catch (e) { dbError = String((e as Error).message); }
+  }, 600_000);
+  beforeEach(() => { if (dbError) throw new Error(dbError); });
+  afterAll(() => { for (const n of [names.good, names.bad]) sh('docker', ['rm', '-f', n]); sh('docker', ['network', 'rm', NET]); });
+
+  const LOAD = `cat > /tmp/q.py <<'PY'
+import glob, importlib.util, re, sys
+sys.path.insert(0, "/repo/infra/ops")
+def load(pattern):
+    path = glob.glob("/repo/infra/ops/status/" + pattern)[0]
+    spec = importlib.util.spec_from_file_location("m_" + pattern[:2], path)
+    m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m); return m
+which = sys.argv[1]
+if which == "slots":
+    sys.stdout.write(load("*_slots.py").SQL)
+else:
+    sigs = re.findall(r"^REVOKE EXECUTE ON FUNCTION pg_catalog\.(\S+) FROM PUBLIC;$", open("/repo/packages/db/sql/roles.sql").read(), re.M)
+    assert len(sigs) == 17
+    sys.stdout.write(load("*_revokes.py").sql(sigs))
+PY
+python3 -I /tmp/q.py revokes > /tmp/rev.sql; python3 -I /tmp/q.py slots > /tmp/slots.sql
+[ -s /tmp/rev.sql ] && [ -s /tmp/slots.sql ] || echo NOSQL
+export PGPASSWORD=$(cat /etc/polycarpic/secrets/postgres/db_superuser_password)
+q() { psql -h "$1" -U postgres -d polycarpic -XAtq -v ON_ERROR_STOP=1 < "$2"; }`;
+  const QT = 'query_to_xml(text,boolean,boolean,text)';
+
+  it('(a) after roles.sql: revokes prints nothing, slots prints nothing', () => {
+    const r = run(`${LOAD}\necho REV; q ${names.good} /tmp/rev.sql; echo SLOTS; q ${names.good} /tmp/slots.sql; echo END`, { image: HOST, network: NET });
+    expect(r.out, 'status modules expose the queries (pin 16)').not.toContain('NOSQL');
+    expect(r.out.split('REV\n')[1]!.split('SLOTS\n')[0]).toBe('');
+    expect(r.out.split('SLOTS\n')[1]!.split('END')[0]).toBe('');
+  });
+  it('(b) before roles.sql (NULL lanacl): open:plpgsql and all 17 open:<sig>', () => {
+    const r = run(`${LOAD}\necho REV; q ${names.bad} /tmp/rev.sql; echo END`, { image: HOST, network: NET });
+    const out = r.out.split('REV\n')[1]!.split('END')[0]!.trim().split('\n');
+    expect(out).toContain('open:plpgsql');
+    expect(out.filter((l) => l.startsWith('open:') && l !== 'open:plpgsql').length).toBe(17);
+    expect(out.filter((l) => !l.startsWith('open:'))).toEqual([]);
+  });
+  it('(c) one built-in granted back to PUBLIC: exactly that signature, then closed again', () => {
+    const r = run(`${LOAD}\npsql -h ${names.good} -U postgres -d polycarpic -qc "GRANT EXECUTE ON FUNCTION pg_catalog.${QT} TO PUBLIC"; echo REV; q ${names.good} /tmp/rev.sql; echo END; psql -h ${names.good} -U postgres -d polycarpic -qc "REVOKE EXECUTE ON FUNCTION pg_catalog.${QT} FROM PUBLIC"; echo AFTER; q ${names.good} /tmp/rev.sql; echo DONE`, { image: HOST, network: NET });
+    expect(r.out.split('REV\n')[1]!.split('END')[0]!.trim()).toBe(`open:${QT}`);
+    expect(r.out.split('AFTER\n')[1]!.split('DONE')[0]).toBe('');
+  });
+  it('(d) a non-temporary physical slot is printed by name, and dropped afterwards', () => {
+    const r = run(`${LOAD}\npsql -h ${names.good} -U postgres -d polycarpic -qc "SELECT pg_create_physical_replication_slot('leftover_slot')" > /dev/null; echo SLOTS; q ${names.good} /tmp/slots.sql; echo END; psql -h ${names.good} -U postgres -d polycarpic -qc "SELECT pg_drop_replication_slot('leftover_slot')" > /dev/null; echo AFTER; q ${names.good} /tmp/slots.sql; echo DONE`, { image: HOST, network: NET });
+    expect(r.out.split('SLOTS\n')[1]!.split('END')[0]!.trim()).toBe('leftover_slot');
+    expect(r.out.split('AFTER\n')[1]!.split('DONE')[0]).toBe('');
+  });
+});

@@ -187,6 +187,11 @@ class Status(OpsTest):
         self._vfs = lambda path: v(path) if not path.rstrip("/").endswith("srv/polycarpic") else vfs(4)
         self.assertEqual(self.find(self.go(), "disk", "host"), line("OK", "disk", "host", "/ 78%, /srv/polycarpic 4%"))
 
+    def test_reserved_blocks_fixture_is_red_at_80_by_dfs_formula(self):  # architect G1: df says 76/95 = 80%, plain used/blocks says 76%
+        self.disk["/"] = 0
+        self._vfs = lambda path: SimpleNamespace(f_blocks=100, f_bfree=24, f_bavail=19, f_frsize=4096) if not path.rstrip("/").endswith("srv/polycarpic") else vfs(4)
+        self.assertEqual(self.find(self.go(), "disk", "host"), line("RED", "disk", "host", "/ 80%, /srv/polycarpic 4%"))
+
     def test_disk_srv_over_80_or_not_mounted_is_red(self):
         self.disk["/srv/polycarpic"] = 85
         self.assertEqual(self.find(self.go(), "disk", "host"), line("RED", "disk", "host", "/ 23%, /srv/polycarpic 85%"))

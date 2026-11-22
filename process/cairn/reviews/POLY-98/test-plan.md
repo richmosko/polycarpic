@@ -107,3 +107,10 @@ The ruling fixes the Ctx field list but not signatures. Everything below is what
 | 67 | (c) recorded chown uid is 0 whatever trusted_uid | U:set_secret :: test_the_recorded_chown_owner… |
 | 68 | (d) sudo-user-owned file in the install → 4 under real sudo | C: an install file owned by anyone but root (file=4) |
 | 69 | (e) fullmatch; newline-suffixed names ignored | U:dispatcher :: test_names_with_a_trailing_newline…; U:lint :: test_names_are_matched_with_fullmatch |
+
+## Architect gaps (pins-review @ 00d40f8)
+
+| # | Item | File :: case |
+|--|--|--|
+| 70 | G1 reserved-blocks fixture (100/24/19 → RED 80%) | U:status :: test_reserved_blocks_fixture… |
+| 71 | G2 revokes/slots SQL as built against real Postgres, (a)-(d) | C: "status revokes and slots SQL against a real Postgres" (pin 16: `status/<nn>_slots.py` `SQL`; `status/<nn>_revokes.py` `sql(signatures)`) |
