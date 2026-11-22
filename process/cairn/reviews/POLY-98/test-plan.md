@@ -112,5 +112,6 @@ The ruling fixes the Ctx field list but not signatures. Everything below is what
 
 | # | Item | File :: case |
 |--|--|--|
-| 70 | G1 reserved-blocks fixture (100/24/19 → RED 80%) | U:status :: test_reserved_blocks_fixture… |
+| 70 | G1 reserved-blocks fixture (100/24/19 → RED 80%); the earlier 100/30/20 case (78%) is a second df-vs-plain separator, G1 itself is test_reserved_blocks_fixture… | U:status :: test_reserved_blocks_fixture…, test_disk_percent_is_dfs… |
+| 72 | K12 lint extras (seceng): no `trusted_uid` assignment outside `Ctx.__init__`, no `Ctx(**kw)`, no pattern string ending in `$` | U:lint :: test_trusted_uid_is_not_assigned…, test_no_pattern_string_ends_in_a_dollar_anchor |
 | 71 | G2 revokes/slots SQL as built against real Postgres, (a)-(d) | C: "status revokes and slots SQL against a real Postgres" (pin 16: `status/<nn>_slots.py` `SQL`; `status/<nn>_revokes.py` `sql(signatures)`) |
