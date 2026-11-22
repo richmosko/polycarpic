@@ -1,12 +1,12 @@
 ---
 id: POLY-100
 title: Pull-based deploy + timers
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83]
 assignee: devops-engineer
-paths: [infra/deploy/**]
+paths: [process/cairn/issues/POLY-100.md, process/cairn/reviews/POLY-100/**, infra/deploy/**, infra/ops/**, infra/compose/**, infra/provision.sh, infra/provision-check.sh, infra/postgres/**, infra/caddy/**, infra/README.md, infra/lint/**, infra/ci/**, packages/db/**, packages/config/**, apps/worker/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, packages/*/package.json, apps/*/package.json, pnpm-lock.yaml, eslint.config.js, layers.json, .gitignore, Dockerfile]
 labels: [ops, deploy, security]
 priority: null
 pr: null
@@ -78,3 +78,7 @@ From the POLY-98 ruling (`process/cairn/reviews/POLY-98/ruling.md` M4, Scope): t
 ### @team-lead — 2026-11-22
 
 From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.md` R-b): the ops bundle is installed from the laptop's checkout, so the compose files `set-secret` and `cli` read can drift from the deployed release's. A drift misses a mount or runs a stale `operator` definition; it grants nothing. `self-update` installing from the attested release bundle is where they converge (ruling R1 leaves the `sha256-<12 hex>` id for it).
+
+### @team-lead — 2026-11-22
+
+Feature started. Branch: `feature/poly-100-pull-based-deploy`.
