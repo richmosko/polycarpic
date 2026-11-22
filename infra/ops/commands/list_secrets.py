@@ -3,6 +3,7 @@ import os
 import stat
 
 from lib import compose
+from lib import secrets as rules
 
 HELP = "table of every compose-mounted secret file: state, mode, owner, size (--staging for staging)"
 ROW = "%-9s %-25s %-8s %-4s %-13s %5s"
@@ -16,7 +17,10 @@ def run(args, ctx):
     project = "staging" if args.staging else "prod"
     rows = []
     n_set = n_missing = n_wrong = 0
-    for svc, name, path in compose.parse_secrets(ctx, project):
+    entries = compose.parse_secrets(ctx, project)
+    if project == "prod":  # host-only secrets root reads, mounted by no service
+        entries = sorted(entries + [(svc, n, "%s%s/%s" % (rules.SECRET_ROOT, svc, n)) for n, svc in rules.HOST_ONLY.items()])
+    for svc, name, path in entries:
         real = ctx.p(path)
         try:
             st = os.lstat(real)

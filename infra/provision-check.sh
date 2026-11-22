@@ -46,14 +46,18 @@ gid_of() {
     uploader) echo 10005 ;; operator) echo 10006 ;; auth) echo 10007 ;; caddy) echo 10010 ;;
   esac
 }
-# The files compose mounts from each service directory (infra/compose/*.yml, single source in provision.sh's table).
+# Secrets root reads that no service mounts: <name>=<service directory>. infra/ops/lib/secrets.py carries the same pair (HOST_ONLY).
+HOST_ONLY="heartbeat_url=uploader"
+# The files compose mounts from each service directory (infra/compose/*.yml, single source in provision.sh's table), plus HOST_ONLY.
 files_for() {
+  local pair
   case "$1" in
     postgres) echo db_superuser_password ;; web) echo "db_password_app plaid_secret" ;;
     auth) echo "db_password_auth auth_secret resend_api_key" ;; worker) echo "db_password_worker credential_keyring resend_api_key" ;;
     migrate) echo db_password_migrator ;; operator) echo db_password_operator ;; backup) echo db_password_backup ;;
-    uploader) echo "backup_store_credential heartbeat_url" ;; caddy) echo staging_basic_auth ;;
+    uploader) echo backup_store_credential ;; caddy) echo staging_basic_auth ;;
   esac
+  for pair in $HOST_ONLY; do if [ "${pair#*=}" = "$1" ]; then echo "${pair%%=*}"; fi; done
 }
 in_list() { local x=$1; shift; local i; for i in "$@"; do [ "$i" = "$x" ] && return 0; done; return 1; }
 

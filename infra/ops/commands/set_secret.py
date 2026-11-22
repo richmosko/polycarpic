@@ -109,8 +109,10 @@ def run(args, ctx):
         return 2
     mounts = compose.parse_secrets(ctx, project)
     targets = [(svc, path) for svc, n, path in mounts if n == name]
+    if not targets and name in rules.HOST_ONLY and not args.staging:
+        targets = [(rules.HOST_ONLY[name], rules.SECRET_ROOT + rules.HOST_ONLY[name] + "/" + name)]
     if not targets:
-        settable = sorted({n for _, n, _ in mounts if not rules.refused_by(n)})
+        settable = sorted({n for _, n, _ in mounts if not rules.refused_by(n)} | (set() if args.staging else set(rules.HOST_ONLY)))
         ctx.err("set-secret: no service in %s mounts %s; names you can set: %s" % (",".join(compose.FILES[project]), name, ", ".join(settable)))
         return 2
     if not ctx.isatty():
