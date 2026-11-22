@@ -92,3 +92,20 @@ quotes the built `status` line. B2 adds its union cap to C-79 when it lands.
   - **Test, overlap counted once.** Two identical 5 h lines → a union of 5 h 2 min → OK.
 - **B3.** `polycarpic-ops provision --stage host --target hetzner --domain example.com --mail-from -x@example.com` exits
   **2** with stderr exactly `provision: bad --mail-from`, and the runner log is empty.
+
+## R4 order correction at 0c279807: concur, plus B4
+
+Asking about the replace before the value prompt is right, and the build already does it: `_plan`, then `confirm`, then
+`_read`. A refused replace never reads the secret.
+
+- **B4. The replace question reads its answer with echo off too.**
+  - **Mechanism.** The new order creates one new way to leak. An operator expecting the value prompt pastes the secret
+    at `type yes to replace:`. Production `confirm` is `input()`, so the value is echoed in clear into the terminal and
+    its scrollback. It is then refused as "not replaced", which reads as if nothing happened.
+  - **Fix.** Production `confirm` uses the same no-echo read as the value prompt, `TCSAFLUSH` included (B1). Anything
+    but `yes` prints `not replaced`, exit 1. The answer is never echoed back.
+  - **Cost.** The operator does not see `yes` as they type it.
+  - **Test (unit, fake `termios`).** The production `confirm` clears `ECHO` with `TCSAFLUSH` before it reads, and
+    restores the terminal afterwards.
+  - **Test (set-secret).** An answer equal to a fixture secret exits 1, `not replaced`. The fixture appears nowhere in
+    stdout, stderr or any file (the K-sweep).
