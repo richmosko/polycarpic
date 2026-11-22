@@ -146,7 +146,7 @@ describe('create.sh (R1)', () => {
   // Pinned behaviour: create.sh prints `change: firewall detached (<name>)` and detaches it (exit 0); the server ends with only ours.
   const SECOND = `hcloud firewall create --name console-fw >/dev/null; hcloud firewall apply-to-resource console-fw --type server --server pc >/dev/null;`;
   it('drift: a second firewall applied to the server in the console is detached and reported; the server ends with exactly our one', () => {
-    const r = run(`${KEY} ${CREATE} >/dev/null; ${SECOND} ${CREATE}; echo "rc=$?"; ${state('[.servers[0].public_net.firewalls | length, (.firewalls[] | select(.name=="console-fw") | .applied_to | length), (.firewalls[] | select(.name=="pc") | .applied_to | length)]')}; ${calls}`);
+    const r = run(`${KEY} ${CREATE} >/dev/null; ${SECOND} ${CREATE}; echo "rc=$?"; ${state('[(.servers[0].public_net.firewalls | length), (.firewalls[] | select(.name=="console-fw") | .applied_to | length), (.firewalls[] | select(.name=="pc") | .applied_to | length)]')}; ${calls}`);
     expect(r.out).toMatch(/rc=0/);
     expect(r.out).toMatch(/^change: firewall detached \(console-fw\)$/m);
     expect(r.out).toContain('[1,0,1]');

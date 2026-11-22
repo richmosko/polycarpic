@@ -250,7 +250,7 @@ class B2Setup(ToolTest):
         b2 = FakeB2()
         rc, out, err = self.go(b2, args=["--probe"], runner=lambda argv, env=None, stdin=None: 0, regenerate=False)
         self.assertNotEqual(rc, 0)
-        self.assertRegex(self.line(out + err, "master"), r"(?i)still (live|valid|authori)")
+        self.assertRegex(self.line(out + err, "master", "still"), r"(?i)still (live|valid|authori)")
         self.assertTrue(b2.deleted)
 
     def test_probe_reports_a_refusal_and_still_deletes_the_temporary_key(self):
