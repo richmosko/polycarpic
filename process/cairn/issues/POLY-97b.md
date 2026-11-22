@@ -6,7 +6,7 @@ milestone: POLY-M1
 parent: POLY-97
 blocked_by: [POLY-97a]
 assignee: seceng
-paths: [process/cairn/issues/POLY-97.md, process/cairn/reviews/POLY-97/**, process/cairn/issues/POLY-97b.md, docs/SECURITY/**]
+paths: [process/cairn/issues/POLY-97.md, process/cairn/reviews/POLY-97/**, process/cairn/issues/POLY-97b.md, docs/SECURITY/**, .gitleaksignore]
 stage: plan
 estimate.cost_usd: "5.00"
 estimate.gate_cycles: 2
