@@ -110,6 +110,7 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
         api = auth["apiUrl"] + "/b2api/v2/"
         hdr = {"Authorization": auth["authorizationToken"]}
         account = auth["accountId"]
+        s3_url = auth.get("s3ApiUrl", "")
         del auth
 
         buckets = call("POST", api + "b2_list_buckets", hdr, {"accountId": account, "bucketName": bucket_name}).get("buckets", [])
@@ -120,7 +121,9 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
         bucket_id = bucket["bucketId"]
 
         if probe:
-            return run_probe(call, api, hdr, account, bucket_id, bucket_name, basic, runner, env, out)
+            code = run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, env, out)
+            ok = master_regenerated(transport, basic, input, out, result)
+            return 1 if (failed or not ok) else code
 
         out()
         out("Bucket %s:" % bucket_name)
@@ -204,24 +207,35 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
             if k.get("bucketId") == bucket_id:
                 result(False, "%s holds bucket %s: delete it in Backblaze (App Keys)" % (k.get("keyName"), bucket_name))
             elif not k.get("bucketId"):
-                out("WARN %s is not restricted to a bucket, so it can reach %s: check that you still need it" % (k.get("keyName"), bucket_name))
+                writes = sorted(set(k.get("capabilities", [])) - set(READ_CAPS) - {"listAllBucketNames"})
+                if writes:
+                    result(False, "%s is not restricted to a bucket and can write to %s (%s): restrict it to another bucket or delete it" % (k.get("keyName"), bucket_name, ", ".join(writes)))
+                else:
+                    out("WARN %s is not restricted to a bucket, so it can read %s (ciphertext only): check that you still need it" % (k.get("keyName"), bucket_name))
 
         # The master key must now be regenerated, and the old one refused.
         out()
-        out("Now generate a new master key again (App Keys -> Generate New Master Application Key).")
-        input("Type done when the new master key is generated: ")
-        status, data = transport("GET", AUTH_URL, {"Authorization": "Basic " + basic}, None)
-        if status == 401:
-            result(True, "the old master key is rejected (401): it was regenerated")
-        else:
-            result(False, "the old master key still works (HTTP %s): generate a new master key now" % status)
-        out("The master key is never to be stored or saved: it can be regenerated from the console behind two-step sign-in.")
+        master_regenerated(transport, basic, input, out, result)
     except ApiError as err:
         stderr.write("error: %s\n" % err)
         return 1
     out()
     out("B2 SETUP PASSED" if not failed else "%d B2 CHECKS FAILED" % failed)
     return 1 if failed else 0
+
+
+def master_regenerated(transport, basic, input, out, result):
+    """The old master key must be refused once a new one is generated. Returns True when it is."""
+    out("Now generate a new master key again (App Keys -> Generate New Master Application Key).")
+    input("Type done when the new master key is generated: ")
+    status, data = transport("GET", AUTH_URL, {"Authorization": "Basic " + basic}, None)
+    ok = status == 401
+    if ok:
+        result(True, "the old master key is rejected (401): it was regenerated")
+    else:
+        result(False, "the old master key is still live (HTTP %s): generate a new master key now" % status)
+    out("The master key is never to be stored or saved: it can be regenerated from the console behind two-step sign-in.")
+    return ok
 
 
 def list_keys(call, api, hdr, account):
@@ -237,16 +251,19 @@ def list_keys(call, api, hdr, account):
             return keys
 
 
-def run_probe(call, api, hdr, account, bucket_id, bucket_name, basic, runner, env, out):
+def run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, env, out):
     """E9: one upload through a temporary writeFiles-only key, to learn whether the box key needs listBuckets."""
     new = call("POST", api + "b2_create_key", hdr, {"accountId": account, "capabilities": ["writeFiles"], "keyName": PROBE_NAME, "bucketId": bucket_id})
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     target = "probe:%s/probe/%s" % (bucket_name, stamp)
     child = dict(env)
-    child["RCLONE_CONFIG_PROBE_TYPE"] = "b2"
-    child["RCLONE_CONFIG_PROBE_ACCOUNT"] = new["applicationKeyId"]
-    child["RCLONE_CONFIG_PROBE_KEY"] = new["applicationKey"]
-    child["RCLONE_B2_NO_CHECK_BUCKET"] = "true"
+    # The uploader uses rclone's S3 backend, so the probe measures that path, set from the environment the same way.
+    child["RCLONE_CONFIG_PROBE_TYPE"] = "s3"
+    child["RCLONE_CONFIG_PROBE_PROVIDER"] = "Other"
+    child["RCLONE_CONFIG_PROBE_ENDPOINT"] = s3_url
+    child["RCLONE_CONFIG_PROBE_ACCESS_KEY_ID"] = new["applicationKeyId"]
+    child["RCLONE_CONFIG_PROBE_SECRET_ACCESS_KEY"] = new["applicationKey"]
+    child["RCLONE_CONFIG_PROBE_NO_CHECK_BUCKET"] = "true"
     try:
         code = runner(["rclone", "rcat", target], env=child, stdin=b"x")
     finally:
@@ -260,7 +277,7 @@ def run_probe(call, api, hdr, account, bucket_id, bucket_name, basic, runner, en
         out("PROBE: rclone is not installed here (exit 127); install it and run --probe again.")
     else:
         out("PROBE: the writeFiles-only upload was refused or failed (exit %s). Keep listBuckets in b2-capabilities.json." % code)
-    out("The temporary key was deleted. Now generate a new master key again, and never store the master key.")
+    out("The temporary key was deleted.")
     return 0
 
 

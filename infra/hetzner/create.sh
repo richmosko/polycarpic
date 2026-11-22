@@ -124,6 +124,19 @@ else
   exists "volume $name-data"
 fi
 
+# Hetzner applies the union of every firewall on a server: one attached in the console opens ports without touching ours.
+# Detach (never delete) any firewall on the server that is not ours.
+sj=$(hcloud server describe "$name" -o json)
+all_fw=$(hcloud firewall list -o json)
+our_id=$(printf '%s' "$all_fw" | jq -r --arg n "$name" '[.[] | select(.name == $n)][0].id // empty')
+for fid in $(printf '%s' "$sj" | jq -r '.public_net.firewalls[]?.id'); do
+  [ "$fid" = "$our_id" ] && continue
+  other=$(printf '%s' "$all_fw" | jq -r --argjson id "$fid" '[.[] | select(.id == $id)][0].name // empty')
+  [ -n "$other" ] || continue
+  change "firewall detached ($other)"
+  hcloud firewall remove-from-resource "$other" --type server --server "$name" > /dev/null
+done
+
 # Addresses.
 sj=$(hcloud server describe "$name" -o json)
 echo "IPv4: $(printf '%s' "$sj" | jq -r '.public_net.ipv4.ip')"
