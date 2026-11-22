@@ -80,8 +80,8 @@ class Dispatcher(OpsTest):
         self.assertTrue(want)
         self.assertEqual(got, want)
 
-    def test_the_eight_subcommands_of_this_loop_exist(self):
-        self.assertEqual(sorted(modules()), sorted(["set_secret", "list_secrets", "status", "gate_check", "provision", "provision_check", "restart", "cli"]))
+    def test_the_ten_subcommands_exist(self):
+        self.assertEqual(sorted(modules()), sorted(["set_secret", "list_secrets", "status", "gate_check", "provision", "provision_check", "restart", "cli", "backup", "upload"]))  # POLY-99 adds backup and upload
 
     def _copy_tree(self):
         need(OPS)

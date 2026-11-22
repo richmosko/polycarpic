@@ -46,8 +46,8 @@ class BackupBase(OpsTest):
         super().setUp()
         h = self.host
         h.write("/etc/polycarpic/host.env", "PUBLIC_ORIGIN=https://app.example.com\nPOLY_INSTANCE=%s\n" % INSTANCE)
-        h.mkdir("/etc/polycarpic/secrets/uploader", 0o750)
-        h.secret("uploader", "heartbeat_url", HB + "\n")
+        h.mkdir("/etc/polycarpic/secrets/host", 0o700)  # H-1: heartbeat_url is host-only, root:root 0400 under secrets/host/
+        h.write("/etc/polycarpic/secrets/host/heartbeat_url", HB + "\n", 0o400)
         h.write(IMAGES_ENV, "POLY_TOOLS_IMAGE=%s\nPOLY_POSTGRES_IMAGE=%s\n" % (TOOLS_REF, PG_REF))
         for d in ("/run/polycarpic", "/srv", "/srv/polycarpic", SPOOL, SPOOL + "/wal", SPOOL + "/dump", SPOOL + "/premigration"):
             h.mkdir(d)

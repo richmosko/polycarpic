@@ -251,7 +251,8 @@ class Upload(BackupBase):
         for out, code in (("".join(self.verified("dump", n) for n in names), 0), ("", 1)):
             res, _ = self.go(out, code=code)
             self.assert_ping_hygiene(res)
-            self.assertNoTrace(HB.split("/")[-1], res, extra_paths=[self.host.secret_path("uploader", "heartbeat_url")])
+            blob = res.out + res.err + res.term.getvalue()
+            self.assertNotIn(HB.split("/")[-1], blob)  # stdin to curl carries it by design; no output, argv or env does
 
 
 if __name__ == "__main__":

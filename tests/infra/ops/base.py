@@ -182,6 +182,7 @@ class Host(object):
             self.mkdir("/etc/polycarpic/" + top, 0o755)
             for svc in sorted(set(s for s, _, _ in mounts(project))):
                 self.mkdir("/etc/polycarpic/%s/%s" % (top, svc), 0o750)
+        self.mkdir("/etc/polycarpic/secrets/host", 0o700)  # POLY-99 H-1: host-only secrets (heartbeat_url), root:root, no service mounts it
 
     def p(self, path):
         return self.root / path.lstrip("/")

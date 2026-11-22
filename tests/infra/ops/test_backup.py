@@ -260,11 +260,10 @@ class Backup(BackupBase):
     def test_list_refuses_a_spool_record_that_is_not_root_owned_0644(self):
         e = self.plant_set(TS)
         self.write_record(e)
-        res = self.host.go("backup", "list-premigration", runner=self.runner(), trusted=os.getuid() + 1)
-        self.assertEqual((res.rc, res.out, res.err), (1, "", "backup: spool.sha256 is not root-owned 0644\n"))
-        os.chmod(str(self.host.p(STATE + "/spool.sha256")), 0o664)
-        res = self.host.go("backup", "list-premigration", runner=self.runner())
-        self.assertEqual((res.rc, res.err), (1, "backup: spool.sha256 is not root-owned 0644\n"))
+        for mode in (0o664, 0o646, 0o666):  # group or other write (a non-root owner is proven against real root in the container suite)
+            os.chmod(str(self.host.p(STATE + "/spool.sha256")), mode)
+            res = self.host.go("backup", "list-premigration", runner=self.runner())
+            self.assertEqual((res.rc, res.out, res.err), (1, "", "backup: spool.sha256 is not root-owned 0644\n"), oct(mode))
         os.chmod(str(self.host.p(STATE + "/spool.sha256")), 0o644)
         self.assertEqual(self.host.go("backup", "list-premigration", runner=self.runner()).rc, 0)  # the positive twin
 
