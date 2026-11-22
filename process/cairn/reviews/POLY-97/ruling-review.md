@@ -84,3 +84,23 @@ Record the decision as an accepted risk, with the Principal as approver. I add i
 - **A6. Two small points.**
   - `dns-records.py` refuses to write a `_dmarc` value containing `ruf=`. The exact pin already makes the check fail on one.
   - POLY-99's version and hide-marker alert ignores E9's `probe/` objects.
+
+## Addendum 1 at f7730d73
+
+**PASS.** Ruling `f7730d73` = `d7dd2d1a` plus §Addendum 1. The diff `d7dd2d1a..f7730d73` touches only `ruling.md`
+(12 added lines, the addendum) and this review file; nothing else in the ruling changed.
+
+| Item | Met by |
+|---|---|
+| S4 (authorizationToken never printed; sweep fixture) | Addendum S4(b,c), with S4(a) already in H12 |
+| S6 (uploader fails loud) | Addendum S6(d) → POLY-99 |
+| S7 (H15) | Addendum S7, H15, plus `AllowUsers polyops` set by R2's drop-in |
+| S8 (D1 log paths) | Addendum S8 |
+| S1, A4 | Addendum: DMARC pinned without `rua` until Cloudflare DMARC Management is on (re-pin PR), `ruf=` fails regardless; TXT compared exactly |
+
+**CAA, the answer on record: the addendum's three rows stand.** `issue "letsencrypt.org"`, `issue "sectigo.com"`
+(confirm the ZeroSSL identifier from its docs), `issuewild ";"`. POLY-104 pins Caddy to one issuer, drops the other
+row and adds `accounturi=`. The two-issuer window until then matches Caddy's default and costs no certificate outage; a second CA, CAA-bound, is a smaller risk than a failed issuance. This supersedes the
+"Let's Encrypt only, accepted" row above.
+
+§D4 concur stands on H15 as written.
