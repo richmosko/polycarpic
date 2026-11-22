@@ -55,6 +55,22 @@ def txt_join(content):
     return "".join(parts) if parts else content
 
 
+def caa_parts(value):
+    """`0 issue "letsencrypt.org"` -> (0, "issue", "letsencrypt.org")."""
+    m = re.match(r'^\s*(\d+)\s+(\w+)\s+"(.*)"\s*$', value)
+    if not m:
+        raise ValueError("not a CAA value: " + value)
+    return int(m.group(1)), m.group(2), m.group(3)
+
+
+def existing_value(rec):
+    """The zone's value for a record: CAA from `data` when the reply has it, else its `content`."""
+    d = rec.get("data")
+    if rec.get("type") == "CAA" and isinstance(d, dict) and d.get("tag"):
+        return '%s %s "%s"' % (d.get("flags", 0), d["tag"], d.get("value", ""))
+    return rec.get("content", "")
+
+
 def norm(typ, value):
     if typ == "TXT":
         return txt_join(value)
@@ -133,10 +149,10 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
         to_create, conflicts = [], []
         for name, typ, value, prio, ttl in desired:
             same = [e for e in existing if rel(e["name"]) == name.lower() and e["type"] == typ]
-            if any(norm(typ, e.get("content", "")) == norm(typ, value) for e in same):
+            if any(norm(typ, existing_value(e)) == norm(typ, value) for e in same):
                 out("exists   %s %s %s" % (name, typ, value))
             elif same and typ != "CAA":
-                conflicts.append((name, typ, value, [norm(typ, e.get("content", "")) for e in same]))
+                conflicts.append((name, typ, value, [norm(typ, existing_value(e)) for e in same]))
             else:
                 to_create.append((name, typ, value, prio, ttl))
         for name, typ, value, held in conflicts:
@@ -154,7 +170,12 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
             out("Nothing changed.")
             return 0
         for name, typ, value, prio, ttl in to_create:
-            body = {"type": typ, "name": fq(name), "content": '"%s"' % value if typ == "TXT" else value, "ttl": ttl}
+            body = {"type": typ, "name": fq(name), "ttl": ttl}
+            if typ == "CAA":
+                flags, tag, val = caa_parts(value)
+                body["data"] = {"flags": flags, "tag": tag, "value": val}
+            else:
+                body["content"] = '"%s"' % value if typ == "TXT" else value
             if typ in ("A", "AAAA", "CNAME"):
                 body["proxied"] = False
             if prio is not None:
@@ -164,7 +185,7 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
 
         after = list_all()
         missing = [(n, t) for n, t, v, p, ttl in desired
-                   if not any(rel(e["name"]) == n.lower() and e["type"] == t and norm(t, e.get("content", "")) == norm(t, v) for e in after)]
+                   if not any(rel(e["name"]) == n.lower() and e["type"] == t and norm(t, existing_value(e)) == norm(t, v) for e in after)]
         for n, t in missing:
             out("MISSING after write: %s %s" % (n, t))
         out("RESULT: %s" % ("all records in place" if not missing else "%d record(s) missing" % len(missing)))

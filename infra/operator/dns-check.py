@@ -130,6 +130,9 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
         typ = rec["type"]
         content = rec.get("content", "")
         value = txt_join(content) if typ == "TXT" else content
+        if typ == "CAA" and isinstance(rec.get("data"), dict) and rec["data"].get("tag"):
+            d = rec["data"]
+            value = '%s %s "%s"' % (d.get("flags", 0), d["tag"], d.get("value", ""))
         seen.setdefault((name, typ), []).append((rec, value))
 
     for (name, typ), items in sorted(seen.items()):
