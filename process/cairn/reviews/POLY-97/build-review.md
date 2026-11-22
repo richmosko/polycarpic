@@ -129,3 +129,23 @@ PASS once C2 is in.
 **Follow-ups (not conditions; the probe is closed for this loop):**
 - **F-probe1, at the E9 real run.** Which wording B2's S3 endpoint uses for a missing capability is unmeasured. If E9 comes back INCONCLUSIVE, the box key stays `{listBuckets, writeFiles}`, which is safe. The operator then cannot see why, because rclone's output is suppressed. Add an opt-in `--show-rclone-output`. rclone takes its credentials from the environment and does not echo them at its default log level, so the output needs only a check that no fixture secret appears in it.
 - **F-probe2, for POLY-99.** When POLY-99 fixes the uploader's rclone flags, the probe uses the same flags, so the measurement keeps following the uploader's path.
+
+## Verdict C1 at af7baf82: PASS
+
+I read the changes to the D3 probe in `infra/provision-check.sh` from `6636ee24` to `af7baf82`.
+
+**P1 still holds on the new path.** Only the probe's `--network` argument and its image changed.
+- The pgpass is still written on `--tmpfs /pgpass` under `umask 077`, inside the probe.
+- The secret is still mounted `:ro`, and the probe still runs as `--user 10004:10004`.
+- Every connection string still carries `require_auth=scram-sha-256`.
+- argv now holds a container id or a network name, never the secret, and nothing is in the environment.
+- The image is the one the running `postgres` container already uses, read with `docker inspect`, with `--pull never`. So the probe runs no new code. An unreadable image is a FAIL with no `docker run`. A missing container or network gives exit 125 and a FAIL, and is never read as a refusal.
+
+**What the probe proves, per service:**
+- **web: unchanged.** It joins web's own network namespace by container id, as before.
+- **backup: the same proof.** The probe stands on `backup-net` and gets an address in the fixed subnet that `pg_hba.conf` admits, which is where the one-off `backup` run stands. What it proves is a property of the network: from `backup-net`, the backup login works. That this network is the backup service's only network is pinned separately, by the compose policy lint's service-to-network matrix. Together they give what the old container-join gave.
+- **uploader: the same proof as before.** It shows that from `upload-net` the name `postgres` does not resolve. That is also all the old probe showed.
+
+**Follow-up (not a condition; recommended before real data): F-D3.** For the uploader, the probe proves only that the name `postgres` does not resolve, not that there is no route.
+
+C-79 claims there is no route from `upload-net` to Postgres. Docker's network isolation rules should drop traffic between bridge networks, but no check exercises that. Add a second uploader probe that connects to Postgres's own addresses on `backup-net` and on the default network, both read with `docker inspect`. It should expect a timeout or "no route", and FAIL on any TCP answer.
