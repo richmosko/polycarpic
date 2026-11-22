@@ -11,7 +11,7 @@ labels: [ops, infra]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-21
+updated: 2026-11-22
 ---
 
 The committed, idempotent scripts INFRA §7.1 steps 7–11 call (D-7): create.sh, cloud-init, provision.sh and provision-check.sh. provision-check is the evidence for C-70, C-71, C-72, C-76, C-77 and C-79 (sshd from sshd -T, the C-79 set, spool holds only .age, Docker pools vs fixed subnets).
@@ -76,3 +76,39 @@ From POLY-137 and POLY-138 (both merged 2026-11-21). Deploy items for this issue
 - Resend: the sending domain with open and click tracking off; two sending-only keys, one per service; key rotation; SPF, DKIM and DMARC `p=reject` (INFRA §6.1).
 - Runbook: only a database superuser can correct a user's email (seceng N2); a notice that cannot be delivered keeps its method held; an alert when the worker's `job.run` lines stop.
 - INFRA §7.1 describes a prod maintenance page that the Caddyfile does not have (POLY-138 F4).
+
+### @team-lead — 2026-11-22
+
+Findings from walking the Principal through INFRA §7.0–7.1 by hand, 2026-11-21/22. Owners: devops-engineer (runbook, scripts), seceng (items 1, 6, 7), architect (item 6). Prototype scripts are in the lead checkout at `temp/poly-97-operator-scripts/` (untracked).
+
+**Security finding**
+
+1. The Backblaze web form's "Write Only" key is not put-only. `b2_authorize_account` on the key the runbook tells the operator to create reports `bypassGovernance, deleteFiles, listBuckets, writeBucketEncryption, writeBucketLifecycleRules, writeBucketLogging, writeBucketNotifications, writeBucketReplications, writeBucketRetentions, writeFileLegalHolds, writeFileRetentions, writeFiles`. A break-in holding it can turn off the bucket's default retention, after which new backups are unlocked and deletable; INFRA §6.1's "the box credential cannot shorten retention or delete versions" is false for that key. Fixed by hand: `polycarpic-put-only` created through `b2_create_key` with `listBuckets, writeFiles` only (read back and confirmed), old key deleted, master key regenerated before and after. The runbook must create keys through the API, and `provision-check` must assert the box key's capability list. Unmeasured: whether rclone's S3 upload and the uploader's verify step work with only those two capabilities.
+
+**Runbook corrections (Backblaze)**
+
+2. The Object Lock dialog offers only a day count; the API reports `mode: compliance`. "If only governance is offered, stop" cannot be followed from the screen; replace it with an API read of `fileLockConfiguration` (a Read Only web key carries `readBucketRetentions`).
+3. Encryption cannot be left off in the current form (bucket shows SSE-B2 / AES256). Harmless; the runbook says "encryption off".
+4. The region is fixed at account creation; say to pick EU Central on the signup form.
+5. Caps & Alerts needs a payment method; say so.
+
+**Design points for the ruling**
+
+6. The acceptance criterion's DNS check fails on "any name other than `app` and `staging`" and on any outside alias. Resend's verification for `mail.polycarpic.com` needs exactly: CNAME `send.mail` → `send.forge.rmta.net`, CNAME `rsend.mail` → `rsend-euw1.forge.rmta.net`, TXT `resend._domainkey.mail`. The apex also carries lock-down records (below). As worded the check can never pass on a zone that sends mail. Define the allowed set, pin the two aliases by target, and fail if a target changes.
+7. Apex lock-down records now published: SPF `v=spf1 -all`, null MX `0 .`, `_dmarc` `v=DMARC1; p=reject`. seceng to confirm the DMARC policy; a test mail must be shown to pass it before the deploy gate.
+8. Healthchecks.io is skipped for now, so alert path B does not exist at first deploy. The checks need an explicit, reported "not configured" state, not a silent pass.
+
+**Deliverable the Principal asked for**
+
+9. "The script you wrote was more helpful than creating the two keys by hand. That walkthrough script should be saved (generate / use master key, then regen new master key)." Turn the prototypes into committed operator tooling under `infra/`, tests first: B2 (master-key steps printed; both keys created through the API; bucket settings and each key's capability list read back and asserted; master key never stored or echoed) and DNS (`dns-move-to-cloudflare.py`, `dns-mail-records.py`; extend for the `app`/`staging` records). Fix in the prototypes: hide the Porkbun API key prompt as well as the secret.
+
+**State as built (all read back through the provider APIs or public DNS)**
+
+- Hetzner: project `polycarpic`, empty; Read & Write token in `hcloud` context `polycarpic` on the laptop (delete after `create.sh`).
+- Laptop: `hcloud`, `age`, `rclone`, `nmap` installed; `~/.ssh/polycarpic_ed25519` (passphrase set); age backup key made, private half off the laptop, public line in `~/polycarpic-backup.key.public`.
+- Backblaze (EU Central, no card): bucket `polycarpic-hetzner-backups`, endpoint `s3.eu-central-003.backblazeb2.com`, private, Object Lock compliance 35 days, lifecycle hide 36 / delete 1; keys `polycarpic-put-only` and `polycarpic-read`.
+- DNS: `polycarpic.com` registered at Porkbun, name servers `anton` / `aron.ns.cloudflare.com` (Cloudflare Free); zone holds only the six mail records.
+- Resend: account; `mail.polycarpic.com` verified, EU region. No API keys yet: create them at `set-secret` time on the box so they are never stored elsewhere (four: auth and worker, staging and production).
+- The Principal does not use a password manager (C-78 assumes one); the macOS Passwords app was offered.
+
+**Conditions before real household data** (recorded in DECISIONS 2026-11-22): a card on Backblaze with storage cap, 75% alert and downloads uncapped (C-73); Healthchecks.io account and checks.
