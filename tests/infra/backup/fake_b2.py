@@ -21,7 +21,7 @@ BUCKET = "poly-test-bucket"
 TOKEN = "authtoken-read-fixture"
 
 LOCK = threading.Lock()
-STATE = {"mode": "pass", "delay": 0, "n": 0}
+STATE = {"mode": "pass", "delay": 0, "n": 0, "apiUrl": None}
 STORE = {}  # name -> list of version dicts, oldest first
 LOG = []
 
@@ -151,7 +151,7 @@ class Native(Base):
                 return self.json(401, {"code": "unauthorized", "message": "bad key"})
             host = self.headers.get("Host")
             return self.json(200, {"accountId": "acct-fixture", "authorizationToken": TOKEN, "apiInfo": {"storageApi": {
-                "apiUrl": "http://%s" % host, "downloadUrl": "http://%s" % host,
+                "apiUrl": STATE["apiUrl"] or "http://%s" % host, "downloadUrl": STATE["apiUrl"] or "http://%s" % host,
                 "allowed": {"buckets": [{"id": BUCKET_ID, "name": BUCKET}], "capabilities": ["listFiles", "readFiles"], "namePrefix": None}}}})
         if not self.authed():
             log("GET", "-", u.path)
@@ -188,6 +188,9 @@ class Native(Base):
             with LOCK:
                 v = new_version(q["name"], data, q.get("action", "upload"), int(q["uploaded"]) if "uploaded" in q else None)
             return self.json(200, public(v))
+        if what == "api":  # C8: make b2_authorize_account answer an apiUrl/downloadUrl of the test's choosing
+            STATE["apiUrl"] = q["url"] or None
+            return self.json(200, {})
         if what == "log":
             with LOCK:
                 return self.json(200, list(LOG))
@@ -200,7 +203,7 @@ class Native(Base):
             return self.send(200, found[0]["data"] if found else b"", "application/octet-stream")
         if what == "reset":
             with LOCK:
-                STORE.clear(); LOG.clear(); STATE.update(mode="pass", delay=0)
+                STORE.clear(); LOG.clear(); STATE.update(mode="pass", delay=0, apiUrl=None)
             return self.json(200, {})
         self.json(404, {"code": "not_found", "message": what})
 
