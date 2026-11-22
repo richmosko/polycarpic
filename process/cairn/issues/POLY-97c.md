@@ -1,7 +1,7 @@
 ---
 id: POLY-97c
 title: Provisioning tests
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: POLY-97
 blocked_by: [POLY-97b]
