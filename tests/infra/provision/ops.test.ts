@@ -296,7 +296,7 @@ which = sys.argv[1]
 if which == "slots":
     sys.stdout.write(load("*_slots.py").SQL)
 else:
-    sigs = re.findall(r"^REVOKE EXECUTE ON FUNCTION pg_catalog\.(\S+) FROM PUBLIC;$", open("/repo/packages/db/sql/roles.sql").read(), re.M)
+    sigs = re.findall(r"^REVOKE EXECUTE ON FUNCTION pg_catalog\\.(\\S+) FROM PUBLIC;$", open("/repo/packages/db/sql/roles.sql").read(), re.M)
     assert len(sigs) == 17
     sys.stdout.write(load("*_revokes.py").sql(sigs))
 PY
