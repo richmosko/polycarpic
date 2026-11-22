@@ -856,3 +856,17 @@ Add new decisions ABOVE this comment, newest first.
 - Strike any of the four — the route it closes reopens and is recorded as accepted.
 - Hold newly generated backup codes for 24 hours while the old ones keep working — about $10 more (the architect's guess) and a change to the library's verify path; put to the Principal in the second auth loop.
 **Approved by:** the Principal (2026-11-21), each of the four in turn, on the architect's, seceng's and the lead's recommendation.
+
+### 2026-11-22 — Sign-in mail is sent from `mail.polycarpic.com`, and the apex is locked
+**Decision:** Sign-in and security mail is sent from the subdomain `mail.polycarpic.com` through Resend (EU region); `polycarpic.com` itself publishes "sends no mail, receives no mail" records (SPF `-all`, null MX, DMARC `p=reject`).
+**Why:** Mail DNS records and Resend keys stay confined to one name, forged mail from the main name is rejected, and the main name's reputation stays separate from automated mail. The Principal uses no `@polycarpic.com` address and plans none.
+**Alternatives considered:**
+- Send from the apex `polycarpic.com`: a shorter address, but not separable later and the apex could not be locked.
+**Approved by:** Mosko (subdomain choice). The DMARC policy is the lead's proposal, pending seceng's confirmation in POLY-97.
+
+### 2026-11-22 — Two operator prerequisites deferred until before real data
+**Decision:** The first staging deploy goes ahead without a payment method on Backblaze (so no editable storage cap or alert, and the free-tier download limit applies) and without Healthchecks.io (so no outside "box went quiet" alert). Both must be in place before real household data is stored.
+**Why:** Staging holds test data only, where a stalled restore or a silent outage costs nothing; the Principal chose not to add a card or another account yet.
+**Alternatives considered:**
+- Set both up now, as INFRA §7.0 lists them: no gap, at the cost of a card on file and one more account before anything runs.
+**Approved by:** Mosko
