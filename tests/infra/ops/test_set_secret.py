@@ -164,6 +164,14 @@ class SetSecret(OpsTest):
             self.assertEqual(self.on_disk("auth", "resend_api_key").read_text(), "old\n")
             self.assertFalse(self.on_disk("worker", "resend_api_key").exists(), "nothing written for the other service either")
 
+    def test_b4_a_secret_pasted_at_the_replace_question_is_refused_and_appears_nowhere(self):
+        pasted = self.fix()
+        self.host.secret("auth", "resend_api_key", "old\n")
+        r = self.put("resend_api_key", "fxnewvalue", confirm=pasted)
+        self.assertEqual((r.rc, r.err), (1, "not replaced\n"))
+        self.assertNoTrace(pasted, r)
+        self.assertEqual(self.on_disk("auth", "resend_api_key").read_text(), "old\n")
+
     def test_yes_replaces_every_target(self):
         self.host.secret("auth", "resend_api_key", "old\n")
         self.host.secret("worker", "resend_api_key", "old\n")
