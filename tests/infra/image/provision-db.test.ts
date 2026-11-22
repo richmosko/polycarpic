@@ -151,6 +151,14 @@ ${Object.entries(LOGIN).map(([role, f]) => `PGPASSWORD=$(cat /etc/polycarpic/sec
     const r = run(`${OPS} ${point(names.good, null)}; bash /tmp/ops/provision.sh --stage database --project nope 2>&1; echo "rc=$?"; bash /tmp/ops/provision.sh --stage database 2>&1; echo "rc=$?"`, { image: HOST, network: NET });
     expect(r.out.match(/rc=(\d)/g)).toEqual(['rc=2', 'rc=2']);
   });
+
+  it('A-M2 mutation: with the two SET lines stripped from the ALTER path the verifier DOES reach the Postgres log (so the sweep above has power)', () => {
+    const r = run(`${OPS} ${point(names.fail, null)}; touch /var/fake-state/psql-strip-sets /var/fake-state/psql-break-alter; bash /tmp/ops/provision.sh --stage database --project prod > /tmp/o 2>&1; echo "rc=$?"`, { image: HOST, network: NET });
+    expect(r.out).not.toMatch(/rc=0\n/);
+    const log = sh('docker', ['logs', names.fail]).all;
+    expect(log, 'without SET log_min_error_statement the failing ALTER is logged with its verifier').toMatch(/SCRAM-SHA-256\$/);
+    expect(log).toMatch(/STATEMENT:\s+ALTER ROLE/);
+  });
 });
 
 describe('provision-check database checks D1–D6, with a running Postgres', () => {

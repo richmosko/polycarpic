@@ -2,7 +2,7 @@
 import json
 import unittest
 
-from base import BUCKET, BUCKET_ID, NEW_KEY_SECRET, OPDIR, SECRETS, FakeB2, Net, ToolTest
+from base import BUCKET, BUCKET_ID, NEW_KEY_SECRET, OPDIR, OTHER_BUCKET_ID, S3_URL, SECRETS, FakeB2, Net, ToolTest
 
 READ_SET = {"listBuckets", "listFiles", "readFiles", "readBucketRetentions", "readFileRetentions", "readFileLegalHolds", "readBucketEncryption"}
 FORBIDDEN = {"deleteFiles", "bypassGovernance", "shareFiles", "listKeys", "writeKeys", "deleteKeys", "writeBucketRetentions", "writeFileRetentions", "writeFileLegalHolds", "writeBucketEncryption", "writeBuckets", "deleteBuckets", "writeFiles"}
@@ -128,11 +128,31 @@ class B2Setup(ToolTest):
         l = self.line(out, "FAIL", "polycarpic-put")
         self.assertIn("delete it", l)
 
-    def test_a_key_for_another_bucket_is_not_a_failure(self):
+    def test_a_key_restricted_to_another_bucket_passes_silently(self):
         b2 = FakeB2()
-        b2.add_key("other-project-key", ["listBuckets", "writeFiles"], bucket=False)
+        b2.add_key("other-project-key", ["listBuckets", "writeFiles"], bucket=OTHER_BUCKET_ID)
         rc, out, _ = self.go(b2)
         self.assertEqual(rc, 0, out)
+        self.assertNotIn("other-project-key", out)
+
+    def test_an_unrestricted_key_that_can_write_is_a_fail_naming_it_with_the_fix(self):
+        for caps in (["listBuckets", "writeFiles"], ["listBuckets", "readFiles", "deleteFiles"], ["listBuckets", "writeKeys"],
+                     ["listBuckets", "bypassGovernance"], ["listBuckets", "writeBucketRetentions"]):
+            b2 = FakeB2()
+            b2.add_key("old-web-key", caps, bucket=False)
+            rc, out, _ = self.go(b2, answers={"delete": "no"})
+            self.assertEqual(rc, 1, caps)
+            l = self.line(out, "FAIL", "old-web-key")
+            self.assertIn("is not restricted to a bucket and can write to " + BUCKET, l)
+            self.assertIn("restrict it to another bucket or delete it", l)
+
+    def test_an_unrestricted_read_only_key_is_a_warn_and_exit_0(self):
+        b2 = FakeB2()
+        b2.add_key("reader", ["listBuckets", "readFiles", "listAllBucketNames"], bucket=False)
+        rc, out, _ = self.go(b2)
+        self.assertEqual(rc, 0, out)
+        self.line(out, "WARN", "reader")
+        self.assertNotRegex(out, r"(?i)FAIL[^\n]*reader")
 
     def test_the_read_back_fails_a_key_whose_capabilities_drifted_from_its_pin(self):
         b2 = FakeB2()
@@ -187,7 +207,7 @@ class B2Setup(ToolTest):
         self.assertEqual(rc, 1)
         self.assertIn("Invalid credentials", out + err)
 
-    def test_probe_creates_a_temporary_writefiles_only_key_uploads_one_probe_object_and_deletes_the_key(self):
+    def test_probe_creates_a_temporary_writefiles_only_key_uploads_one_probe_object_through_the_s3_backend_and_deletes_the_key(self):
         calls = []
 
         def runner(argv, env=None, stdin=None):
@@ -195,7 +215,7 @@ class B2Setup(ToolTest):
             return 0
 
         b2 = FakeB2()
-        rc, out, err = self.go(b2, args=["--probe"], runner=runner, regenerate=False)
+        rc, out, err = self.go(b2, args=["--probe"], runner=runner)
         self.assertEqual(rc, 0, out + err)
         probe_keys = [c for c in b2.created if set(c["capabilities"]) == {"writeFiles"}]
         self.assertEqual(len(probe_keys), 1)
@@ -206,18 +226,41 @@ class B2Setup(ToolTest):
         self.assertRegex(" ".join(argv), r"probe/\d{8}T?\d{6}|probe/\d{4}-\d{2}-\d{2}")
         self.assertTrue(b2.deleted, "the temporary key was deleted")
         joined = " ".join(argv)
-        for s in list(NEW_KEY_SECRET.values()) + ["K004TEMPKEYSECRETxxxxxxxxxxxxxxxxxxx"]:
-            self.assertNotIn(s, joined)  # the key reaches rclone through the child's environment, never argv
+        temp_secret = "K004TEMPKEYSECRETxxxxxxxxxxxxxxxxxxx"
+        for sec in list(NEW_KEY_SECRET.values()) + [temp_secret]:
+            self.assertNotIn(sec, joined)  # the key reaches rclone through the child's environment, never argv
+        # B1 (build-review): the uploader uses rclone's S3 backend, so the probe measures that path
+        cfg = {k: v for k, v in env.items() if k.startswith("RCLONE_CONFIG_PROBE_")}
+        self.assertEqual(cfg.get("RCLONE_CONFIG_PROBE_TYPE"), "s3")
+        self.assertEqual(cfg.get("RCLONE_CONFIG_PROBE_PROVIDER"), "Other")
+        self.assertEqual(cfg.get("RCLONE_CONFIG_PROBE_ENDPOINT"), S3_URL)
+        self.assertEqual(cfg.get("RCLONE_CONFIG_PROBE_NO_CHECK_BUCKET"), "true")
+        self.assertEqual(cfg.get("RCLONE_CONFIG_PROBE_SECRET_ACCESS_KEY"), temp_secret)
+        self.assertTrue(cfg.get("RCLONE_CONFIG_PROBE_ACCESS_KEY_ID"))
+        self.assertFalse([k for k in env if k.startswith("RCLONE_B2_") or k in ("RCLONE_CONFIG_PROBE_ACCOUNT", "RCLONE_CONFIG_PROBE_KEY")], "no B2-backend variables")
         self.assertRegex(out, r"(?i)success|accepted|uploaded")
+
+    def test_probe_ends_with_the_master_key_regeneration_and_the_401_check(self):
+        rc, out, err = self.go(FakeB2(), args=["--probe"], runner=lambda argv, env=None, stdin=None: 0)
+        self.assertEqual(rc, 0, out + err)
+        self.line(out, "PASS", "master")
+        self.assertIn("Generate New Master Application Key", out)
+
+    def test_probe_with_the_old_master_key_still_live_exits_non_zero_saying_so_and_still_deletes_the_temporary_key(self):
+        b2 = FakeB2()
+        rc, out, err = self.go(b2, args=["--probe"], runner=lambda argv, env=None, stdin=None: 0, regenerate=False)
+        self.assertNotEqual(rc, 0)
+        self.assertRegex(self.line(out + err, "master"), r"(?i)still (live|valid|authori)")
+        self.assertTrue(b2.deleted)
 
     def test_probe_reports_a_refusal_and_still_deletes_the_temporary_key(self):
         b2 = FakeB2()
-        rc, out, err = self.go(b2, args=["--probe"], runner=lambda argv, env=None, stdin=None: 1, regenerate=False)
+        rc, out, err = self.go(b2, args=["--probe"], runner=lambda argv, env=None, stdin=None: 1)
         self.assertRegex(out + err, r"(?i)refus|fail|denied")
         self.assertTrue(b2.deleted)
 
     def test_probe_never_leaks_the_temporary_key(self):
-        rc, out, err = self.go(FakeB2(), args=["--probe"], runner=lambda argv, env=None, stdin=None: 0, regenerate=False)
+        rc, out, err = self.go(FakeB2(), args=["--probe"], runner=lambda argv, env=None, stdin=None: 0)
         self.assertNoSecrets(out + err, ["K004TEMPKEYSECRETxxxxxxxxxxxxxxxxxxx", SECRETS["b2_master_key"], SECRETS["b2_token"]])
 
 

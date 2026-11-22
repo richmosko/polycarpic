@@ -137,6 +137,11 @@ case "$name" in
                 if [ -t 0 ]; then exec psql -h "$host" -U postgres "${cmd[@]:1}"; fi
                 # psql-break-alter: break the syntax of every verifier ALTER so Postgres fails it and logs the error statement (M2 case C)
                 set -o pipefail
+                # psql-strip-sets: drop the two SET lines (M2 mutation case: the sweep must go red without them)
+                if [ -e "$S/psql-strip-sets" ]; then
+                  tee -a /dev/shm/psql-stdin.log | grep -vE "^SET +log_(statement|min_error_statement)" | sed -E '/SCRAM-SHA-256\$/ s/ALTER ROLE +([A-Za-z_"]+)/ALTER ROLE \1 BREAKME/I' | psql -h "$host" -U postgres "${cmd[@]:1}"
+                  exit $?
+                fi
                 if [ -e "$S/psql-break-alter" ]; then
                   tee -a /dev/shm/psql-stdin.log | sed -E '/SCRAM-SHA-256\$/ s/ALTER ROLE +([A-Za-z_"]+)/ALTER ROLE \1 BREAKME/I' | psql -h "$host" -U postgres "${cmd[@]:1}"
                 else

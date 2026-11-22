@@ -42,6 +42,8 @@ DKIM = ("p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqge5nT0o5S6dlEmfjwdQo6aWJU+vHg
         "ZyrQakA9zP2fLKgR7PQBrnWfi71lY97U2zig65FfUm6AfF8nQGtNjEpt/AQbnnCkGLlAxm7azPgHyiLeCeuT"
         "F0I91khaVi53MOp3EMS2O20TwDaILCOOllFCrQVbeaFpYwIDAQAB")
 IPV4, IPV6 = "203.0.113.7", "2001:db8:1::7"
+S3_URL = "https://s3.eu-central-003.backblazeb2.com"
+OTHER_BUCKET_ID = "4a48other0000000000000000"
 # The allowed set of R9 plus Addendum 1 (three CAA rows; DMARC without rua until the Principal turns on DMARC Management).
 ALLOWED = [
     ("@", "TXT", "v=spf1 -all"),
@@ -190,7 +192,7 @@ class FakeB2(object):
 
     def add_key(self, name, caps, bucket=True, secret=None):
         self.n += 1
-        k = {"applicationKeyId": "0049fixturekey%010d" % self.n, "keyName": name, "capabilities": list(caps), "bucketId": BUCKET_ID if bucket else None, "namePrefix": None}
+        k = {"applicationKeyId": "0049fixturekey%010d" % self.n, "keyName": name, "capabilities": list(caps), "bucketId": (bucket if isinstance(bucket, str) else (BUCKET_ID if bucket else None)), "namePrefix": None}
         self.keys.append(k)
         return k
 
@@ -204,7 +206,7 @@ class FakeB2(object):
             ident = base64.b64decode(headers["Authorization"].split(" ", 1)[1]).decode()
             if ident != "%s:%s" % self.master or self.regenerated:
                 return 401, {"code": "unauthorized", "status": 401, "message": "Invalid credentials"}
-            return 200, {"accountId": "49fixture", "authorizationToken": SECRETS["b2_token"], "apiUrl": "https://api000.backblazeb2.com",
+            return 200, {"accountId": "49fixture", "authorizationToken": SECRETS["b2_token"], "apiUrl": "https://api000.backblazeb2.com", "s3ApiUrl": S3_URL,
                          "allowed": {"capabilities": ["listKeys", "writeKeys", "deleteKeys", "listBuckets"], "bucketId": None, "bucketName": None, "namePrefix": None}}
         if headers.get("Authorization") != SECRETS["b2_token"]:
             return 401, {"code": "bad_auth_token", "status": 401, "message": "bad token"}

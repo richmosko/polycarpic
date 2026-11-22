@@ -127,6 +127,19 @@ if res == "firewall":
         if not fw:
             die(f"firewall not found: {pos[0]}")
         emit(kv, fw, json.dumps(fw)); sys.exit(0)
+    if verb in ("apply-to-resource", "remove-from-resource"):
+        fw = next((f for f in st["firewalls"] if f["name"] == pos[0]), None)
+        srv = next((x for x in st["servers"] if x["name"] == kv.get("server", "")), None)
+        if not fw or not srv:
+            die("firewall or server not found")
+        fw["applied_to"] = [a for a in fw["applied_to"] if a.get("server", {}).get("id") != srv["id"]]
+        srv["firewalls"] = [a for a in srv["firewalls"] if a["id"] != fw["id"]]
+        srv["public_net"]["firewalls"] = [a for a in srv["public_net"]["firewalls"] if a["id"] != fw["id"]]
+        if verb == "apply-to-resource":
+            fw["applied_to"].append({"type": "server", "server": {"id": srv["id"]}})
+            srv["firewalls"].append({"id": fw["id"], "status": "applied"})
+            srv["public_net"]["firewalls"].append({"id": fw["id"], "status": "applied"})
+        save(); print("Firewall %s" % ("applied" if verb == "apply-to-resource" else "removed")); sys.exit(0)
     if verb == "replace-rules":
         fw = next((f for f in st["firewalls"] if f["name"] == pos[0]), None)
         if not fw:
@@ -151,12 +164,12 @@ if res == "server":
         sid = nid()
         s = {"id": sid, "name": kv["name"], "labels": labels_of(multi), "image": {"name": kv["image"]},
              "server_type": {"name": kv["type"]}, "datacenter": {"location": {"name": kv.get("location", "nbg1")}},
-             "public_net": {"ipv4": {"ip": "203.0.113.7"}, "ipv6": {"ip": "2001:db8:1::/64"}}, "volumes": [], "firewalls": []}
+             "public_net": {"ipv4": {"ip": "203.0.113.7"}, "ipv6": {"ip": "2001:db8:1::/64"}, "firewalls": []}, "volumes": [], "firewalls": []}
         for fwn in multi.get("firewall", []):
             fw = next((f for f in st["firewalls"] if f["name"] == fwn), None)
             if not fw:
                 die(f"firewall not found: {fwn}")
-            fw["applied_to"].append({"type": "server", "server": {"id": sid}}); s["firewalls"].append({"id": fw["id"], "status": "applied"})
+            fw["applied_to"].append({"type": "server", "server": {"id": sid}}); s["firewalls"].append({"id": fw["id"], "status": "applied"}); s["public_net"]["firewalls"].append({"id": fw["id"], "status": "applied"})
         for vn in multi.get("volume", []):
             v = next((v for v in st["volumes"] if v["name"] == vn), None)
             if v:
