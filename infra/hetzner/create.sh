@@ -97,9 +97,17 @@ servers=$(hcloud server list -o json --selector "$label")
 sid=$(printf '%s' "$servers" | jq -r --arg n "$name" '[.[] | select(.name == $n)][0].id // empty')
 created=0
 if [ -z "$sid" ]; then
-  change "hcloud server create --name $name --type $type --image ubuntu-24.04 --location $location --firewall $name"
-  hcloud server create --name "$name" --type "$type" --image ubuntu-24.04 --location "$location" \
-    --ssh-key "$keyname" --firewall "$name" --user-data-from-file "$tmp/user-data.yaml" --label "$label" > /dev/null
+  change "hcloud server create --name $name --type $type --image ubuntu-24.04 --firewall $name (location $location)"
+  if ! err=$(hcloud server create --name "$name" --type "$type" --image ubuntu-24.04 --location "$location" \
+    --ssh-key "$keyname" --firewall "$name" --user-data-from-file "$tmp/user-data.yaml" --label "$label" 2>&1 > /dev/null); then
+    printf '%s\n' "$err" >&2
+    case "$err" in
+      *resource_unavailable* | *placement*)
+        other=nbg1; [ "$location" = nbg1 ] && other=fsn1
+        echo "create.sh: no stock for $type in $location. The key and firewall just made stay; run the same command again with --location $other (same country, same prices)." >&2 ;;
+    esac
+    exit 1
+  fi
   created=1
 else
   exists "server $name"

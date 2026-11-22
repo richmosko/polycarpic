@@ -296,11 +296,20 @@ else
 fi
 
 # ------------------------------------------------------------------ H14 clock
-ntp=$(timedatectl show -p NTPSynchronized 2> /dev/null || true)
+# A box that just booted needs a moment to synchronise: look until it does, for up to POLY_NTP_WAIT seconds.
+ntp=''
+waited=0
+while :; do
+  ntp=$(timedatectl show -p NTPSynchronized 2> /dev/null || true)
+  [ "$ntp" = "NTPSynchronized=yes" ] && break
+  [ "$waited" -ge "${POLY_NTP_WAIT:-60}" ] && break
+  sleep 1
+  waited=$((waited + 1))
+done
 if [ "$ntp" = "NTPSynchronized=yes" ]; then
   pass H14 "clock"
 else
-  fail H14 "clock" "NTP is not synchronised (${ntp:-timedatectl printed nothing})" "sudo timedatectl set-ntp true and wait a minute; check systemd-timesyncd"
+  fail H14 "clock" "NTP is not synchronised after ${waited}s (${ntp:-timedatectl printed nothing})" "sudo timedatectl set-ntp true and wait a minute; check systemd-timesyncd"
 fi
 
 # ------------------------------------------------------------------ H15 operator access
