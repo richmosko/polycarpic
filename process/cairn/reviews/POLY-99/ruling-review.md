@@ -206,3 +206,176 @@ Refs: C-73, T-62, A4; SECURITY §6.6 residuals.
   sees it. Past versions stay safe for 35 days.
 - SECURITY edits (C-79 detection, C-73 restore text, the S2/S3 residuals, C3–C8) wait for the build review, since
   they quote built behaviour.
+
+---
+
+## Re-review: the re-issue @ `852474706b9c6a90ed21c73e6f278685042ded37` with Addendum 1 @ `17e9414f`
+
+Read whole, against the tree at `17e9414f`. **Verdict: accepted with conditions.** C1–C12 stand as Addendum 1
+carries them, with the refinements below. One new condition, **N1**, gates: it closes a path from the uploader to root
+that the re-issue opened.
+
+### C1–C12 against the re-issue
+
+| # | State | Note |
+|---|---|---|
+| C1 `/tmp` cap | **Met** (R10 `size=1m`, R11 watcher on `/tmp`) | The watcher now sees a `/tmp` detour directly, so the 1 MiB padding of the scratch dump is no longer needed for the red case. |
+| C2 core dumps | **Met** by Addendum 1 (`x-hardened`) | `drill.sh` must also run `ulimit -c 0`: it is a separate process, not only `restore-lib.sh`'s caller. |
+| C3 uploader cannot change spool files | **Changed, stronger: met** | A read-only mount and an `r-x` ACL. The uploader now deletes and creates nothing (T14). `.inflight/` as Addendum 1 says. |
+| C4 premigration hash where no container writes | **Changed: met** | Root hashes after the container is gone, instead of an in-pipe `tee`. Equivalent now: after 10004 exits, nobody but root can write `dump/` or `premigration/`. A compromised backup container can still forge the file **before** it exits. That is within its reach anyway (table above). |
+| C5 names are data | **Met** for restore (R7, T16, Addendum 1) | Extended to root's own parsing: **N1**. |
+| C6 scratch hardening | **Met** (R7 plus Addendum 1) | qa pins that Postgres starts under `--cap-drop ALL --user 999:999` (R7 marks it unmeasured). |
+| C7 set choice | **Met** by Addendum 1, **refined here**: see C7′ | |
+| C8 B2 endpoints | **Met** by Addendum 1 | The R11 sentence "`https://…` or loopback" is superseded; the builder builds C8. |
+| C9 two-version names | **Met** by Addendum 1 | R3's "the one benign source" is wrong as text: the checksum-mismatch retry (S3) is a second. INFRA §6.7 must say both. |
+| C10 root-only state | **Met** (R9, R10) | `list-premigration` refuses a `spool.sha256` that is not root 0644, as `05_backupdb` does for `jobs.log`. One fixture. |
+| C11 no secret in argv, logs, output | **Met** by Addendum 1 | |
+| C12 encrypted laptop disk | **Met** by Addendum 1 | |
+| Premigration round trip | **Met** (T18) | |
+
+**C7′ (refines my own C7; a too-tight window would block a real restore).**
+- The content-time window is the runner's own timeout for the mode, not a flat 10 min. The base's `START TIME` must
+  lie in `[TS − 1 min, TS + 10 min]`. The dump's "Archive created at" is taken after the base finishes, so it must lie in
+  `[TS − 1 min, TS + 3 h]` for nightly and `[TS − 1 min, TS + 30 min]` for premigration. A replayed old file is off by
+  days, so the wider window loses nothing. The globals file carries no time, so it is checked only through its set.
+- An upload more than 4 h after `<TS>` is refused (exit 3) and listed. Naming the set explicitly with `--set <TS>`
+  passes it with a `WARN late upload`. Otherwise a B2 outage longer than 4 h would block every restore of the sets it
+  delayed.
+- WAL names carry no time. WAL is chosen by the version rule and by the base's `<sys>` only.
+- *Tests:* a dump with an archive time 2 h after `<TS>` in a nightly set restores, but fails in a premigration set; a
+  late set is refused without `--set` and passes with it.
+
+### B4 not adopted
+
+**Accepted.** The architect's reason holds: a `tee` into a process substitution is a stage that `pipefail` does not see,
+so the check would add a silent failure path to guard against one. What makes the premigration set trustworthy before
+the migrate step runs is then:
+- `pg_dump` exited 0, with every pipe stage seen by `pipefail`;
+- all or nothing: nothing is published unless both files are complete;
+- root's own hash, taken once no container can write.
+
+**T2 must keep its real fault** (Postgres stopped during `pg_dump`), not only the `pipefail` mutant. That fault is the
+proof.
+
+**Residual:** a dump that `pg_dump` wrote cleanly but that does not restore is found only when it is restored. The
+nightly `dump` takes the same path and is restored by every drill. I record this in C-73.
+
+### New in the re-issue
+
+| Item | Ruling | Mechanism and reach |
+|---|---|---|
+| Uploader read-only; root deletes after comparing (R4, R5, T14, T15) | **Accept with N1** | The uploader can no longer plant, replace or delete anything. But root now acts on the uploader's stdout, so that stdout is input to root. |
+| Root alone pings and alone holds `heartbeat_url` (R5, R10) | **Accept** | This matches SECURITY's host-only secret row, which the old compose file did not. A compromised uploader can no longer send a false green ping directly. It can still claim `verified` falsely, and root then pings green and deletes the spool copy. That reach is the same as before, and **D3** is what catches it. |
+| `last-upload` root-written, RED otherwise (R9) | **Accept** | Root writes it, but it is still built from the uploader's claims (A4 stands). |
+| From-box checked against root's record always (R7) | **Accept** | |
+| T14–T18 | **Accept** | Each red case is a mutant or a planted file, as required. In T15 the uploader is faked, and that is correct: the unit under test there is the runner. |
+
+**N1. Root validates what the containers print before it opens any path (gates).** Root reads paths from two
+containers:
+- the uploader's `verified <dir> <name> <sha>` lines;
+- the backup's `published <dir> <TS> <sys> <name>…` line.
+
+Rules:
+- `<dir>` must be exactly `wal`, `dump` or `premigration`.
+- `<name>` must match R2 for that directory.
+- Root opens the file relative to that spool directory with `O_NOFOLLOW` and requires a regular file. Only then does it
+  hash it, delete it, or write a sibling.
+- Any line that fails is a fault: nothing is touched, the run exits 1 and pings `/fail`.
+
+*Why:* without it, a compromised uploader prints `verified wal ../../../etc/polycarpic/ops.conf <sha>`. It reads that
+file through its own mount, so it knows the sha. Root then deletes a host file of the uploader's choosing, and a
+symlink in the spool does the same through a valid name. This is the internet-facing container steering root's
+`unlink`.
+
+*Tests:* a fake uploader prints a `../` path, a bad `<dir>`, a valid name that is a symlink to a root-owned file, and
+a name with a newline. In each case root deletes nothing, the target is unchanged, the runner exits 1, and `/fail` is
+pinged. The same cases run on a fake `published` line. Red: a mutant runner that joins the path without the checks.
+The fakes see all of this.
+
+**Advisory A5.** Root reads the uploader's stdout capped: at most 1 MiB, and lines over 4 KiB are faults. That way a
+flood cannot exhaust the runner.
+
+### The Principal's three decisions
+
+These replace P1 and P2 above. Each is in plain words for the lead to carry. The IDs are on the refs lines.
+
+**D1. When you undo a bad upgrade from the copy kept on the server, must the laptop always check it against the
+off-site copy as well?**
+- *Mechanism.* The laptop fetches the encrypted pre-upgrade copy from the server and unlocks it with your private key.
+  It always checks the copy against the fingerprint the server's root account recorded when the copy was made. That
+  catches a swap by either backup program.
+- *Attacker's reach.* Someone with full control of the server could swap both the copy and the fingerprint. You would
+  then load a fake into a sealed test database and might copy wrong figures back. Only the off-site copy, uploaded
+  before they arrived, gives that away.
+- *Ruled (a):* the off-site check runs only when you give the reading key; otherwise you see a warning.
+- *Stronger (b):* the off-site check is always required, with an explicit override switch that prints a loud warning
+  for the day the key is out of reach. Cost: you get the reading key out on every such restore. It sits in the same
+  place as the private key you already need. If the upgrade is less than about a minute old, you wait for the upload.
+- **My recommendation: (b) with the override.** It costs one more key at hand in a rare event. It turns "a fully
+  compromised server could feed me a fake" from silent into a refusal. Addendum 1 records (a) as my earlier
+  recommendation, made before I weighed the override form. This supersedes it.
+
+Refs: ruling §D1, R7; C4; C-73.
+
+**D2. Where may the unlocked pre-upgrade data sit while you compare it and copy back what the upgrade damaged?**
+- *Mechanism.* (a) The laptop unlocks the copy and streams it straight into a temporary, sealed database **on the
+  server**, so no unlocked file is ever written there. (b) Everything stays on the laptop, and a separate, audited tool
+  copies the corrected rows back.
+- *Attacker's reach.* The difference is where a **fake** copy's hidden code would run. A fake copy can carry
+  instructions that run inside the temporary database.
+  - Under (a), that is a sealed container on the same machine as your live data. To reach the live data, it must also
+    break out of the container.
+  - Under (b), it runs inside the laptop's container instead.
+
+  The fingerprint checks of D1 run before anything is streamed. So under (a), a fake gets in only if the backup program
+  was already taken over when the copy was made, or if the attacker holds root on the server, which already reaches
+  everything.
+- *Is a temporary database on the encrypted disk within your rule (Q8)?* As I read it, **yes, if it is temporary.** The
+  rule exists so that someone who captures the running server finds no readable **backup history** on it. The
+  temporary database holds the state of just before the upgrade, which is nearly what the live database already holds,
+  on the same encrypted disk, and only for the hours you work on it. Left in place after you finish, it becomes a
+  backup copy kept on the server, which is what the rule forbids.
+- **"Destroyed" must mean all of this:**
+  - the container is stopped and removed;
+  - its data directory is a fresh directory used for nothing else, and is removed;
+  - the removal is verified by the tool listing no temporary database;
+  - the status screen shows RED for any temporary database or its directory older than 24 hours.
+
+  Dropping a database inside a running cluster does not count. Overwriting the disk blocks is not required: the deleted
+  blocks sit on the same encrypted disk as the live data's.
+- *Stronger option within (a):* put the temporary database's files in memory (tmpfs) rather than on disk, so they
+  vanish when it stops. Cost: it is limited by the server's spare memory. Today's data is a few hundred MB
+  (unmeasured), which fits. A larger database would fall back to the disk form.
+- **My recommendation: (a), destroyed as above, in memory while it fits.** It keeps the 60-minute recovery target,
+  and it builds no second copy-back tool. Whoever builds it is bound by §L1 (i)–(iii): stream it, use a separate
+  cluster, copy back data only, as a non-superuser.
+
+Refs: ruling §D2, §L1; Q8; INFRA §6.4.
+
+**D3. A daily check, from outside the server, that last night's backup really arrived.**
+- *Mechanism.* A scheduled GitHub job runs once a day. It lists the backup store with a key that can **only list**:
+  names, sizes, upload times, and whether anything was hidden or uploaded twice. It pings the alert service if all is
+  well, and its failure address otherwise.
+- *Attacker's reach today, without it.* A taken-over upload program can report "sent" while sending nothing. The
+  server then deletes its local copy and the alerts stay green. Only the monthly restore test would notice, so up to a
+  month of backups could be missing.
+- *My ruling on GitHub holding that key (TB-12):* **acceptable**, with these conditions.
+  - The key holds exactly `listFiles` (plus `listBuckets` only if B2 measures it necessary), restricted to the one
+    bucket. `b2-setup.py` creates it and asserts that set.
+  - It is a GitHub **environment** secret, used by one scheduled workflow with `permissions: contents: read`. No
+    third-party action runs in that job (a stdlib script only), and the runner image is pinned.
+  - The job prints counts and pass or fail, never object names.
+  - The job's own ping address is its own check. Whoever holds it can fake that one check's green, as the server can
+    for its own.
+
+  TB-12's concern was GitHub holding a credential that **reads the ledger**. This key reads no content and writes
+  nothing. Stolen, it shows when backups run, how big they are, and the cluster's system id. That is metadata, with no
+  path to data or to deletion.
+- *Timing.* There is no real bucket in this loop, so it cannot be built here. But until it exists, a lying uploader is
+  invisible for up to a month.
+- **My recommendation: file it now as its own issue** (Addendum 1 places it in POLY-105). **It gates the first real
+  household data**, as Healthchecks does. It should not wait on POLY-103's alerting design: it needs only one more
+  Healthchecks check. Cost: about $0 a month, one key made once with the existing setup tool and never typed again,
+  and a small loop.
+
+Refs: ruling §D3; TB-12; C-73; T-62; A4.
