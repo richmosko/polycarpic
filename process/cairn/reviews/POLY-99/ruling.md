@@ -295,6 +295,17 @@ GA gate (POLY-116) accepts exit 0 only. Scratch containers are removed on exit.
 - **`prod.yml`, `uploader`:**
   - Mount `/srv/polycarpic/spool:/spool:ro`.
   - Drop the `/srv/polycarpic/uploader-state` mount and the `heartbeat_url` secret: root pings (R5).
+  - *(Correction: R10 left out a consequence of dropping that mount.)* `heartbeat_url` is a **host-only secret**.
+    - **Where:** `/etc/polycarpic/secrets/uploader/heartbeat_url`, 0440 `root:10005`, as for every secret. No host
+      account holds gid 10005 (H9).
+    - **Who reads it:** root only (R5's runner and H13). No service mounts it, so it has no compose entry; the lint's
+      `secret-path` rule refuses a declared secret that no service mounts.
+    - **How it is written:** `infra/ops/lib/secrets.py` gains one constant, `HOST_ONLY = {"heartbeat_url": "uploader"}`.
+      It is the only name `set-secret` writes beyond the compose-derived set, still under the https check.
+    - **How it is accounted for:** `list-secrets` lists it. provision-check H6 carries the same pair as a shell
+      constant, a unit test asserts the two are equal, and H6 accepts that file in that directory and nowhere else.
+    - **Tests:** the two `test_set_secret` cases now expect this path. New cases: a host-only name outside `HOST_ONLY`
+      exits 2, and H6 fails on a mismatched constant.
   - Add `../backup/upload.sh:/usr/local/bin/upload.sh:ro`, `/etc/polycarpic/ops.conf:/etc/uploader/ops.conf:ro` and
     `/etc/polycarpic/host.env:/etc/uploader/host.env:ro`.
   - `tmpfs` `/tmp:size=1m`, which holds the rclone config and the sibling.
