@@ -240,6 +240,24 @@ class B2Setup(ToolTest):
         self.assertFalse([k for k in env if k.startswith("RCLONE_B2_") or k in ("RCLONE_CONFIG_PROBE_ACCOUNT", "RCLONE_CONFIG_PROBE_KEY")], "no B2-backend variables")
         self.assertRegex(out, r"(?i)success|accepted|uploaded")
 
+    def test_probe_argv_carries_s3_no_head_and_a_runner_that_refuses_calls_without_it_makes_the_probe_fail(self):
+        # build-review C1: after an upload rclone sends a HEAD (needs readFiles, which the box key never has), so a good upload could be
+        # reported refused. The uploader never sends HEAD (S5); the probe must not either.
+        seen = []
+
+        def strict(argv, env=None, stdin=None):
+            seen.append(list(argv))
+            return 0 if "--s3-no-head" in argv else 1
+
+        b2 = FakeB2()
+        rc, out, err = self.go(b2, args=["--probe"], runner=strict)
+        self.assertEqual(len(seen), 1)
+        self.assertIn("--s3-no-head", seen[0])
+        self.assertEqual(rc, 0, out + err)
+        self.assertRegex(out, r"(?i)success|accepted|uploaded")
+        # power of the assertion: the same runner without the flag would report a refusal
+        self.assertEqual(strict(["rclone", "rcat", "probe:x"]), 1)
+
     def test_probe_ends_with_the_master_key_regeneration_and_the_401_check(self):
         rc, out, err = self.go(FakeB2(), args=["--probe"], runner=lambda argv, env=None, stdin=None: 0)
         self.assertEqual(rc, 0, out + err)
