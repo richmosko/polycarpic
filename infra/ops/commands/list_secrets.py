@@ -31,9 +31,10 @@ def run(args, ctx):
         try:
             gid = os.stat(os.path.dirname(real)).st_gid
         except OSError:
-            gid = compose.GIDS.get(svc)
+            gid = compose.GIDS.get(svc, 0)
         owner = ("root" if st.st_uid == ctx.trusted_uid else str(st.st_uid)) + ":" + str(st.st_gid)
-        ok = stat.S_ISREG(st.st_mode) and stat.S_IMODE(st.st_mode) == 0o440 and st.st_uid == ctx.trusted_uid and st.st_gid == gid
+        want = 0o400 if svc == rules.HOST_DIR else 0o440
+        ok = stat.S_ISREG(st.st_mode) and stat.S_IMODE(st.st_mode) == want and st.st_uid == ctx.trusted_uid and st.st_gid == gid
         n_set += ok
         n_wrong += not ok
         rows.append(ROW % (svc, name, "set" if ok else "WRONG", "%04o" % stat.S_IMODE(st.st_mode), owner, st.st_size))

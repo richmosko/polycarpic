@@ -43,11 +43,11 @@ STAGING_SERVICES="postgres web worker migrate operator auth"
 gid_of() {
   case "$1" in
     postgres) echo 999 ;; web) echo 10001 ;; worker) echo 10002 ;; migrate) echo 10003 ;; backup) echo 10004 ;;
-    uploader) echo 10005 ;; operator) echo 10006 ;; auth) echo 10007 ;; caddy) echo 10010 ;;
+    uploader) echo 10005 ;; operator) echo 10006 ;; auth) echo 10007 ;; caddy) echo 10010 ;; host) echo 0 ;;
   esac
 }
 # Secrets root reads that no service mounts: <name>=<service directory>. infra/ops/lib/secrets.py carries the same pair (HOST_ONLY).
-HOST_ONLY="heartbeat_url=uploader"
+HOST_ONLY="heartbeat_url=host"
 # The files compose mounts from each service directory (infra/compose/*.yml, single source in provision.sh's table), plus HOST_ONLY.
 files_for() {
   local pair
@@ -149,7 +149,7 @@ h6=''
 tmp_h=$(mktemp -d /dev/shm/pcheck.XXXXXX)
 trap 'rm -rf "$tmp_h"' EXIT
 secret_root() { # root services
-  local root=$1 services=$2 svc d f gid mode
+  local root=$1 services=$2 svc d f gid mode dmode fmode
   [ -d "$root" ] || { h6="$h6 $root is missing;"; return; }
   mode=$(stat -c '%a %U:%G' "$root")
   [ "$mode" = "700 root:root" ] || h6="$h6 $root is $mode (want 700 root:root);"
@@ -159,16 +159,18 @@ secret_root() { # root services
     # shellcheck disable=SC2086
     if ! in_list "$svc" $services; then h6="$h6 $d must not exist here;"; continue; fi
     gid=$(gid_of "$svc")
-    [ "$(stat -c '%a %u:%g' "$d")" = "750 0:$gid" ] || h6="$h6 $d is $(stat -c '%a %u:%g' "$d") (want 750 0:$gid);"
+    dmode=750 fmode=440
+    if [ "$svc" = host ]; then dmode=700 fmode=400; fi # secrets root reads and no service mounts (HOST_ONLY): root:root, nobody else
+    [ "$(stat -c '%a %u:%g' "$d")" = "$dmode 0:$gid" ] || h6="$h6 $d is $(stat -c '%a %u:%g' "$d") (want $dmode 0:$gid);"
     for f in "$d"*; do
       [ -e "$f" ] || continue
       # shellcheck disable=SC2046
       if ! in_list "$(basename "$f")" $(files_for "$svc"); then h6="$h6 $f is not a file compose mounts from $svc;"; continue; fi
-      [ "$(stat -c '%a %u:%g' "$f")" = "440 0:$gid" ] || h6="$h6 $f is $(stat -c '%a %u:%g' "$f") (want 440 0:$gid);"
+      [ "$(stat -c '%a %u:%g' "$f")" = "$fmode 0:$gid" ] || h6="$h6 $f is $(stat -c '%a %u:%g' "$f") (want $fmode 0:$gid);"
     done
   done
 }
-secret_root "$ETC/secrets" "$PROD_SERVICES"
+secret_root "$ETC/secrets" "$PROD_SERVICES host"
 secret_root "$ETC/staging-secrets" "$STAGING_SERVICES"
 while IFS= read -r f; do
   case "$f" in
@@ -319,10 +321,10 @@ fi
 info H12b "bucket lock" "b2-setup.py"
 
 # ------------------------------------------------------------------ H13 heartbeat
-if [ -s "$ETC/secrets/uploader/heartbeat_url" ]; then
+if [ -s "$ETC/secrets/host/heartbeat_url" ]; then
   pass H13 "heartbeat"
 else
-  warn H13 heartbeat "alert path B does not exist; a box going quiet or a full bucket goes unnoticed" "put the ping URL in $ETC/secrets/uploader/heartbeat_url (root:10005, 0440) with polycarpic-ops set-secret (INFRA §6.5)"
+  warn H13 heartbeat "alert path B does not exist; a box going quiet or a full bucket goes unnoticed" "put the ping URL in $ETC/secrets/host/heartbeat_url (root:root, 0400) with polycarpic-ops set-secret (INFRA §6.5)"
 fi
 
 # ------------------------------------------------------------------ H14 clock

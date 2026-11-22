@@ -15,6 +15,7 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const KINDS = ['edge', 'prod', 'staging'];
 const violations = [];
 const v = (id, file, msg) => violations.push(`[${id}] ${file}: ${msg}`);
+const HOST_SECRETS = /(^|\/)secrets\/host(\/|$)/;
 
 function args() {
   const a = process.argv.slice(2);
@@ -184,6 +185,7 @@ for (const [kind, cfg] of Object.entries(rendered)) {
       if (vol.type !== 'bind' && vol.type !== 'tmpfs') v('volume-type', rel, `${at}: volume ${src || vol.target} has type ${vol.type}; only bind and tmpfs`);
       if (vol.type === 'bind' && /docker\.sock|containerd\.sock/.test(base)) v('docker-sock', rel, `${at}: mounts ${src}`);
       if (vol.type === 'bind' && (src === '/' || src === '/var/run' || src === '/run' || src.startsWith('/var/run/') || src.startsWith('/run/'))) v('mount-forbidden', rel, `${at}: mounts ${src}`);
+      if (HOST_SECRETS.test(src)) v('host-secrets', rel, `${at}: mounts ${src}: secrets/host/ holds what root reads and no service mounts`);
       if (vol.type === 'bind') {
         const norm = src.startsWith(ROOT + sep) ? relative(resolve(composeDir), src) : src;
         const hit = (policy.binds[`${kind}.${sn}`] ?? []).find((b) => b.source === norm && b.target === vol.target);
@@ -241,6 +243,7 @@ for (const [kind, cfg] of Object.entries(rendered)) {
   for (const [key, sec] of Object.entries(cfg.secrets ?? {})) {
     if (sec.environment || sec.content) v('secret-source', rel, `secret ${key}: only file: sources`);
     const f = sec.file ?? '';
+    if (HOST_SECRETS.test(f)) v('host-secrets', rel, `secret ${key}: file ${f} is under secrets/host/, which no service mounts`);
     const pre = policy.secretPrefix[kind];
     if (!f.startsWith(pre) || f.includes('..')) v('secret-path', rel, `secret ${key}: file ${f} must be under ${pre}`);
     if (!Object.values(svcs).some((x) => (x.secrets ?? []).some((q) => (typeof q === 'string' ? q : q.source) === key))) v('secret-path', rel, `secret ${key} is mounted by no service`);

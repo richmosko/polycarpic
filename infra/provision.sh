@@ -272,6 +272,20 @@ secrets_for() { # root services generated
   done
 }
 
+host_secrets() { # secrets root reads and no service mounts (heartbeat_url): root:root 0700 directory, root:root 0400 files
+  local root=$ETC/secrets old=$ETC/secrets/uploader/heartbeat_url new=$ETC/secrets/host/heartbeat_url
+  ensure_dir "$root/host" 0700 0:0
+  [ "$(stat -c %a "$root/host")" = 700 ] || chmod 0700 "$root/host"
+  if [ -f "$old" ] && [ ! -e "$new" ]; then
+    mv "$old" "$new"
+    change "moved secrets/uploader/heartbeat_url to secrets/host/heartbeat_url"
+  fi
+  if [ -f "$new" ]; then
+    [ "$(stat -c %u:%g "$new")" = "0:0" ] || chown 0:0 "$new"
+    [ "$(stat -c %a "$new")" = 400 ] || chmod 0400 "$new"
+  fi
+}
+
 host_env() { # file instance origin
   local file=$1 instance=$2 origin=$3 from=$4
   put_file "$file" 0644 "TLS_MODE=real-domain
@@ -327,6 +341,7 @@ stage_host() {
   data_dirs
   state_files
   secrets_for "$ETC/secrets" "$PROD_SERVICES" "$PROD_GENERATED"
+  host_secrets
   secrets_for "$ETC/staging-secrets" "$STAGING_SERVICES" "$STAGING_GENERATED"
   host_env "$ETC/host.env" polycarpic-prod "https://app.$domain" "$mf"
   host_env "$ETC/staging-host.env" polycarpic-staging "https://staging.$domain" "$mf"

@@ -48,8 +48,9 @@ def _plan(ctx, targets):
         try:
             gid_hint = os.stat(dpath).st_gid
         except OSError:
-            gid_hint = compose.GIDS[svc]
-        fail = "%s is not root:%d 0750: run provision" % (dpath, gid_hint)
+            gid_hint = compose.GIDS.get(svc, 0)
+        dmode = 0o700 if svc == rules.HOST_DIR else 0o750
+        fail = "%s is not root:%d %04o: run provision" % (dpath, gid_hint, dmode)
         try:
             dfd = os.open(dpath, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
         except OSError:
@@ -58,7 +59,7 @@ def _plan(ctx, targets):
         entry = [dfd, fname, svc, real, False]
         plan.append(entry)
         st = os.fstat(dfd)
-        if st.st_uid != ctx.trusted_uid or stat.S_IMODE(st.st_mode) != 0o750:
+        if st.st_uid != ctx.trusted_uid or stat.S_IMODE(st.st_mode) != dmode:
             ctx.err(fail)
             return plan, 4
         try:
@@ -72,14 +73,14 @@ def _plan(ctx, targets):
     return plan, 0
 
 
-def _write(ctx, dfd, fname, data):
+def _write(ctx, dfd, fname, data, fmode=0o440):
     """Temporary file in the directory, 0440 root:<dir gid>, fsync, rename over the target, fsync the directory."""
     gid = os.fstat(dfd).st_gid
     tmp = ".%s.tmp-%s" % (fname, _random.token_hex(8))
-    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o440, dir_fd=dfd)
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, fmode, dir_fd=dfd)
     try:
         ctx.chown(fd, 0, gid)
-        os.fchmod(fd, 0o440)  # K4: umask 077 masked the create mode to 0400
+        os.fchmod(fd, fmode)  # K4: umask 077 masked the create mode to 0400
         os.write(fd, data)
         os.fsync(fd)
         os.close(fd)
@@ -135,12 +136,12 @@ def run(args, ctx):
         del values
         for dfd, fname, svc, real, _ in plan:
             try:
-                gid = _write(ctx, dfd, fname, data)
+                gid = _write(ctx, dfd, fname, data, 0o400 if svc == rules.HOST_DIR else 0o440)
             except OSError as err:
                 ctx.err("set-secret: write failed for %s (%s)" % (real, errno.errorcode.get(err.errno, "error")))
                 return 1
             written.append(svc)
-            ctx.out("written: %s (%d bytes, 0440 root:%d)" % (real, len(data), gid))
+            ctx.out("written: %s (%d bytes, %s root:%d)" % (real, len(data), "0400" if svc == rules.HOST_DIR else "0440", gid))
     finally:
         for item in plan:
             os.close(item[0])

@@ -144,7 +144,7 @@ HB_URL = re.compile(r"https://[A-Za-z0-9._~:/?&=%+-]{1,500}")
 def ping(ctx, suffix=""):
     """Root pings the backup check: the URL goes to curl on stdin, never argv or env. A failed ping changes nothing."""
     try:
-        with open(ctx.p("/etc/polycarpic/secrets/uploader/heartbeat_url"), encoding="utf-8") as fh:
+        with open(ctx.p("/etc/polycarpic/secrets/host/heartbeat_url"), encoding="utf-8") as fh:
             url = fh.readline().strip()
     except OSError:
         return
