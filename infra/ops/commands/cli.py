@@ -5,8 +5,8 @@ import re
 from lib import compose
 
 HELP = "app CLI pass-through: user invite <email> [--bootstrap] (--staging for staging)"
-EMAIL = re.compile(r"^[^\s@\-][^\s@]*@[^\s@]+\.[^\s@]+$")
-DIGEST = re.compile(r"^[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}$")
+EMAIL = re.compile(r"[^\s@\-][^\s@]*@[^\s@]+\.[^\s@]+")
+DIGEST = re.compile(r"[a-z0-9./_-]+(:[A-Za-z0-9._-]+)?@sha256:[0-9a-f]{64}")
 REFUSED = ("user reset-mfa", "membership remove-owner", "entity set-founder", "secrets rotate", "secrets init")
 
 
@@ -25,7 +25,7 @@ def run(args, ctx):
         ctx.err("refused: unknown cli command; available: user invite")
         return 2
     email = words[2]
-    if not (3 <= len(email) <= 254 and all(0x21 <= ord(c) <= 0x7E for c in email) and EMAIL.match(email)):
+    if not (3 <= len(email) <= 254 and all(0x21 <= ord(c) <= 0x7E for c in email) and EMAIL.fullmatch(email)):
         ctx.err("refused: not a valid operator email address")
         return 2
     project = "staging" if args.staging else "prod"
@@ -38,7 +38,7 @@ def run(args, ctx):
     images = {}
     for svc in ("web", "postgres"):
         ref = compose.image_ref(compose.inspect(ctx, found[svc].get("Name", "")))
-        if not DIGEST.match(ref):
+        if not DIGEST.fullmatch(ref):
             ctx.err("running %s image is not pinned by digest" % svc)
             return 1
         images[svc] = ref

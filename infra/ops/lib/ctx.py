@@ -90,6 +90,11 @@ def _real_tls_probe(host, port):
         return {"ok": False, "reason": err.__class__.__name__}
 
 
+def production():
+    """The real context: root /, real seams, and root (uid 0) as the only trusted owner. Nothing from the caller (env, argv, files) enters."""
+    return Ctx(trusted_uid=0)
+
+
 class Ctx:
     def __init__(self, *, root="/", run=None, run_inherit=None, getpass=None, isatty=None, confirm=None, now=None, sleep=None,
                  chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0):

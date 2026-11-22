@@ -14,7 +14,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 from lib.compose import ComposeError  # noqa: E402
-from lib.ctx import BUNDLE, Ctx  # noqa: E402
+from lib.ctx import BUNDLE, production  # noqa: E402
 from lib.discover import load, modules  # noqa: E402
 
 
@@ -83,7 +83,7 @@ def main(argv, ctx=None):
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))  # A2: a crash writes no core file holding a secret
     except (ImportError, ValueError, OSError):
         pass
-    ctx = ctx or Ctx()
+    ctx = ctx or production()
     argv = list(argv)
     if ctx.geteuid() != 0:
         ctx.err("polycarpic-ops: run with sudo")

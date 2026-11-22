@@ -1,7 +1,7 @@
 """Secret names the operator CLI may and may not write (R4)."""
 import re
 
-NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+NAME = re.compile(r"[a-z][a-z0-9_]{0,63}")
 TWO_LINES = "backup_store_credential"
 
 

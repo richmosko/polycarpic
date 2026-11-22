@@ -6,7 +6,9 @@ PROJECTS = ("host",)
 
 def _pct(ctx, path):
     sv = ctx.statvfs(path)
-    return (sv.f_blocks - sv.f_bfree) * 100 // sv.f_blocks if sv.f_blocks else 0
+    used = sv.f_blocks - sv.f_bfree  # df's figure: root's reserved blocks count as full
+    total = used + sv.f_bavail
+    return -(-used * 100 // total) if total else 0
 
 
 def run(ctx):

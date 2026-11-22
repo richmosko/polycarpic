@@ -2,12 +2,12 @@
 import calendar
 import re
 
-STAMP = re.compile(r"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z$")
+STAMP = re.compile(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})Z")
 
 
 def parse(text):
     """YYYY-MM-DDTHH:MM:SSZ -> epoch seconds, or None."""
-    m = STAMP.match(text or "")
+    m = STAMP.fullmatch(text or "")
     if not m:
         return None
     y, mo, d, h, mi, s = (int(x) for x in m.groups())
@@ -34,8 +34,8 @@ def age(seconds):
 
 
 def psql(ctx, project, sql, timeout=10):
-    """Read-only SQL on stdin through the project's postgres container. -> (code, stdout text)."""
-    stdin = "SET default_transaction_read_only = on;\n" + sql
+    """SQL on stdin (it sets the session read-only first) through the project's postgres container. -> (code, stdout text)."""
+    stdin = sql  # the query text starts with the read-only SET itself (K10)
     code, out, _ = ctx.run(["docker", "compose", "-p", "polycarpic-" + project, "exec", "-T", "postgres", "psql", "-U", "postgres",
                             "-d", "polycarpic", "-XAtq", "-v", "ON_ERROR_STOP=1"], stdin=stdin, timeout=timeout)
     return code, out

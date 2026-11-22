@@ -10,10 +10,11 @@ from lib.out import Line, clean
 
 PROJECTS = ("prod", "staging")
 WANT = 17
-REVOKE = re.compile(r"^REVOKE EXECUTE ON FUNCTION pg_catalog\.(\S+) FROM PUBLIC;$", re.M)
-SIG = re.compile(r"^[a-z_]+\([a-z_, ]*\)$")
+REVOKE = re.compile(r"REVOKE EXECUTE ON FUNCTION pg_catalog\.(\S+) FROM PUBLIC;")
+SIG = re.compile(r"[a-z_]+\([a-z_, ]*\)")
 
-SQL = """SELECT 'open:plpgsql' WHERE EXISTS (SELECT 1 FROM pg_language l, LATERAL aclexplode(coalesce(l.lanacl, acldefault('l', l.lanowner))) a
+TEMPLATE = """SET default_transaction_read_only = on;
+SELECT 'open:plpgsql' WHERE EXISTS (SELECT 1 FROM pg_language l, LATERAL aclexplode(coalesce(l.lanacl, acldefault('l', l.lanowner))) a
   WHERE l.lanname = 'plpgsql' AND a.grantee = 0 AND a.privilege_type = 'USAGE');
 SELECT CASE WHEN to_regprocedure('pg_catalog.' || s) IS NULL THEN 'missing:' || s ELSE 'open:' || s END
 FROM unnest(ARRAY[%s]) AS s
@@ -23,14 +24,19 @@ WHERE to_regprocedure('pg_catalog.' || s) IS NULL
 """
 
 
+def sql(signatures):
+    """The revokes query for these (pattern-checked) signatures, each a quoted literal. Prints nothing when all is closed."""
+    return TEMPLATE % ", ".join("'%s'" % s for s in signatures)
+
+
 def _signatures(ctx):
     text = ts.read_text(ctx.bundle("packages/db/sql/roles.sql"))
     if text is None:
         return None, "roles.sql is not in the installed bundle"
-    sigs = REVOKE.findall(text)
+    sigs = [m.group(1) for m in map(REVOKE.fullmatch, text.splitlines()) if m]
     if len(sigs) != WANT:
         return None, "roles.sql lists %d built-ins, want %d" % (len(sigs), WANT)
-    if not all(SIG.match(s) for s in sigs):
+    if not all(SIG.fullmatch(s) for s in sigs):
         return None, "roles.sql holds a signature outside the allowed pattern"
     return sigs, None
 
@@ -38,7 +44,7 @@ def _signatures(ctx):
 def _one(ctx, project, sigs):
     if not compose.running(compose.ps(ctx, "polycarpic-" + project), "postgres"):
         return Line("WAIT", "revokes", project, "postgres is not running")
-    code, text = ts.psql(ctx, project, SQL % ", ".join("'%s'" % s for s in sigs))
+    code, text = ts.psql(ctx, project, sql(sigs))
     if code != 0:
         return Line("RED", "revokes", project, "the revokes query failed")
     problems = []

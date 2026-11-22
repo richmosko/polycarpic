@@ -7,13 +7,13 @@ from lib.ts import read_text
 
 PROJECTS = ("prod", "staging")
 ENV = {"prod": "/etc/polycarpic/host.env", "staging": "/etc/polycarpic/staging-host.env"}
-HOST = re.compile(r"^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$")
+HOST = re.compile(r"[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?")
 
 
 def _one(ctx, project):
     text = read_text(ctx.p(ENV[project])) or ""
     m = re.search(r"^PUBLIC_ORIGIN=https://([^/\s:]+)", text, re.M)
-    host = m.group(1) if m and HOST.match(m.group(1)) else None
+    host = m.group(1) if m and HOST.fullmatch(m.group(1)) else None
     if not host:
         return Line("RED", "cert", project, "no PUBLIC_ORIGIN host in " + ENV[project].rsplit("/", 1)[-1])
     try:

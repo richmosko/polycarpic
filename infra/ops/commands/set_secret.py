@@ -106,7 +106,7 @@ def _write(ctx, dfd, fname, data):
 def run(args, ctx):
     name = args.name
     project = "staging" if args.staging else "prod"
-    if not rules.NAME.match(name):
+    if not rules.NAME.fullmatch(name):
         ctx.err("set-secret: bad name (want ^[a-z][a-z0-9_]{0,63}$)")
         return 2
     who = rules.refused_by(name)

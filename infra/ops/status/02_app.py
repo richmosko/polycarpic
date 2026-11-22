@@ -16,7 +16,7 @@ def _digest(info):
     m = re.search(r"@sha256:([0-9a-f]{12})", compose.image_ref(info))
     if m:
         return "sha256:" + m.group(1)
-    m = re.match(r"^sha256:([0-9a-f]{12})", str((info or {}).get("Image", "")))
+    m = re.match(r"sha256:([0-9a-f]{12})", str((info or {}).get("Image", "")))
     return "sha256:" + m.group(1) if m else "unknown"
 
 

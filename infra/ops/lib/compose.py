@@ -2,7 +2,7 @@
 import json
 import re
 
-SECRET_LINE = re.compile(r"^  ([a-z0-9_]+)__([a-z0-9-]+): \{file: (/\S+)\}$")
+SECRET_LINE = re.compile(r"  ([a-z0-9_]+)__([a-z0-9-]+): \{file: (/\S+)\}")
 SECRET_ROOT = {"prod": "/etc/polycarpic/secrets/", "staging": "/etc/polycarpic/staging-secrets/"}
 FILES = {"prod": ("prod.yml", "edge.yml"), "staging": ("staging.yml",)}
 GIDS = {"postgres": 999, "web": 10001, "worker": 10002, "migrate": 10003, "backup": 10004, "uploader": 10005,
@@ -34,7 +34,7 @@ def parse_secrets(ctx, project):
             if not line.startswith(" "):
                 inside = False
                 continue
-            m = SECRET_LINE.match(line)
+            m = SECRET_LINE.fullmatch(line)
             if not m:
                 raise ComposeError("compose secrets block unreadable: %s:%d" % (rel, n))
             name, service, path = m.groups()

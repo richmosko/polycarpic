@@ -3,8 +3,8 @@ import os
 import re
 
 HELP = "provision the host (--stage host) or re-apply the database roles (--stage database --project prod|staging)"
-DOMAIN = re.compile(r"^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$")
-BUCKET = re.compile(r"^[a-z0-9-]{6,50}$")
+DOMAIN = re.compile(r"[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+")
+BUCKET = re.compile(r"[a-z0-9-]{6,50}")
 OPS_CONF = "/etc/polycarpic/ops.conf"
 
 
@@ -27,11 +27,11 @@ def run(args, ctx):
         return _bad(ctx, "--stage must be host or database")
     if args.target is not None and args.target != "hetzner":
         return _bad(ctx, "--target home is not available" if args.target == "home" else "--target must be hetzner")
-    if args.domain is not None and not DOMAIN.match(args.domain):
+    if args.domain is not None and not DOMAIN.fullmatch(args.domain):
         return _bad(ctx, "bad --domain")
     if args.mail_from is not None and not (1 <= len(args.mail_from) <= 254 and all(0x20 <= ord(c) <= 0x7E for c in args.mail_from)):
         return _bad(ctx, "bad --mail-from")
-    if args.b2_bucket is not None and not BUCKET.match(args.b2_bucket):
+    if args.b2_bucket is not None and not BUCKET.fullmatch(args.b2_bucket):
         return _bad(ctx, "bad --b2-bucket")
     if args.project is not None and args.project not in ("prod", "staging"):
         return _bad(ctx, "--project must be prod or staging")

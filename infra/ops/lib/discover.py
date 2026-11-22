@@ -3,8 +3,8 @@ import importlib.util
 import os
 import re
 
-COMMAND = re.compile(r"^[a-z][a-z0-9_]*\.py$")
-STATUS = re.compile(r"^[0-9]{2}_[a-z][a-z0-9_]*\.py$")
+COMMAND = re.compile(r"[a-z][a-z0-9_]*\.py")
+STATUS = re.compile(r"[0-9]{2}_[a-z][a-z0-9_]*\.py")
 
 
 def modules(ops_dir, sub):
@@ -15,7 +15,7 @@ def modules(ops_dir, sub):
         names = sorted(os.listdir(folder))
     except OSError:
         return {}
-    return {n[:-3]: os.path.join(folder, n) for n in names if pattern.match(n)}
+    return {n[:-3]: os.path.join(folder, n) for n in names if pattern.fullmatch(n)}
 
 
 def load(path, label):

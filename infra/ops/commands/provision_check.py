@@ -2,7 +2,7 @@
 import re
 
 HELP = "read-only checks of the provisioned box (--prod once real data exists)"
-BUCKET = re.compile(r"^[a-z0-9-]{6,50}$")
+BUCKET = re.compile(r"[a-z0-9-]{6,50}")
 
 
 def add_arguments(parser):
@@ -14,7 +14,7 @@ def _conf_bucket(ctx):
     try:
         with open(ctx.p("/etc/polycarpic/ops.conf"), encoding="utf-8") as fh:
             for line in fh:
-                m = re.match(r"^B2_BUCKET=([a-z0-9-]{6,50})$", line.rstrip("\n"))
+                m = re.fullmatch(r"B2_BUCKET=([a-z0-9-]{6,50})", line.rstrip("\n"))
                 if m:
                     return m.group(1)
     except OSError:
@@ -24,7 +24,7 @@ def _conf_bucket(ctx):
 
 def run(args, ctx):
     bucket = args.b2_bucket
-    if bucket is not None and not BUCKET.match(bucket):
+    if bucket is not None and not BUCKET.fullmatch(bucket):
         ctx.err("provision-check: bad --b2-bucket")
         return 2
     bucket = bucket or _conf_bucket(ctx)

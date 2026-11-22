@@ -12,7 +12,7 @@ import sys
 import tarfile
 import tempfile
 
-ID = re.compile(r"^(git-[0-9a-f]{12}|sha256-[0-9a-f]{12})$")
+ID = re.compile(r"(git-[0-9a-f]{12}|sha256-[0-9a-f]{12})")
 EXECUTABLES = {"infra/ops/polycarpic-ops", "infra/ops/install_box.py", "infra/provision.sh", "infra/provision-check.sh",
                "infra/postgres/gate-check.sh"}
 LINK = "/usr/local/sbin/polycarpic-ops"
@@ -43,7 +43,7 @@ def _replace_link(target, path):
 
 
 def install(stream, bundle_id, root="/", out=sys.stdout):
-    if not ID.match(bundle_id):
+    if not ID.fullmatch(bundle_id):
         raise InstallError("bad id")
     opt = os.path.join(root, "opt/polycarpic")
     ops = os.path.join(opt, "ops")

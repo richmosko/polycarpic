@@ -10,7 +10,7 @@ from lib.out import Line, hhmm
 PROJECTS = ("prod",)
 JOBS = "/var/lib/polycarpic/state/jobs.log"
 CONN = re.compile(r"(replication )?connection authorized: user=poly_backup\b")
-JOB = re.compile(r"^([0-9T:Z-]+) ([0-9T:Z-]+) ([a-z0-9-]+) (ok|failed)$")
+JOB = re.compile(r"([0-9T:Z-]+) ([0-9T:Z-]+) ([a-z0-9-]+) (ok|failed)")
 CAPS = {"provision-check-d3": 600}
 DEFAULT_CAP = 6 * 3600
 PAD = 60
@@ -25,7 +25,7 @@ def run(ctx):
     for n, raw in enumerate((ts.read_text(ctx.p(JOBS)) or "").split("\n"), 1):
         if not raw.strip():
             continue
-        m = JOB.match(raw)
+        m = JOB.fullmatch(raw)
         start, end = (ts.parse(m.group(1)), ts.parse(m.group(2))) if m else (None, None)
         if not m or start is None or end is None:
             return [Line("RED", "backupdb", "prod", "jobs.log line %d does not parse" % n)]
