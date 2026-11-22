@@ -173,13 +173,14 @@ services:
     profiles: [uploader]
     secrets:
       - {source: backup_store_credential__uploader, target: backup_store_credential}
-      - {source: heartbeat_url__uploader, target: heartbeat_url}
     networks: [upload-net]
     mem_limit: 128m
-    tmpfs: [/tmp]
+    tmpfs: [/tmp:size=1m]
     volumes:
-      - /srv/polycarpic/spool:/spool
-      - /srv/polycarpic/uploader-state:/state
+      - ../backup/upload.sh:/usr/local/bin/upload.sh:ro
+      - /srv/polycarpic/spool:/spool:ro
+      - /etc/polycarpic/ops.conf:/etc/uploader/ops.conf:ro
+      - /etc/polycarpic/host.env:/etc/uploader/host.env:ro
     healthcheck:
       test: ["CMD", "rclone", "version"]
       interval: 60s
@@ -215,4 +216,3 @@ secrets:
   db_password_operator__operator: {file: /etc/polycarpic/secrets/operator/db_password_operator}
   db_password_backup__backup: {file: /etc/polycarpic/secrets/backup/db_password_backup}
   backup_store_credential__uploader: {file: /etc/polycarpic/secrets/uploader/backup_store_credential}
-  heartbeat_url__uploader: {file: /etc/polycarpic/secrets/uploader/heartbeat_url}
