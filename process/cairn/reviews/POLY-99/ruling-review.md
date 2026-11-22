@@ -441,3 +441,64 @@ condition has a test qa can point to. The plan gate is clear on my side.
   the loud `WARN`. That takes one argument rule and two tests (refused without either flag; passes with the override
   and the `WARN`). It can land before build green without reopening the ruling, if the lead records the Principal's
   choice on the issue first.
+
+## The clarification @ `351c9f4c98af62f4438ab68f6ebeac5491d09ee7`: `heartbeat_url` as a host-only secret
+
+**Accepted with condition H-1.** As written it is **refused on one point, the file's group.** The rest stands.
+
+**H-1. The file's group must be root, not 10005.**
+- *Mechanism.* The clarification keeps `/etc/polycarpic/secrets/uploader/heartbeat_url` at 0440 `root:10005`, inside
+  `uploader/`, which is `root:10005` 0750. The uploader container runs as `10005:10005`. H9 is right that no host
+  **account** holds gid 10005, but the kernel checks numbers, not accounts. A process that escapes the uploader
+  container into the host's mount namespace carries gid 10005, traverses `uploader/` and reads the URL.
+- *Reach.* Whoever holds the URL can send the backup check's green pings, and so hide a stopped backup. SECURITY's
+  host-only rule is "never mounted into a container, so a container escape short of root does not reach them". At
+  `root:10005` it does reach them. The extra reach over a plain compromise is small, since a lying uploader already
+  gets root to ping green (D3). But the rule is stated as a property, and this would make it false.
+- *Required:*
+  - The file is `/etc/polycarpic/secrets/host/heartbeat_url`, `root:root` 0400, in a directory `secrets/host/`,
+    `root:root` 0700, which `provision.sh` creates.
+  - `HOST_ONLY = {"heartbeat_url": "host"}`. H6 expects `root:root` 0400 for every `HOST_ONLY` entry, and `root:<gid>`
+    0440 for the rest.
+  - R5's read path and H13's check and fix text move to the new path.
+  - Why a new directory rather than chgrp in place: a host-only file left in `uploader/` invites a later mount of
+    that directory.
+  - The one-mode-for-every-secret argument does not hold here. The special case is one branch keyed on a constant
+    that is already there.
+  - *Cost:* one H6 branch and one `provision.sh` directory.
+  - Migration: a box provisioned before this keeps the old file. `provision.sh` moves it, keeping the value, never
+    printing it, with a `change:` line. H6 fails on a `heartbeat_url` still under `uploader/`.
+- *Tests:*
+  - H6 fails on the file at `root:10005` 0440, and on the file under `uploader/`.
+  - H6 passes at `root:root` 0400 under `host/`.
+  - The `provision.sh` move keeps the value and prints none of it (swept).
+
+**Does each tool still account for it?**
+- `set-secret`: yes. It writes through `HOST_ONLY`, keeps the `https://` check, and refuses a host-only name not in
+  the set (exit 2, the clarification's test).
+- `list-secrets`: yes. It lists it from `HOST_ONLY`, with its path and mode, never its value.
+- H6: yes, through the mirrored shell constant, with the equality test.
+- H13: yes, at the new path.
+
+**What stops `HOST_ONLY` from growing quietly.** The equality test only keeps the two copies the same. They could grow
+together. Add a pin:
+- A unit test asserts `HOST_ONLY == {"heartbeat_url": "host"}` exactly, with a comment naming SECURITY's host-only
+  row. Any addition (POLY-100's `github_read_token` will be one) then fails that test and comes to seceng's review.
+- A second test asserts that no `HOST_ONLY` name is also a compose-mounted secret.
+- The compose-policy lint refuses any service volume or secret whose source is under `/etc/polycarpic/secrets/host/`.
+
+**Can any container still read the URL?** Not once built as above:
+- No service mounts it. The lint refuses a top-level secret that no service mounts, and the new rule refuses the
+  `host/` directory.
+- `ops.conf` and `host.env`, which the uploader mounts, carry no URL. H6 admits only the `B2_` lines there.
+- The `0700` root directory stops an escape short of root.
+
+Two tests prove it:
+- in the rendered uploader, `/run/secrets/heartbeat_url` does not exist;
+- the C11 sweep finds the fixture URL in no container's mounts or environment.
+
+**Noted for the build review:**
+- I will read `infra/lint/policy.json` (the uploader's allowlist, which devops-99 changed) by name, as a diff
+  against `09aeeeb2`.
+- SECURITY's host-only row lists `backup_store_credential`, which the uploader container mounts by design (C-79). I
+  correct that row when I edit SECURITY.
