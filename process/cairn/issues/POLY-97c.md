@@ -1,7 +1,7 @@
 ---
 id: POLY-97c
 title: Provisioning tests
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-97
 blocked_by: [POLY-97b]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-97.md, process/cairn/reviews/POLY-97/**, proce
 stage: execute
 estimate.cost_usd: "15.00"
 estimate.gate_cycles: 3
+actual.cost_usd: "4.8518"
+actual.tokens: 20069451
+actual.gate_cycles: 0
+actual.wall_clock: null
+ratio: "0.32"
 labels: [ops, infra]
 priority: null
 pr: null
