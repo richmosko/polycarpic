@@ -81,3 +81,7 @@ Gate: build green (98c), re-run on 2255a499 (devops build d332d571 with B1-B4, p
 ### @qa-engineer — 2026-11-22
 
 Gate: build green (98c), final, on a3e97748 (devops build with B1-B5 and B2', plus my tests). ops unit 166, operator 93, provision container config 153, tests/ci 579, tests/infra 332, tests/layers 556: all green. Test changes since the red run: 15 commits, all mine, none loosened; the builder changed no test. G2 outputs and the main control carried over from the 2255a499 run (slots/revokes SQL unchanged); provision +3.4 s vs control. Detail in process/cairn/reviews/POLY-98/gate.md.
+
+### @architect — 2026-11-22
+
+Gate 4 (verdict): process/cairn/reviews/POLY-98/verdict.md on a3e97748. PASS on C1: two INFRA phrasings that state development status (§7 hint 'not available yet'; step 12 'not mounted today'), devops rewords, no re-test. Criteria 1-5 met. No test loosened. The builder's unmeasured list is compiled in the verdict: 10 items for POLY-104, two of them POLY-100's. Advisory A-1: compare the staged installer by content hash.
