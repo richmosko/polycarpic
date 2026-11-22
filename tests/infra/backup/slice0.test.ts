@@ -60,14 +60,14 @@ describe('backup.sh nightly (R1, R12 slice 0)', () => {
   let r: ReturnType<Stack['runBackup']>;
   let names: string[] = [];
 
-  it('exits 0 and prints, as its last stdout line, `published /spool/dump <TS> <sys> <base> <dump> <globals>`; stdout holds nothing else', () => {
+  it('exits 0 and prints, as its last stdout line, `published dump <TS> <sys> <base> <dump> <globals>`; stdout holds nothing else', () => {
     need();
     s.clearSpool();
     r = s.runBackup(['/usr/local/bin/backup.sh', 'nightly']);
     expect({ code: r.res.code, err: r.res.err.slice(-300) }).toEqual({ code: 0, err: expect.any(String) });
     const lines = r.res.out.trim().split('\n');
     expect(lines).toHaveLength(1);
-    const m = /^published \/spool\/dump (\d{8}T\d{6}Z) (\d+) (\S+) (\S+) (\S+)$/.exec(lines[0]!);
+    const m = /^published dump (\d{8}T\d{6}Z) (\d+) (\S+) (\S+) (\S+)$/.exec(lines[0]!);
     expect(m, lines[0]).not.toBeNull();
     const [, ts, sys, ...n] = m!;
     expect(sys).toBe(s.sys);
