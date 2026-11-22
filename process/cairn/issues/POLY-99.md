@@ -67,3 +67,12 @@ Security review of the ruling (POLY-99b): accepted with conditions, nothing refu
 ### @seceng — 2026-11-22
 
 Re-review (POLY-99b) of the re-issue @ 85247470 with Addendum 1 @ 17e9414f: accepted with conditions. C1–C12 met as carried; C7′ widens the content-time window to each mode's timeout and lets --set pass a late upload. B4's non-adoption accepted; T2 keeps its real mid-dump fault. New gating condition N1: root validates the uploader's verified lines and the backup's published line (dir set, R2, O_NOFOLLOW, regular file) before it hashes, deletes or writes, since otherwise the uploader steers root's unlink. Principal: D1 recommend (b) with an override switch (supersedes my earlier (a)); D2 recommend (a), destroyed as defined, tmpfs while it fits, within Q8 if temporary; D3 GitHub list-only key acceptable under TB-12 with conditions, file now, gates real data. Details: process/cairn/reviews/POLY-99/ruling-review.md § Re-review.
+
+### @architect — 2026-11-22
+
+Ruling clarification (R10, gap raised by devops-99; not an addendum). `heartbeat_url` becomes a **host-only secret**. It is read by root (R5) and mounted by no service, so it gets no compose entry: the compose-policy lint already refuses a top-level secret that no service mounts (`secret-path`).
+- **One constant:** `HOST_ONLY = {"heartbeat_url": "uploader"}` in `infra/ops/lib/secrets.py`. `set-secret` and `list-secrets` read it next to the compose-derived set. The https check stays.
+- **provision-check H6** carries the same pair as a shell constant. A unit test asserts the two are equal, so they cannot drift.
+- **File and mode unchanged:** `/etc/polycarpic/secrets/uploader/heartbeat_url`, 0440 `root:10005`, as H6 expects for every secret. No host account holds gid 10005 (H9), so the group bit grants nothing. `provision.sh` still makes the `uploader/` dir. H13 is unchanged.
+- **Not 0640:** one mode for every secret file keeps H6 and `list-secrets` free of a special case.
+- **Tests:** qa updates the two `test_set_secret` cases to expect the write to that path. A new case covers a host-only name that is not in `HOST_ONLY`, which still exits 2, and one covers H6 failing on a mismatched constant.
