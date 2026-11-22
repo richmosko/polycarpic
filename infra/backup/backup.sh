@@ -88,4 +88,4 @@ for s in $steps; do rm -f "$(tmpf "$s")"; done
 
 names=()
 for s in $steps; do names+=("$(name "$s")"); done
-echo "published $dir $ts $sys ${names[*]}"
+echo "published ${dir#/spool/} $ts $sys ${names[*]}"
