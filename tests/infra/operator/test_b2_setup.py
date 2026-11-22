@@ -212,7 +212,7 @@ class B2Setup(ToolTest):
 
         def runner(argv, env=None, stdin=None):
             calls.append((list(argv), dict(env or {})))
-            return 0
+            return (0, "")
 
         b2 = FakeB2()
         rc, out, err = self.go(b2, args=["--probe"], runner=runner)
@@ -247,7 +247,7 @@ class B2Setup(ToolTest):
 
         def strict(argv, env=None, stdin=None):
             seen.append(list(argv))
-            return 0 if "--s3-no-head" in argv else 1
+            return (0, "") if "--s3-no-head" in argv else (1, "AccessDenied: HEAD needs readFiles")
 
         b2 = FakeB2()
         rc, out, err = self.go(b2, args=["--probe"], runner=strict)
@@ -256,29 +256,79 @@ class B2Setup(ToolTest):
         self.assertEqual(rc, 0, out + err)
         self.assertRegex(out, r"(?i)success|accepted|uploaded")
         # power of the assertion: the same runner without the flag would report a refusal
-        self.assertEqual(strict(["rclone", "rcat", "probe:x"]), 1)
+        self.assertEqual(strict(["rclone", "rcat", "probe:x"])[0], 1)
+
+    # The probe decides the box key's capability set from its answer, so it reports THREE outcomes (build-review note, lead):
+    OK_TXT, DENIED_TXT, INCONCLUSIVE_TXT = "writeFiles alone is enough", "listBuckets is needed", "INCONCLUSIVE"
+
+    def probe(self, runner):
+        b2 = FakeB2()
+        rc, out, err = self.go(b2, args=["--probe"], runner=runner)
+        return rc, out + err, b2
+
+    def test_probe_outcome_upload_succeeded_says_writefiles_alone_is_enough_and_nothing_else(self):
+        rc, text, b2 = self.probe(lambda argv, env=None, stdin=None: (0, ""))
+        self.assertEqual(rc, 0, text)
+        self.assertIn(self.OK_TXT, text)
+        self.assertNotIn(self.DENIED_TXT, text)
+        self.assertNotIn(self.INCONCLUSIVE_TXT, text)
+
+    def test_probe_outcome_refused_for_lack_of_permission_says_listbuckets_is_needed_and_nothing_else(self):
+        for msg in ("AccessDenied: Access Denied", "403 Forbidden", "HTTP 401 Unauthorized", "not authorized to perform s3:PutObject", "SignatureDoesNotMatch 403"):
+            rc, text, b2 = self.probe(lambda argv, env=None, stdin=None, m=msg: (1, m))
+            self.assertIn(self.DENIED_TXT, text, msg)
+            self.assertNotIn(self.OK_TXT, text, msg)
+            self.assertNotIn(self.INCONCLUSIVE_TXT, text, msg)
+            self.assertTrue(b2.deleted, "the temporary key is deleted on every outcome")
+
+    def test_probe_outcome_anything_else_is_inconclusive_non_zero_and_recommends_nothing(self):
+        cases = [
+            lambda argv, env=None, stdin=None: (1, "dial tcp: lookup s3.eu-central-003.backblazeb2.com: no such host"),
+            lambda argv, env=None, stdin=None: (1, "context deadline exceeded (Client.Timeout exceeded while awaiting headers)"),
+            lambda argv, env=None, stdin=None: (1, "connection refused"),
+            lambda argv, env=None, stdin=None: (2, "Failed to create file system: unknown flag"),
+            lambda argv, env=None, stdin=None: (1, ""),
+        ]
+        for runner in cases:
+            rc, text, b2 = self.probe(runner)
+            self.assertNotEqual(rc, 0, text)
+            self.assertIn(self.INCONCLUSIVE_TXT, text)
+            self.assertNotIn(self.OK_TXT, text)
+            self.assertNotIn(self.DENIED_TXT, text)
+            self.assertTrue(b2.deleted)
+
+    def test_probe_with_rclone_missing_is_inconclusive_not_a_refusal(self):
+        def missing(argv, env=None, stdin=None):
+            raise FileNotFoundError(2, "No such file or directory: 'rclone'")
+
+        rc, text, b2 = self.probe(missing)
+        self.assertNotEqual(rc, 0, text)
+        self.assertIn(self.INCONCLUSIVE_TXT, text)
+        self.assertNotIn(self.DENIED_TXT, text)
+        self.assertNotIn(self.OK_TXT, text)
+        self.assertTrue(b2.deleted)
 
     def test_probe_ends_with_the_master_key_regeneration_and_the_401_check(self):
-        rc, out, err = self.go(FakeB2(), args=["--probe"], runner=lambda argv, env=None, stdin=None: 0)
+        rc, out, err = self.go(FakeB2(), args=["--probe"], runner=lambda argv, env=None, stdin=None: (0, ""))
         self.assertEqual(rc, 0, out + err)
         self.line(out, "PASS", "master")
         self.assertIn("Generate New Master Application Key", out)
 
     def test_probe_with_the_old_master_key_still_live_exits_non_zero_saying_so_and_still_deletes_the_temporary_key(self):
         b2 = FakeB2()
-        rc, out, err = self.go(b2, args=["--probe"], runner=lambda argv, env=None, stdin=None: 0, regenerate=False)
+        rc, out, err = self.go(b2, args=["--probe"], runner=lambda argv, env=None, stdin=None: (0, ""), regenerate=False)
         self.assertNotEqual(rc, 0)
         self.assertRegex(self.line(out + err, "master", "still"), r"(?i)still (live|valid|authori)")
         self.assertTrue(b2.deleted)
 
     def test_probe_reports_a_refusal_and_still_deletes_the_temporary_key(self):
         b2 = FakeB2()
-        rc, out, err = self.go(b2, args=["--probe"], runner=lambda argv, env=None, stdin=None: 1)
+        rc, out, err = self.go(b2, args=["--probe"], runner=lambda argv, env=None, stdin=None: (1, "AccessDenied: not authorized"))
         self.assertRegex(out + err, r"(?i)refus|fail|denied")
         self.assertTrue(b2.deleted)
 
     def test_probe_never_leaks_the_temporary_key(self):
-        rc, out, err = self.go(FakeB2(), args=["--probe"], runner=lambda argv, env=None, stdin=None: 0)
+        rc, out, err = self.go(FakeB2(), args=["--probe"], runner=lambda argv, env=None, stdin=None: (0, ""))
         self.assertNoSecrets(out + err, ["K004TEMPKEYSECRETxxxxxxxxxxxxxxxxxxx", SECRETS["b2_master_key"], SECRETS["b2_token"]])
 
 

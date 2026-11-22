@@ -151,3 +151,9 @@ Ruled by the architect: `ruling.md` Addendum 2 @ 512d9c50 and Addendum 3 @ 1eafa
 - Second firewall drift (lead, same rule as R1/D-7): pinned `change: firewall detached (<name>)`, via `hcloud firewall remove-from-resource`, never delete; positive case prints no such line. V:create +2.
 - A-M2 mutation: with the two SET lines stripped, the verifier does reach the Postgres log. V-db +1; plus a staging-stage test (five roles authenticate, poly_backup has no verifier) V-db +1.
 - CI remedy: `provision` job, changes key and paths, `app` aggregate (REQUIRED, result list), `budgets.json` 200 s, 10 `changes.test.ts` rows, aggregate/ci-workflow expectations, wiring test rewritten.
+
+## Probe outcomes (lead + build-review 5e6846e0 C1)
+
+- Runner contract change: `runner(argv, env=None, stdin=None) -> (returncode, output_text)`; a runner that raises (rclone missing) is also an outcome.
+- Three outcomes, three pinned strings: success prints `writeFiles alone is enough` (exit 0); permission refusal (text matches access denied / 401 / 403 / not authorized / forbidden) prints `listBuckets is needed`; anything else (no such host, timeout, connection refused, other rc, empty text, runner raising) prints `INCONCLUSIVE`, exits non-zero, and prints neither recommendation. The temporary key is deleted on every outcome.
+- `--s3-no-head` must be in the rclone argv (the uploader never sends HEAD).
