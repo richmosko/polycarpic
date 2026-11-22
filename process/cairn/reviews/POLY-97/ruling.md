@@ -1,6 +1,8 @@
 # POLY-97 ruling: infra scaffolding and provisioning
 
-Architect, 2026-11-22. Tree read at `46bce70ff7b3c7b3356d3115b6265c5942248097`. Scope: the description, six acceptance
+Architect, 2026-11-22. This replaces the ruling at `3381b155` whole. It folds in seceng-97's positions
+(`seceng-positions.md` in this directory; items 1, 6, 7, 8 and the built state). Tree read at
+`46bce70ff7b3c7b3356d3115b6265c5942248097`. Scope: the description, six acceptance
 criteria and eleven comments on `POLY-97.md`, plus the operator prototypes in the lead checkout
 (`temp/poly-97-operator-scripts/`, untracked). A claim is measured unless tagged `(unmeasured)`; §M lists the
 measurements (this Mac, Docker 29.9.3, arm64). The Principal's choices are in §D. The ruling proceeds on each
@@ -34,6 +36,9 @@ IN this loop: R1–R12. OUT, with the issue each item moves to:
 | Alert when the worker's `job.run` lines stop | POLY-103 | Monitoring. |
 | Prod maintenance page (POLY-138 F4) | **new issue** (lead files): "Prod maintenance page", before the first prod deploy | Caddyfile, not in paths; prod is from v1.0. This loop corrects the INFRA text only (R11). |
 | `_acme-challenge` records for the home box's DNS-01 | POLY-120 | Adds a `--target home` allowance to R9's allowed set. |
+| Restores and drills pick by version and alert on more than one version or a hide marker; restore only into a throwaway Postgres; the uploader verifies from the upload response's checksum, never by HEAD or list (seceng 1a) | POLY-99 | Restore and uploader. Spool names are unique: WAL by segment name (`archive-wal.sh` refuses an existing target); POLY-99 gives dumps a UTC timestamp. |
+| Caddy pinned to Let's Encrypt as its only issuer, then CAA `accounturi` after first issuance (seceng F-C) | POLY-104 | `infra/caddy/**` is not in paths. Until then a ZeroSSL fallback fails under R9's CAA, which is loud (certificate alert) and safe. |
+| CT-log alert for the domain; DNSSEC | Principal, before real data (recommended, not gating) | Account set-up, no code. |
 
 ## R1 — `infra/hetzner/create.sh`
 
@@ -54,6 +59,8 @@ IN this loop: R1–R12. OUT, with the issue each item moves to:
 - No port number other than 22, 80, 443 appears in any argument the script passes to `hcloud`.
 - It reads no token: `hcloud` uses its active context. The script refuses (exit 2) when `HCLOUD_TOKEN` is set in the
   environment, so a token is never placed where shell history or `ps` shows it.
+- Its last lines, on every run, print the two token-removal steps (`hcloud context delete <name>` and the console
+  deletion). Once the server exists, the token can snapshot both disks, and the LUKS key is on the root disk.
 
 ## R2 — `infra/hetzner/cloud-init.yaml`
 
@@ -91,15 +98,18 @@ IN this loop: R1–R12. OUT, with the issue each item moves to:
 ## R4 — The provision-check output contract
 
 - One line per check: `PASS <id> <what>`, `FAIL <id> <what>: <found> — fix: <command or step>`,
-  `WAIT <id> <what>: <what it waits for>`, `NOT CONFIGURED <id> <what>: <consequence>`. Ids are stable (`H1`…, `D1`…),
-  so a test asserts the exact id that fails.
+  `WAIT <id> <what>: <what it waits for>`, `WARN <id> <what> not configured: <consequence>`,
+  `INFO <id> <what>: checked off-box by <tool>`. INFO is never counted as a pass. Ids are stable (`H1`…, `D1`…), so
+  a test asserts the exact id that fails.
 - Summary, last line, and exit code:
-  - `ALL CHECKS PASSED`, exit 0: no FAIL and no WAIT. NOT CONFIGURED lines are repeated in the summary
-    (`ALL CHECKS PASSED (not configured: heartbeat)`).
+  - `ALL CHECKS PASSED`, exit 0: no FAIL, WAIT or WARN.
+  - `PASSED WITH <n> WARNINGS: <ids>`, exit 0: no FAIL or WAIT, at least one WARN. The words `ALL CHECKS PASSED`
+    never appear with a WARN.
   - `HOST CHECKS PASSED; <n> checks wait for the first deploy`, exit 3: no FAIL, at least one WAIT.
   - `<n> CHECKS FAILED`, exit 1: any FAIL.
 - `--prod` (passed once a prod project exists; detected when `/srv/polycarpic/pg-prod` holds a cluster) turns every
-  NOT CONFIGURED into a FAIL. Staging-only boxes report and pass.
+  WARN into a FAIL. This is the real-data gate for the heartbeat: without path B a filled bucket fails silently
+  (seceng 1b). Staging-only boxes report and pass with the warning.
 - Every check has a positive case and a planted-fault case in the dry run, and the fault case asserts the id and the
   `fix:` text, not just exit 1.
 
@@ -163,8 +173,8 @@ Read-only. Host checks run always; database checks WAIT while the project's Post
 | H9 | R5's gid rule | — |
 | H10 | `host.env` and `staging-host.env` present, `MAIL_FROM` under `mail.<d>`, and no key matching R10's secret-name pattern | D-1 |
 | H11 | `age-recipients.txt` holds exactly one `age1…` line | §6.1 |
-| H12 | The box B2 key: `b2_authorize_account` with `secrets/uploader/backup_store_credential` reports `allowed.capabilities` **exactly** `{listBuckets, writeFiles}` and `allowed.bucketName` the configured bucket; any other capability fails naming it. WAIT while the file is absent. Credential sent to curl on stdin (`--config -`), never argv | item 1 |
-| H13 | `secrets/uploader/heartbeat_url` present; when absent, NOT CONFIGURED `alert path B does not exist; no outside monitor will notice the box going quiet` | item 8 |
+| H12 | The box B2 key: `b2_authorize_account` with `secrets/uploader/backup_store_credential` reports `allowed.capabilities` **exactly** the box-key constant, `allowed.bucketId` and `bucketName` the configured bucket (an unrestricted key fails), `allowed.namePrefix` null. Any capability more or less fails, naming it, with `fix: delete key <name>; recreate it with infra/operator/b2-setup.py`. WAIT while the file is absent. Credential sent to curl on stdin (`--config -`), never argv. Then `INFO H12b bucket lock: checked off-box by b2-setup.py`: the box key cannot read retention | item 1 |
+| H13 | `secrets/uploader/heartbeat_url` present; when absent, `WARN H13 heartbeat not configured: alert path B does not exist; a box going quiet or a full bucket goes unnoticed` | item 8 |
 | H14 | `timedatectl show -p NTPSynchronized` is `yes` | — |
 | D1 | `SHOW` on each project's Postgres: the C-75 three, `archive_mode on`, `archive_timeout 300`, `max_replication_slots 2`, `max_wal_senders 3`, `max_slot_wal_keep_size 2GB`, `log_connections on`, `password_encryption scram-sha-256` | D-8, C-79 |
 | D2 | `SELECT array_agg(extname ORDER BY extname) FROM pg_extension` is exactly `{plpgsql}` on prod **and** staging | criterion 5 |
@@ -173,10 +183,12 @@ Read-only. Host checks run always; database checks WAIT while the project's Post
 | D5 | Every login role in `roles.sql` has a `SCRAM-SHA-256$` verifier | R5 |
 | D6 | The fixed networks carry their §2.2 subnets; no other Docker network lies in `10.201.0.0/16` or `10.202.0.0/16` | §2.2 |
 
-The capability allow-list `{listBuckets, writeFiles}` is one constant, shared by H12 and R8's tool. Whether rclone's
-upload and the uploader's verify work with only those two is POLY-99's to measure (unmeasured). If they need
-`listFiles` or `readFiles`, POLY-99 widens the constant with seceng's review. Nothing that deletes, hides, or changes
-retention, lifecycle, encryption or keys is ever added.
+**The box-key constant** lives in `infra/operator/b2-capabilities.json` and is shared by H12 and R8's tool. It is
+`{writeFiles}`, or `{listBuckets, writeFiles}` only if R12 E9 shows that rclone's upload (`no_check_bucket = true`)
+fails without `listBuckets`. The file starts as `{listBuckets, writeFiles}`, the key as built, and E9's result sets
+it in this loop. `listFiles` and `readFiles` are never added to the box key. If the uploader's verify needs a HEAD
+or a list, the verify step changes instead (POLY-99). The key never gains a capability that deletes, hides beyond
+`writeFiles`, or changes retention, lifecycle, encryption or keys.
 
 `backup_store_credential` format: two lines, the key id then the application key, nothing else. POLY-99's uploader reads
 the same file.
@@ -206,20 +218,30 @@ real runs, with secrets replaced.
   2. Reads the bucket back and asserts `bucketType allPrivate`; `fileLockConfiguration`: enabled, mode `compliance`,
      period 35 days; lifecycle hide 36 / delete 1 (item 2: the lock is read through the API, not the dialog).
      Prints each as PASS or FAIL. Encryption is reported, not asserted (item 3).
-  3. Creates `polycarpic-put-only` with exactly `{listBuckets, writeFiles}` and `polycarpic-read` with exactly
-     `{listBuckets, listFiles, readFiles, readBucketRetentions}`, both restricted to the bucket. If a key of that
+  3. Creates `polycarpic-put-only` with exactly the box-key constant, and `polycarpic-read` with exactly
+     `{listBuckets, listFiles, readFiles, readBucketRetentions, readFileRetentions, readFileLegalHolds,
+     readBucketEncryption}`, plus B2's lifecycle-read capability if one exists under that role (the name is
+     unmeasured; E9 reads it from the API). Both keys are restricted to the bucket. The read key never holds any
+     `write*`, `deleteFiles`, `bypassGovernance`, `shareFiles`, `listKeys`, `writeKeys` or `deleteKeys`; the
+     web-form "Read Only" key is checked against this set and replaced if it differs. If a key of that
      name exists, it shows its capabilities and offers delete-and-recreate. It never makes two keys with one name.
      Each new key's secret is printed **once**, marked, for the password manager. That is the tool's purpose and the
      only secret it ever prints.
   4. Reads every key back through `b2_list_keys` and asserts each one's capability set and bucket exactly. A key
      outside these two names that holds this bucket is listed as FAIL with "delete it".
   5. Prints: "Now generate a new master key again." Waits for `done`, then authorizes with the old master key
-     (still in memory) and expects 401. PASS proves the regeneration. The old key is then discarded.
+     (still in memory) and expects 401. PASS proves the regeneration. The old key is then discarded. The tool says
+     the master key is never to be stored, since it can be regenerated from the console behind two-step sign-in.
+  - `--probe` (E9 only): with the master key, creates a temporary `writeFiles`-only key, runs one rclone upload of a
+    1-byte `probe/<UTC timestamp>` object through it, reports success or the refusal, then deletes the temporary key.
+    The object stays locked for 35 days, at negligible cost.
 - `dns-move-to-cloudflare.py`: as prototyped, with the Porkbun API key read hidden too.
 - `dns-records.py`: writes the allowed set of R9 (mail and lock-down records, and `app`/`staging` A and AAAA with
   `--ipv4`/`--ipv6`, TTL 300, `proxied: false`), idempotent, and never writes a record outside the allowed set
   (tested). Token: zone-scoped DNS edit, deleted after use.
 - `dns-check.py`: R9.
+- `laptop-check.py`: fails if `hcloud context list` shows any context, if `HCLOUD_TOKEN` is set, or if hcloud's config
+  file holds a token. Runs at the deploy gate and in the monthly window, beside `dns-check.py` (seceng, built state).
 
 ## R9 — The DNS allowed set and its check
 
@@ -230,11 +252,12 @@ One file, `infra/operator/dns-allowed.json`, read by both `dns-records.py` and `
 |---|---|---|
 | `@` | TXT | `v=spf1 -all` |
 | `@` | MX | priority 0, `.` |
-| `_dmarc` | TXT | `v=DMARC1; p=reject` (pinned to seceng's position, §D3) |
+| `@` | CAA | exactly two: `0 issue "letsencrypt.org"` and `0 issuewild ";"`. POLY-104 narrows `issue` with `accounturi=` after first issuance. |
+| `_dmarc` | TXT | `v=DMARC1; p=reject; sp=reject; adkim=s; aspf=r; rua=mailto:<Cloudflare DMARC Management address>` (§D3). Never `ruf`. |
 | `send.mail` | CNAME | `send.forge.rmta.net` |
 | `rsend.mail` | CNAME | `rsend-euw1.forge.rmta.net` |
-| `resend._domainkey.mail` | TXT | the DKIM value now published, pinned in full |
-| `app`, `staging` | A, AAAA | one record each, equal to `--ipv4` / `--ipv6`; absent is allowed and reported as `absent` |
+| `resend._domainkey.mail` | TXT | starts `p=`; the SHA-256 of the normalised value is pinned. A change fails with `fix: confirm a Resend key rotation, then re-pin in dns-allowed.json` |
+| `app`, `staging` | A, AAAA | one record each, equal to `--ipv4` / `--ipv6`; absent is allowed and reported as `absent`. Pinned, so a record left behind when a Hetzner address is released fails (seceng) |
 
 `dns-check.py --ipv4 <a> --ipv6 <a>` lists every record through Cloudflare's API (all pages; fails closed if
 `result_info` shows more than it fetched or `success` is false) with a **read-only** (Zone:DNS:Read) token. It prints
@@ -247,6 +270,12 @@ One file, `infra/operator/dns-allowed.json`, read by both `dns-records.py` and `
 - `proxied: true` on any record;
 - an NS record below the apex (a delegation);
 - A or AAAA for `app`/`staging` not equal to the given address.
+
+**Target health.** The check also resolves both CNAME targets through public DNS-over-HTTPS (Cloudflare's JSON
+endpoint, `type=A`, `AAAA`, `CAA`; stdlib `urllib`, the same injected transport). It fails on any A, AAAA or CAA
+answer at either target, with `fix: stop and ask seceng; do not re-pin`. An address there would let whoever runs
+`rmta.net` serve an HTTPS page on our sibling name and plant a `Domain=polycarpic.com` cookie (R-27). Today neither
+target has one (seceng, `dig`).
 
 It ends `DNS CHECK PASSED` with exit 0. The dry run plants each fault in a fixture and asserts the exact FAIL line.
 The planted-record proof on the live zone is R12 E6. Runs at the deploy gate (with INFRA §7.1 step 16) and in the
@@ -279,9 +308,13 @@ path. Secret-name pattern for R2 and H10: `(PASSWORD|SECRET|TOKEN|_KEY|CREDENTIA
   - §8: the two POLY-137/138 runbook sentences: only a database superuser can correct a user's email, and an
     undeliverable notice keeps its method held.
   - `infra/README.md`: the tools.
-- **seceng (SECURITY):** C-73/§6 on the B2 capability sets and API-made keys (item 1's finding); C-78's password-manager
-  assumption against the Principal's position (macOS Passwords offered); the DMARC record (§D3); the DNS Open Risk's
-  check now built (R9); user-data and the metadata service (R2).
+- **seceng (SECURITY):**
+  - C-73: the B2 capability sets, API-made keys, and restore-by-version.
+  - C-78: the password manager. macOS Passwords is acceptable with 2FA, and it gates real data.
+  - The DMARC record.
+  - R-27: the reworded domain rule, and residual (a), the `rmta.net` takeover.
+  - CAA and target health as a new control.
+  - User-data and the metadata service (R2).
 - **architect (ARCH), at the verdict:** §7 integration points gain Backblaze's and Cloudflare's APIs at provisioning
   (laptop only, read-only token for the check); the Hetzner deploy topology's provisioning sentence names the two
   stages.
@@ -300,6 +333,11 @@ Red before the build, each by its own missing behaviour:
   plaintext and neither the plaintext nor the verifier appears in the Postgres log, including after a forced
   failing ALTER.
 - Each operator tool's flow against fixtures, every R9 fault, the old-master 401, and the secret sweep of R10.
+- An A, AAAA and CAA answer, each planted at a CNAME target, fails target health.
+- `laptop-check.py` fails on a planted hcloud context.
+- An unconfigured heartbeat yields `PASSED WITH 1 WARNINGS: H13`, never `ALL CHECKS PASSED`, and FAILs under
+  `--prod`.
+- A box-key fixture holding `listFiles`, or one with no bucket restriction, fails H12.
 - The compose-equals-table test of R5.
 
 ## Guards
@@ -322,10 +360,14 @@ On the Principal's laptop, `hcloud` context `polycarpic`. The Principal pastes t
   E3 again shows three rules.
 - E6. DNS: `dns-check.py` passes on the live zone. Then add TXT `planted` in the console: the check fails naming
   `planted TXT`. Delete it: the check passes.
+- E9. Backblaze: `b2-setup.py` run live. Its read-back passes, or it replaces the read key and then passes. Then
+  `--probe`: if the `writeFiles`-only upload succeeds, the box-key constant becomes `{writeFiles}`, and the put-only
+  key is recreated to match. The lead records which.
 - E7 (if §D1 is taken). R7's host stage and provision-check on the box; expected
   `HOST CHECKS PASSED; <n> checks wait for the first deploy`; any FAIL is a finding for this loop.
-- E8. Cleanup (§D2), then `hcloud context delete polycarpic`, `ls ~/.config/hcloud` shows no token, and the token is
-  deleted in the console (C-78).
+- E8. Cleanup (§D2), then `hcloud context delete polycarpic`, then the token is deleted in the console (C-78), then
+  `laptop-check.py` passes. All of this happens in the same sitting as E1, never later: the box is a fake-data
+  test box, but the token can snapshot it.
 
 ## D — Decisions for the Principal
 
@@ -339,11 +381,15 @@ On the Principal's laptop, `hcloud` context `polycarpic`. The Principal pastes t
     novice would, which is what it is for.
   - (b) Keep it, about €10–15 a month, and POLY-104 starts from a running box. Step 7 becomes a no-op there, and the
     token must stay alive or be remade.
-- **D3. DMARC and DKIM pinned exactly.** The check fails the day Resend rotates its DKIM key or anyone edits the DMARC
-  record, until a PR updates `dns-allowed.json`.
-  - **Recommended:** pin both. A changed DNS record about mail is exactly what should stop the deploy gate.
-  - The alternative is to check only that they exist. That passes silently through a hostile edit.
-  - seceng's DMARC position, when it arrives, sets the pinned value as an addendum.
+- **D3. DMARC reports, and pinning.** seceng's record adds `sp=reject; adkim=s; aspf=r` and a `rua=` report
+  address. The check pins DMARC exactly, and DKIM by hash. The check fails the day Resend rotates its key or anyone
+  edits the record, until a PR re-pins it.
+  - **Recommended:** turn on Cloudflare's free DMARC Management. It gives the `rua=` address, and Cloudflare already
+    holds the zone, so no new party sees anything. That is about 5 minutes in the console during R12; the lead puts
+    the address in `dns-allowed.json`. Without reports, nobody sees someone forging our mail, or our own mail
+    failing.
+  - The alternative is no `rua`: the record is pinned without it, and we stay blind.
+  - `ruf` (forensic reports) is refused either way. Those reports can carry sign-in and recovery links.
 - **D4. Password-free `sudo` for `polyops`.** The SSH key and its passphrase are then the only things between a
   stolen laptop session and root.
   - **Recommended:** accept it. A sudo password typed over that same session adds little against the attacker who
