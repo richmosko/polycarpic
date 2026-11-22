@@ -2,16 +2,17 @@
 
 Authority: `ruling.md` at f7730d73 incl. Addendum 1. Harness per R3: fakes, no network, no credential. Paths: `V:` = `tests/infra/image/` (vitest, image config), `P:` = `tests/infra/operator/` (unittest). Files: `V:provision-create.test.ts` (create), `V:provision.test.ts` (host stage + H), `V:provision-db.test.ts` (database stage + D + summaries), `P:test_*.py`. Harness: `tests/infra/provision/` (Dockerfile pinned by digest, `fakes/`, `prelude.sh`, `apply-cloud-init.py`), `V:provision-box.ts`, `P:base.py`.
 
-## Contract pins (the ruling left these open; devops builds to them, architect told)
+## Contract pins
 
-1. `cloud-init.yaml` carries the literal `__SSH_PUBLIC_KEY__` in `ssh_authorized_keys`; `create.sh` replaces it and passes `--user-data-from-file`. `polyops` is under `users:` (no `sudo:` key); the sshd drop-in and the one sudoers drop-in are `write_files:` entries.
-2. Python tools: `main(argv, *, transport, getpass, input, stdout, stderr, runner=None, env=None, home=None) -> int`, nothing at import; `transport(method, url, headers, body) -> (status, json)`; `runner(argv, env=None, stdin=None) -> returncode` (laptop-check: `(rc, stdout)`).
-3. `infra/operator/b2-capabilities.json` = `{"capabilities": [...], "bucketName": "polycarpic-hetzner-backups"}`. `provision-check.sh` takes `--b2-capabilities <file> --b2-bucket <name>` (R7 copies only three files to the box; the constant must travel with them).
-4. R7 layout: `provision.sh`, `provision-check.sh`, `roles.sql` side by side in one directory (`/tmp/ops` in the dry run).
-5. Volume device: `/dev/disk/by-id/scsi-0HC_Volume_*` (fake file created by `prelude.sh`). Detection verbs the fakes answer: `blkid`, `wipefs`, `file`, `lsblk`, `cryptsetup isLuks|luksFormat|luksOpen|luksDump|status`, `findmnt`, `mount`. An unfaked verb exits 99 "FAKE: unsupported …" (a harness gap, not a failure of the script): ask qa to add it.
-6. D checks detect a running Postgres with `docker compose … ps` and reach it with `docker compose … exec -T postgres psql …`; D3 probes `docker compose … exec -T <web|uploader|backup> <cmd>` (exit 0 = poly_backup login worked); D6 reads `docker network inspect` (names as compose makes them: `polycarpic-prod_default`, `polycarpic-prod_backup-net`, `polycarpic-edge-prod`, …).
-7. D5 on staging skips `poly_backup` (no secret there). `stat %a` of a spool dir shows the ACL mask (770), so R5's "0700" is asserted as base ACL entries `user::rwx group::--- other::---` plus `mask::rwx`.
-8. dns tools print relative names (`planted TXT`, `@ TXT`). `dns-allowed.json` format is free, but must contain the strings the test reads (CAA rows, targets, DMARC pin without `rua`, no `ruf=`).
+Ruled by the architect: `ruling.md` Addendum 2 @ 512d9c50 and Addendum 3 @ 1eafa6c5 (D3 probe, D5 on staging, cloud-init key placeholder and key-file check). Tests cite those shas. Pins still mine, not yet ruled (tell qa if wrong; devops builds to the tests):
+
+1. Python tools: `main(argv, *, transport, getpass, input, stdout, stderr, runner=None, env=None, home=None) -> int`, nothing at import; `transport(method, url, headers, body) -> (status, json)`; `runner(argv, env=None, stdin=None) -> returncode` (laptop-check: `(rc, stdout)`). Routed to architect-97 as the lead asked; awaiting a ruling.
+2. `infra/operator/b2-capabilities.json` = `{"capabilities": [...], "bucketName": "polycarpic-hetzner-backups"}`; `provision-check.sh` takes `--b2-capabilities <file> --b2-bucket <name>` (R7 copies only three files).
+3. R7 layout: `provision.sh`, `provision-check.sh`, `roles.sql` side by side in one directory.
+4. Volume device `/dev/disk/by-id/scsi-0HC_Volume_*`; the fakes answer `blkid wipefs file lsblk cryptsetup findmnt mount`; an unfaked verb exits 99 "FAKE: unsupported …".
+5. D checks detect a running Postgres with `docker compose … ps` and reach it with `docker compose … exec -T postgres psql …`; D6 reads `docker network inspect` (compose names: `polycarpic-prod_default`, `polycarpic-prod_backup-net`, `polycarpic-edge-prod`, …). D3 probe per Addendum 2/3: `docker run --network container:<svc> --tmpfs … -v <db_password_backup>:…:ro`, `require_auth=scram-sha-256` in the connection string, no `-e`, stderr reason asserted.
+6. `stat %a` of a spool dir shows the ACL mask (770); R5's 0700 is asserted as base entries `user::rwx group::--- other::---` plus `mask::rwx`.
+7. dns tools print relative names (`planted TXT`, `@ TXT`); `dns-allowed.json` format is free but must contain the strings the tests read.
 
 ## Rows (one per ruled item)
 
@@ -101,11 +102,12 @@ Authority: `ruling.md` at f7730d73 incl. Addendum 1. Harness per R3: fakes, no n
 | 90 | H15 second login account | V:prov :: H15 a second account… |
 | 91 | H15 positive (service account) | V:prov :: H15 positive… |
 | 92 | all-good: ALL CHECKS PASSED, exit 0 | V:db :: everything good… |
+| 93a | create.sh key file (Addendum 2/3): RSA, 2nd line, non-base64, empty, newline injection refused (exit 2); `"` `'` `:` `#{}` comments dropped, schema valid; plain key accepted | V:create :: create.sh key file (10 cases) |
 | 93 | D1 (three settings, incl. S8 shared_preload_libraries and log_min_duration_statement) | V:db :: D1… |
 | 94 | D2 on staging while prod good | V:db :: D2… |
-| 95 | D3 web, uploader, backup | V:db :: D3… |
+| 95 | D3 probe (Addendum 2/3): positive with hygiene (tmpfs, require_auth, :ro, no -e, no password in output/log); web wrong reason; uploader; backup | V:db :: D3 ×4 |
 | 96 | D4 slot | V:db :: D4… |
-| 97 | D5 role without verifier | V:db :: D5… |
+| 97 | D5 role without verifier; staging poly_backup has no verifier, one there fails | V:db :: D5 ×2 |
 | 98–99 | D6 wrong subnet, stray network; positive | V:db :: D6 ×2 |
 | 100 | R4 `PASSED WITH 1 WARNINGS: H13`, exit 0, never ALL CHECKS PASSED | V:db :: a WARN with no FAIL… |
 | 101 | R4 `--prod` → `1 CHECKS FAILED` | V:db :: --prod turns… |
@@ -133,9 +135,9 @@ Authority: `ruling.md` at f7730d73 incl. Addendum 1. Harness per R3: fakes, no n
 
 ## Counts (a reader can add these up)
 
-- vitest dry run: create 26 + provision 58 + db 21 = **105** (all red at tests-red).
+- vitest dry run: create 36 (26 + 10 for the key-file rules of Addendum 2/3) + provision 58 + db 25 (D3 now 4 tests, D5 now 2) = **119** (all red at tests-red).
 - Python: b2_setup 22 + dns_check 25 + dns_records 10 + dns_move 6 + laptop_check 7 = **70** (all red).
 - Wiring: **6** (green; they guard the CI steps this commit adds).
-- Total new: **181**. The rows above (numbered by ruled item; a few rows hold two or three tests) cover R1 (1–19), R2 (20–25), R3 (176–181), R4 (52–55, 100–104), R5 (26–51), R6 H1–H15 (56–91) and D1–D6 (92–99), R8 (106–143, 169–175), R9 (144–168), R10 (44, 47–49, 82–83, 105, 109–110, plus the secret sweeps in every Python file), M1 (35, 66), M2 (47–48).
+- Total new: **195** (119 + 70 + 6). The rows above (numbered by ruled item; a few rows hold two or three tests) cover R1 (1–19), R2 (20–25), R3 (176–181), R4 (52–55, 100–104), R5 (26–51), R6 H1–H15 (56–91) and D1–D6 (92–99), R8 (106–143, 169–175), R9 (144–168), R10 (44, 47–49, 82–83, 105, 109–110, plus the secret sweeps in every Python file), M1 (35, 66), M2 (47–48).
 - Ruled items without a test, with reason: R12 (the Principal's real run), R11 (docs, seceng/devops/architect verdicts), the INFRA/SECURITY text; H12's real-key behaviour and the Docker apt key (only the pinned-fingerprint branch is testable; unmeasured until E7); `userland-proxy` effect (needs a live daemon, POLY-104); H3's overlap check against a real daemon (fake `docker info`).
 - Guards: the dry run's local time is in `red-run.md`; the image job's ≤120 s and ≤60 s guards are measured at build-green.

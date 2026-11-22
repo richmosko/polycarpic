@@ -85,6 +85,35 @@ case "$name" in
           *) unsupported "$@" ;;
         esac
         exit 0 ;;
+      run)
+        # D3 probe (ruling Addendum 2/3): tools image run inside <svc>'s network namespace, passfile read-only, pgpass on a tmpfs.
+        shift; ns=""; tmpfs=0; ro=0; conn=""; mode=select; envpw=0
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --network) ns=$2; shift ;;
+            --tmpfs) tmpfs=1; shift ;;
+            -v|--volume|--mount) case "$2" in *db_password_backup*) case "$2" in *:ro*|*readonly*|*ro=true*) ro=1 ;; esac ;; esac; shift ;;
+            -e|--env) envpw=1; shift ;;
+          esac
+          case "$1" in *host=postgres*) conn=$1 ;; esac
+          case "$1" in *replication=database*) mode=replication ;; esac
+          shift
+        done
+        case "$ns" in container:*) ;; *) echo "FAKE: probe without --network container:<svc>" >&2; exit 97 ;; esac
+        [ $tmpfs = 1 ] || { echo "FAKE: probe without --tmpfs for the pgpass" >&2; exit 97; }
+        [ $ro = 1 ] || { echo "FAKE: probe without a read-only db_password_backup mount" >&2; exit 97; }
+        [ $envpw = 0 ] || { echo "FAKE: probe passes the password through -e" >&2; exit 97; }
+        case "$conn" in *require_auth=scram-sha-256*) ;; *) echo "FAKE: probe without require_auth=scram-sha-256" >&2; exit 97 ;; esac
+        svc=none; for k in web uploader backup; do case "$ns" in *"$k"*) svc=$k ;; esac; done
+        [ "$svc" != none ] || { echo "FAKE: probe namespace is not web, uploader or backup: $ns" >&2; exit 97; }
+        case "$svc" in
+          web) d='psql: error: connection to server at "postgres" (10.201.1.2), port 5432 failed: FATAL:  no pg_hba.conf entry for host "10.201.1.5", user "poly_backup", database "polycarpic"' ;;
+          uploader) d='psql: error: could not translate host name "postgres" to address: Name or service not known' ;;
+          backup) d=ok ;;
+        esac
+        r=$(cat "$S/c79-$svc" 2>/dev/null || echo "$d")
+        if [ "$r" = ok ]; then if [ $mode = replication ]; then echo "IDENTIFY_SYSTEM: 7000000000000000000 1 0/3000000 polycarpic"; else echo "1"; fi; exit 0; fi
+        echo "$r" >&2; exit 2 ;;
       ps) for p in prod staging; do [ -s "$S/pg-$p-host" ] && echo "polycarpic-$p-postgres-1"; done; exit 0 ;;
       compose)
         shift; proj=prod; verb=""; args=("$@")
@@ -106,9 +135,6 @@ case "$name" in
                 if [ -t 0 ]; then exec psql -h "$host" -U postgres "${cmd[@]:1}"; fi
                 tee -a /dev/shm/psql-stdin.log | psql -h "$host" -U postgres "${cmd[@]:1}"
                 exit "${PIPESTATUS[1]}" ;;
-              web|uploader|backup)
-                d=reject; [ "$svc" = backup ] && d=ok
-                r=$(cat "$S/c79-$svc" 2>/dev/null || echo "$d"); [ "$r" = ok ] && exit 0 || exit 1 ;;
               *) unsupported "$@" ;;
             esac ;;
           *) unsupported "$@" ;;

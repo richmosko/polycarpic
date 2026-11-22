@@ -150,6 +150,44 @@ describe('create.sh (R1)', () => {
   });
 });
 
+// Ruling Addendum 2 @ 512d9c50 and Addendum 3 @ 1eafa6c5 (P2): create.sh substitutes only `ssh-ed25519 <base64>` and drops the comment.
+describe('create.sh key file (Addendum 2/3)', () => {
+  const B64 = `$(cut -d' ' -f2 /root/k.pub)`;
+  const withKey = (file: string) => `${KEY} ${file}; bash /repo/infra/hetzner/create.sh --name pc --location nbg1 --ssh-key /root/bad.pub --type cpx31 2>&1; echo "rc=$?"; cat /var/fake-state/calls.log 2>/dev/null`;
+  const refused = (name: string, file: string) =>
+    it(`refuses ${name}: exit 2, nothing created`, () => {
+      const r = run(withKey(file));
+      expect(r.out).toMatch(/rc=2/);
+      expect(r.out).not.toMatch(MUTATING);
+    });
+  refused('an RSA key', `ssh-keygen -q -t rsa -b 2048 -N "" -f /root/rsa; cp /root/rsa.pub /root/bad.pub`);
+  refused('a key file with a second non-empty line', `{ cat /root/k.pub; echo 'ssh-ed25519 AAAAevil x'; } > /root/bad.pub`);
+  refused('a line that is not base64', `echo 'ssh-ed25519 !!!notbase64!!! c' > /root/bad.pub`);
+  refused('an empty file', `: > /root/bad.pub`);
+  refused('a comment carrying a newline-injected YAML item', `printf 'ssh-ed25519 %s a\\n  - evil\\n' "${B64}" > /root/bad.pub`);
+
+  for (const [label, comment] of [['double quote', 'a"b'], ['single quote', "a'b"], ['colon', 'a:b: c'], ['hash and brace', 'x # {y}']] as const) {
+    it(`a comment holding a ${label} is dropped: the rendered user-data has no comment text, a single ed25519 key line, and passes the schema`, () => {
+      const r = run(`${KEY} printf 'ssh-ed25519 %s %s\\n' "${B64}" '${comment.replace(/'/g, `'\\''`)}' > /root/bad.pub; bash /repo/infra/hetzner/create.sh --name pc --location nbg1 --ssh-key /root/bad.pub --type cpx31 >/dev/null 2>&1; echo "rc=$?"; cat /var/fake-state/user-data.yaml; echo ==; cp /var/fake-state/user-data.yaml /tmp/ud.yaml; cloud-init schema --config-file /tmp/ud.yaml; echo "schema=$?"`);
+      expect(r.out).toMatch(/rc=0/);
+      const ud = r.out.split('==')[0]!;
+      expect(ud).not.toContain(comment);
+      expect(ud).not.toMatch(/__SSH_PUBLIC_KEY__/);
+      const keys = ud.split('\n').filter((l) => /ssh-ed25519/.test(l));
+      expect(keys).toHaveLength(1);
+      expect(keys[0]).toMatch(/^\s*- ssh-ed25519 [A-Za-z0-9+/]+={0,2}$/);
+      expect(r.all).toMatch(/Valid schema/);
+      expect(r.out).toMatch(/schema=0/);
+    });
+  }
+
+  it('positive: a plain ed25519 key with a comment is accepted (exit 0) and its comment is dropped too', () => {
+    const r = run(`${KEY} ssh-keygen -q -t ed25519 -N "" -C 'laptop@home' -f /root/c; bash /repo/infra/hetzner/create.sh --name pc --location nbg1 --ssh-key /root/c.pub --type cpx31 >/dev/null 2>&1; echo "rc=$?"; cat /var/fake-state/user-data.yaml`);
+    expect(r.out).toMatch(/rc=0/);
+    expect(r.out).not.toContain('laptop@home');
+  });
+});
+
 describe('shellcheck (R1, R5, R6; R3: inside the test container so the version is pinned with it)', () => {
   for (const f of ['infra/hetzner/create.sh', 'infra/provision.sh', 'infra/provision-check.sh']) {
     it(`${f} is shellcheck clean`, () => {
