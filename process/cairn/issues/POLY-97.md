@@ -1,12 +1,12 @@
 ---
 id: POLY-97
 title: Infra scaffolding + provisioning
-status: todo
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [infra/hetzner/**, infra/provision.sh, infra/provision-check.sh, infra/README.md]
+paths: [process/cairn/issues/POLY-97.md, process/cairn/reviews/POLY-97/**, infra/hetzner/**, infra/provision.sh, infra/provision-check.sh, infra/README.md, infra/operator/**, infra/lint/**, infra/ci/**, tests/infra/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, pnpm-lock.yaml, eslint.config.js, layers.json, .gitignore]
 labels: [ops, infra]
 priority: null
 pr: null
@@ -112,3 +112,7 @@ Findings from walking the Principal through INFRA §7.0–7.1 by hand, 2026-11-2
 - The Principal does not use a password manager (C-78 assumes one); the macOS Passwords app was offered.
 
 **Conditions before real household data** (recorded in DECISIONS 2026-11-22): a card on Backblaze with storage cap, 75% alert and downloads uncapped (C-73); Healthchecks.io account and checks.
+
+### @team-lead — 2026-11-22
+
+Feature started. Branch: `feature/poly-97-infra-provisioning`.
