@@ -4,7 +4,7 @@ title: Pull-based deploy + timers
 status: backlog
 milestone: POLY-M1
 parent: null
-blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83]
+blocked_by: [POLY-97, POLY-96, POLY-76, POLY-83, POLY-99]
 assignee: devops-engineer
 paths: [infra/deploy/**]
 labels: [ops, deploy, security]

@@ -1,12 +1,12 @@
 ---
 id: POLY-99
 title: Backup, uploader, restore, drill
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97, POLY-95, POLY-83]
 assignee: devops-engineer
-paths: [infra/backup/**, infra/restore.sh, infra/drill.sh]
+paths: [process/cairn/issues/POLY-99.md, process/cairn/reviews/POLY-99/**, infra/backup/**, infra/restore.sh, infra/drill.sh, infra/ops/**, infra/operator/**, infra/compose/**, infra/provision.sh, infra/provision-check.sh, infra/postgres/**, infra/README.md, infra/lint/**, infra/ci/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, pnpm-lock.yaml, .gitignore, .gitleaksignore]
 labels: [ops, backup, security]
 priority: null
 pr: null
@@ -43,3 +43,7 @@ From the POLY-97 loop (ruling Scope, Addendum 1 S6; seceng positions 1a/1b; buil
 ### @team-lead — 2026-11-22
 
 From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.md` R-a; ruling R7): `polycarpic-ops status` accounts for poly_backup connections by the windows in `jobs.log`, which the backup uid itself writes, so a compromised backup container could write a window covering its own connections (capped at 6 h by K9). Take the windows from a source root writes: the systemd unit start and stop times in the journal. The ruling's R7 also fixes the line formats the backup and uploader write to `jobs.log` and `last-upload`.
+
+### @team-lead — 2026-11-22
+
+Feature started. Branch: `feature/poly-99-backup-restore-drill`. Runs before POLY-100 by the Principal's choice of 2026-11-22: the deploy's pre-migration backup and its 60-minute restore criterion rest on this issue's backup container, `restore.sh` and drill. POLY-100 is claimed on `feature/poly-100-pull-based-deploy` (one start commit) and parked until this merges; this loop's ruling fixes the premigration interface the deploy calls.
