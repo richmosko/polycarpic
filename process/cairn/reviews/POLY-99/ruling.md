@@ -150,7 +150,7 @@ none of them (closes R-a and S8(a) of the POLY-98 review).
   computes **its own** sha256 of each. It appends `<sha256> <dir>/<name>` lines to
   `/var/lib/polycarpic/state/spool.sha256` (root 0644; the **spool record**). A named file that is missing turns the
   run into `failed`.
-- On failure it pings `<heartbeat_url>/fail`. Root reads `secrets/uploader/heartbeat_url` (the backup check's full
+- On failure it pings `<heartbeat_url>/fail`. Root reads `secrets/host/heartbeat_url` (R10 correction) (the backup check's full
   ping URL) and passes the URL to curl on stdin (`--config -`). On success it runs
   `systemctl start --no-block polycarpic-uploader.service`.
 - `upload`: a non-blocking `flock /run/polycarpic/upload.lock` (busy → exit 0, since the minute timer overlaps).
@@ -295,17 +295,32 @@ GA gate (POLY-116) accepts exit 0 only. Scratch containers are removed on exit.
 - **`prod.yml`, `uploader`:**
   - Mount `/srv/polycarpic/spool:/spool:ro`.
   - Drop the `/srv/polycarpic/uploader-state` mount and the `heartbeat_url` secret: root pings (R5).
-  - *(Correction: R10 left out a consequence of dropping that mount.)* `heartbeat_url` is a **host-only secret**.
-    - **Where:** `/etc/polycarpic/secrets/uploader/heartbeat_url`, 0440 `root:10005`, as for every secret. No host
-      account holds gid 10005 (H9).
-    - **Who reads it:** root only (R5's runner and H13). No service mounts it, so it has no compose entry; the lint's
-      `secret-path` rule refuses a declared secret that no service mounts.
-    - **How it is written:** `infra/ops/lib/secrets.py` gains one constant, `HOST_ONLY = {"heartbeat_url": "uploader"}`.
-      It is the only name `set-secret` writes beyond the compose-derived set, still under the https check.
-    - **How it is accounted for:** `list-secrets` lists it. provision-check H6 carries the same pair as a shell
-      constant, a unit test asserts the two are equal, and H6 accepts that file in that directory and nowhere else.
-    - **Tests:** the two `test_set_secret` cases now expect this path. New cases: a host-only name outside `HOST_ONLY`
-      exits 2, and H6 fails on a mismatched constant.
+  - *(Correction: R10 left out a consequence of dropping that mount; amended by seceng H-1, `ruling-review.md` @
+    `58cdecef`.)* `heartbeat_url` is a **host-only secret**.
+    - **Where:** `/etc/polycarpic/secrets/host/heartbeat_url`, `root:root` 0400, in `secrets/host/`, `root:root`
+      0700, which `provision.sh` creates. The group is root, not 10005: an escaped uploader carries gid 10005.
+      `provision.sh` moves a file left under `uploader/`, keeps its value and never prints it (with a `change:`
+      line).
+    - **Who reads it:** root only, meaning R5's runner and H13, at the new path. No service mounts it, so it has no
+      compose entry.
+    - **How it is written:** `infra/ops/lib/secrets.py` gains `HOST_ONLY = {"heartbeat_url": "host"}`.
+      `set-secret` writes that name and no other beyond the compose-derived set, still under the https check.
+    - **How it is accounted for:**
+      - `list-secrets` lists it, with its path and mode.
+      - provision-check H6 mirrors the constant in shell, and a test asserts the two copies are equal.
+      - H6 expects `root:root` 0400 for `HOST_ONLY` entries and `root:<gid>` 0440 for the rest. It fails on a
+        `heartbeat_url` under `uploader/`.
+    - **Guards on growth:**
+      - a unit test pins `HOST_ONLY` exactly (any addition comes to seceng);
+      - a test asserts that no `HOST_ONLY` name is compose-mounted;
+      - a compose-policy lint rule refuses any service volume or secret sourced under `/etc/polycarpic/secrets/host/`.
+    - **Tests:**
+      - The two `test_set_secret` cases expect the new path.
+      - A host-only name outside `HOST_ONLY` exits 2.
+      - H6 fails on a mismatched constant, on `root:10005` 0440, and on the file under `uploader/`.
+      - H6 passes at `root:root` 0400 under `host/`.
+      - The move keeps the value, which appears in no output (swept).
+      - In the rendered uploader, `/run/secrets/heartbeat_url` is absent.
   - Add `../backup/upload.sh:/usr/local/bin/upload.sh:ro`, `/etc/polycarpic/ops.conf:/etc/uploader/ops.conf:ro` and
     `/etc/polycarpic/host.env:/etc/uploader/host.env:ro`.
   - `tmpfs` `/tmp:size=1m`, which holds the rclone config and the sibling.
