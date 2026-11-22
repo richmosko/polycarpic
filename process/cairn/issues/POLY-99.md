@@ -47,3 +47,12 @@ From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.m
 ### @team-lead — 2026-11-22
 
 Feature started. Branch: `feature/poly-99-backup-restore-drill`. Runs before POLY-100 by the Principal's choice of 2026-11-22: the deploy's pre-migration backup and its 60-minute restore criterion rest on this issue's backup container, `restore.sh` and drill. POLY-100 is claimed on `feature/poly-100-pull-based-deploy` (one start commit) and parked until this merges; this loop's ruling fixes the premigration interface the deploy calls.
+
+### @architect — 2026-11-22
+
+Gate 1, ruling: `process/cairn/reviews/POLY-99/ruling.md` @ 9f87a180a2403b83023a7f226294abf37f4b137f. qa writes 99c and devops builds 99d from it; seceng reviews it as 99b (§S, S1–S8).
+- Measured (§M): `rclone copyto --no-check-dest --s3-no-head --s3-upload-cutoff 5G` sends one PUT and no HEAD or list; without `--no-check-dest` rclone HEADs first. A rewritten ETag fails the run. The base backup (tar to stdout through age) plus archived WAL recovers on a scratch Postgres. A forced-switch WAL segment is 16 MiB raw and ≈ 81 KB under gzip -1.
+- Slice 0 (R12): `backup.sh nightly` on the scratch stack, three published names, no plaintext seen by the spool watcher. It goes green before the rest of 99c.
+- Premigration contract for POLY-100: R6.
+- `jobs.log` windows are written by root (the job runner); this closes POLY-98 R-a (R9). `05_backupdb.py` gains a root-owner check; `04_backup.py` is unchanged.
+- Principal: D1 (whether the from-box premigration restore always requires the bucket cross-check). Lead: L1 (where the box-side `restore-apply` goes; not in the confirmed scope).
