@@ -424,3 +424,20 @@ Addendum 2 carries the following:
 It changes nothing else in the ruling. The restated C4 test (the section above) is a test specification, not a
 ruling change, so it needs no addendum. qa takes it from this file as one of C1–C12's tests. With that, every
 condition has a test qa can point to. The plan gate is clear on my side.
+
+**Confirmations on `09aeeeb2f64f09ee775cecbf8deab161d8df85ea`:**
+- **N1 covers the hash and the delete.** Its sentence makes root validate the line first ("only after that hashes,
+  deletes or writes a sibling"), and it covers both the `verified` and the `published` line. The ruling gives the test
+  no T-number, so qa files it as **T19 (N1)**: a fake uploader prints `verified` lines carrying a `../` path, a `<dir>`
+  outside the set, a valid R2 name that is a symlink to a root-owned file, and a name with an embedded newline. The
+  same four cases run on a fake `published` line. In each, root hashes nothing outside the spool directory, deletes
+  nothing, writes no sibling and leaves the target byte-identical, the runner exits 1, and fake-hc records `/fail`. It
+  is red on a mutant runner that joins `<dir>/<name>` and opens it without the set, R2 and `O_NOFOLLOW` checks. One
+  further case, a 5 MiB stdout and a 5 KiB line, proves A5.
+- **D1 as the text builds it today: (a).** R7 cross-checks against the bucket only when `--read-credential` is given,
+  and prints `WARN` otherwise. Addendum 2 records that the architect and I both recommend (b), but it does not change
+  R7, and the Principal has not chosen. So the builder builds (a). If the Principal picks (b), the change is small:
+  the from-box path refuses (exit 2) without `--read-credential` unless `--skip-bucket-check` is given, which prints
+  the loud `WARN`. That takes one argument rule and two tests (refused without either flag; passes with the override
+  and the `WARN`). It can land before build green without reopening the ruling, if the lead records the Principal's
+  choice on the issue first.
