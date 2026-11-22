@@ -8,9 +8,16 @@ PROJECTS = ("prod", "staging")
 NEED = ("postgres", "web", "auth", "worker")
 
 
-def _digest(image):
-    m = re.search(r"@sha256:([0-9a-f]{12})", image or "")
-    return "sha256:" + m.group(1) if m else (image or "?")[:19]
+def _word(text):
+    return re.sub(r"[^a-z]", "?", str(text))[:12]
+
+
+def _digest(info):
+    m = re.search(r"@sha256:([0-9a-f]{12})", compose.image_ref(info))
+    if m:
+        return "sha256:" + m.group(1)
+    m = re.match(r"^sha256:([0-9a-f]{12})", str((info or {}).get("Image", "")))
+    return "sha256:" + m.group(1) if m else "unknown"
 
 
 def _one(ctx, project):
@@ -26,19 +33,17 @@ def _one(ctx, project):
         if r is None:
             bad.append("%s missing" % svc)
         elif r.get("State") != "running":
-            bad.append("%s %s" % (svc, re.sub(r"[^a-z]", "?", str(r.get("State", "?")))[:12]))
+            bad.append("%s %s" % (svc, _word(r.get("State", "?"))))
         elif r.get("Health") not in ("", None, "healthy"):
-            bad.append("%s %s" % (svc, re.sub(r"[^a-z]", "?", str(r.get("Health")))[:12]))
+            bad.append("%s %s" % (svc, _word(r.get("Health"))))
     if bad:
         return Line("RED", "app", project, ", ".join(bad))
-    images = {s: compose.inspect_image(ctx, by[s].get("ID", "")) for s in ("web", "auth", "worker")}
-    if len(set(images.values())) != 1:
+    info = {s: compose.inspect(ctx, by[s].get("Name", "")) for s in ("web", "auth", "worker")}
+    if len({compose.image_ref(i) for i in info.values()}) != 1:
         return Line("RED", "app", project, "web, auth and worker run different images")
-    code, out, _ = ctx.call(["docker", "inspect", "--format", "{{.Created}}", by["web"].get("ID", "")], timeout=10)
-    created = out.decode("utf-8", "replace").strip()[:19] + "Z"
-    epoch = ts.parse(created)
-    when = "deployed %s (%s)" % (stamp(epoch), ts.age(int(ctx.now() - epoch))) if epoch else "deployed ?"
-    return Line("OK", "app", project, "%s, %s" % (_digest(images["web"]), when))
+    created = ts.parse_docker((info["web"] or {}).get("Created", ""))
+    when = "deployed %s (%s)" % (stamp(created), ts.age(ctx.epoch() - created)) if created is not None else "deployed ?"
+    return Line("OK", "app", project, "%s, %s" % (_digest(info["web"]), when))
 
 
 def run(ctx):

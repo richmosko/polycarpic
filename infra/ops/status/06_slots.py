@@ -8,8 +8,7 @@ PROJECTS = ("prod", "staging")
 
 
 def _one(ctx, project):
-    rows = compose.ps(ctx, "polycarpic-" + project) or []
-    if not any(r.get("Service") == "postgres" and r.get("State") == "running" for r in rows):
+    if not compose.running(compose.ps(ctx, "polycarpic-" + project), "postgres"):
         return Line("WAIT", "slots", project, "postgres is not running")
     code, text = ts.psql(ctx, project, "SELECT slot_name FROM pg_replication_slots WHERE NOT temporary;\n")
     if code != 0:

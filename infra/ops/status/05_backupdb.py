@@ -16,18 +16,13 @@ DEFAULT_CAP = 6 * 3600
 PAD = 60
 
 
-def _log_time(token):
-    return ts.parse(token[:19] + "Z") if len(token) >= 19 else None
-
-
 def run(ctx):
-    rows = compose.ps(ctx, "polycarpic-prod") or []
-    pg = next((r for r in rows if r.get("Service") == "postgres" and r.get("State") == "running"), None)
+    pg = compose.running(compose.ps(ctx, "polycarpic-prod"), "postgres")
     if pg is None:
         return [Line("WAIT", "backupdb", "prod", "prod postgres is not running")]
-    now = ctx.now()
+    now = ctx.epoch()
     windows = []
-    for n, raw in enumerate((ts.read_text(ctx, JOBS) or "").split("\n"), 1):
+    for n, raw in enumerate((ts.read_text(ctx.p(JOBS)) or "").split("\n"), 1):
         if not raw.strip():
             continue
         m = JOB.match(raw)
@@ -39,27 +34,26 @@ def run(ctx):
         if end - start > CAPS.get(m.group(3), DEFAULT_CAP):
             return [Line("RED", "backupdb", "prod", "jobs.log line %d window is too long" % n)]
         windows.append((start - PAD, end + PAD))
-    code, out, err = ctx.call(["docker", "logs", "--timestamps", "--since", "24h", pg.get("ID", "")], timeout=10)
+    name = pg.get("Name", "")
+    code, out, err = ctx.run(["docker", "logs", "--timestamps", "--since", "24h", name], timeout=10)
     if code != 0:
         return [Line("RED", "backupdb", "prod", "docker logs failed")]
     times, conns = [], []
-    for raw in (out + b"\n" + err).decode("utf-8", "replace").split("\n"):
-        token = raw.split(" ", 1)[0]
-        t = _log_time(token)
+    for raw in (out + "\n" + err).split("\n"):
+        t = ts.parse_docker(raw.split(" ", 1)[0])
         if t is None:
             continue
         times.append(t)
         if CONN.search(raw):
             conns.append(t)
-    code, started_raw, _ = ctx.call(["docker", "inspect", "--format", "{{.State.StartedAt}}", pg.get("ID", "")], timeout=10)
-    started = _log_time(started_raw.decode("utf-8", "replace").strip()) if code == 0 else None
-    young = started is not None and now - started < 24 * 3600
-    if not young:
+    info = compose.inspect(ctx, name)
+    started = ts.parse_docker(((info or {}).get("State") or {}).get("StartedAt", ""))
+    if not (started is not None and now - started < 24 * 3600):
         covered = (now - min(times)) / 3600 if times else 0
         if covered < 23:
             return [Line("RED", "backupdb", "prod", "postgres log covers only %d h" % int(covered))]
-    outside = [t for t in conns if not any(a <= t <= b for a, b in windows)]
+    outside = sorted(t for t in conns if not any(a <= t <= b for a, b in windows))
     if outside:
-        shown = ", ".join(hhmm(t) for t in sorted(outside)[:3])
-        return [Line("RED", "backupdb", "prod", "%d poly_backup connections outside any job window: %s" % (len(outside), shown))]
+        shown = ", ".join(hhmm(t) for t in outside[:3])
+        return [Line("RED", "backupdb", "prod", "%d poly_backup outside windows: %s" % (len(outside), shown))]
     return [Line("OK", "backupdb", "prod", "%d poly_backup connections in 24 h, all accounted" % len(conns))]

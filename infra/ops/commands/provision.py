@@ -9,7 +9,7 @@ OPS_CONF = "/etc/polycarpic/ops.conf"
 
 
 def add_arguments(parser):
-    parser.add_argument("--stage", default="host")
+    parser.add_argument("--stage")
     parser.add_argument("--target")
     parser.add_argument("--domain")
     parser.add_argument("--mail-from")
@@ -23,7 +23,7 @@ def _bad(ctx, text):
 
 
 def run(args, ctx):
-    if args.stage not in ("host", "database"):
+    if args.stage is not None and args.stage not in ("host", "database"):
         return _bad(ctx, "--stage must be host or database")
     if args.target is not None and args.target != "hetzner":
         return _bad(ctx, "--target home is not available" if args.target == "home" else "--target must be hetzner")
@@ -38,13 +38,12 @@ def run(args, ctx):
     if args.stage == "database" and args.project is None:
         return _bad(ctx, "--stage database needs --project prod|staging")
 
-    argv = ["/bin/bash", ctx.bundle_path("infra/provision.sh"), "--stage", args.stage]
-    for flag, value in (("--target", args.target), ("--domain", args.domain), ("--mail-from", args.mail_from), ("--project", args.project)):
+    argv = ["/bin/bash", ctx.bundle("infra/provision.sh")]
+    for flag, value in (("--stage", args.stage), ("--target", args.target), ("--domain", args.domain), ("--mail-from", args.mail_from),
+                        ("--project", args.project)):
         if value is not None:
             argv += [flag, value]
-    code, out, err = ctx.call(argv)
-    ctx.stdout.write(out.decode("utf-8", "replace"))
-    ctx.stderr.write(err.decode("utf-8", "replace"))
+    code = ctx.run_inherit(argv)
     if code == 0 and args.b2_bucket is not None:
         _write_conf(ctx, args.b2_bucket)
     return code
@@ -52,7 +51,7 @@ def run(args, ctx):
 
 def _write_conf(ctx, bucket):
     """ops.conf: root:root 0644, one line B2_BUCKET=<name>; a line printed only when it changes."""
-    real = ctx.path(OPS_CONF)
+    real = ctx.p(OPS_CONF)
     want = "B2_BUCKET=%s\n" % bucket
     try:
         with open(real, encoding="utf-8") as fh:

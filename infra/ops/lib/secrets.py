@@ -2,14 +2,11 @@
 import re
 
 NAME = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
-# name (or prefix) -> the command that writes it
-GENERATED = ("db_superuser_password", "auth_secret")  # provision.sh's generated set, apart from db_password_*
-ONE_SHOT = ("backup_store_credential", "heartbeat_url")  # only one-shot services mount these
 TWO_LINES = "backup_store_credential"
 
 
-def owner(name):
-    """Who writes this name, when set-secret must not; else None."""
+def refused_by(name):
+    """The tool that writes this name when set-secret must not (provision, init-keyring, staging-auth), else None."""
     if name == "db_superuser_password" or name.startswith("db_password_") or name == "auth_secret":
         return "provision"
     if name == "credential_keyring":

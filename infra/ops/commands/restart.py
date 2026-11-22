@@ -1,6 +1,4 @@
 """restart: restart services of the project and wait for them to be healthy (R9)."""
-import re
-
 from lib import compose
 
 HELP = "restart services (postgres web auth worker; caddy on prod) and wait for health (--staging for staging)"
@@ -12,39 +10,43 @@ def add_arguments(parser):
     parser.add_argument("service", nargs="+")
 
 
-def _state(ctx, project, svc):
-    rows = compose.ps(ctx, project) or []
-    for r in rows:
-        if r.get("Service") == svc:
-            return r
-    return {}
+def _project(svc, staging):
+    return "polycarpic-edge" if svc == "caddy" else "polycarpic-" + ("staging" if staging else "prod")
 
 
 def run(args, ctx):
-    valid = [s for s in compose.LONG_RUNNING if not (args.staging and s == "caddy")]
+    valid = sorted(s for s in compose.LONG_RUNNING if not (args.staging and s == "caddy"))
     bad = [s for s in args.service if s not in valid]
     if bad:
-        ctx.err("restart: unknown service %s; valid: %s" % (re.sub(r"[^\x21-\x7e]", "?", bad[0])[:40], ", ".join(valid)))
+        shown = "".join(c if 0x21 <= ord(c) <= 0x7E else "?" for c in bad[0])[:40]
+        ctx.err("restart: unknown service %s; available: %s" % (shown, ", ".join(sorted(compose.LONG_RUNNING))))
         return 2
+    start = ctx.epoch()
     for svc in args.service:
-        project = "polycarpic-edge" if svc == "caddy" else "polycarpic-" + ("staging" if args.staging else "prod")
-        code, _, err = ctx.call(["docker", "compose", "-p", project, "restart", svc], timeout=WAIT)
+        code, _, _ = ctx.run(["docker", "compose", "-p", _project(svc, args.staging), "restart", svc], timeout=WAIT)
         if code != 0:
             ctx.err("restart: docker compose restart %s failed (exit %d)" % (svc, code))
             return 1
     failed = 0
-    deadline = ctx.now() + WAIT
     for svc in args.service:
-        project = "polycarpic-edge" if svc == "caddy" else "polycarpic-" + ("staging" if args.staging else "prod")
         while True:
-            row = _state(ctx, project, svc)
-            state, health = row.get("State", "missing"), row.get("Health", "")
-            if state == "running" and health in ("", "healthy"):
-                ctx.out("%s: %s" % (svc, "healthy" if health == "healthy" else "running"))
+            row = compose.running(compose.ps(ctx, _project(svc, args.staging)), svc)
+            if row is not None and row.get("Health") in ("", None, "healthy"):
+                ctx.out("%s: %s" % (svc, "healthy" if row.get("Health") == "healthy" else "running"))
                 break
-            if ctx.now() >= deadline:
-                ctx.out("%s: not healthy after %d s (%s)" % (svc, WAIT, re.sub(r"[^\x21-\x7e]", "?", health or state)[:20]))
+            if ctx.epoch() - start >= WAIT:
+                state = (row or {}).get("Health") or (row or {}).get("State") or "missing"
+                if row is None:
+                    state = _state_of(ctx, svc, args.staging)
+                ctx.out("%s: not healthy after %d s (%s)" % (svc, WAIT, "".join(c if 0x21 <= ord(c) <= 0x7E else "?" for c in state)[:20]))
                 failed = 1
                 break
             ctx.sleep(2)
     return failed
+
+
+def _state_of(ctx, svc, staging):
+    for r in compose.ps(ctx, _project(svc, staging)) or []:
+        if r.get("Service") == svc:
+            return r.get("Health") or r.get("State") or "missing"
+    return "missing"

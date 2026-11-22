@@ -12,7 +12,7 @@ def add_arguments(parser):
 
 def _conf_bucket(ctx):
     try:
-        with open(ctx.path("/etc/polycarpic/ops.conf"), encoding="utf-8") as fh:
+        with open(ctx.p("/etc/polycarpic/ops.conf"), encoding="utf-8") as fh:
             for line in fh:
                 m = re.match(r"^B2_BUCKET=([a-z0-9-]{6,50})$", line.rstrip("\n"))
                 if m:
@@ -31,11 +31,8 @@ def run(args, ctx):
     if not bucket:
         ctx.err("no bucket: run provision --b2-bucket <name> once, or pass --b2-bucket")
         return 2
-    argv = ["/bin/bash", ctx.bundle_path("infra/provision-check.sh"), "--b2-capabilities",
-            ctx.bundle_path("infra/operator/b2-capabilities.json"), "--b2-bucket", bucket]
+    argv = ["/bin/bash", ctx.bundle("infra/provision-check.sh"), "--b2-capabilities", ctx.bundle("infra/operator/b2-capabilities.json"),
+            "--b2-bucket", bucket]
     if args.prod:
         argv.append("--prod")
-    code, out, err = ctx.call(argv)
-    ctx.stdout.write(out.decode("utf-8", "replace"))
-    ctx.stderr.write(err.decode("utf-8", "replace"))
-    return code
+    return ctx.run_inherit(argv)

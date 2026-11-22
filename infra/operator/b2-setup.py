@@ -86,7 +86,7 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
             stderr.write("usage: b2-setup.py [--probe [--show-rclone-output]] [--bucket <name>]\n")
             return 2
     if show_rclone and not probe:
-        stderr.write("usage: --show-rclone-output is valid only with --probe\n")
+        stderr.write("b2-setup.py: --show-rclone-output is only valid with --probe\n")
         return 2
 
     def out(line=""):

@@ -2,7 +2,7 @@
 import re
 
 from lib import compose
-from lib.out import Line
+from lib.out import Line, clean
 from lib.ts import read_text
 
 PROJECTS = ("prod", "staging")
@@ -11,23 +11,21 @@ HOST = re.compile(r"^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$")
 
 
 def _one(ctx, project):
-    text = read_text(ctx, ENV[project]) or ""
+    text = read_text(ctx.p(ENV[project])) or ""
     m = re.search(r"^PUBLIC_ORIGIN=https://([^/\s:]+)", text, re.M)
     host = m.group(1) if m and HOST.match(m.group(1)) else None
     if not host:
         return Line("RED", "cert", project, "no PUBLIC_ORIGIN host in " + ENV[project].rsplit("/", 1)[-1])
-    not_after, error, answered = ctx.tls_probe(host, 443, 10)
-    if not answered:
-        edge = compose.ps(ctx, "polycarpic-edge")
-        if not edge:
+    try:
+        got = ctx.tls_probe(host, 443)
+    except OSError:
+        if not compose.ps(ctx, "polycarpic-edge"):
             return Line("WAIT", "cert", project, "edge is not deployed")
         return Line("RED", "cert", project, "%s: nothing answers on 443" % host)
-    if error is not None or not_after is None:
-        return Line("RED", "cert", project, "%s: %s" % (host, re.sub(r"[^ -~]", "?", str(error or "no certificate"))[:40]))
-    days = int((not_after - ctx.now()) // 86400)
-    if days < 14:
-        return Line("RED", "cert", project, "%s, %d days left (under 14)" % (host, days))
-    return Line("OK", "cert", project, "%s, %d days left" % (host, days))
+    if not got.get("ok"):
+        return Line("RED", "cert", project, clean(got.get("reason", "no certificate")))  # the reason first: the line is cut at 80 characters
+    days = (got["not_after"] - ctx.now()).days
+    return Line("RED" if days < 14 else "OK", "cert", project, "%s, %d days left" % (host, days))
 
 
 def run(ctx):

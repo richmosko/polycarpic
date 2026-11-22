@@ -10,12 +10,9 @@ def add_arguments(parser):
 
 def run(args, ctx):
     project = "polycarpic-" + ("staging" if args.staging else "prod")
-    rows = compose.ps(ctx, project)
-    if not rows or not any(r.get("Service") == "postgres" and r.get("State") == "running" for r in rows):
+    if not compose.running(compose.ps(ctx, project), "postgres"):
         ctx.out("gate: error (%s postgres is not running)" % project)
         return 1
-    code, out, err = ctx.call(["/bin/sh", ctx.bundle_path("infra/postgres/gate-check.sh"), "docker", "compose", "-p", project,
-                               "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "polycarpic"])
-    ctx.stdout.write(out.decode("utf-8", "replace"))
-    ctx.stderr.write(err.decode("utf-8", "replace"))
-    return code
+    argv = ["/bin/sh", ctx.bundle("infra/postgres/gate-check.sh"), "docker", "compose", "-p", project, "exec", "-T", "postgres",
+            "psql", "-U", "postgres", "-d", "polycarpic"]
+    return ctx.run_inherit(argv)

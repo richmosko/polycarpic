@@ -1,28 +1,30 @@
 """status item revokes: plpgsql and the 17 built-ins are closed to PUBLIC (R7a; POLY-147 R10, R11; SECURITY C-87; K10).
 
 The signatures come from the installed roles.sql, are matched against a strict pattern, and are passed as quoted literals.
+The query prints nothing when all is closed, else `open:plpgsql`, `open:<sig>` and `missing:<sig>` lines.
 """
 import re
 
 from lib import compose, ts
-from lib.out import Line
+from lib.out import Line, clean
 
 PROJECTS = ("prod", "staging")
 WANT = 17
 REVOKE = re.compile(r"^REVOKE EXECUTE ON FUNCTION pg_catalog\.(\S+) FROM PUBLIC;$", re.M)
 SIG = re.compile(r"^[a-z_]+\([a-z_, ]*\)$")
 
-SQL = """SELECT 'plpgsql:open' WHERE EXISTS (SELECT 1 FROM pg_language l, LATERAL aclexplode(coalesce(l.lanacl, acldefault('l', l.lanowner))) a
+SQL = """SELECT 'open:plpgsql' WHERE EXISTS (SELECT 1 FROM pg_language l, LATERAL aclexplode(coalesce(l.lanacl, acldefault('l', l.lanowner))) a
   WHERE l.lanname = 'plpgsql' AND a.grantee = 0 AND a.privilege_type = 'USAGE');
-SELECT 'fn:' || s || ':' || CASE WHEN to_regprocedure('pg_catalog.' || s) IS NULL THEN 'missing'
-  WHEN EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
-    WHERE p.oid = to_regprocedure('pg_catalog.' || s) AND a.grantee = 0 AND a.privilege_type = 'EXECUTE') THEN 'open' ELSE 'closed' END
-FROM unnest(ARRAY[%s]) AS s;
+SELECT CASE WHEN to_regprocedure('pg_catalog.' || s) IS NULL THEN 'missing:' || s ELSE 'open:' || s END
+FROM unnest(ARRAY[%s]) AS s
+WHERE to_regprocedure('pg_catalog.' || s) IS NULL
+   OR EXISTS (SELECT 1 FROM pg_proc p, LATERAL aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) a
+      WHERE p.oid = to_regprocedure('pg_catalog.' || s) AND a.grantee = 0 AND a.privilege_type = 'EXECUTE');
 """
 
 
 def _signatures(ctx):
-    text = ts.read_text(ctx, ctx.bundle_path("packages/db/sql/roles.sql"))
+    text = ts.read_text(ctx.bundle("packages/db/sql/roles.sql"))
     if text is None:
         return None, "roles.sql is not in the installed bundle"
     sigs = REVOKE.findall(text)
@@ -34,8 +36,7 @@ def _signatures(ctx):
 
 
 def _one(ctx, project, sigs):
-    rows = compose.ps(ctx, "polycarpic-" + project) or []
-    if not any(r.get("Service") == "postgres" and r.get("State") == "running" for r in rows):
+    if not compose.running(compose.ps(ctx, "polycarpic-" + project), "postgres"):
         return Line("WAIT", "revokes", project, "postgres is not running")
     code, text = ts.psql(ctx, project, SQL % ", ".join("'%s'" % s for s in sigs))
     if code != 0:
@@ -43,11 +44,12 @@ def _one(ctx, project, sigs):
     problems = []
     for row in text.split("\n"):
         row = row.strip()
-        if row == "plpgsql:open":
+        if row == "open:plpgsql":
             problems.append("plpgsql is open to PUBLIC")
-        m = re.match(r"^fn:(.+):(missing|open)$", row)
-        if m and m.group(1) in sigs:
-            problems.append("%s not found" % m.group(1) if m.group(2) == "missing" else "%s is open" % m.group(1))
+        elif row.startswith("open:"):
+            problems.append("%s is open" % clean(row[5:]))
+        elif row.startswith("missing:"):
+            problems.append("%s not found" % clean(row[8:]))
     if problems:
         return Line("RED", "revokes", project, "; ".join(problems))
     return Line("OK", "revokes", project, "plpgsql and %d built-ins closed to PUBLIC" % WANT)

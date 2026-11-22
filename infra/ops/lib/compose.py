@@ -1,4 +1,4 @@
-"""Compose as the single source (R4): the secrets block of each compose file, and `docker compose ps` readers."""
+"""Compose as the single source (R4): the secrets block of each compose file, and `docker compose ps` / `docker inspect` readers."""
 import json
 import re
 
@@ -20,7 +20,7 @@ def parse_secrets(ctx, project):
     for fname in FILES[project]:
         rel = "infra/compose/" + fname
         try:
-            with open(ctx.path(ctx.bundle_path(rel)), encoding="utf-8") as fh:
+            with open(ctx.bundle(rel), encoding="utf-8") as fh:
                 lines = fh.read().split("\n")
         except OSError:
             raise ComposeError("compose file unreadable: " + rel)
@@ -29,9 +29,7 @@ def parse_secrets(ctx, project):
             if line == "secrets:":
                 inside = True
                 continue
-            if not inside:
-                continue
-            if line.strip() == "":
+            if not inside or line.strip() == "":
                 continue
             if not line.startswith(" "):
                 inside = False
@@ -45,28 +43,43 @@ def parse_secrets(ctx, project):
     return sorted(found)
 
 
-def project_name(project):
-    return "polycarpic-" + project
-
-
 def ps(ctx, compose_project, timeout=10):
-    """Containers of a compose project: a list of dicts (Service, State, Health, ID, ...). None when compose fails."""
-    code, out, _ = ctx.call(["docker", "compose", "-p", compose_project, "ps", "-a", "--format", "json"], timeout=timeout)
+    """Containers of a compose project: a list of dicts (Service, Name, State, Health). None when compose fails."""
+    code, out, _ = ctx.run(["docker", "compose", "-p", compose_project, "ps", "-a", "--format", "json"], timeout=timeout)
     if code != 0:
         return None
-    text = out.decode("utf-8", "replace").strip()
-    if not text:
-        return []
-    try:
-        if text.startswith("["):
-            rows = json.loads(text)
-        else:
-            rows = [json.loads(line) for line in text.split("\n") if line.strip()]
-    except ValueError:
-        return None
+    rows = []
+    for raw in out.split("\n"):
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            row = json.loads(raw)
+        except ValueError:
+            return None
+        rows.extend(row if isinstance(row, list) else [row])
     return [r for r in rows if isinstance(r, dict)]
 
 
-def inspect_image(ctx, container_id, timeout=10):
-    code, out, _ = ctx.call(["docker", "inspect", "--format", "{{.Config.Image}}", container_id], timeout=timeout)
-    return out.decode("utf-8", "replace").strip() if code == 0 else None
+def running(rows, service):
+    """The container row of a running service, else None."""
+    for r in rows or []:
+        if r.get("Service") == service and r.get("State") == "running":
+            return r
+    return None
+
+
+def inspect(ctx, name, timeout=10):
+    """`docker inspect <name>`: the first object (Config.Image, Created, Image, State.StartedAt), or None."""
+    code, out, _ = ctx.run(["docker", "inspect", name], timeout=timeout)
+    if code != 0:
+        return None
+    try:
+        data = json.loads(out)
+    except ValueError:
+        return None
+    return data[0] if isinstance(data, list) and data and isinstance(data[0], dict) else None
+
+
+def image_ref(info):
+    return ((info or {}).get("Config") or {}).get("Image") or ""
