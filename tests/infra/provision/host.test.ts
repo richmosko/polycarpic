@@ -203,7 +203,7 @@ describe('provision.sh host stage (R5)', () => {
     const compose = [...files('prod.yml'), ...files('staging.yml'), ...files('edge.yml')].map((p) => p.replace('/etc/polycarpic/', ''));
     const generated = [...PROD_GEN.map((p) => `secrets/${p}`), ...STAGING_GEN.map((p) => `staging-secrets/${p}`)];
     for (const g of generated) expect(compose, `generated ${g} is not a compose file: path`).toContain(g);
-    const later = ['web/plaid_secret', 'auth/resend_api_key', 'worker/resend_api_key', 'worker/credential_keyring', 'uploader/backup_store_credential', 'uploader/heartbeat_url', 'caddy/staging_basic_auth'];
+    const later = ['web/plaid_secret', 'auth/resend_api_key', 'worker/resend_api_key', 'worker/credential_keyring', 'uploader/backup_store_credential', 'host/heartbeat_url', 'caddy/staging_basic_auth'];
     const rest = compose.filter((p) => !generated.includes(p));
     expect(rest.map((p) => p.replace(/^(staging-)?secrets\//, '')).filter((p) => !later.includes(p))).toEqual([]); // a new compose secret must be generated or named here
     const r = run(`ls /etc/polycarpic/secrets/*/ /etc/polycarpic/staging-secrets/*/ | grep -c .`, { image: HOST });
@@ -462,13 +462,13 @@ describe('H13 and H15 (R4, R6)', () => {
     expect(find(check('').out, 'PASS', 'H13')).toBeDefined();
   });
   it('H13 absent: WARN with the exact consequence text, never a PASS', () => {
-    const r = check('rm /etc/polycarpic/secrets/uploader/heartbeat_url');
+    const r = check('rm /etc/polycarpic/secrets/host/heartbeat_url');
     const w = find(r.out, 'WARN', 'H13');
     expect(w?.text).toBe('heartbeat not configured: alert path B does not exist; a box going quiet or a full bucket goes unnoticed');
     expect(find(r.out, 'PASS', 'H13')).toBeUndefined();
   });
   it('H13 absent under --prod is a FAIL, not a WARN', () => {
-    const r = check('rm /etc/polycarpic/secrets/uploader/heartbeat_url', { args: '--prod' });
+    const r = check('rm /etc/polycarpic/secrets/host/heartbeat_url', { args: '--prod' });
     failLine(r, 'H13', ['heartbeat']);
     expect(find(r.out, 'WARN', 'H13')).toBeUndefined();
   });
