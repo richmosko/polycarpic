@@ -273,7 +273,9 @@ def run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, e
         call("POST", api + "b2_delete_key", hdr, {"applicationKeyId": new["applicationKeyId"]})
         del child, new
     out()
-    denied = bool(re.search(r"access ?denied|\b40[13]\b|not authori[sz]ed|forbidden|unauthori[sz]ed", text or "", re.I))
+    # Only a permission refusal counts. Credential, signature, clock and bare-status errors prove nothing about the capability set.
+    credential_error = re.search(r"SignatureDoesNotMatch|RequestTimeTooSkewed|InvalidAccessKeyId|InvalidToken|ExpiredToken", text or "", re.I)
+    denied = bool(re.search(r"AccessDenied|not entitled|not authorized to perform", text or "", re.I)) and not credential_error
     if error is None and code == 0:
         out("PROBE: the writeFiles-only upload was accepted (%s): writeFiles alone is enough. The box-key constant can be {writeFiles}: set b2-capabilities.json and recreate the put-only key." % target)
         out("The probe object stays locked for 35 days; that costs next to nothing.")
