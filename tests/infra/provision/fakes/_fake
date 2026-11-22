@@ -132,6 +132,7 @@ case "$name" in
       inspect)
         # `docker inspect --format '{{.Config.Image}}' <id>` for the running postgres container
         id=${*: -1}
+        [ -e "$S/inspect-fail" ] && { echo "Error: inspect failed (fixture)" >&2; exit 1; }
         case "$id" in postgres-cid-0001) cat "$S/pg-image" 2>/dev/null || echo "fixture-pg-image:17-running" ;; *) echo "Error: No such object: $id" >&2; exit 1 ;; esac
         exit 0 ;;
       ps) for p in prod staging; do [ -s "$S/pg-$p-host" ] && echo "polycarpic-$p-postgres-1"; done; exit 0 ;;
@@ -147,7 +148,7 @@ case "$name" in
               *" -q "*)
                 svc=${args[$((${#args[@]}-1))]}
                 case "$svc" in
-                  postgres) [ -s "$S/pg-$proj-host" ] && echo "postgres-cid-0001" ;;
+                  postgres) [ -s "$S/pg-$proj-host" ] && [ ! -e "$S/no-pg-cid" ] && echo "postgres-cid-0001" ;;
                   web) [ -e "$S/no-web" ] || echo "web-cid-0001" ;;
                   *) : ;;  # backup and uploader are one-off services: no running container to find (verdict C1, measured)
                 esac

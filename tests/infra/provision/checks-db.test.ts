@@ -100,6 +100,14 @@ describe('provision-check database checks D1–D6, with a running Postgres', () 
     failLine(ALL(without('polycarpic-prod_backup-net')), 'D3', ['polycarpic-prod_backup-net']);
     failLine(ALL(without('polycarpic-prod_upload-net')), 'D3', ['polycarpic-prod_upload-net']);
   });
+  it('D3 (verdict C1 fallback): when the running postgres container\'s image cannot be read (no container, or inspect fails) the result is FAIL D3 naming the image, and no probe is ever run on a default image', () => {
+    for (const plant of ['touch /var/fake-state/no-pg-cid', 'touch /var/fake-state/inspect-fail']) {
+      const r = run(`${OPS}\n${b2Fixture({})}\n${nets(NETS_GOOD)}\n${point(names.good, names.stg)}\n${plant}\n${CHECK} > /tmp/out 2>&1; cat /tmp/out; echo ==CALLS==; grep -c '^docker run' /var/fake-state/calls.log || true`, { image: COMPLETE, network: NET });
+      const [out, calls] = r.out.split('==CALLS==');
+      failLine({ ...r, out: out! }, 'D3', ['image']);
+      expect(calls!.trim().split('\n').pop(), plant).toBe('0');
+    }
+  });
   it('D4: a leftover non-temporary replication slot fails, naming it', () => {
     failLine(ALL('', { prod: names.bad, staging: names.good }), 'D4', ['leftover']);
   });
