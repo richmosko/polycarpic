@@ -1,7 +1,7 @@
 ---
 id: POLY-98d
 title: Ops CLI build
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-98
 blocked_by: [POLY-98c]
@@ -10,7 +10,12 @@ paths: [process/cairn/issues/POLY-98.md, process/cairn/reviews/POLY-98/**, proce
 stage: execute
 estimate.cost_usd: "10.00"
 estimate.gate_cycles: 3
-labels: [ops, cli]
+actual.cost_usd: "8.0140"
+actual.tokens: 47437753
+actual.gate_cycles: 5
+actual.wall_clock: 82
+ratio: "0.80"
+labels: [ops, cli, bloat]
 priority: null
 pr: null
 created: 2026-11-22

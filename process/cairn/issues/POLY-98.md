@@ -85,3 +85,7 @@ Gate: build green (98c), final, on a3e97748 (devops build with B1-B5 and B2', pl
 ### @architect — 2026-11-22
 
 Gate 4 (verdict): process/cairn/reviews/POLY-98/verdict.md on a3e97748. PASS on C1: two INFRA phrasings that state development status (§7 hint 'not available yet'; step 12 'not mounted today'), devops rewords, no re-test. Criteria 1-5 met. No test loosened. The builder's unmeasured list is compiled in the verdict: 10 items for POLY-104, two of them POLY-100's. Advisory A-1: compare the staged installer by content hash.
+
+### @team-lead — 2026-11-22
+
+Verdict condition C1 met at `61d303c6` (devops-engineer, `docs/INFRA/index.html` only); architect-98 confirmed by message on 2026-11-22 that both phrasings carry no development status, so the verdict stands as an unconditional PASS on `a3e97748` plus that docs commit. Stage sub-issues 98a-98e closed.
