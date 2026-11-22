@@ -410,3 +410,14 @@ S3, S4(a), S5, S6(a–c) and A1 are already in `d7dd2d1a` (target health, bucket
 - **S8, D1** adds: `shared_preload_libraries` is empty and `log_min_duration_statement = -1`.
 - **A4.** R9 compares names and CNAME targets case-insensitively. TXT values (DKIM before hashing, DMARC, SPF) are compared exactly, after joining the 255-byte strings.
 - **Scope.** Criterion 6 leaves this issue verbatim for POLY-104 (Scope table). §D4 is concurred on S7's conditions. It is an accepted risk with the Principal as approver, and seceng records it in SECURITY Open Risks.
+
+## Addendum 2 — qa's three pins (qa-engineer-97, before tests-red)
+
+- **D3 probe.** "Any command exits 0" is not the probe. A rejection only counts if the right password was offered, and the test asserts the reason, not just the exit code. Each service has its own probe:
+  - **web:** run the backup tools image inside web's network namespace (`docker run --rm --network container:<web> <tools image>`), with `db_password_backup` bind-mounted read-only as a passfile. Try `psql "host=postgres dbname=polycarpic user=poly_backup"`, then the same with `replication=database` (`IDENTIFY_SYSTEM`). Expect exit ≠ 0 and `no pg_hba.conf entry` or `pg_hba.conf rejects` on stderr.
+  - **uploader:** the same probe from uploader's namespace. Expect exit ≠ 0 with a name or route failure: there is no path to Postgres at all.
+  - **backup:** the same probe from backup's container. Expect `SELECT 1` and `IDENTIFY_SYSTEM` to succeed.
+
+  Any other outcome is FAIL. The fake keys on (namespace, mode) and returns the stderr text.
+- **D5 on staging.** Agreed, with a positive assertion: staging's `poly_backup` has **no** verifier. Staging has no backup service and no `db_password_backup`, so a null password cannot authenticate. A verifier present there is a FAIL. The other five login roles are checked on both projects.
+- **cloud-init key.** Agreed: the placeholder `__SSH_PUBLIC_KEY__`, `users:` for the user, `write_files` for the sshd drop-in and sudoers, and `--user-data-from-file`. Before substituting, create.sh requires the `--ssh-key` file to be exactly one line matching `^ssh-ed25519 [A-Za-z0-9+/]+=* [^\n]*$`. Anything else exits 2, so a key file cannot inject YAML.
