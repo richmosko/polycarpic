@@ -14,7 +14,14 @@ case "$name" in
   swapon)
     if [ -e "$S/swap-active" ]; then printf 'NAME TYPE SIZE USED PRIO\n/swapfile file 2G 0B -2\n'; fi
     exit 0 ;;
-  timedatectl) echo "NTPSynchronized=$(cat "$S/ntp" 2>/dev/null || echo yes)"; exit 0 ;;
+  timedatectl)
+    # ntp-no-calls: answer "no" for the first N calls, then "yes" (a clock that synchronises a few seconds after boot)
+    if [ -s "$S/ntp-no-calls" ]; then
+      n=$(cat "$S/ntp-no-calls")
+      if [ "$n" -gt 0 ]; then echo $((n-1)) > "$S/ntp-no-calls"; echo "NTPSynchronized=no"; exit 0; fi
+      echo "NTPSynchronized=yes"; exit 0
+    fi
+    echo "NTPSynchronized=$(cat "$S/ntp" 2>/dev/null || echo yes)"; exit 0 ;;
   gpg)
     fpr=$(cat "$S/docker-key-fpr" 2>/dev/null || echo 9DC858229FC7DD38854AE2D88D81803C0EBFCD88)
     case " $* " in

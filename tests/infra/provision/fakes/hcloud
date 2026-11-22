@@ -161,6 +161,9 @@ if res == "server":
                 die(f"hcloud: missing --{need}", 2)
         if "user-data-from-file" in kv:
             open(os.path.join(S, "user-data.yaml"), "w").write(open(kv["user-data-from-file"]).read())
+        loc = kv.get("location", "nbg1")
+        if os.path.exists(os.path.join(S, "no-stock-" + loc)):
+            die("hcloud: error during placement (resource_unavailable, 0d1f3a9c5b7e2468)", 1)
         sid = nid()
         s = {"id": sid, "name": kv["name"], "labels": labels_of(multi), "image": {"name": kv["image"]},
              "server_type": {"name": kv["type"]}, "datacenter": {"location": {"name": kv.get("location", "nbg1")}},

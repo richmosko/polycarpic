@@ -58,6 +58,28 @@ describe('create.sh (R1)', () => {
     expect(r.out).toMatch(/^IPv6: 2a01:4f8:c17:abcd::1 \(network 2a01:4f8:c17:abcd::\/64\)$/m);
     expect(r.out).not.toMatch(/^IPv6: \S+\/64\s*$/m);
   });
+  // Real run F1: fsn1 had no stock; hcloud's raw `resource_unavailable` is not an instruction. create.sh names the fallback and still fails.
+  it('F1: no stock in the asked location: exit non-zero, hcloud\'s error kept, the fallback --location named, key and firewall kept, no server', () => {
+    const r = run(`${KEY} touch /var/fake-state/no-stock-fsn1; bash /repo/infra/hetzner/create.sh --name pc --location fsn1 --ssh-key /root/k.pub --type cpx31 2>&1; echo "rc=$?"; ${state('[(.ssh_keys|length), (.firewalls|length), (.servers|length)]')}; ${calls}`);
+    expect(r.out).not.toMatch(/rc=0/);
+    expect(r.out).toMatch(/resource_unavailable/);
+    expect(r.out).toMatch(/--location nbg1/);
+    expect(r.out).toContain('[1,1,0]');
+    expect(r.out).not.toMatch(/^hcloud (ssh-key|firewall|server|volume) delete/m); // what was made stays
+  });
+  it('F1: when nbg1 was asked and has no stock the fallback is fsn1', () => {
+    const r = run(`${KEY} touch /var/fake-state/no-stock-nbg1; bash /repo/infra/hetzner/create.sh --name pc --location nbg1 --ssh-key /root/k.pub --type cpx31 2>&1; echo "rc=$?"`);
+    expect(r.out).not.toMatch(/rc=0/);
+    expect(r.out).toMatch(/--location fsn1/);
+    expect(r.out).not.toMatch(/--location nbg1/);
+  });
+  it('F1: a rerun with the fallback location reuses the key and firewall (exists lines) and creates the server', () => {
+    const r = run(`${KEY} touch /var/fake-state/no-stock-fsn1; bash /repo/infra/hetzner/create.sh --name pc --location fsn1 --ssh-key /root/k.pub --type cpx31 >/dev/null 2>&1; bash /repo/infra/hetzner/create.sh --name pc --location nbg1 --ssh-key /root/k.pub --type cpx31 2>&1; echo "rc=$?"`);
+    expect(r.out).toMatch(/rc=0/);
+    expect(r.out).toMatch(/^exists: ssh key/m);
+    expect(r.out).toMatch(/^exists: firewall/m);
+    expect(r.out).toMatch(/^change: hcloud server create /m);
+  });
   it('prints both token-removal steps in the last lines of every run, first and second', () => {
     const r = run(`${KEY} ${CREATE} > /tmp/r1; ${CREATE} > /tmp/r2; tail -n 8 /tmp/r1; echo ====; tail -n 8 /tmp/r2`);
     const [a, b] = r.out.split('====');

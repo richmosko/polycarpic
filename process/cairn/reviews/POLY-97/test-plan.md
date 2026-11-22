@@ -162,3 +162,8 @@ Ruled by the architect: `ruling.md` Addendum 2 @ 512d9c50 and Addendum 3 @ 1eafa
 
 - C1 (D3 on a real box): the probe joins `container:$(docker compose -p polycarpic-prod ps -q web)`, `polycarpic-prod_backup-net` (backup) and `polycarpic-prod_upload-net` (uploader), with the image of the running postgres container (`docker inspect --format {{.Config.Image}} <id>`), no default tag. The fake models one-off run names: it refuses a join by name (`polycarpic-prod-backup-1`, `container:*backup*`) and `postgres:17`, and a missing web container or network is a FAIL D3 naming it. Tests: checks-db D3 positive (updated) + the missing-thing case.
 - C2: create.sh prints `IPv4: <addr>` and `IPv6: <prefix>::1 (network <prefix>/64)`; dns-records accepts `<prefix>::1` and exits 2 on the bare /64 (both tested); dns-check accepts `<prefix>::1`.
+
+## Real-run findings (real-run.md)
+
+- F1: no stock in the asked location: create.sh exits non-zero, keeps hcloud's error, names `--location nbg1` (`--location fsn1` when nbg1 was asked), key and firewall stay, no server. Fake switch `no-stock-<location>`.
+- F2: H14 waits up to `POLY_NTP_WAIT` seconds (default 60, literally `POLY_NTP_WAIT:-60` in the script) for NTPSynchronized=yes before judging: becomes yes within the wait = PASS; never = FAIL H14 with the fix line after about the wait; already yes = one look. Fake switch `ntp-no-calls` (N answers of "no", then "yes"). All other check runs set `POLY_NTP_WAIT=2`.

@@ -367,6 +367,35 @@ describe('provision-check: one planted fault per check, with id, found value and
   });
 });
 
+describe('H14 waits a bounded time for synchronisation (real run F2: NTPSynchronized=no for the first seconds after a reboot)', () => {
+  // Pin: POLY_NTP_WAIT = seconds to wait (default 60). The fake's timedatectl answers "no" for the first N calls (`ntp-no-calls`).
+  const timed = (plant: string, wait: number) => {
+    const t0 = Date.now();
+    const r = run(`${b2Fixture({})}\n${plant}\nPOLY_NTP_WAIT=${wait} bash /repo/infra/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}; echo "calls=$(grep -c '^timedatectl' /var/fake-state/calls.log)"`, { image: COMPLETE });
+    return { r, secs: (Date.now() - t0) / 1000 };
+  };
+  it('the default wait is 60 s (a bounded wait, named in the script)', () => {
+    expect(readFileSync(join(ROOT, 'infra', 'provision-check.sh'), 'utf8')).toMatch(/POLY_NTP_WAIT:-60/);
+  });
+  it('becomes synchronised within the wait: PASS H14, more than one timedatectl call, no FAIL', () => {
+    const { r } = timed('echo 2 > /var/fake-state/ntp-no-calls', 8);
+    expect(find(r.out, 'PASS', 'H14')).toBeDefined();
+    expect(find(r.out, 'FAIL', 'H14')).toBeUndefined();
+    expect(Number(/calls=(\d+)/.exec(r.out)![1])).toBeGreaterThanOrEqual(3);
+  });
+  it('already synchronised: one look, no waiting (fast)', () => {
+    const { r, secs } = timed('', 30);
+    expect(find(r.out, 'PASS', 'H14')).toBeDefined();
+    expect(secs).toBeLessThan(15);
+  });
+  it('never synchronises: waits about the bounded time, then FAIL H14 with the fix line', () => {
+    const { r, secs } = timed('echo no > /var/fake-state/ntp', 4);
+    failLine(r, 'H14', ['ntp']);
+    expect(secs).toBeGreaterThanOrEqual(3.5); // it did wait
+    expect(secs).toBeLessThan(25); // and the wait is bounded
+  });
+});
+
 describe('H12: the box B2 key (R6, S4, S5)', () => {
   it('PASS when the key holds exactly the box-key constant, is restricted to the bucket, and has no name prefix', () => {
     const r = check('');

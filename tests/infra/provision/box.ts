@@ -67,7 +67,7 @@ export function snapshot(tag: string, from: string | null, script: string) {
 }
 
 export const HOST_ARGS = `--stage host --target hetzner --domain ${DOMAIN}`;
-export const CHECK = `bash /repo/infra/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}`;
+export const CHECK = `POLY_NTP_WAIT=2 bash /repo/infra/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}`;
 
 /** cloud-init applied (test key substituted for the placeholder), then the host stage, once: the snapshot every H test starts from. */
 export function makeHost(): R {

@@ -40,7 +40,7 @@ export const point = (prod: string | null, staging: string | null) => [
   staging ? `echo ${staging} > /var/fake-state/pg-staging-host; ln -sf /etc/polycarpic/secrets/postgres/db_superuser_password /var/fake-state/pg-staging-password` : '',
 ].filter(Boolean).join('\n');
 export const OPS = 'mkdir -p /tmp/ops; cp /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/packages/db/sql/roles.sql /tmp/ops/;';
-export const CHECK_OPS = `bash /tmp/ops/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}`;
+export const CHECK_OPS = `POLY_NTP_WAIT=2 bash /tmp/ops/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}`;
 export const asSuper = (cmd: string) => `export PGPASSWORD=$(cat /etc/polycarpic/secrets/postgres/db_superuser_password); ${cmd}`;
 export const STAGE = (host: string, project = 'prod') => `${OPS} ${point(host, null).replace(/pg-prod/g, `pg-${project}`).trim()}; bash /tmp/ops/provision.sh --stage database --project ${project}`;
 export const LOGIN: Record<string, string> = { poly_app: 'web/db_password_app', poly_auth: 'auth/db_password_auth', poly_worker: 'worker/db_password_worker', poly_migrator: 'migrate/db_password_migrator', poly_operator: 'operator/db_password_operator', poly_backup: 'backup/db_password_backup' };
