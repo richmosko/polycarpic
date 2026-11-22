@@ -2,7 +2,7 @@
 # One dispatcher behind every fake command (symlinked by name). Appends its argv to $FAKE_STATE/calls.log. Unknown verbs
 # exit 99 with "FAKE: unsupported" so a missing fake shows up as a harness gap, not as a pass.
 S=${FAKE_STATE:-/var/fake-state}; mkdir -p "$S"
-name=$(basename "$0")
+name=${FAKE_NAME:-$(basename "$0")}
 { printf '%s' "$name"; for a in "$@"; do printf ' %q' "$a"; done; echo; } >> "$S/calls.log"
 unsupported() { echo "FAKE: unsupported $name $*" >&2; exit 99; }
 vol() { cat "$S/volume" 2>/dev/null || echo empty; }
@@ -24,7 +24,9 @@ case "$name" in
     esac
     exit 0 ;;
   blkid) case "$(vol)" in empty) exit 2 ;; luks) echo 'TYPE="crypto_LUKS"' ;; foreign) echo 'TYPE="ext4"' ;; esac; exit 0 ;;
-  wipefs) case "$(vol)" in luks) echo crypto_LUKS ;; foreign) echo ext4 ;; esac; exit 0 ;;
+  wipefs)
+    case " $* " in *" --no-act "*|*" -n "*) ;; *) echo "FAKE: destructive wipefs (only --no-act is allowed)" >&2; exit 98 ;; esac
+    case "$(vol)" in luks) echo crypto_LUKS ;; foreign) echo ext4 ;; esac; exit 0 ;;
   file) case "$(vol)" in luks) echo "LUKS encrypted file, ver 2" ;; foreign) echo "Linux ext4 filesystem data" ;; *) echo data ;; esac; exit 0 ;;
   lsblk) case "$(vol)" in luks) echo crypto_LUKS ;; foreign) echo ext4 ;; esac; exit 0 ;;
   cryptsetup)

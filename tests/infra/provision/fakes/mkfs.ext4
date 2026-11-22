@@ -1,1 +1,2 @@
-_fake
+#!/bin/bash
+FAKE_NAME=mkfs.ext4 exec "$(dirname "$0")/_fake" "$@"

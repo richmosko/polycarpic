@@ -1,1 +1,2 @@
-_fake
+#!/bin/bash
+FAKE_NAME=blkid exec "$(dirname "$0")/_fake" "$@"

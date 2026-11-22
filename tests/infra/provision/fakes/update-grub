@@ -1,1 +1,2 @@
-_fake
+#!/bin/bash
+FAKE_NAME=update-grub exec "$(dirname "$0")/_fake" "$@"

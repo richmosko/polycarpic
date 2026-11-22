@@ -1,1 +1,2 @@
-_fake
+#!/bin/bash
+FAKE_NAME=cryptsetup exec "$(dirname "$0")/_fake" "$@"

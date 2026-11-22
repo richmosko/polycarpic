@@ -1,1 +1,2 @@
-_fake
+#!/bin/bash
+FAKE_NAME=reboot exec "$(dirname "$0")/_fake" "$@"

@@ -2,17 +2,17 @@
 
 Tree: worktree of `feature/poly-97-infra-provisioning` at 32cbaf33 plus the tests-red commit. Nothing under `infra/hetzner/`, `infra/provision*` or `infra/operator/` exists. Mac, Docker 29.9.3, Python 3.15, no network to any provider, no `hcloud` run on this machine.
 
-## New tests: 189 red, 6 green by construction (updated for Addenda 2 and 3)
+## New tests: 195 red, 6 green by construction (authority 1eafa6c5 + pins-review a483460d)
 
 | Suite | Command | Result | Red because |
 |--|--|--|--|
 | `V:provision-create.test.ts` (36) | `pnpm exec vitest run -c tests/infra/vitest.image.config.ts --exclude '.claude/**' tests/infra/image/provision` | 36 red | `create.sh`/`cloud-init.yaml` absent: rc 127 / ENOENT, shellcheck rc 2; each assertion names the missing behaviour |
-| `V:provision.test.ts` (58) | same | 58 red | setup runs the host stage: `cloud-init.yaml` absent (rc 127); each test fails with that message, none skipped |
+| `V:provision.test.ts` (64) | same | 64 red | setup runs the host stage: `cloud-init.yaml` absent (rc 127); each test fails with that message, none skipped |
 | `V:provision-db.test.ts` (25) | same | 25 red | same cause (host stage absent) |
 | `P:test_*.py` (70) | `python3 -m unittest discover -s tests/infra/operator -t tests/infra/operator -p "test_<name>.py"` ×5 | 70 red | 68 × "infra/operator/<tool>.py does not exist", 2 × missing `b2-capabilities.json` / `dns-allowed.json` |
 | `provision-wiring.test.ts` (6) | `pnpm exec vitest run -c tests/infra/vitest.config.ts --exclude '.claude/**'` | 6 green | the CI steps and files they check are part of this commit; they guard the wiring |
 
-Vitest dry-run files: 3 files, 119 tests, 10.5 s red (fails fast; the real green time is measured at build-green). Operator tests: 0.04 s.
+Vitest dry-run files: 3 files, 125 tests, 10.2 s red (fails fast; the real green time is measured at build-green). Operator tests: 0.04 s.
 
 ## Harness validated, not just red
 

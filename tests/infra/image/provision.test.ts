@@ -96,6 +96,32 @@ describe('provision.sh host stage (R5)', () => {
     expect(fmt).toBe('0');
   });
 
+  it('5a: a second device matching the volume glob stops the stage (exit 1), names both matches, writes nothing', () => {
+    const r = run(`${ENTER} : > /dev/disk/by-id/scsi-0HC_Volume_100000002; ${HOSTRUN} 2>&1${rc}; ls /etc/polycarpic/luks.key 2>&1 | grep -c 'No such'`);
+    expect(r.out).toMatch(/rc=1/);
+    expect(r.out).toContain('scsi-0HC_Volume_100000001');
+    expect(r.out).toContain('scsi-0HC_Volume_100000002');
+    expect(r.out.trim().split('\n').pop()).toBe('1');
+  });
+
+  it('5a: no device matching the glob stops the stage too (exit 1, nothing written)', () => {
+    const r = run(`${ENTER} rm -f /dev/disk/by-id/scsi-0HC_Volume_*; ${HOSTRUN} 2>&1${rc}; ls /etc/polycarpic/luks.key 2>&1 | grep -c 'No such'`);
+    expect(r.out).toMatch(/rc=1/);
+    expect(r.out.trim().split('\n').pop()).toBe('1');
+  });
+
+  it('5b: wipefs is only ever called with --no-act (the fake refuses any other call), on an empty, a LUKS and a foreign volume', () => {
+    for (const vol of ['empty', 'luks', 'foreign']) {
+      const r = run(`${ENTER} echo ${vol} > /var/fake-state/volume; ${HOSTRUN} >/dev/null 2>&1; cat /var/fake-state/calls.log | grep '^wipefs' | grep -vcE -- '--no-act| -n( |$)' || true`);
+      expect(r.out.trim().split('\n').pop(), vol).toBe('0');
+    }
+  });
+
+  it('5b: the fake refuses luksFormat on a volume that is already LUKS, so "never reformatted" is tested (stage still exits 0 by opening it)', () => {
+    const r = run(`echo luks > /var/fake-state/volume; cryptsetup luksFormat /dev/x; echo "rc=$?"`);
+    expect(r.out).toMatch(/rc=5/);
+  });
+
   it('data dirs and the spool have the R5 owners and modes, and the exact ACL entries', () => {
     const r = run(`for d in pg-prod pg-staging spool/wal spool/dump spool/premigration; do stat -c "$d %a %u:%g" /srv/polycarpic/$d; done; for d in spool/wal spool/dump spool/premigration; do echo "== $d"; getfacl -cp /srv/polycarpic/$d | grep -v '^$'; done`, { image: HOST });
     expect(r.out).toMatch(/^pg-prod 700 999:999$/m);
@@ -365,6 +391,20 @@ describe('H12: the box B2 key (R6, S4, S5)', () => {
   it('a rejected credential (401) fails with the fix, not a crash', () => {
     const r = run(`rm -f /var/fake-state/b2-authorize.json; ${CHECK}`, { image: COMPLETE });
     failLine(r, 'H12', [/401|unauthor|reject|denied/i]);
+  });
+  it('3c: a missing --b2-bucket, a missing --b2-capabilities, or an unreadable file is a FAIL with the pass-the-flags fix, never a WAIT or a skip', () => {
+    const base = `${b2Fixture({})}\n`;
+    const FIXTXT = 'pass --b2-capabilities <file> --b2-bucket <name>';
+    for (const args of [`--b2-capabilities ${CAPS}`, `--b2-bucket ${BUCKET}`, `--b2-capabilities /nonexistent.json --b2-bucket ${BUCKET}`, '']) {
+      const r = run(`${base}bash /repo/infra/provision-check.sh ${args}`, { image: COMPLETE });
+      const t = failLine(r, 'H12', []);
+      expect(t).toContain(FIXTXT);
+      expect(find(r.out, 'WAIT', 'H12')).toBeUndefined();
+    }
+  });
+  it('3b: the bucket comes from --b2-bucket alone: a different bucketName in the file is ignored, the flag wins', () => {
+    const r = run(`${b2Fixture({})}\nsed 's/polycarpic-hetzner-backups/some-other-bucket/' ${CAPS} > /tmp/caps.json; bash /repo/infra/provision-check.sh --b2-capabilities /tmp/caps.json --b2-bucket ${BUCKET}`, { image: COMPLETE });
+    expect(find(r.out, 'PASS', 'H12')).toBeDefined();
   });
   it('WAIT while backup_store_credential is absent', () => {
     const r = check('rm -f /etc/polycarpic/secrets/uploader/backup_store_credential');
