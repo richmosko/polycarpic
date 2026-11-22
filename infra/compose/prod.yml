@@ -154,8 +154,9 @@ services:
       - {source: db_password_backup__backup, target: db_password_backup}
     networks: [backup-net]
     mem_limit: 256m
-    tmpfs: [/tmp]
+    tmpfs: [/tmp:size=1m]
     volumes:
+      - ../backup/backup.sh:/usr/local/bin/backup.sh:ro
       - /srv/polycarpic/spool/dump:/spool/dump
       - /srv/polycarpic/spool/premigration:/spool/premigration
       - /etc/polycarpic/age-recipients.txt:/etc/backup/age-recipients.txt:ro
