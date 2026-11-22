@@ -125,9 +125,12 @@ describe('secret files under per-service directories (R8, ruling A1)', () => {
 
 const SEG = '000000010000000000000042';
 const archiveCmd = () => s.psql('SHOW archive_command');
+// R3 (POLY-99): the target is wal-<major>-<system id>-<%f>.age, and the temporary is <target>.<pid>. archive_command runs with the
+// data directory as its cwd (M-P3), which is where the script reads the system id from.
+const T = (f: string) => `wal-${s.psql("SELECT current_setting('server_version_num')::int / 10000")}-${s.psql('SELECT system_identifier FROM pg_control_system()')}-${f}.age`;
 const runArchive = (path: string, name: string) => {
   const cmd = archiveCmd().replaceAll('%p', path).replaceAll('%f', name);
-  return s.exec('sh', '-c', cmd);
+  return s.exec('sh', '-c', `cd /var/lib/postgresql/data && ${cmd}`);
 };
 const mkSeg = (path: string, bytes: number, seed: string) =>
   s.exec('sh', '-c', `head -c ${bytes} /dev/zero | tr '\\0' '${seed}' > ${path}`);
@@ -142,35 +145,35 @@ describe('archive_command: age, fail closed (criterion 3, R6)', () => {
   it('one segment -> <f>.age that the test private key decrypts byte-identical; no plaintext in the spool', () => {
     expect(mkSeg('/tmp/seg1', 1048576, 'A').code).toBe(0);
     expect(runArchive('/tmp/seg1', SEG).code).toBe(0);
-    expect(s.root(`ls ${walDir()}/${SEG}.age`).code).toBe(0);
+    expect(s.root(`ls ${walDir()}/${T(SEG)}`).code).toBe(0);
     const plain = s.exec('sh', '-c', 'sha256sum < /tmp/seg1').out;
     const dec = sh('docker', ['run', '--rm', '-i', '-v', `${s.dir}:/w`, '--entrypoint', 'sh', IMG, '-c',
-      `cat > /tmp/id; age -d -i /tmp/id ${walDir()}/${SEG}.age | sha256sum`], { input: s.identity });
+      `cat > /tmp/id; age -d -i /tmp/id ${walDir()}/${T(SEG)} | sha256sum`], { input: s.identity });
     expect(dec.out).toBe(plain); // red: encrypted to the wrong recipient, or not encrypted
-    expect(s.root(`! grep -q AAAAAAAAAAAAAAAA ${walDir()}/${SEG}.age`).code).toBe(0); // red: a plaintext copy in the spool
+    expect(s.root(`! grep -q AAAAAAAAAAAAAAAA ${walDir()}/${T(SEG)}`).code).toBe(0); // red: a plaintext copy in the spool
   });
   it('a DIFFERENT target already exists -> non-zero, target unchanged', () => {
     const f = '000000010000000000000043';
     expect(mkSeg('/tmp/seg2', 4096, 'B').code).toBe(0);
-    s.root(`printf 'pre-existing' > ${walDir()}/${f}.age && chown 999:999 ${walDir()}/${f}.age`);
-    const before = s.root(`sha256sum ${walDir()}/${f}.age`).out;
+    s.root(`printf 'pre-existing' > ${walDir()}/${T(f)} && chown 999:999 ${walDir()}/${T(f)}`);
+    const before = s.root(`sha256sum ${walDir()}/${T(f)}`).out;
     const r = runArchive('/tmp/seg2', f);
     expect(r.code).not.toBe(0); // red: the script overwrites (cp/mv/redirect instead of ln no-clobber)
-    expect(s.root(`sha256sum ${walDir()}/${f}.age`).out).toBe(before);
+    expect(s.root(`sha256sum ${walDir()}/${T(f)}`).out).toBe(before);
   });
   it('the IDENTICAL segment re-archived (target exists) -> non-zero too, target unchanged, no .sums directory (A1: no liveness path)', () => {
     const f = '000000010000000000000044';
     expect(mkSeg('/tmp/seg3', 4096, 'C').code).toBe(0);
     expect(runArchive('/tmp/seg3', f).code).toBe(0);
-    const before = s.root(`sha256sum ${walDir()}/${f}.age`).out;
+    const before = s.root(`sha256sum ${walDir()}/${T(f)}`).out;
     expect(runArchive('/tmp/seg3', f).code).not.toBe(0); // red: a sum-match shortcut returns 0 on an existing target
-    expect(s.root(`sha256sum ${walDir()}/${f}.age`).out).toBe(before);
+    expect(s.root(`sha256sum ${walDir()}/${T(f)}`).out).toBe(before);
     expect(s.root(`ls -A ${walDir()}`).out).not.toMatch(/\.sums/); // red: plaintext hashes written beside the spool
   });
   it('a stale temp from an earlier failed attempt on the same segment is removed by the next attempt', () => {
     const f = '000000010000000000000046';
     expect(mkSeg('/tmp/seg5', 4096, 'F').code).toBe(0);
-    s.root(`mkdir -p ${walDir()}/.inflight && printf stale > ${walDir()}/.inflight/${f}.age.99999 && chown -R 999:999 ${walDir()}/.inflight`);
+    s.root(`mkdir -p ${walDir()}/.inflight && printf stale > ${walDir()}/.inflight/${T(f)}.99999 && chown -R 999:999 ${walDir()}/.inflight`);
     expect(runArchive('/tmp/seg5', f).code).toBe(0);
     expect(s.root(`ls -A ${walDir()}/.inflight | wc -l`).out).toBe('0'); // red: stale temp never cleaned
   });
@@ -182,15 +185,15 @@ describe('archive_command: age, fail closed (criterion 3, R6)', () => {
     const r = runArchive('/tmp/seg4', f);
     s.root(`chmod 0644 /w/etc/polycarpic/${rec}`);
     expect(r.code).not.toBe(0); // red: set -e / pipefail missing, age error swallowed
-    expect(s.root(`ls ${walDir()}/${f}.age 2>&1; ls -A ${walDir()}/.inflight | wc -l`).out).toMatch(/No such file[\s\S]*0$/); // red: temp left or target created
-    s.root(`printf stale > ${walDir()}/.inflight/${f}.age.77777 && chown 999:999 ${walDir()}/.inflight/${f}.age.77777`);
+    expect(s.root(`ls ${walDir()}/${T(f)} 2>&1; ls -A ${walDir()}/.inflight | wc -l`).out).toMatch(/No such file[\s\S]*0$/); // red: temp left or target created
+    s.root(`printf stale > ${walDir()}/.inflight/${T(f)}.77777 && chown 999:999 ${walDir()}/.inflight/${T(f)}.77777`);
     expect(runArchive('/tmp/seg4', f).code).toBe(0); // the recipients file is readable again
     expect(s.root(`ls -A ${walDir()}/.inflight | wc -l`).out).toBe('0'); // red: failed attempt leaves residue the next one keeps
   });
   it('PostgreSQL itself hits the guard: a differing pre-existing target for the next segment raises pg_stat_archiver.failed_count', () => {
     const name = s.psql('SELECT pg_walfile_name(pg_current_wal_lsn())');
     const before = Number(s.psql('SELECT failed_count FROM pg_stat_archiver'));
-    s.root(`printf 'squatter' > ${walDir()}/${name}.age && chown 999:999 ${walDir()}/${name}.age`);
+    s.root(`printf 'squatter' > ${walDir()}/${T(name)} && chown 999:999 ${walDir()}/${T(name)}`);
     s.psql('SELECT pg_switch_wal()');
     const deadline = Date.now() + 90_000;
     let after = before;
@@ -199,6 +202,6 @@ describe('archive_command: age, fail closed (criterion 3, R6)', () => {
       after = Number(s.psql('SELECT failed_count FROM pg_stat_archiver'));
     }
     expect(after).toBeGreaterThan(before); // red: the server does not run the script, or it overwrites and succeeds
-    expect(s.root(`cat ${walDir()}/${name}.age`).out).toBe('squatter');
+    expect(s.root(`cat ${walDir()}/${T(name)}`).out).toBe('squatter');
   });
 });
