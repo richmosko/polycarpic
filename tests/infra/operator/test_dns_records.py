@@ -24,7 +24,7 @@ class DnsRecords(ToolTest):
 
     def key(self, b):
         n = rel(b["name"]) if b["name"].endswith("polycarpic.com") else b["name"]
-        return (n, b["type"], b["content"].strip('"'), b.get("priority"))
+        return (n, b["type"], b["content"].strip(chr(34)) if b["type"] == "TXT" else b["content"], b.get("priority"))
 
     def test_an_empty_zone_gets_exactly_the_allowed_set_and_the_four_address_records(self):
         rc, out, err = self.run_records(FakeCF())

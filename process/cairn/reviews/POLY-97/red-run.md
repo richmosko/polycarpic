@@ -43,3 +43,5 @@ All in `tests/**`; no assertion was weakened. Each row: what the test asserted b
 | 7 | the sweep's secret list: `cat secrets/*/*` concatenated files that carry no trailing newline into one value, so `not.toContain` checked one giant string and `vals.length > 5` failed | this commit | one value per file (`for f; do cat; echo; done`): **stricter**, three uses |
 
 Gap 8, none: no other harness error appeared in the 125 dry-run tests against the build. Containers: `docker ps` shows only `boring_goldstine`, not mine (names `poly97-pg*`); my networks and Postgres containers are removed by `afterAll`.
+
+| 8 | `test_dns_records` expected-set key stripped every trailing quote, so CAA `0 issue "letsencrypt.org"` could never match | next commit | strip on all content, now only on TXT (CAA compared exactly as sent); not weakened |
