@@ -14,6 +14,17 @@ JOB = re.compile(r"([0-9T:Z-]+) ([0-9T:Z-]+) ([a-z0-9-]+) (ok|failed)")
 CAPS = {"provision-check-d3": 600}
 DEFAULT_CAP = 6 * 3600
 PAD = 60
+MAX_COVER = 8 * 3600  # B2: the windows may cover at most 8 of the last 24 hours
+
+
+def covered(windows, now):
+    """Seconds of the last 24 h inside the union of the windows."""
+    total, end = 0, now - 24 * 3600
+    for a, b in sorted((max(a, now - 24 * 3600), min(b, now)) for a, b in windows):
+        if b > a:
+            total += b - max(a, end)
+            end = max(end, b)
+    return total
 
 
 def run(ctx):
@@ -34,6 +45,9 @@ def run(ctx):
         if end - start > CAPS.get(m.group(3), DEFAULT_CAP):
             return [Line("RED", "backupdb", "prod", "jobs.log line %d window is too long" % n)]
         windows.append((start - PAD, end + PAD))
+    cover = covered(windows, now)
+    if cover > MAX_COVER:
+        return [Line("RED", "backupdb", "prod", "jobs.log windows cover %d h of 24" % (cover // 3600))]
     name = pg.get("Name", "")
     code, out, err = ctx.run(["docker", "logs", "--timestamps", "--since", "24h", name], timeout=10)
     if code != 0:
@@ -49,9 +63,9 @@ def run(ctx):
     info = compose.inspect(ctx, name)
     started = ts.parse_docker(((info or {}).get("State") or {}).get("StartedAt", ""))
     if not (started is not None and now - started < 24 * 3600):
-        covered = (now - min(times)) / 3600 if times else 0
-        if covered < 23:
-            return [Line("RED", "backupdb", "prod", "postgres log covers only %d h" % int(covered))]
+        hours = (now - min(times)) / 3600 if times else 0
+        if hours < 23:
+            return [Line("RED", "backupdb", "prod", "postgres log covers only %d h" % int(hours))]
     outside = sorted(t for t in conns if not any(a <= t <= b for a, b in windows))
     if outside:
         shown = ", ".join(hhmm(t) for t in outside[:3])

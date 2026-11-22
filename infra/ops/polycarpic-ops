@@ -66,7 +66,7 @@ def _parse(mod, name, argv):
     parser = argparse.ArgumentParser(prog="polycarpic-ops " + name, allow_abbrev=False, add_help=False)
 
     def fail(message):
-        raise Usage("polycarpic-ops %s: %s" % (name, message))
+        raise Usage(message if message.startswith(name + ": ") else "polycarpic-ops %s: %s" % (name, message))
 
     parser.error = fail
     mod.add_arguments(parser)

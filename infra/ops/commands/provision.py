@@ -15,6 +15,16 @@ def add_arguments(parser):
     parser.add_argument("--mail-from")
     parser.add_argument("--b2-bucket")
     parser.add_argument("--project")
+    plain = parser.parse_args
+
+    def checked(argv=None, namespace=None):
+        argv = list(argv or [])
+        # a value starting with '-' would be read as an option: refuse it with the named message (B3)
+        if any(a == "--mail-from" and b.startswith("-") for a, b in zip(argv, argv[1:])):
+            parser.error("provision: bad --mail-from")
+        return plain(argv, namespace)
+
+    parser.parse_args = checked
 
 
 def _bad(ctx, text):
