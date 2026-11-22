@@ -186,7 +186,7 @@ if pid == 0:
     os.execvp("bash", ["bash", "-c", cmd])
 buf, eof, alltext, sent = b"", False, b"", []
 def pump(until=None, limit=20):
-    global buf, eof
+    global buf, eof, alltext
     end = time.time() + limit
     while not eof and time.time() < end and (until is None or until not in buf):
         r, _, _ = select.select([fd], [], [], 0.5)
