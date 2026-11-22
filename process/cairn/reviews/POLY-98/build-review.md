@@ -190,3 +190,20 @@ Read: `git diff 939a9fb9..d332d571 -- infra/ops/`, whose only change is one line
 - **Test two (a fixture secret typed at the prompt): still missing.** The first case covers stdout and stderr of
   `confirm` alone. The spec needs it at `set-secret` level: exit 1, `not replaced`, and the fixture absent from stdout,
   stderr, the runner log and every file (the K-sweep).
+
+## Re-review at a3e97748: PASS
+
+Read: `git diff d332d571..a3e97748 -- infra/ops/ tests/infra/ops/` (devops-98's fix commit a3e97748, qa's tests b4ad7a8a,
+4c824ed6, 237ec679 and 2255a499). Run: only `covered()` from `status/05_backupdb.py` at a3e97748, called in-process on
+my B2′ fixture windows. It returned 9.03 h; before the fix it returned 3.3 h.
+
+| Item | Result |
+|---|---|
+| B2′ | **Met.** A window counts only when `b > end`, and `end = b`. So a nested window adds nothing and the union is exact. qa's `test_backupdb_a_window_nested_inside_another…` expects `RED  backupdb  prod     jobs.log windows cover 9 h of 24`. |
+| B5 | **Met.** After the `TCSAFLUSH` call, `tcgetattr` is read again. If `ECHO` is still set, it warns `GetPassWarning` and returns `""` from inside the `try`, so the `finally` still restores the terminal. Nothing is read. qa's three cases cover it: `getpass` and `confirm` with no read and the warning raised, and `set-secret` exiting 2 with `the terminal cannot hide input; nothing written` and no file in either service. |
+| B4 test two | **Met.** `test_b4_a_secret_pasted_at_the_replace_question_is_refused_and_appears_nowhere`: exit 1, `not replaced`, `assertNoTrace` over output, runner log and files, and the old value kept. 237ec679 adds the pty case. |
+| B1, B3, B4 | Met (unchanged). |
+
+**The build at `a3e97748` passes the security review**, K1–K12 and B1–B5 included.
+
+SECURITY C-79 (the 8 h total cap) and C-87 (the `revokes` detection) are true as built.
