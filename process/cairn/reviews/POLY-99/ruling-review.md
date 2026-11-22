@@ -411,3 +411,16 @@ validation (N1). The plan gate clears when an addendum carries:
 - the restated C4 test;
 - the two text fixes: R3's second benign source of a two-version name, and `ulimit -c 0` in `drill.sh`.
 I re-read that sha and pass it, unless it changes something else.
+
+### Gate verdict: **PASS on `09aeeeb2`** (Addendum 2)
+
+Addendum 2 carries the following:
+- N1 and its tests, with A5;
+- C7′, with its tests;
+- `ulimit -c 0` in `drill.sh`;
+- C10's `spool.sha256` check;
+- the R3 correction.
+
+It changes nothing else in the ruling. The restated C4 test (the section above) is a test specification, not a
+ruling change, so it needs no addendum. qa takes it from this file as one of C1–C12's tests. With that, every
+condition has a test qa can point to. The plan gate is clear on my side.
