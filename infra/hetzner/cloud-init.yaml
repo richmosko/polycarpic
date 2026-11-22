@@ -28,4 +28,5 @@ write_files:
     content: |
       polyops ALL=(ALL) NOPASSWD:ALL
 runcmd:
+  - [install, -d, -m, '0755', /etc/polycarpic]
   - [systemctl, reload-or-restart, ssh]
