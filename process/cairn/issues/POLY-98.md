@@ -18,11 +18,11 @@ The operator subcommands INFRA §7 and §8 name (set-secret through cli pass-thr
 
 ## Acceptance criteria
 
-- [ ] Each subcommand has a bats (or equivalent) test against a fake host root.
-- [ ] list-secrets never prints a value.
-- [ ] status fits one screen and exits non-zero on any red item.
-- [ ] INFRA §7.5 and §8 match the output verbatim, or INFRA is corrected in the same PR.
-- [ ] `status` checks the bootstrap revokes on the live database: plpgsql `USAGE` absent for PUBLIC, and PUBLIC holds no EXECUTE on the 17 SQL-string built-ins (POLY-147 ruling R10, R11; SECURITY C-87). Red if a restore or major upgrade lost them. The restore step in INFRA §8.10 becomes a named command if one is added here.
+- [x] Each subcommand has a bats (or equivalent) test against a fake host root. — tests/infra/ops/test_{dispatcher,lint,install,provision,set_secret,list_secrets,gate_check,restart,cli,status,ctx_getpass}.py (166 cases against a temp root with a strict fake runner) and tests/infra/provision/ops.test.ts (23 cases, real box image and sudo)
+- [x] list-secrets never prints a value. — tests/infra/ops/test_list_secrets.py: test_no_secret_file_is_ever_opened (open and os.open raise on any secret path) and test_the_exact_table_on_a_fixture_tree
+- [x] status fits one screen and exits non-zero on any red item. — tests/infra/ops/test_status.py: test_at_most_24_lines_of_at_most_80_characters_even_with_hostile_long_details, test_a_red_item_makes_the_summary_red_exit_1…, test_waiting_items_make_a_green_with_waiting_summary_and_exit_3
+- [x] INFRA §7.5 and §8 match the output verbatim, or INFRA is corrected in the same PR. — docs/INFRA/index.html corrected in this PR; the exact output strings it quotes are pinned by tests/infra/ops/test_status.py (the screen and summaries), test_list_secrets.py (the table), test_set_secret.py, test_cli.py, test_restart.py, test_provision.py and test_gate_check.py (the messages)
+- [x] `status` checks the bootstrap revokes on the live database: plpgsql `USAGE` absent for PUBLIC, and PUBLIC holds no EXECUTE on the 17 SQL-string built-ins (POLY-147 ruling R10, R11; SECURITY C-87). Red if a restore or major upgrade lost them. The restore step in INFRA §8.10 becomes a named command if one is added here. — tests/infra/provision/ops.test.ts: the four G2 real-Postgres cases (a)–(d) (NULL lanacl reads open, one granted built-in is named alone, a slot is named, all closed prints nothing); tests/infra/ops/test_status.py: test_revokes_*
 
 ## Comments
 
