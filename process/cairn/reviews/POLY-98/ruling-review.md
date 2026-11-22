@@ -159,3 +159,9 @@ nothing security-bearing.
     - Lint: no `re.match` or `re.search` with a pattern ending in `$` under `infra/ops/`.
 
 PASS once K12 is in the 98c list. It needs no ruling change: it pins what Addendum 2 and R1 already say.
+
+## pins-review.md pin 3 at 00d40f81: stands on K12
+
+Pin 3, as `pins-review.md` @ `00d40f81` states it, is the reading I reviewed above. It stands once K12 is in the 98c
+list. One correction to its evidence: the `no_test_hook` lint does **not** cover argv and the environment. It only
+looks for the strings `POLYCARPIC_ROOT`, `OPS_ROOT` and `--root`. K12(a) and K12(b) are what cover them.
