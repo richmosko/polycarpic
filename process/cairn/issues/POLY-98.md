@@ -11,7 +11,7 @@ labels: [ops, cli]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-16
+updated: 2026-11-22
 ---
 
 The operator subcommands INFRA §7 and §8 name (set-secret through cli pass-through). status prints digest, last deploy, last backup from last-upload (never from the app), certificate days, disk, unaccounted poly_backup connections in 24 h, and non-temporary replication slots. Secrets are read without echo and written 0400.
@@ -45,3 +45,7 @@ Follow-up from POLY-147 (merged via PR #127) added to the list above; source: `p
 ### @team-lead — 2026-11-16
 
 From the POLY-89 follow-ups (seceng, 2026-11-17): add a `polycarpic-ops gate-check` subcommand that runs the deploy-gate query in INFRA §7.1 step 16 (poly_app holds no privilege on BetterAuth's tables and no EXECUTE on any `enter_*` except `enter_session`) and exits non-zero on any row. Step 16 then calls it in place of the raw `psql` command, which is tagged unmeasured until POLY-97's staging deploy runs it. The gate is the Principal's decision of 2026-11-16 (`process/DECISIONS.md`).
+
+### @team-lead — 2026-11-22
+
+From the POLY-97 loop (ruling Scope, real-run F4): `set-secret`, `list-secrets` and a `polycarpic-ops provision` wrapper belong here. Until then INFRA §7.1 step 11 copies `provision.sh`, `provision-check.sh`, `roles.sql` and `b2-capabilities.json` to `/tmp`, which a reboot clears; give them a permanent home. seceng F-probe1: an opt-in `--show-rclone-output` on `b2-setup.py --probe`, so an INCONCLUSIVE result can be explained.

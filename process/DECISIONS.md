@@ -870,3 +870,35 @@ Add new decisions ABOVE this comment, newest first.
 **Alternatives considered:**
 - Set both up now, as INFRA §7.0 lists them: no gap, at the cost of a card on file and one more account before anything runs.
 **Approved by:** Mosko
+
+### 2026-11-22 — No password manager; the operator secures secrets by their own method
+**Decision:** A password manager is not a condition before real household data. The operator stores account recovery codes, the backup private key and the other operator secrets by a method of their own, which the project does not describe or check.
+**Why:** The Principal declined the condition seceng proposed ("decline. I'll secure data by another method"). Recorded as accepted risk R-30 in SECURITY; INFRA says "your secret store".
+**Alternatives considered:**
+- Make it a third condition before real data (seceng's position, the lead's recommendation), satisfied by the macOS Passwords app.
+**Approved by:** Mosko
+
+### 2026-11-22 — `polyops` has password-free sudo; the SSH key is loaded for one hour at a time
+**Decision:** The one operator account on a box runs `sudo` without a password. The operator's SSH key is loaded with `ssh-add -t 1h`, never stored in the Keychain.
+**Why:** A sudo password stops only someone holding the key file and its passphrase but not the laptop session, and costs one more stored secret; the hour limit bounds what an unattended, unlocked Mac can reach. seceng concurred on condition of provision-check H15 (only `polyops` can log in, one sudoers line, no other account with a key). Accepted risk R-29.
+**Alternatives considered:**
+- A sudo password for `polyops`.
+- The key's passphrase kept in the macOS Keychain (the lead's first advice, superseded).
+**Approved by:** Mosko
+
+### 2026-11-22 — DMARC aggregate reports stay off for now
+**Decision:** The `_dmarc` record is pinned as `v=DMARC1; p=reject; sp=reject; adkim=s; aspf=r`, with no `rua` address. Forensic reports (`ruf`) are refused in any case, because they can carry sign-in links.
+**Why:** The Principal chose to leave Cloudflare's DMARC Management off ("leave them off for now"). Forgeries are still rejected; what is lost is sight of forgery attempts and of our own mail failing its checks. Accepted risk R-31. Reversible by a one-line re-pin.
+**Alternatives considered:**
+- Turn on Cloudflare's free DMARC Management for a `rua` address (the architect's and seceng's recommendation).
+**Approved by:** Mosko
+
+### 2026-11-22 — POLY-97's real run: harden the real box, then delete it; the lead runs the Hetzner half
+**Decision:** POLY-97's acceptance run created a real server, hardened and checked it in the same loop, and deleted the server, volume and firewall afterwards, with the API token removed the same day. The team-lead ran the Hetzner commands with the token already on the laptop; no teammate touched a credential. The live runs of the Backblaze and DNS operator tools were deferred to POLY-104.
+**Why:** The dry run fakes disk encryption, package installs and services, the parts most likely to differ on a real box, so hardening it now finds those faults while the authors are on the code. Deleting it leaves nothing unwatched or billable and lets POLY-104 walk the runbook from an empty project. The Backblaze and DNS runs are not POLY-97 criteria and repeat nothing already set up by hand.
+**Alternatives considered:**
+- Leave hardening to POLY-104.
+- Keep the server until the staging deploy (about 10 EUR a month, and a live token or a new one).
+- The Principal runs every step by hand, as the ruling first had it.
+- Run the Backblaze and DNS tools live in this loop (the architect's sequence).
+**Approved by:** Mosko
