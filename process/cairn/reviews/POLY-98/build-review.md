@@ -71,3 +71,24 @@ runs. Then it sets the modes, `lchown`s everything to `0:0`, renames, and swaps 
 
 This commit edits C-79's Detection bullet and adds a Detection bullet and a unit row to C-87 (version 1.17.1). Each
 quotes the built `status` line. B2 adds its union cap to C-79 when it lands.
+
+## Tests that prove B1–B3 (qa writes them first)
+
+- **B1.**
+  - **Unit (`test_ctx` or `test_set_secret`).** With a fake `termios`, the call that clears `ECHO` passes
+    `termios.TCSAFLUSH`, and the restore in `finally` passes `TCSADRAIN`.
+  - **Container (real pty, real sudo).** Write `earlyvalue` to the pty *before* the prompt appears. Then wait for
+    `<name> (input hidden): `, type `latevalue` and Enter, and answer `yes` if asked. Expect exit 0. The secret file
+    holds exactly `latevalue` plus a newline, and `earlyvalue` appears in no target file. (The echo of `earlyvalue` on the
+    pty is the terminal's, from before the prompt; the test asserts only that it does not become the secret.)
+- **B2.**
+  - **Rule.** Clip each widened window (start − 60 s, end + 60 s) to `[now − 24 h, now]`, then take their union. If the
+    union is **more than 8 h (28 800 s)**, the line is
+    `RED  backupdb  prod     jobs.log windows cover <n> h of 24`, where `<n>` is the union in whole hours, rounded down.
+    The check runs after the per-line checks and before the connection match.
+  - **Test, red.** Four `nightly` lines of 5 h each, non-overlapping, inside the last 24 h, each under the 6 h cap. The
+    union is 4 × (5 h + 2 min) → `jobs.log windows cover 20 h of 24`, exit 1.
+  - **Test, boundary.** Two lines of 3 h 58 min each, non-overlapping. Widened, the union is exactly 8 h → OK.
+  - **Test, overlap counted once.** Two identical 5 h lines → a union of 5 h 2 min → OK.
+- **B3.** `polycarpic-ops provision --stage host --target hetzner --domain example.com --mail-from -x@example.com` exits
+  **2** with stderr exactly `provision: bad --mail-from`, and the runner log is empty.
