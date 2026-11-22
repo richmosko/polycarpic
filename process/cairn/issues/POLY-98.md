@@ -1,12 +1,12 @@
 ---
 id: POLY-98
 title: polycarpic-ops operator CLI
-status: backlog
+status: in-progress
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97]
 assignee: devops-engineer
-paths: [infra/ops/**]
+paths: [process/cairn/issues/POLY-98.md, process/cairn/reviews/POLY-98/**, infra/ops/**, infra/operator/**, infra/provision.sh, infra/provision-check.sh, infra/postgres/**, infra/compose/**, infra/README.md, infra/lint/**, infra/ci/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, pnpm-lock.yaml, .gitignore]
 labels: [ops, cli]
 priority: null
 pr: null
@@ -49,3 +49,7 @@ From the POLY-89 follow-ups (seceng, 2026-11-17): add a `polycarpic-ops gate-che
 ### @team-lead — 2026-11-22
 
 From the POLY-97 loop (ruling Scope, real-run F4): `set-secret`, `list-secrets` and a `polycarpic-ops provision` wrapper belong here. Until then INFRA §7.1 step 11 copies `provision.sh`, `provision-check.sh`, `roles.sql` and `b2-capabilities.json` to `/tmp`, which a reboot clears; give them a permanent home. seceng F-probe1: an opt-in `--show-rclone-output` on `b2-setup.py --probe`, so an INCONCLUSIVE result can be explained.
+
+### @team-lead — 2026-11-22
+
+Feature started. Branch: `feature/poly-98-polycarpic-ops-cli`.
