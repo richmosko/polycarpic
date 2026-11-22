@@ -115,7 +115,7 @@ class Status(OpsTest):
         self.staging = {}
         r = self.go()
         self.assertEqual(r.rc, 3, r.out)
-        self.assertEqual(self.find(r, "app", "staging"), "WAIT app      staging  not deployed")
+        self.assertEqual(self.find(r, "app", "staging"), line("WAIT", "app", "staging", "not deployed"))
         self.assertEqual(r.out.splitlines()[-1], "STATUS GREEN; 3 WAITING: app staging, slots staging, revokes staging")
 
     def test_a_red_item_makes_the_summary_red_exit_1_and_the_count_and_names_exact(self):
@@ -239,7 +239,7 @@ class Status(OpsTest):
         self.prod = {}
         self.staging = {}
         r = self.go()
-        self.assertEqual(self.find(r, "app", "prod"), "WAIT app      prod     not deployed")
+        self.assertEqual(self.find(r, "app", "prod"), line("WAIT", "app", "prod", "not deployed"))
 
     # ---- cert
     def test_cert_ok_exact_red_under_14_days_and_13_days_is_red(self):
@@ -399,8 +399,8 @@ class Status(OpsTest):
         calls = [c for c in r.runner.calls if "psql" in c["argv"]]
         self.assertTrue(calls)
         for c in calls:
-            self.assertEqual(c["argv"][:13], ["docker", "compose", "-p", "polycarpic-" + ("prod" if "polycarpic-prod" in c["argv"] else "staging"), "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "polycarpic", "-XAtq", "-v"])
-            self.assertEqual(c["argv"][13:], ["ON_ERROR_STOP=1"])
+            self.assertEqual(c["argv"][:14], ["docker", "compose", "-p", "polycarpic-" + ("prod" if "polycarpic-prod" in c["argv"] else "staging"), "exec", "-T", "postgres", "psql", "-U", "postgres", "-d", "polycarpic", "-XAtq", "-v"])
+            self.assertEqual(c["argv"][14:], ["ON_ERROR_STOP=1"])
             self.assertTrue(c["stdin"].lstrip().startswith("SET default_transaction_read_only = on"), c["stdin"][:80])
         rev = [c["stdin"] for c in calls if "pg_replication_slots" not in c["stdin"]][0]
         for s in sigs:
