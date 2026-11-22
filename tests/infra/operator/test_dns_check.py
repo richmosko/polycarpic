@@ -51,6 +51,14 @@ class DnsCheck(ToolTest):
                 r["data"]["value"] = "letsencrypt.org"
         self.assertFails(*self.run_check(cf), "CAA")
 
+    def test_accepts_the_ipv6_host_address_create_sh_prints(self):
+        cf = good_zone()
+        for r in cf.records:
+            if r["type"] == "AAAA":
+                r["content"] = "2a01:4f8:c17:abcd::1"
+        rc, out, err = self.run_check(cf, args=["--ipv4", IPV4, "--ipv6", "2a01:4f8:c17:abcd::1"])
+        self.assertEqual(rc, 0, out + err)
+
     def test_absent_app_and_staging_are_allowed_and_reported_as_absent(self):
         cf = FakeCF()
         for r in ALLOWED:

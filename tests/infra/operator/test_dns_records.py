@@ -55,6 +55,15 @@ class DnsRecords(ToolTest):
             rc, out, _ = self.run_records(good_zone(caa_mode=mode))
             self.assertEqual((rc, self.writes), (0, []), mode)
 
+    def test_accepts_the_exact_ipv6_value_create_sh_prints_and_rejects_the_bare_64_network(self):
+        # verdict C2: create.sh prints `IPv6: <prefix>::1 (network <prefix>/64)`; the value to pass is <prefix>::1
+        rc, out, err = self.run_records(FakeCF(), args=("--ipv4", IPV4, "--ipv6", "2a01:4f8:c17:abcd::1"))
+        self.assertEqual((rc, err), (0, ""), out)
+        self.assertEqual({b["content"] for b in self.posts() if b["type"] == "AAAA"}, {"2a01:4f8:c17:abcd::1"})
+        rc, out, err = self.run_records(FakeCF(), args=("--ipv4", IPV4, "--ipv6", "2a01:4f8:c17:abcd::/64"))
+        self.assertEqual(rc, 2, out + err)
+        self.assertEqual(self.writes, [])
+
     def test_address_records_are_ttl_300_and_no_record_is_proxied(self):
         self.run_records(FakeCF())
         for b in self.posts():

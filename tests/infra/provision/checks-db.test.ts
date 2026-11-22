@@ -65,7 +65,14 @@ describe('provision-check database checks D1–D6, with a running Postgres', () 
     expect(find(out!, 'PASS', 'D3')).toBeDefined();
     const runs = calls!.trim().split('\n').filter(Boolean);
     expect(runs.length).toBeGreaterThanOrEqual(3); // one probe per service (two modes for web and backup may share a call)
-    for (const svc of ['web', 'uploader', 'backup']) expect(runs.some((l) => new RegExp(`--network container:\\S*${svc}`).test(l)), svc).toBe(true);
+    // verdict C1: backup and uploader are one-off runs (named <proj>-backup-run-<id>), so the probe joins their NETWORKS, and web's container by id
+    expect(runs.some((l) => /--network container:web-cid-0001\b/.test(l)), 'web: its running container').toBe(true);
+    expect(runs.some((l) => /--network polycarpic-prod_backup-net\b/.test(l)), 'backup: its network').toBe(true);
+    expect(runs.some((l) => /--network polycarpic-prod_upload-net\b/.test(l)), 'uploader: its network').toBe(true);
+    for (const l of runs) {
+      expect(l, 'the running postgres container\'s image, no default tag').toContain('fixture-pg-image:17-running');
+      expect(l).not.toMatch(/postgres:17(\s|$)|prod-(backup|uploader)-1/);
+    }
     for (const l of runs) {
       expect(l).toMatch(/--tmpfs/);
       expect(l).toMatch(/require_auth=scram-sha-256/);
@@ -86,6 +93,12 @@ describe('provision-check database checks D1–D6, with a running Postgres', () 
   });
   it('D3: a backup container that cannot connect (or cannot replicate) fails', () => {
     failLine(ALL('echo "psql: error: connection refused" > /var/fake-state/c79-backup'), 'D3', ['backup']);
+  });
+  it('D3 (verdict C1): a missing web container, and a missing backup or upload network, are each a FAIL naming what is missing', () => {
+    failLine(ALL('touch /var/fake-state/no-web'), 'D3', ['web']);
+    const without = (net: string) => nets(NETS_GOOD.filter(([n]) => n !== net));
+    failLine(ALL(without('polycarpic-prod_backup-net')), 'D3', ['polycarpic-prod_backup-net']);
+    failLine(ALL(without('polycarpic-prod_upload-net')), 'D3', ['polycarpic-prod_upload-net']);
   });
   it('D4: a leftover non-temporary replication slot fails, naming it', () => {
     failLine(ALL('', { prod: names.bad, staging: names.good }), 'D4', ['leftover']);

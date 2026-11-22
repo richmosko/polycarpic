@@ -101,13 +101,26 @@ case "$name" in
           case "$1" in *replication=database*) mode=replication ;; esac
           shift
         done
-        case "$ns" in container:*) ;; *) echo "FAKE: probe without --network container:<svc>" >&2; exit 97 ;; esac
+        img=$(cat "$S/pg-image" 2>/dev/null || echo "fixture-pg-image:17-running")
+        case "$ns" in
+          container:web-cid-0001) probe_svc=web ;;
+          polycarpic-prod_backup-net) probe_svc=backup ;;
+          polycarpic-prod_upload-net) probe_svc=uploader ;;
+          container:*backup*|container:*uploader*|*prod-backup-1*|*prod-uploader-1*) echo "FAKE: joined a one-off service by name ($ns): no such container exists (verdict C1)" >&2; exit 97 ;;
+          container:*) echo "Error response from daemon: No such container: ${ns#container:}" >&2; exit 125 ;;
+          *) echo "FAKE: probe network is not web's container, backup-net or upload-net: $ns" >&2; exit 97 ;;
+        esac
+        case "$ns" in
+          container:*) [ -e "$S/no-web" ] && { echo "Error response from daemon: No such container: ${ns#container:}" >&2; exit 125; } ;;
+          *) grep -q "\"$ns\"" "$S/networks.json" 2>/dev/null || { echo "Error response from daemon: network $ns not found" >&2; exit 125; } ;;
+        esac
+        case " $* " in *" $img "*) ;; *) echo "FAKE: probe image is not the running postgres container's image ($img)" >&2; exit 97 ;; esac
+        case " $* " in *" postgres:17 "*|*" postgres:17."*) echo "FAKE: probe used a default postgres tag" >&2; exit 97 ;; esac
         [ $tmpfs = 1 ] || { echo "FAKE: probe without --tmpfs for the pgpass" >&2; exit 97; }
         [ $ro = 1 ] || { echo "FAKE: probe without a read-only db_password_backup mount" >&2; exit 97; }
         [ $envpw = 0 ] || { echo "FAKE: probe passes the password through -e" >&2; exit 97; }
         case "$conn" in *require_auth=scram-sha-256*) ;; *) echo "FAKE: probe without require_auth=scram-sha-256" >&2; exit 97 ;; esac
-        svc=none; for k in web uploader backup; do case "$ns" in *"$k"*) svc=$k ;; esac; done
-        [ "$svc" != none ] || { echo "FAKE: probe namespace is not web, uploader or backup: $ns" >&2; exit 97; }
+        svc=$probe_svc
         case "$svc" in
           web) d='psql: error: connection to server at "postgres" (10.201.1.2), port 5432 failed: FATAL:  no pg_hba.conf entry for host "10.201.1.5", user "poly_backup", database "polycarpic"' ;;
           uploader) d='psql: error: could not translate host name "postgres" to address: Name or service not known' ;;
@@ -116,6 +129,11 @@ case "$name" in
         r=$(cat "$S/c79-$svc" 2>/dev/null || echo "$d")
         if [ "$r" = ok ]; then if [ $mode = replication ]; then echo "IDENTIFY_SYSTEM: 7000000000000000000 1 0/3000000 polycarpic"; else echo "1"; fi; exit 0; fi
         echo "$r" >&2; exit 2 ;;
+      inspect)
+        # `docker inspect --format '{{.Config.Image}}' <id>` for the running postgres container
+        id=${*: -1}
+        case "$id" in postgres-cid-0001) cat "$S/pg-image" 2>/dev/null || echo "fixture-pg-image:17-running" ;; *) echo "Error: No such object: $id" >&2; exit 1 ;; esac
+        exit 0 ;;
       ps) for p in prod staging; do [ -s "$S/pg-$p-host" ] && echo "polycarpic-$p-postgres-1"; done; exit 0 ;;
       compose)
         shift; proj=prod; verb=""; args=("$@")
@@ -124,7 +142,18 @@ case "$name" in
         for a in "${args[@]}"; do case "$a" in exec|ps|version|config|up|run) verb=$a; break ;; esac; i=$((i+1)); done
         case "$verb" in
           version) echo "Docker Compose version v5.1.4"; exit 0 ;;
-          ps) [ -s "$S/pg-$proj-host" ] && echo postgres; exit 0 ;;
+          ps)
+            case " ${args[*]} " in
+              *" -q "*)
+                svc=${args[$((${#args[@]}-1))]}
+                case "$svc" in
+                  postgres) [ -s "$S/pg-$proj-host" ] && echo "postgres-cid-0001" ;;
+                  web) [ -e "$S/no-web" ] || echo "web-cid-0001" ;;
+                  *) : ;;  # backup and uploader are one-off services: no running container to find (verdict C1, measured)
+                esac
+                exit 0 ;;
+            esac
+            [ -s "$S/pg-$proj-host" ] && echo postgres; exit 0 ;;
           exec)
             rest=("${args[@]:$((i+1))}"); svc=""; j=0
             for a in "${rest[@]}"; do case "$a" in web|uploader|backup|postgres|auth|worker|caddy|migrate|operator) svc=$a; break ;; esac; j=$((j+1)); done

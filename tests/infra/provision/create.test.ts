@@ -44,13 +44,20 @@ describe('create.sh (R1)', () => {
     const r = run(`${KEY} ${CREATE}; echo "rc=$?"`);
     expect(r.out).toMatch(/rc=0/);
     expect(r.out.match(/^change: /gm)!.length).toBeGreaterThanOrEqual(4); // key, firewall, volume, server (+ attach)
-    expect(r.out).toMatch(/203\.0\.113\.7/);
-    expect(r.out).toMatch(/2001:db8:1::/);
+    // verdict C2: Hetzner gives public_net.ipv6.ip as a /64 NETWORK; the host address is <prefix>::1, the value dns-records.py --ipv6 accepts
+    expect(r.out).toMatch(/^IPv4: 203\.0\.113\.7$/m);
+    expect(r.out).toMatch(/^IPv6: 2001:db8:1::1 \(network 2001:db8:1::\/64\)$/m);
     expect(r.out).toMatch(/^created: server, firewall \(22,80,443 in\), volume 20 GB$/m);
     const created = r.out.indexOf('created: server');
     expect(r.out.indexOf('203.0.113.7')).toBeLessThan(created); // addresses come before the created line
   });
 
+  it('C2: a real-looking Hetzner /64 prints as <prefix>::1 with the network in brackets, never the bare /64 as the address', () => {
+    const plant = `jq '.servers[0].public_net.ipv6.ip = "2a01:4f8:c17:abcd::/64"' /var/fake-state/hcloud.json > /tmp/h && cp /tmp/h /var/fake-state/hcloud.json`;
+    const r = run(`${KEY} ${CREATE} >/dev/null; ${plant}; ${CREATE}`);
+    expect(r.out).toMatch(/^IPv6: 2a01:4f8:c17:abcd::1 \(network 2a01:4f8:c17:abcd::\/64\)$/m);
+    expect(r.out).not.toMatch(/^IPv6: \S+\/64\s*$/m);
+  });
   it('prints both token-removal steps in the last lines of every run, first and second', () => {
     const r = run(`${KEY} ${CREATE} > /tmp/r1; ${CREATE} > /tmp/r2; tail -n 8 /tmp/r1; echo ====; tail -n 8 /tmp/r2`);
     const [a, b] = r.out.split('====');
