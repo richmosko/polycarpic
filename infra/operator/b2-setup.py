@@ -265,7 +265,7 @@ def run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, e
     child["RCLONE_CONFIG_PROBE_SECRET_ACCESS_KEY"] = new["applicationKey"]
     child["RCLONE_CONFIG_PROBE_NO_CHECK_BUCKET"] = "true"
     try:
-        code = runner(["rclone", "rcat", target], env=child, stdin=b"x")
+        code = runner(["rclone", "rcat", "--s3-no-head", target], env=child, stdin=b"x")
     finally:
         call("POST", api + "b2_delete_key", hdr, {"applicationKeyId": new["applicationKeyId"]})
         del child, new
