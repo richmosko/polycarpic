@@ -20,6 +20,10 @@ Throwaway reference scripts (a ~50-line `create.sh`, a ~70-line host stage, a cl
 
 ## Existing suites
 
-- `tests/ci` (21 files, 553): green. `tests/infra` fixture suite (9 files, 326, includes the 6 wiring tests): green.
-- `tests/infra/image` existing files (6 files, 81 tests, 84 s): 78 green, **3 red, pre-existing**: `postgres.test.ts` "web is refused a file in postgres's directory…", "a 0440 file in a service directory is refused to an unrelated uid", "an age failure (unreadable recipients file)…". The same 3 fail in the lead's checkout on `main`-based tree with none of my files, so they are not mine: they expect a permission refusal that Docker Desktop's bind mounts on macOS do not give (unverified on Linux CI). Not touched.
+- At 14788740: `tests/ci` 21 files, 553 tests green; `tests/infra` fixture suite 9 files, 326 tests green (includes the 6 wiring tests).
+- `tests/infra/image` existing files (6 files, 81 tests), run at 14788740 with `--exclude 'tests/infra/image/provision*'`: 78 green, **3 red, pre-existing on this Mac** (same 3 in the lead's checkout without any of my files). Each fails the same first line, `AssertionError: expected +0 not to be +0` at `expect(<run>.code).not.toBe(0)` (a permission refusal that Docker Desktop's macOS bind mounts do not give; unverified on Linux CI):
+  1. `postgres.test.ts:113` "web is refused a file in postgres's directory, and postgres in web's (0440 root:gid is not world-readable)"
+  2. `postgres.test.ts:121` "a 0440 file in a service directory is refused to an unrelated uid"
+  3. `postgres.test.ts:184` "archive_command: age, fail closed … an age failure (unreadable recipients file) -> non-zero, no .age, .inflight empty"
+  Any other red in that suite at build-green is a regression.
 - `docker ps` after the runs: no test container left.
