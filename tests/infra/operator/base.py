@@ -79,8 +79,9 @@ def rel(fq):
 class FakeCF(object):
     """Cloudflare v4: zones, paginated dns_records, create/delete. Records are stored as the API returns them (FQDN names)."""
 
-    def __init__(self, records=None, token=SECRETS["cf_token"], page_size=100, lie_total=None, fail_list=False):
-        self.token, self.page_size, self.lie_total, self.fail_list = token, page_size, lie_total, fail_list
+    def __init__(self, records=None, token=SECRETS["cf_token"], page_size=100, lie_total=None, fail_list=False, caa_mode="content"):
+        # caa_mode: how the LIST reply carries CAA values: "content" (`0 issue "x"` only), "data" ({flags, tag, value} only), "both"
+        self.token, self.page_size, self.lie_total, self.fail_list, self.caa_mode = token, page_size, lie_total, fail_list, caa_mode
         self.records, self.n = [], 0
         for r in records or []:
             self.add(**r)
@@ -90,8 +91,24 @@ class FakeCF(object):
         rec = {"id": "rec%03d" % self.n, "type": type, "name": fqdn(name), "content": content, "ttl": ttl, "proxied": proxied}
         if priority is not None:
             rec["priority"] = priority
+        if type == "CAA":
+            if data is None:
+                flags, tag, value = content.split(" ", 2)
+                data = {"flags": int(flags), "tag": tag, "value": value.strip('"')}
+            else:
+                rec["content"] = '%d %s "%s"' % (data["flags"], data["tag"], data["value"])
+            rec["data"] = dict(data)
         self.records.append(rec)
         return rec
+
+    def listed(self, r):
+        r = dict(r)
+        if r["type"] == "CAA":
+            if self.caa_mode == "data":
+                r.pop("content", None)
+            elif self.caa_mode == "content":
+                r.pop("data", None)
+        return r
 
     def __call__(self, method, url, headers, body):
         if headers.get("Authorization") != "Bearer " + self.token:
@@ -105,13 +122,21 @@ class FakeCF(object):
                 return 200, {"success": False, "errors": [{"code": 1000, "message": "list failed"}], "result": []}
             page = int(q.get("page", ["1"])[0])
             per = min(self.page_size, int(q.get("per_page", ["100"])[0]))
-            chunk = self.records[(page - 1) * per: page * per]
+            chunk = [self.listed(r) for r in self.records[(page - 1) * per: page * per]]
             total = len(self.records) if self.lie_total is None else self.lie_total
             return 200, {"success": True, "result": chunk, "result_info": {"page": page, "per_page": per, "count": len(chunk), "total_count": total, "total_pages": max(1, -(-total // per))}}
         if u.path.endswith("/dns_records") and method == "POST":
             if body.get("type") == "MX" and "priority" not in body:
                 return 400, {"success": False, "errors": [{"message": "priority required"}]}
-            rec = self.add(body["type"], rel(body["name"]) if body["name"].endswith(ZONE) else body["name"], body["content"], body.get("ttl", 1), body.get("proxied", False), body.get("priority"))
+            name = rel(body["name"]) if body["name"].endswith(ZONE) else body["name"]
+            if body["type"] == "CAA":
+                # Cloudflare takes CAA as {flags, tag, value} in `data` and stores/returns `content` too.
+                d = body.get("data")
+                if d is None and "content" not in body:
+                    return 400, {"success": False, "errors": [{"message": "CAA needs data"}]}
+                rec = self.add("CAA", name, body.get("content"), body.get("ttl", 1), body.get("proxied", False), None, data=d)
+                return 200, {"success": True, "result": rec}
+            rec = self.add(body["type"], name, body["content"], body.get("ttl", 1), body.get("proxied", False), body.get("priority"))
             return 200, {"success": True, "result": rec}
         if "/dns_records/" in u.path and method == "DELETE":
             rid = u.path.rsplit("/", 1)[1]
@@ -120,9 +145,9 @@ class FakeCF(object):
         return 404, {"success": False, "errors": [{"message": "FAKE: unrouted %s %s" % (method, url)}]}
 
 
-def good_zone():
+def good_zone(caa_mode="content"):
     """A zone holding exactly the allowed set and both app records, as Cloudflare returns them (TXT and CAA content quoted)."""
-    cf = FakeCF()
+    cf = FakeCF(caa_mode=caa_mode)
     for r in ALLOWED:
         name, typ, val = r[0], r[1], r[2]
         content = '"%s"' % val if typ == "TXT" else val

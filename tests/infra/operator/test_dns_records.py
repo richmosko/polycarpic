@@ -24,6 +24,10 @@ class DnsRecords(ToolTest):
 
     def key(self, b):
         n = rel(b["name"]) if b["name"].endswith("polycarpic.com") else b["name"]
+        if b["type"] == "CAA":  # POSTed as data {flags, tag, value}, never as content (devops/lead change)
+            self.assertIn("data", b, "CAA must be posted as data {flags, tag, value}")
+            d = b["data"]
+            return (n, "CAA", '%d %s "%s"' % (d["flags"], d["tag"], d["value"]), None)
         return (n, b["type"], b["content"].strip(chr(34)) if b["type"] == "TXT" else b["content"], b.get("priority"))
 
     def test_an_empty_zone_gets_exactly_the_allowed_set_and_the_four_address_records(self):
@@ -34,6 +38,22 @@ class DnsRecords(ToolTest):
         self.assertEqual({g for g in got if g[1] not in ("A", "AAAA")}, expected)
         self.assertEqual({g[:3] for g in got if g[1] in ("A", "AAAA")}, {("app", "A", IPV4), ("app", "AAAA", IPV6), ("staging", "A", IPV4), ("staging", "AAAA", IPV6)})
         self.assertEqual(len(self.writes), 13)
+
+    def test_caa_is_posted_as_data_flags_tag_value_with_no_content_key(self):
+        self.run_records(FakeCF())
+        caa = [b for b in self.posts() if b["type"] == "CAA"]
+        self.assertEqual(len(caa), 3)
+        for b in caa:
+            self.assertNotIn("content", b)
+            self.assertEqual(set(b["data"]), {"flags", "tag", "value"})
+            self.assertIs(type(b["data"]["flags"]), int)
+            self.assertNotIn('"', b["data"]["value"])
+        self.assertEqual({(b["data"]["tag"], b["data"]["value"]) for b in caa}, {("issue", "letsencrypt.org"), ("issue", "sectigo.com"), ("issuewild", ";")})
+
+    def test_a_zone_whose_caa_comes_back_as_data_only_or_content_only_is_complete_and_idempotent(self):
+        for mode in ("data", "content", "both"):
+            rc, out, _ = self.run_records(good_zone(caa_mode=mode))
+            self.assertEqual((rc, self.writes), (0, []), mode)
 
     def test_address_records_are_ttl_300_and_no_record_is_proxied(self):
         self.run_records(FakeCF())

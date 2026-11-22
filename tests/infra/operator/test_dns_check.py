@@ -32,6 +32,25 @@ class DnsCheck(ToolTest):
         self.assertEqual(self.lines(out)[-1], "DNS CHECK PASSED")
         self.assertNotIn("FAIL", out)
 
+    def test_caa_passes_whether_the_list_reply_carries_content_only_data_only_or_both(self):
+        for mode in ("content", "data", "both"):
+            rc, out, err = self.run_check(good_zone(caa_mode=mode))
+            self.assertEqual(rc, 0, (mode, out))
+            self.assertEqual(self.lines(out)[-1], "DNS CHECK PASSED")
+
+    def test_caa_faults_are_caught_in_data_only_mode_too(self):
+        cf = good_zone(caa_mode="data")
+        cf.records = [r for r in cf.records if not (r["type"] == "CAA" and r["data"]["value"] == "sectigo.com")]
+        self.assertFails(*self.run_check(cf), "CAA")
+        cf = good_zone(caa_mode="data")
+        cf.add("CAA", "@", '0 issue "digicert.com"')
+        self.assertFails(*self.run_check(cf), "CAA", "digicert")
+        cf = good_zone(caa_mode="data")
+        for r in cf.records:
+            if r["type"] == "CAA" and r["data"]["tag"] == "issuewild":
+                r["data"]["value"] = "letsencrypt.org"
+        self.assertFails(*self.run_check(cf), "CAA")
+
     def test_absent_app_and_staging_are_allowed_and_reported_as_absent(self):
         cf = FakeCF()
         for r in ALLOWED:
