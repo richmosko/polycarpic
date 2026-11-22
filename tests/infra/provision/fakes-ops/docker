@@ -1,0 +1,15 @@
+#!/bin/bash
+# POLY-98 R11: the docker polycarpic-ops reaches through sudo's fixed PATH (installed at /usr/bin/docker by ops.test.ts). Logs the argv and the
+# exact environment it was exec'd with (from /proc, before bash adds anything) and answers the few calls the CLI makes from files in $S.
+S=${OPS_FAKE_STATE:-/var/fake-state}; mkdir -p "$S"
+{ printf 'ARGV'; for a in "$@"; do printf ' %q' "$a"; done; echo; } >> "$S/ops-docker.log"
+{ echo '--ENV'; tr '\0' '\n' < "/proc/$$/environ" | sort; } >> "$S/ops-docker-env.log"
+case " $* " in
+  *" ps "*"--format json"*) proj=; for a in "$@"; do case "$a" in polycarpic-*) proj=$a ;; esac; done; cat "$S/ops-ps-$proj.json" 2> /dev/null; exit 0 ;;
+  *" inspect "*) cat "$S/ops-inspect-${!#}.json" 2> /dev/null; exit 0 ;;
+  *" restart "*) exit 0 ;;
+  *" exec "*" psql "*) cat > /dev/null; echo "gate: pass"; exit 0 ;;
+  *" run "*) echo "https://app.example.com/accept?t=FAKELINK"; echo "invitation recorded (bootstrap), expires 2099-01-01T00:00:00Z" >&2; exit 0 ;;
+esac
+echo "FAKE: unsupported docker $*" >&2
+exit 99
