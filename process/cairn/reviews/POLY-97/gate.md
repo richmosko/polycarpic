@@ -1,12 +1,12 @@
-# POLY-97 gate 3: qa sign-off run (final, at the build tip 6619886d)
+# POLY-97 gate 3: qa sign-off run (final, at the build tip 30c3d46d)
 
-Tip tested: 6619886d (branch `feature/poly-97-infra-provisioning`, tree clean; includes devops's probe C1 flag `--s3-no-head` and the three probe outcomes, and my test fixes). Mac, Docker 29.9.3, machine quiet. `docker ps` after: clean.
+Tip tested: 30c3d46d (branch `feature/poly-97-infra-provisioning`, tree clean; includes devops's probe C1 flag `--s3-no-head` and the three probe outcomes, and my test fixes). Mac, Docker 29.9.3, machine quiet. `docker ps` after: clean.
 
 ## 1. The run
 
 | Suite | Result | Time |
 |--|--|--|
-| `provision` job locally: `vitest.provision.config.ts`, 3 files in parallel (create 42, host stage + H 68, D checks + summaries 20) | **130/130** | 63.3 s (48–60 s across runs; the H14 wait tests add a few seconds) |
+| `provision` job locally: `vitest.provision.config.ts`, 3 files in parallel (create 42, host stage + H 68, D checks + summaries 20) | **130/130** | 62.6 s (48–60 s across runs; the H14 wait tests add a few seconds) |
 | Python operator tools, 5 files | **85/85** | 0.07 s |
 | shellcheck of the 3 scripts, in the test container | exit **0** | — |
 | `tests/infra` fixture suite (9 files, includes the 6 CI-wiring tests) | **327/327** | 12.4 s |
@@ -31,4 +31,4 @@ Settled by the lead and seceng: two reviewed fingerprints in `.gitleaksignore`, 
 
 ## Verdict
 
-**PASS** for tests at 6619886d: 130 + 85 + 6 wiring green, shellcheck 0, `tests/ci` and `tests/infra` green, existing image suite unchanged (3 known pre-existing reds), no untested ruled item, dry run within the local guard after the split. Open, not mine: CI limits for `provision` and `image` on the next two runs.
+**PASS** for tests at 30c3d46d: 130 + 85 + 6 wiring green, shellcheck 0, `tests/ci` and `tests/infra` green, existing image suite unchanged (3 known pre-existing reds), no untested ruled item, dry run within the local guard after the split. Open, not mine: CI limits for `provision` and `image` on the next two runs.
