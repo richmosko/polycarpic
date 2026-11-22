@@ -9,7 +9,7 @@ conditions in `ruling-review.md`. I read the code itself:
 
 I ran no containers and made no provider calls.
 
-**Verdict: CHANGES.** Two code changes (B1, B2) and one runbook condition (call b). Every other condition is met in the code.
+**Verdict: PASS at `6636ee24`** (tests at `35590966`). B1, B2, C1 and C2 are resolved in the fix rounds below. The call (b) runbook condition is devops's, in INFRA §7.1 step 11. The first pass, at `ea78daae`, was CHANGES.
 
 ## Conditions checked in the code
 
@@ -119,3 +119,13 @@ PASS once C1 is in.
 - Test: move `SignatureDoesNotMatch 403`, `403 Forbidden` and `HTTP 401 Unauthorized` into the inconclusive cases, and add a `RequestTimeTooSkewed` case.
 
 PASS once C2 is in.
+
+## C2 at 6636ee24: PASS
+
+- **The classifier.** A run counts as "denied" only when the output has `AccessDenied`, `not entitled` or `not authorized to perform`, **and** none of `SignatureDoesNotMatch`, `RequestTimeTooSkewed`, `InvalidAccessKeyId`, `InvalidToken` or `ExpiredToken`. Anything else is INCONCLUSIVE and exits non-zero. That includes a bare `401`, `403`, `Forbidden` or `Unauthorized`, network errors, an empty output, and rclone not running at all.
+- **The tests cover it.** Four permission phrasings give "denied". Twelve other outputs give INCONCLUSIVE: the three network cases, a usage error, empty output, each of the five credential and clock codes, three bare status words, and `AccessDenied` together with `SignatureDoesNotMatch`.
+- **Unchanged from C1:** success still needs exit 0, the temporary key is deleted on every outcome, and rclone's output is never printed.
+
+**Follow-ups (not conditions; the probe is closed for this loop):**
+- **F-probe1, at the E9 real run.** Which wording B2's S3 endpoint uses for a missing capability is unmeasured. If E9 comes back INCONCLUSIVE, the box key stays `{listBuckets, writeFiles}`, which is safe. The operator then cannot see why, because rclone's output is suppressed. Add an opt-in `--show-rclone-output`. rclone takes its credentials from the environment and does not echo them at its default log level, so the output needs only a check that no fixture secret appears in it.
+- **F-probe2, for POLY-99.** When POLY-99 fixes the uploader's rclone flags, the probe uses the same flags, so the measurement keeps following the uploader's path.
