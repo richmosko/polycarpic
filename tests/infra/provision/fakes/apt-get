@@ -1,0 +1,2 @@
+#!/bin/bash
+FAKE_NAME=apt-get exec "$(dirname "$0")/_fake" "$@"

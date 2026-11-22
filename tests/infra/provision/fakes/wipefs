@@ -1,0 +1,2 @@
+#!/bin/bash
+FAKE_NAME=wipefs exec "$(dirname "$0")/_fake" "$@"

@@ -1,0 +1,195 @@
+#!/bin/bash
+# One dispatcher behind every fake command (symlinked by name). Appends its argv to $FAKE_STATE/calls.log. Unknown verbs
+# exit 99 with "FAKE: unsupported" so a missing fake shows up as a harness gap, not as a pass.
+S=${FAKE_STATE:-/var/fake-state}; mkdir -p "$S"
+name=${FAKE_NAME:-$(basename "$0")}
+{ printf '%s' "$name"; for a in "$@"; do printf ' %q' "$a"; done; echo; } >> "$S/calls.log"
+unsupported() { echo "FAKE: unsupported $name $*" >&2; exit 99; }
+vol() { cat "$S/volume" 2>/dev/null || echo empty; }
+case "$name" in
+  apt-get|mkfs.ext4|update-grub|update-initramfs|dpkg-reconfigure|swapoff|sysctl|ufw|hostnamectl|apt-key|add-apt-repository|reboot|shutdown) exit 0 ;;
+  systemctl)
+    case "$1" in is-enabled) echo enabled ;; is-active) echo active ;; esac
+    exit 0 ;;
+  swapon)
+    if [ -e "$S/swap-active" ]; then printf 'NAME TYPE SIZE USED PRIO\n/swapfile file 2G 0B -2\n'; fi
+    exit 0 ;;
+  timedatectl)
+    # ntp-no-calls: answer "no" for the first N calls, then "yes" (a clock that synchronises a few seconds after boot)
+    if [ -s "$S/ntp-no-calls" ]; then
+      n=$(cat "$S/ntp-no-calls")
+      if [ "$n" -gt 0 ]; then echo $((n-1)) > "$S/ntp-no-calls"; echo "NTPSynchronized=no"; exit 0; fi
+      echo "NTPSynchronized=yes"; exit 0
+    fi
+    echo "NTPSynchronized=$(cat "$S/ntp" 2>/dev/null || echo yes)"; exit 0 ;;
+  gpg)
+    fpr=$(cat "$S/docker-key-fpr" 2>/dev/null || echo 9DC858229FC7DD38854AE2D88D81803C0EBFCD88)
+    case " $* " in
+      *" --dearmor "*) cat; exit 0 ;;
+      *" --show-keys "*|*" --with-colons "*|*" --import-options "*)
+        echo "pub:-:4096:1:8D81803C0EBFCD88:1:::-:::scESC::::::23::0:"; echo "fpr:::::::::$fpr:"; exit 0 ;;
+    esac
+    exit 0 ;;
+  blkid) case "$(vol)" in empty) exit 2 ;; luks) echo 'TYPE="crypto_LUKS"' ;; foreign) echo 'TYPE="ext4"' ;; esac; exit 0 ;;
+  wipefs)
+    case " $* " in *" --no-act "*|*" -n "*) ;; *) echo "FAKE: destructive wipefs (only --no-act is allowed)" >&2; exit 98 ;; esac
+    case "$(vol)" in luks) echo crypto_LUKS ;; foreign) echo ext4 ;; esac; exit 0 ;;
+  file) case "$(vol)" in luks) echo "LUKS encrypted file, ver 2" ;; foreign) echo "Linux ext4 filesystem data" ;; *) echo data ;; esac; exit 0 ;;
+  lsblk) case "$(vol)" in luks) echo crypto_LUKS ;; foreign) echo ext4 ;; esac; exit 0 ;;
+  cryptsetup)
+    case "$1" in
+      isLuks) [ "$(vol)" = luks ] && exit 0 || exit 1 ;;
+      luksFormat) [ "$(vol)" = empty ] || { echo "FAKE: luksFormat on a non-empty volume" >&2; exit 5; }; echo luks > "$S/volume"; exit 0 ;;
+      open|luksOpen) [ "$(vol)" = luks ] || { echo "FAKE: not a LUKS device" >&2; exit 4; }; : > "$S/luks-open"; exit 0 ;;
+      close|luksClose) rm -f "$S/luks-open"; exit 0 ;;
+      luksDump|status|luksUUID) echo "Version:        $(cat "$S/luks-version" 2>/dev/null || echo 2)"; echo "Cipher:         aes-xts-plain64"; exit 0 ;;
+      *) unsupported "$@" ;;
+    esac ;;
+  mount) [ -n "$2" ] && echo "$1" > "$S/mounted-src"; exit 0 ;;
+  umount) rm -f "$S/mounted-src"; exit 0 ;;
+  findmnt)
+    [ -e "$S/mounted-src" ] || exit 1
+    src=$(cat "$S/mounted-src")
+    case " $* " in
+      *" -o SOURCE "*|*" --output SOURCE "*) echo "$src" ;;
+      *" -J "*|*" --json "*) echo "{\"filesystems\":[{\"target\":\"/srv/polycarpic\",\"source\":\"$src\",\"fstype\":\"ext4\"}]}" ;;
+      *) echo "/srv/polycarpic $src ext4 rw" ;;
+    esac
+    exit 0 ;;
+  curl)
+    stdin=""; [ ! -t 0 ] && stdin=$(cat)
+    all="$* $stdin"
+    case "$all" in
+      *b2_authorize_account*)
+        if [ -s "$S/b2-authorize.json" ]; then cat "$S/b2-authorize.json"; exit 0; fi
+        echo '{"code":"unauthorized","status":401,"message":"bad credentials"}'; exit 22 ;;
+    esac
+    exit 0 ;;
+  docker)
+    case "$1" in
+      --version|version) echo "Docker version 29.9.3"; exit 0 ;;
+      info)
+        f=""; shift
+        while [ $# -gt 0 ]; do case "$1" in --format|-f) f=$2; shift ;; esac; shift; done
+        if [ -s "$S/docker-info.json" ]; then j=$(cat "$S/docker-info.json"); else
+          d=/etc/docker/daemon.json; [ -f "$d" ] || d=/dev/null
+          j=$(jq -c '{LiveRestoreEnabled: (.["live-restore"] // false), LoggingDriver: (.["log-driver"] // "json-file"),
+            LogOpts: (.["log-opts"] // {}), DefaultAddressPools: [(.["default-address-pools"] // [])[] | {Base: .base, Size: .size}]}' "$d" 2>/dev/null || echo '{}')
+        fi
+        case "$f" in
+          "{{json .}}"|"") echo "$j" ;;
+          "{{json ."*"}}") k=${f#\{\{json .}; k=${k%\}\}}; echo "$j" | jq -c ".$k" ;;
+          "{{."*"}}") k=${f#\{\{.}; k=${k%\}\}}; echo "$j" | jq -r ".$k" ;;
+          *) echo "$j" ;;
+        esac
+        exit 0 ;;
+      network)
+        nets=$(cat "$S/networks.json" 2>/dev/null || echo '[]')
+        case "$2" in
+          ls) echo "$nets" | jq -r '.[].Name' ;;
+          inspect)
+            shift 2; names=()
+            while [ $# -gt 0 ]; do case "$1" in -f|--format) shift ;; -*) ;; *) names+=("$1") ;; esac; shift; done
+            if [ ${#names[@]} -eq 0 ]; then echo "$nets"; else echo "$nets" | jq -c --args '[.[] | select(.Name as $n | $ARGS.positional | index($n))]' "${names[@]}"; fi ;;
+          *) unsupported "$@" ;;
+        esac
+        exit 0 ;;
+      run)
+        # D3 probe (ruling Addendum 2/3): tools image run inside <svc>'s network namespace, passfile read-only, pgpass on a tmpfs.
+        shift; all="$*"; ns=""; tmpfs=0; ro=0; conn=""; mode=select; envpw=0
+        while [ $# -gt 0 ]; do
+          case "$1" in
+            --network) ns=$2; shift ;;
+            --tmpfs) tmpfs=1; shift ;;
+            -v|--volume|--mount) case "$2" in *db_password_backup*) case "$2" in *:ro*|*readonly*|*ro=true*) ro=1 ;; esac ;; esac; shift ;;
+            -e|--env) envpw=1; shift ;;
+          esac
+          case "$1" in *host=postgres*) conn=$1 ;; esac
+          case "$1" in *replication=database*) mode=replication ;; esac
+          shift
+        done
+        img=$(cat "$S/pg-image" 2>/dev/null || echo "fixture-pg-image:17-running")
+        case "$ns" in
+          container:web-cid-0001) probe_svc=web ;;
+          polycarpic-prod_backup-net) probe_svc=backup ;;
+          polycarpic-prod_upload-net) probe_svc=uploader ;;
+          container:*backup*|container:*uploader*|*prod-backup-1*|*prod-uploader-1*) echo "FAKE: joined a one-off service by name ($ns): no such container exists (verdict C1)" >&2; exit 97 ;;
+          container:*) echo "Error response from daemon: No such container: ${ns#container:}" >&2; exit 125 ;;
+          *) echo "FAKE: probe network is not web's container, backup-net or upload-net: $ns" >&2; exit 97 ;;
+        esac
+        case "$ns" in
+          container:*) [ -e "$S/no-web" ] && { echo "Error response from daemon: No such container: ${ns#container:}" >&2; exit 125; } ;;
+          *) grep -q "\"$ns\"" "$S/networks.json" 2>/dev/null || { echo "Error response from daemon: network $ns not found" >&2; exit 125; } ;;
+        esac
+        case " $all " in *" $img "*) ;; *) echo "FAKE: probe image is not the running postgres container's image ($img)" >&2; exit 97 ;; esac
+        case " $all " in *" postgres:17 "*|*" postgres:17."*) echo "FAKE: probe used a default postgres tag" >&2; exit 97 ;; esac
+        [ $tmpfs = 1 ] || { echo "FAKE: probe without --tmpfs for the pgpass" >&2; exit 97; }
+        [ $ro = 1 ] || { echo "FAKE: probe without a read-only db_password_backup mount" >&2; exit 97; }
+        [ $envpw = 0 ] || { echo "FAKE: probe passes the password through -e" >&2; exit 97; }
+        case "$conn" in *require_auth=scram-sha-256*) ;; *) echo "FAKE: probe without require_auth=scram-sha-256" >&2; exit 97 ;; esac
+        svc=$probe_svc
+        case "$svc" in
+          web) d='psql: error: connection to server at "postgres" (10.201.1.2), port 5432 failed: FATAL:  no pg_hba.conf entry for host "10.201.1.5", user "poly_backup", database "polycarpic"' ;;
+          uploader) d='psql: error: could not translate host name "postgres" to address: Name or service not known' ;;
+          backup) d=ok ;;
+        esac
+        r=$(cat "$S/c79-$svc" 2>/dev/null || echo "$d")
+        if [ "$r" = ok ]; then if [ $mode = replication ]; then echo "IDENTIFY_SYSTEM: 7000000000000000000 1 0/3000000 polycarpic"; else echo "1"; fi; exit 0; fi
+        echo "$r" >&2; exit 2 ;;
+      inspect)
+        # `docker inspect --format '{{.Config.Image}}' <id>` for the running postgres container
+        id=${*: -1}
+        [ -e "$S/inspect-fail" ] && { echo "Error: inspect failed (fixture)" >&2; exit 1; }
+        case "$id" in postgres-cid-0001) cat "$S/pg-image" 2>/dev/null || echo "fixture-pg-image:17-running" ;; *) echo "Error: No such object: $id" >&2; exit 1 ;; esac
+        exit 0 ;;
+      ps) for p in prod staging; do [ -s "$S/pg-$p-host" ] && echo "polycarpic-$p-postgres-1"; done; exit 0 ;;
+      compose)
+        shift; proj=prod; verb=""; args=("$@")
+        for a in "${args[@]}"; do case "$a" in *staging*) proj=staging ;; esac; done
+        i=0
+        for a in "${args[@]}"; do case "$a" in exec|ps|version|config|up|run) verb=$a; break ;; esac; i=$((i+1)); done
+        case "$verb" in
+          version) echo "Docker Compose version v5.1.4"; exit 0 ;;
+          ps)
+            case " ${args[*]} " in
+              *" -q "*)
+                svc=${args[$((${#args[@]}-1))]}
+                case "$svc" in
+                  postgres) [ -s "$S/pg-$proj-host" ] && [ ! -e "$S/no-pg-cid" ] && echo "postgres-cid-0001" ;;
+                  web) [ -e "$S/no-web" ] || echo "web-cid-0001" ;;
+                  *) : ;;  # backup and uploader are one-off services: no running container to find (verdict C1, measured)
+                esac
+                exit 0 ;;
+            esac
+            [ -s "$S/pg-$proj-host" ] && echo postgres; exit 0 ;;
+          exec)
+            rest=("${args[@]:$((i+1))}"); svc=""; j=0
+            for a in "${rest[@]}"; do case "$a" in web|uploader|backup|postgres|auth|worker|caddy|migrate|operator) svc=$a; break ;; esac; j=$((j+1)); done
+            cmd=("${rest[@]:$((j+1))}")
+            case "$svc" in
+              postgres)
+                [ -s "$S/pg-$proj-host" ] || { echo "service \"postgres\" is not running" >&2; exit 1; }
+                host=$(cat "$S/pg-$proj-host"); [ "${cmd[0]}" = psql ] || unsupported "$@"
+                if [ -s "$S/pg-$proj-password" ]; then PGPASSWORD=$(cat "$S/pg-$proj-password"); export PGPASSWORD; fi
+                if [ -t 0 ]; then exec psql -h "$host" -U postgres "${cmd[@]:1}"; fi
+                # psql-break-alter: break the syntax of every verifier ALTER so Postgres fails it and logs the error statement (M2 case C)
+                set -o pipefail
+                # psql-strip-sets: drop the two SET lines (M2 mutation case: the sweep must go red without them)
+                if [ -e "$S/psql-strip-sets" ]; then
+                  tee -a /dev/shm/psql-stdin.log | grep -vE "^SET +log_(statement|min_error_statement)" | sed -E '/SCRAM-SHA-256\$/ s/ALTER ROLE +([A-Za-z_"]+)/ALTER ROLE \1 BREAKME/I' | psql -h "$host" -U postgres "${cmd[@]:1}"
+                  exit $?
+                fi
+                if [ -e "$S/psql-break-alter" ]; then
+                  tee -a /dev/shm/psql-stdin.log | sed -E '/SCRAM-SHA-256\$/ s/ALTER ROLE +([A-Za-z_"]+)/ALTER ROLE \1 BREAKME/I' | psql -h "$host" -U postgres "${cmd[@]:1}"
+                else
+                  tee -a /dev/shm/psql-stdin.log | psql -h "$host" -U postgres "${cmd[@]:1}"
+                fi
+                exit $? ;;
+              *) unsupported "$@" ;;
+            esac ;;
+          *) unsupported "$@" ;;
+        esac ;;
+      *) unsupported "$@" ;;
+    esac ;;
+  *) unsupported "$@" ;;
+esac

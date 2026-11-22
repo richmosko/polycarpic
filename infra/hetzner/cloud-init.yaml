@@ -1,0 +1,32 @@
+#cloud-config
+# POLY-97 R2. User-data holds no secret: any process on the box can read it from the metadata service.
+# create.sh replaces the placeholder with the one public key it validated.
+users:
+  - name: polyops
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - __SSH_PUBLIC_KEY__
+disable_root: true
+ssh_pwauth: false
+package_update: true
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-polycarpic.conf
+    permissions: '0644'
+    content: |
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      PermitRootLogin no
+      PubkeyAuthentication yes
+      AllowTcpForwarding no
+      AllowAgentForwarding no
+      AllowStreamLocalForwarding no
+      X11Forwarding no
+      PermitTunnel no
+      AllowUsers polyops
+  - path: /etc/sudoers.d/90-polyops
+    permissions: '0440'
+    content: |
+      polyops ALL=(ALL) NOPASSWD:ALL
+runcmd:
+  - [install, -d, -m, '0755', /etc/polycarpic]
+  - [systemctl, reload-or-restart, ssh]

@@ -1,0 +1,17 @@
+{
+  "zone": "polycarpic.com",
+  "records": [
+    {"name": "@", "type": "TXT", "value": "v=spf1 -all"},
+    {"name": "@", "type": "MX", "value": ".", "priority": 0},
+    {"name": "@", "type": "CAA", "value": "0 issue \"letsencrypt.org\""},
+    {"name": "@", "type": "CAA", "value": "0 issue \"sectigo.com\""},
+    {"name": "@", "type": "CAA", "value": "0 issuewild \";\""},
+    {"name": "_dmarc", "type": "TXT", "value": "v=DMARC1; p=reject; sp=reject; adkim=s; aspf=r"},
+    {"name": "send.mail", "type": "CNAME", "value": "send.forge.rmta.net"},
+    {"name": "rsend.mail", "type": "CNAME", "value": "rsend-euw1.forge.rmta.net"},
+    {"name": "resend._domainkey.mail", "type": "TXT",
+     "value": "p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCqge5nT0o5S6dlEmfjwdQo6aWJU+vHgyHDsEH5E68kZyrQakA9zP2fLKgR7PQBrnWfi71lY97U2zig65FfUm6AfF8nQGtNjEpt/AQbnnCkGLlAxm7azPgHyiLeCeuTF0I91khaVi53MOp3EMS2O20TwDaILCOOllFCrQVbeaFpYwIDAQAB",
+     "sha256": "63eaedf0989039c1eb165dc9d014a55e2d63a60471a9a36d37e6624b8193d947"}
+  ],
+  "address_names": ["app", "staging"]
+}

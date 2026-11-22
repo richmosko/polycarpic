@@ -1,0 +1,1 @@
+{"capabilities": ["listBuckets", "writeFiles"], "bucketName": "polycarpic-hetzner-backups"}

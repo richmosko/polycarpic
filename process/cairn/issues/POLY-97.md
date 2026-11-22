@@ -1,15 +1,15 @@
 ---
 id: POLY-97
 title: Infra scaffolding + provisioning
-status: todo
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: []
 assignee: devops-engineer
-paths: [infra/hetzner/**, infra/provision.sh, infra/provision-check.sh, infra/README.md]
+paths: [process/cairn/issues/POLY-97.md, process/cairn/reviews/POLY-97/**, infra/hetzner/**, infra/provision.sh, infra/provision-check.sh, infra/README.md, infra/operator/**, infra/lint/**, infra/ci/**, tests/infra/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, pnpm-lock.yaml, eslint.config.js, layers.json, .gitignore]
 labels: [ops, infra]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/147
 created: 2026-11-08
 updated: 2026-11-22
 ---
@@ -18,12 +18,12 @@ The committed, idempotent scripts INFRA §7.1 steps 7–11 call (D-7): create.sh
 
 ## Acceptance criteria
 
-- [ ] shellcheck is clean and a dry run in a container passes in CI.
-- [ ] On a real Hetzner project create.sh run twice is a no-op the second time and never opens a port other than 22/80/443.
-- [ ] provision-check ends ALL CHECKS PASSED, and each FAIL line names its fix.
-- [ ] No secret is printed or logged.
-- [ ] provision-check asserts the production database's `pg_extension` is exactly `{plpgsql}`: pgTAP's `lives_ok` / `throws_ok` / `results_eq` run caller-supplied SQL and PUBLIC can execute them, so pgTAP must never reach production (POLY-147 seceng review §5).
-- [ ] At the first staging deploy, the POLY-147 marker measurement (`tests/db/bench/`) is re-run on the VPS against a control and the p95 and WAL deltas are recorded beside `process/cairn/reviews/POLY-147/marker-measure.md`; the first run was one Mac host, and the marker's cost is a commit that flushes WAL (verdict note 3). Limits: 5 ms at p95, 1 KB of WAL per transaction.
+- [x] shellcheck is clean and a dry run in a container passes in CI. — tests/infra/provision/create.test.ts: "shellcheck (R1, R5, R6; …) infra/hetzner/create.sh | infra/provision.sh | infra/provision-check.sh is shellcheck clean"; tests/infra/provision/host.test.ts, create.test.ts, checks-db.test.ts: the dry run (130 tests); tests/infra/provision-wiring.test.ts: "provision builds the test container, runs shellcheck …, the operator unittests, and the provision vitest config"
+- [x] On a real Hetzner project create.sh run twice is a no-op the second time and never opens a port other than 22/80/443. — tests/infra/provision/create.test.ts: "run 2 on the same state changes nothing…", "the firewall is exactly three inbound tcp rules (22, 80, 443)…", "no port other than 22, 80, 443 appears in any hcloud argument", the drift cases (5432, ICMP, outbound, narrowed source, second firewall); process/cairn/reviews/POLY-97/real-run.md steps 9–13 (E1 create, E2 second run `no changes`, E3 three rules, E4 port scan 22 open / 80, 443 closed / the rest filtered, E5 drift reset; IPv6 not measured there)
+- [x] provision-check ends ALL CHECKS PASSED, and each FAIL line names its fix. — tests/infra/provision/checks-db.test.ts: "everything good: ALL CHECKS PASSED, exit 0, no WAIT, no WARN…"; tests/infra/provision/host.test.ts: "every FAIL line is \"FAIL <id> <what>: <found> — fix: <step>\"…" and one planted fault per H check (each asserts the id and the `— fix:` clause), checks-db.test.ts: the D1–D6 faults; process/cairn/reviews/POLY-97/real-run.md step 16 (on the real box before any deploy: `HOST CHECKS PASSED; 7 checks wait for the first deploy`, exit 3, the staging-only result; ALL CHECKS PASSED needs prod and the heartbeat)
+- [x] No secret is printed or logged. — tests/infra/provision/host.test.ts: "R10: no generated secret appears in the stage output, the fakes' argv log, /var/log or any file outside its own path", "sends the credential to curl on stdin (--config -), never in argv; prints no credential, token or response header"; tests/infra/image/provision-db.test.ts: "M2: after a successful run neither a plaintext password nor a verifier is in the Postgres log", "M2: a forced failing ALTER …", "A-M2 mutation …"; tests/infra/provision/checks-db.test.ts: "R10: no fixture B2 key, application key or authorizationToken in any output of the full run"; tests/infra/operator/test_b2_setup.py: test_each_new_keys_secret_is_printed_exactly_once_and_nothing_else_is, test_no_secret_reaches_disk_and_credentials_come_from_getpass_only; test_dns_check.py, test_dns_records.py, test_dns_move.py: the no-leak cases
+- [x] provision-check asserts the production database's `pg_extension` is exactly `{plpgsql}`: pgTAP's `lives_ok` / `throws_ok` / `results_eq` run caller-supplied SQL and PUBLIC can execute them, so pgTAP must never reach production (POLY-147 seceng review §5). — tests/infra/provision/checks-db.test.ts: "D2: an extension besides plpgsql fails (staging faulty, prod good: the check covers both)" and the D2 PASS in "everything good: ALL CHECKS PASSED…" (real Postgres 17, `CREATE EXTENSION pgcrypto` planted); the check on a real box waits for the first deploy (process/cairn/reviews/POLY-97/real-run.md step 16: WAIT D1–D6)
+- [ ] At the first staging deploy, the POLY-147 marker measurement (`tests/db/bench/`) is re-run on the VPS against a control and the p95 and WAL deltas are recorded beside `process/cairn/reviews/POLY-147/marker-measure.md`; the first run was one Mac host, and the marker's cost is a commit that flushes WAL (verdict note 3). Limits: 5 ms at p95, 1 KB of WAL per transaction. — deferred to POLY-104 (ruling Scope)
 
 ## Comments
 
@@ -112,3 +112,15 @@ Findings from walking the Principal through INFRA §7.0–7.1 by hand, 2026-11-2
 - The Principal does not use a password manager (C-78 assumes one); the macOS Passwords app was offered.
 
 **Conditions before real household data** (recorded in DECISIONS 2026-11-22): a card on Backblaze with storage cap, 75% alert and downloads uncapped (C-73); Healthchecks.io account and checks.
+
+### @team-lead — 2026-11-22
+
+Feature started. Branch: `feature/poly-97-infra-provisioning`.
+
+### @team-lead — 2026-11-22
+
+PR opened: https://github.com/richmosko/polycarpic/pull/147. Awaiting the PR's CI run (third timing sample) and the Principal's merge decision.
+
+### @team-lead — 2026-11-22
+
+Validate passed; merging via PR #147. Closing. Criterion 6 and the live runs of the Backblaze and DNS tools move to POLY-104 (verdict, real-run.md).
