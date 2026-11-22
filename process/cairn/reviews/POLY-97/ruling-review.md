@@ -129,3 +129,11 @@ Two leak paths remain open, and P1 closes them:
   - Test: a planted quote in the comment and a planted second key are each refused with exit 2.
 
 PASS once P1 and P2 are in the ruling. Nothing else needs a condition.
+
+## Addendum 3 at 1eafa6c5: PASS
+
+The diff `80c1bd6e..1eafa6c5` adds only §Addendum 3 to the ruling, five lines.
+- **P1 is met.** The pgpass is written on a tmpfs inside the probe, mode 0600. It is never on the host and never in the environment or argv. Every connection string carries `require_auth=scram-sha-256`, and the sweep covers the probe's output and the fake's call log.
+- **P2 is met.** Only `ssh-ed25519 <base64>` is substituted, from a character class that cannot hold any YAML syntax. The comment is dropped, a second non-empty line exits 2, and a comment with a quote or colon is a test.
+
+The ruling at `1eafa6c5` passes the security review, Addenda 1–3 included.
