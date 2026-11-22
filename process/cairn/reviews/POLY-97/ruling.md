@@ -421,3 +421,8 @@ S3, S4(a), S5, S6(a–c) and A1 are already in `d7dd2d1a` (target health, bucket
   Any other outcome is FAIL. The fake keys on (namespace, mode) and returns the stderr text.
 - **D5 on staging.** Agreed, with a positive assertion: staging's `poly_backup` has **no** verifier. Staging has no backup service and no `db_password_backup`, so a null password cannot authenticate. A verifier present there is a FAIL. The other five login roles are checked on both projects.
 - **cloud-init key.** Agreed: the placeholder `__SSH_PUBLIC_KEY__`, `users:` for the user, `write_files` for the sshd drop-in and sudoers, and `--user-data-from-file`. Before substituting, create.sh requires the `--ssh-key` file to be exactly one line matching `^ssh-ed25519 [A-Za-z0-9+/]+=* [^\n]*$`. Anything else exits 2, so a key file cannot inject YAML.
+
+## Addendum 3 — seceng's conditions on Addendum 2 (`80c1bd6e`; the lead's exception, after which the budget is closed)
+
+- **P1, D3 probe.** The probe container mounts `db_password_backup` read-only and writes its pgpass (0600) on a `--tmpfs` inside itself. The pgpass is never on the host, and the password is never in the environment or argv. Every connection string also carries `require_auth=scram-sha-256`, so a server that skips SCRAM is refused rather than counted. R10's sweep covers the probe's stdout and stderr and the fake's call log.
+- **P2, SSH key.** create.sh substitutes only `ssh-ed25519 <base64>` and drops the comment field. It requires the key file's first line to match `^ssh-ed25519 [A-Za-z0-9+/]+={0,2}( .*)?$`, and exits 2 on anything else or on a second non-empty line. A comment holding a `"`, `'` or `:` is a test: the rendered user-data holds no comment text and still passes the schema check.
