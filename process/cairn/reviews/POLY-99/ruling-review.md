@@ -379,3 +379,35 @@ Refs: ruling §D2, §L1; Q8; INFRA §6.4.
   and a small loop.
 
 Refs: ruling §D3; TB-12; C-73; T-62; A4.
+
+### The three deltas Addendum 1 names, ruled by name (@ `17e9414f8f33b53a86c82a7fd853398a9b099a66`)
+
+- **C4 by root's post-exit hash, not an in-pipe `tee`: accepted.** It is sound because, once 10004 has exited, no uid
+  but root can write `dump/` or `premigration/`: 10005 has a read-only mount and `r-x`. If either of those is ever
+  loosened, C4 is open again. So T14 is also C4's precondition test, and it must stay.
+- **C11 by a 0600 rclone config file passed as `--config <path>`: accepted.** The key is never in argv or the
+  environment, and the file is on a 1 MiB tmpfs inside the container that dies with `--rm`. The sweep covers its
+  contents (Addendum 1).
+- **C3's `.inflight/` ACL taking precedence over R10: accepted.** That ACL is a default `u:10005:r--` with no 10005
+  access entry. The other three dirs keep `r-x` and the read-only mount, which is stricter than my original C3.
+
+### Does "by reference" leave any condition without a test qa can point to?
+
+Two would, as written in my C-text, so they are restated here. Every other C names its test in this file.
+
+- **C4's test.** "As 10005, overwrite a published file" cannot run now, because 10005 cannot write. Restated: after
+  `backup premigration`, a fixture step **as root** replaces the published dump with another valid age file. Then
+  `fetch-premigration` exits 1, writing nothing, and `restore.sh --from-box` exits 4. A second case deletes the file's
+  line from `spool.sha256`: fetch refuses. Red: a mutant fetch without the comparison.
+- **C7.** C7′ replaces C7's windows. Its tests are listed under C7′.
+- **N1 is not in Addendum 1.** It needs carrying, with its tests as listed under N1.
+
+### Gate
+
+**Not yet a PASS on `17e9414f`.** C1–C12 and the three deltas are accepted. The re-issue's root-side parsing has no
+validation (N1). The plan gate clears when an addendum carries:
+- **N1**, with its tests;
+- **C7′**, with its tests;
+- the restated C4 test;
+- the two text fixes: R3's second benign source of a two-version name, and `ulimit -c 0` in `drill.sh`.
+I re-read that sha and pass it, unless it changes something else.
