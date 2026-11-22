@@ -202,7 +202,7 @@ OK   backup    prod     last upload 2026-11-22 02:31Z (16 h)
 OK   backupdb  prod     0 poly_backup connections in 24 h, all accounted
 OK   slots     prod     no non-temporary replication slot
 OK   revokes   prod     plpgsql and 17 built-ins closed to PUBLIC
-WAIT app      staging  not deployed
+WAIT app       staging  not deployed
 …
 STATUS GREEN
 ```
