@@ -1,7 +1,7 @@
 ---
 id: POLY-98a
 title: Ops CLI ruling
-status: in-progress
+status: done
 milestone: POLY-M1
 parent: POLY-98
 blocked_by: []
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-98.md, process/cairn/reviews/POLY-98/**, proce
 stage: plan
 estimate.cost_usd: "4.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "4.2532"
+actual.tokens: 7984381
+actual.gate_cycles: 2
+actual.wall_clock: 30
+ratio: "1.06"
 labels: [ops, cli]
 priority: null
 pr: null

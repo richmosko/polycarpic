@@ -1,7 +1,7 @@
 ---
 id: POLY-98b
 title: Ops CLI security review
-status: todo
+status: done
 milestone: POLY-M1
 parent: POLY-98
 blocked_by: [POLY-98a]
@@ -10,6 +10,11 @@ paths: [process/cairn/issues/POLY-98.md, process/cairn/reviews/POLY-98/**, proce
 stage: plan
 estimate.cost_usd: "3.00"
 estimate.gate_cycles: 2
+actual.cost_usd: "1.4947"
+actual.tokens: 1651295
+actual.gate_cycles: 2
+actual.wall_clock: 31
+ratio: "0.50"
 labels: [ops, cli]
 priority: null
 pr: null
