@@ -101,3 +101,22 @@ scrollback copies of the B2 secrets, and delete the Porkbun API key and the old 
 **CI, second sample (run 45050711870 on `05fdf902`):** provision 130 s (≤ 200, PASS). image 321 s, over 290; the first sample was 245 s. Both runs had the same `image` contents, so the 76 s spread is the job's own noise, not this loop's tests. Moving `provision-db` now would act on noise.
 
 Ruling: take the third sample from the PR run, beside a same-day control of `image` on `main`. If the PR run's `image` exceeds 290 s while the control is within its 242–260 s range, `provision-db.test.ts` moves to the `provision` job on `BASE_IMAGE`; that move is pre-authorised in `pins-review.md`, so it needs no new ruling. Otherwise this axis passes.
+
+## Real run (`real-run.md` @ `1713fed0`; fixes at `30c3d46d`, `gate.md` @ `33ec8035`)
+
+- **Criterion 2: met.** The criterion is about what create.sh does: run twice it is a no-op the second time (step 10), and it never opens another port.
+  - What it opens is the rule set it writes, and step 11 reads that back: three TCP rules, 22/80/443, each with `0.0.0.0/0` and `::/0`, on the only firewall attached. Steps 13 and 13b show both kinds of drift reverted.
+  - One firewall object governs both address families, and the IPv4 scan (step 12: `open [22]`, `closed [80, 443]`, 65532 filtered) shows that object being enforced.
+  - The IPv6 outside-in scan is a deploy property, not a create.sh one. It is already POLY-104's own criterion ("exactly 22/80/443 on v4 and v6"), and with F5 it needs an IPv6-capable vantage point there. Not counted here.
+- **Deferring steps 1–6 to POLY-104: accepted.** They are not POLY-97's criteria, and nothing in this issue uses their live result. They gate what POLY-104 and POLY-99 do first, so these conditions go into POLY-104:
+  - E6, the planted-record failure on the live zone, is shown before `dns-check.py` gates any deploy.
+  - The `_dmarc` edit, the live CAA POST (sent as `data`) and `DNS CHECK PASSED` run before the DMARC test mail.
+  - E9 runs before the first real backup. Until then `b2-capabilities.json` stays `{listBuckets, writeFiles}` and H12 asserts exactly that.
+  - Until then the operator tools are proven against fakes only.
+- **Findings:**
+  - F1 (fallback location) and F2 (H14 waits for the clock) are fixed and tested at `30c3d46d`; read in the code, they pass.
+  - F3, F4 and OQ-INFRA-7 are in INFRA (`6727d923`).
+  - F5 and F6 move to POLY-104.
+- **ARCH:** the plan is named `cx33` (§7.3).
+
+**Final verdict: PASS.** Criteria 1–5 are met: criterion 2 on the real run, criteria 1 and 3–5 in CI and the dry run. Criterion 6 is moved to POLY-104. The CI time axis is the only one left open, and it is settled by the PR run's third sample as ruled above.
