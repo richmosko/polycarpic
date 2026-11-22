@@ -73,3 +73,7 @@ Gate: tests red (98c). Plan process/cairn/reviews/POLY-98/test-plan.md, run reco
 ### @qa-engineer — 2026-11-22
 
 Gate: build green (98c). Sha 5a6ed6ca: ops unit 152, operator 93, provision container config 151 (incl. ops.test.ts 21), tests/ci 579, tests/infra 332, tests/layers 556, all green; no test changed by the build (diff 49eb5c59..5a6ed6ca empty). Suite-time delta vs a main control: provision +4.2 s (64.5 to 68.7 s), ci and infra flat, ops unit 5.3 s. Detail in process/cairn/reviews/POLY-98/gate.md. The CI provision job and R13 docs are not covered by this gate.
+
+### @qa-engineer — 2026-11-22
+
+Gate: build green (98c), re-run on 2255a499 (devops build d332d571 with B1-B4, plus my tests). ops unit 162, operator 93, provision container config 153 (ops.test.ts 23: incl. B1 early-value pty, B4 pasted-secret pty, G2 four real-Postgres cases), tests/ci 579, tests/infra 332, tests/layers 556: all green. 14 test commits since the red run, all mine, none loosened; the builder changed no test. Delta vs same-day main control: provision +1.7 s, ci/infra flat, ops unit 5.5 s. Detail: process/cairn/reviews/POLY-98/gate.md.
