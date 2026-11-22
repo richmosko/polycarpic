@@ -360,6 +360,10 @@ class Status(OpsTest):
         self.host.write("/var/lib/polycarpic/state/jobs.log", self.nightly((-h(20), -h(16, 2)), (-h(10), -h(6, 2))))
         self.assertTrue(self.find(self.go(), "backupdb", "prod").startswith("OK   backupdb  prod     "))
 
+    def test_backupdb_a_window_nested_inside_another_adds_nothing_and_the_cap_still_bites(self):  # B2' (seceng): true union 9 h 2 min
+        self.host.write("/var/lib/polycarpic/state/jobs.log", self.nightly((self.at(0, 0), self.at(5, 59)), (self.at(0, 10), self.at(0, 15)), (self.at(7, 0), self.at(9, 59))))
+        self.assertEqual(self.find(self.go(), "backupdb", "prod"), line("RED", "backupdb", "prod", "jobs.log windows cover 9 h of 24"))
+
     def test_backupdb_overlapping_windows_are_counted_once(self):  # B2: two identical 5 h lines are a union of 5 h 2 min
         h = lambda x, m=0: H(hours=x, minutes=m)
         self.host.write("/var/lib/polycarpic/state/jobs.log", self.nightly((-h(10), -h(5)), (-h(10), -h(5))))

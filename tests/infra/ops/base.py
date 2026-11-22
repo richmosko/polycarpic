@@ -223,7 +223,7 @@ class Host(object):
                     out[rel] = None
         return out
 
-    def go(self, *argv, runner=None, secrets=(), tty=True, euid=0, confirm=None, trusted=None, now=NOW, tls=None, statvfs=None, dispatcher=None, setup=None):
+    def go(self, *argv, runner=None, secrets=(), tty=True, euid=0, confirm=None, trusted=None, now=NOW, tls=None, statvfs=None, dispatcher=None, setup=None, getpass_impl=None):
         Ctx = ctx_class()
         r = Result()
         r.term, r.stdout, r.stderr = Term(), io.StringIO(), io.StringIO()
@@ -268,7 +268,7 @@ class Host(object):
                 raise AssertionError("statvfs not supplied")
             return statvfs(path)
 
-        ctx = Ctx(root=str(self.root), run=r.runner, run_inherit=r.runner.inherit, getpass=fake_getpass, isatty=lambda: tty,
+        ctx = Ctx(root=str(self.root), run=r.runner, run_inherit=r.runner.inherit, getpass=getpass_impl or fake_getpass, isatty=lambda: tty,
                   confirm=fake_confirm, now=lambda: clock[0], sleep=fake_sleep, chown=lambda *a: r.chowns.append(a), geteuid=lambda: euid,
                   tls_probe=fake_tls, statvfs=fake_statvfs, stdout=r.stdout, stderr=r.stderr,
                   trusted_uid=os.getuid() if trusted is None else trusted)

@@ -9,22 +9,30 @@ from base import ctx_class
 class FakeTermios(object):
     TCSANOW, TCSADRAIN, TCSAFLUSH, ECHO = 0, 1, 2, 8
 
-    def __init__(self):
+    def __init__(self, stuck_echo=False):
         self.sets = []
         self.old = [0, 0, 0, 0xFF, 0, 0, []]
+        self.cur = list(self.old)
+        self.stuck_echo = stuck_echo  # B5: tcsetattr "succeeds" but ECHO stays set
 
     def tcgetattr(self, fd):
-        return list(self.old)
+        return list(self.cur)
 
     def tcsetattr(self, fd, when, attrs):
         self.sets.append((when, list(attrs)))
+        self.cur = list(attrs)
+        if self.stuck_echo and when != self.TCSADRAIN:
+            self.cur[3] |= self.ECHO
 
 
 class FakeStdin(object):
+    reads = 0
+
     def fileno(self):
         return 0
 
     def readline(self):
+        type(self).reads += 1
         return "latevalue\n"
 
 
@@ -84,6 +92,42 @@ class HiddenPrompt(unittest.TestCase):
             with self.assertRaises(EOFError):
                 self.production().confirm("x:")
         self.assertEqual([w for w, _ in t.sets], [t.TCSAFLUSH, t.TCSADRAIN])
+
+    def _stuck(self, call):
+        import warnings
+        import getpass
+        t = FakeTermios(stuck_echo=True)
+        FakeStdin.reads = 0
+        with mock.patch.dict(sys.modules, {"termios": t}), mock.patch.object(sys, "stdin", FakeStdin()), mock.patch.object(sys, "stderr", mock.MagicMock()), mock.patch.object(sys, "stdout", mock.MagicMock()):
+            with warnings.catch_warnings(record=True) as caught:
+                warnings.simplefilter("always")
+                call(self.production())
+        self.assertTrue([w for w in caught if issubclass(w.category, getpass.GetPassWarning)], "B5: ECHO still set after the echo-off call must warn")
+        self.assertEqual(FakeStdin.reads, 0, "B5: nothing is read when echo could not be turned off")
+        return t
+
+    def test_b5_getpass_refuses_before_reading_when_echo_stays_on(self):
+        t = self._stuck(lambda c: c.getpass("x (input hidden): "))
+        self.assertEqual(t.sets[-1][0], t.TCSADRAIN, "the terminal is still restored")
+
+    def test_b5_confirm_refuses_before_reading_when_echo_stays_on(self):
+        self._stuck(lambda c: c.confirm("type yes to replace:"))
+
+    def test_b5_set_secret_exits_2_with_the_message_and_writes_nothing(self):
+        from base import Host
+        import tempfile
+        import os
+        t = FakeTermios(stuck_echo=True)
+        FakeStdin.reads = 0
+        with tempfile.TemporaryDirectory() as tmp:
+            host = Host(tmp)
+            prod = self.production().getpass
+            with mock.patch.dict(sys.modules, {"termios": t}), mock.patch.object(sys, "stdin", FakeStdin()), mock.patch.object(sys, "stderr", mock.MagicMock()):
+                r = host.go("set-secret", "resend_api_key", getpass_impl=prod)
+            self.assertEqual((r.rc, r.err), (2, "set-secret: the terminal cannot hide input; nothing written\n"))
+            self.assertEqual(FakeStdin.reads, 0)
+            self.assertFalse(os.path.exists(str(host.secret_path("auth", "resend_api_key"))))
+            self.assertFalse(os.path.exists(str(host.secret_path("worker", "resend_api_key"))))
 
 
 if __name__ == "__main__":
