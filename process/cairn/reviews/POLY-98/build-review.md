@@ -162,3 +162,31 @@ replace never reads the secret, and the build already works in this order. The o
 
 **SECURITY C-79** now carries the total cap: the windows together may cover at most 8 h of the last 24, and the
 `backupdb` item is red beyond that. That text is true once B2′ lands.
+
+## Re-review at d332d571: CHANGES (B2′ and B5 still open)
+
+Read: `git diff 939a9fb9..d332d571 -- infra/ops/`, whose only change is one line in `lib/ctx.py`, and qa's tests at
+`c547c920`.
+
+| Item | Result |
+|---|---|
+| B1, B3 | Met (unchanged since 939a9fb9). |
+| **B2′** | **Open.** `covered()` is unchanged. A window nested inside another still subtracts, and the 9 h 4 min case still reads OK. |
+| B4 | **Met.** Production `confirm` is `_real_getpass`. The answer is read with echo off and `TCSAFLUSH`, and never echoed back. If echo cannot be controlled, it warns `GetPassWarning` and returns `""`. `set-secret` then prints `not replaced`, exit 1, before any value prompt, and no echoed read happens. |
+| **B5** | **Open.** `_real_getpass` still does not re-read the attributes after the echo-off call. It now guards both prompts, so B5 covers both. |
+
+**The own no-echo read: my findings at 939a9fb9 stand unchanged**, because the read itself did not change.
+- It reads stdin, which `isatty` has already checked.
+- Echo is restored on every catchable path: success, EOF, an exception from `readline` (qa's second B4 case shows
+  `TCSAFLUSH` then `TCSADRAIN`) and `KeyboardInterrupt`. A kill leaves echo off, which leaks nothing.
+- K5 refuses before anything is read.
+- Stdlib `getpass` would have met B1's flush, but not K5, because its fallback reads with echo on after warning. The
+  own read is acceptable, and better, once B5 is added.
+
+**qa's B4 tests at c547c920 against my spec.**
+- **Test one (fake termios: echo cleared with `TCSAFLUSH` before the read, then restored): met.**
+  `test_b4_the_production_confirm_reads_with_echo_off_tcsaflush_and_restores` asserts both `tcsetattr` calls, `ECHO`
+  cleared, and the restore to the old attributes. It also asserts the answer is not written to stdout or stderr.
+- **Test two (a fixture secret typed at the prompt): still missing.** The first case covers stdout and stderr of
+  `confirm` alone. The spec needs it at `set-secret` level: exit 1, `not replaced`, and the fixture absent from stdout,
+  stderr, the runner log and every file (the K-sweep).
