@@ -1,7 +1,7 @@
 ---
 id: POLY-97
 title: Infra scaffolding + provisioning
-status: in-progress
+status: in-review
 milestone: POLY-M1
 parent: null
 blocked_by: []
@@ -9,7 +9,7 @@ assignee: devops-engineer
 paths: [process/cairn/issues/POLY-97.md, process/cairn/reviews/POLY-97/**, infra/hetzner/**, infra/provision.sh, infra/provision-check.sh, infra/README.md, infra/operator/**, infra/lint/**, infra/ci/**, tests/infra/**, tests/**, docs/ARCH/**, docs/SECURITY/**, docs/INFRA/**, .github/workflows/**, package.json, pnpm-lock.yaml, eslint.config.js, layers.json, .gitignore]
 labels: [ops, infra]
 priority: null
-pr: null
+pr: https://github.com/richmosko/polycarpic/pull/147
 created: 2026-11-08
 updated: 2026-11-22
 ---
@@ -116,3 +116,7 @@ Findings from walking the Principal through INFRA §7.0–7.1 by hand, 2026-11-2
 ### @team-lead — 2026-11-22
 
 Feature started. Branch: `feature/poly-97-infra-provisioning`.
+
+### @team-lead — 2026-11-22
+
+PR opened: https://github.com/richmosko/polycarpic/pull/147. Awaiting the PR's CI run (third timing sample) and the Principal's merge decision.
