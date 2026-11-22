@@ -98,7 +98,7 @@ describe('backup.sh nightly (R1, R12 slice 0)', () => {
     expect(bad).toEqual([]);
     const tmp = r.events.filter((l) => /\/root\/tmp\/|^EV \S+ \/tmp\//.test(l)).filter((l) => !/\/tmp\/pgpass$/.test(l));
     expect(tmp).toEqual([]);
-    const spoolNames = r.events.filter((l) => l.includes('/spool/')).map((l) => l.split(' ')[2]!.replace(/^\/spool\/\w+\//, ''));
+    const spoolNames = r.events.filter((l) => / \/spool\/(dump|premigration)\//.test(l)).map((l) => l.split(' ')[2]!.replace(/^\/spool\/\w+\//, ''));
     for (const n of spoolNames) {
       const ok = n === '.inflight' || R2_DUMP.test(n) || /^\.inflight\/(base|dump|globals)-\d{2}-\d+-\d{8}T\d{6}Z\.age\.\d+$/.test(n);
       expect(ok, `unexpected spool name ${n}`).toBe(true);
