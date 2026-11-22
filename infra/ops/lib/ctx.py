@@ -104,7 +104,7 @@ class Ctx:
         self._run_inherit = run_inherit or _real_run_inherit
         self.getpass = getpass or _real_getpass
         self.isatty = isatty or (lambda: sys.stdin.isatty())
-        self.confirm = confirm or (lambda prompt: input(prompt))
+        self.confirm = confirm or _real_getpass  # B4: the answer is read without echo, like the value: an early paste must not show
         self.now = now or (lambda: datetime.datetime.now(datetime.timezone.utc))
         self.sleep = sleep or time.sleep
         self.chown = chown or _real_chown
