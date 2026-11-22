@@ -12,7 +12,7 @@ rulings below. This file is the review, and it adds two test gaps (G1, G2).
 |---|---|---|
 | 1 dispatcher loaded by path, `main(argv, ctx)`, nothing at import, realpath | Confirmed | Matches R1 and K1. |
 | 2 `Ctx` signatures | Confirmed, **except disk percent** | The percent is `df`'s, `ceil(used*100/(used+f_bavail))` with `used = f_blocks - f_bfree` (Addendum 2). See G1. |
-| 3 `trusted_uid` | Confirmed, **pending seceng** | A constructor field like `root`. Production sets 0 and nothing else. The `no_test_hook` lint covers argv and the environment. Real root is proven by the container cases ("refuses without sudo", "an install file owned by anyone but root exits 4"). seceng-98 reviews this pin at this sha before it stands. |
+| 3 `trusted_uid` | Confirmed, standing on K12 | A constructor field like `root`. Production sets 0 and nothing else. The `no_test_hook` lint does **not** cover it (it greps only `POLYCARPIC_ROOT`, `OPS_ROOT` and `--root`); seceng's K12 (an AST lint, a poisoned-builder test, a real-sudo case) is what pins it. Real root is proven by the container cases ("refuses without sudo", "an install file owned by anyone but root exits 4"). seceng-98 reviews this pin at this sha before it stands. |
 | 4 integrity walk, `--version` | Confirmed | |
 | 5 message wordings | Confirmed | They fill gaps the ruling left; none contradicts it. |
 | 6 child-process shapes, separate psql calls | Confirmed | |
