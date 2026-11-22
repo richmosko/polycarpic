@@ -40,7 +40,7 @@ const nets = (list: string[][]) => `echo '${JSON.stringify(list.map(([Name, Subn
 const point = (prod: string | null, staging: string | null) => [
   prod ? `echo ${prod} > /var/fake-state/pg-prod-host; ln -sf /etc/polycarpic/secrets/postgres/db_superuser_password /var/fake-state/pg-prod-password` : '',
   staging ? `echo ${staging} > /var/fake-state/pg-staging-host; ln -sf /etc/polycarpic/secrets/postgres/db_superuser_password /var/fake-state/pg-staging-password` : '',
-].join('\n');
+].filter(Boolean).join('\n');
 const OPS = 'mkdir -p /tmp/ops; cp /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/packages/db/sql/roles.sql /tmp/ops/;';
 const CHECK = `bash /tmp/ops/provision-check.sh --b2-capabilities ${CAPS} --b2-bucket ${BUCKET}`;
 const ALL = (plant = '', o: { prod?: string | null; staging?: string | null; args?: string } = {}) =>
@@ -144,7 +144,7 @@ ${Object.entries(LOGIN).map(([role, f]) => `PGPASSWORD=$(cat /etc/polycarpic/sec
 
   it('idempotent: a second run exits 0 and every role still authenticates', () => {
     const r = run(`${STAGE()} >/dev/null 2>&1; echo "rc=$?"; PGPASSWORD=$(cat /etc/polycarpic/secrets/web/db_password_app) psql -h ${names.good} -U poly_app -d polycarpic -tAc 'select 1'`, { image: HOST, network: NET });
-    expect(r.out).toMatch(/rc=0\n1$/);
+    expect(r.out).toMatch(/rc=0\n1\n?$/);
   });
 
   it('refuses an unknown --project (exit 2) and a missing one (positive case: prod and staging are accepted)', () => {
