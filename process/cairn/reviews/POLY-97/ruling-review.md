@@ -104,3 +104,28 @@ row and adds `accounturi=`. The two-issuer window until then matches Caddy's def
 "Let's Encrypt only, accepted" row above.
 
 §D4 concur stands on H15 as written.
+
+## Addendum 2 at 512d9c50: CHANGES (two conditions, one line each)
+
+The diff `f7730d73..512d9c50` adds only §Addendum 2 to the ruling. I read nothing beyond it.
+
+**D3 probe, using the real `db_password_backup`.** It does not leak the password through argv, the Postgres log or libpq stderr, provided condition P1 below is met.
+- **argv:** the `docker run` line carries a namespace and a mount path, never the secret.
+- **Postgres log:** the web case is refused at `pg_hba`, before any authentication exchange. Under SCRAM the password never crosses the wire, only a proof of it. `log_connections` records host, user and the `pg_hba` reason, never a password.
+- **libpq stderr:** the asserted refusal text carries no password.
+
+Two leak paths remain open, and P1 closes them:
+
+- **P1. Build the passfile inside the probe container.** libpq cannot use the raw secret file as a `.pgpass`, so the probe must build one. It does this inside the probe container on a `--tmpfs` mount, mode 0600, from the read-only secret mount. It never writes it on the host disk, never sets `PGPASSWORD` (`docker inspect` shows the environment), and never puts it in a `-e` flag.
+- **P1, continued.** The probe's connection string sets `require_auth=scram-sha-256` (libpq 16 or later). Then a misconfigured `pg_hba` line asking for `password` or `md5` makes the probe refuse, instead of sending the secret.
+- **P1, test.** R10's sweep covers the probe's stdout, stderr and the fakes' call log, with a fixture backup password.
+
+**D5 on staging: PASS.** A LOGIN role with no password always fails password authentication. A verifier present there is a FAIL, which is correct.
+- Advisory: if `roles.sql` can take a per-project flag later, make staging's `poly_backup` NOLOGIN. That is stronger than having no verifier.
+
+**cloud-init key check: one gap.**
+- **P2. The key's comment field can still inject YAML.** The regex `^ssh-ed25519 [A-Za-z0-9+/]+=* [^\n]*$` lets that field hold `"`, `'`, `,`, `]`, `:` or `#`. If the placeholder sits inside a quoted or flow-style YAML value, a comment such as `x", "ssh-ed25519 AAAA…other` adds a second authorized key. Also, `[^\n]` inside a bash or ERE bracket is not "no newline"; it is literally "not a backslash and not an n".
+  - Fix: substitute only the first two fields (`ssh-ed25519 <base64>`) and drop the comment. Or restrict the comment to `[A-Za-z0-9@._-]*`.
+  - Test: a planted quote in the comment and a planted second key are each refused with exit 2.
+
+PASS once P1 and P2 are in the ruling. Nothing else needs a condition.
