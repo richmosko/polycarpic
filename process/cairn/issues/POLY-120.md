@@ -11,7 +11,7 @@ labels: [ops, security, post-ga-candidate]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-08
+updated: 2026-11-22
 ---
 
 Post-GA, in POLY-1.2 (Principal, 2026-11-09); timing not yet set. GA runs on the Hetzner VPS (lead ruling, 2026-11-08). INFRA §3.5, §7.2, §7.3: the home-box scripts and the proofs needed before any real data there: OQ-INFRA-10 (TPM-unlocked encrypted root on Ubuntu 24.04, candidate A then B; SECURITY H1), OQ-INFRA-2 (signed PCR policies), and in private-CA mode OQ-INFRA-3 / R-20 (browser name-constraint enforcement).
@@ -22,3 +22,9 @@ Post-GA, in POLY-1.2 (Principal, 2026-11-09); timing not yet set. GA runs on the
 - [ ] nftables, outbound and IPv6 checks pass; an outside-in scan from mobile data shows nothing open.
 - [ ] OQ-INFRA-2, -3 and -10 results are recorded in INFRA; if neither unlock method works, stop and return to SecEng and the Principal.
 - [ ] Automatic reboot stays off until check 3 passes.
+
+## Comments
+
+### @team-lead — 2026-11-22
+
+From the POLY-97 loop (ruling Scope, R9): the DNS allowed set needs a `--target home` allowance for the home box's `_acme-challenge` records, and CAA gains a second `issue` line for the home box's ACME account.

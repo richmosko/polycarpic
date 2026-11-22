@@ -11,7 +11,7 @@ labels: [tooling]
 priority: null
 pr: null
 created: 2026-09-28
-updated: 2026-11-21
+updated: 2026-11-22
 ---
 
 Umbrella for tooling gaps found while running the Plan team in parallel worktrees on 2026-09-28: issue-ID collisions, the hand-off location rule, priority validation at creation, and guard-push counting add-then-remove as a touch. Add further items here rather than filing one issue each.
@@ -71,3 +71,7 @@ From the POLY-86 and POLY-95 loops (2026-11-11), add to the umbrella. (1) `guard
 From the POLY-137 and POLY-138 loops (2026-11-21):
 - `scripts/cairn/tests/test_otel_receiver_watchdog_attribution.py` (`ForeignSessionFilterTests`, "own session is kept") failed in three full-suite runs on a loaded machine (qa's gate and delta, and the lead's first finish gate) and passed alone every time (4 runs) and in the next full run. It waits on a 5-second flush deadline. Make it independent of load.
 - `cairn close` under-counts cost for some suffixed teammates: POLY-138a first closed at $0.16 against POLY-137a's $13.19 for the same kind of stage, and POLY-137g closed with no cost at all. Check how the receiver attributes `architect-138` and `ux-designer-137` to the assignee.
+
+### @team-lead — 2026-11-22
+
+From the POLY-97 loop (`red-run.md`): three `tests/infra/image/postgres.test.ts` cases (lines 113, 121, 184; each `expected +0 not to be +0`) fail on macOS Docker Desktop, whose bind mounts do not refuse the file reads the tests expect, and pass on Linux CI. Local-only; either skip them on darwin with a named reason or run them in a Linux VM.

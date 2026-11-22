@@ -11,7 +11,7 @@ labels: [ops, deploy, security]
 priority: null
 pr: null
 created: 2026-11-08
-updated: 2026-11-16
+updated: 2026-11-22
 ---
 
 INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh attestation verify pinned to the repo and signer workflow, prod git verify-tag against operator-installed allowed_signers, the tag-to-digest label check, ops-bundle extraction, check-config then migrate --plan, a pre-migration encrypted backup via the backup container, migrate under advisory lock, up -d, a 120 s health poll, automatic rollback, quarantine and heartbeat. A bad migration is recovered off the box from the operator's laptop within 60 minutes; no plaintext dump is written on the box (Principal Q8, 2026-11-08).
@@ -66,3 +66,7 @@ From the POLY-95 loop (`process/cairn/reviews/POLY-95/`): (F3) `build.yml` publi
 ### @team-lead — 2026-11-16
 
 Noted in the POLY-89 loop (2026-11-17): the two `it.fails` pins in `tests/db/runner.test.ts` (line 196 on) still stand; they predate that loop.
+
+### @team-lead — 2026-11-22
+
+From the POLY-97 loop (ruling Scope): `env_file:` wiring of `/etc/polycarpic/host.env` into auth and worker; the worker's `DATABASE_*` and `PUBLIC_ORIGIN` (POLY-142); the deploy timer, `allowed_signers` install and poly_backup ACL preflight, each with a provision-check line in R6's format. The D3 probe takes its image from the running postgres container, so the deploy must have Postgres up before the D checks can leave WAIT.
