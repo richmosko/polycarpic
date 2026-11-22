@@ -48,7 +48,7 @@ describe('CI wiring for POLY-97 (R3, CI remedy)', () => {
     expect(readFileSync(join(ROOT, 'tests/infra/vitest.provision.config.ts'), 'utf8')).toContain('tests/infra/provision/*.test.ts');
     expect(readFileSync(join(ROOT, 'tests/infra/vitest.image.config.ts'), 'utf8')).toContain('tests/infra/image/*.test.ts');
     const op = readdirSync(join(ROOT, 'tests/infra/operator')).filter((f) => /^test_.*\.py$/.test(f));
-    expect(op.sort()).toEqual(['test_b2_setup.py', 'test_dns_check.py', 'test_dns_move.py', 'test_dns_records.py', 'test_laptop_check.py']);
+    expect(op.sort()).toEqual(['test_b2_rclone_output.py', 'test_b2_setup.py','test_dns_check.py', 'test_dns_move.py', 'test_dns_records.py', 'test_laptop_check.py']);
   });
   it('the test container is pinned by digest and holds no credential', () => {
     const d = readFileSync(join(ROOT, 'tests/infra/provision/Dockerfile'), 'utf8');

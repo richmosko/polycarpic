@@ -1,0 +1,125 @@
+#!/usr/bin/python3 -IS
+"""polycarpic-ops: the operator CLI on the box (POLY-98). Run as `sudo polycarpic-ops <subcommand>`; `help` lists them.
+
+Exit codes: 0 done or green; 1 failed or red; 2 usage error or refused request; 3 green with waiting items; 4 precondition.
+"""
+import argparse
+import os
+import sys
+
+sys.dont_write_bytecode = True
+# -I leaves the script's directory off sys.path, and the symlink in /usr/local/sbin is not the bundle: use the real path.
+HERE = os.path.dirname(os.path.realpath(__file__))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+
+from lib.compose import ComposeError  # noqa: E402
+from lib.ctx import BUNDLE, production  # noqa: E402
+from lib.discover import load, modules  # noqa: E402
+
+
+class Usage(Exception):
+    pass
+
+
+def _resolved(ctx):
+    """The bundle directory `current` points at, as a path under the root (one readlink, so a root outside / keeps its own spelling)."""
+    current = ctx.p(BUNDLE)
+    if os.path.islink(current):
+        return os.path.normpath(os.path.join(os.path.dirname(current), os.readlink(current)))
+    return current
+
+
+def _integrity(ctx):
+    """R1, K1: from the bundle down, and each parent up to the root, everything is root-owned and not group- or world-writable."""
+    real = _resolved(ctx)
+    top = os.path.normpath(ctx.root)
+
+    def bad(path):
+        try:
+            st = os.lstat(path)
+        except OSError:
+            return False
+        return st.st_uid != ctx.trusted_uid or bool(st.st_mode & 0o022)
+
+    chain = []
+    cur = os.path.dirname(real)
+    while True:
+        chain.append(cur)
+        if cur == top or cur == os.path.dirname(cur):
+            break
+        cur = os.path.dirname(cur)
+    for path in chain[::-1] + [ctx.p("/usr/local/sbin")]:
+        if bad(path):
+            return path
+    for base, dirs, files in os.walk(real):
+        if bad(base):
+            return base
+        for name in dirs + files:
+            path = os.path.join(base, name)
+            if not os.path.islink(path) and bad(path):
+                return path
+    return None
+
+
+def _parse(mod, name, argv):
+    parser = argparse.ArgumentParser(prog="polycarpic-ops " + name, allow_abbrev=False, add_help=False)
+
+    def fail(message):
+        raise Usage(message if message.startswith(name + ": ") else "polycarpic-ops %s: %s" % (name, message))
+
+    parser.error = fail
+    mod.add_arguments(parser)
+    if any(a.startswith("--") and "=" in a for a in argv):
+        fail("write --flag value, not --flag=value")
+    return parser.parse_args(argv)
+
+
+def main(argv, ctx=None):
+    sys.dont_write_bytecode = True
+    os.umask(0o077)
+    try:
+        import resource
+        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))  # A2: a crash writes no core file holding a secret
+    except (ImportError, ValueError, OSError):
+        pass
+    ctx = ctx or production()
+    argv = list(argv)
+    if ctx.geteuid() != 0:
+        ctx.err("polycarpic-ops: run with sudo")
+        return 4
+    bad = _integrity(ctx)
+    if bad:
+        ctx.err("polycarpic-ops: install is not root-owned: " + bad)
+        return 4
+    if not argv:
+        ctx.err("usage: polycarpic-ops <subcommand> [args]; try: polycarpic-ops help")
+        return 2
+    table = {n.replace("_", "-"): path for n, path in modules(HERE, "commands").items()}
+    if argv[0] == "--version":
+        ctx.out("polycarpic-ops " + os.path.basename(_resolved(ctx)))
+        return 0
+    if argv[0] == "help":
+        for name in sorted(table):
+            ctx.out("%-16s %s" % (name, getattr(load(table[name], "ops_help_" + name.replace("-", "_")), "HELP", "")))
+        return 0
+    name = argv[0]
+    if name not in table:
+        shown = "".join(c if 0x21 <= ord(c) <= 0x7E else "?" for c in name)[:40]
+        ctx.err("polycarpic-ops: unknown subcommand: %s; available: %s" % (shown, ", ".join(sorted(table))))
+        return 2
+    mod = load(table[name], "ops_cmd_" + name.replace("-", "_"))
+    try:
+        args = _parse(mod, name, argv[1:])
+    except Usage as err:
+        ctx.err(str(err))
+        return 2
+    try:
+        return mod.run(args, ctx)
+    except ComposeError as err:
+        ctx.err("polycarpic-ops: " + str(err))
+        return 4
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

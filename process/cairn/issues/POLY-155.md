@@ -10,7 +10,7 @@ labels: [auth, security]
 priority: null
 pr: null
 created: 2026-11-21
-updated: 2026-11-21
+updated: 2026-11-22
 ---
 
 The second auth loop: what POLY-137 deferred by the Principal's scope decision of 2026-11-21 (`process/DECISIONS.md`), plus the follow-ups that loop's ruling, reviews and verdict recorded (`process/cairn/reviews/POLY-137/`). Not a condition of the first deploy. Add later auth nits here.
@@ -30,3 +30,9 @@ The second auth loop: what POLY-137 deferred by the Principal's scope decision o
 - [ ] The older pages say "tries", not "attempts" (wording review).
 - [ ] An e2e browser test walks a real reset and a real cancel with a mailed token; a pgTAP case covers the user-delete cascade; `claim_mail` is tested under two workers.
 - [ ] **For the Principal:** whether newly generated backup codes are held for 24 hours while the old ones keep working (about $10, the architect's guess; a change to the library's verify path).
+
+## Comments
+
+### @team-lead — 2026-11-22
+
+From POLY-98 (Principal, 2026-11-22; `process/DECISIONS.md`; ruling §D1, M3): enable `polycarpic-ops cli user reset-mfa <email>` as a pass-through verb, with seceng's review of the identity-check procedure in INFRA §7.5. No grant changes: `poly_operator` already holds EXECUTE on `app.reset_second_step`. The wrapper refuses the verb by name until then. Due before prod is opened to a second person; it pairs with this issue's "owner is emailed when an operator resets their second step".

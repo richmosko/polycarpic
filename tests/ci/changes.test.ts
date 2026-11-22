@@ -74,6 +74,13 @@ const CASES: [string[], string[], string][] = [
   [['infra/provision-check.sh'], ['image', 'provision'], 'infra/provision-check.sh dropped from `provision`'],
   [['tests/infra/image/provision-db.test.ts'], ['image'], 'the database-stage test dropped from `image`, or pulled into `provision`'],
   [['packages/db/sql/roles.sql'], ['node', 'db', 'provision'], 'roles.sql dropped from `provision` (the database stage and D checks run it)'],
+  // POLY-98 R11: polycarpic-ops (infra/ops/**) and its unit tests (tests/infra/ops/**) belong to `provision`, not `image`; the wiring pin file sits in tests/infra and stays in `image`.
+  [['infra/ops/commands/status.py'], ['provision'], 'infra/ops left in `image` (the infra lookahead lacks ops/) or missing from `provision`'],
+  [['infra/ops/install.sh'], ['provision'], 'infra/ops/install.sh left in `image` or missing from `provision`'],
+  [['tests/infra/ops/test_status.py'], ['provision'], 'tests/infra/ops left in `image` or missing from `provision`'],
+  [['tests/infra/provision/ops.test.ts'], ['provision'], 'the container test dropped from `provision`, or left in `image`'],
+  [['tests/infra/ops-wiring.test.ts'], ['image'], 'the ops wiring pin (tests/infra/*.test.ts) pulled out of `image`, or caught by the ops/ exclusion'],
+  [['infra/opsx/y.sh'], ['image'], 'the ops/ exclusion matching a prefix instead of the directory'],
   // POLY-141 E1: the web e2e step imports the db harness and apps/migrate
   [['tests/db/helpers/x.ts'], ['db', 'e2e'], 'tests/db/helpers dropped from `e2e`'],
   [['tests/db/docker/Dockerfile'], ['db', 'e2e'], 'tests/db/docker dropped from `e2e`'],

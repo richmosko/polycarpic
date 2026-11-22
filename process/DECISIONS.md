@@ -902,3 +902,17 @@ Add new decisions ABOVE this comment, newest first.
 - The Principal runs every step by hand, as the ruling first had it.
 - Run the Backblaze and DNS tools live in this loop (the architect's sequence).
 **Approved by:** Mosko
+
+### 2026-11-22 — `polycarpic-ops cli user reset-mfa` stays refused until its own review
+**Decision:** POLY-98's `cli` pass-through accepts `user invite` only. `user reset-mfa` is refused by name, although `poly_operator` already holds EXECUTE on `app.reset_second_step` (POLY-89), so enabling it would widen no grant. It is enabled in a follow-up with seceng's review of the identity-check procedure, before prod is opened to a second person.
+**Why:** A reset is the recovery path for a locked-out person and the takeover path for someone who holds only a password and can talk the operator round; its protection is the identity check, which has not been reviewed. Nothing is deployed and no user has a second step to lose, so refusing it costs nothing now. The refusal is not a technical barrier (the operator is root on the box); it keeps the command off the reviewed path until it is reviewed. The architect and seceng both recommended this.
+**Alternatives considered:**
+- Enable it in POLY-98, with seceng's review of the reset added to that loop.
+**Approved by:** Mosko
+
+### 2026-11-22 — One Resend key, written to both mail-sending services
+**Decision:** `resend_api_key` is one key held in two files, one in `auth`'s secret directory and one in `worker`'s. provision-check H6, which fails any two secret files with equal content, is relaxed only for copies of the same secret name in the same project where compose declares each mount (POLY-98 ruling R4, seceng K6). Equal content under two names, or across prod and staging, still fails.
+**Why:** Either key could send as `mail.polycarpic.com`, so two keys would not shrink what a thief can do; they would only let one service keep sending during a rotation, at the cost of a second secret kept by hand. A leak calls for stopping mail from both anyway. The architect and seceng both recommended this.
+**Alternatives considered:**
+- Two Resend keys, one per service, with H6 strict and a `--service` flag on `set-secret`.
+**Approved by:** Mosko

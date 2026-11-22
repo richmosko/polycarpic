@@ -3,12 +3,13 @@
 #   sudo bash provision-check.sh --b2-capabilities <file> --b2-bucket <name> [--prod]
 # One line per check: PASS | FAIL (with a fix) | WAIT | WARN | INFO. The last line is the summary; the exit code is
 # 0 (all passed, possibly with warnings), 1 (any FAIL) or 3 (host checks passed, the rest waits for the first deploy).
-# Nothing here writes a file under /etc, /srv or /var/lib, and no secret is printed or put in argv.
+# Nothing here writes a file under /etc or /srv (D3 appends one line to /var/lib/polycarpic/state/jobs.log), and no secret is printed or put in argv.
 # shellcheck disable=SC2317  # d1..d6 are called through per_project
 set -uo pipefail
 
 ETC=/etc/polycarpic
 DATA=/srv/polycarpic
+STATE=/var/lib/polycarpic/state
 b2_caps_file='' b2_bucket='' prod=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -166,12 +167,37 @@ secret_root() { # root services
 secret_root "$ETC/secrets" "$PROD_SERVICES"
 secret_root "$ETC/staging-secrets" "$STAGING_SERVICES"
 while IFS= read -r f; do
-  case "$f" in "$ETC/host.env" | "$ETC/staging-host.env" | "$ETC/age-recipients.txt") ;; *) h6="$h6 $f is world-readable;" ;; esac
+  case "$f" in
+    "$ETC/host.env" | "$ETC/staging-host.env" | "$ETC/age-recipients.txt") ;;
+    "$ETC/ops.conf") # POLY-98 R3: world-readable by design, so it may hold only bucket-name lines
+      if [ ! -s "$f" ] || grep -qvE '^B2_BUCKET=[a-z0-9-]{6,50}$' "$f" 2> /dev/null; then h6="$h6 $f holds a line other than B2_BUCKET=<name>;"; fi ;;
+    *) h6="$h6 $f is world-readable;" ;;
+  esac
 done < <(find "$ETC" -type f -perm -o=r 2> /dev/null)
 # no two secrets alike: compare hashes, print only paths
 find "$ETC/secrets" "$ETC/staging-secrets" -type f -exec sha256sum {} + 2> /dev/null | sort > "$tmp_h/sums"
 dups=$(awk '{ c[$1]++; p[$1] = p[$1] " " $2 } END { for (h in c) if (c[h] > 1) print p[h] }' "$tmp_h/sums")
-[ -z "$dups" ] || h6="$h6 files with the same content:$(tr '\n' ';' <<< "$dups")"
+# POLY-98 R4, K6: copies of one value pass only when every copy has the same basename, sits in the same tree (secrets/ or
+# staging-secrets/), is a file compose mounts from its own service, and is not a name a tool generates or owns.
+dup_ok() { # paths...
+  local f name='' tree='' svc b t
+  for f in "$@"; do
+    b=$(basename "$f"); svc=$(basename "$(dirname "$f")"); t=$(dirname "$(dirname "$f")")
+    case "$b" in db_superuser_password | db_password_* | auth_secret | credential_keyring | staging_basic_auth) return 1 ;; esac
+    # shellcheck disable=SC2046
+    in_list "$b" $(files_for "$svc") || return 1
+    if [ -z "$name" ]; then name=$b; tree=$t; fi
+    { [ "$b" = "$name" ] && [ "$t" = "$tree" ]; } || return 1
+  done
+}
+dup_bad=''
+while IFS= read -r grp; do
+  [ -n "$grp" ] || continue
+  # shellcheck disable=SC2086
+  dup_ok $grp || dup_bad="$dup_bad$grp
+"
+done <<< "$dups"
+[ -z "$dup_bad" ] || h6="$h6 files with the same content:$(tr '\n' ';' <<< "$dup_bad")"
 report H6 "secrets layout and modes" "$h6" "inspect the paths named; restore the mode, or delete a copied file (never print a secret); see INFRA §6.4"
 
 # ------------------------------------------------------------------ H7 data dirs, spool, ACLs
@@ -411,11 +437,12 @@ if [ "$2" = replication ]; then psql "$1" -tAc IDENTIFY_SYSTEM; else psql "$1" -
   PROBE_RC=$?
 }
 d3() {
-  local out='' svc mode first pgid
+  local out='' svc mode first pgid t0 t1
   # The probe runs the image the running postgres container uses: no default tag, nothing pulled.
   pgid=$(docker compose -p polycarpic-prod ps -q postgres < /dev/null 2> /dev/null | head -1)
   PROBE_IMAGE=$([ -n "$pgid" ] && docker inspect --format '{{.Config.Image}}' "$pgid" 2> /dev/null)
   if [ -z "$PROBE_IMAGE" ]; then echo " cannot read the image of the running postgres container;"; return; fi
+  t0=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   for svc in web uploader backup; do
     for mode in sql replication; do
       d3_probe "$svc" "$mode"
@@ -434,6 +461,9 @@ d3() {
       esac
     done
   done
+  # POLY-98 R7: the probe connects as poly_backup, so its window goes into jobs.log, where `status` accounts for it.
+  t1=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  printf '%s %s provision-check-d3 %s\n' "$t0" "$t1" "$([ -z "$out" ] && echo ok || echo failed)" >> "$STATE/jobs.log" 2> /dev/null || true
   echo "$out"
 }
 if [ "$up_prod" = 1 ]; then

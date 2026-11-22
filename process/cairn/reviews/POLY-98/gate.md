@@ -1,0 +1,74 @@
+# POLY-98 build-green gate (qa-98)
+
+Gated sha: `a3e97748953ade71ae311f911c7bf76b991f2b70` = devops-98's build with B1–B5 and B2′ fixes plus my test commits. (The gate before it, on `2255a499`, passed with B1–B4; seceng's re-review then added B2′ and B5, so this one supersedes it.) Run 2026-11-22 from a clean worktree at that sha, machine quiet, container suites one at a time. Re-run in full at this sha for the unit, operator, container, ci, infra and layers suites; the G2 outputs and the main control are carried over from the `2255a499` run because the slots and revokes SQL did not change (`git diff 2255a499..a3e97748 -- infra` touches `lib/ctx.py` and the Python of `status/05_backupdb.py` only).
+
+## Suites: counts and what each is over
+
+| Suite | Cases | Over | Result |
+|---|---|---|---|
+| ops unit | 166 | dispatcher 19, lint 8, install 9, provision 17, set_secret 29, list_secrets 6, gate_check 5, restart 9, cli 11, status 46, ctx_getpass 7 (all 98c U: cases: K1–K12, G1, B1–B5, B2′) | green, 5.6 s (R14 ≤ 20 s) |
+| operator unit | 93 | the 85 POLY-97 cases plus 8 `test_b2_rclone_output` (R10, K11, S9) | green, 0.3 s |
+| provision container config | 153 | create, host, checks-db (130, as on main) plus `ops.test.ts` 23: install 5, real sudo 7 (incl. B1 early-value pty and B4 pasted-secret pty), H6 5, D3 `jobs.log` 2, G2 real-Postgres 4 | green, 67.9 s |
+| `tests/ci` | 579 | the 573 on main plus 6 new `changes.test.ts` filter rows | green, 10.1 s |
+| `tests/infra` | 332 | the 327 on main plus 5 `ops-wiring.test.ts` | green, 12.7 s |
+| `tests/layers` | 556 | untouched by this loop | green, 11.0 s |
+
+## G2: the four real-Postgres cases (criterion 5), each against the status modules as built
+
+Captured at this sha with a throwaway copy of the describe that logged `psql -XAtq`'s output (deleted, not committed). Instances: the pinned base image, one after `roles.sql` (the database stage), one fresh.
+
+| Case | Printed |
+|---|---|
+| (a) after roles.sql: revokes, slots | revokes: nothing; slots: nothing |
+| (b) fresh database, roles.sql never ran (NULL `lanacl`) | `open:plpgsql`, then the 17 signatures each as `open:<sig>` (`query_to_xml(text,boolean,boolean,text)` … `ts_rewrite(tsquery,text)`): 18 lines, nothing else |
+| (c) `GRANT EXECUTE … query_to_xml(text,boolean,boolean,text) TO PUBLIC` | `open:query_to_xml(text,boolean,boolean,text)` only; after the revoke: nothing |
+| (d) `pg_create_physical_replication_slot('leftover_slot')` | slots: `leftover_slot`; after `pg_drop_replication_slot`: nothing |
+
+(b) is the check that a NULL `lanacl` counts as open. (a) cannot pass vacuously: the test asserts both query files are non-empty.
+
+## Every test change since the red run @ 1c9b09ec
+
+15 commits, all mine (`git log --format=%an 1c9b09ec..HEAD -- tests` shows only qa-engineer): devops-98 changed no test at any point. Verdicts: **corrected** = a defect in the test, with the assertion's strength unchanged; **stricter** = a case added or tightened; **loosened** = none.
+
+| Commit | Change | Verdict, and why |
+|---|---|---|
+| 656b0384 | df-formula disk case added; row 49 replaced by an all-RED hostile-width case | stricter: architect Addendum 2 |
+| 5dbcb211 | K12 (a)–(e): production-ctx, chown-uid, newline-name, lint, real-sudo file-owner assertion | stricter: seceng K12 |
+| 13c8f6ad | G1 reserved-blocks disk case; G2 four real-Postgres cases | stricter: architect pins-review |
+| 78a9a44c | lint: no `trusted_uid` assignment or `Ctx(**kw)`; no `$`-ended pattern | stricter: seceng |
+| 50d2bb3c | `Runner` rule tokens without a `/` also match a path element's basename (`gate-check.sh` vs `<bundle>/infra/postgres/gate-check.sh`) | corrected: the ruled argv holds the full path, so no build could match; the full argv is still asserted exactly by `test_gate_check` and `test_provision` |
+| 6d6a747c | two `WAIT app … not deployed` literals: 6 spaces → 7, built with `line()` | corrected: the column rule (item padded to 9, one space) gives 7; the ruling's sample was the typo, fixed by the architect at `7799a577` |
+| 6d6a747c | revokes psql argv slice `[:13]`/`[13:]` → `[:14]`/`[14:]` | corrected: the old slice compared 13 elements with a 14-element list and could never pass |
+| 14b8dd70 | `.incoming` pruned from the second-install snapshot | corrected, reason below |
+| 14b8dd70 | cli container regex `ARGV docker compose …` → `ARGV compose …` | corrected: my fake `docker` logs `"$@"`, which has no argv[0]; the compose argv is still matched in full |
+| 14b8dd70 | D3 second-run count `/\n2/` → `/^\s*2\s*$/m` | corrected: `wc -l` is the first output line, so the old pattern could not match; still asserts exactly 2 lines |
+| 14b8dd70 + base.py | `sys.dont_write_bytecode`; the laptop-checkout copy strips `__pycache__` | corrected: my harness left `__pycache__` in the checkout the container test copies, and `git add -A` shipped it, failing "no `__pycache__` in the install" for the harness's own litter |
+| 49eb5c59 | `\.`/`\S` in the G2 Python snippet → `\\.`/`\\S` | corrected: inside a JS template literal the single backslash vanished, the signature list came back empty and every G2 case printed `NOSQL` |
+| 4a6acc75 | set-secret pty cases rewritten with a driver that waits for each prompt (was `script -qec` with input piped first); new B1 case writes `earlyvalue` before the prompt, `latevalue` after; B1 termios unit cases; B2 union cases; B3 exact-message case | corrected (pty) and stricter (the rest): the old case queued its input ahead of the prompt and passed only because 73806f79 used `TCSADRAIN`, which keeps type-ahead and takes it as the secret. The new case is red on `TCSADRAIN` (`AUTH=earlyvalue`) and green on `TCSAFLUSH`, shown by flipping the line locally and reverting |
+| 05b2e7fd | R4 order pinned: yes question first, then the hidden value prompt; refused replace shows no value prompt; a bad directory shows neither (unit `events` log; pty `DRIVER-GIVEN`). The driver's second run no longer accepts either order | **resolved**: architect ruled confirm-first (`0c279807`); the earlier order-insensitive driver is replaced by the ruled order, so this is stricter. The build already matched |
+| c547c920, 4c824ed6 | B4: production `confirm` reads with echo off, `TCSAFLUSH`, restores on EOF; a secret pasted at the replace question → exit 1 `not replaced`, nowhere in output/argv/env/files | stricter: seceng B4 |
+| 237ec679, 2255a499 | B4 on a real pty: the driver records every byte the terminal showed and reports `DRIVER-ECHOED`; the case asserts `[]`. The first version of the driver had an unbound `alltext` (my bug, fixed in 2255a499) | stricter; discrimination shown: at `d332d571~1` (confirm = `input()`) the case reports `DRIVER-ECHOED ["fxPasted999secret"]` and fails; at `d332d571` it passes |
+| b4ad7a8a | B2′: seceng's three nested windows (00:00–05:59, 00:10–00:15, 07:00–09:59) → `jobs.log windows cover 9 h of 24`; B5: `FakeTermios.tcgetattr` now returns the attributes last set (it always returned the originals, so a build could not see its own echo-off), a `stuck_echo` mode keeps ECHO set, and three cases assert getpass and confirm refuse before reading and set-secret exits 2 `set-secret: the terminal cannot hide input; nothing written`; `Host.go` gains a `getpass_impl` override | stricter. The fake change is a **corrected** harness defect: the four older ctx cases stay green with it. My identical-window overlap case hid B2′ (the subtraction in the old `covered()` is 0 for identical windows); the nested case is the one that sees it |
+
+**Loosened: none. The `Runner` change widens how a rule token matches, but every case that depends on it also asserts the full argv.
+
+### The `.incoming` exclusion, in full
+
+The second-install case ("a second install of the same `<id>` changes nothing", R12) snapshots `find /opt/polycarpic /usr/local/sbin` (inode, mtime, path) before and after a second install and diffs them. It failed on `/opt/polycarpic/.incoming/install_box.py`, whose mtime moved. That is not a build bug: Addendum 1's A1 makes `install.sh` always make two ssh calls, and the first is `sudo install -d -m 0700 /opt/polycarpic/.incoming && sudo tee /opt/polycarpic/.incoming/install_box.py`. That call runs before `install_box.py` can look at `<id>`, so every install, including a no-op one, rewrites the staged copy of the installer. No build can avoid it without breaking A1's two-call flow. What R12's sentence protects is the installed tree: `/opt/polycarpic/ops/<id>/**`, the `current` link, the `/usr/local/sbin` link, and the retained previous `<id>`. All of that is still compared, along with the output line `polycarpic-ops <id> already installed`. **Residual:** the staging directory itself is no longer compared, so a second install that left something else in `.incoming` would not be caught; it is root 0700, outside the installed tree, and holds only the installer. The cheap closure is to compare `.incoming/install_box.py`'s content hash instead of its mtime; say so and I add it.
+
+## Suite-time delta, against a same-day control on `main` (`2062ecf9`, same machine, measured earlier today; same-day, not same-minute)
+
+| Suite | main | this sha | delta |
+|---|---|---|---|
+| provision container config | 64.5 s, 130 tests | 67.9 s, 153 tests | +3.4 s (+5 %) for +23 cases and `git` in the box image; CI limit 200 s |
+| `tests/infra` | 13.4 s, 327 | 12.7 s, 332 | −0.7 s, flat |
+| `tests/ci` | 10.4 s, 573 | 10.1 s, 579 | flat |
+| ops unit (new step) | — | 5.6 s, 166 | R14 limit 20 s |
+
+One run each: a control, not a trend. The first gate (`5a6ed6ca`) measured the provision config at 68.7 s, so run-to-run spread is about 2 s.
+
+## Not covered here
+
+- The CI `provision` job and the full workflow_dispatch run: devops-98 and the lead own those.
+- Production `tls_probe`/`statvfs` need a real box (POLY-104).
+- R13's INFRA/README edits and A3's step-16 text: docs, for the architect's verdict.

@@ -12,20 +12,31 @@ Scripts that make the box and its surroundings. The runbook that explains when t
 | `operator/dns-records.py --ipv4 <a> --ipv6 <a>` | Writes the allowed DNS set (`operator/dns-allowed.json`) and the `app` and `staging` address records. Creates only; never deletes or overwrites. | A zone-scoped DNS-edit Cloudflare token, typed hidden. |
 | `operator/dns-check.py --ipv4 <a> --ipv6 <a>` | Fails on any record outside the allowed set, any wildcard, proxied record or delegation, a changed pinned value, and any address or CAA answer at the two mail-alias targets. | A read-only (Zone:DNS:Read) Cloudflare token, typed hidden. |
 | `operator/laptop-check.py` | Fails if the laptop holds an hcloud context, `HCLOUD_TOKEN`, or a token in hcloud's config. | `hcloud` (optional). |
+| `ops/install.sh <user@host> [--ssh-key <file>]` | Installs the operator tool on the box (below) from the committed `HEAD`: refuses uncommitted changes under the files it ships, streams a `git archive` over two `ssh` sessions, prints `installed polycarpic-ops <id> at /opt/polycarpic/ops/current (previous: <id>\|none)`. Run twice on one commit it prints `polycarpic-ops <id> already installed` and changes nothing. | `ssh` and `sudo` on the box; a clean checkout. |
 
 The Python tools are stdlib only and run on the macOS Command Line Tools `python3` (3.9). No tool writes a credential to disk, puts one in argv or the environment, or prints one, except the one-time display of a new B2 key.
 
 A rehearsal run (a throwaway server to see the tools work) ends the same sitting: delete the server, the volume and the firewall, `hcloud context delete <name>`, delete the token in the Hetzner console, then `laptop-check.py`.
 
-## On the box (run as root, copied from a verified checkout)
+## On the box: `polycarpic-ops`
 
-| Script | What it does |
+`ops/` is the operator CLI. `install.sh` puts a root-owned bundle (`ops/**`, `provision.sh`, `provision-check.sh`, `postgres/gate-check.sh` and `.sql`, `operator/b2-capabilities.json`, the compose files, `packages/db/sql/roles.sql`) at `/opt/polycarpic/ops/<id>/`, points `/opt/polycarpic/ops/current` at it and links `/usr/local/sbin/polycarpic-ops`. Run it as `sudo polycarpic-ops <subcommand>`; `polycarpic-ops help` lists them, and `docs/INFRA/index.html` §7.5 says what each prints and its exit codes.
+
+| Subcommand | What it does |
 |---|---|
-| `provision.sh --stage host --target hetzner --domain <d> [--mail-from <addr>]` | Docker, daemon settings, unattended upgrades, no swap, the LUKS2 data volume, data and spool directories with their ACLs, state files, generated secrets, `host.env`. Idempotent; prints `host stage: no changes` on a second run. |
-| `provision.sh --stage database --project prod\|staging` | Applies `packages/db/sql/roles.sql` and sets each login role's password from its secret file. The SCRAM verifier is computed on the host; Postgres never receives a plaintext password. |
-| `provision-check.sh --b2-capabilities <file> --b2-bucket <name> [--prod]` | Read-only. One line per check (`PASS`, `FAIL` with its fix, `WAIT`, `WARN`, `INFO`) and a summary line; exit 0, 1 or 3. |
+| `provision --stage host --target hetzner --domain <d> [--mail-from <addr>] [--b2-bucket <name>]`, `provision --stage database --project prod\|staging` | Runs `provision.sh` from the bundle. The host stage sets up Docker, daemon settings, unattended upgrades, no swap, the LUKS2 data volume, data and spool directories with their ACLs, state files, generated secrets and `host.env`; idempotent, `host stage: no changes` on a second run. The database stage applies `roles.sql` and sets each login role's password from its secret file (the SCRAM verifier is computed on the host). `--b2-bucket` is saved to `/etc/polycarpic/ops.conf`. |
+| `provision-check [--prod] [--b2-bucket <name>]` | Runs `provision-check.sh`: read-only, one line per check (`PASS`, `FAIL` with its fix, `WAIT`, `WARN`, `INFO`) and a summary line; exit 0, 1 or 3. |
+| `set-secret [--staging] <name>`, `list-secrets [--staging]` | Writes a secret from a hidden prompt into each service directory that mounts it (0440 `root:<gid>`); lists the mounted files by state, mode, owner and size without opening any. |
+| `gate-check [--staging]`, `status`, `restart [--staging] <service>…` | The deploy gate; one screen of health (disk, app, cert, backup, backupdb, slots, revokes); restart with a health wait. |
+| `cli [--staging] user invite <email> [--bootstrap]` | The one app-CLI verb enabled; the link goes from the one-shot `operator` container to your terminal. Other verbs are refused. |
 
-Copy `provision.sh`, `provision-check.sh`, `packages/db/sql/roles.sql` and `operator/b2-capabilities.json` into one directory on the box.
+### Adding a subcommand
+
+A subcommand is one file, `ops/commands/<name>.py` (`set_secret.py` is `set-secret`), exporting `HELP` (one line), `add_arguments(parser)` and `run(args, ctx) -> int`, with its test `tests/infra/ops/test_<name>.py`. A status item is `ops/status/<nn>_<item>.py` exporting `PROJECTS` and `run(ctx) -> list[Line]`. There is no registry: the dispatcher lists the two directories by file name. Everything the outside world supplies (child processes, the terminal, the clock, paths under a root) comes through `lib/ctx.py`, so tests inject fakes; a new shared helper goes in a new `lib/` module, and editing an existing `lib/` module is a change every subcommand shares. Children get an environment built from nothing and an argv list; never `shell=True`, `os.system` or a string argument, and never a secret in argv, the environment or output.
+
+## On the box without the tool (the provisioning scripts)
+
+`provision.sh`, `provision-check.sh` and `postgres/gate-check.sh` are the scripts `polycarpic-ops` runs from the bundle; run directly they need the same root and the same `roles.sql` two directories up.
 
 ## Tests
 

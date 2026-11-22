@@ -70,3 +70,11 @@ Noted in the POLY-89 loop (2026-11-17): the two `it.fails` pins in `tests/db/run
 ### @team-lead — 2026-11-22
 
 From the POLY-97 loop (ruling Scope): `env_file:` wiring of `/etc/polycarpic/host.env` into auth and worker; the worker's `DATABASE_*` and `PUBLIC_ORIGIN` (POLY-142); the deploy timer, `allowed_signers` install and poly_backup ACL preflight, each with a provision-check line in R6's format. The D3 probe takes its image from the running postgres container, so the deploy must have Postgres up before the D checks can leave WAIT.
+
+### @team-lead — 2026-11-22
+
+From the POLY-98 ruling (`process/cairn/reviews/POLY-98/ruling.md` M4, Scope): the `operator` compose service sets only `DB_PASSWORD_FILE`, while the config registry reads `DATABASE_PASSWORD_FILE` and the operator also needs `PUBLIC_ORIGIN` and `APP_ENV`. Add `operator` to the env wiring this issue owns. Until then `polycarpic-ops cli user invite` is proven against fakes only; the first live invite is POLY-104's. The GitHub-token-days `status` item is also this issue's.
+
+### @team-lead — 2026-11-22
+
+From the POLY-98 security review (`process/cairn/reviews/POLY-98/ruling-review.md` R-b): the ops bundle is installed from the laptop's checkout, so the compose files `set-secret` and `cli` read can drift from the deployed release's. A drift misses a mount or runs a stale `operator` definition; it grants nothing. `self-update` installing from the attested release bundle is where they converge (ruling R1 leaves the `sha256-<12 hex>` id for it).
