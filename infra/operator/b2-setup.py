@@ -72,16 +72,22 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
     box_caps = sorted(pins["capabilities"])
     bucket_name = pins.get("bucketName")
     probe = False
+    show_rclone = False
     args = list(argv)
     while args:
         a = args.pop(0)
         if a == "--probe":
             probe = True
+        elif a == "--show-rclone-output":
+            show_rclone = True
         elif a == "--bucket" and args:
             bucket_name = args.pop(0)
         else:
-            stderr.write("usage: b2-setup.py [--probe] [--bucket <name>]\n")
+            stderr.write("usage: b2-setup.py [--probe [--show-rclone-output]] [--bucket <name>]\n")
             return 2
+    if show_rclone and not probe:
+        stderr.write("usage: --show-rclone-output is valid only with --probe\n")
+        return 2
 
     def out(line=""):
         stdout.write(line + "\n")
@@ -105,10 +111,12 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
         key_id = getpass("New master key ID (hidden): ").strip()
         app_key = getpass("New master application key (hidden): ").strip()
         basic = base64.b64encode(("%s:%s" % (key_id, app_key)).encode()).decode()
+        redact = [key_id, app_key]  # R10: replaced in any rclone output shown under --show-rclone-output
         del app_key, key_id
         auth = call("GET", AUTH_URL, {"Authorization": "Basic " + basic})
         api = auth["apiUrl"] + "/b2api/v2/"
         hdr = {"Authorization": auth["authorizationToken"]}
+        redact.append(auth["authorizationToken"])
         account = auth["accountId"]
         s3_url = auth.get("s3ApiUrl", "")
         del auth
@@ -121,7 +129,7 @@ def main(argv, *, transport=None, getpass=None, input=None, stdout=sys.stdout, s
         bucket_id = bucket["bucketId"]
 
         if probe:
-            code = run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, env, out)
+            code = run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, env, out, redact if show_rclone else None)
             ok = master_regenerated(transport, basic, input, out, result)
             return 1 if (failed or not ok) else code
 
@@ -251,7 +259,20 @@ def list_keys(call, api, hdr, account):
             return keys
 
 
-def run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, env, out):
+def show_output(text, secrets, out):
+    """R10, K11: redact the whole output first, then cut to 4096 bytes, then keep printable ASCII (and newlines) only."""
+    if isinstance(text, bytes):
+        text = text.decode("utf-8", "replace")
+    for value in sorted({v for v in secrets if v}, key=len, reverse=True):
+        text = text.replace(value, "<redacted>")
+    text = text.encode("utf-8")[:4096].decode("utf-8", "ignore")
+    text = "".join(c if c == "\n" or 0x20 <= ord(c) <= 0x7E else "?" for c in text)
+    out("--- rclone output (temporary key already deleted) ---")
+    out(text.rstrip("\n"))
+    out("--- end ---")
+
+
+def run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, env, out, redact=None):
     """E9: one upload through a temporary writeFiles-only key, to learn whether the box key needs listBuckets."""
     new = call("POST", api + "b2_create_key", hdr, {"accountId": account, "capabilities": ["writeFiles"], "keyName": PROBE_NAME, "bucketId": bucket_id})
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
@@ -271,6 +292,8 @@ def run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, e
         error = err.__class__.__name__
     finally:
         call("POST", api + "b2_delete_key", hdr, {"applicationKeyId": new["applicationKeyId"]})
+        if redact is not None:
+            redact = list(redact) + [new["applicationKeyId"], new["applicationKey"]]
         del child, new
     out()
     # Only a permission refusal counts. Credential, signature, clock and bare-status errors prove nothing about the capability set.
@@ -288,6 +311,8 @@ def run_probe(call, api, hdr, account, bucket_id, bucket_name, s3_url, runner, e
         out("PROBE: INCONCLUSIVE: %s. This says nothing about the capability set; fix the cause and run --probe again." % why)
         result = 1
     out("The temporary key was deleted.")
+    if redact is not None:
+        show_output(text, redact, out)
     return result
 
 

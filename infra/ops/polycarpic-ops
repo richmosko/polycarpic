@@ -1,0 +1,12 @@
+#!/usr/bin/python3 -IS
+"""polycarpic-ops: the operator CLI on the box (POLY-98). Run as `sudo polycarpic-ops <subcommand>`; `help` lists them."""
+import os
+import sys
+
+sys.dont_write_bytecode = True
+# -I leaves the script's directory off sys.path; add the real one (the symlink in /usr/local/sbin is not it).
+sys.path.insert(0, os.path.dirname(os.path.realpath(__file__)))
+
+from lib.main import main  # noqa: E402
+
+sys.exit(main(sys.argv[1:]))
