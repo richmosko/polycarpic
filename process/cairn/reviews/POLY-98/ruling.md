@@ -47,8 +47,8 @@ poly_operator changes.
     `run(ctx) -> list[Line]`.
   - `infra/ops/lib/`: shared helpers (`ctx.py`, `compose.py`, `out.py`, `secrets.py`).
   - `infra/ops/install.sh` (laptop) and `infra/ops/install_box.py` (box): R2.
-- **No registry file.** The dispatcher lists `commands/` and `status/`, accepting only names matching
-  `^[a-z][a-z0-9_]*\.py$`. `help` is generated from the modules. A later issue adds a subcommand as
+- **No registry file.** The dispatcher lists `commands/`, accepting only names matching `^[a-z][a-z0-9_]*\.py$`, and
+  `status/`, accepting only `^[0-9]{2}_[a-z][a-z0-9_]*\.py$`; any other file in either is ignored. `help` is generated from the modules. A later issue adds a subcommand as
   `commands/<name>.py` plus `tests/infra/ops/test_<name>.py`, and a status item as `status/<nn>_<item>.py`, editing no
   file another loop edits. Editing an existing `lib/` module is a cross-loop change and is named at that loop's ruling;
   a new helper goes in a new `lib/` module.
