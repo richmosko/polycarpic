@@ -58,6 +58,33 @@ class HiddenPrompt(unittest.TestCase):
                 self.production().getpass("x: ")
         self.assertEqual([w for w, _ in t.sets], [t.TCSAFLUSH, t.TCSADRAIN])
 
+    def test_b4_the_production_confirm_reads_with_echo_off_tcsaflush_and_restores(self):  # B4: a value pasted at "type yes to replace:" must not echo
+        t = FakeTermios()
+        err, out = mock.MagicMock(), mock.MagicMock()
+        with mock.patch.dict(sys.modules, {"termios": t}), mock.patch.object(sys, "stdin", FakeStdin()), mock.patch.object(sys, "stderr", err), mock.patch.object(sys, "stdout", out):
+            answer = self.production().confirm("resend_api_key exists for: auth; type yes to replace:")
+        self.assertEqual(answer, "latevalue")
+        self.assertEqual(len(t.sets), 2)
+        (clear_when, clear_attrs), (restore_when, restore_attrs) = t.sets
+        self.assertEqual(clear_when, t.TCSAFLUSH)
+        self.assertEqual(clear_attrs[3] & t.ECHO, 0)
+        self.assertEqual(restore_when, t.TCSADRAIN)
+        self.assertEqual(restore_attrs, t.old)
+        written = "".join(str(c) for c in err.mock_calls + out.mock_calls)
+        self.assertNotIn("latevalue", written, "the answer is never echoed back")
+
+    def test_b4_the_answer_is_not_echoed_even_when_the_read_fails(self):
+        t = FakeTermios()
+
+        class Boom(FakeStdin):
+            def readline(self):
+                raise EOFError()
+
+        with mock.patch.dict(sys.modules, {"termios": t}), mock.patch.object(sys, "stdin", Boom()), mock.patch.object(sys, "stderr", mock.MagicMock()), mock.patch.object(sys, "stdout", mock.MagicMock()):
+            with self.assertRaises(EOFError):
+                self.production().confirm("x:")
+        self.assertEqual([w for w, _ in t.sets], [t.TCSAFLUSH, t.TCSADRAIN])
+
 
 if __name__ == "__main__":
     unittest.main()
