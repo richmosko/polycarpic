@@ -4,3 +4,8 @@
 # POLY-150 (seceng-150, build-review.md §7): a dummy auth secret that the R8 test writes to a temporary AUTH_SECRET_FILE for a
 # development-mode sign-in service on a throwaway test database. It is used nowhere else and protects nothing.
 353956958f0749b78b50a52c13851e06c0a5913a:tests/db/second-step-screens.test.ts:generic-api-key:288
+
+# POLY-97 (seceng-97, build-review.md, gitleaks entry): the fixture value `tok-FIXTURE-1234` in the test that create.sh
+# refuses HCLOUD_TOKEN in the environment. Not a Hetzner token (those are 64 random characters); it reaches only the
+# test's fake hcloud and protects nothing. The line was replaced later; the commit stays in history.
+df6ed74352bcff1f0486994fdbc37d694ff5f860:tests/infra/image/provision-create.test.ts:generic-api-key:31

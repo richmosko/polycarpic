@@ -69,3 +69,11 @@ It also says that any other WAIT, or a WAIT naming `staging`, is a finding. Othe
 - **A-probe1. Temporary key in the child's environment.** The probe hands its temporary key to rclone through the child's environment. That departs from R8's rule of no credentials in the environment, and I accept it: the key is writeFiles-only, deleted in `finally` within seconds, and the environment is visible only to the same user.
 - **A-probe2. Master-key regeneration in `--probe` mode.** `--probe` tells the operator to regenerate the master key but does not check the old one gets 401. Run the same 401 check there too.
 - **A-fw. A second firewall on the server.** Hetzner applies the union of every firewall attached to a server. `create.sh` reconciles its own firewall but would not notice a second one. E4's outside-in scan would catch the result. Adding a check that `server describe`'s `public_net.firewalls` lists only ours closes it at the source.
+
+## gitleaks entry
+
+`df6ed743…:tests/infra/image/provision-create.test.ts:generic-api-key:31` was read at that commit. The line is
+`HCLOUD_TOKEN=tok-FIXTURE-1234`, in the test that `create.sh` refuses a token in the environment. That is a 16-character
+fixture with the word FIXTURE in it, passed only to the fake `hcloud`. A Hetzner API token is 64 random characters, so
+this is not one. The line was replaced later (`c61d6b68`), and history is not rewritten. Added to `.gitleaksignore` as
+one exact fingerprint, with its reason. SECURITY's gitleaks paragraph now names both entries.
