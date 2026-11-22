@@ -398,3 +398,15 @@ On the Principal's laptop, `hcloud` context `polycarpic`. The Principal pastes t
   - The alternative is a sudo password: it costs a stored secret, and it stops someone who has the key file but not
     the session.
   - seceng to concur at the ruling review.
+
+## Addendum 1 — seceng's ruling review (`ruling-review.md` @ `c83fddb8`), against `d7dd2d1a`
+
+S3, S4(a), S5, S6(a–c) and A1 are already in `d7dd2d1a` (target health, bucketId/namePrefix, no widening, restore by version, read-key set). Added:
+- **S1/§D3.** `_dmarc` is pinned to `v=DMARC1; p=reject; sp=reject; adkim=s; aspf=r` until the Principal turns on Cloudflare DMARC Management; then `; rua=mailto:<addr>` is appended by a re-pin PR. `dns-check.py` fails on any `ruf=` whatever the pin says.
+- **S2.** R9's CAA rows are three: `0 issue "letsencrypt.org"`, `0 issue "sectigo.com"` (Caddy's ZeroSSL fallback; identifier unmeasured, devops confirms from ZeroSSL's docs), `0 issuewild ";"`. POLY-104 pins Caddy to one issuer, drops the other row and adds `accounturi=`.
+- **S4(b,c).** No tool or check prints, logs or writes an `authorizationToken` or any provider response header, on success, FAIL or HTTP-error paths. R10's sweep adds fixture `authorizationToken` values for H12, `b2-setup.py` and the DNS tools.
+- **S6(d) → POLY-99.** The uploader exits non-zero on any refused upload, so the heartbeat trips.
+- **S7, H15** (condition of seceng's §D4 concurrence): `sshd -T` shows `allowusers polyops`. The cloud-init sudoers drop-in is exactly `polyops ALL=(ALL) NOPASSWD:ALL`, mode 0440, and no other sudoers file grants beyond Ubuntu's defaults. No account but root and `polyops` has both a login shell and an `authorized_keys`. R2 sets `AllowUsers polyops` in its drop-in. Each has a planted fault.
+- **S8, D1** adds: `shared_preload_libraries` is empty and `log_min_duration_statement = -1`.
+- **A4.** R9 compares names and CNAME targets case-insensitively. TXT values (DKIM before hashing, DMARC, SPF) are compared exactly, after joining the 255-byte strings.
+- **Scope.** Criterion 6 leaves this issue verbatim for POLY-104 (Scope table). §D4 is concurred on S7's conditions. It is an accepted risk with the Principal as approver, and seceng records it in SECURITY Open Risks.
