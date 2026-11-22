@@ -146,8 +146,13 @@ class Status(OpsTest):
         self.revokes["prod"] = "\n".join("open:fn%02d(%s)" % (i, "text," * 10) for i in range(30))
         self.tls["app.example.com"] = {"ok": False, "reason": "certificate verify failed: " + "very long reason " * 20}
         self.host.write("/var/lib/polycarpic/state/last-upload", "x" * 500 + "\n")
+        self.disk["/"] = 95  # an all-RED screen: every item red, hostile widths
+        self.prod = {"postgres": ("running", "healthy"), "web": ("running", "unhealthy"), "auth": ("running", "healthy"), "worker": ("running", "healthy")}
+        self.tls["staging.example.com"] = {"ok": False, "reason": "y" * 300}
+        self.logs = self.logs_with(*[self.at(h, 5) for h in (1, 2, 3, 4, 5)])
         r = self.go()
         lines = r.out.splitlines()
+        self.assertEqual(sum(1 for l in lines if l.startswith("RED ")), 9, r.out)
         self.assertLessEqual(len(lines), 24)
         self.assertTrue(all(len(l) <= 80 for l in lines), [l for l in lines if len(l) > 80])
         self.assertTrue(any(l.endswith("\u2026") for l in lines), "a cut detail ends with an ellipsis")
@@ -175,6 +180,12 @@ class Status(OpsTest):
         self.disk["/"] = 80
         l = self.find(self.go(), "disk", "host")
         self.assertEqual(l, line("RED", "disk", "host", "/ 80%, /srv/polycarpic 4%"))
+
+    def test_disk_percent_is_dfs_not_blocks_over_total(self):  # architect Addendum 2: ceil(used*100/(used+bavail))
+        v = lambda p: SimpleNamespace(f_blocks=100, f_bfree=30, f_bavail=20, f_frsize=4096)
+        self.disk["/"] = 0
+        self._vfs = lambda path: v(path) if not path.rstrip("/").endswith("srv/polycarpic") else vfs(4)
+        self.assertEqual(self.find(self.go(), "disk", "host"), line("OK", "disk", "host", "/ 78%, /srv/polycarpic 4%"))
 
     def test_disk_srv_over_80_or_not_mounted_is_red(self):
         self.disk["/srv/polycarpic"] = 85
