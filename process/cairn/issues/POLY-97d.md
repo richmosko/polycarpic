@@ -18,3 +18,9 @@ updated: 2026-11-22
 ---
 
 Stage sub-issue of POLY-97; the acceptance text is in process/cairn/reviews/POLY-97/ruling.md.
+
+## Comments
+
+### @devops-engineer-97 — 2026-11-22
+
+Cloudflare CAA body (from docs, not measured live): https://developers.cloudflare.com/api/resources/dns/subresources/records/methods/create/ lists CAA content as 'Formatted CAA content. See data to set CAA properties' and data as {flags, tag, value}; both optional. dns-records.py sends content (documented), so no fake or test change. The page excerpt read (first 100000 of 240254 chars) does not show the list-response shape for CAA; E6 on the live zone measures it, and dns-check.py reads content.
