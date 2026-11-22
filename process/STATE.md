@@ -15,13 +15,7 @@
 
 A feature = one cairn issue = one PR = one Implement→Validate loop. Exists only during Implement phase. This is a pointer — the issue file (`process/cairn/issues/<ID>.md`) is the record.
 
-- **Feature:** polycarpic-ops operator CLI
-- **Issue:** `POLY-98` (cairn)
-- **Milestone:** `POLY-M1`
-- **Branch:** `feature/poly-98-polycarpic-ops-cli`
-- **Started:** 2026-11-22
-- **Goal:** One `polycarpic-ops` command on the box for the operator jobs INFRA §7 and §8 name — secrets, status, gate-check, provision and the `cli` pass-through — each tested against a fake host root.
-- **Status:** In Review — verdict PASS on `a3e97748` (`process/cairn/reviews/POLY-98/verdict.md`); the PR is on the board and the issue's `pr:` field
+_None. POLY-98 (polycarpic-ops operator CLI) merged 2026-11-22 via PR [#149](https://github.com/richmosko/polycarpic/pull/149) — ARCH 1.27.0, SECURITY 1.17.1, INFRA 1.3.22. `polycarpic-ops` exists under `infra/ops/` with `set-secret`, `list-secrets`, `status`, `gate-check`, `provision`, `provision-check`, `restart` and `cli user invite`; `infra/ops/install.sh` installs it and the provisioning files into `/opt/polycarpic/ops/`. It is proven against fakes, the test box image and a real Postgres only; the ten real-box measurements are on POLY-104 (`process/cairn/reviews/POLY-98/verdict.md`). Decided by the Principal on 2026-11-22 (`process/DECISIONS.md`): `cli user reset-mfa` stays refused until its own review (POLY-155, before prod opens to a second person); one Resend key in two files. Not yet done: a live `cli user invite`, which needs POLY-100 to wire the `operator` service's environment. Follow-ups are on POLY-99, POLY-100, POLY-104 and POLY-155._
 
 _Standing context. POLY-97 (Infra scaffolding + provisioning) merged 2026-11-22 via PR [#147](https://github.com/richmosko/polycarpic/pull/147) — ARCH 1.26.0, SECURITY 1.17.0, INFRA 1.3.21. `infra/hetzner/create.sh`, `infra/provision.sh` and `infra/provision-check.sh` exist and passed a real run on Hetzner (`process/cairn/reviews/POLY-97/real-run.md`): a `cx33` in `nbg1` created, hardened, checked, rebooted and deleted; the project is empty and no token is stored on the laptop. Operator tools for the Backblaze keys and DNS are under `infra/operator/`, proven against fakes only. Decided by the Principal on 2026-11-22 (`process/DECISIONS.md`): mail from `mail.polycarpic.com`; no password manager, password-free sudo for `polyops` and no DMARC reports, each an accepted risk in SECURITY; before real data, a Backblaze card with caps and the Healthchecks.io alarm._
 

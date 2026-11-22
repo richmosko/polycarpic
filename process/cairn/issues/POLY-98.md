@@ -1,7 +1,7 @@
 ---
 id: POLY-98
 title: polycarpic-ops operator CLI
-status: in-review
+status: done
 milestone: POLY-M1
 parent: null
 blocked_by: [POLY-97]
@@ -93,3 +93,7 @@ Verdict condition C1 met at `61d303c6` (devops-engineer, `docs/INFRA/index.html`
 ### @team-lead — 2026-11-22
 
 PR opened: https://github.com/richmosko/polycarpic/pull/149. Full CI run 45074055392 green at `13619aa9` (provision 112 s, db 256 s, image 306 s); merge state CLEAN. Awaiting the Principal's merge decision.
+
+### @team-lead — 2026-11-22
+
+Validate passed; merging via PR #149. Closing.
