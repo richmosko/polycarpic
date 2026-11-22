@@ -140,7 +140,11 @@ done
 # Addresses.
 sj=$(hcloud server describe "$name" -o json)
 echo "IPv4: $(printf '%s' "$sj" | jq -r '.public_net.ipv4.ip')"
-echo "IPv6: $(printf '%s' "$sj" | jq -r '.public_net.ipv6.ip')"
+v6net=$(printf '%s' "$sj" | jq -r '.public_net.ipv6.ip')
+# Hetzner reports the /64 network; the server's own address is <prefix>::1 (the one for AAAA records).
+v6prefix=${v6net%/*}
+case "$v6prefix" in *::) v6host="${v6prefix}1" ;; *) v6host=$v6prefix ;; esac
+echo "IPv6: $v6host (network $v6net)"
 
 cat <<MSG
 Remove the API token now, in this sitting. With the server created, the token can snapshot both disks, and the LUKS key is on the root disk:

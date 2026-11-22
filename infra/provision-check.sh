@@ -377,13 +377,24 @@ per_project D2 "extensions" "DROP EXTENSION the extra one as the superuser, and 
 
 # D3: the backup login is refused from web, has no route from uploader, and works from backup (SECURITY C-79).
 d3_probe() { # svc mode -> PROBE_OUT, PROBE_RC. The password is read inside the container from a read-only mount into a tmpfs pgpass.
-  local svc=$1 mode=$2 conn
+  # backup and uploader are one-off runs (no container to join by name): the probe joins their only network, which is where the
+  # service would stand. web is a running service, joined by its container id.
+  local svc=$1 mode=$2 conn net
+  case "$svc" in
+    web)
+      local wid
+      wid=$(docker compose -p polycarpic-prod ps -q web < /dev/null 2> /dev/null | head -1)
+      if [ -z "$wid" ]; then PROBE_OUT="no running web container of polycarpic-prod"; PROBE_RC=125; return; fi
+      net="container:$wid" ;;
+    backup) net=polycarpic-prod_backup-net ;;
+    uploader) net=polycarpic-prod_upload-net ;;
+  esac
   conn="host=postgres dbname=polycarpic user=poly_backup require_auth=scram-sha-256 connect_timeout=5"
   [ "$mode" = replication ] && conn="$conn replication=database"
-  PROBE_OUT=$(docker run --rm --pull never --network "container:polycarpic-prod-$svc-1" --user 10004:10004 \
+  PROBE_OUT=$(docker run --rm --pull never --network "$net" --user 10004:10004 \
     --tmpfs /pgpass:rw,noexec,nosuid,size=1m,mode=1777 \
     -v "$ETC/secrets/backup/db_password_backup:/run/secrets/db_password_backup:ro" \
-    "${POLY_POSTGRES_IMAGE:-postgres:17}" sh -c '
+    "$PROBE_IMAGE" sh -c '
 umask 077
 printf "postgres:5432:*:poly_backup:%s\n" "$(cat /run/secrets/db_password_backup)" > /pgpass/.pgpass
 PGPASSFILE=/pgpass/.pgpass; export PGPASSFILE
@@ -391,11 +402,16 @@ if [ "$2" = replication ]; then psql "$1" -tAc IDENTIFY_SYSTEM; else psql "$1" -
   PROBE_RC=$?
 }
 d3() {
-  local out='' svc mode first
+  local out='' svc mode first pgid
+  # The probe runs the image the running postgres container uses: no default tag, nothing pulled.
+  pgid=$(docker compose -p polycarpic-prod ps -q postgres < /dev/null 2> /dev/null | head -1)
+  PROBE_IMAGE=$([ -n "$pgid" ] && docker inspect --format '{{.Config.Image}}' "$pgid" 2> /dev/null)
+  if [ -z "$PROBE_IMAGE" ]; then echo " cannot read the image of the running postgres container;"; return; fi
   for svc in web uploader backup; do
     for mode in sql replication; do
       d3_probe "$svc" "$mode"
       first=$(head -1 <<< "$PROBE_OUT" | cut -c1-160)
+      if [ "$PROBE_RC" = 125 ]; then out="$out $svc probe could not start ($mode: $first) — the container or network it names is missing;"; continue; fi
       case "$svc" in
         web)
           if [ "$PROBE_RC" = 0 ]; then out="$out web connected as poly_backup ($mode; it must be refused by pg_hba.conf);"
