@@ -67,9 +67,9 @@ sitting.
 
 | # | Command | Expect |
 |---|---|---|
-| 1 (E9) | `python3 infra/operator/b2-setup.py --probe --bucket polycarpic-hetzner-backups` (generate a new master key first, as it says) | `PROBE: the writeFiles-only upload was accepted …` **or** `… refused or failed (exit N). Keep listBuckets …`; then `The temporary key was deleted.`; then, after you generate the master key again and type `done`: `PASS the old master key is rejected (401)` |
+| 1 (E9) | `python3 infra/operator/b2-setup.py --probe --bucket polycarpic-hetzner-backups` (generate a new master key first, as it says) | one of three: `PROBE: the writeFiles-only upload was accepted (…): writeFiles alone is enough. …`, or `PROBE: the writeFiles-only upload was refused (access denied): listBuckets is needed. …`, or `PROBE: INCONCLUSIVE: … run --probe again.` (fix the cause and rerun; only the first two settle E9); then `The temporary key was deleted.`; then, after you generate the master key again and type `done`: `PASS the old master key is rejected (401)` |
 | 2 | Only if step 1 said "accepted": the lead has `b2-capabilities.json` set to `["writeFiles"]` and pushed; you run `git pull` | the file shows `"capabilities": ["writeFiles"]` |
-| 3 (E9) | `python3 infra/operator/b2-setup.py --bucket polycarpic-hetzner-backups`; at the plan type `yes`; for `polycarpic-read` answer `yes` (recreate); for `polycarpic-put-only` answer `yes` only if step 2 ran, else anything else (keep) | PASS ×6 for the bucket, `INFO encryption: SSE-B2 …`; each new key printed once (move it to Passwords); `PASS polycarpic-read: exactly …; bucket-restricted`, `PASS polycarpic-put-only: exactly …`; no other FAIL; the 401 PASS; `B2 SETUP PASSED` |
+| 3 (E9) | `python3 infra/operator/b2-setup.py --bucket polycarpic-hetzner-backups`; at the plan type `yes`; for `polycarpic-read` answer `yes` (recreate); for `polycarpic-put-only` answer `yes` only if step 2 ran, else anything else (keep) | PASS ×6 for the bucket, `INFO encryption: SSE-B2 …`; each new key printed once (move it to your secret store); `PASS polycarpic-read: exactly …; bucket-restricted`, `PASS polycarpic-put-only: exactly …`; no other FAIL; the 401 PASS; `B2 SETUP PASSED` |
 | 4 | Cloudflare console: edit TXT `_dmarc` to `v=DMARC1; p=reject; sp=reject; adkim=s; aspf=r`; create a token for this zone only, DNS:Edit | saved |
 | 5 | `python3 infra/operator/dns-records.py` (no address flags: no box records in this run) | `exists` for the six mail records; `Records to create` lists the three CAA rows; type `yes`; `created  @ CAA` ×3; `RESULT: all records in place`. Then delete that token in the console |
 | 6 (E6) | Create a read-only (Zone:DNS:Read) token, then `python3 infra/operator/dns-check.py` | `INFO app A absent …` ×4 lines for app/staging A/AAAA; `DNS CHECK PASSED` |
@@ -90,3 +90,14 @@ sitting.
 delete the context and the token. §D3 (DMARC reports) is not part of this run: turning it on adds `rua=`, and the
 re-pin is its own PR. Seceng's F-D items remain the Principal's: move credentials into Passwords, wipe the
 scrollback copies of the B2 secrets, and delete the Porkbun API key and the old write token.
+
+## Conditions C1–C3: met at af7baf82
+
+- C1: `d3_probe` joins `container:<id>` of `docker compose -p polycarpic-prod ps -q web`, and `polycarpic-prod_backup-net` / `polycarpic-prod_upload-net` for backup and uploader. It uses the image of the running `postgres` container via `docker inspect`, with no default. A missing container or network is a FAIL (rc 125 path). seceng passed it at `bb772913`.
+- C2: create.sh prints `IPv6: <prefix>::1 (network <prefix>/64)`, and INFRA step 7 quotes it.
+- C3: INFRA step 8 names the `_dmarc` CONFLICT and the edit that clears it.
+- qa's `gate.md` is PASS at `af7baf82` (`05fdf902`).
+
+**CI, second sample (run 45050711870 on `05fdf902`):** provision 130 s (≤ 200, PASS). image 321 s, over 290; the first sample was 245 s. Both runs had the same `image` contents, so the 76 s spread is the job's own noise, not this loop's tests. Moving `provision-db` now would act on noise.
+
+Ruling: take the third sample from the PR run, beside a same-day control of `image` on `main`. If the PR run's `image` exceeds 290 s while the control is within its 242–260 s range, `provision-db.test.ts` moves to the `provision` job on `BASE_IMAGE`; that move is pre-authorised in `pins-review.md`, so it needs no new ruling. Otherwise this axis passes.
