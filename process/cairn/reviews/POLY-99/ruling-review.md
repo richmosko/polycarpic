@@ -497,6 +497,12 @@ Two tests prove it:
 - in the rendered uploader, `/run/secrets/heartbeat_url` does not exist;
 - the C11 sweep finds the fixture URL in no container's mounts or environment.
 
+**Applies equally to R10's in-place correction @ `5ee29c4ea87a2a5b9f81c08ef5cca2fe388a8df7`.** It carries the same
+text into the ruling, and the same ruling applies: accepted with H-1. Its line "Who reads it: root only" is not true
+at `0440 root:10005`. Any process with gid 10005 reads the file, an escaped uploader included. It becomes true under
+H-1's `root:root` 0400 in `secrets/host/`. H-1's tests and the `HOST_ONLY` pin are added to that correction's test
+list.
+
 **Noted for the build review:**
 - I will read `infra/lint/policy.json` (the uploader's allowlist, which devops-99 changed) by name, as a diff
   against `09aeeeb2`.
