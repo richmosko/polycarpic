@@ -503,6 +503,17 @@ at `0440 root:10005`. Any process with gid 10005 reads the file, an escaped uplo
 H-1's `root:root` 0400 in `secrets/host/`. H-1's tests and the `HOST_ONLY` pin are added to that correction's test
 list.
 
+**H-1 carried: PASS on `dea63614609e6719fa8238a0e6fba90496a27b9a`.** R10's correction now holds everything H-1
+requires:
+- the path, owner and mode;
+- the `root:root` 0700 directory;
+- the move of an old file, with its value swept from output;
+- H6's `HOST_ONLY` branch and its failure on the old location and group;
+- the exact pin, the no-overlap test and the `secrets/host/` lint rule;
+- R5's and H13's read path.
+
+Nothing else changed. The plan gate stays clear.
+
 **Noted for the build review:**
 - I will read `infra/lint/policy.json` (the uploader's allowlist, which devops-99 changed) by name, as a diff
   against `09aeeeb2`.
