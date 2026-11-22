@@ -78,3 +78,23 @@ refuses a token in the environment. Only the fake `hcloud` receives it. A Hetzne
 so this is not one. The line was replaced later (`c61d6b68`), and history is not rewritten. Added to
 `.gitleaksignore` as one exact fingerprint, with its reason. A second entry covers this note's earlier wording at
 `59662a5f`, which quoted the same fixture. SECURITY's gitleaks paragraph names all three entries.
+
+## Fix round at 9e92e880: CHANGES (one flag)
+
+I read the changes in `infra/operator/b2-setup.py` and `infra/hetzner/create.sh` from `ea78daae` to `9e92e880`, and their tests: `tests/infra/operator/test_b2_setup.py`, `tests/infra/provision/create.test.ts` and `tests/infra/image/provision-db.test.ts`.
+
+| Item | Result |
+|---|---|
+| B1: probe through the S3 backend | **Met, except one flag.** The probe's child configuration uses the S3 backend: provider `Other`, endpoint from the authorize response's `s3ApiUrl`, the access key pair, and no-check-bucket on. The test asserts the type, the endpoint and no-check-bucket. |
+| B2: a key with no bucket restriction that can write is a FAIL | **Met.** Any capability outside the read set plus `listAllBucketNames` fails, and the FAIL names the key and the fix. Five write sets each give exit 1, and a key that only reads is a WARN with exit 0. A key with no bucket restriction holding some other read-only capability, such as a replication or logging read, also FAILs. That false positive is the conservative side, so I accept it. |
+| A-probe2: the old master key gets 401 in probe mode | **Met.** `master_regenerated` runs after the probe deletes its key. A key that still works makes the run exit 1. |
+| A-fw: a second firewall on the server | **Met.** Any firewall on the server other than ours is detached, never deleted, and reported as `change: firewall detached (<name>)`. The test plants one and asserts the server ends with exactly ours and that no delete call is made. A clean run makes no remove call. |
+| A-M2: mutation case | **Met.** With the two `SET`s stripped, the failing ALTER writes its `STATEMENT:` line and the verifier into the Postgres log. The test runs after the clean-sweep case on the same container, so the sweep is shown to work. |
+
+**Required (C1).** The probe runs `rclone rcat` without `--s3-no-head`.
+- **Why it matters:** by default rclone's S3 backend sends a HEAD request for an uploaded object, and a HEAD needs `readFiles`, which the `writeFiles`-only probe key does not have. So the upload can succeed and the probe still report a refusal, which makes it say "keep `listBuckets`" for the wrong reason (unmeasured). The ruling (S5) also says the uploader never sends HEAD, so a probe that does is not measuring the uploader's path.
+- **Fix:** add `--s3-no-head` to the probe's argv, and have the probe test assert it.
+
+**Advisory.** When `s3ApiUrl` is missing, or rclone fails for any reason other than an access refusal, the probe should report the result as inconclusive rather than "keep `listBuckets`". Keeping `listBuckets` is the safe default, so this does not gate.
+
+PASS once C1 is in.
