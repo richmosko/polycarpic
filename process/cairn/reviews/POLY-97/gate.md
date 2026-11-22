@@ -1,13 +1,13 @@
-# POLY-97 gate 3: qa sign-off run (final, at the build tip)
+# POLY-97 gate 3: qa sign-off run (final, at the build tip 4da2d8c1)
 
-Tip tested: 5ef6a2d0 (branch `feature/poly-97-infra-provisioning`, tree clean; devops's fix-round build 9e92e880 plus my test fixes). Mac, Docker 29.9.3, machine quiet. `docker ps` after: clean.
+Tip tested: 4da2d8c1 (branch `feature/poly-97-infra-provisioning`, tree clean; includes devops's probe C1 flag `--s3-no-head` and the three probe outcomes, and my test fixes). Mac, Docker 29.9.3, machine quiet. `docker ps` after: clean.
 
 ## 1. The run
 
 | Suite | Result | Time |
 |--|--|--|
-| `provision` job locally: `vitest.provision.config.ts`, 3 files in parallel (create 38, host stage + H 64, D checks + summaries 18) | **120/120** | 48.7 s |
-| Python operator tools, 5 files | **78/78** | 0.06 s |
+| `provision` job locally: `vitest.provision.config.ts`, 3 files in parallel (create 38, host stage + H 64, D checks + summaries 18) | **120/120** | 49.6 s |
+| Python operator tools, 5 files | **83/83** | 0.08 s |
 | shellcheck of the 3 scripts, in the test container | exit **0** | — |
 | `tests/infra` fixture suite (9 files, includes the 6 CI-wiring tests) | **327/327** | 12.4 s |
 | `tests/ci` (21 files) | **573/573** | 9.8 s |
@@ -21,7 +21,7 @@ Grepped the three provision files, `provision-db.test.ts`, the five Python files
 
 - H1–H15 (+ INFO H12b), D1–D6 with id, found value and `— fix:`, plus positives.
 - R9 faults, target health, fail-closed, pagination; Addendum 1 (DMARC pin, `ruf`, three CAA rows, exact TXT, `authorizationToken` never printed, S7/H15, S8 D1 extras); Addenda 2/3 (D3 probe by reason with hygiene, D5 staging, ssh key file); pins-review 3a–c and 5a–b; M1, M2 and R10 sweeps.
-- Added since the last gate, all green on the build: build-review B1 (probe via rclone's S3 backend), B2 (unrestricted key that can write = FAIL, read-only = WARN, another bucket = silent), probe master-key regeneration and 401, CAA as `data` with content-only / data-only / both list replies, second-firewall drift (detach, never delete), the A-M2 mutation case (the verifier does reach the log without the two SETs), staging stage (five roles authenticate, `poly_backup` has no verifier), and the CI wiring of the new `provision` job (changes key and paths, aggregate REQUIRED, budget).
+- Added since the last gate, all green on the build: build-review C1 (`--s3-no-head` in the probe argv, with a runner that refuses calls without it), the probe's three outcomes (`writeFiles alone is enough` / `listBuckets is needed` / `INCONCLUSIVE`, rclone missing inconclusive), B1 (probe via rclone's S3 backend), B2 (unrestricted key that can write = FAIL, read-only = WARN, another bucket = silent), probe master-key regeneration and 401, CAA as `data` with content-only / data-only / both list replies, second-firewall drift (detach, never delete), the A-M2 mutation case (the verifier does reach the log without the two SETs), staging stage (five roles authenticate, `poly_backup` has no verifier), and the CI wiring of the new `provision` job (changes key and paths, aggregate REQUIRED, budget).
 
 **No ruled item lacks a passing test.** Not testable here and so not in the suite: R12 E1–E9 (the Principal's real run); the Docker apt key against Docker's real key (only the pinned-fingerprint branch and refusal); `userland-proxy: false` and the address-pool check against a live daemon (fake `docker info`); B2/Cloudflare/Hetzner live shapes (including the unmeasured `s3ApiUrl` and CAA `data` shapes); R7's four-file copy (a runbook step); R11 docs.
 
@@ -31,4 +31,4 @@ Settled by the lead and seceng: two reviewed fingerprints in `.gitleaksignore`, 
 
 ## Verdict
 
-**PASS** for tests at 5ef6a2d0: 120 + 78 + 6 wiring green, shellcheck 0, `tests/ci` and `tests/infra` green, existing image suite unchanged (3 known pre-existing reds), no untested ruled item, dry run within the local guard after the split. Open, not mine: CI limits for `provision` and `image` on the next two runs.
+**PASS** for tests at 4da2d8c1: 120 + 83 + 6 wiring green, shellcheck 0, `tests/ci` and `tests/infra` green, existing image suite unchanged (3 known pre-existing reds), no untested ruled item, dry run within the local guard after the split. Open, not mine: CI limits for `provision` and `image` on the next two runs.
