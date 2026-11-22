@@ -39,14 +39,6 @@ def _read(ctx, name):
     return values
 
 
-def _exists(ctx, path):
-    try:
-        os.lstat(ctx.p(path))
-        return True
-    except OSError:
-        return False
-
-
 def _plan(ctx, targets):
     """Phase 1: open and check every service directory and target before anything is written. -> (plan, exit code)."""
     plan = []
@@ -63,13 +55,15 @@ def _plan(ctx, targets):
         except OSError:
             ctx.err(fail)
             return plan, 4
-        plan.append((dfd, fname, svc, real))
+        entry = [dfd, fname, svc, real, False]
+        plan.append(entry)
         st = os.fstat(dfd)
         if st.st_uid != ctx.trusted_uid or stat.S_IMODE(st.st_mode) != 0o750:
             ctx.err(fail)
             return plan, 4
         try:
             tst = os.stat(fname, dir_fd=dfd, follow_symlinks=False)
+            entry[4] = True
             if not stat.S_ISREG(tst.st_mode):
                 ctx.err("%s is not a regular file: run provision" % real)
                 return plan, 4
@@ -123,23 +117,21 @@ def run(args, ctx):
         ctx.err("set-secret reads from a terminal only")
         return 2
 
-    existing = [svc for svc, path in targets if _exists(ctx, path)]
-    if existing and ctx.confirm("%s exists for: %s; type yes to replace:" % (name, ", ".join(existing))) != "yes":
-        ctx.err("not replaced")
-        return 1
-
-    values = _read(ctx, name)
-    if isinstance(values, int):
-        return values
-    data = ("\n".join(values) + "\n").encode()
-    del values
-
     plan, code = _plan(ctx, targets)
     written = []
     try:
         if code:
             return code
-        for dfd, fname, svc, real in plan:
+        existing = [item[2] for item in plan if item[4]]
+        if existing and ctx.confirm("%s exists for: %s; type yes to replace:" % (name, ", ".join(existing))) != "yes":
+            ctx.err("not replaced")
+            return 1
+        values = _read(ctx, name)
+        if isinstance(values, int):
+            return values
+        data = ("\n".join(values) + "\n").encode()
+        del values
+        for dfd, fname, svc, real, _ in plan:
             try:
                 gid = _write(ctx, dfd, fname, data)
             except OSError as err:
