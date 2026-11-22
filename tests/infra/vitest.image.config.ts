@@ -5,7 +5,7 @@ import { defineConfig } from 'vitest/config';
 // Needs a Docker daemon and the `docker compose` CLI. One compose-run service per file, shared by its tests.
 export default defineConfig({
   test: {
-    include: ['tests/infra/image/*.test.ts'],
+    include: ['tests/infra/image/*.test.ts', 'tests/infra/backup/*.test.ts'],
     testTimeout: 120_000,
     hookTimeout: 300_000,
     fileParallelism: false,
