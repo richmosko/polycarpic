@@ -177,23 +177,92 @@ awk '/^--ENV/{blk=""} {blk=blk"\\n"$0} /^POLY_POSTGRES_IMAGE=/{print "ENVHAS " $
     expect(r.out).toContain(`ENVHAS POLY_POSTGRES_IMAGE=${pg}`);
   });
 
+  // A real pty driver: each step waits for its prompt (or, for `early`, writes at once, before any prompt exists), so input is never queued ahead by accident.
+  const DRIVER = `cat > /tmp/ptydrv.py <<'PY'
+import json, os, pty, select, sys, time
+cmd, steps = sys.argv[1], json.loads(sys.argv[2])
+pid, fd = pty.fork()
+if pid == 0:
+    os.execvp("bash", ["bash", "-c", cmd])
+buf, eof = b"", False
+def pump(until=None, limit=20):
+    global buf, eof
+    end = time.time() + limit
+    while not eof and time.time() < end and (until is None or until not in buf):
+        r, _, _ = select.select([fd], [], [], 0.5)
+        if r:
+            try:
+                d = os.read(fd, 4096)
+            except OSError:
+                d = b""
+            if not d:
+                eof = True
+            buf += d
+def answer_all(answers):
+    global buf
+    given = set()
+    end = time.time() + 30
+    while not eof and time.time() < end:
+        for k, v in answers.items():
+            if k.encode() in buf and k not in given:
+                buf = buf.split(k.encode(), 1)[1]
+                os.write(fd, v.encode())
+                given.add(k)
+        pump(None, 0.6)
+    return given
+for s in steps:
+    if "answers" in s:
+        answer_all(s["answers"])
+        continue
+    if "early" in s:
+        os.write(fd, s["early"].encode())
+        time.sleep(0.3)
+        continue
+    pump(s["expect"].encode())
+    if s["expect"].encode() in buf:
+        buf = buf.split(s["expect"].encode(), 1)[1]
+        os.write(fd, s["send"].encode())
+    elif not s.get("optional"):
+        print("DRIVER-MISSING", s["expect"])
+pump(None, 20)
+_, status = os.waitpid(pid, 0)
+print("DRIVER-RC", os.waitstatus_to_exitcode(status))
+PY`;
+  const PTY = (cmd: string, steps: object[]) => `python3 /tmp/ptydrv.py "${SUDO(cmd)}" '${JSON.stringify(steps)}'`;
+  const PROMPT = 'resend_api_key (input hidden): ';
+  const TARGETS = '/etc/polycarpic/secrets/auth/resend_api_key /etc/polycarpic/secrets/worker/resend_api_key';
+
   it('set-secret on a real root: resend_api_key lands 0440 root:10007 and root:10002, replacing needs yes, a symlinked service directory exits 4 with nothing written', () => {
-    const pty = (cmd: string, input: string) => `printf '${input}' | script -qec "${SUDO(cmd)}" /dev/null`;
-    const r = INSTALLED(`${pty('polycarpic-ops set-secret resend_api_key', 'fxSecretValue123\\n')} > /tmp/o.out 2>&1; echo "rc=$?"
-stat -c '%a %u:%g %s' /etc/polycarpic/secrets/auth/resend_api_key /etc/polycarpic/secrets/worker/resend_api_key
+    const r = INSTALLED(`${DRIVER}
+${PTY('polycarpic-ops set-secret resend_api_key', [{ expect: PROMPT, send: 'fxSecretValue123\n' }])}
+stat -c '%a %u:%g %s' ${TARGETS}
 ls -A /etc/polycarpic/secrets/auth /etc/polycarpic/secrets/worker | grep -c 'tmp-' || true
-${pty('polycarpic-ops set-secret resend_api_key', 'fxOtherValue456\\nno\\n')} > /tmp/o2.out 2>&1; echo "rc2=$?"; cat /etc/polycarpic/secrets/auth/resend_api_key
+${PTY('polycarpic-ops set-secret resend_api_key', [{ answers: { [PROMPT]: 'fxOtherValue456\n', 'type yes to replace:': 'no\n' } }])}
+echo "AFTERNO=$(cat /etc/polycarpic/secrets/auth/resend_api_key)"
 mv /etc/polycarpic/secrets/worker /etc/polycarpic/secrets/worker.real; ln -s /etc/polycarpic/secrets/worker.real /etc/polycarpic/secrets/worker
 rm /etc/polycarpic/secrets/auth/resend_api_key
-${pty('polycarpic-ops set-secret resend_api_key', 'fxThirdValue789\\n')} > /tmp/o3.out 2>&1; echo "rc3=$?"; ls /etc/polycarpic/secrets/auth /etc/polycarpic/secrets/worker.real | grep -c resend || true
-grep -rl 'fxSecretValue123\\|fxOtherValue456\\|fxThirdValue789' /tmp /var /root /home /opt /etc 2>/dev/null | grep -v '/etc/polycarpic/secrets/' || true`);
-    expect(r.out).toMatch(/rc=0/);
+${PTY('polycarpic-ops set-secret resend_api_key', [{ answers: { [PROMPT]: 'fxThirdValue789\n' } }])}
+echo "SYMLINK-AUTH=$(ls /etc/polycarpic/secrets/auth | grep -c resend) WORKER=$(cat /etc/polycarpic/secrets/worker.real/resend_api_key)"
+grep -rl 'fxSecretValue123\\|fxOtherValue456\\|fxThirdValue789' /tmp /var /root /home /opt /etc 2>/dev/null | grep -v '/etc/polycarpic/secrets/' | grep -v '^/tmp/ptydrv.py$' || true`);
+    const rcs = [...r.out.matchAll(/DRIVER-RC (\d+)/g)].map((m) => m[1]);
+    expect(rcs, r.out.slice(-800)).toEqual(['0', '1', '4']);
     expect(r.out).toContain('440 0:10007 17');
     expect(r.out).toContain('440 0:10002 17');
-    expect(r.out).toMatch(/rc2=1/);
-    expect(r.out).toContain('fxSecretValue123');
-    expect(r.out).toMatch(/rc3=4/);
+    expect(r.out).toContain('AFTERNO=fxSecretValue123');
+    expect(r.out).toContain('SYMLINK-AUTH=0 WORKER=fxSecretValue123'); // nothing written for either service: auth stays empty, the worker file keeps the first value
     expect(r.out).not.toMatch(/fx(Secret|Other|Third)Value\d+\n\/(tmp|var|root|home|opt|etc)\//); // no copy of a value outside the secret trees
+  });
+
+  it('B1: input sent before the prompt is dropped, not taken as the secret; only what is typed after the prompt is written', () => {
+    const r = INSTALLED(`${DRIVER}
+${PTY('polycarpic-ops set-secret resend_api_key', [{ early: 'earlyvalue\n' }, { expect: PROMPT, send: 'latevalue\n' }])}
+echo "AUTH=$(cat /etc/polycarpic/secrets/auth/resend_api_key)"; echo "WORKER=$(cat /etc/polycarpic/secrets/worker/resend_api_key)"
+echo "EARLY-IN-TARGETS=$(cat ${TARGETS} | grep -c earlyvalue || true)"`);
+    expect(r.out, r.all.slice(-1200)).toContain('DRIVER-RC 0');
+    expect(r.out).not.toContain('DRIVER-MISSING');
+    expect(r.out).toContain('AUTH=latevalue\n');
+    expect(r.out).toContain('WORKER=latevalue\n');
+    expect(r.out).toContain('EARLY-IN-TARGETS=0');
   });
 });
 

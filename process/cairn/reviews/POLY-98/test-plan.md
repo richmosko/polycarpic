@@ -115,3 +115,12 @@ The ruling fixes the Ctx field list but not signatures. Everything below is what
 | 70 | G1 reserved-blocks fixture (100/24/19 → RED 80%); the earlier 100/30/20 case (78%) is a second df-vs-plain separator, G1 itself is test_reserved_blocks_fixture… | U:status :: test_reserved_blocks_fixture…, test_disk_percent_is_dfs… |
 | 72 | K12 lint extras (seceng): no `trusted_uid` assignment outside `Ctx.__init__`, no `Ctx(**kw)`, no pattern string ending in `$` | U:lint :: test_trusted_uid_is_not_assigned…, test_no_pattern_string_ends_in_a_dollar_anchor |
 | 71 | G2 revokes/slots SQL as built against real Postgres, (a)-(d) | C: "status revokes and slots SQL against a real Postgres" (pin 16: `status/<nn>_slots.py` `SQL`; `status/<nn>_revokes.py` `sql(signatures)`) |
+
+## Build review B1-B3 (seceng @ e5a4f441)
+
+| # | Item | File :: case |
+|--|--|--|
+| 73 | B1 echo-off is TCSAFLUSH, restore is TCSADRAIN (fake termios) | U:test_ctx_getpass :: both cases |
+| 74 | B1 type-ahead before the prompt is not the secret (real pty, real sudo) | C: "B1: input sent before the prompt is dropped…" (driver waits for the prompt; `earlyvalue` written first) |
+| 75 | B2 union of widened windows > 8 h → `jobs.log windows cover <n> h of 24`; 8 h exactly OK; overlap counted once | U:status :: test_backupdb_windows_covering_* , …overlapping… |
+| 76 | B3 `--mail-from -x@example.com` → 2, `provision: bad --mail-from`, nothing run | U:provision :: test_mail_from_starting_with_a_dash… |

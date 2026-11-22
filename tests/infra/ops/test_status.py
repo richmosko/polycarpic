@@ -347,6 +347,24 @@ class Status(OpsTest):
         self.host.write("/var/lib/polycarpic/state/jobs.log", self.window(-H(hours=5, minutes=59), -H(minutes=1), "backup") + self.window(-H(minutes=19), -H(minutes=10)))
         self.assertTrue(self.find(self.go(), "backupdb", "prod").startswith("OK   backupdb"))
 
+    def nightly(self, *spans):
+        return "".join(self.window(a, b, "nightly") for a, b in spans)
+
+    def test_backupdb_windows_covering_more_than_8_hours_of_24_are_red(self):  # B2: four 5 h lines, each under the 6 h cap
+        h = lambda x, m=0: H(hours=x, minutes=m)
+        self.host.write("/var/lib/polycarpic/state/jobs.log", self.nightly((-h(23, 40), -h(18, 40)), (-h(17), -h(12)), (-h(11), -h(6)), (-h(5), -h(0, 1))))
+        self.assertEqual(self.find(self.go(), "backupdb", "prod"), line("RED", "backupdb", "prod", "jobs.log windows cover 20 h of 24"))
+
+    def test_backupdb_windows_covering_exactly_8_hours_are_ok(self):  # B2 boundary: 2 x (3 h 58 min + 2 min widening)
+        h = lambda x, m=0: H(hours=x, minutes=m)
+        self.host.write("/var/lib/polycarpic/state/jobs.log", self.nightly((-h(20), -h(16, 2)), (-h(10), -h(6, 2))))
+        self.assertTrue(self.find(self.go(), "backupdb", "prod").startswith("OK   backupdb  prod     "))
+
+    def test_backupdb_overlapping_windows_are_counted_once(self):  # B2: two identical 5 h lines are a union of 5 h 2 min
+        h = lambda x, m=0: H(hours=x, minutes=m)
+        self.host.write("/var/lib/polycarpic/state/jobs.log", self.nightly((-h(10), -h(5)), (-h(10), -h(5))))
+        self.assertTrue(self.find(self.go(), "backupdb", "prod").startswith("OK   backupdb  prod     "))
+
     def test_backupdb_a_log_that_covers_under_23_hours_is_red_unless_the_container_is_young(self):  # K9
         self.logs = ["%s 2026-11-22 16:30:00.000 UTC [1] LOG:  checkpoint complete" % ts(-H(hours=2, minutes=5))]
         self.assertEqual(self.find(self.go(), "backupdb", "prod"), line("RED", "backupdb", "prod", "postgres log covers only 2 h"))

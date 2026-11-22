@@ -53,6 +53,10 @@ class Provision(ProvisionBase):
             self.assertEqual(r.runner.calls, [], repr(bad))
         self.assertEqual(self.prov(*self.BASE, "--mail-from", "Name <a@b.example>").rc, 0)
 
+    def test_mail_from_starting_with_a_dash_exits_2_with_the_exact_message_and_runs_nothing(self):  # B3
+        r = self.prov("provision", "--stage", "host", "--target", "hetzner", "--domain", "example.com", "--mail-from", "-x@example.com")
+        self.assertEqual((r.rc, r.err, r.runner.calls), (2, "provision: bad --mail-from\n", []))
+
     def test_unknown_flags_and_abbreviations_exit_2_with_nothing_run(self):  # K2
         for extra in (["--evil"], ["--evil", "x"], ["--dom", "x.example"], ["--stage=host"], ["positional"]):
             r = self.prov("provision", "--target", "hetzner", "--domain", "x.example", *extra)

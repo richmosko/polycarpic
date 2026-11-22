@@ -45,6 +45,9 @@ Run once more at this sha with the printed text captured (a throwaway copy of th
 | 14b8dd70 + base.py | `sys.dont_write_bytecode`, and the laptop-checkout copy strips `__pycache__` | corrected: my harness left `__pycache__` in the checkout the container test copies and `git add -A` shipped it, failing the "no `__pycache__` in the install" case for the harness's own litter |
 | 49eb5c59 | `\.`/`\S` in the G2 Python snippet → `\\.`/`\\S` | corrected: inside a JS template literal the single backslash vanished, the signature list came back empty and every G2 case printed `NOSQL` |
 
+| (B1, after the gate) ops.test.ts set-secret pty cases | `script -qec` with input piped before the prompt replaced by a pty driver that waits for each prompt before sending; new case sends `earlyvalue` before the prompt and `latevalue` after | **corrected, a test defect**: the old case queued its input ahead of the prompt, so it passed only because 73806f79 used TCSADRAIN (type-ahead kept and taken as the secret). The new case is red on TCSADRAIN (`AUTH=earlyvalue`) and green on TCSAFLUSH, shown by flipping the one line locally and reverting |
+| (B1) the driver's second run | answers whichever of the value prompt and `type yes to replace:` comes first | the build asks the replace question before the value prompt; R4 reads the value first. I did not pin the order and left it order-insensitive; spec question for the architect |
+
 **Loosened: none.** No assertion was removed or widened. The Runner change widens how a rule token matches, but every case that depends on it also asserts the full argv.
 
 ### The `.incoming` exclusion, in full
