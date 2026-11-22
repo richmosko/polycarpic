@@ -274,7 +274,9 @@ class B2Setup(ToolTest):
         self.assertNotIn(self.INCONCLUSIVE_TXT, text)
 
     def test_probe_outcome_refused_for_lack_of_permission_says_listbuckets_is_needed_and_nothing_else(self):
-        for msg in ("AccessDenied: Access Denied", "403 Forbidden", "HTTP 401 Unauthorized", "not authorized to perform s3:PutObject", "SignatureDoesNotMatch 403"):
+        # C2 (build-review): only the S3 code AccessDenied, or B2's own not-entitled wording, counts as a permission refusal
+        for msg in ("AccessDenied: Access Denied", "s3 error 403: AccessDenied (key lacks s3:PutObject)", "not entitled to upload to this bucket",
+                    "not authorized to perform s3:PutObject"):
             rc, text, b2 = self.probe(lambda argv, env=None, stdin=None, m=msg: (1, m))
             self.assertIn(self.DENIED_TXT, text, msg)
             self.assertNotIn(self.OK_TXT, text, msg)
@@ -288,6 +290,18 @@ class B2Setup(ToolTest):
             lambda argv, env=None, stdin=None: (1, "connection refused"),
             lambda argv, env=None, stdin=None: (2, "Failed to create file system: unknown flag"),
             lambda argv, env=None, stdin=None: (1, ""),
+            # C2: credential and clock errors, and a bare status word, are not a permission answer
+            lambda argv, env=None, stdin=None: (1, "SignatureDoesNotMatch 403"),
+            lambda argv, env=None, stdin=None: (1, "RequestTimeTooSkewed: The difference between the request time and the server's time is too large (403)"),
+            lambda argv, env=None, stdin=None: (1, "InvalidAccessKeyId: The key id you provided does not exist (403)"),
+            lambda argv, env=None, stdin=None: (1, "InvalidToken: the provided token is malformed"),
+            lambda argv, env=None, stdin=None: (1, "ExpiredToken: the provided token has expired"),
+            lambda argv, env=None, stdin=None: (1, "403 Forbidden"),
+            lambda argv, env=None, stdin=None: (1, "HTTP 401 Unauthorized"),
+            lambda argv, env=None, stdin=None: (1, "Unauthorized"),
+            lambda argv, env=None, stdin=None: (1, "403"),
+            # a credential error that also says AccessDenied is still a credential problem, not a capability answer
+            lambda argv, env=None, stdin=None: (1, "AccessDenied: SignatureDoesNotMatch"),
         ]
         for runner in cases:
             rc, text, b2 = self.probe(runner)
