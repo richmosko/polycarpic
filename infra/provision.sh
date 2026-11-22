@@ -264,7 +264,7 @@ secrets_for() { # root services generated
   for pair in $generated; do
     svc=${pair%%/*}; f=$root/$pair; gid=$(gid_of "$svc")
     if [ ! -e "$f" ]; then
-      (umask 0377; head -c 32 /dev/urandom | base64 | tr -d '\n' > "$f")
+      (umask 0377; head -c 32 /dev/urandom | base64 > "$f")
       change "generated ${f#"$ETC"/}"
     fi
     [ "$(stat -c %u:%g "$f")" = "0:$gid" ] || chown "root:$gid" "$f"
