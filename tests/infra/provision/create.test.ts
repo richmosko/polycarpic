@@ -63,15 +63,22 @@ describe('create.sh (R1)', () => {
     const r = run(`${KEY} touch /var/fake-state/no-stock-fsn1; bash /repo/infra/hetzner/create.sh --name pc --location fsn1 --ssh-key /root/k.pub --type cpx31 2>&1; echo "rc=$?"; ${state('[(.ssh_keys|length), (.firewalls|length), (.servers|length)]')}; ${calls}`);
     expect(r.out).not.toMatch(/rc=0/);
     expect(r.out).toMatch(/resource_unavailable/);
-    expect(r.out).toMatch(/--location nbg1/);
+    const hint = r.out.split('\n').find((l) => /no stock/i.test(l))!; // the hint's own wording: "… no stock for <type> in <location> …"
+    expect(hint, 'a line that says there is no stock').toBeDefined();
+    expect(hint).toMatch(/--location nbg1/);
+    expect(hint).not.toMatch(/--location fsn1/);
+    expect(r.out).toMatch(/^change: hcloud server create .*--location fsn1/m); // the change line stays the real argv (R1)
     expect(r.out).toContain('[1,1,0]');
     expect(r.out).not.toMatch(/^hcloud (ssh-key|firewall|server|volume) delete/m); // what was made stays
   });
   it('F1: when nbg1 was asked and has no stock the fallback is fsn1', () => {
     const r = run(`${KEY} touch /var/fake-state/no-stock-nbg1; bash /repo/infra/hetzner/create.sh --name pc --location nbg1 --ssh-key /root/k.pub --type cpx31 2>&1; echo "rc=$?"`);
     expect(r.out).not.toMatch(/rc=0/);
-    expect(r.out).toMatch(/--location fsn1/);
-    expect(r.out).not.toMatch(/--location nbg1/);
+    const hint = r.out.split('\n').find((l) => /no stock/i.test(l))!;
+    expect(hint, 'a line that says there is no stock').toBeDefined();
+    expect(hint).toMatch(/--location fsn1/);
+    expect(hint).not.toMatch(/--location nbg1/);
+    expect(r.out).toMatch(/^change: hcloud server create .*--location nbg1/m); // the change line keeps the asked location
   });
   it('F1: a rerun with the fallback location reuses the key and firewall (exists lines) and creates the server', () => {
     const r = run(`${KEY} touch /var/fake-state/no-stock-fsn1; bash /repo/infra/hetzner/create.sh --name pc --location fsn1 --ssh-key /root/k.pub --type cpx31 >/dev/null 2>&1; bash /repo/infra/hetzner/create.sh --name pc --location nbg1 --ssh-key /root/k.pub --type cpx31 2>&1; echo "rc=$?"`);
