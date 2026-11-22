@@ -94,6 +94,11 @@ class Term(io.StringIO):
     """What the real terminal would show for a child that inherits stdout/stderr."""
 
 
+def _tok(arg, token):
+    """A token with no "/" also matches the basename of a path element (scripts are run by their full bundle path)."""
+    return arg == token or ("/" not in token and arg.endswith("/" + token))
+
+
 class Runner:
     """ctx.run / ctx.run_inherit fake: answers from rules (last match wins), records every call, refuses what it was not told about."""
 
@@ -110,7 +115,7 @@ class Runner:
                     return r
                 continue
             n = len(tokens)
-            if any(tuple(argv[i:i + n]) == tuple(tokens) for i in range(len(argv) - n + 1)):
+            if any(all(_tok(a, t) for a, t in zip(argv[i:i + n], tokens)) for i in range(len(argv) - n + 1)):
                 return r
         self.unexpected.append(list(argv))
         raise AssertionError("FAKE: unexpected child process %r" % (argv,))
