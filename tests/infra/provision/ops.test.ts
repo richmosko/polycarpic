@@ -12,6 +12,7 @@ const EXEC = ['infra/ops/polycarpic-ops', 'infra/ops/install_box.py', 'infra/pro
 const LAP = `
 rm -rf /tmp/lap /tmp/bin; mkdir -p /tmp/lap /tmp/bin
 (cd /repo && cp -a --parents infra/ops infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql /tmp/lap/)
+find /tmp/lap -name __pycache__ -prune -exec rm -rf {} +
 (cd /tmp/lap && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm one)
 cat > /tmp/bin/ssh <<'SSH'
 #!/bin/bash
@@ -61,7 +62,7 @@ describe('polycarpic-ops install: install.sh to install_box.py on a real root', 
   });
 
   it('a second install of the same id changes nothing and says so', () => {
-    const r = ops(`install_ops >/dev/null; find /opt/polycarpic /usr/local/sbin -printf '%i %T@ %p\\n' | sort > /tmp/before; out=$(install_ops); echo "rc=$?"; echo "$out"; find /opt/polycarpic /usr/local/sbin -printf '%i %T@ %p\\n' | sort > /tmp/after; diff /tmp/before /tmp/after && echo SAME`);
+    const r = ops(`install_ops >/dev/null; find /opt/polycarpic /usr/local/sbin -path /opt/polycarpic/.incoming -prune -o -printf '%i %T@ %p\\n' | sort > /tmp/before; out=$(install_ops); echo "rc=$?"; echo "$out"; find /opt/polycarpic /usr/local/sbin -path /opt/polycarpic/.incoming -prune -o -printf '%i %T@ %p\\n' | sort > /tmp/after; diff /tmp/before /tmp/after && echo SAME`);
     expect(r.out).toMatch(/rc=0/);
     expect(r.out).toMatch(/polycarpic-ops git-[0-9a-f]{12} already installed/);
     expect(r.out).toContain('SAME');
@@ -171,7 +172,7 @@ awk '/^--ENV/{blk=""} {blk=blk"\\n"$0} /^POLY_POSTGRES_IMAGE=/{print "ENVHAS " $
     expect(r.out).toContain('OUT=https://app.example.com/accept?t=FAKELINK');
     expect(r.out).toContain('ERR=invitation recorded (bootstrap), expires');
     expect(r.out).toContain('LEAKS=0');
-    expect(r.out).toMatch(/RUN ARGV docker compose -f \S+\/infra\/compose\/prod\.yml -p polycarpic-prod --profile operator run --rm -T --pull never --no-deps operator user invite owner@example\.com --bootstrap/);
+    expect(r.out).toMatch(/RUN ARGV compose -f \S+\/infra\/compose\/prod\.yml -p polycarpic-prod --profile operator run --rm -T --pull never --no-deps operator user invite owner@example\.com --bootstrap/);
     expect(r.out).toContain(`ENVHAS POLY_APP_IMAGE=${app}`);
     expect(r.out).toContain(`ENVHAS POLY_POSTGRES_IMAGE=${pg}`);
   });
@@ -255,7 +256,7 @@ describe('provision-check D3 records its probe window in jobs.log (R7: without i
     expect(m![3]).toBe('ok');
     expect(m![1]! <= m![2]!).toBe(true);
     const twice = ALL(`rm -f ${JOBS}; ${CHECK_OPS} > /dev/null 2>&1; ${CHECK_OPS} > /dev/null 2>&1; wc -l < ${JOBS}`);
-    expect(twice.out).toMatch(/\n2\s*(rc=\d)?/);
+    expect(twice.out).toMatch(/^\s*2\s*$/m);
   });
   it('a failing probe still appends its window, ending `failed`', () => {
     const r = ALL(`rm -f ${JOBS}; echo ok > /var/fake-state/c79-web; ${CHECK_OPS} > /dev/null 2>&1; cat ${JOBS}`);

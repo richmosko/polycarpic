@@ -23,6 +23,7 @@ import urllib.request
 from pathlib import Path
 from unittest import mock
 
+sys.dont_write_bytecode = True  # never leave infra/ops/__pycache__ in the checkout the container tests copy
 REPO = Path(__file__).resolve().parents[3]
 OPS = REPO / "infra" / "ops"
 DISPATCH = OPS / "polycarpic-ops"
