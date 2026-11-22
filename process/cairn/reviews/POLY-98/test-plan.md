@@ -97,3 +97,13 @@ The ruling fixes the Ctx field list but not signatures. Everything below is what
 - **Row 49:** R12 says "a 30-line fixture". The status screen has at most 11 item lines plus header, fix lines and summary, so 24 cannot be reached by count; the test pushes width and fix lines instead. If the ruling meant multi-line items, architect says so.
 - **Row 44, K6's second test:** compose declares no refused name in two services, and H6's mounted-file list is hard-coded in `provision-check.sh`, so "a refused name present in two declared services" is tested as a generated name copied into a service that does not mount it.
 - **C: tests need a Docker daemon and several minutes;** the set-secret case drives a pty with `script`, the one place a timing flake could appear.
+
+## K12 (seceng, Addendum 2)
+
+| # | Item | File :: case |
+|--|--|--|
+| 65 | (a) Ctx(...) never sets trusted_uid but literal 0; no SUDO_UID/SUDO_USER read | U:lint :: test_trusted_uid_is_never_set… |
+| 66 | (b) production builder ignores SUDO_UID and `--trusted-uid` | U:dispatcher :: test_the_production_context… (pin 15: `lib.ctx.production()`; `main(argv)` with no ctx builds it) |
+| 67 | (c) recorded chown uid is 0 whatever trusted_uid | U:set_secret :: test_the_recorded_chown_owner… |
+| 68 | (d) sudo-user-owned file in the install → 4 under real sudo | C: an install file owned by anyone but root (file=4) |
+| 69 | (e) fullmatch; newline-suffixed names ignored | U:dispatcher :: test_names_with_a_trailing_newline…; U:lint :: test_names_are_matched_with_fullmatch |

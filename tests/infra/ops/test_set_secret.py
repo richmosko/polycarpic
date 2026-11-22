@@ -114,6 +114,12 @@ class SetSecret(OpsTest):
         self.assertEqual(r.out.splitlines(), lines)
         self.assertEqual(sorted((c[1], c[2]) for c in r.chowns), sorted([(0, self.host.gid("auth")), (0, self.host.gid("worker"))]))
 
+    def test_the_recorded_chown_owner_is_root_whatever_the_trusted_uid(self):  # K12(c)
+        r = self.put("resend_api_key", "fxvalue", trusted=os.getuid())
+        self.assertEqual(r.rc, 0, r.err)
+        self.assertTrue(r.chowns)
+        self.assertTrue(all(c[1] == 0 for c in r.chowns), r.chowns)
+
     def test_under_umask_077_the_target_is_still_0440(self):  # K4
         os.umask(0o077)
         self.put("resend_api_key", "fxvalue")

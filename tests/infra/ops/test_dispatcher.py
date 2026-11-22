@@ -105,6 +105,32 @@ class Dispatcher(OpsTest):
         for bad in ("evil-name", "Evil", "evil_name"):
             self.assertEqual(self.host.go(bad, dispatcher=d).rc, 2, bad)
 
+    def test_names_with_a_trailing_newline_are_ignored(self):  # K12(e): fullmatch, not match with $
+        dst = self._copy_tree()
+        body = 'HELP = "planted"\ndef add_arguments(parser):\n    pass\ndef run(args, ctx):\n    return 0\n'
+        (dst / "commands" / "nl_cmd.py\n").write_text(body)
+        (dst / "status" / "99_nl.py\n").write_text("def run(ctx):\n    return []\n")
+        d = load_dispatcher(dst / "polycarpic-ops")
+        names = [l.split()[0] for l in self.host.go("help", dispatcher=d).out.splitlines() if l.split()]
+        self.assertNotIn("nl-cmd", names)
+        self.assertNotIn("nl_cmd", names)
+        self.assertEqual(self.host.go("nl-cmd", dispatcher=d).rc, 2)
+
+    def test_the_production_context_ignores_sudo_uid_and_a_trusted_uid_flag(self):  # K12(b)
+        from base import ctx_class
+        import importlib
+        ctx_class()
+        production = importlib.import_module("lib.ctx").production
+        with mock.patch.dict(os.environ, {"SUDO_UID": "1000", "SUDO_USER": "polyops"}), mock.patch.object(sys, "argv", ["polycarpic-ops", "--trusted-uid", "1000", "help"]):
+            self.assertEqual(production().trusted_uid, 0)
+        d = load_dispatcher()
+        with mock.patch.dict(os.environ, {"SUDO_UID": "1000"}):
+            try:
+                rc = d.main(["--trusted-uid", "1000", "help"])
+            except SystemExit as e:
+                rc = e.code
+        self.assertIn(rc, (2, 4))
+
     def test_invoked_through_a_symlink_it_loads_the_bundles_modules(self):  # K1
         need(DISPATCH)
         link = self.tmp / "sbin-link"

@@ -67,6 +67,24 @@ class Lint(unittest.TestCase):
                 if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call) and not isinstance(node.value.func, ast.Attribute):
                     self.fail("%s:%d runs %s at import" % (f, node.lineno, getattr(node.value.func, "id", "?")))
 
+    def test_trusted_uid_is_never_set_or_derived_from_the_caller(self):  # K12(a)
+        for f, node in self.calls():
+            if (getattr(node.func, "attr", "") or getattr(node.func, "id", "")) == "Ctx":
+                for k in node.keywords:
+                    if k.arg == "trusted_uid":
+                        self.assertTrue(isinstance(k.value, ast.Constant) and k.value.value == 0, "%s:%d" % (f, node.lineno))
+        for f in sources():
+            text = f.read_text()
+            for needle in ("SUDO_UID", "SUDO_USER", "trusted-uid", "trusted_uid=os"):
+                self.assertNotIn(needle, text, str(f))
+
+    def test_names_are_matched_with_fullmatch(self):  # K12(e)
+        for f in sources():
+            for node in ast.walk(ast.parse(f.read_text(), str(f))):
+                if isinstance(node, ast.Call) and getattr(node.func, "attr", "") in ("match", "search") and getattr(getattr(node.func, "value", None), "id", "") == "re":
+                    if node.args and isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str) and node.args[0].value.endswith("$") and "\\n" not in node.args[0].value:
+                        self.fail("%s:%d re.%s with a $-anchored pattern; use fullmatch" % (f, node.lineno, node.func.attr))
+
     def test_no_test_hook_names_a_root_in_argv_or_the_environment(self):  # R1: root and fakes come from the constructor only
         for f in sources():
             text = f.read_text()

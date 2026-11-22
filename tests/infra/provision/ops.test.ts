@@ -136,11 +136,12 @@ describe('polycarpic-ops under real sudo', () => {
   });
 
   it('an install file owned by anyone but root exits 4 naming it; a group-writable one the same; restoring it passes again', () => {
-    const r = INSTALLED(`f=/opt/polycarpic/ops/current/infra/ops/lib; chown polyops:polyops $f; ${SUDO('polycarpic-ops help')}; echo "owner=$?"; chown root:root $f; chmod g+w /opt/polycarpic/ops/current/infra/compose/prod.yml; ${SUDO('polycarpic-ops help')}; echo "gw=$?"; chmod g-w /opt/polycarpic/ops/current/infra/compose/prod.yml; ${SUDO('polycarpic-ops help')} >/dev/null; echo "ok=$?"`);
+    const r = INSTALLED(`f=/opt/polycarpic/ops/current/infra/ops/lib; chown polyops:polyops $f; ${SUDO('polycarpic-ops help')}; echo "owner=$?"; chown root:root $f; touch /opt/polycarpic/ops/current/infra/ops/zz.py; chown polyops /opt/polycarpic/ops/current/infra/ops/zz.py; ${SUDO('polycarpic-ops help')}; echo "file=$?"; rm /opt/polycarpic/ops/current/infra/ops/zz.py; chmod g+w /opt/polycarpic/ops/current/infra/compose/prod.yml; ${SUDO('polycarpic-ops help')}; echo "gw=$?"; chmod g-w /opt/polycarpic/ops/current/infra/compose/prod.yml; ${SUDO('polycarpic-ops help')} >/dev/null; echo "ok=$?"`);
     expect(r.all).toMatch(/install is not root-owned: \/opt\/polycarpic\/ops\/git-[0-9a-f]{12}\/infra\/ops\/lib/);
     expect(r.all).toMatch(/install is not root-owned: \/opt\/polycarpic\/ops\/git-[0-9a-f]{12}\/infra\/compose\/prod\.yml/);
     expect(r.out).toContain('owner=4');
     expect(r.out).toContain('gw=4');
+    expect(r.out).toContain('file=4'); // K12(d): a file owned by the sudo user is not root-owned
     expect(r.out).toContain('ok=0');
   });
 
