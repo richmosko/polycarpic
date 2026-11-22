@@ -8,10 +8,10 @@ import { node, ROOT, wf } from './helpers.ts';
 
 // The jobs ci.yml gates on each filter output, read from the job-level `if:` (the contract REQUIRED must mirror).
 const ifOf = (job: string) => `${wf('ci.yml').jobs[job]?.if ?? ''}`;
-const wired = (out: string) => ['lint', 'unit', 'db', 'image'].filter((j) => new RegExp(`needs\\.changes\\.outputs\\.${out}\\b`).test(ifOf(j))).sort();
+const wired = (out: string) => ['lint', 'unit', 'db', 'image', 'provision'].filter((j) => new RegExp(`needs\\.changes\\.outputs\\.${out}\\b`).test(ifOf(j))).sort();
 
 type Needs = Record<string, { result: string; outputs: Record<string, string> }>;
-const OUT = ['node', 'layers', 'db', 'image', 'ci', 'e2e'];
+const OUT = ['node', 'layers', 'db', 'image', 'ci', 'e2e', 'provision'];
 // POLY-141 C20: the aggregate also reads the four area keys; `db` is their OR, so asking for `db` turns all four on.
 const AREAS = ['db_auth', 'db_tenancy', 'db_migrate', 'db_ops'];
 const outputsFor = (on: string[]): Record<string, string> => {
@@ -22,7 +22,7 @@ const base = (on: string[] = []): Needs => ({
   changes: { result: 'success', outputs: outputsFor(on) },
   guard: { result: 'success', outputs: {} },
   lint: { result: 'skipped', outputs: {} }, unit: { result: 'skipped', outputs: {} },
-  db: { result: 'skipped', outputs: {} }, image: { result: 'skipped', outputs: {} },
+  db: { result: 'skipped', outputs: {} }, image: { result: 'skipped', outputs: {} }, provision: { result: 'skipped', outputs: {} },
 });
 const set = (n: Needs, job: string, result: string): Needs => ({ ...n, [job]: { ...n[job]!, result } });
 const agg = (needs: unknown, raw?: string) => node('aggregate.mjs', { env: { NEEDS: raw ?? JSON.stringify(needs) } }).code;
@@ -33,7 +33,7 @@ describe('aggregate.mjs', () => {
   });
   it('all jobs succeeded with every output true -> green', () => {
     let n = base(OUT);
-    for (const j of ['lint', 'unit', 'db', 'image']) n = set(n, j, 'success');
+    for (const j of ['lint', 'unit', 'db', 'image', 'provision']) n = set(n, j, 'success');
     expect(agg(n)).toBe(0);
   });
   it('changes failed (filter error) -> red  [red if: changes result ignored; criterion 1 fail-closed]', () => {
@@ -42,11 +42,11 @@ describe('aggregate.mjs', () => {
   it('changes skipped -> red', () => { expect(agg(set(base(), 'changes', 'skipped'))).not.toBe(0); });
   it('guard failed -> red  [red if: guard not required]', () => { expect(agg(set(base(), 'guard', 'failure'))).not.toBe(0); });
   it('guard skipped -> red  [red if: guard may be skipped]', () => { expect(agg(set(base(), 'guard', 'skipped'))).not.toBe(0); });
-  for (const j of ['lint', 'unit', 'db', 'image']) {
+  for (const j of ['lint', 'unit', 'db', 'image', 'provision']) {
     it(`${j} failure -> red`, () => { expect(agg(set(base(), j, 'failure'))).not.toBe(0); });
     it(`${j} cancelled -> red  [red if: only 'failure' is rejected]`, () => { expect(agg(set(base(), j, 'cancelled'))).not.toBe(0); });
   }
-  const keyed: [string, string][] = [['node', 'unit'], ['layers', 'lint'], ['ci', 'lint'], ['image', 'image'], ['db', 'db'], ['e2e', 'unit']];
+  const keyed: [string, string][] = [['node', 'unit'], ['layers', 'lint'], ['ci', 'lint'], ['image', 'image'], ['db', 'db'], ['e2e', 'unit'], ['provision', 'provision']];
   for (const [out, job] of keyed) {
     it(`output ${out}=true but ${job} skipped -> red (mis-wired if:)  [red if: output->job check removed or mapped wrong]`, () => {
       expect(agg(base([out]))).not.toBe(0);
@@ -72,7 +72,7 @@ describe('aggregate.mjs', () => {
 
 // POLY-136 item 2 (ruling): one output can gate several jobs; the aggregate checks every one of them.
 describe('aggregate.mjs: every job an output gates (POLY-136 item 2)', () => {
-  const allOk = (on: string[]) => { let n = base(on); for (const j of ['lint', 'unit', 'db', 'image']) n = set(n, j, 'success'); return n; };
+  const allOk = (on: string[]) => { let n = base(on); for (const j of ['lint', 'unit', 'db', 'image', 'provision']) n = set(n, j, 'success'); return n; };
   for (const [out, job] of [['node', 'lint'], ['node', 'image'], ['image', 'lint'], ['image', 'unit']] as const) {
     it(`output ${out}=true but ${job} skipped (the other jobs ran) -> red  [red if: REQUIRED maps ${out} to fewer jobs than ci.yml wires]`, () => {
       expect(agg(set(allOk([out]), job, 'skipped'))).not.toBe(0);

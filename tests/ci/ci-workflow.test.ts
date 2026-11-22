@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { needsOf, runBodies, steps, wf, wfText, type Job } from './helpers.ts';
 
 const w = wf('ci.yml');
-const NEW = ['changes', 'guard', 'lint', 'unit', 'db', 'image'];
+const NEW = ['changes', 'guard', 'lint', 'unit', 'db', 'image', 'provision'];
 const all = (j: Job) => JSON.stringify(j);
 const runOf = (j: Job) => steps(j).map((s) => s.run ?? '').join('\n');
 
@@ -84,7 +84,7 @@ describe('ci.yml: changes + guard (criteria 1, 4)', () => {
     expect(runOf(j)).toMatch(/set -euo pipefail/);
     expect(runOf(j)).toMatch(/infra\/ci\/changes\.mjs/);
     expect(runOf(j)).toMatch(/\^\[0-9a-f\]\{40\}\$/); // dispatch base validated as 40-hex
-    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'e2e', 'image', 'layers', 'node']); // POLY-141: the five keys, e2e and the four areas
+    expect(Object.keys(j.outputs ?? {}).sort()).toEqual(['ci', 'db', 'db_auth', 'db_migrate', 'db_ops', 'db_tenancy', 'e2e', 'image', 'layers', 'node', 'provision']); // POLY-141: the five keys, e2e and the four areas
   });
   it('guard runs always (no if), pin check over .github and infra/ci, and gitleaks  [red if: guard gated on changes]', () => {
     const j = w.jobs.guard!;
@@ -313,7 +313,7 @@ describe('ci.yml: db areas (POLY-141 C8, C11, S7)', () => {
   const battery = () => steps(dbj())[idx(/tests\/db\/vitest\.config\.ts/)]!;
 
   it('changes exposes the nine outputs: the five keys and db_auth, db_tenancy, db_migrate, db_ops  [red while the area keys are absent]', () => {
-    expect(Object.keys(w.jobs.changes!.outputs ?? {}).sort()).toEqual(['ci', 'db', ...AREA_KEYS, 'e2e', 'image', 'layers', 'node'].sort());
+    expect(Object.keys(w.jobs.changes!.outputs ?? {}).sort()).toEqual(['ci', 'db', ...AREA_KEYS, 'e2e', 'image', 'layers', 'node', 'provision'].sort());
   });
   it('a dispatch with no base sets every key true: the printf names all nine', () => {
     const body = runOf(w.jobs.changes!);

@@ -1,6 +1,6 @@
 // POLY-96 `app` aggregate (ruling §1). env NEEDS = toJSON(needs). Exit 0 = green. Anything unexpected is red.
 // Every job whose job-level `if:` names the filter output; tests/ci ties this to ci.yml.
-export const REQUIRED = { node: ['lint', 'unit', 'image'], layers: ['lint'], ci: ['lint'], image: ['lint', 'unit', 'image'], db: ['db'], e2e: ['unit'] };
+export const REQUIRED = { node: ['lint', 'unit', 'image'], layers: ['lint'], ci: ['lint'], image: ['lint', 'unit', 'image'], db: ['db'], e2e: ['unit'], provision: ['provision'] };
 import { ALL_KEYS, AREA_KEYS } from './changes.mjs';
 const OK = new Set(['success', 'skipped']);
 
@@ -9,7 +9,7 @@ export function evaluate(raw) {
   try { needs = JSON.parse(raw ?? ''); } catch { return ['NEEDS is not JSON']; }
   if (!needs || typeof needs !== 'object') return ['NEEDS is not an object'];
   const bad = [];
-  for (const j of ['changes', 'guard', 'lint', 'unit', 'db', 'image']) {
+  for (const j of ['changes', 'guard', 'lint', 'unit', 'db', 'image', 'provision']) {
     const r = needs[j]?.result;
     if (r === undefined) bad.push(`${j}: missing`);
     else if (j === 'changes' || j === 'guard') { if (r !== 'success') bad.push(`${j}: ${r}`); }

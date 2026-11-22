@@ -1,6 +1,6 @@
 # POLY-97 test plan (qa-engineer-97)
 
-Authority: `ruling.md` at 1eafa6c5 (R1–R12 + Addenda 1–3) and `pins-review.md` at a483460d (precisions 3a–c, 5a–b). Harness per R3: fakes, no network, no credential. Paths: `V:` = `tests/infra/image/` (vitest, image config), `P:` = `tests/infra/operator/` (unittest). Files: `V:provision-create.test.ts` (create), `V:provision.test.ts` (host stage + H), `V:provision-db.test.ts` (database stage + D + summaries), `P:test_*.py`. Harness: `tests/infra/provision/` (Dockerfile pinned by digest, `fakes/`, `prelude.sh`, `apply-cloud-init.py`), `V:provision-box.ts`, `P:base.py`.
+Authority: `ruling.md` at 1eafa6c5 (R1–R12 + Addenda 1–3) and `pins-review.md` at a483460d (precisions 3a–c, 5a–b). Harness per R3: fakes, no network, no credential. Paths (after the CI remedy, architect pins-review @ 5b2a5e90): `V:` = `tests/infra/provision/` (vitest, `vitest.provision.config.ts`, the new `provision` job): `create.test.ts` (create.sh, cloud-init), `host.test.ts` (host stage + H), `checks-db.test.ts` (D checks + summaries, on the pinned base Postgres image). `V-db:` = `tests/infra/image/provision-db.test.ts` (the database stage and the M2 log sweep, on the infra/postgres derivative; stays in the `image` job). `P:` = `tests/infra/operator/` (unittest, `provision` job). Harness: `tests/infra/provision/` (Dockerfile pinned by digest, `fakes/`, `prelude.sh`, `apply-cloud-init.py`, `box.ts`, `pg.ts`). Row labels below say `V:create`, `V:prov` (= host), `V:db` (= V-db for rows 45–51, checks-db for rows 92–105).
 
 ## Contract pins
 
@@ -143,3 +143,11 @@ Ruled by the architect: `ruling.md` Addendum 2 @ 512d9c50 and Addendum 3 @ 1eafa
 - Total new: **201** (125 + 70 + 6). The rows above (numbered by ruled item; a few rows hold two or three tests) cover R1 (1–19), R2 (20–25), R3 (176–181), R4 (52–55, 100–104), R5 (26–51), R6 H1–H15 (56–91) and D1–D6 (92–99), R8 (106–143, 169–175), R9 (144–168), R10 (44, 47–49, 82–83, 105, 109–110, plus the secret sweeps in every Python file), M1 (35, 66), M2 (47–48).
 - Ruled items without a test, with reason: R12 (the Principal's real run), R11 (docs, seceng/devops/architect verdicts), the INFRA/SECURITY text; H12's real-key behaviour and the Docker apt key (only the pinned-fingerprint branch is testable; unmeasured until E7); `userland-proxy` effect (needs a live daemon, POLY-104); H3's overlap check against a real daemon (fake `docker info`).
 - Guards: the dry run's local time is in `red-run.md`; the image job's ≤120 s and ≤60 s guards are measured at build-green.
+
+## Added after gate 3 (build-review d07244e8, CAA, CI remedy)
+
+- B1: `b2-setup --probe` runs rclone's S3 backend (env `RCLONE_CONFIG_PROBE_TYPE=s3`, `PROVIDER=Other`, `ENDPOINT=<s3ApiUrl>`, `NO_CHECK_BUCKET=true`, no B2-backend vars). B2: unrestricted key that can write = FAIL (5 capability cases), unrestricted read-only = WARN rc 0, restricted to another bucket id = silent. A-probe2: `--probe` ends with the regeneration prompt and the 401 check; a still-live old key exits non-zero. P:b2_setup, +6 tests.
+- CAA: dns-records POSTs `data {flags, tag, value}` with no `content`; dns-check passes on content-only, data-only and both list replies and catches CAA faults in data-only mode. P:dns_records +2, P:dns_check +2.
+- Second firewall drift (lead, same rule as R1/D-7): pinned `change: firewall detached (<name>)`, via `hcloud firewall remove-from-resource`, never delete; positive case prints no such line. V:create +2.
+- A-M2 mutation: with the two SET lines stripped, the verifier does reach the Postgres log. V-db +1; plus a staging-stage test (five roles authenticate, poly_backup has no verifier) V-db +1.
+- CI remedy: `provision` job, changes key and paths, `app` aggregate (REQUIRED, result list), `budgets.json` 200 s, 10 `changes.test.ts` rows, aggregate/ci-workflow expectations, wiring test rewritten.

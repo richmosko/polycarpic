@@ -155,6 +155,7 @@ jobs:
       db: ${{ steps.filter.outputs.db }}
       image: ${{ steps.filter.outputs.image }}
       ci: ${{ steps.filter.outputs.ci }}
+      provision: ${{ steps.filter.outputs.provision }}
       e2e: ${{ steps.filter.outputs.e2e }}
       db_auth: ${{ steps.filter.outputs.db_auth }}
       db_tenancy: ${{ steps.filter.outputs.db_tenancy }}
@@ -183,7 +184,7 @@ jobs:
           # Fail closed: a git or filter error is a red job, never an all-false output (criterion 1).
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             if [ -z "$DISPATCH_BASE" ]; then
-              printf '%s\n' node=true layers=true db=true image=true ci=true e2e=true db_auth=true db_tenancy=true db_migrate=true db_ops=true >> "$GITHUB_OUTPUT"
+              printf '%s\n' node=true layers=true db=true image=true ci=true provision=true e2e=true db_auth=true db_tenancy=true db_migrate=true db_ops=true >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "$DISPATCH_BASE" | grep -Eq '^[0-9a-f]{40}$'
@@ -662,19 +663,7 @@ jobs:
           bash infra/ci/image.sh scan polycarpic-postgres:ci
           bash infra/ci/image.sh scan polycarpic-caddy:ci
 
-      - name: Build the provisioning test container (POLY-97)
-        if: needs.changes.outputs.image == 'true'
-        run: docker build -t poly97-box:test tests/infra/provision
-
-      - name: Shellcheck the provisioning scripts (inside the test container, so the version is pinned with it)
-        if: needs.changes.outputs.image == 'true'
-        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh
-
-      - name: Operator tool tests (Python stdlib, injected transports, no network)
-        if: needs.changes.outputs.image == 'true'
-        run: python3 -m unittest discover -s tests/infra/operator -t tests/infra/operator
-
-      - name: Container tests (SHOW, archive_command, secret modes, Caddy headers, provisioning dry run)
+      - name: Container tests (SHOW, archive_command, secret modes, Caddy headers, database stage)
         if: needs.changes.outputs.image == 'true'
         run: pnpm exec vitest run -c tests/infra/vitest.image.config.ts
 
@@ -705,9 +694,86 @@ jobs:
           JOB_STATUS: ${{ job.status }}
           CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
 
+  provision:
+    name: provision
+    needs: changes
+    if: needs.changes.outputs.provision == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Start clock
+        run: echo "JOB_START=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "26"
+
+      - name: Install pnpm
+        run: npm i -g --allow-scripts=pnpm pnpm@12.18.0
+
+      - name: Locate pnpm store
+        id: store
+        run: echo "path=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.store.outputs.path }}
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+      - name: Install (lockfile frozen, lifecycle scripts blocked)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the provisioning test container (POLY-97)
+        run: docker build -t poly97-box:test tests/infra/provision
+
+      - name: Shellcheck the provisioning scripts (inside the test container, so the version is pinned with it)
+        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh
+
+      - name: Operator tool tests (Python stdlib, injected transports, no network)
+        run: python3 -m unittest discover -s tests/infra/operator -t tests/infra/operator
+
+      - name: Provisioning dry run (create.sh, cloud-init, host stage, H and D checks, summaries)
+        run: pnpm exec vitest run -c tests/infra/vitest.provision.config.ts
+
+      - name: Record timing
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: jsonl
+          JOB_NAME: provision
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+
+      - name: Upload CI timing
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ci-test-runs-provision
+          path: ${{ runner.temp }}/ci-test-runs.jsonl
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Job report
+        if: always()
+        run: node infra/ci/job-report.mjs
+        env:
+          REPORT_ONLY: summary
+          JOB_NAME: provision
+          JOB_STATUS: ${{ job.status }}
+          CI_FULL_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.base == '' }}
+
   app:
     name: app
-    needs: [changes, guard, lint, unit, db, image]
+    needs: [changes, guard, lint, unit, db, image, provision]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5

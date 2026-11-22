@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { CAPS, BUCKET, COMPLETE, FX, HOST, HOST_ARGS, ROOT, CHECK, b2Fixture, build, check, failLine, find, last, lines, makeComplete, makeHost, run } from './provision-box.ts';
+import { CAPS, BUCKET, COMPLETE, FX, HOST, HOST_ARGS, ROOT, CHECK, b2Fixture, build, check, failLine, find, last, lines, makeComplete, makeHost, run } from './box.ts';
 
 const ENTER = `ssh-keygen -q -t ed25519 -N '' -f /root/k; sed "s|__SSH_PUBLIC_KEY__|$(cat /root/k.pub)|" /repo/infra/hetzner/cloud-init.yaml > /tmp/ci.yaml; python3 /harness/apply-cloud-init.py /tmp/ci.yaml;`;
 const HOSTRUN = `bash /repo/infra/provision.sh ${HOST_ARGS}`;

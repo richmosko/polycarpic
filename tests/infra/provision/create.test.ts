@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse } from 'yaml';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { ROOT, build, run } from './provision-box.ts';
+import { ROOT, build, run } from './box.ts';
 
 beforeAll(() => build());
 

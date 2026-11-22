@@ -63,6 +63,17 @@ const CASES: [string[], string[], string][] = [
   [['infra/postgres/Dockerfile'], ['image', 'db', 'e2e'], 'infra/postgres/Dockerfile dropped from `db` (the battery builds from its FROM line)'],
   [['infra/postgres-major'], ['image', 'db', 'e2e'], 'infra/postgres-major dropped from `db`'],
   [['infra/postgres/postgresql.prod.conf', 'infra/compose/prod.yml', 'infra/lint/policy.json'], ['image'], '`db` widened to all of infra/postgres, or infra/lint/compose dropped from `image`'],
+  // POLY-97 (CI remedy, pins-review @ 5b2a5e90): the provisioning dry run is its own `provision` job; image keeps only what the database-stage test needs.
+  [['infra/hetzner/create.sh'], ['provision'], 'infra/hetzner dropped from `provision`, or left in `image`'],
+  [['infra/operator/dns-check.py'], ['provision'], 'infra/operator dropped from `provision`, or left in `image`'],
+  [['tests/infra/operator/test_dns_check.py'], ['provision'], 'tests/infra/operator dropped from `provision`, or left in `image`'],
+  [['tests/infra/provision/create.test.ts'], ['provision'], 'dry-run test files dropped from `provision`, or left in `image`'],
+  [['tests/infra/vitest.provision.config.ts'], ['provision'], 'the provision vitest config dropped from `provision`, or left in `image`'],
+  [['tests/infra/provision/box.ts'], ['image', 'provision'], 'the box helpers dropped from `image` (provision-db.test.ts imports them) or from `provision`'],
+  [['infra/provision.sh'], ['image', 'provision'], 'infra/provision.sh dropped from `image` (the database-stage test runs it) or from `provision`'],
+  [['infra/provision-check.sh'], ['image', 'provision'], 'infra/provision-check.sh dropped from `provision`'],
+  [['tests/infra/image/provision-db.test.ts'], ['image'], 'the database-stage test dropped from `image`, or pulled into `provision`'],
+  [['packages/db/sql/roles.sql'], ['node', 'db', 'provision'], 'roles.sql dropped from `provision` (the database stage and D checks run it)'],
   // POLY-141 E1: the web e2e step imports the db harness and apps/migrate
   [['tests/db/helpers/x.ts'], ['db', 'e2e'], 'tests/db/helpers dropped from `e2e`'],
   [['tests/db/docker/Dockerfile'], ['db', 'e2e'], 'tests/db/docker dropped from `e2e`'],

@@ -1,1 +1,1 @@
-{"jobs": {"lint": 120, "db": 100}, "packageTest": 120}
+{"jobs": {"lint": 120, "db": 100, "provision": 200}, "packageTest": 120}
