@@ -49,25 +49,13 @@ def _real_run_inherit(argv, env=None, timeout=None):
 
 def _real_getpass(prompt=""):
     # getpass falls back to an echoed read when it cannot switch echo off; refuse that outright (K5).
-    # Our own read, not getpass.getpass: that flushes type-ahead (TCSAFLUSH), which drops a value pasted or piped before the prompt shows.
     try:
         import termios
-        fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
+        termios.tcgetattr(sys.stdin.fileno())
     except Exception:
         warnings.warn("cannot control echo", _getpass.GetPassWarning)
         return ""
-    new = list(old)
-    new[3] &= ~termios.ECHO
-    try:
-        termios.tcsetattr(fd, termios.TCSADRAIN, new)
-        sys.stderr.write(prompt)
-        sys.stderr.flush()
-        line = sys.stdin.readline()
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
-        sys.stderr.write("\n")
-    return line.rstrip("\n")
+    return _getpass.getpass(prompt)  # flushes type-ahead (TCSAFLUSH): anything typed before the prompt was already echoed, so it is not kept
 
 
 def _real_chown(target, uid, gid):
