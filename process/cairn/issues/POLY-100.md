@@ -18,11 +18,11 @@ INFRA §4.4–§4.6 / ARCH §8.1: a 5-minute poll under flock, digest pull, gh a
 
 ## Acceptance criteria
 
-- [ ] With a fake registry fixture, an unverified image is never run.
-- [ ] A failed attestation, a bad tag signature and a wrong commit label each stop the deploy and alert.
-- [ ] An unhealthy release rolls back within 120 s and is quarantined; a failing migration file leaves the old containers running.
-- [ ] The script never rewrites itself.
-- [ ] The bad-migration rollback runbook's inputs are proven: `backup premigration`, then a restore from the pre-migration backup on the operator's laptop (T13). The 60-minute timing is measured in the restore drill, POLY-116.
+- [x] With a fake registry fixture, an unverified image is never run. Proved by `test_deploy_candidate.py` (`test_t1_v1_argv_is_exactly_the_six_flags_with_c_and_precedes_any_pull`, `test_t2_a_label_alone_does_not_bind_the_image`) and `test_deploy_flow.py::test_t7_a_deploy_never_rewrites_the_box_and_runs_nothing_from_the_release`; the guard cases in `test_deploy_guard.py`; red-run.md has each on a mutant.
+- [x] A failed attestation, a bad tag signature and a wrong commit label each stop the deploy and alert. Proved by `test_deploy_candidate.py` (`test_label_mismatch_is_refused_and_quarantined`, `test_t3_a_tag_signed_by_a_key_not_in_allowed_signers`, V1 refusals) and `test_deploy_prod.py`.
+- [x] An unhealthy release rolls back within 120 s and is quarantined; a failing migration file leaves the old containers running. Proved by `test_deploy_flow.py` (`test_t10_unhealthy_rolls_back_from_the_previous_bundle_without_migrating_and_is_quarantined_once`, `test_t11_a_failing_migrate_never_touches_the_running_containers`), `test_deploy_probe.py`, `test_deploy_hang.py`.
+- [x] The script never rewrites itself. Proved by `test_deploy_flow.py::test_t7_a_deploy_never_rewrites_the_box_and_runs_nothing_from_the_release` and `test_deploy_render.py` (every compose call names the saved render; a `releases/` path only as `config`'s inputs).
+- [x] The bad-migration rollback runbook's inputs are proven: `backup premigration`, then a restore from the pre-migration backup on the operator's laptop (T13). The 60-minute timing is measured in the restore drill, POLY-116. Proved by `test_deploy_t13.py` (`test_the_set_a_deploy_logs_is_the_set_list_premigration_offers`, `test_fetch_premigration_gives_the_same_bytes`, `test_the_fake_box_and_the_real_list_print_the_same_bytes`).
 - [ ] A failing migration file leaves the tracking table and the schema exactly as before the run (one transaction).
 - [ ] Two migrate runs started together: the second waits on the advisory lock and then applies nothing.
 

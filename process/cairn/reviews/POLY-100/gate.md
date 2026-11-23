@@ -1,6 +1,6 @@
-# POLY-100 gate (qa-100) — local set at 2825b6f7 (build complete); CI's Linux result to be added
+# POLY-100 gate (qa-100) — SIGNED OFF at 2825b6f7: local set green (one Mac-only exception, below) and ci.yml run 45288873465 green on every job
 
-Plan: `test-plan.md` (pins), `red-run.md` (every test shown red on the build before its fix, and every security test on a mutant). Numbers are this Mac, my worktree, one suite at a time. Linux CI is the authority for the container suites and for the Linux-only cases. **Not signed off: sign-off needs CI green at one sha.**
+Plan: `test-plan.md` (pins), `red-run.md` (every test shown red on the build before its fix, and every security test on a mutant). Numbers are this Mac, my worktree, one suite at a time. Linux CI is the authority for the container suites and for the Linux-only cases. Sign-off: CI green at the same sha 2825b6f7.
 
 ## Results by job
 
@@ -17,6 +17,10 @@ Plan: `test-plan.md` (pins), `red-run.md` (every test shown red on the build bef
 Reds, with my reading:
 - image `postgres.test.ts` ×2 (0440 file ownership refusals): Docker Desktop does not enforce bind-mount uid/gid; CI Linux was green for them.
 - `tests/ci` freshness ×6: as above, worktree without drizzle-kit.
+
+## CI, ci.yml run 45288873465 at 2825b6f7 (Linux; the authority)
+
+Every job green: provision 149 s (ops unit step 15 s, dry run 86 s), image 626 s (container tests 134 s, backup suite 333 s), lint 100 s (infra lint fixtures 33 s, `render-isolation.test.ts` included and passing on Linux), db 196 s, unit 319 s. PR #150's last run, for comparison: provision 150 s, image 737 s, db 244 s. This settles the two Docker-Desktop ownership reds and the six `generated-freshness` reds above as this Mac and worktree, not the branch. The Linux-only S31 cases ran for the first time here and passed.
 
 ## Acceptance criteria and the proving test
 
