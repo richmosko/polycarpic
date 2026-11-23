@@ -387,6 +387,14 @@ not answer)'`, so DR8 FAILs and the drill reaches its verdict.
 - If that case turns out green on the mutant too, the comparison is unreachable on the current code. That would be a
   drill defect, and I review the fix.
 
+**Moved to `a937f9a56e5b49dfe5fbc738fa9c16cafe1c50df`.** `git diff 106f1a9b..a937f9a5 -- infra` changes only two
+trailing marker comments: `# T17` becomes `# T17b` in `restore-lib.sh` and `# T17p` in `restore.sh`. Nothing else
+changes, so the conditional PASS stands on `a937f9a5`.
+
+On DR2: if qa confirms that the existing case prints `FAIL DR2` on the real build and `PASS DR2` on the `if false`
+mutant, that is the red proof. I then withdraw the single-fault case as a requirement. It remains a suggestion for the
+WAL copy of the comparison, which the existing case may not reach.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
