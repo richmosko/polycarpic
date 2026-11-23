@@ -310,3 +310,11 @@ class FirstAttempt(ProdBase):
         r = self.deploy("prod", cmd="first-deploy")
         self.assertEqual(r.rc, 4, r.err)
         self.assertIsNone(self.state("prod", "first-attempt"))
+
+    def test_existing_data_on_a_non_empty_directory_never_writes_the_first_attempt_file(self):
+        self.host.write(self.DATA + "/PG_VERSION", "17\n")
+        self.world.plan_code = 1  # the run stops after Postgres is started, so only a file written up front would still be there
+        r = self.deploy("prod", "--existing-data", cmd="first-deploy")
+        self.assertEqual(r.rc, 1, r.err)
+        self.assertEqual(len(self.world.premigration_calls), 1)
+        self.assertIsNone(self.state("prod", "first-attempt"), "a non-empty directory is never this project's own earlier attempt")

@@ -109,3 +109,24 @@ with write scopes, `release-scan` renamed, scanning the app only, stopping at th
 
 `test_deploy_guard.py` and `compose-real.test.ts` now use the real name. Red on the key-only mutant (`compose_guard._networks`: `entry != pol["networks"][key]` dropped):
 unit `test_t8_each_unsafe_render…` (the S14 subtests) and real-render cases "external polycarpic-prod_default behind key default" and "the staging edge key pointing at polycarpic-edge-prod".
+
+## Rulings after D2 (qa-100; mutants by one textual replacement, module run after each)
+
+| Test | Mutant | Red |
+|---|---|---|
+| T10q / S18 (`test_deploy_quarantine.py`) | `release.quarantined`: lift every reason / never lift / lift without the id check / last line wins instead of any | 4, 3, 1 and 1 tests (the both-orders case needed the last one) |
+| T-help (`test_deploy_help.py`) | `guardhelp._target` accepts any text; `_base` takes `sha256-` ids as commits | the placeholder cases; `test_a_sha256_bundle_id_is_not_a_commit…` |
+| T-help | `clean()` removed | none: every value is checked before it reaches the text, so `clean` is a second layer (equivalent) |
+| T-sauth (`test_staging_auth.py`) | input check off; any cost accepted; `re.search(… $)` for the full match; the file's group not compared | input, cost, grammar and group cases (4 mutants, each red) |
+| T-sauth | `len(data) > MAX` off | none: a 129-byte file cannot full-match (layers). `owner_of` returning constants is only caught by the box case (provision job) |
+| T-edge (`test_deploy_edge.py`) | failed `ps` read as no container; damaged prod `current` read as absent; whole bundle upped (`up_argv` with no service); rising `n` dropped; unhealthy not quarantined | `test_a_failing_ps…`, `test_a_damaged_prod_current…`, 10 tests, `test_a_lower_or_equal_n…`, `test_an_unhealthy_caddy…` |
+| T-edge | `number(tag) == number(cur["tag"])` branch dropped | none (equivalent: the earlier `cur["tag"] == tag` branch catches the only way to equal `n`: no leading zeros) |
+| S19 (`FirstAttempt`) | backup not required on a table; `first-attempt` written when the directory is non-empty | the table, failing-read and failed-backup cases; `test_existing_data_on_a_non_empty_directory…` |
+| S19 | `rerun` without `not cur` | none: `first-deploy` with a `current` is refused earlier (equivalent here) |
+| T-relyml (`release-pins-poly100.test.ts`) | 10 mutants of release.yml inside the file | all red; the real workflow is red until the first step holds both full regexes (build gap) |
+
+## Findings against the build at 2bb43871
+
+- `_prune` keeps edge's `current` and `previous` forever; R4 and R9 keep them only until prod has a `current` (T-take prune cases red).
+- `release.yml`'s first step does not hold the full `v1` and `edge` regexes or refuse other tags (T-relyml red).
+- The lint judges only `edge.yml` for external edge networks; `prod.yml` / `staging.yml` declaring one with an ipam or without `external: true` passes (two lint.test.ts rows red).
