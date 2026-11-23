@@ -666,6 +666,8 @@ jobs:
 
       - name: Container tests (SHOW, archive_command, secret modes, Caddy headers, database stage)
         if: needs.changes.outputs.image == 'true'
+        env:
+          POLY_APP_TEST_IMAGE: polycarpic:ci # F1's built-image test reads the image this job already built
         run: pnpm exec vitest run -c tests/infra/vitest.image.config.ts
 
       - name: Install age and the PostgreSQL client (the restore and drill tests decrypt and pg_restore on the runner)
