@@ -164,3 +164,12 @@ own single-fault case. DR3, DR10 and DR11 each have a single cause.
 - `restore.sh`, `restore-lib.sh` and `drill.sh` together are the largest shell surface in the repo. If POLY-116 adds
   more drill logic, move selection and verdict logic into `b2read.py`-style Python with unit tests. Keep the shell for
   the age/docker orchestration only.
+
+## 10. Carried to `b7bde21d`
+The verdict carries to `b7bde21d`, which rewrites the shellcheck findings (SC2148, SC2015) in four scripts. I read
+each of the seven rewritten lines:
+- every `A && B || X` became `if ! { A && B; }; then X` or its De Morgan form, so each is equivalent;
+- `# T16` still ends the box-line validation line;
+- the patterns the mutants key on (`# T10`, `if [ "$got" != "$want" ]; then`) are unchanged.
+
+No other line changed.
