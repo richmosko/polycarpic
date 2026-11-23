@@ -113,7 +113,7 @@ def _verify(project, ctx, tok, work, digest, commit):
         siblings = rel.parse_images_env(text)
         for key in rel.IMAGE_KEYS:
             repo, dig = siblings[key]
-            rel.verify_image(ctx, tok, work, "polycarpic-" + repo, dig, commit, sibling=True)
+            rel.verify_image(ctx, tok, work, "polycarpic-" + repo, dig, commit, sibling=repo)
         rel.write_images_env(ctx, rdir, ref, text)
     except BaseException:
         rel.remove_tree(rdir)

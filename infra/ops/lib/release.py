@@ -271,7 +271,7 @@ def attest(ctx, tok, work, name, digest, commit):
     return code == 0
 
 
-def pull_and_label(ctx, name, digest, commit, sibling=False):
+def pull_and_label(ctx, name, digest, commit, sibling=None):
     """V2 and V3: pull by digest, then the image must list the digest and carry the revision label equal to C."""
     ref = "ghcr.io/richmosko/%s@%s" % (name, digest)
     try:
@@ -286,17 +286,17 @@ def pull_and_label(ctx, name, digest, commit, sibling=False):
     except (ValueError, IndexError, KeyError, TypeError):
         info = None
     if code != 0 or not isinstance(info, dict) or ref not in (info.get("RepoDigests") or []):
-        raise Refusal("pull")
+        raise Refusal("sibling-" + sibling if sibling else "pull")
     labels = (info.get("Config") or {}).get("Labels") or {}
     if labels.get(LABEL) != commit:
-        raise Refusal("label", True)
+        raise Refusal("sibling-" + sibling if sibling else "label", True)
     return ref
 
 
-def verify_image(ctx, tok, work, name, digest, commit, sibling=False):
+def verify_image(ctx, tok, work, name, digest, commit, sibling=None):
     """V1 (before any pull), V2, V3 for one image. -> its reference."""
     if not attest(ctx, tok, work, name, digest, commit):
-        raise Refusal("sibling-%s" % name if sibling else "attestation")
+        raise Refusal("sibling-" + sibling if sibling else "attestation")
     return pull_and_label(ctx, name, digest, commit, sibling)
 
 
