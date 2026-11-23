@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
     --dump) MODE=dump; NMODES=$((NMODES + 1)); shift ;;
     --keep) KEEP=1; shift ;;
     --cleanup) CLEANUP=1; shift ;;
-    --hours) HOURS=${2:-}; [[ $HOURS =~ ^[0-9]{1,2}$ ]] && [ "$HOURS" -ge 1 ] && [ "$HOURS" -le 24 ] || die 2 "--hours must be 1 to 24"; shift 2 ;;
+    --hours) HOURS=${2:-}; if ! { [[ $HOURS =~ ^[0-9]{1,2}$ ]] && [ "$HOURS" -ge 1 ] && [ "$HOURS" -le 24 ]; }; then die 2 "--hours must be 1 to 24"; fi; shift 2 ;;
     --accept-version) [[ ${2:-} =~ ^[A-Za-z0-9_-]+$ ]] || die 2 "bad --accept-version"; ACCEPT="${ACCEPT:-} $2"; shift 2 ;;
     --plaintext-disk-is-encrypted) PLAIN_OK=1; shift ;;
     *) die 2 "unknown option $1" ;;
@@ -53,7 +53,7 @@ if [ "$MODE" = premigration ]; then
   [[ $BOX =~ ^[A-Za-z0-9][A-Za-z0-9._-]*@[A-Za-z0-9][A-Za-z0-9.-]*$ ]] || die 2 "bad --from-box"
 else
   [ -z "$BOX" ] || die 2 "--from-box is for --premigration"
-  [ -n "$CRED" ] && [ -n "$BUCKET" ] || die 2 "--read-credential and --bucket are required"
+  if [ -z "$CRED" ] || [ -z "$BUCKET" ]; then die 2 "--read-credential and --bucket are required"; fi
 fi
 [ -n "$IDENTITY" ] || usage
 [ -f "$IDENTITY" ] || die 2 "identity file not found"
@@ -122,7 +122,7 @@ from_box() {
     [[ $line =~ $shape ]] || { echo "restore.sh: a line from the box failed validation: $(printf '%s' "$line" | clean | cut -c1-120)" >&2; exit 5; }
     f1=${BASH_REMATCH[1]} f2=${BASH_REMATCH[2]} f3=${BASH_REMATCH[3]} f4=${BASH_REMATCH[4]} f5=${BASH_REMATCH[5]} f6=${BASH_REMATCH[6]}
     # T16: every name, time and hash that comes back from the box is checked before any command uses it
-    [[ $f1 =~ $TS_RE ]] && [[ $f2 =~ $R2_PREM ]] && [[ $f3 =~ $SHA_RE ]] && [[ $f4 =~ $R2_PREM ]] && [[ $f5 =~ $SHA_RE ]] && [[ $f6 =~ ^(uploaded|pending)$ ]] || { echo "restore.sh: a line from the box failed validation: $(printf '%s' "$line" | clean | cut -c1-120)" >&2; exit 5; } # T16
+    if ! { [[ $f1 =~ $TS_RE ]] && [[ $f2 =~ $R2_PREM ]] && [[ $f3 =~ $SHA_RE ]] && [[ $f4 =~ $R2_PREM ]] && [[ $f5 =~ $SHA_RE ]] && [[ $f6 =~ ^(uploaded|pending)$ ]]; }; then echo "restore.sh: a line from the box failed validation: $(printf '%s' "$line" | clean | cut -c1-120)" >&2; exit 5; fi # T16
     if [ -z "$SETTS" ] || [ "$f1" = "$SETTS" ]; then pick=$f1; PD=$f2; PDS=$f3; PG=$f4; PGS=$f5; PST=$f6; fi
   done < <(printf '%s\n' "$list")
   [ -n "$pick" ] || die 3 "no premigration set on the box${SETTS:+ for $SETTS}"

@@ -28,11 +28,11 @@ while [ $# -gt 0 ]; do
     *) usage ;;
   esac
 done
-[ -n "$IDENTITY" ] && [ -n "$CRED" ] && [ -n "$BUCKET" ] && [ -n "$BOXCRED" ] || usage
+if [ -z "$IDENTITY" ] || [ -z "$CRED" ] || [ -z "$BUCKET" ] || [ -z "$BOXCRED" ]; then usage; fi
 [ -f "$IDENTITY" ] || die 2 "identity file not found"
 mode=$(stat -c %a "$IDENTITY" 2> /dev/null || stat -f %Lp "$IDENTITY")
 [ $((8#$mode & 077)) = 0 ] || die 2 "identity file must be mode 0600 or tighter"
-[ -f "$CRED" ] && [ -f "$BOXCRED" ] || die 2 "credential file not found"
+if [ ! -f "$CRED" ] || [ ! -f "$BOXCRED" ]; then die 2 "credential file not found"; fi
 [[ $BUCKET =~ ^[A-Za-z0-9-]{6,63}$ ]] || die 2 "bad --bucket"
 if [ -n "$INSTANCE" ] && ! [[ $INSTANCE =~ ^[A-Za-z0-9][A-Za-z0-9_-]{0,62}$ ]]; then die 2 "bad --instance"; fi
 if [ -n "$BEFORE_ISO" ] && ! [[ $BEFORE_ISO =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$ ]]; then die 2 "--before must be YYYY-MM-DDTHH:MM:SSZ"; fi

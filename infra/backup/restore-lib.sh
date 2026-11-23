@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # restore-lib.sh: selection, download, verification, decryption and the throwaway Postgres, shared by restore.sh and drill.sh (POLY-99 R7, R8).
 # Sourced, never run. Runs on the laptop: decryption is a local `age -d -i <identity>`; nothing plaintext goes to the box, and nothing is restored
 # anywhere but a separate cluster in a container with no network, no capabilities, no bind mount and no secret.
@@ -101,7 +102,7 @@ bucket_select() { # nightly set -> SET_TS SET_SYS SET_M; VERS; RECS
   : > "$VERS"
   printf '%s\n' "$out" | grep '^ver ' > "$VERS" || true
   read -r _ SET_TS SET_SYS SET_M _ <<< "$(printf '%s\n' "$out" | grep '^set ')"
-  [[ $SET_TS =~ $TS_RE ]] && [[ $SET_SYS =~ ^[0-9]{1,20}$ ]] && [[ $SET_M =~ ^[0-9]{2}$ ]] || { err "bad set from the bucket"; return 5; }
+  if ! { [[ $SET_TS =~ $TS_RE ]] && [[ $SET_SYS =~ ^[0-9]{1,20}$ ]] && [[ $SET_M =~ ^[0-9]{2}$ ]]; }; then err "bad set from the bucket"; return 5; fi
   return 0
 }
 

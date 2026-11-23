@@ -24,7 +24,7 @@ getval() { # file name pattern
 
 key_id=$(sed -n 1p "$cred" 2>/dev/null || true)
 app_key=$(sed -n 2p "$cred" 2>/dev/null || true)
-[ -n "$key_id" ] && [ -n "$app_key" ] || die3 "backup_store_credential missing"
+if [ -z "$key_id" ] || [ -z "$app_key" ]; then die3 "backup_store_credential missing"; fi
 bucket=$(getval "$opsconf" B2_BUCKET '^[A-Za-z0-9-]{6,63}$') || true
 [ -n "$bucket" ] || die3 "B2_BUCKET missing or malformed"
 endpoint=$(getval "$opsconf" B2_S3_ENDPOINT '^https://s3\.[a-z0-9-]+\.backblazeb2\.com$') || true
