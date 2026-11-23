@@ -565,3 +565,19 @@ outside the system schemas, read over the local socket just before step 5. A tab
 step 3 required. The file is ignored and removed whenever `current` exists. *T12:* rerun after `roles-missing` with an
 empty database succeeds; with one table, step 3 runs; with the read failing, step 3 runs; a leftover file beside `current`
 has no effect. Red on a mutant that trusts the file alone.
+
+## `7ad32ae1..dafb93bc` (S18, A12, A13)
+
+S18: **met.** A13 with its baseline: **accept**; a fault that was there before the deploy must not quarantine a good release,
+and it alerts. S19 is not in this diff and stays open.
+
+**A12: accept with S20.**
+- *(a) Order.* Counted lines in any order still pass a Caddyfile that moves `respond @denied 403` below `basic_auth` or the
+  proxies (the staging allowlist stops deciding first), or moves a line to another depth. Each block's lines must equal the
+  fixed list **as an ordered sequence**, braces included.
+- *(b) The other way in.* By Caddy's documentation `{$NAME}` is substituted before the Caddyfile is parsed, so a value can
+  carry directives (not measured here). `edge.yml` sets those values and may set `command`. The lint therefore also pins
+  caddy in `edge.yml`: no `command`, no `entrypoint`, and `environment` exactly the three `${NAME:?}` forms. `provision.sh`
+  refuses an `edge.env` value with whitespace other than the single spaces `POLY_STAGING_ALLOW` needs, or with a brace.
+- *T-caddy adds:* `@denied` moved below `basic_auth`; a literal `POLY_TLS` value with a newline; a `command` on caddy; an
+  `edge.env` value with a newline and one with `}`. Red on a mutant comparing counts only.
