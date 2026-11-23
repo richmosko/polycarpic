@@ -373,8 +373,13 @@ if [ "$row" != "polycarpic-render:x:10020:10020::/nonexistent:/usr/sbin/nologin"
   h23=" polycarpic-render is '${row:-missing}';"
 else
   [ "$(id -G polycarpic-render)" = 10020 ] || h23="$h23 it is in groups $(id -G polycarpic-render);"
-  procs=$(pgrep -a -u 10020 2> /dev/null | grep -v 'docker compose' || true)
-  [ -z "$procs" ] || h23="$h23 a process other than a render runs as it;"
+  # G8: a process of uid 10020 is a render only when its executable is docker or docker-compose and its arguments hold `compose` and `config`
+  for pid in $(pgrep -u 10020 2> /dev/null || true); do
+    exe=$(basename "$(readlink "/proc/$pid/exe" 2> /dev/null)")
+    args=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2> /dev/null)
+    case "$exe" in docker | docker-compose) ;; *) h23="$h23 pid $pid runs as it with executable '$exe';"; continue ;; esac
+    case " $args " in *" compose "*" config "*) ;; *) h23="$h23 pid $pid (docker) is not a compose config;" ;; esac
+  done
 fi
 report H23 "render user" "$h23" "sudo bash provision.sh --stage host ... creates it; a different existing user must be removed by hand after checking nothing uses it"
 
