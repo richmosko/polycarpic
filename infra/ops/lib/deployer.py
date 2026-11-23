@@ -173,13 +173,17 @@ def _gate(project, ctx, rdir, images, cur, commit, tag):
     """V6 (the Postgres major is unchanged) and V7 (the installed guard on the rendered config). A refusal of the CANDIDATE by the guard
     carries the operator text (R10); a refusal of `current` or `previous` elsewhere does not."""
     try:
-        return _gate_checks(project, ctx, rdir, images, cur)
+        return _gate_checks(project, ctx, rdir, images, cur, commit)
     except Refusal as err:
         err.help_lines = guardhelp.lines(ctx, err.name, commit, tag)
         raise
 
 
-def _gate_checks(project, ctx, rdir, images, cur):
+def _gate_checks(project, ctx, rdir, images, cur, commit):
+    if project == "prod" and not cur:  # prod takes over from edge once (S23): C equals or descends from edge's commit, else `edge-older` (no Q)
+        edge_cur = rel.load_pointer(ctx, "edge", "current")
+        if edge_cur and edge_cur["commit"] != commit and not rel.descends(ctx, edge_cur["commit"], commit):
+            raise Refusal("edge-older")
     if cur:
         old = rel.ts.read_text(os.path.join(rel.release_dir(ctx, cur["digest"]), "infra/postgres-major"))
         new = rel.ts.read_text(os.path.join(rdir, "infra/postgres-major"))
@@ -370,12 +374,7 @@ def _healthy(project, ctx, rdir, digest, tag, commit, cur):
     if cur:
         rel.save_pointer(ctx, project, "previous", cur)
     rel.save_pointer(ctx, project, "current", dict(digest=digest, tag=tag, commit=commit, tree=stack.tree(rdir), at=rel.now_utc(ctx)))
-    link = ctx.p("%s/%s-current" % (rel.RELEASES, project))
-    tmp = link + ".new"
-    if os.path.lexists(tmp):
-        os.unlink(tmp)
-    os.symlink(os.path.basename(rdir), tmp)
-    os.replace(tmp, link)
+    link_current(ctx, project, rdir)
     if project == "prod":
         rel.write(ctx, ctx.p("/opt/polycarpic/images.env"), open(os.path.join(rdir, "images.env"), encoding="utf-8").read())
     _prune(ctx)
@@ -388,9 +387,18 @@ def _healthy(project, ctx, rdir, digest, tag, commit, cur):
     return 0
 
 
+def link_current(ctx, project, rdir):
+    link = ctx.p("%s/%s-current" % (rel.RELEASES, project))
+    tmp = link + ".new"
+    if os.path.lexists(tmp):
+        os.unlink(tmp)
+    os.symlink(os.path.basename(rdir), tmp)
+    os.replace(tmp, link)
+
+
 def _prune(ctx):
     keep = set()
-    for project in ("prod", "staging"):
+    for project in ("prod", "staging", "edge"):
         for name in ("current", "previous"):
             p = rel.load_pointer(ctx, project, name)
             if p:
@@ -405,6 +413,14 @@ def _rollback_auto(project, ctx, digest, cur, owns=False, probe=None):
     """R8: the candidate did not become healthy; put `current` back from its own release, never migrating."""
     rel.quarantine(ctx, project, digest, "unhealthy")
     if cur is None:
+        if project == "prod" and owns:  # a first prod deploy that ups Caddy and fails puts Caddy back on edge's `current` (S23); the outcome stays unhealthy
+            from lib import edge
+            try:
+                ptr = rel.load_pointer(ctx, "edge", "current")
+            except Refusal:
+                ptr = None
+            if ptr:
+                edge.restore(ctx, ptr, wait_healthy=False)
         rel.log(ctx, project, "rollback-unhealthy", digest)
         rel.alert(ctx, project, "rollback-unhealthy")
         ctx.err("deploy: rollback-unhealthy")

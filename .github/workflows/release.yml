@@ -6,7 +6,7 @@ name: release
 
 on:
   push:
-    tags: ["v1.*"]
+    tags: ["v1.*", "edge-*"]
   workflow_dispatch:
     inputs:
       commit:
@@ -28,6 +28,14 @@ jobs:
     outputs:
       digest: ${{ steps.lookup.outputs.digest }}
     steps:
+      - name: Refuse a tag that is neither a prod nor an edge release tag
+        if: github.event_name == 'push'
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$TAG" | grep -Eq '^(v1\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)|edge-(0|[1-9][0-9]*))$' || { echo "tag is neither v1.<minor>.<patch> nor edge-<n>: refusing" >&2; exit 1; }
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -44,6 +52,7 @@ jobs:
           set -euo pipefail
           [ -n "$SIGNERS" ] || { echo "RELEASE_SIGNERS variable is empty: refusing" >&2; exit 1; }
           [ "$(git cat-file -t "refs/tags/${TAG}")" = "tag" ] || { echo "${TAG} is not an annotated tag" >&2; exit 1; }
+          [ "$(git cat-file tag "refs/tags/${TAG}" | sed -n 's/^tag //p')" = "$TAG" ] || { echo "the tag object's own name is not ${TAG}: refusing" >&2; exit 1; }
           printf '%s\n' "$SIGNERS" > "$RUNNER_TEMP/allowed_signers"
           git config gpg.ssh.allowedSignersFile "$RUNNER_TEMP/allowed_signers"
           git verify-tag "$TAG"
@@ -103,4 +112,7 @@ jobs:
           set -euo pipefail
           echo "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
           if gh release view "$TAG" >/dev/null 2>&1; then echo "Release ${TAG} already exists: refusing" >&2; exit 1; fi
-          gh release create "$TAG" sbom/sbom.cdx.json --verify-tag --title "$TAG" --notes "digest: ${DIGEST}"
+          LATEST=""
+          case "$TAG" in edge-*) LATEST="--latest=false" ;; esac  # an edge Release is never "latest"
+          # shellcheck disable=SC2086
+          gh release create "$TAG" sbom/sbom.cdx.json --verify-tag --title "$TAG" --notes "digest: ${DIGEST}" $LATEST

@@ -4,18 +4,20 @@ Quarantines `current`, re-checks `previous`'s tree hash, runs the installed guar
 """
 import os
 
-from lib import deployer as deploy, release as rel
+from lib import deployer as deploy, edge, release as rel
 
-HELP = "rollback prod|staging (bring back the previous release; no network)"
+HELP = "rollback prod|staging|edge (bring back the previous release; no network)"
 WAIT = 10 * 60
 
 
 def add_arguments(parser):
-    parser.add_argument("project", choices=["prod", "staging"])
+    parser.add_argument("project", choices=["prod", "staging", "edge"])
 
 
 def run(args, ctx):
     project = args.project
+    if project == "edge":
+        return edge.rollback(ctx)
     fd = deploy.take_lock(ctx, WAIT)
     if fd is None:
         ctx.err("rollback: the deploy lock was not got in 10 minutes")

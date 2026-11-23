@@ -321,12 +321,19 @@ jobs:
         run: |
           set -euo pipefail
           TAG="$(gh release list --limit 50 --json tagName --jq '[.[] | select(.tagName | startswith("v1."))][0].tagName // empty')"
-          if [ -z "$TAG" ]; then echo "no v1.* Release yet: nothing to scan" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+          ONLY=""
+          if [ -z "$TAG" ]; then
+            # no v1.* Release yet: the Caddy of the highest-n edge-* Release is what is running (R9, S25)
+            N="$(gh release list --limit 100 --json tagName --jq '[.[] | select(.tagName | test("^edge-(0|[1-9][0-9]*)$")) | .tagName | ltrimstr("edge-") | tonumber] | max // empty')"
+            if [ -z "$N" ]; then echo "no v1.* or edge-* Release yet: nothing to scan" >> "$GITHUB_STEP_SUMMARY"; exit 0; fi
+            TAG="edge-${N}"
+            ONLY="caddy"
+          fi
           DIGEST="$(gh release view "$TAG" --json body --jq .body | sed -n 's/^digest: //p' | head -n1)"
           echo "$DIGEST" | grep -Eq '^sha256:[0-9a-f]{64}$'
           echo "scan of ${TAG}: ${DIGEST}" >> "$GITHUB_STEP_SUMMARY"
           status=0
-          bash infra/ci/image.sh scan "${IMAGE}@${DIGEST}" || status=1
+          if [ -z "$ONLY" ]; then bash infra/ci/image.sh scan "${IMAGE}@${DIGEST}" || status=1; fi
           # the three siblings frozen with that Release: images.env is read out of the app image (created, never started)
           cid="$(docker create "${IMAGE}@${DIGEST}")"
           docker cp "${cid}:/app/infra/release/images.env" images.env || status=1
@@ -337,7 +344,9 @@ jobs:
             if [[ "$line" =~ ^POLY_(POSTGRES|TOOLS|CADDY)_IMAGE=ghcr\.io/richmosko/polycarpic-(postgres|tools|caddy)@(sha256:[0-9a-f]{64})$ ]] \
               && [ "${BASH_REMATCH[1],,}" = "${BASH_REMATCH[2]}" ] && [[ " $seen " != *" ${BASH_REMATCH[2]} "* ]]; then
               seen="$seen ${BASH_REMATCH[2]}"
-              bash infra/ci/image.sh scan "ghcr.io/richmosko/polycarpic-${BASH_REMATCH[2]}@${BASH_REMATCH[3]}" || status=1
+              if [ -z "$ONLY" ] || [ "$ONLY" = "${BASH_REMATCH[2]}" ]; then
+                bash infra/ci/image.sh scan "ghcr.io/richmosko/polycarpic-${BASH_REMATCH[2]}@${BASH_REMATCH[3]}" || status=1
+              fi
             else
               echo "images.env: a line is not in the fixed grammar" >&2; status=1
             fi

@@ -33,5 +33,21 @@ def _one(ctx, project):
     return Line("OK", "deploy", project, detail)
 
 
+def _edge(ctx):
+    """`edge` is shown until prod has a `current`, without the last-poll WARN (no timer runs it)."""
+    d = ctx.p("%s/edge" % rel.STATE)
+    if not os.path.isdir(d):
+        return []
+    try:
+        if rel.load_pointer(ctx, "prod", "current"):
+            return []
+    except rel.Refusal:
+        return []
+    line = _one(ctx, "edge")
+    if line.state == "WARN":
+        line = Line("OK", line.item, line.project, line.detail.split("; GitHub")[0])
+    return [line]
+
+
 def run(ctx):
-    return [_one(ctx, p) for p in PROJECTS]
+    return [_one(ctx, p) for p in PROJECTS] + _edge(ctx)

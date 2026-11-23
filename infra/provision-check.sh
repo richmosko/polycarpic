@@ -340,6 +340,22 @@ PY
 )
   [ -z "$overlap" ] || h21="$h21 $net ($want) overlaps $overlap;"
 done
+# ------------------------------------------------------------------ H22 staging basic-auth file (POLY-100 S30)
+# The Caddyfile imports it as text: exactly `staging $2y$10$<53>` plus one newline, root:10010 0440 in a root:10010 0750 directory, no link.
+# WAIT before the first edge or prod release; after that it is checked, which is what sees a restart by Docker.
+sa=$ETC/secrets/caddy/staging_basic_auth
+if [ ! -f /var/lib/polycarpic/state/deploy/edge/current ] && [ ! -f /var/lib/polycarpic/state/deploy/prod/current ] && [ ! -e "$sa" ]; then
+  wait_ H22 "staging-auth" "waits for: polycarpic-ops staging-auth (before the first edge or prod release)"
+else
+  h22=''
+  if [ -L "$sa" ] || [ ! -f "$sa" ]; then h22=" $sa is missing or a link;"
+  else
+    [ "$(stat -c '%a %u:%g' "$sa")" = "440 0:10010" ] || h22="$h22 file is $(stat -c '%a %u:%g' "$sa") (want 440 0:10010);"
+    [ "$(stat -c '%a %u:%g' "$(dirname "$sa")")" = "750 0:10010" ] || h22="$h22 directory is $(stat -c '%a %u:%g' "$(dirname "$sa")") (want 750 0:10010);"
+    { [ "$(stat -c %s "$sa")" -le 128 ] && [ "$(LC_ALL=C grep -cxE 'staging \$2y\$10\$[./A-Za-z0-9]{53}' "$sa")" = 1 ] && [ "$(wc -l < "$sa")" -eq 1 ] && [ "$(stat -c %s "$sa")" = 69 ]; } || h22="$h22 content is not the one exact line;"
+  fi
+  report H22 "staging-auth" "$h22" "sudo polycarpic-ops staging-auth (paste the htpasswd -nBC 10 staging line), then sudo polycarpic-ops restart caddy"
+fi
 report H21 "edge networks" "$h21" "sudo bash provision.sh --stage host ... creates both; a different existing network must be removed by hand after checking nothing uses it"
 
 # ------------------------------------------------------------------ H9 service gids

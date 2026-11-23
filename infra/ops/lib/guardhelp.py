@@ -32,14 +32,14 @@ def _base(ctx):
     return BASE_PLACEHOLDER
 
 
-def lines(ctx, name, commit, tag):
+def lines(ctx, name, commit, tag, again=None):
     """-> the template's lines for refusal `name` of a candidate at C, or None when `name` is not a guard rule of the installed list."""
     if not name.startswith("guard-") or name[6:] not in RULES:
         return None
     rule = name
     if not (isinstance(commit, str) and re.fullmatch(r"[0-9a-f]{40}", commit)):
         return [clean("%s: this release needs a wider safety policy than the one installed. None of its containers was started." % rule)]
-    signed = tag not in (None, "-") and rel.TAG.fullmatch(tag)
+    signed = tag not in (None, "-") and (rel.TAG.fullmatch(tag) or re.fullmatch(r"edge-(0|[1-9][0-9]*)", tag))
     who = "signed tag %s" % tag if signed else "unsigned: any merge to main"
     base = _base(ctx)
     out = [
@@ -53,6 +53,6 @@ def lines(ctx, name, commit, tag):
     out += [
         "2. only if each command above ended with its review: line and you agree with every line; this installs root code on the box:",
         "   infra/ops/install.sh %s --ssh-key <file> --commit %s" % (_target(ctx), commit),
-        "3. the release then deploys on the next poll; there is nothing to clear.",
+        ("3. then run again: %s" % again) if again else "3. the release then deploys on the next poll; there is nothing to clear.",
     ]
     return [clean(l) for l in out]

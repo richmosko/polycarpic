@@ -7,7 +7,7 @@ from lib.discover import load, modules
 from lib.out import Line, fit, fmt_line, stamp
 
 HELP = "one-screen health of the box: disk, app, cert, backup, backup logins, slots, revokes"
-ORDER = {"host": 0, "prod": 1, "staging": 2}
+ORDER = {"host": 0, "prod": 1, "staging": 2, "edge": 3}
 MAX_LINES = 24
 OPS_DIR = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
