@@ -26,3 +26,9 @@ T-lock's mutant (no advisory lock) is run at the gate.
 | T18 token shape | `lib/secrets.py` `GITHUB_TOKEN` pattern → `\w+` | `test_t18_a_classic_token_is_refused_with_exit_2_and_nothing_written` |
 
 T17 (`allowed-signers install`) is red on the missing command and the missing `ctx.stdin` seam (pinned: Ctx kwarg `stdin`, a text stream, no child process).
+
+## G5 lock (`test_deploy_token_lock.py`)
+
+| Test | Mutant | Red |
+|---|---|---|
+| T16 busy / one lock for both projects | `commands/deploy.py` `LOCK_EX \| LOCK_NB` → `LOCK_EX` (a 20 s alarm turns the hang into a failure) | `test_t16_a_busy_timer_run_exits_0_logs_busy_and_touches_nothing`, `…_one_for_both_projects`, `…_wait_ten_minutes_then_exit_4` |
