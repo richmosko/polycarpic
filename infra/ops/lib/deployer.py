@@ -317,6 +317,12 @@ def _apply(project, ctx, rdir, digest, tag, commit, cur, first):
     return _rollback_auto(project, ctx, digest, cur)
 
 
+def _caddy_current(ctx, rdir):
+    row = compose.running(compose.ps(ctx, "polycarpic-edge"), "caddy")
+    want = stack.refs(rdir).get("POLY_CADDY_IMAGE")
+    return bool(row) and compose.image_ref(compose.inspect(ctx, row.get("Name", ""))) == want
+
+
 def _wipe(path):
     for name in os.listdir(path):
         full = os.path.join(path, name)
@@ -337,6 +343,8 @@ def _edge_up(project, ctx, rdir, first_prod):
         for d in ("/srv/polycarpic/caddy", "/srv/polycarpic/caddy-config"):
             if os.path.isdir(ctx.p(d)):
                 _wipe(ctx.p(d))
+    if not first_prod and _caddy_current(ctx, rdir):
+        return 0  # already running this release's Caddy image: `up` would change nothing
     argv = stack.up_argv(rdir, "edge", ["caddy"], ["--force-recreate"] if first_prod else [], ctx.p("/etc/polycarpic/edge.env"))
     code, _, _ = _compose(ctx, argv)
     return code

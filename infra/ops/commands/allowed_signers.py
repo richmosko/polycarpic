@@ -34,7 +34,9 @@ def run(args, ctx):
     if len(text) > MAX:
         ctx.err("allowed-signers: input is larger than 64 KiB; nothing written")
         return 2
-    lines = [l for l in text.split("\n") if l != "" and not l.startswith("#")]  # blank and whole-line comment lines are dropped, never written
+    lines = text.split("\n")
+    if lines and lines[-1] == "":
+        lines.pop()  # the final newline; any other line, blank or comment included, must be the plain form
     prints = []
     for n, line in enumerate(lines, 1):
         m = LINE.fullmatch(line)
