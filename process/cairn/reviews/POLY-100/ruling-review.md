@@ -696,3 +696,23 @@ The env_file rule becomes **S27**:
   judges only a non-empty one; it compares a single entry; and it reads a normalized render, where a relative or `..` path may
   already be resolved. It must compare the whole list, empty included, and take the paths from the raw YAML, as the guard
   takes them from the raw render.
+
+## `8e67c480`, `c66b6602`, `4d76516a` (S27; edge alone; tightening)
+
+- **`8e67c480`:** S27 carried. **`c66b6602`:** S22, S23 and S25 **met**; S24 unchanged. The additions are accepted: `rollback edge`, Caddy going
+  back to edge's `current` when the first prod deploy fails, the name compare for both namespaces, and help line 3.
+- **`4d76516a`:** compared word by word. No test row changed and no rule was dropped. The Principal options became decisions
+  and the met-by table lost only its descriptions. **One wording to fix:** R8's manual rollback now reads "R5 on `previous`", and edge's
+  render is judged only by R9's sentence. Say "R5 on both renders before either `up`", as before and as step 2 says.
+
+**S28, two gaps in `edge-deploy`.**
+- *(a) Under the lock.* Steps 2 and 3 are read after `deploy.lock` is held, not before; otherwise a prod first deploy can finish while
+  `edge-deploy` waits, and an older Caddy then replaces prod's.
+- *(b) Lost state.* Step 2 reads only the `current` file. If the state directory is lost while prod runs, "no `current`" is true, the
+  rising-`n` check has nothing to compare, and any signed edge release replaces the Caddy in front of live prod. Also refuse when
+  `compose ps -a` lists any `polycarpic-prod` container; a failed or unparsable listing counts as listing one. The same for
+  `rollback edge`. After a failed first prod deploy the way forward is `first-deploy prod` again.
+- *T-edge adds:* prod gaining a `current` while `edge-deploy` waits; a prod container with no `current`; `ps` failing; a damaged edge
+  `current` (`state`). Red on mutants reading before the lock, reading the file alone, and treating a failed `ps` as none.
+
+**Plan gate:** opens when S28 and the R8 wording are in. Nothing else is open in the ruling.
