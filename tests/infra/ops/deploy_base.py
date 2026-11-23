@@ -97,6 +97,7 @@ class World(object):
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
         self.bad_caddy = set()
+        self.unmounted = set()
         self.owners = {}
         self.dir_hooks = {}
         self.ps_fails = set()
@@ -413,6 +414,10 @@ class World(object):
             raise AssertionError("ctx.owner_of is for the two staging-auth paths only, got %r" % (path,))
         return self.owners.get(path, (os.getuid(), 10010))
 
+    def ismount(self, path):
+        """F13's seam: /srv/polycarpic is a mount point unless a test says it is not."""
+        return path not in self.unmounted
+
     def https_status(self, host, addr, path):
         """A13's seam: by default 200 while the web container runs an image not in `edge_bad`; a digest in `edge_bad` answers its scripted status or raises."""
         self.https_calls.append((host, addr, path))
@@ -486,6 +491,8 @@ class DeployTest(OpsTest):
         w.handler(runner)
         extra = {}
         names = ctx_class().__init__.__code__.co_varnames
+        if ctx_seams and "ismount" in names:
+            extra["ismount"] = w.ismount
         if ctx_seams and "owner_of" in names:
             extra["owner_of"] = w.owner_of
         if ctx_seams and "https_status" in names:

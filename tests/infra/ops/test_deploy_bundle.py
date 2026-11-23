@@ -45,8 +45,19 @@ def dockerfile_manifest():
     return sorted(out)
 
 
+def code_manifest():
+    """The old source of a bundle (the code's own list). Used only while the Dockerfile has no /release manifest, so the other tests keep their own reasons to be red or green;
+    `test_f1_the_harness_builds_bundles_from_the_dockerfile_list` is the one that is red until it has."""
+    files = [p for p in MANIFEST] + ["infra/postgres/" + f.name for f in sorted((REPO / "infra" / "postgres").iterdir()) if f.is_file() and f.suffix in (".conf", ".sh")]
+    return sorted(files)
+
+
 def good_files(env=None):
-    files = {p: (REPO / p).read_bytes() for p in dockerfile_manifest() if p != "infra/release/images.env"}
+    try:
+        listed = dockerfile_manifest()
+    except AssertionError:
+        listed = code_manifest()
+    files = {p: (REPO / p).read_bytes() for p in listed if p != "infra/release/images.env"}
     files["infra/release/images.env"] = (env or images_env_text()).encode()
     return files
 
@@ -71,6 +82,12 @@ def member(name, typ=tarfile.REGTYPE, mode=0o644, link="", data=b"", size=None):
         ti.size = len(data) if size is None else size
         t.addfile(ti, io.BytesIO(data) if typ == tarfile.REGTYPE else None)
     return add
+
+
+class F1Harness(unittest.TestCase):
+    def test_f1_the_harness_builds_bundles_from_the_dockerfile_list(self):
+        listed = dockerfile_manifest()  # raises while the Dockerfile has no /release/infra assembly
+        self.assertEqual(sorted(set(listed) - {"infra/release/images.env"}), sorted(set(code_manifest()) - {"infra/release/images.env"}), "the Dockerfile's list is the manifest")
 
 
 class BundleBase(DeployTest):
