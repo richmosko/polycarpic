@@ -85,11 +85,26 @@ trap 'exit 143' TERM
 trap 'exit 129' HUP
 scratch_image || exit 2
 
+# The remote command is built in ONE place, for the two fixed forms only; the name is single-quoted (the grammar check below is the first guard,
+# this quoting the second). Nothing is forwarded: stdin is empty, no agent, no forwarded ports; `--` ends the options before the destination.
+box_cmd() { # <name or empty> <list-premigration|fetch-premigration>
+  local q
+  q="'$(printf '%s' "$1" | sed "s/'/'\\\\''/g")'" # T16q
+  case "$2" in
+    list-premigration) echo "sudo polycarpic-ops backup list-premigration" ;;
+    fetch-premigration) echo "sudo polycarpic-ops backup fetch-premigration $q" ;;
+    *) return 1 ;;
+  esac
+}
+box_ssh() { # <name or empty> <verb>
+  < /dev/null ssh -a -x -o ForwardAgent=no -o ClearAllForwardings=yes -o BatchMode=yes -- "$BOX" "$(box_cmd "$@")" # T9
+}
+
 # from_box: the newest premigration set (or --set) from `list-premigration`, each file checked against root's record on the box
 from_box() {
   local list line n ts d dsha g gsha state f1 f2 f3 f4 f5 f6 extra pick=''
 
-  list=$(box_ssh list-premigration) || die 5 "the box refused list-premigration"
+  list=$(box_ssh "" list-premigration) || die 5 "the box refused list-premigration"
   while IFS= read -r line; do
     if [[ $line =~ ^stray\ [0-9]{1,4}$ ]]; then echo "$line"; continue; fi
     IFS=' ' read -r f1 f2 f3 f4 f5 f6 extra <<< "$line"
@@ -101,7 +116,7 @@ from_box() {
   read -r ts d dsha g gsha state <<< "$pick"
   SET_TS=$ts
   for n in "$d:$dsha" "$g:$gsha"; do
-    box_ssh fetch-premigration "${n%%:*}" > "$WORK/${n%%:*}" || die 5 "the box refused fetch-premigration"
+    box_ssh "${n%%:*}" fetch-premigration > "$WORK/${n%%:*}" || die 5 "the box refused fetch-premigration"
     [ "$(sha256f "$WORK/${n%%:*}")" = "${n##*:}" ] || die 4 "${n%%:*} does not match the spool record"
   done
   decrypt "$WORK/$d" "$WORK/dump.dec" || exit 4

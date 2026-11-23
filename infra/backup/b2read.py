@@ -10,7 +10,7 @@ Runs on the laptop with the READ key. It picks a VERSION (fileId), never a name,
                          lie in [TS - 60 s, TS + SECONDS]; prints `<epoch> <START WAL file or ->` or exits 4 (a replayed old file)
   epoch ISO              a YYYY-MM-DDTHH:MM:SSZ time as epoch seconds
   s3probe --credential READKEY --box-credential BOXKEY --bucket B     DR10: with the BOX key, try to delete, overwrite and change retention; prints
-                         `refused <verb>` or `ALLOWED <verb>` per verb. The probe writes one object, drill-probe/<id>, outside the backup prefix.
+                         `refused <verb>` or `ALLOWED <verb>` per verb. The probe writes <instance>/drill/probe-<TS> (never a backup object).
 
 Exit: 0 done; 2 usage or a refused POLY_B2_AUTH_URL; 3 selection refused; 4 integrity; 5 the bucket refused, or a key or URL failed validation.
 Credential files are two lines (key id, application key) and are read here only: no key reaches an argv or an environment.
@@ -138,8 +138,8 @@ def cmd_list(args):
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,62}", instance):
         die(2, "bad --instance")
     for f in s.versions(args.get("--prefix", instance + "/")):
-        if f.get("action") not in ("upload", "hide"):
-            continue
+        if f.get("action") not in ("upload", "hide") or f.get("fileName", "").startswith(instance + "/drill/"):
+            continue  # the drill's own probe objects are not backups
         if not FILE_ID.fullmatch(f.get("fileId", "")) or valid_key(instance, f.get("fileName", "")) is None:
             die(5, "refused object key in the bucket listing")
         print("%s %s %d %s %s" % (f["fileId"], f["action"], f["uploadTimestamp"], iso(f["uploadTimestamp"]), f["fileName"]))
@@ -334,22 +334,41 @@ def cmd_s3probe(args):
     if not (re.fullmatch(r"https://s3\.[a-z0-9-]+\.backblazeb2\.com", endpoint) or (override and LOOPBACK.fullmatch(endpoint))):
         die(5, "b2_authorize_account returned no usable s3ApiUrl")
     key_id, key = read_credential(args["--box-credential"])
-    obj = "%s/%s/drill-probe/%s" % (endpoint, args["--bucket"], hashlib.sha256(os.urandom(16)).hexdigest()[:16])
+    instance = args.get("--instance", "polycarpic-prod")
+    name = "%s/drill/probe-%s" % (instance, datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+    obj = "%s/%s/%s" % (endpoint, args["--bucket"], name)
     body = b"drill probe\n"
-    md5 = {"Content-MD5": base64.b64encode(hashlib.md5(body).digest()).decode()}
-    status = s3_status("PUT", obj, body, md5, key_id, key)
+    md5 = lambda b: {"Content-MD5": base64.b64encode(hashlib.md5(b).digest()).decode()}
+    status = s3_status("PUT", obj, body, md5(body), key_id, key)
     if not 200 <= status < 300:
         print("ALLOWED setup (the box key could not write the probe object: HTTP %d)" % status)
         return
-    verbs = [
+    first = [f for f in s.versions(name) if f.get("fileName") == name and f.get("action") == "upload"]
+    if not first:
+        print("ALLOWED setup (the probe object is not listed)")
+        return
+    original = sorted(first, key=lambda f: f["uploadTimestamp"])[0]["fileId"]
+
+    def digest(fid):
+        with http("%s/b2api/v3/b2_download_file_by_id?%s" % (s.download, urllib.parse.urlencode({"fileId": fid})), {"Authorization": s.token}) as resp:
+            return hashlib.sha256(resp.read()).hexdigest()
+
+    refused = [
         ("delete", "DELETE", obj, b"", {}),
-        ("overwrite", "PUT", obj, body, dict(md5, **{"If-None-Match": "*"})),
         ("retention", "PUT", obj + "?retention", b"<Retention><Mode>GOVERNANCE</Mode><RetainUntilDate>2000-01-01T00:00:00Z</RetainUntilDate></Retention>", {}),
         ("object-lock", "PUT", "%s/%s?object-lock" % (endpoint, args["--bucket"]), b"<ObjectLockConfiguration><ObjectLockEnabled>Enabled</ObjectLockEnabled></ObjectLockConfiguration>", {}),
     ]
-    for label, method, url, payload, hdrs in verbs:
+    for label, method, url, payload, hdrs in refused:
         code = s3_status(method, url, payload, hdrs, key_id, key)
         print(("ALLOWED %s (HTTP %d)" if 200 <= code < 300 else "refused %s (HTTP %d)") % (label, code))
+    # a plain PUT adds a version; it must leave the first version as it was (Object Lock holds it)
+    other = b"drill probe, second write\n"
+    s3_status("PUT", obj, other, md5(other), key_id, key)
+    try:
+        intact = digest(original) == hashlib.sha256(body).hexdigest()
+    except SystemExit:
+        intact = False
+    print("refused overwrite (the first version is intact)" if intact else "ALLOWED overwrite (the first version changed or is gone)")
 
 
 def parse(argv):

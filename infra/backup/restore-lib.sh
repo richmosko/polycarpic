@@ -184,8 +184,3 @@ scratch_report() {
   echo "scratch container: $SC"
   echo "connect: docker exec -it $SC psql -U postgres"
 }
-
-# ---------------------------------------------------------------- the box (restore --premigration)
-box_ssh() { # one remote command; stdin is empty, nothing is forwarded
-  < /dev/null ssh -a -x -o ForwardAgent=no -o ClearAllForwardings=yes -o BatchMode=yes "$BOX" sudo polycarpic-ops backup "$@" # T9
-}

@@ -170,14 +170,14 @@ fi
 
 # ---- DR10: the box key can add objects and nothing else
 set +e
-probe=$(b2 s3probe --credential "$CRED" --box-credential "$BOXCRED" --bucket "$BUCKET" 2> "$WORK/probe.err"); prc=$?
+probe=$(b2 s3probe --credential "$CRED" --box-credential "$BOXCRED" --bucket "$BUCKET" --instance "$INSTANCE" 2> "$WORK/probe.err"); prc=$?
 set -e
 if [ "$prc" != 0 ]; then
   res FAIL DR10 "the bucket probe could not run (exit $prc): $(tr '\n' ' ' < "$WORK/probe.err" | clean | cut -c1-160)"
 elif grep -q '^ALLOWED' <<< "$probe"; then
   res FAIL DR10 "the box key was allowed: $(grep '^ALLOWED' <<< "$probe" | tr '\n' ';')"
 else
-  res PASS DR10 "the box key is refused delete, overwrite, retention and bucket-default changes"
+  res PASS DR10 "the box key is refused delete, retention and bucket-default changes, and an overwrite leaves the first version intact"
 fi
 
 fails=$(awk '$1 == "FAIL" { print $2 }' "$RESULTS" | sort -u | tr '\n' ' ' | sed 's/ $//; s/ /, /g')
