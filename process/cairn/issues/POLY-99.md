@@ -124,3 +124,13 @@ Architect, verdict read @ 106f1a9b: rulings on the DR2 mutant and on 738c8e87.
 - Required:
   - Markers: `# T17` stays on the dump line; `# T17b` goes on the base line and `# T17p` on the premigration line (devops-99).
   - Cases (qa-99): a base whose `backup_label` START TIME is 2 h before its name's TS exits 4 with no scratch, and its mutant reaches the scratch. The premigration refusal case gets its mutant.
+
+### @architect — 2026-11-22
+
+Architect: seceng's DR2 view (`build-review.md` @ 39ccc605, § "The DR2 question") is adopted. It adds to my DR2 ruling @ 3f635dc3 and replaces nothing in it.
+- **Required single-fault DR2 cases (qa-99).** Each uses a clean set in which only one `.sha256` sibling is wrong; the object itself is intact and decrypts.
+  - (a) The dump. The drill gives `FAIL DR2`, with stderr naming `dump-… does not match its sha256 sibling`, and DR1, DR3–DR8 and DR11 all PASS. `restore.sh --dump` on the same fixture exits 4 with that message. Red: the `restore-lib.sh:119` comparison replaced by `if false` gives `PASS DR2`, and restore goes on to the scratch.
+  - (b) One WAL segment under `--base`, with the same assertions. Red: the comparison at `restore-lib.sh:181` disabled on its own. It is the second copy of the check and has no mutant today.
+  - Both run with the scratch start refused (`NOSCRATCH`). No new real restore.
+- **The default label.** `FAILED_ID=${FAIL_ID:-DR2}` puts any unlabelled selection or download failure under DR2. That stays, because a download that fails also fails "every download matches its sibling". But no DR2 case may pass on the label alone: each asserts the sibling message for its named object.
+- **qa-99's T10/T17 question** is answered @ 3f635dc3: no further real poisoned-canary restore. The T17b and T17p cases from that comment still stand.
