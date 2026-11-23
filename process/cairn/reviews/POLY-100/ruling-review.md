@@ -797,3 +797,26 @@ the command (`state`); the fallback is for a box with no release only. *(b)* S32
 a mutant that falls back, and on one that forgets. **Advisory A17:** prune removes a pruned release's `render-*.json`.
 
 **Still owed:** the three Linux measurements. If any fails, F4 comes back to a ruling before it is built. The mutants named in `build-review.md` are unchanged.
+
+## `121609fe`: S33, A17 **met**. devops-100's F4 measurements on Linux (Compose v5.7.1, Alpine)
+
+Read; not repeated here, except that Compose v5.7.0's `run --help` on this Mac also has no `--no-build`.
+
+| Fact | Result | Ruling |
+|---|---|---|
+| render without network | works; the remote include then fails, and the listener got nothing. Without it, Compose connected during `config` (F4's fetch, now on Linux) | F4 (a) stands |
+| render as uid 65534 | works; secrets, state and the Docker socket are out of reach; an unreadable env file fails the plain render | S31 (a) stands |
+| the two together, with `setpriv` and no-new-privileges | **not measured** (`docker exec -u`, busybox `unshare`) | owed, on Debian's util-linux, as ruled |
+| `up` / `run` from the saved JSON | refused: JSON drops `core: 0`. This is the **unpatched** file; the ruled write-back of `0` was not the thing tried | F4 (b) returns to a ruling: S34 |
+| `run` / `create` from a saved YAML render | same output, same limits, read-only root, dropped capabilities, security options, user, binds; same environment set, in another order | basis for S34 |
+
+**S34 (F4 b): save YAML, judge what was saved.** Render the bundle once with `--format yaml` and keep those bytes, root 0600. Feed the same bytes on stdin to
+`config --format json` (same isolation); the guard judges **that** JSON. `up` and `run` name the saved YAML, its hash re-read first. Nothing is edited between judging and starting, so
+the zero write-back (S31 c) goes. A third render must not be used to make the YAML: it would not be what was judged.
+- The raw render for `env_file`, and S31 (b)'s key check, stay as ruled.
+- A pinned zero limit is seen in JSON as `{}`; the policy pins exactly that. Owed: that a non-zero limit never prints `{}`.
+- *Owed before build:* the two-step on Linux for all three files; `$` in a value survives it; an `up` (not only `create` and `run`) from the saved file; and stdin as 65534.
+
+**F16 (new, blocks): every real one-off run fails.** `run` has no `--no-build`, so `check-config` and `migrate` exit with "unknown flag". Our fake accepts any flag, and R3 and T14 require
+this one: I read them and passed them too. *Required:* drop it from `run` (`build` is refused by the guard, and `--pull never` stays). *Test:* every flag of every `docker`, `gh` and
+`git` argv the code builds is checked against the real tool's `--help`, in the lint job (gh and git where installed, never skipped for Compose). Red on the old `run_argv`.
