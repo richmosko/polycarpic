@@ -160,3 +160,20 @@ Not run: mutants for the provision-job T-net cases ("names only", "no overlap ch
 |---|---|
 | `tests/infra/backup/fake_box.py` prints the dump and globals hashes swapped | `test_the_fake_box_and_the_real_list_print_the_same_bytes` |
 | `backup.py` `_list` swaps the two hashes | the same test, and the T13 chain test |
+
+## Mutants seceng's build review (3bbc6626) listed as not recorded (qa-100; Edit, run, `git checkout --`, tree clean before the next)
+
+| Test | Mutant | Red |
+|---|---|---|
+| T9 after strict (`test_deploy_prod.py`) | `deployer.py` `owner = True` (staging owns edge) | `test_t9_staging_never_touches_edge_once_prod_exists` (and the flow tests) |
+| T15 | `gh` also gets `--token <value>`; `docker pull` gets `GH_TOKEN` in its env; a gh outage becomes a quarantining refusal | `test_t15_the_token_is_in_gh_s_env_only` (twice); `test_a_gh_outage_is_transient…`, `test_t15_a_gh_outage…` |
+| T17 | `allowed_signers.LINE` accepts any options and key type | `test_t17_only_the_plain_form_is_accepted…` |
+| T-take | the `edge-older` ancestry check off; edge's releases pruned while prod is not healthy; no restore of Caddy when the take-over fails | the edge-older case (error); `test_edges_release_is_not_pruned…` + 2 edge cases; `test_edges_release_is_not_pruned…` |
+| T-caddy | the ordered compare replaced by set membership; replaced by a denylist (`forward_auth`, `php_fastcgi`) | 4 and 7 cases |
+| T-probe | no probe (`_probe_baseline` returns `None`); the baseline ignored (always required) | 5 and 2 cases |
+| T8 | policy read from the release directory when one is there (new `test_deploy_policy.py`: a wider policy planted in `current`'s release directory, whose own render is unsafe); plain render only (`raw_services = {}`) | the new current-directory case; the T8 subtests (env, include) |
+| T8 | (note) the same mutant is NOT caught by the candidate-directory variant: the policy is loaded before the render that plants the file, so that test is weak alone; the current-directory test is the one that proves it | |
+| T18 | a third name in `HOST_ONLY` | `test_t18_host_only_is_exactly_two_names…`, `test_HOST_ONLY_is_pinned…`, `test_a_name_no_service_mounts…` |
+| T-help | install lines before the review lines; `install.sh --commit` runs `git checkout`; the ancestor check dropped (new `test_install_commit.py`: C ships while HEAD is elsewhere, off-main exit 2 with no ssh, a planted post-checkout hook leaves no canary and no checkout/switch is run, bad host or commit refused before anything is read, a dirty tree does not matter for `--commit`) | the template tests; the post-checkout case; the off-main case |
+
+The `owner_of` fake now answers only the two staging-auth paths (anything else raises) and the dead `resolve` fake and its docstring are gone.
