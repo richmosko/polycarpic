@@ -511,3 +511,42 @@ signature. The two-line reason changes, not the choice. Two additions, each for 
 - **A12.** The lint allowlists Caddyfile directives and global options instead of naming bad ones. Closes the holes above.
 - **A13.** After a prod `up`, except the first, root asks `https://app.<domain>/api/v1/health` through Caddy (pinned to the
   bind address) and requires 200. Catches a Caddy that misroutes that path or has no certificate; it cannot see logging.
+
+## D2 reopened: strict (staging never touches Caddy) against the exception
+
+**Labels.** Ruling §D2: (a) exception, (b) strict, (c) staging always. My first D2 text to the Principal used "(b)" for what the
+ruling calls (c), and never offered strict. My correction above says "under (b) or (c)" the file reaches prod unsigned;
+that is true of (c) only, and of (a) before prod exists. It is **false of strict (b)**. Below, names only.
+
+**My recommendation changes: strict.** I accepted the exception and then patched it four times. Reading the code showed
+the patches failing open; the exception is the cause.
+
+*What strict removes.*
+- Code: the staging branch of edge ownership, the resolver seam and every DNS check, `edge-prod-name` and its early form,
+  Caddy's wipe and forced first recreate, staging's edge rollback, the DNS-record order in the runbook.
+- Tests: most of T9 (resolve, early name, wipe, the three fail-closed mutants), S16's two-answer case, T10's staging edge.
+- Conditions: S11, S15 and A11 go. S16 shrinks to "`_edge_up` refuses a render this run has not judged".
+- **Stays:** S4 as an absolute (no staging run names edge), S14, S3 on prod's edge and its rollback, and S17: a damaged
+  `current` still defeats the version check and `first-deploy`.
+
+*What the exception keeps even with S11–S17 met.*
+- Unreleased code runs the process on 80/443, with internet access, joined to the prod edge network, until prod's first
+  deploy. It holds the staging password file, which stays in use afterwards unless rotated.
+- The DNS check is a glance, not a lock: it sees the box's resolver at poll time. If the `app.` record appears early,
+  Caddy may get prod's certificate first. `edge-prod-name-early` then refuses, but the key may already be gone; only
+  revoking the certificate helps, and nothing here does that.
+- It checks one name. Any other name pointing at the box (the bare domain, say) can be certified by staging-era code.
+- A destructive one-time path (the wipe) that no live run has exercised.
+
+*What strict costs.* Nothing is served, staging included, until a signed `v1.*` release exists, so the signing key and
+`RELEASE_SIGNERS` move ahead of the first staging deploy. Two shapes, for the architect:
+- **Prod first:** `first-deploy prod` on an empty database, with no `app.` record. No new code, but prod's secrets must be in
+  place first, and prod's first install is not rehearsed on staging.
+- **Edge alone:** an operator command brings up only Caddy from a verified, signed release. Prod's secrets can wait; it
+  is one more path to build and test.
+
+  I prefer prod first if its secrets can be ready. POLY-104's order changes either way. Neither is measured.
+
+*A wrong-but-running Caddy config in a signed release.* No option stops it on the server: CI, review and the signature
+are the gate, then a person and `rollback`. Strict improves one thing: no Caddy ever runs without that gate. A12 and A13
+are wanted under every option.
