@@ -11,7 +11,7 @@ const EXEC = ['infra/ops/polycarpic-ops', 'infra/ops/install_box.py', 'infra/pro
 // A laptop checkout inside the box (bundle paths copied from /repo, committed), a fake ssh that runs the remote command as polyops, and `bump` to make a new commit.
 const LAP = `
 rm -rf /tmp/lap /tmp/bin; mkdir -p /tmp/lap /tmp/bin
-(cd /repo && cp -a --parents infra/ops infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql infra/backup infra/postgres/archive-wal.sh /tmp/lap/)
+(cd /repo && cp -a --parents infra/ops infra/provision.sh infra/provision-check.sh infra/postgres/gate-check.sh infra/postgres/gate-check.sql infra/operator/b2-capabilities.json infra/compose/prod.yml infra/compose/staging.yml infra/compose/edge.yml packages/db/sql/roles.sql infra/backup infra/postgres/archive-wal.sh infra/postgres/pg_hba.prod.conf infra/postgres/pg_hba.staging.conf infra/deploy /tmp/lap/)
 find /tmp/lap -name __pycache__ -prune -exec rm -rf {} +
 (cd /tmp/lap && git init -q && git config user.email t@t && git config user.name t && git add -A && git commit -qm one)
 cat > /tmp/bin/ssh <<'SSH'
