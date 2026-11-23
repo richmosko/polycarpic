@@ -665,3 +665,9 @@ so the certificate may lag the record at launch (unmeasured). That is launch tim
 **Met,** with one test to add: T-net has no case for the rule that both subnets sit outside `pg_hba`'s allow ranges and the
 10.200.0.0/16 pool. Add one overlapping each, provision-check fails, red on a mutant without that check. "Present and
 different: stop, never replace" is right. Open: S21's tag compare, S26; S22, S23, S25 wait on §L6.
+
+## `da6b5338` (S21, S26)
+
+**Both met** in the ruling; the old name is gone from the file. **A15 (advisory):** a failing `test` or `merge-base` prints nothing, so a
+person can read silence as success. End each step-1 chain with `&& echo REVIEW-OK` (prod's second line: `TAG-OK`) and say
+step 2 needs it. Open: T-net's overlap cases; S22, S23, S25 (§L6). The fixed names in tests and INFRA are checked at build review.
