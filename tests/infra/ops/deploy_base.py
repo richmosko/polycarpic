@@ -97,6 +97,7 @@ class World(object):
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
         self.https_calls, self.https_always, self.edge_bad = [], None, {}
         self.bad_caddy = set()
+        self.run_hang, self.run_names, self.stuck_oneoff = set(), [], set()
         self.hang, self.raise_cmd, self.hang_from = set(), {}, 10 ** 9
         self.config_wrapped = []
         self.wrapped_calls, self._isolated, self.network_attempts, self.rerender_hook = [], False, 0, None
@@ -288,6 +289,8 @@ class World(object):
             return self._compose(argv, stdin)
         if sub == "inspect" and "inspect" in self.hang and len(self.up_marks) > self.hang_from:
             raise TimeoutError("inspect")
+        if sub == "inspect" and argv[2] in self.stuck_oneoff:
+            return 0, json.dumps([{"Id": "x", "Config": {"Image": "x"}, "State": {"Status": "running"}}]), ""
         if sub == "inspect":
             c = self.by_name.get(argv[2])
             if c is None:
@@ -400,6 +403,9 @@ class World(object):
             pos = self._positionals(rest)
             svc = rest[pos[0]]
             tail = rest[pos[0] + 2:]
+            self.run_names.append((svc, rest[rest.index("--name") + 1] if "--name" in rest else None))
+            if (svc, tail[0] if tail else "") in self.run_hang:
+                raise TimeoutError("run %s" % svc)
             if "--plan" in tail:
                 return self.plan_code, self.plan_out, ""
             return self.run_codes.get((svc, tail[0] if tail else ""), 0), "", ""

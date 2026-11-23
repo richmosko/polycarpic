@@ -177,3 +177,26 @@ Not run: mutants for the provision-job T-net cases ("names only", "no overlap ch
 | T-help | install lines before the review lines; `install.sh --commit` runs `git checkout`; the ancestor check dropped (new `test_install_commit.py`: C ships while HEAD is elsewhere, off-main exit 2 with no ssh, a planted post-checkout hook leaves no canary and no checkout/switch is run, bad host or commit refused before anything is read, a dirty tree does not matter for `--commit`) | the template tests; the post-checkout case; the off-main case |
 
 The `owner_of` fake now answers only the two staging-auth paths (anything else raises) and the dead `resolve` fake and its docstring are gone.
+
+## Build-review faults F1-F15 (ruling.md table), tests written from the ruling BEFORE the fixes
+
+Each test below was run against the build at `3bbc6626`/`28811f74` (product code unchanged) and is red on it for the reason the finding names. The mutant column of the ruling is run
+once devops-100's fix makes the test green (a test that never went green has no mutant to show); until then "red on today's code" is the proof it can fail.
+
+| Fault | Tests | Red today because |
+|---|---|---|
+| F1 | `release-bundle-poly100.test.ts` (static), `tests/infra/image/release-bundle.test.ts` (built image; container, not yet run), `test_deploy_bundle.F1Harness` | the Dockerfile has no `/release/infra` assembly (`COPY . .`) |
+| F2 | `test_deploy_hang.py` | a hanging or raising health read escapes `deploy`; `_real_run` raises on non-UTF-8; no `in-progress`, no `interrupted` |
+| F3 | `test_deploy_shared_release.py` | staging's live release directory is deleted by prod's refusal and by a failed sibling pull; a tampered tree is rewritten; leftover `.incoming-*` stays; prune with an unreadable pointer removes everything |
+| F4 | `test_deploy_render.py` | renders run unwrapped (a remote include is fetched: 2 network attempts); no saved render, no second render on stdin; compose calls name the bundle's files |
+| F5 | `test_deploy_state.py` (F5) | an unreadable `current`/`previous`/`quarantine`/`first-attempt` reads as absent; a malformed quarantine line is skipped |
+| F6 | `test_deploy_state.py` (F6) | only digest and commit are validated: bad tag, tree or time pass |
+| F7 | `test_deploy_state.py` (F7) | `edge-deploy` and `first-deploy` exit 0 and print nothing on a transient |
+| F8 | `test_deploy_faults.py` (F8) | rollback does not check owner or modes of `releases/<d>` |
+| F10 | `test_deploy_faults.py` (F10) | `edge.env` missing a key or unreadable is not refused `edge-env` |
+| F11 | `test_deploy_state.py` (F11) | a guard refusal of `current` is `guard-<rule>` and quarantines the candidate |
+| F12 | `test_deploy_faults.py` (F12) | no `transient-since`, no `transient-stale` |
+| F13 | `test_deploy_state.py` (F13) | no `ctx.ismount`: an unmounted `/srv/polycarpic` is not refused |
+| F14 | `test_deploy_guard.py` (8 new cases; fixtures now render every profile) | `logging`, `ulimits`, `mem_limit`, `tmpfs` values pass the guard |
+| F15 | `test_deploy_oneoff.py` | no `--name`, migrate timeout 600 s, a hang is `migrate-124`, no `oneoff-stuck` |
+| F9 | not written: the ruling gives no signature for `_edge_up(judged=…)`; asked of architect-100 |
