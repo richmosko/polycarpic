@@ -365,6 +365,19 @@ else
 fi
 report H21 "edge networks" "$h21" "sudo bash provision.sh --stage host ... creates both; a different existing network must be removed by hand after checking nothing uses it"
 
+# ------------------------------------------------------------------ H23 render user (POLY-100 A18)
+# uid and gid 10020, no shell, no home, in no other group, and no process but a render runs as it.
+h23=''
+row=$(getent passwd polycarpic-render) || row=''
+if [ "$row" != "polycarpic-render:x:10020:10020::/nonexistent:/usr/sbin/nologin" ]; then
+  h23=" polycarpic-render is '${row:-missing}';"
+else
+  [ "$(id -G polycarpic-render)" = 10020 ] || h23="$h23 it is in groups $(id -G polycarpic-render);"
+  procs=$(pgrep -a -u 10020 2> /dev/null | grep -v 'docker compose' || true)
+  [ -z "$procs" ] || h23="$h23 a process other than a render runs as it;"
+fi
+report H23 "render user" "$h23" "sudo bash provision.sh --stage host ... creates it; a different existing user must be removed by hand after checking nothing uses it"
+
 # ------------------------------------------------------------------ H9 service gids
 h9=''
 while IFS=: read -r user _ _ gid _; do

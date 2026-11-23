@@ -369,6 +369,20 @@ edge_networks() {
   done
 }
 
+# The render user (POLY-100 A18): uid and gid 10020, no shell, no home, in no other group, used by nothing but the isolated compose render.
+# Present and equal changes nothing; present and different stops; nothing is ever modified.
+render_user() {
+  local name=polycarpic-render row want
+  want="$name:x:10020:10020::/nonexistent:/usr/sbin/nologin"
+  if row=$(getent passwd "$name"); then
+    [ "$row" = "$want" ] || die "user $name exists as '$row' (want '$want'); not modifying it"
+  else
+    getent group "$name" > /dev/null 2>&1 || groupadd --system --gid 10020 "$name"
+    useradd --system --uid 10020 --gid 10020 --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin "$name"
+    change "created user $name (10020)"
+  fi
+}
+
 # edge.env (POLY-100 R9): what the shared Caddy needs, read by the deploy's compose calls. Written only when all three flags are given.
 edge_env() {
   local allow=${staging_allow//,/ }
@@ -427,6 +441,7 @@ stage_host() {
   systemctl enable --now docker > /dev/null 2>&1 || true
   [ "$DAEMON_CHANGED" = 0 ] || systemctl restart docker
   edge_networks
+  render_user
   unattended_upgrades
   systemctl enable --now unattended-upgrades > /dev/null 2>&1 || true
   no_swap
