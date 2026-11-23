@@ -558,6 +558,31 @@ The first one keeps the proof. A mutant that gets past its check reaches the scr
 asserts, while the one real T10 restore still checks the canary. Neither weakens a security case. **The conditional is
 discharged. The build review is PASS on `a780368f`.** D1 is built as (a), pending the Principal.
 
+**Moved to `b7bde21ddad995bd9a6eae7defc1fd1e7f575f38` (shellcheck SC2015 and SC2148).** I read
+`git diff a780368f..b7bde21d -- infra tests` line by line.
+- **The general rule.** `A && B || C` runs `C` exactly when the list `A && B` is false, whichever of them failed. `if
+  ! { A && B; }; then C; fi` runs `C` exactly then too: `!` negates the brace group's status, which is the list's.
+  The commands in an `if` condition are exempt from `set -e`, exactly as the non-final commands of an `&&`/`||` list
+  are, so a failing test aborts neither form. A `[[ … =~ … ]]` that errors (status 2) counts as false in both. In
+  every rewrite `C` is a `die`, `exit`, `return` or `usage`, so nothing runs after it in either form.
+
+| File | Check | Rewrite | Refuses exactly as before |
+|---|---|---|---|
+| `upload.sh` | credential lines | `[ -n k ] && [ -n a ] \|\| die3` → `if [ -z k ] \|\| [ -z a ]; then die3` | yes (De Morgan) |
+| `restore-lib.sh` | set from the bucket | `[[ TS ]] && [[ sys ]] && [[ M ]] \|\| { err; return 5; }` → `if ! { …; }; then err; return 5; fi` | yes |
+| `restore.sh` | `--hours` | `[[ ^[0-9]{1,2}$ ]] && [ -ge 1 ] && [ -le 24 ] \|\| die 2` → `if ! { …; }` | yes. The regex still guards the numeric tests, which are reached only for 1–2 digits. |
+| `restore.sh` | `--read-credential` and `--bucket` | `[ -n ] && [ -n ] \|\| die 2` → `if [ -z ] \|\| [ -z ]` | yes |
+| `restore.sh` | **the box line (`# T16`)** | the six `[[ ]]` field checks `\|\| { echo …; exit 5; }` → `if ! { six checks; }; then echo …; exit 5; fi # T16` | yes. It is still in the main shell (the loop reads `< <(…)`), so `exit 5` ends the script. It is still one line ending in `# T16`, so the mutant still removes the whole check. |
+| `drill.sh` | required options | `[ -n ] && … \|\| usage` → `if [ -z ] \|\| …; then usage` | yes (De Morgan over four) |
+| `drill.sh` | credential files | `[ -f ] && [ -f ] \|\| die 2` → `if [ ! -f ] \|\| [ ! -f ]` | yes |
+
+- Seven validation lines were rewritten (my earlier "eight" counted the `# shellcheck shell=bash` directive that
+  `restore-lib.sh` gains, which is a comment).
+- No check passes now where it failed before.
+- The one test change is stricter: the F8 case asserts the `FAIL … skipped without a failure` line.
+- **The PASS stands on `b7bde21d`.** qa's local re-run of restore, drill and provision on it is the behavioural
+  confirmation.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
