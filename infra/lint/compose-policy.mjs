@@ -338,6 +338,13 @@ for (const [kind, cfg] of Object.entries(rendered)) {
   if (Object.keys(cfg.volumes ?? {}).length) v('top-level-volumes', rel, 'top-level volumes: are not used');
   for (const [key, c] of Object.entries(cfg.configs ?? {})) if (c.content) v('config-inline', rel, `config ${key}: inline content`);
 
+  if (kind === 'prod' || kind === 'staging') {
+    // T-net: a project file only declares its own edge network, external, by its exact name, with no ipam; it never creates one
+    const key = `edge-${kind}`;
+    const n = nets[key];
+    if (n && (n.name !== `polycarpic-${key}` || n.external !== true || (n.ipam && (n.ipam.config ?? []).length))) v('edge-overlap', rel, `network ${key} must be external, named polycarpic-${key}, with no ipam`);
+    for (const k of Object.keys(nets)) if (/^edge/.test(k) && k !== key) v('edge-overlap', rel, `unexpected edge network ${k} in ${kind}.yml`);
+  }
   if (kind === 'edge') {
     // T-net: both edge networks are external, by their fixed names, with no ipam; provision.sh creates them with the fixed subnets below,
     // and those subnets must stay outside every pg_hba allow range and the 10.200.0.0/16 pool (S24).
