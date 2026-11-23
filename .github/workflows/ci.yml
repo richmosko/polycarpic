@@ -745,7 +745,7 @@ jobs:
         run: docker build -t poly97-box:test tests/infra/provision
 
       - name: Shellcheck the provisioning scripts (inside the test container, so the version is pinned with it)
-        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/infra/ops/install.sh /repo/infra/backup/backup.sh /repo/infra/backup/upload.sh /repo/infra/backup/restore-lib.sh /repo/infra/restore.sh /repo/infra/drill.sh /repo/infra/postgres/archive-wal.sh
+        run: docker run --rm -v "$PWD:/repo:ro" poly97-box:test shellcheck -x /repo/infra/hetzner/create.sh /repo/infra/provision.sh /repo/infra/provision-check.sh /repo/infra/ops/install.sh /repo/infra/backup/backup.sh /repo/infra/backup/upload.sh /repo/infra/backup/restore-lib.sh /repo/infra/restore.sh /repo/infra/drill.sh /repo/infra/postgres/archive-wal.sh /repo/infra/ci/images-env.sh
 
       - name: Operator tool tests (Python stdlib, injected transports, no network)
         run: python3 -m unittest discover -s tests/infra/operator -t tests/infra/operator
