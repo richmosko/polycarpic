@@ -290,7 +290,8 @@ restore.sh --identity <age key file> --read-credential <file> --bucket <name> (-
 Last line `DRILL PASSED` (exit 0), `DRILL PASSED WITH SKIPS: <ids>` (exit 3) or `DRILL FAILED: <ids>` (exit 1); usage
 2. `--report` writes the date, timings and results as markdown for the lead to file. *(Correction, F3:)* per object it
 gives only kind, `<TS>`, upload time and sibling sha256, and no bucket name, fileId, system id or object key. The
-fileIds stay in the terminal output. The
+fileIds stay in the terminal output, on **stderr** *(correction, F5)*. Stdout carries only the check lines, the
+scratch name and the verdict, so a redirected drill bypasses nothing. The
 GA gate (POLY-116) accepts exit 0 only. Scratch containers are removed on exit.
 
 ## R9 — Records root writes, and the status readers
