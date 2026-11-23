@@ -3,7 +3,7 @@
 // (globalSetup); a refusal asserts its code and that NO scratch was started (the fake docker log); a case that only needs to see whether the script reached
 // the scratch runs with POLY99_SCRATCH_FAIL=1 (the scratch start is refused at once, so nothing is restored). This file starts ONE real scratch (T10 --before);
 // the other real restores are in roundtrip.test.ts (--base, --dump, --premigration) and drill.test.ts.
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type Files, fixtures, msToTs, plantObject, plantVersion, sha256, tsToMs } from './artifacts.ts';
@@ -183,6 +183,7 @@ describe('restore --premigration --from-box (R7, T9, T16, C4, C5): everything up
     const d = () => name(P, 'dump'), g = () => name(P, 'globals');
     const line = (dn: string, gn = g()) => `${tsP} ${dn} ${'a'.repeat(64)} ${gn} ${'b'.repeat(64)} pending\n`;
     const MARK = () => join(lap.dir, 'pwned');
+    beforeEach(() => { rmSync(MARK(), { force: true }); }); // the canary of one mutant must not leak into the next case
     const evil = () => ({
       semicolon: `dump-17-1-${tsP}.age;touch ${MARK()}`, subshell: `dump-17-1-${tsP}.age$(touch ${MARK()})`,
       newline: `dump-17-1-${tsP}.age\ntouch ${MARK()}`, slash: `../dump-17-1-${tsP}.age`, backtick: `dump-17-1-${tsP}.age\`touch ${MARK()}\``,
