@@ -70,6 +70,8 @@ Two real cases, both found by CI on Linux and fixed; the rest checked and kept.
 | labelled scratch containers | restore, roundtrip, drill | **tightened**: an `afterEach` removes any labelled scratch, so a failed case cannot make the next file's WARN check fail |
 | `docker volume ls` and `docker ps` sets | the F4 real-Docker case and the WARN case | kept, but they assume nothing else touches the daemon during the run: one suite at a time (CI runs the steps in sequence) |
 
+**Per-file green is not the CI command.** The ops unit tests passed here file by file, and as one `discover` on this Mac, while CI's `python3 -m unittest discover -s tests/infra/ops -t tests/infra/ops` on Linux Python 3.12 errored in 97 of 222 tests. The host's test-run guard refuses that command, so it was never run as CI runs it. The exact command, run in `poly97-box:test` with the repo mounted read-only (`docker run --rm -v \"$PWD\":/repo:ro -w /repo poly97-box:test python3 -m unittest discover -s tests/infra/ops -t tests/infra/ops -p 'test_*.py'`), is the proof: 132 errors with the old `backup_base.py` overlaid, 222/222 OK with the fix (`e3be13e3`).
+
 ## Every test commit since the red run (`1cd28a70`)
 
 Marked **stricter**, **corrected** (the test was wrong or the spec moved) or **loosened**, with one line of why. Nothing is loosened without a ruling, and the two that are marked loosened say which (`738c8e87` was accepted by the architect at `3f635dc3`).
