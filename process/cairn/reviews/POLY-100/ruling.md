@@ -43,7 +43,7 @@ IN: R1–R13. OUT:
 
 ## R1 — Entry points, units, lock
 
-- New `infra/ops/commands/deploy.py` (`deploy <prod|staging>`), `first_deploy.py`, `rollback.py`, `allowed_signers.py`;
+- New `infra/ops/commands/deploy.py` (`deploy <prod|staging>`), `first_deploy.py`, `edge_deploy.py`, `rollback.py` (`prod|staging|edge`), `allowed_signers.py`;
   `infra/ops/lib/release.py` (candidate, verify, bundle, state) and `lib/compose_guard.py` (R5). POLY-98 house style: root,
   injected `ctx`, argv lists, `fixed_env`. Every value from GitHub is regex-checked before use; a miss is refusal `malformed`.
 - Units in `infra/deploy/systemd/`: `polycarpic-deploy@.service` (oneshot, `ExecStart=/usr/local/sbin/polycarpic-ops deploy %i`,
@@ -88,7 +88,7 @@ alert, because gh's exit cannot tell an outage from a refusal. Releases live in 
 | V1 | `gh attestation verify oci://ghcr.io/richmosko/polycarpic@<digest> --repo richmosko/polycarpic --signer-workflow richmosko/polycarpic/.github/workflows/build.yml --source-ref refs/heads/main --deny-self-hosted-runners --source-digest C --predicate-type https://slsa.dev/provenance/v1`, exit 0, **before any pull** | `attestation` | no (gh's exit does not tell a refusal from an outage; the next poll re-checks) |
 | V2 | `docker pull ghcr.io/richmosko/polycarpic@<digest>`; `RepoDigests` holds it | `pull` | no |
 | V3 | Label `org.opencontainers.image.revision` == C (a build-bug check; V1 is the binding) | `label` | yes |
-| V4 (prod) | In the bare repo `/var/lib/polycarpic/state/deploy/tags.git` (created by root): `git fetch --no-tags https://github.com/richmosko/polycarpic refs/tags/<tag>:refs/tags/<tag>`; `cat-file -t` = `tag`; the signature block is SSH; `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=/etc/polycarpic/allowed_signers verify-tag <tag>` exit 0, with `GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1`; C = the tag object's direct target, which must be a commit (`tag-commit` otherwise: a tree, blob or nested tag) | `tag-signature`, `tag-commit` | yes |
+| V4 (prod, edge) | In the bare repo `/var/lib/polycarpic/state/deploy/tags.git` (created by root): `git fetch --no-tags https://github.com/richmosko/polycarpic refs/tags/<tag>:refs/tags/<tag>`; `cat-file -t` = `tag`; the signature block is SSH; `git -c gpg.format=ssh -c gpg.ssh.allowedSignersFile=/etc/polycarpic/allowed_signers verify-tag <tag>` exit 0, with `GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1`; C = the tag object's direct target, which must be a commit (`tag-commit` otherwise: a tree, blob or nested tag) | `tag-signature`, `tag-commit` | yes |
 | V5 | Bundle extracted and checked (R4); its `images.env` well-formed; each sibling passes V1 with the **same** C and the same flags, then V2 and V3 | `bundle`, `sibling-<name>` | yes (V1/V2 of a sibling: no) |
 | V6 | Bundle `infra/postgres-major` equals `current`'s (skipped on the first deploy) | `postgres-major` (a major upgrade is INFRA §5's operator procedure) | yes |
 | V7 | Compose guard passes on the rendered config (R5) | `guard-<rule>` | yes |
@@ -235,7 +235,7 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
 ## R9 — Edge is prod's alone (Principal, D2: strict)
 
 - `edge.yml`, the Caddyfile and the Caddy image come from a **signed** release and are rendered and upped only by a prod
-  run. A staging run renders no `edge.yml` and issues no argv naming `polycarpic-edge`, `edge.yml` or `caddy`, on any host, with no
+  run or `edge-deploy`. A staging run renders no `edge.yml` and issues no argv naming `polycarpic-edge`, `edge.yml` or `caddy`, on any host, with no
   exception (S4). R5's `network` rule refuses a staging service on a prod edge network (S14).
 - Both renders are judged before either `up`, and `_edge_up` refuses a render this run has not judged. Rollback restores edge (R8, S3).
 - **Removed with the staging exception:** staging edge ownership and its rollback; the `ctx.resolve` seam and every DNS check;
@@ -248,7 +248,28 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
   too, with no `ipam`; the guard policy (S14) follows. provision-check asserts each name, subnet and driver, and that both
   subnets are outside every `pg_hba` allow range and the 10.200.0.0/16 pool (S24). What compose does when an external network is missing is
   `(unmeasured)`: this loop's tests start no container; POLY-104 runs a first deploy before any edge exists.
-- **Open (§L6):** how Caddy is first brought up before a `v1.*` release exists. Until it is ruled, staging runs and is not served.
+- **Before prod exists: edge alone** (Principal). `polycarpic-ops edge-deploy <tag>`, foreground, no timer. Waits ≤ 10 min for `deploy.lock`.
+
+| # | Step | Stops on |
+|---|---|---|
+| 1 | `<tag>` matches `^edge-(0|[1-9][0-9]*)$`; prod accepts only R2's `v1.*` (S22) | usage, exit 2 |
+| 2 | Prod has no `current`; a damaged one counts as present (S23, S17) | `edge-owned-by-prod` / `state`, exit 4 / 1 |
+| 3 | `n` is above edge `current`'s, or the same tag (then step 4's digest must equal `current`'s: exit 0) | `not-newer` |
+| 4 | `GET …/releases/tags/<tag>`: non-draft, `tag_name` equal to `<tag>`, body exactly one digest line; a quarantined digest is refused | `malformed`, `quarantined` |
+| 5 | V4 (same `allowed_signers`; the tag object's own name = ref = Release, S2) gives C; V1–V3; V5 with all siblings; V6 does not apply | as R3 |
+| 6 | V7 on the **edge** render only | `guard-<rule>`, with R10's help text (signed wording; line 3 reads `then run again: sudo polycarpic-ops edge-deploy <tag>`) |
+| 7 | `up -d --pull never --no-build caddy` in `polycarpic-edge`. No other project, service or one-off container of that release is started | `edge-up` → rollback |
+| 8 | caddy running, healthy and on the release's image within 120 s; no probe (A13 is prod's) | quarantine; tree hash and guard on edge `previous`, `up`; none → `rollback-unhealthy`, change nothing else |
+
+- **Edge state** is `state/deploy/edge/`, with R10's files, grammar and S17 rule. R4 keeps edge's `current` and `previous` until prod has a
+  `current`. `rollback edge` follows R8's manual rule and refuses once prod has a `current`. `08_deploy` shows `edge` until then, without the `last-poll` WARN.
+- **Prod takes over once (S23).** `first-deploy prod`, when edge has a `current`: C must equal or descend from edge's commit
+  (`merge-base --is-ancestor`, both fetched as in R2), else `edge-older` (no Q), before V7. If that first deploy fails after upping caddy,
+  caddy goes back to edge's `current` (tree hash, guard, `up`); the project's outcome stays `rollback-unhealthy`.
+- **`release.yml`** triggers on `v1.*` and `edge-*` and refuses (first step) a tag matching neither full regex. Every other check is the
+  same for both, plus the tag object's name equal to the ref (S2's mirror, for both). An edge Release is created with `--latest=false`.
+- **`release-scan` (S25).** With no `v1.*` Release, it scans the Caddy of the highest-`n` `edge-*` Release, read from its app image's
+  `images.env` by B3's rules; once a `v1.*` Release exists it scans only that one's four. Neither → nothing to scan, as today.
 - `/etc/polycarpic/edge.env` (`POLY_DOMAIN`, `POLY_BIND_ADDR`, `POLY_STAGING_ALLOW`, `POLY_TLS`; root 0644) is written by
   `provision.sh`, with a provision-check line.
 
@@ -366,7 +387,7 @@ than 90 days is caught by the `last-poll` WARN only. POLY-103 sends `alert` outw
 - **provision-check lines,** in the POLY-97 R6 format:
   - the deploy units equal the bundle's copies;
   - `compose-allow.json` is present and root-owned;
-  - `allowed_signers` is present and well-formed (WAIT before prod);
+  - `allowed_signers` is present and well-formed (WAIT before the first edge or prod release);
   - `edge.env` is present;
   - the deploy timer is enabled for each project that has a `current` (WAIT before then).
 - **`install.sh --commit <40 hex>`** (S21). The operator's own checked-out `install.sh` ships `git archive <C>` and C's `install_box.py`,
@@ -450,6 +471,9 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T-lock | Criterion 7: two real `migrate` runs together on a slow file. Both exit 0, one prints `applied:` and the other `nothing to apply`, there is one tracking row, and the second is seen on `Lock/advisory` | mutant without the advisory lock |
 | T-render | **Real renders, this loop.** The runner's `docker compose config`, raw and plain, over temp copies of the real bundle and of T8's compose-level cases, fed to the installed guard: the bundle passes, each case is refused by its named rule (S10's eight, SM6, the edge alias, `include`, `extends`). A regenerated fixture must equal the committed one. The compose version is printed. No daemon, no container; host `env_file` paths are substituted and mapped back as `gen_compose.py` does | mutants: plain render only; service network keys only; a hand-edited fixture. A missing compose plugin fails, never skips |
 | T-help | A refused candidate whose bundle puts a command, newlines, ESC bytes and a fake `install.sh` line everywhere it can write (service names, keys, image names, project name, comments): alert, log and status hold exactly the template. Missing or malformed `ssh-target` and bundle id print placeholders; staging says unsigned, prod the tag, `verify-tag` and the tag's commit compared with C, and each chain ends with its `review:` marker (A15); a `current` refusal prints no command; review precedes install; the text holds no `switch`, `checkout` or `pull`. `install.sh --commit` ships C while HEAD is elsewhere; C off `origin/main` is exit 2 with no ssh; a `post-checkout` hook planted in C leaves no canary; a bad target is refused before extraction. A refused first deploy shows RED | mutant printing the guard's detail; C from the label; target from `edge.env`; command for `current`; install before review; `--commit` via checkout |
+| T-edge | `edge-1` offered to prod and `v1.0.0` to `edge-deploy`: refused, the second before any network call; a signed `edge-1` object as ref `edge-2`: `tag-name`; an unlisted signer: `tag-signature`; a lower or equal `n` with another digest: `not-newer`; prod `current` present, and damaged: refused, nothing upped; success: the only compose `up` is caddy in `polycarpic-edge`, and no argv names another service of that release; unhealthy: quarantined, edge `previous` back after its guard; `rollback edge`; a guard refusal prints the help with the edge tag | mutant sharing one tag regex; mutant without the rising `n`; mutant treating damaged prod `current` as absent; mutant upping the whole bundle |
+| T-take | `first-deploy prod` from edge's commit and from a descendant succeeds and prunes edge's releases afterwards; from a non-descendant: `edge-older`, nothing upped; failing after caddy is up: caddy back on edge's `current` | mutant without the ancestry check; mutant pruning edge's release before prod is healthy; mutant leaving the failed caddy |
+| T-relyml | Static: `release.yml` triggers exactly `v1.*` and `edge-*`; both full regexes in the first step; name compare; `--latest=false` on edge only; publish still `contents: write` alone. `release-scan`: edge's Caddy with no `v1.*`, the four with one, highest `n` not newest | mutants dropping the regex step, the name compare, the switch-over |
 | T-net | All three compose files declare both edge networks they use as external, by exact name, and no file creates one (red on `d634da53`'s `edge.yml`); `provision.sh` creates exactly the two, reruns with no change, and stops on a different subnet (fake docker, provision job); provision-check fails on a missing network, another subnet, another driver, an edge subnet inside a `pg_hba` allow range, and one inside 10.200.0.0/16 (one case each, with provision-check's expected subnet changed to match, so only the overlap rule can refuse). T-render renders `edge.yml` in the external form | today's files; mutant recreating a network that differs; mutant checking names only; mutant without the overlap check |
 | T-caddy | `caddy-allow` passes the real file and refuses: `forward_auth` in a site; a second global `log`; `php_fastcgi` on one line with its block; `import other`; an extra site block; a repeated allowed line; `@denied` moved below `basic_auth`; a `command` on caddy; a literal `POLY_TLS` with a newline. provision refuses an `edge.env` value with a newline, and one with `}` (S20) | mutant naming bad directives instead of allowing; mutant comparing counts, not order |
 | T-probe | Baseline 200 then 502: rollback and quarantine; baseline 200 then a certificate failure: the same; baseline failing: healthy, `edge-probe-baseline` logged and alerted, no quarantine; first deploy and staging: no probe | mutant without the probe; mutant without the baseline; mutant skipping verification (real `https_status` against a local self-signed listener) |
@@ -463,7 +487,7 @@ Every refusal test asserts the exit code and the refusal name, and each guard ha
 | Job | May add | Holds |
 |---|---|---|
 | image | **0 s** | nothing; the POLY-99 backup suite (386 s) stays alone there |
-| provision | ≤ 25 s unit (`test_deploy.py`), plus ≤ 60 s box fixture | T1–T18 |
+| provision | ≤ 25 s unit (`test_deploy.py`), plus ≤ 60 s box fixture | T1–T18, T-edge, T-take |
 | db | ≤ 10 s | T-pre, T-lock (in the existing `runner.test.ts`; no new DB_AREAS entry) |
 | lint | ≤ 15 s `(unmeasured)` | T-env; workflow statics for R11; T-render (needs the compose plugin only). Its step must run when `infra/ops/**`, `infra/compose/**`, `infra/deploy/**` or the test changes: the `image` filter excludes `infra/ops/` |
 
@@ -503,11 +527,15 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
 - **L2.** `self-update` has no issue; I suggest the ops follow-up umbrella.
 - **L4.** User steps before the first real deploy:
   - create the token (§D1), and run the one-call check;
-  - set up the SSH tag-signing key and `RELEASE_SIGNERS` (POLY-96 comment);
+  - set up the SSH tag-signing key and `RELEASE_SIGNERS` (POLY-96 comment): both are needed before staging is **served**;
+  - `allowed-signers install` on the box, with the same key;
+  - sign and push `edge-1` on a `main` commit built in the last 90 days; wait for its Release;
   - after the first `build.yml` run, confirm that the three new GHCR packages are public `(unmeasured)`.
 - **L5.** POLY-104's and INFRA's note on when to create the `app.` record (S11, S15) is withdrawn: no staging-built Caddy
-  exists to obtain that certificate.
-- **L6.** Open, the Principal's: the first edge, "prod first" or "edge alone". `POLY-1.0` tags `v1.0.0` as GA, so either needs a signed tag before GA.
+  exists to obtain that certificate. **POLY-104's order:** provision (host: networks, `edge.env`; staging database), secrets with
+  `github_read_token` and staging's password file, `allowed-signers install`, `first-deploy staging` (again after
+  `provision --stage database` if it asks), `edge-deploy edge-1`, then the scans. Staging comes first because it needs no Caddy and shows that it needs none. It also measures a staging deploy before any edge exists, what Caddy does while `app.` has
+  no record, and whether a failed issuance meets a CA rate limit that matters (both `(unmeasured)`).
 
 ## E — Doc passages (owners, at the verdict)
 
@@ -548,6 +576,7 @@ Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and
 | S21 what a guard refusal prints | R10 help; R11 `install.sh --commit`; T-help |
 | S27 exact `env_file` list per service | R11; T-env |
 | S26 the prod edge network is `polycarpic-edge-prod` | R5, T8 |
-| S24 networks from provision (S22, S23, S25 wait on §L6) | R9; T-net |
+| S22 namespaces cannot cross; S23 one owner after prod; S25 edge's Caddy rescanned | R9; T-edge, T-take, T-relyml |
+| S24 networks from provision | R9; T-net |
 | S19 rerun skips the backup only on an empty database | R6; T12 |
 | A12, A13 (adopted) | R11 `caddy-allow`, T-caddy; R7 through Caddy, T-probe |
