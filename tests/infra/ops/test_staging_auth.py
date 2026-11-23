@@ -210,3 +210,22 @@ class FileCheck(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FileGroup(unittest.TestCase):
+    """The file's own group is compared, not the directory's: the owner seam answers a different group for the file than for the directory."""
+
+    setUp = FileCheck.setUp
+    write = FileCheck.write
+
+    def test_a_file_in_another_group_inside_a_correct_directory_is_refused(self):
+        self.write(stored(24).encode())
+        g = self.sauth.GID
+
+        def owner(fd, path):
+            return (os.getuid(), g if path == DIR else g + 1)
+        from lib.ctx import Ctx
+        ctx = Ctx(root=self.tmp, trusted_uid=os.getuid(), owner_of=owner)
+        self.assertIsNotNone(self.sauth.check(ctx))
+        ctx2 = Ctx(root=self.tmp, trusted_uid=os.getuid(), owner_of=lambda fd, path: (os.getuid() + 1, g))
+        self.assertIsNotNone(self.sauth.check(ctx2), "another owner")
