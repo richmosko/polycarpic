@@ -423,3 +423,30 @@ only account store.
   `pg_database` `a` row whose `datacl` entry for poly_backup is exactly CONNECT, not grantable; refuse every other row."
   T-pre keeps each case red in the current database, and adds one case: TEMPORARY granted to poly_backup on a
   **sibling** database is refused (a `dbid 0` row). Red on a mutant that exempts every `pg_database` row.
+
+### R12(a) wording @ `580be11e` (`99b45aae..580be11e`)
+
+**Accepted.** The wording matches what I agreed above: `dbid` 0 or the current database; `pg_database` rows exempt only
+when `aclexplode` gives poly_backup exactly CONNECT without grant option, on every database; policy rows (`r`) refused.
+
+- **The pg_hba claim, checked against the shipped files.**
+  - `infra/postgres/pg_hba.prod.conf` opens with `host replication poly_backup 10.201.10.0/29`, then
+    `host polycarpic poly_backup 10.201.10.0/29`, then `host all poly_backup all reject`.
+  - pg_hba is first-match, so no later line can admit poly_backup to another database.
+  - `pg_hba.staging.conf` admits poly_backup nowhere.
+  - `compose-policy.mjs` lines 138–147 pin all of this in CI: the four C-79 lines first and in order, and no
+    poly_backup or replication allow on staging.
+  - The ruling says `pg_hba.conf`; the file is `pg_hba.prod.conf`. That is cosmetic.
+- **If pg_hba is later widened** (a poly_backup line for another database, or `all` for it): the sibling database's
+  grants become reachable, and this sweep would not see them.
+  - Who can widen it: a reviewed `main` commit that also edits the CI rule, then a signed tag on prod; or attacker A2,
+    who already holds the migrator credential and gains nothing from it.
+  - The box guard (R5) checks compose files, not the contents of the pg_hba file.
+  - So the protection is the CI rule plus review. Required edit, small: the `pg-hba-prod` rule's comment and message
+    name R12(a). The rule then reads: "the four C-79 lines must come first, in order; R12(a)'s preflight sweeps only
+    this database and relies on it."
+  - A change that widens pg_hba must then widen R12(a) to sweep the newly admitted database. The two cannot drift
+    apart silently.
+- **Test, carried from above:** T-pre adds TEMPORARY granted to poly_backup on a **sibling** database. It must be
+  refused through the shared `pg_database` row, and go red on a mutant that exempts every `pg_database` row. The diff
+  does not add it yet.
