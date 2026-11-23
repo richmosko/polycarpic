@@ -198,7 +198,7 @@ describe('F6(a): a check that did not run fails the verdict, whichever way it we
     plant();
     const m = lap.mutantInfra('drill.sh', /^if \[ "\$prc" != 0 \]; then[\s\S]*?^fi$/m, ':');
     const r = lap.run('drill.sh', DRILL(), { infra: m, env: NOSCRATCH });
-    expect(checks(r.out).DR10).toBeUndefined(); // no result at all
+    expect(checks(r.out).DR10).toMatchObject({ kind: 'FAIL', text: expect.stringContaining('did not run') }); // the verdict itself reports it
     expect(r.code).toBe(1);
     expect(last(r.out)).toMatch(/^DRILL FAILED: .*\bDR10\b/);
     expect(r.out + r.err).toMatch(/DR10 did not run/);
