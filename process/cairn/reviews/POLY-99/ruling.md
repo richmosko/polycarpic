@@ -287,7 +287,7 @@ restore.sh --identity <age key file> --read-credential <file> --bucket <name> (-
 | DR11 | R7's replay check on every chosen artifact (archive time vs name vs upload time) |
 | DR10 | With the box credential: deleting an object, uploading over an existing version, shortening a retention, changing the bucket default retention are each refused |
 
-*(Correction, seceng F6: every expected check id DR1–DR11 must print a line; a missing one is FAIL, and exit 3 reads `DRILL INCOMPLETE: not checked: <ids>`.)* Last line `DRILL PASSED` (exit 0), `DRILL INCOMPLETE: not checked: <ids>` (exit 3) or `DRILL FAILED: <ids>` (exit 1); usage
+*(Correction, seceng F6: every expected check id DR1–DR11 must print a line; a missing one is FAIL, and exit 3 reads `DRILL INCOMPLETE: not checked: <ids>`. Seceng F8: only DR9 may SKIP. Any other SKIP, in a run with no FAIL, is itself a FAIL, so exit 3 means only that DR9 was not checked.)* Last line `DRILL PASSED` (exit 0), `DRILL INCOMPLETE: not checked: <ids>` (exit 3) or `DRILL FAILED: <ids>` (exit 1); usage
 2. `--report` writes the date, timings and results as markdown for the lead to file. *(Correction, F3:)* per object it
 gives only kind, `<TS>`, upload time and sibling sha256, and no bucket name, fileId, system id or object key. The
 fileIds stay in the terminal output, on **stderr** *(correction, F5)*. Stdout carries only the check lines, the
