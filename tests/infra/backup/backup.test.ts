@@ -83,6 +83,9 @@ describe('backup.sh usage and preconditions (R1): exit code, exact stderr, nothi
       try {
         for (const [label, content] of rcases) {
           writeFileSync(recipientsPath(s.dir), content);
+          // a bind-mounted file edited on the host is not seen reliably by a running container on Docker Desktop: a fresh container per recipients file
+          sh('docker', ['rm', '-f', name]);
+          s.startBackupContainer();
           const r = exec(['nightly']);
           expect({ label, code: r.code, last: lastLine(r.err), out: r.out }).toEqual({ label, code: 3, last: RC, out: '' });
         }
