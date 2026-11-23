@@ -210,3 +210,7 @@ once devops-100's fix makes the test green (a test that never went green has no 
 | `test_deploy_judged.py` (F9) | no `Judged` type; `_edge_up` takes a constant |
 | `test_deploy_flags.py`, `tests/infra/flags-real.test.ts` (F16/T14) | `compose run --no-build` (refused by every fake; the lint test reads the real `--help`) |
 | `test_deploy_hang.py` `S33` (the `interrupted` file) | no `interrupted` file |
+
+## A18 and A17 (ruling 13e43e26), red first
+
+`test_deploy_render.py`: the argv prefix is now `setpriv --reuid 10020 --regid 10020` (red: renders are unwrapped); `RenderUser`: a missing render user, one with a shell, another uid, another gid or a home refuses `render-user` exit 4 and a good one passes (red: no check); `Tamper`: a saved render changed between the judging and the `up` is refused (red: nothing is saved, nothing re-read). `test_deploy_render_prune.py` (A17): a pruned release's render goes with it, a stray one is removed, a kept one stays (red: no renders are saved or pruned). `test_deploy_guard.py`: a bind with `propagation: rshared` is refused (red: the guard accepts it). The harness plants `/etc/passwd` with the render user as `provision.sh --stage host` makes it.

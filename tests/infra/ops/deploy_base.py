@@ -555,6 +555,7 @@ class DeployTest(OpsTest):
         if allow.exists():
             h.write("/opt/polycarpic/ops/%s/infra/deploy/compose-allow.json" % h.ops_id, allow.read_bytes())
         self.staging_auth_file()
+        h.write("/etc/passwd", "root:x:0:0:root:/root:/bin/bash\npolycarpic-render:x:10020:10020::/nonexistent:/usr/sbin/nologin\n")  # A18: the render user, as provision.sh makes it
         self.current_digest = digest("current")
         self.seed("staging", self.current_digest, "-", self.world.commit_a)
 

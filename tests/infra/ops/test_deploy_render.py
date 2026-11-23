@@ -1,4 +1,4 @@
-"""POLY-100 F4 (ruling.md; build review F4): (a) every render runs with no network, as nobody, with an empty HOME and the experimental remote flags off, so a remote `include` cannot be fetched;
+"""POLY-100 F4 (ruling.md; build review F4): (a) every render runs with no network, as the render user (10020), with an empty HOME and the experimental remote flags off, so a remote `include` cannot be fetched;
 (b) what was judged is what starts: the judged plain JSON (`ulimits.core` `{}` written back as 0) is saved root 0600 and rendered once more on stdin, and must equal the judged one; every other
 compose call names only that file with -f. Written from the ruling, red on the build it was written against."""
 import json
@@ -8,7 +8,7 @@ import stat
 from deploy_base import DeployTest, digest
 from test_deploy_bundle import good_files, make_tar, sibling_digests
 
-PREFIX = ["unshare", "--net", "--", "setpriv", "--reuid", "65534", "--regid", "65534", "--clear-groups", "--no-new-privs", "--", "docker", "compose"]
+PREFIX = ["unshare", "--net", "--", "setpriv", "--reuid", "10020", "--regid", "10020", "--clear-groups", "--no-new-privs", "--", "docker", "compose"]
 STATE = "/var/lib/polycarpic/state/deploy"
 
 
@@ -181,3 +181,60 @@ class RenderFiles(Render):
                 blob += open(os.path.join(base, f), "rb").read()
         for name, v in values.items():
             self.assertNotIn(v.encode(), blob, "the value of %s is in a saved render, log or alert" % name)
+
+
+class RenderUser(Render):
+    """A18 (ruling 13e43e26): renders run as `polycarpic-render` (uid and gid 10020, no shell, no other group); a missing or wrong user refuses `render-user` (exit 4)."""
+
+    test_every_render_is_isolated_unprivileged_with_an_empty_home_and_the_remote_flags_off = None
+    test_a_remote_include_is_refused_as_guard_render_and_never_fetched = None
+    test_the_judged_render_is_saved_root_0600_with_core_written_back_as_zero = None
+    test_a_second_render_that_differs_from_the_judged_one_is_guard_render = None
+    test_the_second_render_reads_the_saved_file_on_stdin = None
+    test_every_other_compose_call_names_only_the_saved_file_with_f = None
+    test_no_releases_path_reaches_any_argv_but_as_configs_f_env_file_or_project_directory = None
+
+    def passwd(self, line):
+        self.host.write("/etc/passwd", "root:x:0:0:root:/root:/bin/bash\n" + (line + "\n" if line else ""))
+
+    def test_a_missing_render_user_or_one_with_a_shell_or_another_group_refuses_render_user_exit_4(self):
+        self.candidate()
+        for label, line in (("missing", ""), ("a shell", "polycarpic-render:x:10020:10020::/nonexistent:/bin/bash"), ("another uid", "polycarpic-render:x:10021:10020::/nonexistent:/usr/sbin/nologin"),
+                            ("another gid", "polycarpic-render:x:10020:10021::/nonexistent:/usr/sbin/nologin"), ("a home", "polycarpic-render:x:10020:10020::/home/render:/usr/sbin/nologin")):
+            self.passwd(line)
+            r = self.deploy("staging")
+            self.assertEqual((r.rc, last(r)), (4, "deploy: refused render-user"), "%s: %s" % (label, r.err))
+            self.assertEqual([c for c in r.world.compose_log if c["cmd"] in ("up", "run")], [], label)
+        self.passwd("polycarpic-render:x:10020:10020::/nonexistent:/usr/sbin/nologin")
+        r = self.deploy("staging")
+        self.assertNotEqual(last(r), "deploy: refused render-user", "the right user passes: " + r.err)
+
+
+class Tamper(Render):
+    test_every_render_is_isolated_unprivileged_with_an_empty_home_and_the_remote_flags_off = None
+    test_a_remote_include_is_refused_as_guard_render_and_never_fetched = None
+    test_the_judged_render_is_saved_root_0600_with_core_written_back_as_zero = None
+    test_a_second_render_that_differs_from_the_judged_one_is_guard_render = None
+    test_the_second_render_reads_the_saved_file_on_stdin = None
+    test_every_other_compose_call_names_only_the_saved_file_with_f = None
+    test_no_releases_path_reaches_any_argv_but_as_configs_f_env_file_or_project_directory = None
+
+    def test_the_saved_file_changed_between_the_judging_and_the_up_is_refused(self):
+        self.candidate()
+        seen = {"config": 0}
+
+        def tamper(cmd, argv):
+            if cmd == "config":
+                seen["config"] += 1
+                return
+            if cmd in ("run", "up") and not seen.get("done"):
+                names = [n for n in os.listdir(str(self.host.p("%s/staging" % STATE))) if n.startswith("render-")] if os.path.isdir(str(self.host.p("%s/staging" % STATE))) else []
+                if names:
+                    seen["done"] = True
+                    with open(str(self.host.p("%s/staging/%s" % (STATE, names[0]))), "ab") as fh:
+                        fh.write(b" ")
+        self.world.on_compose = tamper
+        r = self.deploy("staging")
+        self.assertTrue(seen.get("done"), "a render was saved before the first run/up")
+        self.assertNotEqual(r.rc, 0, r.err)
+        self.assertEqual([c for c in r.world.compose_log if c["cmd"] == "up" and "caddy" not in c["argv"] and "postgres" not in c["argv"]], [], "nothing starts from a file that is not what was judged")
