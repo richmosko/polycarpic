@@ -30,7 +30,7 @@ def fixed_env(extra=None):
 
 def _real_run(argv, stdin=None, timeout=None, env=None):
     try:
-        p = subprocess.run(argv, input=stdin, capture_output=True, text=True, timeout=timeout, env=env, shell=False, check=False)
+        p = subprocess.run(argv, input=stdin, capture_output=True, text=True, errors="replace", timeout=timeout, env=env, shell=False, check=False)  # non-UTF-8 output is data, not a crash (F2)
     except subprocess.TimeoutExpired:
         raise TimeoutError(argv[0])
     except OSError as err:
@@ -75,6 +75,13 @@ def _real_run_bytes(argv, stdin=None, timeout=None, env=None):
     if timer and not timer.is_alive() and code < 0 and total < MAX_BYTES:
         raise TimeoutError(argv[0])
     return code, b"".join(chunks), (errbuf[0] if errbuf else b"").decode("utf-8", "replace")
+
+
+def _real_ismount(path):
+    try:
+        return os.stat(path).st_dev != os.stat(os.path.dirname(os.path.normpath(path))).st_dev
+    except OSError:
+        return False
 
 
 def _real_owner_of(fd, path):
@@ -160,7 +167,7 @@ def production():
 
 class Ctx:
     def __init__(self, *, root="/", run=None, run_inherit=None, getpass=None, isatty=None, confirm=None, now=None, sleep=None,
-                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None, run_bytes=None, stdin=None, https_status=None, owner_of=None):
+                 chown=None, geteuid=None, tls_probe=None, statvfs=None, stdout=None, stderr=None, trusted_uid=0, stdout_bytes=None, run_bytes=None, stdin=None, https_status=None, owner_of=None, ismount=None):
         self.root = root
         self._run = run or _real_run
         self._run_inherit = run_inherit or _real_run_inherit
@@ -181,6 +188,7 @@ class Ctx:
         self._run_bytes = run_bytes or _real_run_bytes
         self._https_status = https_status or _real_https_status
         self._owner_of = owner_of or _real_owner_of
+        self._ismount = ismount or _real_ismount
 
     def p(self, logical):
         """A host path under the root: root-prefixed in tests, the path itself in production."""
@@ -204,6 +212,10 @@ class Ctx:
 
     def https_status(self, host, addr, path):
         return self._https_status(host, addr, path)
+
+    def ismount(self, path):
+        """True when `path` is a mount point (its device differs from its parent's), F13."""
+        return self._ismount(path)
 
     def owner_of(self, fd, path):
         """(uid, gid) of an open file or directory: `fd` is what the box reads; `path` is its logical path, for a harness that cannot chown."""

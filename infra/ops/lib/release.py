@@ -60,7 +60,15 @@ def sdir(ctx, project):
 
 
 def read(ctx, project, name):
-    return ts.read_text(os.path.join(sdir(ctx, project), name))
+    """A state file's text. Only a missing file is absent (None); any other error is the refusal `state` (F5, S17)."""
+    path = os.path.join(sdir(ctx, project), name)
+    try:
+        with open(path, "rb") as fh:
+            return fh.read(1 << 20).decode("utf-8", "replace")
+    except FileNotFoundError:
+        return None
+    except OSError:
+        raise Refusal("state")
 
 
 def write(ctx, path, text, mode=0o644):
@@ -113,10 +121,26 @@ def bundle_id(ctx):
     return name if BUNDLE_ID.fullmatch(name) else None
 
 
+QLINE = re.compile(r"(sha256:[0-9a-f]{64}) ([0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z) ([a-z0-9-]{1,40})( [^ ]{1,64})?")
+
+
+def _quarantine_lines(ctx, project):
+    """The quarantine file's lines, each checked; a malformed one stops the run with `state` and the file is never rewritten from a partial read (F5)."""
+    text = read(ctx, project, "quarantine") or ""
+    out = []
+    for line in text.split("\n"):
+        if line == "":
+            continue
+        m = QLINE.fullmatch(line)
+        if not m:
+            raise Refusal("state")
+        out.append((m.group(1), m.group(3), (m.group(4) or "").strip()))
+    return text, out
+
+
 def quarantine(ctx, project, digest, reason):
     """A `guard-<rule>` line adds a fourth field, the installed bundle id: it lifts once another bundle is installed (R8, S18)."""
-    path = os.path.join(sdir(ctx, project), "quarantine")
-    prev = ts.read_text(path) or ""
+    prev, _ = _quarantine_lines(ctx, project)
     extra = ""
     if reason.startswith("guard-"):
         extra = " " + (bundle_id(ctx) or "-")
@@ -126,16 +150,11 @@ def quarantine(ctx, project, digest, reason):
 def quarantined(ctx, project):
     """The digests the poll skips. A digest with a non-guard reason is skipped for good; one with only `guard-<rule>` lines is skipped
     only while the installed bundle id equals the stored one; a missing or malformed id on either side keeps it."""
-    text = read(ctx, project, "quarantine") or ""
+    _, lines = _quarantine_lines(ctx, project)
     now = bundle_id(ctx)
     held = {}
-    for line in text.splitlines():
-        parts = line.split(" ")
-        if len(parts) < 3:
-            continue
-        digest, reason = parts[0], parts[2]
+    for digest, reason, stored in lines:
         if reason.startswith("guard-"):
-            stored = parts[3] if len(parts) > 3 else None
             lifts = bool(stored and BUNDLE_ID.fullmatch(stored) and now and stored != now)
             held[digest] = held.get(digest, False) or not lifts
         else:
@@ -143,15 +162,27 @@ def quarantined(ctx, project):
     return set(d for d, h in held.items() if h)
 
 
+TIME = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
+TREE = re.compile(r"[0-9a-f]{64}")
+EDGE_TAG_FULL = re.compile(r"edge-(0|[1-9][0-9]*)")
+
+
 def load_pointer(ctx, project, name):
-    """`current` / `previous`: -> dict(digest, tag, commit, tree, at), None when the file is absent; present but unparsable is the refusal `state` (S17)."""
+    """`current` / `previous`: -> dict(digest, tag, commit, tree, at), None when the file is absent. Present but unreadable or with any of the five
+    fields wrong for the project (prod tag v1.*, edge tag edge-<n>, staging tag -; tree 64 hex; time well-formed) is the refusal `state` (F5, F6, S17)."""
     text = read(ctx, project, name)
     if text is None:
         return None
-    parts = text.strip().split(" ")
-    if len(parts) != 5 or not DIGEST.fullmatch(parts[0]) or not SHA.fullmatch(parts[2]):
+    if not text.endswith("\n") or text.count("\n") != 1:
         raise Refusal("state")
-    return dict(digest=parts[0], tag=parts[1], commit=parts[2], tree=parts[3], at=parts[4])
+    parts = text[:-1].split(" ")
+    if len(parts) != 5:
+        raise Refusal("state")
+    digest, tag, commit, tree, at = parts
+    tag_ok = {"prod": bool(TAG.fullmatch(tag)), "edge": bool(EDGE_TAG_FULL.fullmatch(tag)), "staging": tag == "-"}.get(project, False)
+    if not (DIGEST.fullmatch(digest) and SHA.fullmatch(commit) and tag_ok and TREE.fullmatch(tree) and TIME.fullmatch(at)):
+        raise Refusal("state")
+    return dict(digest=digest, tag=tag, commit=commit, tree=tree, at=at)
 
 
 def save_pointer(ctx, project, name, p):
@@ -400,14 +431,15 @@ def release_dir(ctx, digest):
 
 
 def extract(ctx, ref, digest):
-    """docker create (never started) + cp + rm, the tar filtered, then written 0755/0644 into a fresh directory and renamed. -> release dir."""
+    """docker create (never started) + cp of /release/infra + rm, the tar filtered, then written 0755/0644 into a fresh `.incoming-*` directory.
+    -> that directory. It is renamed to its digest only by `adopt`, after everything is verified (F3)."""
     name = "polycarpic-bundle-" + os.urandom(6).hex()
     code, out, _ = ctx.run(["docker", "create", "--name", name, ref], timeout=120)
     cid = out.strip()
     if code != 0 or not cid:
         raise Refusal("bundle", True)
     try:
-        code, data, _ = ctx.run_bytes(["docker", "cp", "%s:/app/infra" % cid, "-"], timeout=120)
+        code, data, _ = ctx.run_bytes(["docker", "cp", "%s:/release/infra" % cid, "-"], timeout=120)
     finally:
         ctx.run(["docker", "rm", cid], timeout=60)
     if code != 0:
@@ -427,14 +459,83 @@ def extract(ctx, ref, digest):
             os.chmod(dest, 0o755 if exe else 0o644)
         for base, dirs, _ in os.walk(incoming):
             os.chmod(base, 0o755)
-        final = release_dir(ctx, digest)
-        if os.path.isdir(final):
-            remove_tree(final)
-        os.rename(incoming, final)
     except BaseException:
         remove_tree(incoming)
         raise
-    return final
+    return incoming
+
+
+def clear_incoming(ctx):
+    """A run starts by removing leftover `.incoming-*` directories, under the lock (F3)."""
+    root = ctx.p(RELEASES)
+    try:
+        names = os.listdir(root)
+    except OSError:
+        return
+    for n in names:
+        if n.startswith(".incoming-"):
+            remove_tree(os.path.join(root, n))
+
+
+def owned_safely(ctx, path):
+    """F8: `path` and its parents up to the root, and everything under it, are owned by the trusted uid and not group- or world-writable."""
+    top = os.path.normpath(ctx.root)
+    cur = os.path.normpath(path)
+    chain = []
+    while True:
+        chain.append(cur)
+        if cur == top or cur == os.path.dirname(cur):
+            break
+        cur = os.path.dirname(cur)
+
+    def bad(q):
+        try:
+            st = os.lstat(q)
+        except OSError:
+            return True
+        return st.st_uid != ctx.trusted_uid or bool(st.st_mode & 0o022)
+
+    if any(bad(q) for q in chain):
+        return False
+    for base, dirs, files in os.walk(path):
+        if bad(base) or any(bad(os.path.join(base, n)) for n in dirs + files if not os.path.islink(os.path.join(base, n))):
+            return False
+        if any(os.path.islink(os.path.join(base, n)) for n in dirs + files):
+            return False
+    return True
+
+
+def named_by_a_pointer(ctx, digest):
+    """True when any project's `current` or `previous` names this digest; an unreadable or damaged pointer counts as naming all (F3)."""
+    for project in ("prod", "staging", "edge"):
+        for name in ("current", "previous"):
+            try:
+                p = load_pointer(ctx, project, name)
+            except Refusal:
+                return True
+            if p and p["digest"] == digest:
+                return True
+    return False
+
+
+def adopt(ctx, incoming, digest):
+    """F3: the verified `.incoming-*` becomes `sha256-<d>`. -> (release dir, created). An existing directory is never rewritten: it is used only
+    when it is safely owned and its tree hash equals the incoming one, else the refusal `release-tree` (no Q)."""
+    final = release_dir(ctx, digest)
+    if os.path.lexists(final):
+        same = os.path.isdir(final) and not os.path.islink(final) and owned_safely(ctx, final) and tree_hash(final) is not None and tree_hash(final) == tree_hash(incoming)
+        remove_tree(incoming)
+        if not same:
+            raise Refusal("release-tree")
+        return final, False
+    os.rename(incoming, final)
+    return final, True
+
+
+def remove_created(ctx, rdir, digest):
+    """Remove a directory this run renamed itself, and only when no project's pointer names it."""
+    if not named_by_a_pointer(ctx, digest):
+        remove_tree(rdir)
 
 
 def remove_tree(path):
@@ -450,7 +551,7 @@ def parse_images_env(text):
         if not m:
             raise Refusal("bundle", True)
         key, repo, dig = m.groups()
-        if key in got or repo not in SIBLINGS or key != "POLY_%s_IMAGE" % repo.upper():
+        if key in got or repo not in SIBLINGS or key != "POLY_%s_IMAGE" % repo.upper() or dig == "sha256:" + "0" * 64:  # V5 refuses the zeros of a PR build
             raise Refusal("bundle", True)
         got[key] = (repo, dig)
     if sorted(got) != sorted(IMAGE_KEYS):

@@ -108,6 +108,9 @@ def _service(sp, name, svc, raw_svc, plain, images, rdir, bind_addr):
         fail("pinned")
     if svc.get("image") != images.get(sp["image"]):
         fail("image")
+    for k in ("logging", "ulimits", "mem_limit", "tmpfs"):  # F14: these values are pinned as well as their keys; a missing pin means the key must be absent
+        if svc.get(k) != sp.get("pins", {}).get(k):
+            fail("pinned")
     if sp.get("env_exact") is not None:  # S20: `{$NAME}` is substituted before the Caddyfile is parsed, so its environment is exactly the three `${NAME:?}` forms
         renv = raw_svc.get("environment")
         if not isinstance(renv, dict) or sorted(renv) != sp["env_exact"] or any(renv[k] != "${%s:?}" % k for k in renv):

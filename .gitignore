@@ -74,3 +74,6 @@ docs/_assets/vendor/
 # In-process working artifacts; the resolution is the doc edits committed via PR.
 docs/*/comments.md
 .turbo/
+
+# written by build.yml or infra/ci/image.sh (POLY-100): never committed
+infra/release/images.env

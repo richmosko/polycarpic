@@ -56,6 +56,12 @@
       "edge-staging": []
      },
      "no_command": true,
+     "pins": {
+      "mem_limit": "134217728",
+      "tmpfs": [
+       "/tmp"
+      ]
+     },
      "ports": [
       {
        "protocol": "tcp",
@@ -149,6 +155,15 @@
        "prod-auth"
       ]
      },
+     "pins": {
+      "mem_limit": "268435456",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
+     },
      "read_only": true,
      "secrets": {
       "auth_secret__auth": "/etc/polycarpic/secrets/auth/auth_secret",
@@ -206,6 +221,15 @@
      "networks": {
       "backup-net": []
      },
+     "pins": {
+      "mem_limit": "268435456",
+      "tmpfs": [
+       "/tmp:size=1m"
+      ],
+      "ulimits": {
+       "core": {}
+      }
+     },
      "read_only": true,
      "secrets": {
       "db_password_backup__backup": "/etc/polycarpic/secrets/backup/db_password_backup"
@@ -241,6 +265,15 @@
      ],
      "networks": {
       "default": []
+     },
+     "pins": {
+      "mem_limit": "536870912",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
      },
      "read_only": true,
      "secrets": {
@@ -278,6 +311,18 @@
      ],
      "networks": {
       "default": []
+     },
+     "pins": {
+      "logging": {
+       "driver": "none"
+      },
+      "mem_limit": "268435456",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
      },
      "read_only": true,
      "secrets": {
@@ -344,6 +389,16 @@
       "backup-net": [],
       "default": []
      },
+     "pins": {
+      "mem_limit": "3221225472",
+      "tmpfs": [
+       "/tmp",
+       "/var/run/postgresql:uid=999,gid=999,mode=0755"
+      ],
+      "ulimits": {
+       "core": {}
+      }
+     },
      "read_only": true,
      "secrets": {
       "db_superuser_password__postgres": "/etc/polycarpic/secrets/postgres/db_superuser_password"
@@ -398,6 +453,15 @@
      "networks": {
       "upload-net": []
      },
+     "pins": {
+      "mem_limit": "134217728",
+      "tmpfs": [
+       "/tmp:size=1m"
+      ],
+      "ulimits": {
+       "core": {}
+      }
+     },
      "read_only": true,
      "secrets": {
       "backup_store_credential__uploader": "/etc/polycarpic/secrets/uploader/backup_store_credential"
@@ -436,6 +500,15 @@
        "prod-web"
       ]
      },
+     "pins": {
+      "mem_limit": "805306368",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
+     },
      "read_only": true,
      "secrets": {
       "db_password_app__web": "/etc/polycarpic/secrets/web/db_password_app",
@@ -472,6 +545,15 @@
      ],
      "networks": {
       "default": []
+     },
+     "pins": {
+      "mem_limit": "805306368",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
      },
      "read_only": true,
      "secrets": {
@@ -535,6 +617,15 @@
        "staging-auth"
       ]
      },
+     "pins": {
+      "mem_limit": "201326592",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
+     },
      "read_only": true,
      "secrets": {
       "auth_secret__auth": "/etc/polycarpic/staging-secrets/auth/auth_secret",
@@ -573,6 +664,15 @@
      "networks": {
       "default": []
      },
+     "pins": {
+      "mem_limit": "536870912",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
+     },
      "read_only": true,
      "secrets": {
       "db_password_migrator__migrate": "/etc/polycarpic/staging-secrets/migrate/db_password_migrator"
@@ -609,6 +709,18 @@
      ],
      "networks": {
       "default": []
+     },
+     "pins": {
+      "logging": {
+       "driver": "none"
+      },
+      "mem_limit": "268435456",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
      },
      "read_only": true,
      "secrets": {
@@ -659,6 +771,16 @@
      "networks": {
       "default": []
      },
+     "pins": {
+      "mem_limit": "1073741824",
+      "tmpfs": [
+       "/tmp",
+       "/var/run/postgresql:uid=999,gid=999,mode=0755"
+      ],
+      "ulimits": {
+       "core": {}
+      }
+     },
      "read_only": true,
      "secrets": {
       "db_superuser_password__postgres": "/etc/polycarpic/staging-secrets/postgres/db_superuser_password"
@@ -697,6 +819,15 @@
        "staging-web"
       ]
      },
+     "pins": {
+      "mem_limit": "402653184",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
+     },
      "read_only": true,
      "secrets": {
       "db_password_app__web": "/etc/polycarpic/staging-secrets/web/db_password_app",
@@ -733,6 +864,15 @@
      ],
      "networks": {
       "default": []
+     },
+     "pins": {
+      "mem_limit": "402653184",
+      "tmpfs": [
+       "/tmp"
+      ],
+      "ulimits": {
+       "core": {}
+      }
      },
      "read_only": true,
      "secrets": {

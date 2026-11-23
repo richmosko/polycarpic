@@ -1,6 +1,6 @@
 """The pull-based deploy (POLY-100): finds the candidate, verifies all of it, and only then runs anything of it.
 
-Exit codes: 0 done, nothing to do, busy or a transient outage; 1 refused or failed; 4 precondition.
+Exit codes: 0 done, nothing to do, busy or a transient outage (the timer); 1 refused or failed; 4 precondition.
 """
 import fcntl
 import os
@@ -11,6 +11,10 @@ from lib.release import Refusal
 
 LOCK = "/run/polycarpic/deploy.lock"
 BACKUP_TIMEOUT = 65 * 60
+MIGRATE_TIMEOUT = 30 * 60
+DATA = "/srv/polycarpic"
+EDGE_ENV = "/etc/polycarpic/edge.env"
+STALE = 3600
 
 
 def take_lock(ctx, wait=0):
@@ -29,6 +33,12 @@ def take_lock(ctx, wait=0):
             ctx.sleep(30)
 
 
+def require_data_mount(ctx):
+    """F13: the data directory must be a mount point; an unmounted volume would start a fresh cluster on the unencrypted root disk."""
+    if not ctx.ismount(ctx.p(DATA)):
+        raise Refusal("data-mount", code=4)
+
+
 def locked(project, ctx, first, wait=0, existing_data=False):
     fd = take_lock(ctx, wait)
     if fd is None:
@@ -39,6 +49,7 @@ def locked(project, ctx, first, wait=0, existing_data=False):
         return 0
     work = None
     try:
+        rel.clear_incoming(ctx)  # leftovers of an interrupted run, removed under the lock (F3)
         work = tempfile.mkdtemp(prefix="work-", dir=rel.sdir(ctx, project))
         os.chmod(work, 0o700)
         return _deploy(project, ctx, work, first, existing_data)
@@ -52,45 +63,130 @@ class _Skip(Exception):
     pass
 
 
+def _unlink(ctx, project, name):
+    try:
+        os.unlink(os.path.join(rel.sdir(ctx, project), name))
+    except FileNotFoundError:
+        pass
+
+
+# ---- F12: a silent freeze is an alert after an hour
+def mark_transient(ctx, project):
+    since = rel.read(ctx, project, "transient-since")
+    now = ctx.epoch()
+    if since is None:
+        rel.put(ctx, project, "transient-since", rel.now_utc(ctx) + "\n")
+        return
+    t0 = rel.ts.parse(since.strip())
+    if t0 is None:
+        raise Refusal("state")
+    if now - t0 > STALE:
+        rel.alert(ctx, project, "transient-stale")
+
+
+def clear_transient(ctx, project):
+    _unlink(ctx, project, "transient-since")
+
+
+# ---- F2: an interrupted run (power loss, systemd's kill) is found by `in-progress`
+def _handle_interrupted(project, ctx, cur):
+    ip = rel.read(ctx, project, "in-progress")
+    if ip is None:
+        return
+    digest = ip.strip()
+    if not rel.DIGEST.fullmatch(digest):
+        raise Refusal("state")
+    rel.alert(ctx, project, "interrupted")
+    prev = rel.read(ctx, project, "interrupted")
+    if prev is not None and prev.strip() == digest:
+        rel.quarantine(ctx, project, digest, "interrupted")  # the second time for the same digest
+    else:
+        rel.put(ctx, project, "interrupted", digest + "\n")  # the first time: tried again
+    try:
+        if cur and project == "edge":
+            from lib import edge
+            edge.restore(ctx, cur)
+        elif cur:
+            restore(project, ctx, cur, project == "prod")
+    finally:
+        _unlink(ctx, project, "in-progress")
+
+
+def _internal(project, ctx, err, digest, run):
+    """One handler above `_deploy` (F2): before the first `up` a refusal `internal` (alert, no Q); after it R8's automatic rollback."""
+    rel.log(ctx, project, "refused", "internal", digest)
+    ctx.err("deploy: internal error: %s" % err.__class__.__name__)
+    if not run["up"]:
+        rel.alert(ctx, project, "internal")
+        return 1
+    try:
+        return _rollback_auto(project, ctx, digest, run["cur"], run["owns"], run["probe"])
+    except Exception:
+        rel.log(ctx, project, "rollback-unhealthy", digest)
+        rel.alert(ctx, project, "rollback-unhealthy")
+        ctx.err("deploy: rollback-unhealthy")
+        return 1
+
+
 def _deploy(project, ctx, work, first, existing_data):
     seen = {"digest": "-"}
+    run = {"up": False, "cur": None, "owns": False, "probe": None}
     try:
-        tok = rel.token(ctx)
-        tokenexp.refresh(ctx, tok, work)
-        cur = rel.load_pointer(ctx, project, "current")
-        rel.load_pointer(ctx, project, "previous")  # a present but unparsable pointer stops the run with `state` (S17)
-        if cur:  # a leftover first-attempt file beside `current` has no effect and is removed (S19)
-            try:
-                os.unlink(os.path.join(rel.sdir(ctx, project), "first-attempt"))
-            except FileNotFoundError:
-                pass
-        if first and cur:
-            raise Refusal("already-deployed", code=4)
-        if not first and not cur:
-            raise Refusal("not-first-deployed", code=4)
-        fresh = _first_preconditions(project, ctx, existing_data) if first else False
         try:
-            digest, commit, tag = _candidate(project, ctx, tok, work, cur, seen)
-        except _Skip:
-            return 0
-        rel.log(ctx, project, "candidate", digest, commit)
-        if project == "prod":
-            check_staging_auth(ctx)  # before V1: the file is Caddyfile text, and a prod run ups Caddy (S30)
-        rdir, images = _verify(project, ctx, tok, work, digest, commit)
-        keep = False
-        try:
-            owner = _gate(project, ctx, rdir, images, cur, commit, tag)
-            rel.log(ctx, project, "verified", digest)
-            keep = True
-            return _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data, owner, fresh)
+            return _deploy_checked(project, ctx, work, first, existing_data, seen, run)
+        except (rel.Transient, Refusal):
+            raise
+        except Exception as err:
+            return _internal(project, ctx, err, seen["digest"], run)
         finally:
-            if not keep:
-                rel.remove_tree(rdir)
+            if run["up"]:
+                _unlink(ctx, project, "in-progress")
     except rel.Transient as err:
         rel.log(ctx, project, "transient", str(err))
+        mark_transient(ctx, project)
+        if first:  # F7: a foreground first deploy says why it did nothing
+            ctx.err("deploy: transient: %s" % err)
+            return 1
         return 0
     except Refusal as err:
         return refuse(project, ctx, err, seen["digest"])
+
+
+def _deploy_checked(project, ctx, work, first, existing_data, seen, run):
+    require_data_mount(ctx)
+    tok = rel.token(ctx)
+    tokenexp.refresh(ctx, tok, work)
+    cur = rel.load_pointer(ctx, project, "current")
+    rel.load_pointer(ctx, project, "previous")  # a present but unparsable pointer stops the run with `state` (S17)
+    run["cur"] = cur
+    _handle_interrupted(project, ctx, cur)
+    if cur:  # a leftover first-attempt file beside `current` has no effect and is removed (S19)
+        _unlink(ctx, project, "first-attempt")
+    if first and cur:
+        raise Refusal("already-deployed", code=4)
+    if not first and not cur:
+        raise Refusal("not-first-deployed", code=4)
+    fresh = _first_preconditions(project, ctx, existing_data) if first else False
+    try:
+        digest, commit, tag = _candidate(project, ctx, tok, work, cur, seen)
+    except _Skip:
+        clear_transient(ctx, project)
+        return 0
+    rel.log(ctx, project, "candidate", digest, commit)
+    if project == "prod":
+        check_edge_env(ctx)  # F10, before V1
+        check_staging_auth(ctx)  # before V1: the file is Caddyfile text, and a prod run ups Caddy (S30)
+    rdir, images, created = _verify(project, ctx, tok, work, digest, commit)
+    clear_transient(ctx, project)  # past V5
+    keep = False
+    try:
+        owner, judged = _gate(project, ctx, rdir, images, cur, commit, tag)
+        rel.log(ctx, project, "verified", digest)
+        keep = True
+        return _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data, owner, fresh, judged, run)
+    finally:
+        if not keep and created:
+            rel.remove_created(ctx, rdir, digest)
 
 
 def check_staging_auth(ctx):
@@ -98,6 +194,18 @@ def check_staging_auth(ctx):
     if reason:
         ctx.err("deploy: staging-auth: %s; run polycarpic-ops staging-auth" % reason)
         raise Refusal("staging-auth")
+
+
+def check_edge_env(ctx):
+    """F10: edge.env unreadable or missing a key is the refusal `edge-env`, before V1, for prod and edge-deploy."""
+    try:
+        with open(ctx.p(EDGE_ENV), encoding="utf-8") as fh:
+            text = fh.read(8192)
+    except OSError:
+        raise Refusal("edge-env")
+    keys = set(l.split("=", 1)[0] for l in text.splitlines() if "=" in l)
+    if not {"POLY_DOMAIN", "POLY_BIND_ADDR", "POLY_STAGING_ALLOW", "POLY_TLS"} <= keys:
+        raise Refusal("edge-env")
 
 
 def refuse(project, ctx, err, digest="-"):
@@ -133,6 +241,9 @@ def _candidate(project, ctx, tok, work, cur, seen):
         commit = None
     seen["digest"] = digest
     rel.put(ctx, project, "last-poll", rel.now_utc(ctx) + "\n")
+    inter = rel.read(ctx, project, "interrupted")
+    if inter is not None and inter.strip() != digest:  # another digest is tried: the interruption's mark goes (S33)
+        _unlink(ctx, project, "interrupted")
     if cur and cur["digest"] == digest:
         raise _Skip()
     if digest in rel.quarantined(ctx, project):
@@ -140,7 +251,7 @@ def _candidate(project, ctx, tok, work, cur, seen):
         raise _Skip()
     if project == "prod":
         commit = rel.tag_commit(ctx, tag)
-        if cur and cur["tag"] != "-" and rel.semver(tag) <= rel.semver(cur["tag"]):
+        if cur and rel.semver(tag) <= rel.semver(cur["tag"]):
             _not_newer(project, ctx, digest)
     elif cur and not rel.descends(ctx, cur["commit"], commit):
         _not_newer(project, ctx, digest)
@@ -153,25 +264,27 @@ def _not_newer(project, ctx, digest):
 
 
 def _verify(project, ctx, tok, work, digest, commit):
-    """R3 V1-V5: the app image, then the bundle and each sibling. Nothing of the digest is run. -> (release dir, the four image refs)."""
+    """R3 V1-V5: the app image, then the bundle and each sibling, all in `.incoming-*`; then the directory is adopted (F3).
+    Nothing of the digest is run. -> (release dir, the four image refs, whether this run created the directory)."""
     ref = rel.verify_image(ctx, tok, work, "polycarpic", digest, commit)
-    rdir = rel.extract(ctx, ref, digest)
+    incoming = rel.extract(ctx, ref, digest)
     try:
-        text = open(os.path.join(rdir, "infra/release/images.env"), encoding="utf-8").read()
+        text = open(os.path.join(incoming, "infra/release/images.env"), encoding="utf-8").read()
         siblings = rel.parse_images_env(text)
         for key in rel.IMAGE_KEYS:
             repo, dig = siblings[key]
             rel.verify_image(ctx, tok, work, "polycarpic-" + repo, dig, commit, sibling=repo)
-        rel.write_images_env(ctx, rdir, ref, text)
+        rel.write_images_env(ctx, incoming, ref, text)
+        rdir, created = rel.adopt(ctx, incoming, digest)
     except BaseException:
-        rel.remove_tree(rdir)
+        rel.remove_tree(incoming)
         raise
-    return rdir, stack.kinds(stack.refs(rdir))
+    return rdir, stack.kinds(stack.refs(rdir)), created
 
 
 def _gate(project, ctx, rdir, images, cur, commit, tag):
     """V6 (the Postgres major is unchanged) and V7 (the installed guard on the rendered config). A refusal of the CANDIDATE by the guard
-    carries the operator text (R10); a refusal of `current` or `previous` elsewhere does not."""
+    carries the operator text (R10); a refusal of `current` or `previous` elsewhere does not. -> (owner, the render directories judged)."""
     try:
         return _gate_checks(project, ctx, rdir, images, cur, commit)
     except Refusal as err:
@@ -190,14 +303,17 @@ def _gate_checks(project, ctx, rdir, images, cur, commit):
         if old is None or old.strip() != (new or "").strip():
             raise Refusal("postgres-major", True)
     owner = project == "prod"  # R9 strict: edge is prod's alone; a staging run never renders or ups it
+    judged = {}
     guard(project, ctx, rdir, images)
+    judged[project] = rdir
     if owner:
         guard("edge", ctx, rdir, images)
-    return owner
+        judged["edge"] = rdir
+    return owner, judged
 
 
 def bind_addr(ctx):
-    text = rel.ts.read_text(ctx.p("/etc/polycarpic/edge.env")) or ""
+    text = rel.ts.read_text(ctx.p(EDGE_ENV)) or ""
     for line in text.splitlines():
         if line.startswith("POLY_BIND_ADDR="):
             return line.split("=", 1)[1]
@@ -206,18 +322,17 @@ def bind_addr(ctx):
 
 def guard(project, ctx, rdir, images):
     policy = compose_guard.load_policy(ctx)
-    env_files = ["%s/images.env" % rdir] + ([ctx.p("/etc/polycarpic/edge.env")] if project == "edge" else [])
+    env_files = ["%s/images.env" % rdir] + ([ctx.p(EDGE_ENV)] if project == "edge" else [])
     raw, plain = compose_guard.renders(ctx, rdir, rel.RELEASES, project, env_files)
     compose_guard.check(policy, project, raw, plain, images, rdir, bind_addr(ctx))
 
 
 def edge_domain(ctx):
-    text = rel.ts.read_text(ctx.p("/etc/polycarpic/edge.env")) or ""
+    text = rel.ts.read_text(ctx.p(EDGE_ENV)) or ""
     for line in text.splitlines():
         if line.startswith("POLY_DOMAIN="):
             return line.split("=", 1)[1].strip().strip('"')
     return None
-
 
 
 # ---- R6 steps 2-9 ----
@@ -228,10 +343,31 @@ def _compose(ctx, argv, timeout=600):
         return 124, "", "timeout"
 
 
-def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data, owner, fresh):
+def _oneoff(ctx, project, rdir, svc, command, timeout=600):
+    """F15: a one-off run is named; a stale one is removed first; on a timeout it is removed and must be gone before the lock is released."""
+    name = stack.oneoff_name(project, svc)
+    ctx.run(["docker", "rm", "-f", name], timeout=60)
+    try:
+        return ctx.run(stack.run_argv(rdir, project, svc, command), timeout=timeout)
+    except TimeoutError:
+        ctx.run(["docker", "rm", "-f", name], timeout=60)
+        code, _, _ = ctx.run(["docker", "inspect", name], timeout=30)
+        if code == 0:
+            raise Refusal("oneoff-stuck", True)
+        return 124, "", "timeout"
+
+
+def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data, owner, fresh, judged, run):
     cdir = rel.release_dir(ctx, cur["digest"]) if cur else rdir  # only a first deploy, with no `current`, starts the candidate's Postgres
     if cur:  # current's bundle is judged by the installed guard before any container of it is started (S3, S12)
-        guard(project, ctx, cdir, stack.kinds(stack.refs(cdir)))
+        if not rel.owned_safely(ctx, cdir):
+            raise Refusal("release-tree")
+        try:
+            guard(project, ctx, cdir, stack.kinds(stack.refs(cdir)))
+        except Refusal as err:  # F11: current's fault is not the candidate's: alert, no Q, the name only
+            if err.name.startswith("guard-"):
+                raise Refusal("current-" + err.name)
+            raise
     rerun = first and not cur and not existing_data and rel.read(ctx, project, "first-attempt") is not None  # an earlier attempt of this project
     if fresh:  # an empty data directory and no `current`: a rerun after `roles-missing` may proceed without --existing-data
         rel.put(ctx, project, "first-attempt", rel.now_utc(ctx) + "\n")
@@ -251,7 +387,7 @@ def _roll_out(project, ctx, rdir, digest, tag, commit, cur, first, existing_data
         if backup_fd is None:
             raise Refusal("backup-lock")
     try:
-        return _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner)
+        return _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner, judged, run)
     finally:
         if backup_fd is not None:
             os.close(backup_fd)
@@ -295,17 +431,19 @@ def _premigration(project, ctx):
     rel.log(ctx, project, "premigration-set", last.split(" ", 1)[1])
 
 
-def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner):
+def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner, judged, run):
     for svc in stack.APP_SERVICES:
-        code, _, _ = _compose(ctx, stack.run_argv(rdir, project, svc, [svc, "check-config"]))
+        code, _, _ = _oneoff(ctx, project, rdir, svc, [svc, "check-config"])
         if code != 0:
             raise Refusal("check-config", True)
-    code, out, err = _compose(ctx, stack.run_argv(rdir, project, "migrate", ["migrate", "--plan"]))
+    code, out, err = _oneoff(ctx, project, rdir, "migrate", ["migrate", "--plan"])
     if code == 2 and first and "roles-missing" in out + err:
         ctx.err("run: sudo polycarpic-ops provision --stage database --project " + project)
         raise Refusal("roles-missing", code=4)
     if code == 3:
-        code, _, _ = _compose(ctx, stack.run_argv(rdir, project, "migrate", ["migrate"]))
+        code, _, _ = _oneoff(ctx, project, rdir, "migrate", ["migrate"], timeout=MIGRATE_TIMEOUT)
+        if code == 124:
+            raise Refusal("migrate-timeout", True)
         if code == 4:
             raise Refusal("migrate-4")
         if code != 0:
@@ -317,22 +455,25 @@ def _apply(project, ctx, rdir, digest, tag, commit, cur, first, owner):
         raise Refusal("plan-error")
     owns = bool(owner)  # edge is prod's alone (R9 strict)
     probe, baseline_ok = _probe_baseline(project, ctx, first)
+    live_probe = probe if baseline_ok else None  # F10: the probe is required only when the baseline was 200, on every path
+    run["owns"], run["probe"] = owns, live_probe
+    rel.put(ctx, project, "in-progress", digest + "\n")  # marks the candidate's first `up` (F2)
+    run["up"] = True
     if owns:
-        code = _edge_up(project, ctx, rdir, judged=True)
+        code = _edge_up(project, ctx, rdir, judged.get("edge"))
         if code != 0:
-            return _rollback_auto(project, ctx, digest, cur, owns, probe)
+            return _rollback_auto(project, ctx, digest, cur, owns, live_probe)
     code, _, _ = _compose(ctx, stack.up_argv(rdir, project))
     rel.log(ctx, project, "up", digest)
-    extra = probe if baseline_ok else None
-    up_ok = code == 0 and stack.wait_healthy(ctx, project, rdir, stack.services_for(project), extra=extra)
+    up_ok = code == 0 and stack.wait_healthy(ctx, project, rdir, stack.services_for(project), extra=live_probe)
     if up_ok and owns:
-        up_ok = stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=extra)
+        up_ok = stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=live_probe)
     if up_ok:
         code = _healthy(project, ctx, rdir, digest, tag, commit, cur)
         if probe and not baseline_ok:  # A13: the probe was not required, and the alert says so even when healthy
             rel.alert(ctx, project, "edge-probe-baseline")
         return code
-    return _rollback_auto(project, ctx, digest, cur, owns, probe if baseline_ok else None)
+    return _rollback_auto(project, ctx, digest, cur, owns, live_probe)
 
 
 def _probe_baseline(project, ctx, first):
@@ -352,7 +493,7 @@ def _probe_baseline(project, ctx, first):
     def probe():
         try:
             return ctx.https_status(host, addr, "/api/v1/health") == 200
-        except OSError:
+        except (OSError, TimeoutError):
             return False
 
     ok = probe()
@@ -361,11 +502,11 @@ def _probe_baseline(project, ctx, first):
     return probe, ok
 
 
-def _edge_up(project, ctx, rdir, judged=False):
-    """R9: bring the shared Caddy up from this prod release. Refuses an edge render this run has not judged."""
-    if not judged or project != "prod":
+def _edge_up(project, ctx, rdir, judged_dir=None):
+    """R9: bring the shared Caddy up from this prod release. F9: it takes the directory whose edge render was judged and refuses any other."""
+    if project != "prod" or judged_dir is None or os.path.normpath(judged_dir) != os.path.normpath(rdir):
         raise Refusal("guard-edge", True)
-    argv = stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p("/etc/polycarpic/edge.env"))
+    argv = stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p(EDGE_ENV))
     code, _, _ = _compose(ctx, argv)
     return code
 
@@ -379,10 +520,10 @@ def _healthy(project, ctx, rdir, digest, tag, commit, cur):
         rel.write(ctx, ctx.p("/opt/polycarpic/images.env"), open(os.path.join(rdir, "images.env"), encoding="utf-8").read())
     _prune(ctx)
     rel.clear_alert(ctx, project)
-    try:
-        os.unlink(os.path.join(rel.sdir(ctx, project), "first-attempt"))
-    except FileNotFoundError:
-        pass
+    _unlink(ctx, project, "first-attempt")
+    inter = rel.read(ctx, project, "interrupted")
+    if inter is not None and inter.strip() == digest:  # that digest is healthy now (S33)
+        _unlink(ctx, project, "interrupted")
     rel.log(ctx, project, "healthy", digest)
     return 0
 
@@ -397,17 +538,18 @@ def link_current(ctx, project, rdir):
 
 
 def _prune(ctx):
+    """Removes only releases no pointer names; an unreadable or damaged pointer counts as naming all, so nothing is removed (F3)."""
     keep = set()
     try:
         prod_has_current = bool(rel.load_pointer(ctx, "prod", "current"))
+        # edge's current and previous are kept only until prod has a `current` (R4, R9): after that Caddy comes from prod's releases
+        for project in ("prod", "staging") + (() if prod_has_current else ("edge",)):
+            for name in ("current", "previous"):
+                p = rel.load_pointer(ctx, project, name)
+                if p:
+                    keep.add("sha256-" + p["digest"].split(":", 1)[1])
     except Refusal:
-        prod_has_current = True
-    # edge's current and previous are kept only until prod has a `current` (R4, R9): after that Caddy comes from prod's releases
-    for project in ("prod", "staging") + (() if prod_has_current else ("edge",)):
-        for name in ("current", "previous"):
-            p = rel.load_pointer(ctx, project, name)
-            if p:
-                keep.add("sha256-" + p["digest"].split(":", 1)[1])
+        return
     root = ctx.p(rel.RELEASES)
     for name in os.listdir(root):
         if name.startswith("sha256-") and name not in keep:
@@ -439,10 +581,15 @@ def _rollback_auto(project, ctx, digest, cur, owns=False, probe=None):
 
 
 def restore(project, ctx, ptr, owns=None, probe=None):
-    """Bring a recorded release back up: tree-hash re-check, the guard on its render, `up`, health. -> True when healthy.
-    Edge is prod's alone (R9 strict): a prod rollback restores Caddy too, a staging one never names it."""
+    """Bring a recorded release back up: its directory safely owned (F8), tree-hash re-check, the guard on its render, `up`, health.
+    -> True when healthy. Edge is prod's alone (R9 strict): a prod rollback restores Caddy too, a staging one never names it."""
     rdir = rel.release_dir(ctx, ptr["digest"])
-    if not os.path.isdir(rdir) or stack.tree(rdir) != ptr["tree"]:
+    if not os.path.isdir(rdir) or not rel.owned_safely(ctx, rdir):
+        return False
+    try:
+        if stack.tree(rdir) != ptr["tree"]:
+            return False
+    except Refusal:
         return False
     owner = project == "prod"
     if owner and sauth.check(ctx):  # nothing is upped when the staging-auth file is wrong (S30)
@@ -457,6 +604,6 @@ def restore(project, ctx, ptr, owns=None, probe=None):
     code, _, _ = _compose(ctx, stack.up_argv(rdir, project))
     ok = code == 0 and stack.wait_healthy(ctx, project, rdir, stack.services_for(project), extra=probe)
     if owner:
-        code, _, _ = _compose(ctx, stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p("/etc/polycarpic/edge.env")))
+        code, _, _ = _compose(ctx, stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p(EDGE_ENV)))
         ok = ok and code == 0 and stack.wait_healthy(ctx, "edge", rdir, ["caddy"], check_http=False, extra=probe)
     return ok

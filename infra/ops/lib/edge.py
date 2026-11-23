@@ -29,7 +29,10 @@ def owned_by_prod(ctx):
             return Refusal("edge-owned-by-prod", code=4)
     except Refusal:
         return Refusal("state", code=1)
-    rows = compose.ps(ctx, "polycarpic-prod")
+    try:
+        rows = compose.ps(ctx, "polycarpic-prod")
+    except (TimeoutError, OSError, ValueError):
+        rows = None
     if rows is None or rows:
         return Refusal("edge-owned-by-prod", code=4)
     return None
@@ -57,27 +60,49 @@ def deploy(tag, ctx):
         return 4
     work = None
     seen = {"digest": "-"}
+    run = {"up": False, "cur": None}
     try:
+        rel.clear_incoming(ctx)
         work = tempfile.mkdtemp(prefix="work-", dir=rel.sdir(ctx, "edge"))
         os.chmod(work, 0o700)
-        return _run(tag, ctx, work, seen)
+        try:
+            return _run(tag, ctx, work, seen, run)
+        except (rel.Transient, Refusal):
+            raise
+        except Exception as err:  # F2: one handler: before the first `up` a refusal, after it a rollback to edge's previous
+            rel.log(ctx, "edge", "refused", "internal", seen["digest"])
+            ctx.err("deploy: internal error: %s" % err.__class__.__name__)
+            if not run["up"]:
+                rel.alert(ctx, "edge", "internal")
+                return 1
+            return _unhealthy(ctx, seen["digest"], run["cur"], guarded=True)
     except rel.Transient as err:
         rel.log(ctx, "edge", "transient", str(err))
-        return 0
+        deployer.mark_transient(ctx, "edge")
+        ctx.err("edge-deploy: transient: %s" % err)  # F7: a foreground command says why it did nothing
+        return 1
     except Refusal as err:
         return deployer.refuse("edge", ctx, err, seen["digest"])
     finally:
         if work:
             rel.remove_tree(work)
+        if run["up"]:
+            try:
+                os.unlink(os.path.join(rel.sdir(ctx, "edge"), "in-progress"))
+            except OSError:
+                pass
         os.close(fd)
 
 
-def _run(tag, ctx, work, seen):
+def _run(tag, ctx, work, seen, run):
     why = owned_by_prod(ctx)
     if why:
         raise why
+    deployer.require_data_mount(ctx)
     cur = rel.load_pointer(ctx, "edge", "current")
     rel.load_pointer(ctx, "edge", "previous")
+    run["cur"] = cur
+    deployer._handle_interrupted("edge", ctx, cur)
     if cur:
         n_cur, n = number(cur["tag"]), number(tag)
         if n_cur is not None and n < n_cur:
@@ -89,15 +114,15 @@ def _run(tag, ctx, work, seen):
         if cur["digest"] == digest:
             return 0
         raise Refusal("not-newer")
-    if cur and number(tag) == number(cur["tag"]):
-        raise Refusal("not-newer")
     if digest in rel.quarantined(ctx, "edge"):
         rel.log(ctx, "edge", "quarantined", digest)
         raise Refusal("quarantined")
     commit = rel.tag_commit(ctx, tag)
     rel.log(ctx, "edge", "candidate", digest, commit)
+    deployer.check_edge_env(ctx)  # F10, before V1
     deployer.check_staging_auth(ctx)
-    rdir, images = deployer._verify("edge", ctx, tok, work, digest, commit)
+    rdir, images, created = deployer._verify("edge", ctx, tok, work, digest, commit)
+    deployer.clear_transient(ctx, "edge")
     keep = False
     try:
         try:
@@ -107,13 +132,17 @@ def _run(tag, ctx, work, seen):
             raise
         rel.log(ctx, "edge", "verified", digest)
         keep = True
-        return _up(ctx, rdir, digest, tag, commit, cur)
+        return _up(ctx, rdir, digest, tag, commit, cur, rdir, run)
     finally:
-        if not keep:
-            rel.remove_tree(rdir)
+        if not keep and created:
+            rel.remove_created(ctx, rdir, digest)
 
 
-def _up(ctx, rdir, digest, tag, commit, cur):
+def _up(ctx, rdir, digest, tag, commit, cur, judged_dir, run):
+    if os.path.normpath(judged_dir) != os.path.normpath(rdir):  # F9: only the directory whose edge render was judged is upped
+        raise Refusal("guard-edge", True)
+    rel.put(ctx, "edge", "in-progress", digest + "\n")
+    run["up"] = True
     head = stack.up_argv(rdir, "edge", ["caddy"], [], ctx.p(EDGE_ENV))  # only Caddy of this release is started
     code, _, _ = deployer._compose(ctx, head)
     rel.log(ctx, "edge", "up", digest)
@@ -122,7 +151,14 @@ def _up(ctx, rdir, digest, tag, commit, cur):
         _promote(ctx, rdir, digest, tag, commit, cur)
         return 0
     rel.quarantine(ctx, "edge", digest, "unhealthy")
-    restored = bool(cur) and restore(ctx, cur)
+    return _unhealthy(ctx, digest, cur)
+
+
+def _unhealthy(ctx, digest, cur, guarded=False):
+    try:
+        restored = bool(cur) and restore(ctx, cur)
+    except Exception:
+        restored = False
     name = "rolled-back" if restored else "rollback-unhealthy"
     rel.log(ctx, "edge", name, digest)
     rel.alert(ctx, "edge", name)
@@ -141,9 +177,15 @@ def _promote(ctx, rdir, digest, tag, commit, cur):
 
 
 def restore(ctx, ptr, wait_healthy=True):
-    """Caddy back on a recorded edge release: tree hash, the staging-auth file, the guard on its edge render, `up`. -> True when it is up (and healthy)."""
+    """Caddy back on a recorded edge release: its directory safely owned (F8), tree hash, the staging-auth file, the guard on its edge render,
+    `up`. -> True when it is up (and healthy)."""
     rdir = rel.release_dir(ctx, ptr["digest"])
-    if not os.path.isdir(rdir) or stack.tree(rdir) != ptr["tree"]:
+    if not os.path.isdir(rdir) or not rel.owned_safely(ctx, rdir):
+        return False
+    try:
+        if stack.tree(rdir) != ptr["tree"]:
+            return False
+    except Refusal:
         return False
     if sauth.check(ctx):
         return False
@@ -169,6 +211,11 @@ def rollback(ctx):
             ctx.err("rollback: refused %s" % why.name)
             return why.code
         try:
+            deployer.require_data_mount(ctx)
+        except Refusal as err:
+            ctx.err("rollback: refused %s" % err.name)
+            return err.code
+        try:
             cur, prev = rel.load_pointer(ctx, "edge", "current"), rel.load_pointer(ctx, "edge", "previous")
         except Refusal:
             ctx.err("rollback: a state pointer is present but unparsable: stopped (state)")
@@ -177,7 +224,11 @@ def rollback(ctx):
             ctx.err("rollback: there is no previous edge release")
             return 4
         rel.quarantine(ctx, "edge", cur["digest"], "rollback")
-        if not restore(ctx, prev):
+        try:
+            ok = restore(ctx, prev)
+        except Exception:
+            ok = False
+        if not ok:
             rel.log(ctx, "edge", "rollback-unhealthy", cur["digest"])
             rel.alert(ctx, "edge", "rollback-unhealthy")
             ctx.err("rollback: previous edge release is not healthy")
