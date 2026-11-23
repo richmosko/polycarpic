@@ -73,6 +73,7 @@ psql_in() { local c=$1; shift; docker exec -i "$c" psql -U postgres -X -tA -d po
 
 # ---- selection, download, verification, decryption (DR1, DR2, DR11)
 SC_DUMP='' SC_BASE=''
+NONFATAL=1 # a fault in one object is a FAIL line, and the drill goes on with the newest upload version so that every check still runs
 set +e
 bucket_select; rc=$?
 FAILED_ID=''
@@ -93,10 +94,10 @@ if [ -n "$FAILED_ID" ]; then
   skip_rest DR3 DR4 DR5 DR6 DR7 DR8 DR9
 else
   # shellcheck disable=SC2153
-  res PASS DR1 "every chosen object has one version and no hide marker (set $SET_TS, $(awk 'END { print NR }' "$VERS") versions listed)"
-  res PASS DR2 "every download matches its sha256 sibling"
-  res PASS DR11 "the time inside each archive matches its name's TS (replay check)"
-  if grep -aqE 'PASSWORD|SCRAM-SHA-256\$' "$GLOBALS_PLAIN"; then res FAIL DR3 "the globals file carries a role password or hash"; else res PASS DR3 "the globals file carries no PASSWORD and no SCRAM-SHA-256\$"; fi
+  if [ "$DR1_BAD" = 1 ]; then res FAIL DR1 "a chosen object has a second version or a hide marker (the versions are listed above; a hide marker after a checksum mismatch is the usual cause)"; else res PASS DR1 "every chosen object has one version and no hide marker (set $SET_TS, $(awk 'END { print NR }' "$VERS") versions listed)"; fi
+  if [ "$DR2_BAD" = 1 ]; then res FAIL DR2 "a download does not match its sha256 sibling"; else res PASS DR2 "every download matches its sha256 sibling"; fi
+  if [ "$DR11_BAD" = 1 ]; then res FAIL DR11 "the time inside an archive does not match its name's TS (a replayed file?)"; else res PASS DR11 "the time inside each archive matches its name's TS (replay check)"; fi
+  if plain_stream "$GLOBALS_PLAIN" | grep -aqE 'PASSWORD|SCRAM-SHA-256\$'; then res FAIL DR3 "the globals file carries a role password or hash"; else res PASS DR3 "the globals file carries no PASSWORD and no SCRAM-SHA-256\$"; fi
 
   # ---- two scratch restores (DR4 and the comparisons)
   if restore_dump; then SC_DUMP=$SC; else SC_DUMP=''; fi

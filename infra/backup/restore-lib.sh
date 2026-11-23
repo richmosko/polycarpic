@@ -15,9 +15,12 @@ warn() { echo "WARN $*" >&2; }
 err() { echo "$PROG: $*" >&2; }
 # bytes outside 0x20-0x7E (newline kept) are replaced before anything from the box or the bucket is printed
 clean() { tr -c '\040-\176\n' '?'; }
+# plain_stream <file>: the file as a stream, gunzipped when it is gzip (the globals and the base are gzip'd before age)
+plain_stream() { if [ "$(head -c 2 "$1" | od -An -tx1 | tr -d ' \n')" = 1f8b ]; then gzip -dc "$1"; else cat "$1"; fi; }
 sha256f() { if command -v sha256sum > /dev/null 2>&1; then sha256sum "$1" | cut -d' ' -f1; else shasum -a 256 "$1" | cut -d' ' -f1; fi; }
 
 FAIL_ID=""
+DR1_BAD=0 DR2_BAD=0 DR11_BAD=0
 R2_DUMP='^(base|dump|globals)-[0-9]{2}-[0-9]{1,20}-[0-9]{8}T[0-9]{6}Z\.age$'
 R2_PREM='^(dump|globals)-[0-9]{2}-[0-9]{1,20}-[0-9]{8}T[0-9]{6}Z\.age$'
 TS_RE='^[0-9]{8}T[0-9]{6}Z$'
@@ -34,9 +37,9 @@ one_version() {
   n=$(awk -v k="$1" '$3 == k { c++ } END { print c + 0 }' "$VERS")
   if [ "$n" = 0 ]; then err "$(basename "$1") is not in the bucket"; return 4; fi
   FAIL_ID=DR1
-  [ "$n" -le 1 ] || { list_versions "$1"; err "$(basename "$1") has more than one version or a hide marker: pick the time with --before"; return 3; } # T10
+  [ "$n" -le 1 ] || { list_versions "$1"; err "$(basename "$1") has more than one version or a hide marker: pick the time with --before"; DR1_BAD=1; [ "${NONFATAL:-0}" = 1 ] || return 3; } # T10
   act=$(awk -v k="$1" '$3 == k { a = $5 } END { print a }' "$VERS")
-  [ "$act" != hide ] || { list_versions "$1"; err "$(basename "$1") is hidden"; return 3; }
+  if [ "$act" = hide ] && [ "$n" = 1 ]; then list_versions "$1"; err "$(basename "$1") is hidden"; DR1_BAD=1; return 3; fi
   FID=$(awk -v k="$1" '$3 == k && $5 == "upload" { print $6 " " $4 }' "$VERS" | sort -n | tail -1 | cut -d' ' -f2)
   [ -n "$FID" ] || { err "no upload version of $(basename "$1")"; return 3; }
   FAIL_ID=''
@@ -72,7 +75,10 @@ fetch_object() {
   b2 get --credential "$CRED" --bucket "$BUCKET" --file-id "$sfid" --out "$WORK/$sfid" || return $?
   want=$(head -c 200 "$WORK/$sfid" | awk '{ print $1; exit }')
   got=$(sha256f "$WORK/$fid")
-  if [ "$got" != "$want" ]; then FAIL_ID=DR2; err "$2 does not match its sha256 sibling"; return 4; fi
+  if [ "$got" != "$want" ]; then
+    FAIL_ID=DR2; DR2_BAD=1; err "$2 does not match its sha256 sibling"
+    [ "${NONFATAL:-0}" = 1 ] || return 4
+  fi
   OBJ_FILE=$WORK/$fid
   OBJ_FID=$fid
 }
@@ -84,7 +90,11 @@ decrypt() { # in out: a local age process, the identity by path only
 # check_time <kind base|dump> <decrypted file> <TS> <seconds after TS the archive may be taken>
 check_time() {
   local out
-  out=$(b2 check-time --kind "$1" --file "$2" --ts "$3" --before "$4" 2>&1) || { FAIL_ID=DR11; printf '%s\n' "$out" | clean >&2; return 4; }
+  out=$(b2 check-time --kind "$1" --file "$2" --ts "$3" --before "$4" 2>&1) || {
+    FAIL_ID=DR11; DR11_BAD=1; printf '%s\n' "$out" | clean >&2
+    [ "${NONFATAL:-0}" = 1 ] && return 0
+    return 4
+  }
   CHECKED_WAL=${out##* }
 }
 
@@ -125,7 +135,10 @@ prepare_base() {
     sibling=$FID
     b2 get --credential "$CRED" --bucket "$BUCKET" --file-id "$fid" --out "$WORK/$fid" || return $?
     b2 get --credential "$CRED" --bucket "$BUCKET" --file-id "$sibling" --out "$WORK/$sibling" || return $?
-    [ "$(sha256f "$WORK/$fid")" = "$(head -c 200 "$WORK/$sibling" | awk '{ print $1; exit }')" ] || { FAIL_ID=DR2; err "$name does not match its sha256 sibling"; return 4; }
+    if [ "$(sha256f "$WORK/$fid")" != "$(head -c 200 "$WORK/$sibling" | awk '{ print $1; exit }')" ]; then
+      FAIL_ID=DR2; DR2_BAD=1; err "$name does not match its sha256 sibling"
+      [ "${NONFATAL:-0}" = 1 ] || return 4
+    fi
     decrypt "$WORK/$fid" "$WORK/$fid.dec" || return $?
     echo "$seg $WORK/$fid.dec" >> "$WAL_LIST"
   done < "$WORK/wal-keys"
@@ -161,7 +174,7 @@ restore_dump() { # -> SC with the database `polycarpic`
   docker exec "$SC" initdb -D /tmp/pgdata -U postgres --auth=trust > /dev/null || { err "initdb failed in the scratch container"; return 1; }
   docker exec -d "$SC" postgres -D /tmp/pgdata -c listen_addresses= || return 1
   scratch_wait || return 1
-  docker exec -i "$SC" psql -U postgres -X -q -f - < "$GLOBALS_PLAIN" > /dev/null 2>&1 || true # roles that exist already (postgres) are not an error
+  plain_stream "$GLOBALS_PLAIN" | docker exec -i "$SC" psql -U postgres -X -q -f - > /dev/null 2>&1 || true # roles that exist already (postgres) are not an error
   docker exec -i "$SC" pg_restore -U postgres --create -d postgres < "$DUMP_PLAIN" || { err "pg_restore failed"; return 1; }
 }
 
