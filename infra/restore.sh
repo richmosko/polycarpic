@@ -171,6 +171,7 @@ check_accepted() {
 case "$MODE" in
   premigration)
     from_box
+    check_accepted
     restore_dump || exit 1
     ;;
   dump)
