@@ -102,3 +102,25 @@ Build-green gate (99c/99d). Record: process/cairn/reviews/POLY-99/gate.md; build
 Green: backup container suite 101/101 (301 s wall, under 420 s; seven files, per-file times in gate.md); provision container config 171/171; tests/infra 390; tests/ci 587; tests/layers 556; ops unit tests 222; image config 88/90, the two reds being POLY-95 secret-mode cases that fail identically on a clean origin/main (Docker Desktop does not enforce bind-mount modes).
 Found: the provision config had never run on the built code and showed five test-side defects, all fixed (R10 ACLs, R9 state, H16 bundle copy, install bundle); no build fault. F1-F4 were red on 5501a740 (11 cases) and green on the fix; F5 shown red on e7c7cc6b^; F4 removal shown on real Docker.
 Delta vs same-day main control: image +4 s, provision +9 s; the backup suite is new and runs only when the backup change key is true. CI timings, real B2, a ledger schema, non-macOS restore and D1 cross-check cases are not covered; the two secret-mode cases need Linux CI. Change table of every test commit since the red run is in gate.md.
+
+### @architect — 2026-11-22
+
+Architect, verdict read @ 106f1a9b: rulings on the DR2 mutant and on 738c8e87.
+**DR2 mutant (`drill.test.ts`, "DR2 RED ON THE FAULT"): no build defect, and DR2 is not redundant.**
+- For the base, the only source of DR2 is `restore-lib.sh:119`, `fetch_object`'s `if [ "$got" != "$want" ]`. The other two sibling comparisons cannot flag the base:
+  - `prepare_base`'s at :181 compares WAL only;
+  - `version_sibling` sets no flag and runs only on the refused path.
+- Since 5ad60203, the dump's second version carries its own matching sibling. So under the `if false` mutant DR2 must come out PASS, and the case asserts PASS.
+- If "green" means that case passed, that is the red-on-fault proof working. Nothing changes.
+- If it means the mutant run still printed `FAIL DR2`, that contradicts the code: the mutated `restore-lib.sh` is not what `drill.sh` sourced. That would be a harness defect for qa-99, in `lap.mutantInfra`'s infra path, as used by `drill.sh`.
+- qa-99: say in the test-plan which of the two it was, with the run line.
+**738c8e87 (T10/T17 mutants seen by the scratch start, not by a restored canary): accepted, no extra real restore.**
+- The unit under test is selection. T10's mutant asserts that the poisoned version's `fileId` was downloaded. What a restore then contains is proven separately:
+  - the one real `--before` restore, with the original canary (restore.test.ts T10 + C7′);
+  - roundtrip.
+**New gating gap, T17:**
+- Three lines carry `# T17`: `restore-lib.sh:154` (dump), `:165` (base) and `restore.sh:139` (premigration). The marker rule (comment @ e585d393) allows one line per marker.
+- The mutant regex removes only the first. So the base check (window TS−1 min to TS+10 min) has no refusal case and no mutant, and the premigration one has a refusal case but no mutant.
+- Required:
+  - Markers: `# T17` stays on the dump line; `# T17b` goes on the base line and `# T17p` on the premigration line (devops-99).
+  - Cases (qa-99): a base whose `backup_label` START TIME is 2 h before its name's TS exits 4 with no scratch, and its mutant reaches the scratch. The premigration refusal case gets its mutant.
