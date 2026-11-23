@@ -196,12 +196,16 @@ else
 fi
 
 # F6: every check must have a result line; DR5 and DR6 one per instance. A check that did not run is a FAIL, never a silent pass.
+# F8: a SKIP exempts DR9 only (no ledger yet). A SKIP of any other id with no FAIL anywhere in the run is itself a FAIL, so exit 3 is reached
+# only when the skipped set is exactly DR9; a SKIP that follows a FAIL is that failure's fallout.
+anyfail=$(awk '$1 == "FAIL" { n++ } END { print n + 0 }' "$RESULTS")
 for id in DR1 DR2 DR3 DR4 DR5 DR6 DR7 DR8 DR9 DR10 DR11; do
   need=1
   case "$id" in DR5 | DR6) need=2 ;; esac
   have=$(awk -v i="$id" '$2 == i && $1 != "SKIP" { n++ } END { print n + 0 }' "$RESULTS")
   skipped=$(awk -v i="$id" '$2 == i && $1 == "SKIP" { n++ } END { print n + 0 }' "$RESULTS")
   if [ "$have" -lt "$need" ] && [ "$skipped" = 0 ]; then res FAIL "$id" "$id did not run"; fi
+  if [ "$id" != DR9 ] && [ "$skipped" != 0 ] && [ "$anyfail" = 0 ]; then res FAIL "$id" "$id skipped without a failure"; fi
 done
 fails=$(awk '$1 == "FAIL" { print $2 }' "$RESULTS" | sort -u | tr '\n' ' ' | sed 's/ $//; s/ /, /g')
 skips=$(awk '$1 == "SKIP" { print $2 }' "$RESULTS" | sort -u | tr '\n' ' ' | sed 's/ $//; s/ /, /g')
