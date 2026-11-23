@@ -135,7 +135,7 @@ a table per project and service: the **allowed key set**, plus pinned values. Re
 | `mount` | a volume type other than `bind` or `tmpfs`; any top-level named volume (a `driver_opts` bind can reach `/`); a bind source not allowlisted for that service, or writable where the policy says `:ro`; always `/`, `/run`, the Docker or containerd socket, `/opt/polycarpic/ops`, `/var/lib/polycarpic/state`, `secrets/host/`, any `releases/` path but the allowlisted read-only config files |
 | `file` | a top-level `configs` or `secrets` `file` that the policy does not list for a service that uses it (SM4) |
 | `env` | an `env_file` path (raw render) that the policy does not list for that project's service; staging may never name `/etc/polycarpic/host.env` |
-| `network` | a network outside the project's allowlist (e.g. a staging service on `polycarpic-prod_default` or `polycarpic-prod-edge`) |
+| `network` | judged by the **resolved** network, not its key (S14, seceng SM6): for each network a service joins, the top-level entry's `name`, `external` and `driver` must equal the project's installed list, and any other top-level property (`driver_opts`, an `ipam` other than the policy's) is refused. So a staging key `default` whose entry is `external: true, name: polycarpic-prod_default` is refused, as is any staging service on `polycarpic-prod-edge` |
 | `ports` | a `ports` entry on anything but caddy, or not on `POLY_BIND_ADDR` |
 
 This guard is **narrower** than the CI lint (C-70), which stays the full check on every PR. The guard is the trust
@@ -207,7 +207,13 @@ The HTTP clause exists because the worker's healthcheck is `process.exit(0)`. A 
   - Form (ii) is also required, because a wipe alone revokes nothing already sent out. Prod's first deploy stops caddy,
     empties `/srv/polycarpic/caddy` and `/srv/polycarpic/caddy-config`, then recreates it. Prod therefore starts with a
     fresh ACME account and fresh keys.
-  - Consequence for POLY-104 (§L5): the `app.` A/AAAA records are created at the first prod deploy, not before.
+  - **Order (S15).** Caddy retries a failed issuance in the background, so a running staging-era Caddy would obtain
+    the certificate in the minutes between the record appearing and the wipe. The `app.` A/AAAA records are therefore
+    created only **after** `first-deploy prod` has stopped, emptied and recreated caddy, and `first-deploy prod` prints
+    that instruction as its last line. It refuses `edge-prod-name-early` (exit 4), changing nothing, when `app.<domain>`
+    already resolves while a staging-era caddy exists (a caddy container and no prod `current`). The condition is
+    computed from the box, so there is no override flag: seceng's `--caddy-never-staged` would only add a bypass, and
+    the case it covers (no staging-era caddy) is not refused anyway. §L5.
 - `/etc/polycarpic/edge.env` (`POLY_DOMAIN`, `POLY_BIND_ADDR`, `POLY_STAGING_ALLOW`, `POLY_TLS`; root 0644) is written by
   `provision.sh`, with a provision-check line.
 
@@ -317,8 +323,8 @@ qa commits the harness and this one test first, with any contract pins; the buil
 | T5 | A sibling failing V1, or attested at another commit, stops the deploy | mutant skipping siblings |
 | T6 | Bundle tar with a symlink, hardlink, setuid file, `..`, absolute or off-manifest member: refused, nothing under `releases/` | mutant using `tarfile` defaults |
 | T7 | **Never rewrites itself:** a bundle carrying a changed `infra/ops/polycarpic-ops`, changed units and a script that would touch a canary. After a healthy deploy every file outside `releases/`, `images.env`, `state/deploy/` and the lock is byte-identical, the canary is absent, and no argv element is under `releases/` but `-f`/`--env-file`/`--project-directory` values (S7) | mutant copying the bundle's `infra/ops` into `ops/`; mutant running `bash releases/<d>/…` |
-| T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-prod-edge`; `container_name`; an `include:` line; S10's eight: `network_mode: "container:polycarpic-prod-web-1"`, `volumes_from`, a named volume with `driver_opts` bind `/`, a `configs` `file: /etc/shadow`, a staging `env_file` of `/etc/polycarpic/host.env`, `user: "0"`, a service without `cap_drop: [ALL]`, a quoted-key `"include": [x.yml]` adding a service; the same for rollback's `previous`. Positive: the real bundle passes | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check; mutant checking only the plain render (misses `env_file`) |
-| T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4). No prod `current`: with `app.<domain>` resolving (fake `ctx.resolve`), a staging run leaves caddy unchanged and alerts `edge-prod-name`; first prod deploy empties both Caddy directories before the recreate (S11) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest; mutant without the resolve check; mutant without the wipe |
+| T8 | Guard, each refused with no container of the digest created: `privileged: true`; a bind of `/`; the Docker socket; an `image:` outside the verified set (`ghcr.io/anyone/x@sha256:…`); top-level `name: polycarpic-prod` in a staging bundle; a staging service on `polycarpic-prod-edge`; `container_name`; an `include:` line; S10's eight: `network_mode: "container:polycarpic-prod-web-1"`, `volumes_from`, a named volume with `driver_opts` bind `/`, a `configs` `file: /etc/shadow`, a staging `env_file` of `/etc/polycarpic/host.env`, `user: "0"`, a service without `cap_drop: [ALL]`, a quoted-key `"include": [x.yml]` adding a service; SM6's external `name: polycarpic-prod_default` behind key `default`, and an edge alias naming `polycarpic-prod-edge` (S14); the same for rollback's `previous`. Positive: the real bundle passes | mutant reading the policy from the release bundle (the fixture carries a permissive one); mutant that denylists; mutant without the image-set check; mutant checking only the plain render (misses `env_file`); mutant checking service network keys only |
+| T9 | Prod `current` present: a staging candidate with a changed Caddyfile and caddy digest deploys healthy, caddy and its mounts unchanged, no argv names edge or caddy. A first prod deploy with an identical caddy digest still recreates it (S4). No prod `current`: with `app.<domain>` resolving (fake `ctx.resolve`), a staging run leaves caddy unchanged and alerts `edge-prod-name`; first prod deploy empties both Caddy directories before the recreate (S11). `first-deploy prod` with `app.` resolving and a staging-era caddy: exit 4 `edge-prod-name-early`, nothing changed; its last line on success is the record instruction (S15) | mutant letting staging own edge after prod exists; mutant skipping the recreate on an equal digest; mutant without the resolve check; mutant without the wipe; mutant without the early-name check |
 | T10 | Unhealthy: rollback starts at ≤ 120 s fake time; candidate quarantined; previous upped from its own bundle after the tree-hash check; no migrate; next poll skips it without re-alerting | mutant without quarantine; mutant skipping the hash re-check |
 | T11 | `migrate` exit 1: no `up`, the running containers unchanged, quarantined, alert | mutant that `up`s anyway |
 | T12 | Prod: premigration runs before the first `compose run`. 1/3/4, or exit 0 with a malformed line: no `check-config`, no `migrate`, alert. Exit 0 with a good line: the line verbatim in `deploy.log`. Postgres down: started from `current`'s bundle and refs; every `compose` argv before step 5 names `current`'s directory and refs (S12). `first-deploy` on a non-empty data dir without `--existing-data`: exit 4 (A8) | mutant running `check-config` first; mutant ignoring the line; mutant starting the candidate's Postgres; mutant running the backup from the candidate bundle |
@@ -389,8 +395,9 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
   - create the token (§D1), and run the one-call check;
   - set up the SSH tag-signing key and `RELEASE_SIGNERS` (POLY-96 comment);
   - after the first `build.yml` run, confirm that the three new GHCR packages are public `(unmeasured)`.
-- **L5.** POLY-104 needs a comment: no `app.` DNS record before the first prod deploy (R9, S11). Otherwise every
-  staging edge run skips with `edge-prod-name`.
+- **L5.** POLY-104 needs a comment, and INFRA's first-deploy runbook (devops, §E) the same order: no `app.` DNS record
+  until `first-deploy prod` has wiped and recreated caddy (R9, S11, S15). Otherwise every staging edge run skips with
+  `edge-prod-name`, and `first-deploy prod` refuses with `edge-prod-name-early`.
 
 ## E — Doc passages (owners, at the verdict)
 
@@ -403,7 +410,7 @@ code, which lets a `main` merge widen the policy itself. **Recommend (a).**
 - **SECURITY** (seceng): C-83 flags and tested-by; the `HOST_ONLY` row; the guard as a control.
 - **ARCH §8.1** (architect, with 100e): state paths, edge, the binding of the siblings, R5, R7.
 
-## S1–S13 (seceng `ruling-review.md` @ `4aeb7161`): met by
+## S1–S15 (seceng `ruling-review.md` @ `ead8f7f9`): met by
 
 Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and old R5–R12 are R6–R13.
 
@@ -422,4 +429,6 @@ Rule numbers here are this file's; against `43af9303`, R5 is new (the guard) and
 | S11 no prod key for staging-era Caddy | R9: (i) enforced by the resolve precondition, not a Caddyfile read (the reason is given there), plus (ii) the wipe; T9; §L5 |
 | S12 `current`'s images until step 5 | R6 step 2, step 3, the note under the table; T12 |
 | S13 rollback through the guard | R5, R8; T8 |
+| S14 network judged by its resolved name | R5 `network`; T8 |
+| S15 `app.` record only after the prod wipe; `edge-prod-name-early` | R9 Order; T9; §L5. No `--caddy-never-staged` flag (reason in R9) |
 
