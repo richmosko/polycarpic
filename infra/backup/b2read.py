@@ -137,12 +137,16 @@ def cmd_list(args):
     instance = args["--instance"]
     if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,62}", instance):
         die(2, "bad --instance")
+    stray = 0
     for f in s.versions(args.get("--prefix", instance + "/")):
         if f.get("action") not in ("upload", "hide") or f.get("fileName", "").startswith(instance + "/drill/"):
             continue  # the drill's own probe objects are not backups
         if not FILE_ID.fullmatch(f.get("fileId", "")) or valid_key(instance, f.get("fileName", "")) is None:
-            die(5, "refused object key in the bucket listing")
+            stray += 1  # the put-only key can write any name: refuse the KEY, never the listing (and never use it as a path)
+            continue
         print("%s %s %d %s %s" % (f["fileId"], f["action"], f["uploadTimestamp"], iso(f["uploadTimestamp"]), f["fileName"]))
+    if stray:
+        sys.stderr.write("stray %d\n" % stray)
 
 
 def cmd_get(args):

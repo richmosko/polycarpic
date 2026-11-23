@@ -28,16 +28,46 @@ SHA_RE='^[0-9a-f]{64}$'
 
 # ---------------------------------------------------------------- versions: a name with a second version or a hide marker is refused
 # VERS holds `ver <label> <key> <fileId> <action> <uploadMs> <iso>` lines for every version of every chosen object.
+# A version's `sibling yes|no`: its bytes against the name's sibling (the refused path only, so the cost is rare)
+version_sibling() { # key fileId -> yes|no
+  local skey=$1.sha256 sfid want got
+  case "$1" in *.sha256) echo no; return ;; esac
+  sfid=$(awk -v k="$skey" '$3 == k && $5 == "upload" { print $6 " " $4 }' "$VERS" | sort -n | tail -1 | cut -d' ' -f2)
+  [ -n "$sfid" ] || { echo no; return; }
+  b2 get --credential "$CRED" --bucket "$BUCKET" --file-id "$sfid" --out "$WORK/s-$sfid-$2" > /dev/null 2>&1 || { echo no; return; }
+  b2 get --credential "$CRED" --bucket "$BUCKET" --file-id "$2" --out "$WORK/v-$2" > /dev/null 2>&1 || { echo no; return; }
+  want=$(head -c 200 "$WORK/s-$sfid-$2" | awk '{ print $1; exit }')
+  got=$(sha256f "$WORK/v-$2")
+  rm -f "$WORK/s-$sfid-$2" "$WORK/v-$2"
+  if [ "$got" = "$want" ]; then echo yes; else echo no; fi
+}
 list_versions() { # key
-  awk -v k="$1" '$3 == k { printf "version %s %s %s%s\n", $4, $7, $3, ($5 == "hide" ? " hide marker" : "") }' "$VERS" | clean
+  local fid act ms iso
+  awk -v k="$1" '$3 == k { print $4, $5, $6, $7 }' "$VERS" | while read -r fid act ms iso; do
+    if [ "$act" = hide ]; then echo "version $fid $iso $1 sibling no hide marker"; else echo "version $fid $iso $1 sibling $(version_sibling "$1" "$fid")"; fi
+  done | clean
+}
+# accepted_version <key>: one of the --accept-version fileIds belongs to this key's versions -> ACCEPTED_FID
+accepted_version() {
+  local a
+  for a in ${ACCEPT:-}; do
+    if awk -v k="$1" -v f="$a" '$3 == k && $4 == f && $5 == "upload" { found = 1 } END { exit !found }' "$VERS"; then
+      ACCEPTED_FID=$a
+      echo "$a" >> "$WORK/accepted-used"
+      warn "accepting version $a of $(basename "$1")"
+      return 0
+    fi
+  done
+  return 1
 }
 # one_version <key>: sets FID to the newest upload version, or returns 3 after listing every version
 one_version() {
   local n act
   n=$(awk -v k="$1" '$3 == k { c++ } END { print c + 0 }' "$VERS")
   if [ "$n" = 0 ]; then err "$(basename "$1") is not in the bucket"; return 4; fi
+  if [ "$n" -gt 1 ] && accepted_version "$1"; then FID=$ACCEPTED_FID; FAIL_ID=''; return 0; fi
   FAIL_ID=DR1
-  [ "$n" -le 1 ] || { list_versions "$1"; err "$(basename "$1") has more than one version or a hide marker: pick the time with --before"; DR1_BAD=1; [ "${NONFATAL:-0}" = 1 ] || return 3; } # T10
+  [ "$n" -le 1 ] || { list_versions "$1"; err "$(basename "$1") has more than one version or a hide marker: pick the time with --before, or name one with --accept-version <fileId>"; DR1_BAD=1; [ "${NONFATAL:-0}" = 1 ] || return 3; } # T10
   act=$(awk -v k="$1" '$3 == k { a = $5 } END { print a }' "$VERS")
   if [ "$act" = hide ] && [ "$n" = 1 ]; then list_versions "$1"; err "$(basename "$1") is hidden"; DR1_BAD=1; return 3; fi
   FID=$(awk -v k="$1" '$3 == k && $5 == "upload" { print $6 " " $4 }' "$VERS" | sort -n | tail -1 | cut -d' ' -f2)
@@ -45,11 +75,22 @@ one_version() {
   FAIL_ID=''
 }
 
+# list_bucket: the records into RECS; a key the bucket holds that fails the grammar is counted (STRAY_N), never used
+list_bucket() {
+  local rc=0
+  b2 list --credential "$CRED" --bucket "$BUCKET" --instance "$INSTANCE" > "$RECS" 2> "$WORK/list.err" || rc=$?
+  grep -v '^stray ' "$WORK/list.err" >&2 || true
+  STRAY_N=$(sed -n 's/^stray \([0-9][0-9]*\)$/\1/p' "$WORK/list.err" | tail -1)
+  STRAY_N=${STRAY_N:-0}
+  if [ "$STRAY_N" != 0 ]; then warn "$STRAY_N stray objects in the bucket"; fi
+  return "$rc"
+}
+
 # ---------------------------------------------------------------- bucket selection
 bucket_select() { # nightly set -> SET_TS SET_SYS SET_M; VERS; RECS
   local now out rc=0
   RECS=$WORK/records; VERS=$WORK/versions
-  b2 list --credential "$CRED" --bucket "$BUCKET" --instance "$INSTANCE" > "$RECS" || return $?
+  list_bucket || return $?
   now=$(date -u +%s)
   out=$(b2 choose --now "$now" ${BEFORE:+--before "$BEFORE"} ${SETTS:+--set "$SETTS"} < "$RECS") || rc=$?
   if [ "$rc" != 0 ]; then

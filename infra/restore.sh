@@ -16,7 +16,7 @@ usage() { echo "usage: restore.sh --identity <file> (--premigration --from-box <
 die() { local code=$1; shift; echo "restore.sh: $*" >&2; exit "$code"; }
 
 [ $# -gt 0 ] || usage
-IDENTITY='' CRED='' BUCKET='' INSTANCE='' BEFORE='' SETTS='' BOX='' KEEP=0 MODE='' NMODES=0 PLAIN_OK=0 BEFORE_ISO=''
+IDENTITY='' CRED='' BUCKET='' INSTANCE='' BEFORE='' SETTS='' BOX='' KEEP=0 MODE='' NMODES=0 PLAIN_OK=0 BEFORE_ISO='' ACCEPT=''
 while [ $# -gt 0 ]; do
   case "$1" in
     --identity) IDENTITY=${2:-}; shift 2 ;;
@@ -30,6 +30,7 @@ while [ $# -gt 0 ]; do
     --base) MODE=base; NMODES=$((NMODES + 1)); shift ;;
     --dump) MODE=dump; NMODES=$((NMODES + 1)); shift ;;
     --keep) KEEP=1; shift ;;
+    --accept-version) [[ ${2:-} =~ ^[A-Za-z0-9_-]+$ ]] || die 2 "bad --accept-version"; ACCEPT="${ACCEPT:-} $2"; shift 2 ;;
     --plaintext-disk-is-encrypted) PLAIN_OK=1; shift ;;
     *) die 2 "unknown option $1" ;;
   esac
@@ -139,13 +140,21 @@ from_box() {
 cross_check() {
   local d=$1 dsha=$2 g=$3 gsha=$4 ts=$5 f
   RECS=$WORK/records; VERS=$WORK/versions
-  b2 list --credential "$CRED" --bucket "$BUCKET" --instance "$INSTANCE" > "$RECS" || return $?
+  list_bucket || return $?
   awk '{ print "ver x " $5 " " $1 " " $2 " " $3 " " $4 }' "$RECS" > "$VERS"
   SET_M=${d#*-}; SET_M=${SET_M%%-*}
   for f in "$d:$dsha" "$g:$gsha"; do
     one_version "$INSTANCE/$SET_M/premigration/${f%%:*}" || return $?
     b2 get --credential "$CRED" --bucket "$BUCKET" --file-id "$FID" --out "$WORK/x-$FID" || return $?
     [ "$(sha256f "$WORK/x-$FID")" = "${f##*:}" ] || { err "${f%%:*} differs from the bucket's copy"; return 4; }
+  done
+}
+
+# an --accept-version fileId that belongs to no chosen object is a usage error
+check_accepted() {
+  local a
+  for a in $ACCEPT; do
+    grep -qx "$a" "$WORK/accepted-used" 2> /dev/null || die 2 "--accept-version $a does not belong to a chosen object with more than one version"
   done
 }
 
@@ -157,11 +166,13 @@ case "$MODE" in
   dump)
     bucket_select || exit $?
     prepare_dump || exit $?
+    check_accepted
     restore_dump || exit 1
     ;;
   base)
     bucket_select || exit $?
     prepare_base || exit $?
+    check_accepted
     restore_base || exit 1
     ;;
 esac
