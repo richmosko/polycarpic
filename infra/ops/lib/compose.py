@@ -1,5 +1,6 @@
 """Compose as the single source (R4): the secrets block of each compose file, and `docker compose ps` / `docker inspect` readers."""
 import json
+import os
 import re
 
 SECRET_LINE = re.compile(r"  ([a-z0-9_]+)__([a-z0-9-]+): \{file: (/\S+)\}")
@@ -14,13 +15,28 @@ class ComposeError(Exception):
     pass
 
 
+def release_current(ctx, project):
+    """R-b: the compose directory of the project's current release (`releases/<project>-current`, a root symlink), else None."""
+    link = ctx.p("/opt/polycarpic/releases/%s-current" % project)
+    return link if os.path.islink(link) else None
+
+
+def compose_source(ctx, project, fname, bundle_path):
+    """-> (file path, extra compose args): the current release's file and images.env when one is deployed, else the ops bundle's file."""
+    link = release_current(ctx, project)
+    if link:
+        return "%s/infra/compose/%s" % (link, fname), ["--env-file", link + "/images.env"]
+    return bundle_path, []
+
+
 def parse_secrets(ctx, project):
     """-> sorted list of (service, name, logical file path) for every compose-mounted secret under the project's root."""
     found = []
     for fname in FILES[project]:
         rel = "infra/compose/" + fname
         try:
-            with open(ctx.bundle(rel), encoding="utf-8") as fh:
+            link = release_current(ctx, project)
+            with open(("%s/%s" % (link, rel)) if link else ctx.bundle(rel), encoding="utf-8") as fh:
                 lines = fh.read().split("\n")
         except OSError:
             raise ComposeError("compose file unreadable: " + rel)

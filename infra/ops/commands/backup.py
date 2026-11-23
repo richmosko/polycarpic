@@ -70,7 +70,8 @@ def _backup(mode, ctx):
 def _run_locked(mode, ctx, image, d, kinds, timeout):
     t0 = ctx.now()
     ctx.run(["docker", "rm", "-f", CONTAINER], timeout=60)
-    argv = ["docker", "compose", "-p", PROJECT, "-f", BUNDLE_COMPOSE, "--profile", "backup", "run", "--rm", "--no-deps", "-T", "--name",
+    cfile, cenv = compose.compose_source(ctx, "prod", "prod.yml", BUNDLE_COMPOSE)
+    argv = ["docker", "compose", "-p", PROJECT, "-f", cfile] + cenv + ["--profile", "backup", "run", "--rm", "--no-deps", "-T", "--name",
             CONTAINER, "backup", "/usr/local/bin/backup.sh", mode]
     ok, out = True, ""
     try:
