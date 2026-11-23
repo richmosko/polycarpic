@@ -142,6 +142,13 @@ class Bundle(BundleBase):
     def test_t6_a_pax_global_header_member(self):
         self.refused_bundle(make_tar(good_files(), [member("infra/pax", tarfile.XGLTYPE, data=b"")]))
 
+    def test_t6_an_odd_member_in_a_manifest_directory_slot_is_refused_by_its_type_alone(self):
+        # named like an allowed directory, so neither the manifest nor the missing-file check can refuse it: only the member-type check does
+        for label, typ, link in (("symlink", tarfile.SYMTYPE, "/etc"), ("hardlink", tarfile.LNKTYPE, "infra/compose/prod.yml"), ("char device", tarfile.CHRTYPE, ""),
+                                 ("block device", tarfile.BLKTYPE, ""), ("fifo", tarfile.FIFOTYPE, ""), ("sparse", tarfile.GNUTYPE_SPARSE, ""), ("pax global header", tarfile.XGLTYPE, "")):
+            self.tearDown_world()
+            self.refused_bundle(make_tar(good_files(), [member("infra/caddy", typ, link=link)]))
+
     def test_t6_a_missing_manifest_file(self):
         f = good_files()
         del f["infra/compose/edge.yml"]

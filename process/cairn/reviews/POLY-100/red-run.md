@@ -62,3 +62,45 @@ No red (equivalent or redundant code, not a test gap):
 - `-----BEGIN SSH SIGNATURE-----` text check off: `verify-tag` refuses a PGP block anyway; two checks, one outcome.
 
 Open: mutants for T5 (siblings skipped), T9 edge, T11 (`up` after a failed migrate), T-lock (no advisory lock) run once R9 and POLY-100f land.
+
+## G2 refusal → mutant map (lead's request @ 243aca78; every case below is reached by at least one mutant)
+
+| Refusal case (`test_deploy_bundle.py`) | Mutant that turns it red |
+|---|---|
+| setuid, setgid file | drop `m.mode & 0o7000` |
+| symlink, hardlink, char/block device, fifo, sparse, pax-global in a manifest directory slot (one test, 7 types) | `release.py` accept every member type (drop the type tuple **and** the sym/lnk/dev/fifo clause); each clause alone is covered by the other, so neither alone is red (C1a red on the type tuple alone via the slot test; C1b equivalent: the tuple still refuses) |
+| symlink or hardlink elsewhere in the tree; device/fifo off-manifest | masked by the manifest check by design (layers); reached by `allowed_member` → True together with C1 only, not separately |
+| `..` path, absolute path | drop the path-shape check **and** `allowed_member` → True (either alone is covered by the other) |
+| off-manifest member (ops script) | `allowed_member` → True |
+| missing manifest file, absurd declared size | drop the `for need in FILES` check |
+| tar > 64 MiB (padding after valid members) | `if len(data) > MAX_TAR` → `if False` |
+| a single file > 64 MiB | not reached alone: `MAX_TAR`, `MAX_TREE` and `MAX_FILE` all refuse it (layers); reached when all three are removed (not run: the unbounded read) |
+| `images.env` extra key / wrong repo / tag form / missing key | `parse_images_env` key-shape check off; `sorted(got) != sorted(IMAGE_KEYS)` off |
+| garbage, truncated tar | `tarfile` open error path: not mutated; one case each, reached by any change that stops refusing on `TarError` |
+| `run_bytes` cap and kill | `ctx.py` `MAX_BYTES` 64 MiB → 200 MiB |
+
+## env_file lint (named: this loosens a POLY-95 security lint)
+
+`tests/infra/lint.test.ts` used to refuse any `env_file`. It now refuses everything but the project's own host env on the five app services (R11), with:
+17 refusals (unrelated file, prefix, contains, longer name, directory prefix, traversal, relative, staging naming prod's, prod naming staging's,
+host env plus a second file, `required: false`, extra key, another path in object form, postgres/backup/uploader/staging postgres), 12 positives (5 services × 2 projects in
+plain form, two object forms), and one test that the CI lint and the box guard read the same list (`compose-allow.json` `env_files`). The "host env twice"
+case was dropped: compose de-duplicates the list before either reader sees it.
+
+| Mutant | Red |
+|---|---|
+| lint `path === hostEnv` → `startsWith(hostEnv)` | prefix, longer name, traversal cases |
+| lint service allowlist → `true` | the four "service outside the five" cases |
+
+## Real-render guard (`tests/infra/compose-real.test.ts`, lint job; answers the G3 gap)
+
+The committed fixtures are compared with real `docker compose config` output for the shipped files, and 16 S10/S14 edits of the shipped `staging.yml`
+are rendered by real compose and judged by the installed guard (`fixtures/guard_real.py`). It found a generator defect of mine on the way: the prod and staging
+host env paths were mapped to one temp file, so a staging service naming prod's env file looked legitimate; fixed (one temp file per path).
+
+## T-env and the build.yml pins
+
+`env-wiring.test.ts`: detectors proven live inside the file (renamed `DATABASE_PASSWORD_FILE`, `env_file` removed, `PLAID_ENV` absent, the two projects' values swapped).
+`build-pins-poly100.test.ts`: 17 mutants of build.yml, one per B2 item and R11 (a third writer job, `pnpm install` in `build`, an unlisted action or run, a workflow-level
+write, a fifth permission, scan after attest, a sibling attesting another digest, a scan on another digest, swapped arguments, `release-lint` dropped from `needs`, `release-lint`
+with write scopes, `release-scan` renamed, scanning the app only, stopping at the first failure, passing an unchecked line); each returns violations, the real file none.
