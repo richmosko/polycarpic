@@ -176,11 +176,34 @@ describe('restore --premigration --from-box (R7, T9, T16, C4, C5): everything up
       }
       noScratch();
     });
-    it('T16 RED ON THE FAULT: a mutant without the check (the line marked `# T16` removed) sends the name and the box runs it', () => {
+    const sshCalls = () => lap.sshLog().split('\n').filter((l) => l.startsWith('SSH ')).length;
+    it('T16a RED ON THE FAULT: a mutant without the grammar check (`# T16` removed) sends a further ssh command for the hostile name (the quoting still keeps the canary away)', () => {
       const m = lap.mutantInfra('restore.sh', /^.*# T16\s*$/m, ':');
-      lap.setBox({ files: P, list: line(evil().semicolon!) });
+      lap.setBox({ files: P, list: line(evil().subshell!) });
+      lap.run('restore.sh', FROMBOX(), { infra: m, env: NOSCRATCH });
+      expect(sshCalls()).toBeGreaterThan(1);
+      expect(existsSync(MARK())).toBe(false);
+    });
+    it('T16b RED ON THE FAULT: a mutant without the check AND without the quoting (`# T16`, `# T16q` removed) lets the box shell run the name: the canary file appears (the fake ssh runs a real sh -c)', () => {
+      let m = lap.mutantInfra('restore.sh', /^.*# T16\s*$/m, ':');
+      m = lap.mutantInfraFrom(m, 'restore.sh', /^(\s*)(\w+)=.*# T16q\s*$/m, '$1$2=$$1');
+      lap.setBox({ files: P, list: line(evil().subshell!) });
       lap.run('restore.sh', FROMBOX(), { infra: m, env: NOSCRATCH });
       expect(existsSync(MARK())).toBe(true);
+    });
+    it('T16c: a mutant without the quoting only (`# T16q`) stays safe: the grammar check alone refuses the name (the quoting is an independent guard, not dead code)', () => {
+      const m = lap.mutantInfra('restore.sh', /^(\s*)(\w+)=.*# T16q\s*$/m, '$1$2=$$1');
+      lap.setBox({ files: P, list: line(evil().subshell!) });
+      const r = lap.run('restore.sh', FROMBOX(), { infra: m });
+      expect(r.code).toBe(5);
+      expect(sshCalls()).toBe(1);
+      expect(existsSync(MARK())).toBe(false);
+    });
+    it('static: the one ssh line puts `--` before the destination, and the remote command is built by one function whose quoting line is marked `# T16q`', () => {
+      const t = readFileSync(join(lap.infra, 'restore.sh'), 'utf8');
+      const sshLine = t.split('\n').find((l) => /# T9\s*$/.test(l)) ?? '';
+      expect(sshLine).toMatch(/ssh\b.* -- /);
+      expect(t.split('\n').filter((l) => /# T16q\s*$/.test(l))).toHaveLength(1);
     });
     it('control characters and ESC sequences in box text are replaced before anything is printed; a tampered TS, a sha that is not 64 hex and an unknown state are refused (exit 5)', () => {
       lap.setBox({ files: P, list: `${tsP} dump-17-1-${tsP}.age\x1b[31m\x07 ${'a'.repeat(64)} ${g()} ${'b'.repeat(64)} pending\n` });

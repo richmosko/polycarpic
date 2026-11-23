@@ -16,4 +16,4 @@ stdin_copy=$(mktemp)
 cat > "$stdin_copy"
 { printf 'SSH'; for a in "${argv[@]}"; do printf ' [%s]' "$a"; done; printf '\n'; printf 'STDIN %s\n' "$(cat "$stdin_copy" | base64 | tr -d '\n')"; } >> "$log"
 rm -f "$stdin_copy"
-PATH="${BOX_BIN:?}:$PATH" exec bash -c "$*"
+PATH="${BOX_BIN:?}:$PATH" exec sh -c "$*"

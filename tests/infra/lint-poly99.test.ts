@@ -2,7 +2,7 @@
 // (baseline.ts, updated to the POLY-99 compose shape) plus ONE mutation; each rule has a pass twin so a rule that fires on everything is caught.
 // Rule ids pinned here (the builder builds to them): core-dump, tmp-size, state-mount, uploader-spool-ro; host-secrets and mount-allowlist exist.
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -76,5 +76,41 @@ describe('compose-policy lint: POLY-99 rules', () => {
   it.each(PASS)('%s', (name, mut) => {
     const r = run(mut);
     expect({ name, code: r.code, err: r.err }).toEqual({ name, code: 0, err: '' });
+  });
+});
+
+// seceng B-2 (ruling-review.md @ 69abc115): no production script reads a test variable. The checker is a function over {path: text}, shown red on fixtures
+// and then run over the tracked tree, so the rule cannot silently match nothing.
+const ROOTDIR = join(dirname(new URL(import.meta.url).pathname), '..', '..');
+const ALLOW = new Set(['POLY_INSTANCE', 'POLY_POSTGRES_IMAGE', 'POLY_TOOLS_IMAGE', 'POLY_APP_IMAGE', 'POLY_B2_AUTH_URL']);
+const BANNED = /\bPOLY99_|\bPOLY_TEST|\bFAKE_|_FAKE\b/;
+const READ_DIRS = /^(infra\/backup\/|infra\/restore\.sh$|infra\/drill\.sh$|infra\/ops\/)/;
+function noTestVars(files: Record<string, string>, onMain: Set<string>): string[] {
+  const out: string[] = [];
+  for (const [p, text] of Object.entries(files)) {
+    if (BANNED.test(text)) out.push(`${p}: reads a test-only variable`);
+    if (!READ_DIRS.test(p)) continue;
+    for (const n of new Set(text.match(/\bPOLY_[A-Z0-9_]+\b/g) ?? [])) if (!ALLOW.has(n) && !onMain.has(n)) out.push(`${p}: reads ${n}, not in the pinned allowlist`);
+  }
+  return out;
+}
+describe('no-test-vars (seceng B-2): no tracked file under infra/ reads a test-only variable; every POLY_* the backup scripts read is allowlisted', () => {
+  const tracked = () => spawnSync('git', ['ls-files', 'infra/'], { cwd: ROOTDIR, encoding: 'utf8' }).stdout.split('\n').filter(Boolean);
+  const onMain = () => {
+    const r = spawnSync('git', ['grep', '-hoE', '\\bPOLY_[A-Z0-9_]+\\b', 'origin/main', '--', 'infra/backup', 'infra/restore.sh', 'infra/drill.sh', 'infra/ops'], { cwd: ROOTDIR, encoding: 'utf8' });
+    return new Set(r.stdout.split('\n').filter(Boolean));
+  };
+  it('RED ON THE FAULT: a fixture restore.sh reading ${POLY99_SCRATCH_FAIL:-} fails the rule', () => {
+    expect(noTestVars({ 'infra/restore.sh': 'set -euo pipefail\nif [ -n "${POLY99_SCRATCH_FAIL:-}" ]; then exit 1; fi\n' }, new Set()).length).toBeGreaterThan(0);
+  });
+  it('RED ON THE FAULT: a fixture reading an unlisted POLY_DEBUG fails the rule; the allowlisted names do not', () => {
+    expect(noTestVars({ 'infra/restore.sh': 'echo "${POLY_DEBUG:-}"\n' }, new Set()).length).toBeGreaterThan(0);
+    expect(noTestVars({ 'infra/restore.sh': 'echo "$POLY_B2_AUTH_URL $POLY_INSTANCE $POLY_POSTGRES_IMAGE $POLY_TOOLS_IMAGE $POLY_APP_IMAGE"\n' }, new Set())).toEqual([]);
+  });
+  it('the tracked tree is clean: no infra/ file matches the banned patterns, and every POLY_* read in the backup scripts and ops is allowlisted or already read on main', () => {
+    const files: Record<string, string> = {};
+    for (const f of tracked()) { try { files[f] = readFileSync(join(ROOTDIR, f), 'utf8'); } catch { /* deleted in the working tree */ } }
+    expect(Object.keys(files).length).toBeGreaterThan(10);
+    expect(noTestVars(files, onMain())).toEqual([]);
   });
 });

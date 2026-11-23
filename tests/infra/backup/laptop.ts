@@ -25,6 +25,8 @@ export type Laptop = {
   setBox: (o: { files?: Record<string, Buffer>; record?: Array<[string, string]>; list?: string | null }) => void;
   run: (script: 'restore.sh' | 'drill.sh', args: string[], o?: { env?: Record<string, string>; infra?: string; identityMode?: number; cwd?: string }) => Res & { stdoutLines: string[] };
   mutantInfra: (file: string, from: string | RegExp, to: string) => string;
+  /** a second change on top of a mutant copy made by mutantInfra */
+  mutantInfraFrom: (dir: string, file: string, from: string | RegExp, to: string) => string;
   scratches: () => string[];
   cleanup: () => void;
 };
@@ -85,6 +87,14 @@ export function laptop(s: Stack, fake?: Fake): Laptop {
     mutantInfra: (file, from, to) => {
       const m = join(dir, `infra-mutant-${Math.random().toString(36).slice(2, 8)}`);
       cpSync(infra, m, { recursive: true });
+      const f = join(m, file);
+      const t = readFileSync(f, 'utf8');
+      const out = t.replace(from as any, to);
+      if (out === t) throw new Error(`mutant did not change ${file}: ${String(from)}`);
+      writeFileSync(f, out);
+      return m;
+    },
+    mutantInfraFrom: (m, file, from, to) => {
       const f = join(m, file);
       const t = readFileSync(f, 'utf8');
       const out = t.replace(from as any, to);
