@@ -35,14 +35,31 @@ describe('POLY-99 change filter: every path a job executes or reads selects that
   });
 });
 
-describe('POLY-99 CI steps', () => {
-  it('the image job\'s vitest config includes tests/infra/backup/*.test.ts and the image job runs it', () => {
-    expect(readFileSync(join(ROOT, 'tests/infra/vitest.image.config.ts'), 'utf8')).toContain('tests/infra/backup/*.test.ts');
-    expect(job('image').some((s) => /vitest run -c tests\/infra\/vitest\.image\.config\.ts/.test(s.run ?? ''))).toBe(true);
+describe('POLY-99 change key `backup` (ruling Guards @ 2bf5a6ba): the container suite runs only when one of its paths changed', () => {
+  for (const p of ['infra/backup/upload.sh', 'infra/restore.sh', 'infra/drill.sh', 'infra/postgres/archive-wal.sh', 'infra/compose/prod.yml', 'infra/ops/commands/backup.py', 'infra/ops/commands/upload.py', 'tests/infra/backup/restore.test.ts']) {
+    it(`${p} sets backup`, () => { expect(changed([p]), p).toContain('backup'); });
+  }
+  it('a PR touching none of them leaves `backup` false', () => {
+    expect(changed(['apps/web/src/a.ts', 'docs/PRD/index.html', 'infra/caddy/Caddyfile'])).not.toContain('backup');
   });
-  it('the image job installs `age` and the PostgreSQL client (pg_restore) before it runs the image vitest config', () => {
+});
+
+describe('POLY-99 CI steps', () => {
+  const BKRUN = /vitest run -c tests\/infra\/vitest\.backup\.config\.ts/;
+  it('the backup vitest config selects tests/infra/backup/*.test.ts with the one globalSetup, and the image config no longer does', () => {
+    const c = readFileSync(join(ROOT, 'tests/infra/vitest.backup.config.ts'), 'utf8');
+    expect(c).toContain('tests/infra/backup/*.test.ts');
+    expect(c).toContain('tests/infra/backup/global-setup.ts');
+    expect(readFileSync(join(ROOT, 'tests/infra/vitest.image.config.ts'), 'utf8')).not.toContain('tests/infra/backup');
+  });
+  it('the image job runs the backup suite as one step, gated on the `backup` output (no new job)', () => {
+    const st = job('image').find((s) => BKRUN.test(s.run ?? ''));
+    expect(st, 'the backup suite step').toBeDefined();
+    expect(String((st as any).if ?? '')).toContain("needs.changes.outputs.backup == 'true'");
+  });
+  it('the image job installs `age` and the PostgreSQL client (pg_restore) before it runs the backup suite', () => {
     const steps_ = job('image');
-    const run = steps_.findIndex((s) => /vitest run -c tests\/infra\/vitest\.image\.config\.ts/.test(s.run ?? ''));
+    const run = steps_.findIndex((s) => BKRUN.test(s.run ?? ''));
     const inst = steps_.findIndex((s) => /apt-get install[^\n]*\bage\b/.test(s.run ?? '') && /postgresql-client/.test(s.run ?? ''));
     expect(inst, 'a step that installs age and postgresql-client').toBeGreaterThan(-1);
     expect(inst).toBeLessThan(run);
