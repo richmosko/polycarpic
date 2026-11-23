@@ -239,17 +239,16 @@ def tag_commit(ctx, tag):
     code, body, _ = git(ctx, ["--git-dir", repo, "cat-file", "tag", ref])
     if code != 0 or "-----BEGIN SSH SIGNATURE-----" not in body:
         raise Refusal("tag-signature", True)
-    head = body.split("\n\n", 1)[0].splitlines()
-    names = [l[4:] for l in head if l.startswith("tag ")]
-    if names != [tag]:
-        raise Refusal("tag-name", True)
     code, _, _ = git(ctx, ["--git-dir", repo, "-c", "gpg.format=ssh", "-c", "gpg.ssh.allowedSignersFile=" + ctx.p(SIGNERS), "verify-tag", ref])
     if code != 0:
         raise Refusal("tag-signature", True)
-    code, out, _ = git(ctx, ["--git-dir", repo, "rev-parse", ref + "^{commit}"])
-    commit = out.strip()
-    if code != 0 or not SHA.fullmatch(commit):
+    head = body.split("\n\n", 1)[0].splitlines()
+    objs = [l[7:] for l in head if l.startswith("object ")]
+    if "type commit" not in head or len(objs) != 1 or not SHA.fullmatch(objs[0]):
         raise Refusal("tag-commit", True)
+    if [l[4:] for l in head if l.startswith("tag ")] != [tag]:
+        raise Refusal("tag-name", True)
+    commit = objs[0]
     return commit
 
 
@@ -280,7 +279,7 @@ def pull_and_label(ctx, name, digest, commit, sibling=False):
     except TimeoutError:
         code = 1
     if code != 0:
-        raise Refusal("sibling-pull" if sibling else "pull")
+        raise Transient("docker pull failed")
     code, out, _ = ctx.run(["docker", "image", "inspect", ref], timeout=60)
     try:
         info = json.loads(out)[0]
