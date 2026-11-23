@@ -81,6 +81,7 @@ class World(object):
         self.bad_apps, self.run_codes, self.plan_code, self.polls = set(), {}, 3, 0
         self.up_marks, self.stopped, self.sleeps_ref = [], [], None
         self.systemctl_log, self.premigration_calls, self.on_compose = [], [], None
+        self.https_calls, self.https_always, self.edge_bad = [], None, {}
         self.origin = self.tmp / "github-origin"
         self.commit_a = self.commit_b = None
         self._git_origin()
@@ -373,6 +374,19 @@ class World(object):
             return 0, data, ""
         raise AssertionError("FAKE run_bytes: unexpected %r" % (argv,))
 
+    def https_status(self, host, addr, path):
+        """A13's seam: by default 200 while the web container runs an image not in `edge_bad`; a digest in `edge_bad` answers its scripted status or raises."""
+        self.https_calls.append((host, addr, path))
+        if self.https_always is not None:
+            v = self.https_always
+        else:
+            web = self.containers.get("polycarpic-prod", {}).get("web")
+            d = web["image"].split("@")[1] if web else None
+            v = self.edge_bad.get(d, 200)
+        if isinstance(v, Exception):
+            raise v
+        return v
+
     def resolve(self, name):
         if name not in self.names:
             raise OSError("Name or service not known: " + name)
@@ -430,6 +444,8 @@ class DeployTest(OpsTest):
         names = ctx_class().__init__.__code__.co_varnames
         if ctx_seams and "resolve" in names:
             extra["resolve"] = w.resolve
+        if ctx_seams and "https_status" in names:
+            extra["https_status"] = w.https_status
         if ctx_seams and "run_bytes" in names:
             extra["run_bytes"] = w.run_bytes
         def ready(rr):

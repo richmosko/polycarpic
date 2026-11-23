@@ -11,7 +11,7 @@ GOOD_LINE = "premigration-set 20261123T000000Z dump-17-7711142272324444185-20261
 CADDY_DIRS = ("/srv/polycarpic/caddy", "/srv/polycarpic/caddy-config")
 
 
-class Prod(DeployTest):
+class ProdBase(DeployTest):
     def setUp(self):
         super().setUp()
         w = self.world
@@ -22,6 +22,7 @@ class Prod(DeployTest):
         w.premigration = (0, GOOD_LINE + "\n", "")
         for d in CADDY_DIRS + ("/srv/polycarpic/pg-prod", "/srv/polycarpic/pg-staging"):
             self.host.mkdir(d)
+        self.host.write("/etc/polycarpic/host.env", "PUBLIC_ORIGIN=https://app.example.com\nTLS_MODE=real-domain\n")
 
     def release_of(self, version, sibs=None):
         """The next signed prod release: a new commit, an image X with its bundle, three siblings, a Release with the digest line."""
@@ -75,6 +76,8 @@ class Prod(DeployTest):
             out.append(c)
         return out
 
+
+class Prod(ProdBase):
     # ---- first deploy ----
     def test_first_deploy_prod_takes_no_backup_enables_the_three_timers_and_ends_on_the_dns_instruction(self):
         x, r = self.first_prod()
