@@ -583,6 +583,13 @@ discharged. The build review is PASS on `a780368f`.** D1 is built as (a), pendin
 - **The PASS stands on `b7bde21d`.** qa's local re-run of restore, drill and provision on it is the behavioural
   confirmation.
 
+**Confirmed by qa on `b7bde21d`:** backup suite 112/112 (restore 36/36, the `# T16` mutants T16a/b/c among them),
+provision config 171/171, `tests/infra` 390/390. **qa's T3 harness fix (`d42ebd87`, local) is accepted.**
+- The negative still holds against the real fake-b2: from `backup-net`, the backup container cannot reach it.
+- The red-on-fault now uses a throwaway listener instead of re-attaching the shared fake, and it is stricter. The
+  listener is unreachable **before** the backup container joins the routable network, and reachable after. So the
+  route comes from the network attachment alone.
+
 ## Tests reviewed against my spec
 
 The test names are taken from `test-plan.md` and `restore.test.ts` at the sha. I ran none: qa has the machine.
