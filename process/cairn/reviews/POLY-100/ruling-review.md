@@ -456,3 +456,35 @@ when `aclexplode` gives poly_backup exactly CONNECT without grant option, on eve
 **Met.** The `pg-hba-prod` rule names R12(a), with devops building the lint edit. T-pre carries TEMPORARY on a sibling
 database, refused through the shared `pg_database` row, red on a mutant exempting every `pg_database` row. The file name
 is corrected. Nothing else in `ruling.md` changed (`580be11e..cc8f5ba6`). The plan gate stays open.
+
+## Delta `5b774ae5..21891607`
+
+**Accepted with S16 and S17.** Read against `deployer.py` @ `240fcbde` (edge, guard and pointer code only; no test run).
+
+| Item | Ruling |
+|---|---|
+| S3, R8: rollback restores edge, both renders judged before either `up` | **Accept.** A refused edge render leaves the failed release's Caddy up, alerted; that Caddy passed the guard. |
+| R4: edge `up` whenever owned | **Accept.** An equal image does not mean an equal `edge.yml`. |
+| S8: `list-secrets` without path or expiry | **Accept**, narrower. A fine-grained token has a fixed length, so its size says nothing. |
+| S11, S15: fail closed | **Accept**, with S16 and S17. The wipe's listing must be `ps -a` (as built), so a stopped Caddy counts. |
+| R7: health of Caddy is `caddy version` | **Accept** as a stated residual: liveness, not a security check. |
+| R10: token expiry, 90-day estimate | **Accept.** |
+| T-render | **Accept.** It must fail, not skip, when the compose plugin is missing. |
+
+**S16. Edge ownership is decided once per run.** `_gate` guards the edge render only if `edge_owner_peek` says this run
+owns edge; `_apply` later calls `edge_owner`, which resolves the name and runs `compose ps` again. If the first answer is
+"not ours" and the second is "ours", staging's edge is upped **with no guard**. Failing closed makes this easier to reach:
+one `EAI_AGAIN` at the gate is now "resolves", and a clean answer minutes later owns edge.
+- *Required:* one decision, made before V7, carried to step 8 and to rollback. Later checks may only take ownership away
+  (the name now resolves: skip edge), never add it. `_edge_up` refuses a render this run has not judged.
+- *Test (T9):* staging-only host, resolver answers "resolves" then "no such name": no argv names edge. Red on `240fcbde`'s
+  shape. Reverse order: edge skipped, `edge-prod-name`.
+
+**S17. An unreadable or malformed `current` means "prod exists".** `load_pointer` returns `None` both for no file and for a
+bad one, so a damaged prod `current` with prod's containers down hands edge to staging, and `first-deploy prod` would take
+the box for a new one and wipe Caddy. *Required:* absent is absent; present but unparsable stops the run (`state`, exit 1,
+no quarantine), for both projects and for `first-deploy` and `rollback`. *Test:* a truncated prod `current` and no prod
+containers: staging touches no edge; `first-deploy prod` wipes nothing. Red on a mutant treating malformed as absent.
+
+**A11 (advisory).** `first-deploy prod` resolves `app.` at the start; Caddy is wiped after migrate, perhaps minutes later.
+Resolve once more after Caddy is removed and before the recreate, and stop if the name appeared.

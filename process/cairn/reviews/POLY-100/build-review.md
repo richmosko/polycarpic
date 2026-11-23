@@ -49,3 +49,6 @@ architect's independent M6; the 60/h and 401 results agree with M3 except the ra
 closes in the build when `build.yml` has it. B3 open with the lead. One correction: M3, M6 and M7 were also taken through
 scratch scripts after a guard refusal (ruling §M), so M6 repeats SM1's result but is not a cleaner run. POLY-104's live
 wrong-commit check is the evidence to rely on.
+
+**B3 @ `a41370d8`: the ruling edit is met** (four scans, all run, any failure fails; app image never started; lines checked
+before the scan). It closes in the build with `build.yml` and the three mutants R11 names.
