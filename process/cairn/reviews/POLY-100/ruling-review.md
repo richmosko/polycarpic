@@ -734,3 +734,27 @@ unaccepted `$2y$` fails closed: nobody signs in, or Caddy does not start.
 - *T-sauth adds:* `restart caddy` and both rollbacks with a bad file; a file with two trailing newlines, with `\r\n`, and a 129-byte
   file; a directory with another group. Red on mutants using `match` with `$`, and checking only in deploys.
 - *SECURITY, mine at the verdict:* the row says "Staging secrets directory"; the file is in `secrets/caddy/`.
+
+## `3c50fb1c`: S28 and R8's wording **met**
+
+## `staging-auth`: where the hash is made (S30; replaces my acceptance of `apache2-utils` above)
+
+I accepted the new package without weighing it. Comparing:
+
+| Way | For | Against |
+|---|---|---|
+| `apache2-utils` on the box | the draft works as written | root-installed code on prod's host, kept patched for good, for a command run a few times; the password passes through the box |
+| `caddy hash-password` from the verified image | no package; the consumer makes the hash | before `edge-deploy` the only verified Caddy on the box is staging's, unsigned: it would be handed the password and could print a hash of another one. Waiting for a signed image needs a new half-deployed state. Reading a password on stdin is unmeasured |
+| **hash on the laptop** | no package; the box and every image on it never see the password | the box cannot check length; needs `htpasswd`, which macOS ships (measured: `/usr/sbin/htpasswd`) |
+
+**S30. Required: hash on the laptop, and the box takes only the line.**
+- The password is **generated**, not chosen: `openssl rand -hex 16`, into the operator's secret store, then `htpasswd -nBC 10 staging`
+  at its own prompt (never `-b`). That replaces the length rules: 128 random bits, 32 ASCII characters, under bcrypt's 72.
+- `staging-auth` keeps its hidden prompt (not a secret worth printing), takes `staging:$2y$10$<53>`, `fullmatch`, writes the file as drafted. Password
+  prompts, `htpasswd`, the package and their tests go. S29 (a) and (b) stay; (c) goes.
+- The box cannot see a weak password. The runbook's command is the control; the IP allowlist is the second.
+- *T-sauth:* a pasted password, a hash of another cost, another user, an extra line: exit 2, nothing written, value not echoed. No package is added
+  to `provision.sh`.
+
+**Cost 10 on every request:** accept. With a random 128-bit password the cost guards nothing that matters, so it is chosen for CPU. The allowlist
+answers first, so outsiders cost nothing (by the Caddyfile's order, which S20 pins). Load on the shared box is POLY-104's to measure.
