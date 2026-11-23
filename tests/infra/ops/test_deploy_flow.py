@@ -168,7 +168,7 @@ class Flow(DeployTest):
         self.assertEqual(len(ups), 2, "the candidate's up, then the rollback's")
         first_up, back_up = r.world.up_marks[-2], r.world.up_marks[-1]
         self.assertLessEqual(back_up - first_up, 125, "rollback starts no later than 120 s after up -d")
-        self.assertIn(self.hex_dir(x1), " ".join(ups[1]["argv"]), "the rollback runs from the previous release's own bundle")
+        self.assertIn("render-%s.json" % x1.split(":")[1][:12], " ".join(ups[1]["argv"]), "the rollback runs from the previous release's own saved render (F4)")
         self.assertEqual([c for c in r.world.compose_log[r.world.compose_log.index(ups[0]) + 1:] if c["cmd"] == "run"], [], "rollback never migrates")
         self.assertTrue(set(["rolled-back"]) <= set(self.log_events("staging")))
         # the next poll sees the same run: skipped, no new alert line, no new candidate work

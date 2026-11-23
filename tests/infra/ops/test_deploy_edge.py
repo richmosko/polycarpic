@@ -201,7 +201,7 @@ class Edge(EdgeBase):
         self.assertEqual(self.edge_current()[0], x1)
         ups = self.ups(r, mark)
         self.assertEqual(len(ups), 2)
-        self.assertIn(self.hex_dir(x1), " ".join(ups[1]["argv"]), "edge's previous release is upped from its own directory")
+        self.assertRegex(" ".join(ups[1]["argv"]), r"/state/deploy/edge/render-%s\.json" % x1.split(":")[1][:12], "edge's previous release is upped from its own saved render (F4)")
         cfg = [i for i, c in enumerate(r.world.compose_log[mark:]) if c["cmd"] == "config" and self.hex_dir(x1) in " ".join(c["argv"])]
         self.assertTrue(cfg, "the previous release's render is judged before its up")
 
@@ -304,4 +304,4 @@ class Take(EdgeBase):
         self.assertEqual(self.edge_current()[0], self.edge_x)
         edge_ups = [c for c in r.world.compose_log[mark:] if c["cmd"] == "up" and c["project"] == EDGE]
         self.assertTrue(edge_ups)
-        self.assertIn(self.hex_dir(self.edge_x), " ".join(edge_ups[-1]["argv"]), "caddy is put back on edge's current")
+        self.assertRegex(" ".join(edge_ups[-1]["argv"]), r"/state/deploy/edge/render-%s\.json" % self.edge_x.split(":")[1][:12], "caddy is put back on edge's current, from its saved render (F4)")

@@ -126,14 +126,14 @@ class Prod(ProdBase):
         x1, _ = self.first_prod()
         x2 = self.release_of("v1.1.0")
         r = self.deploy("prod")
-        cur, cand = self.hex_dir(x1), self.hex_dir(x2)
+        cur, cand = "render-%s.json" % x1.split(":")[1][:12], "render-%s.json" % x2.split(":")[1][:12]
         before = [c for c in self.calls_before_check_config(r) if c["cmd"] in ("up", "run", "exec", "create", "start", "restart")]
         for c in before:
             joined = " ".join(c["argv"])
-            self.assertIn(cur, joined, c["argv"])
+            self.assertIn(cur, joined, "F4: current's compose calls name current's saved render: %r" % (c["argv"],))
             self.assertNotIn(cand, joined, c["argv"])
         # the candidate's tree is judged only by `config` renders until step 5
-        self.assertTrue(any(c["cmd"] == "config" and cand in " ".join(c["argv"]) for c in r.world.compose_log))
+        self.assertTrue(any(c["cmd"] == "config" and self.hex_dir(x2) in " ".join(c["argv"]) for c in r.world.compose_log))
 
     def test_t12_postgres_down_is_started_from_currents_bundle_and_refs(self):
         x1, _ = self.first_prod()
@@ -144,10 +144,9 @@ class Prod(ProdBase):
         self.assertEqual(len(ups), 1)
         a = ups[0]["argv"]
         self.assertIn("postgres", a)
-        self.assertIn(self.hex_dir(x1), " ".join(a))
-        self.assertNotIn(self.hex_dir(x2), " ".join(a))
-        env_files = [a[i + 1] for a in [ups[0]["argv"]] for i, t in enumerate(a) if t == "--env-file"]
-        self.assertEqual(env_files, [os.path.join(self.hex_dir(x1), "images.env")], "postgres comes up on current's refs, not the candidate's")
+        self.assertIn("render-%s.json" % x1.split(":")[1][:12], " ".join(a), "from current's saved render (F4)")
+        self.assertNotIn("render-%s.json" % x2.split(":")[1][:12], " ".join(a))
+        self.assertNotIn("--env-file", a, "the saved render has the refs baked in: no env file names the bundle")
 
     def test_t12_a_failed_or_malformed_premigration_stops_before_check_config_and_migrate(self):
         self.first_prod()

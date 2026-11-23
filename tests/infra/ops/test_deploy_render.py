@@ -32,6 +32,10 @@ class Render(DeployTest):
         d = self.host.p("%s/%s" % (STATE, project))
         return sorted(n for n in os.listdir(str(d)) if n.startswith("render-") and n.endswith(".json"))
 
+    def saved_of(self, x, project="staging"):
+        """The candidate's own saved render (`current`'s is saved too when Postgres has to come up from it: ruling, step 2)."""
+        return [n for n in self.saved(project) if n == "render-%s.json" % x.split(":")[1][:12]]
+
     # ---- (a) no network at render ----
     def test_every_render_is_isolated_unprivileged_with_an_empty_home_and_the_remote_flags_off(self):
         self.candidate()
@@ -63,8 +67,8 @@ class Render(DeployTest):
         x = self.candidate()
         r = self.deploy("staging")
         self.assertEqual(r.rc, 0, r.err)
-        names = self.saved()
-        self.assertEqual(len(names), 1, names)
+        names = self.saved_of(x)
+        self.assertEqual(len(names), 1, self.saved())
         self.assertRegex(names[0], r"^render-%s\.json$" % x.split(":")[1][:12])
         p = self.host.p("%s/staging/%s" % (STATE, names[0]))
         self.assertEqual(stat.S_IMODE(os.stat(str(p)).st_mode), 0o600)
@@ -92,17 +96,18 @@ class Render(DeployTest):
             self.assertEqual(c["argv"][:len(PREFIX)], PREFIX)
 
     def test_every_other_compose_call_names_only_the_saved_file_with_f(self):
-        self.candidate()
+        x = self.candidate()
         r = self.deploy("staging")
         self.assertEqual(r.rc, 0, r.err)
-        saved = [str(self.host.p("%s/staging/%s" % (STATE, n))) for n in self.saved()]
+        saved = [str(self.host.p("%s/staging/%s" % (STATE, n))) for n in self.saved_of(x)]
         self.assertEqual(len(saved), 1)
         checked = 0
         for c in r.world.compose_log:
             if c["cmd"] in ("up", "run", "exec", "restart"):
                 a = c["argv"]
                 fs = [a[i + 1] for i, t in enumerate(a) if t == "-f"]
-                self.assertEqual(fs, saved, "a compose call names a bundle's compose file, not the judged render: %r" % (a,))
+                every = [str(self.host.p("%s/staging/%s" % (STATE, n))) for n in self.saved()]
+                self.assertTrue(len(fs) == 1 and fs[0] in every, "a compose call names a bundle's compose file, not a judged render: %r" % (a,))
                 self.assertNotIn("--project-directory", a)
                 self.assertNotIn("--env-file", a)
                 checked += 1
@@ -130,21 +135,21 @@ class RenderFiles(Render):
     test_no_releases_path_reaches_any_argv_but_as_configs_f_env_file_or_project_directory = None
 
     def test_the_fixed_point_the_saved_bytes_render_again_to_themselves(self):
-        self.candidate()
+        x = self.candidate()
         r = self.deploy("staging")
         self.assertEqual(r.rc, 0, r.err)
-        path = self.host.p("%s/staging/%s" % (STATE, self.saved()[0]))
+        path = self.host.p("%s/staging/%s" % (STATE, self.saved_of(x)[0]))
         saved = path.read_text()
-        again = [c for c in r.runner.calls if c["argv"] and "config" in c["argv"] and c["stdin"]]
+        again = [c for c in r.runner.calls if c["argv"] and "config" in c["argv"] and c["stdin"] and x.split(":")[1] in c["stdin"]]
         self.assertTrue(again, "the second render")
         for c in again:
             self.assertEqual(c["stdin"], saved, "the second render is fed exactly the saved bytes")
         self.assertEqual(json.loads(saved), json.loads(json.dumps(json.loads(saved))))
 
     def test_the_saved_render_has_the_zero_correction_and_started_containers_come_from_it(self):
-        self.candidate()
+        x = self.candidate()
         r = self.deploy("staging")
-        d = json.loads(self.host.p("%s/staging/%s" % (STATE, self.saved()[0])).read_text())
+        d = json.loads(self.host.p("%s/staging/%s" % (STATE, self.saved_of(x)[0])).read_text())
         for name, svc in d["services"].items():
             core = (svc.get("ulimits") or {}).get("core")
             self.assertNotEqual(core, {}, "%s: `core: {}` is written back as 0 before it is judged and saved" % name)
@@ -152,13 +157,13 @@ class RenderFiles(Render):
         self.assertTrue(started)
 
     def test_s35_the_saved_render_is_owned_by_root_and_mode_0600_whatever_the_umask(self):
-        self.candidate()
+        x = self.candidate()
         old = os.umask(0o000)
         try:
             r = self.deploy("staging")
         finally:
             os.umask(old)
-        p = self.host.p("%s/staging/%s" % (STATE, self.saved()[0]))
+        p = self.host.p("%s/staging/%s" % (STATE, self.saved_of(x)[0]))
         st = os.stat(str(p))
         self.assertEqual(stat.S_IMODE(st.st_mode), 0o600)
         self.assertEqual(st.st_uid, os.getuid(), "owned by the trusted uid (root on a box)")
