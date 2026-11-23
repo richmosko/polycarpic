@@ -291,6 +291,19 @@ describe('provision-check: positive case and the R4 output contract', () => {
     }
   });
 
+  it('H23 (G8): a process of uid 10020 passes only when its executable is docker or docker-compose and its arguments hold compose and config; a script named with the words is a FAIL', () => {
+    const proc = (exe: string, how: string) => `${b2Fixture({})}\ncp /usr/bin/tail /tmp/${exe}; ( setpriv --reuid 10020 --regid 10020 --clear-groups ${how} & ) ; sleep 1; ${CHECK}${rc}`;
+    // a real render's shape: executable named docker, arguments compose and config (tail follows /dev/null and complains about the two names, which is all this needs)
+    const real = run(proc('docker', '/tmp/docker -f /dev/null compose config'), { image: COMPLETE });
+    expect(lines(real.out).find((l) => l.id === 'H23')?.kind, real.out.slice(-600)).toBe('PASS');
+    // a script of any name whose argument vector merely carries the words
+    const faked = run(proc('looks-ish', `bash -c 'exec -a "docker compose config" /tmp/looks-ish -f /dev/null'`), { image: COMPLETE });
+    expect(lines(faked.out).find((l) => l.id === 'H23')?.kind, faked.out.slice(-600)).toBe('FAIL');
+    // the right executable with other arguments is not a render either
+    const other = run(proc('docker', '/tmp/docker -f /dev/null'), { image: COMPLETE });
+    expect(lines(other.out).find((l) => l.id === 'H23')?.kind, other.out.slice(-600)).toBe('FAIL');
+  });
+
   it('is read-only: no file under /etc, /srv or /var/lib/polycarpic changes, and no mutating fake verb is called', () => {
     const snap = `find /etc /srv /var/lib/polycarpic -printf '%p %m %u:%g %s %T@\\n' | sort | sha256sum`;
     const r = run(`${b2Fixture({})}\n${snap}; : > /var/fake-state/calls.log; ${CHECK} >/dev/null 2>&1; ${snap}; cat /var/fake-state/calls.log 2>/dev/null | grep -cE '^(apt-get|mkfs|swapoff|umount|mount|cryptsetup (luksFormat|open|luksOpen|close))' || true`, { image: COMPLETE });
