@@ -18,6 +18,7 @@ let wrote = false;
 let tmp = '';
 beforeAll(() => {
   tmp = mkdtempSync(join(tmpdir(), 'poly100-bundle-'));
+  if (process.env.CI === 'true' && !process.env.POLY_APP_TEST_IMAGE) throw new Error('release-bundle: in CI the image job passes the image it already built (POLY_APP_TEST_IMAGE); a second build here is refused (R13 budget)');
   if (!process.env.POLY_APP_TEST_IMAGE) {
     // infra/release/images.env is a build artifact (R11: infra/ci/images-env.sh writes it from the three sibling digests); the build copies it, so write one with run-time digests and remove it after
     const dg = () => 'sha256:' + '0'.repeat(64); // all-zero, as a PR or local build leaves it
