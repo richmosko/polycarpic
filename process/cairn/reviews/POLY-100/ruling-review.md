@@ -758,3 +758,8 @@ I accepted the new package without weighing it. Comparing:
 
 **Cost 10 on every request:** accept. With a random 128-bit password the cost guards nothing that matters, so it is chosen for CPU. The allowlist
 answers first, so outsiders cost nothing (by the Caddyfile's order, which S20 pins). Load on the shared box is POLY-104's to measure.
+
+## `ccb94ad3`, `6747ce07` (staging-auth): S29 (a, b) and S30 **met**
+
+**Plan gate: open at `6747ce07`.** No condition of mine is open in the ruling. S11, S15 and A11 are withdrawn with strict. The build gates on
+every condition's test.
