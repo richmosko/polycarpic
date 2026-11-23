@@ -104,3 +104,8 @@ host env paths were mapped to one temp file, so a staging service naming prod's 
 `build-pins-poly100.test.ts`: 17 mutants of build.yml, one per B2 item and R11 (a third writer job, `pnpm install` in `build`, an unlisted action or run, a workflow-level
 write, a fifth permission, scan after attest, a sibling attesting another digest, a scan on another digest, swapped arguments, `release-lint` dropped from `needs`, `release-lint`
 with write scopes, `release-scan` renamed, scanning the app only, stopping at the first failure, passing an unchecked line); each returns violations, the real file none.
+
+## S26 (edge network name `polycarpic-edge-prod`)
+
+`test_deploy_guard.py` and `compose-real.test.ts` now use the real name. Red on the key-only mutant (`compose_guard._networks`: `entry != pol["networks"][key]` dropped):
+unit `test_t8_each_unsafe_render…` (the S14 subtests) and real-render cases "external polycarpic-prod_default behind key default" and "the staging edge key pointing at polycarpic-edge-prod".

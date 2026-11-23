@@ -4,7 +4,7 @@ import copy
 from deploy_base import DeployTest, digest
 from test_deploy_bundle import good_files, make_tar, sibling_digests
 
-EDGE = "polycarpic-prod-edge"
+EDGE = "polycarpic-edge-prod"
 
 
 def both(fn):
@@ -71,7 +71,7 @@ CASES = [
     ("the Docker socket", both(add_vol("postgres", {"type": "bind", "source": "/var/run/docker.sock", "target": "/var/run/docker.sock"})), "mount"),
     ("an image outside the verified set", plain_only(svc("web", image="ghcr.io/anyone/x@sha256:" + "9" * 64)), "image"),
     ("top-level name polycarpic-prod in a staging bundle", both(lambda d: d.update(name="polycarpic-prod") or d), "name"),
-    ("a staging service on polycarpic-prod-edge", both(net("edge-prod", {"name": EDGE, "external": True})), "network"),
+    ("a staging service on polycarpic-edge-prod", both(net("edge-prod", {"name": EDGE, "external": True})), "network"),
     ("container_name", both(svc("web", container_name="polycarpic-prod-web-1")), "name"),
     ("a quoted-key include adding a service (raw and plain renders)", both(add_service("x")), "service"),
     ("a service not allowlisted for the project", both(add_service("sidecar")), "service"),
@@ -91,7 +91,7 @@ CASES = [
     ("security_opt widened", both(svc("web", security_opt=["seccomp=unconfined"])), "pinned"),
     ("read_only false", both(svc("web", read_only=False)), "pinned"),
     ("external name polycarpic-prod_default behind key default (S14)", both(lambda d: d["networks"].update(default={"name": "polycarpic-prod_default", "external": True}) or d), "network"),
-    ("an edge alias naming polycarpic-prod-edge behind the staging edge key (S14)", both(lambda d: d["networks"].update({"edge-staging": {"name": EDGE, "external": True}}) or d), "network"),
+    ("an edge alias naming polycarpic-edge-prod behind the staging edge key (S14)", both(lambda d: d["networks"].update({"edge-staging": {"name": EDGE, "external": True}}) or d), "network"),
     ("a published port on a non-caddy service", both(svc("web", ports=[{"mode": "ingress", "target": 3000, "published": "3000", "protocol": "tcp"}])), ("ports", "key")),
 ]
 

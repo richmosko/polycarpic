@@ -56,7 +56,7 @@ describe('guard on real compose renders (POLY-100 R5, S10, S14)', () => {
     ['a top-level name of polycarpic-prod', (y) => { y.name = 'polycarpic-prod'; }, ['guard-name']],
     ['an include that adds a service (S10: include is resolved by both renders)', (y, dir) => { writeFileSync(join(dir, 'x.yml'), stringify({ services: { x: { image: 'ghcr.io/anyone/x@sha256:' + '9'.repeat(64) } } })); y.include = ['x.yml']; }, ['guard-service', 'RENDER']],
     ['an external network named polycarpic-prod_default behind the key default (S14: the resolved name decides)', (y) => { y.networks.default = { external: true, name: 'polycarpic-prod_default' }; }, ['guard-network']],
-    ['the staging edge key pointing at polycarpic-prod-edge (S14)', (y) => { y.networks['edge-staging'] = { external: true, name: 'polycarpic-prod-edge' }; }, ['guard-network']],
+    ['the staging edge key pointing at polycarpic-edge-prod (S14)', (y) => { y.networks['edge-staging'] = { external: true, name: 'polycarpic-edge-prod' }; }, ['guard-network']],
     ['a published port on web', (y) => { web(y).ports = ['3000:3000']; }, ['guard-ports', 'guard-key']],
     ['an image outside the verified set', (y) => { web(y).image = 'ghcr.io/anyone/x@sha256:' + '9'.repeat(64); }, ['guard-image']],
   ];
